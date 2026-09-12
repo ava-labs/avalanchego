@@ -17,6 +17,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 - [Provision CI job dependencies](#provision-ci-job-dependencies)
   - [Cache lifecycle](#cache-lifecycle)
     - [Shared cache policy](#shared-cache-policy)
+    - [Cache validation](#cache-validation)
     - [Task cache](#task-cache)
     - [Nix store cache](#nix-store-cache)
     - [Bazel dependency cache](#bazel-dependency-cache)
@@ -218,13 +219,18 @@ pre-merge CI does not create.
 
 Pull request, merge-queue, tag, and non-`master` branch runs can restore cache
 entries that GitHub makes accessible. They can also download missing input.
-They must not write shared GitHub Actions caches. This policy limits cache
+They must not write shared GitHub Actions caches. This policy limits shared
 storage to merged code. It also prevents unmerged code from publishing input
 that later runs reuse.
 
-A cache miss must not prevent a non-`master` run from getting required input.
-This rule lets a pull request test a dependency change before `master` contains
-the new cache entry.
+The `cache-validation` pull request label is the exception for cache-validation
+runs. These runs write only fixed keys in that pull request's merge-ref scope.
+GitHub does not make those entries available to `master` or other pull requests.
+They exist to validate a proposed cache policy, not to warm shared CI.
+
+A cache miss must not prevent an ordinary non-`master` run from getting required
+input. This rule lets a pull request test a dependency change before `master`
+contains the new cache entry.
 
 GitHub Actions caches are immutable. The first writer for a key wins. Do not let
 parallel producers write different content with the same key.
@@ -232,6 +238,46 @@ parallel producers write different content with the same key.
 This policy does not control workflow artifacts or the Bazel remote cache. The
 [Bazel cache policy](./bazel.md#bazel-ci-external-dependency-caching) controls
 remote action and test-result data.
+
+#### Cache validation
+
+Cache hits alone do not prove that a cache contains all input that a later job
+needs. Cache validation checks both the restore result and the job output for
+work that the restored data should have avoided, such as a download, build, or
+test execution. The checks are implemented and unit tested in
+[`tools/cache-check`](../tools/cache-check/); GitHub Actions remains the
+integration test because it performs the actual restore and save operations.
+
+A labeled pull request uses fixed keys for its merge ref. The first run with no
+entry is a **warm run**. It uses the normal production save paths and does not
+require a hit for the cache it produces. A later push restores that entry and
+runs **validation mode**. Validation requires the expected exact restores and
+fails when the log checker finds unexpected work.
+
+A push does not clear or refresh a validation entry. This is deliberate: it
+keeps one immutable entry per cache and avoids rewarming CI during ordinary PR
+iteration. A cache can be out of date after a source or dependency change. To
+start again, remove and add `cache-validation`. Label removal deletes the fixed
+entries, and the next labeled run warms new entries. Closing the PR also deletes
+them.
+
+The pre-merge Go caller declares `cache-mode: write` so a labeled run has the
+cache capability required by the called workflow. This grants capability only.
+Each save step still checks validation mode, so an ordinary pull request does
+not save caches.
+
+A `master` cache consumer, including a scheduled cache-validation run, uses
+validation mode directly. It does not warm first: earlier post-merge and other
+`master` runs must already have populated the shared entries. A `master` cache
+miss or fallback download therefore exposes a cache-policy gap.
+
+The cleanup workflow handles label removal and pull-request close. This bounds
+storage even for abandoned validation attempts.
+
+When adding a cache consumer, add a corresponding log check and unit-test its
+recognized output. Do not replace production save behavior with a
+validation-only writer; the validation rerun must consume entries that the
+normal writer produced.
 
 #### Task cache
 
@@ -295,7 +341,8 @@ restore lets this repository enforce the shared write policy.
 The `setup` job in [`go-ci.yml`](../.github/workflows/go-ci.yml) calls
 [`setup-go-dependencies`](../.github/actions/setup-go-dependencies/action.yml).
 On an exact miss, this action downloads the workspace modules and the separate
-`tools/external/go.mod` modules. It saves `GOMODCACHE` only on `master`.
+`tools/external/go.mod` modules. It saves `GOMODCACHE` on `master`, or to the
+fixed merge-ref key during a labeled cache-validation run.
 
 The Nix and C-Chain benchmark actions restore the same module cache. They can
 download modules on a miss, but they do not save a competing entry.
@@ -315,8 +362,9 @@ and Go test results. Its exact key contains the operating system, architecture,
 Go source, workspace files, module files, and module sums. A same-platform
 restore prefix gives changed source a warm start from an older entry.
 
-The unit job registers `actions/cache` only on `master`. That action saves in
-its post step, after unit tests populate `GOCACHE`. An explicit save during
+The unit job registers `actions/cache` on `master`. That action saves in its
+post step, after unit tests populate `GOCACHE`. A labeled cache-validation run
+uses the same lifecycle with its fixed merge-ref key. An explicit save during
 setup would store an empty or incomplete cache.
 
 The normal unit task disables race detection and test shuffling. This lets
@@ -329,7 +377,9 @@ Use these rules when you add or change a GitHub Actions cache:
 
 - Keep cache restore enabled for all event types.
 - Let a cache-miss job download the input that it needs.
-- Restrict every save path to `github.ref == 'refs/heads/master'`.
+- Restrict shared save paths to `github.ref == 'refs/heads/master'`. A
+  cache-validation save must use a fixed pull-request merge-ref key and run
+  only when validation mode is enabled.
 - Use a maintained action's save control when the action provides one.
 - Otherwise, separate restore and save steps.
 - Save only after the producer has completed its work.
@@ -337,9 +387,11 @@ Use these rules when you add or change a GitHub Actions cache:
 - Use workflow artifacts, not shared caches, for output passed within one run.
 
 Check each third-party action for an implicit post-job save. Disable that cache
-if the action cannot apply the `master` condition. After an action change, run
-`task lint-action`. Also test one exact hit, one miss on `master`, and one miss
-on a non-`master` ref. Confirm that only the `master` run creates an entry.
+if the action cannot apply the shared `master` condition. After an action
+change, run `task lint-action`. Test one exact hit, one miss on `master`, and
+one miss on an ordinary non-`master` ref. For a cache-validation writer, also
+run its warm attempt and validation rerun. Confirm that only `master` creates a
+shared entry and that validation entries remain in their pull-request scope.
 
 Keep these Task-specific rules:
 
