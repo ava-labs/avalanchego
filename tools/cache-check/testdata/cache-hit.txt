@@ -1,0 +1,6 @@
+task-cache-hit=true
+go-mod-cache-hit=true
+go-unit-cache-hit=true
+Task is already installed
+?   	github.com/ava-labs/avalanchego/utils/units	[no test files]
+ok  	github.com/ava-labs/avalanchego/ids	(cached)
