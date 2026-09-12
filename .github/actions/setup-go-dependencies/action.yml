@@ -1,0 +1,30 @@
+name: Setup Go dependencies
+description: Restore Go module dependencies and populate their cache on master or during PR validation
+
+inputs:
+  cache-validation:
+    description: Use PR-scoped validation caches
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - id: setup-go
+      uses: ./.github/actions/setup-go-for-project
+      with:
+        cache-validation: ${{ inputs.cache-validation }}
+
+    - name: Download Go module dependencies
+      if: ${{ steps.setup-go.outputs.go-mod-cache-hit != 'true' }}
+      shell: bash
+      run: |
+        go mod download
+        GOWORK=off go mod download -modfile=tools/external/go.mod
+
+    - name: Save Go module cache
+      if: ${{ steps.setup-go.outputs.go-mod-cache-hit != 'true' && (github.ref == 'refs/heads/master' || inputs.cache-validation == 'true') }}
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ steps.setup-go.outputs.go-mod-cache-path }}
+        key: ${{ inputs.cache-validation == 'true' && format('go-mod-validation-{0}', runner.os) || format('go-mod-{0}-{1}', runner.os, hashFiles('go.work.sum', '**/go.sum')) }}

@@ -8,10 +8,12 @@ on:
       - master
       - dev
   pull_request:
+    types: [opened, reopened, synchronize, labeled]
   merge_group:
     types: [checks_requested]
 
 permissions:
+  actions: write
   contents: read
 
 # Cancel ongoing workflow runs if a new one is started
@@ -510,10 +512,14 @@ jobs:
 
   unit:
     name: linux-amd64
+    # Cache writers still require their own save guards. This grants the called
+    # workflow the capability needed by labeled PR cache-validation runs.
+    cache-mode: write
     uses: ./.github/workflows/go-ci.yml
     with:
       platform_name: linux-amd64
       runner: ubuntu-24.04
+      cache_validation: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'cache-validation') }}
     secrets: inherit
 
   upgrade:

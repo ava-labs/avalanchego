@@ -1,0 +1,4 @@
+task-cache-hit=true
+go-mod-cache-hit=true
+go-unit-cache-hit=true
+ok  	github.com/ava-labs/avalanchego/tools/cache-check	0.003s

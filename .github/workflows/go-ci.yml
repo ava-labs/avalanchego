@@ -15,18 +15,75 @@ on:
         required: false
         type: boolean
         default: false
+      cache_validation:
+        description: 'Enable PR-scoped Go cache validation'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
+  actions: write
   contents: read
 
 jobs:
-  unit:
+  setup:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/setup-go-dependencies
+        with:
+          cache-validation: ${{ inputs.cache_validation }}
+
+  unit:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: setup-go
+        uses: ./.github/actions/setup-go-for-project
+        with:
+          cache-validation: ${{ inputs.cache_validation }}
+      - id: unit-cache
+        name: Restore Go unit-test cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.setup-go.outputs.go-build-cache-path }}
+          key: ${{ inputs.cache_validation && format('go-unit-validation-{0}-{1}', runner.os, runner.arch) || format('go-unit-{0}-{1}-{2}', runner.os, runner.arch, hashFiles('**/*.go', 'go.work.sum', '**/go.mod', '**/go.sum')) }}
+          restore-keys: |
+            ${{ inputs.cache_validation && format('go-unit-validation-{0}-{1}', runner.os, runner.arch) || format('go-unit-{0}-{1}-', runner.os, runner.arch) }}
+      - name: Record Go cache restore results
+        shell: bash
+        run: |
+          {
+            echo "task-cache-hit=${{ steps.setup-go.outputs.task-cache-hit }}"
+            echo "go-mod-cache-hit=${{ steps.setup-go.outputs.go-mod-cache-hit }}"
+            echo "go-unit-cache-hit=${{ steps.unit-cache.outputs.cache-hit }}"
+          } > "$RUNNER_TEMP/go-unit-cache-validation.log"
+      # actions/cache saves in its post step after successful warm jobs.
+      - name: Save Go unit-test cache
+        if: ${{ (github.ref == 'refs/heads/master' || inputs.cache_validation) && steps.unit-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.setup-go.outputs.go-build-cache-path }}
+          key: ${{ inputs.cache_validation && format('go-unit-validation-{0}-{1}', runner.os, runner.arch) || format('go-unit-{0}-{1}-{2}', runner.os, runner.arch, hashFiles('**/*.go', 'go.work.sum', '**/go.mod', '**/go.sum')) }}
+          restore-keys: |
+            ${{ inputs.cache_validation && format('go-unit-validation-{0}-{1}', runner.os, runner.arch) || format('go-unit-{0}-{1}-', runner.os, runner.arch) }}
       - name: Run unit tests
         shell: bash
-        run: ./scripts/run_task.sh ${{ inputs.run_race_shuffle_unit_tests && 'test-unit-race-shuffle' || 'test-unit' }}
+        run: |
+          set -o pipefail
+          ./scripts/run_task.sh ${{ inputs.run_race_shuffle_unit_tests && 'test-unit-race-shuffle' || 'test-unit' }} 2>&1 | tee -a "$RUNNER_TEMP/go-unit-cache-validation.log"
         env:
+          GOPROXY: ${{ (github.ref == 'refs/heads/master' || (inputs.cache_validation && steps.unit-cache.outputs.cache-hit == 'true')) && 'off' || '' }}
           TIMEOUT: 900s
+      - name: Validate Go unit-test cache
+        if: ${{ always() && (github.ref == 'refs/heads/master' || (inputs.cache_validation && steps.unit-cache.outputs.cache-hit == 'true')) }}
+        shell: bash
+        run: |
+          go run ./tools/cache-check \
+            --check task-cache-restore \
+            --check go-mod-cache-restore \
+            --check go-unit-cache-restore \
+            --check go-unit-test-results \
+            ${{ inputs.cache_validation && '--allow-uncached-go-test-package github.com/ava-labs/avalanchego/tools/cache-check' || '' }} \
+            --log "$RUNNER_TEMP/go-unit-cache-validation.log"
