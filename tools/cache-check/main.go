@@ -22,11 +22,13 @@ func (f *checksFlag) Set(value string) error {
 
 func main() {
 	var (
-		checks  checksFlag
-		logPath string
+		checks                      checksFlag
+		logPath                     string
+		allowUncachedGoTestPackages checksFlag
 	)
 	flag.Var(&checks, "check", "cache check to run; may be repeated")
 	flag.StringVar(&logPath, "log", "", "path to the captured job output")
+	flag.Var(&allowUncachedGoTestPackages, "allow-uncached-go-test-package", "Go test package allowed to have an uncached result; may be repeated")
 	flag.Parse()
 
 	if logPath == "" {
@@ -43,7 +45,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "read log: %v\n", err)
 		os.Exit(2)
 	}
-	if err := check(log, checks); err != nil {
+	if err := checkWithOptions(log, checks, checkOptions{
+		allowUncachedGoTestPackages: allowUncachedGoTestPackages,
+	}); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
