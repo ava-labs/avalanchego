@@ -66,7 +66,6 @@ go_test(
         "//graft/coreth/params/extras/extrastest",
         "//graft/coreth/plugin/evm",
         "//graft/coreth/plugin/evm/atomic",
-        "//graft/coreth/plugin/evm/atomic/vm",
         "//ids",
         "//snow",
         "//snow/validators/validatorstest",

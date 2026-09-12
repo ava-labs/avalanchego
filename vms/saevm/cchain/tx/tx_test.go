@@ -20,9 +20,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	// Imported for [vm.VerifierBackend] comment resolution.
-	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
-
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras/extrastest"
@@ -1720,8 +1717,8 @@ func oldSanityCheck(tx *atomic.Tx, ctx *snow.Context) error {
 	if err := tx.UnsignedAtomicTx.Verify(ctx, rules); err != nil {
 		return err
 	}
-	// We can't call [vm.VerifierBackend.SemanticVerify] here because that
-	// additionally performs signature verification.
+	// Coreth's semantic verification isn't called here because it additionally
+	// performs signature verification.
 	fc := avax.NewFlowChecker()
 	switch tx := tx.UnsignedAtomicTx.(type) {
 	case *atomic.UnsignedImportTx:
