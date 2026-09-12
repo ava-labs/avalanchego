@@ -1,4 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "load",
@@ -24,5 +25,16 @@ go_library(
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",
         "@org_golang_x_sync//errgroup",
+    ],
+)
+
+go_test(
+    name = "load_test",
+    srcs = ["generator_test.go"],
+    embed = [":load"],
+    deps = [
+        "//tests",
+        "//utils/logging",
+        "@com_github_stretchr_testify//require",
     ],
 )
