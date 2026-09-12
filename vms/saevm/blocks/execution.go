@@ -88,6 +88,9 @@ func (e *executionResults) setBaseFee(bf *big.Int) error {
 //
 // This method MUST NOT be called more than once. The wall-clock [time.Time] is
 // for metrics only.
+//
+// Synchronous blocks do not persist their execution results, which are instead
+// derived from the header by [Block.RestoreExecutionArtefacts].
 func (b *Block) MarkExecuted(
 	db ethdb.Database,
 	xdb saetypes.ExecutionResults,
@@ -98,7 +101,10 @@ func (b *Block) MarkExecuted(
 	stateRootPost common.Hash,
 	lastExecuted *atomic.Pointer[Block],
 ) error {
-	if it := b.interimExecutionTime.Load(); it != nil && byGas.Compare(it) < 0 {
+	// A synchronous block's final gas time is derived from its header rather
+	// than from the clock that recorded its interim times, so the two are not
+	// comparable.
+	if it := b.interimExecutionTime.Load(); it != nil && !b.Synchronous() && byGas.Compare(it) < 0 {
 		// The final execution time is scaled to the new gas target but interim
 		// times are not, which can result in rounding errors. Scaling always
 		// rounds up, to maintain a monotonic clock, but we confirm for safety.
@@ -131,16 +137,20 @@ func (b *Block) MarkExecuted(
 	return b.markExecutedAfterDiskArtefacts(e, lastExecuted)
 }
 
-// markExecutedOnDisk updates the [saetypes.ExecutionResults] and the head block
-// in the database. The batch is `Write()`n (yeah, it's a word now) after all
-// disk artefacts are persisted.
+// markExecutedOnDisk updates the [saetypes.ExecutionResults], for asynchronous
+// blocks, and the head block in the database. The batch is `Write()`n (yeah,
+// it's a word now) after all disk artefacts are persisted.
 func (b *Block) markExecutedOnDisk(batch ethdb.Batch, xdb saetypes.ExecutionResults, e *executionResults) error {
-	n := b.NumberU64()
-	if err := xdb.Put(n, e.MarshalCanoto()); err != nil {
-		return err
-	}
-	if err := xdb.Sync(n, n); err != nil {
-		return err
+	// Synchronous blocks derive their results from their header, as in
+	// [Block.RestoreExecutionArtefacts], so persisting them would be dead data.
+	if !b.Synchronous() {
+		n := b.NumberU64()
+		if err := xdb.Put(n, e.MarshalCanoto()); err != nil {
+			return err
+		}
+		if err := xdb.Sync(n, n); err != nil {
+			return err
+		}
 	}
 	b.SetAsHeadBlock(batch)
 	return batch.Write()
@@ -301,8 +311,8 @@ func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.Execut
 // database, thus they are extracted from the header.
 func (b *Block) synchronousExecutionResults() (*executionResults, error) {
 	// Target, excess, and config _after_ are a requirement of
-	// [Block.MarkExecuted], as provided by [Block.synchronousGasTime].
-	execTime, err := b.synchronousGasTime()
+	// [Block.MarkExecuted], as provided by [Block.SynchronousGasTime].
+	execTime, err := b.SynchronousGasTime()
 	if err != nil {
 		return nil, err
 	}
@@ -319,10 +329,12 @@ func (b *Block) synchronousExecutionResults() (*executionResults, error) {
 	return e, nil
 }
 
-// synchronousGasTime derives the gas time of a synchronous block, which has no
-// predecessor clock to advance. Inverting the base fee only approximates the
-// excess.
-func (b *Block) synchronousGasTime() (*gastime.Time, error) {
+// SynchronousGasTime returns the gas time at which a synchronous block finished
+// executing. Such a block has no predecessor clock to advance, so the time is
+// derived from its header alone and every node agrees on it whether it executed
+// the block or restored it from disk. Inverting the base fee only approximates
+// the excess.
+func (b *Block) SynchronousGasTime() (*gastime.Time, error) {
 	target, cfg := b.hooks.GasConfigAfter(b.Header())
 	return gastime.New(
 		b.PreciseTime(),

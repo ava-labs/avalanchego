@@ -64,6 +64,9 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 	if !ok {
 		return errUnverifiedBlock
 	}
+	if b.Synchronous() {
+		return vm.acceptSynchronous(ctx, b)
+	}
 
 	settles := b.Settles()
 	{
@@ -143,6 +146,57 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 	if h := parentLastSettled.Hash(); h != keep { // i.e. `parentLastSettled` was the last block's `keep`
 		vm.consensusCritical.Delete(h)
 	}
+	return nil
+}
+
+// acceptSynchronous accepts a synchronous block. Such a block settles itself,
+// which is only possible once it has executed, so execution runs first and the
+// settlement then acceptance artefacts follow in their usual order. Every
+// guarantee in the invariants document therefore holds without the disk ever
+// recording an accepted block that is not yet settled.
+func (vm *VM) acceptSynchronous(ctx context.Context, b *blocks.Block) error {
+	// Execution marks b as the head block, which MUST resolve to a stored
+	// block. Storing a block by hash does not mark it canonical, so this is not
+	// yet D(b ∈ A).
+	rawdb.WriteBlock(vm.db, b.EthBlock())
+
+	if err := vm.exec.Enqueue(ctx, b); err != nil {
+		return err
+	}
+	if err := b.WaitUntilExecuted(ctx); err != nil {
+		return fmt.Errorf("waiting for synchronous block %d to execute: %w", b.Height(), err)
+	}
+
+	// Settlement severs the ancestry, so the parent is captured first.
+	parent := b.ParentBlock()
+
+	// D(b ∈ S) then D(b ∈ A); yes, I know it's in a batch.
+	batch := vm.db.NewBatch()
+	rawdb.WriteFinalizedBlockHash(batch, b.Hash())
+	rawdb.WriteTxLookupEntriesByBlock(batch, b.EthBlock())
+	rawdb.WriteCanonicalHash(batch, b.Hash(), b.NumberU64())
+	rawdb.WriteHeadFastBlockHash(batch, b.Hash())
+	if err := batch.Write(); err != nil {
+		return err
+	}
+
+	// M(b ∈ S) and I(b ∈ S), before I(b ∈ A) and X(b ∈ A).
+	if err := b.MarkSettled(&vm.last.settled); err != nil {
+		return err
+	}
+	vm.metrics.markSettled(b.Height())
+	vm.last.accepted.Store(b)
+	vm.acceptedBlocks.Send(b)
+
+	vm.log().Debug(
+		"Accepted block",
+		zap.Uint64("height", b.Height()),
+		zap.Stringer("hash", b.Hash()),
+	)
+
+	// The parent was the last-settled block until now, so consensus no longer
+	// needs it.
+	vm.consensusCritical.Delete(parent.Hash())
 	return nil
 }
 

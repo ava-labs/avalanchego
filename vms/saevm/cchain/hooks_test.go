@@ -25,6 +25,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+
+	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestDelayExponent(t *testing.T) {
@@ -141,6 +144,9 @@ func TestAncestorInputIDs(t *testing.T) {
 			wantErr: errMissingBlock,
 		},
 	}
+	// The blocks carry the slice encoding introduced in ApricotPhase5, which
+	// the test config activates at genesis.
+	config := cparams.WithExtra(&ethparams.ChainConfig{}, extras.TestChainConfig)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			source := func(hash common.Hash, number uint64) (*types.Block, bool) {
@@ -152,7 +158,7 @@ func TestAncestorInputIDs(t *testing.T) {
 				return nil, false
 			}
 
-			got, err := ancestorInputIDs(tt.header, tt.settled, source)
+			got, err := ancestorInputIDs(config, tt.header, tt.settled, source)
 			require.ErrorIs(t, err, tt.wantErr, "ancestorInputIDs()")
 			assert.Equal(t, tt.want, got, "ancestorInputIDs()")
 		})

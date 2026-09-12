@@ -18,12 +18,18 @@ import (
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	ethparams "github.com/ava-labs/libevm/params"
 
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
@@ -230,6 +236,61 @@ func TestParseSlice(t *testing.T) {
 			require.ErrorIs(t, err, test.wantErr, "ParseSlice()")
 			if diff := cmp.Diff(test.want, got, txtest.CmpOpt()); diff != "" {
 				t.Errorf("ParseSlice() diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// FromBlock MUST decode extData under the encoding of the block's own upgrade
+// rules, a single transaction before ApricotPhase5 and a slice from then on.
+func TestFromBlock(t *testing.T) {
+	const ap5Time = 100
+	config := cparams.WithExtra(&ethparams.ChainConfig{}, &extras.ChainConfig{
+		NetworkUpgrades: extras.NetworkUpgrades{
+			ApricotPhase5BlockTimestamp: utils.PointerTo[uint64](ap5Time),
+		},
+	})
+
+	slice, err := MarshalSlice([]*Tx{importTx.new, exportTx.new})
+	require.NoError(t, err, "MarshalSlice()")
+
+	tests := []struct {
+		name    string
+		time    uint64
+		extData []byte
+		want    []*Tx
+	}{
+		{
+			name: "pre_ap5_empty",
+			time: ap5Time - 1,
+		},
+		{
+			name:    "pre_ap5_single",
+			time:    ap5Time - 1,
+			extData: importTx.bytes,
+			want:    []*Tx{importTx.new},
+		},
+		{
+			name: "ap5_empty",
+			time: ap5Time,
+		},
+		{
+			name:    "ap5_slice",
+			time:    ap5Time,
+			extData: slice,
+			want:    []*Tx{importTx.new, exportTx.new},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			block := cchaintest.NewTestBlock(t,
+				cchaintest.WithTimestamp(test.time),
+				cchaintest.WithExtData(test.extData),
+			)
+			got, err := FromBlock(config, block)
+			require.NoError(t, err, "FromBlock()")
+			if diff := cmp.Diff(test.want, got, txtest.CmpOpt()); diff != "" {
+				t.Errorf("FromBlock() diff (-want +got):\n%s", diff)
 			}
 		})
 	}

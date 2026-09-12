@@ -4,6 +4,7 @@
 package cchain
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -298,6 +299,41 @@ func withMinDelayTarget(ms uint64) sutOption {
 // chainDBPrefix locates the VM's database within the SUT's base database,
 // mirroring the prefix avalanchego's chain manager applies.
 var chainDBPrefix = []byte("chain")
+
+// synchronousFixture loads the pre-generated synchronous C-Chain history and
+// returns the options that start a fresh VM on its genesis in
+// [snow.Bootstrapping], with the clock past every fixture block. Helicon is
+// scheduled a day after Granite, following the fixture's one-upgrade-per-day
+// cadence, so every synchronous block predates it.
+func synchronousFixture(tb testing.TB) (*synchronoustest.Fixture, []sutOption, *saetest.Clock) {
+	tb.Helper()
+
+	fixture := synchronoustest.Load(tb)
+	upgrades := fixture.Upgrades
+	upgrades.HeliconTime = upgrades.GraniteTime.Add(24 * time.Hour)
+	timeOpt, clock := withVMTime(upgrades.HeliconTime)
+	return fixture, []sutOption{
+		withGenesis(fixture.CoreGenesis(tb)),
+		withUpgrades(upgrades),
+		timeOpt,
+		withState(snow.Bootstrapping),
+	}, clock
+}
+
+// cloneDB copies db as it is right now. A VM started on the copy models a
+// restart after a crash, because no graceful shutdown ever reaches the copy.
+func cloneDB(tb testing.TB, db database.Iteratee) database.Database {
+	tb.Helper()
+
+	clone := memdb.New()
+	it := db.NewIterator()
+	defer it.Release()
+	for it.Next() {
+		require.NoError(tb, clone.Put(bytes.Clone(it.Key()), bytes.Clone(it.Value())), "cloning database")
+	}
+	require.NoError(tb, it.Error(), "iterating database")
+	return clone
+}
 
 // newSUT initializes a cchain [VM], transitions it to the configured
 // [snow.State] (default [snow.NormalOp]), and
@@ -774,6 +810,25 @@ func (s *SUT) parseVerifyAccept(ctx context.Context, tb testing.TB, blk *blocks.
 	require.NoErrorf(tb, s.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", s.VM, blk.Height())
 	require.NoErrorf(tb, s.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", s.VM, blk.Height())
 	return parsed
+}
+
+// acceptSynchronousBlocks drives blks, in order, through parse, verify, and
+// accept while the SUT is bootstrapping, asserting that each re-executes to the
+// state and receipts roots its header commits to.
+func (s *SUT) acceptSynchronousBlocks(ctx context.Context, tb testing.TB, blks []synchronoustest.Block) {
+	tb.Helper()
+
+	for _, blk := range blks {
+		parsed, err := s.ParseBlock(ctx, blk.RLP)
+		require.NoErrorf(tb, err, "%T.ParseBlock(height %d)", s.VM, blk.Number)
+		require.NoErrorf(tb, s.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", s.VM, blk.Number)
+		// Accepting while bootstrapping blocks until the block has executed.
+		require.NoErrorf(tb, s.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", s.VM, blk.Number)
+
+		hdr := parsed.Header()
+		assert.Equalf(tb, hdr.Root, parsed.PostExecutionStateRoot(), "post-execution state root of height %d", blk.Number)
+		assert.Equalf(tb, hdr.ReceiptHash, types.DeriveSha(parsed.Receipts(), saetest.TrieHasher()), "receipts root of height %d", blk.Number)
+	}
 }
 
 // verifyTampered re-seals valid with a mutated header and returns the
@@ -1565,32 +1620,11 @@ func TestRestartWithSettledAsynchronousBlock(t *testing.T) {
 // then extend the chain asynchronously with the last synchronous block as the
 // initial settled block.
 func TestBootstrapSynchronousBlocks(t *testing.T) {
-	fixture := synchronoustest.Load(t)
-
-	// Helicon follows the fixture's one-upgrade-per-day schedule, so every
-	// synchronous block predates it and the clock starts past all of them.
-	upgrades := fixture.Upgrades
-	upgrades.HeliconTime = upgrades.GraniteTime.Add(24 * time.Hour)
-	timeOpt, clock := withVMTime(upgrades.HeliconTime)
-
-	ctx, sut := newSUT(t,
-		withGenesis(fixture.CoreGenesis(t)),
-		withUpgrades(upgrades),
-		timeOpt,
-		withState(snow.Bootstrapping),
-	)
+	fixture, opts, clock := synchronousFixture(t)
+	ctx, sut := newSUT(t, opts...)
 	require.Equal(t, ids.ID(fixture.Blocks[0].Hash), sut.lastAccepted(ctx, t), "genesis")
 
-	for _, blk := range fixture.Blocks[1:] {
-		parsed, err := sut.ParseBlock(ctx, blk.RLP)
-		require.NoErrorf(t, err, "%T.ParseBlock(height %d)", sut.VM, blk.Number)
-		require.NoErrorf(t, sut.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", sut.VM, blk.Number)
-		require.NoErrorf(t, sut.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", sut.VM, blk.Number)
-
-		hdr := parsed.Header()
-		assert.Equalf(t, hdr.Root, parsed.PostExecutionStateRoot(), "post-execution state root of height %d", blk.Number)
-		assert.Equalf(t, hdr.ReceiptHash, types.DeriveSha(parsed.Receipts(), saetest.TrieHasher()), "receipts root of height %d", blk.Number)
-	}
+	sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
 	tip := fixture.Blocks[len(fixture.Blocks)-1]
 	require.Equal(t, ids.ID(tip.Hash), sut.lastAccepted(ctx, t), "last accepted after bootstrapping")
 
@@ -1607,6 +1641,34 @@ func TestBootstrapSynchronousBlocks(t *testing.T) {
 	clock.AdvanceToSettle(ctx, t, first)
 	second := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
 	require.Equal(t, first.ID(), second.LastSettled().ID(), "second asynchronous block settles the first")
+}
+
+// A node that crashes part-way through executing synchronous blocks MUST start
+// again from whatever reached disk and bootstrap the remaining blocks.
+func TestRestartDuringSynchronousBootstrap(t *testing.T) {
+	fixture, opts, _ := synchronousFixture(t)
+	db := memdb.New()
+	dataDir := t.TempDir()
+	ctx, node := newSUT(t, append(opts, withDB(db), withChainDataDir(dataDir))...)
+
+	// Crash after the block importing a non-AVAX asset, so the blocks the
+	// restarted node re-executes include shared-memory writes that already
+	// reached disk. With the default commit interval none of the executed state
+	// roots has reached disk, so re-execution starts from genesis.
+	const crashAfter = 7
+	node.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:crashAfter+1])
+	crashed := cloneDB(t, db)
+
+	// The copy predates this shutdown, so it never receives the state that a
+	// shutdown commits. Shutting down only releases the chain data directory.
+	require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+
+	restartedCtx, restarted := newSUT(t, append(opts, withDB(crashed), withChainDataDir(dataDir))...)
+	require.Equal(t, ids.ID(fixture.Blocks[crashAfter].Hash), restarted.lastAccepted(restartedCtx, t), "last accepted after restart")
+
+	restarted.acceptSynchronousBlocks(restartedCtx, t, fixture.Blocks[crashAfter+1:])
+	tip := fixture.Blocks[len(fixture.Blocks)-1]
+	require.Equal(t, ids.ID(tip.Hash), restarted.lastAccepted(restartedCtx, t), "last accepted after bootstrapping")
 }
 
 // Verifies a built block splits its timestamp: seconds in Header.Time, the full

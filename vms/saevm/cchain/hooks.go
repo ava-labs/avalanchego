@@ -99,7 +99,7 @@ func newHooks(
 }
 
 func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], error) {
-	rawTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	rawTxs, err := tx.FromBlock(h.chainConfig, b)
 	if err != nil {
 		return nil, fmt.Errorf("parsing txs: %w", err)
 	}
@@ -231,7 +231,7 @@ func blockTime(h *types.Header) time.Time {
 }
 
 func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	txs, err := tx.FromBlock(h.chainConfig, b)
 	if err != nil {
 		return nil, fmt.Errorf("parsing txs: %w", err)
 	}
@@ -260,7 +260,7 @@ func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, 
 }
 
 func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ types.Receipts) error {
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	txs, err := tx.FromBlock(h.chainConfig, b)
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
 	}
@@ -277,7 +277,7 @@ func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
 	h.metrics.setMinBlockDelay(delayExponent(b.Header()).DelayDuration())
 
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	txs, err := tx.FromBlock(h.chainConfig, b)
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
 	}
@@ -447,7 +447,7 @@ func (b *builder) PotentialEndOfBlockOps(
 		// between the block we are building and the last executed block. Since
 		// we know the settled block has been executed, we use that as our
 		// reference point.
-		inputs, err := ancestorInputIDs(building, settledHash, source)
+		inputs, err := ancestorInputIDs(b.chainConfig, building, settledHash, source)
 		if err != nil {
 			b.ctx.Log.Error("failed to get ancestor input IDs",
 				zap.Error(err),
@@ -498,7 +498,7 @@ var errMissingBlock = errors.New("missing block")
 
 // ancestorInputIDs returns the set of input IDs of all cross-chain transactions
 // in the block range (h, settled), both exclusive.
-func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.BlockSource) (set.Set[ids.ID], error) {
+func ancestorInputIDs(c *params.ChainConfig, h *types.Header, settled common.Hash, source saetypes.BlockSource) (set.Set[ids.ID], error) {
 	var s set.Set[ids.ID]
 	for h.ParentHash != settled {
 		parentNumber := h.Number.Uint64() - 1
@@ -507,7 +507,7 @@ func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.Bloc
 			return nil, fmt.Errorf("%w: %s (%d)", errMissingBlock, h.ParentHash, parentNumber)
 		}
 
-		txs, err := tx.ParseSlice(customtypes.BlockExtData(p))
+		txs, err := tx.FromBlock(c, p)
 		if err != nil {
 			return nil, fmt.Errorf("parsing txs: %s (%d): %w", h.ParentHash, parentNumber, err)
 		}

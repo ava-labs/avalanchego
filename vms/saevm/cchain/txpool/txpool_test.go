@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -40,6 +41,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 )
 
 func TestMain(m *testing.M) {
@@ -138,9 +141,12 @@ func newSUT(tb testing.TB, state libevm.StateReader) (context.Context, *SUT) {
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
+	// Cross-chain transactions are decoded under the block's upgrade rules, so
+	// the test blocks' slice encoding requires ApricotPhase5 to be active.
+	chainConfig := cparams.Copy(saetest.ChainConfig())
 	pool, err := New(
 		snowCtx,
-		saetest.ChainConfig(),
+		cparams.WithExtra(&chainConfig, extras.TestChainConfig),
 		NewPending(),
 		backend,
 		maxSize,
