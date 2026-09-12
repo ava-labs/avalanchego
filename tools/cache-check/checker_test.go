@@ -13,10 +13,11 @@ import (
 
 func TestCheck(t *testing.T) {
 	tests := []struct {
-		name    string
-		fixture string
-		checks  []string
-		wantErr error
+		name                        string
+		fixture                     string
+		checks                      []string
+		allowUncachedGoTestPackages []string
+		wantErr                     error
 	}{
 		{
 			name:    "cache hit",
@@ -60,6 +61,12 @@ func TestCheck(t *testing.T) {
 			wantErr: errGoTestResultNotCached,
 		},
 		{
+			name:                        "allowed uncached test result",
+			fixture:                     "uncached-go-test.txt",
+			checks:                      []string{goUnitTestResultsCheck},
+			allowUncachedGoTestPackages: []string{"github.com/ava-labs/avalanchego/tools/cache-check"},
+		},
+		{
 			name:    "missing test result",
 			fixture: "no-go-test-result.txt",
 			checks:  []string{goUnitTestResultsCheck},
@@ -76,7 +83,9 @@ func TestCheck(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			log := readFixture(t, test.fixture)
-			err := check(log, test.checks)
+			err := checkWithOptions(log, test.checks, checkOptions{
+				allowUncachedGoTestPackages: test.allowUncachedGoTestPackages,
+			})
 			if test.wantErr == nil {
 				require.NoError(t, err)
 				return

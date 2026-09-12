@@ -32,7 +32,15 @@ var knownChecks = []string{
 	goUnitTestResultsCheck,
 }
 
+type checkOptions struct {
+	allowUncachedGoTestPackages []string
+}
+
 func check(log []byte, names []string) error {
+	return checkWithOptions(log, names, checkOptions{})
+}
+
+func checkWithOptions(log []byte, names []string, options checkOptions) error {
 	errs := make([]error, 0, len(names))
 	for _, name := range names {
 		if !slices.Contains(knownChecks, name) {
@@ -52,7 +60,7 @@ func check(log []byte, names []string) error {
 		case goUnitCacheRestoreCheck:
 			err = checkCacheRestore(log, "go-unit-cache-hit")
 		case goUnitTestResultsCheck:
-			err = checkGoTestResults(log)
+			err = checkGoTestResults(log, options.allowUncachedGoTestPackages)
 		}
 		if err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", name, err))
@@ -78,7 +86,7 @@ func checkNoGoModuleDownload(log []byte) error {
 	return nil
 }
 
-func checkGoTestResults(log []byte) error {
+func checkGoTestResults(log []byte, allowUncachedPackages []string) error {
 	found := false
 	for _, line := range bytes.Split(log, []byte{'\n'}) {
 		fields := bytes.Fields(line)
@@ -87,11 +95,15 @@ func checkGoTestResults(log []byte) error {
 		}
 
 		found = true
-		if !slices.ContainsFunc(fields, func(field []byte) bool {
+		if slices.ContainsFunc(fields, func(field []byte) bool {
 			return bytes.Equal(field, []byte("(cached)"))
 		}) {
-			return fmt.Errorf("%w: %s", errGoTestResultNotCached, line)
+			continue
 		}
+		if len(fields) > 1 && slices.Contains(allowUncachedPackages, string(fields[1])) {
+			continue
+		}
+		return fmt.Errorf("%w: %s", errGoTestResultNotCached, line)
 	}
 	if !found {
 		return errGoTestResultMissing

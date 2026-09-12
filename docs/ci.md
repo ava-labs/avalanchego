@@ -254,6 +254,16 @@ require a hit for the cache it produces. A later push restores that entry and
 runs **validation mode**. Validation requires the expected exact restores and
 fails when the log checker finds unexpected work.
 
+For the Go unit job, use the job log to identify the mode. A warm run reports
+`Cache not found` for `go-unit-validation-<os>-<arch>`, does not run the cache
+checker, and ends by saving that key in the `actions/cache` post-job step. A
+validation run reports `Cache hit for` that key, records
+`go-unit-cache-hit=true`, sets `GOPROXY: off`, and runs `Validate Go unit-test
+cache`. The Task and Go module validation caches can be hits during a Go-unit
+warm run; the Go unit-cache result determines its mode. Re-run the Go workflow
+for the same commit after a warm run to validate the entry without changing its
+contents.
+
 A push does not clear or refresh a validation entry. This is deliberate: it
 keeps one immutable entry per cache and avoids rewarming CI during ordinary PR
 iteration. A cache can be out of date after a source or dependency change. To
@@ -275,9 +285,11 @@ The cleanup workflow handles label removal and pull-request close. This bounds
 storage even for abandoned validation attempts.
 
 When adding a cache consumer, add a corresponding log check and unit-test its
-recognized output. Do not replace production save behavior with a
-validation-only writer; the validation rerun must consume entries that the
-normal writer produced.
+recognized output. The labeled Go validation run allows an uncached result only
+for `tools/cache-check`: changing the checker cannot update its immutable
+pull-request cache entry. `master` does not allow this exception. Do not replace
+production save behavior with a validation-only writer; the validation rerun
+must consume entries that the normal writer produced.
 
 #### Task cache
 

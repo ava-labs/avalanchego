@@ -85,4 +85,5 @@ jobs:
             --check go-mod-cache-restore \
             --check go-unit-cache-restore \
             --check go-unit-test-results \
+            ${{ inputs.cache_validation && '--allow-uncached-go-test-package github.com/ava-labs/avalanchego/tools/cache-check' || '' }} \
             --log "$RUNNER_TEMP/go-unit-cache-validation.log"
