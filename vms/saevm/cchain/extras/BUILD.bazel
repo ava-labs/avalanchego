@@ -1,0 +1,35 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "extras",
+    srcs = ["extras.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/extras",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/core/extstate",
+        "//graft/coreth/params",
+        "//graft/coreth/plugin/evm/customtypes",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//libevm/stateconf",
+        "@com_github_ava_labs_libevm//params",
+    ],
+)
+
+go_test(
+    name = "extras_test",
+    srcs = ["extras_test.go"],
+    embed = [":extras"],
+    deps = [
+        "//graft/coreth/params",
+        "//graft/coreth/plugin/evm/customtypes",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_stretchr_testify//require",
+    ],
+)

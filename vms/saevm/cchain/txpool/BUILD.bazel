@@ -37,7 +37,6 @@ go_test(
     deps = [
         "//graft/coreth/params",
         "//graft/coreth/params/extras",
-        "//graft/coreth/plugin/evm",
         "//ids",
         "//snow/snowtest",
         "//utils",
@@ -47,6 +46,7 @@ go_test(
         "//utils/logging/loggingtest",
         "//vms/components/avax",
         "//vms/saevm/cchain/cchaintest",
+        "//vms/saevm/cchain/extras",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/tx/txtest",
         "//vms/saevm/hook",

@@ -18,14 +18,14 @@ import (
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/tests/e2e/vms"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/extras"
 )
 
 func TestE2E(t *testing.T) {
-	evm.RegisterAllLibEVMExtras()
+	extras.RegisterLibEVM()
 	ginkgo.RunSpecs(t, "e2e test suites")
 }
 

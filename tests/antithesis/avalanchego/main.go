@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
@@ -42,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/extras"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -70,7 +70,7 @@ const (
 
 func main() {
 	// Required for coreth ethclient block deserialization.
-	evm.RegisterAllLibEVMExtras()
+	extras.RegisterLibEVM()
 
 	// TODO(marun) Support choosing the log format
 	tc := antithesis.NewInstrumentedTestContext(tests.NewDefaultLogger(""))
