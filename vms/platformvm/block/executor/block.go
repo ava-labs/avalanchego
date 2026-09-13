@@ -112,7 +112,21 @@ func (b *Block) Options(context.Context) ([2]snowman.Block, error) {
 }
 
 func (b *Block) verifyBlockSizePreHelicon() error {
-	if !b.manager.txExecutorBackend.Config.UpgradeConfig.IsHeliconActivated(b.Timestamp()) {
+	// Gate on the block's own timestamp, not b.Timestamp(): that method
+	// falls back to node-local chain time (the last-accepted block's
+	// timestamp) until this block is tracked in blkIDToState, which is not
+	// yet the case on a block's first verification. Since this is a
+	// consensus rule, it must not depend on node-local state: two nodes
+	// verifying the same block for the first time could otherwise disagree
+	// depending on their own progress through the chain, rather than on the
+	// block itself. Pre-Banff blocks have no stored timestamp and
+	// necessarily predate Helicon, so falling back to the zero value
+	// correctly selects the pre-Helicon limit for them.
+	var blkTime time.Time
+	if banffBlk, ok := b.Block.(platform.BanffBlock); ok {
+		blkTime = banffBlk.Timestamp()
+	}
+	if !b.manager.txExecutorBackend.Config.UpgradeConfig.IsHeliconActivated(blkTime) {
 		blockSize := len(b.Bytes())
 		if blockSize > codec.DefaultMaxSize {
 			b.manager.ctx.Log.Debug("block verification failed, block too big",

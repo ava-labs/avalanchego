@@ -2322,3 +2322,71 @@ func TestTxTooBig(t *testing.T) {
 		})
 	}
 }
+
+// TestBlockSizePreHeliconUsesBlockTimestamp reproduces
+// https://github.com/ava-labs/avalanchego/issues/5941: the pre-Helicon block
+// size gate must key off the block's own timestamp, not the node-local chain
+// time, or a legitimate post-Helicon block can be wrongly rejected by a node
+// whose chain time hasn't advanced past HeliconTime yet.
+func TestBlockSizePreHeliconUsesBlockTimestamp(t *testing.T) {
+	require := require.New(t)
+
+	vm, _, _ := defaultVM(t, upgradetest.Granite) // HeliconTime unscheduled
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	// Schedule Helicon just after the chain's current (committed) timestamp,
+	// but move the wall clock up to meet it. The next built block will
+	// therefore be timestamped at/after HeliconTime, while the chain's
+	// committed timestamp -- what (*executor.Block).Timestamp() falls back
+	// to before a block is tracked -- remains behind it.
+	chainTime := vm.state.GetTimestamp()
+	heliconTime := chainTime.Add(time.Second)
+	vm.UpgradeConfig.HeliconTime = heliconTime
+	vm.clock.Set(heliconTime)
+	require.True(vm.UpgradeConfig.IsHeliconActivated(vm.clock.Time()))
+	require.False(vm.UpgradeConfig.IsHeliconActivated(vm.state.GetTimestamp()))
+
+	// Increase capacity so that the large tx passes gas validation.
+	vm.DynamicFeeConfig.MaxCapacity = 1_000_000
+	vm.state.SetFeeState(gas.State{Capacity: 1_000_000})
+
+	subnetID := testSubnet1.ID()
+	wallet := newWallet(t, vm, walletConfig{
+		subnetIDs: []ids.ID{subnetID},
+	})
+
+	// A genesis payload that makes the resulting block exceed
+	// codec.DefaultMaxSize. Admission relies on the wall clock (already past
+	// HeliconTime), so this is legal to include in a block.
+	bigGenesis := make([]byte, codec.DefaultMaxSize+1)
+	createChainTx, err := wallet.Builder().NewCreateChainTx(
+		subnetID,
+		bigGenesis,
+		ids.ID{'t', 'e', 's', 't', 'v', 'm'},
+		nil,
+		"big",
+	)
+	require.NoError(err)
+
+	bigTx := &platform.Tx{Unsigned: createChainTx}
+	require.NoError(wallet.Signer().Sign(t.Context(), bigTx))
+	require.NoError(vm.manager.VerifyTx(bigTx))
+
+	vm.ctx.Lock.Unlock()
+	require.NoError(vm.issueTxFromRPC(bigTx))
+	vm.ctx.Lock.Lock()
+
+	blk, err := vm.Builder.BuildBlock(t.Context())
+	require.NoError(err)
+	require.Greater(len(blk.Bytes()), codec.DefaultMaxSize)
+
+	banffBlk, ok := blk.(*blockexecutor.Block).Block.(platform.BanffBlock)
+	require.True(ok, "built block must be a Banff block")
+	require.False(banffBlk.Timestamp().Before(heliconTime), "built block must be timestamped at/after HeliconTime")
+
+	// The block's own timestamp is at/after HeliconTime, so it must be
+	// accepted even though the chain's committed timestamp has not reached
+	// HeliconTime yet.
+	require.NoError(blk.Verify(t.Context()))
+}
