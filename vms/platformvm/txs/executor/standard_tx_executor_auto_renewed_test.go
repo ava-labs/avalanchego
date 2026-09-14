@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
@@ -29,7 +30,7 @@ import (
 )
 
 // TestStandardExecutorAddAutoRenewedValidatorTx verifies the successful
-// execution of an [txs.AddAutoRenewedValidatorTx].
+// execution of an [platform.AddAutoRenewedValidatorTx].
 func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	wallet := newWallet(t, env, walletConfig{})
@@ -102,7 +103,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 		diff,
 	)
 	require.NoError(t, err)
-	require.True(t, addAutoRenewedTx.Unsigned.(*txs.AddAutoRenewedValidatorTx).BaseTx.SyntacticallyVerified)
+	require.True(t, addAutoRenewedTx.Unsigned.(*platform.AddAutoRenewedValidatorTx).BaseTx.SyntacticallyVerified)
 	require.NoError(t, diff.Apply(env.state))
 
 	validator, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
@@ -118,7 +119,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 		EndTime:         env.state.GetTimestamp().Add(period),
 		PotentialReward: wantPotentialReward,
 		NextTime:        env.state.GetTimestamp().Add(period),
-		Priority:        txs.PrimaryNetworkValidatorCurrentPriority,
+		Priority:        platform.PrimaryNetworkValidatorCurrentPriority,
 	}
 	require.Equal(t, wantValidator, validator)
 
@@ -158,7 +159,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 }
 
 // TestStandardExecutorAddAutoRenewedValidatorTxErrors verifies the failure
-// cases of [txs.AddAutoRenewedValidatorTx] execution.
+// cases of [platform.AddAutoRenewedValidatorTx] execution.
 func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	wallet := newWallet(t, env, walletConfig{})
@@ -167,7 +168,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 	tests := []struct {
 		name        string
 		want        error
-		updateTx    func(*txs.Tx)
+		updateTx    func(*platform.Tx)
 		updateState func(*state.Diff)
 	}{
 		{
@@ -179,57 +180,57 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddAutoRenewedValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddAutoRenewedValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "invalid_memo_length",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddAutoRenewedValidatorTx).Memo = []byte("memo!")
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddAutoRenewedValidatorTx).Memo = []byte("memo!")
 			},
 			want: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "weight_too_small",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddAutoRenewedValidatorTx).StakeOuts[0].Out.(*secp256k1fx.TransferOutput).Amt = env.config.MinValidatorStake - 1
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddAutoRenewedValidatorTx).StakeOuts[0].Out.(*secp256k1fx.TransferOutput).Amt = env.config.MinValidatorStake - 1
 			},
 			want: errWeightTooSmall,
 		},
 		{
 			name: "weight_too_large",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddAutoRenewedValidatorTx).StakeOuts[0].Out.(*secp256k1fx.TransferOutput).Amt = env.config.MaxValidatorStake + 1
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddAutoRenewedValidatorTx).StakeOuts[0].Out.(*secp256k1fx.TransferOutput).Amt = env.config.MaxValidatorStake + 1
 			},
 			want: errWeightTooLarge,
 		},
 		{
 			name: "insufficient_delegation_fee",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddAutoRenewedValidatorTx).DelegationShares = env.config.MinDelegationFee - 1
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddAutoRenewedValidatorTx).DelegationShares = env.config.MinDelegationFee - 1
 			},
 			want: errInsufficientDelegationFee,
 		},
 		{
 			name: "stake_too_short",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddAutoRenewedValidatorTx).Period = uint64(env.config.HeliconMinStakeDuration.Seconds()) - 1
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddAutoRenewedValidatorTx).Period = uint64(env.config.HeliconMinStakeDuration.Seconds()) - 1
 			},
 			want: errStakeTooShort,
 		},
 		{
 			name: "stake_too_long",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddAutoRenewedValidatorTx).Period = uint64(env.config.MaxStakeDuration.Seconds()) + 1
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddAutoRenewedValidatorTx).Period = uint64(env.config.MaxStakeDuration.Seconds()) + 1
 			},
 			want: ErrStakeTooLong,
 		},
 		{
 			name: "duplicate_validator",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddAutoRenewedValidatorTx).ValidatorNodeID = genesistest.DefaultNodeIDs[0].Bytes()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddAutoRenewedValidatorTx).ValidatorNodeID = genesistest.DefaultNodeIDs[0].Bytes()
 			},
 			want: ErrDuplicateValidator,
 		},
@@ -280,7 +281,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorSetAutoRenewedValidatorConfigTx verifies the successful
-// execution of a [txs.SetAutoRenewedValidatorConfigTx].
+// execution of a [platform.SetAutoRenewedValidatorConfigTx].
 func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 	const (
 		delegationShares            = 0.5 * reward.PercentDenominator
@@ -334,7 +335,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 				2*env.config.MinStakeDuration,
 			)
 			require.NoError(t, err)
-			validatorTx := addAutoRenewedValidatorTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+			validatorTx := addAutoRenewedValidatorTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
 
 			// Execute the AddAutoRenewedValidatorTx so the validator and the UTXOs
 			// it spends/creates are reflected in env.state. This keeps env.state in
@@ -393,7 +394,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 			)
 
 			require.NoError(t, err)
-			require.True(t, setAutoRenewedValidatorConfigTx.Unsigned.(*txs.SetAutoRenewedValidatorConfigTx).BaseTx.SyntacticallyVerified)
+			require.True(t, setAutoRenewedValidatorConfigTx.Unsigned.(*platform.SetAutoRenewedValidatorConfigTx).BaseTx.SyntacticallyVerified)
 			require.NoError(t, diff.Apply(env.state))
 
 			stakingInfo, err := env.state.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
@@ -467,7 +468,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	validatorTx := addAutoRenewedValidatorTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+	validatorTx := addAutoRenewedValidatorTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
 
 	startTime := time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0)
 	duration := time.Duration(validatorTx.Period) * time.Second
@@ -490,7 +491,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		updateTx    func(testing.TB, *txs.SetAutoRenewedValidatorConfigTx, *txs.Tx)
+		updateTx    func(testing.TB, *platform.SetAutoRenewedValidatorConfigTx, *platform.Tx)
 		updateState func(testing.TB, *state.Diff)
 		wantErr     error
 	}{
@@ -503,14 +504,14 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		},
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(_ testing.TB, _ *txs.SetAutoRenewedValidatorConfigTx, stx *txs.Tx) {
-				stx.Unsigned.(*txs.SetAutoRenewedValidatorConfigTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(_ testing.TB, _ *platform.SetAutoRenewedValidatorConfigTx, stx *platform.Tx) {
+				stx.Unsigned.(*platform.SetAutoRenewedValidatorConfigTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			wantErr: avax.ErrWrongChainID,
 		},
 		{
 			name: "invalid_memo_length",
-			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
+			updateTx: func(_ testing.TB, tx *platform.SetAutoRenewedValidatorConfigTx, _ *platform.Tx) {
 				tx.Memo = []byte("memo!")
 			},
 			wantErr: avax.ErrMemoTooLarge,
@@ -528,42 +529,42 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		},
 		{
 			name: "missing_staker_tx",
-			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
+			updateTx: func(_ testing.TB, tx *platform.SetAutoRenewedValidatorConfigTx, _ *platform.Tx) {
 				tx.TxID = ids.GenerateTestID()
 			},
 			wantErr: database.ErrNotFound,
 		},
 		{
 			name: "invalid_staker_tx",
-			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
+			updateTx: func(_ testing.TB, tx *platform.SetAutoRenewedValidatorConfigTx, _ *platform.Tx) {
 				tx.TxID = addPastContValidatorTx.ID()
 			},
 			wantErr: errInvalidStakerTx,
 		},
 		{
 			name: "invalid_staker_tx_type",
-			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
+			updateTx: func(_ testing.TB, tx *platform.SetAutoRenewedValidatorConfigTx, _ *platform.Tx) {
 				tx.TxID = fixedStakerTxID
 			},
 			wantErr: errInvalidStakerTxType,
 		},
 		{
 			name: "stake_too_short",
-			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
+			updateTx: func(_ testing.TB, tx *platform.SetAutoRenewedValidatorConfigTx, _ *platform.Tx) {
 				tx.Period = uint64(env.config.HeliconMinStakeDuration.Seconds()) - 1
 			},
 			wantErr: errStakeTooShort,
 		},
 		{
 			name: "stake_too_long",
-			updateTx: func(_ testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, _ *txs.Tx) {
+			updateTx: func(_ testing.TB, tx *platform.SetAutoRenewedValidatorConfigTx, _ *platform.Tx) {
 				tx.Period = uint64(env.config.MaxStakeDuration.Seconds()) + 1
 			},
 			wantErr: ErrStakeTooLong,
 		},
 		{
 			name: "invalid_auth",
-			updateTx: func(t testing.TB, tx *txs.SetAutoRenewedValidatorConfigTx, sTx *txs.Tx) {
+			updateTx: func(t testing.TB, tx *platform.SetAutoRenewedValidatorConfigTx, sTx *platform.Tx) {
 				dummySig, err := genesistest.DefaultFundedKeys[1].SignHash([]byte{})
 				require.NoError(t, err)
 
@@ -576,7 +577,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		},
 		{
 			name: "wrong_number_of_credentials",
-			updateTx: func(_ testing.TB, _ *txs.SetAutoRenewedValidatorConfigTx, sTx *txs.Tx) {
+			updateTx: func(_ testing.TB, _ *platform.SetAutoRenewedValidatorConfigTx, sTx *platform.Tx) {
 				sTx.Creds = nil
 			},
 			wantErr: errWrongNumberOfCredentials,
@@ -596,7 +597,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 			}
 
 			if tt.updateTx != nil {
-				tt.updateTx(t, tx.Unsigned.(*txs.SetAutoRenewedValidatorConfigTx), tx)
+				tt.updateTx(t, tx.Unsigned.(*platform.SetAutoRenewedValidatorConfigTx), tx)
 			}
 
 			_, _, _, err = StandardTx(
@@ -623,5 +624,5 @@ func TestStandardExecutorRewardAutoRenewedValidatorTx(t *testing.T) {
 		newRewardAutoRenewedValidatorTx(t, ids.GenerateTestID(), time.Unix(1, 0)),
 		diff,
 	)
-	require.ErrorIs(t, err, errWrongTxType)
+	require.ErrorIs(t, err, txs.ErrUnsupportedTxType)
 }

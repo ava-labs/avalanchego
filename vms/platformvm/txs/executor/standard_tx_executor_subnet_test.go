@@ -18,9 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
@@ -30,7 +30,7 @@ import (
 const _ time.Duration = math.MaxUint32 * time.Second
 
 // TestStandardExecutorTransformSubnetTxErrors verifies the failure cases of
-// [txs.TransformSubnetTx] execution.
+// [platform.TransformSubnetTx] execution.
 func TestStandardExecutorTransformSubnetTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Durango)
 	wallet := newWallet(t, env, walletConfig{})
@@ -38,35 +38,35 @@ func TestStandardExecutorTransformSubnetTxErrors(t *testing.T) {
 	tests := []struct {
 		name        string
 		want        error
-		updateTx    func(*txs.Tx)
+		updateTx    func(*platform.Tx)
 		updateState func(*state.Diff)
 	}{
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.TransformSubnetTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.TransformSubnetTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "max_stake_duration_too_large",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.TransformSubnetTx).MaxStakeDuration = math.MaxUint32
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.TransformSubnetTx).MaxStakeDuration = math.MaxUint32
 			},
 			want: errMaxStakeDurationTooLarge,
 		},
 		{
 			name: "fail_subnet_authorization",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				tx.Creds = nil
 			},
 			want: errWrongNumberOfCredentials,
 		},
 		{
 			name: "flow_checker_failed",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				// Produce more AVAX than the tx consumes
-				unsignedTx := tx.Unsigned.(*txs.TransformSubnetTx)
+				unsignedTx := tx.Unsigned.(*platform.TransformSubnetTx)
 				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
@@ -134,7 +134,7 @@ func TestStandardExecutorTransformSubnetTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorTransformSubnetTx verifies the successful execution of
-// a [txs.TransformSubnetTx].
+// a [platform.TransformSubnetTx].
 func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 	require := require.New(t)
 
@@ -171,7 +171,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	tx := stx.Unsigned.(*txs.TransformSubnetTx)
+	tx := stx.Unsigned.(*platform.TransformSubnetTx)
 
 	// assert that the subnet's transform info was set
 	gotTx, err := diff.GetSubnetTransformation(tx.Subnet)
@@ -187,7 +187,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 }
 
 // TestStandardExecutorCreateChainTxErrors verifies the failure cases of
-// [txs.CreateChainTx] execution.
+// [platform.CreateChainTx] execution.
 func TestStandardExecutorCreateChainTxErrors(t *testing.T) {
 	var (
 		env      = newEnvironment(t, upgradetest.Latest)
@@ -198,19 +198,19 @@ func TestStandardExecutorCreateChainTxErrors(t *testing.T) {
 	tests := []struct {
 		name        string
 		want        error
-		updateTx    func(*txs.Tx)
+		updateTx    func(*platform.Tx)
 		updateState func(*state.Diff)
 	}{
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.CreateChainTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.CreateChainTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "insufficient_control_signatures",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				// Remove a signature from the subnet auth credential
 				cred := tx.Creds[len(tx.Creds)-1].(*secp256k1fx.Credential)
 				cred.Sigs = cred.Sigs[1:]
@@ -219,7 +219,7 @@ func TestStandardExecutorCreateChainTxErrors(t *testing.T) {
 		},
 		{
 			name: "wrong_control_signature",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				// Replace a valid signature with one from a new, random key
 				key, err := secp256k1.NewPrivateKey()
 				require.NoError(t, err)
@@ -234,8 +234,8 @@ func TestStandardExecutorCreateChainTxErrors(t *testing.T) {
 		},
 		{
 			name: "subnet_not_found",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.CreateChainTx).SubnetID = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.CreateChainTx).SubnetID = ids.GenerateTestID()
 			},
 			want: database.ErrNotFound,
 		},
@@ -288,7 +288,7 @@ func TestStandardExecutorCreateChainTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorCreateChainTx verifies the successful execution of a
-// [txs.CreateChainTx].
+// [platform.CreateChainTx].
 func TestStandardExecutorCreateChainTx(t *testing.T) {
 	require := require.New(t)
 
@@ -335,7 +335,7 @@ func TestStandardExecutorCreateChainTx(t *testing.T) {
 }
 
 // TestStandardExecutorCreateSubnetTxErrors verifies the failure cases of
-// [txs.CreateSubnetTx] execution.
+// [platform.CreateSubnetTx] execution.
 func TestStandardExecutorCreateSubnetTxErrors(t *testing.T) {
 	var (
 		env    = newEnvironment(t, upgradetest.Latest)
@@ -345,20 +345,20 @@ func TestStandardExecutorCreateSubnetTxErrors(t *testing.T) {
 	tests := []struct {
 		name     string
 		want     error
-		updateTx func(*txs.Tx)
+		updateTx func(*platform.Tx)
 	}{
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.CreateSubnetTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.CreateSubnetTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "flow_checker_failed",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				// Produce more AVAX than the tx consumes
-				unsignedTx := tx.Unsigned.(*txs.CreateSubnetTx)
+				unsignedTx := tx.Unsigned.(*platform.CreateSubnetTx)
 				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
@@ -401,7 +401,7 @@ func TestStandardExecutorCreateSubnetTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorCreateSubnetTx verifies the successful execution of a
-// [txs.CreateSubnetTx].
+// [platform.CreateSubnetTx].
 func TestStandardExecutorCreateSubnetTx(t *testing.T) {
 	require := require.New(t)
 
@@ -445,7 +445,7 @@ func TestStandardExecutorCreateSubnetTx(t *testing.T) {
 }
 
 // TestStandardExecutorTransferSubnetOwnershipTxErrors verifies the failure
-// cases of [txs.TransferSubnetOwnershipTx] execution.
+// cases of [platform.TransferSubnetOwnershipTx] execution.
 func TestStandardExecutorTransferSubnetOwnershipTxErrors(t *testing.T) {
 	var (
 		env      = newEnvironment(t, upgradetest.Latest)
@@ -455,7 +455,7 @@ func TestStandardExecutorTransferSubnetOwnershipTxErrors(t *testing.T) {
 	tests := []struct {
 		name        string
 		want        error
-		updateTx    func(*txs.Tx)
+		updateTx    func(*platform.Tx)
 		updateState func(*state.Diff)
 	}{
 		{
@@ -467,28 +467,28 @@ func TestStandardExecutorTransferSubnetOwnershipTxErrors(t *testing.T) {
 		},
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.TransferSubnetOwnershipTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.TransferSubnetOwnershipTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "subnet_not_found",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.TransferSubnetOwnershipTx).Subnet = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.TransferSubnetOwnershipTx).Subnet = ids.GenerateTestID()
 			},
 			want: database.ErrNotFound,
 		},
 		{
 			name: "tx_has_no_credentials",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				tx.Creds = nil
 			},
 			want: errWrongNumberOfCredentials,
 		},
 		{
 			name: "insufficient_control_signatures",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				// Remove a signature from the subnet auth credential
 				cred := tx.Creds[len(tx.Creds)-1].(*secp256k1fx.Credential)
 				cred.Sigs = cred.Sigs[1:]
@@ -497,9 +497,9 @@ func TestStandardExecutorTransferSubnetOwnershipTxErrors(t *testing.T) {
 		},
 		{
 			name: "flow_checker_failed",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				// Produce more AVAX than the tx consumes
-				unsignedTx := tx.Unsigned.(*txs.TransferSubnetOwnershipTx)
+				unsignedTx := tx.Unsigned.(*platform.TransferSubnetOwnershipTx)
 				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
@@ -551,7 +551,7 @@ func TestStandardExecutorTransferSubnetOwnershipTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorTransferSubnetOwnershipTx verifies the successful
-// execution of a [txs.TransferSubnetOwnershipTx].
+// execution of a [platform.TransferSubnetOwnershipTx].
 func TestStandardExecutorTransferSubnetOwnershipTx(t *testing.T) {
 	require := require.New(t)
 

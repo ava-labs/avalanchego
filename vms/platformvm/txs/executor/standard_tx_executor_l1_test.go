@@ -22,9 +22,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
@@ -35,7 +35,7 @@ import (
 )
 
 // TestStandardExecutorConvertSubnetToL1TxErrors verifies the failure cases of
-// [txs.ConvertSubnetToL1Tx] execution.
+// [platform.ConvertSubnetToL1Tx] execution.
 func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees and allow two active L1 validators.
@@ -59,7 +59,7 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 	tests := []struct {
 		name        string
 		want        error
-		updateTx    func(*testing.T, *txs.Tx)
+		updateTx    func(*testing.T, *platform.Tx)
 		updateState func(*testing.T, *state.Diff)
 	}{
 		{
@@ -71,15 +71,15 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 		},
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.ConvertSubnetToL1Tx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.ConvertSubnetToL1Tx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "invalid_memo_length",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.ConvertSubnetToL1Tx).Memo = []byte("memo!")
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.ConvertSubnetToL1Tx).Memo = []byte("memo!")
 			},
 			want: avax.ErrMemoTooLarge,
 		},
@@ -96,7 +96,7 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 		{
 			name: "invalid_if_subnet_is_transformed",
 			updateState: func(_ *testing.T, diff *state.Diff) {
-				diff.AddSubnetTransformation(&txs.Tx{Unsigned: &txs.TransformSubnetTx{
+				diff.AddSubnetTransformation(&platform.Tx{Unsigned: &platform.TransformSubnetTx{
 					Subnet: subnetID,
 				}})
 			},
@@ -144,9 +144,9 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 		},
 		{
 			name: "flow_checker_failed",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
 				// Produce more AVAX than the tx consumes
-				unsignedTx := tx.Unsigned.(*txs.ConvertSubnetToL1Tx)
+				unsignedTx := tx.Unsigned.(*platform.ConvertSubnetToL1Tx)
 				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
@@ -158,10 +158,10 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 		},
 		{
 			name: "validators_balance_overflow",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
 				// The validator balances sum to more than math.MaxUint64
-				unsignedTx := tx.Unsigned.(*txs.ConvertSubnetToL1Tx)
-				unsignedTx.Validators = append(unsignedTx.Validators, &txs.ConvertSubnetToL1Validator{
+				unsignedTx := tx.Unsigned.(*platform.ConvertSubnetToL1Tx)
+				unsignedTx.Validators = append(unsignedTx.Validators, &platform.ConvertSubnetToL1Validator{
 					NodeID:                ids.GenerateTestNodeID().Bytes(),
 					Weight:                1,
 					Balance:               math.MaxUint64,
@@ -186,7 +186,7 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 				subnetID,
 				ids.GenerateTestID(),
 				utils.RandomBytes(32),
-				[]*txs.ConvertSubnetToL1Validator{{
+				[]*platform.ConvertSubnetToL1Validator{{
 					NodeID:                nodeID.Bytes(),
 					Weight:                1,
 					Balance:               1,
@@ -222,7 +222,7 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorConvertSubnetToL1Tx verifies the successful execution
-// of a [txs.ConvertSubnetToL1Tx].
+// of a [platform.ConvertSubnetToL1Tx].
 func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 	require := require.New(t)
 
@@ -250,7 +250,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 
 	const weight = 1
 
-	validator := &txs.ConvertSubnetToL1Validator{
+	validator := &platform.ConvertSubnetToL1Validator{
 		NodeID:                nodeID.Bytes(),
 		Weight:                weight,
 		Balance:               1,
@@ -263,7 +263,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		subnetID,
 		chainID,
 		address,
-		[]*txs.ConvertSubnetToL1Validator{validator},
+		[]*platform.ConvertSubnetToL1Validator{validator},
 	)
 	require.NoError(err)
 
@@ -308,10 +308,10 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 	)
 
 	// assert that the L1 validator was added
-	remainingBalanceOwner, err := txs.Codec.Marshal(txs.CodecVersion, &validator.RemainingBalanceOwner)
+	remainingBalanceOwner, err := platform.Codec.Marshal(platform.CodecVersion, &validator.RemainingBalanceOwner)
 	require.NoError(err)
 
-	deactivationOwner, err := txs.Codec.Marshal(txs.CodecVersion, &validator.DeactivationOwner)
+	deactivationOwner, err := platform.Codec.Marshal(platform.CodecVersion, &validator.DeactivationOwner)
 	require.NoError(err)
 
 	validationID := subnetID.Append(0)
@@ -335,7 +335,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 }
 
 // TestStandardExecutorRegisterL1ValidatorTxErrors verifies the failure cases
-// of [txs.RegisterL1ValidatorTx] execution.
+// of [platform.RegisterL1ValidatorTx] execution.
 func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees and allow two active L1 validators.
@@ -359,7 +359,7 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 		subnetID,
 		chainID,
 		address,
-		[]*txs.ConvertSubnetToL1Validator{{
+		[]*platform.ConvertSubnetToL1Validator{{
 			NodeID:                ids.GenerateTestNodeID().Bytes(),
 			Weight:                1,
 			Balance:               units.Avax,
@@ -455,7 +455,7 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 		name        string
 		balance     uint64
 		want        error
-		updateTx    func(*testing.T, *txs.Tx)
+		updateTx    func(*testing.T, *platform.Tx)
 		updateState func(*testing.T, *state.Diff)
 	}{
 		{
@@ -467,30 +467,30 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.RegisterL1ValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.RegisterL1ValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "invalid_memo_length",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.RegisterL1ValidatorTx).Memo = []byte("memo!")
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Memo = []byte("memo!")
 			},
 			want: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "fee_calculation_overflow",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.RegisterL1ValidatorTx).Balance = math.MaxUint64
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Balance = math.MaxUint64
 			},
 			want: safemath.ErrOverflow,
 		},
 		{
 			name: "flow_checker_failed",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
 				// Produce more AVAX than the tx consumes
-				unsignedTx := tx.Unsigned.(*txs.RegisterL1ValidatorTx)
+				unsignedTx := tx.Unsigned.(*platform.RegisterL1ValidatorTx)
 				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
@@ -502,15 +502,15 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "invalid_warp_message",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.RegisterL1ValidatorTx).Message = []byte{}
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Message = []byte{}
 			},
 			want: codec.ErrCantUnpackVersion,
 		},
 		{
 			name: "invalid_warp_payload",
-			updateTx: func(t *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.RegisterL1ValidatorTx).Message = must[*warp.Message](t)(warp.NewMessage(
+			updateTx: func(t *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Message = must[*warp.Message](t)(warp.NewMessage(
 					must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
 						env.ctx.NetworkID,
 						chainID,
@@ -523,8 +523,8 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "invalid_addressed_call",
-			updateTx: func(t *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.RegisterL1ValidatorTx).Message = newWarpMessageBytes(
+			updateTx: func(t *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Message = newWarpMessageBytes(
 					t,
 					must[*message.SubnetToL1Conversion](t)(message.NewSubnetToL1Conversion(ids.Empty)).Bytes(),
 				)
@@ -533,8 +533,8 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "invalid_addressed_call_payload",
-			updateTx: func(t *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.RegisterL1ValidatorTx).Message = newWarpMessageBytes(
+			updateTx: func(t *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Message = newWarpMessageBytes(
 					t,
 					must[*message.RegisterL1Validator](t)(message.NewRegisterL1Validator(
 						subnetID,
@@ -551,8 +551,8 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "subnet_conversion_not_found",
-			updateTx: func(t *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.RegisterL1ValidatorTx).Message = newWarpMessageBytes(
+			updateTx: func(t *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Message = newWarpMessageBytes(
 					t,
 					must[*message.RegisterL1Validator](t)(message.NewRegisterL1Validator(
 						ids.GenerateTestID(), // invalid subnetID
@@ -592,8 +592,8 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "message_expiry_too_far_in_the_future",
-			updateTx: func(t *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.RegisterL1ValidatorTx).Message = newWarpMessageBytes(
+			updateTx: func(t *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Message = newWarpMessageBytes(
 					t,
 					must[*message.RegisterL1Validator](t)(message.NewRegisterL1Validator(
 						subnetID,
@@ -621,8 +621,8 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "invalid_pop",
-			updateTx: func(t *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.RegisterL1ValidatorTx).Message = newWarpMessageBytes(
+			updateTx: func(t *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Message = newWarpMessageBytes(
 					t,
 					must[*message.RegisterL1Validator](t)(message.NewRegisterL1Validator(
 						subnetID,
@@ -717,7 +717,7 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorRegisterL1ValidatorTx verifies the successful execution
-// of a [txs.RegisterL1ValidatorTx].
+// of a [platform.RegisterL1ValidatorTx].
 func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	require := require.New(t)
 
@@ -744,7 +744,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 		subnetID,
 		chainID,
 		address,
-		[]*txs.ConvertSubnetToL1Validator{{
+		[]*platform.ConvertSubnetToL1Validator{{
 			NodeID:                ids.GenerateTestNodeID().Bytes(),
 			Weight:                1,
 			Balance:               units.Avax,
@@ -840,10 +840,10 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	requireBaseTxApplied(t, env, diff, feeCalculator, stx)
 
 	// assert that the L1 validator was added
-	remainingBalanceOwnerBytes, err := txs.Codec.Marshal(txs.CodecVersion, &remainingBalanceOwner)
+	remainingBalanceOwnerBytes, err := platform.Codec.Marshal(platform.CodecVersion, &remainingBalanceOwner)
 	require.NoError(err)
 
-	deactivationOwnerBytes, err := txs.Codec.Marshal(txs.CodecVersion, &deactivationOwner)
+	deactivationOwnerBytes, err := platform.Codec.Marshal(platform.CodecVersion, &deactivationOwner)
 	require.NoError(err)
 
 	validationID := addressedCallPayload.ValidationID()
@@ -875,7 +875,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 }
 
 // TestStandardExecutorSetL1ValidatorWeightTxErrors verifies the failure cases
-// of [txs.SetL1ValidatorWeightTx] execution.
+// of [platform.SetL1ValidatorWeightTx] execution.
 func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees so the txs are funded with real inputs and outputs.
@@ -905,7 +905,7 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 		subnetID,
 		chainID,
 		address,
-		[]*txs.ConvertSubnetToL1Validator{{
+		[]*platform.ConvertSubnetToL1Validator{{
 			NodeID:                ids.GenerateTestNodeID().Bytes(),
 			Weight:                initialWeight,
 			Balance:               balance,
@@ -1002,7 +1002,7 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 	tests := []struct {
 		name        string
 		want        error
-		updateTx    func(*testing.T, *txs.Tx)
+		updateTx    func(*testing.T, *platform.Tx)
 		updateState func(*testing.T, *state.Diff)
 	}{
 		{
@@ -1014,23 +1014,23 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 		},
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.SetL1ValidatorWeightTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "invalid_memo_length",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.SetL1ValidatorWeightTx).Memo = []byte("memo!")
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).Memo = []byte("memo!")
 			},
 			want: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "flow_checker_failed",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
 				// Produce more AVAX than the tx consumes
-				unsignedTx := tx.Unsigned.(*txs.SetL1ValidatorWeightTx)
+				unsignedTx := tx.Unsigned.(*platform.SetL1ValidatorWeightTx)
 				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
@@ -1042,15 +1042,15 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 		},
 		{
 			name: "invalid_warp_message",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.SetL1ValidatorWeightTx).Message = []byte{}
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).Message = []byte{}
 			},
 			want: codec.ErrCantUnpackVersion,
 		},
 		{
 			name: "invalid_warp_payload",
-			updateTx: func(t *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.SetL1ValidatorWeightTx).Message = must[*warp.Message](t)(warp.NewMessage(
+			updateTx: func(t *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).Message = must[*warp.Message](t)(warp.NewMessage(
 					must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
 						env.ctx.NetworkID,
 						chainID,
@@ -1063,8 +1063,8 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 		},
 		{
 			name: "invalid_addressed_call",
-			updateTx: func(t *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.SetL1ValidatorWeightTx).Message = newWarpMessageBytes(
+			updateTx: func(t *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).Message = newWarpMessageBytes(
 					t,
 					must[*message.SubnetToL1Conversion](t)(message.NewSubnetToL1Conversion(ids.Empty)).Bytes(),
 				)
@@ -1073,16 +1073,16 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 		},
 		{
 			name: "invalid_addressed_call_payload",
-			updateTx: func(t *testing.T, tx *txs.Tx) {
+			updateTx: func(t *testing.T, tx *platform.Tx) {
 				// A non-zero weight can't use the nonce reserved for removal
-				tx.Unsigned.(*txs.SetL1ValidatorWeightTx).Message = newL1ValidatorWeightMessageBytes(t, validationID, math.MaxUint64, 1)
+				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).Message = newL1ValidatorWeightMessageBytes(t, validationID, math.MaxUint64, 1)
 			},
 			want: message.ErrNonceReservedForRemoval,
 		},
 		{
 			name: "l1_validator_not_found",
-			updateTx: func(t *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.SetL1ValidatorWeightTx).Message = newL1ValidatorWeightMessageBytes(t, ids.GenerateTestID(), nonce, weight)
+			updateTx: func(t *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).Message = newL1ValidatorWeightMessageBytes(t, ids.GenerateTestID(), nonce, weight)
 			},
 			want: errCouldNotLoadL1Validator,
 		},
@@ -1113,15 +1113,15 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 		},
 		{
 			name: "remove_last_validator",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.SetL1ValidatorWeightTx).Message = removeValidatorWarpMessageBytes
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).Message = removeValidatorWarpMessageBytes
 			},
 			want: errRemovingLastValidator,
 		},
 		{
 			name: "should_have_been_previously_deactivated",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.SetL1ValidatorWeightTx).Message = removeValidatorWarpMessageBytes
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).Message = removeValidatorWarpMessageBytes
 			},
 			updateState: func(t *testing.T, diff *state.Diff) {
 				// Add another validator to allow removal
@@ -1177,7 +1177,7 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorSetL1ValidatorWeightTx verifies the successful
-// execution of a [txs.SetL1ValidatorWeightTx].
+// execution of a [platform.SetL1ValidatorWeightTx].
 func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees so the txs are funded with real inputs and outputs.
@@ -1198,7 +1198,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 		subnetID  = testSubnet1.ID()
 		chainID   = ids.GenerateTestID()
 		address   = utils.RandomBytes(32)
-		validator = &txs.ConvertSubnetToL1Validator{
+		validator = &platform.ConvertSubnetToL1Validator{
 			NodeID:  ids.GenerateTestNodeID().Bytes(),
 			Weight:  initialWeight,
 			Balance: balance,
@@ -1223,7 +1223,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 		subnetID,
 		chainID,
 		address,
-		[]*txs.ConvertSubnetToL1Validator{validator},
+		[]*platform.ConvertSubnetToL1Validator{validator},
 	)
 	require.NoError(t, err)
 
@@ -1310,7 +1310,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 
 	tests := []struct {
 		name                   string
-		updateTx               func(*testing.T, *txs.Tx)
+		updateTx               func(*testing.T, *platform.Tx)
 		updateState            func(*testing.T, *state.Diff)
 		wantNonce              uint64
 		wantWeight             uint64
@@ -1318,8 +1318,8 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	}{
 		{
 			name: "remove_deactivated_validator",
-			updateTx: func(t *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.SetL1ValidatorWeightTx).Message = newRemoveValidatorWarpMessageBytes(t, nonce)
+			updateTx: func(t *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).Message = newRemoveValidatorWarpMessageBytes(t, nonce)
 			},
 			updateState: func(t *testing.T, diff *state.Diff) {
 				putL1Validator(t, diff)
@@ -1328,8 +1328,8 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 		},
 		{
 			name: "remove_deactivated_validator_with_nonce_overflow",
-			updateTx: func(t *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.SetL1ValidatorWeightTx).Message = newRemoveValidatorWarpMessageBytes(t, math.MaxUint64)
+			updateTx: func(t *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).Message = newRemoveValidatorWarpMessageBytes(t, math.MaxUint64)
 			},
 			updateState: func(t *testing.T, diff *state.Diff) {
 				putL1Validator(t, diff)
@@ -1338,8 +1338,8 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 		},
 		{
 			name: "remove_active_validator",
-			updateTx: func(t *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.SetL1ValidatorWeightTx).Message = newRemoveValidatorWarpMessageBytes(t, nonce)
+			updateTx: func(t *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).Message = newRemoveValidatorWarpMessageBytes(t, nonce)
 			},
 			updateState: putL1Validator,
 			wantRemainingFundsUTXO: &avax.UTXO{
@@ -1434,7 +1434,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 }
 
 // TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors verifies the failure
-// cases of [txs.IncreaseL1ValidatorBalanceTx] execution.
+// cases of [platform.IncreaseL1ValidatorBalanceTx] execution.
 func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees and allow a single active L1 validator.
@@ -1459,7 +1459,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 		subnetID,
 		ids.GenerateTestID(),
 		utils.RandomBytes(32),
-		[]*txs.ConvertSubnetToL1Validator{{
+		[]*platform.ConvertSubnetToL1Validator{{
 			NodeID:                ids.GenerateTestNodeID().Bytes(),
 			Weight:                1,
 			Balance:               0,
@@ -1487,7 +1487,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 	tests := []struct {
 		name        string
 		want        error
-		updateTx    func(*testing.T, *txs.Tx)
+		updateTx    func(*testing.T, *platform.Tx)
 		updateState func(*testing.T, *state.Diff)
 	}{
 		{
@@ -1499,30 +1499,30 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 		},
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.IncreaseL1ValidatorBalanceTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.IncreaseL1ValidatorBalanceTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "invalid_memo_length",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.IncreaseL1ValidatorBalanceTx).Memo = []byte("memo!")
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.IncreaseL1ValidatorBalanceTx).Memo = []byte("memo!")
 			},
 			want: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "fee_overflow",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.IncreaseL1ValidatorBalanceTx).Balance = math.MaxUint64
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.IncreaseL1ValidatorBalanceTx).Balance = math.MaxUint64
 			},
 			want: safemath.ErrOverflow,
 		},
 		{
 			name: "flow_checker_failed",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
 				// Produce more AVAX than the tx consumes
-				unsignedTx := tx.Unsigned.(*txs.IncreaseL1ValidatorBalanceTx)
+				unsignedTx := tx.Unsigned.(*platform.IncreaseL1ValidatorBalanceTx)
 				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
@@ -1534,8 +1534,8 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 		},
 		{
 			name: "unknown_validation_id",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.IncreaseL1ValidatorBalanceTx).ValidationID = ids.GenerateTestID()
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.IncreaseL1ValidatorBalanceTx).ValidationID = ids.GenerateTestID()
 			},
 			want: database.ErrNotFound,
 		},
@@ -1603,7 +1603,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorIncreaseL1ValidatorBalanceTx verifies the successful
-// execution of a [txs.IncreaseL1ValidatorBalanceTx].
+// execution of a [platform.IncreaseL1ValidatorBalanceTx].
 func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 	require := require.New(t)
 
@@ -1629,7 +1629,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 		subnetID,
 		ids.GenerateTestID(),
 		utils.RandomBytes(32),
-		[]*txs.ConvertSubnetToL1Validator{{
+		[]*platform.ConvertSubnetToL1Validator{{
 			NodeID:  ids.GenerateTestNodeID().Bytes(),
 			Weight:  1,
 			Balance: 0,
@@ -1696,7 +1696,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 }
 
 // TestStandardExecutorDisableL1ValidatorTxErrors verifies the failure cases of
-// [txs.DisableL1ValidatorTx] execution.
+// [platform.DisableL1ValidatorTx] execution.
 func TestStandardExecutorDisableL1ValidatorTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees so the txs are funded with real inputs and outputs.
@@ -1720,7 +1720,7 @@ func TestStandardExecutorDisableL1ValidatorTxErrors(t *testing.T) {
 		subnetID,
 		ids.GenerateTestID(),
 		utils.RandomBytes(32),
-		[]*txs.ConvertSubnetToL1Validator{{
+		[]*platform.ConvertSubnetToL1Validator{{
 			NodeID:  ids.GenerateTestNodeID().Bytes(),
 			Weight:  1,
 			Balance: units.Avax,
@@ -1753,7 +1753,7 @@ func TestStandardExecutorDisableL1ValidatorTxErrors(t *testing.T) {
 	tests := []struct {
 		name        string
 		want        error
-		updateTx    func(*testing.T, *txs.Tx)
+		updateTx    func(*testing.T, *platform.Tx)
 		updateState func(*testing.T, *state.Diff)
 	}{
 		{
@@ -1765,29 +1765,29 @@ func TestStandardExecutorDisableL1ValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.DisableL1ValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.DisableL1ValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "invalid_memo_length",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.DisableL1ValidatorTx).Memo = []byte("memo!")
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.DisableL1ValidatorTx).Memo = []byte("memo!")
 			},
 			want: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "l1_validator_not_found",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.DisableL1ValidatorTx).ValidationID = ids.GenerateTestID()
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.DisableL1ValidatorTx).ValidationID = ids.GenerateTestID()
 			},
 			want: errCouldNotLoadL1Validator,
 		},
 		{
 			name: "not_authorized",
-			updateTx: func(_ *testing.T, tx *txs.Tx) {
-				tx.Unsigned.(*txs.DisableL1ValidatorTx).DisableAuth.(*secp256k1fx.Input).SigIndices[0] = 123456789
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				tx.Unsigned.(*platform.DisableL1ValidatorTx).DisableAuth.(*secp256k1fx.Input).SigIndices[0] = 123456789
 			},
 			want: errUnauthorizedModification,
 		},
@@ -1838,7 +1838,7 @@ func TestStandardExecutorDisableL1ValidatorTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorDisableL1ValidatorTx verifies the successful execution
-// of a [txs.DisableL1ValidatorTx].
+// of a [platform.DisableL1ValidatorTx].
 func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees so the txs are funded with real inputs and outputs.
@@ -1854,7 +1854,7 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	const initialBalance = units.Avax
 	var (
 		subnetID  = testSubnet1.ID()
-		validator = &txs.ConvertSubnetToL1Validator{
+		validator = &platform.ConvertSubnetToL1Validator{
 			NodeID:  ids.GenerateTestNodeID().Bytes(),
 			Weight:  1,
 			Balance: initialBalance,
@@ -1879,7 +1879,7 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 		subnetID,
 		ids.GenerateTestID(),
 		utils.RandomBytes(32),
-		[]*txs.ConvertSubnetToL1Validator{validator},
+		[]*platform.ConvertSubnetToL1Validator{validator},
 	)
 	require.NoError(t, err)
 

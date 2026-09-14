@@ -19,16 +19,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 // TestStandardExecutorAddValidatorTxErrors verifies the failure cases of
-// [txs.AddValidatorTx] execution.
+// [platform.AddValidatorTx] execution.
 func TestStandardExecutorAddValidatorTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Banff)
 
@@ -43,14 +43,14 @@ func TestStandardExecutorAddValidatorTxErrors(t *testing.T) {
 	)
 
 	// putPendingValidator adds nodeID to the primary network's pending
-	// validator set by executing an [txs.AddValidatorTx] funded by a different
+	// validator set by executing an [platform.AddValidatorTx] funded by a different
 	// key than the tx under test.
-	putPendingValidator := func(diff *state.Diff) *txs.Tx {
+	putPendingValidator := func(diff *state.Diff) *platform.Tx {
 		wallet := newWallet(t, env, walletConfig{
 			keys: genesistest.DefaultFundedKeys[1:2],
 		})
 		tx, err := wallet.IssueAddValidatorTx(
-			&txs.Validator{
+			&platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
@@ -75,35 +75,35 @@ func TestStandardExecutorAddValidatorTxErrors(t *testing.T) {
 	tests := []struct {
 		name        string
 		want        error
-		updateTx    func(*txs.Tx)
+		updateTx    func(*platform.Tx)
 		updateState func(*state.Diff)
 	}{
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "empty_node_id",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddValidatorTx).Validator.NodeID = ids.EmptyNodeID
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddValidatorTx).Validator.NodeID = ids.EmptyNodeID
 			},
 			want: errEmptyNodeID,
 		},
 		{
 			name: "start_time_before_current_timestamp",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddValidatorTx).Validator.Start = genesistest.DefaultValidatorStartTimeUnix - 1
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddValidatorTx).Validator.Start = genesistest.DefaultValidatorStartTimeUnix - 1
 			},
 			want: ErrTimestampNotBeforeStartTime,
 		},
 		{
 			name: "already_in_current_validator_set",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				// Start after the validator has been promoted to the current set
-				validator := &tx.Unsigned.(*txs.AddValidatorTx).Validator
+				validator := &tx.Unsigned.(*platform.AddValidatorTx).Validator
 				validator.Start = uint64(startTime.Add(time.Second).Unix())
 				validator.End = uint64(endTime.Add(time.Second).Unix())
 			},
@@ -147,7 +147,7 @@ func TestStandardExecutorAddValidatorTxErrors(t *testing.T) {
 				keys: genesistest.DefaultFundedKeys[:1],
 			})
 			tx, err := wallet.IssueAddValidatorTx(
-				&txs.Validator{
+				&platform.Validator{
 					NodeID: nodeID,
 					Start:  uint64(startTime.Unix()),
 					End:    uint64(endTime.Unix()),
@@ -183,7 +183,7 @@ func TestStandardExecutorAddValidatorTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorAddValidatorTx verifies the successful execution of an
-// [txs.AddValidatorTx].
+// [platform.AddValidatorTx].
 func TestStandardExecutorAddValidatorTx(t *testing.T) {
 	require := require.New(t)
 
@@ -197,7 +197,7 @@ func TestStandardExecutorAddValidatorTx(t *testing.T) {
 	)
 
 	stx, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
 			End:    uint64(endTime.Unix()),
@@ -235,7 +235,7 @@ func TestStandardExecutorAddValidatorTx(t *testing.T) {
 }
 
 // TestStandardExecutorAddDelegatorTxErrors verifies the failure cases of
-// [txs.AddDelegatorTx] execution.
+// [platform.AddDelegatorTx] execution.
 func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.ApricotPhase5)
 	// AddDelegatorTx is executed as a standard tx post-Banff, and the
@@ -263,7 +263,7 @@ func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 			keys: genesistest.DefaultFundedKeys[:1],
 		})
 		tx, err := wallet.IssueAddValidatorTx(
-			&txs.Validator{
+			&platform.Validator{
 				NodeID: validatorID,
 				Start:  uint64(validatorStartTime.Unix()),
 				End:    uint64(validatorEndTime.Unix()),
@@ -274,7 +274,7 @@ func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		addValidatorTx := tx.Unsigned.(*txs.AddValidatorTx)
+		addValidatorTx := tx.Unsigned.(*platform.AddValidatorTx)
 		staker, err := state.NewCurrentStaker(
 			tx.ID(),
 			addValidatorTx,
@@ -292,20 +292,20 @@ func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 	tests := []struct {
 		name        string
 		want        error
-		updateTx    func(*txs.Tx)
+		updateTx    func(*platform.Tx)
 		updateState func(*state.Diff)
 	}{
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddDelegatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddDelegatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "validator_stops_before_delegator",
-			updateTx: func(tx *txs.Tx) {
-				validator := &tx.Unsigned.(*txs.AddDelegatorTx).Validator
+			updateTx: func(tx *platform.Tx) {
+				validator := &tx.Unsigned.(*platform.AddDelegatorTx).Validator
 				validator.NodeID = genesisNodeID
 				validator.Start = genesistest.DefaultValidatorStartTimeUnix + 1
 				validator.End = genesistest.DefaultValidatorEndTimeUnix + 1
@@ -318,8 +318,8 @@ func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "delegator_starts_before_validator",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddDelegatorTx).Validator.Start = uint64(validatorStartTime.Add(-time.Second).Unix())
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddDelegatorTx).Validator.Start = uint64(validatorStartTime.Add(-time.Second).Unix())
 			},
 			updateState: func(diff *state.Diff) {
 				putCurrentValidator(diff, env.config.MinValidatorStake)
@@ -328,8 +328,8 @@ func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "delegator_stops_after_validator",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddDelegatorTx).Validator.End = uint64(validatorEndTime.Add(time.Second).Unix())
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddDelegatorTx).Validator.End = uint64(validatorEndTime.Add(time.Second).Unix())
 			},
 			updateState: func(diff *state.Diff) {
 				putCurrentValidator(diff, env.config.MinValidatorStake)
@@ -338,8 +338,8 @@ func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "starts_delegating_at_current_timestamp",
-			updateTx: func(tx *txs.Tx) {
-				validator := &tx.Unsigned.(*txs.AddDelegatorTx).Validator
+			updateTx: func(tx *platform.Tx) {
+				validator := &tx.Unsigned.(*platform.AddDelegatorTx).Validator
 				validator.NodeID = genesisNodeID
 				validator.Start = uint64(currentTimestamp.Unix())
 				validator.End = genesistest.DefaultValidatorEndTimeUnix
@@ -348,8 +348,8 @@ func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "fee_paying_key_has_no_funds",
-			updateTx: func(tx *txs.Tx) {
-				validator := &tx.Unsigned.(*txs.AddDelegatorTx).Validator
+			updateTx: func(tx *platform.Tx) {
+				validator := &tx.Unsigned.(*platform.AddDelegatorTx).Validator
 				validator.NodeID = genesisNodeID
 				validator.Start = genesistest.DefaultValidatorStartTimeUnix + 1
 				validator.End = genesistest.DefaultValidatorEndTimeUnix
@@ -382,7 +382,7 @@ func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 				keys: genesistest.DefaultFundedKeys[:1],
 			})
 			tx, err := wallet.IssueAddDelegatorTx(
-				&txs.Validator{
+				&platform.Validator{
 					NodeID: validatorID,
 					Start:  uint64(validatorStartTime.Unix()),
 					End:    uint64(validatorEndTime.Unix()),
@@ -417,7 +417,7 @@ func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorAddDelegatorTx verifies the successful execution of an
-// [txs.AddDelegatorTx].
+// [platform.AddDelegatorTx].
 func TestStandardExecutorAddDelegatorTx(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -467,7 +467,7 @@ func TestStandardExecutorAddDelegatorTx(t *testing.T) {
 				keys: genesistest.DefaultFundedKeys[1:2],
 			})
 			addValidatorTx, err := validatorWallet.IssueAddValidatorTx(
-				&txs.Validator{
+				&platform.Validator{
 					NodeID: validatorID,
 					Start:  uint64(validatorStartTime.Unix()),
 					End:    uint64(validatorEndTime.Unix()),
@@ -482,7 +482,7 @@ func TestStandardExecutorAddDelegatorTx(t *testing.T) {
 			require.NoError(err)
 
 			// Add the validator to the current validator set
-			unsignedAddValidatorTx := addValidatorTx.Unsigned.(*txs.AddValidatorTx)
+			unsignedAddValidatorTx := addValidatorTx.Unsigned.(*platform.AddValidatorTx)
 			validator, err := state.NewCurrentStaker(
 				addValidatorTx.ID(),
 				unsignedAddValidatorTx,
@@ -499,7 +499,7 @@ func TestStandardExecutorAddDelegatorTx(t *testing.T) {
 				keys: genesistest.DefaultFundedKeys[:1],
 			})
 			stx, err := wallet.IssueAddDelegatorTx(
-				&txs.Validator{
+				&platform.Validator{
 					NodeID: validatorID,
 					Start:  uint64(validatorStartTime.Unix()),
 					End:    uint64(validatorEndTime.Unix()),
@@ -533,7 +533,7 @@ func TestStandardExecutorAddDelegatorTx(t *testing.T) {
 }
 
 // TestStandardExecutorAddSubnetValidatorTxErrors verifies the failure cases
-// of [txs.AddSubnetValidatorTx] execution.
+// of [platform.AddSubnetValidatorTx] execution.
 func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.ApricotPhase5)
 
@@ -554,7 +554,7 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 	putPendingValidator := func(diff *state.Diff) {
 		wallet := newWallet(t, env, walletConfig{})
 		tx, err := wallet.IssueAddValidatorTx(
-			&txs.Validator{
+			&platform.Validator{
 				NodeID: pendingValidatorID,
 				Start:  uint64(pendingValidatorStartTime.Unix()),
 				End:    uint64(pendingValidatorEndTime.Unix()),
@@ -582,8 +582,8 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 	putSubnetValidator := func(diff *state.Diff) {
 		wallet := newWallet(t, env, walletConfig{})
 		tx, err := wallet.IssueAddSubnetValidatorTx(
-			&txs.SubnetValidator{
-				Validator: txs.Validator{
+			&platform.SubnetValidator{
+				Validator: platform.Validator{
 					NodeID: nodeID,
 					Start:  genesistest.DefaultValidatorStartTimeUnix + 1,
 					End:    genesistest.DefaultValidatorEndTimeUnix,
@@ -607,34 +607,34 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 	tests := []struct {
 		name        string
 		want        error
-		updateTx    func(*txs.Tx)
+		updateTx    func(*platform.Tx)
 		updateState func(*state.Diff)
 	}{
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddSubnetValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddSubnetValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "subnet_validator_stops_after_primary_network",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator.End = genesistest.DefaultValidatorEndTimeUnix + 1
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddSubnetValidatorTx).Validator.End = genesistest.DefaultValidatorEndTimeUnix + 1
 			},
 			want: errPeriodMismatch,
 		},
 		{
 			name: "node_not_in_pending_or_current_primary_network_validator_sets",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator.NodeID = ids.GenerateTestNodeID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddSubnetValidatorTx).Validator.NodeID = ids.GenerateTestNodeID()
 			},
 			want: errNotValidator,
 		},
 		{
 			name: "subnet_validator_starts_before_pending_primary_network_validator",
-			updateTx: func(tx *txs.Tx) {
-				validator := &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator
+			updateTx: func(tx *platform.Tx) {
+				validator := &tx.Unsigned.(*platform.AddSubnetValidatorTx).Validator
 				validator.NodeID = pendingValidatorID
 				validator.Start = uint64(pendingValidatorStartTime.Unix()) - 1
 				validator.End = uint64(pendingValidatorEndTime.Unix())
@@ -644,8 +644,8 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "subnet_validator_stops_after_pending_primary_network_validator",
-			updateTx: func(tx *txs.Tx) {
-				validator := &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator
+			updateTx: func(tx *platform.Tx) {
+				validator := &tx.Unsigned.(*platform.AddSubnetValidatorTx).Validator
 				validator.NodeID = pendingValidatorID
 				validator.Start = uint64(pendingValidatorStartTime.Unix())
 				validator.End = uint64(pendingValidatorEndTime.Unix()) + 1
@@ -655,8 +655,8 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "subnet_validator_starts_at_current_timestamp",
-			updateTx: func(tx *txs.Tx) {
-				validator := &tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator
+			updateTx: func(tx *platform.Tx) {
+				validator := &tx.Unsigned.(*platform.AddSubnetValidatorTx).Validator
 				validator.Start = uint64(newTimestamp.Unix())
 				validator.End = uint64(newTimestamp.Add(env.config.MinStakeDuration).Unix())
 			},
@@ -667,23 +667,23 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "duplicate_subnet_auth_signature_indices",
-			updateTx: func(tx *txs.Tx) {
-				input := tx.Unsigned.(*txs.AddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input)
+			updateTx: func(tx *platform.Tx) {
+				input := tx.Unsigned.(*platform.AddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input)
 				input.SigIndices = append(input.SigIndices, input.SigIndices[0])
 			},
 			want: secp256k1fx.ErrInputIndicesNotSortedUnique,
 		},
 		{
 			name: "too_few_subnet_auth_signatures",
-			updateTx: func(tx *txs.Tx) {
-				input := tx.Unsigned.(*txs.AddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input)
+			updateTx: func(tx *platform.Tx) {
+				input := tx.Unsigned.(*platform.AddSubnetValidatorTx).SubnetAuth.(*secp256k1fx.Input)
 				input.SigIndices = input.SigIndices[1:]
 			},
 			want: errUnauthorizedModification,
 		},
 		{
 			name: "subnet_auth_signature_from_non_control_key",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				sig, err := genesistest.DefaultFundedKeys[3].SignHash(hashing.ComputeHash256(tx.Unsigned.Bytes()))
 				require.NoError(t, err)
 				copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
@@ -692,8 +692,8 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "node_already_a_subnet_validator",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddSubnetValidatorTx).Validator.Start = genesistest.DefaultValidatorStartTimeUnix + 2
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddSubnetValidatorTx).Validator.Start = genesistest.DefaultValidatorStartTimeUnix + 2
 			},
 			updateState: putSubnetValidator,
 			want:        ErrDuplicateValidator,
@@ -715,8 +715,8 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			wallet := newWallet(t, env, walletConfig{})
 			tx, err := wallet.IssueAddSubnetValidatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
+				&platform.SubnetValidator{
+					Validator: platform.Validator{
 						NodeID: nodeID,
 						Start:  genesistest.DefaultValidatorStartTimeUnix + 1,
 						End:    genesistest.DefaultValidatorEndTimeUnix,
@@ -752,7 +752,7 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorAddSubnetValidatorTx verifies the successful execution
-// of an [txs.AddSubnetValidatorTx].
+// of an [platform.AddSubnetValidatorTx].
 func TestStandardExecutorAddSubnetValidatorTx(t *testing.T) {
 	env := newEnvironment(t, upgradetest.ApricotPhase5)
 
@@ -767,12 +767,12 @@ func TestStandardExecutorAddSubnetValidatorTx(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		validator   txs.Validator
+		validator   platform.Validator
 		updateState func(*state.Diff)
 	}{
 		{
 			name: "validation_period_within_current_primary_network_validator_period",
-			validator: txs.Validator{
+			validator: platform.Validator{
 				NodeID: genesistest.DefaultNodeIDs[0],
 				Start:  genesistest.DefaultValidatorStartTimeUnix + 1,
 				End:    genesistest.DefaultValidatorEndTimeUnix,
@@ -781,7 +781,7 @@ func TestStandardExecutorAddSubnetValidatorTx(t *testing.T) {
 		},
 		{
 			name: "validation_period_matches_pending_primary_network_validator_period",
-			validator: txs.Validator{
+			validator: platform.Validator{
 				NodeID: pendingValidatorID,
 				Start:  uint64(pendingValidatorStartTime.Unix()),
 				End:    uint64(pendingValidatorEndTime.Unix()),
@@ -790,7 +790,7 @@ func TestStandardExecutorAddSubnetValidatorTx(t *testing.T) {
 			updateState: func(diff *state.Diff) {
 				wallet := newWallet(t, env, walletConfig{})
 				tx, err := wallet.IssueAddValidatorTx(
-					&txs.Validator{
+					&platform.Validator{
 						NodeID: pendingValidatorID,
 						Start:  uint64(pendingValidatorStartTime.Unix()),
 						End:    uint64(pendingValidatorEndTime.Unix()),
@@ -822,7 +822,7 @@ func TestStandardExecutorAddSubnetValidatorTx(t *testing.T) {
 
 			wallet := newWallet(t, env, walletConfig{})
 			stx, err := wallet.IssueAddSubnetValidatorTx(
-				&txs.SubnetValidator{
+				&platform.SubnetValidator{
 					Validator: tt.validator,
 					Subnet:    subnetID,
 				},
@@ -860,7 +860,7 @@ func TestStandardExecutorAddSubnetValidatorTx(t *testing.T) {
 }
 
 // TestStandardExecutorAddPermissionlessValidatorTxErrors verifies the failure
-// cases of [txs.AddPermissionlessValidatorTx] execution.
+// cases of [platform.AddPermissionlessValidatorTx] execution.
 func TestStandardExecutorAddPermissionlessValidatorTxErrors(t *testing.T) {
 	// Helicon lowers the primary network's minimum staking duration, so run
 	// against the fork right before it.
@@ -881,19 +881,19 @@ func TestStandardExecutorAddPermissionlessValidatorTxErrors(t *testing.T) {
 	tests := []struct {
 		name     string
 		want     error
-		updateTx func(*txs.Tx)
+		updateTx func(*platform.Tx)
 	}{
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddPermissionlessValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "stake_duration_shorter_than_pre_helicon_minimum",
-			updateTx: func(tx *txs.Tx) {
-				validator := &tx.Unsigned.(*txs.AddPermissionlessValidatorTx).Validator
+			updateTx: func(tx *platform.Tx) {
+				validator := &tx.Unsigned.(*platform.AddPermissionlessValidatorTx).Validator
 				validator.End = uint64(env.state.GetTimestamp().Add(env.config.HeliconMinStakeDuration).Unix())
 			},
 			want: errStakeTooShort,
@@ -903,8 +903,8 @@ func TestStandardExecutorAddPermissionlessValidatorTxErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tx, err := wallet.IssueAddPermissionlessValidatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
+				&platform.SubnetValidator{
+					Validator: platform.Validator{
 						NodeID: ids.GenerateTestNodeID(),
 						End:    uint64(env.state.GetTimestamp().Add(env.config.MinStakeDuration).Unix()),
 						Wght:   env.config.MinValidatorStake,
@@ -940,7 +940,7 @@ func TestStandardExecutorAddPermissionlessValidatorTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorAddPermissionlessValidatorTx verifies the successful
-// execution of an [txs.AddPermissionlessValidatorTx].
+// execution of an [platform.AddPermissionlessValidatorTx].
 func TestStandardExecutorAddPermissionlessValidatorTx(t *testing.T) {
 	require := require.New(t)
 
@@ -964,8 +964,8 @@ func TestStandardExecutorAddPermissionlessValidatorTx(t *testing.T) {
 
 	// Stake for the Helicon minimum staking duration
 	stx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				End:    uint64(endTime.Unix()),
 				Wght:   env.config.MinValidatorStake,
@@ -1003,7 +1003,7 @@ func TestStandardExecutorAddPermissionlessValidatorTx(t *testing.T) {
 }
 
 // TestStandardExecutorAddPermissionlessDelegatorTxErrors verifies the failure
-// cases of [txs.AddPermissionlessDelegatorTx] execution.
+// cases of [platform.AddPermissionlessDelegatorTx] execution.
 func TestStandardExecutorAddPermissionlessDelegatorTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 
@@ -1018,8 +1018,8 @@ func TestStandardExecutorAddPermissionlessDelegatorTxErrors(t *testing.T) {
 
 	// setWeight updates the delegator's weight and its stake output
 	// consistently, as the two must match syntactically.
-	setWeight := func(tx *txs.Tx, weight uint64) {
-		unsignedTx := tx.Unsigned.(*txs.AddPermissionlessDelegatorTx)
+	setWeight := func(tx *platform.Tx, weight uint64) {
+		unsignedTx := tx.Unsigned.(*platform.AddPermissionlessDelegatorTx)
 		unsignedTx.Validator.Wght = weight
 		unsignedTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).Amt = weight
 	}
@@ -1027,69 +1027,69 @@ func TestStandardExecutorAddPermissionlessDelegatorTxErrors(t *testing.T) {
 	tests := []struct {
 		name     string
 		want     error
-		updateTx func(*txs.Tx)
+		updateTx func(*platform.Tx)
 	}{
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddPermissionlessDelegatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessDelegatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "weight_too_small",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				setWeight(tx, env.config.MinDelegatorStake-1)
 			},
 			want: errWeightTooSmall,
 		},
 		{
 			name: "stake_too_short",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddPermissionlessDelegatorTx).Validator.End = uint64(env.state.GetTimestamp().Add(time.Second).Unix())
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessDelegatorTx).Validator.End = uint64(env.state.GetTimestamp().Add(time.Second).Unix())
 			},
 			want: errStakeTooShort,
 		},
 		{
 			name: "stake_too_long",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddPermissionlessDelegatorTx).Validator.End = uint64(env.state.GetTimestamp().Add(env.config.MaxStakeDuration + time.Second).Unix())
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessDelegatorTx).Validator.End = uint64(env.state.GetTimestamp().Add(env.config.MaxStakeDuration + time.Second).Unix())
 			},
 			want: ErrStakeTooLong,
 		},
 		{
 			name: "wrong_staked_asset_id",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddPermissionlessDelegatorTx).StakeOuts[0].Asset.ID = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessDelegatorTx).StakeOuts[0].Asset.ID = ids.GenerateTestID()
 			},
 			want: errWrongStakedAssetID,
 		},
 		{
 			name: "validator_not_found",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddPermissionlessDelegatorTx).Validator.NodeID = ids.GenerateTestNodeID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessDelegatorTx).Validator.NodeID = ids.GenerateTestNodeID()
 			},
 			want: database.ErrNotFound,
 		},
 		{
 			name: "delegator_stops_after_validator",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.AddPermissionlessDelegatorTx).Validator.End = genesistest.DefaultValidatorEndTimeUnix + 1
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessDelegatorTx).Validator.End = genesistest.DefaultValidatorEndTimeUnix + 1
 			},
 			want: errPeriodMismatch,
 		},
 		{
 			name: "over_delegation",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				setWeight(tx, env.config.MaxValidatorStake)
 			},
 			want: ErrOverDelegated,
 		},
 		{
 			name: "flow_checker_failed",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				// Produce more AVAX than the tx consumes
-				unsignedTx := tx.Unsigned.(*txs.AddPermissionlessDelegatorTx)
+				unsignedTx := tx.Unsigned.(*platform.AddPermissionlessDelegatorTx)
 				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
@@ -1107,8 +1107,8 @@ func TestStandardExecutorAddPermissionlessDelegatorTxErrors(t *testing.T) {
 			// the wallet's UTXO view consistent with env.state.
 			wallet := newWallet(t, env, walletConfig{})
 			tx, err := wallet.IssueAddPermissionlessDelegatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
+				&platform.SubnetValidator{
+					Validator: platform.Validator{
 						NodeID: nodeID,
 						End:    uint64(endTime.Unix()),
 						Wght:   env.config.MinDelegatorStake,
@@ -1141,7 +1141,7 @@ func TestStandardExecutorAddPermissionlessDelegatorTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorAddPermissionlessDelegatorTx verifies the successful
-// execution of an [txs.AddPermissionlessDelegatorTx].
+// execution of an [platform.AddPermissionlessDelegatorTx].
 func TestStandardExecutorAddPermissionlessDelegatorTx(t *testing.T) {
 	require := require.New(t)
 
@@ -1154,8 +1154,8 @@ func TestStandardExecutorAddPermissionlessDelegatorTx(t *testing.T) {
 	)
 
 	stx, err := wallet.IssueAddPermissionlessDelegatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				End:    uint64(endTime.Unix()),
 				Wght:   env.config.MinDelegatorStake,
@@ -1196,7 +1196,7 @@ func TestStandardExecutorAddPermissionlessDelegatorTx(t *testing.T) {
 }
 
 // TestStandardExecutorRemoveSubnetValidatorTxErrors verifies the failure cases
-// of [txs.RemoveSubnetValidatorTx] execution.
+// of [platform.RemoveSubnetValidatorTx] execution.
 func TestStandardExecutorRemoveSubnetValidatorTxErrors(t *testing.T) {
 	var (
 		env    = newEnvironment(t, upgradetest.Durango)
@@ -1209,13 +1209,13 @@ func TestStandardExecutorRemoveSubnetValidatorTxErrors(t *testing.T) {
 	tests := []struct {
 		name         string
 		want         error
-		updateTx     func(*txs.Tx)
+		updateTx     func(*platform.Tx)
 		updateStaker func(*state.Staker)
 	}{
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.RemoveSubnetValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.RemoveSubnetValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
@@ -1229,14 +1229,14 @@ func TestStandardExecutorRemoveSubnetValidatorTxErrors(t *testing.T) {
 		{
 			name: "validator_is_permissionless",
 			updateStaker: func(staker *state.Staker) {
-				staker.Priority = txs.SubnetPermissionlessValidatorCurrentPriority
+				staker.Priority = platform.SubnetPermissionlessValidatorCurrentPriority
 			},
 			want: errRemovePermissionlessValidator,
 		},
 		{
 			name: "cannot_find_subnet",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.RemoveSubnetValidatorTx).Subnet = testSubnetID
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.RemoveSubnetValidatorTx).Subnet = testSubnetID
 			},
 			updateStaker: func(staker *state.Staker) {
 				staker.SubnetID = testSubnetID
@@ -1245,14 +1245,14 @@ func TestStandardExecutorRemoveSubnetValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "tx_has_no_credentials",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				tx.Creds = nil
 			},
 			want: errWrongNumberOfCredentials,
 		},
 		{
 			name: "no_permission_to_remove_validator",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				// Remove a signature from the subnet auth credential
 				cred := tx.Creds[len(tx.Creds)-1].(*secp256k1fx.Credential)
 				cred.Sigs = cred.Sigs[1:]
@@ -1261,9 +1261,9 @@ func TestStandardExecutorRemoveSubnetValidatorTxErrors(t *testing.T) {
 		},
 		{
 			name: "flow_checker_failed",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				// Produce more AVAX than the tx consumes
-				unsignedTx := tx.Unsigned.(*txs.RemoveSubnetValidatorTx)
+				unsignedTx := tx.Unsigned.(*platform.RemoveSubnetValidatorTx)
 				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
@@ -1294,7 +1294,7 @@ func TestStandardExecutorRemoveSubnetValidatorTxErrors(t *testing.T) {
 				TxID:     ids.GenerateTestID(),
 				NodeID:   nodeID,
 				SubnetID: testSubnet1.ID(),
-				Priority: txs.SubnetPermissionedValidatorCurrentPriority,
+				Priority: platform.SubnetPermissionedValidatorCurrentPriority,
 			}
 			if tt.updateStaker != nil {
 				tt.updateStaker(staker)
@@ -1315,7 +1315,7 @@ func TestStandardExecutorRemoveSubnetValidatorTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorRemoveSubnetValidatorTx verifies the successful
-// execution of a [txs.RemoveSubnetValidatorTx], including on a subnet
+// execution of a [platform.RemoveSubnetValidatorTx], including on a subnet
 // converted to an L1.
 func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 	require := require.New(t)
@@ -1337,7 +1337,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 		TxID:     ids.GenerateTestID(),
 		NodeID:   nodeID,
 		SubnetID: testSubnet1.ID(),
-		Priority: txs.SubnetPermissionedValidatorCurrentPriority,
+		Priority: platform.SubnetPermissionedValidatorCurrentPriority,
 	}
 	require.NoError(diff.PutCurrentValidator(staker))
 
@@ -1358,7 +1358,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	tx := stx.Unsigned.(*txs.RemoveSubnetValidatorTx)
+	tx := stx.Unsigned.(*platform.RemoveSubnetValidatorTx)
 
 	// assert that the validator was removed from the current validator set
 	_, err = diff.GetCurrentValidator(tx.Subnet, tx.NodeID)
