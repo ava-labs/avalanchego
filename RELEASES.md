@@ -6,6 +6,10 @@
 
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 
+### Metrics
+
+- Added `avalanche_platformvm_local_delegated_staked` (gauge): amount (in nAVAX) of AVAX delegated to this node on the Primary Network. `avalanche_platformvm_local_staked` reports this node's own stake and the delegations to it summed together; the new gauge reports the delegated portion on its own.
+
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 
 This release schedules the activation of the Helicon network upgrade at 11 AM ET (3 PM UTC) on Tuesday, September 22nd, 2026 on Mainnet.
@@ -95,7 +99,6 @@ If encountering one of these `FATAL` errors, the only way to recover is by delet
   - Server-side histograms: `avalanche_{vmName}_sync_server_sync_proof_generation_seconds`, `avalanche_{vmName}_sync_server_sync_generated_proof_size_bytes`, and `avalanche_{vmName}_sync_server_sync_proof_shrink_new_key_limit`
   - Client-side histograms: `avalanche_{vmName}_sync_firewood_sync_proof_verification_seconds`, `avalanche_{vmName}_sync_firewood_sync_proof_commit_seconds`, and `avalanche_{vmName}_sync_firewood_sync_received_proof_size_bytes`
   - Client-side gauge: `avalanche_{vmName}_sync_firewood_sync_request_key_limit`
-- Added `avalanche_platformvm_local_delegated_staked` (gauge): amount (in nAVAX) of AVAX delegated to this node on the Primary Network. `avalanche_platformvm_local_staked` reports this node's own stake and the delegations to it summed together; the new gauge reports the delegated portion on its own.
 
 NOTE: `{vmName}` is `evm` for Coreth and `subnetevm` for Subnet-EVM. The `sae` and `cchain` metrics exist only on the C-Chain.
 

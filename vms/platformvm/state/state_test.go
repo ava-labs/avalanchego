@@ -53,17 +53,19 @@ import (
 
 var defaultValidatorNodeID = ids.GenerateTestNodeID()
 
+var defaultRewardConfig = reward.Config{
+	MaxConsumptionRate: .12 * reward.PercentDenominator,
+	MinConsumptionRate: .1 * reward.PercentDenominator,
+	MintingPeriod:      365 * 24 * time.Hour,
+	SupplyCap:          720 * units.MegaAvax,
+}
+
 func newTestState(t testing.TB, db database.Database) *State {
 	return newTestStateWithUpgrade(
 		t,
 		db,
 		upgradetest.GetConfig(upgradetest.Latest),
-		reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .1 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		},
+		defaultRewardConfig,
 	)
 }
 
@@ -72,6 +74,24 @@ func newTestStateWithUpgrade(
 	db database.Database,
 	upgradeConfig upgrade.Config,
 	rewardConfig reward.Config,
+) *State {
+	return newTestStateWithNodeID(
+		t,
+		db,
+		upgradeConfig,
+		rewardConfig,
+		ids.GenerateTestNodeID(),
+		metrics.Noop,
+	)
+}
+
+func newTestStateWithNodeID(
+	t testing.TB,
+	db database.Database,
+	upgradeConfig upgrade.Config,
+	rewardConfig reward.Config,
+	localNodeID ids.NodeID,
+	m metrics.Metrics,
 ) *State {
 	s, err := New(
 		db,
@@ -84,10 +104,10 @@ func newTestStateWithUpgrade(
 		&config.Default,
 		&snow.Context{
 			NetworkID: constants.UnitTestID,
-			NodeID:    ids.GenerateTestNodeID(),
+			NodeID:    localNodeID,
 			Log:       logging.NoLog{},
 		},
-		metrics.Noop,
+		m,
 		rewardConfig,
 	)
 	require.NoError(t, err)
@@ -5097,31 +5117,15 @@ func (m *stakeMetrics) SetTotalStake(s uint64) {
 	m.total = s
 }
 
-func newTestStateWithNodeID(t testing.TB, localNodeID ids.NodeID, m metrics.Metrics) *State {
-	s, err := New(
-		memdb.New(),
-		genesistest.NewBytes(t, genesistest.Config{
-			NodeIDs: []ids.NodeID{defaultValidatorNodeID},
-		}),
-		prometheus.NewRegistry(),
-		validators.NewManager(),
+func newTestStateWithMetrics(t testing.TB, db database.Database, localNodeID ids.NodeID, m metrics.Metrics) *State {
+	return newTestStateWithNodeID(
+		t,
+		db,
 		upgradetest.GetConfig(upgradetest.Latest),
-		&config.Default,
-		&snow.Context{
-			NetworkID: constants.UnitTestID,
-			NodeID:    localNodeID,
-			Log:       logging.NoLog{},
-		},
+		defaultRewardConfig,
+		localNodeID,
 		m,
-		reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .1 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		},
 	)
-	require.NoError(t, err)
-	return s
 }
 
 func TestStakeMetricsDelegated(t *testing.T) {
@@ -5130,7 +5134,7 @@ func TestStakeMetricsDelegated(t *testing.T) {
 	const delegatorWeight = 2 * genesistest.DefaultValidatorWeight
 
 	m := &stakeMetrics{Metrics: metrics.Noop}
-	s := newTestStateWithNodeID(t, defaultValidatorNodeID, m)
+	s := newTestStateWithMetrics(t, memdb.New(), defaultValidatorNodeID, m)
 
 	require.Equal(genesistest.DefaultValidatorWeight, m.local)
 	require.Zero(m.delegated)
@@ -5155,34 +5159,76 @@ func TestStakeMetricsDelegated(t *testing.T) {
 	require.Equal(genesistest.DefaultValidatorWeight, m.total)
 }
 
+// TestStakeMetricsReload covers initValidatorSets, which rebuilds the validator
+// manager from disk rather than from a commit.
+func TestStakeMetricsReload(t *testing.T) {
+	require := require.New(t)
+
+	const delegatorWeight = 2 * genesistest.DefaultValidatorWeight
+
+	db := memdb.New()
+	m := &stakeMetrics{Metrics: metrics.Noop}
+	s := newTestStateWithMetrics(t, db, defaultValidatorNodeID, m)
+
+	// The delegator needs a backing tx to survive the reload.
+	unsigned := createPermissionlessDelegatorTx(constants.PrimaryNetworkID, platform.Validator{
+		NodeID: defaultValidatorNodeID,
+		Start:  genesistest.DefaultValidatorStartTimeUnix,
+		End:    genesistest.DefaultValidatorEndTimeUnix,
+		Wght:   delegatorWeight,
+	})
+	tx := &platform.Tx{Unsigned: unsigned}
+	require.NoError(tx.Initialize(platform.Codec))
+	delegator, err := NewCurrentStaker(
+		tx.ID(),
+		unsigned,
+		genesistest.DefaultValidatorStartTime,
+		unsigned.EndTime(),
+		unsigned.Weight(),
+		0,
+	)
+	require.NoError(err)
+
+	s.AddTx(tx, status.Committed)
+	require.NoError(s.PutCurrentDelegator(delegator))
+	s.SetHeight(1)
+	require.NoError(s.Commit())
+
+	require.Equal(genesistest.DefaultValidatorWeight+delegatorWeight, m.local)
+	require.Equal(delegatorWeight, m.delegated)
+
+	reloaded := &stakeMetrics{Metrics: metrics.Noop}
+	newTestStateWithMetrics(t, db, defaultValidatorNodeID, reloaded)
+
+	require.Equal(genesistest.DefaultValidatorWeight+delegatorWeight, reloaded.local)
+	require.Equal(delegatorWeight, reloaded.delegated)
+}
+
 func TestStakeMetricsNotAValidator(t *testing.T) {
 	require := require.New(t)
 
 	m := &stakeMetrics{Metrics: metrics.Noop}
-	newTestStateWithNodeID(t, ids.GenerateTestNodeID(), m)
+	newTestStateWithMetrics(t, memdb.New(), ids.GenerateTestNodeID(), m)
 
 	require.Zero(m.local)
 	require.Zero(m.delegated)
 	require.Equal(genesistest.DefaultValidatorWeight, m.total)
 }
 
-func TestUpdateStakeMetricsInconsistentValidatorWeight(t *testing.T) {
+// TestStakeMetricsInconsistentValidatorWeight asserts that a manager that
+// disagrees with the staker state reports 0 rather than failing the commit.
+func TestStakeMetricsInconsistentValidatorWeight(t *testing.T) {
 	require := require.New(t)
 
-	s := newTestStateWithNodeID(t, defaultValidatorNodeID, metrics.Noop)
+	m := &stakeMetrics{Metrics: metrics.Noop}
+	s := newTestStateWithMetrics(t, memdb.New(), defaultValidatorNodeID, m)
 	require.NoError(s.validators.RemoveWeight(
 		constants.PrimaryNetworkID,
 		defaultValidatorNodeID,
 		1,
 	))
 
-	err := s.updateStakeMetrics()
-	require.EqualError(
-		err,
-		fmt.Sprintf(
-			"local validator weight %d exceeds validator manager weight %d: underflow",
-			genesistest.DefaultValidatorWeight,
-			genesistest.DefaultValidatorWeight-1,
-		),
-	)
+	require.NoError(s.updateStakeMetrics())
+	require.Zero(m.delegated)
+	require.Equal(genesistest.DefaultValidatorWeight-1, m.local)
 }

@@ -63,7 +63,7 @@ type Metrics interface {
 
 	// Mark that this much stake is staked on the node.
 	SetLocalStake(uint64)
-	// Mark that this much stake was delegated to the node.
+	// Mark that this much stake is delegated to the node.
 	SetLocalDelegatedStake(uint64)
 	// Mark that this much stake is staked in the network.
 	SetTotalStake(uint64)

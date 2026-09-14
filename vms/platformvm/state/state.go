@@ -2714,31 +2714,44 @@ func (s *State) updateStakeMetrics() error {
 	}
 
 	localStake := s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID)
+
 	s.metrics.SetLocalStake(localStake)
-
-	var delegatedStake uint64
-	if localStake != 0 {
-		vdr, err := s.GetCurrentValidator(constants.PrimaryNetworkID, s.ctx.NodeID)
-		if err != nil {
-			return fmt.Errorf("failed to get local validator: %w", err)
-		}
-
-		// The manager's weight includes the validator's own stake. Underflow
-		// means the manager is inconsistent with the current staker state.
-		delegatedStake, err = safemath.Sub(localStake, vdr.Weight)
-		if err != nil {
-			return fmt.Errorf(
-				"local validator weight %d exceeds validator manager weight %d: %w",
-				vdr.Weight,
-				localStake,
-				err,
-			)
-		}
-	}
-	s.metrics.SetLocalDelegatedStake(delegatedStake)
-
+	s.metrics.SetLocalDelegatedStake(s.localDelegatedStake(localStake))
 	s.metrics.SetTotalStake(totalWeight)
 	return nil
+}
+
+// localDelegatedStake subtracts this node's own validator weight from
+// localStake, its weight in the validator manager, which is its own stake plus
+// every delegation to it.
+//
+// Failures are logged and reported as 0 rather than returned, because
+// updateStakeMetrics also runs where nothing is persisted (VM.Disconnected), so
+// returning would stop the chain over a gauge. A zero localStake is the genesis
+// window, where the manager is empty but the stakers are not.
+func (s *State) localDelegatedStake(localStake uint64) uint64 {
+	if localStake == 0 {
+		return 0
+	}
+
+	vdr, err := s.GetCurrentValidator(constants.PrimaryNetworkID, s.ctx.NodeID)
+	if err != nil {
+		s.ctx.Log.Error("failed to get local validator",
+			zap.Error(err),
+		)
+		return 0
+	}
+
+	delegatedStake, err := safemath.Sub(localStake, vdr.Weight)
+	if err != nil {
+		s.ctx.Log.Error("validator manager disagrees with current staker state",
+			zap.Uint64("managerWeight", localStake),
+			zap.Uint64("validatorWeight", vdr.Weight),
+			zap.Error(err),
+		)
+		return 0
+	}
+	return delegatedStake
 }
 
 type validatorDiff struct {
