@@ -71,7 +71,7 @@ type Config struct {
 	EVMTimeout             time.Duration
 	GasCap                 uint64
 	BatchRequestLimit      uint64 // 0 = no limit
-	StateReplayConcurrency uint64 // max concurrent historical state requests re-executing blocks
+	StateReplayConcurrency uint64 // 0 = no limit
 
 	// Transaction submission
 	TxFeeCap            float64 // 0 = no cap
@@ -80,15 +80,11 @@ type Config struct {
 	ResolvePendingToLastExecuted bool
 }
 
-const DefaultStateReplayConcurrency = 1
-
 var (
 	// ErrBatchRequestLimitTooLarge means [Config.BatchRequestLimit] overflows an int.
 	ErrBatchRequestLimitTooLarge = errors.New("batch request limit exceeds max")
 	// ErrUnknownAPI means [Config.APIs] contains an API that doesn't exist.
 	ErrUnknownAPI = errors.New("unknown API")
-	// ErrZeroStateReplayConcurrency means [Config.StateReplayConcurrency] is 0.
-	ErrZeroStateReplayConcurrency = errors.New("state replay concurrency must be non-zero")
 	// ErrStateReplayConcurrencyTooLarge means [Config.StateReplayConcurrency] overflows an int.
 	ErrStateReplayConcurrencyTooLarge = errors.New("state replay concurrency exceeds max")
 )
@@ -103,9 +99,6 @@ func (c Config) Verify() error {
 		if !known.Contains(a) {
 			return fmt.Errorf("%w: %q", ErrUnknownAPI, a)
 		}
-	}
-	if c.StateReplayConcurrency == 0 {
-		return ErrZeroStateReplayConcurrency
 	}
 	if c.StateReplayConcurrency > math.MaxInt {
 		return fmt.Errorf("%w: %d > %d", ErrStateReplayConcurrencyTooLarge, c.StateReplayConcurrency, math.MaxInt)
@@ -132,6 +125,12 @@ func New(chain Chain, config Config) (*Provider, error) {
 		return nil, fmt.Errorf("gasprice.NewEstimator(...): %v", err)
 	}
 
+	// A nil channel signals unbounded re-execution; see [backend.stateAtBlock].
+	var replaySlots chan struct{}
+	if config.StateReplayConcurrency > 0 {
+		replaySlots = make(chan struct{}, config.StateReplayConcurrency)
+	}
+
 	chainIdx := chainIndexer{chain}
 	override := bloomOverrider{chain}
 
@@ -146,7 +145,7 @@ func New(chain Chain, config Config) (*Provider, error) {
 		chain.Mempool(),
 		chainIdx,
 		override,
-		make(chan struct{}, config.StateReplayConcurrency),
+		replaySlots,
 		newBloomIndexer(
 			// TODO(alarso16): if we are state syncing, we need to provide the
 			// first block available to the indexer via
