@@ -2721,9 +2721,8 @@ func (s *State) updateStakeMetrics() error {
 	return nil
 }
 
-// localAndDelegatedStake returns this node's weight in the validator manager -
-// its own stake plus every delegation to it - and the delegated portion of that
-// weight, recovered by subtracting the node's own validator weight.
+// localAndDelegatedStake returns this node's total weight and the delegated
+// portion of that weight.
 //
 // Failures are logged and the delegated portion reported as 0 rather than
 // returned, because updateStakeMetrics also runs where nothing is persisted
