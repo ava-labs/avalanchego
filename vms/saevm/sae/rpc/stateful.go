@@ -97,14 +97,16 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 
 // StateAtBlock returns the state database after executing the given block.
 //
-// The reexec, base, readOnly, and preferDisk parameters are ignored because SAE
-// does not implement geth's re-execution-from-archive strategy, but relies on
-// internal details.
+// The following flags are ignored:
+// - reexec     // TODO(alarso16): Configure the tracer API to have a different maximum depth.
+// - base       // TODO(alarso16): Re-use previous state in `debug_traceChain` if possible.
+// - readOnly   // Ignored because all APIs are read only.
+// - preferDisk // Ignored base isn't used either.
 //
-// Like geth, SAE only stores historical state roots, not full historical state.
-// The underlying trie data must still be present in the state cache/DB for
-// [state.New] to succeed. This means tracing is limited to recent blocks whose
-// trie data has not been pruned (or requires an archival node for older blocks).
+// Like geth, SAE requires that the underlying trie data must still be present
+// in the state cache/DB for [state.New] to succeed. This means tracing is
+// limited to recent blocks whose trie data has not been pruned (or requires an
+// archival node for older blocks).
 //
 // Reference: https://geth.ethereum.org/docs/developers/evm-tracing#state-availability
 //
@@ -214,6 +216,8 @@ func (b *backend) lastBlockWithState(ctx context.Context, num uint64) (*state.St
 // the state just before the target transaction, then returns the message and
 // block context needed for tracing. Replay does not apply end-of-block
 // operations, record block progress, or publish receipts.
+//
+// reexec is ignored. TODO(alarso16): Configure the tracer API to have a different maximum depth.
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
