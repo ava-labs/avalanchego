@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -38,13 +39,13 @@ var (
 	ErrRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
 	ErrRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
 	ErrInvalidState                  = errors.New("generated output isn't valid state")
-	ErrWrongTxType                   = errors.New("wrong transaction type")
 	ErrInvalidID                     = errors.New("invalid ID")
 	ErrProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
 	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
 	errShouldBeAutoRenewedStaker     = errors.New("expected auto renewed staker")
 	errInvalidTimestamp              = errors.New("invalid timestamp")
 	errUnexpectedStakerTxType        = errors.New("unexpected staker transaction type")
+	errWrongTxType                   = errors.New("wrong transaction type")
 )
 
 // ProposalTx executes the proposal transaction [tx].
@@ -79,6 +80,8 @@ func ProposalTx(
 }
 
 type proposalTxExecutor struct {
+	txs.UnsupportedTxVisitor
+
 	// inputs, to be filled before visitor methods are called
 	backend       *Backend
 	feeCalculator fee.Calculator
@@ -90,74 +93,6 @@ type proposalTxExecutor struct {
 	// [onAbortState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is aborted.
 	onAbortState *state.Diff
-}
-
-func (*proposalTxExecutor) CreateChainTx(*platform.CreateChainTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) CreateSubnetTx(*platform.CreateSubnetTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) ImportTx(*platform.ImportTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) ExportTx(*platform.ExportTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) RemoveSubnetValidatorTx(*platform.RemoveSubnetValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) TransformSubnetTx(*platform.TransformSubnetTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) AddPermissionlessValidatorTx(*platform.AddPermissionlessValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) AddPermissionlessDelegatorTx(*platform.AddPermissionlessDelegatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) TransferSubnetOwnershipTx(*platform.TransferSubnetOwnershipTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) BaseTx(*platform.BaseTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) ConvertSubnetToL1Tx(*platform.ConvertSubnetToL1Tx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) RegisterL1ValidatorTx(*platform.RegisterL1ValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) SetL1ValidatorWeightTx(*platform.SetL1ValidatorWeightTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) IncreaseL1ValidatorBalanceTx(*platform.IncreaseL1ValidatorBalanceTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) DisableL1ValidatorTx(*platform.DisableL1ValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) AddAutoRenewedValidatorTx(*platform.AddAutoRenewedValidatorTx) error {
-	return ErrWrongTxType
-}
-
-func (*proposalTxExecutor) SetAutoRenewedValidatorConfigTx(*platform.SetAutoRenewedValidatorConfigTx) error {
-	return ErrWrongTxType
 }
 
 func (e *proposalTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
@@ -632,7 +567,7 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx platform.DelegatorTx
 	//            AddSubnetValidatorTx.
 	vdrTx, ok := vdrTxIntf.Unsigned.(platform.ValidatorTx)
 	if !ok {
-		return ErrWrongTxType
+		return errWrongTxType
 	}
 
 	// Calculate split of reward between delegator/delegatee
