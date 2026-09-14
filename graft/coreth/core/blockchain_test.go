@@ -162,6 +162,22 @@ func TestPruningBlockChain(t *testing.T) {
 	}
 }
 
+// TestPruningBlockChainSpeculativeWarmup runs the chain test suite with the
+// speculative warmup enabled: the warmup executes against throwaway state and
+// must never change the outcome of block processing.
+func TestPruningBlockChainSpeculativeWarmup(t *testing.T) {
+	warmupConfig := *pruningConfig
+	warmupConfig.SpeculativeWarmup = true
+	createWarmupBlockChain := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, _ string) (*BlockChain, error) {
+		return createBlockChain(db, &warmupConfig, gspec, lastAcceptedHash)
+	}
+	for _, tt := range tests {
+		t.Run(tt.Name, func(t *testing.T) {
+			tt.testFunc(t, createWarmupBlockChain)
+		})
+	}
+}
+
 func TestPruningBlockChainSnapsDisabled(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
