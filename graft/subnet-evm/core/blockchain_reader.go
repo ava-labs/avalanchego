@@ -384,7 +384,14 @@ func (bc *BlockChain) GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig
 	if err != nil {
 		return commontype.EmptyFeeConfig, nil, err
 	}
+	return bc.CacheFeeConfigFromState(parent, stateDB)
+}
 
+// CacheFeeConfigFromState reads the fee config stored in [stateDB], which must
+// hold the state at [parent], and caches it under parent.Root. Historical
+// state replay uses it so that block finalization does not need the parent
+// state to be available in the live trie database.
+func (bc *BlockChain) CacheFeeConfigFromState(parent *types.Header, stateDB *state.StateDB) (commontype.FeeConfig, *big.Int, error) {
 	storedFeeConfig := feemanager.GetStoredFeeConfig(stateDB)
 	// this should not return an invalid fee config since it's assumed that
 	// StoreFeeConfig returns an error when an invalid fee config is attempted to be stored.

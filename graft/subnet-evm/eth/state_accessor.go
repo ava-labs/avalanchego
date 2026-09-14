@@ -321,6 +321,12 @@ func (eth *Ethereum) firewoodReconstructedState(ctx context.Context, header *typ
 				return nil, nil, fmt.Errorf("block %d not found", next)
 			}
 
+			// Finalization reads the parent's fee config through the live trie
+			// database, which does not hold historical roots. Prime the cache from
+			// the replay state, which is at [current] here.
+			if _, _, err := eth.blockchain.CacheFeeConfigFromState(current, cache); err != nil {
+				return nil, nil, fmt.Errorf("fee config at block %d: %w", current.Number.Uint64(), err)
+			}
 			_, _, _, err := eth.blockchain.Processor().Process(nextBlock, current, cache, vm.Config{})
 			if err != nil {
 				return nil, nil, fmt.Errorf("processing block %d: %w", next, err)
