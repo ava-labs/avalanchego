@@ -933,7 +933,7 @@ func TestStatefulRPCsEveryHeight(t *testing.T) {
 						// Checks `StateAtTransaction`
 						sut.testRPC(ctx, t, rpcTest{
 							method: "debug_traceTransaction",
-							args:   []any{txHashes[height+1]},
+							args:   []any{txHashes[height-1]},
 							want:   wantTransferTrace,
 						})
 					}
