@@ -2736,7 +2736,7 @@ func (s *State) localAndDelegatedStake() (uint64, uint64) {
 
 	vdr, err := s.GetCurrentValidator(constants.PrimaryNetworkID, s.ctx.NodeID)
 	if err != nil {
-		s.ctx.Log.Error("failed to get local validator",
+		s.ctx.Log.Debug("failed to get local validator",
 			zap.Error(err),
 		)
 		return localStake, 0
@@ -2744,7 +2744,7 @@ func (s *State) localAndDelegatedStake() (uint64, uint64) {
 
 	delegatedStake, err := safemath.Sub(localStake, vdr.Weight)
 	if err != nil {
-		s.ctx.Log.Error("validator manager stake is lower than the validator's weight",
+		s.ctx.Log.Debug("validator manager stake is lower than the validator's weight",
 			zap.Uint64("managerWeight", localStake),
 			zap.Uint64("validatorWeight", vdr.Weight),
 			zap.Error(err),
