@@ -1,0 +1,23 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "enginetest",
+    srcs = [
+        "network.go",
+        "vm.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/snowman/enginetest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow/consensus/snowman",
+        "//snow/consensus/snowman/snowmantest",
+        "//snow/engine/common",
+        "//snow/engine/enginetest",
+        "//snow/engine/snowman/block/blocktest",
+        "//snow/snowtest",
+        "//utils/set",
+        "@com_github_stretchr_testify//require",
+    ],
+)
