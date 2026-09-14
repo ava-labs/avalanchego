@@ -19,6 +19,8 @@ go_library(
         "//graft/evm/sync/types",
         "//ids",
         "//network/p2p",
+        "//utils/logging",
+        "//utils/set",
         "//vms/evm/sync/hashdb",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
@@ -29,6 +31,7 @@ go_library(
         "@com_github_ava_labs_libevm//params",
         "@com_github_ava_labs_libevm//rlp",
         "@com_github_ava_labs_libevm//trie",
+        "@com_github_prometheus_client_golang//prometheus",
     ],
 )
 

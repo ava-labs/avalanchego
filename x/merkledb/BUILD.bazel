@@ -91,7 +91,6 @@ go_test(
         "//trace",
         "//utils",
         "//utils/hashing",
-        "//utils/logging",
         "//utils/maybe",
         "//utils/set",
         "//utils/units",
