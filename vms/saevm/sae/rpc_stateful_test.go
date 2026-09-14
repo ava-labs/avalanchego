@@ -889,18 +889,20 @@ func TestStatefulRPCsEveryHeight(t *testing.T) {
 				withDB(srcDB),
 			)...)
 
-			// One transfer per block, so the sender's nonce at height h is h.
+			txHashes := make([]common.Hash, 0, numBlocks)
 			prev := src.lastAcceptedBlock(t)
 			for h := uint64(1); h <= numBlocks; h++ {
 				// Settling the parent before building the next block evicts all
 				// but the most recent blocks from memory.
 				vmTime.AdvanceToSettle(ctx, t, prev)
-				b := src.runConsensusLoop(t, src.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+				tx := src.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 					To:        &zeroAddr,
 					Gas:       params.TxGas,
 					GasFeeCap: big.NewInt(params.GWei),
-				}))
+				})
+				b := src.runConsensusLoop(t, tx)
 				require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+				txHashes = append(txHashes, tx.Hash())
 				prev = b
 			}
 
@@ -913,11 +915,28 @@ func TestStatefulRPCsEveryHeight(t *testing.T) {
 				withDB(saetest.CopyDB(t, srcDB)),
 			)...)
 
+			// A plain transfer consumes exactly the intrinsic gas.
+			wantTransferTrace := logger.ExecutionResult{
+				Gas:        params.TxGas,
+				StructLogs: []logger.StructLogRes{},
+			}
+
 			for height := range uint64(numBlocks) + 1 {
 				t.Run(fmt.Sprintf("block_%02d", height), func(t *testing.T) {
+					// checks `StateAtBlock`
 					got, err := sut.NonceAt(ctx, sender, new(big.Int).SetUint64(height))
 					require.NoError(t, err, "NonceAt()")
 					assert.Equal(t, height, got, "NonceAt(): one transaction per block")
+
+					// Can't trace genesis
+					if height > 0 {
+						// Checks `StateAtTransaction`
+						sut.testRPC(ctx, t, rpcTest{
+							method: "debug_traceTransaction",
+							args:   []any{txHashes[height+1]},
+							want:   wantTransferTrace,
+						})
+					}
 				})
 			}
 		})
