@@ -33,7 +33,6 @@ graft_go_test(
     embed = [":config"],
     deps = [
         "//ids",
-        "//utils",
         "//utils/constants",
         "//utils/set",
         "//vms/evm/sync/customrawdb",

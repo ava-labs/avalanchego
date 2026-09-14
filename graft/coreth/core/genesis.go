@@ -40,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/libevm/common"
@@ -348,8 +347,8 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) (*types.Bl
 		// Helicon: set the ACP-176 and ACP-283 exponents along with the
 		// SAE settlement markers.
 		if confExtra.IsHelicon(g.Timestamp) {
-			headerExtra.TargetExponent = utils.PointerTo(dynamic.InitialTargetExponent)
-			headerExtra.MinPriceExponent = utils.PointerTo(dynamic.InitialPriceExponent)
+			headerExtra.TargetExponent = new(dynamic.InitialTargetExponent)
+			headerExtra.MinPriceExponent = new(dynamic.InitialPriceExponent)
 
 			// The genesis block is synchronous and thus self-settling, so its settlement
 			// markers are never read.

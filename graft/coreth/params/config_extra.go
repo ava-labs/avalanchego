@@ -11,7 +11,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
@@ -94,11 +93,11 @@ func SetEthUpgrades(c *ChainConfig) error {
 	// We only mark Shanghai and Cancun as enabled if we have marked them as
 	// scheduled.
 	if durango := extra.DurangoBlockTimestamp; durango != nil && *durango < unscheduledActivation {
-		c.ShanghaiTime = utils.PointerTo(*durango)
+		c.ShanghaiTime = new(*durango)
 	}
 
 	if etna := extra.EtnaTimestamp; etna != nil && *etna < unscheduledActivation {
-		c.CancunTime = utils.PointerTo(*etna)
+		c.CancunTime = new(*etna)
 	}
 	return nil
 }

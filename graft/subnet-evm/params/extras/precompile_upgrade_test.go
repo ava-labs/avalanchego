@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TestVerifyUpgradeConfig(t *testing.T) {
@@ -21,7 +20,7 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 		FeeConfig: DefaultFeeConfig,
 	}
 	chainConfig.GenesisPrecompiles = Precompiles{
-		txallowlist.ConfigKey: txallowlist.NewConfig(utils.PointerTo[uint64](1), admins, nil, nil),
+		txallowlist.ConfigKey: txallowlist.NewConfig(new(uint64(1)), admins, nil, nil),
 	}
 
 	type test struct {
@@ -34,7 +33,7 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 			expectedError: errPrecompileUpgradeInvalidDisable,
 			upgrades: []PrecompileUpgrade{
 				{
-					Config: txallowlist.NewConfig(utils.PointerTo[uint64](2), admins, nil, nil),
+					Config: txallowlist.NewConfig(new(uint64(2)), admins, nil, nil),
 				},
 			},
 		},
@@ -42,7 +41,7 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 			expectedError: errPrecompileUpgradeSameKeyTimestampNotStrictly,
 			upgrades: []PrecompileUpgrade{
 				{
-					Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](0)),
+					Config: txallowlist.NewDisableConfig(new(uint64)),
 				},
 			},
 		},
@@ -50,7 +49,7 @@ func TestVerifyUpgradeConfig(t *testing.T) {
 			expectedError: errPrecompileUpgradeSameKeyTimestampNotStrictly,
 			upgrades: []PrecompileUpgrade{
 				{
-					Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](1)),
+					Config: txallowlist.NewDisableConfig(new(uint64(1))),
 				},
 			},
 		},
@@ -79,8 +78,8 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 	admins := []common.Address{{1}}
 	chainConfig := &ChainConfig{}
 	chainConfig.GenesisPrecompiles = Precompiles{
-		txallowlist.ConfigKey:       txallowlist.NewConfig(utils.PointerTo[uint64](1), admins, nil, nil),
-		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.PointerTo[uint64](10), admins, nil, nil),
+		txallowlist.ConfigKey:       txallowlist.NewConfig(new(uint64(1)), admins, nil, nil),
+		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(new(uint64(10)), admins, nil, nil),
 	}
 
 	tests := map[string]upgradeCompatibilityTest{
@@ -90,10 +89,10 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](6)),
+							Config: txallowlist.NewDisableConfig(new(uint64(6))),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.PointerTo[uint64](7), admins, nil, nil),
+							Config: txallowlist.NewConfig(new(uint64(7)), admins, nil, nil),
 						},
 					},
 				},
@@ -105,20 +104,20 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](6)),
+							Config: txallowlist.NewDisableConfig(new(uint64(6))),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.PointerTo[uint64](7), admins, nil, nil),
+							Config: txallowlist.NewConfig(new(uint64(7)), admins, nil, nil),
 						},
 					},
 				},
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](6)),
+							Config: txallowlist.NewDisableConfig(new(uint64(6))),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.PointerTo[uint64](8), admins, nil, nil),
+							Config: txallowlist.NewConfig(new(uint64(8)), admins, nil, nil),
 						},
 					},
 				},
@@ -131,20 +130,20 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](6)),
+							Config: txallowlist.NewDisableConfig(new(uint64(6))),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.PointerTo[uint64](7), admins, nil, nil),
+							Config: txallowlist.NewConfig(new(uint64(7)), admins, nil, nil),
 						},
 					},
 				},
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](6)),
+							Config: txallowlist.NewDisableConfig(new(uint64(6))),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.PointerTo[uint64](8), admins, nil, nil),
+							Config: txallowlist.NewConfig(new(uint64(8)), admins, nil, nil),
 						},
 					},
 				},
@@ -156,17 +155,17 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](6)),
+							Config: txallowlist.NewDisableConfig(new(uint64(6))),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.PointerTo[uint64](7), admins, nil, nil),
+							Config: txallowlist.NewConfig(new(uint64(7)), admins, nil, nil),
 						},
 					},
 				},
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](6)),
+							Config: txallowlist.NewDisableConfig(new(uint64(6))),
 						},
 					},
 				},
@@ -179,17 +178,17 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](6)),
+							Config: txallowlist.NewDisableConfig(new(uint64(6))),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.PointerTo[uint64](7), admins, nil, nil),
+							Config: txallowlist.NewConfig(new(uint64(7)), admins, nil, nil),
 						},
 					},
 				},
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](6)),
+							Config: txallowlist.NewDisableConfig(new(uint64(6))),
 						},
 					},
 				},
@@ -202,21 +201,21 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](6)),
+							Config: txallowlist.NewDisableConfig(new(uint64(6))),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.PointerTo[uint64](7), admins, nil, nil),
+							Config: txallowlist.NewConfig(new(uint64(7)), admins, nil, nil),
 						},
 					},
 				},
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](6)),
+							Config: txallowlist.NewDisableConfig(new(uint64(6))),
 						},
 						{
 							// uses a different (empty) admin list, not allowed
-							Config: txallowlist.NewConfig(utils.PointerTo[uint64](7), []common.Address{}, nil, nil),
+							Config: txallowlist.NewConfig(new(uint64(7)), []common.Address{}, nil, nil),
 						},
 					},
 				},
@@ -228,20 +227,20 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](6)),
+							Config: txallowlist.NewDisableConfig(new(uint64(6))),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.PointerTo[uint64](7), admins, nil, nil),
+							Config: txallowlist.NewConfig(new(uint64(7)), admins, nil, nil),
 						},
 					},
 				},
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](6)),
+							Config: txallowlist.NewDisableConfig(new(uint64(6))),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.PointerTo[uint64](7), admins, nil, nil),
+							Config: txallowlist.NewConfig(new(uint64(7)), admins, nil, nil),
 						},
 					},
 				},
@@ -254,10 +253,10 @@ func TestCheckCompatibleUpgradeConfigs(t *testing.T) {
 				{
 					PrecompileUpgrades: []PrecompileUpgrade{
 						{
-							Config: txallowlist.NewDisableConfig(utils.PointerTo[uint64](5)),
+							Config: txallowlist.NewDisableConfig(new(uint64(5))),
 						},
 						{
-							Config: txallowlist.NewConfig(utils.PointerTo[uint64](6), admins, nil, nil),
+							Config: txallowlist.NewConfig(new(uint64(6)), admins, nil, nil),
 						},
 					},
 				},
