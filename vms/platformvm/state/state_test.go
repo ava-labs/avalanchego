@@ -5215,13 +5215,21 @@ func TestStakeMetricsNotAValidator(t *testing.T) {
 	require.Equal(genesistest.DefaultValidatorWeight, m.total)
 }
 
-// TestStakeMetricsInconsistentValidatorWeight asserts that a manager that
-// disagrees with the staker state reports 0 rather than failing the commit.
-func TestStakeMetricsInconsistentValidatorWeight(t *testing.T) {
+// TestStakeMetricsManagerWeightBelowValidatorWeight drives the validator
+// manager's weight for this node below the node's own validator weight, which is
+// the underflow the delegated stake subtraction guards against. The delegated
+// stake is reported as 0 and the commit still succeeds.
+func TestStakeMetricsManagerWeightBelowValidatorWeight(t *testing.T) {
 	require := require.New(t)
 
 	m := &stakeMetrics{Metrics: metrics.Noop}
 	s := newTestStateWithMetrics(t, memdb.New(), defaultValidatorNodeID, m)
+
+	vdr, err := s.GetCurrentValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	require.NoError(err)
+	require.Equal(genesistest.DefaultValidatorWeight, vdr.Weight)
+
+	// Decrement the manager's weight only, leaving the staker state untouched.
 	require.NoError(s.validators.RemoveWeight(
 		constants.PrimaryNetworkID,
 		defaultValidatorNodeID,
