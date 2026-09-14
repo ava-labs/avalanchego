@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -147,15 +146,12 @@ func (vm *VM) Initialize(
 		if vm.now().Before(vm.transitionTime) {
 			return nil
 		}
-		// Transitioning is only safe once the network has sequenced at least
-		// one commit interval of blocks after the transition, so peers have a
-		// post-transition summary to serve. The production networks are known
-		// to satisfy this; a custom network may not, so it waits for the
-		// transition block instead.
-		if !constants.ProductionNetworkIDs.Contains(preChainCtx.NetworkID) {
-			log.Info("past transition time on a non-production network; waiting for the transition block")
-			return nil
-		}
+		// TEMPORARY(rahulmutt): the production-network gate is disabled so the
+		// msync harness can exercise the mid-chain transition scenario on
+		// tmpnet. Transitioning is only safe once the network has sequenced at
+		// least one commit interval of blocks after the transition, so peers
+		// have a post-transition summary to serve; the harness guarantees that,
+		// a general custom network does not. Restore before merging.
 		// The network is past the transition time, so peers only serve the
 		// post-transition chain's state summaries.
 		if lastAccepted.Height() > 0 {
