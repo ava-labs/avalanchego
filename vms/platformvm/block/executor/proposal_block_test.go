@@ -78,7 +78,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 			TxID: addValTx.ID(),
 		},
 	}
-	require.NoError(blkTx.Initialize(txs.Codec))
+	require.NoError(blkTx.Initialize(platform.Codec))
 
 	// setup state to validate proposal block transaction
 	env.state.AddTx(addValTx, status.Committed)
