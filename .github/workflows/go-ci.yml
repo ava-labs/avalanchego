@@ -74,6 +74,7 @@ jobs:
           set -o pipefail
           ./scripts/run_task.sh ${{ inputs.run_race_shuffle_unit_tests && 'test-unit-race-shuffle' || 'test-unit' }} 2>&1 | tee -a "$RUNNER_TEMP/go-unit-cache-validation.log"
         env:
+          GODEBUG: ${{ (github.ref == 'refs/heads/master' || (inputs.cache_validation && steps.unit-cache.outputs.cache-hit == 'true')) && 'gocachetest=1' || '' }}
           GOPROXY: ${{ (github.ref == 'refs/heads/master' || (inputs.cache_validation && steps.unit-cache.outputs.cache-hit == 'true')) && 'off' || '' }}
           TIMEOUT: 900s
       - name: Validate Go unit-test cache

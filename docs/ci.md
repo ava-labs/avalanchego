@@ -259,10 +259,12 @@ For the Go unit job, use the job log to identify the mode. A warm run reports
 checker, and ends by saving that key in the `actions/cache` post-job step. A
 validation run reports `Cache hit for` that key, records
 `go-unit-cache-hit=true`, sets `GOPROXY: off`, and runs `Validate Go unit-test
-cache`. The Task and Go module validation caches can be hits during a Go-unit
-warm run; the Go unit-cache result determines its mode. Re-run the Go workflow
-for the same commit after a warm run to validate the entry without changing its
-contents.
+cache`. It also sets `GODEBUG=gocachetest=1`, which makes Go log why it reused
+or did not reuse each test result. This diagnostic output helps investigate a
+plain `ok` result; it does not change the validation decision. The Task and Go
+module validation caches can be hits during a Go-unit warm run; the Go
+unit-cache result determines its mode. Re-run the Go workflow for the same
+commit after a warm run to validate the entry without changing its contents.
 
 A push does not clear or refresh a validation entry. This is deliberate: it
 keeps one immutable entry per cache and avoids rewarming CI during ordinary PR
