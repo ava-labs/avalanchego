@@ -2,7 +2,9 @@
 
 ## Pending (v1.15.1)
 
-- None (delete and fill in as you work)
+### Features
+
+- SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 

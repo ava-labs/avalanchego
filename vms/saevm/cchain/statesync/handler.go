@@ -82,6 +82,11 @@ func New(
 	}, nil
 }
 
+// HealthCheck returns the current health status of state syncing.
+func (*Handler) HealthCheck(context.Context) (any, error) {
+	return nil, nil
+}
+
 // Shutdown cancels any ongoing state sync and waits for the sync goroutine to
 // exit, returning early with the context's error if ctx expires first. After
 // Shutdown, no new sync can be started.
