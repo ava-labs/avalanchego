@@ -8,7 +8,7 @@
 
 ### Metrics
 
-- Added `avalanche_platformvm_local_delegated_staked` (gauge): amount (in nAVAX) of AVAX delegated to this node on the Primary Network. `avalanche_platformvm_local_staked` reports this node's own stake and the delegations to it summed together; the new gauge reports the delegated portion on its own.
+- Added `avalanche_platformvm_local_delegated_staked` (gauge): amount (in nAVAX) of AVAX delegated to this node on the Primary Network.
 
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 
