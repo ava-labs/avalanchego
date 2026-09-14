@@ -15,9 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 func TestGetValidatorRules(t *testing.T) {
@@ -107,8 +107,8 @@ func TestGetValidatorRules(t *testing.T) {
 			subnetID: subnetID,
 			backend:  nil,
 			setup: func(s *state.State) {
-				tx := &txs.Tx{
-					Unsigned: &txs.TransformSubnetTx{
+				tx := &platform.Tx{
+					Unsigned: &platform.TransformSubnetTx{
 						AssetID:           customAssetID,
 						InitialSupply:     10,
 						MaximumSupply:     100,
@@ -237,8 +237,8 @@ func TestGetDelegatorRules(t *testing.T) {
 			subnetID: subnetID,
 			backend:  nil,
 			setup: func(s *state.State) {
-				tx := &txs.Tx{
-					Unsigned: &txs.TransformSubnetTx{
+				tx := &platform.Tx{
+					Unsigned: &platform.TransformSubnetTx{
 						AssetID:                  customAssetID,
 						InitialSupply:            10,
 						MaximumSupply:            100,

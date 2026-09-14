@@ -10,8 +10,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 // This file resolves the staking rules that apply to a subnet: the primary
@@ -34,15 +34,15 @@ type addValidatorRules struct {
 
 // GetTransformSubnetTx returns the TransformSubnetTx that transformed
 // subnetID, if any.
-func GetTransformSubnetTx(chain state.Chain, subnetID ids.ID) (*txs.TransformSubnetTx, error) {
+func GetTransformSubnetTx(chain state.Chain, subnetID ids.ID) (*platform.TransformSubnetTx, error) {
 	transformSubnetIntf, err := chain.GetSubnetTransformation(subnetID)
 	if err != nil {
 		return nil, err
 	}
 
-	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
+	transformSubnet, ok := transformSubnetIntf.Unsigned.(*platform.TransformSubnetTx)
 	if !ok {
-		return nil, fmt.Errorf("expected tx type *txs.TransformSubnetTx but got %T", transformSubnetIntf.Unsigned)
+		return nil, fmt.Errorf("expected tx type *platform.TransformSubnetTx but got %T", transformSubnetIntf.Unsigned)
 	}
 
 	return transformSubnet, nil
