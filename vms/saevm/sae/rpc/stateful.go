@@ -78,16 +78,12 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 		}
 	}
 
-	// TODO(JonathanOppenheimer): [backend.restoreExecutedBlock] reads and
-	// decodes the full block body and receipts but this method only needs the
-	// header, the post-execution state root, and the executed base fee. Some
-	// sort of refactor could improve performance.
-	bl, err := b.restoreExecutedBlock(ctx, numOrHash)
+	n, _, err := blocks.ResolveRPCNumberOrHash(b, numOrHash)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sdb, _, err := b.stateAtBlock(ctx, bl.NumberU64())
+	sdb, bl, err := b.stateAtBlock(ctx, n)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -122,55 +118,54 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec u
 // stateAtBlock returns the state after executing block num, along with the
 // stored block it was restored from.
 func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB, *blocks.Block, error) {
-	sdb, parent, toReexec, err := b.lastBlockWithState(ctx, num)
+	sdb, lastBlock, toReexec, err := b.lastBlockWithState(ctx, num)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	for _, stored := range toReexec {
+	var (
+		hooks    = b.Hooks()
+		config   = b.ChainConfig()
+		chainCtx = b.ChainContext()
+		log      = b.Logger()
+	)
+	for _, nextBlock := range toReexec {
 		if ctx.Err() != nil {
 			return nil, nil, context.Cause(ctx)
 		}
 
 		// A settled block has no ancestry, which [saexec.Execute] requires,
 		// so it is rebuilt on top of the previous block.
-		bl, err := b.NewBlock(stored.EthBlock(), parent, nil)
+		toExecute, err := b.NewBlock(nextBlock.EthBlock(), lastBlock, nil)
 		if err != nil {
-			return nil, nil, fmt.Errorf("constructing SAE block %d: %w", stored.NumberU64(), err)
+			return nil, nil, fmt.Errorf("constructing SAE block %d: %w", nextBlock.NumberU64(), err)
 		}
-		_, err = saexec.Execute(
-			bl,
-			sdb,
-			b.Hooks(),
-			b.ChainConfig(),
-			b.ChainContext(),
-			b.Logger(),
-		)
+		_, err = saexec.Execute(toExecute, sdb, hooks, config, chainCtx, log)
 		if err != nil {
-			return nil, nil, fmt.Errorf("re-executing block %d: %w", stored.NumberU64(), err)
+			return nil, nil, fmt.Errorf("re-executing block %d: %w", nextBlock.NumberU64(), err)
 		}
 
 		// A normal execution would commit this state or store it in the triedb.
-		sdb.Finalise(true)
+		sdb.Finalise(config.IsEIP158(toExecute.Number()))
 
-		parent = stored // The stored block is marked as executed.
+		lastBlock = nextBlock // The stored block is marked as executed.
 	}
 
 	// TODO(alarso16): Hashing is an expensive operation and is only used here
 	// to check if there was an error during re-execution. Add metrics to
 	// determine whether this check is prohibitively expensive.
 	got := sdb.IntermediateRoot(true)
-	want := parent.PostExecutionStateRoot()
+	want := lastBlock.PostExecutionStateRoot()
 	if got != want {
 		return nil, nil, fmt.Errorf(
 			"incorrect state root on reconstruction: block %d produced %s, want %s",
-			parent.NumberU64(),
+			lastBlock.NumberU64(),
 			got,
 			want,
 		)
 	}
 
-	return sdb, parent, nil
+	return sdb, lastBlock, nil
 }
 
 // lastBlockWithState searches backwards from block num for the most recent
@@ -178,18 +173,16 @@ func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB,
 // along with the blocks (in ascending order, excluding the found block) that
 // must be re-executed on top of it to reach the state of block num.
 func (b *backend) lastBlockWithState(ctx context.Context, num uint64) (*state.StateDB, *blocks.Block, []*blocks.Block, error) {
-	const maxReexec = 8192 // TODO(alarso16): determine using commit interval and settlement height
+	// TODO(alarso16): determine using commit interval and settlement height, or with user option
+	const maxReexec = 8192
 
 	var (
 		toReexec    []*blocks.Block
 		errNotFound = new(trie.MissingNodeError)
 	)
-	for i := range uint64(maxReexec) {
+	for i := range min(num+1, maxReexec) {
 		if ctx.Err() != nil {
 			return nil, nil, nil, context.Cause(ctx)
-		}
-		if num < i {
-			break
 		}
 		rpcNum := rpc.BlockNumber(num - i) // #nosec G115 -- won't overflow for a while.
 		bl, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(rpcNum))
@@ -202,13 +195,13 @@ func (b *backend) lastBlockWithState(ctx context.Context, num uint64) (*state.St
 			toReexec = append(toReexec, bl)
 			continue
 		case err != nil:
-			return nil, nil, nil, fmt.Errorf("unexpected error looking for state: %w", err)
+			return nil, nil, nil, fmt.Errorf("looking for state root %s at height %d: %w", bl.PostExecutionStateRoot(), bl.NumberU64(), err)
 		}
 		slices.Reverse(toReexec)
 		return sdb, bl, toReexec, nil
 	}
 
-	return nil, nil, nil, fmt.Errorf("no parent state of block %d found", num)
+	return nil, nil, nil, fmt.Errorf("no state found for block %d or any of its %d ancestors", num, maxReexec)
 }
 
 // StateAtTransaction returns the execution environment of a particular

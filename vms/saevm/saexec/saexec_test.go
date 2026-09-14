@@ -1156,6 +1156,18 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			},
 		},
 		{
+			name:           "firewood_archival_with_history",
+			scheme:         customrawdb.FirewoodScheme,
+			archival:       true,
+			commitInterval: 1,
+			expectAvailable: func(height uint64) availability {
+				if height <= numBlocks {
+					return available
+				}
+				return unavailable
+			},
+		},
+		{
 			name:           "firewood",
 			scheme:         customrawdb.FirewoodScheme,
 			archival:       false,
