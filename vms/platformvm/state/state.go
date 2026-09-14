@@ -2725,8 +2725,7 @@ func (s *State) updateStakeMetrics() error {
 // portion of that weight.
 //
 // Failures are logged and the delegated portion reported as 0 rather than
-// returned, because updateStakeMetrics also runs where nothing is persisted
-// (VM.Disconnected), so returning would stop the chain over a gauge.
+// stopping the chain over a gauge.
 func (s *State) localAndDelegatedStake() (uint64, uint64) {
 	localStake := s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID)
 	if localStake == 0 {
