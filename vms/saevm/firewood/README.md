@@ -45,7 +45,7 @@ Some differences between the proposal and reconstructed implementations:
 
 - **Incremental building** A proposal is rebuilt from the full op list every time the ops grow, whereas a reconstruction can apply the ops added since the last hash. Re-executing many transactions with `IntermediateRoot` between them is therefore comparatively cheap on historical state.
 - **`Copy()` semantics** A proposal-backed copy re-proposes from the parent revision on its next hash, because the pending proposal is invalidated when the original commits it. A reconstruction-backed can directly clone the reconstruction, avoiding re-hashing in the future.
-- **`state.Trie.Commit` impacts** `trieCommit` refuses to overwrite `TrieDB.pending`, so if `state.StateDB.Commit` hands a proposal to the `TrieDB` and `TrieDB.Update` then rejects it (for example the parent was no longer the newest root), the next `Commit` from any trie fails with `errProposalPending`. Since there is only one execution thread, this should never be an issue. However, one must never call `state.StateDB.Commit` if it's not canonical execution. If the underlying hasher is a reconstruction, it will also return an error.
+- **`state.Trie.Commit` impacts** `state.Trie.Commit` is expected to be paired with `triedb.Database.Update`, as used in `state.StateDB.Commit`. They MUST always be called as a pair, otherwise any future call to either will return an error. Additionally, because these update canonical state, they MUST only be called for canonical execution (i.e. not the RPCs).
 
 ## SELFDESTRUCT Handling
 
