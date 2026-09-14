@@ -2713,25 +2713,27 @@ func (s *State) updateStakeMetrics() error {
 		return fmt.Errorf("failed to get total weight of primary network: %w", err)
 	}
 
-	localStake := s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID)
+	localStake, delegatedStake := s.localAndDelegatedStake()
 
 	s.metrics.SetLocalStake(localStake)
-	s.metrics.SetLocalDelegatedStake(s.localDelegatedStake(localStake))
+	s.metrics.SetLocalDelegatedStake(delegatedStake)
 	s.metrics.SetTotalStake(totalWeight)
 	return nil
 }
 
-// localDelegatedStake subtracts this node's own validator weight from
-// localStake, its weight in the validator manager, which is its own stake plus
-// every delegation to it.
+// localAndDelegatedStake returns this node's weight in the validator manager -
+// its own stake plus every delegation to it - and the delegated portion of that
+// weight, recovered by subtracting the node's own validator weight.
 //
-// Failures are logged and reported as 0 rather than returned, because
-// updateStakeMetrics also runs where nothing is persisted (VM.Disconnected), so
-// returning would stop the chain over a gauge. A zero localStake is the genesis
-// window, where the manager is empty but the stakers are not.
-func (s *State) localDelegatedStake(localStake uint64) uint64 {
+// Failures are logged and the delegated portion reported as 0 rather than
+// returned, because updateStakeMetrics also runs where nothing is persisted
+// (VM.Disconnected), so returning would stop the chain over a gauge. A zero
+// weight is the genesis window, where the manager is empty but the stakers are
+// not.
+func (s *State) localAndDelegatedStake() (uint64, uint64) {
+	localStake := s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID)
 	if localStake == 0 {
-		return 0
+		return 0, 0
 	}
 
 	vdr, err := s.GetCurrentValidator(constants.PrimaryNetworkID, s.ctx.NodeID)
@@ -2739,19 +2741,19 @@ func (s *State) localDelegatedStake(localStake uint64) uint64 {
 		s.ctx.Log.Error("failed to get local validator",
 			zap.Error(err),
 		)
-		return 0
+		return localStake, 0
 	}
 
 	delegatedStake, err := safemath.Sub(localStake, vdr.Weight)
 	if err != nil {
-		s.ctx.Log.Error("validator manager disagrees with current staker state",
+		s.ctx.Log.Error("validator manager stake is lower than the validator's weight",
 			zap.Uint64("managerWeight", localStake),
 			zap.Uint64("validatorWeight", vdr.Weight),
 			zap.Error(err),
 		)
-		return 0
+		return localStake, 0
 	}
-	return delegatedStake
+	return localStake, delegatedStake
 }
 
 type validatorDiff struct {
