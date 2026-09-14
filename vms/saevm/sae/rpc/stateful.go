@@ -78,6 +78,7 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 		}
 	}
 
+	numOrHash.RequireCanonical = true
 	n, _, err := blocks.ResolveRPCNumberOrHash(b, numOrHash)
 	if err != nil {
 		return nil, nil, err
