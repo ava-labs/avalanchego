@@ -10,7 +10,7 @@
 
 #### New
 
-- `state-replay-concurrency` for C-Chain. Limits how many historical state requests may re-execute blocks at once. Defaults to `1`.
+- `state-replay-concurrency` for C-Chain. Limits how many historical state requests may re-execute blocks at once. Defaults to `0` (no limit).
 
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 

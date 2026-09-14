@@ -193,9 +193,9 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) { c.StateReplayConcurrency = 2 }),
 		},
 		{
-			name:    "api/state_replay_concurrency_zero",
-			json:    `{"state-replay-concurrency":0}`,
-			wantErr: testerr.Is(rpc.ErrZeroStateReplayConcurrency),
+			name: "api/state_replay_concurrency_explicit_zero",
+			json: `{"state-replay-concurrency":0}`, // 0 disables the limit
+			want: with(func(c *config) { c.StateReplayConcurrency = 0 }),
 		},
 		{
 			name:    "api/state_replay_concurrency_too_large",
