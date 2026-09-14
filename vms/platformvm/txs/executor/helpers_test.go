@@ -53,7 +53,7 @@ const (
 	defaultTxFee = 100 * units.NanoAvax
 )
 
-var testSubnet1 *txs.Tx
+var testSubnet1 *platform.Tx
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -294,7 +294,7 @@ func requireBaseTxApplied(
 	env *environment,
 	diff *state.Diff,
 	feeCalculator txfee.Calculator,
-	tx *txs.Tx,
+	tx *platform.Tx,
 ) {
 	require := require.New(t)
 

@@ -21,8 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
@@ -31,7 +31,7 @@ import (
 var fundedSharedMemoryCalls byte
 
 // TestStandardExecutorImportTxErrors verifies the failure cases of
-// [txs.ImportTx] execution.
+// [platform.ImportTx] execution.
 func TestStandardExecutorImportTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 
@@ -52,27 +52,27 @@ func TestStandardExecutorImportTxErrors(t *testing.T) {
 	tests := []struct {
 		name     string
 		want     error
-		updateTx func(*txs.Tx)
+		updateTx func(*platform.Tx)
 	}{
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.ImportTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.ImportTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "import_from_same_chain",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.ImportTx).SourceChain = env.ctx.ChainID
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.ImportTx).SourceChain = env.ctx.ChainID
 			},
 			want: verify.ErrSameChainID,
 		},
 		{
 			name: "flow_checker_failed",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				// Produce more AVAX than the tx consumes
-				unsignedTx := tx.Unsigned.(*txs.ImportTx)
+				unsignedTx := tx.Unsigned.(*platform.ImportTx)
 				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
@@ -121,7 +121,7 @@ func TestStandardExecutorImportTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorImportTx verifies the successful execution of an
-// [txs.ImportTx].
+// [platform.ImportTx].
 func TestStandardExecutorImportTx(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 
@@ -190,7 +190,7 @@ func TestStandardExecutorImportTx(t *testing.T) {
 			)
 			require.NoError(err)
 
-			tx := stx.Unsigned.(*txs.ImportTx)
+			tx := stx.Unsigned.(*platform.ImportTx)
 			require.NotEmpty(tx.ImportedInputs)
 			numInputs := len(tx.Ins) + len(tx.ImportedInputs)
 			require.Equal(len(stx.Creds), numInputs, "should have the same number of credentials as inputs")
@@ -237,7 +237,7 @@ func TestStandardExecutorImportTx(t *testing.T) {
 }
 
 // TestNewImportTxInsufficientFunds verifies that the wallet can't build an
-// [txs.ImportTx] when there is nothing to import.
+// [platform.ImportTx] when there is nothing to import.
 func TestNewImportTxInsufficientFunds(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 
@@ -299,7 +299,7 @@ func fundedSharedMemory(
 				},
 			},
 		}
-		utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
+		utxoBytes, err := platform.Codec.Marshal(platform.CodecVersion, utxo)
 		require.NoError(t, err)
 
 		inputID := utxo.InputID()
@@ -322,34 +322,34 @@ func fundedSharedMemory(
 }
 
 // TestStandardExecutorExportTxErrors verifies the failure cases of
-// [txs.ExportTx] execution.
+// [platform.ExportTx] execution.
 func TestStandardExecutorExportTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 
 	tests := []struct {
 		name     string
 		want     error
-		updateTx func(*txs.Tx)
+		updateTx func(*platform.Tx)
 	}{
 		{
 			name: "tx_fails_syntactic_verification",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.ExportTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.ExportTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "export_to_same_chain",
-			updateTx: func(tx *txs.Tx) {
-				tx.Unsigned.(*txs.ExportTx).DestinationChain = env.ctx.ChainID
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.ExportTx).DestinationChain = env.ctx.ChainID
 			},
 			want: verify.ErrSameChainID,
 		},
 		{
 			name: "flow_checker_failed",
-			updateTx: func(tx *txs.Tx) {
+			updateTx: func(tx *platform.Tx) {
 				// Produce more AVAX than the tx consumes
-				unsignedTx := tx.Unsigned.(*txs.ExportTx)
+				unsignedTx := tx.Unsigned.(*platform.ExportTx)
 				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
@@ -402,7 +402,7 @@ func TestStandardExecutorExportTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorExportTx verifies the successful execution of an
-// [txs.ExportTx].
+// [platform.ExportTx].
 func TestStandardExecutorExportTx(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 
@@ -463,7 +463,7 @@ func TestStandardExecutorExportTx(t *testing.T) {
 
 			// assert the exported outputs are put into the destination chain's
 			// shared memory
-			tx := stx.Unsigned.(*txs.ExportTx)
+			tx := stx.Unsigned.(*platform.ExportTx)
 			require.Len(atomicRequests[tt.destinationChainID].PutRequests, len(tx.ExportedOutputs))
 		})
 	}
