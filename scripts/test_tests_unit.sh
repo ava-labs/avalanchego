@@ -35,6 +35,7 @@ case "\${1-}" in
           github.com/ava-labs/avalanchego/mocks \
           github.com/ava-labs/avalanchego/proto/pb \
           github.com/ava-labs/avalanchego/tests/antithesis \
+          github.com/ava-labs/avalanchego/tests/bootstrap/interchain \
           github.com/ava-labs/avalanchego/tests/e2e
         ;;
       "${repo_root}/graft/coreth")

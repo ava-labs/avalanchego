@@ -1,0 +1,35 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "interchain",
+    srcs = ["bootstrap.go"],
+    importpath = "github.com/ava-labs/avalanchego/tests/bootstrap/interchain",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//genesis",
+        "//ids",
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "//utils/constants",
+        "//vms/platformvm/txs",
+        "//vms/secp256k1fx",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_test(
+    name = "interchain_test",
+    srcs = ["bootstrap_test.go"],
+    tags = ["manual"],  # keep
+    deps = [
+        ":interchain",
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//:zap",
+    ],
+)
