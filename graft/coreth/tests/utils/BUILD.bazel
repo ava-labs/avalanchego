@@ -25,6 +25,7 @@ go_library(
         "//tests/fixture/tmpnet",
         "//utils/constants",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//crypto",
         "@com_github_ava_labs_libevm//log",

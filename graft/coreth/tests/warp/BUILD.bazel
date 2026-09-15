@@ -12,6 +12,7 @@ graft_go_test(
     tags = ["manual"],  # keep
     deps = [
         "//api/info",
+        "//config",
         "//graft/coreth/accounts/abi/bind",
         "//graft/coreth/cmd/simulator/key",
         "//graft/coreth/cmd/simulator/load",
@@ -22,6 +23,7 @@ graft_go_test(
         "//graft/coreth/precompile/contracts/warp",
         "//graft/coreth/tests/utils",
         "//graft/coreth/warp",
+        "//graft/evm/tests/warptest",
         "//ids",
         "//snow/validators",
         "//tests/fixture/e2e",
@@ -31,6 +33,7 @@ graft_go_test(
         "//vms/platformvm",
         "//vms/platformvm/api",
         "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
         "@com_github_ava_labs_libevm//:libevm",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",

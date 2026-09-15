@@ -12,6 +12,8 @@ graft_go_test(
     tags = ["manual"],  # keep
     deps = [
         "//api/info",
+        "//config",
+        "//graft/evm/tests/warptest",
         "//graft/subnet-evm/accounts/abi/bind",
         "//graft/subnet-evm/cmd/simulator/key",
         "//graft/subnet-evm/cmd/simulator/load",
