@@ -10,21 +10,18 @@ ARG GO_VERSION=INVALID # This value is not intended to be used but silences a wa
 # ============= Compilation Stage ================
 FROM --platform=$BUILDPLATFORM golang:$GO_VERSION-bookworm AS builder
 
+# Dependencies are downloaded on the host before the image build.
+ENV GOPROXY=off
+
 WORKDIR /build
 
 # Copy avalanche dependencies first (intermediate docker image caching)
 # Note: Context is now the repo root, so we copy from there
 COPY go.mod go.sum ./
 COPY graft ./graft
-# Download avalanche dependencies using go mod
-# proxy.golang.org intermittently drops a module download mid-transfer with an
-# HTTP/2 INTERNAL_ERROR, failing the whole build. Retry before giving up.
-RUN for i in 1 2 3 4 5; do \
-        go mod download && break; \
-        if [ "$i" -eq 5 ]; then echo "go mod download failed after $i attempts" >&2; exit 1; fi; \
-        echo "go mod download failed (attempt $i/5), retrying in 15s" >&2; \
-        sleep 15; \
-    done && go mod tidy
+# Seed the builder's module cache from the Go module cache on the host.
+RUN --mount=type=bind,from=gomodcache,source=.,target=/gomodcache,ro \
+    mkdir -p /go/pkg/mod && cp -a /gomodcache/. /go/pkg/mod/
 
 # Copy the entire repo to preserve module structure
 COPY . .
@@ -51,7 +48,7 @@ RUN cd graft/subnet-evm && \
   echo "export CC=gcc" > ./build_env.sh \
   ; fi
 
-# Pass in SUBNET_EVM_COMMIT as an arg to allow the build script to set this externally
+# Pass the commit to the build script instead of resolving Git metadata in Docker.
 ARG SUBNET_EVM_COMMIT
 ARG CURRENT_BRANCH
 
@@ -60,7 +57,7 @@ RUN cd graft/subnet-evm && \
   echo "{CC=$CC, TARGETPLATFORM=$TARGETPLATFORM, BUILDPLATFORM=$BUILDPLATFORM}" && \
   export GOARCH=$(echo ${TARGETPLATFORM} | cut -d / -f2) && \
   export CURRENT_BRANCH=$CURRENT_BRANCH && \
-  export SUBNET_EVM_COMMIT=$SUBNET_EVM_COMMIT && \
+  export AVALANCHEGO_COMMIT=$SUBNET_EVM_COMMIT && \
   ./scripts/build.sh build/subnet-evm
 
 # ============= Cleanup Stage ================

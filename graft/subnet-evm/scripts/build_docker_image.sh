@@ -24,12 +24,16 @@ SUBNET_EVM_PATH=$(
 
 # Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
+source "$AVALANCHE_PATH"/scripts/lib_go_module_cache.sh
+
+# The image builder compiles the AvalancheGo workspace, including Subnet-EVM.
+prepare_go_module_cache "${AVALANCHE_PATH}"
 
 # buildx (BuildKit) improves the speed and UI of builds over the legacy builder and
 # simplifies creation of multi-arch images.
 #
 # Reference: https://docs.docker.com/build/buildkit/
-DOCKER_CMD="docker buildx build"
+DOCKER_CMD="docker buildx build --build-context gomodcache=$(go env GOMODCACHE)"
 ispush=0
 if [[ -n "${PUBLISH}" ]]; then
   echo "Pushing $IMAGE_NAME:$BUILD_IMAGE_ID"
