@@ -103,6 +103,9 @@ type config struct {
 	// Non-positive values result in no limit. Defaults to no limit.
 	APIMaxDuration               duration `json:"api-max-duration"`
 	ResolvePendingToLastExecuted bool     `json:"api-resolve-pending-to-last-executed"`
+	// StateReplayConcurrency limits how many historical state requests
+	// re-execute blocks at the same time. Defaults to no limit.
+	StateReplayConcurrency uint64 `json:"state-replay-concurrency"`
 
 	// State sync
 	StateSyncEnabled bool `json:"state-sync-enabled"`
@@ -246,6 +249,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			GasCap:                       50_000_000,
 			TxFeeCap:                     100,
 			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
+			StateReplayConcurrency:       c.StateReplayConcurrency,
 		},
 		Now: now,
 	}
