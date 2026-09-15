@@ -283,33 +283,32 @@ func (vtx *uniqueVertex) String() string {
 
 	parents, err := vtx.Parents()
 	if err != nil {
-		sb.WriteString(fmt.Sprintf("Vertex(ID = %s, Error=error while retrieving vertex parents: %s)", vtx.ID(), err))
+		fmt.Fprintf(&sb, "Vertex(ID = %s, Error=error while retrieving vertex parents: %s)", vtx.ID(), err)
 		return sb.String()
 	}
 	txs, err := vtx.Txs(context.Background())
 	if err != nil {
-		sb.WriteString(fmt.Sprintf("Vertex(ID = %s, Error=error while retrieving vertex txs: %s)", vtx.ID(), err))
+		fmt.Fprintf(&sb, "Vertex(ID = %s, Error=error while retrieving vertex txs: %s)", vtx.ID(), err)
 		return sb.String()
 	}
 
-	sb.WriteString(fmt.Sprintf(
-		"Vertex(ID = %s, Status = %s, Number of Dependencies = %d, Number of Transactions = %d)",
+	fmt.Fprintf(&sb, "Vertex(ID = %s, Status = %s, Number of Dependencies = %d, Number of Transactions = %d)",
 		vtx.ID(),
 		vtx.Status(),
 		len(parents),
 		len(txs),
-	))
+	)
 
 	parentFormat := fmt.Sprintf("\n    Parent[%s]: ID = %%s, Status = %%s", //nolint:perfsprint
 		formatting.IntFormat(len(parents)-1))
 	for i, parent := range parents {
-		sb.WriteString(fmt.Sprintf(parentFormat, i, parent.ID(), parent.Status()))
+		fmt.Fprintf(&sb, parentFormat, i, parent.ID(), parent.Status())
 	}
 
 	txFormat := fmt.Sprintf("\n    Transaction[%s]: ID = %%s, Status = %%s", //nolint:perfsprint
 		formatting.IntFormat(len(txs)-1))
 	for i, tx := range txs {
-		sb.WriteString(fmt.Sprintf(txFormat, i, tx.ID(), tx.Status()))
+		fmt.Fprintf(&sb, txFormat, i, tx.ID(), tx.Status())
 	}
 
 	return sb.String()
