@@ -45,7 +45,8 @@ func GetNodesMetrics(ctx context.Context, nodeURIs []string) (NodesMetrics, erro
 // If multiple metrics match the provided labels, the first metric found is
 // returned.
 //
-// Only Counter and Gauge metrics are supported.
+// Counter and Gauge metrics report their value; Histogram and Summary metrics
+// report their sample count.
 func GetMetricValue(metrics NodeMetrics, name string, labels prometheus.Labels) (float64, bool) {
 	metricFamily, ok := metrics[name]
 	if !ok {
@@ -62,6 +63,12 @@ func GetMetricValue(metrics NodeMetrics, name string, labels prometheus.Labels) 
 			return metric.Gauge.GetValue(), true
 		case metric.Counter != nil:
 			return metric.Counter.GetValue(), true
+		case metric.Histogram != nil:
+			// A histogram's sample count is the number of observations, which
+			// for a per-request histogram is the number of requests.
+			return float64(metric.Histogram.GetSampleCount()), true
+		case metric.Summary != nil:
+			return float64(metric.Summary.GetSampleCount()), true
 		}
 	}
 	return 0, false

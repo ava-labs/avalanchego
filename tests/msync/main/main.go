@@ -16,12 +16,12 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethclient"
@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/load/contracts"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -49,10 +50,37 @@ const (
 	defaultWritesPerTx             int64  = 250
 	defaultLoadWriteSlots          int64  = 64
 	defaultLoadModifySlots         int64  = 32
-	defaultStateSyncMinBlocks      uint64 = 32
 	defaultStateSyncCommitInterval uint64 = 16
 	defaultStateHistory            uint64 = 128
 	defaultPollingDelay                   = 2 * time.Second
+	defaultStateScheme                    = rawdb.HashScheme
+
+	// defaultStatePollInterval is how often the harness re-reads chain state it
+	// is waiting to become visible.
+	defaultStatePollInterval = 100 * time.Millisecond
+
+	// Transaction gas limits are set explicitly rather than left to
+	// eth_estimateGas. The SAE C-Chain never sets rpc.Config.GasCap (see
+	// vms/saevm/cchain.config), so libevm falls back to MaxUint64/2 as the
+	// estimator's ceiling and can return a limit the mempool rejects outright
+	// with "exceeds block gas limit".
+	//
+	// SAE charges at least ceil(gasLimit/params.Lambda) for every transaction,
+	// so each limit is sized to the work its call performs rather than set to a
+	// uniform maximum.
+	deployGasLimit          uint64 = 3_000_000
+	contractCallGasOverhead uint64 = 200_000
+	trieWriteGasPerValue    uint64 = 25_000
+	loadWriteGasPerSlot     uint64 = 25_000
+	loadModifyGasPerSlot    uint64 = 10_000
+	transferGasLimit        uint64 = 21_000
+
+	// defaultSyncSampleInterval is how often the harness polls the bootstrap
+	// node while waiting for it to become healthy. Only the
+	// --restart-during-sync trigger depends on catching a sync in progress
+	// within one interval; the sync duration comes from the VM's own
+	// started/finished timestamp metrics and is exact regardless.
+	defaultSyncSampleInterval = 100 * time.Millisecond
 )
 
 var (
@@ -68,9 +96,162 @@ var (
 	writesPerTx             int64
 	loadWriteSlots          int64
 	loadModifySlots         int64
-	stateSyncMinBlocks      uint64
 	stateSyncCommitInterval uint64
+	stateScheme             string
+	restartDuringSync       bool
+
+	// Derived from --state-scheme in main before the network is configured.
+	schemeConfig stateSchemeConfig
 )
+
+// Metrics registered by the C-Chain's state sync handlers (vms/evm/sync and
+// database/merkle/sync, wired in vms/saevm/statesync) under the statesync
+// namespace. The lifecycle gauges, recorded by the summary handler around the
+// sync it launches, are how this harness observes a sync: that one started,
+// what summary it targeted, whether it is still running, and when and how it
+// ended. The request counters prove that the validators served code and block
+// backfill requests.
+const (
+	syncInProgressMetric    = "avalanche_evm_statesync_in_progress"
+	syncSummaryHeightMetric = "avalanche_evm_statesync_summary_height"
+	syncStartedMetric       = "avalanche_evm_statesync_started_timestamp"
+	syncFinishedMetric      = "avalanche_evm_statesync_finished_timestamp"
+	syncFailedMetric        = "avalanche_evm_statesync_failed"
+
+	codeRequestCountMetric  = "avalanche_evm_statesync_code_request_count"
+	blockRequestCountMetric = "avalanche_evm_statesync_block_request_count"
+)
+
+// chainMetricLabels selects the C-Chain's series from a node's metrics.
+var chainMetricLabels = prometheus.Labels{"chain": blockchainID}
+
+// syncObservation is what the harness measured directly while waiting for the
+// bootstrap node: when it started the node and when the node first reported
+// healthy. Everything about the sync itself is read from the VM's lifecycle
+// metrics (see [readSyncLifecycle]) rather than sampled, so it needs no
+// observation here.
+type syncObservation struct {
+	nodeStartedAt time.Time
+	healthyAt     time.Time
+}
+
+// bootstrapDuration reports how long the bootstrap node took to become healthy,
+// which covers node startup and post-sync bootstrapping as well as the sync.
+func (o syncObservation) bootstrapDuration() time.Duration {
+	return o.healthyAt.Sub(o.nodeStartedAt)
+}
+
+// syncLifecycle is the sync lifecycle read from a node's metrics: the gauges
+// named by [syncInProgressMetric] and its siblings, recorded by the SAE
+// C-Chain's summary handler around the sync it launches.
+type syncLifecycle struct {
+	inProgress    bool
+	summaryHeight uint64
+	// startedSeconds and finishedSeconds are unix seconds, 0 until the sync
+	// reaches the corresponding transition. They are the VM's own timestamps,
+	// so the duration they span is exact rather than bounded by a poller's
+	// sampling interval.
+	startedSeconds  float64
+	finishedSeconds float64
+	failed          bool
+}
+
+// syncDuration reports how long the sync took, and whether it ran to an end at
+// all.
+func (l syncLifecycle) syncDuration() (time.Duration, bool) {
+	if l.startedSeconds == 0 || l.finishedSeconds == 0 {
+		return 0, false
+	}
+	return time.Duration((l.finishedSeconds - l.startedSeconds) * float64(time.Second)), true
+}
+
+// readSyncLifecycle reads the sync lifecycle gauges from a node's metrics. ok
+// is false when the gauges are absent, meaning the C-Chain has not (yet)
+// initialized.
+func readSyncLifecycle(ctx context.Context, node *tmpnet.Node) (syncLifecycle, bool, error) {
+	nodeMetrics, err := tests.GetNodeMetrics(ctx, node.URI)
+	if err != nil {
+		return syncLifecycle{}, false, err
+	}
+	inProgress, ok := tests.GetMetricValue(nodeMetrics, syncInProgressMetric, chainMetricLabels)
+	if !ok {
+		return syncLifecycle{}, false, nil
+	}
+
+	// The remaining gauges register together with in_progress, so a missing
+	// one is a bug rather than an early read.
+	values := make(map[string]float64, 4)
+	for _, name := range []string{syncSummaryHeightMetric, syncStartedMetric, syncFinishedMetric, syncFailedMetric} {
+		value, ok := tests.GetMetricValue(nodeMetrics, name, chainMetricLabels)
+		if !ok {
+			return syncLifecycle{}, false, fmt.Errorf("node %s reports %q but not %q", node.NodeID, syncInProgressMetric, name)
+		}
+		values[name] = value
+	}
+	return syncLifecycle{
+		inProgress:      inProgress != 0,
+		summaryHeight:   uint64(values[syncSummaryHeightMetric]),
+		startedSeconds:  values[syncStartedMetric],
+		finishedSeconds: values[syncFinishedMetric],
+		failed:          values[syncFailedMetric] != 0,
+	}, true, nil
+}
+
+// stateSchemeConfig captures everything that differs between the state schemes
+// this harness supports: the chain configuration the nodes must run with, and
+// the metrics proving the scheme's sync path was exercised.
+type stateSchemeConfig struct {
+	// chainConfig is the scheme-specific C-Chain configuration applied to both
+	// the serving nodes and the bootstrap node.
+	chainConfig tmpnet.ConfigMap
+	// bootstrapRequestMetric is a bootstrap-node metric proving that the
+	// scheme's state requests were made.
+	bootstrapRequestMetric string
+	// servingRequestMetrics are validator metrics proving that the scheme's
+	// state requests were served. Code and block serving evidence is checked
+	// for every scheme and so is not repeated here.
+	servingRequestMetrics []string
+}
+
+// newStateSchemeConfig returns the configuration for the requested state
+// scheme. The C-Chain syncs hash as HashDB leaves over vms/evm/sync and
+// firewood as range proofs over database/merkle/sync; both register their
+// metrics under the statesync namespace (see vms/saevm/statesync).
+func newStateSchemeConfig(scheme string) (stateSchemeConfig, error) {
+	switch scheme {
+	case customrawdb.FirewoodScheme:
+		return stateSchemeConfig{
+			chainConfig: tmpnet.ConfigMap{
+				"state-scheme": customrawdb.FirewoodScheme,
+				// Range proofs are served from the revisions Firewood keeps in
+				// memory, so a summary stays syncable for this many blocks
+				// after it is committed.
+				"state-history": defaultStateHistory,
+			},
+			bootstrapRequestMetric: "avalanche_evm_statesync_sync_requests_made",
+			// The proof handler reports the proofs it generated as a histogram;
+			// its sample count is the number of served requests.
+			servingRequestMetrics: []string{"avalanche_evm_statesync_sync_proof_generation_seconds"},
+		}, nil
+	case rawdb.HashScheme:
+		return stateSchemeConfig{
+			chainConfig: tmpnet.ConfigMap{
+				// Leave the snapshot cache at its default so the serving nodes
+				// can answer leafs requests from their snapshots.
+				"state-scheme": rawdb.HashScheme,
+			},
+			bootstrapRequestMetric: "avalanche_evm_statesync_sync_state_trie_leaves_requested",
+			servingRequestMetrics:  []string{"avalanche_evm_statesync_leafs_request_count"},
+		}, nil
+	default:
+		return stateSchemeConfig{}, fmt.Errorf(
+			"unsupported state scheme %q: must be one of %q or %q",
+			scheme,
+			customrawdb.FirewoodScheme,
+			rawdb.HashScheme,
+		)
+	}
+}
 
 type deployedContracts struct {
 	trieAddress common.Address
@@ -90,9 +271,7 @@ type workloadSnapshot struct {
 }
 
 func init() {
-	flagVars = e2e.RegisterFlags(
-		e2e.WithDefaultOwner("avalanchego-msync-e2e"),
-	)
+	flagVars = e2e.RegisterFlags(e2e.WithDefaultOwner("avalanchego-msync-e2e"))
 
 	flag.Int64Var(
 		&targetBytes,
@@ -131,16 +310,27 @@ func init() {
 		"number of LoadSimulator slots to modify per modify transaction",
 	)
 	flag.Uint64Var(
-		&stateSyncMinBlocks,
-		"state-sync-min-blocks",
-		defaultStateSyncMinBlocks,
-		"minimum number of blocks ahead required for the bootstrap node to choose state sync",
-	)
-	flag.Uint64Var(
 		&stateSyncCommitInterval,
 		"state-sync-commit-interval",
 		defaultStateSyncCommitInterval,
 		"state sync summary interval to use for validator nodes and the bootstrap node",
+	)
+	flag.StringVar(
+		&stateScheme,
+		"state-scheme",
+		defaultStateScheme,
+		fmt.Sprintf(
+			"state scheme to configure the network and bootstrap node with; one of %q or %q",
+			customrawdb.FirewoodScheme,
+			rawdb.HashScheme,
+		),
+	)
+
+	flag.BoolVar(
+		&restartDuringSync,
+		"restart-during-sync",
+		false,
+		"stop and restart the bootstrap node the first time its health reports an in-progress state sync, validating recovery from an interrupted sync",
 	)
 
 	flag.Parse()
@@ -158,8 +348,20 @@ func main() {
 	require.Positive(writesPerTx, "writes-per-tx must be positive")
 	require.Positive(loadWriteSlots, "load-write-slots must be positive")
 	require.Positive(loadModifySlots, "load-modify-slots must be positive")
-	require.Positive(stateSyncMinBlocks, "state-sync-min-blocks must be positive")
 	require.Positive(stateSyncCommitInterval, "state-sync-commit-interval must be positive")
+
+	if stateScheme == customrawdb.FirewoodScheme {
+		// A summary is only syncable while its revision is still in memory.
+		require.Less(stateSyncCommitInterval, defaultStateHistory, "state-sync-commit-interval must be below the Firewood revisions kept in memory")
+	}
+
+	var schemeErr error
+	schemeConfig, schemeErr = newStateSchemeConfig(stateScheme)
+	require.NoError(schemeErr, "newStateSchemeConfig()")
+	log.Info("configuring merkle sync harness",
+		zap.String("stateScheme", stateScheme),
+		zap.Duration("activateLatestAfter", flagVars.ActivateLatestAfter()),
+	)
 
 	network := newMerkleSyncNetwork(flagVars.NetworkOwner())
 	require.NoError(configureNetwork(tc, network))
@@ -184,7 +386,18 @@ func main() {
 	require.NoError(err)
 
 	contracts := deployContracts(tc, client, chainID, fundingKey)
+	requireGasLimitsFitBlock(tc, client)
+	fundingAddr := crypto.PubkeyToAddress(fundingKey.ToECDSA().PublicKey)
+	nonceBeforeExport, err := client.PendingNonceAt(tc.DefaultContext(), fundingAddr)
+	require.NoError(err)
 	issueAtomicExportTx(tc, network, fundingKey)
+	// The export consumes an EVM nonce, but the executed state exposing that
+	// nonce can lag the tx's acceptance. Wait for it so the first workload tx
+	// doesn't reuse the export's nonce and get dropped from the pool.
+	require.Eventually(func() bool {
+		nonce, err := client.PendingNonceAt(tc.DefaultContext(), fundingAddr)
+		return err == nil && nonce > nonceBeforeExport
+	}, 30*time.Second, 100*time.Millisecond, "export tx nonce not reflected in pending state")
 	snapshot := generateWorkload(tc, client, chainID, fundingKey, transferRecipient, contracts, pathsToMeasure, initialSize, initialRecipientBalance)
 
 	require.NoError(stopNode(generationNode))
@@ -194,11 +407,21 @@ func main() {
 	servingClient := newWSClient(tc, []*tmpnet.Node{generationNode})
 	expectedSummaryHeight := refreshStateSummaries(tc, servingClient, chainID, fundingKey, transferRecipient)
 
-	bootstrapNode := checkMerkleSyncBootstrap(tc, network)
+	bootstrapNode, syncObservation := checkMerkleSyncBootstrap(tc, network)
 	if bootstrapNode != nil {
 		bootstrapClient := newWSClient(tc, []*tmpnet.Node{bootstrapNode})
 		validatePostBootstrapState(tc, bootstrapClient, snapshot, contracts)
-		validateMerkleSyncEvidence(tc, network, bootstrapNode, expectedSummaryHeight)
+		syncEvidence := validateMerkleSyncEvidence(tc, validatorNodes(network), bootstrapNode, expectedSummaryHeight)
+		reportStateSyncDuration(tc, syncObservation, syncEvidence)
+
+		// The bootstrap node stays up to serve this scenario: a second fresh
+		// node is pinned to state sync from it alone, proving a node that
+		// initialized via state sync can serve a full state sync.
+		chainedNode := checkChainedBootstrap(tc, network, bootstrapNode, expectedSummaryHeight)
+		chainedClient := newWSClient(tc, []*tmpnet.Node{chainedNode})
+		validatePostBootstrapState(tc, chainedClient, snapshot, contracts)
+		// See the comment on bootstrapNode below.
+		chainedNode.URI = ""
 
 		// SimpleTestContext cleanup runs in registration order rather than LIFO,
 		// so the network-level cleanup may stop this ephemeral node before the
@@ -223,6 +446,21 @@ func configureNetwork(tc tests.TestContext, network *tmpnet.Network) error {
 		return err
 	}
 	network.DefaultRuntimeConfig = *runtimeConfig
+
+	upgrades := tmpnet.UpgradeConfig(flagVars.ActivateLatestAfter())
+	tc.Log().Info("setting upgrades",
+		zap.Reflect("upgrades", upgrades),
+	)
+	upgradeFlags, err := tmpnet.UpgradeFlags(upgrades)
+	if err != nil {
+		return err
+	}
+	if network.DefaultFlags == nil {
+		network.DefaultFlags = upgradeFlags
+	} else {
+		network.DefaultFlags.SetDefaults(upgradeFlags)
+	}
+
 	if err := network.EnsureDefaultConfig(tc.DefaultContext(), tc.Log()); err != nil {
 		return err
 	}
@@ -336,6 +574,16 @@ func copyDir(sourceRoot string, targetRoot string) error {
 	})
 }
 
+// refreshStateSummaries advances the restarted serving topology past a fresh
+// state sync summary boundary and returns that boundary, which the bootstrap
+// node is expected to sync at or above.
+//
+// The head is deliberately not driven onto a boundary by issuing a counted
+// number of transfers. One transfer does not reliably produce one block: the SAE
+// C-Chain packs transactions on its own gas-time schedule and resolves `latest`
+// to the last fully executed block, so the head both lags acceptance and moves
+// in steps larger than one. Instead this targets the next boundary above the
+// current head and issues transfers until the head has passed it.
 func refreshStateSummaries(
 	tc tests.TestContext,
 	client *ethclient.Client,
@@ -347,43 +595,49 @@ func refreshStateSummaries(
 
 	headBlock, err := client.BlockNumber(tc.DefaultContext())
 	require.NoError(err)
-	blocksUntilSummary := stateSyncCommitInterval - (headBlock % stateSyncCommitInterval)
-	if blocksUntilSummary == 0 {
-		blocksUntilSummary = stateSyncCommitInterval
-	}
 
-	for range blocksUntilSummary {
+	// The first commit boundary strictly above the current head, and so one that
+	// only the post-restart blocks can produce.
+	refreshedBoundary := headBlock - headBlock%stateSyncCommitInterval + stateSyncCommitInterval
+
+	updatedHeadBlock := headBlock
+	deadline := time.Now().Add(e2e.DefaultTimeout)
+	for updatedHeadBlock < refreshedBoundary {
+		if time.Now().After(deadline) {
+			require.NoError(fmt.Errorf(
+				"head block reached %d within %s, short of the refreshed summary boundary %d",
+				updatedHeadBlock,
+				e2e.DefaultTimeout,
+				refreshedBoundary,
+			))
+		}
 		issueTransfer(tc, client, chainID, fundingKey, transferRecipient, big.NewInt(0))
+		updatedHeadBlock, err = client.BlockNumber(tc.DefaultContext())
+		require.NoError(err)
 	}
 
-	updatedHeadBlock, err := client.BlockNumber(tc.DefaultContext())
-	require.NoError(err)
-	require.Greater(updatedHeadBlock, headBlock, "expected post-restart summary refresh to advance the head block")
-	require.Zero(updatedHeadBlock%stateSyncCommitInterval, "expected refreshed head block to land on a state sync summary boundary")
+	require.Greater(updatedHeadBlock, headBlock, "expected post-restart blocks to advance the head block")
+
 	tc.Log().Info("forced post-restart blocks to produce a fresh state summary",
 		zap.Uint64("initialHeadBlock", headBlock),
 		zap.Uint64("updatedHeadBlock", updatedHeadBlock),
+		zap.Uint64("refreshedBoundary", refreshedBoundary),
 		zap.Uint64("stateSyncCommitInterval", stateSyncCommitInterval),
 	)
-	return updatedHeadBlock
+	return refreshedBoundary
 }
 
 func newMerkleSyncPrimaryChainConfigs() map[string]tmpnet.ConfigMap {
-	primaryChainConfigs := tmpnet.DefaultChainConfigs()
-	if _, ok := primaryChainConfigs[blockchainID]; !ok {
-		primaryChainConfigs[blockchainID] = make(tmpnet.ConfigMap)
-	}
+	primaryChainConfigs := map[string]tmpnet.ConfigMap{blockchainID: {}}
 
 	maps.Copy(primaryChainConfigs[blockchainID], tmpnet.ConfigMap{
-		"state-scheme":               "firewood",
-		"snapshot-cache":             0,
-		"populate-missing-tries":     nil,
-		"pruning-enabled":            true,
-		"state-sync-enabled":         false,
-		"state-sync-commit-interval": stateSyncCommitInterval,
-		"commit-interval":            stateSyncCommitInterval,
-		"state-history":              defaultStateHistory,
+		"pruning-enabled": true,
+		// The C-Chain takes its summary heights from the commit interval.
+		"commit-interval": stateSyncCommitInterval,
+		// The serving nodes start from genesis and MUST NOT state sync.
+		"state-sync-enabled": false,
 	})
+	maps.Copy(primaryChainConfigs[blockchainID], schemeConfig.chainConfig)
 	return primaryChainConfigs
 }
 
@@ -410,20 +664,18 @@ func deployContracts(
 	fundingKey *secp256k1.PrivateKey,
 ) deployedContracts {
 	require := require.New(tc)
-	txOpts, err := newTxOpts(tc, chainID, fundingKey)
+	txOpts, err := newTxOpts(tc, chainID, fundingKey, deployGasLimit)
 	require.NoError(err)
 
 	trieAddress, trieTx, trieContract, err := contracts.DeployTrieStressTest(txOpts, client)
 	require.NoError(err)
-	_, err = bind.WaitDeployed(tc.DefaultContext(), client, trieTx)
-	require.NoError(err)
+	awaitDeployed(tc, client, trieTx, trieAddress)
 
-	txOpts, err = newTxOpts(tc, chainID, fundingKey)
+	txOpts, err = newTxOpts(tc, chainID, fundingKey, deployGasLimit)
 	require.NoError(err)
 	loadAddress, loadTx, loadContract, err := contracts.DeployLoadSimulator(txOpts, client)
 	require.NoError(err)
-	_, err = bind.WaitDeployed(tc.DefaultContext(), client, loadTx)
-	require.NoError(err)
+	awaitDeployed(tc, client, loadTx, loadAddress)
 
 	tc.Log().Info("deployed contracts for merkle sync workload",
 		zap.Stringer("trieStressAddress", trieAddress),
@@ -438,6 +690,40 @@ func deployContracts(
 		loadAddress: loadAddress,
 		load:        loadContract,
 	}
+}
+
+// awaitDeployed blocks until tx is mined and the deployed contract's code is
+// readable at the chain's latest state.
+//
+// bind.WaitDeployed is not used because it reads the code as soon as it sees a
+// receipt, which SAE does not guarantee is enough: execution is asynchronous and
+// streams per transaction, while the RPC resolves "latest" to the last fully
+// executed block (see vms/saevm/blocks/access.go), so a receipt can be served
+// before the state carrying it is what "latest" refers to. Polling closes that
+// window.
+func awaitDeployed(
+	tc tests.TestContext,
+	client *ethclient.Client,
+	tx *types.Transaction,
+	address common.Address,
+) {
+	require := require.New(tc)
+
+	receipt, err := bind.WaitMined(tc.DefaultContext(), client, tx)
+	require.NoError(err, "bind.WaitMined()")
+	require.Equal(types.ReceiptStatusSuccessful, receipt.Status, "deployment of %s reverted", address)
+
+	var code []byte
+	deadline := time.Now().Add(e2e.DefaultTimeout)
+	for time.Now().Before(deadline) {
+		code, err = client.CodeAt(tc.DefaultContext(), address, nil)
+		require.NoError(err, "client.CodeAt()")
+		if len(code) > 0 {
+			return
+		}
+		time.Sleep(defaultStatePollInterval)
+	}
+	require.NotEmpty(code, "code for the contract deployed at %s never became readable", address)
 }
 
 func generateWorkload(
@@ -463,7 +749,7 @@ func generateWorkload(
 		lastBlockNumber      uint64
 	)
 
-	tc.By("generating mixed Firewood-backed workload until bootstrap thresholds are reached", func() {
+	tc.By("generating mixed workload until bootstrap thresholds are reached", func() {
 		for {
 			currentSize, err := totalSize(pathsToMeasure...)
 			require.NoError(err)
@@ -497,18 +783,18 @@ func generateWorkload(
 
 				lastBlockNumber = issueContractTx(tc, client, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 					return contracts.trie.WriteValues(txOpts, big.NewInt(writesPerTx))
-				}, chainID, fundingKey)
+				}, chainID, fundingKey, trieWriteGasLimit())
 				totalTrieWrites += writesPerTx
 
 				lastBlockNumber = issueContractTx(tc, client, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 					return contracts.load.Write(txOpts, big.NewInt(loadWriteSlots), latestWriteValue)
-				}, chainID, fundingKey)
+				}, chainID, fundingKey, loadWriteGasLimit())
 				totalLoadWrites += loadWriteSlots
 
 				if totalLoadWrites >= loadModifySlots {
 					lastBlockNumber = issueContractTx(tc, client, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 						return contracts.load.Modify(txOpts, big.NewInt(loadModifySlots), latestModifyValue)
-					}, chainID, fundingKey)
+					}, chainID, fundingKey, loadModifyGasLimit())
 				}
 
 				lastBlockNumber = issueTransfer(tc, client, chainID, fundingKey, transferRecipient, defaultTransferWei)
@@ -555,9 +841,10 @@ func issueContractTx(
 	issue func(*bind.TransactOpts) (*types.Transaction, error),
 	chainID *big.Int,
 	fundingKey *secp256k1.PrivateKey,
+	gasLimit uint64,
 ) uint64 {
 	require := require.New(tc)
-	txOpts, err := newTxOpts(tc, chainID, fundingKey)
+	txOpts, err := newTxOpts(tc, chainID, fundingKey, gasLimit)
 	require.NoError(err)
 
 	tx, err := issue(txOpts)
@@ -586,7 +873,7 @@ func issueTransfer(
 		ChainID:   chainID,
 		Nonce:     nonce,
 		To:        &to,
-		Gas:       21_000,
+		Gas:       transferGasLimit,
 		GasFeeCap: new(big.Int).Set(defaultGasFeeCap),
 		GasTipCap: new(big.Int).Set(defaultGasTipCap),
 		Value:     new(big.Int).Set(amount),
@@ -601,7 +888,7 @@ func issueTransfer(
 	return receipt.BlockNumber.Uint64()
 }
 
-func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) *tmpnet.Node {
+func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) (*tmpnet.Node, syncObservation) {
 	require := require.New(tc)
 	tc.By("checking if Firewood merkle sync bootstrap is possible with the current network state")
 
@@ -613,11 +900,12 @@ func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) *tm
 		config.TrackSubnetsKey: strings.Join(subnetIDs, ","),
 	}
 
-	chainConfigContent, err := newBootstrapChainConfigContent(network)
+	chainConfigContent, err := newBootstrapChainConfigContent(network, nil)
 	require.NoError(err)
 	flags[config.ChainConfigContentKey] = chainConfigContent
 
 	node := tmpnet.NewEphemeralNode(flags)
+	nodeStartedAt := time.Now()
 	require.NoError(network.StartNode(tc.DefaultContext(), node))
 
 	tc.DeferCleanup(func() {
@@ -626,7 +914,8 @@ func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) *tm
 		require.NoError(node.Stop(ctx))
 	})
 
-	require.NoError(node.WaitForHealthy(tc.DefaultContext()))
+	observation, err := awaitBootstrapNode(tc, network, node, nodeStartedAt)
+	require.NoError(err, "awaitBootstrapNode()")
 
 	for _, validator := range network.Nodes {
 		if validator.IsEphemeral {
@@ -637,25 +926,138 @@ func checkMerkleSyncBootstrap(tc tests.TestContext, network *tmpnet.Network) *tm
 		require.True(healthy, "primary validator %s is not healthy", validator.NodeID)
 	}
 
+	return node, observation
+}
+
+// checkChainedBootstrap starts a second fresh node pinned to state sync from
+// sourceNode alone — a node that itself initialized via state sync — proving
+// that a state-synced node can serve a full state sync. The pinning needs two
+// layers, because summaries and sync data travel over different planes:
+//   - the state-sync-ids/state-sync-ips node flags replace the snowman
+//     syncer's summary beacons (snow/engine/snowman/syncer/config.go), so the
+//     summary frontier and its acceptance vote come from sourceNode alone —
+//     a non-validator is fine because the node manually tracks the given IP;
+//   - the state-sync-ids C-Chain config key restricts the data plane — the
+//     C-Chain limits its sync PeerTracker to the listed peers
+//     (vms/saevm/cchain/config.go) — so the state, code, and block requests
+//     hit sourceNode alone.
+//
+// The validators stay up on their executed state: they no longer serve any
+// part of the sync, but the post-sync snowman bootstrapping and consensus
+// still need them. The serving-side evidence is therefore read from
+// sourceNode rather than from the validators.
+func checkChainedBootstrap(
+	tc tests.TestContext,
+	network *tmpnet.Network,
+	sourceNode *tmpnet.Node,
+	expectedSummaryHeight uint64,
+) *tmpnet.Node {
+	require := require.New(tc)
+	tc.By("checking that a fresh node state syncs from the state-synced bootstrap node alone")
+
+	require.NotZero(sourceNode.StakingAddress, "state sync source node %s has no staking address", sourceNode.NodeID)
+	subnetIDs := make([]string, len(network.Subnets))
+	for i, subnet := range network.Subnets {
+		subnetIDs[i] = subnet.SubnetID.String()
+	}
+	flags := tmpnet.FlagsMap{
+		config.TrackSubnetsKey: strings.Join(subnetIDs, ","),
+		config.StateSyncIDsKey: sourceNode.NodeID.String(),
+		config.StateSyncIPsKey: sourceNode.StakingAddress.String(),
+	}
+	chainConfigContent, err := newBootstrapChainConfigContent(network, tmpnet.ConfigMap{
+		"state-sync-ids": []ids.NodeID{sourceNode.NodeID},
+	})
+	require.NoError(err)
+	flags[config.ChainConfigContentKey] = chainConfigContent
+
+	node := tmpnet.NewEphemeralNode(flags)
+	nodeStartedAt := time.Now()
+	require.NoError(network.StartNode(tc.DefaultContext(), node))
+	tc.DeferCleanup(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
+		defer cancel()
+		require.NoError(node.Stop(ctx))
+	})
+
+	observation, err := awaitBootstrapNode(tc, network, node, nodeStartedAt)
+	require.NoError(err, "awaitBootstrapNode()")
+	syncEvidence := validateMerkleSyncEvidence(tc, []*tmpnet.Node{sourceNode}, node, expectedSummaryHeight)
+	reportStateSyncDuration(tc, observation, syncEvidence)
 	return node
 }
 
-func newBootstrapChainConfigContent(network *tmpnet.Network) (string, error) {
+// awaitBootstrapNode blocks until the bootstrap node reports healthy, sampling
+// the C-Chain's sync lifecycle metrics as it goes so that --restart-during-sync
+// can catch the sync in progress. It mirrors [tmpnet.Node.WaitForHealthy],
+// which cannot be used here because it allows no work between samples.
+func awaitBootstrapNode(tc tests.TestContext, network *tmpnet.Network, node *tmpnet.Node, nodeStartedAt time.Time) (syncObservation, error) {
+	ctx := tc.DefaultContext()
+	observation := syncObservation{nodeStartedAt: nodeStartedAt}
+
+	ticker := time.NewTicker(defaultSyncSampleInterval)
+	defer ticker.Stop()
+
+	restarted := !restartDuringSync
+	for {
+		if !restarted {
+			// A metrics read that errors or predates the chain's
+			// initialization is not terminal; the node may simply not be
+			// serving yet.
+			if lifecycle, ok, err := readSyncLifecycle(ctx, node); err == nil && ok && lifecycle.inProgress {
+				tc.Log().Info("restarting bootstrap node mid-sync",
+					zap.Stringer("nodeID", node.NodeID),
+					zap.Uint64("summaryHeight", lifecycle.summaryHeight),
+				)
+				if err := node.Stop(ctx); err != nil {
+					return observation, fmt.Errorf("stopping node %s mid-sync: %w", node.NodeID, err)
+				}
+				if err := network.StartNode(ctx, node); err != nil {
+					return observation, fmt.Errorf("restarting node %s mid-sync: %w", node.NodeID, err)
+				}
+				tc.Log().Info("restarted bootstrap node mid-sync", zap.Stringer("nodeID", node.NodeID))
+				restarted = true
+				continue
+			}
+		}
+
+		reply, err := tmpnet.CheckNodeHealth(ctx, node.URI)
+		switch {
+		case errors.Is(err, tmpnet.ErrUnrecoverableNodeHealthCheck):
+			return observation, fmt.Errorf("node %s saw unrecoverable health check: %w", node.NodeID, err)
+		case err != nil:
+			tc.Log().Verbo("failed to query bootstrap node health",
+				zap.Stringer("nodeID", node.NodeID),
+				zap.Error(err),
+			)
+		case reply.Healthy:
+			observation.healthyAt = time.Now()
+			return observation, nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return observation, fmt.Errorf("failed to wait for health of node %s: %w", node.NodeID, ctx.Err())
+		case <-ticker.C:
+		}
+	}
+}
+
+// newBootstrapChainConfigContent renders the chain config content for a
+// bootstrapping node. extraCChainConfig entries, if any, are applied to the
+// C-Chain config last, so they win over the shared configuration.
+func newBootstrapChainConfigContent(network *tmpnet.Network, extraCChainConfig tmpnet.ConfigMap) (string, error) {
 	chainConfigs := map[string]chains.ChainConfig{}
 	for alias, flags := range network.PrimaryChainConfigs {
 		nodeFlags := maps.Clone(flags)
 		if alias == blockchainID {
 			maps.Copy(nodeFlags, tmpnet.ConfigMap{
-				"state-scheme":               "firewood",
-				"snapshot-cache":             0,
-				"populate-missing-tries":     nil,
-				"pruning-enabled":            true,
-				"state-sync-enabled":         true,
-				"state-sync-min-blocks":      stateSyncMinBlocks,
-				"state-sync-commit-interval": stateSyncCommitInterval,
-				"commit-interval":            stateSyncCommitInterval,
-				"state-history":              defaultStateHistory,
+				"pruning-enabled":    true,
+				"commit-interval":    stateSyncCommitInterval,
+				"state-sync-enabled": true,
 			})
+			maps.Copy(nodeFlags, schemeConfig.chainConfig)
+			maps.Copy(nodeFlags, extraCChainConfig)
 		}
 		marshaledFlags, err := json.Marshal(nodeFlags)
 		if err != nil {
@@ -746,79 +1148,175 @@ func issueAtomicExportTx(
 	)
 }
 
-func validateMerkleSyncEvidence(tc tests.TestContext, network *tmpnet.Network, bootstrapNode *tmpnet.Node, expectedSummaryHeight uint64) {
+// validateMerkleSyncEvidence blocks until the bootstrap node reports the
+// expected sync evidence, and returns the sync lifecycle that satisfied it.
+func validateMerkleSyncEvidence(tc tests.TestContext, servingNodes []*tmpnet.Node, bootstrapNode *tmpnet.Node, expectedSummaryHeight uint64) syncLifecycle {
 	require := require.New(tc)
 
 	deadline := time.Now().Add(e2e.DefaultTimeout)
 	var lastErr error
 	for time.Now().Before(deadline) {
-		lastErr = checkMerkleSyncEvidence(tc, network, bootstrapNode, expectedSummaryHeight)
+		var lifecycle syncLifecycle
+		lifecycle, lastErr = checkMerkleSyncEvidence(tc, servingNodes, bootstrapNode, expectedSummaryHeight)
 		if lastErr == nil {
-			return
+			return lifecycle
 		}
 		time.Sleep(defaultPollingDelay)
 	}
 	require.NoError(lastErr)
+	return syncLifecycle{} // unreachable: the require above ends the test
 }
 
-func checkMerkleSyncEvidence(tc tests.TestContext, network *tmpnet.Network, bootstrapNode *tmpnet.Node, expectedSummaryHeight uint64) error {
+// checkMerkleSyncEvidence checks that bootstrapNode state synced and that
+// servingNodes served its requests.
+func checkMerkleSyncEvidence(tc tests.TestContext, servingNodes []*tmpnet.Node, bootstrapNode *tmpnet.Node, expectedSummaryHeight uint64) (syncLifecycle, error) {
+	if err := checkSyncMetrics(tc, servingNodes, bootstrapNode); err != nil {
+		return syncLifecycle{}, err
+	}
+
+	if err := checkBootstrapReady(tc, bootstrapNode); err != nil {
+		return syncLifecycle{}, err
+	}
+
+	lifecycle, ok, err := readSyncLifecycle(tc.DefaultContext(), bootstrapNode)
+	if err != nil {
+		return syncLifecycle{}, err
+	}
+	if !ok {
+		return syncLifecycle{}, errors.New("expected the bootstrap node to report the sync lifecycle metrics")
+	}
+	tc.Log().Info("read bootstrap node sync lifecycle metrics",
+		zap.Bool("inProgress", lifecycle.inProgress),
+		zap.Uint64("summaryHeight", lifecycle.summaryHeight),
+		zap.Float64("startedSeconds", lifecycle.startedSeconds),
+		zap.Float64("finishedSeconds", lifecycle.finishedSeconds),
+		zap.Bool("failed", lifecycle.failed),
+	)
+
+	// A started, finished, and unfailed sync rules out the paths that would
+	// otherwise leave the harness validating a plain bootstrap: sync disabled,
+	// no summary offered, the summary declined, or the sync failed.
+	if lifecycle.failed {
+		return syncLifecycle{}, errors.New("expected bootstrap node state sync to succeed, but it failed")
+	}
+	if lifecycle.startedSeconds == 0 {
+		return syncLifecycle{}, errors.New("expected bootstrap node to start a state sync, but none was started")
+	}
+	if lifecycle.inProgress || lifecycle.finishedSeconds == 0 {
+		return syncLifecycle{}, errors.New("expected bootstrap node state sync to have finished")
+	}
+	// At or above, rather than equal: the serving nodes offer the highest commit
+	// boundary they have accepted, which can be past the boundary the harness
+	// forced if the chain kept building. Anything at or above that boundary
+	// still rules out a summary predating the serving restart.
+	if lifecycle.summaryHeight < expectedSummaryHeight {
+		return syncLifecycle{}, fmt.Errorf(
+			"expected bootstrap node to sync a summary at or above the refreshed boundary %d, got %d",
+			expectedSummaryHeight,
+			lifecycle.summaryHeight,
+		)
+	}
+	if lifecycle.summaryHeight%stateSyncCommitInterval != 0 {
+		return syncLifecycle{}, fmt.Errorf(
+			"expected the synced summary height %d to be a multiple of the commit interval %d",
+			lifecycle.summaryHeight,
+			stateSyncCommitInterval,
+		)
+	}
+	return lifecycle, nil
+}
+
+// validatorNodes returns the network's persistent nodes: the validators that
+// serve the first bootstrap scenario.
+func validatorNodes(network *tmpnet.Network) []*tmpnet.Node {
+	var nodes []*tmpnet.Node
+	for _, node := range network.Nodes {
+		if !node.IsEphemeral {
+			nodes = append(nodes, node)
+		}
+	}
+	return nodes
+}
+
+// checkSyncMetrics checks that bootstrapNode made the scheme's state requests
+// and that servingNodes, between them, served the state, code, and block
+// requests.
+func checkSyncMetrics(tc tests.TestContext, servingNodes []*tmpnet.Node, bootstrapNode *tmpnet.Node) error {
 	bootstrapMetrics, err := tests.GetNodeMetrics(tc.DefaultContext(), bootstrapNode.URI)
 	if err != nil {
 		return err
 	}
-	firewoodRequests, ok := tests.GetMetricValue(bootstrapMetrics, "avalanche_evm_sync_firewood_sync_requests_made", prometheus.Labels{"chain": blockchainID})
+	stateRequests, ok := tests.GetMetricValue(bootstrapMetrics, schemeConfig.bootstrapRequestMetric, prometheus.Labels{"chain": blockchainID})
 	if !ok {
-		return errors.New("expected bootstrap node firewood sync metric")
+		return fmt.Errorf("expected bootstrap node state sync metric %q", schemeConfig.bootstrapRequestMetric)
 	}
-	if firewoodRequests <= 0 {
-		return errors.New("expected bootstrap node to make firewood proof requests")
+	if stateRequests <= 0 {
+		return fmt.Errorf("expected bootstrap node to make state sync requests reported by %q", schemeConfig.bootstrapRequestMetric)
 	}
 
-	validatorURIs := make([]string, 0, len(network.Nodes))
-	for _, node := range network.Nodes {
-		if node.IsEphemeral {
-			continue
-		}
-		validatorURIs = append(validatorURIs, node.URI)
+	servingURIs := make([]string, 0, len(servingNodes))
+	for _, node := range servingNodes {
+		servingURIs = append(servingURIs, node.URI)
 	}
-	validatorMetrics, err := tests.GetNodesMetrics(tc.DefaultContext(), validatorURIs)
+	servingMetrics, err := tests.GetNodesMetrics(tc.DefaultContext(), servingURIs)
 	if err != nil {
 		return err
 	}
-	if sumMetric(validatorMetrics, "avalanche_evm_eth_code_request_count", prometheus.Labels{"chain": blockchainID}) <= 0 {
-		return errors.New("expected validators to serve code sync requests")
+	if sumMetric(servingMetrics, codeRequestCountMetric, prometheus.Labels{"chain": blockchainID}) <= 0 {
+		return errors.New("expected the serving nodes to serve code sync requests")
 	}
-	if sumMetric(validatorMetrics, "avalanche_evm_eth_block_request_count", prometheus.Labels{"chain": blockchainID}) <= 0 {
-		return errors.New("expected validators to serve block backfill requests")
+	if sumMetric(servingMetrics, blockRequestCountMetric, prometheus.Labels{"chain": blockchainID}) <= 0 {
+		return errors.New("expected the serving nodes to serve block backfill requests")
 	}
-
-	bootstrapLogPath := filepath.Join(bootstrapNode.DataDir, "logs", "C.log")
-	bootstrapLog, err := os.ReadFile(bootstrapLogPath)
-	if err != nil {
-		return err
-	}
-	bootstrapLogText := string(bootstrapLog)
-	for _, expectedText := range []string{
-		"Firewood state scheme is enabled",
-		"state sync started",
-		"accepted state summary",
-		"Firewood EVM State Syncer",
-		"Code Syncer",
-		"Block Syncer",
-		"all syncers completed successfully",
-	} {
-		if !strings.Contains(bootstrapLogText, expectedText) {
-			return fmt.Errorf("expected bootstrap log evidence %q", expectedText)
+	for _, metricName := range schemeConfig.servingRequestMetrics {
+		if sumMetric(servingMetrics, metricName, prometheus.Labels{"chain": blockchainID}) <= 0 {
+			return fmt.Errorf("expected the serving nodes to serve state sync requests reported by %q", metricName)
 		}
-	}
-	heightPattern := regexp.MustCompile(fmt.Sprintf(`name="(Block Syncer|Code Syncer|Firewood EVM State Syncer)".*height=%d`, expectedSummaryHeight))
-	if !heightPattern.MatchString(bootstrapLogText) {
-		return errors.New("expected bootstrap syncer log line at refreshed summary height")
-	}
-	if strings.Contains(bootstrapLogText, "last accepted too close to most recent syncable block, skipping state sync") {
-		return errors.New("unexpected bootstrap log evidence for skipping state sync")
 	}
 	return nil
+}
+
+// checkBootstrapReady confirms the bootstrap node reports healthy, which
+// covers the chain's engine having reached normal operation. The VM-level
+// state and scheme details previously read from the health API are gone: the
+// SAE VM reports no health details, and the scheme's sync path is proven by
+// the scheme-specific request metrics in checkSyncMetrics.
+func checkBootstrapReady(tc tests.TestContext, bootstrapNode *tmpnet.Node) error {
+	reply, err := tmpnet.CheckNodeHealth(tc.DefaultContext(), bootstrapNode.URI)
+	if err != nil {
+		return err
+	}
+	if !reply.Healthy {
+		return fmt.Errorf("expected bootstrap node %s to be healthy", bootstrapNode.NodeID)
+	}
+	return nil
+}
+
+// reportStateSyncDuration reports how long the bootstrap node's state sync
+// took. The sync duration spans the VM's own started/finished timestamps and
+// is exact; the bootstrap duration is measured by the harness and covers node
+// startup and post-sync bootstrapping as well as the sync.
+func reportStateSyncDuration(tc tests.TestContext, observation syncObservation, lifecycle syncLifecycle) {
+	fields := []zap.Field{
+		zap.String("stateScheme", stateScheme),
+		zap.Uint64("summaryHeight", lifecycle.summaryHeight),
+		zap.Duration("bootstrapDuration", observation.bootstrapDuration()),
+	}
+
+	stateSyncDuration, ok := lifecycle.syncDuration()
+	if !ok {
+		tc.Log().Warn("the sync lifecycle was not reported, so the state sync duration could not be measured",
+			fields...,
+		)
+		return
+	}
+	tc.Log().Info("measured state sync duration from the VM's own timestamps",
+		append(fields,
+			zap.Duration("stateSyncDuration", stateSyncDuration),
+			zap.Float64("startedSeconds", lifecycle.startedSeconds),
+			zap.Float64("finishedSeconds", lifecycle.finishedSeconds),
+		)...,
+	)
 }
 
 func sumMetric(allMetrics tests.NodesMetrics, metricName string, labels prometheus.Labels) float64 {
@@ -840,7 +1338,10 @@ func storageSlotBig(slotValue *big.Int) common.Hash {
 	return common.BigToHash(slotValue)
 }
 
-func newTxOpts(tc tests.TestContext, chainID *big.Int, fundingKey *secp256k1.PrivateKey) (*bind.TransactOpts, error) {
+// newTxOpts returns transact options that use the provided gas limit rather
+// than estimating one. See the gas limit constants for why estimation is
+// avoided.
+func newTxOpts(tc tests.TestContext, chainID *big.Int, fundingKey *secp256k1.PrivateKey, gasLimit uint64) (*bind.TransactOpts, error) {
 	txOpts, err := bind.NewKeyedTransactorWithChainID(fundingKey.ToECDSA(), chainID)
 	if err != nil {
 		return nil, err
@@ -848,7 +1349,65 @@ func newTxOpts(tc tests.TestContext, chainID *big.Int, fundingKey *secp256k1.Pri
 	txOpts.Context = tc.DefaultContext()
 	txOpts.GasFeeCap = new(big.Int).Set(defaultGasFeeCap)
 	txOpts.GasTipCap = new(big.Int).Set(defaultGasTipCap)
+	txOpts.GasLimit = gasLimit
 	return txOpts, nil
+}
+
+// trieWriteGasLimit returns the gas limit for a TrieStressTest.WriteValues call
+// of --writes-per-tx values.
+func trieWriteGasLimit() uint64 {
+	return contractCallGasOverhead + uint64(writesPerTx)*trieWriteGasPerValue
+}
+
+// loadWriteGasLimit returns the gas limit for a LoadSimulator.Write call of
+// --load-write-slots slots.
+func loadWriteGasLimit() uint64 {
+	return contractCallGasOverhead + uint64(loadWriteSlots)*loadWriteGasPerSlot
+}
+
+// loadModifyGasLimit returns the gas limit for a LoadSimulator.Modify call of
+// --load-modify-slots slots.
+func loadModifyGasLimit() uint64 {
+	return contractCallGasOverhead + uint64(loadModifySlots)*loadModifyGasPerSlot
+}
+
+// requireGasLimitsFitBlock fails the test if the workload's largest transaction
+// could never be included in a block.
+//
+// The C-Chain reports the worst-case block size derived from the gas rate (see
+// vms/saevm/worstcase.State.GasLimit). Reading it from the chain avoids
+// encoding that bound here, and reports a misconfigured workload up front
+// rather than as a rejected transaction mid-run.
+//
+// It must run once the chain has built a block: the genesis header carries the
+// gas limit from the genesis file (100M for tmpnet) rather than the limit the
+// running chain enforces, which would make this check vacuous.
+func requireGasLimitsFitBlock(tc tests.TestContext, client *ethclient.Client) {
+	require := require.New(tc)
+
+	header, err := client.HeaderByNumber(tc.DefaultContext(), nil)
+	require.NoError(err, "client.HeaderByNumber()")
+
+	largestTxGasLimit := max(
+		deployGasLimit,
+		trieWriteGasLimit(),
+		loadWriteGasLimit(),
+		loadModifyGasLimit(),
+		transferGasLimit,
+	)
+	tc.Log().Info("sized workload transaction gas limits",
+		zap.Uint64("blockGasLimit", header.GasLimit),
+		zap.Uint64("largestTxGasLimit", largestTxGasLimit),
+		zap.Uint64("deployGasLimit", deployGasLimit),
+		zap.Uint64("trieWriteGasLimit", trieWriteGasLimit()),
+		zap.Uint64("loadWriteGasLimit", loadWriteGasLimit()),
+		zap.Uint64("loadModifyGasLimit", loadModifyGasLimit()),
+	)
+	require.LessOrEqual(
+		largestTxGasLimit,
+		header.GasLimit,
+		"workload transaction gas limit exceeds the chain's block gas limit; lower --writes-per-tx, --load-write-slots or --load-modify-slots",
+	)
 }
 
 func totalSize(paths ...string) (int64, error) {

@@ -2,8 +2,9 @@
 
 ## Overview
 
-This package provides a standalone end-to-end validation harness for C-Chain MerkleSync bootstrap
-with Firewood.
+This package provides a standalone end-to-end validation harness for C-Chain state sync bootstrap.
+It defaults to the hashdb sync path (`--state-scheme=hash`) and can also run Firewood/MerkleSync
+with `--state-scheme=firewood`.
 
 It is intentionally separate from the shared `tests/e2e` suite. The goal is to provide targeted,
 reviewable coverage for MerkleSync-specific bootstrap behavior without coupling this slower,
@@ -15,22 +16,24 @@ Run it locally with:
 task tests:merkle-sync:e2e -- --min-bootstrap-height=300 --target-bytes=10485760
 ```
 
-CI uses:
+CI runs one job per state scheme:
 
 ```bash
-./scripts/run_task.sh tests:merkle-sync:e2e-ci
+./scripts/run_task.sh tests:merkle-sync:e2e-ci           # hash scheme (the default)
+./scripts/run_task.sh tests:merkle-sync:e2e-ci-firewood  # firewood scheme
 ```
 
-The CI entrypoint differs in that it uses a race-built Bazel avalanchego binary.
+The CI entrypoints differ from the local `e2e` task in that they use a race-built Bazel avalanchego
+binary. They are wired up as the `e2e-merkle-sync-hash` and `e2e-merkle-sync-firewood` jobs in
+`.github/workflows/bazel.yml` so a regression in either sync path is attributable on its own.
 
 ## What this validates
 
 The harness is meant to prove more than "a new node became healthy."
 
 A successful run should demonstrate all of the following:
-- C-Chain was configured with `state-scheme = firewood`
-- the bootstrap node selected state sync rather than skipping it
-- the Firewood/MerkleSync path actually ran
+- the bootstrap node selected state sync rather than skipping it, and synced the expected summary
+- the selected scheme's sync path actually ran (Firewood/MerkleSync, or the hashdb leaf-sync path)
 - code sync was exercised
 - heuristic block-sync/backfill activity was exercised
 - post-bootstrap RPC checks confirm expected code, storage, and balance state
@@ -94,28 +97,63 @@ The harness verifies:
 - transfer recipient balance matches the generated workload
 
 ### Metrics
-The harness checks metrics showing:
-- bootstrap-node metrics provide Firewood proof-request activity
-- validator metrics provide serving-side evidence, including code sync requests and block-request activity
+The C-Chain (`vms/saevm/cchain`) implements state sync in `vms/saevm/cchain/statesync`, over the SAE
+handler in `vms/saevm/statesync`. It syncs both schemes: `hash` as HashDB leaves over `vms/evm/sync`,
+and `firewood` as range proofs over `database/merkle/sync`, committed straight into the Firewood
+database the VM then opens. Both register their request metrics under the `statesync` namespace, and
+`newStateSchemeConfig` selects the evidence by scheme:
 
-### Logs
-MerkleSync-specific evidence is taken from the bootstrap node's:
-- `logs/C.log`
+| Scheme | Requesting side (bootstrap node) | Serving side (validators) |
+|---|---|---|
+| `hash` | `avalanche_evm_statesync_sync_state_trie_leaves_requested` | `avalanche_evm_statesync_leafs_request_count` |
+| `firewood` | `avalanche_evm_statesync_sync_requests_made` | `avalanche_evm_statesync_sync_proof_generation_seconds` |
 
-Important note:
-- use `logs/C.log`, not `logs/main.log`, for bootstrap-path evidence
+The Firewood proof handler reports the proofs it generated as a histogram, so the harness reads its
+sample count as the number of served requests. Code and block serving evidence
+(`avalanche_evm_statesync_code_request_count`, `avalanche_evm_statesync_block_request_count`) is the
+same for both schemes.
 
-The harness looks for evidence that:
-- Firewood was enabled
-- state sync started
-- a state summary was accepted
-- the bootstrap logs include accepted-summary evidence and at least one syncer log line at the refreshed summary height
-- this refreshed-summary check is inferred from bootstrap observability rather than directly proving which summary was accepted
-- the accepted-summary evidence and refreshed-height syncer evidence are checked separately, not as a single structured "accepted summary at exact refreshed height" proof
-- Firewood, Code, and Block syncers ran
-- syncers completed successfully
-- heuristic block-sync/backfill activity occurred, inferred from validator-served block requests plus bootstrap syncer logs
-- the "skipping state sync" path was not taken
+### Sync lifecycle metrics
+Sync-path evidence comes from the bootstrap node's `/ext/metrics`, where the C-Chain's summary
+handler (`vms/saevm/statesync`) reports the sync's lifecycle as gauges, labeled with the chain:
+
+```text
+avalanche_evm_statesync_in_progress{chain="C"}         0
+avalanche_evm_statesync_summary_height{chain="C"}      320
+avalanche_evm_statesync_started_timestamp{chain="C"}   1.7e+09
+avalanche_evm_statesync_finished_timestamp{chain="C"}  1.7e+09
+avalanche_evm_statesync_failed{chain="C"}              0
+```
+
+The harness asserts that:
+- the node reports healthy, so it finished the whole bootstrap path
+- `started_timestamp` and `finished_timestamp` are set, `in_progress` is 0 and `failed` is 0, which
+  simultaneously rules out the disabled, never-offered, declined and failed outcomes that would
+  otherwise leave the harness validating a plain bootstrap
+- `summary_height` is at or above the refreshed summary height the harness forced before starting the
+  bootstrap node, which proves *which* summary was synced
+- the scheme-specific request metrics (see above) prove the sync exercised the requested scheme's
+  storage backend
+
+This replaces the earlier approaches of grepping `logs/C.log` for syncer names and of decoding the
+VM's health details: the metrics API is uniform across chains and pollable at any frequency, and the
+VM is still the authority on its own state. `logs/C.log` remains the place to look when diagnosing a
+failure.
+
+The producer of these gauges is `lifecycleMetrics` in `vms/saevm/statesync/metrics.go`, recorded by
+the C-Chain summary handler (`vms/saevm/cchain/statesync`) around the sync it launches. The harness
+re-declares the metric names it expects rather than importing them, so a rename fails this test
+loudly.
+
+### Reported durations
+
+The harness reports two durations:
+
+- `stateSyncDuration` — the difference between the sync's own `started_timestamp` and
+  `finished_timestamp` gauges. This is the sync itself, excluding node startup and the bootstrapping
+  that follows it, timed by the VM and therefore exact.
+- `bootstrapDuration` — from starting the node to it first reporting healthy, measured directly by
+  the harness. This covers everything.
 
 ## Configuration knobs
 
@@ -126,23 +164,73 @@ Useful flags include:
 - `--writes-per-tx`
 - `--load-write-slots`
 - `--load-modify-slots`
-- `--state-sync-min-blocks`
 - `--state-sync-commit-interval`
+- `--state-scheme`
 
 These exist to help local iteration and future fixture generation.
 
-Important tmpnet-scale tuning note:
-- `--state-sync-min-blocks` is intentionally lowered so the bootstrap node chooses state sync rather
-  than skipping it on a small tmpnet run
-- `--state-sync-commit-interval` is part of making refreshed summary-boundary evidence observable
-  and repeatable during the restarted serving phase
+State-scheme note:
+- `--state-scheme` accepts `hash` (default) or `firewood`, and applies to the serving nodes and the
+  bootstrap node alike
+- scheme-specific chain configuration lives in one place (`newStateSchemeConfig` in `main.go`), which
+  also carries the scheme's expected sync evidence; `hash` keeps the default snapshot cache so
+  serving nodes can answer leafs requests from their snapshots
+- `firewood` serves range proofs from the revisions Firewood keeps in memory (`state-history`), so a
+  summary is only syncable for that many blocks after it is committed. The harness requires
+  `--state-sync-commit-interval` to stay below that value
+- run the Firewood/MerkleSync variant with:
+  `task tests:merkle-sync:e2e -- --state-scheme=firewood`
+
+The C-Chain always offers to sync what it is given and takes its summary heights from
+`commit-interval`, so `--state-sync-commit-interval` sets `commit-interval` on every node and the
+number of blocks forced after the serving restart.
+
+Two C-Chain behaviours the harness has to accommodate:
+- **explicit gas limits.** The SAE C-Chain never sets `rpc.Config.GasCap`, so libevm's estimator
+  falls back to `MaxUint64/2` as its ceiling and `eth_estimateGas` can return a limit the mempool
+  rejects with `exceeds block gas limit`. Every transaction the harness issues therefore carries an
+  explicit gas limit sized to its work rather than an estimate; `requireGasLimitsFitBlock` checks the
+  largest against the chain's own block gas limit before the workload starts. SAE also charges at
+  least `ceil(gasLimit/params.Lambda)`, so over-provisioning a limit costs real block space.
+- **asynchronous execution.** SAE executes blocks asynchronously and streams receipts per
+  transaction, while the RPC resolves `latest` to the last *fully executed* block. A receipt
+  therefore does not imply the deployed code is readable at `latest`, so the harness polls for it
+  (`awaitDeployed`) instead of using `bind.WaitDeployed`.
 
 Maintenance note:
-- this harness relies on specific metric names and bootstrap-log identifiers in `logs/C.log`
-- some MerkleSync assertions are intentionally heuristic and observability-dependent rather than a
-  fully structured proof of bootstrap internals
-- if tmpnet or C-Chain sync observability changes, the evidence checks in this harness may need to
-  be updated even when the underlying bootstrap behavior is still correct
+- this harness relies on the specific metric names described above
+- the lifecycle assertions are a structured proof of which summary was synced and how the sync
+  ended; the request-metric assertions remain heuristic evidence that code sync and block backfill
+  were exercised
+- if tmpnet or the C-Chain sync metrics change, the evidence checks in this harness may need to be
+  updated even when the underlying bootstrap behavior is still correct
+
+### Chained state sync
+
+After the bootstrap node has synced and been validated, it stays up to serve a
+**second** fresh node, which is pinned to state sync from it alone. This
+proves that a node that initialized via state sync can itself serve a full
+state sync: for Firewood, that a database built from range proofs serves range
+proofs.
+
+The pinning needs two layers, because summaries and sync data travel over
+different planes:
+
+- the `state-sync-ids`/`state-sync-ips` **node flags** replace the snowman
+  syncer's summary beacons (`snow/engine/snowman/syncer/config.go`), so the
+  summary frontier and its acceptance vote come from the state-synced node
+  alone; a non-validator works because the node manually tracks the given IP
+- the `state-sync-ids` **C-Chain config key** restricts the data plane: the
+  C-Chain limits its sync `PeerTracker` to the listed peers
+  (`vms/saevm/cchain/config.go`), so the state, code, and block requests hit
+  the state-synced node alone
+
+The validators stay up on their executed state throughout: they no longer serve
+any part of the second sync, but the post-sync snowman bootstrapping and
+consensus still need them. The serving-side request metrics for this scenario
+are therefore read from the state-synced node, not the validators. Sync chain:
+the generation node executes → the bootstrap node state syncs from the
+validators → the chained node state syncs from the bootstrap node only.
 
 ## Current limitations
 
@@ -157,7 +245,7 @@ validation.
 - `tests/msync/Taskfile.yml`
 - `tests/Taskfile.yml`
 - `Taskfile.yml`
-- `.github/workflows/bazel-ci.yml`
+- `.github/workflows/bazel.yml`
 - `.review-briefs/merkle-sync-e2e.md`
 
 Implementation note:
