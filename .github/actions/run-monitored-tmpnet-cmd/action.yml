@@ -14,6 +14,10 @@ inputs:
   setup_bazel:
     description: 'Whether to run Bazel setup before executing the command'
     default: 'false'
+  cache-validation:
+    description: Use the PR-scoped Task validation cache
+    required: false
+    default: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'cache-validation') }}
   filter_by_owner:
     default: ''
   artifact_prefix:
@@ -64,6 +68,8 @@ runs:
         diagnostic-groups: docker
     - uses: ./.github/actions/setup-bazel
       if: ${{ inputs.setup_bazel == 'true' }}
+      with:
+        cache-validation: ${{ inputs.cache-validation }}
     # Install nix and ensure promtail and prometheus are available
     - uses: ./.github/actions/install-nix
     - name: Notify of metrics availability

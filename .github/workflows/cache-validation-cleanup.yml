@@ -22,6 +22,8 @@ jobs:
         run: |
           keys=(
             "task-validation-Linux-X64"
+            "task-validation-Linux-ARM64"
+            "task-validation-macOS-ARM64"
             "go-mod-validation-Linux"
             "go-unit-validation-Linux-X64"
           )

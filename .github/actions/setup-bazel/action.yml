@@ -6,11 +6,17 @@ inputs:
     description: 'Whether this is the initial setup pass that checks metadata and, on master, caches dependencies needed by subsequent Bazel CI jobs'
     required: false
     default: 'false'
+  cache-validation:
+    description: Use the PR-scoped Task validation cache
+    required: false
+    default: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'cache-validation') }}
 
 runs:
   using: composite
   steps:
     - uses: ./.github/actions/setup-task
+      with:
+        cache-validation: ${{ inputs.cache-validation }}
 
     - name: Ensure runner disk space
       uses: ./.github/actions/ensure-disk-space

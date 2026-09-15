@@ -9,11 +9,17 @@ inputs:
     description: 'Working directory to run the command in'
     required: false
     default: '.'
+  cache-validation:
+    description: Use the PR-scoped Task validation cache
+    required: false
+    default: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'cache-validation') }}
 
 runs:
   using: composite
   steps:
     - uses: ./.github/actions/setup-bazel
+      with:
+        cache-validation: ${{ inputs.cache-validation }}
 
     - name: Run command with Bazel failure diagnostics
       shell: bash

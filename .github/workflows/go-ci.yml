@@ -77,7 +77,7 @@ jobs:
           GODEBUG: ${{ (github.ref == 'refs/heads/master' || (inputs.cache_validation && steps.unit-cache.outputs.cache-hit == 'true')) && 'gocachetest=1' || '' }}
           GOPROXY: ${{ (github.ref == 'refs/heads/master' || (inputs.cache_validation && steps.unit-cache.outputs.cache-hit == 'true')) && 'off' || '' }}
           TIMEOUT: 900s
-      - name: Validate Go unit-test cache
+      - name: Validate Go cache restores
         if: ${{ always() && (github.ref == 'refs/heads/master' || (inputs.cache_validation && steps.unit-cache.outputs.cache-hit == 'true')) }}
         shell: bash
         run: |
@@ -85,6 +85,14 @@ jobs:
             --check task-cache-restore \
             --check go-mod-cache-restore \
             --check go-unit-cache-restore \
+            --log "$RUNNER_TEMP/go-unit-cache-validation.log"
+      - name: Validate Go unit-test results
+        # Race-and-shuffle jobs reuse compiler output but intentionally bypass
+        # Go test-result caching.
+        if: ${{ always() && !inputs.run_race_shuffle_unit_tests && (github.ref == 'refs/heads/master' || (inputs.cache_validation && steps.unit-cache.outputs.cache-hit == 'true')) }}
+        shell: bash
+        run: |
+          go run ./tools/cache-check \
             --check go-unit-test-results \
             ${{ inputs.cache_validation && '--allow-uncached-go-test-package github.com/ava-labs/avalanchego/tools/cache-check' || '' }} \
             --log "$RUNNER_TEMP/go-unit-cache-validation.log"
