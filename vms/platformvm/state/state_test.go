@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -69,49 +70,46 @@ type testStateConfig struct {
 }
 
 // A testStateOption overrides a default [newTestState] input.
-type testStateOption func(*testStateConfig)
+type testStateOption = options.Option[testStateConfig]
 
 // withUpgradeConfig overrides the default upgrade config.
 func withUpgradeConfig(c upgrade.Config) testStateOption {
-	return func(cfg *testStateConfig) {
+	return options.Func[testStateConfig](func(cfg *testStateConfig) {
 		cfg.upgradeConfig = c
-	}
+	})
 }
 
 // withRewardConfig overrides the default reward config.
 func withRewardConfig(c reward.Config) testStateOption {
-	return func(cfg *testStateConfig) {
+	return options.Func[testStateConfig](func(cfg *testStateConfig) {
 		cfg.rewardConfig = c
-	}
+	})
 }
 
 // withLocalNodeID overrides the default local node ID.
 func withLocalNodeID(id ids.NodeID) testStateOption {
-	return func(cfg *testStateConfig) {
+	return options.Func[testStateConfig](func(cfg *testStateConfig) {
 		cfg.localNodeID = id
-	}
+	})
 }
 
 // withMetrics overrides the default metrics.
 func withMetrics(m metrics.Metrics) testStateOption {
-	return func(cfg *testStateConfig) {
+	return options.Func[testStateConfig](func(cfg *testStateConfig) {
 		cfg.metrics = m
-	}
+	})
 }
 
 // newTestState constructs a [State] over db. It uses the latest upgrade config,
 // [defaultRewardConfig], a fresh local node ID, and [metrics.Noop] unless
 // overridden by opts.
 func newTestState(t testing.TB, db database.Database, opts ...testStateOption) *State {
-	cfg := testStateConfig{
+	cfg := options.ApplyTo(&testStateConfig{
 		upgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
 		rewardConfig:  defaultRewardConfig,
 		localNodeID:   ids.GenerateTestNodeID(),
 		metrics:       metrics.Noop,
-	}
-	for _, opt := range opts {
-		opt(&cfg)
-	}
+	}, opts...)
 
 	s, err := New(
 		db,
