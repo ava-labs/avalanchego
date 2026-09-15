@@ -27,7 +27,7 @@ var _ state.Trie = (*accountTrie)(nil)
 //     calculate the hash of the trie otherwise. If the parent root can be proposed on (it is the
 //     Firewood tip or a not-yet-committed proposal), an [ffi.Proposal] is created so that the changes
 //     can later be committed. Otherwise, an [ffi.Reconstructed] view over the historical revision is
-//     built, which can be read and hashed but never committed. See [hasher].
+//     built, which can be read and hashed but never committed. See [view].
 //  3. the [accountTrie.GetAccount] and [accountTrie.GetStorage] methods cannot read from changes since
 //     the most recent call to [accountTrie.Hash], and this is a very difficult problem to solve due
 //     to account deletions on the `SELFDESTRUCT` opcode not manually calling [state.Trie.DeleteStorage].
@@ -38,24 +38,27 @@ var _ state.Trie = (*accountTrie)(nil)
 type accountTrie struct {
 	*baseTrie
 	revision *ffi.Revision
-	hasher   hasher
+	view     view
 	tdb      *TrieDB
 }
 
-func newAccountTrie(root common.Hash, db *TrieDB, currentOps []ffi.BatchOp) (*accountTrie, error) {
+func newAccountTrie(root common.Hash, db *TrieDB) (*accountTrie, error) {
 	revision, err := db.newRevision(root)
 	if err != nil {
 		return nil, err
 	}
-	hasher := newProposalHasher(db, root, revision)
-	return newAccountTrieWithHasher(revision, hasher, db, currentOps), nil
+	return newAccountTrieWithRevision(revision, db, nil), nil
 }
 
-func newAccountTrieWithHasher(revision *ffi.Revision, h hasher, db *TrieDB, currentOps []ffi.BatchOp) *accountTrie {
+func newAccountTrieWithRevision(revision *ffi.Revision, db *TrieDB, currentOps []ffi.BatchOp) *accountTrie {
+	view := newProposableView(db, revision)
 	return &accountTrie{
-		baseTrie: &baseTrie{reader: h, updateOps: currentOps},
+		baseTrie: &baseTrie{
+			reader:    view,
+			updateOps: currentOps,
+		},
 		revision: revision,
-		hasher:   h,
+		view:     view,
 		tdb:      db,
 	}
 }
@@ -78,10 +81,10 @@ func (a *accountTrie) Hash() common.Hash {
 	return root
 }
 
-// hash applies all pending updates via the [hasher] and returns the root. If the
+// hash applies all pending updates via the [view] and returns the root. If the
 // previous root was a historical revision, an [ffi.Reconstructed] will be made.
 func (a *accountTrie) hash() (common.Hash, error) {
-	root, err := a.hasher.hash(a.updateOps)
+	root, err := a.view.hash(a.updateOps)
 	if !errors.Is(err, errNotProposable) {
 		return root, err
 	}
@@ -90,9 +93,9 @@ func (a *accountTrie) hash() (common.Hash, error) {
 	if err != nil {
 		return common.Hash{}, err
 	}
-	a.hasher = newReconstructedHasher(recon)
-	a.reader = a.hasher
-	return a.hasher.hash(a.updateOps)
+	a.view = newReconstructedView(recon)
+	a.reader = a.view
+	return a.view.hash(a.updateOps)
 }
 
 // Commit returns the new root hash of the trie and a nil [trienode.NodeSet].
@@ -113,7 +116,7 @@ func (a *accountTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 		return common.Hash{}, nil, err
 	}
 
-	if err := a.hasher.commit(); err != nil {
+	if err := a.view.commit(); err != nil {
 		return common.Hash{}, nil, fmt.Errorf("committing account trie: %w", err)
 	}
 
@@ -122,10 +125,5 @@ func (a *accountTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 
 // Copy creates a copy of the [accountTrie].
 func (a *accountTrie) Copy() *accountTrie {
-	h, err := a.hasher.copy()
-	if err != nil {
-		a.tdb.log.Error("copying account trie", zap.Error(err))
-		return nil
-	}
-	return newAccountTrieWithHasher(a.revision, h, a.tdb, slices.Clone(a.updateOps))
+	return newAccountTrieWithRevision(a.revision, a.tdb, slices.Clone(a.updateOps))
 }

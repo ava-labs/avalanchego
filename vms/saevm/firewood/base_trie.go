@@ -33,7 +33,7 @@ func storageKey(addr common.Address, key []byte) []byte {
 }
 
 type trieReader interface {
-	Get([]byte) ([]byte, error)
+	get([]byte) ([]byte, error)
 }
 
 // baseTrie contains the shared state and methods for all Firewood
@@ -51,7 +51,7 @@ type baseTrie struct {
 // GetAccount returns the state account associated with an address.
 // Returns (nil, nil) if the account does not exist.
 func (b *baseTrie) GetAccount(addr common.Address) (*types.StateAccount, error) {
-	accountBytes, err := b.reader.Get(accountKey(addr))
+	accountBytes, err := b.reader.get(accountKey(addr))
 	if err != nil || accountBytes == nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (b *baseTrie) DeleteAccount(addr common.Address) error {
 // GetStorage returns the value associated with a storage key for a given account address.
 // Returns (nil, nil) if the slot does not exist.
 func (b *baseTrie) GetStorage(addr common.Address, key []byte) ([]byte, error) {
-	storageBytes, err := b.reader.Get(storageKey(addr, key))
+	storageBytes, err := b.reader.get(storageKey(addr, key))
 	if err != nil || storageBytes == nil {
 		return nil, err
 	}

@@ -6,10 +6,10 @@ go_library(
     srcs = [
         "account_trie.go",
         "base_trie.go",
-        "hasher.go",
         "state.go",
         "storage_trie.go",
         "triedb.go",
+        "view.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/firewood",
     visibility = ["//visibility:public"],
