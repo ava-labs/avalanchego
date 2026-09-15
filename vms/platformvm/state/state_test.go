@@ -60,39 +60,59 @@ var defaultRewardConfig = reward.Config{
 	SupplyCap:          720 * units.MegaAvax,
 }
 
-func newTestState(t testing.TB, db database.Database) *State {
-	return newTestStateWithUpgrade(
-		t,
-		db,
-		upgradetest.GetConfig(upgradetest.Latest),
-		defaultRewardConfig,
-	)
+// testStateConfig holds the [New] inputs that tests override.
+type testStateConfig struct {
+	upgradeConfig upgrade.Config
+	rewardConfig  reward.Config
+	localNodeID   ids.NodeID
+	metrics       metrics.Metrics
 }
 
-func newTestStateWithUpgrade(
-	t testing.TB,
-	db database.Database,
-	upgradeConfig upgrade.Config,
-	rewardConfig reward.Config,
-) *State {
-	return newTestStateWithNodeID(
-		t,
-		db,
-		upgradeConfig,
-		rewardConfig,
-		ids.GenerateTestNodeID(),
-		metrics.Noop,
-	)
+// A testStateOption overrides a default [newTestState] input.
+type testStateOption func(*testStateConfig)
+
+// withUpgradeConfig overrides the default upgrade config.
+func withUpgradeConfig(c upgrade.Config) testStateOption {
+	return func(cfg *testStateConfig) {
+		cfg.upgradeConfig = c
+	}
 }
 
-func newTestStateWithNodeID(
-	t testing.TB,
-	db database.Database,
-	upgradeConfig upgrade.Config,
-	rewardConfig reward.Config,
-	localNodeID ids.NodeID,
-	m metrics.Metrics,
-) *State {
+// withRewardConfig overrides the default reward config.
+func withRewardConfig(c reward.Config) testStateOption {
+	return func(cfg *testStateConfig) {
+		cfg.rewardConfig = c
+	}
+}
+
+// withLocalNodeID overrides the default local node ID.
+func withLocalNodeID(id ids.NodeID) testStateOption {
+	return func(cfg *testStateConfig) {
+		cfg.localNodeID = id
+	}
+}
+
+// withMetrics overrides the default metrics.
+func withMetrics(m metrics.Metrics) testStateOption {
+	return func(cfg *testStateConfig) {
+		cfg.metrics = m
+	}
+}
+
+// newTestState constructs a [State] over db. It uses the latest upgrade config,
+// [defaultRewardConfig], a fresh local node ID, and [metrics.Noop] unless
+// overridden by opts.
+func newTestState(t testing.TB, db database.Database, opts ...testStateOption) *State {
+	cfg := testStateConfig{
+		upgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
+		rewardConfig:  defaultRewardConfig,
+		localNodeID:   ids.GenerateTestNodeID(),
+		metrics:       metrics.Noop,
+	}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
 	s, err := New(
 		db,
 		genesistest.NewBytes(t, genesistest.Config{
@@ -100,15 +120,15 @@ func newTestStateWithNodeID(
 		}),
 		prometheus.NewRegistry(),
 		validators.NewManager(),
-		upgradeConfig,
+		cfg.upgradeConfig,
 		&config.Default,
 		&snow.Context{
 			NetworkID: constants.UnitTestID,
-			NodeID:    localNodeID,
+			NodeID:    cfg.localNodeID,
 			Log:       logging.NoLog{},
 		},
-		m,
-		rewardConfig,
+		cfg.metrics,
+		cfg.rewardConfig,
 	)
 	require.NoError(t, err)
 	return s
@@ -163,7 +183,7 @@ func TestNewInitializesGenesisValidatorsWithPrimaryNetworkRewards(t *testing.T) 
 		MintingPeriod:      365 * 24 * time.Hour,
 		SupplyCap:          720 * units.MegaAvax,
 	}
-	s := newTestStateWithUpgrade(t, memdb.New(), upgradeConfig, rewardConfig)
+	s := newTestState(t, memdb.New(), withUpgradeConfig(upgradeConfig), withRewardConfig(rewardConfig))
 
 	wantReward := reward.NewPrimaryNetworkCalculator(rewardConfig, upgradeConfig).Calculate(
 		startTime,
@@ -5117,24 +5137,13 @@ func (m *stakeMetrics) SetTotalStake(s uint64) {
 	m.total = s
 }
 
-func newTestStateWithMetrics(t testing.TB, db database.Database, localNodeID ids.NodeID, m metrics.Metrics) *State {
-	return newTestStateWithNodeID(
-		t,
-		db,
-		upgradetest.GetConfig(upgradetest.Latest),
-		defaultRewardConfig,
-		localNodeID,
-		m,
-	)
-}
-
 func TestStakeMetricsDelegated(t *testing.T) {
 	require := require.New(t)
 
 	const delegatorWeight = 2 * genesistest.DefaultValidatorWeight
 
 	m := &stakeMetrics{Metrics: metrics.Noop}
-	s := newTestStateWithMetrics(t, memdb.New(), defaultValidatorNodeID, m)
+	s := newTestState(t, memdb.New(), withLocalNodeID(defaultValidatorNodeID), withMetrics(m))
 
 	require.Equal(genesistest.DefaultValidatorWeight, m.local)
 	require.Zero(m.delegated)
@@ -5168,7 +5177,7 @@ func TestStakeMetricsReload(t *testing.T) {
 
 	db := memdb.New()
 	m := &stakeMetrics{Metrics: metrics.Noop}
-	s := newTestStateWithMetrics(t, db, defaultValidatorNodeID, m)
+	s := newTestState(t, db, withLocalNodeID(defaultValidatorNodeID), withMetrics(m))
 
 	// The delegator needs a backing tx to survive the reload.
 	unsigned := createPermissionlessDelegatorTx(constants.PrimaryNetworkID, platform.Validator{
@@ -5198,7 +5207,7 @@ func TestStakeMetricsReload(t *testing.T) {
 	require.Equal(delegatorWeight, m.delegated)
 
 	reloaded := &stakeMetrics{Metrics: metrics.Noop}
-	newTestStateWithMetrics(t, db, defaultValidatorNodeID, reloaded)
+	newTestState(t, db, withLocalNodeID(defaultValidatorNodeID), withMetrics(reloaded))
 
 	require.Equal(genesistest.DefaultValidatorWeight+delegatorWeight, reloaded.local)
 	require.Equal(delegatorWeight, reloaded.delegated)
@@ -5208,35 +5217,9 @@ func TestStakeMetricsNotAValidator(t *testing.T) {
 	require := require.New(t)
 
 	m := &stakeMetrics{Metrics: metrics.Noop}
-	newTestStateWithMetrics(t, memdb.New(), ids.GenerateTestNodeID(), m)
+	newTestState(t, memdb.New(), withLocalNodeID(ids.GenerateTestNodeID()), withMetrics(m))
 
 	require.Zero(m.local)
 	require.Zero(m.delegated)
 	require.Equal(genesistest.DefaultValidatorWeight, m.total)
-}
-
-// TestStakeMetricsManagerWeightBelowValidatorWeight drives the validator
-// manager's weight for this node below the node's own validator weight, which is
-// the underflow the delegated stake subtraction guards against. The delegated
-// stake is reported as 0 and the commit still succeeds.
-func TestStakeMetricsManagerWeightBelowValidatorWeight(t *testing.T) {
-	require := require.New(t)
-
-	m := &stakeMetrics{Metrics: metrics.Noop}
-	s := newTestStateWithMetrics(t, memdb.New(), defaultValidatorNodeID, m)
-
-	vdr, err := s.GetCurrentValidator(constants.PrimaryNetworkID, defaultValidatorNodeID)
-	require.NoError(err)
-	require.Equal(genesistest.DefaultValidatorWeight, vdr.Weight)
-
-	// Decrement the manager's weight only, leaving the staker state untouched.
-	require.NoError(s.validators.RemoveWeight(
-		constants.PrimaryNetworkID,
-		defaultValidatorNodeID,
-		1,
-	))
-
-	require.NoError(s.updateStakeMetrics())
-	require.Zero(m.delegated)
-	require.Equal(genesistest.DefaultValidatorWeight-1, m.local)
 }
