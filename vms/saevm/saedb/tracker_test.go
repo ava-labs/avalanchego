@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -377,4 +378,121 @@ func BenchmarkTrackerCommitInterval(b *testing.B) {
 			})
 		}
 	}
+}
+
+// readOnlySchemes are the schemes the read-only guarantee must hold on.
+var readOnlySchemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}
+
+// newSchemeTracker returns a [Tracker] on a fresh database, and that database.
+func newSchemeTracker(t *testing.T, scheme string) (*Tracker, ethdb.Database) {
+	t.Helper()
+
+	disk := rawdb.NewMemoryDatabase()
+	cfg := Config{CommitInterval: DefaultCommitInterval, Scheme: scheme}
+	tr, err := NewTracker(disk, cfg, types.EmptyRootHash, t.TempDir(), loggingtest.New(t, logging.Debug))
+	require.NoErrorf(t, err, "NewTracker(%q)", scheme)
+	t.Cleanup(func() {
+		assert.NoErrorf(t, tr.Close(types.EmptyRootHash), "%T.Close()", tr)
+	})
+	return tr, disk
+}
+
+// TestReadOnlyStateDB verifies that read-only state hashes but cannot be
+// committed, on every scheme rather than only where the backend enforces it.
+func TestReadOnlyStateDB(t *testing.T) {
+	for _, scheme := range readOnlySchemes {
+		t.Run(scheme, func(t *testing.T) {
+			tr, _ := newSchemeTracker(t, scheme)
+
+			sdb, err := tr.ReadOnlyStateDB(types.EmptyRootHash)
+			require.NoErrorf(t, err, "%T.ReadOnlyStateDB()", tr)
+			sdb.SetNonce(common.Address{1}, 1)
+			got := sdb.IntermediateRoot(true)
+
+			canonical, err := tr.StateDB(types.EmptyRootHash)
+			require.NoErrorf(t, err, "%T.StateDB()", tr)
+			canonical.SetNonce(common.Address{1}, 1)
+			require.Equal(t, canonical.IntermediateRoot(true), got, "read-only root matches canonical")
+
+			_, err = sdb.Commit(1, true)
+			require.ErrorIsf(t, err, ErrReadOnlyStateDB, "%T.Commit() on read-only state", sdb)
+
+			// Canonical state stays committable.
+			_, err = canonical.Commit(1, true)
+			require.NoErrorf(t, err, "%T.Commit() on canonical state", canonical)
+		})
+	}
+}
+
+// TestReadOnlyStateDBDiscardsCodeWrites verifies that a rejected commit leaves
+// nothing on disk, since [state.StateDB.Commit] flushes code first.
+func TestReadOnlyStateDBDiscardsCodeWrites(t *testing.T) {
+	for _, scheme := range readOnlySchemes {
+		t.Run(scheme, func(t *testing.T) {
+			tr, disk := newSchemeTracker(t, scheme)
+
+			code := []byte{0x60, 0x00, 0x60, 0x00}
+			hash := crypto.Keccak256Hash(code)
+
+			sdb, err := tr.ReadOnlyStateDB(types.EmptyRootHash)
+			require.NoErrorf(t, err, "%T.ReadOnlyStateDB()", tr)
+			// Code without storage writes, so no storage trie errors first.
+			sdb.SetCode(common.Address{0xAA}, code)
+			sdb.SetNonce(common.Address{0xAA}, 1)
+
+			_, err = sdb.Commit(1, true)
+			require.ErrorIsf(t, err, ErrReadOnlyStateDB, "%T.Commit()", sdb)
+			require.Falsef(t, rawdb.HasCode(disk, hash), "code %s persisted by a rejected commit", hash)
+		})
+	}
+}
+
+// TestReadOnlyDiskDBRefusesClose verifies that a read-only view cannot close the
+// store the rest of the node is using.
+func TestReadOnlyDiskDBRefusesClose(t *testing.T) {
+	for _, scheme := range readOnlySchemes {
+		t.Run(scheme, func(t *testing.T) {
+			tr, disk := newSchemeTracker(t, scheme)
+
+			ro := readOnlyDatabase{tr.cache}
+			require.NoError(t, ro.DiskDB().Close(), "read-only DiskDB().Close()")
+			require.NoErrorf(t, disk.Put([]byte("k"), []byte("v")), "%T still usable afterwards", disk)
+		})
+	}
+}
+
+// TestReadOnlyDatabaseWrapsEveryTrie verifies that the commit rejection reaches
+// storage tries and copies, not just the account trie the StateDB opens first.
+func TestReadOnlyDatabaseWrapsEveryTrie(t *testing.T) {
+	for _, scheme := range readOnlySchemes {
+		t.Run(scheme, func(t *testing.T) {
+			tr, _ := newSchemeTracker(t, scheme)
+			ro := readOnlyDatabase{tr.cache}
+
+			acct, err := ro.OpenTrie(types.EmptyRootHash)
+			require.NoError(t, err, "OpenTrie()")
+			requireRejectsCommit(t, acct, "account trie")
+			requireRejectsCommit(t, ro.CopyTrie(acct), "copy of the account trie")
+
+			addr := common.Address{1}
+			storage, err := ro.OpenStorageTrie(types.EmptyRootHash, addr, types.EmptyRootHash, acct)
+			require.NoError(t, err, "OpenStorageTrie()")
+			requireRejectsCommit(t, storage, "storage trie")
+
+			// A nil copy MUST stay nil rather than become a non-nil interface
+			// holding a nil trie, which the StateDB would then use.
+			if cp := ro.CopyTrie(storage); cp != nil {
+				requireRejectsCommit(t, cp, "copy of the storage trie")
+				require.NotPanicsf(t, func() { cp.Hash() }, "a non-nil copy is usable")
+			}
+		})
+	}
+}
+
+func requireRejectsCommit(t *testing.T, tr state.Trie, what string) {
+	t.Helper()
+
+	require.NotNilf(t, tr, "%s is not nil", what)
+	_, _, err := tr.Commit(true)
+	require.ErrorIsf(t, err, ErrReadOnlyStateDB, "%s Commit()", what)
 }

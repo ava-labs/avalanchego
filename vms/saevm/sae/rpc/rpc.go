@@ -49,7 +49,7 @@ type Chain interface {
 	ChainContext() core.ChainContext
 
 	// Execution results and replay
-	saedb.StateDBOpener
+	saedb.ReadOnlyStateDBOpener
 	RecentReceipt(context.Context, common.Hash) (*saexec.Receipt, bool, error)
 	NewBlock(eth *types.Block, parent, lastSettled *blocks.Block) (*blocks.Block, error)
 
