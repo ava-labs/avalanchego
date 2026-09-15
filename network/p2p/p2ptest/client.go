@@ -24,6 +24,25 @@ func NewSelfClient(t *testing.T, ctx context.Context, nodeID ids.NodeID, handler
 	return NewClient(t, ctx, nodeID, handler, nodeID, handler)
 }
 
+// NewSelfTrackedClient returns a Client that routes to nodeID's own handler and
+// scores every request it issues against tracker.
+func NewSelfTrackedClient(
+	t *testing.T,
+	ctx context.Context,
+	nodeID ids.NodeID,
+	handler p2p.Handler,
+	tracker *p2p.PeerTracker,
+) *p2p.Client {
+	return newClientWithPeers(
+		t,
+		ctx,
+		nodeID,
+		handler,
+		map[ids.NodeID]p2p.Handler{nodeID: handler},
+		tracker,
+	)
+}
+
 // NewClient generates a client-server pair and returns the client used to
 // communicate with a server with the specified handler
 func NewClient(
@@ -53,17 +72,35 @@ func NewClientWithPeers(
 	clientHandler p2p.Handler,
 	peers map[ids.NodeID]p2p.Handler,
 ) *p2p.Client {
+	return newClientWithPeers(t, ctx, clientNodeID, clientHandler, peers, nil)
+}
+
+// newClientWithPeers builds the client-server mesh. A non-nil tracker is
+// registered for the client's connection events and scores its requests.
+func newClientWithPeers(
+	t *testing.T,
+	ctx context.Context,
+	clientNodeID ids.NodeID,
+	clientHandler p2p.Handler,
+	peers map[ids.NodeID]p2p.Handler,
+	tracker *p2p.PeerTracker,
+) *p2p.Client {
 	peers[clientNodeID] = clientHandler
 
 	peerSenders := make(map[ids.NodeID]*enginetest.Sender)
 	peerNetworks := make(map[ids.NodeID]*p2p.Network)
 	for nodeID := range peers {
 		peerSenders[nodeID] = &enginetest.Sender{}
+		var handlers []p2p.ConnectionHandler
+		if tracker != nil && nodeID == clientNodeID {
+			handlers = append(handlers, tracker)
+		}
 		peerNetwork, err := p2p.NewNetwork(
 			logging.NoLog{},
 			peerSenders[nodeID],
 			prometheus.NewRegistry(),
 			"",
+			handlers...,
 		)
 		require.NoError(t, err)
 		peerNetworks[nodeID] = peerNetwork
@@ -127,6 +164,10 @@ func NewClientWithPeers(
 		require.NoError(t, peerNetworks[nodeID].Connected(ctx, clientNodeID, nil))
 		require.NoError(t, peerNetworks[nodeID].Connected(ctx, nodeID, nil))
 		require.NoError(t, peerNetworks[nodeID].AddHandler(0, peers[nodeID]))
+	}
+
+	if tracker != nil {
+		return peerNetworks[clientNodeID].NewTrackedClient(0, tracker)
 	}
 
 	peerSampler := p2p.PeerSampler{Peers: &p2p.Peers{}}

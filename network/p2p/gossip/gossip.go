@@ -262,20 +262,20 @@ func (p *PullGossiper[_]) handleResponse(
 	nodeID ids.NodeID,
 	responseBytes []byte,
 	err error,
-) {
+) error {
 	if err != nil {
 		p.log.Debug(
 			"failed gossip request",
 			zap.Stringer("nodeID", nodeID),
 			zap.Error(err),
 		)
-		return
+		return err
 	}
 
 	gossip, err := ParseAppResponse(responseBytes)
 	if err != nil {
 		p.log.Debug("failed to unmarshal gossip response", zap.Error(err))
-		return
+		return err
 	}
 
 	receivedBytes := 0
@@ -314,6 +314,8 @@ func (p *PullGossiper[_]) handleResponse(
 			zap.Error(err),
 		)
 	}
+
+	return nil
 }
 
 // NewPushGossiper returns an instance of PushGossiper

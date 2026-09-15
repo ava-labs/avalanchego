@@ -121,13 +121,14 @@ func TestAtomicTxGossip(t *testing.T) {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
+	onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) error {
 		require.NoError(err)
 
 		responseGossip, err := gossip.ParseAppResponse(responseBytes)
 		require.NoError(err)
 		require.Empty(responseGossip)
 		wg.Done()
+		return nil
 	}
 	require.NoError(client.AppRequest(ctx, set.Of(vm.Ctx.NodeID), requestBytes, onResponse))
 	require.NoError(vm.AppRequest(ctx, requestingNodeID, 1, time.Time{}, <-peerSender.SentAppRequest))
@@ -155,7 +156,7 @@ func TestAtomicTxGossip(t *testing.T) {
 	// Ask the VM for new transactions. We should get the newly issued tx.
 	wg.Add(1)
 
-	onResponse = func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
+	onResponse = func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) error {
 		require.NoError(err)
 
 		responseGossip, err := gossip.ParseAppResponse(responseBytes)
@@ -167,6 +168,7 @@ func TestAtomicTxGossip(t *testing.T) {
 			responseGossip,
 		)
 		wg.Done()
+		return nil
 	}
 	require.NoError(client.AppRequest(ctx, set.Of(vm.Ctx.NodeID), requestBytes, onResponse))
 	require.NoError(vm.AppRequest(ctx, requestingNodeID, 3, time.Time{}, <-peerSender.SentAppRequest))

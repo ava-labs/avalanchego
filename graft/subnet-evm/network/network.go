@@ -69,9 +69,11 @@ type SyncedNetworkClient interface {
 type Network interface {
 	validators.Connector
 	common.AppHandler
-	p2p.NodeSampler
 
 	SyncedNetworkClient
+
+	// PeerTracker returns the tracker to build a tracked [p2p.Client] with.
+	PeerTracker() *p2p.PeerTracker
 
 	// SendAppRequestAny sends request to an arbitrary peer.
 	// Returns the ID of the chosen peer, and an error if no peer is available.
@@ -166,25 +168,6 @@ func NewNetwork(
 		peers:                      peers,
 		p2pValidators:              p2pValidators,
 	}, nil
-}
-
-// Sample returns a random sample of connected peers.
-// `limit` is ignored, and one peer will be returned.
-// The peer returned may not be a validator - to sample validators,
-// use [p2p.Validators.Sample] instead.
-func (n *network) Sample(_ context.Context, limit int) []ids.NodeID {
-	if limit <= 0 {
-		return nil
-	}
-	if limit > 1 {
-		log.Warn("Sample called with limit > 1, but only 1 peer will be returned", "limit", limit)
-	}
-
-	node, ok := n.peers.SelectPeer()
-	if !ok {
-		return nil
-	}
-	return []ids.NodeID{node}
 }
 
 // SendAppRequestAny synchronously sends request to an arbitrary peer.
@@ -282,6 +265,9 @@ func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 			"error", err,
 		)
 
+		// The request never reached nodeID, so balance the registration above.
+		// Nothing else will, since the handler is gone.
+		n.peers.RegisterFailure(nodeID)
 		n.activeAppRequests.Release(1)
 		delete(n.outstandingRequestHandlers, requestID)
 		return err
@@ -482,6 +468,10 @@ func (n *network) Size() uint32 {
 	defer n.lock.RUnlock()
 
 	return uint32(n.peers.Size())
+}
+
+func (n *network) PeerTracker() *p2p.PeerTracker {
+	return n.peers
 }
 
 func (n *network) RegisterResponse(nodeID ids.NodeID, bandwidth float64) {

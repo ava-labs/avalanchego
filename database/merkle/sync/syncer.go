@@ -418,15 +418,17 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, err error) {
+	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, err error) error {
 		defer s.finishWorkItem()
 
 		if err := s.handleChangeProofResponse(ctx, targetRootID, work, changeReq, responseBytes, err); err != nil {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
-			return
+			return peerFault(err)
 		}
+
+		return nil
 	}
 
 	if err := s.sendRequest(ctx, s.config.ProofClient, requestBytes, onResponse); err != nil {
@@ -473,15 +475,17 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) {
+	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) error {
 		defer s.finishWorkItem()
 
 		if err := s.handleRangeProofResponse(ctx, targetRootID, work, rangeReq, responseBytes, appErr); err != nil {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
-			return
+			return peerFault(err)
 		}
+
+		return nil
 	}
 
 	if err := s.sendRequest(ctx, s.config.ProofClient, requestBytes, onResponse); err != nil {
@@ -491,6 +495,15 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 	}
 
 	s.metrics.requestMade()
+}
+
+// peerFault reports err only when the peer caused it, so a request still in
+// flight when a sync completes is not blamed on the peer serving it.
+func peerFault(err error) error {
+	if errors.Is(err, ErrAlreadyClosed) {
+		return nil
+	}
+	return err
 }
 
 func (s *Syncer[_, _]) sendRequest(
@@ -573,11 +586,6 @@ func (s *Syncer[R, _]) handleRangeProofResponse(
 		return err
 	}
 
-	root, err := ids.ToID(request.RootHash)
-	if err != nil {
-		return err
-	}
-
 	s.metrics.proofReceived(proofTypeRange, len(responseBytes))
 
 	if err := s.verifyAndCommitRangeProof(
@@ -587,7 +595,7 @@ func (s *Syncer[R, _]) handleRangeProofResponse(
 		rangeProof,
 		protoutils.ProtoToMaybe(request.StartKey),
 		protoutils.ProtoToMaybe(request.EndKey),
-		root,
+		targetRootID,
 		int(request.KeyLimit),
 	); err != nil {
 		return fmt.Errorf("%w: %w", errInvalidRangeProof, err)
@@ -614,11 +622,6 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 
 	startKey := protoutils.ProtoToMaybe(request.StartKey)
 	endKey := protoutils.ProtoToMaybe(request.EndKey)
-	endRoot, err := ids.ToID(request.EndRootHash)
-	if err != nil {
-		return err
-	}
-
 	switch response := response.Response.(type) {
 	case *pb.ProofResponse_ChangeProof:
 		// The server had enough history to send us a change proof
@@ -635,7 +638,7 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 			changeProof,
 			startKey,
 			endKey,
-			endRoot,
+			targetRootID,
 			int(request.KeyLimit),
 		)
 		s.metrics.observeVerification(proofTypeChange, time.Since(verificationStart), err)
@@ -670,7 +673,7 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 			rangeProof,
 			startKey,
 			endKey,
-			endRoot,
+			targetRootID,
 			int(request.KeyLimit),
 		)
 	default:

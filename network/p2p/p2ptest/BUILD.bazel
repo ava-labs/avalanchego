@@ -3,7 +3,10 @@ load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "p2ptest",
-    srcs = ["client.go"],
+    srcs = [
+        "client.go",
+        "tracker.go",
+    ],
     importpath = "github.com/ava-labs/avalanchego/network/p2p/p2ptest",
     visibility = ["//visibility:public"],
     deps = [
