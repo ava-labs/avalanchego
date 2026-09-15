@@ -24,25 +24,21 @@ import (
 )
 
 const (
-	// Maximum future start time for staking/delegating
-	MaxFutureStartTime = 24 * 7 * 2 * time.Hour
-
 	// SyncBound is the synchrony bound used for safe decision making
 	SyncBound = 10 * time.Second
-
-	MaxValidatorWeightFactor = 5
 )
 
 var (
 	_ platform.TxVisitor = (*proposalTxExecutor)(nil)
 
-	ErrRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
-	ErrRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
-	ErrInvalidState                  = errors.New("generated output isn't valid state")
 	ErrWrongTxType                   = errors.New("wrong transaction type")
 	ErrInvalidID                     = errors.New("invalid ID")
-	ErrProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
 	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
+
+	errRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
+	errRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
+	errInvalidState                  = errors.New("generated output isn't valid state")
+	errProposedAddStakerTxAfterBanff = errors.New("staker transaction proposed after Banff")
 	errShouldBeAutoRenewedStaker     = errors.New("expected auto renewed staker")
 	errInvalidTimestamp              = errors.New("invalid timestamp")
 	errUnexpectedStakerTxType        = errors.New("unexpected staker transaction type")
@@ -169,7 +165,7 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 	if e.backend.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
-			ErrProposedAddStakerTxAfterBanff,
+			errProposedAddStakerTxAfterBanff,
 			currentTimestamp,
 			e.backend.Config.UpgradeConfig.BanffTime,
 		)
@@ -219,7 +215,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidato
 	if e.backend.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
-			ErrProposedAddStakerTxAfterBanff,
+			errProposedAddStakerTxAfterBanff,
 			currentTimestamp,
 			e.backend.Config.UpgradeConfig.BanffTime,
 		)
@@ -266,7 +262,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 	if e.backend.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
 		return fmt.Errorf(
 			"%w: timestamp (%s) >= Banff fork time (%s)",
-			ErrProposedAddStakerTxAfterBanff,
+			errProposedAddStakerTxAfterBanff,
 			currentTimestamp,
 			e.backend.Config.UpgradeConfig.BanffTime,
 		)
@@ -964,7 +960,7 @@ func (e *proposalTxExecutor) newUTXO(
 	}
 	out, ok := outIntf.(verify.State)
 	if !ok {
-		return nil, ErrInvalidState
+		return nil, errInvalidState
 	}
 
 	return &avax.UTXO{
@@ -1011,7 +1007,7 @@ func getNextStakerToReward(chainState state.Chain, tx platform.RewardTx) (*platf
 	if stakerToReward.TxID != tx.StakerTxID() {
 		return nil, nil, fmt.Errorf(
 			"%w: %s != %s",
-			ErrRemoveWrongStaker,
+			errRemoveWrongStaker,
 			stakerToReward.TxID,
 			tx.StakerTxID(),
 		)
@@ -1022,7 +1018,7 @@ func getNextStakerToReward(chainState state.Chain, tx platform.RewardTx) (*platf
 	if !stakerToReward.EndTime.Equal(currentChainTime) {
 		return nil, nil, fmt.Errorf(
 			"%w: TxID = %s with %s < %s",
-			ErrRemoveStakerTooEarly,
+			errRemoveStakerTooEarly,
 			tx.StakerTxID(),
 			currentChainTime,
 			stakerToReward.EndTime,
