@@ -1297,8 +1297,18 @@ func getDiskTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
 }
 
 func getTraceConfig(v *viper.Viper) (trace.Config, error) {
-	exporterTypeStr := v.GetString(TracingExporterTypeKey)
-	exporterType, err := trace.ExporterTypeFromString(exporterTypeStr)
+	var (
+		exporterType trace.ExporterType
+		err          error
+	)
+	if v.IsSet(TracingExporterTypeKey) {
+		exporterType, err = trace.ExporterTypeFromString(v.GetString(TracingExporterTypeKey))
+	} else {
+		// The standard OTel variables (OTEL_TRACES_EXPORTER and
+		// OTEL_EXPORTER_OTLP_[TRACES_]PROTOCOL) are a fallback when the flag
+		// isn't explicitly set, still leaving tracing disabled by default.
+		exporterType, err = trace.ExporterTypeFromEnv()
+	}
 	if err != nil {
 		return trace.Config{}, err
 	}
