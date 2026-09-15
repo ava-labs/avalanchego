@@ -42,13 +42,7 @@ func (h *Handler) SyncError() error {
 //
 // AcceptSummary MUST only be called once.
 func (h *Handler) AcceptSummary(ctx context.Context, s *summary) (block.StateSyncMode, error) {
-	evmSyncer := statesync.NewSyncer(
-		h.cfg,
-		h.hooks,
-		h.snowCtx,
-		h.network,
-		h.ethDB,
-	)
+	evmSyncer := h.Handler.Syncer()
 	shouldSync := evmSyncer.ShouldAcceptSummary(&s.summary)
 	if !shouldSync {
 		return block.StateSyncSkipped, nil
@@ -60,6 +54,10 @@ func (h *Handler) AcceptSummary(ctx context.Context, s *summary) (block.StateSyn
 		return block.StateSyncSkipped, nil
 	}
 
+	// Recorded before the sync goroutine starts, so a sync is never observable
+	// through its side effects without also being observable in the metrics.
+	h.Handler.MarkSyncStarted(&s.summary)
+
 	// The sync runs in a goroutine that outlives this call, but callers
 	// idiomatically cancel ctx on return. Drop that cancellation while
 	// keeping ctx's values, so the sync stays in the caller's trace.
@@ -68,20 +66,32 @@ func (h *Handler) AcceptSummary(ctx context.Context, s *summary) (block.StateSyn
 		defer h.cancel()
 		defer close(h.done) // result barrier: h.err is now readable
 
-		h.err.Set(h.sync(ctx, evmSyncer, s))
+		err := h.sync(ctx, evmSyncer, s)
+		// Marked after the sync's final write and before done closes, so that
+		// an observer that saw the sync finish also sees its outcome.
+		h.Handler.MarkSyncFinished(err)
+		h.err.Set(err)
 	}()
 	return block.StateSyncStatic, nil
 }
 
 // sync performs the full state sync, including the EVM sync and the cross-chain
-// state sync.
+// state sync, followed by the finalizing writes.
 func (h *Handler) sync(ctx context.Context, evmSyncer *statesync.Syncer, s *summary) error {
 	if err := evmSyncer.Sync(ctx, &s.summary); err != nil {
 		return err
 	}
+	if err := h.syncCChainState(ctx, s); err != nil {
+		return err
+	}
+	return evmSyncer.WriteSynced(&s.summary)
+}
 
-	// We can only determine the settled height after we have fetched the last
-	// accepted block, which is fetched during the EVM sync.
+// syncCChainState syncs the cross-chain state at the settled height. It MUST
+// only be called after the EVM sync, as the settled height can only be
+// determined from the last accepted block, which is fetched during the EVM
+// sync.
+func (h *Handler) syncCChainState(ctx context.Context, s *summary) error {
 	settledHeight, err := h.settledHeight(s.summary.AcceptedHash, s.summary.AcceptedHeight)
 	if err != nil {
 		return err
@@ -93,11 +103,10 @@ func (h *Handler) sync(ctx context.Context, evmSyncer *statesync.Syncer, s *summ
 		zap.Stringer("acceptedHash", s.summary.AcceptedHash),
 		zap.Uint64("acceptedHeight", s.summary.AcceptedHeight),
 	)
-	crossChainSyncer := state.NewSyncer(h.network.Network, h.network.PeerTracker, h.state, s.settledRoot, settledHeight)
+	crossChainSyncer := state.NewSyncer(h.network.Network, h.network.PeerTracker, h.state, s.settledRoot, settledHeight, h.atomicLeaves)
 	if err := crossChainSyncer.Sync(ctx); err != nil {
 		return err
 	}
 	h.snowCtx.Log.Info("finished syncing cross-chain state")
-
-	return evmSyncer.WriteSynced(&s.summary)
+	return nil
 }

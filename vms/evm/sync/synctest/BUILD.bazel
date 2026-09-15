@@ -6,6 +6,7 @@ go_library(
     srcs = [
         "accounts.go",
         "blocks.go",
+        "metrics.go",
         "network.go",
         "proto.go",
         "responders.go",
@@ -24,6 +25,7 @@ go_library(
         "//utils/set",
         "//version",
         "//vms/evm/sync/handlers",
+        "//vms/evm/sync/network",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state/snapshot",
@@ -35,6 +37,7 @@ go_library(
         "@com_github_ava_labs_libevm//triedb",
         "@com_github_holiman_uint256//:uint256",
         "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_model//go",
         "@com_github_stretchr_testify//require",
         "@org_golang_google_protobuf//proto",
         "@org_golang_x_sync//errgroup",
