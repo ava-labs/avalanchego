@@ -5,6 +5,7 @@
 ### Features
 
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
+- Helicon is now active from genesis on local networks. A local network started on a previous version is not compatible with this version.
 
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 
