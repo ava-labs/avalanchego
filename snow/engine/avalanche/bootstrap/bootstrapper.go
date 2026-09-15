@@ -419,13 +419,17 @@ func (b *Bootstrapper) fetch(ctx context.Context, vtxIDs ...ids.ID) error {
 			continue
 		}
 
-		nodeID, ok := b.PeerTracker.SelectPeer()
-		if !ok {
+		peers := b.PeerTracker.Sample(ctx, 1)
+
+		var nodeID ids.NodeID
+		if len(peers) == 0 {
 			// If we aren't connected to any peers, we send a request to ourself
 			// which is guaranteed to fail. We send this message to use the
 			// message timeout as a retry mechanism. Once we are connected to
 			// another node again we will select them to sample from.
 			nodeID = b.Ctx.NodeID
+		} else {
+			nodeID = peers[0]
 		}
 
 		b.PeerTracker.RegisterRequest(nodeID)

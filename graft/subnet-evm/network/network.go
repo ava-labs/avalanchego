@@ -172,19 +172,8 @@ func NewNetwork(
 // `limit` is ignored, and one peer will be returned.
 // The peer returned may not be a validator - to sample validators,
 // use [p2p.Validators.Sample] instead.
-func (n *network) Sample(_ context.Context, limit int) []ids.NodeID {
-	if limit <= 0 {
-		return nil
-	}
-	if limit > 1 {
-		log.Warn("Sample called with limit > 1, but only 1 peer will be returned", "limit", limit)
-	}
-
-	node, ok := n.peers.SelectPeer()
-	if !ok {
-		return nil
-	}
-	return []ids.NodeID{node}
+func (n *network) Sample(ctx context.Context, limit int) []ids.NodeID {
+	return n.peers.Sample(ctx, limit)
 }
 
 // SendAppRequestAny synchronously sends request to an arbitrary peer.
@@ -202,13 +191,14 @@ func (n *network) SendAppRequestAny(ctx context.Context, request []byte, handler
 
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	nodeID, ok := n.peers.SelectPeer()
-	if ok {
-		return nodeID, n.sendAppRequest(ctx, nodeID, request, handler)
+	peers := n.Sample(ctx, 1)
+	if len(peers) == 0 {
+		n.activeAppRequests.Release(1)
+		return ids.EmptyNodeID, fmt.Errorf("%w: numPeers: %d", errNoPeersFound, n.peers.Size())
 	}
 
-	n.activeAppRequests.Release(1)
-	return ids.EmptyNodeID, fmt.Errorf("%w: numPeers: %d", errNoPeersFound, n.peers.Size())
+	nodeID := peers[0]
+	return nodeID, n.sendAppRequest(ctx, nodeID, request, handler)
 }
 
 // SendAppRequest sends request message bytes to specified nodeID, notifying the responseHandler on response or failure

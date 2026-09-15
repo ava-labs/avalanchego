@@ -4,6 +4,7 @@
 package p2p
 
 import (
+	"context"
 	"errors"
 	"math"
 	"math/rand"
@@ -152,7 +153,9 @@ func (p *PeerTracker) shouldSelectUntrackedPeer() bool {
 	return rand.Float64() < newPeerProbability // #nosec G404
 }
 
-// SelectPeer that we could send a request to.
+var _ NodeSampler = (*PeerTracker)(nil)
+
+// Sample a peer that we could send a request to.
 //
 // If we should track more peers, returns a random untracked peer, if any exist.
 // Otherwise, with probability [randomPeerProbability] returns a random peer
@@ -160,8 +163,8 @@ func (p *PeerTracker) shouldSelectUntrackedPeer() bool {
 // With probability [1-randomPeerProbability] returns the peer in
 // [p.bandwidthHeap] with the highest bandwidth.
 //
-// Returns false if there are no connected peers.
-func (p *PeerTracker) SelectPeer() (ids.NodeID, bool) {
+// Returns nil if there are no connected peers.
+func (p *PeerTracker) Sample(_ context.Context, numPeers int) []ids.NodeID {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
@@ -173,7 +176,7 @@ func (p *PeerTracker) SelectPeer() (ids.NodeID, bool) {
 				zap.Int("trackedPeers", p.trackedPeers.Len()),
 				zap.Int("responsivePeers", p.responsivePeers.Len()),
 			)
-			return nodeID, true
+			return []ids.NodeID{nodeID}
 		}
 	}
 
@@ -185,7 +188,7 @@ func (p *PeerTracker) SelectPeer() (ids.NodeID, bool) {
 				zap.Stringer("nodeID", nodeID),
 				zap.Float64("bandwidth", bandwidth.Read()),
 			)
-			return nodeID, true
+			return []ids.NodeID{nodeID}
 		}
 	} else {
 		if nodeID, ok := p.responsivePeers.Peek(); ok {
@@ -193,7 +196,7 @@ func (p *PeerTracker) SelectPeer() (ids.NodeID, bool) {
 				zap.String("reason", "responsive"),
 				zap.Stringer("nodeID", nodeID),
 			)
-			return nodeID, true
+			return []ids.NodeID{nodeID}
 		}
 	}
 
@@ -203,11 +206,11 @@ func (p *PeerTracker) SelectPeer() (ids.NodeID, bool) {
 			zap.Stringer("nodeID", nodeID),
 			zap.Bool("checkedBandwidthHeap", useBandwidthHeap),
 		)
-		return nodeID, true
+		return []ids.NodeID{nodeID}
 	}
 
 	// We're not connected to any peers.
-	return ids.EmptyNodeID, false
+	return nil
 }
 
 // Record that we sent a request to [nodeID].

@@ -125,7 +125,7 @@ func TestDispatcher_CancelInFlight(t *testing.T) {
 		t, t.Context(), nodeID, handler, tracker,
 	)
 
-	_, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
+	_, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
 	require.ErrorIsf(t, err, context.Canceled, "%T.SendTo()", c)
 	assert.Equal(t, 0.0, responsivePeers(t, reg), "responsivePeers()")
 }
@@ -179,7 +179,7 @@ func TestDispatcher_PeerScoring(t *testing.T) {
 				t, ctx, nodeID, tt.handler, tracker,
 			)
 
-			outcome, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
+			outcome, err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
 			require.ErrorIsf(t, err, tt.wantErr, "%T.SendTo()", c)
 			if tt.wantErr != nil {
 				require.Nilf(t, outcome, "%T.SendTo() outcome", c)

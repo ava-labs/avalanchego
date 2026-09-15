@@ -44,9 +44,9 @@ func TestPeerTracker(t *testing.T) {
 
 	// Expect requests to go to new peers until we have desiredMinResponsivePeers responsive peers.
 	for i := 0; i < desiredMinResponsivePeers+numExtraPeers/2; i++ {
-		peer, ok := p.SelectPeer()
-		require.True(ok)
-		require.NotZero(peer)
+		peers := p.Sample(nil, 1)
+		require.NotEmpty(peers)
+		peer := peers[0]
 
 		_, exists := responsivePeers[peer]
 		require.Falsef(exists, "expected connecting to a new peer, but got the same peer twice: peer %s iteration %d", peer, i)
@@ -70,9 +70,9 @@ func TestPeerTracker(t *testing.T) {
 	// Expect requests to go to responsive or new peers, so long as they are available
 	numRequests := 50
 	for i := 0; i < numRequests; i++ {
-		peer, ok := p.SelectPeer()
-		require.True(ok)
-		require.NotZero(peer)
+		peers := p.Sample(nil, 1)
+		require.NotEmpty(peers)
+		peer := peers[0]
 
 		responsive, ok := responsivePeers[peer]
 		if ok {
@@ -94,9 +94,9 @@ func TestPeerTracker(t *testing.T) {
 	}
 
 	// Requests should fall back on non-responsive peers when no other choice is left
-	peer, ok := p.SelectPeer()
-	require.True(ok)
-	require.NotZero(peer)
+	peers := p.Sample(nil, 1)
+	require.NotEmpty(peers)
+	peer := peers[0]
 
 	responsive, ok := responsivePeers[peer]
 	require.True(ok)

@@ -14,7 +14,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
@@ -39,25 +38,14 @@ func NewDispatcher[Req, Resp proto.Message](
 	peers *p2p.PeerTracker,
 ) *Dispatcher[Req, Resp] {
 	return &Dispatcher[Req, Resp]{
-		client: n.NewClient(handlerID, noopSampler{}),
+		client: n.NewClient(handlerID, peers),
 		peers:  peers,
 	}
 }
 
 // Send picks a peer and forwards to [SendTo], or returns errNoPeers
 // (unscored) when none is available.
-func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (*Outcome, error) {
-	nodeID, ok := d.peers.SelectPeer()
-	if !ok {
-		return nil, errNoPeers
-	}
-	return d.SendTo(ctx, nodeID, req, resp)
-}
-
-// SendTo sends req to nodeID. A pre-send context or marshal error
-// returns unscored, any later failure scores the peer and returns a nil
-// Outcome.
-func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (_ *Outcome, retErr error) {
+func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (_ *Outcome, retErr error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -66,24 +54,18 @@ func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, r
 		return nil, fmt.Errorf("%w: %w", errMarshalRequest, err)
 	}
 
-	d.peers.RegisterRequest(nodeID)
-	defer func() {
-		if retErr != nil {
-			d.peers.RegisterFailure(nodeID)
-		}
-	}()
-
 	type result struct {
-		bytes []byte
-		err   error
+		bytes  []byte
+		err    error
+		nodeID ids.NodeID
 	}
 	resultCh := make(chan result, 1)
-	onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
-		resultCh <- result{bytes: responseBytes, err: err}
+	onResponse := func(_ context.Context, nodeID ids.NodeID, responseBytes []byte, err error) {
+		resultCh <- result{bytes: responseBytes, err: err, nodeID: nodeID}
 	}
 
 	start := time.Now()
-	if err := d.client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse); err != nil {
+	if err := d.client.AppRequestAny(ctx, requestBytes, onResponse); err != nil {
 		return nil, fmt.Errorf("%w: %w", errSendRequest, err)
 	}
 
@@ -91,6 +73,13 @@ func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, r
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case r := <-resultCh:
+
+		d.peers.RegisterRequest(r.nodeID)
+		defer func() {
+			if retErr != nil {
+				d.peers.RegisterFailure(r.nodeID)
+			}
+		}()
 		if r.err != nil {
 			return nil, fmt.Errorf("%w: %w", errHandlerFailed, r.err)
 		}
@@ -102,7 +91,7 @@ func (d *Dispatcher[Req, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, r
 		bandwidth := float64(len(r.bytes)) / (time.Since(start).Seconds() + epsilon)
 		return &Outcome{
 			peers:     d.peers,
-			nodeID:    nodeID,
+			nodeID:    r.nodeID,
 			bandwidth: bandwidth,
 		}, nil
 	}
