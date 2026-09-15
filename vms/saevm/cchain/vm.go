@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/triedb"
 	"go.uber.org/zap"
 
@@ -140,6 +141,9 @@ func (vm *VM) Initialize(
 	vm.metrics, err = newMetrics(reg)
 	if err != nil {
 		return fmt.Errorf("registering cchain metrics: %w", err)
+	}
+	if err := snowCtx.Metrics.Register(customrawdb.FirewoodScheme, ffi.Gatherer{}); err != nil {
+		return fmt.Errorf("registering firewood metrics: %w", err)
 	}
 
 	vm.pending = txpool.NewPending()
