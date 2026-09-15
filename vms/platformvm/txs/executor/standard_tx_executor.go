@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -95,6 +96,8 @@ func StandardTx(
 }
 
 type standardTxExecutor struct {
+	txs.UnsupportedTxVisitor
+
 	// inputs, to be filled before visitor methods are called
 	backend       *Backend
 	state         *state.Diff // state is expected to be modified
@@ -105,14 +108,6 @@ type standardTxExecutor struct {
 	onAccept       func() // may be nil
 	inputs         set.Set[ids.ID]
 	atomicRequests map[ids.ID]*atomic.Requests // may be nil
-}
-
-func (*standardTxExecutor) AdvanceTimeTx(*platform.AdvanceTimeTx) error {
-	return ErrWrongTxType
-}
-
-func (*standardTxExecutor) RewardValidatorTx(*platform.RewardValidatorTx) error {
-	return ErrWrongTxType
 }
 
 func (e *standardTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
@@ -1472,10 +1467,6 @@ func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *platform.SetAut
 	avax.Produce(e.state, e.tx.ID(), tx.Outs)
 
 	return nil
-}
-
-func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedValidatorTx) error {
-	return ErrWrongTxType
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
