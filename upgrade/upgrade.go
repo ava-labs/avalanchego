@@ -60,7 +60,7 @@ var (
 		DurangoTime:               time.Date(2024, time.April, 4, 0, 0, 0, 0, time.UTC),
 		EtnaTime:                  time.Date(2025, time.January, 9, 21, 0, 0, 0, time.UTC),
 		FortunaTime:               time.Date(2026, time.April, 1, 15, 0, 0, 0, time.UTC),
-		GraniteTime:               UnscheduledActivationTime,
+		GraniteTime:               time.Date(2026, time.September, 21, 10, 0, 0, 0, time.UTC),
 		GraniteEpochDuration:      5 * time.Minute,
 		HeliconTime:               UnscheduledActivationTime,
 	}
