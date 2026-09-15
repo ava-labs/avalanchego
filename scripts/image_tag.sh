@@ -4,7 +4,10 @@ set -euo pipefail
 
 # Defines an image tag derived from the current branch or tag
 
-image_tag="$( git symbolic-ref -q --short HEAD || git describe --tags --exact-match || true )"
+image_tag="${CURRENT_BRANCH:-}"
+if [[ -z "${image_tag}" ]]; then
+  image_tag="$( git symbolic-ref -q --short HEAD || git describe --tags --exact-match || true )"
+fi
 if [[ -z "${image_tag}" ]]; then
   # Supply a default tag when one is not discovered
   image_tag=ci_dummy

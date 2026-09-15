@@ -8,6 +8,9 @@ FROM docker.io/antithesishq/go-instrumentor AS instrumentor
 # ============= Instrumentation Stage ================
 FROM golang:$GO_VERSION-bookworm
 
+# Dependencies are downloaded on the host before the image build.
+ENV GOPROXY=off
+
 WORKDIR /build
 # Copy and download dependencies using go mod
 COPY go.mod .
@@ -15,14 +18,9 @@ COPY go.sum .
 # Copy graft if it exists to support local replace directives
 RUN --mount=type=bind,source=.,target=/context \
     if [ -d /context/graft ]; then cp -r /context/graft ./graft; fi
-# proxy.golang.org intermittently drops a module download mid-transfer with an
-# HTTP/2 INTERNAL_ERROR, failing the whole build. Retry before giving up.
-RUN for i in 1 2 3 4 5; do \
-        go mod download && break; \
-        if [ "$i" -eq 5 ]; then echo "go mod download failed after $i attempts" >&2; exit 1; fi; \
-        echo "go mod download failed (attempt $i/5), retrying in 15s" >&2; \
-        sleep 15; \
-    done
+# Seed the builder's module cache from the Go module cache on the host.
+RUN --mount=type=bind,from=gomodcache,source=.,target=/gomodcache,ro \
+    mkdir -p /go/pkg/mod && cp -a /gomodcache/. /go/pkg/mod/
 
 # Copy the code into the container
 COPY . .
@@ -52,12 +50,4 @@ RUN /opt/antithesis/bin/goinstrumentor \
     /instrumented
 
 WORKDIR /instrumented/customer
-# proxy.golang.org intermittently drops a module download mid-transfer with an
-# HTTP/2 INTERNAL_ERROR, failing the whole build. Retry before giving up.
-RUN for i in 1 2 3 4 5; do \
-        go mod download && break; \
-        if [ "$i" -eq 5 ]; then echo "go mod download failed after $i attempts" >&2; exit 1; fi; \
-        echo "go mod download failed (attempt $i/5), retrying in 15s" >&2; \
-        sleep 15; \
-    done
 RUN ln -s /opt/tmp/.git .git

@@ -8,6 +8,10 @@ set -euo pipefail
 #
 # Since this file only defines functions, it is intended to be sourced rather than executed.
 
+LIB_BUILD_ANTITHESIS_IMAGES_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "${LIB_BUILD_ANTITHESIS_IMAGES_PATH}/lib_go_module_cache.sh"
+
 # Build the image that enables compiling golang binaries for the node and workload image
 # builds. The builder image is intended to enable building instrumented binaries if built
 # on amd64 and non-instrumented binaries if built on arm64.
@@ -17,6 +21,9 @@ function build_antithesis_builder_image {
   local avalanchego_path=$3
   local target_path=$4
 
+  # The builder compiles the AvalancheGo workspace.
+  prepare_go_module_cache "${avalanchego_path}"
+
   local base_dockerfile="${avalanchego_path}/tests/antithesis/Dockerfile"
   local builder_dockerfile="${base_dockerfile}.builder-instrumented"
   if [[ "$(go env GOARCH)" == "arm64" ]]; then
@@ -25,7 +32,9 @@ function build_antithesis_builder_image {
     builder_dockerfile="${base_dockerfile}.builder-uninstrumented"
   fi
 
-  docker buildx build --build-arg GO_VERSION="${go_version}" -t "${image_name}" -f "${builder_dockerfile}" "${target_path}"
+  docker buildx build --build-arg GO_VERSION="${go_version}" \
+    --build-context "gomodcache=$(go env GOMODCACHE)" \
+    -t "${image_name}" -f "${builder_dockerfile}" "${target_path}"
 }
 
 # Build the antithesis node, workload, and config images.
@@ -62,7 +71,9 @@ function build_antithesis_images {
   fi
 
   # Define default build command
-  local docker_cmd="docker buildx build\
+  local docker_cmd
+  docker_cmd="docker buildx build\
+ --build-context gomodcache=$(go env GOMODCACHE)\
  --build-arg GO_VERSION=${go_version}\
  --build-arg BUILDER_IMAGE_TAG=${image_tag}\
  --build-arg BUILDER_WORKDIR=${builder_workdir}"

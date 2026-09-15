@@ -15,6 +15,8 @@ that span multiple areas of the tree.
 - [Tasks](./tasks.md) - why this repo uses Task and how tasks should be written
 - [CI](./ci.md) - cross-cutting CI conventions for workflows and actions
 - [CI disk space](./ci-disk-space.md) - shared CI runner disk-space policy and diagnostics
+- [Go module cache for Docker builds](./docker-go-module-cache.md) - how image
+  builds use the host Go module cache without module proxy access
 - [Bazel](./bazel.md) - Bazel-related repository guidance
 - [External consumption](./external_consumption.md) - guidance for externally
   consumed repository outputs
