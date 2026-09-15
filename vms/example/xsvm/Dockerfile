@@ -8,28 +8,23 @@ ARG AVALANCHEGO_NODE_IMAGE="invalid-image" # This value is not intended to be us
 # ============= Compilation Stage ================
 FROM golang:$GO_VERSION-bookworm AS builder
 
+# Dependencies are served from the host's local module-proxy cache.
+ENV GOPROXY=file:///gomodproxy,off
+
 WORKDIR /build
 
-# Copy and download avalanche dependencies using go mod
+# Copy Avalanche dependency metadata first
 COPY go.mod .
 COPY go.sum .
 COPY graft/coreth ./graft/coreth
 COPY graft/subnet-evm ./graft/subnet-evm
 COPY graft/evm ./graft/evm
-# proxy.golang.org intermittently drops a module download mid-transfer with an
-# HTTP/2 INTERNAL_ERROR, failing the whole build. Retry before giving up.
-RUN for i in 1 2 3 4 5; do \
-        go mod download && break; \
-        if [ "$i" -eq 5 ]; then echo "go mod download failed after $i attempts" >&2; exit 1; fi; \
-        echo "go mod download failed (attempt $i/5), retrying in 15s" >&2; \
-        sleep 15; \
-    done
-
 # Copy the code into the container
 COPY . .
 
 # Build xsvm
-RUN ./scripts/build_xsvm.sh
+RUN --network=none --mount=type=bind,from=gomodcache,source=.,target=/gomodproxy,ro \
+    ./scripts/build_xsvm.sh
 
 # ============= Cleanup Stage ================
 FROM $AVALANCHEGO_NODE_IMAGE AS execution
