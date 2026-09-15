@@ -24,6 +24,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v5
 
+      - uses: ./.github/actions/setup-go-for-project
+
       - name: Login to GAR
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
