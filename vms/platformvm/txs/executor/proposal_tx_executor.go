@@ -31,9 +31,6 @@ const (
 var (
 	_ platform.TxVisitor = (*proposalTxExecutor)(nil)
 
-	ErrRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
-	ErrRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
-	ErrInvalidState                  = errors.New("generated output isn't valid state")
 	ErrWrongTxType                   = errors.New("wrong transaction type")
 	ErrInvalidID                     = errors.New("invalid ID")
 	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
