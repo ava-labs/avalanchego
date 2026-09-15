@@ -376,7 +376,7 @@ func TestNodeUptimeACP267Requirement(t *testing.T) {
 			peerUptime := uint32(tt.peerUptime * 100)
 
 			// Send the uptime explicitly instead of relying on a periodic ping.
-			ping, err := sender.peerConfig.MessageCreator.Ping(peerUptime)
+			ping, err := sender.MsgCreator().Ping(peerUptime)
 			require.NoError(t, err)
 			require.True(t, peers[0].Send(t.Context(), ping))
 
