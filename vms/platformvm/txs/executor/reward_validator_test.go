@@ -28,16 +28,6 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-var defaultAutoRenewedValidatorConfig = autoRenewedValidatorConfig{
-	weight:                   defaultMinValidatorStake,
-	delegateeReward:          5_000_000,
-	accruedValidationRewards: 1_000_000,
-	accruedDelegateeRewards:  500_000,
-	delegationRewardShares:   reward.PercentDenominator / 10,
-	autoCompoundRewardShares: 4 * reward.PercentDenominator / 10,
-	restake:                  true,
-}
-
 func newRewardValidatorTx(t testing.TB, txID ids.ID) (*platform.Tx, error) {
 	utx := &platform.RewardValidatorTx{TxID: txID}
 	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
@@ -150,7 +140,11 @@ func newAddAutoRenewedValidatorTx(
 ) *platform.Tx {
 	t.Helper()
 
-	wallet := newWallet(t, env, walletConfig{})
+	// Only spend the first funded key so that txs built on top of this one
+	// can use the other keys without conflicting on UTXOs.
+	wallet := newWallet(t, env, walletConfig{
+		keys: genesistest.DefaultFundedKeys[:1],
+	})
 	tx, err := wallet.IssueAddAutoRenewedValidatorTx(
 		ids.GenerateTestNodeID(),
 		weight,
@@ -166,9 +160,10 @@ func newAddAutoRenewedValidatorTx(
 	return tx
 }
 
-// addAutoRenewedValidator executes addTx as a current validator via StandardTx,
-// attaches its staking info, and commits the result to env.state.
-func addAutoRenewedValidator(t testing.TB, env *environment, tx *platform.Tx, cfg autoRenewedValidatorConfig) {
+// addAutoRenewedValidator executes tx as a current validator via StandardTx
+// and attaches its staking info. The result is returned as a diff on top of
+// env.state so that env.state is left untouched.
+func addAutoRenewedValidator(t testing.TB, env *environment, tx *platform.Tx, cfg autoRenewedValidatorConfig) *state.Diff {
 	t.Helper()
 
 	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
@@ -195,9 +190,7 @@ func addAutoRenewedValidator(t testing.TB, env *environment, tx *platform.Tx, cf
 
 	nodeID := (tx.Unsigned.(*platform.AddAutoRenewedValidatorTx)).NodeID()
 	require.NoError(t, diff.SetStakingInfo(constants.PrimaryNetworkID, nodeID, stakingInfo))
-
-	require.NoError(t, diff.Apply(env.state))
-	require.NoError(t, env.state.Commit())
+	return diff
 }
 
 // wantReward is the pair of reward UTXOs produced by a
@@ -260,11 +253,11 @@ func assertValidatorRemoved(t testing.TB, chain state.Chain, stakerTx *platform.
 }
 
 // assertRewardAutoRenewedValidator asserts the commit and abort states produced
-// by rewarding the staged validator addTx, then applies the commit state and
-// verifies the persisted reward UTXOs.
+// by rewarding the validator staked in stakerTx. parent is the state both
+// onCommitState and onAbortState were built on.
 func assertRewardAutoRenewedValidator(
 	t testing.TB,
-	state *state.State,
+	parent state.Chain,
 	stakerTx *platform.Tx,
 	rewardTx *platform.Tx,
 	onCommitState *state.Diff,
@@ -274,9 +267,9 @@ func assertRewardAutoRenewedValidator(
 	t.Helper()
 
 	uStakerTx := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
-	currentSupply := must[uint64](t)(state.GetCurrentSupply(constants.PrimaryNetworkID))
+	currentSupply := must[uint64](t)(parent.GetCurrentSupply(constants.PrimaryNetworkID))
 
-	stakedValidator, err := state.GetCurrentValidator(uStakerTx.SubnetID(), uStakerTx.NodeID())
+	stakedValidator, err := parent.GetCurrentValidator(uStakerTx.SubnetID(), uStakerTx.NodeID())
 	require.NoError(t, err)
 
 	// On abort the validator is always removed and its potential reward is
@@ -310,16 +303,6 @@ func assertRewardAutoRenewedValidator(
 		assertValidatorRemoved(t, onCommitState, stakerTx, rewardTx.ID(), want.commitReward)
 		require.Equal(t, currentSupply, commitSupply)
 	}
-
-	// The persisted reward UTXOs match the commit branch.
-	require.NoError(t, onCommitState.Apply(state))
-	require.NoError(t, state.Commit())
-
-	rewardUTXOs, err := state.GetRewardUTXOs(rewardTx.ID())
-	require.NoError(t, err)
-	require.Len(t, rewardUTXOs, 2)
-	require.Equal(t, want.commitReward.validation, rewardUTXOs[0].Out.(*secp256k1fx.TransferOutput).Amount())
-	require.Equal(t, want.commitReward.delegatee, rewardUTXOs[1].Out.(*secp256k1fx.TransferOutput).Amount())
 }
 
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
@@ -342,10 +325,10 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	tx, err := newRewardValidatorTx(t, stakerToRemove.TxID)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onAbortState)
@@ -365,10 +348,10 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	tx, err = newRewardValidatorTx(t, ids.GenerateTestID())
 	require.NoError(err)
 
-	onCommitState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	err = ProposalTx(
@@ -384,10 +367,10 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	tx, err = newRewardValidatorTx(t, stakerToRemove.TxID)
 	require.NoError(err)
 
-	onCommitState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	require.NoError(ProposalTx(
@@ -443,10 +426,10 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	tx, err := newRewardValidatorTx(t, stakerToRemove.TxID)
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onAbortState)
@@ -479,10 +462,10 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	tx, err = newRewardValidatorTx(t, stakerToRemove.TxID)
 	require.NoError(err)
 
-	onCommitState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	require.NoError(ProposalTx(
@@ -529,7 +512,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	delRewardAddress := ids.GenerateTestShortID()
 
 	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
-	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * env.config.MinStakeDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := wallet.IssueAddValidatorTx(
@@ -601,10 +584,10 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	tx, err := newRewardValidatorTx(t, delTx.ID())
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -663,7 +646,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	delRewardAddress := ids.GenerateTestShortID()
 
 	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
-	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * env.config.MinStakeDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := wallet.IssueAddValidatorTx(
@@ -746,10 +729,10 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require.NoError(err)
 
 	// Create Delegator Diff
-	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -795,10 +778,10 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require.NoError(err)
 
 	// Create Validator Diff
-	onCommitState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err = state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	require.NoError(ProposalTx(
@@ -892,7 +875,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	delRewardAddress := ids.GenerateTestShortID()
 
 	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
-	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * env.config.MinStakeDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := wallet.IssueAddValidatorTx(
@@ -971,10 +954,10 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	require.NoError(err)
 
 	// Create Delegator Diffs
-	delOnCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	delOnCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	delOnAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	delOnAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, delOnCommitState)
@@ -987,13 +970,12 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	))
 
 	// Create Validator Diffs
-	testID := ids.GenerateTestID()
-	env.SetState(testID, delOnCommitState)
+	require.NoError(delOnCommitState.Apply(env.state))
 
-	vdrOnCommitState, err := state.NewDiff(testID, env, state.StakerAdditionAfterDeletionForbidden)
+	vdrOnCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	vdrOnAbortState, err := state.NewDiff(testID, env, state.StakerAdditionAfterDeletionForbidden)
+	vdrOnAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	tx, err = newRewardValidatorTx(t, vdrTx.ID())
@@ -1020,9 +1002,6 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	castUTXO := utxo.Out.(*secp256k1fx.TransferOutput)
 	require.Equal(delRewardAmt/4, castUTXO.Amt, "expected validator to be rewarded with accrued delegator rewards")
 	require.True(vdrDestSet.Equals(castUTXO.AddressesSet()), "expected reward UTXO to be issued to vdrDestSet")
-
-	// Commit Delegator Diff
-	require.NoError(delOnCommitState.Apply(env.state))
 
 	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
@@ -1067,7 +1046,7 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	delRewardAddress := ids.GenerateTestShortID()
 
 	vdrStartTime := genesistest.DefaultValidatorStartTimeUnix + 1
-	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * defaultMinStakingDuration).Unix())
+	vdrEndTime := uint64(genesistest.DefaultValidatorStartTime.Add(2 * env.config.MinStakeDuration).Unix())
 	vdrNodeID := ids.GenerateTestNodeID()
 
 	vdrTx, err := wallet.IssueAddValidatorTx(
@@ -1135,10 +1114,10 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	tx, err := newRewardValidatorTx(t, delTx.ID())
 	require.NoError(err)
 
-	onCommitState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onCommitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
-	onAbortState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAbortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
@@ -1214,9 +1193,7 @@ func TestRewardValidatorStakerTypeError(t *testing.T) {
 			name: "permissioned_subnet_validator",
 			tx: func(t *testing.T, env *environment) *platform.Tx {
 				subnetID := testSubnet1.ID()
-				wallet := newWallet(t, env, walletConfig{
-					subnetIDs: []ids.ID{subnetID},
-				})
+				wallet := newWallet(t, env, walletConfig{})
 
 				startTime := time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0)
 				endTime := startTime.Add(env.config.MinStakeDuration)
@@ -1376,6 +1353,18 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 	const restakingCapacity uint64 = 2_000_000
 
+	env := newEnvironment(t, upgradetest.Latest)
+
+	validatorConfig := autoRenewedValidatorConfig{
+		weight:                   env.config.MinValidatorStake,
+		delegateeReward:          5_000_000,
+		accruedValidationRewards: 1_000_000,
+		accruedDelegateeRewards:  500_000,
+		delegationRewardShares:   reward.PercentDenominator / 10,
+		autoCompoundRewardShares: 4 * reward.PercentDenominator / 10,
+		restake:                  true,
+	}
+
 	tests := []struct {
 		name   string
 		config func(env *environment) autoRenewedValidatorConfig
@@ -1386,7 +1375,7 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 			// is paid the full potential reward plus accrued rewards.
 			name: "graceful_stop",
 			config: func(*environment) autoRenewedValidatorConfig {
-				cfg := defaultAutoRenewedValidatorConfig
+				cfg := validatorConfig
 				cfg.restake = false
 				return cfg
 			},
@@ -1409,7 +1398,7 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 			// rewards are not capped. The remainder of each reward is paid out.
 			name: "restake_below_max",
 			config: func(*environment) autoRenewedValidatorConfig {
-				return defaultAutoRenewedValidatorConfig // restake: true
+				return validatorConfig // restake: true
 			},
 			want: func(cfg autoRenewedValidatorConfig, potentialReward uint64) wantRewardAutoRenewedValidator {
 				restakedValidation := cfg.restakedReward(potentialReward)
@@ -1437,7 +1426,7 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 			// restakingCapacity and split proportionally between the two rewards.
 			name: "restake_capped_at_max",
 			config: func(env *environment) autoRenewedValidatorConfig {
-				cfg := defaultAutoRenewedValidatorConfig
+				cfg := validatorConfig
 				cfg.weight = env.config.MaxValidatorStake - restakingCapacity
 				return cfg
 			},
@@ -1470,17 +1459,13 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			env := newEnvironment(t, upgradetest.Latest)
 			cfg := tt.config(env)
 
 			stakerTx := newAddAutoRenewedValidatorTx(t, env, cfg.weight, cfg.delegationRewardShares, cfg.autoCompoundRewardShares)
-			addAutoRenewedValidator(t, env, stakerTx, cfg)
+			diff := addAutoRenewedValidator(t, env, stakerTx, cfg)
 
 			uStakerTx := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
-			staker, err := env.state.GetCurrentValidator(uStakerTx.SubnetID(), uStakerTx.NodeID())
-			require.NoError(t, err)
-
-			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+			staker, err := diff.GetCurrentValidator(uStakerTx.SubnetID(), uStakerTx.NodeID())
 			require.NoError(t, err)
 			diff.SetTimestamp(staker.EndTime)
 
@@ -1501,7 +1486,7 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 
 			assertRewardAutoRenewedValidator(
 				t,
-				env.state,
+				diff,
 				stakerTx,
 				rewardTx,
 				onCommitState,
@@ -1525,21 +1510,22 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 
 	// Create the auto-renewed validator.
 	stakerTx := newAddAutoRenewedValidatorTx(t, env, vdrWeight, delegationShares, reward.PercentDenominator)
-	addAutoRenewedValidator(t, env, stakerTx, autoRenewedValidatorConfig{
+	diff := addAutoRenewedValidator(t, env, stakerTx, autoRenewedValidatorConfig{
 		delegationRewardShares:   delegationShares,
 		autoCompoundRewardShares: reward.PercentDenominator,
 		restake:                  true,
 	})
 
 	nodeID := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx).NodeID()
-	vdr, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
+	vdr, err := diff.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
 
-	// Create a delegator running for the validator's full period.
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(t, err)
-
-	wallet := newWallet(t, env, walletConfig{})
+	// Create a delegator running for the validator's full period. The wallet
+	// reads UTXOs from env.state, which does not include the validator tx
+	// staged in diff, so use a key the validator did not spend from.
+	wallet := newWallet(t, env, walletConfig{
+		keys: genesistest.DefaultFundedKeys[1:2],
+	})
 	delegatorTx, err := wallet.IssueAddPermissionlessDelegatorTx(
 		&platform.SubnetValidator{
 			Validator: platform.Validator{
@@ -1568,16 +1554,14 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 	diff.AddTx(delegatorTx, status.Committed)
 	diff.SetTimestamp(vdr.EndTime)
 
-	require.NoError(t, diff.Apply(env.state))
-
 	// Reward the delegator via RewardValidatorTx.
 	rewardDelegatorTx, err := newRewardValidatorTx(t, delegatorTx.ID())
 	require.NoError(t, err)
 
-	commitState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	commitState, err := state.NewDiffOn(diff, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(t, err)
 
-	abortState, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	abortState, err := state.NewDiffOn(diff, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(t, err)
 
 	require.NoError(t, ProposalTx(
@@ -1592,7 +1576,7 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 	uDelegatorTx := delegatorTx.Unsigned.(*platform.AddPermissionlessDelegatorTx)
 	wantOwner := uDelegatorTx.RewardsOwner().(*secp256k1fx.OutputOwners)
 
-	delegatorIt, err := env.state.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
+	delegatorIt, err := diff.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
 	require.True(t, delegatorIt.Next())
 	potentialReward := delegatorIt.Value().PotentialReward
@@ -1621,13 +1605,4 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 	stakingInfo, err = abortState.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
 	require.Zero(t, stakingInfo.DelegateeReward)
-
-	// Commit the delegator diff.
-	require.NoError(t, commitState.Apply(env.state))
-
-	// Verify reward UTXOs are correctly tracked via GetRewardUTXOs.
-	rewardUTXOs, err := env.state.GetRewardUTXOs(delegatorTx.ID())
-	require.NoError(t, err)
-	require.Len(t, rewardUTXOs, 1)
-	require.Equal(t, wantDelegatorReward, rewardUTXOs[0].Out.(*secp256k1fx.TransferOutput).Amount())
 }
