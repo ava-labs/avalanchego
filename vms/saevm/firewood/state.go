@@ -32,15 +32,28 @@ func init() {
 //
 // If db is backed by a firewood [TrieDB], interceptor wraps db in a
 // [stateAccessor], whose tries are [accountTrie] and [storageTrie] rather than
-// the normal [trie.StateTrie]. Otherwise db is returned unchanged.
+// the normal [trie.StateTrie]. If it is backed by a [StateDatabaseInterceptor],
+// that decides. Otherwise db is returned unchanged.
 func interceptor(db state.Database) state.Database {
-	if tdb, ok := db.TrieDB().Backend().(*TrieDB); ok {
+	switch tdb := db.TrieDB().Backend().(type) {
+	case *TrieDB:
 		return &stateAccessor{
 			Database: db,
 			triedb:   tdb,
 		}
+	case StateDatabaseInterceptor:
+		return tdb.InterceptStateDatabase(db)
+	default:
+		return db
 	}
-	return db
+}
+
+// A StateDatabaseInterceptor is a [triedb.DBOverride] that wraps a [TrieDB]
+// and provides its own [state.Database], typically on top of the one this
+// package provides for the wrapped [TrieDB]. Only one [state.DatabaseInterceptor]
+// can be registered, so this package's interceptor delegates to it.
+type StateDatabaseInterceptor interface {
+	InterceptStateDatabase(state.Database) state.Database
 }
 
 type stateAccessor struct {

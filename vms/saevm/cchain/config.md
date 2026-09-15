@@ -45,7 +45,7 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 | `trie-clean-cache` | int | Size of the trie clean cache in MB. | `512` |
 | `snapshot-cache` | int | Size of the snapshot disk layer clean cache in MB. | `256` |
 | `allow-missing-tries` | bool | Suppress warnings about an incomplete trie index. | `false` |
-| `state-scheme` | string | EXPERIMENTAL: specifies the database scheme used to store state data; either `hash` or `firewood`. | `hash` |
+| `state-scheme` | string | EXPERIMENTAL: specifies the database scheme used to store state data; `hash`, `firewood`, or `flatfirewood`. `flatfirewood` is `firewood` plus a flat history of every state change, so a pruned node serves historical state at every height; it requires `pruning-enabled` `true` and a chain synced from genesis with this scheme. | `hash` |
 
 ## Transaction Pool
 

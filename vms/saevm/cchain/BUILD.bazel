@@ -180,6 +180,7 @@ go_test(
         "//vms/saevm/cchain/warp",
         "//vms/saevm/cchain/warp/warptest",
         "//vms/saevm/cmputils",
+        "//vms/saevm/flatfirewood",
         "//vms/saevm/gastime",
         "//vms/saevm/hook",
         "//vms/saevm/params",
