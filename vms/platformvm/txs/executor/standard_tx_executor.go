@@ -1179,12 +1179,6 @@ func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *platform.SetAut
 	return nil
 }
 
-// applyBaseTx consumes the inputs and produces the outputs of tx.
-func (e *standardTxExecutor) applyBaseTx(tx *txs.BaseTx) {
-	avax.Consume(e.state, tx.Ins)
-	avax.Produce(e.state, e.tx.ID(), tx.Outs)
-}
-
 func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedValidatorTx) error {
 	return ErrWrongTxType
 }
