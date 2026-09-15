@@ -6,7 +6,6 @@ package sync
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
