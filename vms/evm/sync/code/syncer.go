@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -290,8 +291,15 @@ func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common
 			return nil, err
 		}
 
+		var codes [][]byte
 		resp := &syncpb.GetCodeResponse{}
-		outcome, err := c.Send(ctx, req, resp)
+		err := c.Send(ctx, req, resp, func(nodeID ids.NodeID, resp *syncpb.GetCodeResponse) error {
+			codes = resp.GetData()
+			if err := verifyCode(hashes, codes); err != nil {
+				return fmt.Errorf("invalid code from %s: %w", nodeID, err)
+			}
+			return nil
+		})
 		if err != nil {
 			// Send already de-scored any peer it reached, re-request.
 			log.Debug("code request failed, re-requesting",
@@ -300,17 +308,6 @@ func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common
 			continue
 		}
 
-		codes := resp.GetData()
-		if err := verifyCode(hashes, codes); err != nil {
-			outcome.Failure()
-			log.Debug("invalid code response, re-requesting",
-				zap.Stringer("nodeID", outcome.NodeID()),
-				zap.Error(err),
-			)
-			continue
-		}
-
-		outcome.Success()
 		return codes, nil
 	}
 }

@@ -5,6 +5,7 @@ package p2p
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -26,10 +28,14 @@ const (
 	handlerPrefix = byte(handlerID)
 )
 
-var errFoo = &common.AppError{
-	Code:    123,
-	Message: "foo",
-}
+var (
+	errFoo = &common.AppError{
+		Code:    123,
+		Message: "foo",
+	}
+	errSendFailed  = errors.New("send failed")
+	errBadResponse = errors.New("bad response")
+)
 
 func TestMessageRouting(t *testing.T) {
 	require := require.New(t)
@@ -77,7 +83,7 @@ func TestMessageRouting(t *testing.T) {
 	require.NoError(network.AppGossip(ctx, wantNodeID, <-sender.SentAppGossip))
 	require.True(appGossipCalled)
 
-	require.NoError(client.AppRequest(ctx, set.Of(ids.EmptyNodeID), wantMsg, func(context.Context, ids.NodeID, []byte, error) {}))
+	require.NoError(client.AppRequest(ctx, set.Of(ids.EmptyNodeID), wantMsg, func(context.Context, ids.NodeID, []byte, error) error { return nil }))
 	require.NoError(network.AppRequest(ctx, wantNodeID, 1, time.Time{}, <-sender.SentAppRequest))
 	require.True(appRequestCalled)
 }
@@ -110,7 +116,7 @@ func TestClientPrefixesMessages(t *testing.T) {
 		ctx,
 		set.Of(ids.EmptyNodeID),
 		want,
-		func(context.Context, ids.NodeID, []byte, error) {},
+		func(context.Context, ids.NodeID, []byte, error) error { return nil },
 	))
 	gotAppRequest := <-sender.SentAppRequest
 	require.Equal(handlerPrefix, gotAppRequest[0])
@@ -119,7 +125,7 @@ func TestClientPrefixesMessages(t *testing.T) {
 	require.NoError(client.AppRequestAny(
 		ctx,
 		want,
-		func(context.Context, ids.NodeID, []byte, error) {},
+		func(context.Context, ids.NodeID, []byte, error) error { return nil },
 	))
 	gotAppRequest = <-sender.SentAppRequest
 	require.Equal(handlerPrefix, gotAppRequest[0])
@@ -158,12 +164,13 @@ func TestAppRequestResponse(t *testing.T) {
 	wantNodeID := ids.GenerateTestNodeID()
 	done := make(chan struct{})
 
-	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) {
+	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) error {
 		require.Equal(wantNodeID, gotNodeID)
 		require.NoError(err)
 		require.Equal(wantResponse, gotResponse)
 
 		close(done)
+		return nil
 	}
 
 	want := []byte("request")
@@ -202,12 +209,13 @@ func TestAppRequestCancelledContext(t *testing.T) {
 	wantNodeID := ids.GenerateTestNodeID()
 	done := make(chan struct{})
 
-	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) {
+	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) error {
 		require.Equal(wantNodeID, gotNodeID)
 		require.NoError(err)
 		require.Equal(wantResponse, gotResponse)
 
 		close(done)
+		return nil
 	}
 
 	cancelledCtx, cancel := context.WithCancel(ctx)
@@ -243,12 +251,13 @@ func TestAppRequestFailed(t *testing.T) {
 	wantNodeID := ids.GenerateTestNodeID()
 	done := make(chan struct{})
 
-	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) {
+	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) error {
 		require.Equal(wantNodeID, gotNodeID)
 		require.ErrorIs(err, errFoo)
 		require.Nil(gotResponse)
 
 		close(done)
+		return nil
 	}
 
 	require.NoError(client.AppRequest(ctx, set.Of(wantNodeID), []byte("request"), callback))
@@ -475,7 +484,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	require.NoError(err)
 	client := network.NewClient(0x1, PeerSampler{Peers: &Peers{}})
 
-	noOpCallback := func(context.Context, ids.NodeID, []byte, error) {}
+	noOpCallback := func(context.Context, ids.NodeID, []byte, error) error { return nil }
 	// create a request that never gets a response
 	network.router.requestID = 1
 	require.NoError(client.AppRequest(ctx, set.Of(ids.EmptyNodeID), []byte{}, noOpCallback))
@@ -999,4 +1008,236 @@ func TestPeers_Has(t *testing.T) {
 	require.NoError(network.Connected(t.Context(), ids.EmptyNodeID, nil))
 
 	require.True(peers.Has(ids.EmptyNodeID))
+}
+
+// trackedPeer is one connected peer and a Client that scores it.
+type trackedPeer struct {
+	network *Network
+	tracker *PeerTracker
+	client  *Client
+	nodeID  ids.NodeID
+}
+
+// newTrackedPeer connects one peer whose sends fail with sendErr.
+func newTrackedPeer(t *testing.T, sendErr error) trackedPeer {
+	t.Helper()
+
+	sender := &enginetest.Sender{
+		SendAppRequestF: func(context.Context, set.Set[ids.NodeID], uint32, []byte) error {
+			return sendErr
+		},
+	}
+
+	// A failed send is logged at Error, which loggingtest turns into a test
+	// failure, and one case here provokes exactly that.
+	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	require.NoError(t, err)
+
+	tracker, err := NewPeerTracker(loggingtest.New(t, logging.Debug), "", prometheus.NewRegistry(), nil, nil)
+	require.NoError(t, err)
+
+	nodeID := ids.GenerateTestNodeID()
+	tracker.Connected(nodeID, nil)
+
+	return trackedPeer{
+		network: network,
+		tracker: tracker,
+		client:  network.NewTrackedClient(handlerID, tracker),
+		nodeID:  nodeID,
+	}
+}
+
+// trackerState reads pt's view of nodeID under the tracker's own lock.
+func trackerState(pt *PeerTracker, nodeID ids.NodeID) (tracked, responsive, inHeap bool) {
+	pt.lock.RLock()
+	defer pt.lock.RUnlock()
+
+	_, inHeap = pt.bandwidthHeap.Get(nodeID)
+	return pt.trackedPeers.Contains(nodeID), pt.responsivePeers.Contains(nodeID), inHeap
+}
+
+func TestTrackedClientScoresRequests(t *testing.T) {
+	tests := []struct {
+		name        string
+		sendErr     error
+		appErr      *common.AppError
+		response    []byte
+		callbackErr error
+		preCancel   bool
+
+		wantTracked    bool
+		wantResponsive bool
+		wantInHeap     bool
+	}{
+		{
+			name:           "response_accepted",
+			response:       []byte("response"),
+			wantTracked:    true,
+			wantResponsive: true,
+			wantInHeap:     true,
+		},
+		{
+			name:        "response_rejected_by_caller",
+			response:    []byte("response"),
+			callbackErr: errBadResponse,
+			wantTracked: true,
+			wantInHeap:  true,
+		},
+		{
+			name:        "request_failed",
+			appErr:      errFoo,
+			wantTracked: true,
+			wantInHeap:  true,
+		},
+		{
+			// Nothing left the node, so the peer is neither registered nor
+			// blamed for our own send failure.
+			name:    "send_failed",
+			sendErr: errSendFailed,
+		},
+		{
+			name:           "cancelled_before_send_response_still_accepted",
+			response:       []byte("response"),
+			preCancel:      true,
+			wantTracked:    true,
+			wantResponsive: true,
+			wantInHeap:     true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ctx := t.Context()
+
+			peer := newTrackedPeer(t, test.sendErr)
+
+			requestCtx := ctx
+			if test.preCancel {
+				var cancel context.CancelFunc
+				requestCtx, cancel = context.WithCancel(ctx)
+				cancel()
+			}
+
+			err := peer.client.AppRequest(
+				requestCtx,
+				set.Of(peer.nodeID),
+				[]byte("request"),
+				func(context.Context, ids.NodeID, []byte, error) error {
+					return test.callbackErr
+				},
+			)
+
+			// The router runs the callback inline, so scoring is complete once
+			// the delivery below returns.
+			switch {
+			case test.sendErr != nil:
+				require.ErrorIs(t, err, test.sendErr)
+			case test.appErr != nil:
+				require.NoError(t, err)
+				require.NoError(t, peer.network.AppRequestFailed(ctx, peer.nodeID, 1, test.appErr))
+			default:
+				require.NoError(t, err)
+				require.NoError(t, peer.network.AppResponse(ctx, peer.nodeID, 1, test.response))
+			}
+
+			tracked, responsive, inHeap := trackerState(peer.tracker, peer.nodeID)
+			require.Equal(t, test.wantTracked, tracked)
+			require.Equal(t, test.wantResponsive, responsive)
+			require.Equal(t, test.wantInHeap, inHeap)
+		})
+	}
+}
+
+// A request whose callback never arrives is scored when its context ends.
+func TestTrackedClientScoresAbandonedRequest(t *testing.T) {
+	peer := newTrackedPeer(t, nil)
+
+	invoked := false
+	requestCtx, cancel := context.WithCancel(t.Context())
+	require.NoError(t, peer.client.AppRequest(
+		requestCtx,
+		set.Of(peer.nodeID),
+		[]byte("request"),
+		func(context.Context, ids.NodeID, []byte, error) error {
+			invoked = true
+			return nil
+		},
+	))
+
+	_, _, inHeap := trackerState(peer.tracker, peer.nodeID)
+	require.False(t, inHeap)
+
+	// context.AfterFunc scores on its own goroutine.
+	cancel()
+	require.Eventually(t, func() bool {
+		_, _, inHeap := trackerState(peer.tracker, peer.nodeID)
+		return inHeap
+	}, 5*time.Second, time.Millisecond)
+
+	tracked, responsive, _ := trackerState(peer.tracker, peer.nodeID)
+	require.True(t, tracked)
+	require.False(t, responsive)
+	require.False(t, invoked)
+
+	// A late reply still reaches the caller, but the request is already scored
+	// and must not be scored a second time.
+	require.NoError(t, peer.network.AppResponse(t.Context(), peer.nodeID, 1, []byte("response")))
+	require.True(t, invoked)
+
+	_, responsive, _ = trackerState(peer.tracker, peer.nodeID)
+	require.False(t, responsive)
+}
+
+// One AppRequest to several peers scores each peer on its own response.
+func TestTrackedClientScoresEachPeer(t *testing.T) {
+	ctx := t.Context()
+
+	// Sends run inline within AppRequest, so this needs no synchronization.
+	routedTo := map[uint32]ids.NodeID{}
+	sender := &enginetest.Sender{
+		SendAppRequestF: func(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, _ []byte) error {
+			for nodeID := range nodeIDs {
+				routedTo[requestID] = nodeID
+			}
+			return nil
+		},
+	}
+
+	network, err := NewNetwork(loggingtest.New(t, logging.Debug), sender, prometheus.NewRegistry(), "")
+	require.NoError(t, err)
+	tracker, err := NewPeerTracker(loggingtest.New(t, logging.Debug), "", prometheus.NewRegistry(), nil, nil)
+	require.NoError(t, err)
+
+	accepted := ids.GenerateTestNodeID()
+	rejected := ids.GenerateTestNodeID()
+	tracker.Connected(accepted, nil)
+	tracker.Connected(rejected, nil)
+
+	client := network.NewTrackedClient(handlerID, tracker)
+	require.NoError(t, client.AppRequest(
+		ctx,
+		set.Of(accepted, rejected),
+		[]byte("request"),
+		func(_ context.Context, nodeID ids.NodeID, _ []byte, _ error) error {
+			if nodeID == rejected {
+				return errBadResponse
+			}
+			return nil
+		},
+	))
+	require.Len(t, routedTo, 2)
+
+	for requestID, nodeID := range routedTo {
+		require.NoError(t, network.AppResponse(ctx, nodeID, requestID, []byte("response")))
+	}
+
+	tracked, responsive, inHeap := trackerState(tracker, accepted)
+	require.True(t, tracked)
+	require.True(t, responsive)
+	require.True(t, inHeap)
+
+	tracked, responsive, inHeap = trackerState(tracker, rejected)
+	require.True(t, tracked)
+	require.False(t, responsive)
+	require.True(t, inHeap)
 }
