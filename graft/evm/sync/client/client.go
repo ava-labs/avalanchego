@@ -51,8 +51,6 @@ var _ Client = (*client)(nil)
 // network packages. New consumers should hold a [p2p.PeerTracker] and
 // construct each [p2p.Client] directly rather than extending this interface.
 type Network interface {
-	p2p.NodeSampler
-
 	// SendSyncedAppRequestAny synchronously sends request to an arbitrary peer.
 	// Returns response bytes, the ID of the chosen peer, and ErrRequestFailed if
 	// the request should be retried.
@@ -68,6 +66,9 @@ type Network interface {
 
 	// RegisterFailure records a failed response from nodeID.
 	RegisterFailure(nodeID ids.NodeID)
+
+	// PeerTracker returns the tracker to build a tracked [p2p.Client] with.
+	PeerTracker() *p2p.PeerTracker
 
 	// P2PNetwork returns the unabstracted [p2p.Network].
 	P2PNetwork() *p2p.Network
@@ -132,7 +133,7 @@ func New(config *Config) *client {
 }
 
 func (c *client) AddClient(handlerID uint64) *p2p.Client {
-	return c.network.P2PNetwork().NewClient(handlerID, c.network)
+	return c.network.P2PNetwork().NewTrackedClient(handlerID, c.network.PeerTracker())
 }
 
 func (c *client) StateSyncNodes() []ids.NodeID {

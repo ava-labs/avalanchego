@@ -153,7 +153,9 @@ func (r *router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reques
 		return ErrUnrequestedResponse
 	}
 
-	pending.callback(ctx, nodeID, nil, appErr)
+	// A non-nil return reports an unusable response, which a tracked Client has
+	// already scored. Propagating it here would kill the chain.
+	_ = pending.callback(ctx, nodeID, nil, appErr)
 
 	return r.metrics.observe(
 		prometheus.Labels{
@@ -177,7 +179,9 @@ func (r *router) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID u
 		return ErrUnrequestedResponse
 	}
 
-	pending.callback(ctx, nodeID, response, nil)
+	// A non-nil return reports an unusable response, which a tracked Client has
+	// already scored. Propagating it here would kill the chain.
+	_ = pending.callback(ctx, nodeID, response, nil)
 
 	return r.metrics.observe(
 		prometheus.Labels{
