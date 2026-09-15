@@ -1045,8 +1045,8 @@ func TestImport(t *testing.T) {
 
 func TestStatefulRPCsReconstructExtraState(t *testing.T) {
 	const (
-		commitInterval = 4
-		numBlocks      = 2*commitInterval + 3
+		commitInterval uint64 = 4
+		numBlocks             = 2*commitInterval + 3
 	)
 
 	tests := []struct {
@@ -1084,7 +1084,7 @@ func TestStatefulRPCsReconstructExtraState(t *testing.T) {
 			t.Run("restart", func(t *testing.T) {
 				ctx, sut := newSUT(t, opts...)
 
-				for h := uint64(1); h <= numBlocks; h++ {
+				for h := range numBlocks + 1 {
 					got, err := sut.ethclient.NonceAt(ctx, sender, new(big.Int).SetUint64(h))
 					require.NoErrorf(t, err, "%T.NonceAt(%d)", sut.ethclient, h)
 					assert.Equalf(t, h, got, "%T.NonceAt(%d): one export per block", sut.ethclient, h)

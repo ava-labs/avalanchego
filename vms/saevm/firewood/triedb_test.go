@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
@@ -955,4 +956,66 @@ func TestHashAfterTipMovesPastParent(t *testing.T) {
 	want := newStateDB(t, db, root1)
 	want.SetNonce(addr2, 2)
 	require.Equal(t, want.IntermediateRoot(true), got, "root matches a freshly opened trie")
+}
+
+// TestHashAfterRevisionEviction verifies that a trie whose parent root has left
+// Firewood's in-memory revision window still hashes.
+func TestHashAfterRevisionEviction(t *testing.T) {
+	cfg := DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug))
+	cfg.RevisionsInMemory = 6
+	cfg.DeferredCommitInterval = 5
+
+	// Guarantee one non-empty state root is on disk, since the empty state is always available.
+	var root1 common.Hash
+	{
+		first := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
+			DBOverride: cfg.BackendConstructor,
+		})
+		blk1 := newStateDB(t, first, types.EmptyRootHash)
+		blk1.SetNonce(addr1, 1)
+
+		var err error
+		root1, err = blk1.Commit(1, true)
+		require.NoError(t, err, "blk1.Commit()")
+		require.NoErrorf(t, first.TrieDB().Commit(root1, false), "triedb.Commit(%s)", root1)
+		require.NoError(t, first.TrieDB().Close(), "triedb.Close()")
+	}
+
+	db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
+		DBOverride: cfg.BackendConstructor,
+	})
+
+	want := newStateDB(t, db, root1)
+	want.SetNonce(addr2, 2)
+	wantRoot := want.IntermediateRoot(true)
+
+	// Opened at a persisted root, so its revision handle is historical. Hashing
+	// here creates a proposal on the tip.
+	sdb := newStateDB(t, db, root1)
+	sdb.SetNonce(addr2, 1)
+	require.NotEqual(t, common.Hash{}, sdb.IntermediateRoot(true), "first root")
+
+	// Persist RevisionsInMemory newer roots. Firewood drops root1 from its
+	// by-hash lookup at that point even though sdb's handle keeps it alive.
+	tip := root1
+	for i := uint64(2); i <= uint64(cfg.RevisionsInMemory)+1; i++ {
+		blk := newStateDB(t, db, tip)
+		blk.SetNonce(addr3, i)
+
+		var err error
+		tip, err = blk.Commit(i, true)
+		require.NoErrorf(t, err, "block %d Commit()", i)
+		require.NoErrorf(t, db.TrieDB().Commit(tip, false), "triedb.Commit(%s)", tip)
+	}
+
+	_, err := state.New(root1, db, nil)
+	wantMissingErr := new(trie.MissingNodeError)
+	require.ErrorAs(t, err, &wantMissingErr, "test setup: expected revision to be reaped")
+
+	// After revision is reaped, hashing should still be available
+	sdb.SetNonce(addr2, 2)
+	require.Equal(t, wantRoot, sdb.IntermediateRoot(true), "root after root1 left the revision window")
+
+	_, err = sdb.Commit(2, true)
+	require.ErrorIs(t, err, errHistoricalNotCommittable, "Commit()")
 }

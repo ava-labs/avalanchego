@@ -86,7 +86,7 @@ func (a *accountTrie) hash() (common.Hash, error) {
 		return root, err
 	}
 
-	recon, err := a.tdb.newReconstructed(common.Hash(a.revision.Root()))
+	recon, err := a.tdb.newReconstructed(a.revision)
 	if err != nil {
 		return common.Hash{}, err
 	}

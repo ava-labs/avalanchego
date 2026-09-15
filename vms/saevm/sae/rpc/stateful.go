@@ -155,7 +155,7 @@ func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB,
 	// TODO(alarso16): Hashing is an expensive operation and is only used here
 	// to check if there was an error during re-execution. Add metrics to
 	// determine whether this check is prohibitively expensive.
-	got := sdb.IntermediateRoot(true)
+	got := sdb.IntermediateRoot(config.IsEIP158(lastBlock.Number()))
 	want := lastBlock.PostExecutionStateRoot()
 	if got != want {
 		return nil, nil, fmt.Errorf(
@@ -181,7 +181,7 @@ func (b *backend) lastBlockWithState(ctx context.Context, num uint64) (*state.St
 		toReexec    []*blocks.Block
 		errNotFound = new(trie.MissingNodeError)
 	)
-	for i := range min(num+1, maxReexec) {
+	for i := range min(num, maxReexec) + 1 {
 		if ctx.Err() != nil {
 			return nil, nil, nil, context.Cause(ctx)
 		}

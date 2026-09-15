@@ -302,9 +302,12 @@ func (t *TrieDB) newProposal(parentRoot common.Hash, batchOps []ffi.BatchOp) (*f
 	}
 }
 
-func (t *TrieDB) newReconstructed(root common.Hash) (*ffi.Reconstructed, error) {
-	rev, err := t.newRevision(root)
-	if err != nil {
+func (t *TrieDB) newReconstructed(rev *ffi.Revision) (*ffi.Reconstructed, error) {
+	newRev, err := t.Firewood.Revision(rev.Root())
+	switch {
+	case err == nil:
+		rev = newRev // rev MAY be based on a proposal, which isn't reconstructible
+	case !errors.Is(err, ffi.ErrRevisionNotFound):
 		return nil, err
 	}
 	return rev.Reconstruct(nil)
