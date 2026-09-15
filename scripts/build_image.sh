@@ -28,6 +28,7 @@ set -euo pipefail
 
 # Directory above this script
 AVALANCHE_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
+cd "${AVALANCHE_PATH}"
 
 # Skip building the race image
 SKIP_BUILD_RACE="${SKIP_BUILD_RACE:-}"
@@ -39,6 +40,7 @@ FORCE_TAG_MASTER="${FORCE_TAG_MASTER:-}"
 source "$AVALANCHE_PATH"/scripts/constants.sh
 source "$AVALANCHE_PATH"/scripts/git_commit.sh
 source "$AVALANCHE_PATH"/scripts/image_tag.sh
+source "$AVALANCHE_PATH"/scripts/lib_go_module_cache.sh
 
 if [[ -z "${SKIP_BUILD_RACE}" && $image_tag == *"-r" ]]; then
   echo "Branch name must not end in '-r'"
@@ -61,11 +63,17 @@ DOCKER_IMAGE="${DOCKER_IMAGE:-avalanchego}"
 # Reference: https://docs.docker.com/build/building/multi-platform/
 BUILD_MULTI_ARCH="${BUILD_MULTI_ARCH:-}"
 
+# Populate the host cache with the workspace module graph before Buildx starts.
+prepare_go_module_cache "${AVALANCHE_PATH}"
+
 # buildx (BuildKit) improves the speed and UI of builds over the legacy builder and
 # simplifies creation of multi-arch images.
 #
 # Reference: https://docs.docker.com/build/buildkit/
 DOCKER_CMD="docker buildx build ${*}"
+
+# Pass the host's local module-proxy cache to the builder.
+DOCKER_CMD="${DOCKER_CMD} --build-context gomodcache=$(go_module_proxy_cache)"
 
 # The dockerfile doesn't specify the golang version to minimize the
 # changes required to bump the version. Instead, the golang version is
