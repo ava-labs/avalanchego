@@ -18,7 +18,6 @@ type metrics struct {
 }
 
 func newMetrics(registerer prometheus.Registerer) (*metrics, error) {
-	// processIDLabel partitions resource metrics by process.
 	const processIDLabel = "processID"
 
 	m := &metrics{

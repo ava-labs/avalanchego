@@ -22,7 +22,6 @@ type contextKey int
 
 const requestTimestampKey contextKey = iota
 
-// methodLabel partitions request metrics by RPC method.
 const methodLabel = "method"
 
 type apiInterceptor struct {

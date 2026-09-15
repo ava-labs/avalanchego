@@ -18,7 +18,6 @@ type metrics struct {
 }
 
 func newMetrics(registerer prometheus.Registerer) (*metrics, error) {
-	// baseLabel partitions API metrics by the call's base URL.
 	const baseLabel = "base"
 
 	m := &metrics{
