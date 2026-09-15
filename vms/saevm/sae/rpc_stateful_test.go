@@ -891,7 +891,7 @@ func TestStatefulRPCsEveryHeight(t *testing.T) {
 
 			txHashes := make([]common.Hash, 0, numBlocks)
 			prev := src.lastAcceptedBlock(t)
-			for h := uint64(1); h <= numBlocks; h++ {
+			for range numBlocks {
 				// Settling the parent before building the next block evicts all
 				// but the most recent blocks from memory.
 				vmTime.AdvanceToSettle(ctx, t, prev)

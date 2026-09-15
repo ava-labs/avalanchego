@@ -302,6 +302,12 @@ func (t *TrieDB) newProposal(parentRoot common.Hash, batchOps []ffi.BatchOp) (*f
 	}
 }
 
+// newReconstructed returns an [ffi.Reconstructed] with the state represented
+// in the revision provided.
+//
+// TODO(alarso16): Simplify after https://github.com/ava-labs/firewood/issues/2254
+// is merged. The below code can fail if the revision was based on a proposal,
+// but has now been reaped based on [Config.RevisionsInMemory].
 func (t *TrieDB) newReconstructed(rev *ffi.Revision) (*ffi.Reconstructed, error) {
 	newRev, err := t.Firewood.Revision(rev.Root())
 	switch {
