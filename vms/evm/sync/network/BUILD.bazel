@@ -9,7 +9,6 @@ go_library(
     deps = [
         "//ids",
         "//network/p2p",
-        "//utils/set",
         "@org_golang_google_protobuf//proto",
     ],
 )
@@ -25,7 +24,7 @@ go_test(
         "//proto/pb/sync",
         "//snow/engine/common",
         "//utils/logging",
-        "//version",
+        "//utils/logging/loggingtest",
         "@com_github_google_go_cmp//cmp",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//assert",

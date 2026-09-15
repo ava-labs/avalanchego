@@ -48,6 +48,7 @@ go_test(
         "//proto/pb/sync",
         "//snow/engine/common",
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//utils/maybe",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//assert",
