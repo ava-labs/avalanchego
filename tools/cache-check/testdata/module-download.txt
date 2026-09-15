@@ -1,0 +1,5 @@
+task-cache-hit=true
+go-mod-cache-hit=true
+go-unit-cache-hit=true
+go: downloading github.com/example/module v1.0.0
+ok  	github.com/ava-labs/avalanchego/ids	(cached)

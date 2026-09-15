@@ -1,6 +1,17 @@
 name: Setup Task
 description: Restore the pinned Task binary from cache or download and verify it
 
+inputs:
+  cache-validation:
+    description: Use the PR-scoped validation cache
+    required: false
+    default: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'cache-validation') }}
+
+outputs:
+  cache-hit:
+    description: Whether the Task cache was restored with an exact key
+    value: ${{ steps.cache.outputs.cache-hit }}
+
 runs:
   using: composite
   steps:
@@ -14,7 +25,9 @@ runs:
       uses: actions/cache/restore@v5
       with:
         path: ${{ runner.temp }}/task/${{ steps.version.outputs.version }}/${{ runner.os }}-${{ runner.arch }}
-        key: task-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.version }}
+        key: ${{ inputs.cache-validation == 'true' && format('task-validation-{0}-{1}', runner.os, runner.arch) || format('task-{0}-{1}-{2}', runner.os, runner.arch, steps.version.outputs.version) }}
+        restore-keys: |
+          ${{ inputs.cache-validation == 'true' && format('task-validation-{0}-{1}', runner.os, runner.arch) || format('task-{0}-{1}-', runner.os, runner.arch) }}
 
     - name: Download Task
       if: ${{ steps.cache.outputs.cache-hit != 'true' }}
@@ -24,12 +37,24 @@ runs:
       run: ./scripts/setup_task.sh download
 
     - name: Save Task
-      # Only runs on master may create a shared Task cache entry.
-      if: ${{ steps.cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master' }}
+      # Master saves shared entries; validation runs save only to their PR scope.
+      if: ${{ steps.cache.outputs.cache-hit != 'true' && (github.ref == 'refs/heads/master' || inputs.cache-validation == 'true') }}
       uses: actions/cache/save@v5
       with:
         path: ${{ runner.temp }}/task/${{ steps.version.outputs.version }}/${{ runner.os }}-${{ runner.arch }}
-        key: task-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.version }}
+        key: ${{ inputs.cache-validation == 'true' && format('task-validation-{0}-{1}', runner.os, runner.arch) || format('task-{0}-{1}-{2}', runner.os, runner.arch, steps.version.outputs.version) }}
+
+    - name: Validate Task cache
+      # A validation PR warms on its first miss. Every master run and a later
+      # validation-PR run require the restored binary and an exact cache hit.
+      if: ${{ github.ref == 'refs/heads/master' || (inputs.cache-validation == 'true' && steps.cache.outputs.cache-hit == 'true') }}
+      shell: bash
+      env:
+        TASK_CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+        TASK_PATH: ${{ runner.temp }}/task/${{ steps.version.outputs.version }}/${{ runner.os }}-${{ runner.arch }}/task
+      run: |
+        test "$TASK_CACHE_HIT" = true
+        test -x "$TASK_PATH"
 
     - name: Add Task to PATH
       shell: bash

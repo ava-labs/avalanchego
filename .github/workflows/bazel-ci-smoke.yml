@@ -10,6 +10,11 @@ on:
       runner:
         required: true
         type: string
+      cache_validation:
+        description: Use the PR-scoped Task validation cache
+        required: false
+        type: boolean
+        default: false
 
 env:
   BAZEL_CI_ENFORCE_DEPENDENCY_LIST: 1
@@ -58,6 +63,7 @@ jobs:
       - uses: ./.github/actions/setup-bazel
         with:
           initial-setup: true
+          cache-validation: ${{ inputs.cache_validation }}
       - name: Log Bazel disk diagnostics
         if: failure()
         shell: bash
@@ -72,6 +78,7 @@ jobs:
       - name: Run Bazel unit-test smoke test
         uses: ./.github/actions/run-bazel-with-disk-space
         with:
+          cache-validation: ${{ inputs.cache_validation }}
           run: ./scripts/run_task.sh bazel-test-unit-smoke
 
   e2e-smoke:
@@ -83,6 +90,7 @@ jobs:
       - name: Run E2E smoke test with Bazel-built binary
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
+          cache-validation: ${{ inputs.cache_validation }}
           run: ./scripts/run_task.sh bazel-test-e2e-smoke
           setup_bazel: 'true'
           artifact_prefix: e2e-bazel-smoke-${{ inputs.platform_name }}
