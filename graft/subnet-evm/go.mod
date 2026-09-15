@@ -8,11 +8,11 @@ module github.com/MetalBlockchain/metalgo/graft/subnet-evm
 go 1.25.8
 
 require (
-	github.com/antithesishq/antithesis-sdk-go v0.3.8
+	github.com/MetalBlockchain/libevm v1.13.14-0.4.0.rc.2-1779180596
 	github.com/MetalBlockchain/metalgo v1.14.2
 	github.com/MetalBlockchain/metalgo/graft/evm v1.14.2
+	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.3.1
-	github.com/MetalBlockchain/libevm v1.13.14-0.4.0.rc.2-1779180596
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-cmd/cmd v1.4.3
 	github.com/gorilla/rpc v1.2.0
@@ -44,10 +44,10 @@ require (
 	connectrpc.com/connect v1.18.1 // indirect
 	connectrpc.com/grpcreflect v1.3.0 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
+	github.com/MetalBlockchain/metalgo/graft/coreth v1.14.2 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/StephenButtolph/canoto v0.18.0 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
-	github.com/MetalBlockchain/metalgo/graft/coreth v1.14.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.5 // indirect

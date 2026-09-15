@@ -8,6 +8,8 @@ github.com/CloudyKit/jet/v3 v3.0.0/go.mod h1:HKQPgSJmdK8hdoAbKUUWajkHyHo4RaU5rMd
 github.com/DataDog/zstd v1.5.2 h1:vUG4lAyuPCXO0TLbXvPv7EB7cNK1QV/luu55UHLrrn8=
 github.com/DataDog/zstd v1.5.2/go.mod h1:g4AWEaM3yOg3HYfnJ3YIawPnVdXJh9QME85blwSAmyw=
 github.com/Joker/hpp v1.0.0/go.mod h1:8x5n+M1Hp5hC0g8okX3sR3vFQwynaX/UgSOM9MeBKzY=
+github.com/MetalBlockchain/libevm v1.13.14-0.4.0.rc.2-1779180596 h1:hcuwm78tzihLLor8CprlymhvCxSp1a2m481A/vw2BY0=
+github.com/MetalBlockchain/libevm v1.13.14-0.4.0.rc.2-1779180596/go.mod h1:40jxnN6X0S5CtcSluTSUm5zgMc0qsUUoyRUqFpT2A/0=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/Shopify/goreferrer v0.0.0-20181106222321-ec9c9a553398/go.mod h1:a1uqRtAwp2Xwc6WNPJEufxJ7fx3npB4UV/JOLmbu5I0=
@@ -21,8 +23,6 @@ github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.3.1 h1:2LXaw0vQ/nSjSKyNil2NoNXXuH+nFSSrlUUBl1x6Jcg=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.3.1/go.mod h1:0Z60sYkUFvvOlOc0XHGbP+271EjP5KjaaOA0EQxCCSA=
-github.com/ava-labs/libevm v1.13.14-0.4.0.rc.2 h1:n+YIGbY3rsmtzbQ3ec9qm5gZRkZVIZRwrWGDj9kgwLE=
-github.com/ava-labs/libevm v1.13.14-0.4.0.rc.2/go.mod h1:oyJdZfpQTc9fVzAbDry+QRYeiCbw8s/kGaDUsEMpb4I=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=

@@ -4,10 +4,10 @@ module github.com/MetalBlockchain/metalgo/graft/evm
 go 1.25.8
 
 require (
-	github.com/VictoriaMetrics/fastcache v1.12.1
-	github.com/MetalBlockchain/metalgo v1.14.2
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.3.1
 	github.com/MetalBlockchain/libevm v1.13.14-0.4.0.rc.2-1779180596
+	github.com/MetalBlockchain/metalgo v1.14.2
+	github.com/VictoriaMetrics/fastcache v1.12.1
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.3.1
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/deckarep/golang-set/v2 v2.1.0
 	github.com/google/go-cmp v0.7.0
