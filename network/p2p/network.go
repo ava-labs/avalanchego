@@ -25,6 +25,7 @@ var (
 	_ validators.Connector = (*Network)(nil)
 	_ common.AppHandler    = (*Network)(nil)
 	_ NodeSampler          = (*PeerSampler)(nil)
+	_ NodeSampler          = (*peerTrackerSampler)(nil)
 	_ ConnectionHandler    = (*Peers)(nil)
 
 	opLabel      = "op"
@@ -126,13 +127,42 @@ func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 // NewClient returns a Client that can be used to send messages for the
 // corresponding protocol.
 func (n *Network) NewClient(handlerID uint64, nodeSampler NodeSampler) *Client {
+	return n.newClient(handlerID, nodeSampler, nil)
+}
+
+// NewTrackedClient returns a Client that selects peers with pt and scores every
+// request it issues against pt.
+func (n *Network) NewTrackedClient(handlerID uint64, pt *PeerTracker) *Client {
+	return n.newClient(handlerID, peerTrackerSampler{tracker: pt}, pt)
+}
+
+func (n *Network) newClient(handlerID uint64, nodeSampler NodeSampler, peers *PeerTracker) *Client {
 	return &Client{
 		handlerIDStr:  strconv.FormatUint(handlerID, 10),
 		handlerPrefix: ProtocolPrefix(handlerID),
 		sender:        n.sender,
 		router:        n.router,
 		nodeSampler:   nodeSampler,
+		peers:         peers,
 	}
+}
+
+// peerTrackerSampler adapts a PeerTracker to NodeSampler. SelectPeer yields one
+// peer, so a larger limit still returns at most one.
+type peerTrackerSampler struct {
+	tracker *PeerTracker
+}
+
+func (p peerTrackerSampler) Sample(_ context.Context, limit int) []ids.NodeID {
+	if limit <= 0 {
+		return nil
+	}
+
+	nodeID, ok := p.tracker.SelectPeer()
+	if !ok {
+		return nil
+	}
+	return []ids.NodeID{nodeID}
 }
 
 // AddHandler reserves an identifier for an application protocol

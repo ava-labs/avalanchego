@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/network/peertest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -693,4 +694,38 @@ func (*testSDKHandler) AppGossip(_ context.Context, _ ids.NodeID, _ []byte) {
 func (t *testSDKHandler) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *common.AppError) {
 	t.appRequested = true
 	return nil, nil
+}
+
+// A request the sender never dispatched must not leave the peer registered as
+// having an outstanding request.
+func TestSendAppRequestErrorBalancesTracker(t *testing.T) {
+	errSend := errors.New("send failed")
+	sender := testAppSender{
+		sendAppRequestFn: func(context.Context, set.Set[ids.NodeID], uint32, []byte) error {
+			return errSend
+		},
+	}
+
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	reg := prometheus.NewRegistry()
+	net, err := NewNetwork(snowCtx, sender, buildCodec(t, TestMessage{}), 1, reg)
+	require.NoError(t, err)
+
+	nodeID := ids.GenerateTestNodeID()
+	require.NoError(t, net.Connected(t.Context(), nodeID, defaultPeerVersion))
+
+	// Seed the peer responsive, so a missing failure registration is visible as
+	// the gauge staying at 1.
+	p2ptest.SeedResponsive(t, net.PeerTracker(), nodeID)
+	require.Equal(t, 1.0, responsivePeers(t, reg), "seeded")
+
+	_, err = net.SendSyncedAppRequest(t.Context(), nodeID, []byte("request"))
+	require.ErrorIs(t, err, errSend)
+
+	require.Equal(t, 0.0, responsivePeers(t, reg), "num_responsive_peers")
+}
+
+func responsivePeers(t *testing.T, reg *prometheus.Registry) float64 {
+	t.Helper()
+	return p2ptest.TrackerGauge(t, reg, "sync_peer_tracker", "num_responsive_peers")
 }
