@@ -250,9 +250,30 @@ integration test because it performs the actual restore and save operations.
 
 A labeled pull request uses fixed keys for its merge ref. The first run with no
 entry is a **warm run**. It uses the normal production save paths and does not
-require a hit for the cache it produces. A later push restores that entry and
+require a hit for the cache it produces. A later run restores that entry and
 runs **validation mode**. Validation requires the expected exact restores and
 fails when the log checker finds unexpected work.
+
+To reset and validate a cache change:
+
+1. Remove `cache-validation` and wait for the **Cache Validation Cleanup**
+   workflow to succeed.
+2. Push the cache change while the label is absent. This starts an ordinary,
+   restore-only run; it puts the workflow change on the pull request before the
+   label starts a validation run.
+3. Add `cache-validation`. This starts the warm run. Do not push another commit
+   or rerun the workflow until it completes: workflow concurrency cancels the
+   warm run and can leave its entries absent.
+4. Start a validation run only after the warm run completes. Either rerun the
+   completed labeled workflow, or push another commit while the label remains.
+   Both runs must restore the entries created by the warm run. Rerunning is
+   preferred because it keeps the source unchanged; a later push also validates
+   but changes the source under test.
+
+If the warm run is cancelled or fails before saving its entries, remove the
+label, wait for cleanup, and repeat the procedure. Do not add the label before
+pushing the cache change: the label run would use the old commit and a later
+push can cancel it.
 
 For the Go unit job, use the job log to identify the mode. A warm run reports
 `Cache not found` for `go-unit-validation-<os>-<arch>`, does not run the cache
