@@ -7,10 +7,10 @@ import (
 	"bytes"
 	"context"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -182,16 +181,12 @@ func Test_Sync_RangeProofRequest(t *testing.T) {
 			}
 
 			syncer, err := NewSyncer(
+				Config[*proofDouble, *proofDouble]{},
 				clientDB,
-				Config[*proofDouble, *proofDouble]{
-					TargetRoot:            targetRoot,
-					RangeProofMarshaler:   marshaler{},
-					ChangeProofMarshaler:  marshaler{},
-					ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, handler),
-					Log:                   logging.NoLog{},
-					SimultaneousWorkLimit: 1,
-				},
-				prometheus.NewRegistry(),
+				targetRoot,
+				marshaler{},
+				marshaler{},
+				p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, handler),
 			)
 			require.NoError(t, err)
 			require.NoErrorf(t, syncer.Sync(ctx), "%T.Sync()", syncer)
@@ -262,16 +257,12 @@ func Test_Sync_ChangeProofRequest(t *testing.T) {
 
 			var err error
 			syncer, err = NewSyncer(
+				Config[*proofDouble, *proofDouble]{},
 				clientDB,
-				Config[*proofDouble, *proofDouble]{
-					TargetRoot:            originalTarget,
-					RangeProofMarshaler:   marshaler{},
-					ChangeProofMarshaler:  marshaler{},
-					ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, handler),
-					Log:                   logging.NoLog{},
-					SimultaneousWorkLimit: 1,
-				},
-				prometheus.NewRegistry(),
+				originalTarget,
+				marshaler{},
+				marshaler{},
+				p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, handler),
 			)
 			require.NoError(t, err)
 
@@ -301,21 +292,146 @@ func Test_Sync_BusyContextCancellation(t *testing.T) {
 	}
 
 	syncer, err := NewSyncer(
-		clientDB,
 		Config[*proofDouble, *proofDouble]{
-			TargetRoot:            ids.GenerateTestID(), // must be different from clientDB's root and [ids.Empty]
-			RangeProofMarshaler:   marshaler{},
-			ChangeProofMarshaler:  marshaler{},
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, blockingHandler),
-			Log:                   logging.NoLog{},
 			SimultaneousWorkLimit: 1, // ensures synchronous event handling
 		},
-		prometheus.NewRegistry(),
+		clientDB,
+		ids.GenerateTestID(), // must be different from clientDB's root and [ids.Empty]
+		marshaler{},
+		marshaler{},
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, blockingHandler),
 	)
 	require.NoError(t, err)
 
 	err = syncer.Sync(ctx)
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+// recordingTracker is a [PeerTracker] that records every call made to it.
+type recordingTracker struct {
+	lock      sync.Mutex
+	requests  []ids.NodeID
+	responses []ids.NodeID
+	failures  []ids.NodeID
+	// bandwidths holds the bandwidth reported alongside each entry in
+	// [responses].
+	bandwidths []float64
+}
+
+var _ PeerTracker = (*recordingTracker)(nil)
+
+func (r *recordingTracker) RegisterRequest(nodeID ids.NodeID) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.requests = append(r.requests, nodeID)
+}
+
+func (r *recordingTracker) RegisterResponse(nodeID ids.NodeID, bandwidth float64) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.responses = append(r.responses, nodeID)
+	r.bandwidths = append(r.bandwidths, bandwidth)
+}
+
+func (r *recordingTracker) RegisterFailure(nodeID ids.NodeID) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.failures = append(r.failures, nodeID)
+}
+
+// Test_Sync_PeerTracker ensures that the configured peer tracker is notified
+// of every request, and of whether the response was accepted or dropped.
+func Test_Sync_PeerTracker(t *testing.T) {
+	tests := []struct {
+		name string
+		// firstResponse is returned for the first request. Later requests are
+		// always answered with a valid, sync-finishing range proof.
+		firstResponse func(t *testing.T, targetRoot ids.ID) ([]byte, *common.AppError)
+		// expectFailures is the number of dropped responses expected before
+		// the sync finishes.
+		expectFailures int
+	}{
+		{
+			name: "valid_response",
+			firstResponse: func(t *testing.T, targetRoot ids.ID) ([]byte, *common.AppError) {
+				return marshalRangeProofResponse(t, &proofDouble{newRoot: targetRoot}), nil
+			},
+		},
+		{
+			name: "invalid_response_then_valid",
+			firstResponse: func(t *testing.T, targetRoot ids.ID) ([]byte, *common.AppError) {
+				// A change proof is never a valid response to a range proof request.
+				return marshalChangeProofResponse(t, &proofDouble{newRoot: targetRoot}), nil
+			},
+			expectFailures: 1,
+		},
+		{
+			name: "app_error_then_valid",
+			firstResponse: func(*testing.T, ids.ID) ([]byte, *common.AppError) {
+				return nil, &common.AppError{Code: 1, Message: "test app error"}
+			},
+			expectFailures: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			targetRoot := ids.GenerateTestID()
+			clientDB := &db{id: ids.Empty}
+			serverNodeID := ids.GenerateTestNodeID()
+
+			var alreadySent bool
+			finishingResponse := marshalRangeProofResponse(t, &proofDouble{newRoot: targetRoot})
+			handler := p2p.TestHandler{
+				AppRequestF: func(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *common.AppError) {
+					if alreadySent {
+						return finishingResponse, nil
+					}
+					alreadySent = true
+					return tt.firstResponse(t, targetRoot)
+				},
+			}
+
+			tracker := &recordingTracker{}
+			syncer, err := NewSyncer(
+				Config[*proofDouble, *proofDouble]{
+					PeerTracker: tracker,
+				},
+				clientDB,
+				targetRoot,
+				marshaler{},
+				marshaler{},
+				p2ptest.NewSelfClient(t, t.Context(), serverNodeID, handler),
+			)
+			require.NoError(t, err)
+			require.NoErrorf(t, syncer.Sync(t.Context()), "%T.Sync()", syncer)
+
+			tracker.lock.Lock()
+			defer tracker.lock.Unlock()
+
+			// Every request is registered, whether or not its response is
+			// accepted, and exactly one response is needed to finish the sync.
+			numRequests := tt.expectFailures + 1
+			require.Equal(t, repeatNodeID(serverNodeID, numRequests), tracker.requests, "RegisterRequest calls")
+			require.Equal(t, repeatNodeID(serverNodeID, tt.expectFailures), tracker.failures, "RegisterFailure calls")
+			require.Equal(t, repeatNodeID(serverNodeID, 1), tracker.responses, "RegisterResponse calls")
+			require.Len(t, tracker.bandwidths, 1)
+			require.Positive(t, tracker.bandwidths[0], "reported bandwidth")
+		})
+	}
+}
+
+// repeatNodeID returns a slice holding [nodeID] [n] times, or nil if n == 0 so
+// that it compares equal to an untouched slice.
+func repeatNodeID(nodeID ids.NodeID, n int) []ids.NodeID {
+	if n == 0 {
+		return nil
+	}
+	s := make([]ids.NodeID, n)
+	for i := range s {
+		s[i] = nodeID
+	}
+	return s
 }
 
 func Test_Midpoint(t *testing.T) {
