@@ -219,9 +219,7 @@ func New(config DatabaseConfig, log logging.Logger) (_ database.HeightIndex, err
 		config: config,
 		log:    databaseLog,
 		fileCache: lru.NewCacheWithOnEvict(config.MaxDataFiles, func(_ int, f *os.File) {
-			if f != nil {
-				f.Close()
-			}
+			f.Close()
 		}),
 		compressor: compressor,
 	}
@@ -251,12 +249,6 @@ func New(config DatabaseConfig, log logging.Logger) (_ database.HeightIndex, err
 
 	if err := db.openAndInitializeIndex(); err != nil {
 		db.log.Error("Failed to initialize database: failed to initialize index", zap.Error(err))
-		return nil, err
-	}
-
-	if err := db.initializeDataFiles(); err != nil {
-		db.log.Error("Failed to initialize database: failed to initialize data files", zap.Error(err))
-		db.closeFiles()
 		return nil, err
 	}
 
@@ -467,27 +459,15 @@ func (db *Database) Get(height BlockHeight) (BlockData, error) {
 	}
 	buf := make([]byte, int(totalReadSize))
 
-	// loop to retry fetching the data file if it got closed between get and read.
-	// If not closed, we read the block header and data.
-	for {
-		dataFile, localOffset, fileIndex, err := db.getDataFileAndOffset(indexEntry.Offset)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get data file and offset: %w", err)
-		}
-		if _, err := dataFile.ReadAt(buf, int64(localOffset)); err != nil {
-			if errors.Is(err, os.ErrClosed) {
-				db.fileCache.Evict(fileIndex)
-				continue
-			}
-			db.log.Error("Failed to read block: failed to read block data from file",
-				zap.Uint64("height", height),
-				zap.Uint64("localOffset", localOffset),
-				zap.Uint32("blockSize", indexEntry.Size),
-				zap.Error(err),
-			)
-			return nil, fmt.Errorf("failed to read block header and data: %w", err)
-		}
-		break
+	fileIndex, localOffset, err := db.dataFileIndexAndOffset(indexEntry.Offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get data file index and offset for height %d: %w", height, err)
+	}
+	if err := db.retryDataFileOperation(fileIndex, false, func(f *os.File) error {
+		_, err := f.ReadAt(buf, int64(localOffset))
+		return err
+	}); err != nil {
+		return nil, fmt.Errorf("failed to read block header and data for height %d at local offset %d: %w", height, localOffset, err)
 	}
 
 	var bh blockEntryHeader
@@ -542,9 +522,9 @@ func (db *Database) getDataFileIndexForHeight(height BlockHeight) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	_, _, idx, err := db.getDataFileAndOffset(entry.Offset)
+	idx, _, err := db.dataFileIndexAndOffset(entry.Offset)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get data file index for height %d: %w", height, err)
+		return 0, fmt.Errorf("%w: calculating data file index for height %d: %w", ErrCorrupted, height, err)
 	}
 	return idx, nil
 }
@@ -580,11 +560,7 @@ func (db *Database) Sync(start, end uint64) error {
 	}
 
 	for idx := firstIdx; idx <= lastIdx; idx++ {
-		f, err := db.getOrOpenDataFile(idx)
-		if err != nil {
-			return fmt.Errorf("failed to open data file %d: %w", idx, err)
-		}
-		if err := f.Sync(); err != nil {
+		if err := db.retryDataFileOperation(idx, false, (*os.File).Sync); err != nil {
 			return fmt.Errorf("failed to sync data file %d: %w", idx, err)
 		}
 	}
@@ -704,6 +680,9 @@ func (db *Database) recover() error {
 	}
 
 	if len(dataFiles) == 0 {
+		if db.header.NextWriteOffset > 0 {
+			return fmt.Errorf("%w: index checkpoint is %d bytes, but no data files exist", ErrCorrupted, db.header.NextWriteOffset)
+		}
 		return nil
 	}
 
@@ -935,18 +914,6 @@ func (db *Database) openAndInitializeIndex() error {
 	return db.loadOrInitializeHeader()
 }
 
-func (db *Database) initializeDataFiles() error {
-	// Pre-load the data file for the next write offset.
-	nextOffset := db.nextDataWriteOffset.Load()
-	if nextOffset > 0 {
-		_, _, _, err := db.getDataFileAndOffset(nextOffset)
-		if err != nil {
-			return fmt.Errorf("failed to pre-load data file for offset %d: %w", nextOffset, err)
-		}
-	}
-	return nil
-}
-
 func (db *Database) loadOrInitializeHeader() error {
 	fileInfo, err := db.indexFile.Stat()
 	if err != nil {
@@ -1031,7 +998,16 @@ func (db *Database) dataFilePath(index int) string {
 	return filepath.Join(db.config.DataDir, fmt.Sprintf(dataFileNameFormat, index))
 }
 
-func (db *Database) getOrOpenDataFile(fileIndex int) (*os.File, error) {
+func (db *Database) dataFileIndexAndOffset(offset uint64) (int, uint64, error) {
+	maxFileSize := db.header.MaxDataFileSize
+	idx := offset / maxFileSize
+	if idx > math.MaxInt {
+		return 0, 0, fmt.Errorf("data file index %d exceeds maximum %d: %w", idx, math.MaxInt, safemath.ErrOverflow)
+	}
+	return int(idx), offset % maxFileSize, nil
+}
+
+func (db *Database) getDataFile(fileIndex, flags int) (*os.File, error) {
 	if handle, ok := db.fileCache.Get(fileIndex); ok {
 		return handle, nil
 	}
@@ -1046,7 +1022,7 @@ func (db *Database) getOrOpenDataFile(fileIndex int) (*os.File, error) {
 	}
 
 	filePath := db.dataFilePath(fileIndex)
-	handle, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, defaultFilePermissions)
+	handle, err := os.OpenFile(filePath, flags, defaultFilePermissions)
 	if err != nil {
 		db.log.Error("Failed to open data file",
 			zap.Int("fileIndex", fileIndex),
@@ -1063,6 +1039,41 @@ func (db *Database) getOrOpenDataFile(fileIndex int) (*os.File, error) {
 	)
 
 	return handle, nil
+}
+
+// retryDataFileOperation opens the file and retries op if cache eviction closes it.
+// The create flag allows initial creation. The operation must be safe to repeat.
+func (db *Database) retryDataFileOperation(idx int, create bool, op func(*os.File) error) error {
+	flags := os.O_RDWR
+	if create {
+		flags |= os.O_CREATE
+	}
+	f, err := db.getDataFile(idx, flags)
+	if err != nil {
+		return err
+	}
+	for {
+		err := op(f)
+		if err == nil {
+			return nil
+		}
+		if !errors.Is(err, os.ErrClosed) {
+			return err
+		}
+
+		db.fileOpenMu.Lock()
+		cached, ok := db.fileCache.Get(idx)
+		if ok && cached == f {
+			db.fileCache.Evict(idx)
+		}
+		db.fileOpenMu.Unlock()
+
+		// Omit O_CREATE so an unexpectedly missing file returns an error.
+		f, err = db.getDataFile(idx, os.O_RDWR)
+		if err != nil {
+			return err
+		}
+	}
 }
 
 func calculateChecksum(data []byte) uint64 {
@@ -1084,34 +1095,24 @@ func (db *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block Block
 	copy(combinedBuf, headerBytes)
 	copy(combinedBuf[sizeOfBlockEntryHeader:], block)
 
-	// loop to retry fetching the data file if it got closed between get and write.
-	// If not closed, we write the block and return.
-	for {
-		dataFile, localOffset, fileIndex, err := db.getDataFileAndOffset(offset)
-		if err != nil {
-			return fmt.Errorf("failed to get data file for writing block %d: %w", bh.Height, err)
+	idx, localOffset, err := db.dataFileIndexAndOffset(offset)
+	if err != nil {
+		return fmt.Errorf("failed to get data file index for writing block %d: %w", bh.Height, err)
+	}
+	if err := db.retryDataFileOperation(idx, true, func(f *os.File) error {
+		if _, err := f.WriteAt(combinedBuf, int64(localOffset)); err != nil {
+			return fmt.Errorf("failed to write block data: %w", err)
 		}
-
-		if _, err := dataFile.WriteAt(combinedBuf, int64(localOffset)); err != nil {
-			if errors.Is(err, os.ErrClosed) {
-				// ensure the file is evicted, otherwise we'll retry forever
-				db.fileCache.Evict(fileIndex)
-				continue
-			}
-			return fmt.Errorf("failed to write block to data file at offset %d: %w", offset, err)
-		}
-
 		if db.config.SyncToDisk {
-			if err := dataFile.Sync(); err != nil {
-				if errors.Is(err, os.ErrClosed) {
-					db.fileCache.Evict(fileIndex)
-					continue
-				}
-				return fmt.Errorf("failed to sync data file after writing block %d: %w", bh.Height, err)
+			if err := f.Sync(); err != nil {
+				return fmt.Errorf("failed to sync data file: %w", err)
 			}
 		}
 		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to write block to data file at offset %d: %w", offset, err)
 	}
+	return nil
 }
 
 func (db *Database) updateBlockMaxHeight(writtenBlockHeight BlockHeight) error {
@@ -1214,9 +1215,10 @@ func (db *Database) allocateBlockSpace(totalSize uint32) (writeDataOffset uint64
 }
 
 func (db *Database) getDataFileAndOffset(globalOffset uint64) (*os.File, uint64, int, error) {
-	maxFileSize := db.header.MaxDataFileSize
-	fileIndex := int(globalOffset / maxFileSize)
-	localOffset := globalOffset % maxFileSize
-	handle, err := db.getOrOpenDataFile(fileIndex)
+	fileIndex, localOffset, err := db.dataFileIndexAndOffset(globalOffset)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	handle, err := db.getDataFile(fileIndex, os.O_RDWR)
 	return handle, localOffset, fileIndex, err
 }
