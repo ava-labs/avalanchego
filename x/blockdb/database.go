@@ -459,12 +459,15 @@ func (db *Database) Get(height BlockHeight) (BlockData, error) {
 	}
 	buf := make([]byte, int(totalReadSize))
 
-	dataFile, localOffset, fileIndex, err := db.getDataFileAndOffset(indexEntry.Offset)
+	fileIndex, localOffset, err := db.dataFileIndexAndOffset(indexEntry.Offset)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get data file and offset: %w", err)
+		return nil, fmt.Errorf("failed to get data file index and offset for height %d: %w", height, err)
 	}
-	if err := db.readDataFileAt(fileIndex, dataFile, buf, int64(localOffset)); err != nil {
-		return nil, fmt.Errorf("failed to read block header and data: %w", err)
+	if err := db.retryDataFileOperation(fileIndex, false, func(f *os.File) error {
+		_, err := f.ReadAt(buf, int64(localOffset))
+		return err
+	}); err != nil {
+		return nil, fmt.Errorf("failed to read block header and data for height %d at local offset %d: %w", height, localOffset, err)
 	}
 
 	var bh blockEntryHeader
@@ -557,11 +560,7 @@ func (db *Database) Sync(start, end uint64) error {
 	}
 
 	for idx := firstIdx; idx <= lastIdx; idx++ {
-		f, err := db.getDataFile(idx, os.O_RDWR)
-		if err != nil {
-			return fmt.Errorf("failed to open data file %d: %w", idx, err)
-		}
-		if err := db.retryDataFileOperation(idx, f, (*os.File).Sync); err != nil {
+		if err := db.retryDataFileOperation(idx, false, (*os.File).Sync); err != nil {
 			return fmt.Errorf("failed to sync data file %d: %w", idx, err)
 		}
 	}
@@ -1042,9 +1041,22 @@ func (db *Database) getDataFile(fileIndex, flags int) (*os.File, error) {
 	return handle, nil
 }
 
-func (db *Database) retryDataFileOperation(idx int, f *os.File, op func(*os.File) error) error {
+// retryDataFileOperation opens the file and retries op if cache eviction closes it.
+// The create flag allows initial creation. The operation must be safe to repeat.
+func (db *Database) retryDataFileOperation(idx int, create bool, op func(*os.File) error) error {
+	flags := os.O_RDWR
+	if create {
+		flags |= os.O_CREATE
+	}
+	f, err := db.getDataFile(idx, flags)
+	if err != nil {
+		return err
+	}
 	for {
 		err := op(f)
+		if err == nil {
+			return nil
+		}
 		if !errors.Is(err, os.ErrClosed) {
 			return err
 		}
@@ -1056,18 +1068,12 @@ func (db *Database) retryDataFileOperation(idx int, f *os.File, op func(*os.File
 		}
 		db.fileOpenMu.Unlock()
 
+		// Omit O_CREATE so an unexpectedly missing file returns an error.
 		f, err = db.getDataFile(idx, os.O_RDWR)
 		if err != nil {
 			return err
 		}
 	}
-}
-
-func (db *Database) readDataFileAt(idx int, f *os.File, buf []byte, offset int64) error {
-	return db.retryDataFileOperation(idx, f, func(f *os.File) error {
-		_, err := f.ReadAt(buf, offset)
-		return err
-	})
 }
 
 func calculateChecksum(data []byte) uint64 {
@@ -1093,11 +1099,7 @@ func (db *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block Block
 	if err != nil {
 		return fmt.Errorf("failed to get data file index for writing block %d: %w", bh.Height, err)
 	}
-	f, err := db.getDataFile(idx, os.O_RDWR|os.O_CREATE)
-	if err != nil {
-		return fmt.Errorf("failed to get data file for writing block %d: %w", bh.Height, err)
-	}
-	if err := db.retryDataFileOperation(idx, f, func(f *os.File) error {
+	if err := db.retryDataFileOperation(idx, true, func(f *os.File) error {
 		if _, err := f.WriteAt(combinedBuf, int64(localOffset)); err != nil {
 			return fmt.Errorf("failed to write block data: %w", err)
 		}

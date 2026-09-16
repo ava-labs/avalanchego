@@ -309,9 +309,7 @@ func TestFileCache_Eviction(t *testing.T) {
 				evictionMu.Lock()
 				defer evictionMu.Unlock()
 				evictionCount.Add(1)
-				if file != nil {
-					file.Close()
-				}
+				file.Close()
 			})
 			store.fileCache = smallCache
 
@@ -497,13 +495,16 @@ func TestRetryDataFileOperationPreservesReplacement(t *testing.T) {
 	db := newDatabase(t, DefaultConfig())
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	require.NoError(t, db.Put(0, []byte("block")))
-	stale, err := db.getDataFile(0, os.O_RDWR)
-	require.NoError(t, err)
-	db.fileCache.Evict(0)
-	replacement, err := db.getDataFile(0, os.O_RDWR)
-	require.NoError(t, err)
-
-	require.NoError(t, db.retryDataFileOperation(0, stale, (*os.File).Sync))
-	_, err = replacement.Stat()
+	var replacement *os.File
+	require.NoError(t, db.retryDataFileOperation(0, false, func(f *os.File) error {
+		if replacement == nil {
+			db.fileCache.Evict(0)
+			var err error
+			replacement, err = db.getDataFile(0, os.O_RDWR)
+			require.NoError(t, err)
+		}
+		return f.Sync()
+	}))
+	_, err := replacement.Stat()
 	require.NoError(t, err)
 }
