@@ -508,6 +508,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			AVAXAssetID: m.AVAXAssetID,
 
 			Log:          chainLog,
+			Tracer:       m.Tracer,
 			SharedMemory: m.AtomicMemory.NewSharedMemory(chainParams.ID),
 			BCLookup:     m,
 			Metrics:      metrics.NewPrefixGatherer(),
