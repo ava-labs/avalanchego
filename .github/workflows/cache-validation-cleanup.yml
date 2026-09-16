@@ -20,15 +20,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_REF: refs/pull/${{ github.event.pull_request.number }}/merge
         run: |
-          keys=(
+          key_prefixes=(
             "task-validation-Linux-X64"
             "task-validation-Linux-ARM64"
             "task-validation-macOS-ARM64"
             "go-mod-validation-Linux"
             "go-unit-validation-Linux-X64"
           )
-          for key in "${keys[@]}"; do
-            cache_ids="$(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$PR_REF" --key "$key" --limit 100 --json id --jq '.[].id')"
+          for key_prefix in "${key_prefixes[@]}"; do
+            cache_ids="$(
+              gh cache list --repo "$GITHUB_REPOSITORY" --ref "$PR_REF" --limit 100 --json id,key \
+                --jq ".[] | select(.key | startswith(\"${key_prefix}\")) | .id"
+            )"
             for cache_id in $cache_ids; do
               gh cache delete "$cache_id" --repo "$GITHUB_REPOSITORY"
             done

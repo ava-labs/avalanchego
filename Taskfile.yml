@@ -612,6 +612,10 @@ tasks:
     cmds:
       - cmd: '{{.NIX_RUN}} ./bin/tmpnetctl start-kind-cluster --install-chaos-mesh'
 
+  normalize-testdata-mtimes:
+    desc: Normalizes testdata modification times for Go test-result caching
+    cmd: '{{.NIX_RUN}} ./scripts/normalize_testdata_mtimes.sh'
+
   test-run-task-launcher:
     desc: Tests the run_task launcher behavior
     cmd: '{{.NIX_RUN}} ./scripts/test_run_task_launcher.sh'

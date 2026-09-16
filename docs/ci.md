@@ -224,9 +224,9 @@ storage to merged code. It also prevents unmerged code from publishing input
 that later runs reuse.
 
 The `cache-validation` pull request label is the exception for cache-validation
-runs. These runs write only fixed keys in that pull request's merge-ref scope.
-GitHub does not make those entries available to `master` or other pull requests.
-They exist to validate a proposed cache policy, not to warm shared CI.
+runs. These runs write keys in that pull request's merge-ref scope. GitHub does
+not make these entries available to `master` or other pull requests. They
+validate a proposed cache policy. They do not warm shared CI.
 
 A cache miss must not prevent an ordinary non-`master` run from getting required
 input. This rule lets a pull request test a dependency change before `master`
@@ -248,11 +248,11 @@ test execution. The checks are implemented and unit tested in
 [`tools/cache-check`](../tools/cache-check/); GitHub Actions remains the
 integration test because it performs the actual restore and save operations.
 
-A labeled pull request uses fixed keys for its merge ref. The first run with no
-entry is a **warm run**. It uses the normal production save paths and does not
-require a hit for the cache it produces. A later run restores that entry and
-runs **validation mode**. Validation requires the expected exact restores and
-fails when the log checker finds unexpected work.
+A labeled pull request uses merge-ref cache keys. The first run with no exact
+entry is a **warm run**. It uses the production save path. It does not require
+a cache hit. A later run restores the exact entry and runs **validation mode**.
+Validation requires exact restores. It fails when the log checker finds work
+that the restored cache should avoid.
 
 To reset and validate a cache change:
 
@@ -264,35 +264,33 @@ To reset and validate a cache change:
 3. Add `cache-validation`. This starts the warm run. Do not push another commit
    or rerun the workflow until it completes: workflow concurrency cancels the
    warm run and can leave its entries absent.
-4. Start a validation run only after the warm run completes. Either rerun the
-   completed labeled workflow, or push another commit while the label remains.
-   Both runs must restore the entries created by the warm run. Rerunning is
-   preferred because it keeps the source unchanged; a later push also validates
-   but changes the source under test.
+4. Rerun the completed labeled workflow only after the warm run completes.
+   Keep the commit unchanged. The rerun must restore the entries from the warm
+   run. A new commit can change Go test-cache inputs. It is not a full
+   validation of the warm entry.
 
 If the warm run is cancelled or fails before saving its entries, remove the
 label, wait for cleanup, and repeat the procedure. Do not add the label before
 pushing the cache change: the label run would use the old commit and a later
 push can cancel it.
 
-For the Go unit job, use the job log to identify the mode. A warm run reports
-`Cache not found` for `go-unit-validation-<os>-<arch>`, does not run the cache
-checker, and ends by saving that key in the `actions/cache` post-job step. A
-validation run reports `Cache hit for` that key, records
+For the Go unit job, use the job log to identify the mode. Its key is
+`go-unit-validation-<os>-<arch>-<testdata-hash>`. A warm run has no exact hit.
+It does not run the Go test-result checker. The `actions/cache` post step saves
+the key after unit tests finish. A validation run has an exact hit, records
 `go-unit-cache-hit=true`, sets `GOPROXY: off`, and runs `Validate Go unit-test
-cache`. It also sets `GODEBUG=gocachetest=1`, which makes Go log why it reused
-or did not reuse each test result. This diagnostic output helps investigate a
-plain `ok` result; it does not change the validation decision. The Task and Go
-module validation caches can be hits during a Go-unit warm run; the Go
-unit-cache result determines its mode. Re-run the Go workflow for the same
-commit after a warm run to validate the entry without changing its contents.
+results`.
 
-A push does not clear or refresh a validation entry. This is deliberate: it
-keeps one immutable entry per cache and avoids rewarming CI during ordinary PR
-iteration. A cache can be out of date after a source or dependency change. To
-start again, remove and add `cache-validation`. Label removal deletes the fixed
-entries, and the next labeled run warms new entries. Closing the PR also deletes
-them.
+Both warm and validation runs set `GODEBUG=gocachetest=1`. Go includes
+`GODEBUG` in its test-result inputs. This setting also records each cache lookup
+in the log. The Task and Go module caches can hit during a Go-unit warm run. The
+Go unit-cache result selects the unit-job mode.
+
+A new commit does not replace an immutable validation entry. Remove and add
+`cache-validation` to reset the validation caches. Label removal deletes all
+Go-unit validation keys that start with the Go-unit validation prefix. Closing
+the pull request also deletes them. A changed `testdata` file creates a new
+Go-unit key. The next run warms that key.
 
 The pre-merge Go caller declares `cache-mode: write` so a labeled run has the
 cache capability required by the called workflow. This grants capability only.
@@ -393,14 +391,33 @@ provides all required modules.
 #### Go unit cache
 
 The Go `unit` job also restores `GOCACHE`. This cache contains compiler output
-and Go test results. Its exact key contains the operating system, architecture,
-Go source, workspace files, module files, and module sums. A same-platform
-restore prefix gives changed source a warm start from an older entry.
+and Go test results. The normal key contains the operating system, architecture,
+the `testdata` content hash, Go source, workspace files, module files, and
+module sums. The validation key contains the operating system, architecture,
+and the `testdata` content hash.
+
+Go uses file modification times when it creates test-result keys. Git checkout
+sets new modification times on each runner. Before the unit job restores
+`GOCACHE`, it runs `normalize-testdata-mtimes`. This task sets all `testdata`
+file and directory times to `1970-01-01`. The fixed times let an exact restored
+cache reuse test results on another runner.
+
+The `testdata` content hash keeps this change safe. A fixture change selects a
+new primary key. A restore first tries an archive with the same fixture hash.
+It can reuse compiler output and test results. A later fallback can use an
+archive with a different fixture hash. The job then runs `go clean -testcache`.
+This keeps compiler output and removes test results that could use the fixed
+fixture times.
+
+The current task normalizes all `testdata` entries. If a future fuzz job writes
+corpus entries there, do not normalize or fingerprint those generated entries.
+Store that corpus in a separate fuzz cache. Committed corpus entries remain
+fixtures. The unit-cache fingerprint must include them.
 
 The unit job registers `actions/cache` on `master`. That action saves in its
 post step, after unit tests populate `GOCACHE`. A labeled cache-validation run
-uses the same lifecycle with its fixed merge-ref key. An explicit save during
-setup would store an empty or incomplete cache.
+uses the same lifecycle in its pull-request merge-ref scope. An explicit save
+during setup would store an empty or incomplete cache.
 
 The normal unit task disables race detection and test shuffling. This lets
 repeated runs use cached test results. The scheduled race-and-shuffle job still
