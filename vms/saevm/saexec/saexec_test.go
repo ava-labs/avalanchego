@@ -36,7 +36,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -565,14 +564,14 @@ func TestExecuteRecordsOnlyCanonicalProgress(t *testing.T) {
 			txs:             makeTxs,
 			ops:             nil,
 			opts:            []Option{asCanonical()},
-			wantInterimTick: utils.PointerTo(gas.Gas(params.TxGas)),
+			wantInterimTick: new(gas.Gas(params.TxGas)),
 		},
 		{
 			name:            "canonical with end-of-block operation only",
 			txs:             nil,
 			ops:             []saehookstest.Op{{Gas: 1}},
 			opts:            []Option{asCanonical()},
-			wantInterimTick: utils.PointerTo[gas.Gas](1),
+			wantInterimTick: new(gas.Gas(1)),
 		},
 	}
 	for _, tt := range tests {
