@@ -67,7 +67,7 @@ type Network interface {
 	// RegisterFailure records a failed response from nodeID.
 	RegisterFailure(nodeID ids.NodeID)
 
-	// PeerTracker returns the tracker to build a tracked [p2p.Client] with.
+	// PeerTracker returns the tracker to build a [p2p.TrackingClient] with.
 	PeerTracker() *p2p.PeerTracker
 
 	// P2PNetwork returns the unabstracted [p2p.Network].
@@ -89,7 +89,7 @@ type Client interface {
 	GetCode(ctx context.Context, hashes []common.Hash) ([][]byte, error)
 
 	// AddClient creates a separate client on the underlying [p2p.Network].
-	AddClient(handlerID uint64) *p2p.Client
+	AddClient(handlerID uint64) *p2p.TrackingClient
 
 	// StateSyncNodes returns the list of nodes provided via config.
 	StateSyncNodes() []ids.NodeID
@@ -132,8 +132,8 @@ func New(config *Config) *client {
 	}
 }
 
-func (c *client) AddClient(handlerID uint64) *p2p.Client {
-	return c.network.P2PNetwork().NewTrackedClient(handlerID, c.network.PeerTracker())
+func (c *client) AddClient(handlerID uint64) *p2p.TrackingClient {
+	return c.network.P2PNetwork().NewTrackingClient(handlerID, c.network.PeerTracker())
 }
 
 func (c *client) StateSyncNodes() []ids.NodeID {

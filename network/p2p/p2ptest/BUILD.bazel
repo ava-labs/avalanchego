@@ -15,6 +15,7 @@ go_library(
         "//snow/engine/common",
         "//snow/engine/enginetest",
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//utils/set",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",

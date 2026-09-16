@@ -39,7 +39,7 @@ const (
 // preferring to contact peers with known good bandwidth, connecting
 // to new peers with an exponentially decaying probability.
 //
-// Prefer [Network.NewTrackedClient], which pairs each request with its outcome.
+// Prefer [Network.NewTrackingClient], which pairs each request with its outcome.
 // Use RegisterRequest and its pair directly only where a [Client] cannot.
 type PeerTracker struct {
 	// Lock to protect concurrent access to the peer tracker

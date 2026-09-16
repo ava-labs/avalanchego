@@ -146,7 +146,7 @@ type Syncer[R any, C any] struct {
 type Config[R any, C any] struct {
 	RangeProofMarshaler   Marshaler[R]
 	ChangeProofMarshaler  Marshaler[C]
-	ProofClient           *p2p.Client
+	ProofClient           *p2p.TrackingClient
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
@@ -431,7 +431,7 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		return nil
 	}
 
-	if err := s.sendRequest(ctx, s.config.ProofClient, requestBytes, onResponse); err != nil {
+	if err := s.sendRequest(ctx, requestBytes, onResponse); err != nil {
 		s.finishWorkItem()
 		s.setError(err)
 		return
@@ -488,7 +488,7 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		return nil
 	}
 
-	if err := s.sendRequest(ctx, s.config.ProofClient, requestBytes, onResponse); err != nil {
+	if err := s.sendRequest(ctx, requestBytes, onResponse); err != nil {
 		s.finishWorkItem()
 		s.setError(err)
 		return
@@ -508,10 +508,10 @@ func peerFault(err error) error {
 
 func (s *Syncer[_, _]) sendRequest(
 	ctx context.Context,
-	client *p2p.Client,
 	requestBytes []byte,
-	onResponse p2p.AppResponseCallback,
+	onResponse p2p.AppResponseVerifier,
 ) error {
+	client := s.config.ProofClient
 	if len(s.config.StateSyncNodes) == 0 {
 		return client.AppRequestAny(ctx, requestBytes, onResponse)
 	}
