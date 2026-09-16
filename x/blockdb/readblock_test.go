@@ -311,6 +311,7 @@ func TestGetRejectsIndexedHeightMismatch(t *testing.T) {
 
 func TestGetMissingDataFileDoesNotCreate(t *testing.T) {
 	db := newDatabase(t, DefaultConfig())
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	require.NoError(t, db.Put(0, randomBlock(t)))
 
 	dataFilePath := db.dataFilePath(0)
@@ -324,5 +325,4 @@ func TestGetMissingDataFileDoesNotCreate(t *testing.T) {
 	_, err = os.Stat(dataFilePath)
 	require.ErrorIs(t, err, os.ErrNotExist)
 	require.NoError(t, os.Rename(missingDataFilePath, dataFilePath))
-	require.NoError(t, db.Close())
 }
