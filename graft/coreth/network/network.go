@@ -72,7 +72,7 @@ type Network interface {
 
 	SyncedNetworkClient
 
-	// PeerTracker returns the tracker to build a tracked [p2p.Client] with.
+	// PeerTracker returns the tracker to build a [p2p.TrackingClient] with.
 	PeerTracker() *p2p.PeerTracker
 
 	// SendAppRequestAny sends request to an arbitrary peer.

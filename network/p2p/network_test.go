@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -83,7 +84,7 @@ func TestMessageRouting(t *testing.T) {
 	require.NoError(network.AppGossip(ctx, wantNodeID, <-sender.SentAppGossip))
 	require.True(appGossipCalled)
 
-	require.NoError(client.AppRequest(ctx, set.Of(ids.EmptyNodeID), wantMsg, func(context.Context, ids.NodeID, []byte, error) error { return nil }))
+	require.NoError(client.AppRequest(ctx, set.Of(ids.EmptyNodeID), wantMsg, func(context.Context, ids.NodeID, []byte, error) {}))
 	require.NoError(network.AppRequest(ctx, wantNodeID, 1, time.Time{}, <-sender.SentAppRequest))
 	require.True(appRequestCalled)
 }
@@ -116,7 +117,7 @@ func TestClientPrefixesMessages(t *testing.T) {
 		ctx,
 		set.Of(ids.EmptyNodeID),
 		want,
-		func(context.Context, ids.NodeID, []byte, error) error { return nil },
+		func(context.Context, ids.NodeID, []byte, error) {},
 	))
 	gotAppRequest := <-sender.SentAppRequest
 	require.Equal(handlerPrefix, gotAppRequest[0])
@@ -125,7 +126,7 @@ func TestClientPrefixesMessages(t *testing.T) {
 	require.NoError(client.AppRequestAny(
 		ctx,
 		want,
-		func(context.Context, ids.NodeID, []byte, error) error { return nil },
+		func(context.Context, ids.NodeID, []byte, error) {},
 	))
 	gotAppRequest = <-sender.SentAppRequest
 	require.Equal(handlerPrefix, gotAppRequest[0])
@@ -164,13 +165,12 @@ func TestAppRequestResponse(t *testing.T) {
 	wantNodeID := ids.GenerateTestNodeID()
 	done := make(chan struct{})
 
-	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) error {
+	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) {
 		require.Equal(wantNodeID, gotNodeID)
 		require.NoError(err)
 		require.Equal(wantResponse, gotResponse)
 
 		close(done)
-		return nil
 	}
 
 	want := []byte("request")
@@ -209,13 +209,12 @@ func TestAppRequestCancelledContext(t *testing.T) {
 	wantNodeID := ids.GenerateTestNodeID()
 	done := make(chan struct{})
 
-	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) error {
+	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) {
 		require.Equal(wantNodeID, gotNodeID)
 		require.NoError(err)
 		require.Equal(wantResponse, gotResponse)
 
 		close(done)
-		return nil
 	}
 
 	cancelledCtx, cancel := context.WithCancel(ctx)
@@ -251,13 +250,12 @@ func TestAppRequestFailed(t *testing.T) {
 	wantNodeID := ids.GenerateTestNodeID()
 	done := make(chan struct{})
 
-	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) error {
+	callback := func(_ context.Context, gotNodeID ids.NodeID, gotResponse []byte, err error) {
 		require.Equal(wantNodeID, gotNodeID)
 		require.ErrorIs(err, errFoo)
 		require.Nil(gotResponse)
 
 		close(done)
-		return nil
 	}
 
 	require.NoError(client.AppRequest(ctx, set.Of(wantNodeID), []byte("request"), callback))
@@ -484,7 +482,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	require.NoError(err)
 	client := network.NewClient(0x1, PeerSampler{Peers: &Peers{}})
 
-	noOpCallback := func(context.Context, ids.NodeID, []byte, error) error { return nil }
+	noOpCallback := func(context.Context, ids.NodeID, []byte, error) {}
 	// create a request that never gets a response
 	network.router.requestID = 1
 	require.NoError(client.AppRequest(ctx, set.Of(ids.EmptyNodeID), []byte{}, noOpCallback))
@@ -1010,11 +1008,11 @@ func TestPeers_Has(t *testing.T) {
 	require.True(peers.Has(ids.EmptyNodeID))
 }
 
-// trackedPeer is one connected peer and a Client that scores it.
+// trackedPeer is one connected peer and a TrackingClient that scores it.
 type trackedPeer struct {
 	network *Network
 	tracker *PeerTracker
-	client  *Client
+	client  *TrackingClient
 	nodeID  ids.NodeID
 }
 
@@ -1042,7 +1040,7 @@ func newTrackedPeer(t *testing.T, sendErr error) trackedPeer {
 	return trackedPeer{
 		network: network,
 		tracker: tracker,
-		client:  network.NewTrackedClient(handlerID, tracker),
+		client:  network.NewTrackingClient(handlerID, tracker),
 		nodeID:  nodeID,
 	}
 }
@@ -1056,7 +1054,15 @@ func trackerState(pt *PeerTracker, nodeID ids.NodeID) (tracked, responsive, inHe
 	return pt.trackedPeers.Contains(nodeID), pt.responsivePeers.Contains(nodeID), inHeap
 }
 
-func TestTrackedClientScoresRequests(t *testing.T) {
+// peerBandwidth reads pt's measured bandwidth for nodeID under its own lock.
+func peerBandwidth(pt *PeerTracker, nodeID ids.NodeID) float64 {
+	pt.lock.RLock()
+	defer pt.lock.RUnlock()
+
+	return pt.peerBandwidth[nodeID].Read()
+}
+
+func TestTrackingClientScoresRequests(t *testing.T) {
 	tests := []struct {
 		name        string
 		sendErr     error
@@ -1090,10 +1096,12 @@ func TestTrackedClientScoresRequests(t *testing.T) {
 			wantInHeap:  true,
 		},
 		{
-			// Nothing left the node, so the peer is neither registered nor
-			// blamed for our own send failure.
-			name:    "send_failed",
-			sendErr: errSendFailed,
+			// Registration precedes the send, so a send that never left the
+			// node is balanced by a failure rather than left outstanding.
+			name:        "send_failed",
+			sendErr:     errSendFailed,
+			wantTracked: true,
+			wantInHeap:  true,
 		},
 		{
 			name:           "cancelled_before_send_response_still_accepted",
@@ -1148,48 +1156,74 @@ func TestTrackedClientScoresRequests(t *testing.T) {
 	}
 }
 
-// A request whose callback never arrives is scored when its context ends.
-func TestTrackedClientScoresAbandonedRequest(t *testing.T) {
-	peer := newTrackedPeer(t, nil)
+// Bandwidth measures delivery, so a caller that takes a long time to verify a
+// response must not make the peer that served it look slow.
+func TestTrackingClientScoresBandwidthBeforeVerification(t *testing.T) {
+	// Long enough that charging it would change the bandwidth by orders of
+	// magnitude, so the assertion below needs no timing tolerance.
+	const verification = 50 * time.Millisecond
 
-	invoked := false
-	requestCtx, cancel := context.WithCancel(t.Context())
+	ctx := t.Context()
+	peer := newTrackedPeer(t, nil)
+	response := []byte("response")
+
 	require.NoError(t, peer.client.AppRequest(
-		requestCtx,
+		ctx,
 		set.Of(peer.nodeID),
 		[]byte("request"),
 		func(context.Context, ids.NodeID, []byte, error) error {
-			invoked = true
+			time.Sleep(verification)
 			return nil
 		},
 	))
+	require.NoError(t, peer.network.AppResponse(ctx, peer.nodeID, 1, response))
 
-	_, _, inHeap := trackerState(peer.tracker, peer.nodeID)
-	require.False(t, inHeap)
-
-	// context.AfterFunc scores on its own goroutine.
-	cancel()
-	require.Eventually(t, func() bool {
-		_, _, inHeap := trackerState(peer.tracker, peer.nodeID)
-		return inHeap
-	}, 5*time.Second, time.Millisecond)
-
-	tracked, responsive, _ := trackerState(peer.tracker, peer.nodeID)
-	require.True(t, tracked)
-	require.False(t, responsive)
-	require.False(t, invoked)
-
-	// A late reply still reaches the caller, but the request is already scored
-	// and must not be scored a second time.
-	require.NoError(t, peer.network.AppResponse(t.Context(), peer.nodeID, 1, []byte("response")))
-	require.True(t, invoked)
-
-	_, responsive, _ = trackerState(peer.tracker, peer.nodeID)
-	require.False(t, responsive)
+	// Charging the verification caps bandwidth at len(response)/verification,
+	// so anything near that ceiling means the measurement started too early.
+	ceiling := float64(len(response)) / verification.Seconds()
+	require.Greater(t, peerBandwidth(peer.tracker, peer.nodeID), 10*ceiling)
 }
 
-// One AppRequest to several peers scores each peer on its own response.
-func TestTrackedClientScoresEachPeer(t *testing.T) {
+// A request whose callback never arrives is scored when its context ends.
+func TestTrackingClientScoresAbandonedRequest(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		peer := newTrackedPeer(t, nil)
+
+		invoked := false
+		requestCtx, cancel := context.WithCancel(t.Context())
+		require.NoError(t, peer.client.AppRequest(
+			requestCtx,
+			set.Of(peer.nodeID),
+			[]byte("request"),
+			func(context.Context, ids.NodeID, []byte, error) error {
+				invoked = true
+				return nil
+			},
+		))
+
+		_, _, inHeap := trackerState(peer.tracker, peer.nodeID)
+		require.False(t, inHeap)
+
+		cancel()
+		synctest.Wait() // the AfterFunc has scored the failure
+
+		tracked, responsive, inHeap := trackerState(peer.tracker, peer.nodeID)
+		require.True(t, tracked)
+		require.False(t, responsive)
+		require.True(t, inHeap)
+		require.False(t, invoked)
+
+		// A late reply still reaches the caller, but the request is already
+		// scored and must not be scored a second time.
+		require.NoError(t, peer.network.AppResponse(t.Context(), peer.nodeID, 1, []byte("response")))
+		require.True(t, invoked)
+
+		_, responsive, _ = trackerState(peer.tracker, peer.nodeID)
+		require.False(t, responsive)
+	})
+}
+
+func TestTrackingClientScoresEachPeer(t *testing.T) {
 	ctx := t.Context()
 
 	// Sends run inline within AppRequest, so this needs no synchronization.
@@ -1213,7 +1247,7 @@ func TestTrackedClientScoresEachPeer(t *testing.T) {
 	tracker.Connected(accepted, nil)
 	tracker.Connected(rejected, nil)
 
-	client := network.NewTrackedClient(handlerID, tracker)
+	client := network.NewTrackingClient(handlerID, tracker)
 	require.NoError(t, client.AppRequest(
 		ctx,
 		set.Of(accepted, rejected),

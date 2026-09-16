@@ -227,30 +227,29 @@ func (r *responseHandler) HandleResponse(
 	nodeID ids.NodeID,
 	responseBytes []byte,
 	err error,
-) error {
+) {
 	validator := r.nodeIDsToValidators[nodeID]
 	if err != nil {
 		r.results <- result{NodeID: nodeID, Validator: validator, Err: err}
-		return err
+		return
 	}
 
 	response := &sdk.SignatureResponse{}
 	if err := proto.Unmarshal(responseBytes, response); err != nil {
 		r.results <- result{NodeID: nodeID, Validator: validator, Err: err}
-		return err
+		return
 	}
 
 	signature, err := bls.SignatureFromBytes(response.Signature)
 	if err != nil {
 		r.results <- result{NodeID: nodeID, Validator: validator, Err: err}
-		return err
+		return
 	}
 
 	if !bls.Verify(validator.PublicKey, signature, r.message.UnsignedMessage.Bytes()) {
 		r.results <- result{NodeID: nodeID, Validator: validator, Err: errFailedVerification}
-		return errFailedVerification
+		return
 	}
 
 	r.results <- result{NodeID: nodeID, Validator: validator, Signature: signature}
-	return nil
 }

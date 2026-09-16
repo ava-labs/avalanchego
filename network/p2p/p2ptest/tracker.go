@@ -11,7 +11,27 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 )
+
+// NewTrackerWithRegistry returns an empty [p2p.PeerTracker] publishing under
+// namespace to registerer. Read its gauges back with [TrackerGauge].
+func NewTrackerWithRegistry(t *testing.T, namespace string, registerer prometheus.Registerer) *p2p.PeerTracker {
+	t.Helper()
+
+	tracker, err := p2p.NewPeerTracker(loggingtest.New(t, logging.Debug), namespace, registerer, nil, nil)
+	require.NoError(t, err, "p2p.NewPeerTracker()")
+	return tracker
+}
+
+// NewTracker returns an empty [p2p.PeerTracker] whose metrics nothing reads,
+// for a test that needs a [p2p.TrackingClient] but does not assert on scoring.
+func NewTracker(t *testing.T) *p2p.PeerTracker {
+	t.Helper()
+
+	return NewTrackerWithRegistry(t, "", prometheus.NewRegistry())
+}
 
 // TrackerGauge returns the value a [p2p.PeerTracker] published for one of its
 // gauges, such as "num_responsive_peers", under the namespace it was built with.
@@ -39,9 +59,8 @@ func TrackerGauge(t *testing.T, gatherer prometheus.Gatherer, namespace, name st
 	return 0
 }
 
-// SeedResponsive marks nodeID responsive so that a later de-score shows up as a
-// transition rather than a no-op. nodeID must already be connected, since
-// [p2p.PeerTracker.RegisterRequest] ignores peers the tracker does not know.
+// SeedResponsive marks nodeID responsive so a later de-score is a transition
+// rather than a no-op. nodeID must already be connected.
 func SeedResponsive(t *testing.T, tracker *p2p.PeerTracker, nodeID ids.NodeID) {
 	t.Helper()
 

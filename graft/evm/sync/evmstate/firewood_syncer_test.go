@@ -163,7 +163,7 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 	require.NoError(t, err, "NewCodeSyncer()")
 
 	// Create the firewood syncer.
-	proofClient := p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, proofHandler)
+	proofClient := p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, proofHandler, p2ptest.NewTracker(t))
 	firewoodSyncer, err := NewFirewoodSyncer(
 		syncer.Config{},
 		dbFromState(t, clientState),

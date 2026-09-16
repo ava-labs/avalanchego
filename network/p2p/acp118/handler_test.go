@@ -170,14 +170,14 @@ func TestHandler(t *testing.T) {
 				expectedErr error
 				handled     = make(chan struct{})
 			)
-			onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, appErr error) error {
+			onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, appErr error) {
 				defer func() {
 					handled <- struct{}{}
 				}()
 
 				require.ErrorIs(appErr, expectedErr)
 				if appErr != nil {
-					return nil
+					return
 				}
 
 				response := &sdk.SignatureResponse{}
@@ -193,8 +193,6 @@ func TestHandler(t *testing.T) {
 				if ok {
 					require.Equal(sig, response.Signature)
 				}
-
-				return nil
 			}
 
 			for _, expectedErr = range tt.expectedErrs {
