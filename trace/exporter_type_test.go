@@ -9,6 +9,87 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestExporterTypeFromEnv(t *testing.T) {
+	tests := []struct {
+		name          string
+		env           map[string]string
+		expected      ExporterType
+		expectedError error
+	}{
+		{
+			name:     "unset_disables_tracing",
+			expected: Disabled,
+		},
+		{
+			name:     "none",
+			env:      map[string]string{"OTEL_TRACES_EXPORTER": "none"},
+			expected: Disabled,
+		},
+		{
+			name:     "case_insensitive",
+			env:      map[string]string{"OTEL_TRACES_EXPORTER": "NONE"},
+			expected: Disabled,
+		},
+		{
+			name: "otlp_defaults_to_http_protobuf",
+			env:  map[string]string{"OTEL_TRACES_EXPORTER": "otlp"},
+			// http/protobuf is the protocol the OTel spec recommends as the
+			// default.
+			expected: HTTP,
+		},
+		{
+			name: "otlp_grpc",
+			env: map[string]string{
+				"OTEL_TRACES_EXPORTER":        "otlp",
+				"OTEL_EXPORTER_OTLP_PROTOCOL": "grpc",
+			},
+			expected: GRPC,
+		},
+		{
+			name: "otlp_http_protobuf",
+			env: map[string]string{
+				"OTEL_TRACES_EXPORTER":        "otlp",
+				"OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+			},
+			expected: HTTP,
+		},
+		{
+			name: "traces_protocol_overrides_general_protocol",
+			env: map[string]string{
+				"OTEL_TRACES_EXPORTER":               "otlp",
+				"OTEL_EXPORTER_OTLP_PROTOCOL":        "http/protobuf",
+				"OTEL_EXPORTER_OTLP_TRACES_PROTOCOL": "grpc",
+			},
+			expected: GRPC,
+		},
+		{
+			name: "unsupported_protocol",
+			env: map[string]string{
+				"OTEL_TRACES_EXPORTER":        "otlp",
+				"OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+			},
+			expectedError: errUnsupportedOTLPProtocol,
+		},
+		{
+			name:          "unsupported_exporter",
+			env:           map[string]string{"OTEL_TRACES_EXPORTER": "zipkin"},
+			expectedError: errUnsupportedTracesExporter,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+
+			actual, err := ExporterTypeFromEnv()
+			require.ErrorIs(t, err, tt.expectedError, "ExporterTypeFromEnv()")
+			require.Equal(t, tt.expected, actual, "ExporterTypeFromEnv()")
+		})
+	}
+}
+
 func TestMarshal(t *testing.T) {
 	tests := []struct {
 		name          string
