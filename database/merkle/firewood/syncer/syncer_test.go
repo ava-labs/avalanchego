@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/merkle/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestMain(m *testing.M) {
@@ -352,7 +353,7 @@ func logDiff(t *testing.T, wantDB, gotDB *ffi.Database) {
 func newTestGetProofHandler(t *testing.T, db *ffi.Database) *sync.ProofHandler[*RangeProof, struct{}] {
 	t.Helper()
 
-	handler, err := NewGetProofHandler(db, prometheus.NewRegistry())
+	handler, err := NewGetProofHandler(logging.NoLog{}, db, prometheus.NewRegistry())
 	require.NoError(t, err, "NewGetProofHandler()")
 	return handler
 }

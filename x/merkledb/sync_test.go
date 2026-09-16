@@ -511,7 +511,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 func newTestProofHandler(t *testing.T, db MerkleDB) *sync.ProofHandler[*RangeProof, *ChangeProof] {
 	t.Helper()
 
-	handler, err := sync.NewProofHandler(db, rangeProofMarshaler, changeProofMarshaler, prometheus.NewRegistry())
+	handler, err := sync.NewProofHandler(logging.NoLog{}, db, rangeProofMarshaler, changeProofMarshaler, prometheus.NewRegistry())
 	require.NoError(t, err, "sync.NewProofHandler()")
 	return handler
 }

@@ -67,6 +67,13 @@ func (h *Handler) AcceptSummary(ctx context.Context, s *summary) (block.StateSyn
 		defer close(h.done) // result barrier: h.err is now readable
 
 		err := h.sync(ctx, evmSyncer, s)
+		// Logged at info even on failure: tests drive failure paths through
+		// loggers that fail the test on error-level output.
+		h.snowCtx.Log.Info("state sync finished",
+			zap.Uint64("acceptedHeight", s.summary.AcceptedHeight),
+			zap.Stringer("acceptedHash", s.summary.AcceptedHash),
+			zap.Error(err),
+		)
 		// Marked after the sync's final write and before done closes, so that
 		// an observer that saw the sync finish also sees its outcome.
 		h.Handler.MarkSyncFinished(err)

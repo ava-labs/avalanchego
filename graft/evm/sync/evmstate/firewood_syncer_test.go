@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
@@ -151,7 +152,7 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 
 	// Create the proof handler.
 	serverDB := dbFromState(t, serverState)
-	proofHandler, err := syncer.NewGetProofHandler(serverDB, prometheus.NewRegistry())
+	proofHandler, err := syncer.NewGetProofHandler(logging.NoLog{}, serverDB, prometheus.NewRegistry())
 	require.NoError(t, err, "syncer.NewGetProofHandler()")
 
 	// Create the producer code queue.

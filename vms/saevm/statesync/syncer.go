@@ -133,6 +133,13 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		return fmt.Errorf("%w: %s at height %d", errSynchronousBlock, summary.AcceptedHash, summary.AcceptedHeight)
 	}
 
+	s.snowCtx.Log.Info("syncing EVM state",
+		zap.String("scheme", s.cfg.DBConfig.Scheme),
+		zap.Stringer("root", hdr.Root),
+		zap.Stringer("acceptedHash", summary.AcceptedHash),
+		zap.Uint64("acceptedHeight", summary.AcceptedHeight),
+	)
+
 	codeSyncer, err := code.NewSyncer(
 		s.snowCtx.Log,
 		code.NewClient(s.network.Network, s.network.PeerTracker, s.metrics.code),

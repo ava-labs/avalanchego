@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database/merkle/sync/protoutils"
@@ -19,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/units"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -50,7 +52,11 @@ var (
 	errEmptyProof           = errors.New("proof for empty trie requested")
 )
 
+// NewProofHandler returns a [p2p.Handler] serving range and change proofs
+// from db. Requests it cannot serve are logged on log at info level, so a
+// peer that keeps failing to sync from this node is diagnosable here.
 func NewProofHandler[R any, C any](
+	log logging.Logger,
 	db DB[R, C],
 	rangeProofMarshaler Marshaler[R],
 	changeProofMarshaler Marshaler[C],
@@ -61,6 +67,7 @@ func NewProofHandler[R any, C any](
 		return nil, err
 	}
 	return &ProofHandler[R, C]{
+		log:                  log,
 		db:                   db,
 		rangeProofMarshaler:  rangeProofMarshaler,
 		changeProofMarshaler: changeProofMarshaler,
@@ -69,6 +76,7 @@ func NewProofHandler[R any, C any](
 }
 
 type ProofHandler[R any, C any] struct {
+	log                  logging.Logger
 	db                   DB[R, C]
 	rangeProofMarshaler  Marshaler[R]
 	changeProofMarshaler Marshaler[C]
@@ -77,9 +85,13 @@ type ProofHandler[R any, C any] struct {
 
 func (*ProofHandler[_, _]) AppGossip(context.Context, ids.NodeID, []byte) {}
 
-func (h *ProofHandler[R, C]) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+func (h *ProofHandler[R, C]) AppRequest(ctx context.Context, nodeID ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	req := &pb.ProofRequest{}
 	if err := proto.Unmarshal(requestBytes, req); err != nil {
+		h.log.Debug("failed to unmarshal proof request",
+			zap.Stringer("nodeID", nodeID),
+			zap.Error(err),
+		)
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
 			Message: fmt.Sprintf("failed to unmarshal request: %s", err),
@@ -99,10 +111,22 @@ func (h *ProofHandler[R, C]) AppRequest(ctx context.Context, _ ids.NodeID, _ tim
 		err = fmt.Errorf("unknown request type: %T", r)
 	}
 	if err != nil {
+		h.log.Info("failed to handle proof request",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("request", req),
+			zap.Error(err),
+		)
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
 			Message: fmt.Sprintf("failed to handle request: %s", err),
 		}
+	}
+	if resp == nil {
+		// Only insufficient history drops a request without an error.
+		h.log.Info("dropping proof request; insufficient history",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("request", req),
+		)
 	}
 	return resp, nil
 }

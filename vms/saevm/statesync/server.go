@@ -35,7 +35,7 @@ func (h *Handler) RegisterServer(tdb *triedb.Database, snap *snapshot.Tree) erro
 
 	switch backend := tdb.Backend().(type) {
 	case *firewood.TrieDB:
-		handler, err := fwsyncer.NewGetProofHandler(backend.Firewood, h.reg)
+		handler, err := fwsyncer.NewGetProofHandler(log, backend.Firewood, h.reg)
 		if err != nil {
 			return fmt.Errorf("creating firewood proof handler: %w", err)
 		}

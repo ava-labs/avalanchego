@@ -139,6 +139,13 @@ type Syncer[R any, C any] struct {
 	syncing   bool
 	closeOnce sync.Once
 
+	// Request accounting for [Syncer.logProgress], so that a sync which
+	// never progresses is diagnosable from info-level logs alone.
+	requestsMade      atomic.Uint64
+	requestsSucceeded atomic.Uint64
+	requestsFailed    atomic.Uint64
+	lastFailure       atomic.Pointer[requestFailure]
+
 	stateSyncNodeIdx uint32
 	metrics          *syncerMetrics
 }
@@ -311,17 +318,60 @@ func (s *Syncer[_, _]) logProgress(ctx context.Context) {
 			return
 		case <-ticker.C:
 			root := s.getTargetRoot()
-			percentage := s.getProgress(root)
-			s.config.Log.Info("syncing progress", zap.String("percent complete", fmt.Sprintf("%.2f", percentage)), zap.Stringer("target root", root))
+			percentage, unprocessed, inFlight := s.getProgress(root)
+			fields := []zap.Field{
+				zap.String("percent complete", fmt.Sprintf("%.2f", percentage)),
+				zap.Stringer("target root", root),
+				zap.Int("unprocessedWorkItems", unprocessed),
+				zap.Int("inFlightWorkItems", inFlight),
+				zap.Uint64("requestsMade", s.requestsMade.Load()),
+				zap.Uint64("requestsSucceeded", s.requestsSucceeded.Load()),
+				zap.Uint64("requestsFailed", s.requestsFailed.Load()),
+			}
+			if failure := s.lastFailure.Load(); failure != nil {
+				fields = append(fields,
+					zap.Stringer("lastFailureNodeID", failure.nodeID),
+					zap.Duration("lastFailureAge", time.Since(failure.at)),
+					zap.NamedError("lastFailure", failure.err),
+				)
+			}
+			s.config.Log.Info("syncing progress", fields...)
 		}
 	}
 }
 
-func (s *Syncer[_, _]) getProgress(root ids.ID) float64 {
+// getProgress returns the percentage of the keyspace synced at root, the
+// number of work items waiting to be requested, and the number in flight.
+func (s *Syncer[_, _]) getProgress(root ids.ID) (float64, int, int) {
 	s.workLock.Lock()
 	defer s.workLock.Unlock()
 
-	return s.processedWork.KeyspacePercent(root)
+	return s.processedWork.KeyspacePercent(root), s.unprocessedWork.Len(), s.processingWorkItems
+}
+
+// requestFailure records a dropped response for [Syncer.logProgress].
+type requestFailure struct {
+	nodeID ids.NodeID
+	err    error
+	at     time.Time
+}
+
+// recordFailure records that nodeID's response to request was dropped with
+// err. The first failure is logged at info so that a sync which never
+// succeeds is diagnosable without debug logging; every failure is logged at
+// debug, and [Syncer.logProgress] summarises them.
+func (s *Syncer[_, _]) recordFailure(nodeID ids.NodeID, err error, request *pb.ProofRequest) {
+	s.lastFailure.Store(&requestFailure{nodeID: nodeID, err: err, at: time.Now()})
+	fields := []zap.Field{
+		zap.Stringer("nodeID", nodeID),
+		zap.Error(err),
+		zap.Stringer("request", request),
+	}
+	if s.requestsFailed.Add(1) == 1 {
+		s.config.Log.Info("dropping first failed response", fields...)
+		return
+	}
+	s.config.Log.Debug("dropping response", fields...)
 }
 
 // close is called when there is a fatal error or sync is complete.
@@ -423,15 +473,15 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) bool {
+	onResponse := func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, appErr error) bool {
 		defer s.finishWorkItem()
 
 		if err := s.handleChangeProofResponse(ctx, targetRootID, work, changeReq, responseBytes, appErr); err != nil {
-			// TODO log responses
-			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
+			s.recordFailure(nodeID, err, request)
 			s.retryWork(work)
 			return false
 		}
+		s.requestsSucceeded.Add(1)
 		return true
 	}
 
@@ -479,15 +529,15 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) bool {
+	onResponse := func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, appErr error) bool {
 		defer s.finishWorkItem()
 
 		if err := s.handleRangeProofResponse(ctx, targetRootID, work, rangeReq, responseBytes, appErr); err != nil {
-			// TODO log responses
-			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
+			s.recordFailure(nodeID, err, request)
 			s.retryWork(work)
 			return false
 		}
+		s.requestsSucceeded.Add(1)
 		return true
 	}
 
@@ -497,6 +547,7 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
+	s.requestsMade.Add(1)
 	s.metrics.requestMade()
 }
 

@@ -680,7 +680,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		if err := vm.ctx.Metrics.Register(syncServerMetricsPrefix, syncServerMetrics); err != nil {
 			return fmt.Errorf("registering sync server metrics: %w", err)
 		}
-		proofHandler, err := syncer.NewGetProofHandler(tdb.Firewood, syncServerMetrics)
+		proofHandler, err := syncer.NewGetProofHandler(vm.ctx.Log, tdb.Firewood, syncServerMetrics)
 		if err != nil {
 			return fmt.Errorf("creating firewood proof handler: %w", err)
 		}
