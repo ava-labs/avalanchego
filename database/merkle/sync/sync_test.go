@@ -16,12 +16,12 @@ import (
 	"go.uber.org/goleak"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ava-labs/avalanchego/database/merkle/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -188,7 +188,7 @@ func Test_Sync_RangeProofRequest(t *testing.T) {
 					TargetRoot:            targetRoot,
 					RangeProofMarshaler:   marshaler{},
 					ChangeProofMarshaler:  marshaler{},
-					ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, handler),
+					ProofClient:           synctest.NewProofClient(t, ctx, handler),
 					Log:                   logging.NoLog{},
 					SimultaneousWorkLimit: 1,
 				},
@@ -268,7 +268,7 @@ func Test_Sync_ChangeProofRequest(t *testing.T) {
 					TargetRoot:            originalTarget,
 					RangeProofMarshaler:   marshaler{},
 					ChangeProofMarshaler:  marshaler{},
-					ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, handler),
+					ProofClient:           synctest.NewProofClient(t, ctx, handler),
 					Log:                   logging.NoLog{},
 					SimultaneousWorkLimit: 1,
 				},
@@ -307,7 +307,7 @@ func Test_Sync_BusyContextCancellation(t *testing.T) {
 			TargetRoot:            ids.GenerateTestID(), // must be different from clientDB's root and [ids.Empty]
 			RangeProofMarshaler:   marshaler{},
 			ChangeProofMarshaler:  marshaler{},
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, blockingHandler),
+			ProofClient:           synctest.NewProofClient(t, ctx, blockingHandler),
 			Log:                   logging.NoLog{},
 			SimultaneousWorkLimit: 1, // ensures synchronous event handling
 		},
@@ -429,8 +429,7 @@ func TestSyncerScoresProofSource(t *testing.T) {
 			}
 
 			reg := prometheus.NewRegistry()
-			tracker, err := p2p.NewPeerTracker(loggingtest.New(t, logging.Debug), "sync", reg, nil, nil)
-			require.NoError(t, err)
+			tracker := p2ptest.NewTrackerWithRegistry(t, "sync", reg)
 
 			syncer, err := NewSyncer(
 				&db{id: ids.Empty},
@@ -438,7 +437,7 @@ func TestSyncerScoresProofSource(t *testing.T) {
 					TargetRoot:           targetRoot,
 					RangeProofMarshaler:  marshaler{},
 					ChangeProofMarshaler: marshaler{},
-					ProofClient:          p2ptest.NewSelfTrackedClient(t, ctx, nodeID, handler, tracker),
+					ProofClient:          p2ptest.NewSelfTrackingClient(t, ctx, nodeID, handler, tracker),
 					// The unusable-proof case ends the sync by cancellation,
 					// which the syncer logs at Error.
 					Log:                   logging.NoLog{},

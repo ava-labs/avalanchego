@@ -109,11 +109,10 @@ func TestClient_AppRequest(t *testing.T) {
 			require.NoError(tt.appRequestF(
 				ctx,
 				client,
-				func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) error {
+				func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
 					defer close(appRequestChan)
 					require.ErrorIs(err, tt.appErr)
 					require.Equal(tt.appResponse, responseBytes)
-					return nil
 				},
 			))
 			<-appRequestChan

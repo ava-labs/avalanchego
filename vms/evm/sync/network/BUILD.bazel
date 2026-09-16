@@ -23,8 +23,6 @@ go_test(
         "//network/p2p/p2ptest",
         "//proto/pb/sync",
         "//snow/engine/common",
-        "//utils/logging",
-        "//utils/logging/loggingtest",
         "@com_github_google_go_cmp//cmp",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//assert",

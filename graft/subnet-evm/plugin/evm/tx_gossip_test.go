@@ -106,14 +106,13 @@ func TestEthTxGossip(t *testing.T) {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) error {
+	onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
 		require.NoError(err)
 
 		response, err := gossip.ParseAppResponse(responseBytes)
 		require.NoError(err)
 		require.Empty(response)
 		wg.Done()
-		return nil
 	}
 	require.NoError(client.AppRequest(ctx, set.Of(vm.ctx.NodeID), requestBytes, onResponse))
 	require.NoError(vm.AppRequest(ctx, requestingNodeID, 1, time.Time{}, <-peerSender.SentAppRequest))
@@ -135,7 +134,7 @@ func TestEthTxGossip(t *testing.T) {
 
 	// Ask the VM for new transactions. We should get the newly issued tx.
 	wg.Add(1)
-	onResponse = func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) error {
+	onResponse = func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
 		require.NoError(err)
 
 		response, err := gossip.ParseAppResponse(responseBytes)
@@ -149,7 +148,6 @@ func TestEthTxGossip(t *testing.T) {
 		)
 
 		wg.Done()
-		return nil
 	}
 	require.NoError(client.AppRequest(ctx, set.Of(vm.ctx.NodeID), requestBytes, onResponse))
 	require.NoError(vm.AppRequest(ctx, requestingNodeID, 3, time.Time{}, <-peerSender.SentAppRequest))

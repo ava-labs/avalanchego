@@ -24,7 +24,7 @@ var (
 // Dispatcher is a typed synchronous client bound to one handler ID.
 // Use one instance per RPC type.
 type Dispatcher[Req, Resp proto.Message] struct {
-	client *p2p.Client
+	client *p2p.TrackingClient
 }
 
 // NewDispatcher returns a [Dispatcher] bound to handlerID on n, selecting and
@@ -35,7 +35,7 @@ func NewDispatcher[Req, Resp proto.Message](
 	peers *p2p.PeerTracker,
 ) *Dispatcher[Req, Resp] {
 	return &Dispatcher[Req, Resp]{
-		client: n.NewTrackedClient(handlerID, peers),
+		client: n.NewTrackingClient(handlerID, peers),
 	}
 }
 
@@ -92,7 +92,6 @@ func awaitReply(ctx context.Context, arrived <-chan struct{}, result <-chan erro
 	}
 }
 
-// decode turns a reply into resp and applies the caller's verdict.
 func decode[Resp proto.Message](
 	nodeID ids.NodeID,
 	responseBytes []byte,

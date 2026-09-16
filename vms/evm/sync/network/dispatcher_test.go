@@ -20,47 +20,55 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
+// De-score rows seed responsive first, so the drop to 0 is a real transition.
 func TestDispatcher_Send(t *testing.T) {
-	nodeID := ids.GenerateTestNodeID()
-
 	want := &syncpb.GetLeafResponse{Keys: [][]byte{{1, 2, 3}}}
 	wantBytes, err := proto.Marshal(want)
 	require.NoError(t, err, "proto.Marshal(want)")
 
+	okBytes, err := proto.Marshal(&syncpb.GetLeafResponse{})
+	require.NoError(t, err, "proto.Marshal()")
+
 	tests := []struct {
 		name       string
-		disconnect bool
 		handler    p2p.Handler
+		seed       bool
+		disconnect bool
 		cancel     bool
+		rejectResp bool
 		want       *syncpb.GetLeafResponse
 		wantErr    error
+		wantPeers  float64
 	}{
 		{
-			name:    "round_trip",
-			handler: echoHandler(wantBytes),
-			want:    want,
+			name:      "round_trip",
+			handler:   echoHandler(wantBytes),
+			want:      want,
+			wantPeers: 1,
 		},
 		{
 			name:       "no_peer_to_send_to",
-			disconnect: true,
 			handler:    p2p.NoOpHandler{},
+			disconnect: true,
 			wantErr:    p2p.ErrNoPeers,
 		},
 		{
-			name:    "handler_returns_app_error",
-			handler: errorHandler(),
-			wantErr: errHandlerFailed,
+			name:      "handler_returns_app_error",
+			handler:   errorHandler(),
+			seed:      true,
+			wantErr:   errHandlerFailed,
+			wantPeers: 0,
 		},
 		{
-			name:    "response_bytes_are_not_valid_proto",
-			handler: echoHandler([]byte{0xff, 0xff, 0xff}),
-			wantErr: errUnmarshalResponse,
+			name:      "response_bytes_are_not_valid_proto",
+			handler:   echoHandler([]byte{0xff, 0xff, 0xff}),
+			seed:      true,
+			wantErr:   errUnmarshalResponse,
+			wantPeers: 0,
 		},
 		{
 			// Pre-send cancel returns at the ctx.Err() guard, before the handler.
@@ -69,32 +77,49 @@ func TestDispatcher_Send(t *testing.T) {
 			cancel:  true,
 			wantErr: context.Canceled,
 		},
+		{
+			name:       "response_rejected_by_caller",
+			handler:    echoHandler(okBytes),
+			seed:       true,
+			rejectResp: true,
+			wantErr:    errRejected,
+			wantPeers:  0,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			_, tracker := newTestTracker(t)
+			nodeID := ids.GenerateTestNodeID()
+			reg, tracker := newTestTracker(t)
 			c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
 				t, ctx, nodeID, tt.handler, tracker,
 			)
+			if tt.seed {
+				p2ptest.SeedResponsive(t, tracker, nodeID)
+			}
 			if tt.disconnect {
 				tracker.Disconnected(nodeID)
 			}
-
 			if tt.cancel {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
 				cancel()
 			}
 
+			validate := accept
+			if tt.rejectResp {
+				validate = reject
+			}
+
 			got := &syncpb.GetLeafResponse{}
-			err := c.Send(ctx, &syncpb.GetLeafRequest{}, got, accept)
+			err := c.Send(ctx, &syncpb.GetLeafRequest{}, got, validate)
 			require.ErrorIsf(t, err, tt.wantErr, "%T.Send()", c)
+			assert.Equal(t, tt.wantPeers, p2ptest.TrackerGauge(t, reg, "test_peer_tracker", "num_responsive_peers"), "responsivePeers()")
+
 			if tt.wantErr != nil {
 				return
 			}
-
 			assert.Empty(t, cmp.Diff(tt.want, got, protocmp.Transform()), "cmp.Diff(want, got)")
 		})
 	}
@@ -128,66 +153,6 @@ func TestDispatcher_CancelInFlight(t *testing.T) {
 	assert.Equal(t, 0.0, p2ptest.TrackerGauge(t, reg, "test_peer_tracker", "num_responsive_peers"), "responsivePeers()")
 }
 
-// Success scores the peer responsive, failure de-scores it. De-score rows
-// seed responsive first so the drop to 0 is a real transition.
-func TestDispatcher_PeerScoring(t *testing.T) {
-	okBytes, err := proto.Marshal(&syncpb.GetLeafResponse{})
-	require.NoError(t, err, "proto.Marshal()")
-
-	tests := []struct {
-		name       string
-		seed       bool
-		handler    p2p.Handler
-		rejectResp bool
-		wantErr    error
-		wantPeers  float64
-	}{
-		{
-			name:      "accepted_response_scores_responsive",
-			handler:   echoHandler(okBytes),
-			wantPeers: 1,
-		},
-		{
-			name:       "rejected_response_de_scores",
-			seed:       true,
-			handler:    echoHandler(okBytes),
-			rejectResp: true,
-			wantErr:    errRejected,
-			wantPeers:  0,
-		},
-		{
-			name:      "handler_error_de_scores",
-			seed:      true,
-			handler:   errorHandler(),
-			wantErr:   errHandlerFailed,
-			wantPeers: 0,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx := t.Context()
-			nodeID := ids.GenerateTestNodeID()
-			reg, tracker := newTestTracker(t)
-			c := newTestDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
-				t, ctx, nodeID, tt.handler, tracker,
-			)
-			if tt.seed {
-				p2ptest.SeedResponsive(t, tracker, nodeID)
-			}
-
-			validate := accept
-			if tt.rejectResp {
-				validate = reject
-			}
-			err := c.Send(ctx, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{}, validate)
-			require.ErrorIsf(t, err, tt.wantErr, "%T.Send()", c)
-
-			assert.Equal(t, tt.wantPeers, p2ptest.TrackerGauge(t, reg, "test_peer_tracker", "num_responsive_peers"), "responsivePeers()")
-		})
-	}
-}
-
 var errRejected = errors.New("rejected by caller")
 
 func accept(ids.NodeID, *syncpb.GetLeafResponse) error { return nil }
@@ -210,13 +175,11 @@ func errorHandler() p2p.Handler {
 	}
 }
 
-// newTestTracker returns an empty tracker. The client mesh connects its peer.
+// newTestTracker returns an empty tracker and the registry it publishes to.
 func newTestTracker(t *testing.T) (*prometheus.Registry, *p2p.PeerTracker) {
 	t.Helper()
 	reg := prometheus.NewRegistry()
-	tracker, err := p2p.NewPeerTracker(loggingtest.New(t, logging.Debug), "test_peer_tracker", reg, nil, nil)
-	require.NoError(t, err, "p2p.NewPeerTracker()")
-	return reg, tracker
+	return reg, p2ptest.NewTrackerWithRegistry(t, "test_peer_tracker", reg)
 }
 
 func newTestDispatcher[Req, Resp proto.Message](
@@ -228,6 +191,6 @@ func newTestDispatcher[Req, Resp proto.Message](
 ) *Dispatcher[Req, Resp] {
 	t.Helper()
 	return &Dispatcher[Req, Resp]{
-		client: p2ptest.NewSelfTrackedClient(t, ctx, nodeID, h, peers),
+		client: p2ptest.NewSelfTrackingClient(t, ctx, nodeID, h, peers),
 	}
 }

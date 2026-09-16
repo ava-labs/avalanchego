@@ -24,16 +24,16 @@ func NewSelfClient(t *testing.T, ctx context.Context, nodeID ids.NodeID, handler
 	return NewClient(t, ctx, nodeID, handler, nodeID, handler)
 }
 
-// NewSelfTrackedClient returns a Client that routes to nodeID's own handler and
-// scores every request it issues against tracker.
-func NewSelfTrackedClient(
+// NewSelfTrackingClient returns a TrackingClient that routes to nodeID's own
+// handler and scores every request it issues against tracker.
+func NewSelfTrackingClient(
 	t *testing.T,
 	ctx context.Context,
 	nodeID ids.NodeID,
 	handler p2p.Handler,
 	tracker *p2p.PeerTracker,
-) *p2p.Client {
-	return newClientWithPeers(
+) *p2p.TrackingClient {
+	network := newMesh(
 		t,
 		ctx,
 		nodeID,
@@ -41,6 +41,7 @@ func NewSelfTrackedClient(
 		map[ids.NodeID]p2p.Handler{nodeID: handler},
 		tracker,
 	)
+	return network.NewTrackingClient(0, tracker)
 }
 
 // NewClient generates a client-server pair and returns the client used to
@@ -72,19 +73,26 @@ func NewClientWithPeers(
 	clientHandler p2p.Handler,
 	peers map[ids.NodeID]p2p.Handler,
 ) *p2p.Client {
-	return newClientWithPeers(t, ctx, clientNodeID, clientHandler, peers, nil)
+	network := newMesh(t, ctx, clientNodeID, clientHandler, peers)
+
+	peerSampler := p2p.PeerSampler{Peers: &p2p.Peers{}}
+	for nodeID := range peers {
+		peerSampler.Peers.Connected(nodeID, nil)
+	}
+
+	return network.NewClient(0, peerSampler)
 }
 
-// newClientWithPeers builds the client-server mesh. A non-nil tracker is
-// registered for the client's connection events and scores its requests.
-func newClientWithPeers(
+// newMesh wires the client-server mesh and returns the client's network.
+// clientConnHandlers receive connection events on the client's network only.
+func newMesh(
 	t *testing.T,
 	ctx context.Context,
 	clientNodeID ids.NodeID,
 	clientHandler p2p.Handler,
 	peers map[ids.NodeID]p2p.Handler,
-	tracker *p2p.PeerTracker,
-) *p2p.Client {
+	clientConnHandlers ...p2p.ConnectionHandler,
+) *p2p.Network {
 	peers[clientNodeID] = clientHandler
 
 	peerSenders := make(map[ids.NodeID]*enginetest.Sender)
@@ -92,8 +100,8 @@ func newClientWithPeers(
 	for nodeID := range peers {
 		peerSenders[nodeID] = &enginetest.Sender{}
 		var handlers []p2p.ConnectionHandler
-		if tracker != nil && nodeID == clientNodeID {
-			handlers = append(handlers, tracker)
+		if nodeID == clientNodeID {
+			handlers = clientConnHandlers
 		}
 		peerNetwork, err := p2p.NewNetwork(
 			logging.NoLog{},
@@ -166,14 +174,5 @@ func newClientWithPeers(
 		require.NoError(t, peerNetworks[nodeID].AddHandler(0, peers[nodeID]))
 	}
 
-	if tracker != nil {
-		return peerNetworks[clientNodeID].NewTrackedClient(0, tracker)
-	}
-
-	peerSampler := p2p.PeerSampler{Peers: &p2p.Peers{}}
-	for nodeID := range peers {
-		peerSampler.Peers.Connected(nodeID, nil)
-	}
-
-	return peerNetworks[clientNodeID].NewClient(0, peerSampler)
+	return peerNetworks[clientNodeID]
 }
