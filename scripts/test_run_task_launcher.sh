@@ -9,7 +9,8 @@ set -euo pipefail
 #
 # Covered cases:
 # - a real `task` on PATH wins
-# - otherwise we fall back to `go`
+# - otherwise local runs fall back to `go`
+# - CI fails instead of building Task with `go tool`
 # - non-PATH backends preserve the caller's working directory
 # - the go backend does not leak GOWORK=off into task
 # - missing tools fail clearly
@@ -171,6 +172,22 @@ assert_file "${workdir}/go-args" \
 # run_tool.sh sets GOWORK=off for the build. Leaking it into task would disable
 # the workspace for every command task runs.
 assert_file "${workdir}/gowork" "<unset>"
+
+# CI must use the pinned release from setup-task or a Task binary from the Nix
+# development shell. It must not build Task through `go tool`.
+reset_observations
+if CI=true PATH="${stub_dir}:${util_dir}" "${bash_bin}" "${launcher}" hello world >"${workdir}/stdout" 2>"${workdir}/stderr"; then
+  echo "expected CI task fallback to fail" >&2
+  exit 1
+fi
+if ! grep -q "Task is not available in CI" "${workdir}/stderr"; then
+  echo "CI task fallback did not print expected error" >&2
+  exit 1
+fi
+if [[ -e "${workdir}/go-args" ]]; then
+  echo "CI task fallback invoked go" >&2
+  exit 1
+fi
 
 # If go is unavailable, the launcher should fail clearly.
 rm "${stub_dir}/go"

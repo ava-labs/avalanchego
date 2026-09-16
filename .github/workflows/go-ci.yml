@@ -39,26 +39,26 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v5
-      - name: Normalize testdata modification times
-        shell: bash
-        run: ./scripts/run_task.sh normalize-testdata-mtimes
       - id: setup-go
         uses: ./.github/actions/setup-go-for-project
         with:
           cache-validation: ${{ inputs.cache_validation }}
+      - name: Normalize testdata modification times
+        shell: bash
+        run: ./scripts/run_task.sh normalize-testdata-mtimes
       - id: unit-cache
         name: Restore Go unit-test cache
         uses: actions/cache/restore@v5
         with:
           path: ${{ steps.setup-go.outputs.go-build-cache-path }}
-          key: ${{ inputs.cache_validation && format('go-unit-validation-{0}-{1}-{2}', runner.os, runner.arch, hashFiles('**/testdata/**')) || format('go-unit-{0}-{1}-{2}-{3}', runner.os, runner.arch, hashFiles('**/testdata/**'), hashFiles('**/*.go', 'go.work.sum', '**/go.mod', '**/go.sum')) }}
+          key: ${{ inputs.cache_validation && format('go-unit-validation-v2-{0}-{1}-{2}', runner.os, runner.arch, hashFiles('**/testdata/**')) || format('go-unit-v2-{0}-{1}-{2}-{3}', runner.os, runner.arch, hashFiles('**/testdata/**'), hashFiles('**/*.go', 'go.work.sum', '**/go.mod', '**/go.sum')) }}
           restore-keys: |
-            ${{ inputs.cache_validation && format('go-unit-validation-{0}-{1}-', runner.os, runner.arch) || format('go-unit-{0}-{1}-{2}-', runner.os, runner.arch, hashFiles('**/testdata/**')) }}
-            ${{ !inputs.cache_validation && format('go-unit-{0}-{1}-', runner.os, runner.arch) || '' }}
+            ${{ inputs.cache_validation && format('go-unit-validation-v2-{0}-{1}-', runner.os, runner.arch) || format('go-unit-v2-{0}-{1}-{2}-', runner.os, runner.arch, hashFiles('**/testdata/**')) }}
+            ${{ !inputs.cache_validation && format('go-unit-v2-{0}-{1}-', runner.os, runner.arch) || '' }}
       # A fallback with changed fixtures may have test results keyed by the
       # same fixed testdata mtimes. Keep its build cache, not its test results.
       - name: Clear test results from a changed-fixture cache
-        if: ${{ steps.unit-cache.outputs.cache-matched-key != '' && (inputs.cache_validation && !startsWith(steps.unit-cache.outputs.cache-matched-key, format('go-unit-validation-{0}-{1}-{2}', runner.os, runner.arch, hashFiles('**/testdata/**'))) || (!inputs.cache_validation && !startsWith(steps.unit-cache.outputs.cache-matched-key, format('go-unit-{0}-{1}-{2}-', runner.os, runner.arch, hashFiles('**/testdata/**'))))) }}
+        if: ${{ steps.unit-cache.outputs.cache-matched-key != '' && (inputs.cache_validation && !startsWith(steps.unit-cache.outputs.cache-matched-key, format('go-unit-validation-v2-{0}-{1}-{2}', runner.os, runner.arch, hashFiles('**/testdata/**'))) || (!inputs.cache_validation && !startsWith(steps.unit-cache.outputs.cache-matched-key, format('go-unit-v2-{0}-{1}-{2}-', runner.os, runner.arch, hashFiles('**/testdata/**'))))) }}
         shell: bash
         run: go clean -testcache
       - name: Record Go cache restore results
@@ -75,10 +75,10 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ steps.setup-go.outputs.go-build-cache-path }}
-          key: ${{ inputs.cache_validation && format('go-unit-validation-{0}-{1}-{2}', runner.os, runner.arch, hashFiles('**/testdata/**')) || format('go-unit-{0}-{1}-{2}-{3}', runner.os, runner.arch, hashFiles('**/testdata/**'), hashFiles('**/*.go', 'go.work.sum', '**/go.mod', '**/go.sum')) }}
+          key: ${{ inputs.cache_validation && format('go-unit-validation-v2-{0}-{1}-{2}', runner.os, runner.arch, hashFiles('**/testdata/**')) || format('go-unit-v2-{0}-{1}-{2}-{3}', runner.os, runner.arch, hashFiles('**/testdata/**'), hashFiles('**/*.go', 'go.work.sum', '**/go.mod', '**/go.sum')) }}
           restore-keys: |
-            ${{ inputs.cache_validation && format('go-unit-validation-{0}-{1}-', runner.os, runner.arch) || format('go-unit-{0}-{1}-{2}-', runner.os, runner.arch, hashFiles('**/testdata/**')) }}
-            ${{ !inputs.cache_validation && format('go-unit-{0}-{1}-', runner.os, runner.arch) || '' }}
+            ${{ inputs.cache_validation && format('go-unit-validation-v2-{0}-{1}-', runner.os, runner.arch) || format('go-unit-v2-{0}-{1}-{2}-', runner.os, runner.arch, hashFiles('**/testdata/**')) }}
+            ${{ !inputs.cache_validation && format('go-unit-v2-{0}-{1}-', runner.os, runner.arch) || '' }}
       - name: Run unit tests
         shell: bash
         run: |

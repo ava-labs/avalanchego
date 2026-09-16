@@ -124,8 +124,12 @@ When CI runs a repo operation, it should usually do so by running a named task. 
 behavior existing only in GitHub Actions YAML is harder to discover, run, and
 maintain.
 
-In this repo, that usually means calling `./scripts/run_task.sh` from a workflow. That
-helps keep the task runnable even when `task` is not already installed.
+In this repo, workflows usually call `./scripts/run_task.sh`. Before that call,
+CI must provide a Task binary. Use `setup-task` to restore or download the
+pinned release. A job that uses Nix can use the Task binary from the development
+shell. `run_task.sh` fails in CI when Task is unavailable. It does not build
+Task with `go tool`. This prevents CI from changing `GOMODCACHE` before its
+cache restore.
 
 For tasks that CI runs directly, the caller should usually not need special:
 

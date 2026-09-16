@@ -235,6 +235,26 @@ contains the new cache entry.
 GitHub Actions caches are immutable. The first writer for a key wins. Do not let
 parallel producers write different content with the same key.
 
+Use a cache schema version when a change makes an existing archive unsafe or
+incomplete. Put the version in the key before the platform and input hashes. For
+example:
+
+```text
+go-unit-v2-<os>-<arch>-<input-hash>
+```
+
+Increment the version when the cache path, archive contents, producer, restore
+procedure, or consumer behavior changes. Do not use an earlier schema as a
+restore prefix. A new schema starts a new warm and validation sequence. This
+preserves compiler-cache fallback within one schema and prevents an incompatible
+archive from passing as a cache hit.
+
+Normally, change the schema version in the same commit as the cache-semantic
+change. Do not create a version-only commit. It only discards reuse and creates
+storage churn. Use a version-only change only to discard a known-bad archive.
+Use label removal to delete validation entries. Use a schema version to
+invalidate their meaning.
+
 This policy does not control workflow artifacts or the Bazel remote cache. The
 [Bazel cache policy](./bazel.md#bazel-ci-external-dependency-caching) controls
 remote action and test-result data.
@@ -275,7 +295,7 @@ pushing the cache change: the label run would use the old commit and a later
 push can cancel it.
 
 For the Go unit job, use the job log to identify the mode. Its key is
-`go-unit-validation-<os>-<arch>-<testdata-hash>`. A warm run has no exact hit.
+`go-unit-validation-v2-<os>-<arch>-<testdata-hash>`. A warm run has no exact hit.
 It does not run the Go test-result checker. The `actions/cache` post step saves
 the key after unit tests finish. A validation run has an exact hit, records
 `go-unit-cache-hit=true`, sets `GOPROXY: off`, and runs `Validate Go unit-test
@@ -414,6 +434,26 @@ corpus entries there, do not normalize or fingerprint those generated entries.
 Store that corpus in a separate fuzz cache. Committed corpus entries remain
 fixtures. The unit-cache fingerprint must include them.
 
+**Validate all eligible test results.** The unit cache must restore compiler
+output, test results, and coverage profiles for every cacheable unit-test
+package. This avoids repeated test work. It also proves that the saved archive
+contains the coverage data that `go test` needs. Do not add package exceptions
+for fixture users or fuzz targets. Exceptions make those packages run again.
+They also hide restore failures. The validation checker permits `tools/cache-check` only
+because a change to that tool cannot update its immutable validation entry.
+
+**Alternatives not selected.** Do not exclude `testdata` packages. Normal unit
+tests use fixture files, and fuzz targets are only some of the affected tests.
+Do not validate by running tests twice in one job. That test does not restore an
+archive on a new runner. Do not ignore uncached packages in the checker. That
+would accept the repeated work this cache must prevent.
+
+`git-restore-mtime` can restore each file's last Git commit time. It needs a
+full Git history and adds a separate dependency. The selected task uses a fixed
+time. It needs no history. The fixture-content hash and the test-cache cleanup
+step preserve correctness. Normalize only `testdata`, not the full worktree.
+Tests can use modification times outside fixture directories as input.
+
 The unit job registers `actions/cache` on `master`. That action saves in its
 post step, after unit tests populate `GOCACHE`. A labeled cache-validation run
 uses the same lifecycle in its pull-request merge-ref scope. An explicit save
@@ -460,21 +500,12 @@ Nix development shell.
 A job that directly uses `./.github/actions/install-nix` must set its default shell to
 `nix develop`.
 
-CI previously failed when a job installed Nix but ran `scripts/run_task.sh` from a
-step outside the dev shell. In these jobs, the dev shell, rather than
-`setup-go-for-project`, supplies Task and the required Go version.
+In these jobs, the development shell, rather than `setup-go-for-project`,
+supplies Task and the required Go version. `scripts/run_task.sh` fails in CI if
+Task is not in `PATH`. It does not build Task with `go tool`.
 
-The failure occurred as follows:
-
-1. `task` was not in the `PATH`.
-2. `scripts/run_task.sh` ran `task` with `go run`.
-3. The runner Go version was in the `PATH`.
-4. The runner Go version differed from the repository version.
-5. Go downloaded the required version.
-6. The download failed and failed the job.
-
-Using the Nix dev shell avoids this failure mode by ensuring that `task` and the
-required Go version are in the `PATH`.
+Using the Nix development shell makes Task and the required Go version
+available in `PATH`.
 
 An alternative to setting the Nix dev shell in the workflow could be to start it in
 `scripts/run_task.sh`. This would protect task calls, but not direct script calls. A
