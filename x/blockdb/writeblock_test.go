@@ -445,7 +445,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 			wantErr: safemath.ErrOverflow,
 		},
 		{
-			name:   "writeBlockAt - failed to get data file",
+			name:   "writeBlockDataAt - failed to get data file",
 			height: 0,
 			block:  make([]byte, 100),
 			setup: func(db *Database) {
