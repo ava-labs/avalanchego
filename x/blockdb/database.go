@@ -388,9 +388,10 @@ func (db *Database) writeBlock(indexFileOffset uint64, bh blockEntryHeader, bloc
 	}
 	writeDataOffset := reservation.writeOffset
 
-	if err := db.writeBlockAt(writeDataOffset, bh, block); err != nil {
-		// Reclaim the range only if no later Put has reserved past it.
-		db.nextDataReservationOffset.CompareAndSwap(reservation.endOffset, reservation.previousOffset)
+	if err := db.writeBlockDataAt(writeDataOffset, bh, block); err != nil {
+		// Reuse the failed reservation to avoid gaps that interrupt recovery.
+		// Only rewind if no later Put has reserved past it.
+		db.nextDataReservationOffset.CompareAndSwap(writeDataOffset+uint64(sizeWithDataHeader), reservation.previousOffset)
 		db.log.Error("Failed to write block: error writing block data",
 			zap.Uint64("height", bh.Height),
 			zap.Uint64("dataOffset", writeDataOffset),
@@ -1134,7 +1135,7 @@ func calculateChecksum(data []byte) uint64 {
 	return xxhash.Sum64(data)
 }
 
-func (db *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block BlockData) error {
+func (db *Database) writeBlockDataAt(offset uint64, bh blockEntryHeader, block BlockData) error {
 	headerBytes, err := bh.MarshalBinary()
 	if err != nil {
 		return fmt.Errorf("failed to serialize block header: %w", err)
@@ -1188,7 +1189,6 @@ func (db *Database) updateBlockMaxHeight(height BlockHeight) {
 
 type dataReservation struct {
 	writeOffset    uint64
-	endOffset      uint64
 	previousOffset uint64
 }
 
@@ -1266,7 +1266,6 @@ func (db *Database) allocateBlockSpace(totalSize uint32) (dataReservation, error
 		if db.nextDataReservationOffset.CompareAndSwap(currentOffset, actualBlockEndOffset) {
 			return dataReservation{
 				writeOffset:    actualWriteOffset,
-				endOffset:      actualBlockEndOffset,
 				previousOffset: currentOffset,
 			}, nil
 		}
