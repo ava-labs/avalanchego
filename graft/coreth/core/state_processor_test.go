@@ -42,7 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/cortina"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/consensus/misc/eip4844"
@@ -56,8 +55,6 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-func u64(val uint64) *uint64 { return &val }
-
 // TestStateProcessorErrors tests the output from the 'core' errors
 // as defined in core/error.go. These errors are generated when the
 // blockchain imports bad blocks, meaning blocks which have valid headers but
@@ -65,8 +62,8 @@ func u64(val uint64) *uint64 { return &val }
 func TestStateProcessorErrors(t *testing.T) {
 	cpcfg := *params.TestChainConfig
 	config := &cpcfg
-	config.ShanghaiTime = u64(0)
-	config.CancunTime = u64(0)
+	config.ShanghaiTime = new(uint64)
+	config.CancunTime = new(uint64)
 
 	var (
 		signer  = types.LatestSigner(config)
@@ -283,8 +280,8 @@ func TestStateProcessorErrors(t *testing.T) {
 					},
 					&extras.ChainConfig{
 						NetworkUpgrades: extras.NetworkUpgrades{
-							ApricotPhase1BlockTimestamp: utils.PointerTo[uint64](0),
-							ApricotPhase2BlockTimestamp: utils.PointerTo[uint64](0),
+							ApricotPhase1BlockTimestamp: new(uint64),
+							ApricotPhase2BlockTimestamp: new(uint64),
 						},
 					},
 				),
@@ -391,7 +388,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 	}
 	if configExtra.IsGranite(header.Time) {
 		headerExtra := customtypes.GetHeaderExtra(header)
-		headerExtra.TimeMilliseconds = utils.PointerTo(timeMS)
+		headerExtra.TimeMilliseconds = new(timeMS)
 	}
 	if configExtra.IsApricotPhase4(header.Time) {
 		headerExtra := customtypes.GetHeaderExtra(header)
