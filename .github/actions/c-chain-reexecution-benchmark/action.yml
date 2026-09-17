@@ -114,20 +114,24 @@ runs:
       uses: actions/cache/restore@v5
       with:
         path: ${{ steps.go-mod-cache-path.outputs.path }}
-        key: go-mod-${{ runner.os }}-${{ hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum') }}
+        key: go-mod-v2-${{ runner.os }}-${{ hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum') }}
         restore-keys: |
-          go-mod-${{ runner.os }}-
-    - name: Download Go module dependencies
-      run: |
-        env -u GOPROXY go mod download
-        GOWORK=off env -u GOPROXY go mod download -modfile=tools/external/go.mod
+          go-mod-v2-${{ runner.os }}-
+    # Scheduled runs must prove that the exact restored archive has every
+    # dependency. Other runs can warm a missing cache entry.
+    - name: Disable the Go module proxy for validation
+      if: ${{ github.event_name == 'schedule' }}
+      shell: bash
+      run: echo 'GOPROXY=off' >> "$GITHUB_ENV"
+    - name: Prepare Go module dependencies
+      run: ./scripts/download_go_modules.sh
       shell: nix develop --command bash -x {0}
     - name: Save Go module cache
       if: ${{ steps.go-mod-cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master' }}
       uses: actions/cache/save@v5
       with:
         path: ${{ steps.go-mod-cache-path.outputs.path }}
-        key: go-mod-${{ runner.os }}-${{ hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum') }}
+        key: go-mod-v2-${{ runner.os }}-${{ hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum') }}
     - name: Disable the Go module proxy
       shell: bash
       run: echo 'GOPROXY=off' >> "$GITHUB_ENV"

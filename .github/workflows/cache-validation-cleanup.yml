@@ -25,6 +25,7 @@ jobs:
             "task-validation-Linux-ARM64"
             "task-validation-macOS-ARM64"
             "go-mod-validation-Linux"
+            "go-mod-validation-v2-Linux"
             "go-unit-validation-"
           )
           for key_prefix in "${key_prefixes[@]}"; do

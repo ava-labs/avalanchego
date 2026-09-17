@@ -383,8 +383,9 @@ complete design.
 #### Go module cache
 
 [`setup-go-for-project`](../.github/actions/setup-go-for-project/action.yml)
-installs Go and restores `GOMODCACHE`. The key contains the operating system and
-the hashes of `go.work`, `go.work.sum`, and all `go.mod` and `go.sum` files.
+installs Go and restores `GOMODCACHE`. Its schema-v2 key contains the operating
+system and the hashes of `go.work`, `go.work.sum`, and all `go.mod` and `go.sum`
+files.
 Module source does not need an architecture-specific key. Nix actions read
 `GOMODCACHE` from their Go toolchain and use the same key and archive.
 
@@ -392,17 +393,19 @@ The action disables the implicit cache in `actions/setup-go`. That implicit
 cache saves in a post step and has no separate write condition. An explicit
 restore lets this repository enforce the shared write policy.
 
-The action always downloads the workspace modules and the separate
-`tools/external/go.mod` modules before the build. This makes dependency changes
-available on non-`master` runs. It saves `GOMODCACHE` on `master` or during a
-labeled cache-validation run. Nix actions do the same on `master`. Both key
-types include the module-file hash. A validation restore can use an older
-validation archive, but the action downloads and saves a new archive for changed
-module files.
+On an ordinary run or a cache-validation warm run, the action prepares every
+repository module with `GOWORK=off`. It also prepares the pinned `abigen` tool
+that the load-contract generator runs from `GOMODCACHE`. This lets a dependency
+change run before `master` has a corresponding cache entry. `master` saves
+`GOMODCACHE` on an exact miss; a labeled cache-validation run saves only its
+pull-request-scoped entry. Nix actions use the same shared key and save policy.
 
-After the download, these actions set `GOPROXY=off`. Every later Go build or test
-must use the prepared module cache. A download attempt fails the workflow and
-shows that the setup did not cache a required module.
+A cache-validation rerun with an exact module-cache hit, and every scheduled
+run, sets `GOPROXY=off` before preparation. The preparation command then fails
+if the restored archive lacks a required module. Other runs may use a fallback
+archive and download missing modules, but do not publish a shared entry. All
+actions set `GOPROXY=off` after preparation, so every later Go build or test
+uses the prepared module cache.
 
 #### Go unit cache
 

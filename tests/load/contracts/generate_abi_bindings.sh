@@ -10,6 +10,9 @@ if ! command -v solc &> /dev/null; then
 fi
 
 CONTRACTS_DIR="$(dirname "$0")"
+readonly abigen_version='v1.13.14-0.2.0.release'
+abigen_dir="$(go env GOMODCACHE)/github.com/ava-labs/libevm@${abigen_version}"
+readonly abigen_dir
 TEMPDIR=$(mktemp -d)
 
 cleanup() {
@@ -42,11 +45,14 @@ for FILE in "${CONTRACTS_DIR}"/*.sol; do
   echo "Generating Go bindings from Solidity contract $FILE..."
   CONTRACT_NAME=$(basename "$FILE" .sol)
   solc --evm-version="cancun" --abi --bin --overwrite -o "$TEMPDIR" "${CONTRACTS_DIR}/${CONTRACT_NAME}.sol"
-  go run github.com/ava-labs/libevm/cmd/abigen@v1.13.14-0.2.0.release \
-    --bin="${TEMPDIR}/${CONTRACT_NAME}.bin" \
-    --abi="${TEMPDIR}/${CONTRACT_NAME}.abi" \
-    --type "$CONTRACT_NAME" \
-    --pkg=contracts \
-    --out="${CONTRACTS_DIR}/${CONTRACT_NAME}.bindings.go"
+  (
+    cd "${abigen_dir}"
+    go run ./cmd/abigen \
+      --bin="${TEMPDIR}/${CONTRACT_NAME}.bin" \
+      --abi="${TEMPDIR}/${CONTRACT_NAME}.abi" \
+      --type "$CONTRACT_NAME" \
+      --pkg=contracts \
+      --out="${CONTRACTS_DIR}/${CONTRACT_NAME}.bindings.go"
+  )
   echo "Generated ${CONTRACT_NAME}.bindings.go"
 done
