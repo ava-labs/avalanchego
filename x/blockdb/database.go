@@ -389,9 +389,10 @@ func (db *Database) writeBlock(indexFileOffset uint64, bh blockEntryHeader, bloc
 	writeDataOffset := reservation.writeOffset
 
 	if err := db.writeBlockDataAt(writeDataOffset, bh, block); err != nil {
+		endOffset := writeDataOffset + uint64(sizeWithDataHeader)
 		// Reuse the failed reservation to avoid gaps that interrupt recovery.
 		// Only rewind if no later Put has reserved past it.
-		db.nextDataReservationOffset.CompareAndSwap(writeDataOffset+uint64(sizeWithDataHeader), reservation.previousOffset)
+		db.nextDataReservationOffset.CompareAndSwap(endOffset, reservation.previousOffset)
 		db.log.Error("Failed to write block: error writing block data",
 			zap.Uint64("height", bh.Height),
 			zap.Uint64("dataOffset", writeDataOffset),
