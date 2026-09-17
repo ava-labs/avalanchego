@@ -286,22 +286,18 @@ func persist(db ethdb.Batcher, hashes []common.Hash, codes [][]byte) error {
 // response. It retries until a peer returns valid code or ctx is cancelled.
 func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common.Hash) ([][]byte, error) {
 	req := &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)}
-	resp, err := c.Send(ctx, req,
-		func(resp *syncpb.GetCodeResponse, nodeID ids.NodeID) error {
+	return c.Send(ctx, req,
+		func(resp *syncpb.GetCodeResponse, nodeID ids.NodeID) ([][]byte, error) {
 			if err := verifyCode(hashes, resp.GetData()); err != nil {
 				log.Debug("invalid code response, re-requesting",
 					zap.Stringer("nodeID", nodeID),
 					zap.Error(err),
 				)
-				return err
+				return nil, err
 			}
-			return nil
+			return resp.GetData(), nil
 		},
 	)
-	if err != nil {
-		return nil, err
-	}
-	return resp.GetData(), nil
 }
 
 var (

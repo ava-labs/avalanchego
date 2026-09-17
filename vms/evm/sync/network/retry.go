@@ -92,15 +92,15 @@ func classify(err error) retryClass {
 
 // doRetry retries attempt until verify accepts a response, ctx ends, or a fatal
 // error. attempt must return a fresh response each call so failures never merge.
-func doRetry[Resp proto.Message](
+func doRetry[Resp proto.Message, Out any](
 	ctx context.Context,
 	log logging.Logger,
 	policy retryPolicy,
-	verify func(Resp, ids.NodeID) error,
+	verify func(Resp, ids.NodeID) (Out, error),
 	attempt func() (Resp, ids.NodeID, *Outcome, error),
-) (Resp, error) {
+) (Out, error) {
 	var (
-		zero           Resp
+		zero           Out
 		attempts       int
 		lastErr        error
 		noPeerAttempts int
@@ -115,11 +115,11 @@ func doRetry[Resp proto.Message](
 		var wait time.Duration
 		if err == nil {
 			// verify reports its own rejection, since only the caller knows what
-			// made the response wrong.
-			verifyErr := verify(resp, nodeID)
+			// made the response wrong, and returns the value Send hands back.
+			out, verifyErr := verify(resp, nodeID)
 			if verifyErr == nil {
 				outcome.Success()
-				return resp, nil
+				return out, nil
 			}
 			outcome.Failure()
 			lastErr = verifyErr

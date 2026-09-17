@@ -148,12 +148,12 @@ func TestSend_RetriesThenSucceeds(t *testing.T) {
 			verify := acceptLeaf
 			if tt.failVerify {
 				rejected := false
-				verify = func(*syncpb.GetLeafResponse, ids.NodeID) error {
+				verify = func(resp *syncpb.GetLeafResponse, _ ids.NodeID) (*syncpb.GetLeafResponse, error) {
 					if !rejected {
 						rejected = true
-						return errors.New("invalid")
+						return nil, errors.New("invalid")
 					}
-					return nil
+					return resp, nil
 				}
 			}
 
@@ -187,7 +187,7 @@ func TestSend_NoPeersBackoffEscalates(t *testing.T) {
 
 		handler, _ := scriptedHandler(scriptResponse{bytes: wantBytes})
 		_, tracker := newTestTracker(t)
-		c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse](t, ctx, nodeID, handler, tracker)
+		c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](t, ctx, nodeID, handler, tracker)
 		c.policy = *options.ApplyTo(defaultRetryPolicy(),
 			WithNoPeersInitialBackoff(initial),
 			WithNoPeersFactor(factor),
@@ -253,9 +253,9 @@ func TestDoRetry_CtxEndReportsFailure(t *testing.T) {
 				_, tracker := newTestTracker(t, nodeID)
 				return &syncpb.GetLeafResponse{}, nodeID, &Outcome{peers: tracker, nodeID: nodeID}, nil
 			}
-			verify := func(*syncpb.GetLeafResponse, ids.NodeID) error {
+			verify := func(*syncpb.GetLeafResponse, ids.NodeID) (*syncpb.GetLeafResponse, error) {
 				cancel()
-				return errInvalid
+				return nil, errInvalid
 			}
 
 			got, err := doRetry(ctx, loggingtest.New(t, logging.Debug), *defaultRetryPolicy(), verify, attempt)
@@ -266,9 +266,11 @@ func TestDoRetry_CtxEndReportsFailure(t *testing.T) {
 	}
 }
 
-func acceptLeaf(*syncpb.GetLeafResponse, ids.NodeID) error { return nil }
+func acceptLeaf(resp *syncpb.GetLeafResponse, _ ids.NodeID) (*syncpb.GetLeafResponse, error) {
+	return resp, nil
+}
 
-type leafRetryDispatcher = Dispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse]
+type leafRetryDispatcher = Dispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse]
 
 func newRetryDispatcher(
 	t *testing.T,
@@ -278,7 +280,7 @@ func newRetryDispatcher(
 	tracker *p2p.PeerTracker,
 ) *leafRetryDispatcher {
 	t.Helper()
-	c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse](t, ctx, nodeID, h, tracker)
+	c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](t, ctx, nodeID, h, tracker)
 	c.policy = *options.ApplyTo(defaultRetryPolicy(),
 		WithPeerFailureBackoff(time.Millisecond),
 		WithNoPeersInitialBackoff(time.Millisecond),

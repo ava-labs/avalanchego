@@ -37,7 +37,7 @@ type ProtoMessage[T any] interface {
 
 // Dispatcher is a typed synchronous client bound to one handler ID.
 // Use one instance per RPC type.
-type Dispatcher[Req proto.Message, V any, Resp ProtoMessage[V]] struct {
+type Dispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any] struct {
 	log    logging.Logger
 	client *p2p.Client
 	peers  *p2p.PeerTracker
@@ -45,14 +45,14 @@ type Dispatcher[Req proto.Message, V any, Resp ProtoMessage[V]] struct {
 }
 
 // NewDispatcher returns a [Dispatcher] bound to handlerID on n.
-func NewDispatcher[Req proto.Message, V any, Resp ProtoMessage[V]](
+func NewDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any](
 	log logging.Logger,
 	n *p2p.Network,
 	handlerID uint64,
 	peers *p2p.PeerTracker,
 	opts ...RetryOption,
-) *Dispatcher[Req, V, Resp] {
-	return &Dispatcher[Req, V, Resp]{
+) *Dispatcher[Req, In, Resp, Out] {
+	return &Dispatcher[Req, In, Resp, Out]{
 		// Tagged once, so every retry line names the RPC without each caller repeating it.
 		log:    log.With(zap.Uint64("handlerID", handlerID)),
 		client: n.NewClient(handlerID, noopSampler{}),
@@ -62,19 +62,20 @@ func NewDispatcher[Req proto.Message, V any, Resp ProtoMessage[V]](
 }
 
 // Send retries req through [SendTo] until verify accepts a response or ctx ends.
-// verify receives the peer that served the response, so a rejection can name it.
-func (d *Dispatcher[Req, V, Resp]) Send(
+// verify receives the peer that served the response, so a rejection can name
+// it, and returns the value Send hands back to its own caller.
+func (d *Dispatcher[Req, In, Resp, Out]) Send(
 	ctx context.Context,
 	req Req,
-	verify func(Resp, ids.NodeID) error,
-) (Resp, error) {
+	verify func(Resp, ids.NodeID) (Out, error),
+) (Out, error) {
 	return doRetry(ctx, d.log, d.policy, verify, func() (Resp, ids.NodeID, *Outcome, error) {
 		nodeID, ok := d.peers.SelectPeer()
 		if !ok {
 			var zero Resp
 			return zero, ids.EmptyNodeID, nil, errNoPeers
 		}
-		resp := Resp(new(V))
+		resp := Resp(new(In))
 		outcome, err := d.SendTo(ctx, nodeID, req, resp)
 		return resp, nodeID, outcome, err
 	})
@@ -83,7 +84,7 @@ func (d *Dispatcher[Req, V, Resp]) Send(
 // SendTo sends req to nodeID. A pre-send context or marshal error
 // returns unscored, any later failure scores the peer and returns a nil
 // Outcome.
-func (d *Dispatcher[Req, V, Resp]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (_ *Outcome, retErr error) {
+func (d *Dispatcher[Req, In, Resp, Out]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (_ *Outcome, retErr error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
