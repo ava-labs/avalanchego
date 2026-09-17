@@ -56,8 +56,8 @@ func (d readOnlyDatabase) CopyTrie(tr state.Trie) state.Trie {
 }
 
 // DiskDB serves reads but discards writes, since [state.StateDB.Commit] flushes
-// contract code before the trie can reject the commit. TrieDB is reached only
-// after that rejection, so it needs no guard.
+// contract code before the trie can reject the commit. TrieDB needs no guard
+// because it is only read before that point and written after.
 func (d readOnlyDatabase) DiskDB() ethdb.KeyValueStore {
 	return readOnlyDiskDB{d.Database.DiskDB()}
 }
