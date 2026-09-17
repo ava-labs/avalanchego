@@ -295,18 +295,17 @@ func (s *vdrSet) PrefixedString(prefix string) string {
 func (s *vdrSet) prefixedString(prefix string) string {
 	sb := strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("Validator Set: (Size = %d, Weight = %d)",
+	fmt.Fprintf(&sb, "Validator Set: (Size = %d, Weight = %d)",
 		len(s.vdrSlice),
 		s.totalWeight,
-	))
+	)
 	format := fmt.Sprintf("\n%s    Validator[%s]: %%33s, %%d", prefix, formatting.IntFormat(len(s.vdrSlice)-1))
 	for i, vdr := range s.vdrSlice {
-		sb.WriteString(fmt.Sprintf(
-			format,
+		fmt.Fprintf(&sb, format,
 			i,
 			vdr.NodeID,
 			vdr.Weight,
-		))
+		)
 	}
 
 	return sb.String()
