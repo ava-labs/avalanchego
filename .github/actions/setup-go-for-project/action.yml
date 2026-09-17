@@ -64,6 +64,23 @@ runs:
       uses: actions/cache/restore@v5
       with:
         path: ${{ steps.cache-paths.outputs.go-mod-cache }}
-        key: ${{ inputs.cache-validation == 'true' && format('go-mod-validation-{0}', runner.os) || format('go-mod-{0}-{1}', runner.os, hashFiles('go.work.sum', '**/go.sum')) }}
+        key: ${{ inputs.cache-validation == 'true' && format('go-mod-validation-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum')) || format('go-mod-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum')) }}
         restore-keys: |
-          ${{ inputs.cache-validation == 'true' && format('go-mod-validation-{0}', runner.os) || format('go-mod-{0}-', runner.os) }}
+          ${{ inputs.cache-validation == 'true' && format('go-mod-validation-{0}-', runner.os) || format('go-mod-{0}-', runner.os) }}
+
+    - name: Download Go module dependencies
+      shell: bash
+      run: |
+        env -u GOPROXY go mod download
+        GOWORK=off env -u GOPROXY go mod download -modfile=tools/external/go.mod
+
+    - name: Save Go module cache
+      if: ${{ steps.go-mod-cache.outputs.cache-hit != 'true' && (github.ref == 'refs/heads/master' || inputs.cache-validation == 'true') }}
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ steps.cache-paths.outputs.go-mod-cache }}
+        key: ${{ inputs.cache-validation == 'true' && format('go-mod-validation-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum')) || format('go-mod-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum')) }}
+
+    - name: Disable the Go module proxy
+      shell: bash
+      run: echo 'GOPROXY=off' >> "$GITHUB_ENV"

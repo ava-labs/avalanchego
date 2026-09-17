@@ -30,19 +30,29 @@ runs:
     - name: Load flake dependencies
       run: nix develop --command echo "dependencies installed"
       shell: bash
-    # Restore the module cache populated by the Go setup job. This action may
-    # download missing modules, but only the setup job saves the shared cache.
-    - uses: actions/cache/restore@v5
-      id: go-mod-cache
+    - id: go-mod-cache-path
+      name: Read Go module cache path
+      run: echo "path=$(nix develop --command go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+      shell: bash
+    - id: go-mod-cache
+      name: Restore Go module cache
+      uses: actions/cache/restore@v5
       with:
-        path: ~/go/pkg/mod
-        key: go-mod-${{ runner.os }}-${{ hashFiles('go.work.sum', '**/go.sum') }}
+        path: ${{ steps.go-mod-cache-path.outputs.path }}
+        key: go-mod-${{ runner.os }}-${{ hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum') }}
         restore-keys: |
           go-mod-${{ runner.os }}-
-    # Download modules only on cache miss
-    - run: nix develop --command go mod download
-      if: steps.go-mod-cache.outputs.cache-hit != 'true'
+    - name: Download Go module dependencies
+      run: |
+        env -u GOPROXY nix develop --command go mod download
+        GOWORK=off env -u GOPROXY nix develop --command go mod download -modfile=tools/external/go.mod
       shell: bash
-    - run: GOWORK=off nix develop --command go mod download -modfile=tools/external/go.mod
-      if: steps.go-mod-cache.outputs.cache-hit != 'true'
+    - name: Save Go module cache
+      if: ${{ steps.go-mod-cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master' }}
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ steps.go-mod-cache-path.outputs.path }}
+        key: go-mod-${{ runner.os }}-${{ hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum') }}
+    - name: Disable the Go module proxy
       shell: bash
+      run: echo 'GOPROXY=off' >> "$GITHUB_ENV"

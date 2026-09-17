@@ -87,7 +87,6 @@ jobs:
         env:
           # GODEBUG is a Go test-cache input. Warm and validation runs must match.
           GODEBUG: ${{ (github.ref == 'refs/heads/master' || inputs.cache_validation) && 'gocachetest=1' || '' }}
-          GOPROXY: ${{ (github.ref == 'refs/heads/master' || (inputs.cache_validation && steps.unit-cache.outputs.cache-hit == 'true')) && 'off' || '' }}
           TIMEOUT: 900s
       - name: Validate Go cache restores
         if: ${{ always() && (github.ref == 'refs/heads/master' || (inputs.cache_validation && steps.unit-cache.outputs.cache-hit == 'true')) }}

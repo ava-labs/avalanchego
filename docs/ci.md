@@ -298,8 +298,8 @@ For the Go unit job, use the job log to identify the mode. Its key is
 `go-unit-validation-v2-<os>-<arch>-<testdata-hash>`. A warm run has no exact hit.
 It does not run the Go test-result checker. The `actions/cache` post step saves
 the key after unit tests finish. A validation run has an exact hit, records
-`go-unit-cache-hit=true`, sets `GOPROXY: off`, and runs `Validate Go unit-test
-results`.
+`go-unit-cache-hit=true`, and runs `Validate Go unit-test results`. The Go setup
+action sets `GOPROXY=off` after it downloads the required modules.
 
 Both warm and validation runs set `GODEBUG=gocachetest=1`. Go includes
 `GODEBUG` in its test-result inputs. This setting also records each cache lookup
@@ -384,29 +384,25 @@ complete design.
 
 [`setup-go-for-project`](../.github/actions/setup-go-for-project/action.yml)
 installs Go and restores `GOMODCACHE`. The key contains the operating system and
-the hashes of `go.work.sum` and all `go.sum` files. Module source does not need
-an architecture-specific key.
+the hashes of `go.work`, `go.work.sum`, and all `go.mod` and `go.sum` files.
+Module source does not need an architecture-specific key. Nix actions read
+`GOMODCACHE` from their Go toolchain and use the same key and archive.
 
 The action disables the implicit cache in `actions/setup-go`. That implicit
 cache saves in a post step and has no separate write condition. An explicit
 restore lets this repository enforce the shared write policy.
 
-The `setup` job in [`go-ci.yml`](../.github/workflows/go-ci.yml) calls
-[`setup-go-dependencies`](../.github/actions/setup-go-dependencies/action.yml).
-On an exact miss, this action downloads the workspace modules and the separate
-`tools/external/go.mod` modules. It saves `GOMODCACHE` on `master`, or to the
-fixed merge-ref key during a labeled cache-validation run.
+The action always downloads the workspace modules and the separate
+`tools/external/go.mod` modules before the build. This makes dependency changes
+available on non-`master` runs. It saves `GOMODCACHE` on `master` or during a
+labeled cache-validation run. Nix actions do the same on `master`. Both key
+types include the module-file hash. A validation restore can use an older
+validation archive, but the action downloads and saves a new archive for changed
+module files.
 
-The Nix and C-Chain benchmark actions restore the same module cache. They can
-download modules on a miss, but they do not save a competing entry.
-
-The Go `unit` job runs after the `setup` job. On `master`, it sets
-`GOPROXY=off`. The unit job must then use the modules that setup made available.
-A missing module fails the job and exposes an incomplete setup download.
-Non-`master` jobs keep normal proxy access so they can test dependency changes.
-
-Do not enable offline mode for other jobs until they depend on a setup job that
-provides all required modules.
+After the download, these actions set `GOPROXY=off`. Every later Go build or test
+must use the prepared module cache. A download attempt fails the workflow and
+shows that the setup did not cache a required module.
 
 #### Go unit cache
 
