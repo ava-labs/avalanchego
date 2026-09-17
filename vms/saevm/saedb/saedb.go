@@ -27,3 +27,9 @@ func LastCommittedTrieDBHeight(atOrBefore, commitInterval uint64) uint64 {
 type StateDBOpener interface {
 	StateDB(root common.Hash) (*state.StateDB, error)
 }
+
+// ReadOnlyStateDBOpener opens state at the given root that cannot be
+// committed.
+type ReadOnlyStateDBOpener interface {
+	ReadOnlyStateDB(root common.Hash) (*state.StateDB, error)
+}
