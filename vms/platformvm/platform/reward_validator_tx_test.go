@@ -74,4 +74,9 @@ func TestRewardValidatorTxSerialization(t *testing.T) {
 	gotBytes, err := Codec.Marshal(CodecVersion, &unsignedTx)
 	require.NoError(err)
 	require.Equal(wantBytes, gotBytes)
+
+	var gotTx UnsignedTx
+	_, err = Codec.Unmarshal(gotBytes, &gotTx)
+	require.NoError(err)
+	require.Equal(rewardTx, gotTx)
 }
