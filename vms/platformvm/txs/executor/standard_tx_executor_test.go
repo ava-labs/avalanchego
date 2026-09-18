@@ -4492,7 +4492,7 @@ func TestStandardExecutorAddPermissionlessValidatorTxFlowCheckFails(t *testing.T
 		diff,
 	)
 
-	require.ErrorIs(gotErr, ErrFlowCheckFailed)
+	require.ErrorIs(gotErr, errFlowCheckFailed)
 }
 
 func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
