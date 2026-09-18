@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -123,6 +124,9 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", ginkgo
 				},
 				NextPeriod:               uint64(updatedStakingPeriod.Seconds()),
 				AutoCompoundRewardShares: autoCompoundRewardShares,
+				// No cycle has renewed yet.
+				RestakedValidationRewards: utils.PointerTo(uint64(0)),
+				RestakedDelegateeRewards:  utils.PointerTo(uint64(0)),
 			}, currentValidator(tc, pvmClient, f.validatorNode.NodeID).AutoRenewedConfig)
 		})
 
@@ -184,6 +188,9 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", ginkgo
 				},
 				NextPeriod:               uint64(updatedStakingPeriod.Seconds()),
 				AutoCompoundRewardShares: updatedAutoCompoundRewardShares,
+				// One cycle has renewed, so the totals hold that cycle's split.
+				RestakedValidationRewards: utils.PointerTo(restakingValidationRewards1),
+				RestakedDelegateeRewards:  utils.PointerTo(restakingDelegateeRewards1),
 			}, currentValidator(tc, pvmClient, f.validatorNode.NodeID).AutoRenewedConfig)
 		})
 
@@ -240,7 +247,27 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", ginkgo
 
 		tc.By("checking auto-renewed validator's weight and accrued rewards", func() {
 			expectedValidatorWeight := validatorWeight + restakingValidationRewards1 + restakingDelegateeRewards1 + restakingValidationRewards2 + restakingDelegateeRewards2
-			require.Equal(tc, expectedValidatorWeight, currentValidator(tc, pvmClient, f.validatorNode.NodeID).Weight)
+			validator := currentValidator(tc, pvmClient, f.validatorNode.NodeID)
+			require.Equal(tc, expectedValidatorWeight, validator.Weight)
+
+			cfg := validator.AutoRenewedConfig
+			require.NotNil(tc, cfg)
+			require.NotNil(tc, cfg.RestakedValidationRewards)
+			require.NotNil(tc, cfg.RestakedDelegateeRewards)
+			restakedValidation := *cfg.RestakedValidationRewards
+			restakedDelegatee := *cfg.RestakedDelegateeRewards
+
+			// The totals are cumulative, so after a second renewal they are the
+			// sums across both cycles rather than the latest cycle's amounts.
+			require.Equal(tc, restakingValidationRewards1+restakingValidationRewards2, restakedValidation)
+			require.Equal(tc, restakingDelegateeRewards1+restakingDelegateeRewards2, restakedDelegatee)
+
+			// Together they account for all weight grown above the principal.
+			require.Equal(tc, validator.Weight-validatorWeight, restakedValidation+restakedDelegatee)
+
+			// Differencing across a renewal recovers that cycle's contribution.
+			require.Equal(tc, restakingValidationRewards2, restakedValidation-restakingValidationRewards1)
+			require.Equal(tc, restakingDelegateeRewards2, restakedDelegatee-restakingDelegateeRewards1)
 		})
 
 		var validatorThirdCyclePotentialRewards uint64

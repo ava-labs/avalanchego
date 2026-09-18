@@ -72,6 +72,7 @@ go_library(
 go_test(
     name = "platformvm_test",
     srcs = [
+        "client_permissionless_validator_test.go",
         "main_test.go",
         "service_test.go",
         "validator_set_property_test.go",
