@@ -17,7 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/database/merkle/sync/synctest"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
@@ -43,7 +45,7 @@ func Test_Creation(t *testing.T) {
 		sync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
 			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           synctest.NewProofClient(t, ctx, newTestProofHandler(t, db)),
+			ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, db)),
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
 		},
@@ -75,7 +77,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = append(response.KeyChanges, KeyChange{})
 				})
 
-				return synctest.NewProofClient(t, t.Context(), handler)
+				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -85,7 +87,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
 
-				return synctest.NewProofClient(t, t.Context(), handler)
+				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -111,7 +113,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					}
 				})
 
-				return synctest.NewProofClient(t, t.Context(), handler)
+				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -122,7 +124,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
 
-				return synctest.NewProofClient(t, t.Context(), handler)
+				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -133,7 +135,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.EndProof = nil
 				})
 
-				return synctest.NewProofClient(t, t.Context(), handler)
+				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -143,7 +145,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.EndProof = nil
 				})
 
-				return synctest.NewProofClient(t, t.Context(), handler)
+				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -155,13 +157,13 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = nil
 				})
 
-				return synctest.NewProofClient(t, t.Context(), handler)
+				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof server flake",
 			proofClient: func(db MerkleDB) *p2p.TrackingClient {
-				return synctest.NewProofClient(t, t.Context(), &flakyHandler{
+				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
 					Handler: newTestProofHandler(t, db),
 					c:       &counter{m: 2},
 				})
@@ -174,7 +176,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = append(response.KeyChanges, make([]KeyChange, sync.DefaultRequestKeyLimit)...)
 				})
 
-				return synctest.NewProofClient(t, t.Context(), handler)
+				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -184,7 +186,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
 
-				return synctest.NewProofClient(t, t.Context(), handler)
+				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -195,7 +197,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
 
-				return synctest.NewProofClient(t, t.Context(), handler)
+				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -206,13 +208,13 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.EndProof = nil
 				})
 
-				return synctest.NewProofClient(t, t.Context(), handler)
+				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "change proof flaky server",
 			proofClient: func(db MerkleDB) *p2p.TrackingClient {
-				return synctest.NewProofClient(t, t.Context(), &flakyHandler{
+				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
 					Handler: newTestProofHandler(t, db),
 					c:       &counter{m: 2},
 				})
@@ -238,7 +240,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			)
 			require.NoError(err)
 
-			proofClient := synctest.NewProofClient(t, ctx, newTestProofHandler(t, dbToSync))
+			proofClient := p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, dbToSync))
 			if tt.proofClient != nil {
 				proofClient = tt.proofClient(dbToSync)
 			}
@@ -327,7 +329,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		sync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
 			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           synctest.NewProofClient(t, ctx, newTestProofHandler(t, dbToSync)),
+			ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, dbToSync)),
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
@@ -356,7 +358,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		sync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
 			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           synctest.NewProofClient(t, ctx, newTestProofHandler(t, dbToSync)),
+			ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, dbToSync)),
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
@@ -438,7 +440,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		sync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
 			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           synctest.NewProofClient(t, ctx, actionHandler),
+			ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, actionHandler),
 			TargetRoot:            firstSyncRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
@@ -494,7 +496,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 		sync.Config[*RangeProof, *ChangeProof]{
 			RangeProofMarshaler:   rangeProofMarshaler,
 			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           synctest.NewProofClient(t, ctx, actionHandler),
+			ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, actionHandler),
 			TargetRoot:            root1,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},

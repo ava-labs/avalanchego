@@ -191,6 +191,6 @@ func newTestDispatcher[Req, Resp proto.Message](
 ) *Dispatcher[Req, Resp] {
 	t.Helper()
 	return &Dispatcher[Req, Resp]{
-		client: p2ptest.NewSelfTrackingClient(t, ctx, nodeID, h, peers),
+		client: p2ptest.NewSelfTrackingClientWithTracker(t, ctx, nodeID, h, peers),
 	}
 }
