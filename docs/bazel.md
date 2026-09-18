@@ -11,7 +11,7 @@ avalanchego monorepo.
 - [Architecture Overview](#architecture-overview)
   - [Toolchain Strategy](#toolchain-strategy)
   - [Version Pinning](#version-pinning)
-  - [Repository tools and external-dependency fetches](#repository-tools-and-external-dependency-fetches)
+  - [External-dependency fetches](#external-dependency-fetches)
   - [Why Bazel 8?](#why-bazel-8)
   - [Multi-Module Structure](#multi-module-structure)
   - [Key Configuration Files](#key-configuration-files)
@@ -44,7 +44,7 @@ avalanchego monorepo.
   - [Why the remote cache uses gRPC](#why-the-remote-cache-uses-grpc)
   - [What is cached](#what-is-cached)
   - [Cache key](#cache-key)
-  - [Checked-in list of Bazel CI target patterns used to prepare the build dependency cache](#checked-in-list-of-bazel-ci-target-patterns-used-to-prepare-the-build-dependency-cache)
+  - [Dependency list](#dependency-list)
   - [Enforcement](#enforcement)
   - [Changing this safely](#changing-this-safely)
   - [Apple CommandLineTools](#apple-commandlinetools)
@@ -642,8 +642,13 @@ unacceptable.
 
 The E2E smoke task selects the C-Chain ProposerVM API test. Ubuntu and macOS use
 the same task. It does not provide full E2E coverage. A future change will
-replace the Ubuntu smoke test with a non-smoke E2E test. Each setup job checks
-Bazel metadata and prefetches the full CI dependency list.
+replace the Ubuntu smoke test with a non-smoke E2E test.
+
+Each initial setup checks Bazel metadata. An initial setup on `master` also
+prefetches the full CI dependency list and saves it on a cache miss. This
+includes scheduled jobs on `master`. Scheduled jobs warm dependency caches for
+platforms that pre-merge CI does not test. Pull request and merge-queue setup
+jobs restore existing entries, but do not prefetch or save shared entries.
 
 The daily scheduled workflow runs one full unit-test job on Ubuntu 22.04 and
 24.04, on AMD64 and ARM64, and on macOS 26 ARM64. It also runs the same focused
@@ -737,8 +742,10 @@ The Bazel CI cache setup configures three kinds of cached data:
 - Bazel remote action and test-result data
 
 GitHub Actions restores the repository cache and `GOMODCACHE` on each runner.
-These caches contain downloaded external dependencies. The setup job prepares
-them for the later jobs on the same platform.
+These caches contain downloaded external dependencies. On `master`, the setup
+job prepares them for later jobs on the same platform. Other runs restore
+available data. Their Bazel jobs can download a missing dependency, but cannot
+save it to the shared GitHub Actions cache.
 
 The shared `GOMODCACHE` is required because Gazelle `go_repository` otherwise
 keeps Go module downloads in each Bazel work area. Thus, a later job can use the
@@ -780,19 +787,23 @@ cache only when all these conditions are true:
 - CI provides the remote-cache URL
 - CI provides the authorization header
 
-### Checked-in list of Bazel CI target patterns used to prepare the build dependency cache
+### Dependency list
 
-This setup is similar in spirit to `actions/setup-go`: before the later Bazel
-CI jobs run, prepare cache state for the build dependencies they are expected
-to need so those jobs do not each discover missing dependencies on their own.
+This setup has the same goal as `actions/setup-go`. It prepares dependency
+cache data before later Bazel CI jobs run. The later jobs do not each discover
+and download the same missing dependencies.
 
-The setup action first restores the pinned Task binary and any previously
-saved Bazel dependency data, then configures Bazel to use the dependency
-cache. In the per-platform `setup` job it is run with `initial-setup: true`;
-in that mode it also checks Bazel metadata and runs `./scripts/run_task.sh
-bazel-cache-ci-build-dependencies`, which delegates to
+The setup action first restores the pinned Task binary and any saved Bazel
+dependency data. It then configures Bazel to use the dependency cache. The
+per-platform `setup` job sets `initial-setup: true`, so every run checks Bazel
+metadata.
+
+On `master`, the initial setup also runs `./scripts/run_task.sh
+bazel-cache-ci-build-dependencies`. This task delegates to
 `./scripts/cache_bazel_ci_build_dependencies.sh` and uses the checked-in list
-in `./scripts/bazel_ci_dependency_list.sh`.
+in `./scripts/bazel_ci_dependency_list.sh`. The action saves the prepared data
+only when the exact cache key was absent. On other refs, the initial setup does
+not prefetch or save the list.
 
 That checked-in list names the Bazel target patterns whose build dependencies
 the later CI jobs are expected to need.
@@ -814,10 +825,9 @@ All Bazel CI tasks that consume this cache state use
 patterns to this wrapper. The wrapper checks that the patterns are present in
 `bazel_ci_dependency_list.sh` when CI enables enforcement.
 
-That keeps the checked-in list aligned with the Bazel CI jobs we actually run.
-It makes it harder for a new or changed Bazel CI job to start depending on a
-different set of external build dependencies without also updating the list of
-target patterns used by setup to prepare the cache.
+This check keeps the list aligned with the Bazel CI jobs. A new or changed job
+cannot use an unlisted target pattern. The author must update the dependency
+list in the same change.
 
 ### Changing this safely
 
@@ -826,8 +836,12 @@ When modifying `setup-bazel`, `run_task.sh`, `run_bazel_ci_command.sh`,
 preserve these invariants:
 
 - CI can launch `task` without assuming a preinstalled repo-specific wrapper
-- the `setup` job prepares the dependency state later Bazel CI jobs are
-  expected to consume
+- on `master`, the `setup` job prepares the dependency state that later Bazel
+  CI jobs are expected to consume
+- GitHub Actions dependency-cache writes stay restricted to
+  `github.ref == 'refs/heads/master'`
+- cache misses on other refs do not prevent Bazel from downloading required
+  dependencies
 - the checked-in dependency list matches the Bazel target patterns actually run
   by the Bazel CI reusable workflows
 - cache-prefetch behavior stays focused on external repositories and does not

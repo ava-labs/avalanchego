@@ -15,7 +15,15 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
   - [Local composite actions define reusable GitHub Actions behavior](#local-composite-actions-define-reusable-github-actions-behavior)
   - [CI-only helpers implement CI-specific behavior](#ci-only-helpers-implement-ci-specific-behavior)
 - [Provision CI job dependencies](#provision-ci-job-dependencies)
-  - [Task](#task)
+  - [Cache lifecycle](#cache-lifecycle)
+    - [Shared cache policy](#shared-cache-policy)
+    - [Cache validation](#cache-validation)
+    - [Task cache](#task-cache)
+    - [Nix store cache](#nix-store-cache)
+    - [Bazel dependency cache](#bazel-dependency-cache)
+    - [Go module cache](#go-module-cache)
+    - [Go unit cache](#go-unit-cache)
+    - [Changing cache writers](#changing-cache-writers)
 - [Using Nix in GitHub Actions](#using-nix-in-github-actions)
   - [Run `install-nix` jobs in the Nix dev shell](#run-install-nix-jobs-in-the-nix-dev-shell)
   - [Start the Nix dev shell in composite actions](#start-the-nix-dev-shell-in-composite-actions)
@@ -187,41 +195,302 @@ reserved for jobs with dependencies that another setup action does not provide.
 provisioning mechanisms. A job that uses `setup-bazel` can also use `install-nix`
 for dependencies that Bazel does not provide.
 
-### Task
+### Cache lifecycle
+
+GitHub-hosted runners are temporary. CI uses GitHub Actions caches to reuse
+trusted tools and dependencies across jobs and workflow runs. This reduces
+network requests and setup time.
+
+A cache is not a workflow artifact. A cache supplies reusable input to later
+runs. An artifact transfers output between jobs in one workflow run. Use an
+artifact when one job builds output for another job in the same run.
+
+#### Shared cache policy
+
+All GitHub Actions cache writers use this trust boundary:
+
+```yaml
+github.ref == 'refs/heads/master'
+```
+
+A run against `master` can restore and write caches. Scheduled jobs against
+`master` satisfy this condition. These jobs warm platform-specific caches that
+pre-merge CI does not create.
+
+Pull request, merge-queue, tag, and non-`master` branch runs can restore cache
+entries that GitHub makes accessible. They can also download missing input.
+They must not write shared GitHub Actions caches. This policy limits shared
+storage to merged code. It also prevents unmerged code from publishing input
+that later runs reuse.
+
+The `cache-validation` pull request label is the exception for cache-validation
+runs. These runs write keys in that pull request's merge-ref scope. GitHub does
+not make these entries available to `master` or other pull requests. They
+validate a proposed cache policy. They do not warm shared CI.
+
+A cache miss must not prevent an ordinary non-`master` run from getting required
+input. This rule lets a pull request test a dependency change before `master`
+contains the new cache entry.
+
+GitHub Actions caches are immutable. The first writer for a key wins. Do not let
+parallel producers write different content with the same key.
+
+Use a cache schema version when a change makes an existing archive unsafe or
+incomplete. Put the version in the key before the platform and input hashes. For
+example:
+
+```text
+go-unit-v2-<os>-<arch>-<input-hash>
+```
+
+Increment the version when the cache path, archive contents, producer, restore
+procedure, or consumer behavior changes. Do not use an earlier schema as a
+restore prefix. A new schema starts a new warm and validation sequence. This
+preserves compiler-cache fallback within one schema and prevents an incompatible
+archive from passing as a cache hit.
+
+Normally, change the schema version in the same commit as the cache-semantic
+change. Do not create a version-only commit. It only discards reuse and creates
+storage churn. Use a version-only change only to discard a known-bad archive.
+Use label removal to delete validation entries. Use a schema version to
+invalidate their meaning.
+
+This policy does not control workflow artifacts or the Bazel remote cache. The
+[Bazel cache policy](./bazel.md#bazel-ci-external-dependency-caching) controls
+remote action and test-result data.
+
+#### Cache validation
+
+Cache hits alone do not prove that a cache contains all input that a later job
+needs. Cache validation checks both the restore result and the job output for
+work that the restored data should have avoided, such as a download, build, or
+test execution. The checks are implemented and unit tested in
+[`tools/cache-check`](../tools/cache-check/); GitHub Actions remains the
+integration test because it performs the actual restore and save operations.
+
+A labeled pull request uses merge-ref cache keys. The first run with no exact
+entry is a **warm run**. It uses the production save path. It does not require
+a cache hit. A later run restores the exact entry and runs **validation mode**.
+Validation requires exact restores. It fails when the log checker finds work
+that the restored cache should avoid.
+
+To reset and validate a cache change:
+
+1. Remove `cache-validation` and wait for the **Cache Validation Cleanup**
+   workflow to succeed.
+2. Push the cache change while the label is absent. This starts an ordinary,
+   restore-only run; it puts the workflow change on the pull request before the
+   label starts a validation run.
+3. Add `cache-validation`. This starts the warm run. Do not push another commit
+   or rerun the workflow until it completes: workflow concurrency cancels the
+   warm run and can leave its entries absent.
+4. Rerun the completed labeled workflow only after the warm run completes.
+   Keep the commit unchanged. The rerun must restore the entries from the warm
+   run. A new commit can change Go test-cache inputs. It is not a full
+   validation of the warm entry.
+
+If the warm run is cancelled or fails before saving its entries, remove the
+label, wait for cleanup, and repeat the procedure. Do not add the label before
+pushing the cache change: the label run would use the old commit and a later
+push can cancel it.
+
+For the Go unit job, use the job log to identify the mode. Its key is
+`go-unit-validation-v2-<os>-<arch>-<testdata-hash>`. A warm run has no exact hit.
+It does not run the Go test-result checker. The `actions/cache` post step saves
+the key after unit tests finish. A validation run has an exact hit, records
+`go-unit-cache-hit=true`, and runs `Validate Go unit-test results`. The Go setup
+action sets `GOPROXY=off` after it downloads the required modules.
+
+Both warm and validation runs set `GODEBUG=gocachetest=1`. Go includes
+`GODEBUG` in its test-result inputs. This setting also records each cache lookup
+in the log. The Task and Go module caches can hit during a Go-unit warm run. The
+Go unit-cache result selects the unit-job mode.
+
+A new commit does not replace an immutable validation entry. Remove and add
+`cache-validation` to reset the validation caches. Label removal deletes all
+Go-unit validation keys that start with the Go-unit validation prefix. Closing
+the pull request also deletes them. A changed `testdata` file creates a new
+Go-unit key. The next run warms that key.
+
+The pre-merge Go caller declares `cache-mode: write` so a labeled run has the
+cache capability required by the called workflow. This grants capability only.
+Each save step still checks validation mode, so an ordinary pull request does
+not save caches.
+
+A `master` cache consumer, including a scheduled cache-validation run, uses
+validation mode directly. It does not warm first: earlier post-merge and other
+`master` runs must already have populated the shared entries. A `master` cache
+miss or fallback download therefore exposes a cache-policy gap.
+
+The cleanup workflow handles label removal and pull-request close. This bounds
+storage even for abandoned validation attempts.
+
+When adding a cache consumer, add a corresponding log check and unit-test its
+recognized output. The labeled Go validation run allows an uncached result only
+for `tools/cache-check`: changing the checker cannot update its immutable
+pull-request cache entry. `master` does not allow this exception. Do not replace
+production save behavior with a validation-only writer; the validation rerun
+must consume entries that the normal writer produced.
+
+#### Task cache
 
 [Task](https://taskfile.dev) runs repository operations in CI. The local
 [`setup-task`](../.github/actions/setup-task/action.yml) action makes the Task
 binary available to Go, Bazel, and Docker jobs. Run this action after checkout
 because it reads `tools/external/go.mod`.
 
-See [Task version](./tasks.md#task-version) for the version policy and update
-commands.
+The key contains the Task version, operating system, and architecture. On a
+miss, the action downloads the platform release. It checks the SHA-256 value
+against the value in `scripts/setup_task.sh`. Only a `master` run saves the
+downloaded binary.
 
-The action uses a GitHub Actions cache, not an artifact. A cache lets unrelated
-jobs and workflow runs reuse one binary. An artifact belongs to one workflow
-run. The cache key includes the Task version, operating system, and
-architecture. Each job restores the matching cache. Only runs on `master` save
-a cache entry. Pull request and merge-queue jobs download Task on a cache miss.
-They do not save the binary. This policy limits cache storage to merged versions
-and prevents unmerged code from producing shared cache contents. Scheduled
-`master` jobs can save entries for platforms not tested on each push.
+This download avoids a host Go dependency in Bazel jobs. A source build would
+require Go before Task can run. See [Task version](./tasks.md#task-version) for
+the version policy and update commands.
 
-A cache entry exists only after a `master` job runs on the same operating system
-and architecture. When you add a CI platform, add a `master` job for that
-platform if it needs a reusable Task cache. Otherwise, cache-miss jobs download
-Task.
+When you add a CI platform, add a `master` job for that platform if it needs a
+reusable Task cache. Scheduled jobs can provide this coverage for platforms
+that pre-merge CI does not test.
 
-On a cache miss, the action downloads the platform release from the Task GitHub
-release and checks its SHA-256 value against the checked-in value in
-`setup_task.sh`. This avoids a host Go dependency in Bazel jobs. A source build would
-require host Go before Task can run. The checked-in checksum detects a damaged or
-changed archive in transit and makes release-archive changes visible in repository
-review.
+#### Nix store cache
 
-When changing this setup, keep these rules:
+[`install-nix`](../.github/actions/install-nix/action.yml) and the
+[`c-chain-reexecution-benchmark`](../.github/actions/c-chain-reexecution-benchmark/action.yml)
+action restore the Nix store cache on Linux and macOS. The key contains the
+operating system, architecture, and `flake.lock` hash.
+
+The maintained `nix-community/cache-nix-action` controls its own save step.
+Both local actions set its `save` input from the shared `master` condition. On a
+miss, the job loads the flake dependencies before it continues.
+
+#### Bazel dependency cache
+
+[`setup-bazel`](../.github/actions/setup-bazel/action.yml) always restores the
+Bazel dependency cache. The cache contains the Bazel repository cache and a
+Bazel-specific Go module cache. It does not contain remote Bazel action or test
+results.
+
+An initial setup always checks Bazel metadata. Only an initial setup on
+`master` prefetches the checked-in CI dependency list. It then saves the cache
+if the exact key was absent. A non-`master` job can download a missing
+dependency, but it does not publish that data.
+
+The key contains the operating system, architecture, `.bazelversion`,
+`MODULE.bazel.lock`, and the CI dependency-list script. See [Bazel CI external
+dependency caching](./bazel.md#bazel-ci-external-dependency-caching) for the
+complete design.
+
+#### Go module cache
+
+[`setup-go-for-project`](../.github/actions/setup-go-for-project/action.yml)
+installs Go and restores `GOMODCACHE`. Its schema-v2 key contains the operating
+system and the hashes of `go.work`, `go.work.sum`, all `go.mod` and `go.sum`
+files, and [`scripts/go_module_cache_manifest.tsv`](../scripts/go_module_cache_manifest.tsv).
+Module source does not need an architecture-specific key. Nix actions read
+`GOMODCACHE` from their Go toolchain and use the same key and archive.
+
+The action disables the implicit cache in `actions/setup-go`. That implicit
+cache saves in a post step and has no separate write condition. An explicit
+restore lets this repository enforce the shared write policy.
+
+On an ordinary run or a cache-validation warm run, the action prepares every
+repository module with `GOWORK=off`. It resolves the explicit CI tool and
+exceptional pinned-dependency graphs in the manifest with `go list -deps`; it
+does not build or run those tools. The manifest includes the pinned `abigen`
+tool that the load-contract generator runs from `GOMODCACHE`. When CI adds a Go
+tool outside ordinary module builds, add its dependency-graph entry to this
+manifest. Offline CI enforces that the manifest remains complete. This lets a
+dependency change run before `master` has a corresponding cache entry. `master` saves
+`GOMODCACHE` on an exact miss; a labeled cache-validation run saves only its
+pull-request-scoped entry. Nix actions use the same shared key and save policy.
+
+A cache-validation rerun with an exact module-cache hit, and every scheduled
+run, sets `GOPROXY=off` before preparation. The preparation command then fails
+if the restored archive lacks a required module. Other runs may use a fallback
+archive and download missing modules, but do not publish a shared entry. All
+actions set `GOPROXY=off` after preparation, so every later Go build or test
+uses the prepared module cache.
+
+#### Go unit cache
+
+The Go `unit` job also restores `GOCACHE`. This cache contains compiler output
+and Go test results. The normal key contains the operating system, architecture,
+the `testdata` content hash, Go source, workspace files, module files, and
+module sums. The validation key contains the operating system, architecture,
+and the `testdata` content hash.
+
+Go uses file modification times when it creates test-result keys. Git checkout
+sets new modification times on each runner. Before the unit job restores
+`GOCACHE`, it runs `normalize-testdata-mtimes`. This task sets all `testdata`
+file and directory times to `1970-01-01`. The fixed times let an exact restored
+cache reuse test results on another runner.
+
+The `testdata` content hash keeps this change safe. A fixture change selects a
+new primary key. A restore first tries an archive with the same fixture hash.
+It can reuse compiler output and test results. A later fallback can use an
+archive with a different fixture hash. The job then runs `go clean -testcache`.
+This keeps compiler output and removes test results that could use the fixed
+fixture times.
+
+The current task normalizes all `testdata` entries. If a future fuzz job writes
+corpus entries there, do not normalize or fingerprint those generated entries.
+Store that corpus in a separate fuzz cache. Committed corpus entries remain
+fixtures. The unit-cache fingerprint must include them.
+
+**Validate all eligible test results.** The unit cache must restore compiler
+output, test results, and coverage profiles for every cacheable unit-test
+package. This avoids repeated test work. It also proves that the saved archive
+contains the coverage data that `go test` needs. Do not add package exceptions
+for fixture users or fuzz targets. Exceptions make those packages run again.
+They also hide restore failures. The validation checker permits `tools/cache-check` only
+because a change to that tool cannot update its immutable validation entry.
+
+**Alternatives not selected.** Do not exclude `testdata` packages. Normal unit
+tests use fixture files, and fuzz targets are only some of the affected tests.
+Do not validate by running tests twice in one job. That test does not restore an
+archive on a new runner. Do not ignore uncached packages in the checker. That
+would accept the repeated work this cache must prevent.
+
+`git-restore-mtime` can restore each file's last Git commit time. It needs a
+full Git history and adds a separate dependency. The selected task uses a fixed
+time. It needs no history. The fixture-content hash and the test-cache cleanup
+step preserve correctness. Normalize only `testdata`, not the full worktree.
+Tests can use modification times outside fixture directories as input.
+
+The unit job registers `actions/cache` on `master`. That action saves in its
+post step, after unit tests populate `GOCACHE`. A labeled cache-validation run
+uses the same lifecycle in its pull-request merge-ref scope. An explicit save
+during setup would store an empty or incomplete cache.
+
+The normal unit task disables race detection and test shuffling. This lets
+repeated runs use cached test results. The scheduled race-and-shuffle job still
+warms compiler output, but its task does not reuse test results.
+
+#### Changing cache writers
+
+Use these rules when you add or change a GitHub Actions cache:
+
+- Keep cache restore enabled for all event types.
+- Let a cache-miss job download the input that it needs.
+- Restrict shared save paths to `github.ref == 'refs/heads/master'`. A
+  cache-validation save must use a fixed pull-request merge-ref key and run
+  only when validation mode is enabled.
+- Use a maintained action's save control when the action provides one.
+- Otherwise, separate restore and save steps.
+- Save only after the producer has completed its work.
+- Give parallel producers different keys, or order them before one writer.
+- Use workflow artifacts, not shared caches, for output passed within one run.
+
+Check each third-party action for an implicit post-job save. Disable that cache
+if the action cannot apply the shared `master` condition. After an action
+change, run `task lint-action`. Test one exact hit, one miss on `master`, and
+one miss on an ordinary non-`master` ref. For a cache-validation writer, also
+run its warm attempt and validation rerun. Confirm that only `master` creates a
+shared entry and that validation entries remain in their pull-request scope.
+
+Keep these Task-specific rules:
 
 - Keep Nix and `tools/external/go.mod` on the same Task version.
-- Keep cache writes limited to runs on `master`.
 - Keep the release platform mapping compatible with every CI runner.
 
 ## Using Nix in GitHub Actions
@@ -234,21 +503,12 @@ Nix development shell.
 A job that directly uses `./.github/actions/install-nix` must set its default shell to
 `nix develop`.
 
-CI previously failed when a job installed Nix but ran `scripts/run_task.sh` from a
-step outside the dev shell. In these jobs, the dev shell, rather than
-`setup-go-for-project`, supplies Task and the required Go version.
+In these jobs, the development shell, rather than `setup-go-for-project`,
+supplies Task and the required Go version. `scripts/run_task.sh` fails in CI if
+Task is not in `PATH`. It does not build Task with `go tool`.
 
-The failure occurred as follows:
-
-1. `task` was not in the `PATH`.
-2. `scripts/run_task.sh` ran `task` with `go run`.
-3. The runner Go version was in the `PATH`.
-4. The runner Go version differed from the repository version.
-5. Go downloaded the required version.
-6. The download failed and failed the job.
-
-Using the Nix dev shell avoids this failure mode by ensuring that `task` and the
-required Go version are in the `PATH`.
+Using the Nix development shell makes Task and the required Go version
+available in `PATH`.
 
 An alternative to setting the Nix dev shell in the workflow could be to start it in
 `scripts/run_task.sh`. This would protect task calls, but not direct script calls. A

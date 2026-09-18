@@ -1,0 +1,39 @@
+name: Cache Validation Cleanup
+
+on:
+  pull_request:
+    types: [unlabeled, closed]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    if: ${{ github.event.action == 'closed' || github.event.label.name == 'cache-validation' }}
+    runs-on: ubuntu-24.04
+    cache-mode: write
+    steps:
+      - name: Delete pull request validation caches
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_REF: refs/pull/${{ github.event.pull_request.number }}/merge
+        run: |
+          key_prefixes=(
+            "task-validation-Linux-X64"
+            "task-validation-Linux-ARM64"
+            "task-validation-macOS-ARM64"
+            "go-mod-validation-Linux"
+            "go-mod-validation-v2-Linux"
+            "go-unit-validation-"
+          )
+          for key_prefix in "${key_prefixes[@]}"; do
+            cache_ids="$(
+              gh cache list --repo "$GITHUB_REPOSITORY" --ref "$PR_REF" --limit 100 --json id,key \
+                --jq ".[] | select(.key | startswith(\"${key_prefix}\")) | .id"
+            )"
+            for cache_id in $cache_ids; do
+              gh cache delete "$cache_id" --repo "$GITHUB_REPOSITORY"
+            done
+          done

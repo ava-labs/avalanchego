@@ -13,15 +13,79 @@
 name: 'Install Go toolchain with project defaults'
 description: 'Install a go toolchain with project defaults'
 
+inputs:
+  cache-validation:
+    description: Use PR-scoped validation caches
+    required: false
+    default: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'cache-validation') }}
+
+outputs:
+  task-cache-hit:
+    description: 'Whether the Task cache was restored with an exact key'
+    value: ${{ steps.setup-task.outputs.cache-hit }}
+  go-mod-cache-hit:
+    description: 'Whether the Go module cache was restored with an exact key'
+    value: ${{ steps.go-mod-cache.outputs.cache-hit }}
+  go-mod-cache-path:
+    description: 'Path to the Go module cache'
+    value: ${{ steps.cache-paths.outputs.go-mod-cache }}
+  go-build-cache-path:
+    description: 'Path to the Go build and test cache'
+    value: ${{ steps.cache-paths.outputs.go-build-cache }}
+
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/setup-task
+    - id: setup-task
+      uses: ./.github/actions/setup-task
+      with:
+        cache-validation: ${{ inputs.cache-validation }}
 
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
         go-version-file: go.mod
-        cache-dependency-path: |
-          go.work.sum
-          tools/external/go.sum
+        # setup-go saves its dependency cache in a post step that cannot be
+        # restricted to runs on master. Caching is handled explicitly by actions
+        # that can apply the master-write-only policy.
+        cache: false
+
+    - id: cache-paths
+      name: Read Go cache paths
+      shell: bash
+      run: |
+        {
+          echo "go-mod-cache=$(go env GOMODCACHE)"
+          echo "go-build-cache=$(go env GOCACHE)"
+        } >> "$GITHUB_OUTPUT"
+
+    - id: go-mod-cache
+      name: Restore Go module cache
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ steps.cache-paths.outputs.go-mod-cache }}
+        key: ${{ inputs.cache-validation == 'true' && format('go-mod-validation-v2-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum', 'scripts/go_module_cache_manifest.tsv')) || format('go-mod-v2-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum', 'scripts/go_module_cache_manifest.tsv')) }}
+        restore-keys: |
+          ${{ inputs.cache-validation == 'true' && format('go-mod-validation-v2-{0}-', runner.os) || format('go-mod-v2-{0}-', runner.os) }}
+
+    # Scheduled runs and validation reruns must prove that the exact restored
+    # archive has every dependency. Other runs can warm a missing cache entry.
+    - name: Disable the Go module proxy for validation
+      if: ${{ github.event_name == 'schedule' || (inputs.cache-validation == 'true' && steps.go-mod-cache.outputs.cache-hit == 'true') }}
+      shell: bash
+      run: echo 'GOPROXY=off' >> "$GITHUB_ENV"
+
+    - name: Prepare Go module dependencies
+      shell: bash
+      run: ./scripts/download_go_modules.sh
+
+    - name: Save Go module cache
+      if: ${{ steps.go-mod-cache.outputs.cache-hit != 'true' && (github.ref == 'refs/heads/master' || inputs.cache-validation == 'true') }}
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ steps.cache-paths.outputs.go-mod-cache }}
+        key: ${{ inputs.cache-validation == 'true' && format('go-mod-validation-v2-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum', 'scripts/go_module_cache_manifest.tsv')) || format('go-mod-v2-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum', 'scripts/go_module_cache_manifest.tsv')) }}
+
+    - name: Disable the Go module proxy
+      shell: bash
+      run: echo 'GOPROXY=off' >> "$GITHUB_ENV"

@@ -13,11 +13,17 @@ inputs:
     description: 'Whether to set up QEMU before running the command'
     required: false
     default: 'false'
+  cache-validation:
+    description: Use the PR-scoped Task validation cache
+    required: false
+    default: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'cache-validation') }}
 
 runs:
   using: composite
   steps:
     - uses: ./.github/actions/setup-task
+      with:
+        cache-validation: ${{ inputs.cache-validation }}
 
     - uses: ./.github/actions/ensure-disk-space
       with:

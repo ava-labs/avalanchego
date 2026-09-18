@@ -1,0 +1,16 @@
+name: Setup Go dependencies
+description: Install the project Go toolchain and its module dependencies
+
+inputs:
+  cache-validation:
+    description: Use PR-scoped validation caches
+    required: false
+    default: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'cache-validation') }}
+
+runs:
+  using: composite
+  steps:
+    - id: setup-go
+      uses: ./.github/actions/setup-go-for-project
+      with:
+        cache-validation: ${{ inputs.cache-validation }}

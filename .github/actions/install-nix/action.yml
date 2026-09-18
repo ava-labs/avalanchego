@@ -17,35 +17,46 @@ runs:
     # same flake inputs on every run. Key by OS, arch, and flake.lock so the
     # cache is reused across matching runners and replaced when inputs change.
     # Cap the saved store size to keep cache growth bounded.
-    - name: Restore and save Nix store cache
+    - name: Restore Nix store cache
       if: runner.os == 'Linux' || runner.os == 'macOS'
       uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
       with:
         primary-key: nix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}
         restore-prefixes-first-match: |
           nix-${{ runner.os }}-${{ runner.arch }}-
+        save: ${{ github.ref == 'refs/heads/master' }}
         gc-max-store-size-linux: 5G
         gc-max-store-size-macos: 5G
     - name: Load flake dependencies
       run: nix develop --command echo "dependencies installed"
       shell: bash
-    # Cache Go modules (architecture-independent)
-    - uses: actions/cache@v5
-      id: go-mod-cache
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.work.sum', 'tools/external/go.sum') }}
-        restore-keys: ${{ runner.os }}-go-mod-
-    # Cache Go build cache (architecture-specific)
-    - uses: actions/cache@v5
-      with:
-        path: ~/.cache/go-build
-        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.work.sum', 'tools/external/go.sum') }}
-        restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
-    # Download modules only on cache miss
-    - run: nix develop --command go mod download
-      if: steps.go-mod-cache.outputs.cache-hit != 'true'
+    - id: go-mod-cache-path
+      name: Read Go module cache path
+      run: echo "path=$(nix develop --command go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
       shell: bash
-    - run: GOWORK=off nix develop --command go mod download -modfile=tools/external/go.mod
-      if: steps.go-mod-cache.outputs.cache-hit != 'true'
+    - id: go-mod-cache
+      name: Restore Go module cache
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ steps.go-mod-cache-path.outputs.path }}
+        key: go-mod-v2-${{ runner.os }}-${{ hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum', 'scripts/go_module_cache_manifest.tsv') }}
+        restore-keys: |
+          go-mod-v2-${{ runner.os }}-
+    # Scheduled runs must prove that the exact restored archive has every
+    # dependency. Other runs can warm a missing cache entry.
+    - name: Disable the Go module proxy for validation
+      if: ${{ github.event_name == 'schedule' }}
       shell: bash
+      run: echo 'GOPROXY=off' >> "$GITHUB_ENV"
+    - name: Prepare Go module dependencies
+      run: nix develop --command ./scripts/download_go_modules.sh
+      shell: bash
+    - name: Save Go module cache
+      if: ${{ steps.go-mod-cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master' }}
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ steps.go-mod-cache-path.outputs.path }}
+        key: go-mod-v2-${{ runner.os }}-${{ hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum', 'scripts/go_module_cache_manifest.tsv') }}
+    - name: Disable the Go module proxy
+      shell: bash
+      run: echo 'GOPROXY=off' >> "$GITHUB_ENV"
