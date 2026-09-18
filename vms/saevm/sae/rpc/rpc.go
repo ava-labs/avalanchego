@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"runtime"
 	"time"
 
 	"github.com/ava-labs/libevm/accounts"
@@ -67,11 +68,10 @@ type Config struct {
 	APIs set.Set[API]
 
 	// Resource limits
-	BlocksPerBloomSection  uint64
-	EVMTimeout             time.Duration
-	GasCap                 uint64
-	BatchRequestLimit      uint64 // 0 = no limit
-	StateReplayConcurrency uint64 // 0 = no limit
+	BlocksPerBloomSection uint64
+	EVMTimeout            time.Duration
+	GasCap                uint64
+	BatchRequestLimit     uint64 // 0 = no limit
 
 	// Transaction submission
 	TxFeeCap            float64 // 0 = no cap
@@ -85,8 +85,6 @@ var (
 	ErrBatchRequestLimitTooLarge = errors.New("batch request limit exceeds max")
 	// ErrUnknownAPI means [Config.APIs] contains an API that doesn't exist.
 	ErrUnknownAPI = errors.New("unknown API")
-	// ErrStateReplayConcurrencyTooLarge means [Config.StateReplayConcurrency] overflows an int.
-	ErrStateReplayConcurrencyTooLarge = errors.New("state replay concurrency exceeds max")
 )
 
 // Verify checks that all values in c are within usable bounds.
@@ -99,9 +97,6 @@ func (c Config) Verify() error {
 		if !known.Contains(a) {
 			return fmt.Errorf("%w: %q", ErrUnknownAPI, a)
 		}
-	}
-	if c.StateReplayConcurrency > math.MaxInt {
-		return fmt.Errorf("%w: %d > %d", ErrStateReplayConcurrencyTooLarge, c.StateReplayConcurrency, math.MaxInt)
 	}
 	return nil
 }
@@ -125,12 +120,7 @@ func New(chain Chain, config Config) (*Provider, error) {
 		return nil, fmt.Errorf("gasprice.NewEstimator(...): %v", err)
 	}
 
-	// A nil channel signals unbounded re-execution; see [backend.stateAtBlock].
-	var replaySlots chan struct{}
-	if config.StateReplayConcurrency > 0 {
-		replaySlots = make(chan struct{}, config.StateReplayConcurrency)
-	}
-
+	replaySlots := max(1, runtime.GOMAXPROCS(0)-1)
 	chainIdx := chainIndexer{chain}
 	override := bloomOverrider{chain}
 
@@ -145,7 +135,7 @@ func New(chain Chain, config Config) (*Provider, error) {
 		chain.Mempool(),
 		chainIdx,
 		override,
-		replaySlots,
+		make(chan struct{}, replaySlots),
 		newBloomIndexer(
 			// TODO(alarso16): if we are state syncing, we need to provide the
 			// first block available to the indexer via
