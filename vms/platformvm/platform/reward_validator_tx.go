@@ -52,8 +52,7 @@ func (*RewardValidatorTx) Outputs() []*avax.TransferableOutput {
 }
 
 func (tx *RewardValidatorTx) SyntacticVerify(*snow.Context) error {
-	switch {
-	case tx.TxID == ids.Empty:
+	if tx.TxID == ids.Empty {
 		return errMissingTxID
 	}
 	return nil

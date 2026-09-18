@@ -34,7 +34,6 @@ var (
 	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
 
 	errWrongTxType                   = errors.New("wrong transaction type")
-	errInvalidID                     = errors.New("invalid ID")
 	errRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
 	errRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
 	errInvalidState                  = errors.New("generated output isn't valid state")
