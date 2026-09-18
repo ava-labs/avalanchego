@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
-	api "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 // Test the JSON field names of AutoRenewedConfig, which are public API.
