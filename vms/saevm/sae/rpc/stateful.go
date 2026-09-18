@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -22,6 +23,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
+	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -76,32 +78,32 @@ func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rp
 		}
 	}
 
-	// TODO(JonathanOppenheimer): [backend.restoreExecutedBlock] reads and
-	// decodes the full block body and receipts but this method only needs the
-	// header, the post-execution state root, and the executed base fee. Some
-	// sort of refactor could improve performance.
-	bl, err := b.restoreExecutedBlock(ctx, numOrHash)
+	numOrHash.RequireCanonical = true
+	n, _, err := blocks.ResolveRPCNumberOrHash(b, numOrHash)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	hdr := executedHeader(bl)
-	sdb, err := b.StateDB(hdr.Root)
+	sdb, bl, err := b.stateAtBlock(ctx, n)
 	if err != nil {
 		return nil, nil, err
 	}
-	return sdb, hdr, nil
+
+	return sdb, executedHeader(bl), nil
 }
 
 // StateAtBlock returns the state database after executing the given block.
 //
-// The reexec, base, readOnly, and preferDisk parameters are ignored because SAE
-// does not implement geth's re-execution-from-archive strategy.
+// The following flags are ignored:
+// - reexec     // TODO(alarso16): Configure the tracer API to have a different maximum depth.
+// - base       // TODO(alarso16): Re-use previous state in `debug_traceChain` if possible.
+// - readOnly   // Ignored because all APIs are read only.
+// - preferDisk // Ignored base isn't used either.
 //
-// Like geth, SAE only stores historical state roots, not full historical state.
-// The underlying trie data must still be present in the state cache/DB for
-// [state.New] to succeed. This means tracing is limited to recent blocks whose
-// trie data has not been pruned (or requires an archival node for older blocks).
+// Like geth, SAE requires that the underlying trie data must still be present
+// in the state cache/DB for [state.New] to succeed. This means tracing is
+// limited to recent blocks whose trie data has not been pruned (or requires an
+// archival node for older blocks).
 //
 // Reference: https://geth.ethereum.org/docs/developers/evm-tracing#state-availability
 //
@@ -117,17 +119,90 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec u
 // stateAtBlock returns the state after executing block num, along with the
 // stored block it was restored from.
 func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB, *blocks.Block, error) {
-	n := rpc.BlockNumber(num) // #nosec G115 -- won't overflow for a while.
-	bl, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(n))
+	sdb, lastBlock, toReexec, err := b.lastBlockWithState(ctx, num)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	sdb, err := b.StateDB(bl.PostExecutionStateRoot())
-	if err != nil {
-		return nil, nil, err
+	var (
+		hooks    = b.Hooks()
+		config   = b.ChainConfig()
+		chainCtx = b.ChainContext()
+		log      = b.Logger()
+	)
+	for _, nextBlock := range toReexec {
+		if ctx.Err() != nil {
+			return nil, nil, context.Cause(ctx)
+		}
+
+		// A settled block has no ancestry, which [saexec.Execute] requires,
+		// so it is rebuilt on top of the previous block.
+		toExecute, err := b.NewBlock(nextBlock.EthBlock(), lastBlock, nil)
+		if err != nil {
+			return nil, nil, fmt.Errorf("constructing SAE block %d: %w", nextBlock.NumberU64(), err)
+		}
+		_, err = saexec.Execute(toExecute, sdb, hooks, config, chainCtx, log)
+		if err != nil {
+			return nil, nil, fmt.Errorf("re-executing block %d: %w", nextBlock.NumberU64(), err)
+		}
+
+		// A normal execution would commit this state or store it in the triedb.
+		sdb.Finalise(config.IsEIP158(toExecute.Number()))
+
+		lastBlock = nextBlock // The stored block is marked as executed.
 	}
-	return sdb, bl, nil
+
+	// TODO(alarso16): Hashing is an expensive operation and is only used here
+	// to check if there was an error during re-execution. Add metrics to
+	// determine whether this check is prohibitively expensive.
+	got := sdb.IntermediateRoot(config.IsEIP158(lastBlock.Number()))
+	want := lastBlock.PostExecutionStateRoot()
+	if got != want {
+		return nil, nil, fmt.Errorf(
+			"incorrect state root on reconstruction: block %d produced %s, want %s",
+			lastBlock.NumberU64(),
+			got,
+			want,
+		)
+	}
+
+	return sdb, lastBlock, nil
+}
+
+// lastBlockWithState searches backwards from block num for the most recent
+// block with available post-execution state. It returns that state and block,
+// along with the blocks (in ascending order, excluding the found block) that
+// must be re-executed on top of it to reach the state of block num.
+func (b *backend) lastBlockWithState(ctx context.Context, num uint64) (*state.StateDB, *blocks.Block, []*blocks.Block, error) {
+	// TODO(alarso16): determine using commit interval and settlement height, or with user option
+	const maxReexec = 8192
+
+	var (
+		toReexec    []*blocks.Block
+		errNotFound = new(trie.MissingNodeError)
+	)
+	for i := range min(num, maxReexec) + 1 {
+		if ctx.Err() != nil {
+			return nil, nil, nil, context.Cause(ctx)
+		}
+		rpcNum := rpc.BlockNumber(num - i) // #nosec G115 -- won't overflow for a while.
+		bl, err := b.restoreExecutedBlock(ctx, rpc.BlockNumberOrHashWithNumber(rpcNum))
+		if err != nil {
+			return nil, nil, nil, err
+		}
+		sdb, err := b.StateDB(bl.PostExecutionStateRoot())
+		switch {
+		case errors.As(err, &errNotFound):
+			toReexec = append(toReexec, bl)
+			continue
+		case err != nil:
+			return nil, nil, nil, fmt.Errorf("looking for state root %s at height %d: %w", bl.PostExecutionStateRoot(), bl.NumberU64(), err)
+		}
+		slices.Reverse(toReexec)
+		return sdb, bl, toReexec, nil
+	}
+
+	return nil, nil, nil, fmt.Errorf("no state found for block %d or any of its %d ancestors", num, maxReexec)
 }
 
 // StateAtTransaction returns the execution environment of a particular
@@ -135,6 +210,8 @@ func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB,
 // the state just before the target transaction, then returns the message and
 // block context needed for tracing. Replay does not apply end-of-block
 // operations, record block progress, or publish receipts.
+//
+// reexec is ignored. TODO(alarso16): Configure the tracer API to have a different maximum depth.
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
@@ -147,17 +224,13 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		return nil, bCtx, nil, nil, fmt.Errorf("transaction index %d out of range [0, %d)", txIndex, len(txs))
 	}
 
-	parent, err := b.restoreExecutedParent(ctx, ethB)
+	stateDB, parent, err := b.stateAtBlock(ctx, ethB.NumberU64()-1)
 	if err != nil {
-		return nil, bCtx, nil, nil, fmt.Errorf("restoring parent block: %w", err)
+		return nil, bCtx, nil, nil, err
 	}
 	block, err := b.NewBlock(ethB, parent, nil)
 	if err != nil {
 		return nil, bCtx, nil, nil, fmt.Errorf("constructing SAE block: %v", err)
-	}
-	stateDB, err := b.StateDB(parent.PostExecutionStateRoot())
-	if err != nil {
-		return nil, bCtx, nil, nil, err
 	}
 
 	// Replay transactions 0..txIndex-1 to produce the state just before the

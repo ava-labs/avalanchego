@@ -56,11 +56,13 @@ const (
 )
 
 // Config allows parameterization of the TrieDB and when state is committed.
+//
+// TODO(alarso16): completely separate HashDB and Firewood options.
 type Config struct {
 	Scheme            string // trie database scheme to use; defaults to [rawdb.HashScheme]
 	TrieCacheMiB      uint64 // size of the TrieDB cache
 	SnapshotCacheMiB  uint64 // size of the snapshot cache - if 0, snapshots are disabled
-	Archival          bool   // if true, will store every state on disk
+	Archival          bool   // if true, state will be persisted regularly for RPC support
 	CommitInterval    uint64 // MUST be set to a non-zero value
 	AllowMissingTries bool   // allow switching from archival to pruning on a DB that ran archival
 
@@ -104,10 +106,6 @@ func (c Config) TrieDBConfig(dataDir string, log logging.Logger) *triedb.Config 
 		if c.TrieCacheMiB == 0 {
 			// Firewood doesn't allow memory-only operation
 			c.TrieCacheMiB = DefaultTrieCacheSizeMiB
-		}
-		if c.Archival {
-			// TODO(alarso16): Allow arbitrary values when re-execution is enabled
-			c.CommitInterval = 1
 		}
 		return &triedb.Config{
 			DBOverride: firewood.Config{
