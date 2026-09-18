@@ -107,11 +107,11 @@ type standardTxExecutor struct {
 }
 
 func (*standardTxExecutor) AdvanceTimeTx(*platform.AdvanceTimeTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*standardTxExecutor) RewardValidatorTx(*platform.RewardValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (e *standardTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
@@ -1181,7 +1181,7 @@ func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *platform.SetAut
 }
 
 func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
