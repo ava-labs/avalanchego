@@ -31,10 +31,10 @@ const (
 var (
 	_ platform.TxVisitor = (*proposalTxExecutor)(nil)
 
-	ErrWrongTxType                   = errors.New("wrong transaction type")
-	ErrInvalidID                     = errors.New("invalid ID")
 	ErrAdvanceTimeTxIssuedAfterBanff = errors.New("AdvanceTimeTx issued after Banff")
 
+	errWrongTxType                   = errors.New("wrong transaction type")
+	errInvalidID                     = errors.New("invalid ID")
 	errRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
 	errRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
 	errInvalidState                  = errors.New("generated output isn't valid state")
@@ -90,71 +90,71 @@ type proposalTxExecutor struct {
 }
 
 func (*proposalTxExecutor) CreateChainTx(*platform.CreateChainTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) CreateSubnetTx(*platform.CreateSubnetTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) ImportTx(*platform.ImportTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) ExportTx(*platform.ExportTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) RemoveSubnetValidatorTx(*platform.RemoveSubnetValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) TransformSubnetTx(*platform.TransformSubnetTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) AddPermissionlessValidatorTx(*platform.AddPermissionlessValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) AddPermissionlessDelegatorTx(*platform.AddPermissionlessDelegatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) TransferSubnetOwnershipTx(*platform.TransferSubnetOwnershipTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) BaseTx(*platform.BaseTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) ConvertSubnetToL1Tx(*platform.ConvertSubnetToL1Tx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) RegisterL1ValidatorTx(*platform.RegisterL1ValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) SetL1ValidatorWeightTx(*platform.SetL1ValidatorWeightTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) IncreaseL1ValidatorBalanceTx(*platform.IncreaseL1ValidatorBalanceTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) DisableL1ValidatorTx(*platform.DisableL1ValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) AddAutoRenewedValidatorTx(*platform.AddAutoRenewedValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*proposalTxExecutor) SetAutoRenewedValidatorConfigTx(*platform.SetAutoRenewedValidatorConfigTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (e *proposalTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
@@ -320,7 +320,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *platform.RewardValidatorTx) e
 	case tx == nil:
 		return platform.ErrNilTx
 	case tx.TxID == ids.Empty:
-		return ErrInvalidID
+		return errInvalidID
 	case len(e.tx.Creds) != 0:
 		return errWrongNumberOfCredentials
 	}
@@ -628,7 +628,7 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx platform.DelegatorTx
 	//            AddSubnetValidatorTx.
 	vdrTx, ok := vdrTxIntf.Unsigned.(platform.ValidatorTx)
 	if !ok {
-		return ErrWrongTxType
+		return errWrongTxType
 	}
 
 	// Calculate split of reward between delegator/delegatee
