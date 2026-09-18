@@ -161,17 +161,16 @@ func verifyAddValidatorTx(
 }
 
 // verifyAddSubnetValidatorTx carries out the validation for an
-// AddSubnetValidatorTx. It returns the credentials authorizing the spend of the
-// tx inputs.
+// AddSubnetValidatorTx.
 func verifyAddSubnetValidatorTx(
 	backend *Backend,
 	chainState state.Chain,
 	sTx *platform.Tx,
 	tx *platform.AddSubnetValidatorTx,
-) ([]verify.Verifiable, error) {
+) error {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return nil, err
+		return err
 	}
 
 	var (
@@ -179,7 +178,7 @@ func verifyAddSubnetValidatorTx(
 		isDurangoActive  = backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
-		return nil, err
+		return err
 	}
 
 	startTime := currentTimestamp
@@ -191,24 +190,24 @@ func verifyAddSubnetValidatorTx(
 	switch {
 	case duration < backend.Config.MinStakeDuration:
 		// Ensure staking length is not too short
-		return nil, ErrStakeTooShort
+		return ErrStakeTooShort
 
 	case duration > backend.Config.MaxStakeDuration:
 		// Ensure staking length is not too long
-		return nil, ErrStakeTooLong
+		return ErrStakeTooLong
 	}
 
 	if !backend.Bootstrapped.Get() {
-		return nil, nil
+		return nil
 	}
 
 	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
-		return nil, err
+		return err
 	}
 
 	_, err := GetValidator(chainState, tx.SubnetValidator.Subnet, tx.Validator.NodeID)
 	if err == nil {
-		return nil, fmt.Errorf(
+		return fmt.Errorf(
 			"attempted to issue %w for %s on subnet %s",
 			ErrDuplicateValidator,
 			tx.Validator.NodeID,
@@ -216,7 +215,7 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 	if err != database.ErrNotFound {
-		return nil, fmt.Errorf(
+		return fmt.Errorf(
 			"failed to find whether %s is a subnet validator: %w",
 			tx.Validator.NodeID,
 			err,
@@ -224,15 +223,15 @@ func verifyAddSubnetValidatorTx(
 	}
 
 	if err := verifySubnetValidatorPrimaryNetworkRequirements(isDurangoActive, chainState, tx.Validator); err != nil {
-		return nil, err
+		return err
 	}
 
-	return verifyPoASubnetAuthorization(backend.Fx, chainState, sTx, tx.SubnetValidator.Subnet, tx.SubnetAuth)
+	_, err = verifyPoASubnetAuthorization(backend.Fx, chainState, sTx, tx.SubnetValidator.Subnet, tx.SubnetAuth)
+	return err
 }
 
 // Returns the representation of tx.NodeID validating tx.Subnet, which may
-// be either a current or a pending validator, and the credentials authorizing
-// the spend of the tx inputs.
+// be either a current or a pending validator.
 // Returns an error if the given tx is invalid.
 // The transaction is valid if:
 // * tx.NodeI] is a current/pending PoA validator of tx.Subnet.
@@ -242,10 +241,10 @@ func verifyRemoveSubnetValidatorTx(
 	chainState state.Chain,
 	sTx *platform.Tx,
 	tx *platform.RemoveSubnetValidatorTx,
-) (*state.Staker, []verify.Verifiable, error) {
+) (*state.Staker, error) {
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	var (
@@ -253,7 +252,7 @@ func verifyRemoveSubnetValidatorTx(
 		isDurangoActive  = backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
 	)
 	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	vdr, err := chainState.GetCurrentValidator(tx.Subnet, tx.NodeID)
@@ -262,7 +261,7 @@ func verifyRemoveSubnetValidatorTx(
 	}
 	if err != nil {
 		// It isn't a current or pending validator.
-		return nil, nil, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"%s %w of %s: %w",
 			tx.NodeID,
 			ErrNotValidator,
@@ -272,20 +271,19 @@ func verifyRemoveSubnetValidatorTx(
 	}
 
 	if !vdr.Priority.IsPermissionedValidator() {
-		return nil, nil, ErrRemovePermissionlessValidator
+		return nil, ErrRemovePermissionlessValidator
 	}
 
 	if !backend.Bootstrapped.Get() {
 		// Not bootstrapped yet -- don't need to do full verification.
-		return vdr, nil, nil
+		return vdr, nil
 	}
 
-	baseTxCreds, err := verifySubnetAuthorization(backend.Fx, chainState, sTx, tx.Subnet, tx.SubnetAuth)
-	if err != nil {
-		return nil, nil, err
+	if _, err := verifySubnetAuthorization(backend.Fx, chainState, sTx, tx.Subnet, tx.SubnetAuth); err != nil {
+		return nil, err
 	}
 
-	return vdr, baseTxCreds, nil
+	return vdr, nil
 }
 
 // verifyAddDelegatorTx carries out the validation for an AddDelegatorTx.
@@ -603,8 +601,6 @@ func verifyAddPermissionlessDelegatorTx(
 	return nil
 }
 
-// Returns the credentials authorizing the spend of the tx inputs. The flow
-// check is left to the caller.
 // Returns an error if the given tx is invalid.
 // The transaction is valid if:
 // * [sTx]'s creds authorize it to transfer ownership of [tx.Subnet].
@@ -613,30 +609,31 @@ func verifyTransferSubnetOwnershipTx(
 	chainState state.Chain,
 	sTx *platform.Tx,
 	tx *platform.TransferSubnetOwnershipTx,
-) ([]verify.Verifiable, error) {
+) error {
 	var (
 		currentTimestamp = chainState.GetTimestamp()
 		upgrades         = backend.Config.UpgradeConfig
 	)
 	if !upgrades.IsDurangoActivated(currentTimestamp) {
-		return nil, ErrDurangoUpgradeNotActive
+		return ErrDurangoUpgradeNotActive
 	}
 
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
-		return nil, err
+		return err
 	}
 
 	if !backend.Bootstrapped.Get() {
 		// Not bootstrapped yet -- don't need to do full verification.
-		return nil, nil
+		return nil
 	}
 
-	return verifySubnetAuthorization(backend.Fx, chainState, sTx, tx.Subnet, tx.SubnetAuth)
+	_, err := verifySubnetAuthorization(backend.Fx, chainState, sTx, tx.Subnet, tx.SubnetAuth)
+	return err
 }
 
 // verifyAddAutoRenewedValidatorTx carries out the validation for an
@@ -715,71 +712,69 @@ func verifyAddAutoRenewedValidatorTx(
 }
 
 // verifySetAutoRenewedValidatorConfigTx carries out the validation for a
-// SetAutoRenewedValidatorConfigTx. It returns the validator being configured
-// and the credentials authorizing the spend of the tx inputs.
+// SetAutoRenewedValidatorConfigTx. It returns the validator being configured.
 func verifySetAutoRenewedValidatorConfigTx(
 	backend *Backend,
 	chainState state.Chain,
 	sTx *platform.Tx,
 	tx *platform.SetAutoRenewedValidatorConfigTx,
-) (*state.Staker, []verify.Verifiable, error) {
+) (*state.Staker, error) {
 	if !backend.Config.UpgradeConfig.IsHeliconActivated(chainState.GetTimestamp()) {
-		return nil, nil, errHeliconUpgradeNotActive
+		return nil, errHeliconUpgradeNotActive
 	}
 
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	stakerTx, _, err := chainState.GetTx(tx.TxID)
 	if err != nil {
-		return nil, nil, fmt.Errorf("getting staker tx: %w", err)
+		return nil, fmt.Errorf("getting staker tx: %w", err)
 	}
 
 	autoRenewedStakerTx, ok := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
 	if !ok {
-		return nil, nil, fmt.Errorf("%w: %T", errInvalidStakerTxType, stakerTx.Unsigned)
+		return nil, fmt.Errorf("%w: %T", errInvalidStakerTxType, stakerTx.Unsigned)
 	}
 
 	validator, err := chainState.GetCurrentValidator(constants.PrimaryNetworkID, autoRenewedStakerTx.NodeID())
 	if err != nil {
-		return nil, nil, fmt.Errorf("getting validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
+		return nil, fmt.Errorf("getting validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
 	}
 
 	if tx.TxID != validator.TxID {
 		// This can happen if a validator restaked with the same node id.
 		// In this case, TxID should be the latest transaction of the auto-renewed validator.
-		return nil, nil, fmt.Errorf("%w: wrong tx id", errInvalidStakerTx)
+		return nil, fmt.Errorf("%w: wrong tx id", errInvalidStakerTx)
 	}
 
 	if !backend.Bootstrapped.Get() {
 		// Not bootstrapped yet -- don't need to do full verification.
-		return validator, nil, nil
+		return validator, nil
 	}
 
 	validatorRules, err := getValidatorRules(backend, chainState, autoRenewedStakerTx.SubnetID())
 	if err != nil {
-		return nil, nil, fmt.Errorf("getting validator rules: %w", err)
+		return nil, fmt.Errorf("getting validator rules: %w", err)
 	}
 
 	switch {
 	case tx.Period > 0 && tx.Period < uint64(validatorRules.minStakeDuration/time.Second):
-		return nil, nil, ErrStakeTooShort
+		return nil, ErrStakeTooShort
 	case tx.Period > uint64(validatorRules.maxStakeDuration/time.Second):
-		return nil, nil, ErrStakeTooLong
+		return nil, ErrStakeTooLong
 	}
 
-	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, autoRenewedStakerTx.ValidatorAuthority, tx.Auth)
-	if err != nil {
-		return nil, nil, err
+	if _, err := verifyAuthorization(backend.Fx, sTx, autoRenewedStakerTx.ValidatorAuthority, tx.Auth); err != nil {
+		return nil, err
 	}
 
-	return validator, baseTxCreds, nil
+	return validator, nil
 }
 
 // Ensure the proposed validator starts after the current time
