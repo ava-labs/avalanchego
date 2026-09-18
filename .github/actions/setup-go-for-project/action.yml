@@ -64,7 +64,7 @@ runs:
       uses: actions/cache/restore@v5
       with:
         path: ${{ steps.cache-paths.outputs.go-mod-cache }}
-        key: ${{ inputs.cache-validation == 'true' && format('go-mod-validation-v2-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum')) || format('go-mod-v2-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum')) }}
+        key: ${{ inputs.cache-validation == 'true' && format('go-mod-validation-v2-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum', 'scripts/go_module_cache_manifest.tsv')) || format('go-mod-v2-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum', 'scripts/go_module_cache_manifest.tsv')) }}
         restore-keys: |
           ${{ inputs.cache-validation == 'true' && format('go-mod-validation-v2-{0}-', runner.os) || format('go-mod-v2-{0}-', runner.os) }}
 
@@ -84,7 +84,7 @@ runs:
       uses: actions/cache/save@v5
       with:
         path: ${{ steps.cache-paths.outputs.go-mod-cache }}
-        key: ${{ inputs.cache-validation == 'true' && format('go-mod-validation-v2-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum')) || format('go-mod-v2-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum')) }}
+        key: ${{ inputs.cache-validation == 'true' && format('go-mod-validation-v2-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum', 'scripts/go_module_cache_manifest.tsv')) || format('go-mod-v2-{0}-{1}', runner.os, hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum', 'scripts/go_module_cache_manifest.tsv')) }}
 
     - name: Disable the Go module proxy
       shell: bash

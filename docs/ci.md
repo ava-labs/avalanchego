@@ -384,8 +384,8 @@ complete design.
 
 [`setup-go-for-project`](../.github/actions/setup-go-for-project/action.yml)
 installs Go and restores `GOMODCACHE`. Its schema-v2 key contains the operating
-system and the hashes of `go.work`, `go.work.sum`, and all `go.mod` and `go.sum`
-files.
+system and the hashes of `go.work`, `go.work.sum`, all `go.mod` and `go.sum`
+files, and [`scripts/go_module_cache_manifest.tsv`](../scripts/go_module_cache_manifest.tsv).
 Module source does not need an architecture-specific key. Nix actions read
 `GOMODCACHE` from their Go toolchain and use the same key and archive.
 
@@ -394,9 +394,13 @@ cache saves in a post step and has no separate write condition. An explicit
 restore lets this repository enforce the shared write policy.
 
 On an ordinary run or a cache-validation warm run, the action prepares every
-repository module with `GOWORK=off`. It also prepares the pinned `abigen` tool
-that the load-contract generator runs from `GOMODCACHE`. This lets a dependency
-change run before `master` has a corresponding cache entry. `master` saves
+repository module with `GOWORK=off`. It resolves the explicit CI tool and
+exceptional pinned-dependency graphs in the manifest with `go list -deps`; it
+does not build or run those tools. The manifest includes the pinned `abigen`
+tool that the load-contract generator runs from `GOMODCACHE`. When CI adds a Go
+tool outside ordinary module builds, add its dependency-graph entry to this
+manifest. Offline CI enforces that the manifest remains complete. This lets a
+dependency change run before `master` has a corresponding cache entry. `master` saves
 `GOMODCACHE` on an exact miss; a labeled cache-validation run saves only its
 pull-request-scoped entry. Nix actions use the same shared key and save policy.
 

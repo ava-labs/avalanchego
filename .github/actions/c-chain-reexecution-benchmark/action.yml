@@ -114,7 +114,7 @@ runs:
       uses: actions/cache/restore@v5
       with:
         path: ${{ steps.go-mod-cache-path.outputs.path }}
-        key: go-mod-v2-${{ runner.os }}-${{ hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum') }}
+        key: go-mod-v2-${{ runner.os }}-${{ hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum', 'scripts/go_module_cache_manifest.tsv') }}
         restore-keys: |
           go-mod-v2-${{ runner.os }}-
     # Scheduled runs must prove that the exact restored archive has every
@@ -131,7 +131,7 @@ runs:
       uses: actions/cache/save@v5
       with:
         path: ${{ steps.go-mod-cache-path.outputs.path }}
-        key: go-mod-v2-${{ runner.os }}-${{ hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum') }}
+        key: go-mod-v2-${{ runner.os }}-${{ hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum', 'scripts/go_module_cache_manifest.tsv') }}
     - name: Disable the Go module proxy
       shell: bash
       run: echo 'GOPROXY=off' >> "$GITHUB_ENV"

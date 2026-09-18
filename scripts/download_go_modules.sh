@@ -15,29 +15,36 @@ while IFS= read -r -d '' go_mod; do
     # tidy -diff resolves the modules required by package tests as well as
     # ordinary builds, without modifying go.mod or go.sum.
     GOWORK=off go mod tidy -diff
-
-    # A module's declared tools can use dependency versions outside its package
-    # build list. Build each tool once to download that tool's full graph.
-    while IFS= read -r tool_path; do
-      GOWORK=off go tool -modfile=go.mod "${tool_path##*/}" -h \
-        >/dev/null 2>&1
-    done < <(go mod edit -json | jq -r '.Tool[]?.Path')
   )
 done < <(find "${repo_root}" -path "${repo_root}/.git" -prune -o -name go.mod -print0)
 
-# The load-contract generator runs this pinned tool from GOMODCACHE. It is not
-# a requirement of a repository module, so download it explicitly.
-abigen_version="$(
-  sed -n -E "s/^readonly abigen_version='([^']+)'$/\\1/p" \
-    "${repo_root}/tests/load/contracts/generate_abi_bindings.sh"
-)"
-if [[ -z "${abigen_version}" ]]; then
-  echo "abigen version not found" >&2
-  exit 1
-fi
-go mod download "github.com/ava-labs/libevm@${abigen_version}"
-abigen_dir="$(go env GOMODCACHE)/github.com/ava-labs/libevm@${abigen_version}"
-(
-  cd "${abigen_dir}"
-  go run ./cmd/abigen --help >/dev/null
-)
+manifest="${repo_root}/scripts/go_module_cache_manifest.tsv"
+while IFS=$'\t' read -r kind source package; do
+  [[ -z "${kind}" || "${kind}" == \#* ]] && continue
+
+  case "${kind}" in
+    local)
+      (
+        cd "${repo_root}/${source}"
+        GOWORK=off go list -deps "${package}" >/dev/null
+      )
+      ;;
+    pinned)
+      # Pinned tools are outside the repository module graphs. Resolve each
+      # graph in an isolated module without building or running the tool.
+      temp_module="$(mktemp -d "${repo_root}/.go-module-cache.XXXXXX")"
+      (
+        trap 'rm -rf "${temp_module}"' EXIT
+        cd "${temp_module}"
+        go mod init cache-preparation >/dev/null
+        go mod edit -require="${source}"
+        GOWORK=off go mod download all
+        GOWORK=off go list -mod=mod -deps "${package}" >/dev/null
+      )
+      ;;
+    *)
+      echo "unknown manifest entry kind: ${kind}" >&2
+      exit 1
+      ;;
+  esac
+done < "${manifest}"
