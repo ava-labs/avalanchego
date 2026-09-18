@@ -36,7 +36,7 @@ type TrackingClient struct {
 }
 
 // AppRequestAny issues an AppRequest to the peer the PeerTracker selects.
-// See Client.AppRequestAny for more docs.
+// See [Client.AppRequestAny] for more docs.
 func (c *TrackingClient) AppRequestAny(
 	ctx context.Context,
 	appRequestBytes []byte,
@@ -51,7 +51,7 @@ func (c *TrackingClient) AppRequestAny(
 }
 
 // AppRequest issues a request to each node in nodeIDs, scoring every one.
-// See Client.AppRequest for more docs.
+// See [Client.AppRequest] for more docs.
 func (c *TrackingClient) AppRequest(
 	ctx context.Context,
 	nodeIDs set.Set[ids.NodeID],
@@ -87,11 +87,11 @@ func (c *TrackingClient) request(
 		})
 	}
 
-	// A request can outlive its callback. vms/transitionvm drops both the
-	// response and the failure for requests issued before a transition.
+	// The callback is not guaranteed. A VM may drop both the response and the
+	// failure for a request the chain it is running no longer recognises.
 	stop := func() bool { return false }
-	// Not armed for a ctx already done, since the send ignores cancellation and
-	// firing now would blame the peer for a reply still on its way.
+	// Skipped for a ctx already done, since firing now would blame the peer for
+	// a reply still on its way.
 	if ctx.Err() == nil {
 		stop = context.AfterFunc(ctx, registerFailure)
 	}

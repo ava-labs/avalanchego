@@ -425,7 +425,7 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
-			return peerFault(err)
+			return err
 		}
 
 		return nil
@@ -482,7 +482,7 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
-			return peerFault(err)
+			return err
 		}
 
 		return nil
@@ -495,15 +495,6 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 	}
 
 	s.metrics.requestMade()
-}
-
-// peerFault reports err only when the peer caused it, so a request still in
-// flight when a sync completes is not blamed on the peer serving it.
-func peerFault(err error) error {
-	if errors.Is(err, ErrAlreadyClosed) {
-		return nil
-	}
-	return err
 }
 
 func (s *Syncer[_, _]) sendRequest(
