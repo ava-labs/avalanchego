@@ -85,6 +85,7 @@ go_test(
         "//database/merkle/sync/synctest",
         "//ids",
         "//network/p2p",
+        "//network/p2p/p2ptest",
         "//proto/pb/sync",
         "//snow/engine/common",
         "//trace",

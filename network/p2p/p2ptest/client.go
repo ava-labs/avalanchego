@@ -25,15 +25,26 @@ func NewSelfClient(t *testing.T, ctx context.Context, nodeID ids.NodeID, handler
 }
 
 // NewSelfTrackingClient returns a TrackingClient that routes to nodeID's own
-// handler and scores every request it issues against tracker.
+// handler, scoring against a tracker the test does not observe.
 func NewSelfTrackingClient(
+	t *testing.T,
+	ctx context.Context,
+	nodeID ids.NodeID,
+	handler p2p.Handler,
+) *p2p.TrackingClient {
+	return NewSelfTrackingClientWithTracker(t, ctx, nodeID, handler, NewTracker(t))
+}
+
+// NewSelfTrackingClientWithTracker returns a TrackingClient that routes to
+// nodeID's own handler and scores every request it issues against tracker.
+func NewSelfTrackingClientWithTracker(
 	t *testing.T,
 	ctx context.Context,
 	nodeID ids.NodeID,
 	handler p2p.Handler,
 	tracker *p2p.PeerTracker,
 ) *p2p.TrackingClient {
-	network := newMesh(
+	network := newClientNetwork(
 		t,
 		ctx,
 		nodeID,
@@ -73,7 +84,7 @@ func NewClientWithPeers(
 	clientHandler p2p.Handler,
 	peers map[ids.NodeID]p2p.Handler,
 ) *p2p.Client {
-	network := newMesh(t, ctx, clientNodeID, clientHandler, peers)
+	network := newClientNetwork(t, ctx, clientNodeID, clientHandler, peers)
 
 	peerSampler := p2p.PeerSampler{Peers: &p2p.Peers{}}
 	for nodeID := range peers {
@@ -83,9 +94,9 @@ func NewClientWithPeers(
 	return network.NewClient(0, peerSampler)
 }
 
-// newMesh wires the client-server mesh and returns the client's network.
-// clientConnHandlers receive connection events on the client's network only.
-func newMesh(
+// newClientNetwork returns a network for clientNodeID with every peer reachable.
+// clientConnHandlers receive connection events on that network only.
+func newClientNetwork(
 	t *testing.T,
 	ctx context.Context,
 	clientNodeID ids.NodeID,

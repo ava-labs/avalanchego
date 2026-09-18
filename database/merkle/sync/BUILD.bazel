@@ -42,7 +42,6 @@ go_test(
     ],
     embed = [":sync"],
     deps = [
-        "//database/merkle/sync/synctest",
         "//ids",
         "//network/p2p",
         "//network/p2p/p2ptest",

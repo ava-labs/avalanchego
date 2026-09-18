@@ -16,7 +16,6 @@ import (
 	"go.uber.org/goleak"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ava-labs/avalanchego/database/merkle/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
@@ -188,7 +187,7 @@ func Test_Sync_RangeProofRequest(t *testing.T) {
 					TargetRoot:            targetRoot,
 					RangeProofMarshaler:   marshaler{},
 					ChangeProofMarshaler:  marshaler{},
-					ProofClient:           synctest.NewProofClient(t, ctx, handler),
+					ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, handler),
 					Log:                   logging.NoLog{},
 					SimultaneousWorkLimit: 1,
 				},
@@ -268,7 +267,7 @@ func Test_Sync_ChangeProofRequest(t *testing.T) {
 					TargetRoot:            originalTarget,
 					RangeProofMarshaler:   marshaler{},
 					ChangeProofMarshaler:  marshaler{},
-					ProofClient:           synctest.NewProofClient(t, ctx, handler),
+					ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, handler),
 					Log:                   logging.NoLog{},
 					SimultaneousWorkLimit: 1,
 				},
@@ -307,7 +306,7 @@ func Test_Sync_BusyContextCancellation(t *testing.T) {
 			TargetRoot:            ids.GenerateTestID(), // must be different from clientDB's root and [ids.Empty]
 			RangeProofMarshaler:   marshaler{},
 			ChangeProofMarshaler:  marshaler{},
-			ProofClient:           synctest.NewProofClient(t, ctx, blockingHandler),
+			ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, blockingHandler),
 			Log:                   logging.NoLog{},
 			SimultaneousWorkLimit: 1, // ensures synchronous event handling
 		},
@@ -437,7 +436,7 @@ func TestSyncerScoresProofSource(t *testing.T) {
 					TargetRoot:           targetRoot,
 					RangeProofMarshaler:  marshaler{},
 					ChangeProofMarshaler: marshaler{},
-					ProofClient:          p2ptest.NewSelfTrackingClient(t, ctx, nodeID, handler, tracker),
+					ProofClient:          p2ptest.NewSelfTrackingClientWithTracker(t, ctx, nodeID, handler, tracker),
 					// The unusable-proof case ends the sync by cancellation,
 					// which the syncer logs at Error.
 					Log:                   logging.NoLog{},
