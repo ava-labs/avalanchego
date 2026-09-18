@@ -32,9 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-// TODO: Ensure that the maximum number of expiries to track is limited to a reasonable number by this window.
-const registerL1ValidatorTxExpiryWindowSeconds = uint64(24 * time.Hour / time.Second)
-
 var (
 	_ platform.TxVisitor = (*standardTxExecutor)(nil)
 
@@ -122,7 +119,7 @@ func (e *standardTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 		return err
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, e.tx.Creds); err != nil {
+	if err := e.applySpend(e.tx.Creds); err != nil {
 		return err
 	}
 
@@ -153,7 +150,7 @@ func (e *standardTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidato
 		return err
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds); err != nil {
 		return err
 	}
 
@@ -170,7 +167,7 @@ func (e *standardTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 		return err
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, e.tx.Creds); err != nil {
+	if err := e.applySpend(e.tx.Creds); err != nil {
 		return err
 	}
 
@@ -196,7 +193,7 @@ func (e *standardTxExecutor) CreateChainTx(tx *platform.CreateChainTx) error {
 		return err
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds); err != nil {
 		return err
 	}
 
@@ -227,7 +224,7 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *platform.CreateSubnetTx) error {
 		return err
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, e.tx.Creds); err != nil {
+	if err := e.applySpend(e.tx.Creds); err != nil {
 		return err
 	}
 
@@ -357,7 +354,7 @@ func (e *standardTxExecutor) ExportTx(tx *platform.ExportTx) error {
 		}
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, e.tx.Creds); err != nil {
+	if err := e.applySpend(e.tx.Creds); err != nil {
 		return err
 	}
 
@@ -416,7 +413,7 @@ func (e *standardTxExecutor) RemoveSubnetValidatorTx(tx *platform.RemoveSubnetVa
 		return err
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds); err != nil {
 		return err
 	}
 
@@ -516,7 +513,7 @@ func (e *standardTxExecutor) AddPermissionlessValidatorTx(tx *platform.AddPermis
 		return err
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, e.tx.Creds); err != nil {
+	if err := e.applySpend(e.tx.Creds); err != nil {
 		return err
 	}
 
@@ -549,7 +546,7 @@ func (e *standardTxExecutor) AddPermissionlessDelegatorTx(tx *platform.AddPermis
 		return err
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, e.tx.Creds); err != nil {
+	if err := e.applySpend(e.tx.Creds); err != nil {
 		return err
 	}
 
@@ -571,7 +568,7 @@ func (e *standardTxExecutor) TransferSubnetOwnershipTx(tx *platform.TransferSubn
 		return err
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds); err != nil {
 		return err
 	}
 
@@ -595,7 +592,7 @@ func (e *standardTxExecutor) BaseTx(tx *platform.BaseTx) error {
 		return err
 	}
 
-	return applySpend(e.backend, e.feeCalculator, e.state, e.tx, e.tx.Creds)
+	return e.applySpend(e.tx.Creds)
 }
 
 func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1Tx) error {
@@ -681,7 +678,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1T
 		}
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds); err != nil {
 		return err
 	}
 
@@ -720,7 +717,7 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1Valida
 		return err
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, e.tx.Creds); err != nil {
+	if err := e.applySpend(e.tx.Creds); err != nil {
 		return err
 	}
 
@@ -752,6 +749,9 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1Valida
 	if msg.Expiry <= currentTimestampUnix {
 		return fmt.Errorf("%w at %d and it is currently %d", errWarpMessageExpired, msg.Expiry, currentTimestampUnix)
 	}
+
+	// TODO: Ensure that the maximum number of expiries to track is limited to a reasonable number by this window.
+	const registerL1ValidatorTxExpiryWindowSeconds = uint64(24 * time.Hour / time.Second)
 	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > registerL1ValidatorTxExpiryWindowSeconds {
 		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, registerL1ValidatorTxExpiryWindowSeconds)
 	}
@@ -848,10 +848,6 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorW
 		return err
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, e.tx.Creds); err != nil {
-		return err
-	}
-
 	// Parse the warp message.
 	warpMessage, err := warp.ParseMessage(tx.Message)
 	if err != nil {
@@ -941,7 +937,11 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorW
 	// without overflow.
 	l1Validator.MinNonce = msg.Nonce + 1
 	l1Validator.Weight = msg.Weight
-	return e.state.PutL1Validator(l1Validator)
+	if err := e.state.PutL1Validator(l1Validator); err != nil {
+		return err
+	}
+
+	return e.applySpend(e.tx.Creds)
 }
 
 func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *platform.IncreaseL1ValidatorBalanceTx) error {
@@ -962,7 +962,7 @@ func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *platform.IncreaseL
 		return err
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, e.tx.Creds); err != nil {
+	if err := e.applySpend(e.tx.Creds); err != nil {
 		return err
 	}
 
@@ -1028,7 +1028,7 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *platform.DisableL1Validato
 		return err
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds); err != nil {
 		return err
 	}
 
@@ -1079,7 +1079,7 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenew
 		return err
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, e.tx.Creds); err != nil {
+	if err := e.applySpend(e.tx.Creds); err != nil {
 		return err
 	}
 
@@ -1160,7 +1160,7 @@ func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *platform.SetAut
 		return err
 	}
 
-	if err := applySpend(e.backend, e.feeCalculator, e.state, e.tx, baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds); err != nil {
 		return err
 	}
 
@@ -1272,6 +1272,10 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 	return nil
 }
 
+func (e *standardTxExecutor) applySpend(creds []verify.Verifiable) error {
+	return applySpend(e.backend, e.feeCalculator, e.state, e.tx, creds)
+}
+
 // applySpend spends the UTXOs of tx in chainState: it consumes the inputs of
 // tx and produces its base outputs. Unless the node is still bootstrapping, it
 // first verifies via [verifySpend] that the inputs, authorized by creds, fund
@@ -1280,10 +1284,13 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 // Callers must syntactically verify tx and select its spending credentials
 // before calling applySpend. Transaction-specific verification may continue
 // afterward. Callers must discard the state diff if transaction execution fails.
+//
+// Must not be used for [platform.ImportTx]. The inputs from [utxo.GetInputOutputs]
+// include the imported inputs.
 func applySpend(
 	backend *Backend,
 	feeCalculator fee.Calculator,
-	chainState state.Chain,
+	diff *state.Diff,
 	tx *platform.Tx,
 	creds []verify.Verifiable,
 ) error {
@@ -1296,16 +1303,16 @@ func applySpend(
 	// Blocks executed while bootstrapping were already accepted by the
 	// network, so their txs are known to have passed the flow check.
 	if backend.Bootstrapped.Get() {
-		if err := verifySpend(backend, feeCalculator, chainState, unsignedTx, ins, outs, producedAVAX, creds); err != nil {
+		if err := verifySpend(backend, feeCalculator, diff, unsignedTx, ins, outs, producedAVAX, creds); err != nil {
 			return err
 		}
 	}
 
-	avax.Consume(chainState, ins)
+	avax.Consume(diff, ins)
 	// Only the base outputs become UTXOs. outs additionally holds the outputs
 	// that the flow check must account for but that are not spendable on this
 	// chain, such as staked or exported outputs.
-	avax.Produce(chainState, tx.ID(), unsignedTx.Outputs())
+	avax.Produce(diff, tx.ID(), unsignedTx.Outputs())
 	return nil
 }
 
