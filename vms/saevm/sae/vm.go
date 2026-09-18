@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/state/snapshot"
@@ -33,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/unwind"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
@@ -140,6 +142,9 @@ func NewVM[T hook.Transaction](
 	metrics, err := newMetrics(reg)
 	if err != nil {
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
+	}
+	if err := snowCtx.Metrics.Register(customrawdb.FirewoodScheme, ffi.Gatherer{}); err != nil {
+		return nil, fmt.Errorf("registering firewood metrics: %w", err)
 	}
 
 	// ==========  Execution Results DB  ==========
