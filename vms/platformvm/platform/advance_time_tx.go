@@ -50,11 +50,7 @@ func (*AdvanceTimeTx) Outputs() []*avax.TransferableOutput {
 	return nil
 }
 
-func (tx *AdvanceTimeTx) SyntacticVerify(*snow.Context) error {
-	if tx == nil {
-		return ErrNilTx
-	}
-
+func (*AdvanceTimeTx) SyntacticVerify(*snow.Context) error {
 	return nil
 }
 
