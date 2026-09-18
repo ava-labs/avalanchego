@@ -217,18 +217,17 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidato
 		)
 	}
 
-	baseTxCreds, err := verifyAddSubnetValidatorTx(
+	if err := verifyAddSubnetValidatorTx(
 		e.backend,
 		e.onCommitState,
 		e.tx,
 		tx,
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
 	// Set up the state if this tx is committed
-	if err := e.applySpend(baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
 		return err
 	}
 

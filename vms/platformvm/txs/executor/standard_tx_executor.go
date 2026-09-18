@@ -140,17 +140,16 @@ func (e *standardTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 }
 
 func (e *standardTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidatorTx) error {
-	baseTxCreds, err := verifyAddSubnetValidatorTx(
+	if err := verifyAddSubnetValidatorTx(
 		e.backend,
 		e.state,
 		e.tx,
 		tx,
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
-	if err := e.applySpend(baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
 		return err
 	}
 
@@ -403,7 +402,7 @@ func (e *standardTxExecutor) ExportTx(tx *platform.ExportTx) error {
 // [tx.SubnetID].
 // Note: [tx.NodeID] may be either a current or pending validator.
 func (e *standardTxExecutor) RemoveSubnetValidatorTx(tx *platform.RemoveSubnetValidatorTx) error {
-	staker, baseTxCreds, err := verifyRemoveSubnetValidatorTx(
+	staker, err := verifyRemoveSubnetValidatorTx(
 		e.backend,
 		e.state,
 		e.tx,
@@ -413,7 +412,7 @@ func (e *standardTxExecutor) RemoveSubnetValidatorTx(tx *platform.RemoveSubnetVa
 		return err
 	}
 
-	if err := e.applySpend(baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
 		return err
 	}
 
@@ -558,17 +557,16 @@ func (e *standardTxExecutor) AddPermissionlessDelegatorTx(tx *platform.AddPermis
 // This transaction will result in the ownership of [tx.Subnet] being transferred
 // to [tx.Owner].
 func (e *standardTxExecutor) TransferSubnetOwnershipTx(tx *platform.TransferSubnetOwnershipTx) error {
-	baseTxCreds, err := verifyTransferSubnetOwnershipTx(
+	if err := verifyTransferSubnetOwnershipTx(
 		e.backend,
 		e.state,
 		e.tx,
 		tx,
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
-	if err := e.applySpend(baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
 		return err
 	}
 
@@ -1155,12 +1153,12 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenew
 }
 
 func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *platform.SetAutoRenewedValidatorConfigTx) error {
-	validator, baseTxCreds, err := verifySetAutoRenewedValidatorConfigTx(e.backend, e.state, e.tx, tx)
+	validator, err := verifySetAutoRenewedValidatorConfigTx(e.backend, e.state, e.tx, tx)
 	if err != nil {
 		return err
 	}
 
-	if err := e.applySpend(baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
 		return err
 	}
 
