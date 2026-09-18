@@ -124,6 +124,7 @@ func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB,
 		return nil, nil, err
 	}
 
+	// TODO(#5999): Remove this reconstruction throttler.
 	if len(toReexec) > 0 && b.replaySlots != nil {
 		select {
 		case b.replaySlots <- struct{}{}:
