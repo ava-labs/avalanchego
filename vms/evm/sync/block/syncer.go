@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -128,8 +129,16 @@ func (s *Syncer) getBlocks(ctx context.Context, hash common.Hash, height uint64,
 			return nil, err
 		}
 
+		var blocks []*types.Block
 		resp := &syncpb.GetBlockResponse{}
-		outcome, err := s.client.Send(ctx, req, resp)
+		err := s.client.Send(ctx, req, resp, func(nodeID ids.NodeID, resp *syncpb.GetBlockResponse) error {
+			var err error
+			blocks, err = verifyBlocks(hash, maxBlocks, resp.GetBlocks(), s.parseBlock)
+			if err != nil {
+				return fmt.Errorf("invalid blocks from %s: %w", nodeID, err)
+			}
+			return nil
+		})
 		if err != nil {
 			// Send already de-scored the peer, re-request from another.
 			s.log.Debug("block request failed, re-requesting",
@@ -138,17 +147,6 @@ func (s *Syncer) getBlocks(ctx context.Context, hash common.Hash, height uint64,
 			continue
 		}
 
-		blocks, err := verifyBlocks(hash, maxBlocks, resp.GetBlocks(), s.parseBlock)
-		if err != nil {
-			outcome.Failure()
-			s.log.Debug("invalid block response, re-requesting",
-				zap.Stringer("nodeID", outcome.NodeID()),
-				zap.Error(err),
-			)
-			continue
-		}
-
-		outcome.Success()
 		return blocks, nil
 	}
 }

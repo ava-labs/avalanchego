@@ -3,7 +3,10 @@ load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "p2ptest",
-    srcs = ["client.go"],
+    srcs = [
+        "client.go",
+        "tracker.go",
+    ],
     importpath = "github.com/ava-labs/avalanchego/network/p2p/p2ptest",
     visibility = ["//visibility:public"],
     deps = [
@@ -12,6 +15,7 @@ go_library(
         "//snow/engine/common",
         "//snow/engine/enginetest",
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//utils/set",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",

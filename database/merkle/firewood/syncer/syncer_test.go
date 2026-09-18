@@ -90,7 +90,7 @@ func testSync(t *testing.T, clientKeys int, serverKeys int) {
 		Config{},
 		clientDB,
 		root,
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, newTestGetProofHandler(t, serverDB)),
+		p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, newTestGetProofHandler(t, serverDB)),
 	)
 	require.NoError(t, err)
 
@@ -166,7 +166,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 		Config{},
 		clientDB,
 		firstRoot,
-		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, proofHandler),
+		p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, proofHandler),
 	)
 	require.NoError(t, err)
 

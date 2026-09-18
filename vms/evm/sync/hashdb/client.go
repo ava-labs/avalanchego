@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/network"
@@ -85,8 +86,18 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 			return Leaves{}, false, err
 		}
 
-		var resp syncpb.GetLeafResponse
-		outcome, err := c.sender.Send(ctx, reqPB, &resp)
+		var (
+			more bool
+			resp syncpb.GetLeafResponse
+		)
+		err := c.sender.Send(ctx, reqPB, &resp, func(nodeID ids.NodeID, resp *syncpb.GetLeafResponse) error {
+			var err error
+			more, err = verifyRange(c.minKey, req, resp)
+			if err != nil {
+				return fmt.Errorf("invalid leaves from %s: %w", nodeID, err)
+			}
+			return nil
+		})
 		if err != nil {
 			// Send already de-scored the peer, re-request from another.
 			c.log.Debug("leaf request failed, re-requesting",
@@ -95,16 +106,6 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 			continue
 		}
 
-		more, err := verifyRange(c.minKey, req, &resp)
-		if err != nil {
-			outcome.Failure()
-			c.log.Debug("invalid leaf response, re-requesting",
-				zap.Error(err),
-			)
-			continue
-		}
-
-		outcome.Success()
 		return Leaves{
 			Keys: resp.GetKeys(),
 			Vals: resp.GetValues(),

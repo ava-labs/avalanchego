@@ -187,7 +187,7 @@ func Test_Sync_RangeProofRequest(t *testing.T) {
 					TargetRoot:            targetRoot,
 					RangeProofMarshaler:   marshaler{},
 					ChangeProofMarshaler:  marshaler{},
-					ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, handler),
+					ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, handler),
 					Log:                   logging.NoLog{},
 					SimultaneousWorkLimit: 1,
 				},
@@ -267,7 +267,7 @@ func Test_Sync_ChangeProofRequest(t *testing.T) {
 					TargetRoot:            originalTarget,
 					RangeProofMarshaler:   marshaler{},
 					ChangeProofMarshaler:  marshaler{},
-					ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, handler),
+					ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, handler),
 					Log:                   logging.NoLog{},
 					SimultaneousWorkLimit: 1,
 				},
@@ -306,7 +306,7 @@ func Test_Sync_BusyContextCancellation(t *testing.T) {
 			TargetRoot:            ids.GenerateTestID(), // must be different from clientDB's root and [ids.Empty]
 			RangeProofMarshaler:   marshaler{},
 			ChangeProofMarshaler:  marshaler{},
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, blockingHandler),
+			ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, blockingHandler),
 			Log:                   logging.NoLog{},
 			SimultaneousWorkLimit: 1, // ensures synchronous event handling
 		},
@@ -380,5 +380,80 @@ func Test_Midpoint(t *testing.T) {
 		mid = midPoint(maybe.Some(start), maybe.Some(end))
 		require.Equal(-1, bytes.Compare(start, mid.Value()))
 		require.Equal(-1, bytes.Compare(mid.Value(), end))
+	}
+}
+
+// The proof client scores the peer it fetched from. Only the wiring is pinned,
+// since an unusable proof also ends the sync by cancellation, which de-scores.
+func TestSyncerScoresProofSource(t *testing.T) {
+	tests := []struct {
+		name           string
+		validProof     bool
+		wantResponsive float64
+	}{
+		{
+			name:           "valid_proof_keeps_the_peer_responsive",
+			validProof:     true,
+			wantResponsive: 1,
+		},
+		{
+			name: "unusable_proof_leaves_the_peer_unresponsive",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			targetRoot := ids.GenerateTestID()
+			nodeID := ids.GenerateTestNodeID()
+			response := marshalRangeProofResponse(t, &proofDouble{newRoot: targetRoot})
+
+			// An unusable proof is retried forever, so stop the syncer from
+			// inside the second request rather than racing it from outside.
+			served := 0
+			handler := p2p.TestHandler{
+				AppRequestF: func(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *common.AppError) {
+					served++
+					if tt.validProof {
+						return response, nil
+					}
+					if served > 1 {
+						cancel()
+						return nil, &common.AppError{Code: 1, Message: "stop"}
+					}
+					return []byte{0xff, 0xff, 0xff}, nil
+				},
+			}
+
+			reg := prometheus.NewRegistry()
+			tracker := p2ptest.NewTrackerWithRegistry(t, "sync", reg)
+
+			syncer, err := NewSyncer(
+				&db{id: ids.Empty},
+				Config[*proofDouble, *proofDouble]{
+					TargetRoot:           targetRoot,
+					RangeProofMarshaler:  marshaler{},
+					ChangeProofMarshaler: marshaler{},
+					ProofClient:          p2ptest.NewSelfTrackingClientWithTracker(t, ctx, nodeID, handler, tracker),
+					// The unusable-proof case ends the sync by cancellation,
+					// which the syncer logs at Error.
+					Log:                   logging.NoLog{},
+					SimultaneousWorkLimit: 1,
+				},
+				prometheus.NewRegistry(),
+			)
+			require.NoError(t, err)
+
+			if tt.validProof {
+				require.NoErrorf(t, syncer.Sync(ctx), "%T.Sync()", syncer)
+			} else {
+				require.Errorf(t, syncer.Sync(ctx), "%T.Sync()", syncer)
+			}
+
+			assert.Equal(t, 1.0, p2ptest.TrackerGauge(t, reg, "sync", "num_tracked_peers"), "num_tracked_peers")
+			assert.Equal(t, tt.wantResponsive, p2ptest.TrackerGauge(t, reg, "sync", "num_responsive_peers"), "num_responsive_peers")
+		})
 	}
 }
