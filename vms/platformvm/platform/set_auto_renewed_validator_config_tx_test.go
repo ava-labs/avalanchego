@@ -50,7 +50,7 @@ func TestSetAutoRenewedValidatorConfigTxSyntacticVerify(t *testing.T) {
 				tx.TxID = ids.Empty
 				return tx
 			},
-			want: errMissingStakerTxID,
+			want: errMissingTxID,
 		},
 		{
 			name: "too_many_restake_shares",
