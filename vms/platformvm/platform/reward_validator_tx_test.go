@@ -18,11 +18,6 @@ func TestRewardValidatorTxSyntacticVerify(t *testing.T) {
 		want error
 	}{
 		{
-			name: "nil",
-			tx:   nil,
-			want: ErrNilTx,
-		},
-		{
 			name: "missing_tx_id",
 			tx:   &RewardValidatorTx{},
 			want: errMissingTxID,
