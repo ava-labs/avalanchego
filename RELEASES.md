@@ -10,6 +10,9 @@
 
 - Added:
   - `restakedValidationRewards` and `restakedDelegateeRewards` fields to `platform.getCurrentValidators` results for auto-renewed validators
+### Metrics
+
+- Added `avalanche_platformvm_local_delegated_staked` (gauge): amount (in nAVAX) of AVAX delegated to this node on the Primary Network.
 
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 
