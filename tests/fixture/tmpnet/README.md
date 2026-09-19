@@ -13,6 +13,7 @@ orchestrate the same temporary networks without the use of an rpc daemon.
 - [Package details](#package-details)
 - [Usage](#usage)
   - [Via tmpnetctl](#via-tmpnetctl)
+    - [Archive import/export](#archive-importexport)
   - [Simplifying usage with direnv](#simplifying-usage-with-direnv)
     - [Deprecated usage with e2e suite](#deprecated-usage-with-e2e-suite)
   - [Via code](#via-code)
@@ -125,7 +126,8 @@ network.
 
 `tmpnetctl` can export a restartable archive of an existing stopped local
 tmpnet network and import it as a fresh network instance. Archived persistent
-nodes must be process-backed; ephemeral nodes are excluded from the archive:
+nodes must be process-backed. Import also requires a local process runtime.
+Ephemeral nodes are excluded from the archive:
 
 ```bash
 # Export the persistent network state for a network
@@ -155,12 +157,13 @@ command.
 Archive/import behavior is intentionally constrained:
 - the network must be stopped before export
 - archived persistent nodes must be local and process-backed
-- archive contents do not include runtime configuration; import binds the archive to locally supplied runtime settings
+- archive contents do not include runtime configuration; import requires locally supplied process runtime settings
 - export requires at least one non-ephemeral node
 - only non-ephemeral nodes are included in the archive
 - import creates a fresh tmpnet UUID and a fresh network directory
 - imported persistent nodes retain their node identities and staking material
-- import recreates tmpnet-managed node directories under that new network directory and then copies persistent node contents into them
+- archive stores per-node configuration and identity material for every persistent node, but stores the shared persistent database state once
+- import recreates tmpnet-managed node directories under that new network directory and copies the archived shared persistent state into each one
 - import does not preserve source `--data-dir` paths; explicit archived data-dir flags are cleared so the imported network uses freshly derived tmpnet-managed paths
 - transient runtime artifacts such as `process.json`, logs, and metrics snapshots are excluded
 - `tmpnetctl import-network` updates the `latest` symlink just like `start-network`
@@ -169,11 +172,15 @@ This makes archive import/export suitable for restoring a restartable serving
 network without carrying forward ephemeral test machinery, stale runtime state,
 or source-path assumptions. Attempting to export a running network is rejected.
 
-The archive layout is currently a tmpnet fixture format for in-repo workflows.
-It does not yet have a formal compatibility or versioning guarantee across
-future tmpnet changes. Imported archives also assume that locally supplied
-runtime configuration makes sense in the target environment, including the
-binary and plugin paths used to start nodes after import.
+The archive contains a format-version manifest and the database version from
+the archived nodes' AvalancheGo binaries. Export rejects nodes with different
+database versions. Import reads the supplied AvalancheGo binary's
+`--version-json` output and rejects archives that lack this manifest, declare
+an unsupported format version, or use a different database version. This avoids
+interpreting an archive from an incompatible tmpnet or database version.
+Imported archives also assume that locally supplied runtime configuration makes
+sense in the target environment, including the binary and plugin paths used to
+start nodes after import.
 
 #### Deprecated usage with e2e suite
 [Top](#table-of-contents)
@@ -203,7 +210,8 @@ materializing it as a fresh tmpnet network instance. The same archive
 constraints described for `tmpnetctl` apply to the Go APIs as well: archive
 export/import is for local, process-backed persistent nodes, requires at least
 one non-ephemeral node, rejects running networks, preserves archived persistent
-node identities, omits runtime configuration from the archive, and imports into
+node identities, stores one copy of the shared persistent state, omits runtime
+configuration from the archive, and imports into
 a fresh tmpnet network directory with freshly derived node data dirs.
 
 For archive behavior, distinguish between:

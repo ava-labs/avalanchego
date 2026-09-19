@@ -7,6 +7,7 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"io/fs"
@@ -19,10 +20,18 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
+)
+
+const (
+	archiveManifestFilename = "archive.json"
+	archiveStateDirName     = "state"
+	archiveDatabaseDirName  = "db"
+	archiveChainDataDirName = "chainData"
+	// Increment when an archive layout change is not backward compatible.
+	archiveFormatVersion = 3
 )
 
 var (
@@ -30,13 +39,25 @@ var (
 	errExportRunningNetwork      = errors.New("network archive export requires all nodes to be stopped")
 	errArchiveUnsupportedRuntime = errors.New("network archive export supports only process-backed persistent nodes")
 	errImportRuntimeRequired     = errors.New("network archive import requires runtime configuration")
+	errImportUnsupportedRuntime  = errors.New("network archive import supports only process-backed nodes")
+	errUnsupportedArchiveFormat  = errors.New("unsupported network archive format")
+	errIncompatibleArchiveDB     = errors.New("incompatible network archive database version")
+	errArchiveInconsistentDB     = errors.New("network archive requires all nodes to use the same database version")
+	errMissingArchiveDB          = errors.New("AvalancheGo version output is missing the database version")
 )
 
+type archiveManifest struct {
+	FormatVersion   int    `json:"formatVersion"`
+	DatabaseVersion string `json:"databaseVersion"`
+}
+
 // ExportNetworkArchive writes a restartable archive for a stopped tmpnet network.
-// The archive contains network configuration and only non-ephemeral node state.
+// The archive contains network configuration, per-node configuration, and one shared
+// persistent-state directory from a non-ephemeral node.
 // Export rejects running networks, networks without any non-ephemeral nodes, and networks
-// whose persistent nodes use unsupported runtimes. Runtime configuration is intentionally
-// not preserved in the archive so imports can be rebound to local execution settings.
+// whose persistent nodes use unsupported runtimes. The archive records its format and
+// database versions. Runtime configuration is intentionally not preserved so imports can
+// be rebound to local execution settings.
 func ExportNetworkArchive(ctx context.Context, log logging.Logger, networkDir string, archivePath string) error {
 	network, err := ReadNetwork(ctx, log, networkDir)
 	if err != nil {
@@ -57,6 +78,13 @@ func ExportNetworkArchive(ctx context.Context, log logging.Logger, networkDir st
 	if err := copyNetworkArchiveRoot(network, stagingRoot, persistentNodes); err != nil {
 		return stacktrace.Wrap(err)
 	}
+	databaseVersion, err := getArchiveDatabaseVersion(log, persistentNodes)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+	if err := writeArchiveManifest(stagingRoot, databaseVersion); err != nil {
+		return stacktrace.Wrap(err)
+	}
 	if err := writeTarGz(stagingRoot, archivePath); err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -66,11 +94,15 @@ func ExportNetworkArchive(ctx context.Context, log logging.Logger, networkDir st
 // ImportNetworkArchive materializes a fresh tmpnet network from an exported archive.
 // Import assigns the network a new UUID and network directory, preserves archived persistent
 // node identities, clears explicit archived data-dir settings so node paths are freshly
-// derived under the new network directory, binds the imported network to the provided local
-// runtime configuration, and does not start any nodes.
+// derived under the new network directory, copies the archived shared persistent state to each
+// node, binds the imported network to the provided local process runtime configuration, and does
+// not start any nodes.
 func ImportNetworkArchive(ctx context.Context, log logging.Logger, archivePath string, rootNetworkDir string, runtimeConfig *NodeRuntimeConfig) (*Network, error) {
 	if runtimeConfig == nil {
 		return nil, stacktrace.Wrap(errImportRuntimeRequired)
+	}
+	if runtimeConfig.Process == nil {
+		return nil, stacktrace.Wrap(errImportUnsupportedRuntime)
 	}
 	extractedRoot, err := os.MkdirTemp("", "tmpnet-import-*")
 	if err != nil {
@@ -79,6 +111,17 @@ func ImportNetworkArchive(ctx context.Context, log logging.Logger, archivePath s
 	defer os.RemoveAll(extractedRoot)
 
 	if err := extractTarGz(archivePath, extractedRoot); err != nil {
+		return nil, stacktrace.Wrap(err)
+	}
+	manifest, err := readArchiveManifest(extractedRoot)
+	if err != nil {
+		return nil, stacktrace.Wrap(err)
+	}
+	targetVersion, err := getAvalancheGoVersion(log, runtimeConfig.Process.AvalancheGoPath)
+	if err != nil {
+		return nil, stacktrace.Wrap(err)
+	}
+	if err := validateArchiveDatabaseVersion(manifest, targetVersion.Database); err != nil {
 		return nil, stacktrace.Wrap(err)
 	}
 
@@ -92,9 +135,7 @@ func ImportNetworkArchive(ctx context.Context, log logging.Logger, archivePath s
 		return nil, stacktrace.Wrap(err)
 	}
 
-	sourceDataDirs := make(map[ids.NodeID]string, len(persistentNodes))
 	for _, node := range persistentNodes {
-		sourceDataDirs[node.NodeID] = node.DataDir
 		delete(node.Flags, config.DataDirKey)
 		node.DataDir = ""
 		node.URI = ""
@@ -119,8 +160,9 @@ func ImportNetworkArchive(ctx context.Context, log logging.Logger, archivePath s
 			return nil, stacktrace.Wrap(err)
 		}
 	}
+	archiveStateDir := filepath.Join(extractedRoot, archiveStateDirName)
 	for _, node := range network.Nodes {
-		if err := copyImportedNodeState(sourceDataDirs[node.NodeID], node.DataDir); err != nil {
+		if err := copyImportedNodeState(archiveStateDir, node.DataDir); err != nil {
 			return nil, stacktrace.Wrap(err)
 		}
 	}
@@ -169,6 +211,64 @@ func writeArchivedNodeConfig(destDir string, node *Node) error {
 	return archivedNode.Write()
 }
 
+func getArchiveDatabaseVersion(log logging.Logger, nodes []*Node) (string, error) {
+	var databaseVersion string
+	for _, node := range nodes {
+		versions, err := getAvalancheGoVersion(log, node.getRuntimeConfig().Process.AvalancheGoPath)
+		if err != nil {
+			return "", stacktrace.Wrap(err)
+		}
+		if versions.Database == "" {
+			return "", stacktrace.Wrap(errMissingArchiveDB)
+		}
+		if databaseVersion == "" {
+			databaseVersion = versions.Database
+			continue
+		}
+		if databaseVersion != versions.Database {
+			return "", stacktrace.Errorf("%w: got %q and %q", errArchiveInconsistentDB, databaseVersion, versions.Database)
+		}
+	}
+	return databaseVersion, nil
+}
+
+func writeArchiveManifest(destRoot string, databaseVersion string) error {
+	manifestBytes, err := json.Marshal(archiveManifest{
+		FormatVersion:   archiveFormatVersion,
+		DatabaseVersion: databaseVersion,
+	})
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+	return stacktrace.Wrap(os.WriteFile(filepath.Join(destRoot, archiveManifestFilename), manifestBytes, perms.ReadWrite))
+}
+
+func readArchiveManifest(root string) (*archiveManifest, error) {
+	manifestBytes, err := os.ReadFile(filepath.Join(root, archiveManifestFilename))
+	if err != nil {
+		return nil, stacktrace.Errorf("%w: missing manifest: %w", errUnsupportedArchiveFormat, err)
+	}
+
+	manifest := archiveManifest{}
+	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+		return nil, stacktrace.Errorf("%w: invalid manifest: %w", errUnsupportedArchiveFormat, err)
+	}
+	if manifest.FormatVersion != archiveFormatVersion {
+		return nil, stacktrace.Errorf("%w: got version %d, expected %d", errUnsupportedArchiveFormat, manifest.FormatVersion, archiveFormatVersion)
+	}
+	return &manifest, nil
+}
+
+func validateArchiveDatabaseVersion(manifest *archiveManifest, databaseVersion string) error {
+	if databaseVersion == "" {
+		return stacktrace.Wrap(errMissingArchiveDB)
+	}
+	if manifest.DatabaseVersion != databaseVersion {
+		return stacktrace.Errorf("%w: got version %q, expected %q", errIncompatibleArchiveDB, manifest.DatabaseVersion, databaseVersion)
+	}
+	return nil
+}
+
 func copyNetworkArchiveRoot(network *Network, destRoot string, nodes []*Node) error {
 	if err := os.MkdirAll(destRoot, perms.ReadWriteExecute); err != nil {
 		return stacktrace.Wrap(err)
@@ -187,31 +287,28 @@ func copyNetworkArchiveRoot(network *Network, destRoot string, nodes []*Node) er
 		if err := writeArchivedNodeConfig(archivedNodeDir, node); err != nil {
 			return stacktrace.Wrap(err)
 		}
-		if err := copyArchivedNodeState(node.DataDir, archivedNodeDir); err != nil {
+	}
+
+	// The chain state is shared across persistent nodes. Archive it once and copy it to
+	// each newly materialized node during import.
+	return copyArchivedNodeState(nodes[0].DataDir, filepath.Join(destRoot, archiveStateDirName))
+}
+
+func copyArchivedNodeState(srcDir string, destDir string) error {
+	return copyPersistentNodeState(srcDir, destDir)
+}
+
+func copyImportedNodeState(srcDir string, destDir string) error {
+	return copyPersistentNodeState(srcDir, destDir)
+}
+
+func copyPersistentNodeState(srcDir string, destDir string) error {
+	for _, name := range []string{archiveDatabaseDirName, archiveChainDataDirName} {
+		if err := copyDirIfExists(filepath.Join(srcDir, name), filepath.Join(destDir, name), nil); err != nil {
 			return stacktrace.Wrap(err)
 		}
 	}
 	return nil
-}
-
-func copyArchivedNodeState(srcDir string, destDir string) error {
-	return copyDirIfExists(srcDir, destDir, func(_ string, entry fs.DirEntry) bool {
-		name := entry.Name()
-		if entry.IsDir() {
-			return name == "logs" || name == "metrics"
-		}
-		return name == defaultConfigFilename || name == "flags.json" || name == config.DefaultProcessContextFilename
-	})
-}
-
-func copyImportedNodeState(srcDir string, destDir string) error {
-	return copyDirIfExists(srcDir, destDir, func(_ string, entry fs.DirEntry) bool {
-		name := entry.Name()
-		if entry.IsDir() {
-			return name == "logs" || name == "metrics"
-		}
-		return name == defaultConfigFilename || name == "flags.json" || name == config.DefaultProcessContextFilename
-	})
 }
 
 func copyFileIfExists(src string, dest string) error {
@@ -306,15 +403,11 @@ func writeTarGz(srcDir string, archivePath string) error {
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
-	defer archiveFile.Close()
 
 	gzipWriter := gzip.NewWriter(archiveFile)
-	defer gzipWriter.Close()
-
 	tarWriter := tar.NewWriter(gzipWriter)
-	defer tarWriter.Close()
 
-	return filepath.Walk(srcDir, func(path string, info fs.FileInfo, walkErr error) error {
+	walkErr := filepath.Walk(srcDir, func(path string, info fs.FileInfo, walkErr error) error {
 		if walkErr != nil {
 			return stacktrace.Wrap(walkErr)
 		}
@@ -353,6 +446,10 @@ func writeTarGz(srcDir string, archivePath string) error {
 		}
 		return nil
 	})
+	if err := errors.Join(walkErr, tarWriter.Close(), gzipWriter.Close(), archiveFile.Close()); err != nil {
+		return stacktrace.Wrap(err)
+	}
+	return nil
 }
 
 func extractTarGz(archivePath string, destDir string) error {

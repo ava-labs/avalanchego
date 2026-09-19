@@ -59,6 +59,7 @@ jobs:
       - setup
       - unit
       - e2e
+      - tmpnet-e2e
     runs-on: ${{ inputs.runner }}
     timeout-minutes: ${{ inputs.required_timeout_minutes }}
     steps:
@@ -132,10 +133,11 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   tmpnet-e2e:
-    needs: check-metadata-linux
-    runs-on: ubuntu-latest
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.e2e_timeout_minutes }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Run tmpnet archive e2e test with Bazel-built binary
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:

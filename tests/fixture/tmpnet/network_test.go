@@ -6,13 +6,27 @@ package tmpnet
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 )
+
+func newAvalancheGoVersionCommand(t *testing.T, databaseVersion string) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("test version command requires a POSIX shell")
+	}
+
+	path := filepath.Join(t.TempDir(), "avalanchego")
+	contents := "#!/bin/sh\nprintf '%s\\n' '{\"database\": \"" + databaseVersion + "\"}'\n"
+	require.NoError(t, os.WriteFile(path, []byte(contents), 0o755))
+	return path
+}
 
 func TestNetworkSerialization(t *testing.T) {
 	require := require.New(t)
@@ -43,7 +57,7 @@ func TestNetworkSerialization(t *testing.T) {
 	require.Equal(network, loadedNetwork)
 }
 
-func TestCopyArchivedNodeStateExcludesTransientArtifacts(t *testing.T) {
+func TestCopyArchivedNodeStateCopiesOnlyDatabaseState(t *testing.T) {
 	require := require.New(t)
 
 	srcDir := t.TempDir()
@@ -54,6 +68,8 @@ func TestCopyArchivedNodeStateExcludesTransientArtifacts(t *testing.T) {
 	require.NoError(os.WriteFile(filepath.Join(srcDir, config.DefaultProcessContextFilename), []byte("process"), 0o644))
 	require.NoError(os.MkdirAll(filepath.Join(srcDir, "db"), 0o755))
 	require.NoError(os.WriteFile(filepath.Join(srcDir, "db", "state"), []byte("state"), 0o644))
+	require.NoError(os.MkdirAll(filepath.Join(srcDir, "chainData"), 0o755))
+	require.NoError(os.WriteFile(filepath.Join(srcDir, "chainData", "state"), []byte("chain state"), 0o644))
 	require.NoError(os.MkdirAll(filepath.Join(srcDir, "logs"), 0o755))
 	require.NoError(os.WriteFile(filepath.Join(srcDir, "logs", "main.log"), []byte("logs"), 0o644))
 	require.NoError(os.MkdirAll(filepath.Join(srcDir, "metrics"), 0o755))
@@ -67,12 +83,55 @@ func TestCopyArchivedNodeStateExcludesTransientArtifacts(t *testing.T) {
 	require.ErrorIs(err, os.ErrNotExist)
 	_, err = os.Stat(filepath.Join(destDir, "db", "state"))
 	require.NoError(err)
+	_, err = os.Stat(filepath.Join(destDir, "chainData", "state"))
+	require.NoError(err)
 	_, err = os.Stat(filepath.Join(destDir, config.DefaultProcessContextFilename))
 	require.ErrorIs(err, os.ErrNotExist)
 	_, err = os.Stat(filepath.Join(destDir, "logs"))
 	require.ErrorIs(err, os.ErrNotExist)
 	_, err = os.Stat(filepath.Join(destDir, "metrics"))
 	require.ErrorIs(err, os.ErrNotExist)
+}
+
+func TestNetworkArchiveUsesOneSharedPersistentState(t *testing.T) {
+	require := require.New(t)
+	ctx := t.Context()
+
+	network := &Network{
+		Owner: "testnet",
+		Nodes: NewNodesOrPanic(2),
+		DefaultRuntimeConfig: NodeRuntimeConfig{
+			Process: &ProcessRuntimeConfig{
+				AvalancheGoPath: newAvalancheGoVersionCommand(t, version.CurrentDatabase),
+			},
+		},
+	}
+	require.NoError(network.EnsureDefaultConfig(ctx, logging.NoLog{}))
+	require.NoError(network.Create(t.TempDir()))
+	for i, node := range network.Nodes {
+		require.NoError(os.MkdirAll(filepath.Join(node.DataDir, "db"), 0o755))
+		require.NoError(os.WriteFile(filepath.Join(node.DataDir, "db", "state"), []byte{byte(i)}, 0o644))
+	}
+
+	archivePath := filepath.Join(t.TempDir(), "network.tar.gz")
+	require.NoError(ExportNetworkArchive(ctx, logging.NoLog{}, network.Dir, archivePath))
+
+	archiveRoot := t.TempDir()
+	require.NoError(extractTarGz(archivePath, archiveRoot))
+	archivedState, err := os.ReadFile(filepath.Join(archiveRoot, archiveStateDirName, "db", "state"))
+	require.NoError(err)
+	for _, node := range network.Nodes {
+		_, err := os.Stat(filepath.Join(archiveRoot, node.NodeID.String(), "db"))
+		require.ErrorIs(err, os.ErrNotExist)
+	}
+
+	importedNetwork, err := ImportNetworkArchive(ctx, logging.NoLog{}, archivePath, t.TempDir(), &network.DefaultRuntimeConfig)
+	require.NoError(err)
+	for _, node := range importedNetwork.Nodes {
+		state, err := os.ReadFile(filepath.Join(node.DataDir, "db", "state"))
+		require.NoError(err)
+		require.Equal(archivedState, state)
+	}
 }
 
 func TestExportNetworkArchiveRejectsRunningNetwork(t *testing.T) {
@@ -111,6 +170,92 @@ func TestGetArchiveableNodesRejectsUnsupportedRuntime(t *testing.T) {
 	require.ErrorIs(err, errArchiveUnsupportedRuntime)
 }
 
+func TestImportNetworkArchiveRejectsUnsupportedRuntime(t *testing.T) {
+	require := require.New(t)
+
+	network, err := ImportNetworkArchive(
+		t.Context(),
+		logging.NoLog{},
+		"unused.tar.gz",
+		t.TempDir(),
+		&NodeRuntimeConfig{Kube: &KubeRuntimeConfig{}},
+	)
+	require.Nil(network)
+	require.ErrorIs(err, errImportUnsupportedRuntime)
+}
+
+func TestImportNetworkArchiveRejectsUnsupportedFormat(t *testing.T) {
+	require := require.New(t)
+
+	tests := []struct {
+		name     string
+		manifest string
+		wantErr  error
+	}{
+		{
+			name:    "missing manifest",
+			wantErr: errUnsupportedArchiveFormat,
+		},
+		{
+			name:     "unknown format version",
+			manifest: `{"formatVersion": 4, "databaseVersion": "` + version.CurrentDatabase + `"}`,
+			wantErr:  errUnsupportedArchiveFormat,
+		},
+		{
+			name:     "incompatible database version",
+			manifest: `{"formatVersion": 3, "databaseVersion": "stale"}`,
+			wantErr:  errIncompatibleArchiveDB,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			archiveRoot := t.TempDir()
+			if test.manifest != "" {
+				require.NoError(os.WriteFile(filepath.Join(archiveRoot, archiveManifestFilename), []byte(test.manifest), 0o644))
+			}
+			archivePath := filepath.Join(t.TempDir(), "network.tar.gz")
+			require.NoError(writeTarGz(archiveRoot, archivePath))
+
+			network, err := ImportNetworkArchive(
+				t.Context(),
+				logging.NoLog{},
+				archivePath,
+				t.TempDir(),
+				&NodeRuntimeConfig{Process: &ProcessRuntimeConfig{
+					AvalancheGoPath: newAvalancheGoVersionCommand(t, version.CurrentDatabase),
+				}},
+			)
+			require.Nil(network)
+			require.ErrorIs(err, test.wantErr)
+		})
+	}
+}
+
+func TestGetArchiveDatabaseVersionRejectsDifferentNodeVersions(t *testing.T) {
+	require := require.New(t)
+
+	network := &Network{
+		DefaultRuntimeConfig: NodeRuntimeConfig{
+			Process: &ProcessRuntimeConfig{
+				AvalancheGoPath: newAvalancheGoVersionCommand(t, version.CurrentDatabase),
+			},
+		},
+	}
+	firstNode := NewNode()
+	firstNode.network = network
+	secondNode := NewNode()
+	secondNode.network = network
+	secondNode.RuntimeConfig = &NodeRuntimeConfig{
+		Process: &ProcessRuntimeConfig{
+			AvalancheGoPath: newAvalancheGoVersionCommand(t, "stale"),
+		},
+	}
+
+	databaseVersion, err := getArchiveDatabaseVersion(logging.NoLog{}, []*Node{firstNode, secondNode})
+	require.Empty(databaseVersion)
+	require.ErrorIs(err, errArchiveInconsistentDB)
+}
+
 func TestGetArchiveableNodesRejectsAllEphemeralNetworks(t *testing.T) {
 	require := require.New(t)
 
@@ -134,7 +279,9 @@ func TestImportNetworkArchiveClearsExplicitDataDir(t *testing.T) {
 		Owner: "testnet",
 		Nodes: NewNodesOrPanic(1),
 		DefaultRuntimeConfig: NodeRuntimeConfig{
-			Process: &ProcessRuntimeConfig{},
+			Process: &ProcessRuntimeConfig{
+				AvalancheGoPath: newAvalancheGoVersionCommand(t, version.CurrentDatabase),
+			},
 		},
 	}
 	require.NoError(network.EnsureDefaultConfig(ctx, logging.NoLog{}))
@@ -174,7 +321,9 @@ func TestImportNetworkArchiveRoundTripsSubnets(t *testing.T) {
 		Owner: "testnet",
 		Nodes: NewNodesOrPanic(1),
 		DefaultRuntimeConfig: NodeRuntimeConfig{
-			Process: &ProcessRuntimeConfig{},
+			Process: &ProcessRuntimeConfig{
+				AvalancheGoPath: newAvalancheGoVersionCommand(t, version.CurrentDatabase),
+			},
 		},
 	}
 	require.NoError(network.EnsureDefaultConfig(ctx, logging.NoLog{}))

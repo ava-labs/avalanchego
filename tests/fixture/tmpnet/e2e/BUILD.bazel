@@ -5,6 +5,7 @@ go_test(
     srcs = ["e2e_test.go"],
     tags = ["manual"],  # keep
     deps = [
+        "//ids",
         "//tests/fixture/e2e",
         "//tests/fixture/tmpnet",
         "@com_github_ava_labs_libevm//core/types",

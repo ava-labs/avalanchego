@@ -14,6 +14,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
@@ -53,11 +54,15 @@ var _ = ginkgo.Describe("[tmpnet archive]", func() {
 
 		network := &tmpnet.Network{
 			Owner: "tmpnet-archive-private",
-			Nodes: tmpnet.NewNodesOrPanic(1),
+			Nodes: tmpnet.NewNodesOrPanic(2),
 		}
 		env.StartPrivateNetwork(network)
-		require.Len(network.Nodes, 1)
+		require.Len(network.Nodes, 2)
 		persistentNode := network.Nodes[0]
+		persistentNodeIDs := make([]ids.NodeID, len(network.Nodes))
+		for i, node := range network.Nodes {
+			persistentNodeIDs[i] = node.NodeID
+		}
 		originalUUID := network.UUID
 		originalDir := network.Dir
 
@@ -126,21 +131,27 @@ var _ = ginkgo.Describe("[tmpnet archive]", func() {
 
 		require.NotEqual(originalUUID, importedNetwork.UUID)
 		require.NotEqual(originalDir, importedNetwork.Dir)
-		require.Len(importedNetwork.Nodes, 1)
-		require.Equal(persistentNode.NodeID, importedNetwork.Nodes[0].NodeID)
+		require.Len(importedNetwork.Nodes, 2)
+		importedNodeIDs := make([]ids.NodeID, len(importedNetwork.Nodes))
+		for i, node := range importedNetwork.Nodes {
+			importedNodeIDs[i] = node.NodeID
+		}
+		require.ElementsMatch(persistentNodeIDs, importedNodeIDs)
 
 		require.NoError(importedNetwork.Bootstrap(tc.ContextWithTimeout(e2e.DefaultTimeout), tc.Log()))
-		importedNodeURI := tmpnet.NodeURI{
-			NodeID: importedNetwork.Nodes[0].NodeID,
-			URI:    importedNetwork.Nodes[0].GetAccessibleURI(),
-		}
-		importedClient := e2e.NewEthClient(tc, importedNodeURI)
-		importedHeight, err := importedClient.BlockNumber(tc.DefaultContext())
-		require.NoError(err)
-		require.GreaterOrEqual(importedHeight, originalHeight)
+		for _, importedNode := range importedNetwork.Nodes {
+			importedNodeURI := tmpnet.NodeURI{
+				NodeID: importedNode.NodeID,
+				URI:    importedNode.GetAccessibleURI(),
+			}
+			importedClient := e2e.NewEthClient(tc, importedNodeURI)
+			importedHeight, err := importedClient.BlockNumber(tc.DefaultContext())
+			require.NoError(err)
+			require.GreaterOrEqual(importedHeight, originalHeight)
 
-		importedRecipientBalance, err := importedClient.BalanceAt(tc.DefaultContext(), recipientEthAddress, nil)
-		require.NoError(err)
-		require.Zero(importedRecipientBalance.Cmp(expectedRecipientBalance))
+			importedRecipientBalance, err := importedClient.BalanceAt(tc.DefaultContext(), recipientEthAddress, nil)
+			require.NoError(err)
+			require.Zero(importedRecipientBalance.Cmp(expectedRecipientBalance))
+		}
 	})
 })
