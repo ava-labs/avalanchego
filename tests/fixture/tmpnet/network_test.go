@@ -4,6 +4,8 @@
 package tmpnet
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -55,6 +57,53 @@ func TestNetworkSerialization(t *testing.T) {
 		_ = key.Address()
 	}
 	require.Equal(network, loadedNetwork)
+}
+
+func TestExtractTarGzRejectsNonLocalEntries(t *testing.T) {
+	tests := []struct {
+		name      string
+		entryName string
+	}{
+		{
+			name:      "parent directory",
+			entryName: "../outside",
+		},
+		{
+			name:      "absolute path",
+			entryName: "/outside",
+		},
+		{
+			name:      "archive root",
+			entryName: ".",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			archivePath := filepath.Join(t.TempDir(), "archive.tar.gz")
+			archiveFile, err := os.Create(archivePath)
+			require.NoError(err)
+			gzipWriter := gzip.NewWriter(archiveFile)
+			tarWriter := tar.NewWriter(gzipWriter)
+			require.NoError(tarWriter.WriteHeader(&tar.Header{
+				Name:     test.entryName,
+				Mode:     0o600,
+				Size:     1,
+				Typeflag: tar.TypeReg,
+			}))
+			_, err = tarWriter.Write([]byte("x"))
+			require.NoError(err)
+			require.NoError(tarWriter.Close())
+			require.NoError(gzipWriter.Close())
+			require.NoError(archiveFile.Close())
+
+			destDir := filepath.Join(t.TempDir(), "destination")
+			err = extractTarGz(archivePath, destDir)
+			require.ErrorIs(err, errInvalidArchiveEntry)
+			require.NoFileExists(filepath.Join(filepath.Dir(destDir), "outside"))
+		})
+	}
 }
 
 func TestCopyArchivedNodeStateCopiesOnlyDatabaseState(t *testing.T) {

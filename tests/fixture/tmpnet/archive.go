@@ -15,7 +15,6 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/google/uuid"
 
@@ -44,6 +43,7 @@ var (
 	errIncompatibleArchiveDB     = errors.New("incompatible network archive database version")
 	errArchiveInconsistentDB     = errors.New("network archive requires all nodes to use the same database version")
 	errMissingArchiveDB          = errors.New("AvalancheGo version output is missing the database version")
+	errInvalidArchiveEntry       = errors.New("invalid archive entry")
 )
 
 type archiveManifest struct {
@@ -476,13 +476,10 @@ func extractTarGz(archivePath string, destDir string) error {
 		}
 
 		cleanName := filepath.Clean(header.Name)
-		if cleanName == "." || strings.HasPrefix(cleanName, "..") {
-			return stacktrace.Errorf("invalid archive entry %q", header.Name)
+		if cleanName == "." || !filepath.IsLocal(cleanName) {
+			return stacktrace.Errorf("%w: %q", errInvalidArchiveEntry, header.Name)
 		}
 		destPath := filepath.Join(destDir, cleanName)
-		if !strings.HasPrefix(destPath, destDir+string(os.PathSeparator)) && destPath != destDir {
-			return stacktrace.Errorf("archive entry escapes destination: %q", header.Name)
-		}
 
 		switch header.Typeflag {
 		case tar.TypeDir:
