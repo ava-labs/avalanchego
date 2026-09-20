@@ -11,6 +11,7 @@ orchestrate the same temporary networks without the use of an rpc daemon.
 
 - [What's in a name?](#whats-in-a-name)
 - [Package details](#package-details)
+- [Archive design and maintenance](archive.md)
 - [Usage](#usage)
   - [Via tmpnetctl](#via-tmpnetctl)
     - [Archive import/export](#archive-importexport)
@@ -123,6 +124,9 @@ network.
 
 #### Archive import/export
 [Top](#table-of-contents)
+
+For archive format, state-boundary, and maintenance guidance, see
+[Tmpnet network archives](archive.md).
 
 `tmpnetctl` can export a restartable archive of an existing stopped local
 tmpnet network and import it as a fresh network instance. Archived persistent
