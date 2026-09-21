@@ -9,12 +9,30 @@ AVALANCHE_PATH="$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )"
 #
 # Launcher policy:
 # 1. Use a real `task` from PATH when available.
-# 2. Otherwise, bootstrap task via `go tool` from tools/external.
+# 2. Outside CI, bootstrap Task via `go tool` from tools/external.
+# 3. In CI, fail if setup did not provide a Task binary.
 # This launcher intentionally does not dispatch to `task` from PATH unless it
 # excludes the repo-local wrapper, so aliases like `bin/task` can safely point
 # here without recursion.
 if task_bin="$(which -a task 2>/dev/null | grep -Fvx "${AVALANCHE_PATH}/bin/task" | head -n1)"; then
   exec "${task_bin}" "${@}"
+fi
+
+if [[ -n "${CI:-}" ]]; then
+  # nix develop can replace PATH and hide the release that setup-task added.
+  # Resolve the release from its cache location before reporting it missing.
+  task_version="$("${AVALANCHE_PATH}/scripts/setup_task.sh" version)"
+  if task_dir="$(
+    TASK_VERSION="${task_version}" "${AVALANCHE_PATH}/scripts/setup_task.sh" path 2>/dev/null
+  )"; then
+    exec "${task_dir}/task" "${@}"
+  fi
+
+  cat >&2 <<'EOF'
+Task is not available in CI.
+CI must restore or download the pinned Task release before it runs this launcher.
+EOF
+  exit 127
 fi
 
 if command -v go >/dev/null 2>&1; then

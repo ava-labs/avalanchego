@@ -194,6 +194,10 @@ for dependencies that Bazel does not provide.
 binary available to Go, Bazel, and Docker jobs. Run this action after checkout
 because it reads `tools/external/go.mod`.
 
+CI never compiles Task from source. Every CI path that uses
+`./scripts/run_task.sh` must run `setup-task`, `setup-go-for-project`, or
+`setup-bazel` first, unless a Nix development shell provides `task`.
+
 See [Task version](./tasks.md#task-version) for the version policy and update
 commands.
 
