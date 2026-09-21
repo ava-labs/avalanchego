@@ -4,6 +4,7 @@
 package subnets
 
 import (
+	"bytes"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
@@ -27,6 +28,7 @@ const (
 var (
 	ErrNoMemberCACertificates = errors.New("member CA holds no certificates")
 	ErrMalformedMemberCA      = errors.New("malformed member CA certificate")
+	ErrTrailingMemberCAData   = errors.New("trailing data after the last member CA certificate")
 
 	errUnexpectedPEMBlock = errors.New("unexpected PEM block type in member CA")
 	errMemberCANotACA     = errors.New("member CA certificate is not a certificate authority")
@@ -80,6 +82,13 @@ func ParseMemberCA(pemBytes []byte) (*MemberCA, error) {
 
 	if numRoots == 0 {
 		return nil, ErrNoMemberCACertificates
+	}
+	// pem.Decode reports "no more PEM" and "this is not PEM" the same way, so
+	// without this a truncated or corrupt block silently loads only the roots
+	// ahead of it. That is exactly the shape a half-written rotation file has,
+	// and it would admit the old fleet while quietly dropping the new root.
+	if len(bytes.TrimSpace(rest)) > 0 {
+		return nil, ErrTrailingMemberCAData
 	}
 	return ca, nil
 }

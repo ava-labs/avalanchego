@@ -76,6 +76,26 @@ func TestParseMemberCA(t *testing.T) {
 		_, err := ParseMemberCA(garbage)
 		require.ErrorIs(t, err, ErrMalformedMemberCA)
 	})
+
+	t.Run("trailing garbage after a valid root", func(t *testing.T) {
+		// The shape a rotation file has when the second root was half written:
+		// the first root parses, so without the trailing check this loads as a
+		// CA that trusts only the old fleet.
+		_, err := ParseMemberCA(append(root.CertPEM(), "-----BEGIN CERTIFI"...))
+		require.ErrorIs(t, err, ErrTrailingMemberCAData)
+	})
+
+	t.Run("trailing whitespace is not garbage", func(t *testing.T) {
+		ca, err := ParseMemberCA(append(root.CertPEM(), "\n\n\t "...))
+		require.NoError(t, err)
+		require.True(t, verifies(ca, chain))
+	})
+
+	t.Run("garbage alone", func(t *testing.T) {
+		// Nothing parsed at all, which is the plainer error of the two.
+		_, err := ParseMemberCA([]byte("not PEM at all"))
+		require.ErrorIs(t, err, ErrNoMemberCACertificates)
+	})
 }
 
 func TestMemberCAVerifyUntil(t *testing.T) {

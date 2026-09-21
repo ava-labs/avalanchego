@@ -178,6 +178,46 @@ func TestLargeMessagesVerify(t *testing.T) {
 			},
 			expectedErr: errThrottlerValueTooSmall,
 		},
+		"at-large pool below one frame": {
+			// A certificate-only member draws from the at-large pool alone, so
+			// a pool this small stalls it on its first large message.
+			config: LargeMessagesConfig{
+				MaxMessageSize: testMaxMessageSize,
+				ThrottlerConfig: &LargeMessageThrottlerConfig{
+					InboundMsgThrottlerConfig: throttling.InboundMsgThrottlerConfig{
+						MsgByteThrottlerConfig: throttling.MsgByteThrottlerConfig{
+							AtLargeAllocSize: testMaxMessageSize - 1,
+						},
+					},
+				},
+			},
+			expectedErr: errThrottlerValueTooSmall,
+		},
+		"outbound at-large pool below one frame": {
+			config: LargeMessagesConfig{
+				MaxMessageSize: testMaxMessageSize,
+				ThrottlerConfig: &LargeMessageThrottlerConfig{
+					OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
+						AtLargeAllocSize: testMaxMessageSize - 1,
+					},
+				},
+			},
+			expectedErr: errThrottlerValueTooSmall,
+		},
+		"validator allocation below one frame is allowed": {
+			// VdrAllocSize is drawn second, so a small one costs a validator
+			// its head start and nothing more.
+			config: LargeMessagesConfig{
+				MaxMessageSize: testMaxMessageSize,
+				ThrottlerConfig: &LargeMessageThrottlerConfig{
+					InboundMsgThrottlerConfig: throttling.InboundMsgThrottlerConfig{
+						MsgByteThrottlerConfig: throttling.MsgByteThrottlerConfig{
+							VdrAllocSize: testMaxMessageSize - 1,
+						},
+					},
+				},
+			},
+		},
 		"recheck delay below the minimum": {
 			config: LargeMessagesConfig{
 				MaxMessageSize: testMaxMessageSize,

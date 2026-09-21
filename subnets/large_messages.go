@@ -99,12 +99,23 @@ func (c *LargeMessagesConfig) Verify() error {
 	)
 	// A peer that cannot be granted a whole frame's worth of budget would stall
 	// on the first large message.
+	//
+	// The at-large pools are in this list because both throttlers draw from
+	// them before the validator allocation, and a member admitted by its
+	// certificate alone carries no primary network weight, so the at-large pool
+	// is the only budget it ever draws from. An at-large pool below the frame
+	// size never grants a whole frame, however much is released: inbound the
+	// peer blocks forever, outbound every large message is dropped. VdrAllocSize
+	// is deliberately absent - it is drawn second, so a small one only costs a
+	// validator its head start.
 	for _, limit := range []struct {
 		name  string
 		value uint64
 	}{
+		{name: "inboundMsgThrottlerConfig.atLargeAllocSize", value: inbound.AtLargeAllocSize},
 		{name: "inboundMsgThrottlerConfig.nodeMaxAtLargeBytes", value: inbound.NodeMaxAtLargeBytes},
 		{name: "inboundMsgThrottlerConfig.maxBurstSize", value: inbound.MaxBurstSize},
+		{name: "outboundMsgThrottlerConfig.atLargeAllocSize", value: outbound.AtLargeAllocSize},
 		{name: "outboundMsgThrottlerConfig.nodeMaxAtLargeBytes", value: outbound.NodeMaxAtLargeBytes},
 	} {
 		if limit.value < maxMessageSize {

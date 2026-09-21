@@ -152,9 +152,15 @@ func (m *membership) IsSubnetMember(subnetID ids.ID, nodeID ids.NodeID) bool {
 // supplied by the caller: the record of a connected peer, or the freshly
 // verified chain of one that is not recorded yet.
 //
-// An expired entry is simply not a member. It is left in place until the peer
-// disconnects, because losing membership already closes the connection: the
-// peer's next Ping finds it on the wrong message stack.
+// An expired entry is simply not a member: every read checks the expiry, so
+// leaving it in place until the peer disconnects costs nothing but a map entry
+// and saves sweeping the map on a timer.
+//
+// Expiry does not by itself close the connection. It stops the peer being
+// admitted to the subnet, which is what [subnets.Subnet.IsAllowed] enforces on
+// every message. Only when the subnet declares largeMessages does the peer also
+// fall off the elevated stack, and its next Ping then finds it on the wrong one
+// and reconnects on the default stack.
 func (m *membership) isSubnetMember(subnetID ids.ID, nodeID ids.NodeID, certified certifiedSubnets) bool {
 	if _, isValidator := m.validators.GetValidator(subnetID, nodeID); isValidator {
 		return true
