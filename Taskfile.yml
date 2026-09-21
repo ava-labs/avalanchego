@@ -593,6 +593,20 @@ tasks:
       - task: generate-load-contract-bindings
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.load.kube.kind.sh --load-timeout=30s'
 
+  test-membership:
+    desc: Runs the certificate-based subnet membership e2e test
+    cmds:
+      - task: build
+      - task: build-xsvm
+      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.membership.sh {{.CLI_ARGS}}'
+
+  test-membership-ci:
+    desc: Runs the certificate-based subnet membership e2e test in CI
+    cmds:
+      - task: build
+      - task: build-xsvm
+      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.membership.sh'
+
   test-robustness:
     desc: Deploys kind with chaos mesh. Intended to eventually run a robustness (fault-injection) test suite.
     cmds:

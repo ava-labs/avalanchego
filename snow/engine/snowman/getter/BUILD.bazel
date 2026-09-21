@@ -10,7 +10,6 @@ go_library(
         "//ids",
         "//snow/engine/common",
         "//snow/engine/snowman/block",
-        "//utils/constants",
         "//utils/logging",
         "//utils/metric",
         "//utils/set",
