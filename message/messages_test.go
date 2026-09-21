@@ -262,7 +262,7 @@ func TestMessage(t *testing.T) {
 						ChainId:   testID[:],
 						RequestId: 1,
 						Deadline:  1,
-						Heights:   []uint64{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+						Heights:   make([]uint64, 100),
 					},
 				},
 			},

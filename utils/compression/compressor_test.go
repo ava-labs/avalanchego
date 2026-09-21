@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/DataDog/zstd"
+	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/require"
 
 	_ "embed"
@@ -65,6 +65,38 @@ func TestDecompressZipBombs(t *testing.T) {
 			require.Less(bytesAllocatedDuringDecompression, uint64(10*maxMessageSize))
 		})
 	}
+}
+
+// A truncated zstd skippable frame declares a frame size that is never
+// delivered. The decompressor must not size its internal buffers off of that
+// attacker-controlled hint.
+func TestDecompressTruncatedSkippableFrame(t *testing.T) {
+	require := require.New(t)
+
+	compressor, err := NewZstdCompressor(maxMessageSize)
+	require.NoError(err)
+
+	// Skippable frame IDs take the form of:
+	// 4 Bytes, Little endian format, any value from 0x184D2A50 to 0x184D2A5F
+	truncatedSkippableFrame := []byte{
+		0x50, 0x2A, 0x4D, 0x18,
+		0xFF, 0xFF, 0xFF, 0xFF,
+	}
+
+	var (
+		beforeDecompressionStats runtime.MemStats
+		afterDecompressionStats  runtime.MemStats
+	)
+	runtime.ReadMemStats(&beforeDecompressionStats)
+	_, err = compressor.Decompress(truncatedSkippableFrame)
+	runtime.ReadMemStats(&afterDecompressionStats)
+
+	// Make sure that we didn't allocate significantly more memory than the max
+	// message size.
+	bytesAllocatedDuringDecompression := afterDecompressionStats.TotalAlloc - beforeDecompressionStats.TotalAlloc
+	require.Less(bytesAllocatedDuringDecompression, uint64(10*maxMessageSize))
+
+	require.Error(err)
 }
 
 func TestCompressDecompress(t *testing.T) {
@@ -151,7 +183,7 @@ func TestNewCompressorWithInvalidLimit(t *testing.T) {
 }
 
 func TestNewZstdCompressorWithLevel(t *testing.T) {
-	compressor, err := NewZstdCompressorWithLevel(maxMessageSize, zstd.BestSpeed)
+	compressor, err := NewZstdCompressorWithLevel(maxMessageSize, zstd.SpeedFastest)
 	require.NoError(t, err)
 
 	data := utils.RandomBytes(4096)
