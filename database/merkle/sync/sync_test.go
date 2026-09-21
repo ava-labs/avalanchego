@@ -160,20 +160,9 @@ func TestNewSyncerMaxMessageSize(t *testing.T) {
 	}
 }
 
-func TestNewProofHandlerWithMaxMessageSize(t *testing.T) {
-	const maxMessageSize = 2 * constants.DefaultMaxMessageSize
-
-	handler, err := NewProofHandlerWithMaxMessageSize(
-		&db{},
-		marshaler{},
-		marshaler{},
-		prometheus.NewRegistry(),
-		maxMessageSize,
-	)
-	require.NoError(t, err)
-	require.Equal(t, uint32(maxMessageSize-estimatedMessageOverhead), handler.maxByteSizeLimit)
-}
-
+// TestProofHandlerConfiguredMaxMessageSize checks that a handler built for an
+// elevated frame serves a proof larger than the default limit, which is the
+// point of configuring one.
 func TestProofHandlerConfiguredMaxMessageSize(t *testing.T) {
 	const maxMessageSize = 2 * constants.DefaultMaxMessageSize
 
@@ -185,6 +174,7 @@ func TestProofHandlerConfiguredMaxMessageSize(t *testing.T) {
 		maxMessageSize,
 	)
 	require.NoError(t, err)
+	require.Equal(t, uint32(maxMessageSize-estimatedMessageOverhead), handler.maxByteSizeLimit)
 
 	root := ids.GenerateTestID()
 	requestBytes, err := proto.Marshal(&pb.ProofRequest{

@@ -88,7 +88,6 @@ func main() {
 		prometheus.NewRegistry(),
 		compression.TypeZstd,
 		time.Hour,
-		int64(constants.DefaultMaxMessageSize),
 	)
 	if err != nil {
 		log.Fatalf("failed to create message builder: %s\n", err)

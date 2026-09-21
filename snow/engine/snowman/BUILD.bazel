@@ -55,7 +55,6 @@ go_test(
         "//cache/lru",
         "//database",
         "//ids",
-        "//network",
         "//snow",
         "//snow/consensus/snowball",
         "//snow/consensus/snowman",

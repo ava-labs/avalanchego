@@ -4,6 +4,7 @@
 package network
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -14,38 +15,75 @@ import (
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 const largeMessageMetricsPrefix = "large_message_"
 
-// MessageStacks holds default and elevated per-peer P2P resource stacks.
+var errTooManyLargeMessageSubnets = errors.New("only one tracked subnet may declare largeMessages; the node builds a single elevated message stack")
+
+// MessageStacks holds the default and, when a tracked subnet declares
+// largeMessages, the elevated per-peer P2P resource stack. Which one a
+// connection gets is decided per peer by [network.stackFor].
 type MessageStacks struct {
-	largeMessageConfig LargeMessageConfig
-	Default            peer.MessageStack
-	Elevated           peer.MessageStack
+	Default peer.MessageStack
+
+	// elevated is only populated when a tracked subnet declares largeMessages.
+	elevated elevatedStack
+}
+
+// elevatedStack is the stack granted to members of [subnetID]. hasElevated
+// reports whether the node built it; the other fields are only meaningful when
+// it is true.
+type elevatedStack struct {
+	hasElevated  bool
+	subnetID     ids.ID
+	messageStack peer.MessageStack
 }
 
 // MsgCreator returns the node-wide message creator for outbound consensus
-// traffic. When the elevated stack is enabled it returns the large creator so
-// the sender can build payloads above the default max size; per-peer frame size
-// enforcement at write time still rejects oversized frames for unselected
-// peers. For payloads within the default size both creators produce identical
-// bytes.
+// traffic. It is the elevated creator whenever that stack exists, so that the
+// sender can build oversized payloads at all; per-peer frame enforcement at
+// write time is what keeps them from reaching an unelevated peer. Within the
+// default size both creators produce identical bytes.
 func (s *MessageStacks) MsgCreator() message.Creator {
-	if !s.largeMessageConfig.Enabled {
+	if !s.elevated.hasElevated {
 		return s.Default.MessageCreator
 	}
-	return s.Elevated.MessageCreator
+	return s.elevated.messageStack.MessageCreator
 }
 
-// Resolve returns the stack for [nodeID].
-func (s *MessageStacks) Resolve(nodeID ids.NodeID) peer.MessageStack {
-	if s.largeMessageConfig.Enabled && s.largeMessageConfig.AppliesTo(nodeID) {
-		return s.Elevated
+// largeMessagesSubnet returns the subnet that declares largeMessages, and the
+// block it declares. Both are zero when none does.
+//
+// The node builds a single elevated stack, so at most one subnet may declare
+// the block.
+func largeMessagesSubnet(
+	subnetConfigs map[ids.ID]subnets.Config,
+) (ids.ID, *subnets.LargeMessagesConfig, error) {
+	var (
+		elevatedSubnetID ids.ID
+		largeMessages    *subnets.LargeMessagesConfig
+	)
+	for subnetID, subnetConfig := range subnetConfigs {
+		if subnetConfig.LargeMessages == nil {
+			continue
+		}
+		if largeMessages != nil {
+			return ids.Empty, nil, fmt.Errorf(
+				"%w: %s and %s both declare it",
+				errTooManyLargeMessageSubnets,
+				elevatedSubnetID,
+				subnetID,
+			)
+		}
+
+		elevatedSubnetID = subnetID
+		largeMessages = subnetConfig.LargeMessages
 	}
-	return s.Default
+	return elevatedSubnetID, largeMessages, nil
 }
 
 func newMessageStacks(
@@ -54,111 +92,108 @@ func newMessageStacks(
 	vdrs validators.Manager,
 	config *Config,
 ) (*MessageStacks, error) {
-	defaultCreator, err := message.NewCreator(
-		registerer,
-		config.CompressionType,
-		config.MaximumInboundMessageTimeout,
-		int64(constants.DefaultMaxMessageSize),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("initializing default message creator: %w", err)
-	}
-
-	defaultInbound, err := throttling.NewInboundMsgThrottler(
+	defaultStack, err := newMessageStack(
 		log,
 		registerer,
 		vdrs,
+		config,
+		constants.DefaultMaxMessageSize,
 		config.ThrottlerConfig.InboundMsgThrottlerConfig,
-		config.ResourceTracker,
-		config.CPUTargeter,
-		config.DiskTargeter,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("initializing default inbound message throttler: %w", err)
-	}
-
-	defaultOutbound, err := throttling.NewSybilOutboundMsgThrottler(
-		log,
-		registerer,
-		vdrs,
 		config.ThrottlerConfig.OutboundMsgThrottlerConfig,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("initializing default outbound message throttler: %w", err)
+		return nil, fmt.Errorf("initializing default message stack: %w", err)
 	}
 
 	stacks := &MessageStacks{
-		largeMessageConfig: config.LargeMessageConfig,
-		Default: peer.MessageStack{
-			MaxFrameSize:        constants.DefaultMaxMessageSize,
-			MessageCreator:      defaultCreator,
-			InboundMsgThrottler: defaultInbound,
-			OutboundThrottler:   defaultOutbound,
-		},
+		Default: defaultStack,
 	}
 
-	if !config.LargeMessageConfig.Enabled {
+	elevatedSubnetID, largeMessages, err := largeMessagesSubnet(config.SubnetConfigs)
+	if err != nil {
+		return nil, err
+	}
+	if largeMessages == nil {
 		return stacks, nil
 	}
 
-	largeRegisterer := prometheus.WrapRegistererWithPrefix(largeMessageMetricsPrefix, registerer)
-
-	throttler := config.LargeMessageConfig.Throttler
-	largeInboundConfig := throttler.InboundMsgThrottlerConfig
-	largeOutboundConfig := throttler.OutboundMsgThrottlerConfig
+	throttler := largeMessages.Throttler()
 	log.Warn(
 		"large message config enabled",
-		zap.Uint32("maxMessageSize", config.LargeMessageConfig.MaxMessageSize),
-		zap.Bool("allowAllPeers", config.LargeMessageConfig.AllowAll),
-		zap.Int("allowlistedPeers", config.LargeMessageConfig.Allowlist.Len()),
-		zap.Uint64("inboundNodeMaxAtLargeBytes", largeInboundConfig.MsgByteThrottlerConfig.NodeMaxAtLargeBytes),
-		zap.Uint64("inboundValidatorAllocSize", largeInboundConfig.MsgByteThrottlerConfig.VdrAllocSize),
-		zap.Uint64("inboundBandwidthRefillRate", largeInboundConfig.BandwidthThrottlerConfig.RefillRate),
-		zap.Uint64("inboundBandwidthMaxBurstSize", largeInboundConfig.BandwidthThrottlerConfig.MaxBurstSize),
-		zap.Uint64("inboundAtLargeAllocSize", largeInboundConfig.MsgByteThrottlerConfig.AtLargeAllocSize),
-		zap.Uint64("outboundNodeMaxAtLargeBytes", largeOutboundConfig.NodeMaxAtLargeBytes),
-		zap.Uint64("outboundValidatorAllocSize", largeOutboundConfig.VdrAllocSize),
-		zap.Uint64("outboundAtLargeAllocSize", largeOutboundConfig.AtLargeAllocSize),
+		zap.Stringer("subnetID", elevatedSubnetID),
+		zap.Uint32("maxMessageSize", largeMessages.MaxMessageSize),
+		zap.Reflect("throttlerConfig", throttler),
 	)
 
-	largeCreator, err := message.NewCreator(
-		largeRegisterer,
-		config.CompressionType,
-		config.MaximumInboundMessageTimeout,
-		int64(config.LargeMessageConfig.MaxMessageSize),
+	elevated, err := newMessageStack(
+		log,
+		prometheus.WrapRegistererWithPrefix(largeMessageMetricsPrefix, registerer),
+		vdrs,
+		config,
+		largeMessages.MaxMessageSize,
+		throttler.InboundMsgThrottlerConfig,
+		throttler.OutboundMsgThrottlerConfig,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("initializing large message creator: %w", err)
+		return nil, fmt.Errorf("initializing large message stack: %w", err)
 	}
 
-	largeInbound, err := throttling.NewInboundMsgThrottler(
+	stacks.elevated = elevatedStack{
+		hasElevated:  true,
+		subnetID:     elevatedSubnetID,
+		messageStack: elevated,
+	}
+	return stacks, nil
+}
+
+// newMessageStack builds one per-peer resource stack: a codec bounded by
+// [maxFrameSize] and the throttlers that police it.
+func newMessageStack(
+	log logging.Logger,
+	registerer prometheus.Registerer,
+	vdrs validators.Manager,
+	config *Config,
+	maxFrameSize uint32,
+	inboundConfig throttling.InboundMsgThrottlerConfig,
+	outboundConfig throttling.MsgByteThrottlerConfig,
+) (peer.MessageStack, error) {
+	creator, err := message.NewCreatorWithMaxMessageSize(
+		registerer,
+		config.CompressionType,
+		config.MaximumInboundMessageTimeout,
+		int64(maxFrameSize),
+	)
+	if err != nil {
+		return peer.MessageStack{}, fmt.Errorf("initializing message creator: %w", err)
+	}
+
+	inbound, err := throttling.NewInboundMsgThrottler(
 		log,
-		largeRegisterer,
+		registerer,
 		vdrs,
-		largeInboundConfig,
+		inboundConfig,
 		config.ResourceTracker,
 		config.CPUTargeter,
 		config.DiskTargeter,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("initializing large inbound message throttler: %w", err)
+		return peer.MessageStack{}, fmt.Errorf("initializing inbound message throttler: %w", err)
 	}
 
-	largeOutbound, err := throttling.NewSybilOutboundMsgThrottler(
+	outbound, err := throttling.NewSybilOutboundMsgThrottler(
 		log,
-		largeRegisterer,
+		registerer,
 		vdrs,
-		largeOutboundConfig,
+		outboundConfig,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("initializing large outbound message throttler: %w", err)
+		return peer.MessageStack{}, fmt.Errorf("initializing outbound message throttler: %w", err)
 	}
 
-	stacks.Elevated = peer.MessageStack{
-		MaxFrameSize:        config.LargeMessageConfig.MaxMessageSize,
-		MessageCreator:      largeCreator,
-		InboundMsgThrottler: largeInbound,
-		OutboundThrottler:   largeOutbound,
-	}
-	return stacks, nil
+	return peer.MessageStack{
+		MaxFrameSize:        maxFrameSize,
+		MessageCreator:      creator,
+		InboundMsgThrottler: inbound,
+		OutboundThrottler:   outbound,
+	}, nil
 }

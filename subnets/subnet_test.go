@@ -20,7 +20,7 @@ func TestSubnet(t *testing.T) {
 	chainID1 := ids.GenerateTestID()
 	chainID2 := ids.GenerateTestID()
 
-	s := New(myNodeID, Config{})
+	s := New(myNodeID, ids.Empty, Config{}, NoOpMembershipChecker)
 	s.AddChain(chainID0)
 	require.False(s.IsBootstrapped(), "A subnet with one chain in bootstrapping shouldn't be considered bootstrapped")
 
@@ -40,31 +40,65 @@ func TestSubnet(t *testing.T) {
 	require.True(s.IsBootstrapped(), "A subnet with only bootstrapped chains should be considered bootstrapped")
 }
 
+// testMembers is a MembershipChecker backed by a fixed set per subnet, standing
+// in for the network layer, which resolves validator status, certificate
+// membership, and allowedNodes into one answer.
+type testMembers map[ids.ID]set.Set[ids.NodeID]
+
+func (m testMembers) IsSubnetMember(subnetID ids.ID, nodeID ids.NodeID) bool {
+	members := m[subnetID]
+	return members.Contains(nodeID)
+}
+
 func TestIsAllowed(t *testing.T) {
-	require := require.New(t)
+	var (
+		myNodeID = ids.GenerateTestNodeID()
+		subnetID = ids.GenerateTestID()
+		member   = ids.GenerateTestNodeID()
+		stranger = ids.GenerateTestNodeID()
 
-	myNodeID := ids.GenerateTestNodeID()
-	// Test with no rules
-	s := New(myNodeID, Config{})
-	require.True(s.IsAllowed(ids.GenerateTestNodeID(), true), "Validator should be allowed with no rules")
-	require.True(s.IsAllowed(ids.GenerateTestNodeID(), false), "Non-validator should be allowed with no rules")
+		members = testMembers{subnetID: set.Of(member)}
+	)
 
-	// Test with validator only rules
-	s = New(myNodeID, Config{
-		ValidatorOnly: true,
-	})
-	require.True(s.IsAllowed(ids.GenerateTestNodeID(), true), "Validator should be allowed with validator only rules")
-	require.True(s.IsAllowed(myNodeID, false), "Self node should be allowed with validator only rules")
-	require.False(s.IsAllowed(ids.GenerateTestNodeID(), false), "Non-validator should not be allowed with validator only rules")
+	tests := map[string]struct {
+		config  Config
+		nodeID  ids.NodeID
+		allowed bool
+	}{
+		"open subnet, member": {
+			nodeID:  member,
+			allowed: true,
+		},
+		"open subnet, stranger": {
+			nodeID:  stranger,
+			allowed: true,
+		},
+		"validator only, member": {
+			config:  Config{ValidatorOnly: true},
+			nodeID:  member,
+			allowed: true,
+		},
+		"validator only, self": {
+			config:  Config{ValidatorOnly: true},
+			nodeID:  myNodeID,
+			allowed: true,
+		},
+		"validator only, stranger": {
+			config: Config{ValidatorOnly: true},
+			nodeID: stranger,
+		},
+		"validator only, member of another subnet": {
+			config: Config{ValidatorOnly: true},
+			nodeID: ids.GenerateTestNodeID(),
+		},
+	}
 
-	// Test with validator only rules and allowed nodes
-	allowedNodeID := ids.GenerateTestNodeID()
-	s = New(myNodeID, Config{
-		ValidatorOnly: true,
-		AllowedNodes:  set.Of(allowedNodeID),
-	})
-	require.True(s.IsAllowed(allowedNodeID, true), "Validator should be allowed with validator only rules and allowed nodes")
-	require.True(s.IsAllowed(myNodeID, false), "Self node should be allowed with validator only rules")
-	require.False(s.IsAllowed(ids.GenerateTestNodeID(), false), "Non-validator should not be allowed with validator only rules and allowed nodes")
-	require.True(s.IsAllowed(allowedNodeID, true), "Non-validator allowed node should be allowed with validator only rules and allowed nodes")
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			s := New(myNodeID, subnetID, test.config, members)
+			require.Equal(test.allowed, s.IsAllowed(test.nodeID))
+		})
+	}
 }

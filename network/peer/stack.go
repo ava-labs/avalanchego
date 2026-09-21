@@ -9,7 +9,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-// MessageStack holds per-peer P2P resources selected by nodeID allowlist.
+// MessageStack holds the per-peer P2P resources a connection is started on:
+// its frame size and the codec and throttlers bounded by it. Which stack a
+// connection gets follows the peer's subnet membership.
 type MessageStack struct {
 	MaxFrameSize        uint32
 	MessageCreator      message.Creator

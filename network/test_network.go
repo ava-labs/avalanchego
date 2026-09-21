@@ -237,6 +237,6 @@ func newNodeIDConnector(nodeID ids.NodeID) *nodeIDConnector {
 	return &nodeIDConnector{nodeID: nodeID}
 }
 
-func (f *nodeIDConnector) IsAllowed(nodeID ids.NodeID, _ bool) bool {
+func (f *nodeIDConnector) IsAllowed(nodeID ids.NodeID) bool {
 	return nodeID == f.nodeID
 }

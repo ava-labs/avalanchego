@@ -44,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -101,14 +100,6 @@ var (
 	errInvalidSignerConfig                    = fmt.Errorf("only one of the following flags can be set: %s, %s, %s, %s", StakingEphemeralSignerEnabledKey, StakingSignerKeyContentKey, StakingSignerKeyPathKey, StakingRPCSignerEndpointKey)
 	errDiskSpaceOutOfRange                    = fmt.Errorf("out of range [0,%d]", maxDiskSpaceThreshold)
 	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
-
-	errLargeMessageFlagsTogether        = fmt.Errorf("%q and %q must be set together", NetworkLargeMessageSizeKey, NetworkLargeMessagePeerIDsKey)
-	errLargeMessageSizeTooLarge         = fmt.Errorf("%s must be <= %d KiB", NetworkLargeMessageSizeKey, math.MaxUint32/units.KiB)
-	errLargeMessageSizeTooSmall         = fmt.Errorf("%s must be >= %d KiB", NetworkLargeMessageSizeKey, constants.DefaultMaxMessageSize/units.KiB)
-	errLargeMessagePeerIDsEmpty         = fmt.Errorf("%s is set but empty", NetworkLargeMessagePeerIDsKey)
-	errLargeMessagePeerIDsWildcardAlone = fmt.Errorf("%s wildcard must be the only value", NetworkLargeMessagePeerIDsKey)
-	errLargeMessageSizeIsDefault        = fmt.Errorf("%s is set to the default %d KiB; increase %s to enable large messages", NetworkLargeMessageSizeKey, constants.DefaultMaxMessageSize/units.KiB, NetworkLargeMessageSizeKey)
-	errParseLargeMessagePeerID          = fmt.Errorf("couldn't parse nodeID for %s", NetworkLargeMessagePeerIDsKey)
 )
 
 func getPrimaryNetworkSnowConfig(v *viper.Viper) *snowball.Parameters {
@@ -242,6 +233,12 @@ func getSubnetConfigFromBytes(rawBytes []byte, v *viper.Viper) (subnets.Config, 
 
 	// validate parameters
 	if err := config.ValidParameters(); err != nil {
+		return subnets.Config{}, err
+	}
+
+	// Load the member CA now so that an unreadable or malformed file is a
+	// startup error rather than a subnet that silently admits nobody.
+	if err := config.LoadMemberCA(); err != nil {
 		return subnets.Config{}, err
 	}
 
@@ -387,6 +384,7 @@ func getNetworkConfig(
 	networkID uint32,
 	sybilProtectionEnabled bool,
 	halflife time.Duration,
+	subnetConfigs map[ids.ID]subnets.Config,
 ) (network.Config, error) {
 	// Set the max number of recent inbound connections upgraded to be
 	// equal to the max number of inbound connections per second.
@@ -435,11 +433,6 @@ func getNetworkConfig(
 	// objection or support of activated ACPs.
 	supportedACPs.Difference(constants.ActivatedACPs)
 	objectedACPs.Difference(constants.ActivatedACPs)
-
-	largeMessageConfig, err := getLargeMessageConfig(v)
-	if err != nil {
-		return network.Config{}, err
-	}
 
 	config := network.Config{
 		ThrottlerConfig: network.ThrottlerConfig{
@@ -525,7 +518,7 @@ func getNetworkConfig(
 		RequireValidatorToConnect: v.GetBool(NetworkRequireValidatorToConnectKey),
 		PeerReadBufferSize:        int(v.GetUint(NetworkPeerReadBufferSizeKey)),
 		PeerWriteBufferSize:       int(v.GetUint(NetworkPeerWriteBufferSizeKey)),
-		LargeMessageConfig:        largeMessageConfig,
+		SubnetConfigs:             subnetConfigs,
 	}
 
 	switch {
@@ -565,152 +558,6 @@ func getNetworkConfig(
 		return network.Config{}, fmt.Errorf("%s must be >= 0", NetworkMaxClockDifferenceKey)
 	}
 	return config, nil
-}
-
-func getLargeMessageConfig(v *viper.Viper) (network.LargeMessageConfig, error) {
-	maxSizeSet := v.IsSet(NetworkLargeMessageSizeKey)
-	allowlistSet := v.IsSet(NetworkLargeMessagePeerIDsKey)
-	if maxSizeSet != allowlistSet {
-		return network.LargeMessageConfig{}, errLargeMessageFlagsTogether
-	}
-	if !maxSizeSet {
-		return network.LargeMessageConfig{}, nil
-	}
-
-	maxSizeKiB := v.GetUint(NetworkLargeMessageSizeKey)
-	maxSize := uint64(maxSizeKiB) * units.KiB
-	const defaultMaxMessageSizeKiB = constants.DefaultMaxMessageSize / units.KiB
-	if maxSize > math.MaxUint32 {
-		return network.LargeMessageConfig{}, errLargeMessageSizeTooLarge
-	}
-	if maxSize < constants.DefaultMaxMessageSize {
-		return network.LargeMessageConfig{}, errLargeMessageSizeTooSmall
-	}
-
-	idSlice := v.GetStringSlice(NetworkLargeMessagePeerIDsKey)
-	var (
-		allowAll  bool
-		allowlist set.Set[ids.NodeID]
-	)
-	if len(idSlice) > 0 && strings.TrimSpace(idSlice[0]) == "*" {
-		if len(idSlice) != 1 {
-			return network.LargeMessageConfig{}, errLargeMessagePeerIDsWildcardAlone
-		}
-		allowAll = true
-	} else {
-		allowlist = set.NewSet[ids.NodeID](len(idSlice))
-		for _, idStr := range idSlice {
-			idStr = strings.TrimSpace(idStr)
-			if idStr == "" {
-				continue
-			}
-			nodeID, err := ids.NodeIDFromString(idStr)
-			if err != nil {
-				return network.LargeMessageConfig{}, fmt.Errorf("%w %q: %w", errParseLargeMessagePeerID, idStr, err)
-			}
-			allowlist.Add(nodeID)
-		}
-	}
-
-	switch {
-	case !allowAll && allowlist.Len() == 0:
-		return network.LargeMessageConfig{}, errLargeMessagePeerIDsEmpty
-	case maxSizeKiB == defaultMaxMessageSizeKiB:
-		return network.LargeMessageConfig{}, errLargeMessageSizeIsDefault
-	}
-
-	throttler, err := getLargeMessageThrottlerConfig(v, maxSize)
-	if err != nil {
-		return network.LargeMessageConfig{}, err
-	}
-
-	return network.LargeMessageConfig{
-		Enabled:        true,
-		MaxMessageSize: uint32(maxSize),
-		AllowAll:       allowAll,
-		Allowlist:      allowlist,
-		Throttler:      throttler,
-	}, nil
-}
-
-func getLargeMessageThrottlerConfig(
-	v *viper.Viper,
-	maxMessageSize uint64,
-) (network.LargeMessageThrottlerConfig, error) {
-	throttler := network.DefaultLargeMessageThrottlerConfig(maxMessageSize)
-	inbound := &throttler.InboundMsgThrottlerConfig
-	outbound := &throttler.OutboundMsgThrottlerConfig
-	if v.IsSet(NetworkLargeMessageInboundAtLargeAllocSizeKey) {
-		inbound.AtLargeAllocSize = v.GetUint64(NetworkLargeMessageInboundAtLargeAllocSizeKey)
-	}
-	if v.IsSet(NetworkLargeMessageInboundValidatorAllocSizeKey) {
-		inbound.VdrAllocSize = v.GetUint64(NetworkLargeMessageInboundValidatorAllocSizeKey)
-	}
-	if v.IsSet(NetworkLargeMessageInboundNodeMaxAtLargeBytesKey) {
-		inbound.NodeMaxAtLargeBytes = v.GetUint64(NetworkLargeMessageInboundNodeMaxAtLargeBytesKey)
-	}
-	if v.IsSet(NetworkLargeMessageInboundMaxProcessingMsgsKey) {
-		inbound.MaxProcessingMsgsPerNode = v.GetUint64(NetworkLargeMessageInboundMaxProcessingMsgsKey)
-	}
-	if v.IsSet(NetworkLargeMessageInboundBandwidthRefillRateKey) {
-		inbound.RefillRate = v.GetUint64(NetworkLargeMessageInboundBandwidthRefillRateKey)
-	}
-	if v.IsSet(NetworkLargeMessageInboundBandwidthMaxBurstSizeKey) {
-		inbound.MaxBurstSize = v.GetUint64(NetworkLargeMessageInboundBandwidthMaxBurstSizeKey)
-	}
-	if v.IsSet(NetworkLargeMessageInboundCPUMaxRecheckDelayKey) {
-		inbound.CPUThrottlerConfig.MaxRecheckDelay = v.GetDuration(NetworkLargeMessageInboundCPUMaxRecheckDelayKey)
-	}
-	if v.IsSet(NetworkLargeMessageInboundDiskMaxRecheckDelayKey) {
-		inbound.DiskThrottlerConfig.MaxRecheckDelay = v.GetDuration(NetworkLargeMessageInboundDiskMaxRecheckDelayKey)
-	}
-	if v.IsSet(NetworkLargeMessageOutboundAtLargeAllocSizeKey) {
-		outbound.AtLargeAllocSize = v.GetUint64(NetworkLargeMessageOutboundAtLargeAllocSizeKey)
-	}
-	if v.IsSet(NetworkLargeMessageOutboundValidatorAllocSizeKey) {
-		outbound.VdrAllocSize = v.GetUint64(NetworkLargeMessageOutboundValidatorAllocSizeKey)
-	}
-	if v.IsSet(NetworkLargeMessageOutboundNodeMaxAtLargeBytesKey) {
-		outbound.NodeMaxAtLargeBytes = v.GetUint64(NetworkLargeMessageOutboundNodeMaxAtLargeBytesKey)
-	}
-
-	if err := validateLargeMessageThrottlerConfig(throttler, maxMessageSize); err != nil {
-		return network.LargeMessageThrottlerConfig{}, err
-	}
-	return throttler, nil
-}
-
-func validateLargeMessageThrottlerConfig(
-	throttler network.LargeMessageThrottlerConfig,
-	maxMessageSize uint64,
-) error {
-	inbound := throttler.InboundMsgThrottlerConfig
-	outbound := throttler.OutboundMsgThrottlerConfig
-	switch {
-	case inbound.AtLargeAllocSize == 0:
-		return fmt.Errorf("%s must be > 0", NetworkLargeMessageInboundAtLargeAllocSizeKey)
-	case inbound.VdrAllocSize == 0:
-		return fmt.Errorf("%s must be > 0", NetworkLargeMessageInboundValidatorAllocSizeKey)
-	case inbound.MaxProcessingMsgsPerNode == 0:
-		return fmt.Errorf("%s must be > 0", NetworkLargeMessageInboundMaxProcessingMsgsKey)
-	case inbound.RefillRate == 0:
-		return fmt.Errorf("%s must be > 0", NetworkLargeMessageInboundBandwidthRefillRateKey)
-	case inbound.CPUThrottlerConfig.MaxRecheckDelay < constants.MinInboundThrottlerMaxRecheckDelay:
-		return fmt.Errorf("%s must be >= %d", NetworkLargeMessageInboundCPUMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay)
-	case inbound.DiskThrottlerConfig.MaxRecheckDelay < constants.MinInboundThrottlerMaxRecheckDelay:
-		return fmt.Errorf("%s must be >= %d", NetworkLargeMessageInboundDiskMaxRecheckDelayKey, constants.MinInboundThrottlerMaxRecheckDelay)
-	case outbound.AtLargeAllocSize == 0:
-		return fmt.Errorf("%s must be > 0", NetworkLargeMessageOutboundAtLargeAllocSizeKey)
-	case outbound.VdrAllocSize == 0:
-		return fmt.Errorf("%s must be > 0", NetworkLargeMessageOutboundValidatorAllocSizeKey)
-	case inbound.NodeMaxAtLargeBytes < maxMessageSize:
-		return fmt.Errorf("%s must be >= %d bytes", NetworkLargeMessageInboundNodeMaxAtLargeBytesKey, maxMessageSize)
-	case inbound.MaxBurstSize < maxMessageSize:
-		return fmt.Errorf("%s must be >= %d bytes", NetworkLargeMessageInboundBandwidthMaxBurstSizeKey, maxMessageSize)
-	case outbound.NodeMaxAtLargeBytes < maxMessageSize:
-		return fmt.Errorf("%s must be >= %d bytes", NetworkLargeMessageOutboundNodeMaxAtLargeBytesKey, maxMessageSize)
-	}
-	return nil
 }
 
 func getBenchlistConfig(v *viper.Viper, snowballParameters *snowball.Parameters) (benchlist.Config, error) {
@@ -1604,18 +1451,11 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	// Network Config
-	nodeConfig.NetworkConfig, err = getNetworkConfig(
-		v,
-		nodeConfig.NetworkID,
-		nodeConfig.SybilProtectionEnabled,
-		healthCheckAveragerHalflife,
-	)
-	if err != nil {
-		return node.Config{}, err
-	}
-
 	// Subnet Configs
+	//
+	// Read before the network config: the member CAs and the elevated message
+	// stack the network layer runs on are declared here, per subnet, rather
+	// than in node flags.
 	subnetConfigs, err := getSubnetConfigs(v, nodeConfig.TrackedSubnets.List())
 	if err != nil {
 		return node.Config{}, fmt.Errorf("couldn't read subnet configs: %w", err)
@@ -1629,6 +1469,18 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	nodeConfig.ProposerMinBlockDelay = v.GetDuration(ProposerVMMinBlockDelayKey)
 	nodeConfig.SubnetConfigs = subnetConfigs
+
+	// Network Config
+	nodeConfig.NetworkConfig, err = getNetworkConfig(
+		v,
+		nodeConfig.NetworkID,
+		nodeConfig.SybilProtectionEnabled,
+		healthCheckAveragerHalflife,
+		subnetConfigs,
+	)
+	if err != nil {
+		return node.Config{}, err
+	}
 
 	// Benchlist
 	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, primaryNetworkConfig.SnowParameters)

@@ -24,4 +24,9 @@ type Info struct {
 	TrackedSubnets set.Set[ids.ID] `json:"trackedSubnets"`
 	SupportedACPs  set.Set[uint32] `json:"supportedACPs"`
 	ObjectedACPs   set.Set[uint32] `json:"objectedACPs"`
+	// MaxFrameSize is the P2P frame size this connection was established on. A
+	// value above the default means this node treats the peer as a member of a
+	// subnet that declares largeMessages; the default means it does not, which
+	// is the first thing to check when a member cannot bootstrap.
+	MaxFrameSize uint32 `json:"maxFrameSize"`
 }

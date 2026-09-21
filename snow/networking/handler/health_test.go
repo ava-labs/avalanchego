@@ -69,9 +69,11 @@ func TestHealthCheckSubnet(t *testing.T) {
 
 			sb := subnets.New(
 				ctx.NodeID,
+				ids.Empty,
 				subnets.Config{
 					SnowParameters: test.consensusParams,
 				},
+				subnets.NoOpMembershipChecker,
 			)
 
 			p2pTracker, err := p2p.NewPeerTracker(

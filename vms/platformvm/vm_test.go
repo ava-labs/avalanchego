@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
@@ -1230,14 +1229,13 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
-		int64(constants.DefaultMaxMessageSize),
 	)
 	require.NoError(err)
 
 	consensusCtx := snowtest.ConsensusContext(ctx)
 	externalSender := &sendertest.External{TB: t}
 	externalSender.Default(true)
-	subnet := subnets.New(ctx.NodeID, subnets.Config{})
+	subnet := subnets.New(ctx.NodeID, ids.Empty, subnets.Config{}, subnets.NoOpMembershipChecker)
 	// Passes messages from the consensus engine to the network
 	sender, err := sender.New(
 		consensusCtx,
@@ -1278,7 +1276,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		ctx.Log,
 		time.Second,
 		2000,
-		network.LargeMessageConfig{},
+		constants.MaxContainersLen,
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)

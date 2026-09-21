@@ -79,7 +79,6 @@ func TestTimeout(t *testing.T) {
 		metrics,
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
-		int64(constants.DefaultMaxMessageSize),
 	)
 	require.NoError(err)
 
@@ -106,7 +105,7 @@ func TestTimeout(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2ppb.EngineType_ENGINE_TYPE_CHAIN,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		subnets.New(ctx.NodeID, ids.Empty, subnets.Config{}, subnets.NoOpMembershipChecker),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -137,7 +136,7 @@ func TestTimeout(t *testing.T) {
 		time.Hour,
 		testThreadPoolSize,
 		resourceTracker,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		subnets.New(ctx.NodeID, ids.Empty, subnets.Config{}, subnets.NoOpMembershipChecker),
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
@@ -339,7 +338,6 @@ func TestReliableMessages(t *testing.T) {
 		metrics,
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
-		int64(constants.DefaultMaxMessageSize),
 	)
 	require.NoError(err)
 
@@ -366,7 +364,7 @@ func TestReliableMessages(t *testing.T) {
 		&chainRouter,
 		tm,
 		p2ppb.EngineType_ENGINE_TYPE_CHAIN,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		subnets.New(ctx.NodeID, ids.Empty, subnets.Config{}, subnets.NoOpMembershipChecker),
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -397,7 +395,7 @@ func TestReliableMessages(t *testing.T) {
 		1,
 		testThreadPoolSize,
 		resourceTracker,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		subnets.New(ctx.NodeID, ids.Empty, subnets.Config{}, subnets.NoOpMembershipChecker),
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
@@ -499,7 +497,6 @@ func TestReliableMessagesToMyself(t *testing.T) {
 				metrics,
 				constants.DefaultNetworkCompressionType,
 				10*time.Second,
-				int64(constants.DefaultMaxMessageSize),
 			)
 			require.NoError(err)
 
@@ -519,9 +516,14 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			externalSender := &sendertest.External{TB: t}
 			externalSender.Default(false)
 
-			subnet := subnets.New(ctx.NodeID, subnets.Config{
-				ValidatorOnly: validatorOnly,
-			})
+			subnet := subnets.New(
+				ctx.NodeID,
+				ids.Empty,
+				subnets.Config{
+					ValidatorOnly: validatorOnly,
+				},
+				subnets.NoOpMembershipChecker,
+			)
 			sender, err := New(
 				ctx,
 				mc,
@@ -916,7 +918,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				testInternalHandler,
 				timeoutManager,
 				p2ppb.EngineType_ENGINE_TYPE_CHAIN,
-				subnets.New(ctx.NodeID, subnets.Config{}),
+				subnets.New(ctx.NodeID, ids.Empty, subnets.Config{}, subnets.NoOpMembershipChecker),
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
@@ -1117,7 +1119,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				testInternalHandler,
 				timeoutManager,
 				p2ppb.EngineType_ENGINE_TYPE_CHAIN,
-				subnets.New(ctx.NodeID, subnets.Config{}),
+				subnets.New(ctx.NodeID, ids.Empty, subnets.Config{}, subnets.NoOpMembershipChecker),
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
@@ -1275,7 +1277,7 @@ func TestSender_Single_Request(t *testing.T) {
 				testInternalHandler,
 				timeoutManager,
 				engineType,
-				subnets.New(ctx.NodeID, subnets.Config{}),
+				subnets.New(ctx.NodeID, ids.Empty, subnets.Config{}, subnets.NoOpMembershipChecker),
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)

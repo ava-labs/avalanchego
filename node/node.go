@@ -1111,7 +1111,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
 	}
 
-	subnets, err := chains.NewSubnets(n.ID, n.Config.SubnetConfigs)
+	subnets, err := chains.NewSubnets(n.ID, n.Config.SubnetConfigs, n.Net)
 	if err != nil {
 		return fmt.Errorf("failed to initialize subnets: %w", err)
 	}
@@ -1155,7 +1155,6 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			ConsensusAppConcurrency:                 n.Config.ConsensusAppConcurrency,
 			BootstrapMaxTimeGetAncestors:            n.Config.BootstrapMaxTimeGetAncestors,
 			BootstrapAncestorsMaxContainersSent:     n.Config.BootstrapAncestorsMaxContainersSent,
-			BootstrapLargeMessageConfig:             n.Config.NetworkConfig.LargeMessageConfig,
 			BootstrapAncestorsMaxContainersReceived: n.Config.BootstrapAncestorsMaxContainersReceived,
 			Upgrades:                                n.Config.UpgradeConfig,
 			ResourceTracker:                         n.resourceTracker,

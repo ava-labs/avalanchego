@@ -47,7 +47,6 @@ go_test(
         "//database",
         "//database/memdb",
         "//ids",
-        "//network",
         "//network/p2p",
         "//proto/pb/p2p",
         "//snow",

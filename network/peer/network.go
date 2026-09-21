@@ -20,6 +20,11 @@ type Network interface {
 	// connection is no longer desired and should be terminated.
 	AllowConnection(peerID ids.NodeID) bool
 
+	// FrameSize returns the maximum P2P frame size the network currently wants
+	// to use with [peerID]. A connection whose stack no longer matches is
+	// closed so that it is re-established on the right one.
+	FrameSize(peerID ids.NodeID) uint32
+
 	// Track allows the peer to notify the network of potential new peers to
 	// connect to.
 	Track(ips []*ips.ClaimedIPPort) error

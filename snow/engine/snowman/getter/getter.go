@@ -11,10 +11,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -23,13 +21,16 @@ import (
 // Get requests are always served, regardless node state (bootstrapping or normal operations).
 var _ common.AllGetsServer = (*getter)(nil)
 
+// New returns a getter whose Ancestors responses are bounded by
+// [maxBytesGetAncestors]. Only a chain in a subnet declaring largeMessages
+// needs a budget above [constants.MaxContainersLen], the default P2P frame.
 func New(
 	vm block.ChainVM,
 	sender common.Sender,
 	log logging.Logger,
 	maxTimeGetAncestors time.Duration,
 	maxContainersGetAncestors int,
-	largeMessageConfig network.LargeMessageConfig,
+	maxBytesGetAncestors int,
 	reg prometheus.Registerer,
 ) (common.AllGetsServer, error) {
 	ssVM, _ := vm.(block.StateSyncableVM)
@@ -40,7 +41,7 @@ func New(
 		log:                       log,
 		maxTimeGetAncestors:       maxTimeGetAncestors,
 		maxContainersGetAncestors: maxContainersGetAncestors,
-		largeMessageConfig:        largeMessageConfig,
+		maxBytesGetAncestors:      maxBytesGetAncestors,
 	}
 
 	var err error
@@ -63,8 +64,8 @@ type getter struct {
 	maxTimeGetAncestors time.Duration
 	// Max number of containers in an ancestors message sent by this node.
 	maxContainersGetAncestors int
-	// Selects peers that may receive larger GetAncestors responses.
-	largeMessageConfig network.LargeMessageConfig
+	// Cumulative byte budget for an ancestors message sent by this chain.
+	maxBytesGetAncestors int
 
 	getAncestorsBlks metric.Averager
 }
@@ -194,7 +195,7 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 		gh.vm,
 		blkID,
 		gh.maxContainersGetAncestors,
-		gh.maxContainersBytesFor(nodeID),
+		gh.maxBytesGetAncestors,
 		gh.maxTimeGetAncestors,
 	)
 	if err != nil {
@@ -211,13 +212,6 @@ func (gh *getter) GetAncestors(ctx context.Context, nodeID ids.NodeID, requestID
 	gh.getAncestorsBlks.Observe(float64(len(ancestorsBytes)))
 	gh.sender.SendAncestors(ctx, nodeID, requestID, ancestorsBytes)
 	return nil
-}
-
-func (gh *getter) maxContainersBytesFor(nodeID ids.NodeID) int {
-	if gh.largeMessageConfig.AppliesTo(nodeID) {
-		return gh.largeMessageConfig.MaxAncestorsBytes()
-	}
-	return constants.MaxContainersLen
 }
 
 func (gh *getter) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {

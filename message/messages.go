@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/utils/compression"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -77,6 +78,17 @@ type msgBuilder struct {
 }
 
 func newMsgBuilder(
+	metrics prometheus.Registerer,
+	maxMessageTimeout time.Duration,
+) (*msgBuilder, error) {
+	return newMsgBuilderWithMaxMessageSize(
+		metrics,
+		maxMessageTimeout,
+		constants.DefaultMaxMessageSize,
+	)
+}
+
+func newMsgBuilderWithMaxMessageSize(
 	metrics prometheus.Registerer,
 	maxMessageTimeout time.Duration,
 	maxMessageSize int64,

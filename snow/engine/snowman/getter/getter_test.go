@@ -14,7 +14,6 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -27,11 +26,6 @@ import (
 )
 
 var errUnknownBlock = errors.New("unknown block")
-
-var elevatedLargeMessageConfig = network.LargeMessageConfig{
-	Enabled:        true,
-	MaxMessageSize: uint32(4 * constants.DefaultMaxMessageSize),
-}
 
 type StateSyncEnabledMock struct {
 	*blocktest.VM
@@ -57,7 +51,7 @@ func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *enginet
 		logging.NoLog{},
 		time.Second,
 		2000,
-		network.LargeMessageConfig{},
+		constants.MaxContainersLen,
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
@@ -65,56 +59,24 @@ func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *enginet
 	return bs, vm, sender
 }
 
-func TestMaxContainersBytesFor(t *testing.T) {
-	allowedPeer := ids.GenerateTestNodeID()
-	otherPeer := ids.GenerateTestNodeID()
-	elevatedAncestorsBytes := elevatedLargeMessageConfig.MaxAncestorsBytes()
-
-	tests := map[string]struct {
-		largeMessageConfig network.LargeMessageConfig
-		nodeID             ids.NodeID
-		want               int
-	}{
-		"allowlisted peer": {
-			largeMessageConfig: network.LargeMessageConfig{
-				Enabled:   true,
-				Allowlist: set.Of(allowedPeer),
-				MaxMessageSize: uint32(
-					4 * constants.DefaultMaxMessageSize,
-				),
-			},
-			nodeID: allowedPeer,
-			want:   elevatedAncestorsBytes,
-		},
-		"peer outside allowlist": {
-			largeMessageConfig: network.LargeMessageConfig{
-				Enabled:   true,
-				Allowlist: set.Of(allowedPeer),
-				MaxMessageSize: uint32(
-					4 * constants.DefaultMaxMessageSize,
-				),
-			},
-			nodeID: otherPeer,
-			want:   constants.MaxContainersLen,
-		},
-		"all peers": {
-			largeMessageConfig: network.LargeMessageConfig{
-				Enabled:        true,
-				AllowAll:       true,
-				MaxMessageSize: uint32(4 * constants.DefaultMaxMessageSize),
-			},
-			nodeID: otherPeer,
-			want:   elevatedAncestorsBytes,
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			handler := &getter{
-				largeMessageConfig: test.largeMessageConfig,
-			}
-			require.Equal(t, test.want, handler.maxContainersBytesFor(test.nodeID))
-		})
+// TestGetAncestorsByteBudget checks that the getter serves Ancestors from the
+// chain's configured budget, rather than resolving one per peer.
+func TestGetAncestorsByteBudget(t *testing.T) {
+	for _, maxBytes := range []int{
+		constants.MaxContainersLen,
+		4 * constants.DefaultMaxMessageSize,
+	} {
+		bs, err := New(
+			&blocktest.VM{},
+			&enginetest.Sender{T: t},
+			logging.NoLog{},
+			time.Second,
+			2000,
+			maxBytes,
+			prometheus.NewRegistry(),
+		)
+		require.NoError(t, err)
+		require.Equal(t, maxBytes, bs.(*getter).maxBytesGetAncestors)
 	}
 }
 

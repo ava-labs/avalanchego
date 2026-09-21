@@ -5,30 +5,42 @@ package network
 
 import (
 	"testing"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-func TestMessageStacksResolve(t *testing.T) {
-	allowlisted := ids.GenerateTestNodeID()
-	other := ids.GenerateTestNodeID()
+const testElevatedMessageSize = 4 * constants.DefaultMaxMessageSize
 
-	vdrs := validators.NewManager()
-	cfg, err := NewTestNetworkConfig(prometheus.NewRegistry(), constants.LocalID, vdrs, set.Set[ids.ID]{})
+// newMembershipTestNetwork returns a network with just the pieces that decide
+// which stack a peer is put on: the config, the message stacks, the membership
+// and the ip tracker.
+func newMembershipTestNetwork(t *testing.T, configure func(*Config)) *network {
+	t.Helper()
+
+	cfg, err := NewTestNetworkConfig(
+		prometheus.NewRegistry(),
+		constants.LocalID,
+		validators.NewManager(),
+		set.Set[ids.ID]{},
+	)
 	require.NoError(t, err)
-	cfg.LargeMessageConfig = LargeMessageConfig{
-		Enabled:        true,
-		MaxMessageSize: 4 * constants.DefaultMaxMessageSize,
-		Allowlist:      set.Of(allowlisted),
-		Throttler:      DefaultLargeMessageThrottlerConfig(4 * constants.DefaultMaxMessageSize),
+	if configure != nil {
+		configure(cfg)
 	}
+	// Node config produces exactly this relationship: a config per tracked
+	// subnet, plus the primary network.
+	cfg.TrackedSubnets = trackedSubnetsOf(cfg.SubnetConfigs)
 
 	stacks, err := newMessageStacks(
 		logging.NoLog{},
@@ -37,117 +49,202 @@ func TestMessageStacksResolve(t *testing.T) {
 		cfg,
 	)
 	require.NoError(t, err)
-	require.True(t, stacks.largeMessageConfig.Enabled)
 
-	defaultStack := stacks.Resolve(other)
-	require.Equal(t, uint32(constants.DefaultMaxMessageSize), defaultStack.MaxFrameSize)
-	require.Equal(t, stacks.Default.MessageCreator, defaultStack.MessageCreator)
-	require.Equal(t, stacks.Default.InboundMsgThrottler, defaultStack.InboundMsgThrottler)
-	require.Equal(t, stacks.Default.OutboundThrottler, defaultStack.OutboundThrottler)
+	ipTracker, err := newIPTracker(
+		cfg.TrackedSubnets,
+		logging.NoLog{},
+		prometheus.NewRegistry(),
+		cfg.ConnectToAllValidators,
+	)
+	require.NoError(t, err)
 
-	elevatedStack := stacks.Resolve(allowlisted)
-	require.Equal(t, cfg.LargeMessageConfig.MaxMessageSize, elevatedStack.MaxFrameSize)
-	require.Equal(t, stacks.Elevated.MessageCreator, elevatedStack.MessageCreator)
-	require.Equal(t, stacks.Elevated.InboundMsgThrottler, elevatedStack.InboundMsgThrottler)
-	require.Equal(t, stacks.Elevated.OutboundThrottler, elevatedStack.OutboundThrottler)
-
-	// Default and elevated stacks must be distinct when enabled, otherwise the
-	// elevated peer would inherit the default frame limit.
-	require.NotEqual(t, stacks.Default.MessageCreator, stacks.Elevated.MessageCreator)
-	require.NotEqual(t, stacks.Default.MaxFrameSize, stacks.Elevated.MaxFrameSize)
+	return &network{
+		config:        cfg,
+		messageStacks: stacks,
+		membership:    newMembership(cfg.SubnetConfigs, cfg.TrackedSubnets, cfg.Validators),
+		ipTracker:     ipTracker,
+	}
 }
 
-func TestMessageStacksResolveAll(t *testing.T) {
-	vdrs := validators.NewManager()
-	cfg, err := NewTestNetworkConfig(prometheus.NewRegistry(), constants.LocalID, vdrs, set.Set[ids.ID]{})
-	require.NoError(t, err)
-	cfg.LargeMessageConfig = LargeMessageConfig{
-		Enabled:        true,
-		MaxMessageSize: 4 * constants.DefaultMaxMessageSize,
-		AllowAll:       true,
-		Throttler:      DefaultLargeMessageThrottlerConfig(4 * constants.DefaultMaxMessageSize),
+func elevatedSubnetConfig(allowedNodes ...ids.NodeID) subnets.Config {
+	return subnets.Config{
+		ValidatorOnly: true,
+		AllowedNodes:  set.Of(allowedNodes...),
+		LargeMessages: &subnets.LargeMessagesConfig{
+			MaxMessageSize: testElevatedMessageSize,
+		},
 	}
+}
 
-	stacks, err := newMessageStacks(
-		logging.NoLog{},
-		prometheus.NewRegistry(),
-		cfg.Validators,
-		cfg,
+func withElevatedSubnet(subnetID ids.ID, subnetConfig subnets.Config) func(*Config) {
+	return func(cfg *Config) {
+		cfg.SubnetConfigs = map[ids.ID]subnets.Config{subnetID: subnetConfig}
+	}
+}
+
+// TestStackForMembership checks that the elevated stack follows membership of
+// the subnet that declares largeMessages, by each of the three member sources.
+func TestStackForMembership(t *testing.T) {
+	var (
+		subnetID  = ids.GenerateTestID()
+		validator = ids.GenerateTestNodeID()
+		allowed   = ids.GenerateTestNodeID()
+		certPeer  = ids.GenerateTestNodeID()
+		stranger  = ids.GenerateTestNodeID()
 	)
-	require.NoError(t, err)
 
-	for _, nodeID := range []ids.NodeID{
-		ids.GenerateTestNodeID(),
-		ids.GenerateTestNodeID(),
+	n := newMembershipTestNetwork(t, withElevatedSubnet(subnetID, elevatedSubnetConfig(allowed)))
+	require.NoError(t, n.config.Validators.AddStaker(subnetID, validator, nil, ids.GenerateTestID(), 1))
+	n.membership.track(certPeer, certifiedSubnets{
+		subnetID: time.Now().Add(time.Hour),
+	})
+
+	for name, test := range map[string]struct {
+		nodeID   ids.NodeID
+		elevated bool
+	}{
+		"subnet validator":   {nodeID: validator, elevated: true},
+		"certificate member": {nodeID: certPeer, elevated: true},
+		"allowedNodes entry": {nodeID: allowed, elevated: true},
+		"stranger":           {nodeID: stranger, elevated: false},
 	} {
-		elevatedStack := stacks.Resolve(nodeID)
-		require.Equal(t, cfg.LargeMessageConfig.MaxMessageSize, elevatedStack.MaxFrameSize)
-		require.Equal(t, stacks.Elevated.MessageCreator, elevatedStack.MessageCreator)
-		require.Equal(t, stacks.Elevated.InboundMsgThrottler, elevatedStack.InboundMsgThrottler)
-		require.Equal(t, stacks.Elevated.OutboundThrottler, elevatedStack.OutboundThrottler)
-	}
-}
-
-// TestMsgCreatorUsesElevatedWhenEnabled verifies the node-wide creator returns
-// the large creator when the elevated stack is enabled (so the sender can build
-// payloads above the default max size), and the default creator otherwise.
-func TestMsgCreatorUsesElevatedWhenEnabled(t *testing.T) {
-	vdrs := validators.NewManager()
-	cfg, err := NewTestNetworkConfig(prometheus.NewRegistry(), constants.LocalID, vdrs, set.Set[ids.ID]{})
-	require.NoError(t, err)
-	cfg.LargeMessageConfig = LargeMessageConfig{
-		Enabled:        true,
-		MaxMessageSize: 4 * constants.DefaultMaxMessageSize,
-		Allowlist:      set.Of(ids.GenerateTestNodeID()),
-		Throttler:      DefaultLargeMessageThrottlerConfig(4 * constants.DefaultMaxMessageSize),
+		t.Run(name, func(t *testing.T) {
+			want := n.messageStacks.Default
+			if test.elevated {
+				want = n.messageStacks.elevated.messageStack
+			}
+			require.Equal(t, want, n.stackFor(test.nodeID))
+			require.Equal(t, want.MaxFrameSize, n.FrameSize(test.nodeID))
+		})
 	}
 
-	stacks, err := newMessageStacks(
-		logging.NoLog{},
-		prometheus.NewRegistry(),
-		cfg.Validators,
-		cfg,
-	)
-	require.NoError(t, err)
-	require.True(t, stacks.largeMessageConfig.Enabled)
-	require.Equal(t, stacks.Elevated.MessageCreator, stacks.MsgCreator())
-	require.NotEqual(t, stacks.Default.MessageCreator, stacks.MsgCreator())
+	// The two stacks must be distinct, otherwise an elevated peer would inherit
+	// the default frame limit.
+	require.NotEqual(t, n.messageStacks.Default.MessageCreator, n.messageStacks.elevated.messageStack.MessageCreator)
+	require.NotEqual(t, n.messageStacks.Default.MaxFrameSize, n.messageStacks.elevated.messageStack.MaxFrameSize)
 }
 
-// TestMsgCreatorUsesDefaultWhenDisabled verifies the node-wide creator falls
-// back to the default creator when the elevated stack is disabled.
-func TestMsgCreatorUsesDefaultWhenDisabled(t *testing.T) {
-	vdrs := validators.NewManager()
-	cfg, err := NewTestNetworkConfig(prometheus.NewRegistry(), constants.LocalID, vdrs, set.Set[ids.ID]{})
-	require.NoError(t, err)
-
-	stacks, err := newMessageStacks(
-		logging.NoLog{},
-		prometheus.NewRegistry(),
-		cfg.Validators,
-		cfg,
+// TestStackForReadsTrackedMembership checks that stackFor reads the certificate
+// membership [membership.track] recorded, which is why the connection path
+// tracks the peer before it selects a stack.
+func TestStackForReadsTrackedMembership(t *testing.T) {
+	var (
+		subnetID = ids.GenerateTestID()
+		nodeID   = ids.GenerateTestNodeID()
 	)
-	require.NoError(t, err)
-	require.False(t, stacks.largeMessageConfig.Enabled)
-	require.Equal(t, stacks.Default.MessageCreator, stacks.MsgCreator())
+
+	n := newMembershipTestNetwork(t, withElevatedSubnet(subnetID, elevatedSubnetConfig()))
+
+	require.Equal(t, n.messageStacks.Default, n.stackFor(nodeID))
+
+	n.membership.track(nodeID, certifiedSubnets{
+		subnetID: time.Now().Add(time.Hour),
+	})
+	require.Equal(t, n.messageStacks.elevated.messageStack, n.stackFor(nodeID))
 }
 
-func TestMessageStacksDisabledWhenAllowlistEmpty(t *testing.T) {
-	vdrs := validators.NewManager()
-	cfg, err := NewTestNetworkConfig(prometheus.NewRegistry(), constants.LocalID, vdrs, set.Set[ids.ID]{})
-	require.NoError(t, err)
-	cfg.LargeMessageConfig = LargeMessageConfig{
-		MaxMessageSize: 4 * constants.DefaultMaxMessageSize,
-		Allowlist:      set.Set[ids.NodeID]{},
+func TestStackForDisabled(t *testing.T) {
+	n := newMembershipTestNetwork(t, nil)
+
+	require.False(t, n.messageStacks.elevated.hasElevated)
+	require.Equal(t, n.messageStacks.Default, n.stackFor(ids.GenerateTestNodeID()))
+	require.Equal(t, uint32(constants.DefaultMaxMessageSize), n.FrameSize(ids.GenerateTestNodeID()))
+}
+
+// TestLargeMessagesSubnet checks that the node's single elevated stack is
+// resolved from the one subnet that declares largeMessages.
+func TestLargeMessagesSubnet(t *testing.T) {
+	var (
+		subnetID      = ids.GenerateTestID()
+		otherSubnetID = ids.GenerateTestID()
+		largeMessages = &subnets.LargeMessagesConfig{
+			MaxMessageSize: testElevatedMessageSize,
+		}
+	)
+
+	t.Run("no subnet declares largeMessages", func(t *testing.T) {
+		require := require.New(t)
+
+		elevatedSubnetID, got, err := largeMessagesSubnet(map[ids.ID]subnets.Config{
+			constants.PrimaryNetworkID: {},
+			subnetID:                   {ValidatorOnly: true},
+		})
+		require.NoError(err)
+		require.Nil(got)
+		require.Equal(ids.Empty, elevatedSubnetID)
+	})
+
+	t.Run("one subnet declares largeMessages", func(t *testing.T) {
+		require := require.New(t)
+
+		elevatedSubnetID, got, err := largeMessagesSubnet(map[ids.ID]subnets.Config{
+			constants.PrimaryNetworkID: {},
+			subnetID: {
+				ValidatorOnly: true,
+				LargeMessages: largeMessages,
+			},
+		})
+		require.NoError(err)
+		require.Equal(subnetID, elevatedSubnetID)
+		require.Equal(largeMessages, got)
+	})
+
+	t.Run("two subnets declare largeMessages", func(t *testing.T) {
+		_, _, err := largeMessagesSubnet(map[ids.ID]subnets.Config{
+			constants.PrimaryNetworkID: {},
+			subnetID:                   {LargeMessages: largeMessages},
+			otherSubnetID:              {LargeMessages: largeMessages},
+		})
+		require.ErrorIs(t, err, errTooManyLargeMessageSubnets)
+	})
+}
+
+// TestLargeMessagesLogged checks that a node running the elevated stack says so
+// at startup, which is the cheapest way to catch a node missed in a rollout.
+func TestLargeMessagesLogged(t *testing.T) {
+	require := require.New(t)
+
+	subnetID := ids.GenerateTestID()
+	config, err := NewTestNetworkConfig(
+		prometheus.NewRegistry(),
+		constants.LocalID,
+		validators.NewManager(),
+		set.Of(subnetID),
+	)
+	require.NoError(err)
+	config.SubnetConfigs = map[ids.ID]subnets.Config{
+		subnetID: elevatedSubnetConfig(),
 	}
 
-	stacks, err := newMessageStacks(
-		logging.NoLog{},
+	core, logs := observer.New(zapcore.Level(logging.Warn))
+	_, err = newMessageStacks(
+		logging.NewLogger("", logging.WrappedCore{Core: core}),
 		prometheus.NewRegistry(),
-		cfg.Validators,
-		cfg,
+		config.Validators,
+		config,
 	)
-	require.NoError(t, err)
-	require.False(t, stacks.largeMessageConfig.Enabled)
-	require.Equal(t, stacks.Default, stacks.Resolve(ids.GenerateTestNodeID()))
+	require.NoError(err)
+
+	entries := logs.All()
+	require.Len(entries, 1)
+	require.Equal("large message config enabled", entries[0].Message)
+	require.Equal(uint32(testElevatedMessageSize), entries[0].ContextMap()["maxMessageSize"])
+}
+
+// TestMsgCreator checks that the node-wide creator is the elevated one whenever
+// that stack exists, so the sender can build payloads above the default size at
+// all.
+func TestMsgCreator(t *testing.T) {
+	t.Run("elevated stack", func(t *testing.T) {
+		n := newMembershipTestNetwork(t, withElevatedSubnet(ids.GenerateTestID(), elevatedSubnetConfig()))
+
+		require.Equal(t, n.messageStacks.elevated.messageStack.MessageCreator, n.MsgCreator())
+		require.NotEqual(t, n.messageStacks.Default.MessageCreator, n.MsgCreator())
+	})
+
+	t.Run("no elevated stack", func(t *testing.T) {
+		n := newMembershipTestNetwork(t, nil)
+
+		require.Equal(t, n.messageStacks.Default.MessageCreator, n.MsgCreator())
+	})
 }

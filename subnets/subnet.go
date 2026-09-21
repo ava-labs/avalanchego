@@ -15,7 +15,25 @@ var _ Subnet = (*subnet)(nil)
 
 type Allower interface {
 	// IsAllowed filters out nodes that are not allowed to connect to this subnet
-	IsAllowed(nodeID ids.NodeID, isValidator bool) bool
+	IsAllowed(nodeID ids.NodeID) bool
+}
+
+// MembershipChecker reports whether a peer is a member of a subnet: a validator
+// of it, a peer whose staking certificate chains to its member CA, or a peer
+// listed in its allowedNodes. It is implemented by the network layer, which is
+// where all three are resolved.
+type MembershipChecker interface {
+	IsSubnetMember(subnetID ids.ID, nodeID ids.NodeID) bool
+}
+
+// NoOpMembershipChecker reports no peer as a member. Tests pass it to [New]
+// when membership is irrelevant; production always supplies a real checker.
+var NoOpMembershipChecker MembershipChecker = noOpMembershipChecker{}
+
+type noOpMembershipChecker struct{}
+
+func (noOpMembershipChecker) IsSubnetMember(ids.ID, ids.NodeID) bool {
+	return false
 }
 
 // Subnet keeps track of the currently bootstrapping chains in a subnet. If no
@@ -38,14 +56,25 @@ type subnet struct {
 	bootstrapping   set.Set[ids.ID]
 	bootstrapped    set.Set[ids.ID]
 	config          Config
+	subnetID        ids.ID
 	myNodeID        ids.NodeID
+	members         MembershipChecker
 	bootstrapSignal common.PreemptionSignal
 }
 
-func New(myNodeID ids.NodeID, config Config) Subnet {
+// New returns the Subnet [subnetID] as this node runs it. [members] reports
+// which peers are members of it.
+func New(
+	myNodeID ids.NodeID,
+	subnetID ids.ID,
+	config Config,
+	members MembershipChecker,
+) Subnet {
 	return &subnet{
 		config:   config,
+		subnetID: subnetID,
 		myNodeID: myNodeID,
+		members:  members,
 	}
 }
 
@@ -89,13 +118,11 @@ func (s *subnet) Config() Config {
 	return s.config
 }
 
-func (s *subnet) IsAllowed(nodeID ids.NodeID, isValidator bool) bool {
+func (s *subnet) IsAllowed(nodeID ids.NodeID) bool {
 	// Case 1: NodeID is this node
-	// Case 2: This subnet is not validator-only subnet
-	// Case 3: NodeID is a validator for this chain
-	// Case 4: NodeID is explicitly allowed whether it's subnet validator or not
+	// Case 2: This subnet is not a validator-only subnet
+	// Case 3: NodeID is a member of this subnet
 	return nodeID == s.myNodeID ||
 		!s.config.ValidatorOnly ||
-		isValidator ||
-		s.config.AllowedNodes.Contains(nodeID)
+		s.members.IsSubnetMember(s.subnetID, nodeID)
 }

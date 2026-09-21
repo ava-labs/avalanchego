@@ -231,9 +231,6 @@ type ManagerConfig struct {
 	BootstrapMaxTimeGetAncestors time.Duration
 	// Max number of containers in an ancestors message sent by this node.
 	BootstrapAncestorsMaxContainersSent int
-	// BootstrapLargeMessageConfig selects peers that may receive larger
-	// GetAncestors responses.
-	BootstrapLargeMessageConfig network.LargeMessageConfig
 	// This node will only consider the first [AncestorsMaxContainersReceived]
 	// containers in an ancestors message it receives.
 	BootstrapAncestorsMaxContainersReceived int
@@ -921,13 +918,14 @@ func (m *manager) createAvalancheChain(
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
 	vdrs.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
 
+	subnetConfig := m.SubnetConfigs[ctx.SubnetID]
 	snowGetHandler, err := snowgetter.New(
 		vmWrappingProposerVM,
 		snowmanMessageSender,
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
-		m.BootstrapLargeMessageConfig,
+		subnetConfig.MaxAncestorsBytes(),
 		ctx.Registerer,
 	)
 	if err != nil {
@@ -1347,13 +1345,14 @@ func (m *manager) createSnowmanChain(
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
 	beacons.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
 
+	subnetConfig := m.SubnetConfigs[ctx.SubnetID]
 	snowGetHandler, err := snowgetter.New(
 		vm,
 		messageSender,
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
-		m.BootstrapLargeMessageConfig,
+		subnetConfig.MaxAncestorsBytes(),
 		ctx.Registerer,
 	)
 	if err != nil {

@@ -69,7 +69,7 @@ func StartTestPeer(
 		prometheus.NewCounter(prometheus.CounterOpts{}),
 	)
 
-	peerID, conn, cert, err := clientUpgrader.Upgrade(conn)
+	peerID, conn, cert, _, err := clientUpgrader.Upgrade(conn)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,6 @@ func StartTestPeer(
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
-		int64(constants.DefaultMaxMessageSize),
 	)
 	if err != nil {
 		return nil, err

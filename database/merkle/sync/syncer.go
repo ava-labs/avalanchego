@@ -180,10 +180,11 @@ func NewSyncer[R any, C any](
 		return nil, ErrZeroWorkLimit
 	}
 
-	if config.MaxMessageSize == 0 {
-		config.MaxMessageSize = constants.DefaultMaxMessageSize
+	maxMessageSize := config.MaxMessageSize
+	if maxMessageSize == 0 {
+		maxMessageSize = constants.DefaultMaxMessageSize
 	}
-	requestByteSizeLimit, err := proofByteSizeLimit(config.MaxMessageSize)
+	requestByteSizeLimit, err := proofByteSizeLimit(maxMessageSize)
 	if err != nil {
 		return nil, err
 	}

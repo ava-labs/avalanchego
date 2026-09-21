@@ -201,7 +201,6 @@ func newMessageCreator(t *testing.T) message.Creator {
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
-		int64(constants.DefaultMaxMessageSize),
 	)
 	require.NoError(t, err)
 
@@ -368,7 +367,6 @@ func TestNodeUptimeACP267Requirement(t *testing.T) {
 			sender := networks[1]
 			peers := sender.getPeers(
 				set.Of(nodeIDs[0]),
-				constants.PrimaryNetworkID,
 				subnets.NoOpAllower,
 			)
 			require.Len(t, peers, 1)

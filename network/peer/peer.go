@@ -243,6 +243,7 @@ func (p *Peer) Info() Info {
 		TrackedSubnets: p.trackedSubnets,
 		SupportedACPs:  p.supportedACPs,
 		ObjectedACPs:   p.objectedACPs,
+		MaxFrameSize:   p.stack.MaxFrameSize,
 	}
 }
 
@@ -378,10 +379,7 @@ func (p *Peer) readMessages() {
 		// Parse the message length
 		msgLen, err := readMsgLen(msgLenBytes, p.stack.MaxFrameSize)
 		if err != nil {
-			p.Log.Verbo("error parsing message length",
-				zap.Stringer("nodeID", p.id),
-				zap.Error(err),
-			)
+			p.logRejectedMsgLen(err)
 			return
 		}
 
@@ -645,6 +643,10 @@ func (p *Peer) sendNetworkMessages() {
 				return
 			}
 
+			if p.isOnWrongStack() {
+				return
+			}
+
 			// Only check if we should disconnect after the handshake is
 			// finished to avoid race conditions and accessing uninitialized
 			// values.
@@ -668,6 +670,52 @@ func (p *Peer) sendNetworkMessages() {
 			return
 		}
 	}
+}
+
+// logRejectedMsgLen reports a message length this connection refused to read.
+//
+// The frame size is never negotiated, so this is the only place a disagreement
+// about it becomes observable. It is a warning only for a peer we elevated,
+// where the likely cause is a different maxMessageSize on its side; every other
+// peer stays at Verbo, so that an arbitrary peer cannot write to the log.
+func (p *Peer) logRejectedMsgLen(err error) {
+	if p.stack.MaxFrameSize <= constants.DefaultMaxMessageSize {
+		p.Log.Verbo("error parsing message length",
+			zap.Stringer("nodeID", p.id),
+			zap.Error(err),
+		)
+		return
+	}
+
+	p.Log.Warn("rejected a message length from an elevated peer",
+		zap.Stringer("nodeID", p.id),
+		zap.Uint32("frameSize", p.stack.MaxFrameSize),
+		zap.Error(err),
+	)
+}
+
+// isOnWrongStack reports whether this connection's frame size no longer matches
+// what the network wants for this peer.
+//
+// A connection's frame size is fixed for its lifetime, but a peer can become or
+// stop being a member while connected, so the only way onto the right stack is
+// a new connection. The network establishes one as soon as this one closes.
+//
+// Like [Peer.shouldDisconnect], this is checked when sending a Ping rather than
+// from a validator set callback, to keep this work off the P-chain accept path.
+func (p *Peer) isOnWrongStack() bool {
+	frameSize := p.Network.FrameSize(p.id)
+	if frameSize == p.stack.MaxFrameSize {
+		return false
+	}
+
+	p.Log.Debug(disconnectingLog,
+		zap.String("reason", "message stack changed"),
+		zap.Stringer("nodeID", p.id),
+		zap.Uint32("currentFrameSize", p.stack.MaxFrameSize),
+		zap.Uint32("desiredFrameSize", frameSize),
+	)
+	return true
 }
 
 // shouldDisconnect is called both during receipt of the Handshake message and

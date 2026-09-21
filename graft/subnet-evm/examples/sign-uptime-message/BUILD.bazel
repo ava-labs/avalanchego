@@ -20,7 +20,6 @@ go_library(
         "//proto/pb/sdk",
         "//snow/networking/router",
         "//utils/compression",
-        "//utils/constants",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
         "//wallet/subnet/primary",

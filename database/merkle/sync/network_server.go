@@ -51,23 +51,21 @@ var (
 	errEmptyProof           = errors.New("proof for empty trie requested")
 )
 
+// NewProofHandler returns a proof handler whose responses fit within the
+// default P2P message size.
 func NewProofHandler[R any, C any](
 	db DB[R, C],
 	rangeProofMarshaler Marshaler[R],
 	changeProofMarshaler Marshaler[C],
 	registerer prometheus.Registerer,
 ) (*ProofHandler[R, C], error) {
-	metrics, err := newHandlerMetrics("sync", registerer)
-	if err != nil {
-		return nil, err
-	}
-	return &ProofHandler[R, C]{
-		db:                   db,
-		rangeProofMarshaler:  rangeProofMarshaler,
-		changeProofMarshaler: changeProofMarshaler,
-		maxByteSizeLimit:     maxByteSizeLimit,
-		metrics:              metrics,
-	}, nil
+	return NewProofHandlerWithMaxMessageSize(
+		db,
+		rangeProofMarshaler,
+		changeProofMarshaler,
+		registerer,
+		constants.DefaultMaxMessageSize,
+	)
 }
 
 // NewProofHandlerWithMaxMessageSize returns a proof handler whose responses fit
@@ -81,9 +79,6 @@ func NewProofHandlerWithMaxMessageSize[R any, C any](
 	registerer prometheus.Registerer,
 	maxMessageSize uint32,
 ) (*ProofHandler[R, C], error) {
-	if maxMessageSize == 0 {
-		maxMessageSize = constants.DefaultMaxMessageSize
-	}
 	maxByteSizeLimit, err := proofByteSizeLimit(maxMessageSize)
 	if err != nil {
 		return nil, err
@@ -141,10 +136,7 @@ func (h *ProofHandler[R, C]) AppRequest(ctx context.Context, _ ids.NodeID, _ tim
 	return resp, nil
 }
 
-func (h *ProofHandler[R, C]) handleRangeProofRequest(
-	ctx context.Context,
-	req *pb.RangeProofRequest,
-) ([]byte, error) {
+func (h *ProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req *pb.RangeProofRequest) ([]byte, error) {
 	if err := validateRangeProofRequest(req); err != nil {
 		return nil, err
 	}
@@ -205,10 +197,7 @@ func (h *ProofHandler[R, C]) handleRangeProofRequest(
 	return nil, errMinProofSizeIsTooLarge
 }
 
-func (h *ProofHandler[R, C]) handleChangeProofRequest(
-	ctx context.Context,
-	req *pb.ChangeProofRequest,
-) ([]byte, error) {
+func (h *ProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, req *pb.ChangeProofRequest) ([]byte, error) {
 	if err := validateChangeProofRequest(req); err != nil {
 		return nil, err
 	}
@@ -289,6 +278,8 @@ func (h *ProofHandler[R, C]) handleChangeProofRequest(
 	return nil, errMinProofSizeIsTooLarge
 }
 
+// proofByteSizeLimit returns the byte budget a proof response has inside a
+// [maxMessageSize] frame.
 func proofByteSizeLimit(maxMessageSize uint32) (uint32, error) {
 	if maxMessageSize <= estimatedMessageOverhead {
 		return 0, errMaxMessageSizeTooSmall
