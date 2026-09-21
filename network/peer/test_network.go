@@ -6,6 +6,7 @@ package peer
 import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -18,6 +19,10 @@ func (testNetwork) Connected(ids.NodeID) {}
 
 func (testNetwork) AllowConnection(ids.NodeID) bool {
 	return true
+}
+
+func (testNetwork) FrameSize(ids.NodeID) uint32 {
+	return constants.DefaultMaxMessageSize
 }
 
 func (testNetwork) Track([]*ips.ClaimedIPPort) error {

@@ -117,7 +117,7 @@ func TestShutdown(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
-		subnets.New(chainCtx.NodeID, subnets.Config{}),
+		subnets.New(chainCtx.NodeID, ids.Empty, subnets.Config{}, subnets.NoOpMembershipChecker),
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
@@ -244,7 +244,7 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
-		subnets.New(chainCtx.NodeID, subnets.Config{}),
+		subnets.New(chainCtx.NodeID, ids.Empty, subnets.Config{}, subnets.NoOpMembershipChecker),
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
@@ -378,7 +378,7 @@ func TestShutdownTimesOut(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		subnets.New(ctx.NodeID, ids.Empty, subnets.Config{}, subnets.NoOpMembershipChecker),
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
@@ -548,7 +548,7 @@ func TestRouterTimeout(t *testing.T) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		subnets.New(ctx.NodeID, ids.Empty, subnets.Config{}, subnets.NoOpMembershipChecker),
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),
@@ -1008,6 +1008,17 @@ func TestRouterClearTimeouts(t *testing.T) {
 	}
 }
 
+// testMembers reports subnet membership from a fixed set, standing in for the
+// network layer, which resolves validator status, certificate membership, and
+// allowedNodes into one answer.
+type testMembers struct {
+	members set.Set[ids.NodeID]
+}
+
+func (m testMembers) IsSubnetMember(_ ids.ID, nodeID ids.NodeID) bool {
+	return m.members.Contains(nodeID)
+}
+
 func TestValidatorOnlyMessageDrops(t *testing.T) {
 	require := require.New(t)
 
@@ -1052,10 +1063,10 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
-	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true})
 	vdrs := validators.NewManager()
 	vID := ids.GenerateTestNodeID()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, vID, nil, ids.Empty, 1))
+	sb := subnets.New(ctx.NodeID, ctx.SubnetID, subnets.Config{ValidatorOnly: true}, testMembers{members: set.Of(vID)})
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
 		resource.NoUsage,
@@ -1217,11 +1228,17 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	ctx := snowtest.ConsensusContext(snowCtx)
 	allowedID := ids.GenerateTestNodeID()
 	allowedSet := set.Of(allowedID)
-	sb := subnets.New(ctx.NodeID, subnets.Config{ValidatorOnly: true, AllowedNodes: allowedSet})
 
 	vdrs := validators.NewManager()
 	vID := ids.GenerateTestNodeID()
 	require.NoError(vdrs.AddStaker(ctx.SubnetID, vID, nil, ids.Empty, 1))
+
+	sb := subnets.New(
+		ctx.NodeID,
+		ctx.SubnetID,
+		subnets.Config{ValidatorOnly: true, AllowedNodes: allowedSet},
+		testMembers{members: set.Of(vID, allowedID)},
+	)
 
 	resourceTracker, err := tracker.NewResourceTracker(
 		prometheus.NewRegistry(),
@@ -1717,7 +1734,7 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
-		subnets.New(ctx.NodeID, subnets.Config{}),
+		subnets.New(ctx.NodeID, ids.Empty, subnets.Config{}, subnets.NoOpMembershipChecker),
 		commontracker.NewPeers(),
 		p2pTracker,
 		prometheus.NewRegistry(),

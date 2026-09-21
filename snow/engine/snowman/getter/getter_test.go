@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -50,11 +51,33 @@ func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *enginet
 		logging.NoLog{},
 		time.Second,
 		2000,
+		constants.MaxContainersLen,
 		prometheus.NewRegistry(),
 	)
 	require.NoError(t, err)
 
 	return bs, vm, sender
+}
+
+// TestGetAncestorsByteBudget checks that the getter serves Ancestors from the
+// chain's configured budget, rather than resolving one per peer.
+func TestGetAncestorsByteBudget(t *testing.T) {
+	for _, maxBytes := range []int{
+		constants.MaxContainersLen,
+		4 * constants.DefaultMaxMessageSize,
+	} {
+		bs, err := New(
+			&blocktest.VM{},
+			&enginetest.Sender{T: t},
+			logging.NoLog{},
+			time.Second,
+			2000,
+			maxBytes,
+			prometheus.NewRegistry(),
+		)
+		require.NoError(t, err)
+		require.Equal(t, maxBytes, bs.(*getter).maxBytesGetAncestors)
+	}
 }
 
 func TestAcceptedFrontier(t *testing.T) {

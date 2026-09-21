@@ -236,6 +236,12 @@ func getSubnetConfigFromBytes(rawBytes []byte, v *viper.Viper) (subnets.Config, 
 		return subnets.Config{}, err
 	}
 
+	// Load the member CA now so that an unreadable or malformed file is a
+	// startup error rather than a subnet that silently admits nobody.
+	if err := config.LoadMemberCA(); err != nil {
+		return subnets.Config{}, err
+	}
+
 	return config, nil
 }
 
@@ -378,6 +384,7 @@ func getNetworkConfig(
 	networkID uint32,
 	sybilProtectionEnabled bool,
 	halflife time.Duration,
+	subnetConfigs map[ids.ID]subnets.Config,
 ) (network.Config, error) {
 	// Set the max number of recent inbound connections upgraded to be
 	// equal to the max number of inbound connections per second.
@@ -511,6 +518,7 @@ func getNetworkConfig(
 		RequireValidatorToConnect: v.GetBool(NetworkRequireValidatorToConnectKey),
 		PeerReadBufferSize:        int(v.GetUint(NetworkPeerReadBufferSizeKey)),
 		PeerWriteBufferSize:       int(v.GetUint(NetworkPeerWriteBufferSizeKey)),
+		SubnetConfigs:             subnetConfigs,
 	}
 
 	switch {
@@ -1443,18 +1451,11 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	// Network Config
-	nodeConfig.NetworkConfig, err = getNetworkConfig(
-		v,
-		nodeConfig.NetworkID,
-		nodeConfig.SybilProtectionEnabled,
-		healthCheckAveragerHalflife,
-	)
-	if err != nil {
-		return node.Config{}, err
-	}
-
 	// Subnet Configs
+	//
+	// Read before the network config: the member CAs and the elevated message
+	// stack the network layer runs on are declared here, per subnet, rather
+	// than in node flags.
 	subnetConfigs, err := getSubnetConfigs(v, nodeConfig.TrackedSubnets.List())
 	if err != nil {
 		return node.Config{}, fmt.Errorf("couldn't read subnet configs: %w", err)
@@ -1468,6 +1469,18 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	nodeConfig.ProposerMinBlockDelay = v.GetDuration(ProposerVMMinBlockDelayKey)
 	nodeConfig.SubnetConfigs = subnetConfigs
+
+	// Network Config
+	nodeConfig.NetworkConfig, err = getNetworkConfig(
+		v,
+		nodeConfig.NetworkID,
+		nodeConfig.SybilProtectionEnabled,
+		healthCheckAveragerHalflife,
+		subnetConfigs,
+	)
+	if err != nil {
+		return node.Config{}, err
+	}
 
 	// Benchlist
 	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, primaryNetworkConfig.SnowParameters)

@@ -45,6 +45,7 @@ go_test(
         "//snow/engine/snowman/getter",
         "//snow/snowtest",
         "//snow/validators",
+        "//utils/constants",
         "//utils/hashing",
         "//utils/logging",
         "//utils/set",

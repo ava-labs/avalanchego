@@ -89,6 +89,12 @@ type Network interface {
 	// NodeUptime returns given node's primary network UptimeResults in the view of
 	// this node's peer validators.
 	NodeUptime() (UptimeResult, error)
+
+	// MsgCreator returns the message creator for outbound consensus traffic.
+	MsgCreator() message.Creator
+
+	// MembershipChecker reports which connected peers are members of a subnet.
+	subnets.MembershipChecker
 }
 
 type UptimeResult struct {
@@ -112,6 +118,7 @@ type UptimeResult struct {
 //
 // 1. peersLock
 // 2. manuallyTrackedIDsLock
+// 3. membership.lock
 //
 // If a higher lock (e.g. manuallyTrackedIDsLock) is held when trying to grab a
 // lower lock (e.g. peersLock) a deadlock could occur.
@@ -120,7 +127,12 @@ type network struct {
 	peerConfig *peer.Config
 	metrics    *metrics
 
-	outboundMsgThrottler throttling.OutboundMsgThrottler
+	messageStacks *MessageStacks
+
+	// membership decides which subnets a peer belongs to. It is the single
+	// predicate behind subnet admission, elevated frame size, and, with
+	// RequireValidatorToConnect, connection admission.
+	membership *membership
 
 	// Limits the number of connection attempts based on IP.
 	inboundConnUpgradeThrottler throttling.InboundConnUpgradeThrottler
@@ -172,11 +184,14 @@ type network struct {
 	router router.ExternalHandler
 }
 
+func (n *network) MsgCreator() message.Creator {
+	return n.messageStacks.MsgCreator()
+}
+
 // NewNetwork returns a new Network implementation with the provided parameters.
 func NewNetwork(
 	config *Config,
 	minCompatibleTime time.Time,
-	msgCreator message.Creator,
 	metricsRegisterer prometheus.Registerer,
 	log logging.Logger,
 	listener net.Listener,
@@ -209,28 +224,17 @@ func NewNetwork(
 		return nil, errTrackingPrimaryNetwork
 	}
 
-	inboundMsgThrottler, err := throttling.NewInboundMsgThrottler(
+	messageStacks, err := newMessageStacks(
 		log,
 		metricsRegisterer,
 		config.Validators,
-		config.ThrottlerConfig.InboundMsgThrottlerConfig,
-		config.ResourceTracker,
-		config.CPUTargeter,
-		config.DiskTargeter,
+		config,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("initializing inbound message throttler failed with: %w", err)
+		return nil, fmt.Errorf("initializing message stacks failed with: %w", err)
 	}
 
-	outboundMsgThrottler, err := throttling.NewSybilOutboundMsgThrottler(
-		log,
-		metricsRegisterer,
-		config.Validators,
-		config.ThrottlerConfig.OutboundMsgThrottlerConfig,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("initializing outbound message throttler failed with: %w", err)
-	}
+	membership := newMembership(config.SubnetConfigs, config.TrackedSubnets, config.Validators)
 
 	peerMetrics, err := peer.NewMetrics(metricsRegisterer)
 	if err != nil {
@@ -263,9 +267,7 @@ func NewNetwork(
 		ReadBufferSize:         config.PeerReadBufferSize,
 		WriteBufferSize:        config.PeerWriteBufferSize,
 		Metrics:                peerMetrics,
-		MessageCreator:         msgCreator,
 		Log:                    log,
-		InboundMsgThrottler:    inboundMsgThrottler,
 		Network:                nil, // This is set below.
 		Router:                 router,
 		VersionCompatibility:   version.GetCompatibility(minCompatibleTime),
@@ -287,11 +289,12 @@ func NewNetwork(
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
 	n := &network{
-		startupTime:          time.Now(),
-		config:               config,
-		peerConfig:           peerConfig,
-		metrics:              metrics,
-		outboundMsgThrottler: outboundMsgThrottler,
+		startupTime:   time.Now(),
+		config:        config,
+		peerConfig:    peerConfig,
+		metrics:       metrics,
+		messageStacks: messageStacks,
+		membership:    membership,
 
 		inboundConnUpgradeThrottler: throttling.NewInboundConnUpgradeThrottler(config.ThrottlerConfig.InboundConnUpgradeThrottlerConfig),
 		listener:                    listener,
@@ -324,7 +327,7 @@ func (n *network) Send(
 	subnetID ids.ID,
 	allower subnets.Allower,
 ) set.Set[ids.NodeID] {
-	namedPeers := n.getPeers(config.NodeIDs, subnetID, allower)
+	namedPeers := n.getPeers(config.NodeIDs, allower)
 	n.peerConfig.Metrics.MultipleSendsFailed(
 		msg.Op,
 		config.NodeIDs.Len()-len(namedPeers),
@@ -498,13 +501,56 @@ func (n *network) Connected(nodeID ids.NodeID) {
 // AllowConnection returns true if this node should have a connection to the
 // provided nodeID. If the node is attempting to connect to the minimum number
 // of peers, then it should only connect if this node is a validator, or the
-// peer is a validator/beacon.
+// peer is a validator, a beacon, or a member of a subnet this node tracks.
+//
+// Certificate membership is read from the record of the peer's connection.
+// [network.upgrade] decides admission for a connection that is not recorded
+// yet through [network.allowConnection].
 func (n *network) AllowConnection(nodeID ids.NodeID) bool {
+	return n.allowConnection(nodeID, n.membership.certified(nodeID))
+}
+
+// allowConnection is [network.AllowConnection] with the certificate membership
+// source supplied by the caller: what [nodeID]'s chain proved, whether or not
+// that has been recorded yet.
+func (n *network) allowConnection(nodeID ids.NodeID, certified certifiedSubnets) bool {
 	if !n.config.RequireValidatorToConnect {
 		return true
 	}
 	_, areWeAPrimaryNetworkAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
-	return areWeAPrimaryNetworkAValidator || n.ipTracker.WantsConnection(nodeID)
+	return areWeAPrimaryNetworkAValidator ||
+		n.ipTracker.WantsConnection(nodeID) ||
+		n.membership.isMemberOfAny(nodeID, certified)
+}
+
+// FrameSize returns the maximum P2P frame size this node currently wants to use
+// with [nodeID]. The peer compares it against the stack it was started on when
+// it sends a Ping, and closes the connection if they disagree.
+//
+// The frame size is never negotiated: each end answers this about the other
+// from its own view of membership. The two answers can differ for a while,
+// because a validator carries no certificate and so reads as a stranger to a
+// peer that has not yet synced the P-chain. A lasting disagreement means the
+// two nodes are configured with different maxMessageSize values, and surfaces
+// through [peer.Peer.logRejectedMsgLen].
+func (n *network) FrameSize(nodeID ids.NodeID) uint32 {
+	return n.stackFor(nodeID).MaxFrameSize
+}
+
+// stackFor returns the message stack to use with [nodeID]. Membership is read
+// from what [membership.track] recorded for the connection.
+func (n *network) stackFor(nodeID ids.NodeID) peer.MessageStack {
+	elevated := n.messageStacks.elevated
+	if elevated.hasElevated && n.membership.IsSubnetMember(elevated.subnetID, nodeID) {
+		return elevated.messageStack
+	}
+	return n.messageStacks.Default
+}
+
+// IsSubnetMember implements [subnets.MembershipChecker] so that the chains this
+// node runs read membership from the network that established the connections.
+func (n *network) IsSubnetMember(subnetID ids.ID, nodeID ids.NodeID) bool {
+	return n.membership.IsSubnetMember(subnetID, nodeID)
 }
 
 func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
@@ -752,13 +798,10 @@ func (n *network) track(ip *ips.ClaimedIPPort, trackAllSubnets bool) error {
 //
 //   - [nodeIDs] the IDs of the peers that should be returned if they are
 //     connected.
-//   - [subnetID] the subnetID whose membership should be considered to
-//     determine if the node is a validator.
 //   - [allower] interface that determines if a node is allowed to connect to
-//     the subnet based on its validator status.
+//     the subnet.
 func (n *network) getPeers(
 	nodeIDs set.Set[ids.NodeID],
-	subnetID ids.ID,
 	allower subnets.Allower,
 ) []*peer.Peer {
 	peers := make([]*peer.Peer, 0, nodeIDs.Len())
@@ -772,9 +815,8 @@ func (n *network) getPeers(
 			continue
 		}
 
-		_, areTheyAValidator := n.config.Validators.GetValidator(subnetID, nodeID)
 		// check if the peer is allowed to connect to the subnet
-		if !allower.IsAllowed(nodeID, areTheyAValidator) {
+		if !allower.IsAllowed(nodeID) {
 			continue
 		}
 
@@ -817,7 +859,7 @@ func (n *network) samplePeers(
 
 			_, areTheyAValidator := n.config.Validators.GetValidator(subnetID, peerID)
 			// check if the peer is allowed to connect to the subnet
-			if !allower.IsAllowed(peerID, areTheyAValidator) {
+			if !allower.IsAllowed(peerID) {
 				return false
 			}
 
@@ -842,6 +884,7 @@ func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
 	defer n.peersLock.Unlock()
 
 	n.connectingPeers.Remove(nodeID)
+	n.membership.untrack(nodeID)
 
 	// The peer that is disconnecting from us didn't finish the handshake
 	tracked, ok := n.trackedIPs[nodeID]
@@ -867,6 +910,7 @@ func (n *network) disconnectedFromConnected(peer *peer.Peer, nodeID ids.NodeID) 
 	defer n.peersLock.Unlock()
 
 	n.connectedPeers.Remove(nodeID)
+	n.membership.untrack(nodeID)
 
 	// The peer that is disconnecting from us finished the handshake
 	if ip, wantsConnection := n.ipTracker.GetIP(nodeID); wantsConnection {
@@ -1030,7 +1074,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 		return err
 	}
 
-	nodeID, tlsConn, cert, err := upgrader.Upgrade(conn)
+	nodeID, tlsConn, cert, chain, err := upgrader.Upgrade(conn)
 	if err != nil {
 		_ = conn.Close()
 		n.peerConfig.Log.Verbo("failed to upgrade connection",
@@ -1056,7 +1100,12 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 		return nil
 	}
 
-	if !n.AllowConnection(nodeID) {
+	// Verify the chain here, before taking peersLock: this is the one
+	// signature-verifying step on the connection path, like the IP check in
+	// [network.track].
+	certified := n.membership.findCertifiedSubnets(chain)
+
+	if !n.allowConnection(nodeID, certified) {
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
 			"dropping undesired connection",
@@ -1102,15 +1151,24 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 		return nil
 	}
 
+	// Record what the chain proved only now, under peersLock and after the
+	// de-duplication checks, so that the record lives exactly as long as the
+	// peer it describes: a Disconnected for an earlier connection to the same
+	// node cannot remove the record this one is started on. It selects the
+	// stack below and answers every later membership question about the peer.
+	n.membership.track(nodeID, certified)
+
 	n.peerConfig.Log.Verbo("starting handshake",
 		zap.Stringer("nodeID", nodeID),
 	)
 
 	// peer.Start requires there is only ever one peer instance running with the
-	// same [peerConfig.InboundMsgThrottler]. This is guaranteed by the above
+	// same [stack.InboundMsgThrottler]. This is guaranteed by the above
 	// de-duplications for [connectingPeers] and [connectedPeers].
+	stack := n.stackFor(nodeID)
 	peer := peer.Start(
 		n.peerConfig,
+		stack,
 		tlsConn,
 		cert,
 		nodeID,
@@ -1118,7 +1176,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 			n.peerConfig.Metrics,
 			nodeID,
 			n.peerConfig.Log,
-			n.outboundMsgThrottler,
+			stack.OutboundThrottler,
 		),
 		isIngress,
 	)

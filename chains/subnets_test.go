@@ -19,7 +19,7 @@ func TestNewSubnets(t *testing.T) {
 		constants.PrimaryNetworkID: {},
 	}
 
-	subnets, err := NewSubnets(ids.EmptyNodeID, config)
+	subnets, err := NewSubnets(ids.EmptyNodeID, config, subnets.NoOpMembershipChecker)
 	require.NoError(err)
 
 	subnet, ok := subnets.GetOrCreate(constants.PrimaryNetworkID)
@@ -31,7 +31,7 @@ func TestNewSubnetsNoPrimaryNetworkConfig(t *testing.T) {
 	require := require.New(t)
 	config := map[ids.ID]subnets.Config{}
 
-	_, err := NewSubnets(ids.EmptyNodeID, config)
+	_, err := NewSubnets(ids.EmptyNodeID, config, subnets.NoOpMembershipChecker)
 	require.ErrorIs(err, ErrNoPrimaryNetworkConfig)
 }
 
@@ -84,7 +84,7 @@ func TestSubnetsGetOrCreate(t *testing.T) {
 			config := map[ids.ID]subnets.Config{
 				constants.PrimaryNetworkID: {},
 			}
-			subnets, err := NewSubnets(ids.EmptyNodeID, config)
+			subnets, err := NewSubnets(ids.EmptyNodeID, config, subnets.NoOpMembershipChecker)
 			require.NoError(err)
 
 			for _, arg := range tt.args {
@@ -131,7 +131,7 @@ func TestSubnetConfigs(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			subnets, err := NewSubnets(ids.EmptyNodeID, tt.config)
+			subnets, err := NewSubnets(ids.EmptyNodeID, tt.config, subnets.NoOpMembershipChecker)
 			require.NoError(err)
 
 			subnet, ok := subnets.GetOrCreate(tt.subnetID)
@@ -149,7 +149,7 @@ func TestSubnetsBootstrapping(t *testing.T) {
 		constants.PrimaryNetworkID: {},
 	}
 
-	subnets, err := NewSubnets(ids.EmptyNodeID, config)
+	subnets, err := NewSubnets(ids.EmptyNodeID, config, subnets.NoOpMembershipChecker)
 	require.NoError(err)
 
 	subnetID := ids.GenerateTestID()

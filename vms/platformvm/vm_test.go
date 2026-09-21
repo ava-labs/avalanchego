@@ -1234,7 +1234,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	consensusCtx := snowtest.ConsensusContext(ctx)
 	externalSender := &sendertest.External{TB: t}
 	externalSender.Default(true)
-	subnet := subnets.New(ctx.NodeID, subnets.Config{})
+	subnet := subnets.New(ctx.NodeID, ids.Empty, subnets.Config{}, subnets.NoOpMembershipChecker)
 	// Passes messages from the consensus engine to the network
 	sender, err := sender.New(
 		consensusCtx,
@@ -1275,6 +1275,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		ctx.Log,
 		time.Second,
 		2000,
+		constants.MaxContainersLen,
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)

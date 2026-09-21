@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "stakingtest",
+    srcs = [
+        "ca.go",
+        "pki.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/staking/stakingtest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//staking",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_test(
+    name = "stakingtest_test",
+    srcs = ["ca_test.go"],
+    embed = [":stakingtest"],
+    deps = [
+        "//staking",
+        "@com_github_stretchr_testify//require",
+    ],
+)

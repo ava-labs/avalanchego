@@ -12,7 +12,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 var validParameters = snowball.Parameters{
@@ -86,6 +88,49 @@ func TestValidParameters(t *testing.T) {
 			},
 			expectedErr: simplex.ErrInvalidParameters,
 		},
+		{
+			name: "valid largeMessages",
+			s: Config{
+				ValidatorOnly:  true,
+				LargeMessages:  &LargeMessagesConfig{MaxMessageSize: 160 * units.MiB},
+				SnowParameters: &validParameters,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "largeMessages on public subnet",
+			s: Config{
+				LargeMessages:  &LargeMessagesConfig{MaxMessageSize: 160 * units.MiB},
+				SnowParameters: &validParameters,
+			},
+			expectedErr: ErrLargeMessagesWhenNotValidatorOnly,
+		},
+		{
+			name: "memberCA on public subnet",
+			s: Config{
+				MemberCAPEMs:   []string{"-----BEGIN CERTIFICATE-----"},
+				SnowParameters: &validParameters,
+			},
+			expectedErr: ErrMemberCAWhenNotValidatorOnly,
+		},
+		{
+			name: "largeMessages with member CA on public subnet",
+			s: Config{
+				MemberCAPEMs:   []string{"-----BEGIN CERTIFICATE-----"},
+				LargeMessages:  &LargeMessagesConfig{MaxMessageSize: 160 * units.MiB},
+				SnowParameters: &validParameters,
+			},
+			expectedErr: ErrLargeMessagesWhenNotValidatorOnly,
+		},
+		{
+			name: "largeMessages at the default size",
+			s: Config{
+				ValidatorOnly:  true,
+				LargeMessages:  &LargeMessagesConfig{MaxMessageSize: constants.DefaultMaxMessageSize},
+				SnowParameters: &validParameters,
+			},
+			expectedErr: ErrLargeMessageSizeTooSmall,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -93,6 +138,16 @@ func TestValidParameters(t *testing.T) {
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
+}
+
+func TestMaxAncestorsBytes(t *testing.T) {
+	require := require.New(t)
+
+	var config Config
+	require.Equal(constants.MaxContainersLen, config.MaxAncestorsBytes())
+
+	config.LargeMessages = &LargeMessagesConfig{MaxMessageSize: 80 * constants.DefaultMaxMessageSize}
+	require.Equal(64*constants.DefaultMaxMessageSize, config.MaxAncestorsBytes())
 }
 
 // TestValidConsensusConfiguration tests the three meaningful states of
