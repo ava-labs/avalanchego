@@ -175,7 +175,8 @@ assert_file "${workdir}/gowork" "<unset>"
 
 # CI must use the pinned release from setup-task even if nix develop has hidden
 # it from PATH. It must not build Task through `go tool`.
-cached_task_dir="${workdir}/runner-temp/task/v3.48.0/Linux-X64"
+task_version="$("${repo_root}/scripts/setup_task.sh" version)"
+cached_task_dir="${workdir}/runner-temp/task/${task_version}/Linux-X64"
 mkdir -p "${cached_task_dir}"
 cat >"${cached_task_dir}/task" <<EOF
 #!${bash_bin}

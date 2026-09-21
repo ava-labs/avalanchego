@@ -23,7 +23,7 @@ if [[ -n "${CI:-}" ]]; then
   # Resolve the release from its cache location before reporting it missing.
   task_version="$("${AVALANCHE_PATH}/scripts/setup_task.sh" version)"
   if task_dir="$(
-    TASK_VERSION="${task_version}" "${AVALANCHE_PATH}/scripts/setup_task.sh" path 2>/dev/null
+    TASK_VERSION="${task_version}" "${AVALANCHE_PATH}/scripts/setup_task.sh" path
   )"; then
     exec "${task_dir}/task" "${@}"
   fi
