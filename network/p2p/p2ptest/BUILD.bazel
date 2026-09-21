@@ -3,6 +3,7 @@ load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "p2ptest",
+    testonly = True,
     srcs = [
         "client.go",
         "tracker.go",
