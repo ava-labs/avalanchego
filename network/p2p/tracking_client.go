@@ -58,8 +58,6 @@ func (c *TrackingClient) AppRequest(
 	appRequestBytes []byte,
 	onResponse AppResponseVerifier,
 ) error {
-	// One node per call, since each needs its own scoring state. A shared
-	// callback would collapse the whole set onto one sync.Once and one start.
 	for nodeID := range nodeIDs {
 		if err := c.request(ctx, nodeID, appRequestBytes, onResponse); err != nil {
 			return err
