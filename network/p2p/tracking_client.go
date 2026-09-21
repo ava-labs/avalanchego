@@ -5,7 +5,6 @@ package p2p
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -67,8 +66,8 @@ func (c *TrackingClient) AppRequest(
 	return nil
 }
 
-// request sends to nodeID and scores the outcome exactly once. A send that
-// never leaves the node is balanced here, since nothing else will.
+// request registers a request to nodeID, sends it, and scores the outcome. The
+// engine answers every request it sends, with a timeout failure if nothing else.
 func (c *TrackingClient) request(
 	ctx context.Context,
 	nodeID ids.NodeID,
@@ -78,22 +77,6 @@ func (c *TrackingClient) request(
 	c.peers.RegisterRequest(nodeID)
 	start := time.Now()
 
-	var once sync.Once
-	registerFailure := func() {
-		once.Do(func() {
-			c.peers.RegisterFailure(nodeID)
-		})
-	}
-
-	// Settle the registration if the caller's context ends first, since the
-	// reply may never arrive to settle it.
-	stop := func() bool { return false }
-	// Skipped for a context already done, since firing now would blame the peer
-	// for a reply still on its way.
-	if ctx.Err() == nil {
-		stop = context.AfterFunc(ctx, registerFailure)
-	}
-
 	// Scoring always uses nodeID, the node we asked. The chain router keys a
 	// response on its sender, so respNodeID agrees with it.
 	score := func(
@@ -102,27 +85,23 @@ func (c *TrackingClient) request(
 		responseBytes []byte,
 		appErr error,
 	) {
-		stop()
-
 		// Taken before onResponse so that the peer is not charged for the cost
 		// of validating its own response.
 		elapsed := time.Since(start)
 
 		err := onResponse(respCtx, respNodeID, responseBytes, appErr)
 		if appErr != nil || err != nil {
-			registerFailure()
+			c.peers.RegisterFailure(nodeID)
 			return
 		}
 
-		once.Do(func() {
-			bandwidth := float64(len(responseBytes)) / (elapsed.Seconds() + bandwidthEpsilon)
-			c.peers.RegisterResponse(nodeID, bandwidth)
-		})
+		bandwidth := float64(len(responseBytes)) / (elapsed.Seconds() + bandwidthEpsilon)
+		c.peers.RegisterResponse(nodeID, bandwidth)
 	}
 
 	if err := c.client.AppRequest(ctx, set.Of(nodeID), appRequestBytes, score); err != nil {
-		stop()
-		registerFailure()
+		// The request never left the node, so balance the registration above.
+		c.peers.RegisterFailure(nodeID)
 		return err
 	}
 

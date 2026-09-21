@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"testing/synctest"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -1182,45 +1181,6 @@ func TestTrackingClientScoresBandwidthBeforeVerification(t *testing.T) {
 	// so anything near that ceiling means the measurement started too early.
 	ceiling := float64(len(response)) / verification.Seconds()
 	require.Greater(t, peerBandwidth(peer.tracker, peer.nodeID), 10*ceiling)
-}
-
-// A request whose callback never arrives is scored when its context ends.
-func TestTrackingClientScoresAbandonedRequest(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		peer := newTrackedPeer(t, nil)
-
-		invoked := false
-		requestCtx, cancel := context.WithCancel(t.Context())
-		require.NoError(t, peer.client.AppRequest(
-			requestCtx,
-			set.Of(peer.nodeID),
-			[]byte("request"),
-			func(context.Context, ids.NodeID, []byte, error) error {
-				invoked = true
-				return nil
-			},
-		))
-
-		_, _, inHeap := trackerState(peer.tracker, peer.nodeID)
-		require.False(t, inHeap)
-
-		cancel()
-		synctest.Wait() // the AfterFunc has scored the failure
-
-		tracked, responsive, inHeap := trackerState(peer.tracker, peer.nodeID)
-		require.True(t, tracked)
-		require.False(t, responsive)
-		require.True(t, inHeap)
-		require.False(t, invoked)
-
-		// A late reply still reaches the caller, but the request is already
-		// scored and must not be scored a second time.
-		require.NoError(t, peer.network.AppResponse(t.Context(), peer.nodeID, 1, []byte("response")))
-		require.True(t, invoked)
-
-		_, responsive, _ = trackerState(peer.tracker, peer.nodeID)
-		require.False(t, responsive)
-	})
 }
 
 func TestTrackingClientScoresEachPeer(t *testing.T) {
