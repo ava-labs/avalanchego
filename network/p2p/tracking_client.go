@@ -87,11 +87,11 @@ func (c *TrackingClient) request(
 		})
 	}
 
-	// The callback is not guaranteed. A VM may drop both the response and the
-	// failure for a request the chain it is running no longer recognises.
+	// Settle the registration if the caller's context ends first, since the
+	// reply may never arrive to settle it.
 	stop := func() bool { return false }
-	// Skipped for a ctx already done, since firing now would blame the peer for
-	// a reply still on its way.
+	// Skipped for a context already done, since firing now would blame the peer
+	// for a reply still on its way.
 	if ctx.Err() == nil {
 		stop = context.AfterFunc(ctx, registerFailure)
 	}
