@@ -469,7 +469,7 @@ Set both versions to `MinimumCompatibleVersion`, without the leading `v`:
     optionalVersion: '1.14.0'
 ```
 
-Open the PR against `devops-argocd` ([example](https://github.com/ava-labs/devops-argocd/pull/17216)) and get approval from the infra team. 
+Open the PR against `devops-argocd` ([example](https://github.com/ava-labs/devops-argocd/pull/17216)), get approval from the infra team, and merge it so the notify service picks up the new floor.
 
 ### 11. Post-Release Version Bump
 
