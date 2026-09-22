@@ -103,8 +103,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.True(t, addAutoRenewedTx.Unsigned.(*platform.AddAutoRenewedValidatorTx).BaseTx.SyntacticallyVerified)
-	cccccbkfftiultidtbckijjffdujbjhjkurkjrlegchf
-	(t, env, diff, feeCalculator, addAutoRenewedTx)
+	requireBaseTxApplied(t, env, diff, feeCalculator, addAutoRenewedTx)
 	require.NoError(t, diff.Apply(env.state))
 
 	validator, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
