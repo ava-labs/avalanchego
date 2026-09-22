@@ -61,6 +61,28 @@ These changes prepare the merge commit that will be tagged.
    }
    ```
 
+   On a minor release, also bump the compatibility floor in the same file:
+   `MinimumCompatibleVersion` to this release's minor and `PrevMinimumCompatibleVersion`
+   to the one before, both with `Patch: 0`. Patch releases leave both alone.
+
+   ```go
+   MinimumCompatibleVersion = &Application{
+       Name:  Client,
+       Major: 1,
+       Minor: 14,
+       Patch: 0,
+   }
+   PrevMinimumCompatibleVersion = &Application{
+       Name:  Client,
+       Major: 1,
+       Minor: 13,
+       Patch: 0,
+   }
+   ```
+
+   Changing `MinimumCompatibleVersion` also means updating the notify service after the
+   release is published — see [step 10](#10-update-the-notify-service).
+
 1. Update [`RELEASES.md`](RELEASES.md) - rename "Pending" section to the new version and create a new "Pending" section.
 
 1. If RPC chain VM protocol version changed, update [`version/constants.go`](version/constants.go):
@@ -112,7 +134,7 @@ These changes prepare the merge commit that will be tagged.
    The test starts a network on the published `DEFAULT_VERSION` binary and restarts it on
    the current code, so the two MUST agree on the local schedule. After this change only
    `$VERSION` agrees, and it is not published until the release itself — so leave the job
-   off and re-enable it in [step 10](#10-post-release-version-bump).
+   off and re-enable it in [step 11](#11-post-release-version-bump).
 
 1. Update submodule require directives to reference the future tag:
 
@@ -430,7 +452,26 @@ Antithesis test images are built and pushed to Google Artifact Registry on every
 See the [Antithesis testing documentation](tests/antithesis/README.md#scheduled-testing)
 for scheduled testing details.
 
-### 10. Post-Release Version Bump
+### 10. Update the Notify Service
+
+Only needed when `MinimumCompatibleVersion` changed in step 3.
+
+The notify service warns node operators running below a configured version. Its config
+lives in `devops-argocd`, under the `uptime` job of
+[`aws/data/us-east-1/data-k8s/root/analytics/analytics-app.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/aws/data/us-east-1/data-k8s/root/analytics/analytics-app.yaml).
+Set both versions to `MinimumCompatibleVersion`, without the leading `v`:
+
+```yaml
+- cmd: uptime
+  config:
+    # ...
+    requiredVersion: '1.14.0'
+    optionalVersion: '1.14.0'
+```
+
+Open the PR against `devops-argocd` ([example](https://github.com/ava-labs/devops-argocd/pull/17216)) and get approval from the infra team. 
+
+### 11. Post-Release Version Bump
 
 Prepare for the next release:
 
