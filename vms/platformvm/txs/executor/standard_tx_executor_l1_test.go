@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 // TestStandardExecutorConvertSubnetToL1TxErrors verifies the failure cases of
@@ -57,10 +58,11 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		want        error
-		updateTx    func(*testing.T, *platform.Tx)
-		updateState func(*testing.T, *state.Diff)
+		name          string
+		feeCalculator txfee.Calculator
+		want          error
+		updateTx      func(*testing.T, *platform.Tx)
+		updateState   func(*testing.T, *state.Diff)
 	}{
 		{
 			name: "invalid_prior_to_etna",
@@ -143,6 +145,16 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 			want: state.ErrDuplicateL1Validator,
 		},
 		{
+			name: "insufficient_fee",
+			// The wallet funds the tx at the current price. A higher execution
+			// price leaves its outputs and balances covered but underpays the fee.
+			feeCalculator: txfee.NewDynamicCalculator(
+				env.config.DynamicFeeConfig.Weights,
+				100*env.config.DynamicFeeConfig.MinPrice,
+			),
+			want: utxo.ErrInsufficientUnlockedFunds,
+		},
+		{
 			name: "flow_checker_failed",
 			updateTx: func(_ *testing.T, tx *platform.Tx) {
 				// Produce more AVAX than the tx consumes
@@ -209,6 +221,10 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 			}
 
 			feeCalculator := state.PickFeeCalculator(env.config, env.state)
+			if tt.feeCalculator != nil {
+				feeCalculator = tt.feeCalculator
+			}
+			
 			_, _, _, got = StandardTx(
 				&env.backend,
 				feeCalculator,
@@ -452,11 +468,12 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 
 	validationID := addressedCallPayload.ValidationID()
 	tests := []struct {
-		name        string
-		balance     uint64
-		want        error
-		updateTx    func(*testing.T, *platform.Tx)
-		updateState func(*testing.T, *state.Diff)
+		name          string
+		feeCalculator txfee.Calculator
+		balance       uint64
+		want          error
+		updateTx      func(*testing.T, *platform.Tx)
+		updateState   func(*testing.T, *state.Diff)
 	}{
 		{
 			name: "invalid_prior_to_etna",
@@ -485,6 +502,16 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Balance = math.MaxUint64
 			},
 			want: safemath.ErrOverflow,
+		},
+		{
+			name: "insufficient_fee",
+			// The wallet funds the tx at the current price. A higher execution
+			// price leaves its outputs and balances covered but underpays the fee.
+			feeCalculator: txfee.NewDynamicCalculator(
+				env.config.DynamicFeeConfig.Weights,
+				100*env.config.DynamicFeeConfig.MinPrice,
+			),
+			want: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
 			name: "flow_checker_failed",
@@ -704,6 +731,9 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 			}
 
 			feeCalculator := state.PickFeeCalculator(env.config, env.state)
+			if tt.feeCalculator != nil {
+				feeCalculator = tt.feeCalculator
+			}
 			_, _, _, got = StandardTx(
 				&env.backend,
 				feeCalculator,
@@ -1000,10 +1030,11 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		want        error
-		updateTx    func(*testing.T, *platform.Tx)
-		updateState func(*testing.T, *state.Diff)
+		name          string
+		feeCalculator txfee.Calculator
+		want          error
+		updateTx      func(*testing.T, *platform.Tx)
+		updateState   func(*testing.T, *state.Diff)
 	}{
 		{
 			name: "invalid_prior_to_etna",
@@ -1025,6 +1056,16 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).Memo = []byte("memo!")
 			},
 			want: avax.ErrMemoTooLarge,
+		},
+		{
+			name: "insufficient_fee",
+			// The wallet funds the tx at the current price. A higher execution
+			// price leaves its outputs and balances covered but underpays the fee.
+			feeCalculator: txfee.NewDynamicCalculator(
+				env.config.DynamicFeeConfig.Weights,
+				100*env.config.DynamicFeeConfig.MinPrice,
+			),
+			want: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
 			name: "flow_checker_failed",
@@ -1164,6 +1205,9 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 			}
 
 			feeCalculator := state.PickFeeCalculator(env.config, env.state)
+			if tt.feeCalculator != nil {
+				feeCalculator = tt.feeCalculator
+			}
 			_, _, _, got = StandardTx(
 				&env.backend,
 				feeCalculator,
@@ -1485,10 +1529,11 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 
 	const balanceIncrease = units.NanoAvax
 	tests := []struct {
-		name        string
-		want        error
-		updateTx    func(*testing.T, *platform.Tx)
-		updateState func(*testing.T, *state.Diff)
+		name          string
+		feeCalculator txfee.Calculator
+		want          error
+		updateTx      func(*testing.T, *platform.Tx)
+		updateState   func(*testing.T, *state.Diff)
 	}{
 		{
 			name: "invalid_prior_to_etna",
@@ -1517,6 +1562,16 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 				tx.Unsigned.(*platform.IncreaseL1ValidatorBalanceTx).Balance = math.MaxUint64
 			},
 			want: safemath.ErrOverflow,
+		},
+		{
+			name: "insufficient_fee",
+			// The wallet funds the tx at the current price. A higher execution
+			// price leaves its outputs and balances covered but underpays the fee.
+			feeCalculator: txfee.NewDynamicCalculator(
+				env.config.DynamicFeeConfig.Weights,
+				100*env.config.DynamicFeeConfig.MinPrice,
+			),
+			want: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
 			name: "flow_checker_failed",
@@ -1590,6 +1645,9 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 			}
 
 			feeCalculator := state.PickFeeCalculator(env.config, env.state)
+			if tt.feeCalculator != nil {
+				feeCalculator = tt.feeCalculator
+			}
 			_, _, _, got = StandardTx(
 				&env.backend,
 				feeCalculator,
