@@ -39,6 +39,7 @@ graft_go_test(
     ],
     embed = [":feemanager"],
     deps = [
+        "//graft/evm/utils",
         "//graft/subnet-evm/accounts/abi/bind",
         "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/core",

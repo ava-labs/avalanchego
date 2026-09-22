@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
@@ -49,10 +50,10 @@ func TestBadTxAllowListBlock(t *testing.T) {
 			&extras.ChainConfig{
 				FeeConfig: params.DefaultFeeConfig,
 				NetworkUpgrades: extras.NetworkUpgrades{
-					SubnetEVMTimestamp: new(uint64),
+					SubnetEVMTimestamp: utils.PointerTo[uint64](0),
 				},
 				GenesisPrecompiles: extras.Precompiles{
-					txallowlist.ConfigKey: txallowlist.NewConfig(new(uint64), nil, nil, nil),
+					txallowlist.ConfigKey: txallowlist.NewConfig(utils.PointerTo[uint64](0), nil, nil, nil),
 				},
 			},
 		)

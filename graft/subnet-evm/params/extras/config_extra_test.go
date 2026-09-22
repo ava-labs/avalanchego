@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 )
 
 func TestIsTimestampForked(t *testing.T) {
@@ -28,22 +30,22 @@ func TestIsTimestampForked(t *testing.T) {
 			isForked: false,
 		},
 		"zero fork at genesis": {
-			fork:     new(uint64),
+			fork:     utils.PointerTo[uint64](0),
 			block:    0,
 			isForked: true,
 		},
 		"pre fork timestamp": {
-			fork:     new(uint64(100)),
+			fork:     utils.PointerTo[uint64](100),
 			block:    50,
 			isForked: false,
 		},
 		"at fork timestamp": {
-			fork:     new(uint64(100)),
+			fork:     utils.PointerTo[uint64](100),
 			block:    100,
 			isForked: true,
 		},
 		"post fork timestamp": {
-			fork:     new(uint64(100)),
+			fork:     utils.PointerTo[uint64](100),
 			block:    150,
 			isForked: true,
 		},
@@ -70,50 +72,50 @@ func TestIsForkTransition(t *testing.T) {
 			transitioned: false,
 		},
 		"activate at genesis": {
-			fork:         new(uint64),
+			fork:         utils.PointerTo[uint64](0),
 			parent:       nil,
 			current:      0,
 			transitioned: true,
 		},
 		"nil fork arbitrary transition": {
 			fork:         nil,
-			parent:       new(uint64(100)),
+			parent:       utils.PointerTo[uint64](100),
 			current:      101,
 			transitioned: false,
 		},
 		"nil fork transition same timestamp": {
 			fork:         nil,
-			parent:       new(uint64(100)),
+			parent:       utils.PointerTo[uint64](100),
 			current:      100,
 			transitioned: false,
 		},
 		"exact match on current timestamp": {
-			fork:         new(uint64(100)),
-			parent:       new(uint64(99)),
+			fork:         utils.PointerTo[uint64](100),
+			parent:       utils.PointerTo[uint64](99),
 			current:      100,
 			transitioned: true,
 		},
 		"current same as parent does not transition twice": {
-			fork:         new(uint64(100)),
-			parent:       new(uint64(101)),
+			fork:         utils.PointerTo[uint64](100),
+			parent:       utils.PointerTo[uint64](101),
 			current:      101,
 			transitioned: false,
 		},
 		"current, parent, and fork same should not transition twice": {
-			fork:         new(uint64(100)),
-			parent:       new(uint64(100)),
+			fork:         utils.PointerTo[uint64](100),
+			parent:       utils.PointerTo[uint64](100),
 			current:      100,
 			transitioned: false,
 		},
 		"current transitions after fork": {
-			fork:         new(uint64(100)),
-			parent:       new(uint64(99)),
+			fork:         utils.PointerTo[uint64](100),
+			parent:       utils.PointerTo[uint64](99),
 			current:      101,
 			transitioned: true,
 		},
 		"current and parent come after fork": {
-			fork:         new(uint64(100)),
-			parent:       new(uint64(101)),
+			fork:         utils.PointerTo[uint64](100),
+			parent:       utils.PointerTo[uint64](101),
 			current:      102,
 			transitioned: false,
 		},

@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -96,7 +97,7 @@ func (c *ChainConfig) verifyPrecompileUpgrades() error {
 			lastTimestamp = nil
 		} else {
 			disabled = lastUpgradeByKey.disabled
-			lastTimestamp = new(lastUpgradeByKey.blockTimestamp)
+			lastTimestamp = utils.PointerTo(lastUpgradeByKey.blockTimestamp)
 		}
 		upgradeTimestamp := upgrade.Timestamp()
 

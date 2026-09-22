@@ -25,6 +25,7 @@ go_library(
         "//graft/coreth/precompile/modules",
         "//graft/coreth/precompile/precompileconfig",
         "//graft/evm/precompileconfig",
+        "//graft/evm/utils",
         "//snow",
         "//upgrade",
         "//utils/set",
@@ -49,6 +50,7 @@ graft_go_test(
     embed = [":params"],
     deps = [
         "//graft/coreth/params/extras",
+        "//graft/evm/utils",
         "//upgrade/upgradetest",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//params",

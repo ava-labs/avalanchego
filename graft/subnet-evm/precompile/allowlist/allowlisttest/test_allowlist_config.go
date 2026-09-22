@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
@@ -104,7 +105,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 				ManagerAddresses: []common.Address{TestManagerAddr},
 				EnabledAddresses: nil,
 			}, precompileconfig.Upgrade{
-				BlockTimestamp: new(uint64(1)),
+				BlockTimestamp: utils.PointerTo[uint64](1),
 			}),
 			ChainConfig: func() precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(gomock.NewController(t))

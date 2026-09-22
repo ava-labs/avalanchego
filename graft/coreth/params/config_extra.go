@@ -10,6 +10,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/upgrade"
 )
 
@@ -93,11 +94,11 @@ func SetEthUpgrades(c *ChainConfig) error {
 	// We only mark Shanghai and Cancun as enabled if we have marked them as
 	// scheduled.
 	if durango := extra.DurangoBlockTimestamp; durango != nil && *durango < unscheduledActivation {
-		c.ShanghaiTime = new(*durango)
+		c.ShanghaiTime = utils.PointerTo(*durango)
 	}
 
 	if etna := extra.EtnaTimestamp; etna != nil && *etna < unscheduledActivation {
-		c.CancunTime = new(*etna)
+		c.CancunTime = utils.PointerTo(*etna)
 	}
 	return nil
 }

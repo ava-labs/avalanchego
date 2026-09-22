@@ -15,6 +15,7 @@ go_library(
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest",
     deps = [
+        "//graft/evm/utils",
         "//graft/subnet-evm/accounts/abi/bind",
         "//graft/subnet-evm/core/extstate",
         "//graft/subnet-evm/ethclient/simulated",

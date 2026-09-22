@@ -32,6 +32,7 @@ graft_go_test(
     srcs = ["config_test.go"],
     embed = [":config"],
     deps = [
+        "//graft/evm/utils",
         "//ids",
         "//utils/constants",
         "//utils/set",

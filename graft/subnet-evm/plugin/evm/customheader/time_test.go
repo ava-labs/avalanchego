@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
@@ -30,7 +31,7 @@ func TestVerifyTime(t *testing.T) {
 	}{
 		{
 			name:        "pre_granite_time_milliseconds_should_fail",
-			header:      generateHeader(timeSeconds, new(timeMillis)),
+			header:      generateHeader(timeSeconds, utils.PointerTo(timeMillis)),
 			extraConfig: extras.TestFortunaChainConfig,
 			expectedErr: ErrTimeMillisecondsBeforeGranite,
 		},
@@ -47,23 +48,23 @@ func TestVerifyTime(t *testing.T) {
 		},
 		{
 			name:        "granite_time_milliseconds_matching_time_should_work",
-			header:      generateHeader(timeSeconds, new(timeSeconds*1000)),
+			header:      generateHeader(timeSeconds, utils.PointerTo(timeSeconds*1000)),
 			extraConfig: extras.TestGraniteChainConfig,
 		},
 		{
 			name:        "granite_time_milliseconds_matching_time_rounded_should_work",
-			header:      generateHeader(timeSeconds, new(timeMillis)),
+			header:      generateHeader(timeSeconds, utils.PointerTo(timeMillis)),
 			extraConfig: extras.TestGraniteChainConfig,
 		},
 		{
 			name:        "granite_time_milliseconds_less_than_time_should_fail",
-			header:      generateHeader(timeSeconds, new((timeSeconds-1)*1000)),
+			header:      generateHeader(timeSeconds, utils.PointerTo((timeSeconds-1)*1000)),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: ErrTimeMillisecondsMismatched,
 		},
 		{
 			name:        "granite_time_milliseconds_greater_than_time_should_fail",
-			header:      generateHeader(timeSeconds, new((timeSeconds+1)*1000)),
+			header:      generateHeader(timeSeconds, utils.PointerTo((timeSeconds+1)*1000)),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: ErrTimeMillisecondsMismatched,
 		},
@@ -76,10 +77,10 @@ func TestVerifyTime(t *testing.T) {
 		},
 		{
 			name:   "granite_time_earlier_than_parent_should_fail",
-			header: generateHeader(timeSeconds, new(timeSeconds*1000)),
+			header: generateHeader(timeSeconds, utils.PointerTo(timeSeconds*1000)),
 			parentHeader: generateHeader(
 				timeSeconds+1,
-				new((timeSeconds+1)*1000),
+				utils.PointerTo((timeSeconds+1)*1000),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: errBlockTooOld,
@@ -88,11 +89,11 @@ func TestVerifyTime(t *testing.T) {
 			name: "granite_time_milliseconds_earlier_than_parent_should_fail",
 			header: generateHeader(
 				timeSeconds,
-				new(timeSeconds*1000),
+				utils.PointerTo(timeSeconds*1000),
 			),
 			parentHeader: generateHeader(
 				timeSeconds,
-				new(timeSeconds*1000+1),
+				utils.PointerTo(timeSeconds*1000+1),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: errBlockTooOld,
@@ -107,7 +108,7 @@ func TestVerifyTime(t *testing.T) {
 			name: "granite_time_too_far_in_future_should_fail",
 			header: generateHeader(
 				uint64(now.Add(MaxFutureBlockTime).Add(1*time.Second).Unix()),
-				new(uint64(now.Add(MaxFutureBlockTime).Add(1*time.Second).UnixMilli())),
+				utils.PointerTo(uint64(now.Add(MaxFutureBlockTime).Add(1*time.Second).UnixMilli())),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: ErrBlockTooFarInFuture,
@@ -116,14 +117,14 @@ func TestVerifyTime(t *testing.T) {
 			name: "granite_time_milliseconds_too_far_in_future_should_fail",
 			header: generateHeader(
 				uint64(now.Add(MaxFutureBlockTime).Unix()),
-				new(uint64(now.Add(MaxFutureBlockTime).Add(1*time.Millisecond).UnixMilli())),
+				utils.PointerTo(uint64(now.Add(MaxFutureBlockTime).Add(1*time.Millisecond).UnixMilli())),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: ErrBlockTooFarInFuture,
 		},
 		{
 			name:         "first_granite_block_should_work",
-			header:       generateHeader(timeSeconds, new(timeMillis)),
+			header:       generateHeader(timeSeconds, utils.PointerTo(timeMillis)),
 			parentHeader: generateHeader(timeSeconds, nil),
 			extraConfig:  extras.TestGraniteChainConfig,
 		},
@@ -138,8 +139,8 @@ func TestVerifyTime(t *testing.T) {
 			name: "granite_first_block_no_parent_min_delay_excess",
 			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
-				new(timeMillis),
-				new(acp226.InitialDelayExcess),
+				utils.PointerTo(timeMillis),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
 			parentHeader: generateHeader(timeSeconds-1, nil), // Pre-Granite parent
 			extraConfig:  extras.TestGraniteChainConfig,
@@ -148,13 +149,13 @@ func TestVerifyTime(t *testing.T) {
 			name: "granite_initial_delay_met",
 			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
-				new(timeMillis),
-				new(acp226.InitialDelayExcess),
+				utils.PointerTo(timeMillis),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds-1,
-				new(timeMillis-2000), // 2000 ms is the exact initial delay
-				new(acp226.InitialDelayExcess),
+				utils.PointerTo(timeMillis-2000), // 2000 ms is the exact initial delay
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 		},
@@ -162,13 +163,13 @@ func TestVerifyTime(t *testing.T) {
 			name: "granite_initial_delay_not_met",
 			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
-				new(timeMillis),
-				new(acp226.InitialDelayExcess),
+				utils.PointerTo(timeMillis),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds-1,
-				new(timeMillis-1999), // 1 ms less than required
-				new(acp226.InitialDelayExcess),
+				utils.PointerTo(timeMillis-1999), // 1 ms less than required
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: ErrMinDelayNotMet,
@@ -177,13 +178,13 @@ func TestVerifyTime(t *testing.T) {
 			name: "granite_future_timestamp_within_limits",
 			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds+5, // 5 seconds in future
-				new(timeMillis+5000),
-				new(acp226.InitialDelayExcess),
+				utils.PointerTo(timeMillis+5000),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds-1,
-				new(timeMillis-2000),
-				new(acp226.InitialDelayExcess),
+				utils.PointerTo(timeMillis-2000),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 		},
@@ -191,13 +192,13 @@ func TestVerifyTime(t *testing.T) {
 			name: "granite_future_timestamp_abuse",
 			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds+15, // 15 seconds in future, exceeds MaxFutureBlockTime
-				new(timeMillis+15000),
-				new(acp226.InitialDelayExcess),
+				utils.PointerTo(timeMillis+15000),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds-1,
-				new(timeMillis-2000),
-				new(acp226.InitialDelayExcess),
+				utils.PointerTo(timeMillis-2000),
+				utils.PointerTo(acp226.InitialDelayExcess),
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: ErrBlockTooFarInFuture,
@@ -206,13 +207,13 @@ func TestVerifyTime(t *testing.T) {
 			name: "granite_zero_delay_excess",
 			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
-				new(timeMillis),
-				new(acp226.DelayExcess),
+				utils.PointerTo(timeMillis),
+				utils.PointerTo(acp226.DelayExcess(0)),
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
-				new(timeMillis-1),       // 1ms delay, meets zero requirement
-				new(acp226.DelayExcess), // Parent has zero delay excess
+				utils.PointerTo(timeMillis-1),          // 1ms delay, meets zero requirement
+				utils.PointerTo(acp226.DelayExcess(0)), // Parent has zero delay excess
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 		},
@@ -220,13 +221,13 @@ func TestVerifyTime(t *testing.T) {
 			name: "granite_zero_delay_excess_but_zero_delay",
 			header: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
-				new(timeMillis),
-				new(acp226.DelayExcess),
+				utils.PointerTo(timeMillis),
+				utils.PointerTo(acp226.DelayExcess(0)),
 			),
 			parentHeader: generateHeaderWithMinDelayExcessAndTime(
 				timeSeconds,
-				new(timeMillis),         // Same timestamp, zero delay
-				new(acp226.DelayExcess), // Parent has zero delay excess
+				utils.PointerTo(timeMillis),            // Same timestamp, zero delay
+				utils.PointerTo(acp226.DelayExcess(0)), // Parent has zero delay excess
 			),
 			extraConfig: extras.TestGraniteChainConfig,
 			expectedErr: ErrMinDelayNotMet,
@@ -268,7 +269,7 @@ func TestGetNextTimestamp(t *testing.T) {
 		},
 		{
 			name:           "current_time_after_parent_time_with_milliseconds",
-			parent:         generateHeader(nowSeconds-10, new(nowMillis-500)),
+			parent:         generateHeader(nowSeconds-10, utils.PointerTo(nowMillis-500)),
 			now:            now,
 			expectedSec:    nowSeconds,
 			expectedMillis: nowMillis,
@@ -289,28 +290,28 @@ func TestGetNextTimestamp(t *testing.T) {
 		},
 		{
 			name:           "current_time_before_parent_time_with_milliseconds",
-			parent:         generateHeader(nowSeconds+10, new(nowMillis)),
+			parent:         generateHeader(nowSeconds+10, utils.PointerTo(nowMillis)),
 			now:            now,
 			expectedSec:    nowSeconds,
 			expectedMillis: nowMillis,
 		},
 		{
 			name:           "current_time_milliseconds_before_parent_time_milliseconds",
-			parent:         generateHeader(nowSeconds, new(nowMillis+10)),
+			parent:         generateHeader(nowSeconds, utils.PointerTo(nowMillis+10)),
 			now:            now,
 			expectedSec:    nowSeconds,
 			expectedMillis: nowMillis,
 		},
 		{
 			name:           "current_time_equals_parent_time_with_milliseconds_granite",
-			parent:         generateHeader(nowSeconds, new(nowMillis)),
+			parent:         generateHeader(nowSeconds, utils.PointerTo(nowMillis)),
 			now:            now,
 			expectedSec:    nowSeconds,
 			expectedMillis: nowMillis,
 		},
 		{
 			name:           "current_timesec_equals_parent_time_with_less_milliseconds",
-			parent:         generateHeader(nowSeconds, new(nowMillis-10)),
+			parent:         generateHeader(nowSeconds, utils.PointerTo(nowMillis-10)),
 			now:            now,
 			expectedSec:    nowSeconds,
 			expectedMillis: nowMillis,

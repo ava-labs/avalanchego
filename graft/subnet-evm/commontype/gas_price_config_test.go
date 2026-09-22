@@ -9,6 +9,8 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 )
 
 func TestGasPriceConfigVerify(t *testing.T) {
@@ -176,13 +178,13 @@ func TestGasPriceConfigEqual(t *testing.T) {
 	}{
 		{
 			name: "both equal",
-			a:    new(DefaultGasPriceConfig()),
-			b:    new(DefaultGasPriceConfig()),
+			a:    utils.PointerTo(DefaultGasPriceConfig()),
+			b:    utils.PointerTo(DefaultGasPriceConfig()),
 			want: true,
 		},
 		{
 			name: "different targetGas",
-			a:    new(DefaultGasPriceConfig()),
+			a:    utils.PointerTo(DefaultGasPriceConfig()),
 			b: func() *GasPriceConfig {
 				c := DefaultGasPriceConfig()
 				c.TargetGas++
@@ -192,14 +194,14 @@ func TestGasPriceConfigEqual(t *testing.T) {
 		},
 		{
 			name: "other nil",
-			a:    new(DefaultGasPriceConfig()),
+			a:    utils.PointerTo(DefaultGasPriceConfig()),
 			b:    nil,
 			want: false,
 		},
 		{
 			name: "receiver nil",
 			a:    nil,
-			b:    new(DefaultGasPriceConfig()),
+			b:    utils.PointerTo(DefaultGasPriceConfig()),
 			want: false,
 		},
 		{

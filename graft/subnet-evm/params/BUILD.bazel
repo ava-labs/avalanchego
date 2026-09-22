@@ -18,6 +18,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/params",
     deps = [
         "//graft/evm/precompileconfig",
+        "//graft/evm/utils",
         "//graft/subnet-evm/params/extras",
         "//graft/subnet-evm/plugin/evm/customheader",
         "//graft/subnet-evm/precompile/contract",
@@ -45,6 +46,7 @@ graft_go_test(
     ],
     embed = [":params"],
     deps = [
+        "//graft/evm/utils",
         "//graft/subnet-evm/params/extras",
         "//graft/subnet-evm/precompile/contracts/nativeminter",
         "//graft/subnet-evm/precompile/contracts/rewardmanager",

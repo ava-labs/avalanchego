@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
@@ -21,7 +22,7 @@ func TestMain(m *testing.M) {
 
 func TestSetEthUpgrades(t *testing.T) {
 	genesisBlock := big.NewInt(0)
-	genesisTimestamp := new(initiallyActive)
+	genesisTimestamp := utils.PointerTo(initiallyActive)
 	tests := []struct {
 		fork     upgradetest.Fork
 		expected *ChainConfig

@@ -33,6 +33,7 @@ graft_go_test(
     ],
     embed = [":gaspricemanager"],
     deps = [
+        "//graft/evm/utils",
         "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/core/extstate",
         "//graft/subnet-evm/precompile/allowlist",

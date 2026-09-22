@@ -31,5 +31,8 @@ graft_go_test(
     name = "extras_test",
     srcs = ["config_extra_test.go"],
     embed = [":extras"],
-    deps = ["@com_github_stretchr_testify//require"],
+    deps = [
+        "//graft/evm/utils",
+        "@com_github_stretchr_testify//require",
+    ],
 )

@@ -37,6 +37,7 @@ graft_go_test(
     ],
     embed = [":customtypes"],
     deps = [
+        "//graft/evm/utils",
         "//graft/subnet-evm/internal/blocktest",
         "//graft/subnet-evm/params",
         "//vms/evm/acp226",

@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -142,7 +143,7 @@ func TestNativeMinter(t *testing.T) {
 		},
 	}
 
-	precompileCfg := nativeminter.NewConfig(new(uint64), []common.Address{adminAddress}, nil, nil, nil)
+	precompileCfg := nativeminter.NewConfig(utils.PointerTo[uint64](0), []common.Address{adminAddress}, nil, nil, nil)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			backend := utilstest.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
@@ -162,7 +163,7 @@ func TestINativeMinter_Events(t *testing.T) {
 	testKey, _ := crypto.GenerateKey()
 	testAddress := crypto.PubkeyToAddress(testKey.PublicKey)
 
-	precompileCfg := nativeminter.NewConfig(new(uint64), []common.Address{adminAddress}, nil, nil, nil)
+	precompileCfg := nativeminter.NewConfig(utils.PointerTo[uint64](0), []common.Address{adminAddress}, nil, nil, nil)
 	backend := utilstest.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
 	defer backend.Close()
 

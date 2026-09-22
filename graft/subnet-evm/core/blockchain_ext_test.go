@@ -18,6 +18,7 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -1349,8 +1350,8 @@ func StatefulPrecompiles(t *testing.T, create createFunc) {
 	config := params.Copy(params.TestChainConfig)
 	// Set all of the required config parameters
 	params.GetExtra(&config).GenesisPrecompiles = extras.Precompiles{
-		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(new(uint64), []common.Address{addr1}, nil, nil),
-		feemanager.ConfigKey:        feemanager.NewConfig(new(uint64), []common.Address{addr1}, nil, nil, nil),
+		deployerallowlist.ConfigKey: deployerallowlist.NewConfig(utils.PointerTo[uint64](0), []common.Address{addr1}, nil, nil),
+		feemanager.ConfigKey:        feemanager.NewConfig(utils.PointerTo[uint64](0), []common.Address{addr1}, nil, nil, nil),
 	}
 	gspec := &Genesis{
 		Config: &config,

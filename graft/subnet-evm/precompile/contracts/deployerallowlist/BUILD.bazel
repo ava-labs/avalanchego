@@ -32,6 +32,7 @@ graft_go_test(
     ],
     deps = [
         ":deployerallowlist",
+        "//graft/evm/utils",
         "//graft/subnet-evm/accounts/abi/bind",
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/ethclient/simulated",

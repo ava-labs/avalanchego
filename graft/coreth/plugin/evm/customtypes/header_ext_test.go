@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
@@ -105,22 +106,22 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		Nonce:            types.BlockNonce{15},
 		BaseFee:          big.NewInt(16),
 		WithdrawalsHash:  &common.Hash{17},
-		BlobGasUsed:      new(uint64(18)),
-		ExcessBlobGas:    new(uint64(19)),
+		BlobGasUsed:      utils.PointerTo[uint64](18),
+		ExcessBlobGas:    utils.PointerTo[uint64](19),
 		ParentBeaconRoot: &common.Hash{20},
 	}
 	extra := &HeaderExtra{
 		ExtDataHash:         common.Hash{21},
 		ExtDataGasUsed:      big.NewInt(22),
 		BlockGasCost:        big.NewInt(23),
-		TimeMilliseconds:    new(uint64(24)),
-		MinDelayExcess:      new(acp226.DelayExcess(25)),
-		TargetExponent:      new(dynamic.TargetExponent(26)),
-		MinPriceExponent:    new(dynamic.PriceExponent(27)),
-		SettledHeight:       new(uint64(28)),
-		SettledGasUnix:      new(uint64(29)),
-		SettledGasNumerator: new(uint64(30)),
-		SettledExcess:       new(uint64(31)),
+		TimeMilliseconds:    utils.PointerTo[uint64](24),
+		MinDelayExcess:      utils.PointerTo(acp226.DelayExcess(25)),
+		TargetExponent:      utils.PointerTo(dynamic.TargetExponent(26)),
+		MinPriceExponent:    utils.PointerTo(dynamic.PriceExponent(27)),
+		SettledHeight:       utils.PointerTo[uint64](28),
+		SettledGasUnix:      utils.PointerTo[uint64](29),
+		SettledGasNumerator: utils.PointerTo[uint64](30),
+		SettledExcess:       utils.PointerTo[uint64](31),
 	}
 	return WithHeaderExtra(header, extra), extra
 }

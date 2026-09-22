@@ -35,6 +35,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -118,7 +119,7 @@ func TestCheckCompatible(t *testing.T) {
 			headTimestamp: 0,
 			wantErr: &ethparams.ConfigCompatError{
 				What:         "ApricotPhase5 fork block timestamp",
-				StoredTime:   new(uint64),
+				StoredTime:   utils.PointerTo[uint64](0),
 				NewTime:      nil,
 				RewindToTime: 0,
 			},
@@ -130,7 +131,7 @@ func TestCheckCompatible(t *testing.T) {
 			headTimestamp: 100,
 			wantErr: &ethparams.ConfigCompatError{
 				What:         "ApricotPhase5 fork block timestamp",
-				StoredTime:   new(uint64),
+				StoredTime:   utils.PointerTo[uint64](0),
 				NewTime:      nil,
 				RewindToTime: 0,
 			},
@@ -150,7 +151,7 @@ func TestConfigRules(t *testing.T) {
 		&ChainConfig{},
 		&extras.ChainConfig{
 			NetworkUpgrades: extras.NetworkUpgrades{
-				CortinaBlockTimestamp: new(uint64(500)),
+				CortinaBlockTimestamp: utils.PointerTo[uint64](500),
 			},
 		},
 	)

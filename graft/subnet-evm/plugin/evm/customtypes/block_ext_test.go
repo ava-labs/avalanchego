@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/blocktest"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
@@ -36,12 +37,12 @@ func TestBlockGetters(t *testing.T) {
 			name: "fields_set",
 			headerExtra: &HeaderExtra{
 				BlockGasCost:     big.NewInt(2),
-				TimeMilliseconds: new(uint64(3)),
-				MinDelayExcess:   new(acp226.DelayExcess(4)),
+				TimeMilliseconds: utils.PointerTo[uint64](3),
+				MinDelayExcess:   utils.PointerTo(acp226.DelayExcess(4)),
 			},
 			wantBlockGasCost:     big.NewInt(2),
-			wantTimeMilliseconds: new(uint64(3)),
-			wantMinDelayExcess:   new(acp226.DelayExcess(4)),
+			wantTimeMilliseconds: utils.PointerTo[uint64](3),
+			wantMinDelayExcess:   utils.PointerTo(acp226.DelayExcess(4)),
 		},
 	}
 	for _, test := range tests {

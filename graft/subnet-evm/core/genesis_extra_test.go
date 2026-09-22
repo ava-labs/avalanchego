@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
@@ -80,7 +81,7 @@ func TestGenesisEthUpgrades(t *testing.T) {
 				MinBaseFee: big.NewInt(1),
 			},
 			NetworkUpgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: new(uint64),
+				SubnetEVMTimestamp: utils.PointerTo[uint64](0),
 			},
 		},
 	)

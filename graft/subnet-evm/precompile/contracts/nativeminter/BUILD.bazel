@@ -41,6 +41,7 @@ graft_go_test(
     embed = [":nativeminter"],
     deps = [
         "//graft/evm/constants",
+        "//graft/evm/utils",
         "//graft/subnet-evm/accounts/abi/bind",
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/core/extstate",

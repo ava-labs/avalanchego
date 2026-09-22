@@ -68,6 +68,7 @@ graft_go_test(
     embed = [":ethapi"],
     deps = [
         "//graft/evm/rpc",
+        "//graft/evm/utils",
         "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/consensus",
         "//graft/subnet-evm/consensus/dummy",

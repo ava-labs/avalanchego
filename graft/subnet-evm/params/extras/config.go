@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -47,27 +48,27 @@ var (
 	}
 
 	TestSubnetEVMChainConfig = copyAndSet(TestPreSubnetEVMChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.SubnetEVMTimestamp = new(uint64)
+		c.NetworkUpgrades.SubnetEVMTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestDurangoChainConfig = copyAndSet(TestSubnetEVMChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.DurangoTimestamp = new(uint64)
+		c.NetworkUpgrades.DurangoTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestEtnaChainConfig = copyAndSet(TestDurangoChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.EtnaTimestamp = new(uint64)
+		c.NetworkUpgrades.EtnaTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestFortunaChainConfig = copyAndSet(TestEtnaChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.FortunaTimestamp = new(uint64)
+		c.NetworkUpgrades.FortunaTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestGraniteChainConfig = copyAndSet(TestFortunaChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.GraniteTimestamp = new(uint64)
+		c.NetworkUpgrades.GraniteTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestHeliconChainConfig = copyAndSet(TestGraniteChainConfig, func(c *ChainConfig) {
-		c.NetworkUpgrades.HeliconTimestamp = new(uint64)
+		c.NetworkUpgrades.HeliconTimestamp = utils.PointerTo[uint64](0)
 	})
 
 	TestChainConfig = copyConfig(TestHeliconChainConfig)
@@ -125,7 +126,7 @@ func (c *ChainConfig) CheckConfigCompatible(newConfig *ethparams.ChainConfig, he
 		// Return an error to prevent the chain from starting, just in case.
 		return ethparams.NewTimestampCompatError(
 			fmt.Sprintf("ChainConfig.Hooks() is not of the expected type *extras.ChainConfig, got %T", newConfig.Hooks()),
-			new(uint64),
+			utils.PointerTo[uint64](0),
 			nil,
 		)
 	}

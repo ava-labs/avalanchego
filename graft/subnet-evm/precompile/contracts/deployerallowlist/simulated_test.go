@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -181,7 +182,7 @@ func TestDeployerAllowList(t *testing.T) {
 		},
 	}
 
-	precompileCfg := deployerallowlist.NewConfig(new(uint64), []common.Address{adminAddress}, nil, nil)
+	precompileCfg := deployerallowlist.NewConfig(utils.PointerTo[uint64](0), []common.Address{adminAddress}, nil, nil)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			backend := utilstest.NewBackendWithPrecompile(t, precompileCfg, []common.Address{adminAddress, unprivilegedAddress})
@@ -196,7 +197,7 @@ func TestDeployerAllowList(t *testing.T) {
 }
 
 func TestIAllowList_Events(t *testing.T) {
-	precompileCfg := deployerallowlist.NewConfig(new(uint64), []common.Address{adminAddress}, nil, nil)
+	precompileCfg := deployerallowlist.NewConfig(utils.PointerTo[uint64](0), []common.Address{adminAddress}, nil, nil)
 	admin := utilstest.NewAuth(t, adminKey, params.TestChainConfig.ChainID)
 	allowlisttest.RunAllowListEventTests(t, precompileCfg, deployerallowlist.ContractAddress, admin, adminAddress, unprivilegedAddress)
 }
