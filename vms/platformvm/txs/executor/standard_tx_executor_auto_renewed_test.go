@@ -103,6 +103,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.True(t, addAutoRenewedTx.Unsigned.(*platform.AddAutoRenewedValidatorTx).BaseTx.SyntacticallyVerified)
+	requireBaseTxApplied(t, env, diff, feeCalculator, addAutoRenewedTx)
 	require.NoError(t, diff.Apply(env.state))
 
 	validator, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
@@ -141,20 +142,6 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 		NextPeriod:               uint64(period / time.Second),
 	}
 	require.Equal(t, wantStakingInfo, stakingInfo)
-
-	require.NotEmpty(t, inputIDs)
-	for utxoID := range inputIDs {
-		_, err := env.state.GetUTXO(utxoID)
-		require.ErrorIs(t, err, database.ErrNotFound)
-	}
-
-	require.NotEmpty(t, baseTxOutputUTXOs)
-	for _, wantUTXO := range baseTxOutputUTXOs {
-		utxoID := wantUTXO.InputID()
-		utxo, err := env.state.GetUTXO(utxoID)
-		require.NoError(t, err)
-		require.Equal(t, wantUTXO, utxo)
-	}
 }
 
 // TestStandardExecutorAddAutoRenewedValidatorTxErrors verifies the failure
@@ -394,6 +381,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 
 			require.NoError(t, err)
 			require.True(t, setAutoRenewedValidatorConfigTx.Unsigned.(*platform.SetAutoRenewedValidatorConfigTx).BaseTx.SyntacticallyVerified)
+			requireBaseTxApplied(t, env, diff, feeCalculator, setAutoRenewedValidatorConfigTx)
 			require.NoError(t, diff.Apply(env.state))
 
 			stakingInfo, err := env.state.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
@@ -403,18 +391,6 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 			wantStakingInfo.AutoCompoundRewardShares = newAutoCompoundRewardShares
 			wantStakingInfo.NextPeriod = uint64(tt.newPeriod.Seconds())
 			require.Equal(t, wantStakingInfo, stakingInfo)
-
-			// After execution: the input UTXOs are consumed and the change outputs are created.
-			for inputID := range inputIDs {
-				_, err := env.state.GetUTXO(inputID)
-				require.ErrorIs(t, err, database.ErrNotFound)
-			}
-
-			for _, wantUTXO := range outputUTXOs {
-				gotUTXO, err := env.state.GetUTXO(wantUTXO.InputID())
-				require.NoError(t, err)
-				require.Equal(t, wantUTXO, gotUTXO)
-			}
 		})
 	}
 }
