@@ -6,7 +6,6 @@ package network
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -56,60 +55,6 @@ func TestNoPeersBackoff(t *testing.T) {
 		require.GreaterOrEqual(t, d, prev)
 		require.LessOrEqual(t, d, p.noPeersMaxBackoff)
 		prev = d
-	}
-}
-
-func TestClassify(t *testing.T) {
-	tests := []struct {
-		name string
-		err  error
-		want retryClass
-	}{
-		{
-			name: "canceled",
-			err:  context.Canceled,
-			want: retryFatal,
-		},
-		{
-			name: "deadline",
-			err:  context.DeadlineExceeded,
-			want: retryFatal,
-		},
-		{
-			name: "wrapped_canceled",
-			err:  fmt.Errorf("send: %w", context.Canceled),
-			want: retryFatal,
-		},
-		{
-			name: "marshal",
-			err:  fmt.Errorf("%w: bad", errMarshalRequest),
-			want: retryFatal,
-		},
-		{
-			name: "no_peers",
-			err:  errNoPeers,
-			want: retryNoPeers,
-		},
-		{
-			name: "send_request",
-			err:  fmt.Errorf("%w: x", errSendRequest),
-			want: retryPeerScoped,
-		},
-		{
-			name: "handler_failed",
-			err:  fmt.Errorf("%w: x", errHandlerFailed),
-			want: retryPeerScoped,
-		},
-		{
-			name: "unmarshal_response",
-			err:  fmt.Errorf("%w: x", errUnmarshalResponse),
-			want: retryPeerScoped,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, classify(tt.err))
-		})
 	}
 }
 
@@ -262,6 +207,109 @@ func TestDoRetry_CtxEndReportsFailure(t *testing.T) {
 			require.Nil(t, got)
 			require.ErrorIs(t, err, context.Canceled)
 			require.ErrorIs(t, err, tt.wantLast)
+		})
+	}
+}
+
+// A fatal classification must stop the loop immediately. attempt
+// self-cancels past the first call, so a regression is caught by count.
+func TestDoRetry_FatalStopsRetrying(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	calls := 0
+	attempt := func() (*syncpb.GetLeafResponse, ids.NodeID, *Outcome, error) {
+		calls++
+		if calls > 1 {
+			cancel()
+		}
+		return nil, ids.EmptyNodeID, nil, context.Canceled
+	}
+
+	got, err := doRetry(ctx, loggingtest.New(t, logging.Debug), *defaultRetryPolicy(), acceptLeaf, attempt)
+	require.Nil(t, got)
+	require.Equal(t, 1, calls, "doRetry called attempt again after a fatal classification")
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+// A peer-scoped failure and a verify rejection both reset the no-peers
+// streak, or a later wait inherits an escalation it never earned.
+func TestDoRetry_NoPeersStreakResets(t *testing.T) {
+	errInvalid := errors.New("invalid")
+
+	tests := []struct {
+		name       string
+		resetError error // nil: attempt succeeds and verify rejects once instead
+	}{
+		{
+			name:       "peer_scoped_failure",
+			resetError: errSendRequest,
+		},
+		{
+			name: "verify_rejection",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				const (
+					initial = 100 * time.Millisecond
+					factor  = 10.0
+					max     = 10 * time.Second
+					// A reset streak's next wait is 0. An unreset streak inherits
+					// noPeersBackoff(2), exactly 10s under this policy, well over this.
+					threshold = 2 * time.Second
+				)
+				policy := *options.ApplyTo(defaultRetryPolicy(),
+					WithNoPeersInitialBackoff(initial),
+					WithNoPeersFactor(factor),
+					WithNoPeersMaxBackoff(max),
+				)
+
+				want := &syncpb.GetLeafResponse{Keys: [][]byte{{1}}}
+				_, tracker := newTestTracker(t)
+				calls := 0
+				rejected := false
+				// call 1: no-peers.
+				// call 2: no-peers, escalation would start here.
+				// call 3: resetError's branch, or verify's rejection if nil.
+				// call 4: a fresh no-peers streak, the one being checked.
+				// call 5+: success.
+				attempt := func() (*syncpb.GetLeafResponse, ids.NodeID, *Outcome, error) {
+					calls++
+					switch {
+					case calls == 1, calls == 2, calls == 4:
+						return nil, ids.EmptyNodeID, nil, errNoPeers
+					case calls == 3 && tt.resetError != nil:
+						return nil, ids.EmptyNodeID, nil, tt.resetError
+					default:
+						nodeID := ids.GenerateTestNodeID()
+						return want, nodeID, &Outcome{peers: tracker, nodeID: nodeID}, nil
+					}
+				}
+				verify := func(resp *syncpb.GetLeafResponse, _ ids.NodeID) (*syncpb.GetLeafResponse, error) {
+					if tt.resetError == nil && !rejected {
+						rejected = true
+						return nil, errInvalid
+					}
+					return resp, nil
+				}
+
+				start := time.Now()
+				got, err := doRetry(
+					t.Context(),
+					loggingtest.New(t, logging.Debug),
+					policy,
+					verify,
+					attempt,
+				)
+				elapsed := time.Since(start)
+
+				require.NoError(t, err)
+				require.Empty(t, cmp.Diff(want, got, protocmp.Transform()))
+				require.Less(t, elapsed, threshold,
+					"the no-peers streak was not reset in between")
+			})
 		})
 	}
 }

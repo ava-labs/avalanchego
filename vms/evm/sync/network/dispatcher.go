@@ -62,13 +62,19 @@ func NewDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any](
 }
 
 // Send retries req through [SendTo] until verify accepts a response or ctx ends.
-// verify receives the peer that served the response, so a rejection can name
-// it, and returns the value Send hands back to its own caller.
+// req is marshaled once, since it never changes between attempts. verify
+// receives the peer that served the response, so a rejection can name it,
+// and returns the value Send hands back to its own caller.
 func (d *Dispatcher[Req, In, Resp, Out]) Send(
 	ctx context.Context,
 	req Req,
 	verify func(Resp, ids.NodeID) (Out, error),
 ) (Out, error) {
+	requestBytes, err := proto.Marshal(req)
+	if err != nil {
+		var zero Out
+		return zero, fmt.Errorf("%w: %w", errMarshalRequest, err)
+	}
 	return doRetry(ctx, d.log, d.policy, verify, func() (Resp, ids.NodeID, *Outcome, error) {
 		nodeID, ok := d.peers.SelectPeer()
 		if !ok {
@@ -76,7 +82,7 @@ func (d *Dispatcher[Req, In, Resp, Out]) Send(
 			return zero, ids.EmptyNodeID, nil, errNoPeers
 		}
 		resp := Resp(new(In))
-		outcome, err := d.SendTo(ctx, nodeID, req, resp)
+		outcome, err := d.sendBytes(ctx, nodeID, requestBytes, resp)
 		return resp, nodeID, outcome, err
 	})
 }
@@ -84,13 +90,22 @@ func (d *Dispatcher[Req, In, Resp, Out]) Send(
 // SendTo sends req to nodeID. A pre-send context or marshal error
 // returns unscored, any later failure scores the peer and returns a nil
 // Outcome.
-func (d *Dispatcher[Req, In, Resp, Out]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (_ *Outcome, retErr error) {
+func (d *Dispatcher[Req, In, Resp, Out]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (*Outcome, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	requestBytes, err := proto.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", errMarshalRequest, err)
+	}
+	return d.sendBytes(ctx, nodeID, requestBytes, resp)
+}
+
+// sendBytes is [SendTo] past the marshal step, shared with [Send]'s retry
+// loop so a retried request is marshaled once, not once per attempt.
+func (d *Dispatcher[Req, In, Resp, Out]) sendBytes(ctx context.Context, nodeID ids.NodeID, requestBytes []byte, resp Resp) (_ *Outcome, retErr error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	d.peers.RegisterRequest(nodeID)

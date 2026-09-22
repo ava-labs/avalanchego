@@ -71,25 +71,6 @@ func (p retryPolicy) noPeersBackoff(attempt int) time.Duration {
 	return time.Duration(d)
 }
 
-type retryClass int
-
-const (
-	retryFatal      retryClass = iota // retrying cannot help
-	retryNoPeers                      // no peer available, the escalating case
-	retryPeerScoped                   // this peer's fault, de-score it and try another
-)
-
-func classify(err error) retryClass {
-	switch {
-	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded), errors.Is(err, errMarshalRequest):
-		return retryFatal
-	case errors.Is(err, errNoPeers):
-		return retryNoPeers
-	default:
-		return retryPeerScoped
-	}
-}
-
 // doRetry retries attempt until verify accepts a response, ctx ends, or a fatal
 // error. attempt must return a fresh response each call so failures never merge.
 func doRetry[Resp proto.Message, Out any](
@@ -113,7 +94,8 @@ func doRetry[Resp proto.Message, Out any](
 		attempts++
 		resp, nodeID, outcome, err := attempt()
 		var wait time.Duration
-		if err == nil {
+		switch {
+		case err == nil:
 			// verify reports its own rejection, since only the caller knows what
 			// made the response wrong, and returns the value Send hands back.
 			out, verifyErr := verify(resp, nodeID)
@@ -125,24 +107,21 @@ func doRetry[Resp proto.Message, Out any](
 			lastErr = verifyErr
 			noPeerAttempts = 0
 			wait = policy.peerFailureBackoff
-		} else {
-			switch classify(err) {
-			case retryFatal:
-				return zero, retryFailure(err, lastErr, attempts)
-			case retryNoPeers:
-				log.Debug("no peer available, retrying", zap.Error(err))
-				lastErr = err
-				wait = policy.noPeersBackoff(noPeerAttempts)
-				noPeerAttempts++
-			default:
-				log.Debug("request failed, retrying",
-					zap.Stringer("nodeID", nodeID),
-					zap.Error(err),
-				)
-				lastErr = err
-				noPeerAttempts = 0
-				wait = policy.peerFailureBackoff
-			}
+		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
+			return zero, retryFailure(err, lastErr, attempts)
+		case errors.Is(err, errNoPeers):
+			log.Debug("no peer available, retrying", zap.Error(err))
+			lastErr = err
+			wait = policy.noPeersBackoff(noPeerAttempts)
+			noPeerAttempts++
+		default:
+			log.Debug("request failed, retrying",
+				zap.Stringer("nodeID", nodeID),
+				zap.Error(err),
+			)
+			lastErr = err
+			noPeerAttempts = 0
+			wait = policy.peerFailureBackoff
 		}
 		if err := backoff(ctx, wait); err != nil {
 			return zero, retryFailure(err, lastErr, attempts)
