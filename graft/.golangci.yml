@@ -68,6 +68,11 @@ linters:
       - builtin$
       - examples$
 
+issues:
+  # Match ../.golangci.yml. A fix pass must see every finding.
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
 formatters:
   enable:
     - goimports

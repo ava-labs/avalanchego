@@ -163,9 +163,9 @@ func (b *Bag[T]) Remove(elt T) {
 func (b *Bag[T]) PrefixedString(prefix string) string {
 	sb := strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("Bag[%T]: (Size = %d)", utils.Zero[T](), b.Len()))
+	fmt.Fprintf(&sb, "Bag[%T]: (Size = %d)", utils.Zero[T](), b.Len())
 	for elt, count := range b.counts {
-		sb.WriteString(fmt.Sprintf("\n%s    %v: %d", prefix, elt, count))
+		fmt.Fprintf(&sb, "\n%s    %v: %d", prefix, elt, count)
 	}
 
 	return sb.String()

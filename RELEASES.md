@@ -13,6 +13,9 @@
 ### Configs
 
 - The `eth-apis` C-Chain option, deprecated in v1.15.0, is removed. The node now ignores it and logs a warning like any other unrecognized option. Set `apis` instead.
+### Metrics
+
+- Added `avalanche_platformvm_local_delegated_staked` (gauge): amount (in nAVAX) of AVAX delegated to this node on the Primary Network.
 
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 

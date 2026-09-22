@@ -120,6 +120,13 @@ linters:
         - pattern: ^sort\.(Slice|Strings)$(# the slices package should be used instead)?
       # Exclude godoc examples from forbidigo checks.
       exclude-godoc-examples: false
+    goconst:
+      # goconst counts occurrences in _test.go files, but combines them with
+      # the default 3 occurrences in production files, causing a lint error
+      # even though goconst is ignored for all test files by the regex in the
+      # exclusion rules.
+      # TODO(JonathanOppenheimer): Remove this exclusion.
+      ignore-tests: true
     gosec:
       excludes:
         - G107 # Url provided to HTTP request as taint input https://securego.io/docs/rules/g107
@@ -266,5 +273,7 @@ linters:
       # 4. Exclude any file suffixed with _test.go.
       - path: "(^tests/)|(^(.*/)*test_[^/]*\\.go$)|(.*test/.*)|(.*_test\\.go$)"
         linters:
+          # TODO(JonathanOppenheimer): Remove these exclusion.
+          - goconst
           - gosec
           - prealloc
