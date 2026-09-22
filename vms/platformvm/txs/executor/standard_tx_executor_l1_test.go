@@ -224,7 +224,7 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 			if tt.feeCalculator != nil {
 				feeCalculator = tt.feeCalculator
 			}
-			
+
 			_, _, _, got = StandardTx(
 				&env.backend,
 				feeCalculator,

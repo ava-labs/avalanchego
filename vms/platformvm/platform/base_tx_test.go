@@ -567,7 +567,7 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 				unsortedOutputs := []*avax.TransferableOutput{newOutput(1), newOutput(2)}
 				avax.SortTransferableOutputs(unsortedOutputs, Codec)
 				unsortedOutputs[0], unsortedOutputs[1] = unsortedOutputs[1], unsortedOutputs[0]
-				
+
 				tx.Outs = unsortedOutputs
 				return tx
 			}(),
