@@ -285,8 +285,7 @@ func persist(db ethdb.Batcher, hashes []common.Hash, codes [][]byte) error {
 // getCode fetches the code for hashes through c, scoring each peer on its
 // response. It retries until a peer returns valid code or ctx is cancelled.
 func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common.Hash) ([][]byte, error) {
-	req := &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)}
-	return c.Send(ctx, req,
+	return c.Send(ctx, &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)},
 		func(resp *syncpb.GetCodeResponse, nodeID ids.NodeID) ([][]byte, error) {
 			if err := verifyCode(hashes, resp.GetData()); err != nil {
 				log.Debug("invalid code response, re-requesting",

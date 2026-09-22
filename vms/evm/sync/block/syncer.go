@@ -119,12 +119,11 @@ func (s *Syncer) Sync(ctx context.Context) error {
 // maxBlocks-1 of its ancestors, in descending height order. It keeps
 // re-requesting from peers until a valid chain arrives or ctx ends.
 func (s *Syncer) getBlocks(ctx context.Context, hash common.Hash, height uint64, maxBlocks uint16) ([]*types.Block, error) {
-	req := &syncpb.GetBlockRequest{
+	return s.client.Send(ctx, &syncpb.GetBlockRequest{
 		Height: height,
 		// The field counts parents, so it excludes the block at height.
 		NumParents: uint32(maxBlocks - 1),
-	}
-	return s.client.Send(ctx, req,
+	},
 		func(resp *syncpb.GetBlockResponse, nodeID ids.NodeID) ([]*types.Block, error) {
 			blocks, err := verifyBlocks(hash, maxBlocks, resp.GetBlocks(), s.parseBlock)
 			if err != nil {
