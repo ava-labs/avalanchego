@@ -11,11 +11,13 @@ import (
 	"maps"
 	"math/big"
 	"reflect"
+	"slices"
 	"sync"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -23,6 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
@@ -39,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 // getTxStatus exposes the deprecated [service.GetAtomicTxStatus] endpoint.
@@ -307,26 +311,25 @@ func TestRPCExtras(t *testing.T) {
 	}
 }
 
-// TestSynchronousRPCs replays JSON-RPC calls recorded from the synchronous VM
-// and requires an identical response, covering state, receipt, log, and tracing
-// RPCs at every height for every pre-SAE network upgrade.
-func TestSynchronousRPCs(t *testing.T) {
-	// The fixture's keys are relative to the VM's own database rather than to
-	// the base database that contains it.
-	fixture := synchronoustest.Load(t)
-	db := memdb.New()
-	fixture.WriteDatabase(t, prefixdb.New(chainDBPrefix, db))
+// newSynchronousSUT starts a VM over db, into which the fixture's database has
+// been written, as a node would after transitioning from the synchronous VM.
+func newSynchronousSUT(tb testing.TB, fixture *synchronoustest.Fixture, db database.Database) (context.Context, *SUT) {
+	tb.Helper()
 
-	ctx, sut := newSUT(t,
+	return newSUT(tb,
 		withDB(db),
-		withGenesis(fixture.CoreGenesis(t)),
+		withGenesis(fixture.CoreGenesis(tb)),
 		withUpgrades(fixture.Upgrades),
 		// The fixture was generated without pruning, which marked the database
 		// to refuse later pruning runs.
 		withArchival(),
 	)
+}
 
-	for _, call := range fixture.RPCCalls {
+// replayRPCCalls issues each recorded JSON-RPC call to sut and requires the
+// recorded response.
+func replayRPCCalls(ctx context.Context, t *testing.T, sut *SUT, calls []synchronoustest.RPCCall) {
+	for _, call := range calls {
 		t.Run(call.Name, func(t *testing.T) {
 			t.Parallel()
 
@@ -344,6 +347,20 @@ func TestSynchronousRPCs(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSynchronousRPCs replays JSON-RPC calls recorded from the synchronous VM
+// and requires an identical response, covering state, receipt, log, and tracing
+// RPCs at every height for every pre-SAE network upgrade.
+func TestSynchronousRPCs(t *testing.T) {
+	// The fixture's keys are relative to the VM's own database rather than to
+	// the base database that contains it.
+	fixture := synchronoustest.Load(t)
+	db := memdb.New()
+	fixture.WriteDatabase(t, prefixdb.New(chainDBPrefix, db))
+
+	ctx, sut := newSynchronousSUT(t, fixture, db)
+	replayRPCCalls(ctx, t, sut, fixture.RPCCalls)
 
 	// We test block lookups separately because SAE decided not to support
 	// totalDifficulty and always report 0.
@@ -375,6 +392,36 @@ func TestSynchronousRPCs(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSynchronousRPCsReexecuted requires that re-executing synchronous blocks
+// under SAE reproduces the responses recorded from the synchronous VM. Every
+// post-execution state except genesis and the tip is dropped before startup, as
+// on a node between Firewood commits, so each historical state query MUST
+// re-execute the blocks beneath it, including those carrying cross-chain
+// transactions under the pre-ApricotPhase5 extData encoding.
+func TestSynchronousRPCsReexecuted(t *testing.T) {
+	fixture := synchronoustest.Load(t)
+	db := memdb.New()
+	chainDB := prefixdb.New(chainDBPrefix, db)
+	fixture.WriteDatabase(t, chainDB)
+
+	// Deleting a state trie's root node leaves the state unopenable. Startup
+	// requires the tip's state, and re-execution starts from genesis.
+	ethDB := saetypes.NewEthDB(prefixdb.NewNested(ethDBPrefix, chainDB))
+	for _, block := range fixture.Blocks[1 : len(fixture.Blocks)-1] {
+		rawdb.DeleteLegacyTrieNode(ethDB, block.EthBlock(t).Root())
+	}
+
+	ctx, sut := newSynchronousSUT(t, fixture, db)
+
+	// eth_getProof reopens the trie from disk by header root, which a
+	// re-executed state never writes, so it fails at every re-executed height.
+	// TODO(StephenButtolph): Serve proofs from re-executed state.
+	calls := slices.DeleteFunc(slices.Clone(fixture.RPCCalls), func(c synchronoustest.RPCCall) bool {
+		return c.Method == "eth_getProof"
+	})
+	replayRPCCalls(ctx, t, sut, calls)
 }
 
 // decodeRPCResult decodes a JSON-RPC result into its generic Go representation,

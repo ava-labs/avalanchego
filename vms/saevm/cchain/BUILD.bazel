@@ -188,6 +188,7 @@ go_test(
         "//vms/saevm/saetest",
         "//vms/saevm/saexec",
         "//vms/saevm/txgossip/txgossiptest",
+        "//vms/saevm/types",
         "//vms/secp256k1fx",
         "@com_github_arr4n_shed//testerr",
         "@com_github_ava_labs_libevm//:libevm",

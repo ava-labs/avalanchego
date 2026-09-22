@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/params"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
@@ -19,11 +21,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
@@ -230,6 +235,83 @@ func TestParseSlice(t *testing.T) {
 			require.ErrorIs(t, err, test.wantErr, "ParseSlice()")
 			if diff := cmp.Diff(test.want, got, txtest.CmpOpt()); diff != "" {
 				t.Errorf("ParseSlice() diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestFromBlock(t *testing.T) {
+	newTxs := make([]*Tx, len(allTxs))
+	for i, tx := range allTxs {
+		newTxs[i] = tx.new
+	}
+
+	sliceBytes, err := MarshalSlice(newTxs)
+	require.NoError(t, err, "MarshalSlice()")
+
+	tests := []struct {
+		name    string
+		config  *params.ChainConfig
+		extData []byte
+		want    []*Tx
+		wantErr error
+	}{
+		{
+			name:    "pre_ap5_single",
+			config:  corethparams.TestApricotPhase4Config,
+			extData: importTx.bytes,
+			want:    []*Tx{importTx.new},
+		},
+		{
+			name:   "pre_ap5_empty",
+			config: corethparams.TestApricotPhase4Config,
+		},
+		{
+			name:   "pre_ap5_unknown_version",
+			config: corethparams.TestApricotPhase4Config,
+			extData: []byte{
+				// codecVersion:
+				0x00, 0x01,
+			},
+			wantErr: codec.ErrUnknownVersion,
+		},
+		{
+			name:    "ap5_slice",
+			config:  corethparams.TestApricotPhase5Config,
+			extData: sliceBytes,
+			want:    newTxs,
+		},
+		{
+			name:   "ap5_empty",
+			config: corethparams.TestApricotPhase5Config,
+		},
+		{
+			name:   "ap5_inefficient",
+			config: corethparams.TestApricotPhase5Config,
+			extData: []byte{
+				// codecVersion:
+				0x00, 0x00,
+				// len(txs):
+				0x00, 0x00, 0x00, 0x00,
+			},
+			wantErr: ErrInefficientSlicePacking,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			block := customtypes.NewBlockWithExtData(
+				&types.Header{},
+				nil, // txs
+				nil, // uncles
+				nil, // receipts
+				nil, // hasher, unused without txs
+				test.extData,
+				true, // update [customtypes.HeaderExtra.ExtDataHash]
+			)
+			got, err := FromBlock(test.config, block)
+			require.ErrorIs(t, err, test.wantErr, "FromBlock()")
+			if diff := cmp.Diff(test.want, got, txtest.CmpOpt()); diff != "" {
+				t.Errorf("FromBlock() diff (-want +got):\n%s", diff)
 			}
 		})
 	}
