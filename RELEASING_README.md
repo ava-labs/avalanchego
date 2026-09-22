@@ -61,6 +61,8 @@ These changes prepare the merge commit that will be tagged.
    }
    ```
 
+   Coreth and Subnet-EVM versions are derived from this file and need no manual update.
+
 1. Update [`RELEASES.md`](RELEASES.md) - rename "Pending" section to the new version and create a new "Pending" section.
 
 1. If RPC chain VM protocol version changed, update [`version/constants.go`](version/constants.go):
@@ -71,12 +73,10 @@ These changes prepare the merge commit that will be tagged.
 
    And update [`version/compatibility.json`](version/compatibility.json) and [`proto/README.md`](proto/README.md) for the new version.
 
-1. If this release adds a network upgrade, make all three of these edits:
+1. If this release activates a new network upgrade on local networks:
 
-   1. In [`upgrade/upgrade.go`](upgrade/upgrade.go), set the new upgrade's time in
-      `Default` to `InitiallyActiveTime`. `Default` is the schedule for local
-      networks. Until it activates the upgrade, no test that relies on the default
-      schedule exercises the upgrade:
+   1. In [`upgrade/upgrade.go`](upgrade/upgrade.go), set the upgrade's time in `Default`
+      — the local-network schedule — to `InitiallyActiveTime`:
 
       ```go
       Default = Config{
@@ -85,39 +85,36 @@ These changes prepare the merge commit that will be tagged.
       }
       ```
 
-      Update any test that pins the local schedule, such as `TestParseGenesis` in
+      Then update the tests that pin the local schedule: `TestParseGenesis` and
+      `TestGenesisHash` (the local genesis hash changes) in
       [`vms/saevm/cchain/genesis_test.go`](vms/saevm/cchain/genesis_test.go).
 
-   1. In [`scripts/tests.upgrade.sh`](scripts/tests.upgrade.sh), set `DEFAULT_VERSION`
-      to `$VERSION` without the leading `v`. Name the new upgrade in the comment above
-      it:
+   1. In [`scripts/tests.upgrade.sh`](scripts/tests.upgrade.sh), set `DEFAULT_VERSION` to
+      `$VERSION` without the leading `v`, naming the upgrade in the comment above it:
 
       ```bash
       # v1.15.1 is the earliest version that activates Helicon on local networks.
       DEFAULT_VERSION="1.15.1"
       ```
 
-   1. In
-      [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml),
-      comment out the `Run e2e tests` step of the `upgrade` job. Keep the
-      `actions/checkout` step, so the job still reports success:
+   1. In [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml),
+      comment out the `Run e2e tests` step of the `upgrade` job, leaving `actions/checkout`
+      so the job still has a step:
 
       ```yaml
       upgrade:
         runs-on: ubuntu-24.04
         steps:
           - uses: actions/checkout@v5
-          # TODO: Reactivate test once $VERSION is published
+          # TODO: Reactivate test once v1.15.1 is published
           # - name: Run e2e tests
           #   ...
       ```
 
-   The test starts a network on `DEFAULT_VERSION` and restarts it on the current
-   code, so both MUST use the same local schedule. Only `$VERSION` activates the new
-   upgrade locally, and it is not published yet, so the job must stay off until
-   [step 10](#10-post-release-version-bump).
-
-**Note:** Coreth and Subnet-EVM versions are automatically derived from `version/constants.go` and do not require manual updates.
+   The test starts a network on the published `DEFAULT_VERSION` binary and restarts it on
+   the current code, so the two MUST agree on the local schedule. After this change only
+   `$VERSION` agrees, and it is not published until the release itself — so leave the job
+   off and re-enable it in [step 10](#10-post-release-version-bump).
 
 1. Update submodule require directives to reference the future tag:
 
