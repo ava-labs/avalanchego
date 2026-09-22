@@ -15,6 +15,7 @@ import (
 var (
 	_ sync.Marshaler[*RangeProof] = rangeProofMarshaler{}
 	_ sync.Marshaler[struct{}]    = changeProofMarshaler{}
+	_ sync.Freer                  = (*RangeProof)(nil)
 )
 
 type rangeProofMarshaler struct{}
@@ -37,6 +38,17 @@ type RangeProof struct {
 	rp        *ffi.RangeProof
 	root      ids.ID
 	maxLength int
+}
+
+// Free releases the Rust-owned memory behind the proof, including any
+// proposal prepared by verifying it. Firewood otherwise frees it from a Go
+// finalizer, whose timing the garbage collector decides without seeing that
+// memory. Free is safe to call on a nil proof and more than once.
+func (p *RangeProof) Free() error {
+	if p == nil || p.rp == nil {
+		return nil
+	}
+	return p.rp.Free()
 }
 
 // TODO: implement an actual ChangeProof marshaler.

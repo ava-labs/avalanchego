@@ -715,6 +715,8 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 		if err != nil {
 			return err
 		}
+		// The proof is not needed once committed or rejected; see [Freer].
+		defer freeProof(s.config.Log, changeProof)
 
 		s.metrics.proofReceived(proofTypeChange, len(responseBytes))
 
@@ -785,6 +787,9 @@ func (s *Syncer[R, _]) verifyAndCommitRangeProof(
 	root ids.ID,
 	keyLimit int,
 ) error {
+	// The proof is not needed once committed or rejected; see [Freer].
+	defer freeProof(s.config.Log, rangeProof)
+
 	verificationStart := time.Now()
 	err := s.db.VerifyRangeProof(ctx, rangeProof, start, end, root, keyLimit)
 	s.metrics.observeVerification(proofTypeRange, time.Since(verificationStart), err)

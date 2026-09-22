@@ -8,7 +8,10 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
@@ -20,6 +23,29 @@ var (
 type Marshaler[T any] interface {
 	Marshal(T) ([]byte, error)
 	Unmarshal([]byte) (T, error)
+}
+
+// Freer is implemented by proof types whose memory lives outside the Go heap,
+// such as Firewood's Rust-owned proofs. The [Syncer] and [ProofHandler] free
+// such a proof as soon as they are done with it rather than leaving it to a
+// finalizer: the garbage collector paces itself on the Go heap alone, so it
+// never sees the memory a finalizer would release and can leave gigabytes of
+// proofs outstanding.
+type Freer interface {
+	Free() error
+}
+
+// freeProof releases proof if it implements [Freer], logging a failure to do
+// so. Proof types without external resources are left to the garbage
+// collector.
+func freeProof[T any](log logging.Logger, proof T) {
+	freer, ok := any(proof).(Freer)
+	if !ok {
+		return
+	}
+	if err := freer.Free(); err != nil {
+		log.Warn("failed to free proof", zap.Error(err))
+	}
 }
 
 type DB[R any, C any] interface {

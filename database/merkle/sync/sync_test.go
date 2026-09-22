@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"math/rand"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -35,6 +36,50 @@ type marshaler struct{}
 
 type proofDouble struct {
 	newRoot ids.ID
+	// onFree, if set, is called by [proofDouble.Free].
+	onFree func()
+}
+
+// Free implements [Freer] so tests can observe when the syncer and the proof
+// handler release proofs.
+func (p *proofDouble) Free() error {
+	if p.onFree != nil {
+		p.onFree()
+	}
+	return nil
+}
+
+// freeCountingMarshaler unmarshals proofs that count their frees in frees.
+type freeCountingMarshaler struct {
+	frees *atomic.Int64
+}
+
+func (freeCountingMarshaler) Marshal(p *proofDouble) ([]byte, error) {
+	return marshaler{}.Marshal(p)
+}
+
+func (m freeCountingMarshaler) Unmarshal(b []byte) (*proofDouble, error) {
+	p, err := marshaler{}.Unmarshal(b)
+	if err != nil {
+		return nil, err
+	}
+	p.onFree = func() { m.frees.Add(1) }
+	return p, nil
+}
+
+// freeCountingServerDB serves range proofs that complete the sync to its root
+// and count their frees in frees.
+type freeCountingServerDB struct {
+	*db
+	frees *atomic.Int64
+}
+
+//nolint:revive // unused parameter clarifies method signature
+func (s *freeCountingServerDB) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*proofDouble, error) {
+	return &proofDouble{
+		newRoot: s.id,
+		onFree:  func() { s.frees.Add(1) },
+	}, nil
 }
 
 var _ Marshaler[*proofDouble] = marshaler{}
@@ -497,4 +542,37 @@ func Test_Midpoint(t *testing.T) {
 		require.Equal(-1, bytes.Compare(start, mid.Value()))
 		require.Equal(-1, bytes.Compare(mid.Value(), end))
 	}
+}
+
+// Test_Sync_FreesProofs checks that both sides release a proof as soon as they
+// are done with it: the handler after serializing it, and the syncer after
+// committing it. Firewood proofs are Rust-owned, so relying on finalizers
+// leaks them for as long as the garbage collector stays idle.
+func Test_Sync_FreesProofs(t *testing.T) {
+	ctx := t.Context()
+	targetRoot := ids.GenerateTestID()
+
+	var serverFrees, clientFrees atomic.Int64
+	serverDB := &freeCountingServerDB{db: &db{id: targetRoot}, frees: &serverFrees}
+	handler, err := NewProofHandler(logging.NoLog{}, serverDB, marshaler{}, marshaler{}, prometheus.NewRegistry())
+	require.NoError(t, err, "NewProofHandler()")
+
+	syncer, err := NewSyncer(
+		&db{id: ids.Empty},
+		Config[*proofDouble, *proofDouble]{
+			TargetRoot:            targetRoot,
+			RangeProofMarshaler:   freeCountingMarshaler{frees: &clientFrees},
+			ChangeProofMarshaler:  marshaler{},
+			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, handler),
+			Log:                   logging.NoLog{},
+			SimultaneousWorkLimit: 1,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err, "NewSyncer()")
+	require.NoErrorf(t, syncer.Sync(ctx), "%T.Sync()", syncer)
+
+	// The server's proof completes the sync, so exactly one proof crosses.
+	require.Equal(t, int64(1), serverFrees.Load(), "proofs freed by the handler after serializing them")
+	require.Equal(t, int64(1), clientFrees.Load(), "proofs freed by the syncer after committing them")
 }

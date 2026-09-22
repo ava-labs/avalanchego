@@ -167,6 +167,8 @@ func (h *ProofHandler[R, C]) handleRangeProofRequest(ctx context.Context, req *p
 		}
 
 		innerBytes, err := h.rangeProofMarshaler.Marshal(rangeProof)
+		// The serialized bytes are all that is sent; see [Freer].
+		freeProof(h.log, rangeProof)
 		if err != nil {
 			return nil, err
 		}
@@ -248,6 +250,8 @@ func (h *ProofHandler[R, C]) handleChangeProofRequest(ctx context.Context, req *
 
 		// We generated a change proof. See if it's small enough.
 		changeProofBytes, err := h.changeProofMarshaler.Marshal(changeProof)
+		// The serialized bytes are all that is sent; see [Freer].
+		freeProof(h.log, changeProof)
 		if err != nil {
 			return nil, err
 		}
