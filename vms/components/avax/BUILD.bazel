@@ -63,6 +63,7 @@ go_test(
         "//database",
         "//database/memdb",
         "//ids",
+        "//snow",
         "//utils",
         "//utils/set",
         "//vms/secp256k1fx",

@@ -502,12 +502,6 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 		}
 	}
 
-	unsortedOutputs := []*avax.TransferableOutput{newOutput(1), newOutput(2)}
-	avax.SortTransferableOutputs(unsortedOutputs, Codec)
-	unsortedOutputs[0], unsortedOutputs[1] = unsortedOutputs[1], unsortedOutputs[0]
-
-	duplicateInput := newInput(1)
-
 	tests := []struct {
 		name string
 		tx   *BaseTx
@@ -569,6 +563,11 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 			name: "outputs_not_sorted",
 			tx: func() *BaseTx {
 				tx := newBaseTx()
+
+				unsortedOutputs := []*avax.TransferableOutput{newOutput(1), newOutput(2)}
+				avax.SortTransferableOutputs(unsortedOutputs, Codec)
+				unsortedOutputs[0], unsortedOutputs[1] = unsortedOutputs[1], unsortedOutputs[0]
+				
 				tx.Outs = unsortedOutputs
 				return tx
 			}(),
@@ -578,7 +577,9 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 			name: "inputs_not_sorted_and_unique",
 			tx: func() *BaseTx {
 				tx := newBaseTx()
-				tx.Ins = []*avax.TransferableInput{duplicateInput, duplicateInput}
+
+				input := newInput(1)
+				tx.Ins = []*avax.TransferableInput{input, input}
 				return tx
 			}(),
 			want: errInputsNotSortedUnique,
