@@ -61,8 +61,6 @@ These changes prepare the merge commit that will be tagged.
    }
    ```
 
-   Coreth and Subnet-EVM versions are derived from this file and need no manual update.
-
 1. Update [`RELEASES.md`](RELEASES.md) - rename "Pending" section to the new version and create a new "Pending" section.
 
 1. If RPC chain VM protocol version changed, update [`version/constants.go`](version/constants.go):
