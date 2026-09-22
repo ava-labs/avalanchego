@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -66,7 +65,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	currentSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(t, err)
 
-	rewards, err := getRewardsCalculator(
+	rewards, err := GetRewardsCalculator(
 		env.config.RewardConfig,
 		env.config.UpgradeConfig,
 		env.state,
@@ -624,5 +623,5 @@ func TestStandardExecutorRewardAutoRenewedValidatorTx(t *testing.T) {
 		newRewardAutoRenewedValidatorTx(t, ids.GenerateTestID(), time.Unix(1, 0)),
 		diff,
 	)
-	require.ErrorIs(t, err, txs.ErrUnsupportedTxType)
+	require.ErrorIs(t, err, errWrongTxType)
 }
