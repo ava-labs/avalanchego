@@ -1017,29 +1017,30 @@ func TestSizeMinimumGas(t *testing.T) {
 		name string
 		// gas returns the gas limit that the RPC recommends for msg, and
 		// the access list to send with it.
-		gas func(ethereum.CallMsg) (uint64, types.AccessList, error)
+		gas func(*testing.T, ethereum.CallMsg) (uint64, types.AccessList, error)
 	}{
 		{
 			name: "eth_estimateGas",
-			gas: func(msg ethereum.CallMsg) (uint64, types.AccessList, error) {
+			gas: func(_ *testing.T, msg ethereum.CallMsg) (uint64, types.AccessList, error) {
 				gas, err := sut.EstimateGas(ctx, msg)
 				return gas, nil, err
 			},
 		},
 		{
 			name: "eth_createAccessList",
-			gas: func(msg ethereum.CallMsg) (uint64, types.AccessList, error) {
-				accessList, gas, _, err := gc.CreateAccessList(ctx, msg)
+			gas: func(t *testing.T, msg ethereum.CallMsg) (uint64, types.AccessList, error) {
+				accessList, gas, vmErr, err := gc.CreateAccessList(ctx, msg)
 				if err != nil {
 					return 0, nil, err
 				}
+				require.Emptyf(t, vmErr, "%T.CreateAccessList() execution error", gc)
 				return gas, *accessList, nil
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gas, accessList, err := tt.gas(msg)
+			gas, accessList, err := tt.gas(t, msg)
 			require.NoErrorf(t, err, "%s()", tt.name)
 
 			data := txData
@@ -1053,7 +1054,7 @@ func TestSizeMinimumGas(t *testing.T) {
 
 			below := msg
 			below.Gas = sut.rawVM.mempool.MinGasForSize(tx.Size()) - 1
-			_, _, err = tt.gas(below)
+			_, _, err = tt.gas(t, below)
 			if diff := testerr.Diff(err, testerr.Contains("gas required exceeds allowance")); diff != "" {
 				t.Errorf("%s() with gas limit %d below the size minimum %s", tt.name, below.Gas, diff)
 			}
