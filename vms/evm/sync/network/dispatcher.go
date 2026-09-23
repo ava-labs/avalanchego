@@ -62,9 +62,7 @@ func NewDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any](
 }
 
 // Send retries req through [SendTo] until verify accepts a response or ctx ends.
-// req is marshaled once, since it never changes between attempts. verify
-// receives the peer that served the response, so a rejection can name it,
-// and returns the value Send hands back to its own caller.
+// req is marshaled once since it never changes across attempts, and verify names the rejecting peer and returns Send's result.
 func (d *Dispatcher[Req, In, Resp, Out]) Send(
 	ctx context.Context,
 	req Req,
@@ -87,9 +85,8 @@ func (d *Dispatcher[Req, In, Resp, Out]) Send(
 	})
 }
 
-// SendTo sends req to nodeID. A pre-send context or marshal error
-// returns unscored, any later failure scores the peer and returns a nil
-// Outcome.
+// SendTo sends req to nodeID. A pre-send context or marshal error returns
+// unscored, any later failure scores the peer and returns a nil Outcome.
 func (d *Dispatcher[Req, In, Resp, Out]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (*Outcome, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

@@ -253,9 +253,9 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				const (
-					initial = 100 * time.Millisecond
-					factor  = 10.0
-					max     = 10 * time.Second
+					initial    = 100 * time.Millisecond
+					factor     = 10.0
+					maxBackoff = 10 * time.Second
 					// A reset streak's next wait is 0. An unreset streak inherits
 					// noPeersBackoff(2), exactly 10s under this policy, well over this.
 					threshold = 2 * time.Second
@@ -263,7 +263,7 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 				policy := *options.ApplyTo(defaultRetryPolicy(),
 					WithNoPeersInitialBackoff(initial),
 					WithNoPeersFactor(factor),
-					WithNoPeersMaxBackoff(max),
+					WithNoPeersMaxBackoff(maxBackoff),
 				)
 
 				want := &syncpb.GetLeafResponse{Keys: [][]byte{{1}}}
