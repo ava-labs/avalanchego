@@ -643,7 +643,10 @@ unacceptable.
 The E2E smoke task selects the C-Chain ProposerVM API test. Ubuntu and macOS use
 the same task. It does not provide full E2E coverage. A future change will
 replace the Ubuntu smoke test with a non-smoke E2E test. Each setup job checks
-Bazel metadata and prefetches the full CI dependency list.
+Bazel metadata. On `master`, a cache miss makes each setup job prefetch the full
+CI dependency list and save it. Setup jobs can duplicate this work when they
+share a key. On other refs, each Bazel-consuming job prepares its own non-exact
+restore before it runs offline.
 
 The daily scheduled workflow runs one full unit-test job on Ubuntu 22.04 and
 24.04, on AMD64 and ARM64, and on macOS 26 ARM64. It also runs the same focused
@@ -736,9 +739,10 @@ The Bazel CI cache setup configures three kinds of cached data:
 - shared Gazelle `GOMODCACHE`
 - Bazel remote action and test-result data
 
-GitHub Actions restores the repository cache and `GOMODCACHE` on each runner.
-These caches contain downloaded external dependencies. The setup job prepares
-them for the later jobs on the same platform.
+GitHub Actions restores the repository cache and `GOMODCACHE` on each runner.  These
+caches contain downloaded external dependencies. On `master`, the setup job prepares
+and saves a cache entry for later jobs on the same platform.  On other refs, later
+Bazel-consuming jobs prepare their own non-exact restores but do not save them.
 
 The shared `GOMODCACHE` is required because Gazelle `go_repository` otherwise
 keeps Go module downloads in each Bazel work area. Thus, a later job can use the
@@ -782,17 +786,31 @@ cache only when all these conditions are true:
 
 ### Checked-in list of Bazel CI target patterns used to prepare the build dependency cache
 
-This setup is similar in spirit to `actions/setup-go`: before the later Bazel
-CI jobs run, prepare cache state for the build dependencies they are expected
-to need so those jobs do not each discover missing dependencies on their own.
+This setup has the same goal as `actions/setup-go`: prepare dependency input
+before a Bazel job runs so a later command does not discover a missing
+repository through the network.
 
 The setup action first restores the pinned Task binary and any previously
 saved Bazel dependency data, then configures Bazel to use the dependency
-cache. In the per-platform `setup` job it is run with `initial-setup: true`;
-in that mode it also checks Bazel metadata and runs `./scripts/run_task.sh
-bazel-cache-ci-build-dependencies`, which delegates to
+cache. The per-platform `setup` job runs
+[`setup-bazel`](../.github/actions/setup-bazel/action.yml) with
+`is-setup-job: true`. This restores the cache and checks Bazel metadata on every
+event. It asks
+[`cache-policy`](../.github/actions/cache-policy/action.yml) to decide whether a
+cache miss can prefetch and save. On `master`, a non-exact restore in that
+setup job runs `./scripts/run_task.sh bazel-cache-ci-build-dependencies`, which
+delegates to
 `./scripts/cache_bazel_ci_build_dependencies.sh` and uses the checked-in list
-in `./scripts/bazel_ci_dependency_list.sh`.
+in `./scripts/bazel_ci_dependency_list.sh`. It then saves the exact key.
+
+An ordinary pull request or other non-`master` setup job restores the cache and
+checks metadata, but does not prefetch or save. Each later Bazel-consuming job
+restores the cache and, on a non-exact hit, runs the same dependency-list fetch
+locally. The action then enables `--repository_disable_download`. If a later
+repository rule needs a download absent from the restored or prepared cache,
+Bazel fails rather than fetching it. This lets a pull request test a new
+dependency input without writing a shared cache, and shows that the dependency
+list or preparation process did not supply an input required by CI.
 
 That checked-in list names the Bazel target patterns whose build dependencies
 the later CI jobs are expected to need.
@@ -826,8 +844,14 @@ When modifying `setup-bazel`, `run_task.sh`, `run_bazel_ci_command.sh`,
 preserve these invariants:
 
 - CI can launch `task` without assuming a preinstalled repo-specific wrapper
-- the `setup` job prepares the dependency state later Bazel CI jobs are
-  expected to consume
+- on `master`, every `setup` job requests a cache save after it checks metadata;
+  see [CI cache policy](./ci.md#ci-cache-policy) for cache preparation and
+  concurrent-save behavior
+- on other refs, each setup job checks metadata, and each Bazel-consuming job
+  prepares a non-exact restore locally before repository downloads are disabled
+- GitHub Actions dependency-cache writes remain restricted to
+  `github.ref == 'refs/heads/master'`; see
+  [CI cache policy](./ci.md#ci-cache-policy) for the rationale
 - the checked-in dependency list matches the Bazel target patterns actually run
   by the Bazel CI reusable workflows
 - cache-prefetch behavior stays focused on external repositories and does not

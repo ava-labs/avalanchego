@@ -13,15 +13,27 @@
 name: 'Install Go toolchain with project defaults'
 description: 'Install a go toolchain with project defaults'
 
+inputs:
+  request-cache-save:
+    description: 'Request permission to save Task and Go module cache entries'
+    required: false
+    default: 'false'
+
 runs:
   using: composite
   steps:
     - uses: ./.github/actions/setup-task
+      with:
+        request-cache-save: ${{ inputs.request-cache-save }}
 
     - name: Set up Go
       uses: actions/setup-go@v6
       with:
         go-version-file: go.mod
-        cache-dependency-path: |
-          go.work.sum
-          tools/external/go.sum
+        # setup-go saves its dependency cache in a post step that cannot be
+        # restricted to master. Cache Go modules explicitly instead.
+        cache: false
+
+    - uses: ./.github/actions/setup-go-module-cache
+      with:
+        request-cache-save: ${{ inputs.request-cache-save }}

@@ -16,6 +16,9 @@ jobs:
       - uses: actions/checkout@v5
       - name: Set up QEMU (required for cross-platform builds)
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
+        with:
+          # Do not let the upstream action write branch-scoped image caches.
+          cache-image: false
       - name: Create multiplatform docker builder
         run: docker buildx create --use
       - name: Build and publish Docker images

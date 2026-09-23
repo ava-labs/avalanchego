@@ -93,11 +93,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-bazel
         with:
-          initial-setup: true
-      - name: Log Bazel disk diagnostics
-        if: failure()
-        shell: bash
-        run: ./scripts/run_task.sh log-ci-disk-state-bazel
+          is-setup-job: 'true'
 
   unit:
     needs: setup

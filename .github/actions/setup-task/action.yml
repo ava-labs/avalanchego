@@ -1,9 +1,20 @@
 name: Setup Task
 description: Restore the pinned Task binary from cache or download and verify it
 
+inputs:
+  request-cache-save:
+    description: 'Request a save when cache policy permits it'
+    required: false
+    default: 'false'
+
 runs:
   using: composite
   steps:
+    - id: cache-policy
+      uses: ./.github/actions/cache-policy
+      with:
+        request-cache-save: ${{ inputs.request-cache-save }}
+
     - id: version
       name: Read pinned Task version
       shell: bash
@@ -24,8 +35,8 @@ runs:
       run: ./scripts/setup_task.sh download
 
     - name: Save Task
-      # Only runs on master may create a shared Task cache entry.
-      if: ${{ steps.cache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master' }}
+      # Master creates shared entries; manual validation writes only to its ref.
+      if: ${{ steps.cache.outputs.cache-hit != 'true' && steps.cache-policy.outputs.cache-save-allowed == 'true' }}
       uses: actions/cache/save@v5
       with:
         path: ${{ runner.temp }}/task/${{ steps.version.outputs.version }}/${{ runner.os }}-${{ runner.arch }}
