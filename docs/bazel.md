@@ -529,7 +529,6 @@ selection. See [`scripts/tests.unit.sh`](../scripts/tests.unit.sh).
 | Bootstrap monitor E2E | `tests/fixture/bootstrapmonitor/e2e/BUILD.bazel` |
 | Subnet-EVM warp tests | `graft/subnet-evm/tests/warp/BUILD.bazel` |
 | Subnet-EVM load tests | `graft/subnet-evm/tests/load/BUILD.bazel` |
-| Coreth warp tests | `graft/coreth/tests/warp/BUILD.bazel` |
 
 **When adding new non-unit tests**, add the manual tag with a `# keep`
 comment. The `# keep` is required because gazelle does not manage the
