@@ -15,7 +15,7 @@ import (
 const bandwidthEpsilon = 1e-6
 
 // AppResponseVerifier is called upon receiving an AppResponse for an AppRequest
-// issued by TrackingClient, and reports whether the peer served it usefully.
+// issued by [TrackingClient], and reports whether the peer served it usefully.
 // Callers should check [err] to see whether the AppRequest failed or not.
 //
 // A non-nil return registers a failure against nodeID, so return nil for a
@@ -27,14 +27,14 @@ type AppResponseVerifier func(
 	err error,
 ) error
 
-// TrackingClient issues requests through a Client and scores each one against
-// its PeerTracker.
+// TrackingClient issues requests through a [Client] and scores each one
+// against its [PeerTracker].
 type TrackingClient struct {
 	client *Client
 	peers  *PeerTracker
 }
 
-// AppRequestAny issues an AppRequest to the peer the PeerTracker selects.
+// AppRequestAny issues an AppRequest to the peer the [PeerTracker] selects.
 // See [Client.AppRequestAny] for more docs.
 func (c *TrackingClient) AppRequestAny(
 	ctx context.Context,
