@@ -996,7 +996,7 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 		})
 		require.NoErrorf(t, sut.SendTransaction(ctx, tx), "SendTransaction() with estimated gas %d", gas)
 
-		msg.Gas = gas - 1
+		msg.Gas = gas / 2
 		_, err = sut.EstimateGas(ctx, msg)
 		if diff := testerr.Diff(err, testerr.Contains("gas required exceeds allowance")); diff != "" {
 			t.Errorf("EstimateGas() with gas limit below the size minimum %s", diff)

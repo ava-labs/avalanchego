@@ -283,14 +283,19 @@ func (b *blockChainAPI) EstimateGas(ctx context.Context, args ethapi.Transaction
 	}
 	// The caller hasn't signed the transaction yet, so any field it didn't
 	// provide is set to its maximum to avoid underestimating the size.
-	maxNonce := hexutil.Uint64(math.MaxUint64)
+	maxU64 := hexutil.Uint64(math.MaxUint64)
 	maxU256 := (*hexutil.Big)(math.MaxBig256)
+	// Like the embedded estimate, respect a gas limit that the caller provides.
+	allowance := maxU64
+	if args.Gas != nil && uint64(*args.Gas) >= params.TxGas {
+		allowance = *args.Gas
+	}
 	tx := types.NewTx(&types.DynamicFeeTx{
 		ChainID:    b.b.ChainConfig().ChainID,
-		Nonce:      uint64(*cmp.Or(args.Nonce, &maxNonce)),
+		Nonce:      uint64(*cmp.Or(args.Nonce, &maxU64)),
 		GasTipCap:  cmp.Or(args.MaxPriorityFeePerGas, args.GasPrice, maxU256).ToInt(),
 		GasFeeCap:  cmp.Or(args.MaxFeePerGas, args.GasPrice, maxU256).ToInt(),
-		Gas:        math.MaxUint64,
+		Gas:        uint64(allowance),
 		To:         msg.To,
 		Value:      cmp.Or(args.Value, maxU256).ToInt(),
 		Data:       msg.Data,
@@ -300,9 +305,8 @@ func (b *blockChainAPI) EstimateGas(ctx context.Context, args ethapi.Transaction
 		S:          maxU256.ToInt(), // signature proof value
 	})
 	floor := hexutil.Uint64(b.b.MinGasForSize(tx.Size()))
-	// Like the embedded estimate, respect a gas limit that the caller provides.
-	if args.Gas != nil && uint64(*args.Gas) >= params.TxGas && floor > *args.Gas {
-		return 0, fmt.Errorf("gas required exceeds allowance (%d)", *args.Gas)
+	if floor > allowance {
+		return 0, fmt.Errorf("gas required exceeds allowance (%d)", allowance)
 	}
 	return max(gas, floor), nil
 }
