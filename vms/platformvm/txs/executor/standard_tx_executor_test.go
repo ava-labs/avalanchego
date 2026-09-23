@@ -39,10 +39,6 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 		End:    genesistest.DefaultValidatorEndTimeUnix,
 		Wght:   env.config.MinValidatorStake,
 	}
-	rewardsOwner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-	}
 
 	tests := []struct {
 		name string
@@ -52,14 +48,14 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 		{
 			name: "AddValidatorTx",
 			tx: func() (*platform.Tx, error) {
-				return wallet.IssueAddValidatorTx(validator, rewardsOwner, reward.PercentDenominator)
+				return wallet.IssueAddValidatorTx(validator, newOwner(), reward.PercentDenominator)
 			},
 			want: errAddValidatorTxPostDurango,
 		},
 		{
 			name: "AddDelegatorTx",
 			tx: func() (*platform.Tx, error) {
-				return wallet.IssueAddDelegatorTx(validator, rewardsOwner)
+				return wallet.IssueAddDelegatorTx(validator, newOwner())
 			},
 			want: errAddDelegatorTxPostDurango,
 		},
@@ -93,10 +89,7 @@ func TestDurangoMemoField(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Durango)
 	wallet := newWallet(t, env, walletConfig{})
 
-	owners := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-	}
+	owners := newOwner()
 	memoOpt := common.WithMemo([]byte{'m'})
 
 	tests := []struct {
@@ -392,11 +385,8 @@ func TestStandardExecutorBaseTxErrors(t *testing.T) {
 				[]*avax.TransferableOutput{{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
-						Amt: units.Avax,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-						},
+						Amt:          units.Avax,
+						OutputOwners: *newOwner(),
 					},
 				}},
 			)
@@ -439,10 +429,6 @@ func TestStandardExecutorAddPermissionlessValidatorTxFlowCheckFails(t *testing.T
 	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(err)
 
-	rewardsOwner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-	}
 	endTime := env.state.GetTimestamp().Add(defaultMinStakingDuration)
 	tx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&platform.SubnetValidator{
@@ -455,8 +441,8 @@ func TestStandardExecutorAddPermissionlessValidatorTxFlowCheckFails(t *testing.T
 		},
 		pop,
 		env.ctx.AVAXAssetID,
-		rewardsOwner,
-		rewardsOwner,
+		newOwner(),
+		newOwner(),
 		reward.PercentDenominator,
 	)
 	require.NoError(err)
@@ -466,16 +452,7 @@ func TestStandardExecutorAddPermissionlessValidatorTxFlowCheckFails(t *testing.T
 
 	// Remove the UTXOs funding the tx so that its inputs no longer cover its
 	// outputs plus the fee.
-	utxoIDs, err := env.state.UTXOIDs(
-		genesistest.DefaultFundedKeys[0].Address().Bytes(),
-		ids.Empty,
-		math.MaxInt32,
-	)
-	require.NoError(err)
-
-	for _, utxoID := range utxoIDs {
-		diff.DeleteUTXO(utxoID)
-	}
+	deleteUTXOsOwnedBy(t, env, diff, genesistest.DefaultFundedKeys[0])
 
 	_, _, _, gotErr := StandardTx(
 		&env.backend,
@@ -499,11 +476,8 @@ func TestStandardExecutorBaseTx(t *testing.T) {
 		[]*avax.TransferableOutput{{
 			Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 			Out: &secp256k1fx.TransferOutput{
-				Amt: units.Avax,
-				OutputOwners: secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-				},
+				Amt:          units.Avax,
+				OutputOwners: *newOwner(),
 			},
 		}},
 	)

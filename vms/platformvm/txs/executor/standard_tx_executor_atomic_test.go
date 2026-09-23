@@ -93,10 +93,7 @@ func TestStandardExecutorImportTxErrors(t *testing.T) {
 
 			tx, err := wallet.IssueImportTx(
 				env.ctx.XChainID,
-				&secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-				},
+				newOwner(),
 			)
 			require.NoError(t, err)
 
@@ -183,10 +180,7 @@ func TestStandardExecutorImportTx(t *testing.T) {
 
 			stx, err := wallet.IssueImportTx(
 				tt.sourceChainID,
-				&secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-				},
+				newOwner(),
 			)
 			require.NoError(err)
 
@@ -259,10 +253,7 @@ func TestNewImportTxInsufficientFunds(t *testing.T) {
 	})
 	_, err = wallet.IssueImportTx(
 		env.ctx.XChainID,
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
+		newOwner(),
 	)
 	require.ErrorIs(t, err, builder.ErrInsufficientFunds)
 }
@@ -371,11 +362,8 @@ func TestStandardExecutorExportTxErrors(t *testing.T) {
 				[]*avax.TransferableOutput{{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
-						Amt: units.Avax,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-						},
+						Amt:          units.Avax,
+						OutputOwners: *newOwner(),
 					},
 				}},
 			)
@@ -435,11 +423,8 @@ func TestStandardExecutorExportTx(t *testing.T) {
 				[]*avax.TransferableOutput{{
 					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 					Out: &secp256k1fx.TransferOutput{
-						Amt: genesistest.DefaultInitialBalance - defaultTxFee,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-						},
+						Amt:          genesistest.DefaultInitialBalance - defaultTxFee,
+						OutputOwners: *newOwner(),
 					},
 				}},
 			)
