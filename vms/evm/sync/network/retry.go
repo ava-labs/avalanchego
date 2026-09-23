@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/libevm/libevm/options"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -71,14 +70,14 @@ func (p retryPolicy) noPeersBackoff(attempt int) time.Duration {
 	return time.Duration(d)
 }
 
-// doRetry retries attempt until verify accepts a response, ctx ends, or a fatal
-// error. attempt must return a fresh response each call so failures never merge.
-func doRetry[Resp proto.Message, Out any](
+// doRetry retries attempt until it succeeds, ctx ends, or a fatal error. A
+// rejection by the caller's verify arrives as the attempt's error, since verify
+// runs on the handler goroutine where it can de-score the peer.
+func doRetry[Out any](
 	ctx context.Context,
 	log logging.Logger,
 	policy retryPolicy,
-	verify func(Resp, ids.NodeID) (Out, error),
-	attempt func() (Resp, ids.NodeID, *Outcome, error),
+	attempt func() (Out, ids.NodeID, error),
 ) (Out, error) {
 	var (
 		zero           Out
@@ -92,21 +91,11 @@ func doRetry[Resp proto.Message, Out any](
 		}
 
 		attempts++
-		resp, nodeID, outcome, err := attempt()
+		out, nodeID, err := attempt()
 		var wait time.Duration
 		switch {
 		case err == nil:
-			// verify reports its own rejection, since only the caller knows what
-			// made the response wrong, and returns the value Send hands back.
-			out, verifyErr := verify(resp, nodeID)
-			if verifyErr == nil {
-				outcome.Success()
-				return out, nil
-			}
-			outcome.Failure()
-			lastErr = verifyErr
-			noPeerAttempts = 0
-			wait = policy.peerFailureBackoff
+			return out, nil
 		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 			return zero, retryFailure(err, lastErr, attempts)
 		case errors.Is(err, errNoPeers):
