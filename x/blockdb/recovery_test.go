@@ -657,6 +657,28 @@ func TestRecoveryLeavesIndexedDataAfterChecksumMismatch(t *testing.T) {
 	require.NoError(t, db.Close())
 }
 
+func TestRecoveryContinuesInNextDataFile(t *testing.T) {
+	db := newDatabase(t, DefaultConfig().WithMaxDataFileSize(64))
+	require.NoError(t, db.Put(0, []byte("checkpoint")))
+	checkpointOffset := db.header.NextWriteOffset
+	require.NoError(t, db.Put(1, []byte("malformed")))
+	want := []byte("recovered")
+	require.NoError(t, db.Put(2, want))
+	malformedEntry, err := db.readIndexEntry(1)
+	require.NoError(t, err)
+	require.NoError(t, db.Close())
+
+	require.NoError(t, writeIndexFileHeader(db, 0, checkpointOffset))
+	require.NoError(t, os.Truncate(db.indexFile.Name(), int64(sizeOfIndexFileHeader+sizeOfIndexEntry)))
+	require.NoError(t, writeBlockHeader(db, int64(malformedEntry.Offset), blockEntryHeader{}))
+
+	db = newDatabase(t, db.config)
+	got, err := db.Get(2)
+	require.NoError(t, err)
+	require.Equal(t, want, got)
+	require.NoError(t, db.Close())
+}
+
 func writeIndexFileHeader(db *Database, maxHeight, nextWriteOffset uint64) error {
 	indexPath := db.indexFile.Name()
 	indexFile, err := os.OpenFile(indexPath, os.O_RDWR, 0)

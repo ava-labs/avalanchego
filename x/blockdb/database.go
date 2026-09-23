@@ -859,9 +859,9 @@ func (db *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error 
 			}
 			badOffset = currentScanOffset
 			badErr = err
-			// The checkpoint header can lag a later index entry, so preserve this suffix.
-			currentScanOffset = endOffset
-			break
+			// Record boundaries are unknown after corruption, so try the next file.
+			currentScanOffset = currentFileEnd
+			continue
 		}
 		db.log.Debug("Recovery: Successfully validated and indexed block",
 			zap.Uint64("height", bh.Height),
@@ -930,7 +930,7 @@ func (db *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error 
 		return fmt.Errorf("recovery: failed to save index header after recovery scan: %w", err)
 	}
 	if badErr != nil {
-		db.log.Warn("Recovery stopped at malformed data; remaining suffix left orphaned",
+		db.log.Warn("Recovery skipped malformed data; affected file suffix left orphaned",
 			zap.Uint64("dataOffset", badOffset),
 			zap.Uint64("dataEnd", endOffset),
 			zap.Error(badErr),
