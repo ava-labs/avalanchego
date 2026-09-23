@@ -6,6 +6,10 @@
 
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 
+### Fixes
+
+- SAE `eth_estimateGas` now includes the minimum gas limit that the mempool requires for the transaction's size. Large transactions signed with the estimate were previously rejected with `insufficient gas limit for tx size`.
+
 ### Metrics
 
 - Added `avalanche_platformvm_local_delegated_staked` (gauge): amount (in nAVAX) of AVAX delegated to this node on the Primary Network.

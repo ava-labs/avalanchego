@@ -290,6 +290,8 @@ func (b *blockChainAPI) EstimateGas(ctx context.Context, args ethapi.Transaction
 	if args.Gas != nil && uint64(*args.Gas) >= params.TxGas {
 		allowance = *args.Gas
 	}
+	// A dynamic-fee tx is the largest supported type. This would no longer
+	// hold if EIP-7702 set-code txs were supported.
 	tx := types.NewTx(&types.DynamicFeeTx{
 		ChainID:    b.b.ChainConfig().ChainID,
 		Nonce:      uint64(*cmp.Or(args.Nonce, &maxU64)),
@@ -306,7 +308,7 @@ func (b *blockChainAPI) EstimateGas(ctx context.Context, args ethapi.Transaction
 	})
 	floor := hexutil.Uint64(b.b.MinGasForSize(tx.Size()))
 	if floor > allowance {
-		return 0, fmt.Errorf("gas required exceeds allowance (%d)", allowance)
+		return 0, fmt.Errorf("gas required exceeds allowance (%d): tx size %d bytes requires gas limit at least %d", allowance, tx.Size(), floor)
 	}
 	return max(gas, floor), nil
 }
