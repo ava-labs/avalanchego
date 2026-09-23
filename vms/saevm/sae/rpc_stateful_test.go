@@ -1046,7 +1046,10 @@ func TestSizeMinimumGas(t *testing.T) {
 			data.Gas = gas
 			data.AccessList = accessList
 			tx := sut.wallet.SetNonceAndSign(t, 0, &data)
-			require.NoErrorf(t, sut.SendTransaction(ctx, tx), "SendTransaction() with %s() gas %d", tt.name, gas)
+			b := sut.runConsensusLoop(t, tx)
+			require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+			require.Lenf(t, b.Receipts(), 1, "%T.Receipts()", b)
+			require.Equalf(t, types.ReceiptStatusSuccessful, b.Receipts()[0].Status, "%T.Receipts()[0].Status with %s() gas %d", b, tt.name, gas)
 
 			below := msg
 			below.Gas = sut.rawVM.mempool.MinGasForSize(tx.Size()) - 1
