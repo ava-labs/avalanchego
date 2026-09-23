@@ -106,6 +106,12 @@ func (*standardTxExecutor) RewardValidatorTx(*platform.RewardValidatorTx) error 
 }
 
 func (e *standardTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
+	// The empty node ID check must stay scoped to the standard (post-Banff)
+	// execution path. Validators with the empty node ID were accepted
+	// pre-Banff through proposal blocks, so this check can live neither in
+	// [txs.AddValidatorTx.SyntacticVerify] nor in verifyAddValidatorTx (both
+	// are also exercised when replaying that history); enforcing it there
+	// would reject accepted blocks during bootstrapping.
 	if tx.Validator.NodeID == ids.EmptyNodeID {
 		return errEmptyNodeID
 	}

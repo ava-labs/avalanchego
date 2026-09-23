@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -24,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -33,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -40,11 +43,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
+
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 const (
-	defaultMinValidatorStake = 5 * units.MilliAvax
-
 	defaultMinStakingDuration        = 24 * time.Hour
 	defaultHeliconMinStakingDuration = 12 * time.Hour
 	defaultMaxStakingDuration        = 365 * 24 * time.Hour
@@ -52,44 +55,24 @@ const (
 	defaultTxFee = 100 * units.NanoAvax
 )
 
-var (
-	lastAcceptedID = ids.GenerateTestID()
-
-	testSubnet1 *platform.Tx
-)
+var testSubnet1 *platform.Tx
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
 
 type environment struct {
-	isBootstrapped *utils.Atomic[bool]
-	config         *config.Internal
-	clk            *mockable.Clock
-	baseDB         *versiondb.Database
-	ctx            *snow.Context
-	msm            *mutableSharedMemory
-	state          *state.State
-	states         map[ids.ID]state.Chain
-	uptimes        uptime.Manager
-	backend        Backend
-}
-
-func (e *environment) GetState(blkID ids.ID) (state.Chain, bool) {
-	if blkID == lastAcceptedID {
-		return e.state, true
-	}
-	chainState, ok := e.states[blkID]
-	return chainState, ok
-}
-
-func (e *environment) SetState(blkID ids.ID, chainState state.Chain) {
-	e.states[blkID] = chainState
+	config  *config.Internal
+	clk     *mockable.Clock
+	baseDB  *versiondb.Database
+	ctx     *snow.Context
+	msm     *mutableSharedMemory
+	state   *state.State
+	backend Backend
 }
 
 func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
-	var isBootstrapped utils.Atomic[bool]
-	isBootstrapped.Set(true)
+	t.Helper()
 
 	config := defaultConfig(f)
 	clk := defaultClock(f)
@@ -102,7 +85,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 	}
 	ctx.SharedMemory = msm
 
-	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
+	fx := defaultFx(clk, ctx.Log)
 
 	baseState := statetest.New(t, statetest.Config{
 		DB:           baseDB,
@@ -112,32 +95,27 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 		Context:      ctx,
 		RewardConfig: config.RewardConfig,
 	})
-	lastAcceptedID = baseState.GetLastAccepted()
 
 	uptimes := uptime.NewManager(baseState, clk)
-	utxosVerifier := utxo.NewVerifier(ctx, clk, fx)
 
 	backend := Backend{
 		Config:       config,
 		Ctx:          ctx,
 		Clk:          clk,
-		Bootstrapped: &isBootstrapped,
+		Bootstrapped: utils.NewAtomic[bool](true),
 		Fx:           fx,
-		FlowChecker:  utxosVerifier,
+		FlowChecker:  utxo.NewVerifier(ctx, clk, fx),
 		Uptimes:      uptimes,
 	}
 
 	env := &environment{
-		isBootstrapped: &isBootstrapped,
-		config:         config,
-		clk:            clk,
-		baseDB:         baseDB,
-		ctx:            ctx,
-		msm:            msm,
-		state:          baseState,
-		states:         make(map[ids.ID]state.Chain),
-		uptimes:        uptimes,
-		backend:        backend,
+		config:  config,
+		clk:     clk,
+		baseDB:  baseDB,
+		ctx:     ctx,
+		msm:     msm,
+		state:   baseState,
+		backend: backend,
 	}
 
 	addSubnet(t, env)
@@ -148,15 +126,13 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 
 		require := require.New(t)
 
-		if env.isBootstrapped.Get() {
-			if env.uptimes.StartedTracking() {
-				validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
-				require.NoError(env.uptimes.StopTracking(validatorIDs))
-			}
-
-			env.state.SetHeight(math.MaxUint64)
-			require.NoError(env.state.Commit())
+		if uptimes.StartedTracking() {
+			validatorIDs := env.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)
+			require.NoError(uptimes.StopTracking(validatorIDs))
 		}
+
+		env.state.SetHeight(math.MaxUint64)
+		require.NoError(env.state.Commit())
 
 		require.NoError(env.state.Close())
 		require.NoError(env.baseDB.Close())
@@ -166,27 +142,27 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 }
 
 type walletConfig struct {
-	config    *config.Internal
-	keys      []*secp256k1.PrivateKey
-	subnetIDs []ids.ID
-	chainIDs  []ids.ID
+	keys          []*secp256k1.PrivateKey
+	validationIDs []ids.ID
+	chainIDs      []ids.ID
 }
 
 func newWallet(t testing.TB, e *environment, c walletConfig) wallet.Wallet {
-	if c.config == nil {
-		c.config = e.config
-	}
 	if len(c.keys) == 0 {
 		c.keys = genesistest.DefaultFundedKeys
 	}
+
+	subnets, err := e.state.GetSubnetIDs()
+	require.NoError(t, err)
+
 	return txstest.NewWallet(
 		t,
 		e.ctx,
-		c.config,
+		e.config,
 		e.state,
 		secp256k1fx.NewKeychain(c.keys...),
-		c.subnetIDs,
-		nil, // validationIDs
+		subnets,
+		c.validationIDs,
 		c.chainIDs,
 	)
 }
@@ -211,7 +187,7 @@ func addSubnet(t *testing.T, env *environment) {
 	)
 	require.NoError(err)
 
-	stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	stateDiff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, env.state)
@@ -289,7 +265,7 @@ func (fvi *fxVMInt) Logger() logging.Logger {
 	return fvi.log
 }
 
-func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.Fx {
+func defaultFx(clk *mockable.Clock, log logging.Logger) fx.Fx {
 	fxVMInt := &fxVMInt{
 		registry: linearcodec.NewDefault(),
 		clk:      clk,
@@ -299,10 +275,149 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 	if err := res.Initialize(fxVMInt); err != nil {
 		panic(err)
 	}
-	if isBootstrapped {
-		if err := res.Bootstrapped(); err != nil {
-			panic(err)
-		}
+	if err := res.Bootstrapped(); err != nil {
+		panic(err)
 	}
 	return res
+}
+
+// executeProposalTx executes tx as a proposal tx on fresh onCommitState and
+// onAbortState diffs built on top of diff.
+func executeProposalTx(
+	t testing.TB,
+	env *environment,
+	diff *state.Diff,
+	tx *platform.Tx,
+) (onCommitState *state.Diff, onAbortState *state.Diff, err error) {
+	t.Helper()
+
+	stakerAdditionAfterDeletionLegality := state.StakerAdditionAfterDeletionLegality(
+		env.config.UpgradeConfig.IsHeliconActivated(diff.GetTimestamp()),
+	)
+	onCommitState, err = state.NewDiffOn(diff, stakerAdditionAfterDeletionLegality)
+	require.NoError(t, err)
+
+	onAbortState, err = state.NewDiffOn(diff, stakerAdditionAfterDeletionLegality)
+	require.NoError(t, err)
+
+	feeCalculator := state.PickFeeCalculator(env.config, diff)
+	return onCommitState, onAbortState, ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	)
+}
+
+// newOwner returns a 1-of-1 owner with a random address.
+func newOwner() *secp256k1fx.OutputOwners {
+	return &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+}
+
+// deleteUTXOsOwnedBy removes every UTXO owned by key on diff.
+func deleteUTXOsOwnedBy(t testing.TB, env *environment, diff *state.Diff, key *secp256k1.PrivateKey) {
+	t.Helper()
+
+	utxoIDs, err := env.state.UTXOIDs(key.Address().Bytes(), ids.Empty, math.MaxInt32)
+	require.NoError(t, err)
+
+	for _, utxoID := range utxoIDs {
+		diff.DeleteUTXO(utxoID)
+	}
+}
+
+func newProofOfPossession(t testing.TB) *signer.ProofOfPossession {
+	t.Helper()
+
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
+	return pop
+}
+
+func newAdvanceTimeTx(t testing.TB, timestamp time.Time) *platform.Tx {
+	t.Helper()
+
+	utx := &platform.AdvanceTimeTx{Time: uint64(timestamp.Unix())}
+	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
+	require.NoError(t, err)
+	require.NoError(t, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID)))
+	return tx
+}
+
+func newRewardValidatorTx(t testing.TB, txID ids.ID) *platform.Tx {
+	t.Helper()
+
+	utx := &platform.RewardValidatorTx{TxID: txID}
+	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
+	require.NoError(t, err)
+	require.NoError(t, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID)))
+	return tx
+}
+
+func newRewardAutoRenewedValidatorTx(t testing.TB, txID ids.ID, timestamp time.Time) *platform.Tx {
+	t.Helper()
+
+	utx := &platform.RewardAutoRenewedValidatorTx{TxID: txID, Timestamp: uint64(timestamp.Unix())}
+	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
+	require.NoError(t, err)
+	return tx
+}
+
+func must[T any](t require.TestingT) func(T, error) T {
+	return func(val T, err error) T {
+		require.NoError(t, err)
+		return val
+	}
+}
+
+// requireBaseTxApplied asserts that executing stx on diff consumed the tx's
+// inputs, produced its outputs, and burned exactly the fee charged by
+// feeCalculator.
+func requireBaseTxApplied(
+	t testing.TB,
+	env *environment,
+	diff *state.Diff,
+	feeCalculator txfee.Calculator,
+	tx *platform.Tx,
+) {
+	require := require.New(t)
+
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx.Unsigned)
+	require.NoError(err)
+
+	// The inputs were consumed
+	for _, in := range ins {
+		_, err := diff.GetUTXO(in.InputID())
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	// The outputs were produced
+	for _, wantUTXO := range tx.UTXOs() {
+		gotUTXO, err := diff.GetUTXO(wantUTXO.InputID())
+		require.NoError(err)
+		require.Equal(wantUTXO, gotUTXO)
+	}
+
+	// Exactly the fee was burned: the consumed AVAX covers the outputs, the
+	// AVAX produced outside of UTXOs (stake, balances, exports) and the fee.
+	var consumedAVAX uint64
+	for _, in := range ins {
+		if in.AssetID() == env.ctx.AVAXAssetID {
+			consumedAVAX += in.In.Amount()
+		}
+	}
+	for _, out := range outs {
+		if out.AssetID() == env.ctx.AVAXAssetID {
+			producedAVAX += out.Out.Amount()
+		}
+	}
+	fee, err := feeCalculator.CalculateFee(tx.Unsigned)
+	require.NoError(err)
+	require.Equal(consumedAVAX, producedAVAX+fee)
 }
