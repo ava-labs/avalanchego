@@ -87,10 +87,6 @@ func doRetry[Resp proto.Message, Out any](
 		noPeerAttempts int
 	)
 	for {
-		if err := ctx.Err(); err != nil {
-			return zero, retryFailure(err, lastErr, attempts)
-		}
-
 		attempts++
 		resp, nodeID, outcome, err := attempt()
 		var wait time.Duration
