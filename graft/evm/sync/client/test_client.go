@@ -57,7 +57,7 @@ func NewTestClient(
 	}
 }
 
-func (*TestClient) AddClient(uint64) *p2p.Client {
+func (*TestClient) AddClient(uint64) *p2p.TrackingClient {
 	panic("AddClient is not supported in TestClient")
 }
 

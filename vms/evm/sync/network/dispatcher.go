@@ -7,8 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
-	"time"
 
 	"github.com/ava-labs/libevm/libevm/options"
 	"go.uber.org/zap"
@@ -39,7 +37,7 @@ type ProtoMessage[T any] interface {
 // Use one instance per RPC type.
 type Dispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any] struct {
 	log    logging.Logger
-	client *p2p.Client
+	client *p2p.TrackingClient
 	peers  *p2p.PeerTracker
 	policy retryPolicy
 }
@@ -55,14 +53,15 @@ func NewDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any](
 	return &Dispatcher[Req, In, Resp, Out]{
 		// Tagged once, so every retry line names the RPC without each caller repeating it.
 		log:    log.With(zap.Uint64("handlerID", handlerID)),
-		client: n.NewClient(handlerID, noopSampler{}),
+		client: n.NewTrackingClient(handlerID, peers),
 		peers:  peers,
 		policy: *options.ApplyTo(defaultRetryPolicy(), opts...),
 	}
 }
 
-// Send retries req through [SendTo] until verify accepts a response or ctx ends.
-// req is marshaled once since it never changes across attempts, and verify names the rejecting peer and returns Send's result.
+// Send retries req through [Dispatcher.SendTo] until verify accepts a response
+// or ctx ends. req is marshaled once since it never changes across attempts,
+// and verify names the rejecting peer and returns Send's result.
 func (d *Dispatcher[Req, In, Resp, Out]) Send(
 	ctx context.Context,
 	req Req,
@@ -73,111 +72,99 @@ func (d *Dispatcher[Req, In, Resp, Out]) Send(
 		var zero Out
 		return zero, fmt.Errorf("%w: %w", errMarshalRequest, err)
 	}
-	return doRetry(ctx, d.log, d.policy, verify, func() (Resp, ids.NodeID, *Outcome, error) {
+	return doRetry(ctx, d.log, d.policy, func() (Out, ids.NodeID, error) {
 		nodeID, ok := d.peers.SelectPeer()
 		if !ok {
-			var zero Resp
-			return zero, ids.EmptyNodeID, nil, errNoPeers
+			var zero Out
+			return zero, ids.EmptyNodeID, errNoPeers
 		}
-		resp := Resp(new(In))
-		outcome, err := d.sendBytes(ctx, nodeID, requestBytes, resp)
-		return resp, nodeID, outcome, err
+		out, err := d.sendBytes(ctx, nodeID, requestBytes, verify)
+		return out, nodeID, err
 	})
 }
 
-// SendTo sends req to nodeID. A pre-send context or marshal error returns
-// unscored, any later failure scores the peer and returns a nil Outcome.
-func (d *Dispatcher[Req, In, Resp, Out]) SendTo(ctx context.Context, nodeID ids.NodeID, req Req, resp Resp) (*Outcome, error) {
+// SendTo sends req to nodeID and returns what verify made of the reply.
+// A pre-send context or marshal error returns before the peer is registered.
+func (d *Dispatcher[Req, In, Resp, Out]) SendTo(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	req Req,
+	verify func(Resp, ids.NodeID) (Out, error),
+) (Out, error) {
+	var zero Out
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return zero, err
 	}
 	requestBytes, err := proto.Marshal(req)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errMarshalRequest, err)
+		return zero, fmt.Errorf("%w: %w", errMarshalRequest, err)
 	}
-	return d.sendBytes(ctx, nodeID, requestBytes, resp)
+	return d.sendBytes(ctx, nodeID, requestBytes, verify)
 }
 
-// sendBytes is [SendTo] past the marshal step, shared with [Send]'s retry
-// loop so a retried request is marshaled once, not once per attempt.
-func (d *Dispatcher[Req, In, Resp, Out]) sendBytes(ctx context.Context, nodeID ids.NodeID, requestBytes []byte, resp Resp) (_ *Outcome, retErr error) {
+// sendBytes is [Dispatcher.SendTo] past the marshal step, shared with
+// [Dispatcher.Send]'s retry loop so a retried request is marshaled once, not
+// once per attempt.
+func (d *Dispatcher[Req, In, Resp, Out]) sendBytes(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	requestBytes []byte,
+	verify func(Resp, ids.NodeID) (Out, error),
+) (Out, error) {
+	var zero Out
 	if err := ctx.Err(); err != nil {
-		return nil, err
+		return zero, err
 	}
-
-	d.peers.RegisterRequest(nodeID)
-	defer func() {
-		if retErr != nil {
-			d.peers.RegisterFailure(nodeID)
-		}
-	}()
 
 	type result struct {
-		bytes []byte
-		err   error
+		out Out
+		err error
 	}
+	// Closed before verify runs, so a cancelled caller can tell a reply being
+	// verified from one that never came.
+	arrived := make(chan struct{})
+	// Buffered so a reply landing after ctx ends never blocks the handler.
 	resultCh := make(chan result, 1)
-	onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
-		resultCh <- result{bytes: responseBytes, err: err}
+	onResponse := func(_ context.Context, respNodeID ids.NodeID, responseBytes []byte, appErr error) error {
+		close(arrived)
+		out, err := decode[In, Resp](respNodeID, responseBytes, appErr, verify)
+		resultCh <- result{out: out, err: err}
+		return err
 	}
 
-	start := time.Now()
 	if err := d.client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse); err != nil {
-		return nil, fmt.Errorf("%w: %w", errSendRequest, err)
+		return zero, fmt.Errorf("%w: %w", errSendRequest, err)
 	}
 
 	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
 	case r := <-resultCh:
-		if r.err != nil {
-			return nil, fmt.Errorf("%w: %w", errHandlerFailed, r.err)
+		return r.out, r.err
+	case <-ctx.Done():
+		select {
+		case <-arrived:
+			r := <-resultCh
+			return r.out, r.err
+		default:
+			return zero, ctx.Err()
 		}
-
-		if err := proto.Unmarshal(r.bytes, resp); err != nil {
-			return nil, fmt.Errorf("%w: %w", errUnmarshalResponse, err)
-		}
-		const epsilon = 1e-6
-		bandwidth := float64(len(r.bytes)) / (time.Since(start).Seconds() + epsilon)
-		return &Outcome{
-			peers:     d.peers,
-			nodeID:    nodeID,
-			bandwidth: bandwidth,
-		}, nil
 	}
 }
 
-// Outcome scores a peer after the caller validates its response. Call at
-// least one of Success or Failure. Both are idempotent, so a pessimistic
-// defer Failure() with Success() on the happy path is safe. Forgetting
-// both leaks the peer's RegisterRequest.
-type Outcome struct {
-	peers     *p2p.PeerTracker
-	nodeID    ids.NodeID
-	bandwidth float64
-	once      sync.Once
+// decode turns a reply into Resp and applies the caller's verdict. It runs on
+// the handler goroutine, so a rejection de-scores the peer that served it.
+func decode[In any, Resp ProtoMessage[In], Out any](
+	nodeID ids.NodeID,
+	responseBytes []byte,
+	appErr error,
+	verify func(Resp, ids.NodeID) (Out, error),
+) (Out, error) {
+	var zero Out
+	if appErr != nil {
+		return zero, fmt.Errorf("%w: %w", errHandlerFailed, appErr)
+	}
+	resp := Resp(new(In))
+	if err := proto.Unmarshal(responseBytes, resp); err != nil {
+		return zero, fmt.Errorf("%w: %w", errUnmarshalResponse, err)
+	}
+	return verify(resp, nodeID)
 }
-
-// NodeID is the peer that served the response.
-func (o *Outcome) NodeID() ids.NodeID {
-	return o.nodeID
-}
-
-// Success records the response as semantically valid.
-func (o *Outcome) Success() {
-	o.once.Do(func() { o.peers.RegisterResponse(o.nodeID, o.bandwidth) })
-}
-
-// Failure records the response as semantically invalid.
-func (o *Outcome) Failure() {
-	o.once.Do(func() { o.peers.RegisterFailure(o.nodeID) })
-}
-
-var _ p2p.NodeSampler = noopSampler{}
-
-// noopSampler satisfies [p2p.Network.NewClient]'s non-nil sampler
-// requirement. [Dispatcher] always picks an explicit peer, so Sample
-// never runs.
-type noopSampler struct{}
-
-func (noopSampler) Sample(context.Context, int) []ids.NodeID { return nil }

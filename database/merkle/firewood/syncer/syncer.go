@@ -37,7 +37,7 @@ type Config struct {
 	Registerer            prometheus.Registerer
 }
 
-func New(config Config, db *ffi.Database, targetRoot ids.ID, proofClient *p2p.Client) (*sync.Syncer[*RangeProof, struct{}], error) {
+func New(config Config, db *ffi.Database, targetRoot ids.ID, proofClient *p2p.TrackingClient) (*sync.Syncer[*RangeProof, struct{}], error) {
 	return newWithDB(
 		config,
 		&database{db},
@@ -46,7 +46,7 @@ func New(config Config, db *ffi.Database, targetRoot ids.ID, proofClient *p2p.Cl
 	)
 }
 
-func newWithDB(config Config, db sync.DB[*RangeProof, struct{}], targetRoot ids.ID, proofClient *p2p.Client) (*sync.Syncer[*RangeProof, struct{}], error) {
+func newWithDB(config Config, db sync.DB[*RangeProof, struct{}], targetRoot ids.ID, proofClient *p2p.TrackingClient) (*sync.Syncer[*RangeProof, struct{}], error) {
 	if config.Registerer == nil {
 		config.Registerer = prometheus.NewRegistry()
 	}
