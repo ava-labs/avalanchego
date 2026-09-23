@@ -11,11 +11,19 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
   - [Workflows coordinate repository operations](#workflows-coordinate-repository-operations)
   - [Keep Go CI unified](#keep-go-ci-unified)
   - [Go and Bazel CI workflow layout](#go-and-bazel-ci-workflow-layout)
+  - [Platform-specific setup dependencies](#platform-specific-setup-dependencies)
   - [Go unit test platforms](#go-unit-test-platforms)
   - [Local composite actions define reusable GitHub Actions behavior](#local-composite-actions-define-reusable-github-actions-behavior)
   - [CI-only helpers implement CI-specific behavior](#ci-only-helpers-implement-ci-specific-behavior)
   - [C-Chain reexecution benchmarks](#c-chain-reexecution-benchmarks)
 - [Provision CI job dependencies](#provision-ci-job-dependencies)
+- [CI cache policy](#ci-cache-policy)
+  - [Input-cache lifecycle](#input-cache-lifecycle)
+    - [Event behavior](#event-behavior)
+    - [Go module cache](#go-module-cache)
+    - [Bazel dependency cache](#bazel-dependency-cache)
+    - [Nix store cache](#nix-store-cache)
+    - [Changing input caches safely](#changing-input-caches-safely)
   - [Task](#task)
 - [Using Nix in GitHub Actions](#using-nix-in-github-actions)
   - [Run `install-nix` jobs in the Nix dev shell](#run-install-nix-jobs-in-the-nix-dev-shell)
@@ -104,6 +112,20 @@ Smoke workflows run a minimal macOS test. This test verifies that unit tests
 can run on macOS. The Linux pre-merge job and scheduled jobs run the full unit
 suite.
 
+### Platform-specific setup dependencies
+
+The Go workflows define named platform setup jobs. A Linux job needs only the
+Linux setup job. A macOS job needs only the macOS setup job. Do not replace these
+jobs with one matrix job unless every consumer can wait for every matrix
+entry. GitHub Actions lets `needs` name the matrix job, but not one matrix entry.
+
+Define platform setup jobs after required jobs and before jobs that depend on
+them. This keeps the workflow dependency graph readable.
+
+Bazel avoids this cross-platform dependency problem. Each platform calls a
+reusable workflow separately, and each call contains its own setup and consumer
+jobs. Therefore, a platform's Bazel jobs wait only for that platform's setup job.
+
 ### Go unit test platforms
 
 The `unit` job in `go-ci-pre-merge.yml` calls the reusable
@@ -140,6 +162,10 @@ A composite action can:
 - set up an environment
 - collect artifacts
 - run a command with monitoring
+
+Check out the repository before a workflow uses a local action. GitHub must read
+its `action.yml` from the workspace before it can run the action. A local action
+cannot check out the repository for its own first use.
 
 For example, end-to-end jobs in
 [`.github/workflows/go-ci-pre-merge.yml`](../.github/workflows/go-ci-pre-merge.yml) use
@@ -192,15 +218,210 @@ reserved for jobs with dependencies that another setup action does not provide.
 
 | Dependency | Provisioning mechanism | Use when |
 | --- | --- | --- |
-| Go | [`setup-go-for-project`](../.github/actions/setup-go-for-project/) | The job needs Go and does not use Nix or Bazel to provide it. |
-| Bazel | [`setup-bazel`](../.github/actions/setup-bazel/) | The job needs Bazel, which also provides Go. |
-| Flake-provided tools | [`install-nix`](../.github/actions/install-nix/) | A job runs a command that requires a dependency supplied by the Nix dev shell, which also provides Go. |
+| Go | [`setup-go-for-project`](../.github/actions/setup-go-for-project/) | The job needs Go and Task and does not use Nix or Bazel to provide them. |
+| Bazel | [`setup-bazel`](../.github/actions/setup-bazel/) | The job needs Bazel and Task. Bazel also provides Go. |
+| Flake-provided tools | [`install-nix`](../.github/actions/install-nix/) | A job runs a command that requires a dependency from the Nix dev shell. The shell provides Go and Task. |
+
+`setup-go-for-project` and `setup-bazel` install the pinned Task release.
+`install-nix` makes the Nix dev-shell Task available. See [Task](#task) for the
+cache and version rules.
 
 `setup-go-for-project`, `setup-bazel`, and `install-nix` are alternative Go
 provisioning mechanisms. A job that uses `setup-bazel` can also use `install-nix`
-for dependencies that Bazel does not provide. `install-nix` restores Go caches but
-does not save them. [`setup-go-for-project`](../.github/actions/setup-go-for-project/action.yml)
-is the designated Go-cache writer. Keep `install-nix` restore-only.
+for dependencies that Bazel does not provide. `install-nix` can restore Go
+module input, but it does not save that cache. The Go workflow setup jobs own
+Go module, Task, and Nix store cache writes. Other workflows consume these
+caches without writing them.
+
+## CI cache policy
+
+### Input-cache lifecycle
+
+GitHub-hosted runners are temporary. GitHub Actions caching is currently used
+for build inputs - tools and dependencies - not outputs (build and testing). A
+cache miss must still let the job obtain its required input before the job runs
+offline. GitHub Actions caches are immutable: the first successful save for a
+key wins and later saves of that key do not replace it.
+
+Bazel is configured to cache outputs via its separate remote cache, but still
+depends on GitHub Actions caching for its repository inputs.
+
+The Go module and Bazel dependency caches restore their exact key first and may
+restore a same-platform prefix as a warm start. An exact hit skips preparation.
+A non-exact hit or miss prepares the input locally. After preparation, the job
+disables further download. This makes a missing prepared input fail in the job
+that uses it instead of being silently downloaded later.
+
+Only `github.ref == 'refs/heads/master'` can save an input cache. Pull request,
+merge-queue, tag, and non-`master` branch runs can restore entries and prepare a
+local miss, but cannot save it. The local
+[`cache-policy`](../.github/actions/cache-policy/action.yml) action is where this
+policy is defined. Shared cache setup actions serve both cache-writing setup
+jobs and restore-only consumers. Only a designated cache-writing setup job uses
+`request-cache-save` to request permission to save. All other uses restore and
+prepare inputs without saving. The policy action returns `cache-save-allowed`
+only when that request is permitted.
+
+GitHub isolates pull-request cache entries from `master`, and cache entries are
+immutable. Thus, a pull-request cache cannot replace or supply a `master` cache
+entry. The restriction on writes instead protects the repository's limited
+cache storage. High pull-request traffic can evict useful entries from `master`
+and cause repeated cache misses. Restricting writes to `master` reserves cache
+storage for merged code and makes cache usage predictable.
+
+To validate cache saves before merge, add a temporary exception for that pull
+request to `cache-policy`. This confines write permission to one reviewable pull
+request instead of adding a workflow input or general rule that could let
+unrelated pull requests consume cache storage. Delete the exception before
+merging so the policy remains limited to normal `master` writes.
+
+For example, add the pull-request test as the second allowed branch in
+`cache-policy`:
+
+```bash
+[[ "$GITHUB_REF" == 'refs/heads/master' ]] || {
+  [[ "$GITHUB_EVENT_NAME" == 'pull_request' ]] &&
+  [[ "$PULL_REQUEST_NUMBER" == '<pull-request-number>' ]]
+}
+```
+
+Replace `<pull-request-number>` for the validation run, then delete that
+conditional branch before merge. After validation, delete cache entries created
+by the temporary exception from [GitHub Actions
+caches](https://github.com/ava-labs/avalanchego/actions/caches). The entries
+created for the PR will be marked with `refs/pull/[PR number]/merge` instead of
+`master`.
+
+#### Event behavior
+
+All jobs restore matching input caches when available.
+
+- **Pull request, merge queue, tag, or non-`master` branch:** jobs do not save
+  shared entries. A consumer prepares any missing input on its own runner.
+- **Post-merge `master`:** designated setup jobs prepare and save shared entries
+  before their dependent jobs run.
+- **Scheduled `master`:** setup jobs also save entries, including entries for
+  platforms that post-merge CI does not run.
+
+A job cannot transfer locally prepared cache input to another GitHub-hosted
+runner. On refs where cache writes are denied, each consumer prepares missing or
+stale cache inputs on its own runner. On `master`, a setup job saves the prepared
+cache entry for dependent jobs to restore.
+
+Concurrent jobs can prepare the same missing or stale cache inputs. GitHub
+Actions cache entries are immutable, so the first save wins and later saves
+cannot overwrite it.
+
+This policy applies to GitHub Actions input caches. The Bazel remote cache is
+separate: normal pre-merge and post-merge Bazel workflows use it when CI has its
+URL and authorization header. The scheduled Bazel workflow disables it. See
+[Bazel CI external dependency caching](./bazel.md#bazel-ci-external-dependency-caching).
+
+#### Go module cache
+
+[`setup-go-module-cache`](../.github/actions/setup-go-module-cache/action.yml)
+restores `GOMODCACHE`. On a non-exact hit it runs
+[`download_go_modules.sh`](../scripts/download_go_modules.sh), which resolves
+all repository modules and the checked-in
+[`go_module_cache_manifest.tsv`](../scripts/go_module_cache_manifest.tsv).
+The manifest covers CI tools and pinned module graphs that repository modules
+do not reach. After preparation, the action sets `GOPROXY=off`.
+
+Callers that configure custom polyrepo refs should keep `GOPROXY` enabled during
+setup because those refs can require modules that are not represented by the
+avalanchego cache key. They must disable the proxy after dependency setup so the
+subsequent workload fails if its prepared module set is incomplete.
+
+The cache key has this structure:
+
+```text
+go-mod-${runner.os}-${dependency-hash}
+```
+
+[`setup-go-module-cache`](../.github/actions/setup-go-module-cache/action.yml)
+defines the dependency hash from Go module metadata and cache-preparation inputs.
+The module files already contain the Go version. The cache contains module
+archives and source files. The key includes `runner.os`, so architectures on the
+same operating system share one module cache while cache archives from different
+operating systems remain separate.
+
+The platform cache setup jobs in the Go workflows are the only jobs that write
+cache entries for Task and Nix. The Linux AMD64 setup job owns the Linux Go
+module cache, which is shared across architectures. The macOS setup job owns the
+macOS Go module cache. The jobs run their cache-writing steps only when cache
+policy permits a save. Other Go workflow jobs depend on the setup job for their
+platform. They skip cache-writing steps when policy denies a save, and each
+consumer prepares missing cache inputs on its own runner.
+
+The cache-writing setup jobs use
+[`setup-go-workflow-cache-producer`](../.github/actions/setup-go-workflow-cache-producer/action.yml).
+It requests saves from `setup-go-for-project`, `setup-task`, and `install-nix`
+only when `cache-policy` permits cache writing. Other uses of these actions are
+restore-only. `install-nix` can use the same module-cache action as a
+restore-only consumer. Bazel jobs disable this use because Bazel has a separate
+`GOMODCACHE`. The implicit `actions/setup-go` cache is disabled because its
+post-job save cannot be limited to `master` runs by `cache-policy`.
+
+#### Bazel dependency cache
+
+[`setup-bazel`](../.github/actions/setup-bazel/action.yml) runs each Bazel
+setup job. It restores the Bazel repository cache and Bazel-specific Go module
+cache, then checks metadata. A non-exact consumer restore runs the checked-in
+dependency list through `bazelisk fetch`. On `master`, a non-exact setup restore
+also prepares and saves the cache. Setup jobs can duplicate this cold-cache
+work. After an exact restore or local preparation, the action enables
+`--repository_disable_download`; see [Bazel CI external dependency
+caching](./bazel.md#bazel-ci-external-dependency-caching).
+
+The cache contains only external Bazel dependency input. It is separate from
+the Bazel remote action and test-result cache. See
+[Bazel CI external dependency caching](./bazel.md#bazel-ci-external-dependency-caching)
+for its key and dependency-list rules.
+
+#### Nix store cache
+
+`install-nix` restores the Nix store cache on Linux and macOS and loads the
+flake dependencies in every job. The platform cache setup jobs in the Go
+workflows are the only jobs that write these cache entries. Nix-consuming Go
+jobs depend on the setup job for their platform. The setup job saves on
+`master`. All other `install-nix` invocations are restore-only consumers. The
+flake defines the commands available to Nix jobs, so a command that neither the
+runner nor the flake provides fails. Nix can still fetch a missing store path
+for a dependency declared by the flake; the Nix store cache only accelerates
+that loading. Go jobs that use Nix-provided Go restore the shared Go module
+cache through `install-nix` so they reuse the same dependencies as jobs that use
+`setup-go-for-project`.  Bazel jobs disable this behavior because they use the
+Bazel-specific cache.
+
+#### Changing input caches safely
+
+These rules keep cache production predictable and storage use bounded. They
+also ensure that CI fails when preparation omits a required input, rather than
+silently downloading it during a later job. This minimizes the potential for
+job failure caused by network flakes.
+
+When changing an input cache:
+
+- keep restore enabled on every event type so every job can reuse compatible
+  inputs; write permission is a separate policy decision;
+- restrict saves to `master` to preserve limited cache capacity for merged
+  code;
+- keep one designated Go module, Task, and Nix store cache-writing setup job
+  for each cache key in a workflow run so dependent jobs wait for one
+  preparation and save;
+- keep Go module, Task, and Nix store cache-writing setup jobs in the Go
+  workflows so the workflow that defines their consumers also owns their
+  shared-cache writes;
+- keep Bazel dependency cache-writing setup jobs in the Bazel workflows so they
+  can prepare the dependency list before their Bazel consumers run;
+- prepare every non-exact restore before disabling its network path so a missing
+  prepared input fails rather than being silently downloaded later;
+- add each new Go tool or pinned module to the module manifest, and each new
+  Bazel CI target pattern to the dependency list, so preparation covers every
+  input that CI commands require;
+- do not use a shared cache to transfer build output or test results between
+  jobs because those results depend on job-specific configuration and require a
+  dedicated transfer protocol.
 
 ### Task
 
@@ -219,14 +440,15 @@ commands.
 The action uses a GitHub Actions cache, not an artifact. A cache lets unrelated
 jobs and workflow runs reuse one binary. An artifact belongs to one workflow
 run. The cache key includes the Task version, operating system, and
-architecture. Each job restores the matching cache. Only runs on `master` save
-a cache entry. Pull request and merge-queue jobs download Task on a cache miss.
-They do not save the binary. This policy limits cache storage to merged versions
-and prevents unmerged code from producing shared cache contents. Scheduled
-`master` jobs can save entries for platforms not tested on each push.
+architecture. Each job restores the matching cache. Platform cache setup jobs
+in the Go workflows can save a cache entry on `master`. All other jobs are
+restore-only consumers. Pull request and merge-queue jobs download Task on a
+cache miss. They do not save the binary. This policy reserves cache storage for
+merged Task versions. Scheduled `master` jobs can save entries for platforms
+not tested on each push.
 
-A cache entry exists only after a `master` job runs on the same operating system
-and architecture. When you add a CI platform, add a `master` job for that
+A shared cache entry exists only after a `master` job runs on the same operating
+system and architecture. When you add a CI platform, add a `master` job for that
 platform if it needs a reusable Task cache. Otherwise, cache-miss jobs download
 Task.
 
@@ -240,7 +462,7 @@ review.
 When changing this setup, keep these rules:
 
 - Keep Nix and `tools/external/go.mod` on the same Task version.
-- Keep cache writes limited to runs on `master`.
+- Keep shared cache writes limited to runs on `master`.
 - Keep the release platform mapping compatible with every CI runner.
 
 ## Using Nix in GitHub Actions
