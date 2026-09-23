@@ -103,7 +103,7 @@ func TestParseGenesis(t *testing.T) {
 							EtnaTimestamp:                   avalancheutils.PointerTo[uint64](1734368400),
 							FortunaTimestamp:                avalancheutils.PointerTo[uint64](1744124400),
 							GraniteTimestamp:                avalancheutils.PointerTo[uint64](1763568000),
-							HeliconTimestamp:                unscheduled,
+							HeliconTimestamp:                avalancheutils.PointerTo[uint64](1790089200),
 						},
 						AvalancheContext: extras.AvalancheContext{
 							SnowCtx: mainnetCtx,
@@ -170,7 +170,7 @@ func TestParseGenesis(t *testing.T) {
 							EtnaTimestamp:                   avalancheutils.PointerTo[uint64](1732550400),
 							FortunaTimestamp:                avalancheutils.PointerTo[uint64](1741878000),
 							GraniteTimestamp:                avalancheutils.PointerTo[uint64](1761750000),
-							HeliconTimestamp:                unscheduled,
+							HeliconTimestamp:                avalancheutils.PointerTo[uint64](1785250800),
 						},
 						AvalancheContext: extras.AvalancheContext{
 							SnowCtx: fujiCtx,

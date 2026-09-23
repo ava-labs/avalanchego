@@ -23,6 +23,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/prefetch"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -44,9 +45,9 @@ type queuedBlock struct {
 	enqueuedAt time.Time
 }
 
-// Enqueue pushes a new block to the FIFO queue. If [Executor.Close] is called
-// before [blocks.Block.Executed] returns true then there is no guarantee that
-// the block will be executed.
+// Enqueue pushes a new block to the FIFO queue. Every enqueued block is
+// executed before [Executor.Close] returns, unless an earlier block fails to
+// execute. Enqueue MUST NOT be called after [Executor.Close] or it will panic.
 func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 	e.createReceiptBuffers(block)
 
@@ -61,61 +62,73 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 				zap.Int("queue_capacity", n),
 			)
 		}
+		// As it's concurrent, there's no perfect place to check for a
+		// processing error when enqueueing (nor is it strictly necessary as its
+		// exposed by [Executor.HealthCheck]), but this is the latest possible
+		// time.
+		if err := e.HealthCheck(); err != nil {
+			return err
+		}
 		return nil
 
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-e.quit:
-		return errExecutorClosed
 	case <-e.done:
-		// `e.done` can also close due to [Executor.execute] errors.
-		return errExecutorClosed
+		return errors.Join(errExecutorClosed, e.HealthCheck())
 	}
 }
 
-const emergencyPlaybookLink = "https://github.com/ava-labs/avalanchego/issues/5276"
+func (e *Executor) processQueue() (ret *Unhealthy) {
+	defer func() {
+		e.queueErr.Store(ret)
+		close(e.done)
+	}()
 
-func (e *Executor) processQueue() {
-	defer close(e.done)
+	for qb := range e.queue {
+		block := qb.block
+		log := e.log.With(
+			zap.Uint64("block_height", block.Height()),
+			zap.Uint64("block_time", block.BuildTime()),
+			zap.Stringer("block_hash", block.Hash()),
+			zap.Int("tx_count", len(block.Transactions())),
+		)
 
-	for {
-		select {
-		case <-e.quit:
-			return
-
-		case qb := <-e.queue:
-			block := qb.block
-			log := e.log.With(
-				zap.Uint64("block_height", block.Height()),
-				zap.Uint64("block_time", block.BuildTime()),
-				zap.Stringer("block_hash", block.Hash()),
-				zap.Int("tx_count", len(block.Transactions())),
+		err := e.execute(block, log)
+		switch {
+		case errors.Is(err, errFatal):
+			log.Fatal( //nolint:gocritic // False positive, will not terminate the process
+				"Block execution failed",
+				zap.Error(err),
 			)
-
-			err := e.execute(block, log)
-			switch {
-			case errors.Is(err, errFatal):
-				log.Fatal( //nolint:gocritic // False positive, will not terminate the process
-					"Block execution failed",
-					zap.String("playbook", emergencyPlaybookLink),
-					zap.Error(err),
-				)
-			case err != nil:
-				log.Error(
-					"Error of unknown severity in block execution",
-					zap.String("if_escalation_required", emergencyPlaybookLink),
-					zap.Error(err),
-				)
-			}
-			if err != nil {
-				return
-			}
-			e.metrics.observeQueueDuration(time.Since(qb.enqueuedAt))
+		case err != nil:
+			log.Error(
+				"Error of unknown severity in block execution",
+				zap.Error(err),
+			)
 		}
+		if err != nil {
+			return &Unhealthy{
+				err:   err,
+				cause: block,
+			}
+		}
+		e.metrics.observeQueueDuration(time.Since(qb.enqueuedAt))
 	}
+	return nil
 }
 
 var errFatal = errors.New("fatal execution error")
+
+const (
+	// triePrefetcherNamespace names the prefetcher's metrics. libevm records
+	// them as `trie/prefetch/sae/*` on its global registry.
+	//
+	// TODO(JonathanOppenheimer): We need to register this namespace within
+	// SAE.
+	triePrefetcherNamespace = "sae"
+	// triePrefetcherParallelism limits the prefetcher to 16 goroutines.
+	triePrefetcherParallelism = 16
+)
 
 func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	// If the VM were to encounter an error after enqueuing the block, we would
@@ -133,6 +146,16 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
+
+	// The prefetcher loads trie nodes during execution which removes the loads
+	// at Commit time. On historical mainnet C-Chain it cut mean block insertion
+	// from 99.76ms to 44.84ms:
+	// https://github.com/ava-labs/avalanchego/issues/5665#issuecomment-5372800462
+	//
+	// TODO(JonathanOppenheimer): measure this again after SAE is live!
+	stateDB.StartPrefetcher(triePrefetcherNamespace, prefetch.WithConcurrentWorkers(triePrefetcherParallelism))
+	defer stateDB.StopPrefetcher()
+
 	result, err := Execute(
 		b,
 		stateDB,
@@ -421,7 +444,7 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 	if err != nil {
 		return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
 	}
-	if err := e.Tracker.MaybeCommit(b.SettledStateRoot(), root, b.NumberU64()); err != nil {
+	if err := e.Tracker.BlockExecuted(b.SettledStateRoot(), root, b.NumberU64()); err != nil {
 		return err
 	}
 

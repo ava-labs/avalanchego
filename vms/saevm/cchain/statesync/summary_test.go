@@ -34,7 +34,7 @@ func FuzzSummaryRoundTrip(f *testing.F) {
 	f.Add(uint64(0), []byte{}, []byte{})
 	f.Add(uint64(1), []byte{1, 2, 3}, []byte{4, 5, 6})
 
-	h := new(SummaryHandler)
+	h := new(Handler)
 	f.Fuzz(func(t *testing.T, height uint64, hashBytes, rootBytes []byte) {
 		summary := newSummary(
 			common.BytesToHash(hashBytes),

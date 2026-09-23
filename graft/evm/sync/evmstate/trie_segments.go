@@ -13,8 +13,8 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
@@ -53,7 +53,7 @@ type trieToSync struct {
 	// We keep a pointer to the overall sync operation,
 	// used to add segments to the work queue and to
 	// update the eta.
-	sync *stateSync
+	sync *StateSync
 
 	// task implements the syncTask interface with methods
 	// containing logic specific to the main trie or storage
@@ -63,7 +63,7 @@ type trieToSync struct {
 }
 
 // NewTrieToSync initializes a trieToSync and restores any previously started segments.
-func NewTrieToSync(sync *stateSync, root common.Hash, account common.Hash, syncTask syncTask) (*trieToSync, error) {
+func NewTrieToSync(sync *StateSync, root common.Hash, account common.Hash, syncTask syncTask) (*trieToSync, error) {
 	batch := sync.db.NewBatch() // TODO: migrate state sync to use database schemes.
 	writeFn := func(path []byte, hash common.Hash, blob []byte) {
 		rawdb.WriteTrieNode(batch, account, path, hash, blob, rawdb.HashScheme)
@@ -133,7 +133,9 @@ func (t *trieToSync) loadSegments() error {
 			utils.IncrOne(lastKey)
 			segment.pos = lastKey // syncing will start from this key
 		}
-		log.Debug("evmstate: loading segment", "segment", segment)
+		t.sync.log.Debug("loading segment",
+			zap.Stringer("segment", segment),
+		)
 	}
 	return it.Error()
 }
@@ -172,7 +174,9 @@ func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	log.Debug("evmstate: segment finished", "segment", t.segments[idx])
+	t.sync.log.Debug("segment finished",
+		zap.Stringer("segment", t.segments[idx]),
+	)
 	t.segmentsDone[idx] = struct{}{}
 	for {
 		if _, ok := t.segmentsDone[t.segmentToHashNext]; !ok {
@@ -323,7 +327,11 @@ func (t *trieToSync) createSegments(ctx context.Context, numSegments int) error 
 		}
 	}
 	t.sync.stats.incTriesSegmented()
-	log.Debug("evmstate: trie segmented for parallel sync", "root", t.root, "account", t.account, "segments", len(t.segments))
+	t.sync.log.Debug("trie segmented for parallel sync",
+		zap.Stringer("root", t.root),
+		zap.Stringer("account", t.account),
+		zap.Int("segments", len(t.segments)),
+	)
 	return nil
 }
 

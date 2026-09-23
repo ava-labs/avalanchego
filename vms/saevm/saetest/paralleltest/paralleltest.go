@@ -6,7 +6,6 @@
 package paralleltest
 
 import (
-	"context"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -88,11 +87,8 @@ func NewExecutor[CommonData, Prefetch any, R parallel.PrecompileResult, Aggregat
 	require.NoError(tb, err, "saexec.New()")
 
 	tb.Cleanup(func() {
-		if !tb.Failed() {
-			ctx := context.WithoutCancel(tb.Context())
-			assert.NoErrorf(tb, chain.Last().WaitUntilExecuted(ctx), "%T.Last().WaitUntilExecuted()", chain)
-		}
-		assert.NoErrorf(tb, exec.Close(), "%T.Close()", exec)
+		require.NoErrorf(tb, exec.Close(), "%T.Close()", exec)
+		assert.NoErrorf(tb, tr.Close(exec.LastExecuted().PostExecutionStateRoot()), "%T.Close()", tr)
 		par.Close()
 	})
 

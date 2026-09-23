@@ -1,0 +1,40 @@
+name: Scheduled Go
+
+# Full platform coverage runs separately from pre-merge Go CI
+on:
+  schedule:
+    - cron: '0 9 * * *' # Runs every day at 09:00 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full:
+    name: ${{ matrix.platform_name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform_name: ubuntu-22.04-amd64
+            runner: ubuntu-22.04
+          - platform_name: ubuntu-22.04-arm64
+            runner: ubuntu-22.04-arm
+          # Run race and shuffled tests once on our production platform to retain coverage
+          # without increasing flake rate across every platform.
+          - platform_name: ubuntu-24.04-amd64
+            runner: ubuntu-24.04
+            run_race_shuffle_unit_tests: true
+          - platform_name: ubuntu-24.04-arm64
+            runner: ubuntu-24.04-arm
+          - platform_name: macos-26-arm64
+            runner: macos-26
+    uses: ./.github/workflows/go-ci.yml
+    with:
+      platform_name: ${{ matrix.platform_name }}
+      runner: ${{ matrix.runner }}
+      run_race_shuffle_unit_tests: ${{ matrix.run_race_shuffle_unit_tests || false }}
+    secrets: inherit

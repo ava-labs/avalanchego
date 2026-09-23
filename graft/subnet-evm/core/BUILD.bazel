@@ -64,6 +64,7 @@ go_library(
         "//utils/set",
         "//vms/evm/acp226",
         "//vms/evm/predicate",
+        "//vms/evm/prefetch",
         "//vms/evm/sync/customrawdb",
         "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",

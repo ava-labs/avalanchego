@@ -45,6 +45,9 @@ runs:
       if: ${{ runner.os == 'Linux' && steps.initial-check.outputs.below_threshold == 'true' }}
       uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
       with:
+        # CI bootstraps Task from the cached release binary or the Nix dev
+        # shell, rather than from the runner's Go toolchain. Reclaim the runner
+        # tool cache when disk pressure requires cleanup.
         tool-cache: true
         docker-images: true
 

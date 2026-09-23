@@ -21,10 +21,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
@@ -95,8 +95,8 @@ var (
 		validationID: validationOwner,
 	}
 
-	primaryNetworkPermissionlessStaker = &txs.SubnetValidator{
-		Validator: txs.Validator{
+	primaryNetworkPermissionlessStaker = &platform.SubnetValidator{
+		Validator: platform.Validator{
 			NodeID: nodeID,
 			End:    uint64(time.Now().Add(time.Hour).Unix()),
 			Wght:   2 * units.Avax,
@@ -179,8 +179,8 @@ func TestBaseTx(t *testing.T) {
 }
 
 func TestAddSubnetValidatorTx(t *testing.T) {
-	subnetValidator := &txs.SubnetValidator{
-		Validator: txs.Validator{
+	subnetValidator := &platform.SubnetValidator{
+		Validator: platform.Validator{
 			NodeID: nodeID,
 			End:    uint64(time.Now().Add(time.Hour).Unix()),
 		},
@@ -568,7 +568,7 @@ func TestConvertSubnetToL1Tx(t *testing.T) {
 	var (
 		chainID    = ids.GenerateTestID()
 		address    = utils.RandomBytes(32)
-		validators = []*txs.ConvertSubnetToL1Validator{
+		validators = []*platform.ConvertSubnetToL1Validator{
 			{
 				NodeID:  utils.RandomBytes(ids.NodeIDLen),
 				Weight:  rand.Uint64(), //#nosec G404
@@ -956,10 +956,10 @@ func TestAddAutoRenewedValidatorTx(t *testing.T) {
 
 	// BaseTx and StakeOuts are asserted separately because UTXO selection is
 	// fee-dependent and checked by requireFeeIsCorrect above.
-	gotTx.BaseTx = txs.BaseTx{}
+	gotTx.BaseTx = platform.BaseTx{}
 	gotTx.StakeOuts = nil
 
-	wantTx := &txs.AddAutoRenewedValidatorTx{
+	wantTx := &platform.AddAutoRenewedValidatorTx{
 		ValidatorNodeID:          types.JSONByteSlice(nodeID.Bytes()),
 		Signer:                   pop,
 		ValidatorRewardsOwner:    validationRewardsOwner,
@@ -1009,9 +1009,9 @@ func TestSetAutoRenewedValidatorConfigTx(t *testing.T) {
 
 	// BaseTx is asserted separately because UTXO selection is fee-dependent
 	// and checked by requireFeeIsCorrect above.
-	gotTx.BaseTx = txs.BaseTx{}
+	gotTx.BaseTx = platform.BaseTx{}
 
-	wantTx := &txs.SetAutoRenewedValidatorConfigTx{
+	wantTx := &platform.SetAutoRenewedValidatorConfigTx{
 		TxID: validationID,
 		Auth: &secp256k1fx.Input{
 			SigIndices: []uint32{0},
@@ -1138,7 +1138,7 @@ func makeUTXOs(amounts ...uint64) []*avax.UTXO {
 func requireFeeIsCorrect(
 	require *require.Assertions,
 	feeCalculator fee.Calculator,
-	utx txs.UnsignedTx,
+	utx platform.UnsignedTx,
 	baseTx *avax.BaseTx,
 	additionalIns []*avax.TransferableInput,
 	additionalOuts []*avax.TransferableOutput,

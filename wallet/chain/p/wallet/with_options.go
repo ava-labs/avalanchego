@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -49,7 +49,7 @@ func (w *withOptions) Signer() walletsigner.Signer {
 func (w *withOptions) IssueBaseTx(
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueBaseTx(
 		outputs,
 		common.UnionOptions(w.options, options)...,
@@ -57,11 +57,11 @@ func (w *withOptions) IssueBaseTx(
 }
 
 func (w *withOptions) IssueAddValidatorTx(
-	vdr *txs.Validator,
+	vdr *platform.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueAddValidatorTx(
 		vdr,
 		rewardsOwner,
@@ -71,9 +71,9 @@ func (w *withOptions) IssueAddValidatorTx(
 }
 
 func (w *withOptions) IssueAddSubnetValidatorTx(
-	vdr *txs.SubnetValidator,
+	vdr *platform.SubnetValidator,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueAddSubnetValidatorTx(
 		vdr,
 		common.UnionOptions(w.options, options)...,
@@ -84,7 +84,7 @@ func (w *withOptions) IssueRemoveSubnetValidatorTx(
 	nodeID ids.NodeID,
 	subnetID ids.ID,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueRemoveSubnetValidatorTx(
 		nodeID,
 		subnetID,
@@ -93,10 +93,10 @@ func (w *withOptions) IssueRemoveSubnetValidatorTx(
 }
 
 func (w *withOptions) IssueAddDelegatorTx(
-	vdr *txs.Validator,
+	vdr *platform.Validator,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueAddDelegatorTx(
 		vdr,
 		rewardsOwner,
@@ -111,7 +111,7 @@ func (w *withOptions) IssueCreateChainTx(
 	fxIDs []ids.ID,
 	chainName string,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueCreateChainTx(
 		subnetID,
 		genesis,
@@ -125,7 +125,7 @@ func (w *withOptions) IssueCreateChainTx(
 func (w *withOptions) IssueCreateSubnetTx(
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueCreateSubnetTx(
 		owner,
 		common.UnionOptions(w.options, options)...,
@@ -136,7 +136,7 @@ func (w *withOptions) IssueTransferSubnetOwnershipTx(
 	subnetID ids.ID,
 	owner *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueTransferSubnetOwnershipTx(
 		subnetID,
 		owner,
@@ -148,9 +148,9 @@ func (w *withOptions) IssueConvertSubnetToL1Tx(
 	subnetID ids.ID,
 	chainID ids.ID,
 	address []byte,
-	validators []*txs.ConvertSubnetToL1Validator,
+	validators []*platform.ConvertSubnetToL1Validator,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueConvertSubnetToL1Tx(
 		subnetID,
 		chainID,
@@ -165,7 +165,7 @@ func (w *withOptions) IssueRegisterL1ValidatorTx(
 	proofOfPossession [bls.SignatureLen]byte,
 	message []byte,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueRegisterL1ValidatorTx(
 		balance,
 		proofOfPossession,
@@ -177,7 +177,7 @@ func (w *withOptions) IssueRegisterL1ValidatorTx(
 func (w *withOptions) IssueSetL1ValidatorWeightTx(
 	message []byte,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueSetL1ValidatorWeightTx(
 		message,
 		common.UnionOptions(w.options, options)...,
@@ -188,7 +188,7 @@ func (w *withOptions) IssueIncreaseL1ValidatorBalanceTx(
 	validationID ids.ID,
 	balance uint64,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueIncreaseL1ValidatorBalanceTx(
 		validationID,
 		balance,
@@ -199,7 +199,7 @@ func (w *withOptions) IssueIncreaseL1ValidatorBalanceTx(
 func (w *withOptions) IssueDisableL1ValidatorTx(
 	validationID ids.ID,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueDisableL1ValidatorTx(
 		validationID,
 		common.UnionOptions(w.options, options)...,
@@ -210,7 +210,7 @@ func (w *withOptions) IssueImportTx(
 	sourceChainID ids.ID,
 	to *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueImportTx(
 		sourceChainID,
 		to,
@@ -222,7 +222,7 @@ func (w *withOptions) IssueExportTx(
 	chainID ids.ID,
 	outputs []*avax.TransferableOutput,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueExportTx(
 		chainID,
 		outputs,
@@ -246,7 +246,7 @@ func (w *withOptions) IssueTransformSubnetTx(
 	maxValidatorWeightFactor byte,
 	uptimeRequirement uint32,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueTransformSubnetTx(
 		subnetID,
 		assetID,
@@ -267,14 +267,14 @@ func (w *withOptions) IssueTransformSubnetTx(
 }
 
 func (w *withOptions) IssueAddPermissionlessValidatorTx(
-	vdr *txs.SubnetValidator,
+	vdr *platform.SubnetValidator,
 	signer vmsigner.Signer,
 	assetID ids.ID,
 	validationRewardsOwner *secp256k1fx.OutputOwners,
 	delegationRewardsOwner *secp256k1fx.OutputOwners,
 	shares uint32,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueAddPermissionlessValidatorTx(
 		vdr,
 		signer,
@@ -287,11 +287,11 @@ func (w *withOptions) IssueAddPermissionlessValidatorTx(
 }
 
 func (w *withOptions) IssueAddPermissionlessDelegatorTx(
-	vdr *txs.SubnetValidator,
+	vdr *platform.SubnetValidator,
 	assetID ids.ID,
 	rewardsOwner *secp256k1fx.OutputOwners,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueAddPermissionlessDelegatorTx(
 		vdr,
 		assetID,
@@ -311,7 +311,7 @@ func (w *withOptions) IssueAddAutoRenewedValidatorTx(
 	autoCompoundRewardShares uint32,
 	period time.Duration,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueAddAutoRenewedValidatorTx(
 		validatorNodeID,
 		weight,
@@ -331,7 +331,7 @@ func (w *withOptions) IssueSetAutoRenewedValidatorConfigTx(
 	autoCompoundRewardShares uint32,
 	period time.Duration,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueSetAutoRenewedValidatorConfigTx(
 		txID,
 		autoCompoundRewardShares,
@@ -341,9 +341,9 @@ func (w *withOptions) IssueSetAutoRenewedValidatorConfigTx(
 }
 
 func (w *withOptions) IssueUnsignedTx(
-	utx txs.UnsignedTx,
+	utx platform.UnsignedTx,
 	options ...common.Option,
-) (*txs.Tx, error) {
+) (*platform.Tx, error) {
 	return w.wallet.IssueUnsignedTx(
 		utx,
 		common.UnionOptions(w.options, options)...,
@@ -351,7 +351,7 @@ func (w *withOptions) IssueUnsignedTx(
 }
 
 func (w *withOptions) IssueTx(
-	tx *txs.Tx,
+	tx *platform.Tx,
 	options ...common.Option,
 ) error {
 	return w.wallet.IssueTx(

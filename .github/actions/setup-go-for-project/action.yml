@@ -16,6 +16,8 @@ description: 'Install a go toolchain with project defaults'
 runs:
   using: composite
   steps:
+    - uses: ./.github/actions/setup-task
+
     - name: Set up Go
       uses: actions/setup-go@v6
       with:

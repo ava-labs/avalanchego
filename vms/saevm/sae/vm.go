@@ -13,15 +13,20 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+
+	_ "github.com/ava-labs/avalanchego/vms/saevm/firewood" // registers metrics
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -31,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/unwind"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
@@ -41,11 +47,17 @@ import (
 
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	evmprometheus "github.com/ava-labs/avalanchego/vms/evm/metrics/prometheus"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	ethmetrics "github.com/ava-labs/libevm/metrics"
 )
 
 // directory that stores execution results database under the chain data directory
 const executionResultsDir = "sae_execution_results"
+
+func ExecutionResultsPath(chainDataDir string) string {
+	return filepath.Join(chainDataDir, executionResultsDir)
+}
 
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,
 // which needs to be provided by a harness. In all cases, the harness MUST
@@ -135,10 +147,15 @@ func NewVM[T hook.Transaction](
 	if err != nil {
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
+	if err := snowCtx.Metrics.Register(customrawdb.FirewoodScheme, ffi.Gatherer{}); err != nil {
+		return nil, fmt.Errorf("registering firewood metrics: %w", err)
+	}
+	if err := snowCtx.Metrics.Register("eth", evmprometheus.NewGatherer(ethmetrics.DefaultRegistry)); err != nil {
+		return nil, fmt.Errorf("registering libevm metrics: %w", err)
+	}
 
 	// ==========  Execution Results DB  ==========
-	xdbDir := filepath.Join(snowCtx.ChainDataDir, executionResultsDir)
-
+	xdbDir := ExecutionResultsPath(snowCtx.ChainDataDir)
 	xdb, err := hooks.ExecutionResultsDB(xdbDir)
 	if err != nil {
 		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %w", hooks, xdbDir, err)
@@ -150,7 +167,16 @@ func NewVM[T hook.Transaction](
 	if err != nil {
 		return nil, fmt.Errorf("creating new execution: %w", err)
 	}
-	closers.Push(exec)
+	closers.Push(
+		unwind.CloserFunc(func() error {
+			// We MUST NOT write a root that is more advanced than the last settled
+			// root to ensure that firewood is able to restart.
+			return exec.Tracker.Close(exec.LastExecuted().SettledStateRoot())
+		}),
+		// The executor MUST be closed before the tracker, and unwinding is
+		// performed in reverse order.
+		exec,
+	)
 
 	// ==========  Mempool & P2P Gossip  ==========
 	pool, mempoolClosers, err := newGossipMempool(cfg.MempoolConfig, snowCtx, network, exec, ethBlockSource(consensusCritical, db), reg)
@@ -354,6 +380,11 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 func (vm *VM) numPendingTxs() int {
 	p, _ := vm.mempool.Pool.Stats()
 	return p
+}
+
+// EVMState returns direct access to the databases that control the EVM state.
+func (vm *VM) EVMState() (*triedb.Database, *snapshot.Tree) {
+	return vm.exec.TrieDB(), vm.exec.Snapshot()
 }
 
 // SetState notifies the VM of a transition in the state lifecycle.

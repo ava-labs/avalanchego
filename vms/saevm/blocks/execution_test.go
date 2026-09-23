@@ -6,6 +6,7 @@ package blocks
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"sync/atomic"
 	"testing"
@@ -181,25 +182,12 @@ func TestMarkExecuted(t *testing.T) {
 	})
 }
 
-// errAll requires the error to satisfy every `want`. [testerr] provides only
-// primitive matchers, leaving their composition to the caller.
-func errAll(wants ...testerr.Want) testerr.Want {
-	return testerr.Func(func(got error) string {
-		for _, w := range wants {
-			if diff := w.ErrDiff(got); diff != "" {
-				return diff
-			}
-		}
-		return ""
-	})
-}
-
 // errIsNot requires that the error does NOT wrap `target`; a nil error
 // trivially satisfies this.
 func errIsNot(target error) testerr.Want {
 	return testerr.Func(func(got error) string {
 		if errors.Is(got, target) {
-			return testerr.DiffMessage(got, "error that is not %v", target)
+			return fmt.Sprintf("error that is not %v", target)
 		}
 		return ""
 	})
@@ -209,27 +197,24 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 	const height = 2
 	asynchronous := hook.Settled{Height: height - 1}
 
-	markExecuted := func(t *testing.T, db ethdb.Database, xdb saetypes.ExecutionResults, hooks hook.Points, ethB *types.Block) {
-		t.Helper()
-
-		hdr := ethB.Header()
-		target, cfg := hooks.GasConfigAfter(hdr)
-		tm := mustNewGasTime(t, hooks.BlockTime(hdr), target, gas.Price(hdr.BaseFee.Uint64()), cfg)
-		newBlock(t, ethB, nil, nil).markExecutedForTests(t, db, xdb, tm)
-	}
-
 	putCorruptResults := func(t *testing.T, _ ethdb.Database, xdb saetypes.ExecutionResults, _ hook.Points, ethB *types.Block) {
 		t.Helper()
 		require.NoErrorf(t, xdb.Put(ethB.NumberU64(), []byte("not canoto")), "%T.Put()", xdb)
 	}
 
+	validGasTime := func(hdr *types.Header, hooks hook.Points) *gastime.Time {
+		target, cfg := hooks.GasConfigAfter(hdr)
+		return mustNewGasTime(t, hooks.BlockTime(hdr), target, gas.Price(hdr.BaseFee.Uint64()), cfg)
+	}
+
 	tests := []struct {
-		name     string
-		settled  hook.Settled
-		txs      []*types.Transaction
-		hookOpts []hookstest.HookOption
-		setupDBs func(t *testing.T, db ethdb.Database, xdb saetypes.ExecutionResults, hooks hook.Points, ethB *types.Block)
-		wantErr  testerr.Want
+		name             string
+		settled          hook.Settled
+		txs              []*types.Transaction
+		hookOpts         []hookstest.HookOption
+		checkSynchronous bool
+		setupDBs         func(t *testing.T, db ethdb.Database, xdb saetypes.ExecutionResults, hooks hook.Points, ethB *types.Block)
+		wantErr          testerr.Want
 	}{
 		{
 			name:    "asynchronous_missing_execution_results",
@@ -249,24 +234,42 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 				t.Helper()
 				require.NoErrorf(t, xdb.Close(), "%T.Close()", xdb)
 			},
-			wantErr: errAll(
+			wantErr: testerr.AllOf(
 				testerr.Is(ErrMissingExecutionResults),
 				testerr.Is(database.ErrClosed),
 			),
 		},
 		{
-			name:     "asynchronous_missing_receipts",
-			settled:  asynchronous,
-			txs:      []*types.Transaction{types.NewTx(&types.LegacyTx{Gas: params.TxGas})},
-			setupDBs: markExecuted,
-			wantErr: errAll(
+			name:    "empty_receipts_no_error",
+			settled: asynchronous,
+			txs:     []*types.Transaction{types.NewTx(&types.LegacyTx{Gas: params.TxGas})},
+			setupDBs: func(t *testing.T, db ethdb.Database, xdb saetypes.ExecutionResults, hooks hook.Points, ethB *types.Block) {
+				t.Helper()
+				tm := validGasTime(ethB.Header(), hooks)
+				newBlock(t, ethB, nil, nil).markExecutedForTests(t, db, xdb, tm)
+			},
+		},
+		{
+			name:    "missing_receiptis",
+			settled: asynchronous,
+			txs:     []*types.Transaction{types.NewTx(&types.LegacyTx{Gas: params.TxGas})},
+			setupDBs: func(t *testing.T, db ethdb.Database, xdb saetypes.ExecutionResults, hooks hook.Points, ethB *types.Block) {
+				t.Helper()
+				tm := validGasTime(ethB.Header(), hooks)
+				b := newBlock(t, ethB, nil, nil)
+				receipts := types.Receipts{&types.Receipt{Status: 8}}
+				require.NoErrorf(t, b.MarkExecuted(db, xdb, tm, time.Time{}, new(big.Int), receipts, common.Hash{}, new(atomic.Pointer[Block])), "%T.MarkExecuted()", b)
+				rawdb.DeleteReceipts(db, ethB.Hash(), ethB.NumberU64())
+			},
+			wantErr: testerr.AllOf(
 				errIsNot(ErrMissingExecutionResults),
 				testerr.Contains("deriving receipt fields"),
 			),
 		},
 		{
-			name:     "synchronous_ignores_execution_results",
-			setupDBs: putCorruptResults,
+			name:             "synchronous_ignores_execution_results",
+			setupDBs:         putCorruptResults,
+			checkSynchronous: true,
 		},
 		{
 			name:     "synchronous_gas_time_error",
@@ -300,7 +303,7 @@ func TestRestoreExecutionArtefacts(t *testing.T) {
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("%T.RestoreExecutionArtefacts() %s", b, diff)
 			}
-			if tt.wantErr != nil {
+			if !tt.checkSynchronous {
 				return
 			}
 

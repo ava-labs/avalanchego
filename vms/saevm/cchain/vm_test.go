@@ -57,6 +57,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
@@ -95,9 +96,11 @@ type SUT struct {
 	ethclient  *ethclient.Client
 	clientOnce func()
 
-	ctx       *snow.Context
-	db        database.Database
-	memory    *atomic.Memory
+	ctx            *snow.Context
+	db             database.Database
+	memory         *atomic.Memory
+	sharedMemoryDB database.Database
+
 	sender    *saetest.Sender
 	p2pclient *saetest.CapturingPeer
 	clock     *saetest.Clock
@@ -258,6 +261,28 @@ func withArchival() sutOption {
 	})
 }
 
+// withCommitInterval sets the interval at which trie roots are persisted.
+func withCommitInterval(n uint64) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.CommitInterval = n
+	})
+}
+
+// withFirewood selects Firewood as the trie database
+func withFirewood() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.StateScheme = customrawdb.FirewoodScheme
+	})
+}
+
+// withStateSyncDisabled clears [config.StateSyncEnabled], which defaults to
+// true.
+func withStateSyncDisabled() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.StateSyncEnabled = false
+	})
+}
+
 // withPriceTarget sets [config.PriceTarget] on the SUT.
 func withPriceTarget(p gas.Price) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -331,7 +356,9 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 
 	// The VM and shared memory MUST share an underlying database so that
 	// [atomic.SharedMemory.Apply] writes to the VM DB.
-	memory := atomic.NewMemory(prefixdb.New([]byte("sharedmemory"), db))
+	sharedMemoryDB := prefixdb.New([]byte("sharedmemory"), db)
+	memory := atomic.NewMemory(sharedMemoryDB)
+
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
 	snowCtx.ChainDataDir = cfg.chainDataDir
 	snowCtx.NodeID = cfg.nodeID
@@ -383,14 +410,15 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 	require.NoErrorf(tb, vm.Connected(ctx, snowCtx.NodeID, version.Current), "%T.Connected(%s)", vm, snowCtx.NodeID)
 
 	sut := &SUT{
-		VM:        vm,
-		db:        db,
-		ctx:       snowCtx,
-		memory:    memory,
-		sender:    appSender,
-		p2pclient: saetest.NewCapturingPeer(tb, validatorIDs),
-		clock:     cfg.clock,
-		logger:    log,
+		VM:             vm,
+		db:             db,
+		ctx:            snowCtx,
+		memory:         memory,
+		sharedMemoryDB: sharedMemoryDB,
+		sender:         appSender,
+		p2pclient:      saetest.NewCapturingPeer(tb, validatorIDs),
+		clock:          cfg.clock,
+		logger:         log,
 	}
 
 	// Called from [SUT.SetState].
@@ -657,6 +685,17 @@ func (s *SUT) buildVerifyAccept(ctx context.Context, tb testing.TB, opts ...bloc
 	return blk
 }
 
+// blockAtHeight returns the accepted block at the given height.
+func (s *SUT) blockAtHeight(ctx context.Context, tb testing.TB, height uint64) *blocks.Block {
+	tb.Helper()
+
+	id, err := s.GetBlockIDAtHeight(ctx, height)
+	require.NoErrorf(tb, err, "%T.GetBlockIDAtHeight(%d)", s.VM, height)
+	blk, err := s.GetBlock(ctx, id)
+	require.NoErrorf(tb, err, "%T.GetBlock(%s)", s.VM, id)
+	return blk
+}
+
 // lastAccepted returns the ID of the last-accepted block.
 func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 	tb.Helper()
@@ -664,6 +703,15 @@ func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 	id, err := s.LastAccepted(ctx)
 	require.NoErrorf(tb, err, "%T.LastAccepted()", s.VM)
 	return id
+}
+
+// lastAcceptedHeight returns the height of the last-accepted block.
+func (s *SUT) lastAcceptedHeight(ctx context.Context, tb testing.TB) uint64 {
+	tb.Helper()
+
+	blk, err := s.GetBlock(ctx, s.lastAccepted(ctx, tb))
+	require.NoErrorf(tb, err, "%T.GetBlock(last accepted)", s.VM)
+	return blk.Height()
 }
 
 // unblockWaitForEvent advances the [withVMTime] clock to ensure that
@@ -720,6 +768,19 @@ func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.I
 	require.NoErrorf(tb, err, "%T.BuildBlock()", s.VM)
 	require.NoErrorf(tb, s.VerifyBlock(ctx, blockContext, blk), "%T.VerifyBlock()", s.VM)
 	return blk
+}
+
+// parseVerifyAccept drives a block produced by another node through
+// this SUT's consensus surface, as the engine would during bootstrapping or
+// normal operation.
+func (s *SUT) parseVerifyAccept(ctx context.Context, tb testing.TB, blk *blocks.Block) *blocks.Block {
+	tb.Helper()
+
+	parsed, err := s.ParseBlock(ctx, blk.Bytes())
+	require.NoErrorf(tb, err, "%T.ParseBlock(height %d)", s.VM, blk.Height())
+	require.NoErrorf(tb, s.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", s.VM, blk.Height())
+	require.NoErrorf(tb, s.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", s.VM, blk.Height())
+	return parsed
 }
 
 // verifyTampered re-seals valid with a mutated header and returns the
@@ -841,7 +902,7 @@ func (w *wallet) newImportTx(
 	sourceChain ids.ID,
 	to common.Address,
 	fee uint64,
-) (*tx.Tx, *tx.Import) {
+) *tx.Tx {
 	tb.Helper()
 
 	var (
@@ -883,7 +944,7 @@ func (w *wallet) newImportTx(
 			AssetID: avaxAssetID,
 		}},
 	}
-	return w.sign(tb, imp, len(inputs)), imp
+	return w.sign(tb, imp, len(inputs))
 }
 
 // sign wraps u in a [tx.Tx] with numCreds copies of a single-sig credential
@@ -908,11 +969,13 @@ func addNAVAX(tb testing.TB, balance uint256.Int, nAVAXDelta int64) uint256.Int 
 
 	var (
 		op       = balance.AddOverflow
-		absDelta = uint64(nAVAXDelta)
+		absDelta uint64
 	)
 	if nAVAXDelta < 0 {
 		op = balance.SubOverflow
-		absDelta = -absDelta
+		absDelta = uint64(-nAVAXDelta)
+	} else {
+		absDelta = uint64(nAVAXDelta)
 	}
 
 	delta := tx.ScaleAVAX(absDelta)
@@ -970,7 +1033,7 @@ func TestImport(t *testing.T) {
 		receiver = txtest.NewKey(t).EthAddress()
 	)
 	const txFee = 50
-	signedImport, _ := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
+	signedImport := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
 
 	blk := sut.issueAndExecute(ctx, t, signedImport)
 	sut.assertTxAccepted(ctx, t, signedImport, blk.NumberU64())
@@ -980,6 +1043,57 @@ func TestImport(t *testing.T) {
 	)
 	sut.assertAccount(t, receiver, nonce, tx.ScaleAVAX(amountMinted))
 	sut.assertUTXOsMissing(t, sut.ctx.ChainID, sourceChain, utxo)
+}
+
+func TestStatefulRPCsReconstructExtraState(t *testing.T) {
+	const (
+		commitInterval uint64 = 4
+		numBlocks             = 2*commitInterval + 3
+	)
+
+	tests := []struct {
+		name string
+		opts []sutOption
+	}{
+		{
+			name: "hashdb_pruning",
+			opts: []sutOption{withCommitInterval(commitInterval)},
+		},
+		{
+			name: "firewood_commit_interval",
+			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(commitInterval)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := txtest.NewKey(t)
+			sender := key.EthAddress()
+			timeOpt, clock := withVMTime(testStartTime)
+			opts := []sutOption{withMaxAllocFor(sender), timeOpt, withDB(memdb.New()), withChainDataDir(t.TempDir())}
+			opts = append(opts, tt.opts...)
+
+			ctx, node := newSUT(t, opts...)
+			w := newWallet(key, node.ctx, node.Client)
+			for range numBlocks {
+				blk := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+				clock.AdvanceToSettle(ctx, t, blk)
+			}
+
+			// Restarting the VM clears all caches so that every uncommitted
+			// state root MUST be reconstructed by re-execution.
+			require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+			t.Run("restart", func(t *testing.T) {
+				ctx, sut := newSUT(t, opts...)
+
+				for h := range numBlocks + 1 {
+					got, err := sut.ethclient.NonceAt(ctx, sender, new(big.Int).SetUint64(h))
+					require.NoErrorf(t, err, "%T.NonceAt(%d)", sut.ethclient, h)
+					assert.Equalf(t, h, got, "%T.NonceAt(%d): one export per block", sut.ethclient, h)
+				}
+			})
+		})
+	}
 }
 
 // TestBuildBlockOnProcessing verifies that the block builder excludes a mempool
@@ -1018,6 +1132,17 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 		for _, tx := range blockTxs(t, block) {
 			sut.assertTxAccepted(ctx, t, tx, block.NumberU64())
 		}
+	}
+}
+
+func assertBlockIncludes(tb testing.TB, blk *blocks.Block, ethTxs types.Transactions, stxs []*tx.Tx) {
+	tb.Helper()
+
+	if diff := cmp.Diff(ethTxs, blk.Transactions(), cmputils.TransactionsByHash()); diff != "" {
+		tb.Errorf("%T eth txs (-want +got):\n%s", blk, diff)
+	}
+	if diff := cmp.Diff(stxs, blockTxs(tb, blk), txtest.CmpOpt()); diff != "" {
+		tb.Errorf("%T cross-chain txs (-want +got):\n%s", blk, diff)
 	}
 }
 
@@ -1065,12 +1190,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	require.NoErrorf(t, sut.IssueTx(ctx, signedExport), "%T.IssueTx()", sut.Client)
 
 	blk := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
-	if diff := cmp.Diff(types.Transactions{tracedTx}, blk.Transactions(), cmputils.TransactionsByHash()); diff != "" {
-		t.Errorf("%T eth txs (-want +got):\n%s", blk, diff)
-	}
-	if diff := cmp.Diff([]*tx.Tx{signedExport}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
-		t.Errorf("%T cross-chain txs (-want +got):\n%s", blk, diff)
-	}
+	assertBlockIncludes(t, blk, types.Transactions{tracedTx}, []*tx.Tx{signedExport})
 
 	rpc := sut.GethRPCBackends()
 	// To rebuild the state at a particular tx, the [saexec.Execute] method is

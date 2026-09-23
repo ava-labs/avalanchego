@@ -34,13 +34,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	blockexecutor "github.com/ava-labs/avalanchego/vms/platformvm/block/executor"
@@ -253,8 +252,8 @@ func addSubnetValidator(t testing.TB, vm *VM, data *validatorInputData, subnetID
 		subnetIDs: []ids.ID{subnetID},
 	})
 	tx, err := wallet.IssueAddSubnetValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: data.nodeID,
 				Start:  uint64(data.startTime.Unix()),
 				End:    uint64(data.endTime.Unix()),
@@ -286,8 +285,8 @@ func addPrimaryValidatorWithBLSKey(t testing.TB, vm *VM, data *validatorInputDat
 	}
 
 	tx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: data.nodeID,
 				Start:  uint64(data.startTime.Unix()),
 				End:    uint64(data.endTime.Unix()),
@@ -308,7 +307,7 @@ func addPrimaryValidatorWithBLSKey(t testing.TB, vm *VM, data *validatorInputDat
 	return staker
 }
 
-func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
+func internalAddValidator(vm *VM, signedTx *platform.Tx) (*state.Staker, error) {
 	vm.ctx.Lock.Unlock()
 	err := vm.issueTxFromRPC(signedTx)
 	vm.ctx.Lock.Lock()
@@ -331,7 +330,7 @@ func internalAddValidator(vm *VM, signedTx *txs.Tx) (*state.Staker, error) {
 		return nil, fmt.Errorf("failed setting preference: %w", err)
 	}
 
-	stakerTx := signedTx.Unsigned.(txs.Staker)
+	stakerTx := signedTx.Unsigned.(platform.Staker)
 	return vm.state.GetCurrentValidator(stakerTx.SubnetID(), stakerTx.NodeID())
 }
 
@@ -377,7 +376,7 @@ func terminatePrimaryValidator(vm *VM, validator *state.Staker) error {
 	}
 
 	commit := options[0].(*blockexecutor.Block)
-	_, ok := commit.Block.(*block.BanffCommitBlock)
+	_, ok := commit.Block.(*platform.BanffCommitBlock)
 	if !ok {
 		return fmt.Errorf("failed retrieving commit option: %w", err)
 	}

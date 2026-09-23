@@ -10,40 +10,39 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 )
 
 func TestVerifyWarpMessages(t *testing.T) {
 	var (
-		validTx = &txs.Tx{
-			Unsigned: &txs.BaseTx{},
+		validTx = &platform.Tx{
+			Unsigned: &platform.BaseTx{},
 		}
-		invalidTx = &txs.Tx{
-			Unsigned: &txs.RegisterL1ValidatorTx{},
+		invalidTx = &platform.Tx{
+			Unsigned: &platform.RegisterL1ValidatorTx{},
 		}
 	)
 
 	tests := []struct {
 		name        string
-		block       block.Block
+		block       platform.Block
 		expectedErr error
 	}{
 		{
 			name:  "BanffAbortBlock",
-			block: &block.BanffAbortBlock{},
+			block: &platform.BanffAbortBlock{},
 		},
 		{
 			name:  "BanffCommitBlock",
-			block: &block.BanffCommitBlock{},
+			block: &platform.BanffCommitBlock{},
 		},
 		{
 			name: "BanffProposalBlock with invalid standard tx",
-			block: &block.BanffProposalBlock{
-				Transactions: []*txs.Tx{
+			block: &platform.BanffProposalBlock{
+				Transactions: []*platform.Tx{
 					invalidTx,
 				},
-				ApricotProposalBlock: block.ApricotProposalBlock{
+				ApricotProposalBlock: platform.ApricotProposalBlock{
 					Tx: validTx,
 				},
 			},
@@ -51,8 +50,8 @@ func TestVerifyWarpMessages(t *testing.T) {
 		},
 		{
 			name: "BanffProposalBlock with invalid proposal tx",
-			block: &block.BanffProposalBlock{
-				ApricotProposalBlock: block.ApricotProposalBlock{
+			block: &platform.BanffProposalBlock{
+				ApricotProposalBlock: platform.ApricotProposalBlock{
 					Tx: invalidTx,
 				},
 			},
@@ -60,17 +59,17 @@ func TestVerifyWarpMessages(t *testing.T) {
 		},
 		{
 			name: "BanffProposalBlock with valid proposal tx",
-			block: &block.BanffProposalBlock{
-				ApricotProposalBlock: block.ApricotProposalBlock{
+			block: &platform.BanffProposalBlock{
+				ApricotProposalBlock: platform.ApricotProposalBlock{
 					Tx: validTx,
 				},
 			},
 		},
 		{
 			name: "BanffStandardBlock with invalid tx",
-			block: &block.BanffStandardBlock{
-				ApricotStandardBlock: block.ApricotStandardBlock{
-					Transactions: []*txs.Tx{
+			block: &platform.BanffStandardBlock{
+				ApricotStandardBlock: platform.ApricotStandardBlock{
+					Transactions: []*platform.Tx{
 						invalidTx,
 					},
 				},
@@ -79,9 +78,9 @@ func TestVerifyWarpMessages(t *testing.T) {
 		},
 		{
 			name: "BanffStandardBlock with valid tx",
-			block: &block.BanffStandardBlock{
-				ApricotStandardBlock: block.ApricotStandardBlock{
-					Transactions: []*txs.Tx{
+			block: &platform.BanffStandardBlock{
+				ApricotStandardBlock: platform.ApricotStandardBlock{
+					Transactions: []*platform.Tx{
 						validTx,
 					},
 				},
@@ -89,29 +88,29 @@ func TestVerifyWarpMessages(t *testing.T) {
 		},
 		{
 			name:  "ApricotAbortBlock",
-			block: &block.ApricotAbortBlock{},
+			block: &platform.ApricotAbortBlock{},
 		},
 		{
 			name:  "ApricotCommitBlock",
-			block: &block.ApricotCommitBlock{},
+			block: &platform.ApricotCommitBlock{},
 		},
 		{
 			name: "ApricotProposalBlock with invalid proposal tx",
-			block: &block.ApricotProposalBlock{
+			block: &platform.ApricotProposalBlock{
 				Tx: invalidTx,
 			},
 			expectedErr: codec.ErrCantUnpackVersion,
 		},
 		{
 			name: "ApricotProposalBlock with valid proposal tx",
-			block: &block.ApricotProposalBlock{
+			block: &platform.ApricotProposalBlock{
 				Tx: validTx,
 			},
 		},
 		{
 			name: "ApricotStandardBlock with invalid tx",
-			block: &block.ApricotStandardBlock{
-				Transactions: []*txs.Tx{
+			block: &platform.ApricotStandardBlock{
+				Transactions: []*platform.Tx{
 					invalidTx,
 				},
 			},
@@ -119,22 +118,22 @@ func TestVerifyWarpMessages(t *testing.T) {
 		},
 		{
 			name: "ApricotStandardBlock with valid tx",
-			block: &block.ApricotStandardBlock{
-				Transactions: []*txs.Tx{
+			block: &platform.ApricotStandardBlock{
+				Transactions: []*platform.Tx{
 					validTx,
 				},
 			},
 		},
 		{
 			name: "ApricotAtomicBlock with invalid proposal tx",
-			block: &block.ApricotAtomicBlock{
+			block: &platform.ApricotAtomicBlock{
 				Tx: invalidTx,
 			},
 			expectedErr: codec.ErrCantUnpackVersion,
 		},
 		{
 			name: "ApricotAtomicBlock with valid proposal tx",
-			block: &block.ApricotAtomicBlock{
+			block: &platform.ApricotAtomicBlock{
 				Tx: validTx,
 			},
 		},

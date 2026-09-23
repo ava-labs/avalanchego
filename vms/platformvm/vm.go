@@ -31,12 +31,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/network"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
@@ -327,9 +326,9 @@ func (vm *VM) createSubnet(subnetID ids.ID) error {
 		return err
 	}
 	for _, chain := range chains {
-		tx, ok := chain.Unsigned.(*txs.CreateChainTx)
+		tx, ok := chain.Unsigned.(*platform.CreateChainTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chain.Unsigned)
+			return fmt.Errorf("expected tx type *platform.CreateChainTx but got %T", chain.Unsigned)
 		}
 		vm.Internal.CreateChain(chain.ID(), tx)
 	}
@@ -410,7 +409,7 @@ func (vm *VM) Shutdown(context.Context) error {
 func (vm *VM) ParseBlock(_ context.Context, b []byte) (snowman.Block, error) {
 	// Note: blocks to be parsed are not verified, so we must used blocks.Codec
 	// rather than blocks.GenesisCodec
-	statelessBlk, err := block.Parse(block.Codec, b)
+	statelessBlk, err := platform.ParseBlock(platform.Codec, b)
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +497,7 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 	return vm.state.GetBlockIDAtHeight(height)
 }
 
-func (vm *VM) issueTxFromRPC(tx *txs.Tx) error {
+func (vm *VM) issueTxFromRPC(tx *platform.Tx) error {
 	err := vm.Network.IssueTxFromRPC(tx)
 	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
 		vm.ctx.Log.Debug("failed to add tx to mempool",

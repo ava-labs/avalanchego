@@ -30,12 +30,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -330,7 +330,7 @@ func (s *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, response *ap
 	} else {
 		utxos, endAddr, endUTXOID, err = avax.GetAtomicUTXOs(
 			s.vm.ctx.SharedMemory,
-			txs.Codec,
+			platform.Codec,
 			sourceChain,
 			addrSet,
 			startAddr,
@@ -344,7 +344,7 @@ func (s *Service) GetUTXOs(_ *http.Request, args *api.GetUTXOsArgs, response *ap
 
 	response.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		bytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
+		bytes, err := platform.Codec.Marshal(platform.CodecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize UTXO %q: %w", utxo.InputID(), err)
 		}
@@ -631,7 +631,7 @@ func (s *Service) GetStakingAssetID(_ *http.Request, args *GetStakingAssetIDArgs
 			err,
 		)
 	}
-	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
+	transformSubnet, ok := transformSubnetIntf.Unsigned.(*platform.TransformSubnetTx)
 	if !ok {
 		return fmt.Errorf(
 			"unexpected subnet transformation tx type fetched %T",
@@ -675,7 +675,7 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 	}
 
 	switch stakerTx := tx.Unsigned.(type) {
-	case txs.ValidatorTx:
+	case platform.ValidatorTx:
 		attr = &stakerAttributes{
 			shares:                 stakerTx.Shares(),
 			validationRewardsOwner: stakerTx.ValidationRewardsOwner(),
@@ -683,9 +683,9 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 		}
 
 		switch stakerTx := stakerTx.(type) {
-		case *txs.AddPermissionlessValidatorTx:
+		case *platform.AddPermissionlessValidatorTx:
 			attr.proofOfPossession, _ = stakerTx.Signer.(*signer.ProofOfPossession)
-		case *txs.AddAutoRenewedValidatorTx:
+		case *platform.AddAutoRenewedValidatorTx:
 			pop, ok := stakerTx.Signer.(*signer.ProofOfPossession)
 			if !ok {
 				return nil, fmt.Errorf("expected *signer.ProofOfPossession but got %T", stakerTx.Signer)
@@ -693,12 +693,12 @@ func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error)
 
 			attr.proofOfPossession = pop
 			attr.autoRenewedValidatorAuthority = stakerTx.ValidatorAuthority
-		case *txs.AddValidatorTx:
+		case *platform.AddValidatorTx:
 		default:
 			return nil, fmt.Errorf("unknown tx type %T", stakerTx)
 		}
 
-	case txs.DelegatorTx:
+	case platform.DelegatorTx:
 		attr = &stakerAttributes{
 			rewardsOwner: stakerTx.RewardsOwner(),
 		}
@@ -854,7 +854,7 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 		jsonDelegateeReward := avajson.Uint64(stakingInfo.DelegateeReward)
 
 		switch currentStaker.Priority {
-		case txs.PrimaryNetworkValidatorCurrentPriority, txs.SubnetPermissionlessValidatorCurrentPriority:
+		case platform.PrimaryNetworkValidatorCurrentPriority, platform.SubnetPermissionlessValidatorCurrentPriority:
 			attr, err := s.loadStakerTxAttributes(currentStaker.TxID)
 			if err != nil {
 				return nil, err
@@ -931,7 +931,7 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 
 			validators = append(validators, vdr)
 
-		case txs.PrimaryNetworkDelegatorCurrentPriority, txs.SubnetPermissionlessDelegatorCurrentPriority:
+		case platform.PrimaryNetworkDelegatorCurrentPriority, platform.SubnetPermissionlessDelegatorCurrentPriority:
 			var rewardOwner *platformapi.Owner
 			// If we are handling multiple nodeIDs, we don't return the
 			// delegator information.
@@ -956,7 +956,7 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 			}
 			vdrToDelegators[delegator.NodeID] = append(vdrToDelegators[delegator.NodeID], delegator)
 
-		case txs.SubnetPermissionedValidatorCurrentPriority:
+		case platform.SubnetPermissionedValidatorCurrentPriority:
 			validators = append(validators, apiStaker)
 
 		default:
@@ -1040,7 +1040,7 @@ func (s *Service) GetL1Validator(r *http.Request, args *GetL1ValidatorArgs, repl
 
 func (s *Service) convertL1ValidatorToAPI(vdr state.L1Validator) (platformapi.APIL1Validator, error) {
 	var remainingBalanceOwner message.PChainOwner
-	if _, err := txs.Codec.Unmarshal(vdr.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
+	if _, err := platform.Codec.Unmarshal(vdr.RemainingBalanceOwner, &remainingBalanceOwner); err != nil {
 		return platformapi.APIL1Validator{}, fmt.Errorf("failed unmarshalling remaining balance owner: %w", err)
 	}
 	remainingBalanceAPIOwner, err := s.getAPIOwner(&secp256k1fx.OutputOwners{
@@ -1052,7 +1052,7 @@ func (s *Service) convertL1ValidatorToAPI(vdr state.L1Validator) (platformapi.AP
 	}
 
 	var deactivationOwner message.PChainOwner
-	if _, err := txs.Codec.Unmarshal(vdr.DeactivationOwner, &deactivationOwner); err != nil {
+	if _, err := platform.Codec.Unmarshal(vdr.DeactivationOwner, &deactivationOwner); err != nil {
 		return platformapi.APIL1Validator{}, fmt.Errorf("failed unmarshalling deactivation owner: %w", err)
 	}
 	deactivationAPIOwner, err := s.getAPIOwner(&secp256k1fx.OutputOwners{
@@ -1240,7 +1240,7 @@ func (s *Service) nodeValidates(blockchainID ids.ID) bool {
 		return false
 	}
 
-	chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
+	chain, ok := chainTx.Unsigned.(*platform.CreateChainTx)
 	if !ok {
 		return false
 	}
@@ -1269,7 +1269,7 @@ func (s *Service) chainExists(ctx context.Context, blockID ids.ID, chainID ids.I
 	if err != nil {
 		return false, err
 	}
-	_, ok = tx.Unsigned.(*txs.CreateChainTx)
+	_, ok = tx.Unsigned.(*platform.CreateChainTx)
 	return ok, nil
 }
 
@@ -1330,7 +1330,7 @@ func (s *Service) Validates(_ *http.Request, args *ValidatesArgs, response *Vali
 				err,
 			)
 		}
-		_, ok := subnetTx.Unsigned.(*txs.CreateSubnetTx)
+		_, ok := subnetTx.Unsigned.(*platform.CreateSubnetTx)
 		if !ok {
 			return fmt.Errorf("%q is not a subnet", args.SubnetID)
 		}
@@ -1398,9 +1398,9 @@ func (s *Service) GetBlockchains(_ *http.Request, _ *struct{}, response *GetBloc
 
 		for _, chainTx := range chains {
 			chainID := chainTx.ID()
-			chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
+			chain, ok := chainTx.Unsigned.(*platform.CreateChainTx)
 			if !ok {
-				return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chainTx.Unsigned)
+				return fmt.Errorf("expected tx type *platform.CreateChainTx but got %T", chainTx.Unsigned)
 			}
 			response.Blockchains = append(response.Blockchains, APIBlockchain{
 				ID:       chainID,
@@ -1417,9 +1417,9 @@ func (s *Service) GetBlockchains(_ *http.Request, _ *struct{}, response *GetBloc
 	}
 	for _, chainTx := range chains {
 		chainID := chainTx.ID()
-		chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
+		chain, ok := chainTx.Unsigned.(*platform.CreateChainTx)
 		if !ok {
-			return fmt.Errorf("expected tx type *txs.CreateChainTx but got %T", chainTx.Unsigned)
+			return fmt.Errorf("expected tx type *platform.CreateChainTx but got %T", chainTx.Unsigned)
 		}
 		response.Blockchains = append(response.Blockchains, APIBlockchain{
 			ID:       chainID,
@@ -1442,7 +1442,7 @@ func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, response *api.
 	if err != nil {
 		return fmt.Errorf("problem decoding transaction: %w", err)
 	}
-	tx, err := txs.Parse(txs.Codec, txBytes)
+	tx, err := platform.ParseTx(platform.Codec, txBytes)
 	if err != nil {
 		return fmt.Errorf("couldn't parse tx: %w", err)
 	}
@@ -1647,7 +1647,7 @@ func (s *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetSta
 	response.Staked = response.Stakeds[s.vm.ctx.AVAXAssetID]
 	response.Outputs = make([]string, len(stakedOuts))
 	for i, output := range stakedOuts {
-		bytes, err := txs.Codec.Marshal(txs.CodecVersion, output)
+		bytes, err := platform.Codec.Marshal(platform.CodecVersion, output)
 		if err != nil {
 			return fmt.Errorf("couldn't serialize output %s: %w", output.ID, err)
 		}
@@ -1698,7 +1698,7 @@ func (s *Service) GetMinStake(_ *http.Request, args *GetMinStakeArgs, reply *Get
 			err,
 		)
 	}
-	transformSubnet, ok := transformSubnetIntf.Unsigned.(*txs.TransformSubnetTx)
+	transformSubnet, ok := transformSubnetIntf.Unsigned.(*platform.TransformSubnetTx)
 	if !ok {
 		return fmt.Errorf(
 			"unexpected subnet transformation tx type fetched %T",
@@ -1773,7 +1773,7 @@ func (s *Service) GetRewardUTXOs(_ *http.Request, args *api.GetTxArgs, reply *Ge
 	reply.NumFetched = avajson.Uint64(len(utxos))
 	reply.UTXOs = make([]string, len(utxos))
 	for i, utxo := range utxos {
-		utxoBytes, err := txs.GenesisCodec.Marshal(txs.CodecVersion, utxo)
+		utxoBytes, err := platform.GenesisCodec.Marshal(platform.CodecVersion, utxo)
 		if err != nil {
 			return fmt.Errorf("couldn't encode UTXO to bytes: %w", err)
 		}
@@ -2124,8 +2124,8 @@ func (s *Service) getAPIOwner(owner *secp256k1fx.OutputOwners) (*platformapi.Own
 // Returns:
 // 1) The total amount staked by addresses in [addrs]
 // 2) The staked outputs
-func getStakeHelper(tx *txs.Tx, addrs set.Set[ids.ShortID], totalAmountStaked map[ids.ID]uint64) []avax.TransferableOutput {
-	staker, ok := tx.Unsigned.(txs.PermissionlessStaker)
+func getStakeHelper(tx *platform.Tx, addrs set.Set[ids.ShortID], totalAmountStaked map[ids.ID]uint64) []avax.TransferableOutput {
+	staker, ok := tx.Unsigned.(platform.PermissionlessStaker)
 	if !ok {
 		return nil
 	}

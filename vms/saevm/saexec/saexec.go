@@ -9,7 +9,6 @@ package saexec
 
 import (
 	"fmt"
-	"io"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
@@ -35,11 +34,12 @@ var _ saedb.StateDBOpener = (*Executor)(nil)
 // An Executor accepts and executes a [blocks.Block] FIFO queue.
 type Executor struct {
 	*saedb.Tracker
-	quit, done chan struct{}
-	log        logging.Logger
-	hooks      hook.Points
+	done  chan struct{}
+	log   logging.Logger
+	hooks hook.Points
 
 	queue        chan queuedBlock
+	queueErr     atomic.Pointer[Unhealthy]
 	lastExecuted atomic.Pointer[blocks.Block]
 
 	headEvents  event.FeedOf[core.ChainHeadEvent]
@@ -54,8 +54,7 @@ type Executor struct {
 	metrics      *metrics
 }
 
-// New constructs and starts a new [Executor]. Call [Executor.Close] to release
-// resources created by this constructor.
+// New constructs and starts a new [Executor]. Call [Executor.Close] to stop it.
 //
 // The last-executed block MAY be the genesis block for an always-SAE chain, the
 // last pre-SAE synchronous block during transition, or the last asynchronously
@@ -78,13 +77,13 @@ func New(
 
 	e := &Executor{
 		Tracker: tracker,
-		quit:    make(chan struct{}), // closed by [Executor.Close]
-		done:    make(chan struct{}), // closed by [Executor.processQueue] after `quit` is closed
+		done:    make(chan struct{}), // closed by [Executor.processQueue] once `queue` is closed and drained
 		log:     logger,
 		hooks:   hooks,
 		// On startup we enqueue every block since the last time the trie DB was
 		// committed, so the queue needs sufficient capacity to avoid
 		// [Executor.Enqueue] warning about it being too full.
+		// queue is closed by [Executor.Close].
 		queue: make(chan queuedBlock, 2*tracker.CommitInterval()),
 		chainContext: &chainContext{
 			headerSrc,
@@ -99,19 +98,49 @@ func New(
 	}
 	e.lastExecuted.Store(lastExecuted)
 
-	go e.processQueue()
+	go e.processQueue() //nolint:errcheck // Stored in [Executor.queueErr] for access via [Executor.HealthCheck]
 	return e, nil
 }
 
-var _ io.Closer = (*Executor)(nil)
+// Unhealthy is the [error] type returned by [Executor.HealthCheck].
+type Unhealthy struct {
+	err   error
+	cause *blocks.Block
+}
 
-// Close shuts down the [Executor], waits for the currently executing block
-// to complete, and then releases all resources.
+// Error implements [error].
+func (e *Unhealthy) Error() string {
+	return fmt.Sprintf("saexec.Executor unhealthy due to block %d (%#x): %s", e.cause.NumberU64(), e.cause.Hash(), e.err.Error())
+}
+
+// Unwrap returns the error that caused the [Executor] to enter an unhealthy
+// state.
+func (e *Unhealthy) Unwrap() error {
+	return e.err
+}
+
+// Block returns the block that caused the [Executor] to enter an unhealthy
+// state.
+func (e *Unhealthy) Block() *blocks.Block {
+	return e.cause
+}
+
+// HealthCheck returns any error resulting from queue processing. It MAY return
+// nil even if the [Executor] has been closed, as long as the shutdown was
+// graceful. If non-nil, the error will be of type [Unhealthy].
+func (e *Executor) HealthCheck() error {
+	if err := e.queueErr.Load(); err != nil { // Avoids returning typed nil
+		return err
+	}
+	return nil
+}
+
+// Close shuts down the [Executor] and waits for all queued blocks to finish
+// executing. It returns [Executor.HealthCheck].
 func (e *Executor) Close() error {
-	close(e.quit)
+	close(e.queue)
 	<-e.done
-
-	return e.Tracker.Close(e.LastExecuted().PostExecutionStateRoot())
+	return e.HealthCheck()
 }
 
 // ChainConfig returns the config originally passed to [New].

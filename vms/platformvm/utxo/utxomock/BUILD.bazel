@@ -9,7 +9,7 @@ go_library(
         "//ids",
         "//vms/components/avax",
         "//vms/components/verify",
-        "//vms/platformvm/txs",
+        "//vms/platformvm/platform",
         "@org_uber_go_mock//gomock",
     ],
 )

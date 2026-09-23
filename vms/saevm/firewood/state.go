@@ -50,7 +50,7 @@ type stateAccessor struct {
 
 // OpenTrie opens the main account trie.
 func (s *stateAccessor) OpenTrie(root common.Hash) (state.Trie, error) {
-	return newAccountTrie(root, s.triedb, nil /*ops*/)
+	return newAccountTrie(root, s.triedb)
 }
 
 // OpenStorageTrie opens a wrapped version of the account trie.

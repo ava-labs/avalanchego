@@ -20,6 +20,7 @@ type Factory struct {
 	PreFactory     vms.Factory
 	PostFactory    vms.Factory
 	TransitionTime time.Time
+	Now            func() time.Time
 	// APIDrainTimeout bounds how long the transition waits for in-flight API
 	// requests to the pre-transition chain to return before shutting it down.
 	APIDrainTimeout time.Duration
@@ -50,6 +51,7 @@ func (f *Factory) New(log logging.Logger) (interface{}, error) {
 		preTransitionChain:  pre,
 		postTransitionChain: post,
 		transitionTime:      f.TransitionTime,
+		now:                 f.Now,
 		apiDrainTimeout:     f.APIDrainTimeout,
 
 		// [VM.Version] and [VM.Shutdown] may be called before [VM.Initialize],

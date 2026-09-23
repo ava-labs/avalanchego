@@ -51,6 +51,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/evm/prefetch"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/lru"
@@ -1402,7 +1403,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	blockStateInitTimer.Inc(time.Since(substart).Milliseconds())
 
 	// Enable prefetching to pull in trie node paths while processing transactions
-	statedb.StartPrefetcher("chain", extstate.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
+	statedb.StartPrefetcher("chain", prefetch.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
 	defer statedb.StopPrefetcher()
 
 	// Process block using the parent state as reference point
@@ -1765,7 +1766,7 @@ func (bc *BlockChain) reprocessBlock(parent *types.Block, current *types.Block) 
 	}
 
 	// Enable prefetching to pull in trie node paths while processing transactions
-	statedb.StartPrefetcher("chain", extstate.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
+	statedb.StartPrefetcher("chain", prefetch.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
 	defer statedb.StopPrefetcher()
 
 	// Process previously stored block

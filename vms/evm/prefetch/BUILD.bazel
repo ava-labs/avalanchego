@@ -1,0 +1,26 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "prefetch",
+    srcs = ["prefetch.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/prefetch",
+    visibility = ["//visibility:public"],
+    deps = ["@com_github_ava_labs_libevm//core/state"],
+)
+
+go_test(
+    name = "prefetch_test",
+    srcs = ["prefetch_test.go"],
+    embed = [":prefetch"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/state/snapshot",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//require",
+    ],
+)

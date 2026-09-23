@@ -69,7 +69,7 @@ These changes prepare the merge commit that will be tagged.
    RPCChainVMProtocol uint = 45
    ```
 
-   And update [`version/compatibility.json`](version/compatibility.json) to add the new version.
+   And update [`version/compatibility.json`](version/compatibility.json) and [`proto/README.md`](proto/README.md) for the new version.
 
 **Note:** Coreth and Subnet-EVM versions are automatically derived from `version/constants.go` and do not require manual updates.
 

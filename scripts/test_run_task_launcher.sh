@@ -9,9 +9,10 @@ set -euo pipefail
 #
 # Covered cases:
 # - a real `task` on PATH wins
-# - otherwise we fall back to `go`
-# - Bazel is used only when RUN_TASK_PREFER_BAZEL=1
+# - otherwise local runs fall back to `go`
+# - CI fails instead of building Task with `go tool`
 # - non-PATH backends preserve the caller's working directory
+# - the go backend does not leak GOWORK=off into task
 # - missing tools fail clearly
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -28,7 +29,7 @@ mkdir -p "${stub_dir}" "${util_dir}"
 # Give the launcher only the small set of commands it needs so the test stays
 # hermetic and PATH resolution is easy to reason about.
 ln -s "${bash_bin}" "${util_dir}/bash"
-for tool in dirname grep head env cat which pwd sed; do
+for tool in awk dirname grep head env cat which pwd sed; do
   ln -s "$(command -v "${tool}")" "${util_dir}/${tool}"
 done
 
@@ -50,6 +51,10 @@ assert_called() {
   local expected_name="$1"
   local expected_args="$2"
   local actual_name actual_args
+  if [[ ! -f "${workdir}/called" || ! -f "${workdir}/args" ]]; then
+    echo "expected ${expected_name} to run, but no backend recorded a call" >&2
+    exit 1
+  fi
   actual_name="$(<"${workdir}/called")"
   actual_args="$(<"${workdir}/args")"
   if [[ "${actual_name}" != "${expected_name}" ]]; then
@@ -74,11 +79,29 @@ assert_pwd() {
   fi
 }
 
+assert_file() {
+  local path="$1"
+  local expected="$2"
+  local actual
+  if [[ ! -f "${path}" ]]; then
+    echo "expected ${path##*/} to exist with: ${expected}" >&2
+    exit 1
+  fi
+  actual="$(<"${path}")"
+  if [[ "${actual}" != "${expected}" ]]; then
+    echo "expected ${path##*/}: ${expected}" >&2
+    echo "actual ${path##*/}:   ${actual}" >&2
+    exit 1
+  fi
+}
+
 reset_observations() {
   rm -f \
     "${workdir}/called" \
     "${workdir}/args" \
-    "${workdir}/pwd"
+    "${workdir}/pwd" \
+    "${workdir}/gowork" \
+    "${workdir}/go-args"
 }
 
 run_case() {
@@ -86,7 +109,7 @@ run_case() {
   shift
 
   reset_observations
-  PATH="${path_entries}:${util_dir}" "${bash_bin}" "${launcher}" "$@"
+  CI='' PATH="${path_entries}:${util_dir}" "${bash_bin}" "${launcher}" "$@"
 }
 
 run_case_in_dir() {
@@ -97,44 +120,40 @@ run_case_in_dir() {
   reset_observations
   (
     cd "${run_dir}"
-    PATH="${path_entries}:${util_dir}" "${bash_bin}" "${launcher}" "$@"
+    CI='' PATH="${path_entries}:${util_dir}" "${bash_bin}" "${launcher}" "$@"
   )
 }
 
 # Backend stubs used by the scenarios below.
 make_stub task
 
-cat >"${stub_dir}/fake-task" <<EOF
-#!${bash_bin}
-set -euo pipefail
-printf '%s\n' 'fake-task' >"${workdir}/called"
-printf '%s\n' "\$*" >"${workdir}/args"
-printf '%s\n' "\$(pwd)" >"${workdir}/pwd"
-EOF
-chmod +x "${stub_dir}/fake-task"
-
 cat >"${stub_dir}/go" <<EOF
 #!${bash_bin}
 set -euo pipefail
 printf '%s\n' 'go' >"${workdir}/called"
-printf '%s\n' "\$*" >"${workdir}/args"
+printf '%s\n' "\$*" >"${workdir}/go-args"
 printf '%s\n' "\$(pwd)" >"${workdir}/pwd"
+# Mimic \`go tool -n\`: build nothing, print where the tool binary lives.
+for arg in "\$@"; do
+  if [[ "\${arg}" == "-n" ]]; then
+    printf '%s\n' "${stub_dir}/tool-task"
+    exit 0
+  fi
+done
 EOF
 chmod +x "${stub_dir}/go"
 
-cat >"${stub_dir}/bazelisk" <<EOF
+# Stands in for the task binary that \`go tool -n\` resolves. It records GOWORK
+# so the test can prove run_tool.sh's GOWORK=off does not reach task.
+cat >"${stub_dir}/tool-task" <<EOF
 #!${bash_bin}
 set -euo pipefail
-if [[ "\$1" == "build" ]]; then
-  exit 0
-fi
-if [[ "\$1" == "cquery" ]]; then
-  printf '%s\n' "${stub_dir}/fake-task"
-  exit 0
-fi
-exit 1
+printf '%s\n' 'tool-task' >"${workdir}/called"
+printf '%s\n' "\$*" >"${workdir}/args"
+printf '%s\n' "\$(pwd)" >"${workdir}/pwd"
+printf '%s\n' "\${GOWORK-<unset>}" >"${workdir}/gowork"
 EOF
-chmod +x "${stub_dir}/bazelisk"
+chmod +x "${stub_dir}/tool-task"
 
 # A real task binary on PATH should win immediately.
 run_case "${stub_dir}" hello world
@@ -146,36 +165,68 @@ rm "${stub_dir}/task"
 caller_dir="${workdir}/caller"
 mkdir -p "${caller_dir}"
 run_case_in_dir "${stub_dir}" "${caller_dir}" hello world
-assert_called go "tool -modfile=${repo_root}/tools/external/go.mod task hello world"
+assert_called tool-task "hello world"
 assert_pwd "${caller_dir}"
+assert_file "${workdir}/go-args" \
+  "tool -modfile=${repo_root}/tools/external/go.mod -n task"
+# run_tool.sh sets GOWORK=off for the build. Leaking it into task would disable
+# the workspace for every command task runs.
+assert_file "${workdir}/gowork" "<unset>"
 
-# Bazel should only be used when CI explicitly asks for it.
-RUN_TASK_PREFER_BAZEL=1 run_case_in_dir "${stub_dir}" "${caller_dir}" hello world
-assert_called fake-task "hello world"
-assert_pwd "${caller_dir}"
+# CI must use the pinned release from setup-task even if nix develop has hidden
+# it from PATH. It must not build Task through `go tool`.
+task_version="$("${repo_root}/scripts/setup_task.sh" version)"
+cached_task_dir="${workdir}/runner-temp/task/${task_version}/Linux-X64"
+mkdir -p "${cached_task_dir}"
+cat >"${cached_task_dir}/task" <<EOF
+#!${bash_bin}
+set -euo pipefail
+printf '%s\n' 'cached-task' >"${workdir}/called"
+printf '%s\n' "\$*" >"${workdir}/args"
+printf '%s\n' "\$(pwd)" >"${workdir}/pwd"
+EOF
+chmod +x "${cached_task_dir}/task"
+reset_observations
+CI=true \
+  RUNNER_TEMP="${workdir}/runner-temp" RUNNER_OS=Linux RUNNER_ARCH=X64 \
+  PATH="${stub_dir}:${util_dir}" "${bash_bin}" "${launcher}" hello world
+assert_called cached-task "hello world"
+assert_pwd "${repo_root}"
+if [[ -e "${workdir}/go-args" ]]; then
+  echo "CI cached Task fallback invoked go" >&2
+  exit 1
+fi
 
-# If go is unavailable and Bazel was not requested, the launcher should fail
-# clearly.
+# CI fails clearly when neither PATH nor the setup-task cache provides Task.
+reset_observations
+status=0
+if CI=true PATH="${stub_dir}:${util_dir}" "${bash_bin}" "${launcher}" hello world >"${workdir}/stdout" 2>"${workdir}/stderr"; then
+  echo "expected CI task fallback to fail" >&2
+  exit 1
+else
+  status=$?
+fi
+if [[ "${status}" -ne 127 ]]; then
+  echo "expected CI task fallback to exit 127, got ${status}" >&2
+  exit 1
+fi
+if ! grep -q "Task is not available in CI" "${workdir}/stderr"; then
+  echo "CI task fallback did not print expected error" >&2
+  exit 1
+fi
+if [[ -e "${workdir}/go-args" ]]; then
+  echo "CI task fallback invoked go" >&2
+  exit 1
+fi
+
+# If go is unavailable, the launcher should fail clearly.
 rm "${stub_dir}/go"
-if PATH="${stub_dir}:${util_dir}" "${bash_bin}" "${launcher}" hello world >"${workdir}/stdout" 2>"${workdir}/stderr"; then
+if CI='' PATH="${stub_dir}:${util_dir}" "${bash_bin}" "${launcher}" hello world >"${workdir}/stdout" 2>"${workdir}/stderr"; then
   echo "expected missing-go-without-bazel-preference case to fail" >&2
   exit 1
 fi
 if ! grep -q "Unable to launch task" "${workdir}/stderr"; then
   echo "missing-go-without-bazel-preference case did not print expected error" >&2
-  exit 1
-fi
-
-# With neither go nor Bazel available, we should get the generic launcher
-# failure message.
-rm "${stub_dir}/bazelisk"
-if PATH="${stub_dir}:${util_dir}" "${bash_bin}" "${launcher}" hello world >"${workdir}/stdout" 2>"${workdir}/stderr"; then
-  echo "expected missing-tools case to fail" >&2
-  exit 1
-fi
-
-if ! grep -q "Unable to launch task" "${workdir}/stderr"; then
-  echo "missing-tools case did not print expected error" >&2
   exit 1
 fi
 

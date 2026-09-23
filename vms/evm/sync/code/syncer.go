@@ -166,13 +166,18 @@ func (s *Syncer) Sync(ctx context.Context) error {
 		return errSyncAlreadyRun
 	}
 
+	s.log.Info("starting code sync")
 	eg, egCtx := errgroup.WithContext(ctx)
 	const numCodeFetchers = 5
 	// One extra slot for the batcher, so numCodeFetchers can run alongside it.
 	eg.SetLimit(numCodeFetchers + 1)
 
 	eg.Go(func() error { return s.batchHashes(egCtx, eg) })
-	return eg.Wait()
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+	s.log.Info("finished code sync")
+	return nil
 }
 
 // drainQueue blocks until at least one hash is queued or [Syncer.DoneAdding]
@@ -321,7 +326,7 @@ func verifyCode(hashes []common.Hash, codes [][]byte) error {
 		return fmt.Errorf("%w: got %d requested %d", errCodeCountMismatch, len(codes), len(hashes))
 	}
 	for i, code := range codes {
-		if got := crypto.Keccak256Hash(code); got != hashes[i] {
+		if got := crypto.Keccak256Hash(code); got != hashes[i] { //#nosec G602 -- the length check above keeps i in range for hashes.
 			return fmt.Errorf("%w at index %d: got %s requested %s", errCodeHashMismatch, i, got, hashes[i])
 		}
 	}

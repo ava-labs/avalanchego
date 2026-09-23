@@ -15,7 +15,7 @@ func FuzzSummaryRoundTrip(f *testing.F) {
 	f.Add(uint64(0), []byte{})
 	f.Add(uint64(1), []byte{1, 2, 3})
 
-	handler := new(SummaryHandler) // stateless
+	handler := new(Handler) // stateless
 	f.Fuzz(func(t *testing.T, height uint64, hashBytes []byte) {
 		summary := NewSummary(common.BytesToHash(hashBytes), height)
 		summaryBytes := summary.Bytes()

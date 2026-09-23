@@ -291,10 +291,7 @@ func (l *leafRange) next() []byte {
 		return l.start
 	}
 
-	last := l.keys[len(l.keys)-1]
-	next := slices.Clone(last)
-	incrementBytes(next)
-	return next
+	return NextKey(l.keys[len(l.keys)-1])
 }
 
 // fillFromSnapshot appends leaves from [leafRange.next] to r, up to the
@@ -475,13 +472,15 @@ func dbValues(db *memorydb.Database) [][]byte {
 	return out
 }
 
-// incrementBytes adds 1 to b in place, with carry. All-0xff wraps to all-zeros.
-func incrementBytes(b []byte) {
-	for i := len(b) - 1; i >= 0; i-- {
-		if b[i] < 0xff {
-			b[i]++
-			return
+// NextKey adds 1 to a copy of k, with carry. All-0xff wraps to all-zeros.
+func NextKey(k []byte) []byte {
+	k = slices.Clone(k)
+	for i := len(k) - 1; i >= 0; i-- {
+		if k[i] < 0xff {
+			k[i]++
+			return k
 		}
-		b[i] = 0
+		k[i] = 0
 	}
+	return k
 }

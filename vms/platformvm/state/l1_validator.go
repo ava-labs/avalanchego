@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 )
 
 var (
@@ -217,7 +217,7 @@ func getL1Validator(
 	l1Validator := L1Validator{
 		ValidationID: validationID,
 	}
-	if _, err := block.GenesisCodec.Unmarshal(bytes, &l1Validator); err != nil {
+	if _, err := platform.GenesisCodec.Unmarshal(bytes, &l1Validator); err != nil {
 		return L1Validator{}, fmt.Errorf("failed to unmarshal L1 validator: %w", err)
 	}
 
@@ -230,7 +230,7 @@ func putL1Validator(
 	cache cache.Cacher[ids.ID, maybe.Maybe[L1Validator]],
 	l1Validator L1Validator,
 ) error {
-	bytes, err := block.GenesisCodec.Marshal(block.CodecVersion, l1Validator)
+	bytes, err := platform.GenesisCodec.Marshal(platform.CodecVersion, l1Validator)
 	if err != nil {
 		return fmt.Errorf("failed to marshal L1 validator: %w", err)
 	}
