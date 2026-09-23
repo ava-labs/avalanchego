@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -34,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -277,6 +279,94 @@ func defaultFx(clk *mockable.Clock, log logging.Logger) fx.Fx {
 		panic(err)
 	}
 	return res
+}
+
+// executeProposalTx executes tx as a proposal tx on fresh onCommitState and
+// onAbortState diffs built on top of diff.
+func executeProposalTx(
+	t testing.TB,
+	env *environment,
+	diff *state.Diff,
+	tx *platform.Tx,
+) (onCommitState *state.Diff, onAbortState *state.Diff, err error) {
+	t.Helper()
+
+	stakerAdditionAfterDeletionLegality := state.StakerAdditionAfterDeletionLegality(
+		env.config.UpgradeConfig.IsHeliconActivated(diff.GetTimestamp()),
+	)
+	onCommitState, err = state.NewDiffOn(diff, stakerAdditionAfterDeletionLegality)
+	require.NoError(t, err)
+
+	onAbortState, err = state.NewDiffOn(diff, stakerAdditionAfterDeletionLegality)
+	require.NoError(t, err)
+
+	feeCalculator := state.PickFeeCalculator(env.config, diff)
+	return onCommitState, onAbortState, ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	)
+}
+
+// newOwner returns a 1-of-1 owner with a random address.
+func newOwner() *secp256k1fx.OutputOwners {
+	return &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+}
+
+// deleteUTXOsOwnedBy removes every UTXO owned by key on diff.
+func deleteUTXOsOwnedBy(t testing.TB, env *environment, diff *state.Diff, key *secp256k1.PrivateKey) {
+	t.Helper()
+
+	utxoIDs, err := env.state.UTXOIDs(key.Address().Bytes(), ids.Empty, math.MaxInt32)
+	require.NoError(t, err)
+
+	for _, utxoID := range utxoIDs {
+		diff.DeleteUTXO(utxoID)
+	}
+}
+
+func newProofOfPossession(t testing.TB) *signer.ProofOfPossession {
+	t.Helper()
+
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
+	return pop
+}
+
+func newAdvanceTimeTx(t testing.TB, timestamp time.Time) *platform.Tx {
+	t.Helper()
+
+	utx := &platform.AdvanceTimeTx{Time: uint64(timestamp.Unix())}
+	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
+	require.NoError(t, err)
+	require.NoError(t, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID)))
+	return tx
+}
+
+func newRewardValidatorTx(t testing.TB, txID ids.ID) *platform.Tx {
+	t.Helper()
+
+	utx := &platform.RewardValidatorTx{TxID: txID}
+	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
+	require.NoError(t, err)
+	require.NoError(t, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID)))
+	return tx
+}
+
+func newRewardAutoRenewedValidatorTx(t testing.TB, txID ids.ID, timestamp time.Time) *platform.Tx {
+	t.Helper()
+
+	utx := &platform.RewardAutoRenewedValidatorTx{TxID: txID, Timestamp: uint64(timestamp.Unix())}
+	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
+	require.NoError(t, err)
+	return tx
 }
 
 func must[T any](t require.TestingT) func(T, error) T {

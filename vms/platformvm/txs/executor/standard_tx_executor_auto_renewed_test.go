@@ -47,14 +47,14 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	period := 2 * env.config.MinStakeDuration
 	weight := 2 * env.config.MinValidatorStake
-	configOwner := &secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}}
+	configOwner := newOwner()
 
 	addAutoRenewedTx, err := wallet.IssueAddAutoRenewedValidatorTx(
 		nodeID,
 		weight,
 		pop,
-		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
-		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+		newOwner(),
+		newOwner(),
 		configOwner,
 		100_000,
 		200_000,
@@ -234,9 +234,9 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 				ids.GenerateTestNodeID(),
 				env.config.MinValidatorStake,
 				pop,
-				&secp256k1fx.OutputOwners{},
-				&secp256k1fx.OutputOwners{},
-				&secp256k1fx.OutputOwners{},
+				newOwner(),
+				newOwner(),
+				newOwner(),
 				500_000,
 				300_000,
 				env.config.MinStakeDuration,
@@ -313,8 +313,8 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 				nodeID,
 				env.config.MinValidatorStake,
 				pop,
-				&secp256k1fx.OutputOwners{},
-				&secp256k1fx.OutputOwners{},
+				newOwner(),
+				newOwner(),
 				&secp256k1fx.OutputOwners{},
 				delegationShares,
 				autoCompoundRewardShares,
@@ -421,8 +421,8 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		nodeID,
 		env.config.MinValidatorStake,
 		pop,
-		&secp256k1fx.OutputOwners{},
-		&secp256k1fx.OutputOwners{},
+		newOwner(),
+		newOwner(),
 		&secp256k1fx.OutputOwners{},
 		0,
 		0,
@@ -434,8 +434,8 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		nodeID,
 		env.config.MinValidatorStake,
 		pop,
-		&secp256k1fx.OutputOwners{},
-		&secp256k1fx.OutputOwners{},
+		newOwner(),
+		newOwner(),
 		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()}},
 		500_000,
 		300_000,

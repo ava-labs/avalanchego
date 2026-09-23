@@ -373,10 +373,7 @@ func TestStandardExecutorCreateSubnetTxErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tx, err := wallet.IssueCreateSubnetTx(
-				&secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-				},
+				newOwner(),
 			)
 			require.NoError(t, err)
 
@@ -408,10 +405,7 @@ func TestStandardExecutorCreateSubnetTx(t *testing.T) {
 	var (
 		env    = newEnvironment(t, upgradetest.Latest)
 		wallet = newWallet(t, env, walletConfig{})
-		owner  = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		}
+		owner  = newOwner()
 	)
 
 	stx, err := wallet.IssueCreateSubnetTx(owner)
@@ -519,10 +513,7 @@ func TestStandardExecutorTransferSubnetOwnershipTxErrors(t *testing.T) {
 			wallet := newWallet(t, env, walletConfig{})
 			tx, err := wallet.IssueTransferSubnetOwnershipTx(
 				subnetID,
-				&secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-				},
+				newOwner(),
 			)
 			require.NoError(t, err)
 
@@ -556,16 +547,13 @@ func TestStandardExecutorTransferSubnetOwnershipTx(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		env      = newEnvironment(t, upgradetest.Latest)
-		wallet   = newWallet(t, env, walletConfig{})
-		subnetID = testSubnet1.ID()
-		newOwner = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		}
+		env       = newEnvironment(t, upgradetest.Latest)
+		wallet    = newWallet(t, env, walletConfig{})
+		subnetID  = testSubnet1.ID()
+		wantOwner = newOwner()
 	)
 
-	stx, err := wallet.IssueTransferSubnetOwnershipTx(subnetID, newOwner)
+	stx, err := wallet.IssueTransferSubnetOwnershipTx(subnetID, wantOwner)
 	require.NoError(err)
 
 	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
@@ -585,5 +573,5 @@ func TestStandardExecutorTransferSubnetOwnershipTx(t *testing.T) {
 	// assert the subnet's owner was updated
 	gotOwner, err := diff.GetSubnetOwner(subnetID)
 	require.NoError(err)
-	require.Equal(newOwner, gotOwner)
+	require.Equal(wantOwner, gotOwner)
 }
