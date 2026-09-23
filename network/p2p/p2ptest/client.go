@@ -35,8 +35,8 @@ func NewSelfTrackingClient(
 	return NewSelfTrackingClientWithTracker(t, ctx, nodeID, handler, NewTracker(t))
 }
 
-// NewSelfTrackingClientWithTracker returns a [p2p.TrackingClient] that routes to
-// nodeID's own handler and scores every request it issues against tracker.
+// NewSelfTrackingClientWithTracker returns a [p2p.TrackingClient] routing to
+// nodeID's handler, scoring against tracker, with nodeID already connected to it.
 func NewSelfTrackingClientWithTracker(
 	t *testing.T,
 	ctx context.Context,
@@ -44,27 +44,8 @@ func NewSelfTrackingClientWithTracker(
 	handler p2p.Handler,
 	tracker *p2p.PeerTracker,
 ) *p2p.TrackingClient {
-	network := newClientNetwork(
-		t,
-		ctx,
-		nodeID,
-		handler,
-		map[ids.NodeID]p2p.Handler{nodeID: handler},
-		tracker,
-	)
-	return network.NewTrackingClient(0, tracker)
-}
-
-// NewSelfTrackingClientWithUnknownPeer returns a [p2p.TrackingClient] whose
-// tracker has not been told about nodeID, for a test that connects it itself.
-func NewSelfTrackingClientWithUnknownPeer(
-	t *testing.T,
-	ctx context.Context,
-	nodeID ids.NodeID,
-	handler p2p.Handler,
-	tracker *p2p.PeerTracker,
-) *p2p.TrackingClient {
-	network := newClientNetwork(t, ctx, nodeID, handler, map[ids.NodeID]p2p.Handler{nodeID: handler})
+	peers := map[ids.NodeID]p2p.Handler{nodeID: handler}
+	network := newClientNetwork(t, ctx, nodeID, handler, peers, tracker)
 	return network.NewTrackingClient(0, tracker)
 }
 

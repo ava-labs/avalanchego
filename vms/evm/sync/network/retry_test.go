@@ -133,13 +133,14 @@ func TestSend_NoPeersBackoffEscalates(t *testing.T) {
 
 		handler, _ := scriptedHandler(scriptResponse{bytes: wantBytes})
 		_, tracker := newTestTracker(t)
-		// The tracker must start empty, so the client is built without telling
-		// it about nodeID. The goroutine below connects the peer instead.
 		c := &Dispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse]{
 			log:    loggingtest.New(t, logging.Debug),
-			client: p2ptest.NewSelfTrackingClientWithUnknownPeer(t, ctx, nodeID, handler, tracker),
+			client: p2ptest.NewSelfTrackingClientWithTracker(t, ctx, nodeID, handler, tracker),
 			peers:  tracker,
 		}
+		// The constructor connects nodeID. Undo it so SelectPeer starts with no
+		// peers and the goroutine below is what makes one appear.
+		tracker.Disconnected(nodeID)
 		c.policy = *options.ApplyTo(defaultRetryPolicy(),
 			WithNoPeersInitialBackoff(initial),
 			WithNoPeersFactor(factor),
