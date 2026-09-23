@@ -206,7 +206,7 @@ func TestFeeManager(t *testing.T) {
 		{
 			name: "should reject a transaction below the minimum fee",
 			test: func(t *testing.T, backend *sim.Backend, feeManager *feemanagerbindings.IFeeManager) {
-				t.Skip("TODO(JonathanOppenheimer): flaky, will be deleted with graft.")
+				t.Skip("TODO(JonathanOppenheimer): flaky due to geth mempool race (believed), will be deleted with graft.")
 
 				testContractAddr, testContract := deployFeeManagerTest(t, backend, admin)
 				allowlisttest.SetAsEnabled(t, backend, feeManager, admin, testContractAddr)
