@@ -1,0 +1,76 @@
+name: 'Setup Go module cache'
+description: 'Restore, prepare, and optionally save the project Go module cache'
+
+inputs:
+  use-nix:
+    description: 'Run Go commands in the Nix development shell'
+    required: false
+    default: 'false'
+  request-cache-save:
+    description: 'Request a save when cache policy permits it'
+    required: false
+    default: 'false'
+  disable-go-proxy:
+    # Keep the proxy enabled only when later setup can require modules that are
+    # not represented by this repository's cache key, such as custom polyrepo refs.
+    description: 'Disable GOPROXY after module preparation'
+    required: false
+    default: 'true'
+
+outputs:
+  cache-hit:
+    description: 'Whether the module cache was restored with an exact key'
+    value: ${{ steps.cache.outputs.cache-hit }}
+  cache-path:
+    description: 'Path to the Go module cache'
+    value: ${{ steps.cache-paths.outputs.go-mod-cache }}
+
+runs:
+  using: composite
+  steps:
+    - id: cache-policy
+      uses: ./.github/actions/cache-policy
+      with:
+        request-cache-save: ${{ inputs.request-cache-save }}
+
+    - id: cache-paths
+      name: Read Go module cache metadata
+      shell: ${{ inputs.use-nix == 'true' && 'nix develop --command bash {0}' || 'bash' }}
+      run: echo "go-mod-cache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+
+    - id: cache-key
+      name: Determine Go module cache key
+      shell: bash
+      env:
+        CACHE_KEY_PREFIX: go-mod-${{ runner.os }}-
+      run: |
+        {
+          echo "cache-key-prefix=$CACHE_KEY_PREFIX"
+          echo "cache-key=${CACHE_KEY_PREFIX}${{ hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum', 'scripts/download_go_modules.sh', 'scripts/go_module_cache_manifest.tsv') }}"
+        } >> "$GITHUB_OUTPUT"
+
+    - id: cache
+      name: Restore Go module cache
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ steps.cache-paths.outputs.go-mod-cache }}
+        key: ${{ steps.cache-key.outputs.cache-key }}
+        restore-keys: |
+          ${{ steps.cache-key.outputs.cache-key-prefix }}
+
+    - name: Prepare Go module dependencies
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      shell: ${{ inputs.use-nix == 'true' && 'nix develop --command bash {0}' || 'bash' }}
+      run: ./scripts/download_go_modules.sh
+
+    - name: Save Go module cache
+      if: ${{ steps.cache-policy.outputs.cache-save-allowed == 'true' && steps.cache.outputs.cache-hit != 'true' }}
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ steps.cache-paths.outputs.go-mod-cache }}
+        key: ${{ steps.cache-key.outputs.cache-key }}
+
+    - name: Disable the Go module proxy
+      if: ${{ inputs.disable-go-proxy == 'true' }}
+      shell: bash
+      run: echo 'GOPROXY=off' >> "$GITHUB_ENV"
