@@ -224,11 +224,12 @@ func seedResponsive(t *testing.T, reg *prometheus.Registry, tracker *p2p.PeerTra
 	require.Equal(t, 1.0, responsivePeers(t, reg), "responsivePeers()")
 }
 
+const trackerNamespace = "test_peer_tracker"
+
 func newTestTracker(t *testing.T, peers ...ids.NodeID) (*prometheus.Registry, *p2p.PeerTracker) {
 	t.Helper()
 	reg := prometheus.NewRegistry()
-	tracker, err := p2p.NewPeerTracker(logging.NoLog{}, "test_peer_tracker", reg, nil, nil)
-	require.NoError(t, err, "p2p.NewPeerTracker()")
+	tracker := p2ptest.NewTrackerWithRegistry(t, trackerNamespace, reg)
 	for _, nodeID := range peers {
 		tracker.Connected(nodeID, &version.Application{Major: 99})
 	}
@@ -253,19 +254,5 @@ func newTestDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any
 // responsivePeers reads the num_responsive_peers gauge from reg.
 func responsivePeers(t *testing.T, reg *prometheus.Registry) float64 {
 	t.Helper()
-	const name = "test_peer_tracker_num_responsive_peers"
-	mfs, err := reg.Gather()
-	require.NoError(t, err, "reg.Gather()")
-	for _, mf := range mfs {
-		if mf.GetName() != name {
-			continue
-		}
-		for _, m := range mf.GetMetric() {
-			if m.Gauge != nil {
-				return m.Gauge.GetValue()
-			}
-		}
-	}
-	t.Fatalf("metric %q not found", name)
-	return 0
+	return p2ptest.TrackerGauge(t, reg, trackerNamespace, "num_responsive_peers")
 }
