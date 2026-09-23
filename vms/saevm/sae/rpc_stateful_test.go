@@ -972,37 +972,6 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 		requireCallSucceedsWithGas(t, callMsg, gas)
 	})
 
-	t.Run("eth_estimateGas_size_floor", func(t *testing.T) {
-		// Execution of this tx uses ~50k gas, but the mempool requires ~420k
-		// because of its size.
-		msg := ethereum.CallMsg{
-			From:      sut.wallet.Addresses()[0],
-			To:        &common.Address{},
-			Data:      make([]byte, 8192),
-			GasFeeCap: big.NewInt(2 * params.GWei),
-			GasTipCap: big.NewInt(1),
-			Value:     big.NewInt(1),
-		}
-		gas, err := sut.EstimateGas(ctx, msg)
-		require.NoError(t, err, "EstimateGas()")
-
-		tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
-			To:        msg.To,
-			Gas:       gas,
-			GasFeeCap: msg.GasFeeCap,
-			GasTipCap: msg.GasTipCap,
-			Value:     msg.Value,
-			Data:      msg.Data,
-		})
-		require.NoErrorf(t, sut.SendTransaction(ctx, tx), "SendTransaction() with estimated gas %d", gas)
-
-		msg.Gas = gas / 2
-		_, err = sut.EstimateGas(ctx, msg)
-		if diff := testerr.Diff(err, testerr.Contains("gas required exceeds allowance")); diff != "" {
-			t.Errorf("EstimateGas() with gas limit below the size minimum %s", diff)
-		}
-	})
-
 	t.Run("eth_createAccessList", func(t *testing.T) {
 		accessList, gas, errMsg, err := gc.CreateAccessList(ctx, callMsg)
 		require.NoError(t, err, "CreateAccessList()")
@@ -1018,6 +987,75 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 		msg.AccessList = *accessList
 		requireCallSucceedsWithGas(t, msg, gas)
 	})
+}
+
+// TestSizeMinimumGas tests that gas limits recommended by RPCs satisfy the
+// mempool's size-based minimum, even when execution uses less gas.
+func TestSizeMinimumGas(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+	gc := gethclient.New(sut.rpcClient)
+
+	// Execution of this tx uses ~50k gas, but the mempool requires ~420k
+	// because of its size.
+	txData := types.DynamicFeeTx{
+		To:        &common.Address{},
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		GasTipCap: big.NewInt(1),
+		Value:     big.NewInt(1),
+		Data:      make([]byte, 8192),
+	}
+	msg := ethereum.CallMsg{
+		From:      sut.wallet.Addresses()[0],
+		To:        txData.To,
+		GasFeeCap: txData.GasFeeCap,
+		GasTipCap: txData.GasTipCap,
+		Value:     txData.Value,
+		Data:      txData.Data,
+	}
+
+	tests := []struct {
+		name string
+		// gas returns the gas limit that the RPC recommends for msg, and
+		// the access list to send with it.
+		gas func(ethereum.CallMsg) (uint64, types.AccessList, error)
+	}{
+		{
+			name: "eth_estimateGas",
+			gas: func(msg ethereum.CallMsg) (uint64, types.AccessList, error) {
+				gas, err := sut.EstimateGas(ctx, msg)
+				return gas, nil, err
+			},
+		},
+		{
+			name: "eth_createAccessList",
+			gas: func(msg ethereum.CallMsg) (uint64, types.AccessList, error) {
+				accessList, gas, _, err := gc.CreateAccessList(ctx, msg)
+				if err != nil {
+					return 0, nil, err
+				}
+				return gas, *accessList, nil
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gas, accessList, err := tt.gas(msg)
+			require.NoErrorf(t, err, "%s()", tt.name)
+
+			data := txData
+			data.Gas = gas
+			data.AccessList = accessList
+			tx := sut.wallet.SetNonceAndSign(t, 0, &data)
+			require.NoErrorf(t, sut.SendTransaction(ctx, tx), "SendTransaction() with %s() gas %d", tt.name, gas)
+
+			below := msg
+			below.Gas = sut.rawVM.mempool.MinGasForSize(tx.Size()) - 1
+			_, _, err = tt.gas(below)
+			if diff := testerr.Diff(err, testerr.Contains("gas required exceeds allowance")); diff != "" {
+				t.Errorf("%s() with gas limit %d below the size minimum %s", tt.name, below.Gas, diff)
+			}
+		})
+	}
 }
 
 func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {

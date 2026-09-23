@@ -40,9 +40,6 @@ func (b *backend) getReceipts(ctx context.Context, numOrHash rpc.BlockNumberOrHa
 	}
 }
 
-// TODO(JonathanOppenheimer): Override CreateAccessList to apply the same size
-// minimum as [blockChainAPI.EstimateGas] to its gasUsed, which clients may also
-// use as a gas limit.
 type blockChainAPI struct {
 	*ethapi.BlockChainAPI
 	b *backend

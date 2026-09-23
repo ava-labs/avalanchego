@@ -273,28 +273,60 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 // EstimateGas returns at least the gas limit that the mempool requires for a
 // transaction of this size, which can exceed the gas used by execution.
 func (b *blockChainAPI) EstimateGas(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash *rpc.BlockNumberOrHash, overrides *ethapi.StateOverride) (hexutil.Uint64, error) {
-	gas, err := b.BlockChainAPI.EstimateGas(ctx, args, blockNrOrHash, overrides)
+	used, err := b.BlockChainAPI.EstimateGas(ctx, args, blockNrOrHash, overrides)
 	if err != nil {
 		return 0, err
 	}
+	minForBytes, err := b.b.minGasForArgs(args)
+	if err != nil {
+		return 0, err
+	}
+	return max(used, minForBytes), nil
+}
+
+// CreateAccessList returns a gasUsed of at least the gas limit that the mempool
+// requires for a transaction of this size, including the returned access list.
+func (b *blockChainAPI) CreateAccessList(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash *rpc.BlockNumberOrHash) (*ethapi.AccessListResult, error) {
+	res, err := b.BlockChainAPI.CreateAccessList(ctx, args, blockNrOrHash)
+	if err != nil {
+		return nil, err
+	}
+	// Clients may also use gasUsed as a gas limit, and will send the
+	// transaction with the returned access list rather than their own.
+	args.AccessList = res.Accesslist
+	minForBytes, err := b.b.minGasForArgs(args)
+	if err != nil {
+		return nil, err
+	}
+	res.GasUsed = max(res.GasUsed, minForBytes)
+	return res, nil
+}
+
+// minGasForArgs returns the minimum gas limit that the mempool accepts for a
+// transaction built from args, or an error if it exceeds a gas limit that the
+// caller provides.
+func (b *backend) minGasForArgs(args ethapi.TransactionArgs) (hexutil.Uint64, error) {
 	msg, err := args.ToMessage(0, nil)
 	if err != nil {
 		return 0, err
 	}
 	// The caller hasn't signed the transaction yet, so any field it didn't
 	// provide is set to its maximum to avoid underestimating the size.
-	maxU64 := hexutil.Uint64(math.MaxUint64)
 	maxU256 := (*hexutil.Big)(math.MaxBig256)
+	nonce := uint64(math.MaxUint64)
+	if args.Nonce != nil {
+		nonce = uint64(*args.Nonce)
+	}
 	// Like the embedded estimate, respect a gas limit that the caller provides.
-	allowance := maxU64
+	allowance := hexutil.Uint64(math.MaxUint64)
 	if args.Gas != nil && uint64(*args.Gas) >= params.TxGas {
 		allowance = *args.Gas
 	}
 	// A dynamic-fee tx is the largest supported type. This would no longer
 	// hold if EIP-7702 set-code txs were supported.
 	tx := types.NewTx(&types.DynamicFeeTx{
-		ChainID:    b.b.ChainConfig().ChainID,
-		Nonce:      uint64(*cmp.Or(args.Nonce, &maxU64)),
+		ChainID:    b.ChainConfig().ChainID,
+		Nonce:      nonce,
 		GasTipCap:  cmp.Or(args.MaxPriorityFeePerGas, args.GasPrice, maxU256).ToInt(),
 		GasFeeCap:  cmp.Or(args.MaxFeePerGas, args.GasPrice, maxU256).ToInt(),
 		Gas:        uint64(allowance),
@@ -306,11 +338,11 @@ func (b *blockChainAPI) EstimateGas(ctx context.Context, args ethapi.Transaction
 		R:          maxU256.ToInt(), // signature x-coordinate
 		S:          maxU256.ToInt(), // signature proof value
 	})
-	floor := hexutil.Uint64(b.b.MinGasForSize(tx.Size()))
-	if floor > allowance {
-		return 0, fmt.Errorf("gas required exceeds allowance (%d): tx size %d bytes requires gas limit at least %d", allowance, tx.Size(), floor)
+	minForBytes := hexutil.Uint64(b.MinGasForSize(tx.Size()))
+	if minForBytes > allowance {
+		return 0, fmt.Errorf("gas required exceeds allowance (%d): tx size %d bytes requires gas limit at least %d", allowance, tx.Size(), minForBytes)
 	}
-	return max(gas, floor), nil
+	return minForBytes, nil
 }
 
 // tracerAPI serves the debug tracer APIs, routing each endpoint to a
