@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/libevm/ethapi"
+	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/ava-labs/libevm/trie"
@@ -298,7 +299,12 @@ func (b *blockChainAPI) EstimateGas(ctx context.Context, args ethapi.Transaction
 		R:          maxU256.ToInt(), // signature x-coordinate
 		S:          maxU256.ToInt(), // signature proof value
 	})
-	return max(gas, hexutil.Uint64(b.b.MinGasForSize(tx.Size()))), nil
+	floor := hexutil.Uint64(b.b.MinGasForSize(tx.Size()))
+	// Like the embedded estimate, respect a gas limit that the caller provides.
+	if args.Gas != nil && uint64(*args.Gas) >= params.TxGas && floor > *args.Gas {
+		return 0, fmt.Errorf("gas required exceeds allowance (%d)", *args.Gas)
+	}
+	return max(gas, floor), nil
 }
 
 // tracerAPI serves the debug tracer APIs, routing each endpoint to a
