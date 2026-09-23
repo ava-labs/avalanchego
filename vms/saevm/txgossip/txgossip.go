@@ -94,6 +94,12 @@ func NewSet(
 	}, nil
 }
 
+// MinGasForSize returns the minimum gas limit that the Set accepts for a
+// transaction of size bytes. See [minGasForSize].
+func (s *Set) MinGasForSize(size uint64) uint64 {
+	return minGasForSize(size, s.set.blockGasLimit())
+}
+
 var _ gossip.Set[Transaction] = (*txSet)(nil)
 
 type txSet struct {

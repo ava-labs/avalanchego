@@ -972,6 +972,31 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 		requireCallSucceedsWithGas(t, callMsg, gas)
 	})
 
+	t.Run("eth_estimateGas_size_floor", func(t *testing.T) {
+		// Execution of this tx uses ~50k gas, but the mempool requires ~420k
+		// because of its size.
+		msg := ethereum.CallMsg{
+			From:      sut.wallet.Addresses()[0],
+			To:        &common.Address{},
+			Data:      make([]byte, 8192),
+			GasFeeCap: big.NewInt(2 * params.GWei),
+			GasTipCap: big.NewInt(1),
+			Value:     big.NewInt(1),
+		}
+		gas, err := sut.EstimateGas(ctx, msg)
+		require.NoError(t, err, "EstimateGas()")
+
+		tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        msg.To,
+			Gas:       gas,
+			GasFeeCap: msg.GasFeeCap,
+			GasTipCap: msg.GasTipCap,
+			Value:     msg.Value,
+			Data:      msg.Data,
+		})
+		require.NoErrorf(t, sut.SendTransaction(ctx, tx), "SendTransaction() with estimated gas %d", gas)
+	})
+
 	t.Run("eth_createAccessList", func(t *testing.T) {
 		accessList, gas, errMsg, err := gc.CreateAccessList(ctx, callMsg)
 		require.NoError(t, err, "CreateAccessList()")

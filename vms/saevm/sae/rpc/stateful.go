@@ -4,15 +4,18 @@
 package rpc
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
+	"math/big"
 	"os"
 	"slices"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/consensus"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -264,6 +267,38 @@ func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txI
 		return nil, bCtx, nil, nil, err
 	}
 	return msg, result.BlockCtx, stateDB, noopRelease, nil
+}
+
+// EstimateGas returns at least the gas limit that the mempool requires for a
+// transaction of this size, which can exceed the gas used by execution.
+func (b *blockChainAPI) EstimateGas(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash *rpc.BlockNumberOrHash, overrides *ethapi.StateOverride) (hexutil.Uint64, error) {
+	gas, err := b.BlockChainAPI.EstimateGas(ctx, args, blockNrOrHash, overrides)
+	if err != nil {
+		return 0, err
+	}
+	msg, err := args.ToMessage(0, nil)
+	if err != nil {
+		return 0, err
+	}
+	// The caller hasn't signed the transaction yet, so any field it didn't
+	// provide is set to its maximum to avoid underestimating the size.
+	maxNonce := hexutil.Uint64(math.MaxUint64)
+	maxU256 := (*hexutil.Big)(math.MaxBig256)
+	tx := types.NewTx(&types.DynamicFeeTx{
+		ChainID:    b.b.ChainConfig().ChainID,
+		Nonce:      uint64(*cmp.Or(args.Nonce, &maxNonce)),
+		GasTipCap:  cmp.Or(args.MaxPriorityFeePerGas, args.GasPrice, maxU256).ToInt(),
+		GasFeeCap:  cmp.Or(args.MaxFeePerGas, args.GasPrice, maxU256).ToInt(),
+		Gas:        math.MaxUint64,
+		To:         msg.To,
+		Value:      cmp.Or(args.Value, maxU256).ToInt(),
+		Data:       msg.Data,
+		AccessList: msg.AccessList,
+		V:          big.NewInt(1),   // signature y-parity, 0 or 1
+		R:          maxU256.ToInt(), // signature x-coordinate
+		S:          maxU256.ToInt(), // signature proof value
+	})
+	return max(gas, hexutil.Uint64(b.b.MinGasForSize(tx.Size()))), nil
 }
 
 // tracerAPI serves the debug tracer APIs, routing each endpoint to a
