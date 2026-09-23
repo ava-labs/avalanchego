@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
@@ -37,13 +36,10 @@ func IssueTxsToActivateProposerVMFork(
 	client ethclient.Client,
 ) error {
 	addr := crypto.PubkeyToAddress(fundedKey.PublicKey)
-	// The pool nonce accounts for transactions the node has accepted but not
-	// yet executed, which the nonce at the latest block does not under SAE.
-	var pendingNonce hexutil.Uint64
-	if err := client.Client().CallContext(ctx, &pendingNonce, "eth_getTransactionCount", addr, "pending"); err != nil {
+	nonce, err := client.NonceAt(ctx, addr, nil)
+	if err != nil {
 		return err
 	}
-	nonce := uint64(pendingNonce)
 
 	gasPrice := big.NewInt(legacy.BaseFee)
 	txSigner := types.LatestSignerForChainID(chainID)
