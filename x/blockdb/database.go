@@ -955,6 +955,24 @@ func (db *Database) recoverBlockAtOffset(offset, fileEndOffset uint64) (blockEnt
 	if err != nil {
 		return bh, fmt.Errorf("%w: cannot get index offset for recovered block %d: %w", ErrCorrupted, bh.Height, err)
 	}
+	indexed, err := db.readIndexEntry(bh.Height)
+	if err != nil && !errors.Is(err, database.ErrNotFound) {
+		return bh, fmt.Errorf("failed to read index entry for recovered block %d: %w", bh.Height, err)
+	}
+	// Keep a later indexed write only if its block is still valid.
+	if err == nil && indexed.Offset > offset {
+		dataEnd, err := db.dataFileEndForOffset(indexed.Offset)
+		if err == nil {
+			var later blockEntryHeader
+			later, _, err = db.readBlockAtOffset(indexed.Offset, dataEnd, &indexed.Size)
+			if err == nil && later.Height == bh.Height {
+				return bh, nil
+			}
+		}
+		if err != nil && !errors.Is(err, ErrCorrupted) {
+			return bh, fmt.Errorf("failed to validate indexed block %d: %w", bh.Height, err)
+		}
+	}
 	if err := db.writeIndexEntryAt(indexOffset, offset, bh.Size); err != nil {
 		return bh, fmt.Errorf("failed to write index entry for recovered block %d: %w", bh.Height, err)
 	}
