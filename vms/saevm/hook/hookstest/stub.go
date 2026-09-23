@@ -92,6 +92,10 @@ func NewStub(target gas.Gas, opts ...HookOption) *Stub {
 	}, opts...)
 }
 
+func (*Stub) ApplyGenesisTo(*state.StateDB) {
+	panic("unimplemented")
+}
+
 // ExecutionResultsDB propagates arguments to and from
 // [Stub.ExecutionResultsDBFn] if non-nil, otherwise it returns a fresh
 // [saetest.NewHeightIndexDB] on every call.

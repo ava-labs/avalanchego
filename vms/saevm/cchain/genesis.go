@@ -362,6 +362,21 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 		return common.Hash{}, err
 	}
 
+	g.toStateDB(statedb)
+
+	const deleteEmptyObjects = true
+	root, err := statedb.Commit(genesisNumber, deleteEmptyObjects)
+	if err != nil {
+		return common.Hash{}, fmt.Errorf("committing statedb: %w", err)
+	}
+	const logAsInfo = false
+	if err := tdb.Commit(root, logAsInfo); err != nil {
+		return common.Hash{}, fmt.Errorf("committing triedb: %w", err)
+	}
+	return root, nil
+}
+
+func (g *genesis) toStateDB(statedb *state.StateDB) {
 	for addr, account := range g.Alloc {
 		statedb.SetBalance(addr, uint256.MustFromBig(account.Balance))
 		statedb.SetCode(addr, account.Code)
@@ -377,15 +392,4 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 	if c := corethparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
 		activatePrecompile(statedb, warp.ContractAddress)
 	}
-
-	const deleteEmptyObjects = true
-	root, err := statedb.Commit(genesisNumber, deleteEmptyObjects)
-	if err != nil {
-		return common.Hash{}, fmt.Errorf("committing statedb: %w", err)
-	}
-	const logAsInfo = false
-	if err := tdb.Commit(root, logAsInfo); err != nil {
-		return common.Hash{}, fmt.Errorf("committing triedb: %w", err)
-	}
-	return root, nil
 }
