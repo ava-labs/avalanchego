@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -174,25 +175,21 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 		)
 	}
 
-	onAbortOuts, err := verifyAddValidatorTx(
+	if err := verifyAddValidatorTx(
 		e.backend,
-		e.feeCalculator,
 		e.onCommitState,
 		e.tx,
 		tx,
-	)
-	if err != nil {
+	); err != nil {
+		return err
+	}
+
+	// Set up the state if this tx is committed
+	if err := e.applySpend(e.tx.Creds); err != nil {
 		return err
 	}
 
 	txID := e.tx.ID()
-
-	// Set up the state if this tx is committed
-	// Consume the UTXOs
-	avax.Consume(e.onCommitState, tx.Ins)
-	// Produce the UTXOs
-	avax.Produce(e.onCommitState, txID, tx.Outs)
-
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
 		return err
@@ -202,12 +199,8 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 		return err
 	}
 
-	// Set up the state if this tx is aborted
-	// Consume the UTXOs
-	avax.Consume(e.onAbortState, tx.Ins)
-	// Produce the UTXOs
-	avax.Produce(e.onAbortState, txID, onAbortOuts)
-	return nil
+	// Set up the state if this tx is aborted, returning the stake to its owner
+	return e.applySpendOnAbort(tx)
 }
 
 func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidatorTx) error {
@@ -226,7 +219,6 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidato
 
 	if err := verifyAddSubnetValidatorTx(
 		e.backend,
-		e.feeCalculator,
 		e.onCommitState,
 		e.tx,
 		tx,
@@ -234,14 +226,12 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidato
 		return err
 	}
 
-	txID := e.tx.ID()
-
 	// Set up the state if this tx is committed
-	// Consume the UTXOs
-	avax.Consume(e.onCommitState, tx.Ins)
-	// Produce the UTXOs
-	avax.Produce(e.onCommitState, txID, tx.Outs)
+	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
+		return err
+	}
 
+	txID := e.tx.ID()
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
 		return err
@@ -252,11 +242,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidato
 	}
 
 	// Set up the state if this tx is aborted
-	// Consume the UTXOs
-	avax.Consume(e.onAbortState, tx.Ins)
-	// Produce the UTXOs
-	avax.Produce(e.onAbortState, txID, tx.Outs)
-	return nil
+	return e.applySpendOnAbort(tx)
 }
 
 func (e *proposalTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
@@ -273,25 +259,21 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 		)
 	}
 
-	onAbortOuts, err := verifyAddDelegatorTx(
+	if err := verifyAddDelegatorTx(
 		e.backend,
-		e.feeCalculator,
 		e.onCommitState,
 		e.tx,
 		tx,
-	)
-	if err != nil {
+	); err != nil {
+		return err
+	}
+
+	// Set up the state if this tx is committed
+	if err := e.applySpend(e.tx.Creds); err != nil {
 		return err
 	}
 
 	txID := e.tx.ID()
-
-	// Set up the state if this tx is committed
-	// Consume the UTXOs
-	avax.Consume(e.onCommitState, tx.Ins)
-	// Produce the UTXOs
-	avax.Produce(e.onCommitState, txID, tx.Outs)
-
 	newStaker, err := state.NewPendingStaker(txID, tx)
 	if err != nil {
 		return err
@@ -299,12 +281,8 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 
 	e.onCommitState.PutPendingDelegator(newStaker)
 
-	// Set up the state if this tx is aborted
-	// Consume the UTXOs
-	avax.Consume(e.onAbortState, tx.Ins)
-	// Produce the UTXOs
-	avax.Produce(e.onAbortState, txID, onAbortOuts)
-	return nil
+	// Set up the state if this tx is aborted, returning the stake to its owner
+	return e.applySpendOnAbort(tx)
 }
 
 func (e *proposalTxExecutor) AdvanceTimeTx(tx *platform.AdvanceTimeTx) error {
@@ -500,6 +478,28 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 		totalDelegateeRewards,
 		e.onCommitState,
 	)
+}
+
+func (e *proposalTxExecutor) applySpend(creds []verify.Verifiable) error {
+	return applySpend(e.backend, e.feeCalculator, e.onCommitState, e.tx, creds)
+}
+
+// applySpendOnAbort spends the UTXOs of tx in onAbortState: it consumes the
+// inputs of tx and produces every output of tx, including its staked outputs.
+// The abort branch does not add the staker, so its stake is returned to its
+// owner instead of being locked.
+//
+// No flow check is performed: the commit branch already verified via
+// [applySpend] that these inputs fund these outputs plus the fee.
+func (e *proposalTxExecutor) applySpendOnAbort(tx platform.UnsignedTx) error {
+	ins, outs, _, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("getting utxos: %w", err)
+	}
+
+	avax.Consume(e.onAbortState, ins)
+	avax.Produce(e.onAbortState, e.tx.ID(), outs)
+	return nil
 }
 
 // undoSupplyMintOnAbort removes the staker's potential reward from

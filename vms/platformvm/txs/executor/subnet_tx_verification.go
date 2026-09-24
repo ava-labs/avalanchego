@@ -98,3 +98,13 @@ func verifyAuthorization(
 
 	return tx.Creds[:baseTxCredsLen], nil
 }
+
+// baseTxCreds returns the credentials of sTx that authorize the spend of its
+// inputs, which are all of its credentials except the trailing authorization
+// credential consumed by verifyAuthorization.
+func baseTxCreds(sTx *platform.Tx) []verify.Verifiable {
+	if len(sTx.Creds) == 0 {
+		return nil
+	}
+	return sTx.Creds[:len(sTx.Creds)-1]
+}

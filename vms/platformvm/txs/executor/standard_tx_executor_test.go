@@ -4442,6 +4442,67 @@ func TestHeliconMinStakeDurationValidator(t *testing.T) {
 	}
 }
 
+func TestStandardExecutorAddPermissionlessValidatorTxFlowCheckFails(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t, upgradetest.Latest)
+	wallet := newWallet(t, env, walletConfig{keys: genesistest.DefaultFundedKeys[:1]})
+	feeCalculator := state.PickFeeCalculator(env.config, env.state)
+
+	sk, err := localsigner.New()
+	require.NoError(err)
+
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
+	rewardsOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+	endTime := env.state.GetTimestamp().Add(defaultMinStakingDuration)
+	tx, err := wallet.IssueAddPermissionlessValidatorTx(
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				End:    uint64(endTime.Unix()),
+				Wght:   env.config.MinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
+		pop,
+		env.ctx.AVAXAssetID,
+		rewardsOwner,
+		rewardsOwner,
+		reward.PercentDenominator,
+	)
+	require.NoError(err)
+
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(err)
+
+	// Remove the UTXOs funding the tx so that its inputs no longer cover its
+	// outputs plus the fee.
+	utxoIDs, err := env.state.UTXOIDs(
+		genesistest.DefaultFundedKeys[0].Address().Bytes(),
+		ids.Empty,
+		math.MaxInt32,
+	)
+	require.NoError(err)
+
+	for _, utxoID := range utxoIDs {
+		diff.DeleteUTXO(utxoID)
+	}
+
+	_, _, _, gotErr := StandardTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		diff,
+	)
+
+	require.ErrorIs(gotErr, ErrFlowCheckFailed)
+}
+
 func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	var (
 		env           = newEnvironment(t, upgradetest.Latest)
