@@ -7,6 +7,14 @@
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 - Updated the minimum Go version from `1.25.10` to `1.26.8`.
 
+### Fixes
+
+- The C-Chain wallet (`wallet/chain/c`) now waits for atomic txs with `avax.getAtomicTx` instead of the deprecated `avax.getAtomicTxStatus`, which public API endpoints no longer serve.
+
+### APIs
+
+- `wallet/chain/c.NewWallet`, `primary.AVAXState.CClient` and `primary.EthState.Client` now use `vms/saevm/cchain.Client` and the libevm `ethclient.Client` instead of the coreth clients.
+
 ### Metrics
 
 - Added `avalanche_platformvm_local_delegated_staked` (gauge): amount (in nAVAX) of AVAX delegated to this node on the Primary Network.
