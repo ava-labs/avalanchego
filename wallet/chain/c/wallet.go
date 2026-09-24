@@ -164,7 +164,7 @@ func (w *wallet) IssueAtomicTx(
 	if err := w.avaxClient.IssueTx(ctx, t); err != nil {
 		return err
 	}
-	txID := atx.ID()
+	txID := t.ID()
 
 	issuanceDuration := time.Since(startTime)
 	if f := ops.IssuanceHandler(); f != nil {
