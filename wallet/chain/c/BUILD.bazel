@@ -1,4 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "c",
@@ -16,9 +17,7 @@ go_library(
     deps = [
         "//api/info",
         "//database",
-        "//graft/coreth/ethclient",
         "//graft/coreth/plugin/evm/atomic",
-        "//graft/coreth/plugin/evm/client",
         "//ids",
         "//snow",
         "//utils",
@@ -27,12 +26,29 @@ go_library(
         "//utils/crypto/secp256k1",
         "//utils/logging",
         "//utils/math",
+        "//utils/rpc",
         "//utils/set",
         "//vms/avm",
         "//vms/components/avax",
         "//vms/components/verify",
+        "//vms/saevm/cchain",
+        "//vms/saevm/cchain/tx",
         "//vms/secp256k1fx",
         "//wallet/subnet/primary/common",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//ethclient",
+    ],
+)
+
+go_test(
+    name = "c_test",
+    srcs = ["wallet_test.go"],
+    embed = [":c"],
+    deps = [
+        "//ids",
+        "//utils/rpc",
+        "//vms/saevm/cchain/tx",
+        "@com_github_stretchr_testify//require",
     ],
 )

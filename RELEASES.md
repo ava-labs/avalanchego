@@ -4,9 +4,17 @@
 
 This release updates the plugin version to `47`. All plugins must update to remain compatible.
 
+### APIs
+
+- `wallet/chain/c.NewWallet`, `primary.AVAXState.CClient` and `primary.EthState.Client` now use `vms/saevm/cchain.Client` and the libevm `ethclient.Client` instead of the coreth clients.
+
 ### Metrics
 
 - Added `avalanche_evm_transition_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
+
+### Fixes
+
+- The C-Chain wallet (`wallet/chain/c`) now waits for atomic txs with `avax.getAtomicTx` instead of the deprecated `avax.getAtomicTxStatus`, which public API endpoints no longer serve.
 
 ## [v1.15.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.1)
 

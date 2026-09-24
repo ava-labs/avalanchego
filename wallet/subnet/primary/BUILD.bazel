@@ -12,9 +12,6 @@ go_library(
     deps = [
         "//api/info",
         "//codec",
-        "//graft/coreth/ethclient",
-        "//graft/coreth/plugin/evm/atomic",
-        "//graft/coreth/plugin/evm/client",
         "//ids",
         "//utils/constants",
         "//utils/crypto/keychain",
@@ -24,6 +21,7 @@ go_library(
         "//vms/components/avax",
         "//vms/platformvm",
         "//vms/platformvm/platform",
+        "//vms/saevm/cchain",
         "//wallet/chain/c",
         "//wallet/chain/p",
         "//wallet/chain/p/builder",
@@ -34,6 +32,7 @@ go_library(
         "//wallet/chain/x/signer",
         "//wallet/subnet/primary/common",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//ethclient",
     ],
 )
 
