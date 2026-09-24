@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
@@ -665,19 +666,19 @@ func TestDebugIntermediateRoots(t *testing.T) {
 	}{
 		{
 			name: "hashdb_archival",
-			opts: []sutOption{withArchival()},
+			opts: []sutOption{withHashDB(saedb.HashDBConfig{CommitInterval: saedb.DefaultCommitInterval, Archival: true})},
 		},
 		{
 			name: "hashdb_pruning",
-			opts: []sutOption{withCommitInterval(commitInterval)},
+			opts: []sutOption{withHashDB(saedb.HashDBConfig{CommitInterval: commitInterval})},
 		},
 		{
 			name: "firewood_archival_every",
-			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(1)},
+			opts: []sutOption{withFirewood(firewood.Config{MaxPersistGap: 1, RootStore: true})},
 		},
 		{
 			name: "firewood_archival_interval",
-			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(commitInterval)},
+			opts: []sutOption{withFirewood(firewood.Config{MaxPersistGap: commitInterval, RootStore: true})},
 		},
 	}
 
@@ -849,23 +850,23 @@ func TestStatefulRPCsEveryHeight(t *testing.T) {
 	}{
 		{
 			name: "hash_archival",
-			opts: []sutOption{withArchival(), withCommitInterval(saedb.DefaultCommitInterval)},
+			opts: []sutOption{withHashDB(saedb.HashDBConfig{CommitInterval: saedb.DefaultCommitInterval, Archival: true})},
 		},
 		{
 			name: "hash_commit_every_block",
-			opts: []sutOption{withCommitInterval(1)},
+			opts: []sutOption{withHashDB(saedb.HashDBConfig{CommitInterval: 1})},
 		},
 		{
 			name: "firewood_archival",
-			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(saedb.DefaultCommitInterval)},
+			opts: []sutOption{withFirewood(firewood.Config{MaxPersistGap: saedb.DefaultCommitInterval, RootStore: true})},
 		},
 		{
 			name: "firewood_commit_every_block",
-			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(1)},
+			opts: []sutOption{withFirewood(firewood.Config{MaxPersistGap: 1, RootStore: true})},
 		},
 		{
 			name: "firewood_commit_interval",
-			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(commitInterval)},
+			opts: []sutOption{withFirewood(firewood.Config{MaxPersistGap: commitInterval, RootStore: true})},
 		},
 	}
 	for _, tt := range tests {

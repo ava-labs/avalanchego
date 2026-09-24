@@ -4,6 +4,7 @@
 package firewood
 
 import (
+	"math"
 	"math/big"
 	"testing"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
@@ -26,13 +28,21 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
+// mustOpen opens a Firewood-backed [triedb.Database] over db, stored at path,
+// failing the test on error.
+func mustOpen(t *testing.T, db ethdb.Database, cfg Config, path string) *triedb.Database {
+	t.Helper()
+
+	tdb, err := NewTrieDB(db, cfg, path, loggingtest.New(t, logging.Debug))
+	require.NoError(t, err, "WrapTrieDB()")
+	return tdb
+}
+
 func newDB(t *testing.T) state.Database {
 	t.Helper()
 
-	cfg := DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug))
-	db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
-		DBOverride: cfg.BackendConstructor,
-	})
+	memDB := rawdb.NewMemoryDatabase()
+	db := state.NewDatabaseWithNodeDB(memDB, mustOpen(t, memDB, DefaultConfig(), t.TempDir()))
 	t.Cleanup(func() {
 		assert.NoError(t, db.TrieDB().Close(), "triedb.Close()")
 	})
@@ -570,12 +580,13 @@ func FuzzReconstructedRoot(f *testing.F) {
 }
 
 func TestGenesis(t *testing.T) {
-	cfg := DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug))
-	memDB := rawdb.NewMemoryDatabase()
-	tdb := triedb.NewDatabase(memDB, &triedb.Config{
-		DBOverride: cfg.BackendConstructor,
-	})
+	var (
+		memDB = rawdb.NewMemoryDatabase()
+		cfg   = DefaultConfig()
+		path  = t.TempDir()
+	)
 
+	tdb := mustOpen(t, memDB, cfg, path)
 	g := core.Genesis{
 		Config: params.MergedTestChainConfig,
 		Alloc: types.GenesisAlloc{
@@ -594,10 +605,7 @@ func TestGenesis(t *testing.T) {
 	require.NoError(t, tdb.Close(), "triedb.Close()")
 
 	t.Run("recovery", func(t *testing.T) {
-		cfg.Log = loggingtest.New(t, logging.Debug)
-		tdb = triedb.NewDatabase(memDB, &triedb.Config{
-			DBOverride: cfg.BackendConstructor,
-		})
+		tdb = mustOpen(t, memDB, cfg, path)
 		require.True(t, tdb.Initialized(genesisRoot), "Genesis root should still be initialized in the database")
 		require.NoError(t, tdb.Close(), "triedb.Close()")
 	})
@@ -606,11 +614,13 @@ func TestGenesis(t *testing.T) {
 // TestMultipleProposals verifies that a single [triedb.Commit] call
 // chains the commit of dependent proposals.
 func TestMultipleProposals(t *testing.T) {
-	cfg := DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug))
-	db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
-		DBOverride: cfg.BackendConstructor,
-	})
+	var (
+		memDB = rawdb.NewMemoryDatabase()
+		cfg   = DefaultConfig()
+		path  = t.TempDir()
+	)
 
+	db := state.NewDatabaseWithNodeDB(memDB, mustOpen(t, memDB, cfg, path))
 	const numBlocks = 5
 	lastRoot := types.EmptyRootHash
 	for i := range numBlocks {
@@ -629,9 +639,8 @@ func TestMultipleProposals(t *testing.T) {
 	// Firewood loses all uncommitted proposals on close, to test that it was
 	// committed, we can close the database
 	require.NoErrorf(t, db.TrieDB().Close(), "triedb.Close()")
-	db = state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
-		DBOverride: cfg.BackendConstructor,
-	})
+	memDB = rawdb.NewMemoryDatabase()
+	db = state.NewDatabaseWithNodeDB(memDB, mustOpen(t, memDB, cfg, path))
 	defer func() {
 		assert.NoError(t, db.TrieDB().Close(), "triedb.Close()")
 	}()
@@ -648,14 +657,6 @@ func TestInvalidConfig(t *testing.T) {
 		wantErr error
 	}{
 		{
-			name: "empty_path",
-			cfg: func(cfg Config) Config {
-				cfg.Path = ""
-				return cfg
-			},
-			wantErr: errPathNotProvided,
-		},
-		{
 			name: "too_few_revisions",
 			cfg: func(cfg Config) Config {
 				cfg.RevisionsInMemory = 1
@@ -664,38 +665,34 @@ func TestInvalidConfig(t *testing.T) {
 			wantErr: errTooFewRevisions,
 		},
 		{
-			name: "commit_interval_too_big",
+			name: "persist_gap_too_big",
 			cfg: func(cfg Config) Config {
-				cfg.DeferredCommitInterval = 5
+				cfg.MaxPersistGap = 5
 				cfg.RevisionsInMemory = 5
 				return cfg
 			},
-			wantErr: errCommitIntervalTooBig,
+			wantErr: errPersistGapTooBig,
 		},
 		{
-			name: "no_logger",
+			name: "cache_size_overflows_bytes",
 			cfg: func(cfg Config) Config {
-				cfg.Log = nil
+				cfg.CacheSizeMiB = math.MaxUint64
 				return cfg
 			},
-			wantErr: errNoLogger,
+			wantErr: errCacheTooLarge,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := tt.cfg(DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug)))
-			_, err := New(cfg)
-			require.ErrorIs(t, err, tt.wantErr, "New()")
+			cfg := tt.cfg(DefaultConfig())
+			require.ErrorIsf(t, cfg.Verify(), tt.wantErr, "%T.Verify()", cfg)
+
+			// Opening a database with an invalid config MUST be refused.
+			_, err := NewTrieDB(rawdb.NewMemoryDatabase(), cfg, t.TempDir(), loggingtest.New(t, logging.Debug))
+			require.ErrorIs(t, err, tt.wantErr, "WrapTrieDB()")
 		})
 	}
-}
-
-func TestNoLoggerPanicsInBackendConstructor(t *testing.T) {
-	cfg := DefaultConfig(t.TempDir(), nil)
-	require.Panicsf(t, func() {
-		_ = cfg.BackendConstructor(rawdb.NewMemoryDatabase())
-	}, "%T.BackendConstructor()", cfg)
 }
 
 // TestUnknownCommitNoError verifies that committing a root that is not known to
@@ -961,30 +958,28 @@ func TestHashAfterTipMovesPastParent(t *testing.T) {
 // TestHashAfterRevisionEviction verifies that a trie whose parent root has left
 // Firewood's in-memory revision window still hashes.
 func TestHashAfterRevisionEviction(t *testing.T) {
-	cfg := DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug))
-	cfg.RevisionsInMemory = 6
-	cfg.DeferredCommitInterval = 5
+	cfg := DefaultConfig()
+	dir := t.TempDir()
+	memdb := rawdb.NewMemoryDatabase()
 
 	// Guarantee one non-empty state root is on disk, since the empty state is always available.
 	var root1 common.Hash
 	{
-		first := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
-			DBOverride: cfg.BackendConstructor,
-		})
+		tdb, err := NewTrieDB(memdb, cfg, dir, loggingtest.New(t, logging.Debug))
+		require.NoError(t, err, "NewTrieDB(...)")
+		first := state.NewDatabaseWithNodeDB(memdb, tdb)
 		blk1 := newStateDB(t, first, types.EmptyRootHash)
 		blk1.SetNonce(addr1, 1)
 
-		var err error
 		root1, err = blk1.Commit(1, true)
 		require.NoError(t, err, "blk1.Commit()")
-		require.NoErrorf(t, first.TrieDB().Commit(root1, false), "triedb.Commit(%s)", root1)
-		require.NoError(t, first.TrieDB().Close(), "triedb.Close()")
+		require.NoErrorf(t, tdb.Commit(root1, false), "triedb.Commit(%s)", root1)
+		require.NoError(t, tdb.Close(), "triedb.Close()")
 	}
 
-	db := state.NewDatabaseWithConfig(rawdb.NewMemoryDatabase(), &triedb.Config{
-		DBOverride: cfg.BackendConstructor,
-	})
-
+	tdb, err := NewTrieDB(memdb, cfg, dir, loggingtest.New(t, logging.Debug))
+	require.NoError(t, err, "NewTrieDB(...)")
+	db := state.NewDatabaseWithNodeDB(memdb, tdb)
 	want := newStateDB(t, db, root1)
 	want.SetNonce(addr2, 2)
 	wantRoot := want.IntermediateRoot(true)
@@ -998,7 +993,7 @@ func TestHashAfterRevisionEviction(t *testing.T) {
 	// Persist RevisionsInMemory newer roots. Firewood drops root1 from its
 	// by-hash lookup at that point even though sdb's handle keeps it alive.
 	tip := root1
-	for i := uint64(2); i <= uint64(cfg.RevisionsInMemory)+1; i++ {
+	for i := uint64(2); i <= cfg.RevisionsInMemory+1; i++ {
 		blk := newStateDB(t, db, tip)
 		blk.SetNonce(addr3, i)
 
@@ -1008,7 +1003,7 @@ func TestHashAfterRevisionEviction(t *testing.T) {
 		require.NoErrorf(t, db.TrieDB().Commit(tip, false), "triedb.Commit(%s)", tip)
 	}
 
-	_, err := state.New(root1, db, nil)
+	_, err = state.New(root1, db, nil)
 	wantMissingErr := new(trie.MissingNodeError)
 	require.ErrorAs(t, err, &wantMissingErr, "test setup: expected revision to be reaped")
 

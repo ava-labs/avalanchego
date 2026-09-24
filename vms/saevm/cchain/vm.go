@@ -15,7 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/libevm/triedb"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -192,8 +191,11 @@ func (vm *VM) Initialize(
 		}
 
 		saeConfig := userConfig.saeConfig(vm.now)
-		tdbConfig := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
-		if err := genesis.setupTrieDB(ethDB, tdbConfig); err != nil {
+		genesisTDB, err := saeConfig.DBConfig.Open(ethDB, snowCtx.ChainDataDir, snowCtx.Log)
+		if err != nil {
+			return fmt.Errorf("opening trie database for genesis: %w", err)
+		}
+		if err := genesis.setupTrieDB(ethDB, genesisTDB); err != nil {
 			return fmt.Errorf("setting up genesis trie: %w", err)
 		}
 
@@ -201,7 +203,6 @@ func (vm *VM) Initialize(
 		// [VM.activeHandler] ensures that methods accessing [sae.VM] only occur
 		// AFTER [vm.SetState] is called with [snow.Bootstrapping] or
 		// [snow.NormalOp], which guarantees that this method has returned no error.
-		var err error
 		vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, vm.chainConfig, ethDB, vm.Network)
 		if err != nil {
 			return fmt.Errorf("creating SAE VM: %w", err)
@@ -295,9 +296,12 @@ func (vm *VM) Initialize(
 		// Register state sync server
 		{
 			// TODO(alarso16): Find a way to wire in Firewood.
-			if saeConfig.DBConfig.Scheme != customrawdb.FirewoodScheme {
+			if userConfig.StateScheme != customrawdb.FirewoodScheme {
 				// The triedb shouldn't share a cache with execution.
-				tdb := triedb.NewDatabase(ethDB, tdbConfig)
+				tdb, err := saeConfig.DBConfig.Open(ethDB, snowCtx.ChainDataDir, snowCtx.Log)
+				if err != nil {
+					return fmt.Errorf("opening trie database for state sync: %w", err)
+				}
 				vm.onClose = append(vm.onClose, func(context.Context) error {
 					return tdb.Close()
 				})
