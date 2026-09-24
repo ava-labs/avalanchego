@@ -200,5 +200,5 @@ func (c *Client) AwaitTxAccepted(ctx context.Context, txID ids.ID, freq time.Dur
 // "could not find tx <txID>".
 func isAtomicTxNotFound(err error) bool {
 	msg := err.Error()
-	return strings.Contains(msg, "not found") || strings.Contains(msg, "could not find tx")
+	return strings.Contains(msg, "reading tx: not found") || strings.Contains(msg, "could not find tx")
 }
