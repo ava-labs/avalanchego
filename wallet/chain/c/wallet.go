@@ -156,7 +156,6 @@ func (w *wallet) IssueAtomicTx(
 	ctx := ops.Context()
 	startTime := time.Now()
 
-	// The coreth and SAE atomic tx codecs are wire compatible.
 	t, err := tx.Parse(atx.SignedBytes())
 	if err != nil {
 		return fmt.Errorf("parsing atomic tx: %w", err)
@@ -227,11 +226,8 @@ func awaitTxAccepted(ctx context.Context, c txGetter, txID ids.ID, freq time.Dur
 }
 
 // isTxNotFound reports whether err means the node has not accepted the tx yet.
-// SAE returns "fetching tx: reading tx: not found" and coreth returns
-// "could not find tx <txID>".
 func isTxNotFound(err error) bool {
-	msg := err.Error()
-	return strings.Contains(msg, "reading tx: not found") || strings.Contains(msg, "could not find tx")
+	return strings.Contains(err.Error(), "reading tx: not found")
 }
 
 func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
