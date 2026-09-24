@@ -15,7 +15,7 @@ import (
 var (
 	_ UnsignedTx = (*RewardAutoRenewedValidatorTx)(nil)
 
-	errMissingTxID      = errors.New("missing tx id")
+	errMissingTxID      = errors.New("missing staker id")
 	errMissingTimestamp = errors.New("missing timestamp")
 )
 
