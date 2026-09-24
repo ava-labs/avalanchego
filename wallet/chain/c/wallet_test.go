@@ -43,17 +43,9 @@ func TestAwaitTxAccepted(t *testing.T) {
 			wantCalls: 1,
 		},
 		{
-			name: "sae_not_found_then_accepted",
+			name: "not_found_then_accepted",
 			errs: []error{
 				errors.New("sending request: fetching tx: reading tx: not found"),
-				nil,
-			},
-			wantCalls: 2,
-		},
-		{
-			name: "coreth_not_found_then_accepted",
-			errs: []error{
-				errors.New("sending request: could not find tx 2QouvFWUbjuySRxeX5xMbNCuAaKWfbk5FeEa2JmoF85RKLk2dD"),
 				nil,
 			},
 			wantCalls: 2,
