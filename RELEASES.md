@@ -6,6 +6,7 @@
 
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 - Updated the minimum Go version from `1.25.10` to `1.26.8`.
+- `api-max-blocks-per-request` was added back to the C-Chain config.
 
 ### Metrics
 
@@ -190,7 +191,6 @@ After Helicon activates, the C-Chain ignores the following options. The node log
 - `transaction-history`
 - `tx-pool-account-queue`
 - `tx-pool-global-queue`
-- `api-max-blocks-per-request`
 
 ### Fixes
 

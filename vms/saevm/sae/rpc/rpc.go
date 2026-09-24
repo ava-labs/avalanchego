@@ -72,6 +72,7 @@ type Config struct {
 	EVMTimeout            time.Duration
 	GasCap                uint64
 	BatchRequestLimit     uint64 // 0 = no limit
+	MaxBlocksPerRequest   int64  // maximum number of blocks per eth_getLogs request; 0 = no limit
 
 	// Transaction submission
 	TxFeeCap            float64 // 0 = no cap

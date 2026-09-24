@@ -8,6 +8,7 @@ go_library(
         "blocks.go",
         "custom.go",
         "debug.go",
+        "filters.go",
         "gasprice.go",
         "indexing.go",
         "mempool.go",

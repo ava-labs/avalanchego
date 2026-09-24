@@ -859,6 +859,77 @@ func TestGetLogs(t *testing.T) {
 	}
 }
 
+func TestGetLogsBlockLimit(t *testing.T) {
+	const maxBlocksPerRequest = 2
+
+	ctx, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.RPCConfig.MaxBlocksPerRequest = maxBlocksPerRequest
+	}))
+	genesis := sut.lastAcceptedBlock(t)
+	first := sut.runConsensusLoop(t)
+	second := sut.runConsensusLoop(t)
+	require.NoErrorf(t, second.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", second)
+
+	tests := []struct {
+		name    string
+		query   ethereum.FilterQuery
+		wantErr testerr.Want
+	}{
+		{
+			name: "single_block",
+			query: ethereum.FilterQuery{
+				FromBlock: genesis.Number(),
+				ToBlock:   genesis.Number(),
+			},
+		},
+		{
+			name: "at_limit",
+			query: ethereum.FilterQuery{
+				FromBlock: genesis.Number(),
+				ToBlock:   first.Number(),
+			},
+		},
+		{
+			name: "over_limit",
+			query: ethereum.FilterQuery{
+				FromBlock: genesis.Number(),
+				ToBlock:   second.Number(),
+			},
+			wantErr: testerr.Contains("requested too many blocks from 0 to 2, maximum is set to 2"),
+		},
+		{
+			name: "over_limit_to_latest",
+			query: ethereum.FilterQuery{
+				FromBlock: genesis.Number(),
+			},
+			wantErr: testerr.Contains("requested too many blocks from 0 to 2, maximum is set to 2"),
+		},
+		{
+			name: "over_limit_to_future_block",
+			query: ethereum.FilterQuery{
+				FromBlock: genesis.Number(),
+				ToBlock:   big.NewInt(100),
+			},
+			wantErr: testerr.Contains("not accepted yet"),
+		},
+		{
+			name: "block_hash_bypasses_range_limit",
+			query: ethereum.FilterQuery{
+				BlockHash: utils.PointerTo(genesis.Hash()),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := sut.FilterLogs(ctx, tt.query)
+			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
+				t.Errorf("eth_getLogs(...) %s", diff)
+			}
+		})
+	}
+}
+
 func TestEthPendingTransactions(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
