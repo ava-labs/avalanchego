@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"golang.org/x/exp/slog"
@@ -157,20 +158,33 @@ func (c *Client) GetVMConfig(ctx context.Context, options ...rpc.Option) (*confi
 	return res.Config, err
 }
 
-// AwaitTxAccepted polls GetAtomicTxStatus every freq until txID is accepted
-// or ctx is cancelled.
+// getAtomicTxHeightReply is the subset of the avax.getAtomicTx reply that
+// [Client.AwaitTxAccepted] reads. Both the coreth and SAE C-Chain set
+// blockHeight only after the tx is accepted.
+type getAtomicTxHeightReply struct {
+	BlockHeight *json.Uint64 `json:"blockHeight,omitempty"`
+}
+
+// AwaitTxAccepted polls avax.getAtomicTx every freq until txID is accepted or
+// ctx is cancelled.
+//
+// It does not use avax.getAtomicTxStatus, which is deprecated and is not
+// served by public API endpoints after Helicon.
 func (c *Client) AwaitTxAccepted(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) error {
 	ticker := time.NewTicker(freq)
 	defer ticker.Stop()
 
 	for {
-		status, err := c.GetAtomicTxStatus(ctx, txID, options...)
-		if err != nil {
-			return err
-		}
-
-		if status == atomic.Accepted {
+		res := &getAtomicTxHeightReply{}
+		err := c.requester.SendRequest(ctx, "avax.getAtomicTx", &api.GetTxArgs{
+			TxID:     txID,
+			Encoding: formatting.Hex,
+		}, res, options...)
+		switch {
+		case err == nil && res.BlockHeight != nil:
 			return nil
+		case err != nil && !isAtomicTxNotFound(err):
+			return err
 		}
 
 		select {
@@ -179,4 +193,12 @@ func (c *Client) AwaitTxAccepted(ctx context.Context, txID ids.ID, freq time.Dur
 			return ctx.Err()
 		}
 	}
+}
+
+// isAtomicTxNotFound reports whether err means the node has not accepted the
+// tx yet. SAE returns "fetching tx: reading tx: not found" and coreth returns
+// "could not find tx <txID>".
+func isAtomicTxNotFound(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "not found") || strings.Contains(msg, "could not find tx")
 }
