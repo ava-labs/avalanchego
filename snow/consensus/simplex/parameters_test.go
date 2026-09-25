@@ -14,9 +14,9 @@ func TestParametersVerify(t *testing.T) {
 	validValidators := []ValidatorInfo{{}}
 
 	tests := []struct {
-		name          string
-		params        Parameters
-		expectedError error
+		name         string
+		params       Parameters
+		expectedErrs []error
 	}{
 		{
 			name: "valid",
@@ -25,7 +25,7 @@ func TestParametersVerify(t *testing.T) {
 				MaxRebroadcastWait: time.Second,
 				InitialValidators:  validValidators,
 			},
-			expectedError: nil,
+			expectedErrs: nil,
 		},
 		{
 			name: "zero MaxNetworkDelay",
@@ -34,7 +34,7 @@ func TestParametersVerify(t *testing.T) {
 				MaxRebroadcastWait: time.Second,
 				InitialValidators:  validValidators,
 			},
-			expectedError: ErrInvalidParameters,
+			expectedErrs: []error{errMaxNetworkDelayNotPositive},
 		},
 		{
 			name: "zero MaxRebroadcastWait",
@@ -43,7 +43,7 @@ func TestParametersVerify(t *testing.T) {
 				MaxRebroadcastWait: 0,
 				InitialValidators:  validValidators,
 			},
-			expectedError: ErrInvalidParameters,
+			expectedErrs: []error{errMaxRebroadcastWaitNotPositive},
 		},
 		{
 			name: "empty InitialValidators",
@@ -52,7 +52,7 @@ func TestParametersVerify(t *testing.T) {
 				MaxRebroadcastWait: time.Second,
 				InitialValidators:  []ValidatorInfo{},
 			},
-			expectedError: ErrInvalidParameters,
+			expectedErrs: []error{errInitialValidatorsEmpty},
 		},
 		{
 			name: "nil InitialValidators",
@@ -61,13 +61,78 @@ func TestParametersVerify(t *testing.T) {
 				MaxRebroadcastWait: time.Second,
 				InitialValidators:  nil,
 			},
-			expectedError: ErrInvalidParameters,
+			expectedErrs: []error{errInitialValidatorsEmpty},
+		},
+		{
+			name: "multiple invalid",
+			params: Parameters{
+				MaxNetworkDelay:    0,
+				MaxRebroadcastWait: 0,
+				InitialValidators:  validValidators,
+			},
+			expectedErrs: []error{
+				errMaxNetworkDelayNotPositive,
+				errMaxRebroadcastWaitNotPositive,
+			},
+		},
+		{
+			name:   "zero value",
+			params: Parameters{},
+			expectedErrs: []error{
+				errMaxNetworkDelayNotPositive,
+				errMaxRebroadcastWaitNotPositive,
+				errInitialValidatorsEmpty,
+			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			err := test.params.Verify()
-			require.ErrorIs(t, err, test.expectedError)
+			if len(test.expectedErrs) == 0 {
+				require.NoError(t, err)
+				return
+			}
+
+			require.ErrorIs(t, err, ErrInvalidParameters)
+			for _, expectedErr := range test.expectedErrs {
+				require.ErrorIs(t, err, expectedErr)
+			}
+			// Verify joins one error per violated condition, so every expected
+			// condition being present and the counts matching means nothing
+			// else was reported.
+			require.Len(t, joinedErrs(t, err), len(test.expectedErrs))
+		})
+	}
+}
+
+// joinedErrs returns the individual errors combined by [errors.Join].
+func joinedErrs(t *testing.T, err error) []error {
+	joined, ok := err.(interface{ Unwrap() []error })
+	require.True(t, ok, "expected an error produced by errors.Join")
+	return joined.Unwrap()
+}
+
+func TestParametersVerifyErrorMessage(t *testing.T) {
+	tests := []struct {
+		name            string
+		params          Parameters
+		expectedMessage string
+	}{
+		{
+			name: "single violation",
+			params: Parameters{
+				MaxNetworkDelay:    0,
+				MaxRebroadcastWait: time.Second,
+				InitialValidators:  []ValidatorInfo{{}},
+			},
+			expectedMessage: "simplex parameters must be valid: maxNetworkDelay must be positive",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := test.params.Verify()
+			require.ErrorIs(t, err, ErrInvalidParameters)
+			require.Equal(t, test.expectedMessage, err.Error())
 		})
 	}
 }

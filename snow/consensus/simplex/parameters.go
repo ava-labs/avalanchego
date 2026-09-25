@@ -11,7 +11,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var ErrInvalidParameters = errors.New("simplex parameters must be valid")
+var (
+	ErrInvalidParameters = errors.New("simplex parameters must be valid")
+
+	errMaxNetworkDelayNotPositive    = errors.New("maxNetworkDelay must be positive")
+	errMaxRebroadcastWaitNotPositive = errors.New("maxRebroadcastWait must be positive")
+	errInitialValidatorsEmpty        = errors.New("initialValidators must be non-empty")
+)
 
 type ValidatorInfo struct {
 	NodeID ids.NodeID `json:"nodeID" yaml:"nodeID"`
@@ -32,17 +38,23 @@ var DefaultParameters = Parameters{
 	MaxRebroadcastWait: 5 * time.Second,
 }
 
+// Verify returns nil if the parameters are valid.
+//
+// If any condition is violated, the returned error is the [errors.Join] of
+// one error per violated condition, each wrapping [ErrInvalidParameters],
+// rather than only the first violation.
 func (p Parameters) Verify() error {
+	var errs []error
 	if p.MaxNetworkDelay <= 0 {
-		return fmt.Errorf("%w: maxNetworkDelay must be positive", ErrInvalidParameters)
+		errs = append(errs, fmt.Errorf("%w: %w", ErrInvalidParameters, errMaxNetworkDelayNotPositive))
 	}
 	if p.MaxRebroadcastWait <= 0 {
-		return fmt.Errorf("%w: maxRebroadcastWait must be positive", ErrInvalidParameters)
+		errs = append(errs, fmt.Errorf("%w: %w", ErrInvalidParameters, errMaxRebroadcastWaitNotPositive))
 	}
 	// TODO: we need to validate InitialValidators contains only unique nodes with valid keys.
 	// See: https://github.com/ava-labs/avalanchego/issues/5023
 	if len(p.InitialValidators) == 0 {
-		return fmt.Errorf("%w: initialValidators must be non-empty", ErrInvalidParameters)
+		errs = append(errs, fmt.Errorf("%w: %w", ErrInvalidParameters, errInitialValidatorsEmpty))
 	}
-	return nil
+	return errors.Join(errs...)
 }
