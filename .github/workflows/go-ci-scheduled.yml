@@ -13,28 +13,78 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  full:
+  # Keep setup jobs separate rather than using a matrix so each consumer waits
+  # only for the setup job for its platform.
+
+  setup-cache-darwin-arm64:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-workflow-cache-producer
+
+  setup-cache-linux-amd64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-workflow-cache-producer
+
+  setup-cache-linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-workflow-cache-producer
+        with:
+          # The Linux AMD64 setup job produces the Go module cache shared by all Linux
+          # architectures. This job still produces its platform-specific Task and Nix caches.
+          produce-go-module-cache: 'false'
+
+  full-darwin-arm64:
+    name: macos-26-arm64
+    needs: setup-cache-darwin-arm64
+    uses: ./.github/workflows/go-ci.yml
+    with:
+      platform_name: macos-26-arm64
+      runner: macos-26
+      run_race_shuffle_unit_tests: false
+    secrets: inherit
+
+  full-linux-amd64:
     name: ${{ matrix.platform_name }}
+    needs: setup-cache-linux-amd64
     strategy:
       fail-fast: false
       matrix:
         include:
           - platform_name: ubuntu-22.04-amd64
             runner: ubuntu-22.04
-          - platform_name: ubuntu-22.04-arm64
-            runner: ubuntu-22.04-arm
           # Run race and shuffled tests once on our production platform to retain coverage
           # without increasing flake rate across every platform.
           - platform_name: ubuntu-24.04-amd64
             runner: ubuntu-24.04
             run_race_shuffle_unit_tests: true
-          - platform_name: ubuntu-24.04-arm64
-            runner: ubuntu-24.04-arm
-          - platform_name: macos-26-arm64
-            runner: macos-26
     uses: ./.github/workflows/go-ci.yml
     with:
       platform_name: ${{ matrix.platform_name }}
       runner: ${{ matrix.runner }}
       run_race_shuffle_unit_tests: ${{ matrix.run_race_shuffle_unit_tests || false }}
+    secrets: inherit
+
+  full-linux-arm64:
+    name: ${{ matrix.platform_name }}
+    needs:
+      - setup-cache-linux-amd64
+      - setup-cache-linux-arm64
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform_name: ubuntu-22.04-arm64
+            runner: ubuntu-22.04-arm
+          - platform_name: ubuntu-24.04-arm64
+            runner: ubuntu-24.04-arm
+    uses: ./.github/workflows/go-ci.yml
+    with:
+      platform_name: ${{ matrix.platform_name }}
+      runner: ${{ matrix.runner }}
+      run_race_shuffle_unit_tests: false
     secrets: inherit

@@ -27,6 +27,9 @@ runs:
     - name: Set up QEMU (required for cross-platform builds)
       if: ${{ inputs.setup-qemu == 'true' }}
       uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
+      with:
+        # The upstream action otherwise writes a GitHub Actions cache on every ref.
+        cache-image: false
 
     - name: Run command with Docker failure diagnostics
       shell: bash

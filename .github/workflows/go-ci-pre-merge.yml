@@ -76,7 +76,20 @@ jobs:
             exit 1
           fi
 
+  setup-cache-darwin-arm64:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-workflow-cache-producer
+
+  setup-cache-linux-amd64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-workflow-cache-producer
+
   build-antithesis-images-avalanchego:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -86,6 +99,7 @@ jobs:
           run: ./scripts/run_task.sh test-build-antithesis-images-avalanchego
 
   build-antithesis-images-subnet-evm:
+    needs: setup-cache-linux-amd64
     # Use a faster runner pending migration to bazel. The default free runners result
     # in 20+ minute runtime, slowing down every PR and merge queue CI run.
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -97,6 +111,7 @@ jobs:
           run: ./scripts/run_task.sh test-build-antithesis-images-subnet-evm
 
   build-image-avalanchego:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -107,6 +122,7 @@ jobs:
           run: ./scripts/run_task.sh test-build-image
 
   build-image-subnet-evm:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -118,6 +134,7 @@ jobs:
           working_directory: ./graft/subnet-evm
 
   check-contract-bindings:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -128,6 +145,7 @@ jobs:
       - run: ./scripts/run_task.sh check-generate-load-contract-bindings
 
   check-generated-canoto:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -136,6 +154,7 @@ jobs:
         run: ./scripts/run_task.sh check-generate-canoto
 
   check-generated-mocks:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -144,6 +163,7 @@ jobs:
         run: ./scripts/run_task.sh check-generate-mocks
 
   check-generated-protobuf:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -155,6 +175,7 @@ jobs:
       - run: ./scripts/run_task.sh check-generate-protobuf
 
   check-go-mod-tidy:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -183,6 +204,7 @@ jobs:
           fi
 
   e2e:
+    needs: setup-cache-linux-amd64
     name: e2e (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -209,6 +231,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-bootstrap-monitor:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -232,6 +255,7 @@ jobs:
           artifact_name: bootstrap-monitor-kind-diagnostics
 
   e2e-existing-network:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -250,6 +274,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-kube:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -269,6 +294,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-load-subnet-evm:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - name: Git checkout
@@ -291,6 +317,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-post-latest:
+    needs: setup-cache-linux-amd64
     # The default free runners lack the resources for parallel execution, so a beefier
     # runner is required.
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -312,6 +339,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-schedule-latest:
+    needs: setup-cache-linux-amd64
     # The default free runners lack the resources for parallel execution, so a beefier
     # runner is required.
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -333,6 +361,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-warp-coreth:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - name: Git checkout
@@ -355,6 +384,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-warp-subnet-evm:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - name: Git checkout
@@ -377,6 +407,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   fuzz:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -386,6 +417,7 @@ jobs:
         run: ./scripts/run_task.sh test-fuzz
 
   lint-avalanchego:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -397,6 +429,7 @@ jobs:
         run: ./scripts/run_task.sh lint-all-ci
 
   lint-coreth:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -411,6 +444,7 @@ jobs:
         run: ./scripts/run_task.sh check-go-mod-tidy
 
   lint-evm:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -424,6 +458,7 @@ jobs:
         run: ../../scripts/run_task.sh check-go-mod-tidy
 
   lint-subnet-evm:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -438,6 +473,7 @@ jobs:
         run: ./scripts/run_task.sh check-go-mod-tidy
 
   load:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -474,6 +510,7 @@ jobs:
   #         loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   robustness:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -502,6 +539,7 @@ jobs:
   # runs the full suite on macOS.
   smoke:
     name: darwin-arm64
+    needs: setup-cache-darwin-arm64
     uses: ./.github/workflows/go-ci-smoke.yml
     with:
       platform_name: darwin-arm64
@@ -510,6 +548,7 @@ jobs:
 
   unit:
     name: linux-amd64
+    needs: setup-cache-linux-amd64
     uses: ./.github/workflows/go-ci.yml
     with:
       platform_name: linux-amd64
@@ -517,6 +556,7 @@ jobs:
     secrets: inherit
 
   upgrade:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
