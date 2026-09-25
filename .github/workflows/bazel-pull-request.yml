@@ -39,7 +39,7 @@ jobs:
       platform_name: linux-amd64
       runner: ubuntu-24.04
       e2e_runner: ubuntu-24.04-amd64-4-core
-      run_race_shuffle_unit_tests: false
+      run_race_unit_tests: true
     secrets: inherit
 
   smoke:
