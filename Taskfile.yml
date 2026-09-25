@@ -81,12 +81,10 @@ tasks:
       - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'
 
   bazel-test-e2e:
-    desc: Run E2E tests with bazel-built binary
-    cmds:
-      - task: bazel-build
-      - task: build-xsvm
-      - cmd: |
-          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
+    desc: Run E2E tests with Bazel-built runtime dependencies
+    env:
+      BAZEL_CI_TARGET_PATTERNS: //tests/e2e:e2e_runner
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run //tests/e2e:e2e_runner'
 
   bazel-test-e2e-ci:
     desc: Run the E2E network-reuse smoke test with a Bazel-built binary [serially with race detection]
@@ -99,12 +97,10 @@ tasks:
           {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
 
   bazel-test-e2e-smoke:
-    desc: Run an E2E smoke test with bazel-built binary
-    cmds:
-      - task: bazel-build
-      - task: build-xsvm
-      - cmd: |
-          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.sh --ginkgo.focus-file=c/api.go'
+    desc: Run an E2E smoke test with Bazel-built runtime dependencies
+    env:
+      BAZEL_CI_TARGET_PATTERNS: //tests/e2e:e2e_runner
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run //tests/e2e:e2e_runner -- --ginkgo.focus-file=c/api.go'
 
   bazel-test-unit:
     desc: Run cacheable Go unit tests with Bazel

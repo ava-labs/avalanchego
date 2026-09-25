@@ -28,3 +28,29 @@ go_test(
         "@org_uber_go_zap//:zap",
     ],
 )
+
+genrule(
+    name = "e2e_test_binary",
+    testonly = True,
+    srcs = [":e2e_test"],
+    outs = ["e2e.test"],
+    cmd = "cp $< $@",
+)
+
+sh_binary(
+    name = "e2e_runner",
+    testonly = True,
+    srcs = ["e2e_runner.sh"],
+    args = [
+        "$(location //main:avalanchego)",
+        "$(location :e2e_test_binary)",
+        "$(location @com_github_onsi_ginkgo_v2//ginkgo:ginkgo)",
+        "$(location //vms/example/xsvm/cmd/xsvm:xsvm)",
+    ],
+    data = [
+        ":e2e_test_binary",
+        "//main:avalanchego",
+        "//vms/example/xsvm/cmd/xsvm",
+        "@com_github_onsi_ginkgo_v2//ginkgo",
+    ],
+)

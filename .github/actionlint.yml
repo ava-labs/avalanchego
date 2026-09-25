@@ -2,3 +2,4 @@ self-hosted-runner:
   labels:
     - avalanche-avalanchego-runner # Github Action Runner Controller
     - blacksmith-4vcpu-ubuntu-2404 # Beefier x86 runner
+    - ubuntu-24.04-amd64-4-core    # GitHub-hosted x86 runner
