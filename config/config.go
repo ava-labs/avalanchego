@@ -1231,6 +1231,7 @@ func getPrimaryNetworkConfig(v *viper.Viper) subnets.Config {
 		SnowParameters:              getPrimaryNetworkSnowConfig(v),
 		ValidatorOnly:               false,
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
+		ProposerWindowMilliseconds:  uint64(proposervm.DefaultWindowDuration / time.Millisecond),
 	}
 }
 
