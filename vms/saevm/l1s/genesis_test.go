@@ -40,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	avalancheutils "github.com/ava-labs/avalanchego/utils"
 )
 
 func TestMain(m *testing.M) {
@@ -115,7 +114,7 @@ func testGenesis(opts ...genesisOption) *core.Genesis {
 	return options.ApplyTo(&core.Genesis{
 		Config: l1params.WithExtra(testEthConfig(), &extras.ChainConfig{
 			NetworkUpgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](0),
+				SubnetEVMTimestamp: new(uint64(0)),
 			},
 			FeeConfig: l1params.DefaultFeeConfig,
 		}),
@@ -162,7 +161,7 @@ func TestParseGenesis(t *testing.T) {
 	var (
 		latest    = newContext(t, upgradetest.Latest)
 		durango   = newContext(t, upgradetest.Durango)
-		delayedTS = avalancheutils.PointerTo(testGenesisTime + 100)
+		delayedTS = new(testGenesisTime + 100)
 	)
 	tests := []struct {
 		name         string
@@ -282,7 +281,7 @@ func TestParseGenesis(t *testing.T) {
 			genesis: testGenesisJSON(),
 			upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
 				NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-					GraniteTimestamp: avalancheutils.PointerTo[uint64](1),
+					GraniteTimestamp: new(uint64(1)),
 				},
 			})),
 			wantErr: testerr.Contains("granite fork block timestamp is invalid"),
@@ -625,7 +624,7 @@ func TestWriteGenesis(t *testing.T) {
 				genesis:           testGenesisJSON(),
 				upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
 					NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-						HeliconTimestamp: avalancheutils.PointerTo(testGenesisTime + 2_000),
+						HeliconTimestamp: new(testGenesisTime + 2_000),
 					},
 				})),
 			},
@@ -645,7 +644,7 @@ func TestWriteGenesis(t *testing.T) {
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
 				upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
 					NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-						HeliconTimestamp: avalancheutils.PointerTo(testGenesisTime + 3_000),
+						HeliconTimestamp: new(testGenesisTime + 3_000),
 					},
 				})),
 			},
@@ -666,7 +665,7 @@ func TestWriteGenesis(t *testing.T) {
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
 				upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
 					NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-						HeliconTimestamp: avalancheutils.PointerTo(testGenesisTime + 3_000),
+						HeliconTimestamp: new(testGenesisTime + 3_000),
 					},
 				})),
 			},
