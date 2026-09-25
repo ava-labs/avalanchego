@@ -34,6 +34,7 @@ avalanchego monorepo.
 - [Common Tasks](#common-tasks)
   - [Building](#building)
   - [Testing](#testing)
+    - [E2E runner](#e2e-runner)
     - [Go Test Selection](#go-test-selection)
     - [Test Options](#test-options)
     - [Test Timeouts](#test-timeouts)
@@ -151,10 +152,6 @@ default for all local Bazel commands.
 
 See [Go toolchains and dependency caches](./go-toolchains-and-caches.md) for
 cache boundaries, preparation order, and the limits of download restrictions.
-
-A task with a Bazel name can also run Go commands outside Bazel. For example,
-`bazel-test-e2e-smoke` builds the node with Bazel, but uses Go to build XSVM and
-the E2E test binary. Its Nix environment supplies Go for those commands.
 
 ### Version Pinning
 
@@ -474,8 +471,7 @@ bazel build //...
 
 ### Testing
 
-Use the Bazel test tasks for repository test suites. The tasks select Go test
-rules and exclude manual tests.
+Use the Bazel unit-test tasks to select Go test rules and exclude manual tests.
 
 ```bash
 # Run all cacheable Go unit tests
@@ -489,10 +485,41 @@ bazel test //utils:set_test --test_filter=TestSet_Add
 
 # Collect coverage
 bazel coverage //...
-
-# Run E2E tests (requires built binary)
-task bazel-test-e2e
 ```
+
+#### E2E runner
+
+```bash
+# Run all E2E tests with Bazel-built runtime dependencies
+task bazel-test-e2e
+
+# Run E2E tests serially with Bazel-built runtime dependencies
+task bazel-test-e2e-serial
+
+# Run only the C-Chain ProposerVM API test
+task bazel-test-e2e-smoke
+```
+
+`task bazel-test-e2e` runs `bazel run //tests/e2e:e2e_runner`. The
+[`e2e_runner` target](../tests/e2e/BUILD.bazel) uses Bazel's Go toolchain to build
+avalanchego, Ginkgo, the E2E test binary, and XSVM.
+The [Bazel runner](../scripts/tests.e2e.bazel.sh) uses the
+[shared E2E script](../scripts/tests.e2e.sh) to execute these prebuilt binaries.
+Bazel can cache the binary builds. E2E test execution does not use cached test
+results.
+
+[CI builds and executes E2E tests in one job](../.github/workflows/bazel.yml)
+through the same tasks used locally.
+This follows the [CI entrypoint conventions](./ci.md#principles) and avoids a
+separate artifact lifecycle. Remote caching lets each job reuse compiled outputs.
+
+The Bazel entrypoint uses `bazel run`, not `bazel test`. It keeps network data
+available for inspection after a failure. Network data defaults to `$HOME/.tmpnet`.
+Any sandboxed execution must preserve access to this data after a failure.
+
+The XSVM plugin link lives under `build/bazel-e2e/plugins` to keep each
+checkout's plugin state separate. This also avoids overwriting plugins from
+non-Bazel builds.
 
 #### Go Test Selection
 
@@ -618,10 +645,9 @@ uses the Go-based Task bootstrap when Task is not on `PATH`.
 See [Bazel CI External Dependency
 Caching](#bazel-ci-external-dependency-caching) for the motivation,
 cache-key design, checked-in Bazel dependency list, and [how CI checks the
-list](#enforcement). The E2E Bazel job uses the same cache setup through
-`run-monitored-tmpnet-cmd`, which also collects test data and metrics.
+list](#enforcement).
 
-That check includes the Bazel module metadata files, so lockfile drift
+The metadata check includes the Bazel module metadata files, so lockfile drift
 is caught in the metadata phase rather than showing up later as a
 surprising working-tree mutation.
 
@@ -643,15 +669,18 @@ workflow, which reduces exposure to those infrastructure failures.
 
 ### Test platforms and cache policy
 
-Bazel CI uses a small pre-merge test set. GitHub-hosted runners can fail for
+Bazel CI uses a small pre-merge platform set. GitHub-hosted runners can fail for
 reasons outside the repository. A smaller job set reduces that risk.
 
 Non-scheduled Bazel CI runs these jobs:
 
-- Ubuntu 24.04 AMD64 CI runs one full cacheable unit-test job and a focused E2E
-  smoke test.
-- macOS 26 ARM64 CI runs one cacheable unit-test smoke target and one focused
+- Linux pre-merge CI runs the full cacheable unit-test suite and full E2E suite.
+- macOS pre-merge CI runs one cacheable unit-test smoke target and one focused
   E2E smoke test.
+
+See [E2E runner](#e2e-runner) for build and execution details.
+See [E2E runner capacity](./ci.md#use-beefier-runners-for-faster-e2e-jobs) for the
+shared runner-sizing policy.
 
 Previously, Bazel CI divided the full unit-test suite among three
 component-specific jobs. These jobs ran in parallel to keep the pre-merge
@@ -660,20 +689,17 @@ detection. These changes remove the need for separate jobs. Reconsider separate
 jobs if these conditions change or one job makes the pre-merge runtime
 unacceptable.
 
-The E2E smoke task selects the C-Chain ProposerVM API test. Ubuntu and macOS use
-the same task. It does not provide full E2E coverage. A future change will
-replace the Ubuntu smoke test with a non-smoke E2E test. Each setup job checks
-Bazel metadata. On `master`, a cache miss makes each setup job prepare the CI
-dependency list. The job then disables downloads, checks metadata, and saves the
-cache. Setup jobs can duplicate this work when they share a key. On other refs,
-each Bazel-consuming job prepares its own non-exact restore before it disables
-repository and module downloads. Those jobs do not save the cache.
+Each setup job checks Bazel metadata. On `master`, a cache miss makes each setup
+job prepare the CI dependency list. The job then disables downloads, checks
+metadata, and saves the cache. Setup jobs can duplicate this work when they
+share a key. On other refs, each Bazel-consuming job prepares its own non-exact
+restore before it disables repository and module downloads. Those jobs do not
+save the cache.
 
-The daily scheduled workflow runs one full unit-test job on Ubuntu 22.04 and
-24.04, on AMD64 and ARM64, and on macOS 26 ARM64. It also runs the same focused
-E2E smoke test on each platform. Only the Ubuntu 24.04 AMD64 unit-test job uses
-race detection and shuffled test order. It uses `--nocache_test_results`. Thus,
-Bazel runs it again and does not use a cached random test result.
+The [daily scheduled workflow](../.github/workflows/bazel-scheduled.yml) runs
+full unit-test and E2E suites across its platform matrix. It
+includes a race-detection and shuffled-order unit-test run. That run disables
+test-result caching so it executes rather than reusing a cached random result.
 
 The scheduled workflow also disables the remote cache. This provides daily
 validation that does not depend on remote action or test results.
