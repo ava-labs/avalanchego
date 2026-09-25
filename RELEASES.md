@@ -6,6 +6,7 @@
 
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 - Updated the minimum Go version from `1.25.10` to `1.26.8`.
+- Consensus parameter validation (`snowball.Parameters.Verify` and `simplex.Parameters.Verify`) now reports every violated condition instead of only the first one.
 
 ### Metrics
 
