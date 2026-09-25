@@ -206,13 +206,8 @@ func (service *AvaxAPI) GetAtomicTxStatus(_ *http.Request, args *api.JSONTxID, r
 	return err
 }
 
-type FormattedTx struct {
-	api.FormattedTx
-	BlockHeight *json.Uint64 `json:"blockHeight,omitempty"`
-}
-
 // GetAtomicTx returns the specified transaction
-func (service *AvaxAPI) GetAtomicTx(_ *http.Request, args *api.GetTxArgs, reply *FormattedTx) error {
+func (service *AvaxAPI) GetAtomicTx(_ *http.Request, args *api.GetTxArgs, reply *client.FormattedTx) error {
 	service.Context.Log.Debug("API called",
 		zap.String("service", "avax"),
 		zap.String("method", "getAtomicTx"),
