@@ -49,7 +49,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -1661,7 +1660,7 @@ func TestDynamicPriceExponent(t *testing.T) {
 		},
 		{
 			name:    "max_diff",
-			desired: utils.PointerTo[gas.Price](2),
+			desired: new(gas.Price(2)),
 			want: []dynamic.PriceExponent{
 				maxDiff,
 				2 * maxDiff,
@@ -1714,7 +1713,7 @@ func TestDynamicTargetExponent(t *testing.T) {
 		},
 		{
 			name:    "max_diff",
-			desired: utils.PointerTo[gas.Gas](15_000_000),
+			desired: new(gas.Gas(15_000_000)),
 			want: []dynamic.TargetExponent{
 				maxDiff,
 				2 * maxDiff,
@@ -1767,7 +1766,7 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 		},
 		{
 			name:    "votes_up_capped",
-			desired: utils.PointerTo[uint64](4000), // above the ~2000ms initial
+			desired: new(uint64(4000)), // above the ~2000ms initial
 			want: []dynamic.DelayExponent{
 				dynamic.InitialDelayExponent + maxDiff,
 				dynamic.InitialDelayExponent + 2*maxDiff,
@@ -1775,7 +1774,7 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 		},
 		{
 			name:    "votes_down_capped",
-			desired: utils.PointerTo[uint64](1000),
+			desired: new(uint64(1000)),
 			want: []dynamic.DelayExponent{
 				dynamic.InitialDelayExponent - maxDiff,
 				dynamic.InitialDelayExponent - 2*maxDiff,
