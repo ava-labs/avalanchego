@@ -32,6 +32,7 @@ graft_go_test(
     ],
     deps = [
         ":deployerallowlist",
+        "//graft/evm/utils",
         "//graft/subnet-evm/accounts/abi/bind",
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/ethclient/simulated",
@@ -43,7 +44,6 @@ graft_go_test(
         "//graft/subnet-evm/precompile/contracts/utilstest",
         "//graft/subnet-evm/precompile/precompileconfig",
         "//graft/subnet-evm/precompile/precompiletest",
-        "//utils",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//crypto",

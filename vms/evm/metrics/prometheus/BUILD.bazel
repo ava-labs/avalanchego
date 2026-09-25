@@ -10,7 +10,6 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/evm/metrics/prometheus",
     visibility = ["//visibility:public"],
     deps = [
-        "//utils",
         "@com_github_ava_labs_libevm//metrics",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_prometheus_client_model//go",
