@@ -480,8 +480,9 @@ jobs:
     needs: setup-cache-linux-amd64
     uses: ./.github/workflows/go-unit.yml
     with:
-      platform_name: linux-amd64
       runner: ubuntu-24.04
+      test_task: test-unit
+      reuse_test_results: true
     secrets: inherit
 
   upgrade:
