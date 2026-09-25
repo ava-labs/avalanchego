@@ -41,7 +41,6 @@ jobs:
       - e2e-load-subnet-evm
       - e2e-post-latest
       - e2e-schedule-latest
-      - e2e-warp-coreth
       - e2e-warp-subnet-evm
       - fuzz
       - lint-avalanchego
@@ -323,28 +322,6 @@ jobs:
           run: ./scripts/run_task.sh test-e2e-ci-schedule-latest
           artifact_prefix: e2e-schedule-latest
           filter_by_owner: avalanchego-e2e
-          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
-          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_url: ${{ secrets.LOKI_URL || '' }}
-          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-
-  e2e-warp-coreth:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Git checkout
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - name: Run Warp E2E Tests
-        uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/run_task.sh test-e2e-warp-ci
-          working_directory: ./graft/coreth
-          artifact_prefix: warp
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}

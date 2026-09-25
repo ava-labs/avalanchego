@@ -28,7 +28,6 @@ graft_go_test(
         "//snow/validators",
         "//tests/fixture/e2e",
         "//tests/fixture/tmpnet",
-        "//utils/constants",
         "//vms/evm/predicate",
         "//vms/platformvm",
         "//vms/platformvm/api",
