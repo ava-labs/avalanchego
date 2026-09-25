@@ -187,6 +187,7 @@ type CacheConfig struct {
 	TrieDirtyLimit                  int     // Memory limit (MB) at which to block on insert and force a flush of dirty trie nodes to disk
 	TrieDirtyCommitTarget           int     // Memory limit (MB) to target for the dirties cache before invoking commit
 	TriePrefetcherParallelism       int     // Max concurrent disk reads trie prefetcher should perform at once
+	SpeculativeWarmup               bool    // Whether to warm state caches by speculatively executing a block's transactions in parallel
 	CommitInterval                  uint64  // Commit the trie every [CommitInterval] blocks.
 	Pruning                         bool    // Whether to disable trie write caching and GC altogether (archive node)
 	AcceptorQueueLimit              int     // Blocks to queue before blocking during acceptance
