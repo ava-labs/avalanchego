@@ -42,8 +42,15 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 			ginkgo.Skip("skipping test because granite isn't active")
 		}
 
+		// The nonce is tracked locally because the accepted nonce can lag behind
+		// receipt availability: SAE serves receipts as soon as a transaction
+		// executes, before its block's state is marked as executed.
+		nonce, err := ethClient.AcceptedNonceAt(ctx, senderKey.EthAddress())
+		require.NoError(err)
+
 		// Issue a transaction to the C-Chain to advance past genesis block
-		issueTransaction(tc, ethClient, senderKey)
+		issueTransaction(tc, ethClient, senderKey, nonce)
+		nonce++
 
 		proposerClient := proposervm.NewJSONRPCClient(nodeURI.URI, "C")
 
@@ -53,9 +60,10 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 			zap.Reflect("epoch", initialEpoch),
 		)
 
-		issueTransaction(tc, ethClient, senderKey)
+		issueTransaction(tc, ethClient, senderKey, nonce)
+		nonce++
 		time.Sleep(upgrades.GraniteEpochDuration)
-		issueTransaction(tc, ethClient, senderKey)
+		issueTransaction(tc, ethClient, senderKey, nonce)
 
 		advancedEpoch, err := proposerClient.GetCurrentEpoch(ctx)
 		require.NoError(err)
@@ -79,16 +87,15 @@ func issueTransaction(
 	tc tests.TestContext,
 	ethClient *ethclient.Client,
 	senderKey *secp256k1.PrivateKey,
+	nonce uint64,
 ) {
 	ctx := tc.DefaultContext()
 	addr := senderKey.EthAddress()
-	acceptedNonce, err := ethClient.AcceptedNonceAt(ctx, addr)
-	require.NoError(tc, err)
 
 	gasPrice := e2e.SuggestGasPrice(tc, ethClient)
 	const amount = 10 * units.Avax // Arbitrary amount to transfer
 	tx := types.NewTransaction(
-		acceptedNonce,
+		nonce,
 		addr,
 		new(big.Int).SetUint64(amount),
 		e2e.DefaultGasLimit,
