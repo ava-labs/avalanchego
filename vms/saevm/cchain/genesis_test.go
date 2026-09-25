@@ -54,7 +54,6 @@ func TestParseGenesis(t *testing.T) {
 		localCtx   = &snow.Context{NetworkUpgrades: upgrade.Default}
 
 		initiallyActive = evmutils.TimeToNewUint64(upgrade.InitiallyActiveTime)
-		unscheduled     = evmutils.TimeToNewUint64(upgrade.UnscheduledActivationTime)
 	)
 	tests := []struct {
 		name    string
@@ -237,7 +236,7 @@ func TestParseGenesis(t *testing.T) {
 							EtnaTimestamp:                   initiallyActive,
 							FortunaTimestamp:                initiallyActive,
 							GraniteTimestamp:                initiallyActive,
-							HeliconTimestamp:                unscheduled,
+							HeliconTimestamp:                initiallyActive,
 						},
 						AvalancheContext: extras.AvalancheContext{
 							SnowCtx: localCtx,
@@ -385,7 +384,7 @@ func TestGenesisHash(t *testing.T) {
 		{
 			name:      "local",
 			networkID: constants.LocalID,
-			want:      "0x608ddbd611241719b64642d8e152537e2a5bdf46b6ddb9e8f15340c5e007b8b1",
+			want:      "0xa8ba8fe99b2affb0ed27d0d8c825f6292c3c6f5eb9d53707504bea02ac9c1a9b",
 		},
 	}
 	for _, test := range tests {
