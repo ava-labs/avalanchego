@@ -203,6 +203,14 @@ func (b *backend) lastBlockWithState(ctx context.Context, num uint64) (*state.St
 		sdb, err := b.StateDB(bl.PostExecutionStateRoot())
 		switch {
 		case errors.As(err, &errNotFound):
+			if rpcNum == 0 {
+				sdb, err = b.StateDB(types.EmptyRootHash)
+				if err != nil {
+					return nil, nil, nil, err
+				}
+				b.Hooks().ApplyGenesisTo(sdb)
+				break
+			}
 			toReexec = append(toReexec, bl)
 			continue
 		case err != nil:

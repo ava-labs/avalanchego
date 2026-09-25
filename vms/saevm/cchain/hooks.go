@@ -57,6 +57,7 @@ type hooks struct {
 	state       *cchainstate.State
 	warpStorage *warp.Storage
 	metrics     *metrics
+	genesis     *genesis
 }
 
 func newHooks(
@@ -68,6 +69,7 @@ func newHooks(
 	now func() time.Time,
 	desired desiredParams,
 	metrics *metrics,
+	genesis *genesis,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -95,7 +97,12 @@ func newHooks(
 		state,
 		warpStorage,
 		metrics,
+		genesis,
 	}
+}
+
+func (h *hooks) ApplyGenesisTo(statedb *state.StateDB) {
+	h.genesis.toStateDB(statedb)
 }
 
 func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], error) {

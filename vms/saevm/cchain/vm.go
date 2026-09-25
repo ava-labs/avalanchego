@@ -153,6 +153,7 @@ func (vm *VM) Initialize(
 		vm.now,
 		userConfig.desired(),
 		vm.metrics,
+		genesis,
 	)
 	vm.Network, err = network.New(snowCtx, appSender, userConfig.networkOptions()...)
 	if err != nil {

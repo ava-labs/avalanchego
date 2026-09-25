@@ -54,6 +54,7 @@ type PointsG[T Transaction] interface {
 // Points define user-injected hook points which do not depend on generic
 // types.
 type Points interface {
+	ApplyGenesisTo(*state.StateDB)
 	// ExecutionResultsDB opens and returns a height-indexed database, which
 	// will be closed by the VM when no longer needed. It MAY use the provided
 	// directory for persistence and MUST NOT write data outside of it.

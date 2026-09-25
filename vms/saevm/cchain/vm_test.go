@@ -100,6 +100,7 @@ type SUT struct {
 	db             database.Database
 	memory         *atomic.Memory
 	sharedMemoryDB database.Database
+	genesis        *genesis
 
 	sender    *saetest.Sender
 	p2pclient *saetest.CapturingPeer
@@ -419,6 +420,7 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 		p2pclient:      saetest.NewCapturingPeer(tb, validatorIDs),
 		clock:          cfg.clock,
 		logger:         log,
+		genesis:        (*genesis)(&cfg.genesis),
 	}
 
 	// Called from [SUT.SetState].
@@ -489,6 +491,7 @@ func (s *SUT) hooks(tb testing.TB) *hooks {
 		s.now,
 		desiredParams{},
 		m,
+		s.genesis,
 	)
 }
 
@@ -1062,6 +1065,12 @@ func TestStatefulRPCsReconstructExtraState(t *testing.T) {
 		{
 			name: "firewood_commit_interval",
 			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(commitInterval)},
+		},
+		{
+			// Firewood only keeps the tip on disk across restarts, so every
+			// historical state, including genesis, MUST be reconstructed.
+			name: "firewood_pruning",
+			opts: []sutOption{withFirewood(), withCommitInterval(commitInterval)},
 		},
 	}
 
