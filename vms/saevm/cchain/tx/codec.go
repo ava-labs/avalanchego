@@ -7,11 +7,17 @@ import (
 	"errors"
 	"math"
 
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/params"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 )
 
 const codecVersion uint16 = 0
@@ -77,6 +83,22 @@ func ParseSlice(b []byte) ([]*Tx, error) {
 		return nil, errInefficientSlicePacking
 	}
 	return txs, nil
+}
+
+// FromBlock returns the transactions carried in b.
+func FromBlock(c *params.ChainConfig, b *types.Block) ([]*Tx, error) {
+	extData := customtypes.BlockExtData(b)
+	if corethparams.GetExtra(c).IsApricotPhase5(b.Time()) {
+		return ParseSlice(extData)
+	}
+	if len(extData) == 0 {
+		return nil, nil
+	}
+	t, err := Parse(extData)
+	if err != nil {
+		return nil, err
+	}
+	return []*Tx{t}, nil
 }
 
 // MarshalUTXO serializes an [avax.UTXO] to its canonical binary format.
