@@ -12,6 +12,7 @@ on:
     types: [checks_requested]
 
 permissions:
+  actions: write
   contents: read
 
 # Cancel ongoing workflow runs if a new one is started

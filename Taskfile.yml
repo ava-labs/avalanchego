@@ -369,6 +369,7 @@ tasks:
       - test-setup-task
       - test-sync-task-version
       - test-unit-script
+      - test-workflow-validate-go-unit-cache
       - check-go-version
       - check-require-directives
       - check-task-version
@@ -393,6 +394,7 @@ tasks:
       - task: test-setup-task
       - task: test-sync-task-version
       - task: test-unit-script
+      - task: test-workflow-validate-go-unit-cache
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
       - task: check-go-version
@@ -612,6 +614,10 @@ tasks:
     cmds:
       - cmd: '{{.NIX_RUN}} ./bin/tmpnetctl start-kind-cluster --install-chaos-mesh'
 
+  normalize-testdata-mtimes:
+    desc: Normalizes testdata modification times for Go test-result caching
+    cmd: '{{.NIX_RUN}} ./scripts/normalize_testdata_mtimes.sh'
+
   test-run-task-launcher:
     desc: Tests the run_task launcher behavior
     cmd: '{{.NIX_RUN}} ./scripts/test_run_task_launcher.sh'
@@ -638,6 +644,10 @@ tasks:
   test-unit-script:
     desc: Tests unified unit-test script behavior
     cmd: '{{.NIX_RUN}} ./scripts/test_tests_unit.sh'
+
+  test-workflow-validate-go-unit-cache:
+    desc: Tests Go unit-test cache validation
+    cmd: '{{.NIX_RUN}} ./scripts/test_workflow_validate_go_unit_cache.sh'
 
   test-unit-smoke:
     desc: Runs one unit test package to check that Go unit tests run on a platform
