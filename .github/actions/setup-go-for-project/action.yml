@@ -13,6 +13,11 @@
 name: 'Install Go toolchain with project defaults'
 description: 'Install a go toolchain with project defaults'
 
+outputs:
+  go-build-cache-path:
+    description: 'Path to the Go build and test cache'
+    value: ${{ steps.cache-paths.outputs.go-build-cache }}
+
 inputs:
   request-cache-save:
     description: 'Request permission to save Task and Go module cache entries'
@@ -37,3 +42,9 @@ runs:
     - uses: ./.github/actions/setup-go-module-cache
       with:
         request-cache-save: ${{ inputs.request-cache-save }}
+
+    # Publish Go's GOCACHE path so callers cache the configured toolchain's output.
+    - id: cache-paths
+      name: Read Go build-cache path
+      shell: bash
+      run: echo "go-build-cache=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
