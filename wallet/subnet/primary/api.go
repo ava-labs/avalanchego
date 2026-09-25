@@ -7,11 +7,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ava-labs/libevm/ethclient"
+
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/client"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -20,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
@@ -41,7 +41,6 @@ const (
 var (
 	_ UTXOClient = (*platformvm.Client)(nil)
 	_ UTXOClient = (*avm.Client)(nil)
-	_ UTXOClient = (*client.Client)(nil)
 )
 
 type UTXOClient interface {
@@ -61,7 +60,7 @@ type AVAXState struct {
 	PCTX    *pbuilder.Context
 	XClient *avm.Client
 	XCTX    *xbuilder.Context
-	CClient *client.Client
+	CClient *cchain.Client
 	CCTX    *c.Context
 	UTXOs   walletcommon.UTXOs
 }
@@ -77,7 +76,7 @@ func FetchState(
 	infoClient := info.NewClient(uri)
 	pClient := platformvm.NewClient(uri)
 	xClient := avm.NewClient(uri, "X")
-	cClient := client.NewCChainClient(uri)
+	cClient := cchain.NewClient(uri)
 
 	pCTX, err := p.NewContextFromClients(ctx, infoClient, pClient)
 	if err != nil {
@@ -111,26 +110,39 @@ func FetchState(
 			client: xClient,
 			codec:  xbuilder.Parser.Codec(),
 		},
-		{
-			id:     cCTX.BlockchainID,
-			client: cClient,
-			codec:  atomic.Codec,
-		},
+	}
+	sourceChainIDs := []ids.ID{
+		constants.PlatformChainID,
+		xCTX.BlockchainID,
+		cCTX.BlockchainID,
 	}
 	for _, destinationChain := range chains {
-		for _, sourceChain := range chains {
+		for _, sourceChainID := range sourceChainIDs {
 			err = AddAllUTXOs(
 				ctx,
 				utxos,
 				destinationChain.client,
 				destinationChain.codec,
-				sourceChain.id,
+				sourceChainID,
 				destinationChain.id,
 				addrList,
 			)
 			if err != nil {
 				return nil, err
 			}
+		}
+	}
+	for _, sourceChainID := range sourceChainIDs {
+		err = addAllCChainUTXOs(
+			ctx,
+			utxos,
+			cClient,
+			sourceChainID,
+			cCTX.BlockchainID,
+			addrList,
+		)
+		if err != nil {
+			return nil, err
 		}
 	}
 	return &AVAXState{
@@ -269,4 +281,49 @@ func AddAllUTXOs(
 		startUTXO = endUTXO
 	}
 	return nil
+}
+
+// addAllCChainUTXOs fetches all the UTXOs referenced by [addrs] that were sent
+// from [sourceChainID] to the C-Chain from [client] and adds them into
+// [utxos]. If [ctx] expires, then the returned error will be immediately
+// reported.
+func addAllCChainUTXOs(
+	ctx context.Context,
+	utxos walletcommon.UTXOs,
+	client *cchain.Client,
+	sourceChainID ids.ID,
+	cChainID ids.ID,
+	addrs []ids.ShortID,
+) error {
+	var (
+		startAddr ids.ShortID
+		startUTXO ids.ID
+	)
+	for {
+		page, endAddr, endUTXO, err := client.GetUTXOs(
+			ctx,
+			addrs,
+			sourceChainID,
+			fetchLimit,
+			startAddr,
+			startUTXO,
+		)
+		if err != nil {
+			return err
+		}
+
+		for _, utxo := range page {
+			if err := utxos.AddUTXO(ctx, sourceChainID, cChainID, utxo); err != nil {
+				return err
+			}
+		}
+
+		if len(page) < fetchLimit {
+			return nil
+		}
+
+		// Update the vars to query the next page of UTXOs.
+		startAddr = endAddr
+		startUTXO = endUTXO
+	}
 }
