@@ -16,6 +16,7 @@ set -euo pipefail
 bazel_ci_target_patterns() {
   cat <<'EOF'
 //main:avalanchego
+//tests/e2e:e2e_runner
 //...
 //ids:ids_test
 EOF
