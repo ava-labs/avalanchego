@@ -185,7 +185,7 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 	}
 
 	// Set up the state if this tx is committed
-	if err := e.applySpend(e.tx.Creds); err != nil {
+	if err := e.applySpendOnCommit(e.tx.Creds); err != nil {
 		return err
 	}
 
@@ -227,7 +227,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidato
 	}
 
 	// Set up the state if this tx is committed
-	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
+	if err := e.applySpendOnCommit(baseTxCreds(e.tx)); err != nil {
 		return err
 	}
 
@@ -269,7 +269,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 	}
 
 	// Set up the state if this tx is committed
-	if err := e.applySpend(e.tx.Creds); err != nil {
+	if err := e.applySpendOnCommit(e.tx.Creds); err != nil {
 		return err
 	}
 
@@ -480,7 +480,7 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 	)
 }
 
-func (e *proposalTxExecutor) applySpend(creds []verify.Verifiable) error {
+func (e *proposalTxExecutor) applySpendOnCommit(creds []verify.Verifiable) error {
 	return applySpend(e.backend, e.feeCalculator, e.onCommitState, e.tx, creds)
 }
 

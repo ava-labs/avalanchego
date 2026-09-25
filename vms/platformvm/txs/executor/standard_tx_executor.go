@@ -187,12 +187,11 @@ func (e *standardTxExecutor) CreateChainTx(tx *platform.CreateChainTx) error {
 		return err
 	}
 
-	baseTxCreds, err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.SubnetID, tx.SubnetAuth)
-	if err != nil {
+	if err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.SubnetID, tx.SubnetAuth); err != nil {
 		return err
 	}
 
-	if err := e.applySpend(baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
 		return err
 	}
 
@@ -451,8 +450,7 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *platform.TransformSubnetTx) e
 		return errMaxStakeDurationTooLarge
 	}
 
-	baseTxCreds, err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth)
-	if err != nil {
+	if err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth); err != nil {
 		return err
 	}
 
@@ -478,7 +476,7 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *platform.TransformSubnetTx) e
 		e.state,
 		ins,
 		outs,
-		baseTxCreds,
+		baseTxCreds(e.tx),
 		// Invariant: [tx.AssetID != e.Ctx.AVAXAssetID]. This prevents the first
 		//            entry in this map literal from being overwritten by the
 		//            second entry.
@@ -611,8 +609,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1T
 		return err
 	}
 
-	baseTxCreds, err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth)
-	if err != nil {
+	if err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth); err != nil {
 		return err
 	}
 
@@ -676,7 +673,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1T
 		}
 	}
 
-	if err := e.applySpend(baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
 		return err
 	}
 
@@ -1013,7 +1010,7 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *platform.DisableL1Validato
 		return err
 	}
 
-	baseTxCreds, err := verifyAuthorization(
+	if err := verifyAuthorization(
 		e.backend.Fx,
 		e.tx,
 		&secp256k1fx.OutputOwners{
@@ -1021,12 +1018,11 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *platform.DisableL1Validato
 			Addrs:     disableOwner.Addresses,
 		},
 		tx.DisableAuth,
-	)
-	if err != nil {
+	); err != nil {
 		return err
 	}
 
-	if err := e.applySpend(baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
 		return err
 	}
 
