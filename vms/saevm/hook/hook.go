@@ -229,6 +229,34 @@ type Settled struct {
 	Excess       gas.Gas
 }
 
+// NewSettled returns the [Settled] stored in the provided header fields, or the
+// zero value if any of them are nil.
+func NewSettled(height, gasUnix, gasNumerator, excess *uint64) Settled {
+	if height == nil ||
+		gasUnix == nil ||
+		gasNumerator == nil ||
+		excess == nil {
+		return Settled{}
+	}
+	return Settled{
+		Height:       *height,
+		GasUnix:      *gasUnix,
+		GasNumerator: gas.Gas(*gasNumerator),
+		Excess:       gas.Gas(*excess),
+	}
+}
+
+// BlockTime returns the canonical wall-clock time of a block.
+//
+// The whole-second value is authoritative and the millisecond field only
+// refines it below the second, so the two can never disagree on which second a
+// block belongs to. This keeps a block's time stable even when a peer sends a
+// header whose millisecond field is inconsistent with its seconds.
+func BlockTime(seconds, ms uint64) time.Time {
+	subSecondNanos := int64(ms%1000) * int64(time.Millisecond) //#nosec G115 -- ms%1000 < 1000
+	return time.Unix(int64(seconds), subSecondNanos)           //#nosec G115 -- Won't overflow for a few millennia
+}
+
 // Synchronous reports whether the header is that of a synchronously executed
 // (pre-SAE) block.
 func Synchronous(h Points, hdr *types.Header) bool {

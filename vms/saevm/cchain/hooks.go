@@ -200,34 +200,16 @@ func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceC
 
 func (*hooks) SettledBy(h *types.Header) hook.Settled {
 	he := customtypes.GetHeaderExtra(h)
-	if he.SettledHeight == nil ||
-		he.SettledGasUnix == nil ||
-		he.SettledGasNumerator == nil ||
-		he.SettledExcess == nil {
-		return hook.Settled{}
-	}
-	return hook.Settled{
-		Height:       *he.SettledHeight,
-		GasUnix:      *he.SettledGasUnix,
-		GasNumerator: gas.Gas(*he.SettledGasNumerator),
-		Excess:       gas.Gas(*he.SettledExcess),
-	}
+	return hook.NewSettled(he.SettledHeight, he.SettledGasUnix, he.SettledGasNumerator, he.SettledExcess)
 }
 
 // BlockTime returns the canonical wall-clock time of a block.
-//
-// The whole-second value is authoritative and the millisecond field only
-// refines it below the second, so the two can never disagree on which second a
-// block belongs to. This keeps a block's time stable even when a peer sends a
-// header whose millisecond field is inconsistent with its seconds.
 func (*hooks) BlockTime(h *types.Header) time.Time {
 	return blockTime(h)
 }
 
 func blockTime(h *types.Header) time.Time {
-	ms := customtypes.HeaderTimeMilliseconds(h)
-	subSecondNanos := int64(ms%1000) * int64(time.Millisecond) //#nosec G115 -- ms%1000 < 1000
-	return time.Unix(int64(h.Time), subSecondNanos)            //#nosec G115 -- Won't overflow for a few millennia
+	return hook.BlockTime(h.Time, customtypes.HeaderTimeMilliseconds(h))
 }
 
 func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
