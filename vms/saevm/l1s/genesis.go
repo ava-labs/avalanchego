@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	avalancheutils "github.com/ava-labs/avalanchego/utils"
 )
 
 const genesisNumber = 0
@@ -145,7 +144,7 @@ func newExtras(ctx *snow.Context, cfg *params.ChainConfig, upgradeConfig extras.
 func newNetworkUpgrades(ctx *snow.Context, upgradeConfig extras.UpgradeConfig) extras.NetworkUpgrades {
 	u := &ctx.NetworkUpgrades
 	upgrades := extras.NetworkUpgrades{
-		SubnetEVMTimestamp: avalancheutils.PointerTo[uint64](0),
+		SubnetEVMTimestamp: new(uint64(0)),
 		DurangoTimestamp:   utils.TimeToNewUint64(u.DurangoTime),
 		EtnaTimestamp:      utils.TimeToNewUint64(u.EtnaTime),
 		FortunaTimestamp:   nil,
@@ -305,13 +304,13 @@ func (g *genesis) block() (*types.Block, error) {
 	}
 
 	if c.IsGranite(g.Timestamp) {
-		headerExtra.TimeMilliseconds = avalancheutils.PointerTo(g.Timestamp * 1000)
+		headerExtra.TimeMilliseconds = new(g.Timestamp * 1000)
 
 		minDelayExcess := acp226.InitialDelayExcess
 		if c.InitialMinDelayMS != 0 {
 			minDelayExcess = acp226.DesiredDelayExcess(c.InitialMinDelayMS)
 		}
-		headerExtra.MinDelayExcess = avalancheutils.PointerTo(minDelayExcess)
+		headerExtra.MinDelayExcess = new(minDelayExcess)
 	}
 
 	// TODO: Add SAE required fields if active at genesis.
