@@ -24,12 +24,17 @@ SUBNET_EVM_PATH=$(
 
 # Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
+# shellcheck source=/dev/null
+source "$AVALANCHE_PATH"/scripts/lib_go_module_cache.sh
+
+# Populate the host cache with the workspace module graph before Buildx starts.
+prepare_go_module_cache "${AVALANCHE_PATH}"
 
 # buildx (BuildKit) improves the speed and UI of builds over the legacy builder and
 # simplifies creation of multi-arch images.
 #
 # Reference: https://docs.docker.com/build/buildkit/
-DOCKER_CMD="docker buildx build"
+DOCKER_CMD="docker buildx build --build-context gomodcache=$(go_module_proxy_cache)"
 ispush=0
 if [[ -n "${PUBLISH}" ]]; then
   echo "Pushing $IMAGE_NAME:$BUILD_IMAGE_ID"
@@ -104,7 +109,7 @@ ${DOCKER_CMD} -t "$IMAGE_NAME:$BUILD_IMAGE_ID" -t "$IMAGE_NAME:${commit_hash}" \
   "$AVALANCHE_PATH" -f "$SUBNET_EVM_PATH/Dockerfile" \
   --build-arg GO_VERSION="${GO_VERSION}" \
   --build-arg AVALANCHEGO_NODE_IMAGE="$AVALANCHEGO_NODE_IMAGE" \
-  --build-arg SUBNET_EVM_COMMIT="$git_commit" \
+  --build-arg AVALANCHEGO_COMMIT="$git_commit" \
   --build-arg CURRENT_BRANCH="$image_tag" \
   --build-arg VM_ID="$VM_ID"
 

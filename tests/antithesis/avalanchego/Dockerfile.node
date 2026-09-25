@@ -4,11 +4,15 @@ ARG BUILDER_IMAGE_TAG=INVALID # This value is not intended to be used but silenc
 # ============= Compilation Stage ================
 FROM antithesis-avalanchego-builder:$BUILDER_IMAGE_TAG AS builder
 
+# Dependencies are served from the host's local module-proxy cache.
+ENV GOPROXY=file:///gomodproxy,off
+
 # The workdir is hard-coded since this Dockerfile is only intended for instrumented builds.
 WORKDIR /instrumented/customer
 
 # Build avalanchego with race detection (-r) enabled.
-RUN ./scripts/build.sh -r
+RUN --network=none --mount=type=bind,from=gomodcache,source=.,target=/gomodproxy,ro \
+    ./scripts/build.sh -r
 
 # ============= Cleanup Stage ================
 FROM debian:12-slim AS execution
