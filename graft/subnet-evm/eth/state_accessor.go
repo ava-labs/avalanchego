@@ -240,7 +240,7 @@ func (eth *Ethereum) firewoodReconstructedState(ctx context.Context, header *typ
 			break
 		}
 		if current.Number.Uint64() == 0 {
-			break
+			return nil, nil, errors.New("reached genesis without finding persisted state")
 		}
 		parent := eth.blockchain.GetHeader(current.ParentHash, current.Number.Uint64()-1)
 		if parent == nil {

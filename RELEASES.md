@@ -9,7 +9,7 @@
 
 ### Fixes
 
-- Firewood archival nodes commit genesis state on all chains.
+- New Firewood archival nodes commit genesis state on all chains.
 
 ### Metrics
 
