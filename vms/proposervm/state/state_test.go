@@ -22,6 +22,7 @@ func TestState(t *testing.T) {
 
 	testBlockState(a, s)
 	testChainState(a, s)
+	testHeightIndex(a, s)
 }
 
 func TestMeteredState(t *testing.T) {
@@ -34,4 +35,5 @@ func TestMeteredState(t *testing.T) {
 
 	testBlockState(a, s)
 	testChainState(a, s)
+	testHeightIndex(a, s)
 }
