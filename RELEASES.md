@@ -7,6 +7,10 @@
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 - Updated the minimum Go version from `1.25.10` to `1.26.8`.
 
+### Fixes
+
+- SAE `eth_estimateGas` and `eth_createAccessList` now include the minimum gas limit that the mempool requires for the transaction's size. Large transactions signed with the estimate were previously rejected with `insufficient gas limit for tx size`.
+
 ### Metrics
 
 - Added `avalanche_platformvm_local_delegated_staked` (gauge): amount (in nAVAX) of AVAX delegated to this node on the Primary Network.

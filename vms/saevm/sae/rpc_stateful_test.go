@@ -989,6 +989,79 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 	})
 }
 
+// TestSizeMinimumGas tests that gas limits recommended by RPCs satisfy the
+// mempool's size-based minimum, even when execution uses less gas.
+func TestSizeMinimumGas(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+	gc := gethclient.New(sut.rpcClient)
+
+	// Execution of this tx uses ~50k gas, but the mempool requires ~420k
+	// because of its size.
+	txData := types.DynamicFeeTx{
+		To:        &common.Address{},
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		GasTipCap: big.NewInt(1),
+		Value:     big.NewInt(1),
+		Data:      make([]byte, 8192),
+	}
+	msg := ethereum.CallMsg{
+		From:      sut.wallet.Addresses()[0],
+		To:        txData.To,
+		GasFeeCap: txData.GasFeeCap,
+		GasTipCap: txData.GasTipCap,
+		Value:     txData.Value,
+		Data:      txData.Data,
+	}
+
+	tests := []struct {
+		name string
+		// gas returns the gas limit that the RPC recommends for msg, and
+		// the access list to send with it.
+		gas func(*testing.T, ethereum.CallMsg) (uint64, types.AccessList, error)
+	}{
+		{
+			name: "eth_estimateGas",
+			gas: func(_ *testing.T, msg ethereum.CallMsg) (uint64, types.AccessList, error) {
+				gas, err := sut.EstimateGas(ctx, msg)
+				return gas, nil, err
+			},
+		},
+		{
+			name: "eth_createAccessList",
+			gas: func(t *testing.T, msg ethereum.CallMsg) (uint64, types.AccessList, error) {
+				accessList, gas, vmErr, err := gc.CreateAccessList(ctx, msg)
+				if err != nil {
+					return 0, nil, err
+				}
+				require.Emptyf(t, vmErr, "%T.CreateAccessList() execution error", gc)
+				return gas, *accessList, nil
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gas, accessList, err := tt.gas(t, msg)
+			require.NoErrorf(t, err, "%s()", tt.name)
+
+			data := txData
+			data.Gas = gas
+			data.AccessList = accessList
+			tx := sut.wallet.SetNonceAndSign(t, 0, &data)
+			b := sut.runConsensusLoop(t, tx)
+			require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+			require.Lenf(t, b.Receipts(), 1, "%T.Receipts()", b)
+			require.Equalf(t, types.ReceiptStatusSuccessful, b.Receipts()[0].Status, "%T.Receipts()[0].Status with %s() gas %d", b, tt.name, gas)
+
+			below := msg
+			below.Gas = sut.rawVM.mempool.MinGasForSize(tx.Size()) - 1
+			_, _, err = tt.gas(t, below)
+			if diff := testerr.Diff(err, testerr.Contains("gas required exceeds allowance")); diff != "" {
+				t.Errorf("%s() with gas limit %d below the size minimum %s", tt.name, below.Gas, diff)
+			}
+		})
+	}
+}
+
 func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 	blocking := common.Address{'b', 'l', 'o', 'c', 'k'}
 	opt, unblock := withBlockingPrecompile(blocking)
