@@ -6,6 +6,7 @@ package rpc
 import (
 	"context"
 	"fmt"
+	"math/big"
 
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/eth/filters"
@@ -23,7 +24,7 @@ type filterAPI struct {
 // GetLogs overrides [filters.FilterAPI.GetLogs] to reject block ranges larger
 // than the configured maximum before asking libevm to scan them.
 func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) ([]*types.Log, error) {
-	if api.maxBlocksPerRequest == 0 || crit.BlockHash != nil {
+	if api.maxBlocksPerRequest <= 0 || crit.BlockHash != nil {
 		return api.FilterAPI.GetLogs(ctx, crit)
 	}
 
@@ -61,5 +62,10 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 			api.maxBlocksPerRequest,
 		)
 	}
+
+	// Uses [Config.ResolvePendingToLastExecuted] and avoids unintuitive geth handling
+	crit.FromBlock = new(big.Int).SetUint64(resolvedBegin)
+	crit.ToBlock = new(big.Int).SetUint64(resolvedEnd)
+
 	return api.FilterAPI.GetLogs(ctx, crit)
 }
