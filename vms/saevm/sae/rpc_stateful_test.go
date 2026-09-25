@@ -695,14 +695,14 @@ func TestDebugIntermediateRoots(t *testing.T) {
 			opts := append(slices.Clone(tt.opts), options.Func[sutConfig](func(c *sutConfig) {
 				c.dataDir = dataDir
 			}))
-			ctx, src := newSUT(t, 1, append(slices.Clone(opts), withDB(srcDB), withExecResultsDB(xdb), timeOpt)...)
+			ctx, src := newSUT(t, txsPerBlock, append(slices.Clone(opts), withDB(srcDB), withExecResultsDB(xdb), timeOpt)...)
 
 			blks := make([]*blocks.Block, 0, numBlocks)
 			for range numBlocks {
 				vmTime.AdvanceToSettle(ctx, t, src.lastAcceptedBlock(t))
 				txs := make([]*types.Transaction, txsPerBlock)
 				for i := range txs {
-					txs[i] = src.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+					txs[i] = src.wallet.SetNonceAndSign(t, i, &types.LegacyTx{
 						To:       &common.Address{},
 						Gas:      params.TxGas,
 						GasPrice: big.NewInt(1),
@@ -716,7 +716,7 @@ func TestDebugIntermediateRoots(t *testing.T) {
 
 			// restarting the VM clears the cache
 			src.close()
-			ctx, sut := newSUT(t, 1, append(slices.Clone(opts),
+			ctx, sut := newSUT(t, txsPerBlock, append(slices.Clone(opts),
 				withDB(saetest.CopyDB(t, srcDB)),
 				withExecResultsDB(xdb.Clone()),
 			)...)
