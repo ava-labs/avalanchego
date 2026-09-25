@@ -41,12 +41,11 @@ runs:
     - id: cache-key
       name: Determine Go module cache key
       shell: bash
-      env:
-        CACHE_KEY_PREFIX: go-mod-${{ runner.os }}-
       run: |
+        cache_key_prefix="go-mod-${{ runner.os }}-"
         {
-          echo "cache-key-prefix=$CACHE_KEY_PREFIX"
-          echo "cache-key=${CACHE_KEY_PREFIX}${{ hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum', 'scripts/download_go_modules.sh', 'scripts/go_module_cache_manifest.tsv') }}"
+          echo "cache-key-prefix=$cache_key_prefix"
+          echo "cache-key=${cache_key_prefix}${{ hashFiles('go.work', 'go.work.sum', '**/go.mod', '**/go.sum', 'scripts/download_go_modules.sh', 'scripts/go_module_cache_manifest.tsv') }}"
         } >> "$GITHUB_OUTPUT"
 
     - id: cache
