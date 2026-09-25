@@ -72,6 +72,7 @@ var (
 	_ block.BuildBlockWithContextChainVM = (*VMClient)(nil)
 	_ block.BatchedChainVM               = (*VMClient)(nil)
 	_ block.StateSyncableVM              = (*VMClient)(nil)
+	_ block.RetainsAcceptedBlocksVM      = (*VMClient)(nil)
 	_ prometheus.Gatherer                = (*VMClient)(nil)
 
 	_ snowman.Block           = (*blockClient)(nil)
@@ -100,6 +101,11 @@ type VMClient struct {
 	conns        []*grpc.ClientConn
 
 	grpcServerMetrics *grpc_prometheus.ServerMetrics
+
+	// retainsAcceptedBlocks reports whether the served VM durably retains the
+	// bytes of every accepted block, retrievable via GetBlock, forever. Set
+	// from the VM's InitializeResponse.
+	retainsAcceptedBlocks bool
 }
 
 // NewClient returns a VM connected to a remote VM
@@ -224,6 +230,8 @@ func (vm *VMClient) Initialize(
 	if err != nil {
 		return err
 	}
+
+	vm.retainsAcceptedBlocks = resp.RetainsAcceptedBlocks
 
 	// We don't need to check whether this is a block.WithVerifyContext because
 	// we'll never Verify this block.
@@ -374,6 +382,12 @@ func (vm *VMClient) Shutdown(ctx context.Context) error {
 
 	vm.processTracker.UntrackProcess(vm.pid)
 	return errs.Err
+}
+
+// RetainsAcceptedBlocks reports the capability declared by the served VM in
+// its InitializeResponse. It is only valid after Initialize has returned.
+func (vm *VMClient) RetainsAcceptedBlocks() bool {
+	return vm.retainsAcceptedBlocks
 }
 
 func (vm *VMClient) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
