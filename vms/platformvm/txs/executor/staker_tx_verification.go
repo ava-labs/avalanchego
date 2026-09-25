@@ -226,15 +226,14 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	_, err = verifyPoASubnetAuthorization(backend.Fx, chainState, sTx, tx.SubnetValidator.Subnet, tx.SubnetAuth)
-	return err
+	return verifyPoASubnetAuthorization(backend.Fx, chainState, sTx, tx.SubnetValidator.Subnet, tx.SubnetAuth)
 }
 
 // Returns the representation of tx.NodeID validating tx.Subnet, which may
 // be either a current or a pending validator.
 // Returns an error if the given tx is invalid.
 // The transaction is valid if:
-// * tx.NodeI] is a current/pending PoA validator of tx.Subnet.
+// * tx.NodeID is a current/pending PoA validator of tx.Subnet.
 // * sTx's creds authorize it to remove a validator from tx.Subnet.
 func verifyRemoveSubnetValidatorTx(
 	backend *Backend,
@@ -279,7 +278,7 @@ func verifyRemoveSubnetValidatorTx(
 		return vdr, nil
 	}
 
-	if _, err := verifySubnetAuthorization(backend.Fx, chainState, sTx, tx.Subnet, tx.SubnetAuth); err != nil {
+	if err := verifySubnetAuthorization(backend.Fx, chainState, sTx, tx.Subnet, tx.SubnetAuth); err != nil {
 		return nil, err
 	}
 
@@ -632,8 +631,7 @@ func verifyTransferSubnetOwnershipTx(
 		return nil
 	}
 
-	_, err := verifySubnetAuthorization(backend.Fx, chainState, sTx, tx.Subnet, tx.SubnetAuth)
-	return err
+	return verifySubnetAuthorization(backend.Fx, chainState, sTx, tx.Subnet, tx.SubnetAuth)
 }
 
 // verifyAddAutoRenewedValidatorTx carries out the validation for an
@@ -770,7 +768,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 		return nil, ErrStakeTooLong
 	}
 
-	if _, err := verifyAuthorization(backend.Fx, sTx, autoRenewedStakerTx.ValidatorAuthority, tx.Auth); err != nil {
+	if err := verifyAuthorization(backend.Fx, sTx, autoRenewedStakerTx.ValidatorAuthority, tx.Auth); err != nil {
 		return nil, err
 	}
 

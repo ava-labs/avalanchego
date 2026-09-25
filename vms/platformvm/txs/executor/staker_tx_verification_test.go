@@ -31,7 +31,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 
 	type test struct {
 		name        string
-		backendF    func() *Backend
+		backend     *Backend
 		chain       state.Chain
 		sTxF        func() *platform.Tx
 		txF         func() *platform.AddPermissionlessValidatorTx
@@ -108,13 +108,11 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 	tests := []test{
 		{
 			name: "fail syntactic verification",
-			backendF: func() *Backend {
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
 			},
 
 			chain: func() *state.State {
@@ -132,14 +130,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "not bootstrapped",
-			backendF: func() *Backend {
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: &utils.Atomic[bool]{},
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: &utils.Atomic[bool]{},
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -156,16 +152,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "start time too early",
-			backendF: func() *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Cortina, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Cortina, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -182,16 +174,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "weight too low",
-			backendF: func() *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -211,16 +199,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "weight too high",
-			backendF: func() *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -240,16 +224,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "insufficient delegation fee",
-			backendF: func() *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -270,16 +250,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "duration too short",
-			backendF: func() *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -303,16 +279,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "duration too long",
-			backendF: func() *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -336,16 +308,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "wrong assetID",
-			backendF: func() *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -371,16 +339,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "duplicate validator",
-			backendF: func() *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -411,16 +375,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "validator not subset of primary network validator",
-			backendF: func() *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -446,17 +406,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "success",
-			backendF: func() *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-
-				return &Backend{
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Ctx:          ctx,
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Ctx:          ctx,
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -483,7 +438,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var (
-				backend = tt.backendF()
+				backend = tt.backend
 				sTx     = tt.sTxF()
 				tx      = tt.txF()
 			)
