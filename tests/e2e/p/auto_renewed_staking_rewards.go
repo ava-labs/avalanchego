@@ -249,25 +249,18 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", ginkgo
 			expectedValidatorWeight := validatorWeight + restakingValidationRewards1 + restakingDelegateeRewards1 + restakingValidationRewards2 + restakingDelegateeRewards2
 			validator := currentValidator(tc, pvmClient, f.validatorNode.NodeID)
 			require.Equal(tc, expectedValidatorWeight, validator.Weight)
-
-			cfg := validator.AutoRenewedConfig
-			require.NotNil(tc, cfg)
-			require.NotNil(tc, cfg.RestakedValidationRewards)
-			require.NotNil(tc, cfg.RestakedDelegateeRewards)
-			restakedValidation := *cfg.RestakedValidationRewards
-			restakedDelegatee := *cfg.RestakedDelegateeRewards
-
-			// The totals are cumulative, so after a second renewal they are the
-			// sums across both cycles rather than the latest cycle's amounts.
-			require.Equal(tc, restakingValidationRewards1+restakingValidationRewards2, restakedValidation)
-			require.Equal(tc, restakingDelegateeRewards1+restakingDelegateeRewards2, restakedDelegatee)
-
-			// Together they account for all weight grown above the principal.
-			require.Equal(tc, validator.Weight-validatorWeight, restakedValidation+restakedDelegatee)
-
-			// Differencing across a renewal recovers that cycle's contribution.
-			require.Equal(tc, restakingValidationRewards2, restakedValidation-restakingValidationRewards1)
-			require.Equal(tc, restakingDelegateeRewards2, restakedDelegatee-restakingDelegateeRewards1)
+			require.Equal(tc, &platformvm.ClientAutoRenewedConfig{
+				ValidatorAuthority: &platformvm.ClientOwner{
+					Locktime:  0,
+					Threshold: 1,
+					Addresses: []ids.ShortID{f.validatorFundingKey.Address()},
+				},
+				NextPeriod:               uint64(updatedStakingPeriod.Seconds()),
+				AutoCompoundRewardShares: updatedAutoCompoundRewardShares,
+				// The totals are cumulative across both renewed cycles.
+				RestakedValidationRewards: utils.PointerTo(restakingValidationRewards1 + restakingValidationRewards2),
+				RestakedDelegateeRewards:  utils.PointerTo(restakingDelegateeRewards1 + restakingDelegateeRewards2),
+			}, validator.AutoRenewedConfig)
 		})
 
 		var validatorThirdCyclePotentialRewards uint64

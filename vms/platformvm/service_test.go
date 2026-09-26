@@ -872,170 +872,37 @@ func TestGetValidatorsAt(t *testing.T) {
 }
 
 func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
-	require := require.New(t)
-	service, _ := defaultService(t)
-
-	nodeID := ids.GenerateTestNodeID()
-	startTime := service.vm.clock.Time()
-
 	const (
 		autoCompoundRewardShares = uint32(reward.PercentDenominator / 3)
 		potentialReward          = uint64(12_345)
 		period                   = defaultMinStakingDuration
 	)
 	periodSeconds := uint64(period / time.Second)
-	weight := service.vm.MinValidatorStake
-	endTime := startTime.Add(period)
-
-	rewardOwner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-	}
-	validatorAuthority := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-	}
-	sk, err := localsigner.New()
-	require.NoError(err)
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(err)
-
-	addAutoRenewedValidatorTx := &platform.AddAutoRenewedValidatorTx{
-		ValidatorNodeID:          types.JSONByteSlice(nodeID.Bytes()),
-		Signer:                   pop,
-		ValidatorRewardsOwner:    rewardOwner,
-		DelegatorRewardsOwner:    rewardOwner,
-		ValidatorAuthority:       validatorAuthority,
-		DelegationShares:         reward.PercentDenominator,
-		AutoCompoundRewardShares: autoCompoundRewardShares,
-		Period:                   periodSeconds,
-	}
-	tx := &platform.Tx{Unsigned: addAutoRenewedValidatorTx}
-	require.NoError(tx.Initialize(platform.Codec))
-
-	service.vm.ctx.Lock.Lock()
-	staker := &state.Staker{
-		TxID:            tx.ID(),
-		NodeID:          addAutoRenewedValidatorTx.NodeID(),
-		PublicKey:       pop.Key(),
-		SubnetID:        addAutoRenewedValidatorTx.SubnetID(),
-		Weight:          weight,
-		StartTime:       startTime,
-		EndTime:         endTime,
-		PotentialReward: potentialReward,
-		NextTime:        endTime,
-		Priority:        addAutoRenewedValidatorTx.CurrentPriority(),
-	}
-
-	diff, err := state.NewDiffOn(service.vm.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(err)
-	diff.AddTx(tx, status.Committed)
-	require.NoError(diff.PutCurrentValidator(staker))
-	require.NoError(diff.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
-		AutoCompoundRewardShares: autoCompoundRewardShares,
-		NextPeriod:               periodSeconds,
-	}))
-	require.NoError(diff.Apply(service.vm.state))
-	require.NoError(service.vm.state.Commit())
-	service.vm.ctx.Lock.Unlock()
-
-	reply := GetCurrentValidatorsReply{}
-	require.NoError(service.GetCurrentValidators(&http.Request{}, &GetCurrentValidatorsArgs{
-		SubnetID: constants.PrimaryNetworkID,
-		NodeIDs:  []ids.NodeID{nodeID},
-	}, &reply))
-	require.Len(reply.Validators, 1)
-
-	gotValidator := reply.Validators[0].(pchainapi.PermissionlessValidator)
-
-	rewardOwnerAddr, err := service.addrManager.FormatLocalAddress(rewardOwner.Addrs[0])
-	require.NoError(err)
-	validatorAuthorityAddr, err := service.addrManager.FormatLocalAddress(validatorAuthority.Addrs[0])
-	require.NoError(err)
-
-	wantRewardOwner := &pchainapi.Owner{
-		Threshold: avajson.Uint32(rewardOwner.Threshold),
-		Addresses: []string{rewardOwnerAddr},
-	}
-	wantValidator := pchainapi.PermissionlessValidator{
-		Staker: pchainapi.Staker{
-			TxID:      tx.ID(),
-			StartTime: avajson.Uint64(startTime.Unix()),
-			EndTime:   avajson.Uint64(endTime.Unix()),
-			Weight:    avajson.Uint64(weight),
-			NodeID:    nodeID,
-		},
-		ValidationRewardOwner:  wantRewardOwner,
-		DelegationRewardOwner:  wantRewardOwner,
-		PotentialReward:        utils.PointerTo(avajson.Uint64(potentialReward)),
-		AccruedDelegateeReward: utils.PointerTo(avajson.Uint64(0)),
-		DelegationFee:          avajson.Float32(100),
-		Uptime:                 utils.PointerTo(avajson.Float32(100)),
-		Connected:              utils.PointerTo(false),
-		Signer: &signer.ProofOfPossession{
-			PublicKey:         pop.PublicKey,
-			ProofOfPossession: pop.ProofOfPossession,
-		},
-		AutoRenewedConfig: &pchainapi.AutoRenewedConfig{
-			ValidatorAuthority: &pchainapi.Owner{
-				Threshold: avajson.Uint32(validatorAuthority.Threshold),
-				Addresses: []string{validatorAuthorityAddr},
-			},
-			NextPeriod:               avajson.Uint64(periodSeconds),
-			AutoCompoundRewardShares: avajson.Uint32(autoCompoundRewardShares),
-			// Zero rather than omitted: no cycle has renewed.
-			RestakedValidationRewards: utils.PointerTo(avajson.Uint64(0)),
-			RestakedDelegateeRewards:  utils.PointerTo(avajson.Uint64(0)),
-		},
-		DelegatorCount:  utils.PointerTo(avajson.Uint64(0)),
-		DelegatorWeight: utils.PointerTo(avajson.Uint64(0)),
-		Delegators:      &[]pchainapi.PrimaryDelegator{},
-	}
-	require.Equal(wantValidator, gotValidator)
-}
-
-// Test the API reports the restaked validation and delegation totals
-// separately, and that they stay distinct from AccruedDelegateeReward.
-func TestGetCurrentValidatorsAutoRenewedRestakedRewards(t *testing.T) {
-	// The principal in the tx's StakeOuts; weight above it was restaked.
-	const (
-		stakedAmount    = uint64(2_000_000_000_000)
-		potentialReward = uint64(12_345)
-	)
 
 	tests := []struct {
 		name               string
 		restakedValidation uint64
 		restakedDelegatee  uint64
-		// StakingInfo.DelegateeReward: pending for the current cycle.
-		pendingCommission uint64
+		delegateeReward    uint64
 	}{
 		{
-			name: "first cycle, nothing restaked",
+			name: "nothing restaked",
 		},
 		{
-			name:               "only own validation rewards restaked",
+			name:               "only validation rewards restaked",
 			restakedValidation: 7_000,
 		},
 		{
-			// With the previous case, guards against both fields reading
-			// from the same source.
-			name:              "only delegation commission restaked",
+			name:              "only delegatee rewards restaked",
 			restakedDelegatee: 3_000,
 		},
 		{
-			name:               "both restaked, distinct values",
+			name:               "delegatee reward reported apart from restaked totals",
 			restakedValidation: 7_000,
 			restakedDelegatee:  3_000,
-		},
-		{
-			name:               "pending commission reported apart from restaked totals",
-			restakedValidation: 7_000,
-			restakedDelegatee:  3_000,
-			pendingCommission:  111,
+			delegateeReward:    111,
 		},
 	}
-
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
@@ -1043,14 +910,11 @@ func TestGetCurrentValidatorsAutoRenewedRestakedRewards(t *testing.T) {
 
 			nodeID := ids.GenerateTestNodeID()
 			startTime := service.vm.clock.Time()
-			period := defaultMinStakingDuration
-			periodSeconds := uint64(period / time.Second)
 			endTime := startTime.Add(period)
+			// Restaked rewards are added to the weight on every renewal.
+			weight := service.vm.MinValidatorStake + test.restakedValidation + test.restakedDelegatee
 
-			// The identity the executor maintains on every renewal.
-			weight := stakedAmount + test.restakedValidation + test.restakedDelegatee
-
-			owner := &secp256k1fx.OutputOwners{
+			rewardOwner := &secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 			}
@@ -1064,29 +928,17 @@ func TestGetCurrentValidatorsAutoRenewedRestakedRewards(t *testing.T) {
 			require.NoError(err)
 
 			addAutoRenewedValidatorTx := &platform.AddAutoRenewedValidatorTx{
-				ValidatorNodeID: types.JSONByteSlice(nodeID.Bytes()),
-				Signer:          pop,
-				StakeOuts: []*avax.TransferableOutput{
-					{
-						Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
-						Out: &secp256k1fx.TransferOutput{
-							Amt:          stakedAmount,
-							OutputOwners: *owner,
-						},
-					},
-				},
-				ValidatorRewardsOwner:    owner,
-				DelegatorRewardsOwner:    owner,
+				ValidatorNodeID:          types.JSONByteSlice(nodeID.Bytes()),
+				Signer:                   pop,
+				ValidatorRewardsOwner:    rewardOwner,
+				DelegatorRewardsOwner:    rewardOwner,
 				ValidatorAuthority:       validatorAuthority,
 				DelegationShares:         reward.PercentDenominator,
-				AutoCompoundRewardShares: reward.PercentDenominator,
+				AutoCompoundRewardShares: autoCompoundRewardShares,
 				Period:                   periodSeconds,
 			}
 			tx := &platform.Tx{Unsigned: addAutoRenewedValidatorTx}
 			require.NoError(tx.Initialize(platform.Codec))
-
-			// The principal a caller reads back from platform.getTx.
-			require.Equal(stakedAmount, addAutoRenewedValidatorTx.Weight())
 
 			service.vm.ctx.Lock.Lock()
 			staker := &state.Staker{
@@ -1107,10 +959,10 @@ func TestGetCurrentValidatorsAutoRenewedRestakedRewards(t *testing.T) {
 			diff.AddTx(tx, status.Committed)
 			require.NoError(diff.PutCurrentValidator(staker))
 			require.NoError(diff.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
-				DelegateeReward:          test.pendingCommission,
+				DelegateeReward:          test.delegateeReward,
 				AccruedValidationRewards: test.restakedValidation,
 				AccruedDelegateeRewards:  test.restakedDelegatee,
-				AutoCompoundRewardShares: reward.PercentDenominator,
+				AutoCompoundRewardShares: autoCompoundRewardShares,
 				NextPeriod:               periodSeconds,
 			}))
 			require.NoError(diff.Apply(service.vm.state))
@@ -1125,22 +977,50 @@ func TestGetCurrentValidatorsAutoRenewedRestakedRewards(t *testing.T) {
 			require.Len(reply.Validators, 1)
 
 			gotValidator := reply.Validators[0].(pchainapi.PermissionlessValidator)
-			gotCfg := gotValidator.AutoRenewedConfig
-			require.NotNil(gotCfg)
 
-			// Both are always set, including when zero; nil means unreported.
-			require.NotNil(gotCfg.RestakedValidationRewards)
-			require.NotNil(gotCfg.RestakedDelegateeRewards)
-			require.Equal(avajson.Uint64(test.restakedValidation), *gotCfg.RestakedValidationRewards)
-			require.Equal(avajson.Uint64(test.restakedDelegatee), *gotCfg.RestakedDelegateeRewards)
+			rewardOwnerAddr, err := service.addrManager.FormatLocalAddress(rewardOwner.Addrs[0])
+			require.NoError(err)
+			validatorAuthorityAddr, err := service.addrManager.FormatLocalAddress(validatorAuthority.Addrs[0])
+			require.NoError(err)
 
-			// Pending commission must not be folded into either total.
-			require.Equal(avajson.Uint64(test.pendingCommission), *gotValidator.AccruedDelegateeReward)
-
-			require.Equal(
-				uint64(gotValidator.Weight)-stakedAmount,
-				uint64(*gotCfg.RestakedValidationRewards)+uint64(*gotCfg.RestakedDelegateeRewards),
-			)
+			wantRewardOwner := &pchainapi.Owner{
+				Threshold: avajson.Uint32(rewardOwner.Threshold),
+				Addresses: []string{rewardOwnerAddr},
+			}
+			wantValidator := pchainapi.PermissionlessValidator{
+				Staker: pchainapi.Staker{
+					TxID:      tx.ID(),
+					StartTime: avajson.Uint64(startTime.Unix()),
+					EndTime:   avajson.Uint64(endTime.Unix()),
+					Weight:    avajson.Uint64(weight),
+					NodeID:    nodeID,
+				},
+				ValidationRewardOwner:  wantRewardOwner,
+				DelegationRewardOwner:  wantRewardOwner,
+				PotentialReward:        utils.PointerTo(avajson.Uint64(potentialReward)),
+				AccruedDelegateeReward: utils.PointerTo(avajson.Uint64(test.delegateeReward)),
+				DelegationFee:          avajson.Float32(100),
+				Uptime:                 utils.PointerTo(avajson.Float32(100)),
+				Connected:              utils.PointerTo(false),
+				Signer: &signer.ProofOfPossession{
+					PublicKey:         pop.PublicKey,
+					ProofOfPossession: pop.ProofOfPossession,
+				},
+				AutoRenewedConfig: &pchainapi.AutoRenewedConfig{
+					ValidatorAuthority: &pchainapi.Owner{
+						Threshold: avajson.Uint32(validatorAuthority.Threshold),
+						Addresses: []string{validatorAuthorityAddr},
+					},
+					NextPeriod:                avajson.Uint64(periodSeconds),
+					AutoCompoundRewardShares:  avajson.Uint32(autoCompoundRewardShares),
+					RestakedValidationRewards: utils.PointerTo(avajson.Uint64(test.restakedValidation)),
+					RestakedDelegateeRewards:  utils.PointerTo(avajson.Uint64(test.restakedDelegatee)),
+				},
+				DelegatorCount:  utils.PointerTo(avajson.Uint64(0)),
+				DelegatorWeight: utils.PointerTo(avajson.Uint64(0)),
+				Delegators:      &[]pchainapi.PrimaryDelegator{},
+			}
+			require.Equal(wantValidator, gotValidator)
 		})
 	}
 }
