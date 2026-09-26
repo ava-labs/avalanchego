@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
@@ -24,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxo/utxomock"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -33,7 +31,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 
 	type test struct {
 		name        string
-		backendF    func(*gomock.Controller) *Backend
+		backend     *Backend
 		chain       state.Chain
 		sTxF        func() *platform.Tx
 		txF         func() *platform.AddPermissionlessValidatorTx
@@ -110,13 +108,11 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 	tests := []test{
 		{
 			name: "fail syntactic verification",
-			backendF: func(*gomock.Controller) *Backend {
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
 			},
 
 			chain: func() *state.State {
@@ -128,20 +124,18 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				return nil
 			},
 			txF: func() *platform.AddPermissionlessValidatorTx {
-				return nil
+				return &verifiedTx
 			},
 			expectedErr: platform.ErrNilSignedTx,
 		},
 		{
 			name: "not bootstrapped",
-			backendF: func(*gomock.Controller) *Backend {
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: &utils.Atomic[bool]{},
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: &utils.Atomic[bool]{},
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -158,16 +152,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "start time too early",
-			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Cortina, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Cortina, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -184,16 +174,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "weight too low",
-			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -213,16 +199,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "weight too high",
-			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -242,16 +224,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "insufficient delegation fee",
-			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -272,16 +250,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "duration too short",
-			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -305,16 +279,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "duration too long",
-			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -338,16 +308,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "wrong assetID",
-			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -373,16 +339,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "duplicate validator",
-			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -413,16 +375,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		{
 			name: "validator not subset of primary network validator",
-			backendF: func(*gomock.Controller) *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-				return &Backend{
-					Ctx: ctx,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Ctx: ctx,
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -447,75 +405,13 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			expectedErr: ErrPeriodMismatch,
 		},
 		{
-			name: "flow check fails",
-			backendF: func(ctrl *gomock.Controller) *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-
-				flowChecker := utxomock.NewVerifier(ctrl)
-				flowChecker.EXPECT().VerifySpend(
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-				).Return(ErrFlowCheckFailed)
-
-				return &Backend{
-					FlowChecker: flowChecker,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Ctx:          ctx,
-					Bootstrapped: bootstrapped,
-				}
-			},
-			chain: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				s.SetTimestamp(now)
-				s.AddSubnetTransformation(&transformTx)
-
-				primaryNetworkVdr := &state.Staker{
-					EndTime:  mockable.MaxTime,
-					SubnetID: constants.PrimaryNetworkID,
-					NodeID:   verifiedTx.NodeID(),
-				}
-				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
-				return s
-			}(),
-			sTxF: func() *platform.Tx {
-				return &verifiedSignedTx
-			},
-			txF: func() *platform.AddPermissionlessValidatorTx {
-				return &verifiedTx
-			},
-			expectedErr: ErrFlowCheckFailed,
-		},
-		{
 			name: "success",
-			backendF: func(ctrl *gomock.Controller) *Backend {
-				bootstrapped := &utils.Atomic[bool]{}
-				bootstrapped.Set(true)
-
-				flowChecker := utxomock.NewVerifier(ctrl)
-				flowChecker.EXPECT().VerifySpend(
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-					gomock.Any(),
-				).Return(nil)
-
-				return &Backend{
-					FlowChecker: flowChecker,
-					Config: &config.Internal{
-						UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-					},
-					Ctx:          ctx,
-					Bootstrapped: bootstrapped,
-				}
+			backend: &Backend{
+				Config: &config.Internal{
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
+				},
+				Ctx:          ctx,
+				Bootstrapped: utils.NewAtomic(true),
 			},
 			chain: func() *state.State {
 				s := statetest.New(t, statetest.Config{})
@@ -541,16 +437,13 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
-
 			var (
-				backend = tt.backendF(ctrl)
+				backend = tt.backend
 				sTx     = tt.sTxF()
 				tx      = tt.txF()
 			)
 
-			feeCalculator := state.PickFeeCalculator(backend.Config, tt.chain)
-			err := verifyAddPermissionlessValidatorTx(backend, feeCalculator, tt.chain, sTx, tx)
+			err := verifyAddPermissionlessValidatorTx(backend, tt.chain, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
