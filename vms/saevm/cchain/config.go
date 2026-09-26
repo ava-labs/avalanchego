@@ -90,8 +90,7 @@ type config struct {
 	TxPoolGlobalSlots  uint64 `json:"tx-pool-global-slots"`
 
 	// APIs
-	// MaxBlocksPerRequest int64  `json:"api-max-blocks-per-request"`
-
+	MaxBlocksPerRequest int64 `json:"api-max-blocks-per-request"`
 	// APIs is the exhaustive set of JSON-RPC APIs this node serves. Methods of
 	// any other API return "method not found".
 	APIs                set.Set[rpc.API] `json:"apis"`
@@ -240,6 +239,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
 			BatchRequestLimit:   c.BatchRequestLimit,
 			EVMTimeout:          c.APIMaxDuration.Duration,
+			MaxBlocksPerRequest: c.MaxBlocksPerRequest,
 			// GasCap and TxFeeCap are set to reasonable values for mainnet
 			// C-Chain. They are left unconfigurable to minimize the size of the
 			// user config.
