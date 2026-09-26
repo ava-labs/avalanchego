@@ -2,16 +2,29 @@
 
 set -euo pipefail
 
-if (( $# < 4 )); then
-  echo "usage: $0 <avalanchego> <e2e-test> <ginkgo> <xsvm> [e2e-test-args...]" >&2
-  exit 1
-fi
+if [[ "${1:-}" == "--use-staged-binaries" ]]; then
+  # CI restores these files from the artifacts produced by the staging tasks.
+  staged_binary_dir="build/bazel-e2e"
+  avalanchego_path="$(realpath "${staged_binary_dir}/avalanchego/avalanchego")"
+  e2e_test_path="$(realpath "${staged_binary_dir}/runtime/e2e.test")"
+  ginkgo_path="$(realpath "${staged_binary_dir}/runtime/ginkgo")"
+  xsvm_path="$(realpath "${staged_binary_dir}/runtime/xsvm")"
+  # actions/download-artifact stores files in a ZIP archive, which does not
+  # preserve executable permissions. The staged directory is workspace-owned.
+  chmod +x "${avalanchego_path}" "${e2e_test_path}" "${ginkgo_path}" "${xsvm_path}"
+  shift
+else
+  if (( $# < 4 )); then
+    echo "usage: $0 [--use-staged-binaries] [e2e-test-args...]" >&2
+    exit 1
+  fi
 
-avalanchego_path="$(realpath "$1")"
-e2e_test_path="$(realpath "$2")"
-ginkgo_path="$(realpath "$3")"
-xsvm_path="$(realpath "$4")"
-shift 4
+  avalanchego_path="$(realpath "$1")"
+  e2e_test_path="$(realpath "$2")"
+  ginkgo_path="$(realpath "$3")"
+  xsvm_path="$(realpath "$4")"
+  shift 4
+fi
 
 # Keep tmpnet data in the user's home directory so it remains easy to inspect.
 # The plugin directory is separate from the network data and contains a symlink

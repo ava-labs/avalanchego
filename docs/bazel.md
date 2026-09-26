@@ -473,14 +473,27 @@ task bazel-test-e2e
 
 # Run the focused E2E smoke test with Bazel-built runtime dependencies
 task bazel-test-e2e-smoke
+
+# Build and stage the binaries used by E2E artifact consumers
+task bazel-stage-avalanchego
+task bazel-stage-e2e-runtime
+
+# Run E2E tests from the staged binaries without invoking Bazel
+task bazel-test-e2e-staged
 ```
 
 #### E2E runner
 
-`task bazel-test-e2e` runs `bazel run //tests/e2e:e2e_runner`. The runner
-builds avalanchego, Ginkgo, the E2E test binary, and XSVM with Bazel. It then
-runs the prebuilt E2E binary through Ginkgo. It does not build a binary with Go
-during test execution.
+`task bazel-test-e2e` runs `bazel run //tests/e2e:e2e_runner`. Bazel builds
+avalanchego, Ginkgo, the E2E test binary, and XSVM before it starts the runner.
+The runner then runs the prebuilt E2E binary through Ginkgo. It does not build a
+binary with Go during test execution.
+
+`task bazel-stage-avalanchego` and `task bazel-stage-e2e-runtime` build and
+stage these binaries under `build/bazel-e2e`. CI uploads the two directories as
+separate artifacts. `task bazel-test-e2e-staged` runs the restored binaries from
+that location without invoking Bazel. The runner restores executable permissions
+because GitHub Actions artifacts do not preserve them.
 
 The runner uses `bazel run`, not `bazel test`. Tmpnet creates network data under
 `$HOME/.tmpnet`. This path lets developers inspect a failed network. Tmpnet
@@ -656,10 +669,11 @@ Non-scheduled Bazel CI runs these jobs:
 - macOS 26 ARM64 CI runs one cacheable unit-test smoke target and one focused
   E2E smoke test.
 
-The Linux E2E job uses `//tests/e2e:e2e_runner`. This target builds all E2E
-runtime binaries with Bazel. It then runs the test on the host so tmpnet can
-write network data to `$HOME/.tmpnet`. The macOS smoke job uses the same target.
-It changes only the Ginkgo focus filter.
+The Linux E2E jobs build avalanchego and the other E2E runtime binaries with
+Bazel, upload them as separate artifacts, and run the restored binaries on the
+host. This lets tmpnet write network data to `$HOME/.tmpnet`. The macOS smoke
+job uses `//tests/e2e:e2e_runner` directly and changes only the Ginkgo focus
+filter.
 
 The Linux runner label is `ubuntu-24.04-amd64-4-core`. The four cores let
 Ginkgo run E2E tests in parallel. Add a new custom runner label to

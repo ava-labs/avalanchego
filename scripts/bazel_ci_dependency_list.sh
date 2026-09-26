@@ -17,6 +17,7 @@ bazel_ci_target_patterns() {
   cat <<'EOF'
 //main:avalanchego
 //tests/e2e:e2e_runner
+//tests/e2e:e2e_runtime
 //...
 //ids:ids_test
 EOF

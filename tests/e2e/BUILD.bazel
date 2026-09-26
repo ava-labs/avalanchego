@@ -37,6 +37,16 @@ genrule(
     cmd = "cp $< $@",
 )
 
+filegroup(
+    name = "e2e_runtime",
+    testonly = True,
+    srcs = [
+        ":e2e_test_binary",
+        "//vms/example/xsvm/cmd/xsvm",
+        "@com_github_onsi_ginkgo_v2//ginkgo",
+    ],
+)
+
 sh_binary(
     name = "e2e_runner",
     testonly = True,
@@ -48,6 +58,7 @@ sh_binary(
         "$(location //vms/example/xsvm/cmd/xsvm:xsvm)",
     ],
     data = [
+        ":e2e_runtime",
         ":e2e_test_binary",
         "//main:avalanchego",
         "//vms/example/xsvm/cmd/xsvm",
