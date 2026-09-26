@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
@@ -41,15 +40,12 @@ func Test_Creation(t *testing.T) {
 
 	ctx := t.Context()
 	syncer, err := sync.NewSyncer(
+		sync.Config[*RangeProof, *ChangeProof]{SimultaneousWorkLimit: 5},
 		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, db)),
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
+		ids.Empty,
+		rangeProofMarshaler,
+		changeProofMarshaler,
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, db)),
 	)
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -246,16 +242,12 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			}
 
 			syncer, err := sync.NewSyncer(
+				sync.Config[*RangeProof, *ChangeProof]{SimultaneousWorkLimit: 5},
 				db,
-				sync.Config[*RangeProof, *ChangeProof]{
-					RangeProofMarshaler:   rangeProofMarshaler,
-					ChangeProofMarshaler:  changeProofMarshaler,
-					ProofClient:           proofClient,
-					TargetRoot:            syncRoot,
-					SimultaneousWorkLimit: 5,
-					Log:                   logging.NoLog{},
-				},
-				prometheus.NewRegistry(),
+				syncRoot,
+				rangeProofMarshaler,
+				changeProofMarshaler,
+				proofClient,
 			)
 
 			require.NoError(err)
@@ -325,16 +317,12 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	syncer, err := sync.NewSyncer(
+		sync.Config[*RangeProof, *ChangeProof]{SimultaneousWorkLimit: 5},
 		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, dbToSync)),
-			TargetRoot:            syncRoot,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
+		syncRoot,
+		rangeProofMarshaler,
+		changeProofMarshaler,
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, dbToSync)),
 	)
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -354,16 +342,12 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 
 	ctx = t.Context()
 	newSyncer, err := sync.NewSyncer(
+		sync.Config[*RangeProof, *ChangeProof]{SimultaneousWorkLimit: 5},
 		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, dbToSync)),
-			TargetRoot:            syncRoot,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
+		syncRoot,
+		rangeProofMarshaler,
+		changeProofMarshaler,
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, dbToSync)),
 	)
 	require.NoError(err)
 	require.NotNil(newSyncer)
@@ -436,16 +420,12 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	}, 1)
 
 	syncer, err = sync.NewSyncer(
+		sync.Config[*RangeProof, *ChangeProof]{SimultaneousWorkLimit: 5},
 		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
-			TargetRoot:            firstSyncRoot,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
+		firstSyncRoot,
+		rangeProofMarshaler,
+		changeProofMarshaler,
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
 	)
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -492,16 +472,12 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 		}
 	}, 0)
 	syncer, err = sync.NewSyncer(
+		sync.Config[*RangeProof, *ChangeProof]{SimultaneousWorkLimit: 5},
 		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
-			TargetRoot:            root1,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
+		root1,
+		rangeProofMarshaler,
+		changeProofMarshaler,
+		p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
 	)
 	require.NoError(err)
 
