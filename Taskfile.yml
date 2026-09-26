@@ -80,13 +80,27 @@ tasks:
       - task: bazel-mod-tidy
       - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'
 
-  bazel-test-e2e:
-    desc: Run E2E tests with bazel-built binary
+  bazel-stage-avalanchego:
+    desc: Build and stage avalanchego for Bazel E2E tests
+    env:
+      BAZEL_CI_TARGET_PATTERNS: //main:avalanchego
     cmds:
-      - task: bazel-build
-      - task: build-xsvm
-      - cmd: |
-          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
+      - '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh build //main:avalanchego'
+      - '{{.NIX_RUN}} ./scripts/stage_bazel_e2e_binaries.sh avalanchego'
+
+  bazel-stage-e2e-runtime:
+    desc: Build and stage E2E runtime binaries with Bazel
+    env:
+      BAZEL_CI_TARGET_PATTERNS: //tests/e2e:e2e_runtime
+    cmds:
+      - '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh build //tests/e2e:e2e_runtime'
+      - '{{.NIX_RUN}} ./scripts/stage_bazel_e2e_binaries.sh runtime'
+
+  bazel-test-e2e:
+    desc: Run E2E tests with Bazel-built runtime dependencies
+    env:
+      BAZEL_CI_TARGET_PATTERNS: //tests/e2e:e2e_runner
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run //tests/e2e:e2e_runner'
 
   bazel-test-e2e-ci:
     desc: Run the E2E network-reuse smoke test with a Bazel-built binary [serially with race detection]
@@ -99,12 +113,14 @@ tasks:
           {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
 
   bazel-test-e2e-smoke:
-    desc: Run an E2E smoke test with bazel-built binary
-    cmds:
-      - task: bazel-build
-      - task: build-xsvm
-      - cmd: |
-          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.sh --ginkgo.focus-file=c/api.go'
+    desc: Run an E2E smoke test with Bazel-built runtime dependencies
+    env:
+      BAZEL_CI_TARGET_PATTERNS: //tests/e2e:e2e_runner
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run //tests/e2e:e2e_runner -- --ginkgo.focus-file=c/api.go'
+
+  bazel-test-e2e-staged:
+    desc: Run E2E tests from staged Bazel binaries
+    cmd: '{{.NIX_RUN}} ./tests/e2e/e2e_runner.sh --use-staged-binaries {{.CLI_ARGS}}'
 
   bazel-test-unit:
     desc: Run cacheable Go unit tests with Bazel
