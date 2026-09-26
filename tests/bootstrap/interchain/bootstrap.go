@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -58,8 +58,8 @@ var _ = e2e.DescribeCChain("[Interchain Bootstrap]", func() {
 			endTime := time.Now().Add(6 * time.Minute)
 			for range count {
 				_, err := pWallet.IssueAddPermissionlessDelegatorTx(
-					&txs.SubnetValidator{
-						Validator: txs.Validator{
+					&platform.SubnetValidator{
+						Validator: platform.Validator{
 							NodeID: nodeURI.NodeID,
 							End:    uint64(endTime.Unix()),
 							Wght:   genesis.LocalParams.StakingConfig.MinDelegatorStake,

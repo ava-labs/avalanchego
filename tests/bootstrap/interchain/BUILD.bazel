@@ -12,7 +12,7 @@ go_library(
         "//tests/fixture/e2e",
         "//tests/fixture/tmpnet",
         "//utils/constants",
-        "//vms/platformvm/txs",
+        "//vms/platformvm/platform",
         "//vms/secp256k1fx",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_onsi_ginkgo_v2//:ginkgo",
