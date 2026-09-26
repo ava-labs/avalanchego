@@ -123,6 +123,9 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", ginkgo
 				},
 				NextPeriod:               uint64(updatedStakingPeriod.Seconds()),
 				AutoCompoundRewardShares: autoCompoundRewardShares,
+				// No cycle has renewed yet.
+				RestakedValidationRewards: new(uint64),
+				RestakedDelegateeRewards:  new(uint64),
 			}, currentValidator(tc, pvmClient, f.validatorNode.NodeID).AutoRenewedConfig)
 		})
 
@@ -184,6 +187,9 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", ginkgo
 				},
 				NextPeriod:               uint64(updatedStakingPeriod.Seconds()),
 				AutoCompoundRewardShares: updatedAutoCompoundRewardShares,
+				// One cycle has renewed, so the totals hold that cycle's split.
+				RestakedValidationRewards: new(restakingValidationRewards1),
+				RestakedDelegateeRewards:  new(restakingDelegateeRewards1),
 			}, currentValidator(tc, pvmClient, f.validatorNode.NodeID).AutoRenewedConfig)
 		})
 
@@ -240,7 +246,20 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", ginkgo
 
 		tc.By("checking auto-renewed validator's weight and accrued rewards", func() {
 			expectedValidatorWeight := validatorWeight + restakingValidationRewards1 + restakingDelegateeRewards1 + restakingValidationRewards2 + restakingDelegateeRewards2
-			require.Equal(tc, expectedValidatorWeight, currentValidator(tc, pvmClient, f.validatorNode.NodeID).Weight)
+			validator := currentValidator(tc, pvmClient, f.validatorNode.NodeID)
+			require.Equal(tc, expectedValidatorWeight, validator.Weight)
+			require.Equal(tc, &platformvm.ClientAutoRenewedConfig{
+				ValidatorAuthority: &platformvm.ClientOwner{
+					Locktime:  0,
+					Threshold: 1,
+					Addresses: []ids.ShortID{f.validatorFundingKey.Address()},
+				},
+				NextPeriod:               uint64(updatedStakingPeriod.Seconds()),
+				AutoCompoundRewardShares: updatedAutoCompoundRewardShares,
+				// The totals are cumulative across both renewed cycles.
+				RestakedValidationRewards: new(restakingValidationRewards1 + restakingValidationRewards2),
+				RestakedDelegateeRewards:  new(restakingDelegateeRewards1 + restakingDelegateeRewards2),
+			}, validator.AutoRenewedConfig)
 		})
 
 		var validatorThirdCyclePotentialRewards uint64

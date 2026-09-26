@@ -7,6 +7,11 @@
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 - Updated the minimum Go version from `1.25.10` to `1.26.8`.
 
+### APIs
+
+- Added:
+  - `restakedValidationRewards` and `restakedDelegateeRewards` fields to `platform.getCurrentValidators` results for auto-renewed validators
+
 ### Metrics
 
 - Added `avalanche_platformvm_local_delegated_staked` (gauge): amount (in nAVAX) of AVAX delegated to this node on the Primary Network.
