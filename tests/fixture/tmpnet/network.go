@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 )
 
@@ -1076,17 +1077,12 @@ func checkVMBinaries(log logging.Logger, subnets []*Subnet, config *ProcessRunti
 	return nil
 }
 
-type RPCChainVMVersion struct {
-	RPCChainVM uint64 `json:"rpcchainvm"`
-}
-
-// getRPCVersion attempts to invoke the given command with the specified version arguments and
-// retrieve an rpcchainvm version from its output.
-func getRPCVersion(log logging.Logger, command string, versionArgs ...string) (uint64, error) {
-	cmd := exec.Command(command, versionArgs...)
+// getAvalancheGoVersion invokes an AvalancheGo binary and returns its version details.
+func getAvalancheGoVersion(log logging.Logger, command string) (*version.Versions, error) {
+	cmd := exec.Command(command, "--version-json")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return 0, stacktrace.Errorf("command %q failed with output: %s", command, output)
+		return nil, stacktrace.Errorf("command %q failed with output: %s", command, output)
 	}
 
 	// Ignore output before the opening brace to tolerate the case of a command being invoked
@@ -1099,11 +1095,35 @@ func getRPCVersion(log logging.Logger, command string, versionArgs ...string) (u
 		output = output[idx:]
 	}
 
-	version := &RPCChainVMVersion{}
+	versions := &version.Versions{}
+	if err := json.Unmarshal(output, versions); err != nil {
+		return nil, stacktrace.Errorf("failed to unmarshal output from command %q: %w, output: %s", command, err, output)
+	}
+	return versions, nil
+}
+
+// getRPCVersion attempts to invoke the given command with the specified version arguments and
+// retrieve an rpcchainvm version from its output.
+func getRPCVersion(log logging.Logger, command string, versionArgs ...string) (uint64, error) {
+	if len(versionArgs) == 1 && versionArgs[0] == "--version-json" {
+		versions, err := getAvalancheGoVersion(log, command)
+		if err != nil {
+			return 0, err
+		}
+		return versions.RPCChainVM, nil
+	}
+
+	cmd := exec.Command(command, versionArgs...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return 0, stacktrace.Errorf("command %q failed with output: %s", command, output)
+	}
+	version := &struct {
+		RPCChainVM uint64 `json:"rpcchainvm"`
+	}{}
 	if err := json.Unmarshal(output, version); err != nil {
 		return 0, stacktrace.Errorf("failed to unmarshal output from command %q: %w, output: %s", command, err, output)
 	}
-
 	return version.RPCChainVM, nil
 }
 
