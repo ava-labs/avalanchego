@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -997,11 +996,11 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 				},
 				ValidationRewardOwner:  wantRewardOwner,
 				DelegationRewardOwner:  wantRewardOwner,
-				PotentialReward:        utils.PointerTo(avajson.Uint64(potentialReward)),
-				AccruedDelegateeReward: utils.PointerTo(avajson.Uint64(test.delegateeReward)),
+				PotentialReward:        new(avajson.Uint64(potentialReward)),
+				AccruedDelegateeReward: new(avajson.Uint64(test.delegateeReward)),
 				DelegationFee:          avajson.Float32(100),
-				Uptime:                 utils.PointerTo(avajson.Float32(100)),
-				Connected:              utils.PointerTo(false),
+				Uptime:                 new(avajson.Float32(100)),
+				Connected:              new(false),
 				Signer: &signer.ProofOfPossession{
 					PublicKey:         pop.PublicKey,
 					ProofOfPossession: pop.ProofOfPossession,
@@ -1013,11 +1012,11 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 					},
 					NextPeriod:                avajson.Uint64(periodSeconds),
 					AutoCompoundRewardShares:  avajson.Uint32(autoCompoundRewardShares),
-					RestakedValidationRewards: utils.PointerTo(avajson.Uint64(test.restakedValidation)),
-					RestakedDelegateeRewards:  utils.PointerTo(avajson.Uint64(test.restakedDelegatee)),
+					RestakedValidationRewards: new(avajson.Uint64(test.restakedValidation)),
+					RestakedDelegateeRewards:  new(avajson.Uint64(test.restakedDelegatee)),
 				},
-				DelegatorCount:  utils.PointerTo(avajson.Uint64(0)),
-				DelegatorWeight: utils.PointerTo(avajson.Uint64(0)),
+				DelegatorCount:  new(avajson.Uint64),
+				DelegatorWeight: new(avajson.Uint64),
 				Delegators:      &[]pchainapi.PrimaryDelegator{},
 			}
 			require.Equal(wantValidator, gotValidator)

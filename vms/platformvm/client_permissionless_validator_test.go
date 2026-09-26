@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 
@@ -85,8 +84,8 @@ func TestClientGetCurrentValidators(t *testing.T) {
 					ValidatorAuthority:        &api.Owner{Threshold: 1},
 					NextPeriod:                1209600,
 					AutoCompoundRewardShares:  1_000_000,
-					RestakedValidationRewards: utils.PointerTo(avajson.Uint64(7_000)),
-					RestakedDelegateeRewards:  utils.PointerTo(avajson.Uint64(3_000)),
+					RestakedValidationRewards: new(avajson.Uint64(7_000)),
+					RestakedDelegateeRewards:  new(avajson.Uint64(3_000)),
 				},
 			},
 			expectedJSON: `{
@@ -109,8 +108,8 @@ func TestClientGetCurrentValidators(t *testing.T) {
 					ValidatorAuthority:        &ClientOwner{Threshold: 1, Addresses: []ids.ShortID{}},
 					NextPeriod:                1209600,
 					AutoCompoundRewardShares:  1_000_000,
-					RestakedValidationRewards: utils.PointerTo(uint64(7_000)),
-					RestakedDelegateeRewards:  utils.PointerTo(uint64(3_000)),
+					RestakedValidationRewards: new(uint64(7_000)),
+					RestakedDelegateeRewards:  new(uint64(3_000)),
 				},
 			},
 		},
@@ -123,8 +122,8 @@ func TestClientGetCurrentValidators(t *testing.T) {
 					ValidatorAuthority:        &api.Owner{Threshold: 1},
 					NextPeriod:                1209600,
 					AutoCompoundRewardShares:  1_000_000,
-					RestakedValidationRewards: utils.PointerTo(avajson.Uint64(0)),
-					RestakedDelegateeRewards:  utils.PointerTo(avajson.Uint64(0)),
+					RestakedValidationRewards: new(avajson.Uint64),
+					RestakedDelegateeRewards:  new(avajson.Uint64),
 				},
 			},
 			expectedJSON: `{
@@ -147,8 +146,8 @@ func TestClientGetCurrentValidators(t *testing.T) {
 					ValidatorAuthority:        &ClientOwner{Threshold: 1, Addresses: []ids.ShortID{}},
 					NextPeriod:                1209600,
 					AutoCompoundRewardShares:  1_000_000,
-					RestakedValidationRewards: utils.PointerTo(uint64(0)),
-					RestakedDelegateeRewards:  utils.PointerTo(uint64(0)),
+					RestakedValidationRewards: new(uint64),
+					RestakedDelegateeRewards:  new(uint64),
 				},
 			},
 		},

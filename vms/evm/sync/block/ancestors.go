@@ -41,7 +41,7 @@ func GetAncestors(
 	// fetching rather than using DB iterators on real databases.
 	var (
 		numBlocks = min(
-			uint64(max(maxBlocks, 1)), //#nosec G115 -- non-negative by max()
+			uint64(max(maxBlocks, 1)),
 			num+1,
 		)
 		blocks = make([][]byte, 0, numBlocks)

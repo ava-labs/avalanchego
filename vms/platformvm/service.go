@@ -926,8 +926,8 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 					ValidatorAuthority:        apiAuthority,
 					NextPeriod:                avajson.Uint64(stakingInfo.NextPeriod),
 					AutoCompoundRewardShares:  avajson.Uint32(stakingInfo.AutoCompoundRewardShares),
-					RestakedValidationRewards: utils.PointerTo(avajson.Uint64(stakingInfo.AccruedValidationRewards)),
-					RestakedDelegateeRewards:  utils.PointerTo(avajson.Uint64(stakingInfo.AccruedDelegateeRewards)),
+					RestakedValidationRewards: new(avajson.Uint64(stakingInfo.AccruedValidationRewards)),
+					RestakedDelegateeRewards:  new(avajson.Uint64(stakingInfo.AccruedDelegateeRewards)),
 				}
 			}
 

@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -125,8 +124,8 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", ginkgo
 				NextPeriod:               uint64(updatedStakingPeriod.Seconds()),
 				AutoCompoundRewardShares: autoCompoundRewardShares,
 				// No cycle has renewed yet.
-				RestakedValidationRewards: utils.PointerTo(uint64(0)),
-				RestakedDelegateeRewards:  utils.PointerTo(uint64(0)),
+				RestakedValidationRewards: new(uint64),
+				RestakedDelegateeRewards:  new(uint64),
 			}, currentValidator(tc, pvmClient, f.validatorNode.NodeID).AutoRenewedConfig)
 		})
 
@@ -189,8 +188,8 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", ginkgo
 				NextPeriod:               uint64(updatedStakingPeriod.Seconds()),
 				AutoCompoundRewardShares: updatedAutoCompoundRewardShares,
 				// One cycle has renewed, so the totals hold that cycle's split.
-				RestakedValidationRewards: utils.PointerTo(restakingValidationRewards1),
-				RestakedDelegateeRewards:  utils.PointerTo(restakingDelegateeRewards1),
+				RestakedValidationRewards: new(restakingValidationRewards1),
+				RestakedDelegateeRewards:  new(restakingDelegateeRewards1),
 			}, currentValidator(tc, pvmClient, f.validatorNode.NodeID).AutoRenewedConfig)
 		})
 
@@ -258,8 +257,8 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", ginkgo
 				NextPeriod:               uint64(updatedStakingPeriod.Seconds()),
 				AutoCompoundRewardShares: updatedAutoCompoundRewardShares,
 				// The totals are cumulative across both renewed cycles.
-				RestakedValidationRewards: utils.PointerTo(restakingValidationRewards1 + restakingValidationRewards2),
-				RestakedDelegateeRewards:  utils.PointerTo(restakingDelegateeRewards1 + restakingDelegateeRewards2),
+				RestakedValidationRewards: new(restakingValidationRewards1 + restakingValidationRewards2),
+				RestakedDelegateeRewards:  new(restakingDelegateeRewards1 + restakingDelegateeRewards2),
 			}, validator.AutoRenewedConfig)
 		})
 

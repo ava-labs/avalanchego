@@ -5,6 +5,7 @@
 ### Features
 
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
+- Updated the minimum Go version from `1.25.10` to `1.26.8`.
 
 ### APIs
 
@@ -14,6 +15,7 @@
 ### Metrics
 
 - Added `avalanche_platformvm_local_delegated_staked` (gauge): amount (in nAVAX) of AVAX delegated to this node on the Primary Network.
+- Route all go-ethereum metrics to `transition` after transition, allowing use after node restart.
 
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 

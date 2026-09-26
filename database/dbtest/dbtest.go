@@ -1247,10 +1247,10 @@ func FuzzNewIteratorWithPrefix(f *testing.F, db database.Database) {
 		expected := map[string][]byte{}
 		for i := 0; i < int(numKeyValues); i++ {
 			key := make([]byte, r.Intn(maxKeyLen))
-			_, _ = r.Read(key) // #nosec G404
+			_, _ = r.Read(key)
 
 			value := make([]byte, r.Intn(maxValueLen))
-			_, _ = r.Read(value) // #nosec G404
+			_, _ = r.Read(value)
 
 			if len(value) == 0 {
 				// Consistently treat zero length values as nil
@@ -1312,10 +1312,10 @@ func FuzzNewIteratorWithStartAndPrefix(f *testing.F, db database.Database) {
 		// Put a bunch of key-values
 		for i := 0; i < int(numKeyValues); i++ {
 			key := make([]byte, r.Intn(maxKeyLen))
-			_, _ = r.Read(key) // #nosec G404
+			_, _ = r.Read(key)
 
 			value := make([]byte, r.Intn(maxValueLen))
-			_, _ = r.Read(value) // #nosec G404
+			_, _ = r.Read(value)
 
 			if len(value) == 0 {
 				// Consistently treat zero length values as nil

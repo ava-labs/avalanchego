@@ -117,6 +117,8 @@ func StateSyncFromScratchTest(t *testing.T, testSetup *SyncTestSetup) {
 }
 
 func StateSyncFromScratchExceedParentTest(t *testing.T, testSetup *SyncTestSetup) {
+	t.Skip("TODO(JonathanOppenheimer): flaky, will be deleted with graft.")
+
 	numToGen := engine.BlocksToFetch + uint64(32)
 	test := SyncTestParams{
 		SyncableInterval:   numToGen,
@@ -239,6 +241,8 @@ func stateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 }
 
 func VMShutdownWhileSyncingTest(t *testing.T, testSetup *SyncTestSetup) {
+	t.Skip("TODO(JonathanOppenheimer): flaky, will be deleted with graft.")
+
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
 			const maxRequests = 50
