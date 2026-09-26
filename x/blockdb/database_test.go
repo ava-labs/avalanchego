@@ -309,9 +309,7 @@ func TestFileCache_Eviction(t *testing.T) {
 				evictionMu.Lock()
 				defer evictionMu.Unlock()
 				evictionCount.Add(1)
-				if file != nil {
-					file.Close()
-				}
+				file.Close()
 			})
 			store.fileCache = smallCache
 
@@ -474,4 +472,39 @@ func TestStructSizes(t *testing.T) {
 				tt.name, tt.expectedPadding, actualMemorySize, binarySize)
 		})
 	}
+}
+
+func TestSyncRetriesClosedCachedFile(t *testing.T) {
+	db := newDatabase(t, DefaultConfig())
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	block := []byte("block")
+	require.NoError(t, db.Put(0, block))
+
+	f, ok := db.fileCache.Get(0)
+	require.True(t, ok)
+	// Force Sync to reopen the cached data file after its handle is closed.
+	require.NoError(t, f.Close())
+
+	require.NoError(t, db.Sync(0, 0))
+	got, err := db.Get(0)
+	require.NoError(t, err)
+	require.Equal(t, block, got)
+}
+
+func TestRetryDataFileOperationPreservesReplacement(t *testing.T) {
+	db := newDatabase(t, DefaultConfig())
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	require.NoError(t, db.Put(0, []byte("block")))
+	var replacement *os.File
+	require.NoError(t, db.retryDataFileOperation(0, false, func(f *os.File) error {
+		if replacement == nil {
+			db.fileCache.Evict(0)
+			var err error
+			replacement, err = db.getDataFile(0, os.O_RDWR)
+			require.NoError(t, err)
+		}
+		return f.Sync()
+	}))
+	_, err := replacement.Stat()
+	require.NoError(t, err)
 }
