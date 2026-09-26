@@ -139,7 +139,7 @@ func ResolveRPCNumber(c Chain, bn rpc.BlockNumber) (uint64, error) {
 	if bn < 0 {
 		return 0, fmt.Errorf("%s block unsupported", bn.String())
 	}
-	n := uint64(bn) //#nosec G115 -- Non-negative check performed above
+	n := uint64(bn)
 	if n > tip {
 		return 0, fmt.Errorf("%w: block %d", ErrFutureBlockNotResolved, n)
 	}
@@ -278,7 +278,7 @@ func FromNumberAndHash[T any](c Chain, hash common.Hash, rpcNum rpc.BlockNumber,
 	if rpcNum < 0 {
 		return nil, errors.New("named blocks not supported")
 	}
-	n := uint64(rpcNum) //#nosec G115 -- Non-negative check performed above
+	n := uint64(rpcNum)
 	if b, ok := c.ConsensusCriticalBlock(hash); ok {
 		if b.NumberU64() != n {
 			return nil, fmt.Errorf("%w: found block number %d for hash %#x, expected %d", ErrNotFound, b.NumberU64(), hash, n)
