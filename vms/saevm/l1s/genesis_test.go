@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
@@ -38,13 +39,14 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
 func TestMain(m *testing.M) {
 	evm.RegisterAllLibEVMExtras()
-	m.Run()
+	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
 
 func errIsType[T error]() testerr.Want {

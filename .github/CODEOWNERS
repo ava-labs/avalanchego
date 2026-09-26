@@ -12,3 +12,4 @@
 /graft/subnet-evm @ava-labs/platform-evm
 /vms/saevm @ARR4N @StephenButtolph
 /vms/saevm/cchain @StephenButtolph
+/vms/saevm/l1s @ava-labs/platform-evm
