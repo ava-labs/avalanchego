@@ -15,8 +15,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/DataDog/zstd"
 	"github.com/cespare/xxhash/v2"
+	"github.com/klauspost/compress/zstd"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
@@ -208,9 +208,9 @@ func New(config DatabaseConfig, log logging.Logger) (_ database.HeightIndex, err
 		databaseLog = logging.NoLog{}
 	}
 
-	// from benchmarks, zstd.BestSpeed is about 100% faster than the default
+	// from benchmarks, zstd.SpeedFastest is about 100% faster than the default
 	// compression level while giving us ~5% better compression ratio than Snappy.
-	compressor, err := compression.NewZstdCompressorWithLevel(math.MaxUint32, zstd.BestSpeed)
+	compressor, err := compression.NewZstdCompressorWithLevel(math.MaxUint32, zstd.SpeedFastest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize compressor: %w", err)
 	}

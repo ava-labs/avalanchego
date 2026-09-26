@@ -11,7 +11,7 @@ go_library(
     ],
     importpath = "github.com/ava-labs/avalanchego/utils/compression",
     visibility = ["//visibility:public"],
-    deps = ["@com_github_datadog_zstd//:zstd"],
+    deps = ["@com_github_klauspost_compress//zstd"],
 )
 
 go_test(
@@ -26,7 +26,7 @@ go_test(
     deps = [
         "//utils",
         "//utils/units",
-        "@com_github_datadog_zstd//:zstd",
+        "@com_github_klauspost_compress//zstd",
         "@com_github_stretchr_testify//require",
     ],
 )

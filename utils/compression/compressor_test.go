@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/DataDog/zstd"
+	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/require"
 
 	_ "embed"
@@ -57,7 +57,7 @@ func TestDecompressZipBombs(t *testing.T) {
 			_, err = compressor.Decompress(zipBomb)
 			runtime.ReadMemStats(&afterDecompressionStats)
 
-			require.ErrorIs(err, ErrDecompressedMsgTooLarge)
+			require.ErrorIs(err, zstd.ErrDecoderSizeExceeded)
 
 			// Make sure that we didn't allocate significantly more memory than
 			// the max message size.
@@ -130,7 +130,7 @@ func TestSizeLimiting(t *testing.T) {
 			require.NoError(err)
 
 			_, err = compressor.Decompress(dataCompressed) // should be too large
-			require.ErrorIs(err, ErrDecompressedMsgTooLarge)
+			require.ErrorIs(err, zstd.ErrDecoderSizeExceeded)
 		})
 	}
 }
@@ -151,7 +151,7 @@ func TestNewCompressorWithInvalidLimit(t *testing.T) {
 }
 
 func TestNewZstdCompressorWithLevel(t *testing.T) {
-	compressor, err := NewZstdCompressorWithLevel(maxMessageSize, zstd.BestSpeed)
+	compressor, err := NewZstdCompressorWithLevel(maxMessageSize, zstd.SpeedFastest)
 	require.NoError(t, err)
 
 	data := utils.RandomBytes(4096)
