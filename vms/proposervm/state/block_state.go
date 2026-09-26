@@ -31,6 +31,9 @@ var (
 
 type BlockState interface {
 	GetBlock(blkID ids.ID) (block.Block, error)
+	// GetBlockBytes returns the bytes of the block with the given ID without
+	// parsing the block.
+	GetBlockBytes(blkID ids.ID) ([]byte, error)
 	PutBlock(blk block.Block) error
 	DeleteBlock(blkID ids.ID) error
 }
@@ -94,13 +97,9 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, error) {
 		return nil, err
 	}
 
-	blkWrapper := blockWrapper{}
-	parsedVersion, err := Codec.Unmarshal(blkWrapperBytes, &blkWrapper)
+	blkWrapper, err := parseBlockWrapper(blkWrapperBytes)
 	if err != nil {
 		return nil, err
-	}
-	if parsedVersion != CodecVersion {
-		return nil, errBlockWrongVersion
 	}
 
 	// The key was in the database
@@ -112,6 +111,45 @@ func (s *blockState) GetBlock(blkID ids.ID) (block.Block, error) {
 
 	s.blkCache.Put(blkID, &blkWrapper)
 	return blk, nil
+}
+
+// GetBlockBytes returns the bytes of the block with the given ID without
+// parsing the block.
+//
+// Unlike [blockState.GetBlock], a block read from the database is not cached.
+// This method is used to serve large ranges of historical blocks, which would
+// otherwise evict the parsed blocks near the tip that are needed to process
+// consensus.
+func (s *blockState) GetBlockBytes(blkID ids.ID) ([]byte, error) {
+	if blk, found := s.blkCache.Get(blkID); found {
+		if blk == nil {
+			return nil, database.ErrNotFound
+		}
+		return blk.Block, nil
+	}
+
+	blkWrapperBytes, err := s.db.Get(blkID[:])
+	if err != nil {
+		return nil, err
+	}
+
+	blkWrapper, err := parseBlockWrapper(blkWrapperBytes)
+	if err != nil {
+		return nil, err
+	}
+	return blkWrapper.Block, nil
+}
+
+func parseBlockWrapper(blkWrapperBytes []byte) (blockWrapper, error) {
+	blkWrapper := blockWrapper{}
+	parsedVersion, err := Codec.Unmarshal(blkWrapperBytes, &blkWrapper)
+	if err != nil {
+		return blockWrapper{}, err
+	}
+	if parsedVersion != CodecVersion {
+		return blockWrapper{}, errBlockWrongVersion
+	}
+	return blkWrapper, nil
 }
 
 func (s *blockState) PutBlock(blk block.Block) error {
