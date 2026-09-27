@@ -1340,6 +1340,220 @@ func TestInnerVMRollback(t *testing.T) {
 	require.Equal(snowmantest.GenesisID, lastAcceptedID)
 }
 
+// retainsAcceptedBlocksVM wraps a test inner VM to declare the
+// RetainsAcceptedBlocks capability, enabling inner-block deduplication.
+type retainsAcceptedBlocksVM struct {
+	*blocktest.VM
+}
+
+func (*retainsAcceptedBlocksVM) RetainsAcceptedBlocks() bool {
+	return true
+}
+
+// TestInnerVMRollbackWithDedup is the crash-window regression test for
+// inner-block deduplication: the proposervm accepts and durably commits a
+// deduplicated block, but the node dies before the inner VM durably accepts
+// the inner block, so on restart the inner bytes needed to reconstruct the
+// last accepted record are gone. The repair path must roll back to the inner
+// VM's height instead of failing chain creation.
+func TestInnerVMRollbackWithDedup(t *testing.T) {
+	require := require.New(t)
+
+	valState := &validatorstest.State{
+		T: t,
+		GetCurrentHeightF: func(context.Context) (uint64, error) {
+			return defaultPChainHeight, nil
+		},
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			nodeID := ids.BuildTestNodeID([]byte{1})
+			return map[ids.NodeID]*validators.GetValidatorOutput{
+				nodeID: {
+					NodeID: nodeID,
+					Weight: 100,
+				},
+			}, nil
+		},
+	}
+
+	coreVM := &retainsAcceptedBlocksVM{
+		VM: &blocktest.VM{
+			VM: enginetest.VM{
+				T: t,
+				InitializeF: func(
+					context.Context,
+					*snow.Context,
+					database.Database,
+					[]byte,
+					[]byte,
+					[]byte,
+					[]*common.Fx,
+					common.AppSender,
+				) error {
+					return nil
+				},
+			},
+			ParseBlockF: func(_ context.Context, b []byte) (snowman.Block, error) {
+				switch {
+				case bytes.Equal(b, snowmantest.GenesisBytes):
+					return snowmantest.Genesis, nil
+				default:
+					return nil, errUnknownBlock
+				}
+			},
+			GetBlockF: func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+				switch blkID {
+				case snowmantest.GenesisID:
+					return snowmantest.Genesis, nil
+				default:
+					return nil, errUnknownBlock
+				}
+			},
+			LastAcceptedF: snowmantest.MakeLastAcceptedBlockF(
+				[]*snowmantest.Block{snowmantest.Genesis},
+			),
+		},
+	}
+
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.ValidatorState = valState
+
+	db := memdb.New()
+	registry := prometheus.NewRegistry()
+
+	proVM := New(
+		coreVM,
+		Config{
+			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.ApricotPhase4, time.Time{}),
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+			Registerer:          registry,
+		},
+	)
+
+	require.NoError(proVM.Initialize(
+		t.Context(),
+		ctx,
+		db,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	))
+
+	require.NoError(proVM.SetState(t.Context(), snow.NormalOp))
+	require.NoError(proVM.SetPreference(t.Context(), snowmantest.GenesisID))
+
+	coreBlk := snowmantest.BuildChild(snowmantest.Genesis)
+	statelessBlock, err := statelessblock.BuildUnsigned(
+		snowmantest.GenesisID,
+		coreBlk.Timestamp(),
+		0,
+		statelessblock.Epoch{},
+		coreBlk.Bytes(),
+	)
+	require.NoError(err)
+
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		case coreBlk.ID():
+			return coreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	proVM.Clock.Set(statelessBlock.Timestamp())
+
+	parsedBlock, err := proVM.ParseBlock(t.Context(), statelessBlock.Bytes())
+	require.NoError(err)
+
+	require.NoError(parsedBlock.Verify(t.Context()))
+	require.NoError(proVM.SetPreference(t.Context(), parsedBlock.ID()))
+	require.NoError(parsedBlock.Accept(t.Context()))
+
+	// The accepted block must have been stored deduplicated, otherwise this
+	// test exercises nothing beyond TestInnerVMRollback.
+	metricFamilies, err := registry.Gather()
+	require.NoError(err)
+	var dedupStored float64
+	for _, mf := range metricFamilies {
+		if mf.GetName() == "state_dedup_blocks_stored" {
+			for _, m := range mf.GetMetric() {
+				dedupStored += m.GetCounter().GetValue()
+			}
+		}
+	}
+	require.Equal(float64(1), dedupStored)
+
+	// Restart the node as if it was killed between the proposervm accepting
+	// the block and the inner VM durably accepting the inner block: the inner
+	// VM is back at genesis and no longer has the inner block at all.
+	require.NoError(proVM.Shutdown(t.Context()))
+	coreBlk.Status = snowtest.Undecided
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	proVM = New(
+		coreVM,
+		Config{
+			Upgrades:            upgradetest.GetConfigWithUpgradeTime(upgradetest.ApricotPhase4, time.Time{}),
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+			Registerer:          prometheus.NewRegistry(),
+		},
+	)
+
+	require.NoError(proVM.Initialize(
+		t.Context(),
+		ctx,
+		db,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	))
+	defer func() {
+		require.NoError(proVM.Shutdown(t.Context()))
+	}()
+
+	lastAcceptedID, err := proVM.LastAccepted(t.Context())
+	require.NoError(err)
+	require.Equal(snowmantest.GenesisID, lastAcceptedID)
+}
+
 func TestBuildBlockDuringWindow(t *testing.T) {
 	require := require.New(t)
 
