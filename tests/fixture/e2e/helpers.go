@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
@@ -62,19 +63,29 @@ func NewWallet(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmp
 }
 
 func NewWalletWithConfig(tc tests.TestContext, keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI, config primary.WalletConfig) *primary.Wallet {
-	log := tc.Log()
+	wallet, err := MakeWallet(tc.DefaultContext(), tc.Log(), keychain, nodeURI, config)
+	require.NoError(tc, err)
+	OutputWalletBalances(tc, wallet)
+	return wallet
+}
+
+// MakeWallet returns an error instead of failing the test, for callers that
+// must recover from RPC errors.
+func MakeWallet(ctx context.Context, log logging.Logger, keychain *secp256k1fx.Keychain, nodeURI tmpnet.NodeURI, config primary.WalletConfig) (*primary.Wallet, error) {
 	log.Info("initializing a new wallet",
 		zap.Stringer("nodeID", nodeURI.NodeID),
 		zap.String("URI", nodeURI.URI),
 	)
 	baseWallet, err := primary.MakeWallet(
-		tc.DefaultContext(),
+		ctx,
 		nodeURI.URI,
 		keychain,
 		keychain,
 		config,
 	)
-	require.NoError(tc, err)
+	if err != nil {
+		return nil, err
+	}
 	wallet := primary.NewWalletWithOptions(
 		baseWallet,
 		common.WithIssuanceHandler(func(r common.IssuanceReceipt) {
@@ -95,8 +106,7 @@ func NewWalletWithConfig(tc tests.TestContext, keychain *secp256k1fx.Keychain, n
 		// Reducing the default from 100ms speeds up detection of tx acceptance
 		common.WithPollFrequency(10*time.Millisecond),
 	)
-	OutputWalletBalances(tc, wallet)
-	return wallet
+	return wallet, nil
 }
 
 // OutputWalletBalances outputs the X-Chain and P-Chain balances of the provided wallet.

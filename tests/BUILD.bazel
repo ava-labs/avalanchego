@@ -9,6 +9,7 @@ go_library(
         "notify_context.go",
         "prometheus_server.go",
         "simple_test_context.go",
+        "tb_test_context.go",
         "test_context.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/tests",
