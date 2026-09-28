@@ -5,6 +5,7 @@ package compression
 
 import (
 	"fmt"
+	"math"
 	"runtime"
 	"testing"
 
@@ -15,7 +16,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"math"
 )
 
 const maxMessageSize = 2 * units.MiB // Max message size. Can't import due to cycle.
