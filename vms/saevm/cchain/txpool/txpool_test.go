@@ -138,7 +138,6 @@ func newSUT(tb testing.TB, state libevm.StateReader) (context.Context, *SUT) {
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
-
 	pool, err := New(
 		snowCtx,
 		cchaintest.ChainConfig(),
