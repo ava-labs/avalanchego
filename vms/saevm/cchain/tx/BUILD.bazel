@@ -62,6 +62,7 @@ go_test(
         "//database/memdb",
         "//graft/coreth/core/extstate",
         "//graft/coreth/params",
+        "//graft/coreth/params/extras",
         "//graft/coreth/params/extras/extrastest",
         "//graft/coreth/plugin/evm",
         "//graft/coreth/plugin/evm/atomic",
