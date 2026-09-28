@@ -20,6 +20,7 @@ import (
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
@@ -249,26 +250,39 @@ func TestFromBlock(t *testing.T) {
 	sliceBytes, err := MarshalSlice(newTxs)
 	require.NoError(t, err, "MarshalSlice()")
 
+	const (
+		preAP5Time uint64 = 0
+		ap5Time           = preAP5Time + 1
+	)
+	config := corethparams.WithExtra(
+		&params.ChainConfig{},
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
+				ApricotPhase5BlockTimestamp: new(ap5Time),
+			},
+		},
+	)
+
 	tests := []struct {
 		name    string
-		config  *params.ChainConfig
+		time    uint64
 		extData []byte
 		want    []*Tx
 		wantErr error
 	}{
 		{
 			name:    "pre_ap5_single",
-			config:  corethparams.TestApricotPhase4Config,
+			time:    preAP5Time,
 			extData: importTx.bytes,
 			want:    []*Tx{importTx.new},
 		},
 		{
-			name:   "pre_ap5_empty",
-			config: corethparams.TestApricotPhase4Config,
+			name: "pre_ap5_empty",
+			time: preAP5Time,
 		},
 		{
-			name:   "pre_ap5_unknown_version",
-			config: corethparams.TestApricotPhase4Config,
+			name: "pre_ap5_unknown_version",
+			time: preAP5Time,
 			extData: []byte{
 				// codecVersion:
 				0x00, 0x01,
@@ -277,17 +291,17 @@ func TestFromBlock(t *testing.T) {
 		},
 		{
 			name:    "ap5_slice",
-			config:  corethparams.TestApricotPhase5Config,
+			time:    ap5Time,
 			extData: sliceBytes,
 			want:    newTxs,
 		},
 		{
-			name:   "ap5_empty",
-			config: corethparams.TestApricotPhase5Config,
+			name: "ap5_empty",
+			time: ap5Time,
 		},
 		{
-			name:   "ap5_inefficient",
-			config: corethparams.TestApricotPhase5Config,
+			name: "ap5_inefficient",
+			time: ap5Time,
 			extData: []byte{
 				// codecVersion:
 				0x00, 0x00,
@@ -300,7 +314,9 @@ func TestFromBlock(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			block := customtypes.NewBlockWithExtData(
-				&types.Header{},
+				&types.Header{
+					Time: test.time,
+				},
 				nil, // txs
 				nil, // uncles
 				nil, // receipts
@@ -308,7 +324,7 @@ func TestFromBlock(t *testing.T) {
 				test.extData,
 				true, // update [customtypes.HeaderExtra.ExtDataHash]
 			)
-			got, err := FromBlock(test.config, block)
+			got, err := FromBlock(config, block)
 			require.ErrorIs(t, err, test.wantErr, "FromBlock()")
 			if diff := cmp.Diff(test.want, got, txtest.CmpOpt()); diff != "" {
 				t.Errorf("FromBlock() diff (-want +got):\n%s", diff)
