@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
@@ -190,7 +189,7 @@ func TestGetAtomicTxStatus(t *testing.T) {
 		require.NoErrorf(t, err, "%T.getTxStatus()", sut.Client)
 		want := TxStatus{
 			Status: choices.Accepted,
-			Height: utils.PointerTo(avajson.Uint64(blk.NumberU64())),
+			Height: new(avajson.Uint64(blk.NumberU64())),
 		}
 		require.Equalf(t, want, got, "%T.getTxStatus()", sut.Client)
 	})

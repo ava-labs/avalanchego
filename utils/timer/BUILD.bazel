@@ -31,7 +31,6 @@ go_test(
     embed = [":timer"],
     deps = [
         "//ids",
-        "//utils",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",
     ],

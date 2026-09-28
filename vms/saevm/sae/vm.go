@@ -47,7 +47,9 @@ import (
 
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	evmprometheus "github.com/ava-labs/avalanchego/vms/evm/metrics/prometheus"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	ethmetrics "github.com/ava-labs/libevm/metrics"
 )
 
 // directory that stores execution results database under the chain data directory
@@ -147,6 +149,9 @@ func NewVM[T hook.Transaction](
 	}
 	if err := snowCtx.Metrics.Register(customrawdb.FirewoodScheme, ffi.Gatherer{}); err != nil {
 		return nil, fmt.Errorf("registering firewood metrics: %w", err)
+	}
+	if err := snowCtx.Metrics.Register("eth", evmprometheus.NewGatherer(ethmetrics.DefaultRegistry)); err != nil {
+		return nil, fmt.Errorf("registering libevm metrics: %w", err)
 	}
 
 	// ==========  Execution Results DB  ==========

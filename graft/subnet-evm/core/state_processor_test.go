@@ -32,6 +32,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -40,7 +41,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/consensus/misc/eip4844"
 	"github.com/ava-labs/libevm/core/rawdb"
