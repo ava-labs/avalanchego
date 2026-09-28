@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	ethereum "github.com/ava-labs/libevm"
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 const (
@@ -168,8 +169,7 @@ func WaitForHealthy(t require.TestingT, node *tmpnet.Node) {
 	require.NoError(t, node.WaitForHealthy(ctx))
 }
 
-// Sends an eth transaction and waits for the transaction receipt from the
-// execution of the transaction.
+// Sends an eth transaction and waits for its receipt.
 func SendEthTransaction(tc tests.TestContext, ethClient *ethclient.Client, signedTx *types.Transaction) *types.Receipt {
 	require := require.New(tc)
 
@@ -198,7 +198,37 @@ func SendEthTransaction(tc tests.TestContext, ethClient *ethclient.Client, signe
 		zap.Stringer("gasPrice", receipt.EffectiveGasPrice),
 		zap.Stringer("blockNumber", receipt.BlockNumber),
 	)
+
 	return receipt
+}
+
+// SendEthTransactionAndWait sends an eth transaction and waits for the state
+// of its receipt block to be fully executed.
+func SendEthTransactionAndWait(tc tests.TestContext, ethClient *ethclient.Client, signedTx *types.Transaction) *types.Receipt {
+	receipt := SendEthTransaction(tc, ethClient, signedTx)
+	require.NoError(tc, WaitForEthBlockExecution(
+		tc.DefaultContext(),
+		ethClient,
+		receipt.BlockNumber,
+	))
+	return receipt
+}
+
+// WaitForEthBlockExecution waits for the state of the block at [blockNumber]
+// to be fully executed.
+func WaitForEthBlockExecution(
+	ctx context.Context,
+	ethClient *ethclient.Client,
+	blockNumber *big.Int,
+) error {
+	if blockNumber == nil {
+		return errors.New("missing block number")
+	}
+
+	// SAE can return a receipt before the containing block is fully executed.
+	// A state read at the block's height waits for that execution.
+	_, err := ethClient.BalanceAt(ctx, ethcommon.Address{}, blockNumber)
+	return err
 }
 
 // Determines the suggested gas price for the configured client that will
