@@ -27,10 +27,7 @@ go_test(
         "batch_test.go",
         "db_test.go",
         "iterator_linux_test.go",
-<<<<<<< HEAD
-=======
         "iterator_test.go",
->>>>>>> 86527d40e1 (fix: free pebbledb nextKey/nextVal before return)
     ],
     embed = [":pebbledb"],
     deps = [
