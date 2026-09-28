@@ -15,5 +15,6 @@ import (
 // ChainConfig returns a new C-Chain config with all network upgrades active.
 func ChainConfig() *params.ChainConfig {
 	c := *saetest.ChainConfig()
-	return corethparams.WithExtra(&c, extras.TestHeliconChainConfig)
+	extra := *extras.TestHeliconChainConfig
+	return corethparams.WithExtra(&c, &extra)
 }

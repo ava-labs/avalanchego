@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -271,36 +272,32 @@ func TestFromBlock(t *testing.T) {
 		wantErr error
 	}{
 		{
+			name: "pre_ap5_empty",
+			time: preAP5Time,
+		},
+		{
+			name: "pre_ap5_empty_slice",
+			time: preAP5Time,
+			extData: []byte{
+				// codecVersion:
+				0x00, 0x00,
+				// len(txs):
+				0x00, 0x00, 0x00, 0x00,
+			},
+			wantErr: wrappers.ErrInsufficientLength,
+		},
+		{
 			name:    "pre_ap5_single",
 			time:    preAP5Time,
 			extData: importTx.bytes,
 			want:    []*Tx{importTx.new},
 		},
 		{
-			name: "pre_ap5_empty",
-			time: preAP5Time,
-		},
-		{
-			name: "pre_ap5_unknown_version",
-			time: preAP5Time,
-			extData: []byte{
-				// codecVersion:
-				0x00, 0x01,
-			},
-			wantErr: codec.ErrUnknownVersion,
-		},
-		{
-			name:    "ap5_slice",
-			time:    ap5Time,
-			extData: sliceBytes,
-			want:    newTxs,
-		},
-		{
 			name: "ap5_empty",
 			time: ap5Time,
 		},
 		{
-			name: "ap5_inefficient",
+			name: "ap5_empty_slice",
 			time: ap5Time,
 			extData: []byte{
 				// codecVersion:
@@ -309,6 +306,18 @@ func TestFromBlock(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00,
 			},
 			wantErr: ErrInefficientSlicePacking,
+		},
+		{
+			name:    "ap5_single",
+			time:    ap5Time,
+			extData: importTx.bytes,
+			wantErr: codec.ErrExtraSpace,
+		},
+		{
+			name:    "ap5_slice",
+			time:    ap5Time,
+			extData: sliceBytes,
+			want:    newTxs,
 		},
 	}
 	for _, test := range tests {
