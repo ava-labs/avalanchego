@@ -5,7 +5,6 @@ package compression
 
 import (
 	"fmt"
-	"math"
 	"runtime"
 	"testing"
 
@@ -16,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"math"
 )
 
 const maxMessageSize = 2 * units.MiB // Max message size. Can't import due to cycle.
@@ -139,14 +139,38 @@ func TestSizeLimiting(t *testing.T) {
 // which leads to undefined decompress behavior due to integer overflow
 // in limit reader creation.
 func TestNewCompressorWithInvalidLimit(t *testing.T) {
+	tests := []struct {
+		maxSize int64
+		want    error
+	}{
+		{
+			maxSize: -1,
+			want:    ErrInvalidMaxSizeCompressor,
+		},
+		{
+			maxSize: 0,
+			want:    ErrInvalidMaxSizeCompressor,
+		},
+		{
+			maxSize: 100,
+		},
+		{
+			maxSize: math.MaxInt64,
+			want:    ErrInvalidMaxSizeCompressor,
+		},
+	}
+
 	for compressionType, compressorFunc := range newCompressorFuncs {
 		if compressionType == TypeNone {
 			continue
 		}
-		t.Run(compressionType.String(), func(t *testing.T) {
-			_, err := compressorFunc(math.MaxInt64)
-			require.ErrorIs(t, err, ErrInvalidMaxSizeCompressor)
-		})
+
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%s_with_max_size_%d", compressionType.String(), tt.maxSize), func(t *testing.T) {
+				_, err := compressorFunc(tt.maxSize)
+				require.ErrorIs(t, err, tt.want)
+			})
+		}
 	}
 }
 
