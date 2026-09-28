@@ -34,10 +34,15 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("proposervm"), func(
 			recipientKey := e2e.NewPrivateKey(tc)
 			recipientEthAddress := recipientKey.EthAddress()
 
+			// The nonce is tracked locally because the accepted nonce can lag
+			// behind receipt availability: SAE serves receipts as soon as a
+			// transaction executes, before its block's state is marked as
+			// executed.
+			nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), senderEthAddress)
+			require.NoError(err)
+
 			for i := 0; i < 3; i++ {
 				// Create and send a simple transaction to trigger block production
-				nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), senderEthAddress)
-				require.NoError(err)
 				gasPrice := e2e.SuggestGasPrice(tc, ethClient)
 				tx := types.NewTransaction(
 					nonce,
@@ -58,6 +63,7 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("proposervm"), func(
 				// Send the transaction and wait for receipt
 				receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
 				require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
+				nonce++
 			}
 		})
 
