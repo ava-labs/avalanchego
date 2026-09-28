@@ -28,6 +28,11 @@ type HeightIndexGetter interface {
 	// there are no indexed blockIDs, ErrNotFound will be returned.
 	GetMinimumHeight() (uint64, error)
 	GetBlockIDAtHeight(height uint64) (ids.ID, error)
+	// GetBlockIDsAtHeights returns the IDs of the blocks indexed at the
+	// heights in [minHeight, maxHeight], ordered by ascending height. Heights
+	// without an indexed block are reported as [ids.Empty]. Callers are
+	// expected to bound the size of the requested range.
+	GetBlockIDsAtHeights(minHeight, maxHeight uint64) ([]ids.ID, error)
 
 	// Fork height is stored when the first post-fork block/option is accepted.
 	// Before that, fork height won't be found.
@@ -94,6 +99,36 @@ func (hi *heightIndex) GetBlockIDAtHeight(height uint64) (ids.ID, error) {
 	}
 	hi.heightsCache.Put(height, blkID)
 	return blkID, err
+}
+
+func (hi *heightIndex) GetBlockIDsAtHeights(minHeight, maxHeight uint64) ([]ids.ID, error) {
+	if minHeight > maxHeight {
+		return nil, nil
+	}
+
+	// Heights are stored as big-endian keys, so iterating from minHeight
+	// visits the requested range in ascending order with a single sequential
+	// scan rather than one read per height.
+	blkIDs := make([]ids.ID, maxHeight-minHeight+1)
+	it := hi.heightDB.NewIteratorWithStart(database.PackUInt64(minHeight))
+	defer it.Release()
+
+	for it.Next() {
+		height, err := database.ParseUInt64(it.Key())
+		if err != nil {
+			return nil, err
+		}
+		if height > maxHeight {
+			break
+		}
+
+		blkID, err := ids.ToID(it.Value())
+		if err != nil {
+			return nil, err
+		}
+		blkIDs[height-minHeight] = blkID
+	}
+	return blkIDs, it.Error()
 }
 
 func (hi *heightIndex) SetBlockIDAtHeight(height uint64, blkID ids.ID) error {

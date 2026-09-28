@@ -35,6 +35,7 @@ go_library(
 go_test(
     name = "state_test",
     srcs = [
+        "block_height_index_test.go",
         "block_state_test.go",
         "chain_state_test.go",
         "state_test.go",

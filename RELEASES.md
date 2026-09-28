@@ -6,6 +6,7 @@
 
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 - Updated the minimum Go version from `1.25.10` to `1.26.8`.
+- Optimized serving `GetAncestors` requests from the `proposervm`: accepted post-fork blocks are now resolved through the height index and read without being parsed, concurrently, for every chain rather than only for chains whose VM implements `BatchedChainVM`.
 
 ### Metrics
 
