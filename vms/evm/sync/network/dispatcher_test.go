@@ -27,12 +27,15 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func TestDispatcher_SendTo(t *testing.T) {
+func TestDispatcher_SendBytes(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	want := &syncpb.GetLeafResponse{Keys: [][]byte{{1, 2, 3}}}
 	wantBytes, err := proto.Marshal(want)
 	require.NoError(t, err, "proto.Marshal(want)")
+
+	reqBytes, err := proto.Marshal(&syncpb.GetLeafRequest{})
+	require.NoError(t, err, "proto.Marshal(req)")
 
 	tests := []struct {
 		name    string
@@ -80,21 +83,21 @@ func TestDispatcher_SendTo(t *testing.T) {
 			}
 
 			got := &syncpb.GetLeafResponse{}
-			outcome, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafRequest{}, got)
-			require.ErrorIsf(t, err, tt.wantErr, "%T.SendTo()", c)
+			outcome, err := c.sendBytes(ctx, nodeID, reqBytes, got)
+			require.ErrorIsf(t, err, tt.wantErr, "%T.sendBytes()", c)
 			if tt.wantErr != nil {
 				// Failures self-register, the caller gets no Outcome.
-				require.Nilf(t, outcome, "%T.SendTo() outcome", c)
+				require.Nilf(t, outcome, "%T.sendBytes() outcome", c)
 				return
 			}
 
-			require.NotNilf(t, outcome, "%T.SendTo() outcome", c)
+			require.NotNilf(t, outcome, "%T.sendBytes() outcome", c)
 			assert.Empty(t, cmp.Diff(tt.want, got, protocmp.Transform()), "cmp.Diff(want, got)")
 		})
 	}
 }
 
-// Mid-flight cancel (parked in SendTo's select) returns context.Canceled
+// Mid-flight cancel (parked in sendBytes' select) returns context.Canceled
 // and de-scores the peer. The handler cancels its own context to ensure it.
 func TestDispatcher_CancelInFlight(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
@@ -111,14 +114,17 @@ func TestDispatcher_CancelInFlight(t *testing.T) {
 		},
 	}
 
+	reqBytes, err := proto.Marshal(&syncpb.GetLeafRequest{})
+	require.NoError(t, err, "proto.Marshal(req)")
+
 	reg, tracker := newTestTracker(t, nodeID)
 	seedResponsive(t, reg, tracker, nodeID)
 	c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 		t, t.Context(), nodeID, handler, tracker,
 	)
 
-	_, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
-	require.ErrorIsf(t, err, context.Canceled, "%T.SendTo()", c)
+	_, err = c.sendBytes(ctx, nodeID, reqBytes, &syncpb.GetLeafResponse{})
+	require.ErrorIsf(t, err, context.Canceled, "%T.sendBytes()", c)
 	assert.Equal(t, 0.0, responsivePeers(t, reg), "responsivePeers()")
 }
 
@@ -127,6 +133,8 @@ func TestDispatcher_CancelInFlight(t *testing.T) {
 func TestDispatcher_PeerScoring(t *testing.T) {
 	okBytes, err := proto.Marshal(&syncpb.GetLeafResponse{})
 	require.NoError(t, err, "proto.Marshal()")
+	reqBytes, err := proto.Marshal(&syncpb.GetLeafRequest{})
+	require.NoError(t, err, "proto.Marshal(req)")
 
 	tests := []struct {
 		name      string
@@ -171,12 +179,12 @@ func TestDispatcher_PeerScoring(t *testing.T) {
 				t, ctx, nodeID, tt.handler, tracker,
 			)
 
-			outcome, err := c.SendTo(ctx, nodeID, &syncpb.GetLeafRequest{}, &syncpb.GetLeafResponse{})
-			require.ErrorIsf(t, err, tt.wantErr, "%T.SendTo()", c)
+			outcome, err := c.sendBytes(ctx, nodeID, reqBytes, &syncpb.GetLeafResponse{})
+			require.ErrorIsf(t, err, tt.wantErr, "%T.sendBytes()", c)
 			if tt.wantErr != nil {
-				require.Nilf(t, outcome, "%T.SendTo() outcome", c)
+				require.Nilf(t, outcome, "%T.sendBytes() outcome", c)
 			} else {
-				require.NotNilf(t, outcome, "%T.SendTo() outcome", c)
+				require.NotNilf(t, outcome, "%T.sendBytes() outcome", c)
 				tt.score(outcome)
 			}
 
