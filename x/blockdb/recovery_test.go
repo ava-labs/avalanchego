@@ -12,7 +12,6 @@ import (
 	"github.com/DataDog/zstd"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/compression"
 )
 
@@ -418,8 +417,8 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 			name:               "missing data file at index 1",
 			blockHeights:       []uint64{0, 1, 2, 3, 4, 5},
 			disableCompression: true,
-			maxDataFileSize:    utils.PointerTo[uint64](1024), // 1KB per file to force multiple files
-			blockSize:          512,                           // 512 bytes per block
+			maxDataFileSize:    new(uint64(1024)), // 1KB per file to force multiple files
+			blockSize:          512,               // 512 bytes per block
 			setupCorruption: func(store *Database, _ [][]byte) error {
 				// Delete the second data file (index 1)
 				dataFilePath := store.dataFilePath(1)
@@ -431,8 +430,8 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 		{
 			name:            "unexpected multiple data files when MaxDataFileSize is max uint64",
 			blockHeights:    []uint64{0, 1, 2},
-			maxDataFileSize: utils.PointerTo[uint64](math.MaxUint64), // Single file mode
-			blockSize:       512,                                     // 512 bytes per block
+			maxDataFileSize: new(uint64(math.MaxUint64)), // Single file mode
+			blockSize:       512,                         // 512 bytes per block
 			setupCorruption: func(store *Database, _ [][]byte) error {
 				// Manually create a second data file to simulate corruption
 				secondDataFilePath := store.dataFilePath(1)
