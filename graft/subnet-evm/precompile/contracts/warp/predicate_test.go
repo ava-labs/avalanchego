@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras/extrastest"
@@ -24,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -32,12 +32,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
+	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 var (
-	_ utils.Sortable[*testValidator] = (*testValidator)(nil)
+	_ avalancheutils.Sortable[*testValidator] = (*testValidator)(nil)
 
 	sourceChainID  = ids.GenerateTestID()
 	sourceSubnetID = ids.GenerateTestID()
@@ -62,7 +63,7 @@ func init() {
 	for i := 0; i < numTestVdrs; i++ {
 		testVdrs = append(testVdrs, newTestValidator())
 	}
-	utils.Sort(testVdrs)
+	avalancheutils.Sort(testVdrs)
 
 	vdrs = map[ids.NodeID]*validators.GetValidatorOutput{
 		testVdrs[0].nodeID: {
@@ -275,7 +276,7 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 	require := require.New(t)
 	numKeys := 10
 	cChainID := ids.GenerateTestID()
-	addressedCall, err := payload.NewAddressedCall(utils.RandomBytes(20), utils.RandomBytes(100))
+	addressedCall, err := payload.NewAddressedCall(avalancheutils.RandomBytes(20), avalancheutils.RandomBytes(100))
 	require.NoError(err)
 	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(constants.UnitTestID, cChainID, addressedCall.Bytes())
 	require.NoError(err)
@@ -301,7 +302,7 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 			NodeIDs:        []ids.NodeID{vdr.nodeID},
 		})
 	}
-	utils.Sort(warpValidators.Validators)
+	avalancheutils.Sort(warpValidators.Validators)
 
 	aggregateSignature, err := bls.AggregateSignatures(blsSignatures)
 	require.NoError(err)
@@ -461,7 +462,7 @@ func TestInvalidAddressedPayload(t *testing.T) {
 }
 
 func TestInvalidBitSet(t *testing.T) {
-	addressedCall, err := payload.NewAddressedCall(utils.RandomBytes(20), utils.RandomBytes(100))
+	addressedCall, err := payload.NewAddressedCall(avalancheutils.RandomBytes(20), avalancheutils.RandomBytes(100))
 	require.NoError(t, err)
 	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(
 		constants.UnitTestID,
