@@ -39,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
@@ -322,14 +321,10 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 	tb.Helper()
 
-	// Run under the latest network upgrade rules by default.
-	chainConfig := cparams.Copy(saetest.ChainConfig())
-	cparams.WithExtra(&chainConfig, extras.TestChainConfig)
-
 	var (
 		cfg = options.ApplyTo(&sutConfig{
 			genesis: core.Genesis{
-				Config:     &chainConfig,
+				Config:     cchaintest.ChainConfig(),
 				Timestamp:  uint64(upgrade.InitiallyActiveTime.Unix()), //#nosec G115 -- Known non-negative
 				Difficulty: big.NewInt(0),                              // irrelevant but required to marshal
 				Alloc:      types.GenesisAlloc{},

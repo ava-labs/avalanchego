@@ -25,7 +25,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -41,8 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 )
 
 func TestMain(m *testing.M) {
@@ -142,13 +139,9 @@ func newSUT(tb testing.TB, state libevm.StateReader) (context.Context, *SUT) {
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
 
-	// Run under the latest network upgrade rules so that blocks carry the
-	// post-ApricotPhase5 extData encoding.
-	chainConfig := cparams.Copy(saetest.ChainConfig())
-	cparams.WithExtra(&chainConfig, extras.TestChainConfig)
 	pool, err := New(
 		snowCtx,
-		&chainConfig,
+		cchaintest.ChainConfig(),
 		NewPending(),
 		backend,
 		maxSize,
