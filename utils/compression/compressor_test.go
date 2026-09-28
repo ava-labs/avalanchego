@@ -135,10 +135,7 @@ func TestSizeLimiting(t *testing.T) {
 	}
 }
 
-// Attempts to create a compressor with math.MaxInt64
-// which leads to undefined decompress behavior due to integer overflow
-// in limit reader creation.
-func TestNewCompressorWithInvalidLimit(t *testing.T) {
+func TestNewCompressor(t *testing.T) {
 	tests := []struct {
 		maxSize int64
 		want    error
