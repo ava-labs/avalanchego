@@ -23,7 +23,7 @@ The minimum recommended hardware specification for nodes connected to Mainnet is
 
 If you plan to build AvalancheGo from source, you will also need the following software:
 
-- [Go](https://golang.org/doc/install) version >= 1.25.10
+- [Go](https://golang.org/doc/install) version >= 1.26.8
 - [gcc](https://gcc.gnu.org/)
 - g++
 
@@ -93,7 +93,7 @@ Make sure Docker is installed on the machine - so commands like `docker run` etc
 Building the Docker image of latest `avalanchego` branch can be done by running:
 
 ```sh
-./scripts/run-task.sh build-image
+./scripts/run_task.sh build-image
 ```
 
 To check the built image, run:
@@ -155,7 +155,7 @@ AvalancheGo uses multiple tools to generate efficient and boilerplate code.
 
 ### Running protobuf codegen
 
-To regenerate the protobuf go code, run `scripts/run-task.sh generate-protobuf` from the root of the repo.
+To regenerate the protobuf go code, run `scripts/run_task.sh generate-protobuf` from the root of the repo.
 
 This should only be necessary when upgrading protobuf versions or modifying .proto definition files.
 

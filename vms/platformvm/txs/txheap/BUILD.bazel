@@ -12,7 +12,7 @@ go_library(
     deps = [
         "//ids",
         "//utils/heap",
-        "//vms/platformvm/txs",
+        "//vms/platformvm/platform",
     ],
 )
 
@@ -22,7 +22,7 @@ go_test(
     embed = [":txheap"],
     deps = [
         "//ids",
-        "//vms/platformvm/txs",
+        "//vms/platformvm/platform",
         "//vms/secp256k1fx",
         "@com_github_stretchr_testify//require",
     ],

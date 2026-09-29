@@ -7,14 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/rlp"
-	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -22,84 +19,23 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
-// maxFutureBlockDuration is the maximum time from the current time allowed for
-// blocks before they're considered future blocks and fail parsing or
-// verification.
-const (
-	maxFutureBlockSeconds  uint64 = 10
-	maxFutureBlockDuration        = time.Duration(maxFutureBlockSeconds) * time.Second
-)
-
-var (
-	errBlockHeightNotUint64 = errors.New("block height not uint64")
-	errBlockTooFarInFuture  = errors.New("block too far in the future")
-
-	errTxHashMismatch         = errors.New("transaction hash mismatch")
-	errUncleHashMismatch      = errors.New("uncle hash mismatch")
-	errWithdrawalHashMismatch = errors.New("withdrawals hash mismatch")
-)
-
-// ParseBlock parses the buffer as [rlp] encoding of a [types.Block]. It does
-// NOT populate the block ancestry, which is done by [VM.VerifyBlock] i.f.f.
-// verification passes.
+// ParseBlock parses the buffer via [blocks.ParseEth]. It does NOT populate the
+// block ancestry, which is done by [VM.VerifyBlock] i.f.f. verification
+// passes.
 func (vm *VM) ParseBlock(ctx context.Context, buf []byte) (*blocks.Block, error) {
-	b := new(types.Block)
-	if err := rlp.DecodeBytes(buf, b); err != nil {
-		return nil, fmt.Errorf("rlp.DecodeBytes(..., %T): %v", b, err)
-	}
-
-	if !b.Number().IsUint64() {
-		return nil, errBlockHeightNotUint64
-	}
-	// The uint64 timestamp can't underflow [time.Time] but it can overflow so
-	// make this some future engineer's problem in a few millennia.
-	if b.Time() > unix(vm.config.Now())+maxFutureBlockSeconds {
-		return nil, fmt.Errorf("%w: >%s", errBlockTooFarInFuture, maxFutureBlockDuration)
-	}
-
-	// Block body must match what is declared by the header.
-	hasher := trie.NewStackTrie(nil)
-	hdr := b.Header()
-	if types.DeriveSha(b.Transactions(), hasher) != hdr.TxHash {
-		return nil, errTxHashMismatch
-	}
-	if types.CalcUncleHash(b.Uncles()) != hdr.UncleHash {
-		return nil, errUncleHashMismatch
-	}
-	{
-		// The withdrawals hash being set depends on the Ethereum hard fork.
-		var want *common.Hash
-		switch w := b.Withdrawals(); {
-		case w == nil:
-			want = nil
-		case len(w) == 0:
-			want = &types.EmptyWithdrawalsHash
-		default:
-			h := types.DeriveSha(w, hasher)
-			want = &h
-		}
-		if !compareHashPtrs(want, hdr.WithdrawalsHash) {
-			return nil, errWithdrawalHashMismatch
-		}
+	b, err := blocks.ParseEth(buf, vm.hooks)
+	if err != nil {
+		return nil, err
 	}
 
 	return vm.blockBuilder.new(b, nil, nil)
-}
-
-func compareHashPtrs(a, b *common.Hash) bool {
-	switch an, bn := a == nil, b == nil; {
-	case an && bn:
-		return true
-	case an || bn:
-		return false
-	default:
-		return *a == *b
-	}
 }
 
 // BuildBlock builds a new block, using the last block passed to
@@ -108,10 +44,14 @@ func (vm *VM) BuildBlock(ctx context.Context, bCtx *block.Context) (*blocks.Bloc
 	return vm.blockBuilder.build(ctx, bCtx, vm.preference.Load())
 }
 
+// saeparams.MaxBlockBytes < constants.DefaultMaxMessageSize
+const _ uint = constants.DefaultMaxMessageSize - saeparams.MaxBlockBytes - 1
+
 var (
 	errUnknownParent     = errors.New("unknown parent")
 	errBlockHeightTooLow = errors.New("block height too low")
 	errHashMismatch      = errors.New("hash mismatch")
+	errBlockTooLarge     = errors.New("block size exceeds maximum")
 )
 
 // VerifyBlock validates the block and, if successful, populates its ancestry.
@@ -129,6 +69,10 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 
 	if vm.consensusState.Get() == snow.Bootstrapping {
 		return vm.verifyWhenBootstrapping(b, parent)
+	}
+
+	if size := b.EthBlock().Size(); size > saeparams.MaxBlockBytes {
+		return fmt.Errorf("%w: %d > %d bytes", errBlockTooLarge, size, saeparams.MaxBlockBytes)
 	}
 
 	rebuilt, err := vm.blockBuilder.rebuild(ctx, bCtx, parent, b)
@@ -261,26 +205,25 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 	return id, nil
 }
 
-var (
-	_ saetypes.BlockSource  = (*VM)(nil).ethBlockSource
-	_ saetypes.HeaderSource = (*VM)(nil).headerSource
-)
-
-func (vm *VM) ethBlockSource(hash common.Hash, num uint64) (*types.Block, bool) {
-	return source(vm, hash, num, (*blocks.Block).EthBlock, rawdb.ReadBlock)
+func ethBlockSource(m *syncMap[common.Hash, *blocks.Block], db ethdb.Database) saetypes.BlockSource {
+	return func(hash common.Hash, num uint64) (*types.Block, bool) {
+		return source(m, db, hash, num, (*blocks.Block).EthBlock, rawdb.ReadBlock)
+	}
 }
 
-func (vm *VM) headerSource(hash common.Hash, num uint64) (*types.Header, bool) {
-	return source(vm, hash, num, (*blocks.Block).Header, rawdb.ReadHeader)
+func headerSource(m *syncMap[common.Hash, *blocks.Block], db ethdb.Database) saetypes.HeaderSource {
+	return func(hash common.Hash, num uint64) (*types.Header, bool) {
+		return source(m, db, hash, num, (*blocks.Block).Header, rawdb.ReadHeader)
+	}
 }
 
-func source[T any](vm *VM, hash common.Hash, num uint64, fromMem blocks.Extractor[T], fromDB blocks.DBReader[T]) (*T, bool) {
-	if b, ok := vm.consensusCritical.Load(hash); ok {
+func source[T any](cc *syncMap[common.Hash, *blocks.Block], db ethdb.Database, hash common.Hash, num uint64, fromMem blocks.Extractor[T], fromDB blocks.DBReader[T]) (*T, bool) {
+	if b, ok := cc.Load(hash); ok {
 		if b.NumberU64() != num {
 			return nil, false
 		}
 		return fromMem(b), true
 	}
-	x := fromDB(vm.db, hash, num)
+	x := fromDB(db, hash, num)
 	return x, x != nil
 }

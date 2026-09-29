@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
@@ -23,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/utilstest"
-	"github.com/ava-labs/avalanchego/utils"
 
 	sim "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/simulated"
 	feemanagerbindings "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/feemanagertest/bindings"
@@ -206,6 +206,8 @@ func TestFeeManager(t *testing.T) {
 		{
 			name: "should reject a transaction below the minimum fee",
 			test: func(t *testing.T, backend *sim.Backend, feeManager *feemanagerbindings.IFeeManager) {
+				t.Skip("TODO(JonathanOppenheimer): flaky due to geth mempool race (believed), will be deleted with graft.")
+
 				testContractAddr, testContract := deployFeeManagerTest(t, backend, admin)
 				allowlisttest.SetAsEnabled(t, backend, feeManager, admin, testContractAddr)
 

@@ -6,7 +6,6 @@ package cchain
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -46,7 +45,7 @@ func TestPushGossip(t *testing.T) {
 		sk        = txtest.NewKey(t)
 		withAlloc = withMaxAllocFor(sk.EthAddress())
 		vdrID     = ids.GenerateTestNodeID()
-		vdrs      = warptest.NewValidatorsWithNodeIDs(t, vdrID)
+		vdrs      = warptest.NewValidators(t, warptest.WithNodeIDs(vdrID))
 	)
 	apiCtx, api := newSUT(t, withAlloc, withValidators(vdrs))
 	vdrCtx, vdr := newSUT(t, withAlloc, withNodeID(vdrID), withValidators(vdrs))
@@ -58,9 +57,7 @@ func TestPushGossip(t *testing.T) {
 	api.assertTxBloomContains(t, stx.ID())
 
 	blk := vdr.runConsensusLoop(vdrCtx, t)
-	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
-		t.Errorf("%T built by validator after gossip (-want +got):\n%s", blk, diff)
-	}
+	assertBlockIncludes(t, blk, nil, []*tx.Tx{stx})
 }
 
 // TestPullGossip verifies that a validator will share a cross-chain transaction
@@ -71,7 +68,7 @@ func TestPullGossip(t *testing.T) {
 		withAlloc = withMaxAllocFor(sk.EthAddress())
 		vdrIDA    = ids.GenerateTestNodeID()
 		vdrIDB    = ids.GenerateTestNodeID()
-		vdrs      = warptest.NewValidatorsWithNodeIDs(t, vdrIDA, vdrIDB)
+		vdrs      = warptest.NewValidators(t, warptest.WithNodeIDs(vdrIDA, vdrIDB))
 	)
 	apiCtx, api := newSUT(t, withAlloc, withValidators(vdrs))
 	_, vdrA := newSUT(t, withAlloc, withNodeID(vdrIDA), withValidators(vdrs))
@@ -87,9 +84,7 @@ func TestPullGossip(t *testing.T) {
 	// Because vdrB isn't connected to api, vdrB can only learn about the
 	// transaction by pulling it from vdrA.
 	blk := vdrB.runConsensusLoop(vdrBCtx, t)
-	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
-		t.Errorf("%T built by vdrB after gossip (-want +got):\n%s", blk, diff)
-	}
+	assertBlockIncludes(t, blk, nil, []*tx.Tx{stx})
 }
 
 // TestPushGossipAfterPullGossip verifies that a node which previously received
@@ -101,7 +96,7 @@ func TestPushGossipAfterPullGossip(t *testing.T) {
 		withAlloc = withMaxAllocFor(sk.EthAddress())
 		vdrIDA    = ids.GenerateTestNodeID()
 		vdrIDB    = ids.GenerateTestNodeID()
-		vdrs      = warptest.NewValidatorsWithNodeIDs(t, vdrIDA, vdrIDB)
+		vdrs      = warptest.NewValidators(t, warptest.WithNodeIDs(vdrIDA, vdrIDB))
 	)
 	apiCtx, api := newSUT(t, withAlloc, withValidators(vdrs))
 	vdrACtx, vdrA := newSUT(t, withAlloc, withNodeID(vdrIDA), withValidators(vdrs))
@@ -124,7 +119,5 @@ func TestPushGossipAfterPullGossip(t *testing.T) {
 	require.NoErrorf(t, vdrA.IssueTx(vdrACtx, stx), "%T.IssueTx()", vdrA.VM)
 
 	blk := vdrB.runConsensusLoop(vdrBCtx, t)
-	if diff := cmp.Diff([]*tx.Tx{stx}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
-		t.Errorf("%T built by vdrB after gossip (-want +got):\n%s", blk, diff)
-	}
+	assertBlockIncludes(t, blk, nil, []*tx.Tx{stx})
 }

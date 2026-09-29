@@ -617,6 +617,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	n.Config.NetworkConfig.MyNodeID = n.ID
 	n.Config.NetworkConfig.MyIPPort = atomicIP
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
+	n.Config.NetworkConfig.UpgradeConfig = n.Config.UpgradeConfig
 	n.Config.NetworkConfig.Validators = n.vdrs
 	n.Config.NetworkConfig.Beacons = n.bootstrappers
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
@@ -631,7 +632,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
-		n.Config.UpgradeConfig.GraniteTime,
+		n.Config.UpgradeConfig.HeliconTime, // Must be updated for each network upgrade
 		n.msgCreator,
 		reg,
 		n.Log,
@@ -1245,6 +1246,7 @@ func (n *Node) initVMs() error {
 			// is around a second, so 10 seconds provides plenty of time to
 			// ensure this doesn't happen.
 			TransitionTime:  n.Config.UpgradeConfig.HeliconTime.Add(-10 * time.Second),
+			Now:             time.Now,
 			APIDrainTimeout: 15 * time.Second,
 		}),
 	)
@@ -1547,7 +1549,7 @@ func (n *Node) initHealthAPI() error {
 	// are expensive calls. This could be rewritten as an event based monitor to
 	// avoid expensive iteration.
 	var (
-		localUpgradeTime     = n.Config.UpgradeConfig.GraniteTime
+		localUpgradeTime     = n.Config.UpgradeConfig.HeliconTime // Must be updated for each network upgrade
 		localUpgradeTimeUnix = uint64(localUpgradeTime.Unix())
 		lastLogTime          time.Time
 	)

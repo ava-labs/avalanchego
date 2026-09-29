@@ -20,8 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/window"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 const (
@@ -326,7 +326,7 @@ func (m *Manager) GetSubnetID(_ context.Context, chainID ids.ID) (ids.ID, error)
 			err,
 		)
 	}
-	chain, ok := chainTx.Unsigned.(*txs.CreateChainTx)
+	chain, ok := chainTx.Unsigned.(*platform.CreateChainTx)
 	if !ok {
 		return ids.Empty, fmt.Errorf("%q is not a blockchain", chainID)
 	}

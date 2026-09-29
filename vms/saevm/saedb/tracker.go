@@ -7,8 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"path/filepath"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/ethdb"
@@ -17,6 +20,10 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
+
+	graftfw "github.com/ava-labs/avalanchego/graft/evm/firewood"
 )
 
 const (
@@ -49,16 +56,26 @@ const (
 )
 
 // Config allows parameterization of the TrieDB and when state is committed.
+//
+// TODO(alarso16): completely separate HashDB and Firewood options.
 type Config struct {
-	TrieCacheMiB     uint64 // size of the TrieDB cache
-	SnapshotCacheMiB uint64 // size of the snapshot cache - if 0, snapshots are disabled
-	Archival         bool   // if true, will store every state on disk
-	CommitInterval   uint64 // MUST be set to a non-zero value
+	Scheme            string // trie database scheme to use; defaults to [rawdb.HashScheme]
+	TrieCacheMiB      uint64 // size of the TrieDB cache
+	SnapshotCacheMiB  uint64 // size of the snapshot cache - if 0, snapshots are disabled
+	Archival          bool   // if true, state will be persisted regularly for RPC support
+	CommitInterval    uint64 // MUST be set to a non-zero value
+	AllowMissingTries bool   // allow switching from archival to pruning on a DB that ran archival
 
 	// only configurable for tests
 	maxCapBytes       common.StorageSize
 	targetCommitBytes common.StorageSize
 }
+
+var (
+	errZeroCommitInterval = errors.New("commit interval must be non-zero")
+	errCacheTooLarge      = fmt.Errorf("cache size exceeds maximum of %d MiB", maxCacheMiB)
+	errUnknownScheme      = errors.New("unknown trie database scheme")
+)
 
 func (c Config) Verify() error {
 	if c.CommitInterval == 0 {
@@ -70,14 +87,48 @@ func (c Config) Verify() error {
 	if c.SnapshotCacheMiB > maxCacheMiB {
 		return fmt.Errorf("%w: SnapshotCacheMiB (%d)", errCacheTooLarge, c.SnapshotCacheMiB)
 	}
+	switch c.Scheme {
+	case "", customrawdb.FirewoodScheme, rawdb.HashScheme:
+	default:
+		return fmt.Errorf("%w: %q", errUnknownScheme, c.Scheme)
+	}
+
 	return nil
 }
 
-func (c Config) TrieDBConfig() *triedb.Config {
-	return &triedb.Config{
-		HashDB: &hashdb.Config{
-			CleanCacheSize: int(c.TrieCacheMiB) * mibToBytes, //#nosec G115 // checked in [Config.Verify]
-		},
+// TrieDBConfig returns a config that can be used to create a [triedb.Database]
+// based on the [Config] parameters provided. All arguments MUST be provided.
+//
+// All [triedb.Database] MUST be closed.
+func (c Config) TrieDBConfig(dataDir string, log logging.Logger) *triedb.Config {
+	switch c.Scheme {
+	case customrawdb.FirewoodScheme:
+		if c.TrieCacheMiB == 0 {
+			// Firewood doesn't allow memory-only operation
+			c.TrieCacheMiB = DefaultTrieCacheSizeMiB
+		}
+		return &triedb.Config{
+			DBOverride: firewood.Config{
+				Path:                   filepath.Join(dataDir, graftfw.Directory),
+				CacheSizeBytes:         uint(c.TrieCacheMiB) * mibToBytes,
+				RevisionsInMemory:      uint(2 * c.CommitInterval),
+				DeferredCommitInterval: c.CommitInterval,
+				Archive:                c.Archival,
+				Log:                    log,
+			}.BackendConstructor,
+		}
+	case rawdb.HashScheme, "":
+		return &triedb.Config{
+			HashDB: &hashdb.Config{
+				CleanCacheSize: int(c.TrieCacheMiB) * mibToBytes, // #nosec G115 -- checked in [Config.Verify]
+			},
+		}
+	default:
+		log.Error("defaulting to hashdb",
+			zap.Error(errUnknownScheme),
+			zap.String("scheme", c.Scheme),
+		)
+		return nil
 	}
 }
 
@@ -85,8 +136,13 @@ func (c Config) snapConfig() *snapshot.Config {
 	if c.SnapshotCacheMiB <= 0 {
 		return nil
 	}
+	if c.Scheme == customrawdb.FirewoodScheme {
+		// Firewood already has efficient value lookups, so the snapshot
+		// provides unnecessary overhead.
+		return nil
+	}
 	return &snapshot.Config{
-		CacheSize:  int(c.SnapshotCacheMiB), //#nosec G115 // checked in [Config.Verify]
+		CacheSize:  int(c.SnapshotCacheMiB), //#nosec G115 -- checked in [Config.Verify]
 		AsyncBuild: true,
 	}
 }
@@ -116,21 +172,26 @@ type Tracker struct {
 	snaps *snapshot.Tree
 	cache state.Database
 
+	// recent is a ring of the post-execution roots of the most recently
+	// executed blocks, each holding a reference that keeps its trie in memory
+	// for the snapshot generator. Unused when the snapshot is disabled.
+	recent     [core.TriesInMemory]common.Hash
+	recentNext int
+
 	config Config
 	log    logging.Logger
 }
 
-var (
-	errZeroCommitInterval = errors.New("commit interval must be non-zero")
-	errCacheTooLarge      = fmt.Errorf("cache size exceeds maximum of %d MiB", maxCacheMiB)
-)
-
 // NewTracker provides a new [Tracker] on the underlying database.
-func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, log logging.Logger) (*Tracker, error) {
+func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir string, log logging.Logger) (*Tracker, error) {
 	if err := c.Verify(); err != nil {
 		return nil, err
 	}
-	cache := state.NewDatabaseWithConfig(db, c.TrieDBConfig())
+	if err := protectTrieIndex(db, c); err != nil {
+		return nil, fmt.Errorf("preventing missing tries: %w", err)
+	}
+
+	cache := state.NewDatabaseWithConfig(db, c.TrieDBConfig(dataDir, log))
 	var snaps *snapshot.Tree
 	if snapConf := c.snapConfig(); snapConf != nil {
 		var err error
@@ -149,6 +210,23 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, log loggi
 	}, nil
 }
 
+// TrieDB returns the trie database used by [Tracker.StateDB].
+func (t *Tracker) TrieDB() *triedb.Database {
+	return t.cache.TrieDB()
+}
+
+// Snapshot returns any snapshot that is used by a [state.StateDB] returned
+// by [Tracker.StateDB]. This MAY be nil.
+func (t *Tracker) Snapshot() *snapshot.Tree {
+	return t.snaps
+}
+
+// CommitInterval returns the number of blocks between guaranteed commits of the
+// settled state, as configured in [Config.CommitInterval].
+func (t *Tracker) CommitInterval() uint64 {
+	return t.config.CommitInterval
+}
+
 // Track tracks the root and may commit the trie associated with the root
 // to the database if [Config.ShouldCommitTrieDB] returns true, or the [Config]
 // specifies that the node is archival.
@@ -162,21 +240,34 @@ func (t *Tracker) Track(root common.Hash) {
 	}
 }
 
-// MaybeCommit potentially calls [triedb.Database.Commit], based on the
-// following priorities:
+// BlockExecuted informs the Tracker that the block at height executed to
+// executionRoot, settling the state at settledRoot. It MAY call
+// [triedb.Database.Commit], based on the following priorities:
 //
-// 1. If [Config.Archival] is true, then `executionRoot` will be committed.
-// 2. If [ShouldCommitTrieDB] based on `height`, `settledRoot` is committed.
-// 3. If there is sufficient memory pressure in HashDB, flushes the oldest trie nodes to disk.
-// 4. Otherwise, nothing is committed.
+// 1. If [Config.Scheme] is [customrawdb.FirewoodScheme], the settled root is committed.
+// 2. If [Config.Archival] is true, then `executionRoot` will be committed.
+// 3. If [ShouldCommitTrieDB] based on `height`, `settledRoot` is committed.
+// 4. If there is sufficient memory pressure in HashDB, flushes the oldest trie nodes to disk.
+// 5. Otherwise, nothing is committed.
 //
-// This does NOT change in-memory tracking.
-func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uint64) error {
+// While the snapshot is enabled, the Tracker also holds its own reference to
+// the executed state, as if by [Tracker.Track], and releases it once
+// [core.TriesInMemory] later blocks have executed.
+func (t *Tracker) BlockExecuted(settledRoot, executionRoot common.Hash, height uint64) error {
+	t.retain(executionRoot)
+
 	var (
 		commit  common.Hash
 		because string
 	)
 	switch {
+	case t.config.Scheme == customrawdb.FirewoodScheme:
+		// Firewood prunes all but the last state on disk after shutdown.
+		// Persisting the execution root would make VM recovery (re-execution
+		// since last settled) impossible, as Firewood can only build off the
+		// most recent state.
+		commit = settledRoot
+		because = "settled"
 	case t.config.Archival:
 		commit = executionRoot
 		because = "post-execution archive"
@@ -195,6 +286,23 @@ func (t *Tracker) MaybeCommit(settledRoot, executionRoot common.Hash, height uin
 		return fmt.Errorf("%T.Commit(%#x) %s at end of block %d: %v", tdb, commit, because, height, err)
 	}
 	return nil
+}
+
+// retain holds a reference to `root` until [core.TriesInMemory] later roots
+// have been retained. This is necessary because snapshot generation resumes at
+// the root of its disk layer, which is never more than [core.TriesInMemory]
+// blocks behind. If [Tracker.snaps] is nil then retain is a no-op.
+func (t *Tracker) retain(root common.Hash) {
+	if t.snaps == nil {
+		return
+	}
+	t.Track(root)
+	if toEvict := t.recent[t.recentNext]; toEvict != (common.Hash{}) {
+		t.Untrack(toEvict)
+	}
+	t.recent[t.recentNext] = root
+	t.recentNext++
+	t.recentNext %= len(t.recent)
 }
 
 // maybeCap checks if the in-memory state of a HashDB is too high for an efficient
@@ -243,18 +351,31 @@ func (t *Tracker) StateDB(root common.Hash) (*state.StateDB, error) {
 	return state.New(root, t.cache, t.snaps)
 }
 
-// Close releases all resources associated with the `[triedb.Database]`
-// and cancel any snapshot generation.
-func (t *Tracker) Close(lastRoot common.Hash) error {
+// Close commits the state at root to disk, flattens any snapshot onto it, and
+// releases all resources associated with the [triedb.Database]. root SHOULD be
+// the state that a subsequent [NewTracker] opens at, otherwise the snapshot is
+// regenerated instead of loaded.
+//
+// TODO(StephenButtolph): Close fails if the snapshot layer at root was already
+// flattened away, which happens when settlement lags execution by more than the
+// number of retained diff layers. In this case, shutdown will report the error
+// and the next start will regenerate the snapshot.
+func (t *Tracker) Close(root common.Hash) error {
 	var errs []error
+
+	tdb := t.cache.TrieDB()
+	if err := tdb.Commit(root, false /* log */); err != nil {
+		errs = append(errs, fmt.Errorf("%T.Commit(%#x): %v", tdb, root, err))
+	}
+
 	if t.snaps != nil {
 		// We don't use [snapshot.Tree.Journal] because re-orgs are impossible under
 		// SAE so we don't mind flattening all snapshot layers to disk. Note that
 		// calling `Cap([disk root], 0)` returns an error when it's actually a
 		// no-op, so we ensure there are changes.
-		if lastRoot != t.snaps.DiskRoot() {
-			if err := t.snaps.Cap(lastRoot, 0); err != nil {
-				errs = append(errs, fmt.Errorf("%T.Cap(%s, 0): %v", t.snaps, lastRoot, err))
+		if root != t.snaps.DiskRoot() {
+			if err := t.snaps.Cap(root, 0); err != nil {
+				errs = append(errs, fmt.Errorf("%T.Cap(%#x, 0): %v", t.snaps, root, err))
 			}
 		}
 
@@ -264,9 +385,30 @@ func (t *Tracker) Close(lastRoot common.Hash) error {
 		t.snaps.Release()
 	}
 
-	if err := t.cache.TrieDB().Close(); err != nil {
-		errs = append(errs, fmt.Errorf("triedb.Database.Close(): %v", err))
+	if err := tdb.Close(); err != nil {
+		errs = append(errs, fmt.Errorf("%T.Close(): %v", tdb, err))
 	}
 
 	return errors.Join(errs...)
+}
+
+var errRefuseToCorruptArchiver = errors.New(`node is switching from non-pruning to pruning; if this is intentional, set "allow-missing-tries" via config, otherwise disable pruning`)
+
+// protectTrieIndex prevents a pruning run from deleting tries stored by a
+// previous archival run. Archival runs persistently mark the database, and
+// the marker is never removed. Pruning runs against a marked database return
+// [errRefuseToCorruptArchiver] unless [Config.AllowMissingTries] is set,
+// which bypasses the check without removing the marker.
+func protectTrieIndex(db ethdb.KeyValueStore, c Config) error {
+	if c.Archival {
+		return customrawdb.WritePruningDisabled(db)
+	}
+	prevArchival, err := customrawdb.HasPruningDisabled(db)
+	if err != nil {
+		return err
+	}
+	if prevArchival && !c.AllowMissingTries {
+		return errRefuseToCorruptArchiver
+	}
+	return nil
 }

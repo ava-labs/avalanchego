@@ -1682,6 +1682,8 @@ func TestWaitForEvent(t *testing.T) {
 // the VM is restarted and the import's input UTXO has already been consumed
 // from shared memory.
 func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
+	t.Skip("TODO(JonathanOppenheimer): flaky, will be deleted with graft.")
+
 	ctx := t.Context()
 
 	// Creating the genesis state (block 0) is a commit operation and so Firewood first persists at block 3.

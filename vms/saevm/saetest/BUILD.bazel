@@ -12,7 +12,7 @@ go_library(
         "heightdb.go",
         "network.go",
         "peer.go",
-        "proof.go",
+        "proofs.go",
         "saetest.go",
         "wallet.go",
     ],

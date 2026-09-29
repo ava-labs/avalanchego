@@ -23,9 +23,10 @@ import (
 )
 
 // Case specifies one RPC call and its expected outcome: a reply equal to Want,
-// or an error matching WantErr.
+// or an error matching WantErr. Name labels the subtest and defaults to Method.
 type Case struct {
 	Method       string
+	Name         string
 	Args         []any
 	Want         any // untyped nil means no return value
 	WantErr      testerr.Want
@@ -70,7 +71,11 @@ func Run(ctx context.Context, t *testing.T, client *rpc.Client, cases ...Case) {
 			}
 		}
 
-		t.Run(tc.Method, func(t *testing.T) {
+		name := tc.Name
+		if name == "" {
+			name = tc.Method
+		}
+		t.Run(name, func(t *testing.T) {
 			if tc.Parallel {
 				t.Parallel()
 			}

@@ -24,9 +24,6 @@ on:
         required: true
         type: string
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   antithesis_avalanchego:
     name: Run Antithesis Avalanchego Test Setup
@@ -44,5 +41,5 @@ jobs:
           email_recipients: ${{ github.event.inputs.recipients || secrets.ANTITHESIS_RECIPIENTS }}
           # Duration is in hours
           additional_parameters: |-
-            custom.duration=${{ github.event.inputs.duration || '4' }}
+            custom.duration=${{ github.event.inputs.duration || '6' }}
             custom.workload=avalanchego

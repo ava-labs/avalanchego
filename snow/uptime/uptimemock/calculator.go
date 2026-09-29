@@ -86,3 +86,18 @@ func (mr *CalculatorMockRecorder) CalculateUptimePercentFrom(nodeID, startTime a
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CalculateUptimePercentFrom", reflect.TypeOf((*Calculator)(nil).CalculateUptimePercentFrom), nodeID, startTime)
 }
+
+// GetStartTime mocks base method.
+func (m *Calculator) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetStartTime", nodeID)
+	ret0, _ := ret[0].(time.Time)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetStartTime indicates an expected call of GetStartTime.
+func (mr *CalculatorMockRecorder) GetStartTime(nodeID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStartTime", reflect.TypeOf((*Calculator)(nil).GetStartTime), nodeID)
+}

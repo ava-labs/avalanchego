@@ -4,26 +4,41 @@
 package cchain
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"maps"
+	"math/big"
 	"reflect"
+	"sync"
 	"testing"
 
+	"github.com/arr4n/shed/testerr"
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest/rpctest"
+
+	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 // getTxStatus exposes the deprecated [service.GetAtomicTxStatus] endpoint.
@@ -67,8 +82,8 @@ func (c *Client) getAllUTXOs(
 		)
 		require.NoErrorf(tb, err, "%T.GetUTXOs()", c)
 		utxos = append(utxos, page...)
-		// This termination condition matches the initial API behavior from
-		// coreth. Changing the expected termination condition could
+		// This termination condition matches the original synchronous C-Chain
+		// API behavior. Changing the expected termination condition could
 		// accidentally break legacy users.
 		if uint64(len(page)) < uint64(limit) {
 			return utxos
@@ -88,6 +103,58 @@ func TestIssueTxRejectsInvalidTransaction(t *testing.T) {
 
 	err := sut.IssueTx(ctx, stx)
 	require.ErrorContainsf(t, err, errIssuingTx.Error(), "%T.IssueTx()", sut.Client)
+}
+
+// TestIssueTxConcurrent issues multiple [tx.Export] transactions through
+// [Client.IssueTx] simultaneously.
+//
+// This is a regression test ensuring that the txpool does not concurrently
+// access a statedb instance.
+//
+// This test is best run with the race detector enabled.
+func TestIssueTxConcurrent(t *testing.T) {
+	const numConcurrentTxs = 2
+
+	// Each tx uses a different key so that they don't conflict.
+	keys := make([]*secp256k1.PrivateKey, numConcurrentTxs)
+	addrs := make([]common.Address, numConcurrentTxs)
+	for i := range keys {
+		keys[i] = txtest.NewKey(t)
+		addrs[i] = keys[i].EthAddress()
+	}
+	ctx, sut := newSUT(t, withMaxAllocFor(addrs...))
+
+	txs := make([]*tx.Tx, numConcurrentTxs)
+	for i, sk := range keys {
+		const (
+			txFee          = 1
+			exportedAmount = 1
+		)
+		// Export transactions are validated against the statedb, so they must
+		// be used rather than Import transactions here.
+		txs[i], _ = newWallet(sk, sut.ctx, sut.Client).newExportTx(
+			t,
+			snowtest.XChainID,
+			txFee,
+			txtest.NewTransferOutput(exportedAmount, sk.Address()),
+		)
+	}
+
+	var (
+		done sync.WaitGroup
+		errs = make([]error, numConcurrentTxs)
+	)
+	for i, stx := range txs {
+		done.Go(func() {
+			errs[i] = sut.IssueTx(ctx, stx)
+		})
+	}
+	done.Wait()
+
+	for i, stx := range txs {
+		require.NoErrorf(t, errs[i], "%T.IssueTx(txs[%d])", sut.Client, i)
+		require.Truef(t, sut.pending.Has(stx.ID()), "%T.Has(txs[%d])", sut.pending, i)
+	}
 }
 
 // TestGetTxNotFound asserts that [Client.GetTx] surfaces an error when the
@@ -123,7 +190,7 @@ func TestGetAtomicTxStatus(t *testing.T) {
 		require.NoErrorf(t, err, "%T.getTxStatus()", sut.Client)
 		want := TxStatus{
 			Status: choices.Accepted,
-			Height: utils.PointerTo(json.Uint64(blk.NumberU64())),
+			Height: new(avajson.Uint64(blk.NumberU64())),
 		}
 		require.Equalf(t, want, got, "%T.getTxStatus()", sut.Client)
 	})
@@ -179,7 +246,7 @@ func TestRPCExtras(t *testing.T) {
 	require.NotNilf(t, extra.SettledGasUnix, "%T.SettledGasUnix", extra)
 	require.NotNilf(t, extra.SettledGasNumerator, "%T.SettledGasNumerator", extra)
 	require.NotNilf(t, extra.SettledExcess, "%T.SettledExcess", extra)
-	wantHeaderExtras := map[string]string{
+	wantHeaderExtras := map[string]any{
 		"extDataHash":           extra.ExtDataHash.Hex(),
 		"extDataGasUsed":        hexutil.EncodeBig(extra.ExtDataGasUsed),
 		"blockGasCost":          hexutil.EncodeBig(extra.BlockGasCost),
@@ -201,41 +268,134 @@ func TestRPCExtras(t *testing.T) {
 	)
 	wantBlockExtras["blockExtraData"] = hexutil.Encode(extData)
 
-	tests := []struct {
-		method string
-		args   []any
-		want   map[string]string
-	}{
+	rpctest.Run(ctx, t, sut.ethclient.Client(), []rpctest.Case{
 		{
-			method: "eth_getHeaderByNumber",
-			args:   []any{blockNumber},
-			want:   wantHeaderExtras,
+			Method:       "eth_getHeaderByNumber",
+			Args:         []any{blockNumber},
+			Want:         wantHeaderExtras,
+			ExtraCmpOpts: []cmp.Option{onlyKeysOf(wantHeaderExtras)},
 		},
 		{
-			method: "eth_getHeaderByHash",
-			args:   []any{blockHash},
-			want:   wantHeaderExtras,
+			Method:       "eth_getHeaderByHash",
+			Args:         []any{blockHash},
+			Want:         wantHeaderExtras,
+			ExtraCmpOpts: []cmp.Option{onlyKeysOf(wantHeaderExtras)},
 		},
 		{
-			method: "eth_getBlockByNumber",
-			args:   []any{blockNumber, true},
-			want:   wantBlockExtras,
+			Method:       "eth_getBlockByNumber",
+			Args:         []any{blockNumber, true},
+			Want:         wantBlockExtras,
+			ExtraCmpOpts: []cmp.Option{onlyKeysOf(wantBlockExtras)},
 		},
 		{
-			method: "eth_getBlockByHash",
-			args:   []any{blockHash, true},
-			want:   wantBlockExtras,
+			Method:       "eth_getBlockByHash",
+			Args:         []any{blockHash, true},
+			Want:         wantBlockExtras,
+			ExtraCmpOpts: []cmp.Option{onlyKeysOf(wantBlockExtras)},
 		},
+	}...)
+}
+
+// onlyKeysOf restricts a comparison of JSON objects to the keys of want.
+func onlyKeysOf(want map[string]any) cmp.Option {
+	return cmpopts.IgnoreMapEntries(func(k string, _ any) bool {
+		_, ok := want[k]
+		return !ok
+	})
+}
+
+// TestSynchronousRPCs replays JSON-RPC calls recorded from the synchronous VM
+// and requires an identical response, covering state, receipt, log, and tracing
+// RPCs at every height for every pre-SAE network upgrade.
+func TestSynchronousRPCs(t *testing.T) {
+	// The fixture's keys are relative to the VM's own database rather than to
+	// the base database that contains it.
+	fixture := synchronoustest.Load(t)
+	db := memdb.New()
+	fixture.WriteDatabase(t, prefixdb.New(chainDBPrefix, db))
+
+	ctx, sut := newSUT(t,
+		withDB(db),
+		withGenesis(fixture.CoreGenesis(t)),
+		withUpgrades(fixture.Upgrades),
+		// The fixture was generated without pruning, which marked the database
+		// to refuse later pruning runs.
+		withArchival(),
+	)
+
+	cases := make([]rpctest.Case, len(fixture.RPCCalls))
+	for i, call := range fixture.RPCCalls {
+		cases[i] = rpctest.Case{
+			Name:         call.Name,
+			Method:       call.Method,
+			Args:         call.Args(),
+			Want:         call.Result,
+			WantErr:      errorMessage(call.Error),
+			Parallel:     true,
+			ExtraCmpOpts: []cmp.Option{jsonContent()},
+		}
 	}
-	for _, tt := range tests {
-		t.Run(tt.method, func(t *testing.T) {
-			client := sut.ethclient.Client()
-			var got map[string]any
-			err := client.CallContext(ctx, &got, tt.method, tt.args...)
-			require.NoErrorf(t, err, "%s(%v)", tt.method, tt.args)
-			for k, want := range tt.want {
-				assert.Equalf(t, want, got[k], "field %q", k)
+	rpctest.Run(ctx, t, sut.ethclient.Client(), cases...)
+
+	// We test block lookups separately because SAE decided not to support
+	// totalDifficulty and always report 0.
+	//
+	// TODO: Once libevm is updated to remove totalDifficulty, we can remove
+	// this special case and test block lookups like any other RPC.
+	opts := cmp.Options{
+		cmputils.Blocks(),
+		cmputils.Headers(),
+		cmpopts.EquateEmpty(),
+	}
+	for _, block := range fixture.Blocks {
+		t.Run(fmt.Sprintf("block_%02d_%s", block.Number, block.Fork), func(t *testing.T) {
+			t.Parallel()
+
+			t.Logf("%s", block.Description)
+			want := block.EthBlock(t)
+
+			byNumber, err := sut.ethclient.BlockByNumber(ctx, new(big.Int).SetUint64(block.Number))
+			require.NoErrorf(t, err, "BlockByNumber(%d)", block.Number)
+			if diff := cmp.Diff(want, byNumber, opts); diff != "" {
+				t.Errorf("BlockByNumber(%d) diff (-want +got):\n%s", block.Number, diff)
+			}
+
+			byHash, err := sut.ethclient.BlockByHash(ctx, block.Hash)
+			require.NoErrorf(t, err, "BlockByHash(%s)", block.Hash)
+			if diff := cmp.Diff(want, byHash, opts); diff != "" {
+				t.Errorf("BlockByHash(%s) diff (-want +got):\n%s", block.Hash, diff)
 			}
 		})
 	}
+}
+
+// jsonContent compares JSON-RPC results by content rather than by encoding.
+// Numbers are preserved as [json.Number] to avoid precision loss.
+func jsonContent() cmp.Option {
+	return cmp.Transformer("decodeJSON", func(raw json.RawMessage) any {
+		if len(raw) == 0 {
+			return nil
+		}
+		dec := json.NewDecoder(bytes.NewReader(raw))
+		dec.UseNumber()
+		var v any
+		if err := dec.Decode(&v); err != nil {
+			return fmt.Sprintf("undecodable JSON %s: %v", raw, err)
+		}
+		return v
+	})
+}
+
+// errorMessage wants an error whose message is exactly msg, or no error if msg
+// is empty.
+func errorMessage(msg string) testerr.Want {
+	if msg == "" {
+		return nil
+	}
+	return testerr.Func(func(got error) string {
+		if got != nil && got.Error() == msg {
+			return ""
+		}
+		return fmt.Sprintf("error with message %q", msg)
+	})
 }

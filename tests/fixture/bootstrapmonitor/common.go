@@ -95,9 +95,14 @@ func setImageDetails(ctx context.Context, log logging.Logger, clientset *kuberne
 	return nil
 }
 
+// isDigestPinned returns whether the image includes a digest (e.g. `repo@sha256:...`)
+func isDigestPinned(image string) bool {
+	return strings.Contains(image, "@")
+}
+
 // getBaseImageName removes the tag from the image name
 func getBaseImageName(log logging.Logger, imageName string) (string, error) {
-	if strings.Contains(imageName, "@") {
+	if isDigestPinned(imageName) {
 		// Image name contains a digest, remove it
 		return strings.Split(imageName, "@")[0], nil
 	}

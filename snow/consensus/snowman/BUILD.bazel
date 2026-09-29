@@ -24,7 +24,6 @@ go_library(
         "//utils/bag",
         "//utils/linked",
         "//utils/logging",
-        "//utils/math",
         "//utils/metric",
         "//utils/set",
         "//utils/wrappers",
