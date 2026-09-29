@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/stretchr/testify/require"
@@ -28,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	ethereum "github.com/ava-labs/libevm"
 	ethcommon "github.com/ava-labs/libevm/common"
 )
 
@@ -182,22 +180,8 @@ func SendEthTransaction(tc tests.TestContext, ethClient *ethclient.Client, signe
 
 	require.NoError(ethClient.SendTransaction(tc.DefaultContext(), signedTx))
 
-	// Wait for the receipt
-	var receipt *types.Receipt
-	tc.Eventually(func() bool {
-		var err error
-		receipt, err = ethClient.TransactionReceipt(tc.DefaultContext(), txID)
-		if errors.Is(err, ethereum.NotFound) {
-			return false // Transaction is still pending
-		}
-		require.NoError(err)
-		return true
-	}, DefaultTimeout, DefaultPollingInterval, "failed to see transaction acceptance before timeout")
-
-	// SAE serves state at a height only once it has executed, after which
-	// "latest" includes the tx.
-	_, err := ethClient.NonceAt(tc.DefaultContext(), ethcommon.Address{}, receipt.BlockNumber)
-	require.NoError(err, "NonceAt()")
+	receipt, err := AwaitEthReceipt(tc.DefaultContext(), ethClient, txID)
+	require.NoError(err, "AwaitEthReceipt()")
 
 	tc.Log().Info("eth transaction accepted",
 		zap.Stringer("txID", txID),
@@ -208,13 +192,28 @@ func SendEthTransaction(tc tests.TestContext, ethClient *ethclient.Client, signe
 	return receipt
 }
 
-// EstimateBaseFee returns the estimated base fee of the next block.
-func EstimateBaseFee(ctx context.Context, c *ethclient.Client) (*big.Int, error) {
-	var fee hexutil.Big
-	if err := c.Client().CallContext(ctx, &fee, "eth_baseFee"); err != nil {
-		return nil, err
+// AwaitEthReceipt returns the receipt of the transaction once its block has
+// been executed.
+func AwaitEthReceipt(ctx context.Context, c *ethclient.Client, txHash ethcommon.Hash) (*types.Receipt, error) {
+	ticker := time.NewTicker(DefaultPollingInterval)
+	defer ticker.Stop()
+
+	for {
+		receipt, err := c.TransactionReceipt(ctx, txHash)
+		if err == nil {
+			// SAE serves state at a height only once it has executed.
+			if _, err := c.NonceAt(ctx, ethcommon.Address{}, receipt.BlockNumber); err != nil {
+				return nil, fmt.Errorf("awaiting execution of block %d: %w", receipt.BlockNumber, err)
+			}
+			return receipt, nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("awaiting receipt: %w", errors.Join(ctx.Err(), err))
+		case <-ticker.C:
+		}
 	}
-	return (*big.Int)(&fee), nil
 }
 
 // Determines the suggested gas price for the configured client that will

@@ -145,7 +145,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			nonce++
 		})
 
-		initialGasPrice, err := e2e.EstimateBaseFee(tc.DefaultContext(), ethClient)
+		initialGasPrice, err := ethClient.SuggestGasPrice(tc.DefaultContext())
 		require.NoError(err)
 
 		targetGasPrice := new(big.Int).Set(initialGasPrice)
@@ -167,7 +167,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 			tc.Eventually(func() bool {
 				// Check the gas price
-				gasPrice, err := e2e.EstimateBaseFee(tc.DefaultContext(), ethClient)
+				gasPrice, err := ethClient.SuggestGasPrice(tc.DefaultContext())
 				require.NoError(err)
 
 				// If the gas price has increased, stop the loop.
@@ -217,7 +217,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		tc.By("sending small transactions until a sufficient gas price decrease is detected", func() {
 			tc.Eventually(func() bool {
 				// Check the gas price
-				gasPrice, err := e2e.EstimateBaseFee(tc.DefaultContext(), ethClient)
+				gasPrice, err := ethClient.SuggestGasPrice(tc.DefaultContext())
 				require.NoError(err)
 
 				// If the gas price has decreased, stop the loop.

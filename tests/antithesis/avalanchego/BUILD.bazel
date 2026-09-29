@@ -33,7 +33,6 @@ go_library(
         "//wallet/subnet/primary/common",
         "@com_github_antithesishq_antithesis_sdk_go//assert",
         "@com_github_antithesishq_antithesis_sdk_go//lifecycle",
-        "@com_github_ava_labs_libevm//accounts/abi/bind",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//crypto",

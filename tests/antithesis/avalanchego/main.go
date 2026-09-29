@@ -15,7 +15,6 @@ import (
 
 	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/antithesishq/antithesis-sdk-go/lifecycle"
-	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethclient"
@@ -988,9 +987,9 @@ func (w *workload) confirmCChainTx(ctx context.Context, tx *types.Transaction) e
 			return fmt.Errorf("failed to get C-Chain RPC client for %s: %w", uri, err)
 		}
 
-		receipt, err := bind.WaitMined(ctx, client, tx)
+		receipt, err := e2e.AwaitEthReceipt(ctx, client, txHash)
 		if err != nil {
-			return fmt.Errorf("failed to get receipt for tx %s on %s: %w", txHash, uri, err)
+			return fmt.Errorf("awaiting tx %s on %s: %w", txHash, uri, err)
 		}
 
 		if receipt.Status != types.ReceiptStatusSuccessful {
@@ -1005,12 +1004,6 @@ func (w *workload) confirmCChainTx(ctx context.Context, tx *types.Transaction) e
 				"status": receipt.Status,
 			})
 			return fmt.Errorf("tx %s failed on %s with status %d", txHash, uri, receipt.Status)
-		}
-
-		// SAE serves state at a height only once it has executed, after which
-		// the next nonce read at "latest" is current.
-		if _, err := client.NonceAt(ctx, crypto.PubkeyToAddress(w.cChainKey.PublicKey), receipt.BlockNumber); err != nil {
-			return fmt.Errorf("awaiting execution of tx %s on %s: %w", txHash, uri, err)
 		}
 
 		w.log.Info("confirmed C-Chain transaction",
@@ -1048,14 +1041,12 @@ func (w *workload) sendCChainTx(ctx context.Context, client *ethclient.Client, t
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch suggested gas tip: %w", err)
 	}
-	estimatedBaseFee, err := e2e.EstimateBaseFee(ctx, client)
+	gasPrice, err := client.SuggestGasPrice(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch estimated base fee: %w", err)
+		return nil, fmt.Errorf("failed to fetch suggested gas price: %w", err)
 	}
-	gasFeeCap := new(big.Int).Add(
-		gasTipCap,
-		new(big.Int).Mul(estimatedBaseFee, big.NewInt(2)),
-	)
+	// Double the suggested price to absorb base fee increases before inclusion.
+	gasFeeCap := new(big.Int).Mul(gasPrice, big.NewInt(2))
 
 	chainID := new(big.Int).Set(w.cChainID)
 	signer := types.LatestSignerForChainID(chainID)
