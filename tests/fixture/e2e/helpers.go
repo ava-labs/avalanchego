@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	ethereum "github.com/ava-labs/libevm"
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 const (
@@ -192,6 +193,8 @@ func SendEthTransaction(tc tests.TestContext, ethClient *ethclient.Client, signe
 		return true
 	}, DefaultTimeout, DefaultPollingInterval, "failed to see transaction acceptance before timeout")
 
+	require.NoError(AwaitExecuted(tc.DefaultContext(), ethClient, receipt), "AwaitExecuted()")
+
 	tc.Log().Info("eth transaction accepted",
 		zap.Stringer("txID", txID),
 		zap.Uint64("gasUsed", receipt.GasUsed),
@@ -199,6 +202,14 @@ func SendEthTransaction(tc tests.TestContext, ethClient *ethclient.Client, signe
 		zap.Stringer("blockNumber", receipt.BlockNumber),
 	)
 	return receipt
+}
+
+// AwaitExecuted blocks until the block containing receipt is reflected at
+// "latest". SAE MAY issue a receipt before its block finishes executing, but
+// only serves state at a height once that block has executed.
+func AwaitExecuted(ctx context.Context, c ethereum.ChainStateReader, receipt *types.Receipt) error {
+	_, err := c.NonceAt(ctx, ethcommon.Address{}, receipt.BlockNumber)
+	return err
 }
 
 // Determines the suggested gas price for the configured client that will

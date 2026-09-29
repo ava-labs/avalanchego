@@ -1011,6 +1011,11 @@ func (w *workload) confirmCChainTx(ctx context.Context, tx *types.Transaction) e
 			return fmt.Errorf("tx %s failed on %s with status %d", txHash, uri, receipt.Status)
 		}
 
+		// [workload.sendCChainTx] reads the next nonce at "latest".
+		if err := e2e.AwaitExecuted(ctx, client, receipt); err != nil {
+			return fmt.Errorf("awaiting execution of tx %s on %s: %w", txHash, uri, err)
+		}
+
 		w.log.Info("confirmed C-Chain transaction",
 			zap.Stringer("txID", txHash),
 			zap.String("uri", uri),
