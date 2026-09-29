@@ -44,7 +44,7 @@ func TestTxTypeSupport(t *testing.T) {
 			t.FailNow()
 		}
 	}
-	b := sut.RunConsensusLoop(t)
+	b := sut.runConsensusLoop(t)
 	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 
 	sdb := sut.stateAt(t, b.PostExecutionStateRoot())

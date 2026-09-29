@@ -241,7 +241,7 @@ func TestRecover(t *testing.T) {
 				// CommitTrieDBEvery boundaries where the settled state was
 				// written to disk. Otherwise, the memory will leak.
 				t.Run("unavailable_outside_window", func(t *testing.T) {
-					lastSettled := sut.RawVM.lastSettledBlock().NumberU64()
+					lastSettled := sut.RawVM.last.settled.Load().NumberU64()
 					committedHeight := saedb.LastCommittedTrieDBHeight(lastSettled, commitInterval)
 					lastOnDisk, err := canonicalBlock(sut.RawVM.db, committedHeight)
 					require.NoErrorf(t, err, "canonicalBlock(): %d", committedHeight)

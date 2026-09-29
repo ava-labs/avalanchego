@@ -217,7 +217,7 @@ func TestSubscriptions(t *testing.T) {
 	mustSendTx := func(tx *types.Transaction) {
 		t.Helper()
 
-		sut.MustSendTx(t, tx)
+		sut.MustSendTxs(t, tx)
 		require.Equal(t, tx.Hash(), <-newTxs, "tx hash from newPendingTransactions subscription")
 	}
 
@@ -341,7 +341,7 @@ func TestTxPoolNamespace(t *testing.T) {
 	queuedTx := makeTx(queuedAccount)
 	queuedRPCTx := ethapi.NewRPCPendingTransaction(queuedTx, nil, saetest.ChainConfig())
 
-	sut.MustSendTx(t, queuedTx, pendingTx)
+	sut.MustSendTxs(t, queuedTx, pendingTx)
 	sut.WaitUntilTxsPending(t, pendingTx)
 
 	// TODO: This formatting is copied from libevm, consider exposing it somehow
@@ -667,7 +667,7 @@ func TestMempoolTxGetters(t *testing.T) {
 		Gas:       params.TxGas,
 		GasFeeCap: big.NewInt(1),
 	})
-	sut.MustSendTx(t, pendingTx, queuedTx)
+	sut.MustSendTxs(t, pendingTx, queuedTx)
 	sut.WaitUntilTxsPending(t, pendingTx)
 
 	for _, tt := range []struct {

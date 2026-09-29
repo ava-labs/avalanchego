@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/vmtest"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -343,7 +344,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 			}
 
 			sut.WaitUntilTxsPending(t, tx)
-			built := sut.runConsensusLoop(t, withBlockContext(&block.Context{}))
+			built := sut.runConsensusLoop(t, vmtest.WithBlockContext(&block.Context{}))
 			receipts := built.Receipts()
 			require.Lenf(t, receipts, 1, "%T.Receipts()", built)
 			receipt := receipts[0]

@@ -111,7 +111,7 @@ func TestPushGossipAfterPullGossip(t *testing.T) {
 
 	// Ensure vdrA learned about stx before we reissue the tx so we don't race
 	// with the normal issuance path.
-	vdrA.WaitForPendingTxs(t)
+	vdrA.WaitForPendingTxsEvent(t)
 
 	// Because vdrB doesn't consider vdrA a validator and isn't connected to
 	// api, vdrB can only learn about the transaction if vdrA pushes it.

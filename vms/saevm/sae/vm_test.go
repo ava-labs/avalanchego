@@ -99,7 +99,7 @@ type SUT struct {
 	close     func()
 }
 
-func (s *SUT) NodeID() ids.NodeID { return s.RawVM.nodeID() }
+func (s *SUT) NodeID() ids.NodeID { return s.RawVM.snowCtx.NodeID }
 
 type (
 	sutConfig struct {
@@ -220,7 +220,7 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 	}
 	closeOnce := sync.OnceFunc(func() {
 		ctx := context.WithoutCancel(tb.Context())
-		require.NoError(tb, vm.lastAcceptedBlock().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
+		require.NoError(tb, vm.last.accepted.Load().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
 		if diff := testerr.Diff(snow.Shutdown(ctx), conf.wantShutdownErr); diff != "" {
 			tb.Errorf("%T.Shutdown() %s", snow, diff)
 		}
@@ -245,7 +245,7 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 		hooks: conf.hooks,
 
 		rpcClient: rpcClient,
-		genesis:   vm.lastSettledBlock(),
+		genesis:   vm.last.settled.Load(),
 		close:     closeOnce,
 	}
 	sender.Start(tb, sut)
@@ -522,7 +522,7 @@ func (s *SUT) createAndVerifyBlock(tb testing.TB, preference *blocks.Block, txs 
 func (s *SUT) runConsensusLoopOnPreference(tb testing.TB, preference *blocks.Block, txs ...*types.Transaction) *blocks.Block {
 	tb.Helper()
 	s.SendTxsAndWaitUntilPending(tb, txs...)
-	return s.RunConsensusLoopOnPreference(tb, preference.ID())
+	return s.BuildVerifyAndAccept(tb, preference.ID())
 }
 
 // runConsensusLoop is a convenience wrapper for
@@ -574,8 +574,8 @@ func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Addres
 
 func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
 	tb.Helper()
-	sdb, err := s.RawVM.stateDB(root)
-	require.NoErrorf(tb, err, "state.New(%#x, %T.StateCache())", root, s.RawVM)
+	sdb, err := s.RawVM.exec.StateDB(root)
+	require.NoErrorf(tb, err, "state.New(%#x, %T.StateCache())", root, s.RawVM.exec)
 	return sdb
 }
 
@@ -1000,7 +1000,7 @@ func TestGossip(t *testing.T) {
 		GasFeeCap: big.NewInt(1),
 		Value:     big.NewInt(1),
 	})
-	api.MustSendTx(t, tx)
+	api.MustSendTxs(t, tx)
 	requireReceiveTx(t, n.validators, tx.Hash())
 	requireNotReceiveTx(t, n.nonValidators[1:], tx.Hash())
 }

@@ -79,16 +79,16 @@ func (s *SUT[VM]) LastAcceptedBlock(tb testing.TB) *blocks.Block {
 	return b
 }
 
-// WaitForPendingTxs blocks until the VM reports pending transactions.
-func (s *SUT[VM]) WaitForPendingTxs(tb testing.TB) {
+// WaitForPendingTxsEvent blocks until WaitForEvent reports [common.PendingTxs].
+func (s *SUT[VM]) WaitForPendingTxsEvent(tb testing.TB) {
 	tb.Helper()
 	msg, err := s.RawVM.WaitForEvent(s.Context(tb))
 	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.RawVM)
 	require.Equalf(tb, common.PendingTxs, msg, "%T.WaitForEvent() message", s.RawVM)
 }
 
-// MustSendTx submits each tx via the eth client, failing the test on error.
-func (s *SUT[VM]) MustSendTx(tb testing.TB, txs ...*types.Transaction) {
+// MustSendTxs submits each tx via the eth client, failing the test on error.
+func (s *SUT[VM]) MustSendTxs(tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
 	ctx := s.Context(tb)
 	for _, tx := range txs {
@@ -107,7 +107,7 @@ func (s *SUT[VM]) WaitUntilTxsPending(tb testing.TB, txs ...*types.Transaction) 
 // the source the block builder draws from.
 func (s *SUT[VM]) SendTxsAndWaitUntilPending(tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
-	s.MustSendTx(tb, txs...)
+	s.MustSendTxs(tb, txs...)
 	s.WaitUntilTxsPending(tb, txs...)
 }
 
@@ -127,9 +127,9 @@ func WithBlockContext(blockCtx *block.Context) BlockOption {
 	})
 }
 
-// BuildVerify builds a block on top of preferenceID and verifies it, using the
-// [block.Context] from opts (nil if unset).
-func (s *SUT[VM]) BuildVerify(tb testing.TB, preferenceID ids.ID, opts ...BlockOption) *blocks.Block {
+// BuildAndVerify builds a block on top of preferenceID and verifies it, using
+// the [block.Context] from opts (nil if unset).
+func (s *SUT[VM]) BuildAndVerify(tb testing.TB, preferenceID ids.ID, opts ...BlockOption) *blocks.Block {
 	tb.Helper()
 	blockCtx := options.As(opts...).context
 	ctx := s.Context(tb)
@@ -140,20 +140,13 @@ func (s *SUT[VM]) BuildVerify(tb testing.TB, preferenceID ids.ID, opts ...BlockO
 	return b
 }
 
-// RunConsensusLoopOnPreference builds, verifies, and accepts a block on top of
+// BuildVerifyAndAccept builds, verifies, and accepts a block on top of
 // preferenceID. It does NOT wait for execution.
-func (s *SUT[VM]) RunConsensusLoopOnPreference(tb testing.TB, preferenceID ids.ID, opts ...BlockOption) *blocks.Block {
+func (s *SUT[VM]) BuildVerifyAndAccept(tb testing.TB, preferenceID ids.ID, opts ...BlockOption) *blocks.Block {
 	tb.Helper()
-	b := s.BuildVerify(tb, preferenceID, opts...)
+	b := s.BuildAndVerify(tb, preferenceID, opts...)
 	require.NoErrorf(tb, s.RawVM.AcceptBlock(s.Context(tb), b), "%T.AcceptBlock()", s.RawVM)
 	return b
-}
-
-// RunConsensusLoop is [SUT.RunConsensusLoopOnPreference] on top of the
-// last-accepted block.
-func (s *SUT[VM]) RunConsensusLoop(tb testing.TB, opts ...BlockOption) *blocks.Block {
-	tb.Helper()
-	return s.RunConsensusLoopOnPreference(tb, s.LastAcceptedID(tb), opts...)
 }
 
 // Dial returns an RPC client and an [ethclient.Client] for url, closed during

@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
@@ -29,7 +28,6 @@ import (
 
 	_ "github.com/ava-labs/avalanchego/vms/saevm/firewood" // registers metrics
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
@@ -403,22 +401,6 @@ func (vm *VM) Shutdown(context.Context) error {
 // Version reports the VM's version.
 func (*VM) Version(context.Context) (string, error) {
 	return version.Current.String(), nil
-}
-
-func (vm *VM) lastAcceptedBlock() *blocks.Block {
-	return vm.last.accepted.Load()
-}
-
-func (vm *VM) lastSettledBlock() *blocks.Block {
-	return vm.last.settled.Load()
-}
-
-func (vm *VM) stateDB(root common.Hash) (*state.StateDB, error) {
-	return vm.exec.StateDB(root)
-}
-
-func (vm *VM) nodeID() ids.NodeID {
-	return vm.snowCtx.NodeID
 }
 
 func (vm *VM) log() logging.Logger {

@@ -44,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -238,8 +237,8 @@ var testStartTime = upgrade.InitiallyActiveTime.Add(dynamic.InitialDelayExponent
 
 // withVMTime fixes the SUT's clock at startTime and returns a handle that lets
 // the test move the clock forward (e.g. past Tau to settle a block). It also
-// makes [SUT.WaitForPendingTxs] automatically advance the clock past the
-// ACP-226 min-delay pacing timer.
+// makes [SUT.WaitForPendingTxsEvent] advance the clock past the ACP-226
+// min-delay pacing timer.
 func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 	c := saetest.NewClock(startTime, time.Millisecond)
 	opt := options.Func[sutConfig](func(cfg *sutConfig) {
@@ -653,17 +652,13 @@ func (s *SUT) assertTxAccepted(ctx context.Context, tb testing.TB, want *tx.Tx, 
 	assert.Equalf(tb, wantHeight, gotHeight, "%T.GetTx() block height", s.Client)
 }
 
-// runConsensusLoop builds, verifies, accepts, and executes a block from any
-// configured txs and block context. cchain must not build empty blocks, so it
-// waits for a pending-tx event first.
-func (s *SUT) runConsensusLoop(tb testing.TB, opts ...consensusOption) *blocks.Block {
+// runConsensusLoop builds, verifies, accepts, and executes a block on top of
+// the last-accepted block. cchain must not build empty blocks, so it waits for
+// a pending-tx event first.
+func (s *SUT) runConsensusLoop(tb testing.TB, opts ...vmtest.BlockOption) *blocks.Block {
 	tb.Helper()
 
-	cfg := options.ApplyTo(&consensusConfig{}, opts...)
-	if len(cfg.txs) > 0 {
-		s.SendTxsAndWaitUntilPending(tb, cfg.txs...)
-	}
-	blk := s.buildVerifyAccept(tb, s.LastAcceptedID(tb), cfg.blockOpts...)
+	blk := s.buildVerifyAccept(tb, s.LastAcceptedID(tb), opts...)
 	require.NoErrorf(tb, blk.WaitUntilExecuted(s.Context(tb)), "%T.WaitUntilExecuted()", blk)
 	return blk
 }
@@ -676,8 +671,8 @@ func (s *SUT) buildVerify(tb testing.TB, preferenceID ids.ID, opts ...vmtest.Blo
 	// Set the preference before waiting so the ACP-226 min-delay pacing in
 	// WaitForEvent keys off the block we are about to build on.
 	require.NoErrorf(tb, s.RawVM.SetPreference(s.Context(tb), preferenceID, nil), "%T.SetPreference()", s.RawVM)
-	s.WaitForPendingTxs(tb)
-	return s.SUT.BuildVerify(tb, preferenceID, opts...)
+	s.WaitForPendingTxsEvent(tb)
+	return s.SUT.BuildAndVerify(tb, preferenceID, opts...)
 }
 
 // buildVerifyAccept builds, verifies, and accepts a block on top of
@@ -701,37 +696,15 @@ func (s *SUT) blockAtHeight(ctx context.Context, tb testing.TB, height uint64) *
 	return blk
 }
 
-// WaitForPendingTxs is [vmtest.SUT.WaitForPendingTxs] after advancing the
-// clock past the ACP-226 delay that would otherwise throttle [VM.WaitForEvent].
-func (s *SUT) WaitForPendingTxs(tb testing.TB) {
+// WaitForPendingTxsEvent is [vmtest.SUT.WaitForPendingTxsEvent] after
+// advancing the clock past the ACP-226 delay throttling [VM.WaitForEvent].
+func (s *SUT) WaitForPendingTxsEvent(tb testing.TB) {
 	tb.Helper()
 	s.clock.AdvanceTo(earliestBuildTime(s.RawVM.GetPreference()))
-	s.SUT.WaitForPendingTxs(tb)
+	s.SUT.WaitForPendingTxsEvent(tb)
 }
 
-type (
-	consensusConfig struct {
-		txs       []*types.Transaction
-		blockOpts []vmtest.BlockOption
-	}
-	consensusOption = options.Option[consensusConfig]
-)
-
-// withTxs sets the txs for [SUT.runConsensusLoop] to submit before building.
-func withTxs(txs ...*types.Transaction) consensusOption {
-	return options.Func[consensusConfig](func(c *consensusConfig) {
-		c.txs = txs
-	})
-}
-
-// withBlockContext sets the [block.Context] for [SUT.runConsensusLoop].
-func withBlockContext(blockCtx *block.Context) consensusOption {
-	return options.Func[consensusConfig](func(c *consensusConfig) {
-		c.blockOpts = append(c.blockOpts, vmtest.WithBlockContext(blockCtx))
-	})
-}
-
-// parseVerifyAccept parses, verifies, and accepts a block built by another node.
+// parseVerifyAccept parses, verifies, and accepts a block from another node.
 func (s *SUT) parseVerifyAccept(ctx context.Context, tb testing.TB, blk *blocks.Block) *blocks.Block {
 	tb.Helper()
 
@@ -1206,7 +1179,8 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 	}
 
 	preBalance := sut.balance(t, sender)
-	blk := sut.runConsensusLoop(t, withTxs(txs...))
+	sut.SendTxsAndWaitUntilPending(t, txs...)
+	blk := sut.runConsensusLoop(t)
 	require.Lenf(t, blk.Receipts(), len(tests), "%T.Receipts()", blk)
 
 	receiptByTx := make(map[common.Hash]*types.Receipt, len(blk.Receipts()))
@@ -1790,7 +1764,8 @@ func TestGasRefundsDisabled(t *testing.T) {
 		GasFeeCap: big.NewInt(1),
 	})
 
-	blk := sut.runConsensusLoop(t, withTxs(tx))
+	sut.SendTxsAndWaitUntilPending(t, tx)
+	blk := sut.runConsensusLoop(t)
 	require.Lenf(t, blk.Receipts(), 1, "%T.Receipts()", blk)
 
 	receipt := blk.Receipts()[0]
@@ -1985,7 +1960,7 @@ func TestPreHeliconBlocksDisallowed(t *testing.T) {
 
 	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
 	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
-	sut.WaitForPendingTxs(t)
+	sut.WaitForPendingTxsEvent(t)
 
 	t.Run("build", func(t *testing.T) {
 		_, err := sut.BuildBlock(ctx, nil)

@@ -48,7 +48,7 @@ func TestAcceptBlock(t *testing.T) {
 		ffMillis := 100 + rng.IntN(1000*(1+saeparams.TauSeconds))
 		vmTime.Advance(time.Millisecond * time.Duration(ffMillis))
 
-		b := sut.RunConsensusLoop(t)
+		b := sut.runConsensusLoop(t)
 		unsettled = append(unsettled, b)
 		sut.assertBlockHashInvariants(ctx, t)
 
