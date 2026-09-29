@@ -310,7 +310,7 @@ func TestDebugTrace(t *testing.T) {
 	}
 
 	t.Run("before_block_hook", func(t *testing.T) {
-		sut.testRPC(ctx, t, withCmpOpts(
+		sut.testRPC(ctx, t, rpctest.WithCmpOpts(
 			[]rpctest.Case{
 				{
 					Method: "debug_traceBlockByNumber",
@@ -418,7 +418,7 @@ func TestDebugTrace(t *testing.T) {
 	}
 
 	t.Run("executed_base_fee", func(t *testing.T) {
-		sut.testRPC(ctx, t, withCmpOpts(
+		sut.testRPC(ctx, t, rpctest.WithCmpOpts(
 			[]rpctest.Case{
 				{
 					Method: "debug_traceBlockByNumber",
@@ -504,7 +504,7 @@ func TestDebugTrace(t *testing.T) {
 	}
 
 	t.Run("reported_block_hash", func(t *testing.T) {
-		sut.testRPC(ctx, t, withCmpOpts(
+		sut.testRPC(ctx, t, rpctest.WithCmpOpts(
 			[]rpctest.Case{
 				{
 					Name:   "canonical_by_hash",

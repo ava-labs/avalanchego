@@ -268,32 +268,36 @@ func TestRPCExtras(t *testing.T) {
 	)
 	wantBlockExtras["blockExtraData"] = hexutil.Encode(extData)
 
-	rpctest.Run(ctx, t, sut.ethclient.Client(), []rpctest.Case{
-		{
-			Method:       "eth_getHeaderByNumber",
-			Args:         []any{blockNumber},
-			Want:         wantHeaderExtras,
-			ExtraCmpOpts: []cmp.Option{onlyKeysOf(wantHeaderExtras)},
+	rpctest.Run(ctx, t, sut.ethclient.Client(), rpctest.WithCmpOpts(
+		[]rpctest.Case{
+			{
+				Method: "eth_getHeaderByNumber",
+				Args:   []any{blockNumber},
+				Want:   wantHeaderExtras,
+			},
+			{
+				Method: "eth_getHeaderByHash",
+				Args:   []any{blockHash},
+				Want:   wantHeaderExtras,
+			},
 		},
-		{
-			Method:       "eth_getHeaderByHash",
-			Args:         []any{blockHash},
-			Want:         wantHeaderExtras,
-			ExtraCmpOpts: []cmp.Option{onlyKeysOf(wantHeaderExtras)},
+		onlyKeysOf(wantHeaderExtras),
+	)...)
+	rpctest.Run(ctx, t, sut.ethclient.Client(), rpctest.WithCmpOpts(
+		[]rpctest.Case{
+			{
+				Method: "eth_getBlockByNumber",
+				Args:   []any{blockNumber, true},
+				Want:   wantBlockExtras,
+			},
+			{
+				Method: "eth_getBlockByHash",
+				Args:   []any{blockHash, true},
+				Want:   wantBlockExtras,
+			},
 		},
-		{
-			Method:       "eth_getBlockByNumber",
-			Args:         []any{blockNumber, true},
-			Want:         wantBlockExtras,
-			ExtraCmpOpts: []cmp.Option{onlyKeysOf(wantBlockExtras)},
-		},
-		{
-			Method:       "eth_getBlockByHash",
-			Args:         []any{blockHash, true},
-			Want:         wantBlockExtras,
-			ExtraCmpOpts: []cmp.Option{onlyKeysOf(wantBlockExtras)},
-		},
-	}...)
+		onlyKeysOf(wantBlockExtras),
+	)...)
 }
 
 // onlyKeysOf restricts a comparison of JSON objects to the keys of want.

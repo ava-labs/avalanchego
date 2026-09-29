@@ -35,6 +35,17 @@ type Case struct {
 	ExtraCmpOpts []cmp.Option
 }
 
+// WithCmpOpts appends opts to the [Case.ExtraCmpOpts] of every test, for
+// tables whose rows compare their results the same way. A row MAY carry its
+// own options too.
+func WithCmpOpts(tests []Case, opts ...cmp.Option) []Case {
+	for i := range tests {
+		test := &tests[i]
+		test.ExtraCmpOpts = append(test.ExtraCmpOpts, opts...)
+	}
+	return tests
+}
+
 // Run executes each Case against client and fails t on any mismatch. It is the
 // RPC assertion harness shared by the SAE and C-Chain suites.
 func Run(ctx context.Context, t *testing.T, client *rpc.Client, cases ...Case) {

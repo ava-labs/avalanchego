@@ -55,17 +55,6 @@ import (
 
 var zeroAddr common.Address
 
-// withCmpOpts appends opts to the [rpctest.Case.ExtraCmpOpts] of every test, for
-// tables whose rows compare their results the same way. A row MAY carry its own
-// options too.
-func withCmpOpts(tests []rpctest.Case, opts ...cmp.Option) []rpctest.Case {
-	for i := range tests {
-		test := &tests[i]
-		test.ExtraCmpOpts = append(test.ExtraCmpOpts, opts...)
-	}
-	return tests
-}
-
 // testRPC drives the [rpctest.Case] table against the SUT's RPC client.
 func (s *SUT) testRPC(ctx context.Context, t *testing.T, cases ...rpctest.Case) {
 	t.Helper()
