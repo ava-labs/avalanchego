@@ -273,13 +273,13 @@ func TestWriteBlock_Errors(t *testing.T) {
 			block:  make([]byte, 100),
 			setup: func(db *Database) {
 				// Change file permissions to read-only
-				file, err := db.getOrOpenDataFile(0)
+				file, err := db.getDataFile(0, os.O_RDWR|os.O_CREATE)
 				require.NoError(t, err)
 				filePath := file.Name()
 				file.Close()
 				require.NoError(t, os.Chmod(filePath, 0o444))
 			},
-			wantErrMsg: "failed to get data file for writing block",
+			wantErr: os.ErrPermission,
 		},
 		{
 			name:   "writeIndexEntryAt - index file write failure",
