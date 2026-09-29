@@ -17,7 +17,6 @@ go_library(
     deps = [
         "//graft/coreth/consensus",
         "//graft/coreth/core",
-        "//graft/coreth/core/extstate",
         "//graft/coreth/core/txpool",
         "//graft/coreth/params",
         "//graft/coreth/params/extras",
@@ -29,6 +28,7 @@ go_library(
         "//utils/units",
         "//vms/evm/acp176",
         "//vms/evm/predicate",
+        "//vms/evm/prefetch",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//consensus/misc/eip4844",
         "@com_github_ava_labs_libevm//core/state",

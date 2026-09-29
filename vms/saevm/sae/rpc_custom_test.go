@@ -121,30 +121,23 @@ func TestCallDetailed(t *testing.T) {
 	ctx, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.RPCConfig.GasCap = gasCap
 
-		const (
-			size   = byte(vm.CALLDATASIZE)
-			cp     = byte(vm.CALLDATACOPY)
-			zero   = byte(vm.PUSH0)
-			revert = byte(vm.REVERT)
-			jump   = byte(vm.JUMP)
-		)
 		c.genesis.Alloc[echoReverter] = types.Account{
-			Code: []byte{
-				size, zero, zero, cp, // https://www.evm.codes/#37
-				size, zero, revert,
-			},
+			Code: saetest.Ops(
+				vm.CALLDATASIZE, vm.PUSH0, vm.PUSH0, vm.CALLDATACOPY, // https://www.evm.codes/#37
+				vm.CALLDATASIZE, vm.PUSH0, vm.REVERT,
+			),
 			Balance: new(big.Int),
 		}
 		c.genesis.Alloc[invalidJumper] = types.Account{
 			// Jumping back to PC=0 is invalid because it's not a [vm.JUMPDEST]
-			Code:    []byte{zero, jump},
+			Code:    saetest.Ops(vm.PUSH0, vm.JUMP),
 			Balance: new(big.Int),
 		}
 	}))
 
 	const escrowDepositVal = 42
 	recipient := common.Address{'r', 'e', 'c', 'v'}
-	_, escrowAddr, _ := sut.deployEscrow(t)
+	escrowAddr := sut.deployEscrow(t)
 	sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
 
 	const revertWith = 12345
@@ -164,9 +157,9 @@ func TestCallDetailed(t *testing.T) {
 		{
 			method: "eth_callDetailed",
 			args: []any{
-				map[string]any{
-					"to":   escrowAddr,
-					"data": hexutil.Encode(escrow.CallDataForBalance(recipient)),
+				ethapi.TransactionArgs{
+					To:   &escrowAddr,
+					Data: new(hexutil.Bytes(escrow.CallDataForBalance(recipient))),
 				},
 				latest,
 			},
@@ -178,10 +171,10 @@ func TestCallDetailed(t *testing.T) {
 		{
 			method: "eth_callDetailed",
 			args: []any{
-				map[string]any{
-					"to":   escrowAddr,
-					"from": noBalance,
-					"data": hexutil.Encode(escrow.CallDataToWithdraw()),
+				ethapi.TransactionArgs{
+					From: &noBalance,
+					To:   &escrowAddr,
+					Data: new(hexutil.Bytes(escrow.CallDataToWithdraw())),
 				},
 				latest,
 			},
@@ -199,9 +192,9 @@ func TestCallDetailed(t *testing.T) {
 		{
 			method: "eth_callDetailed",
 			args: []any{
-				map[string]any{
-					"to":   echoReverter,
-					"data": hexutil.Bytes{42},
+				ethapi.TransactionArgs{
+					To:   &echoReverter,
+					Data: new(hexutil.Bytes{42}),
 				},
 				latest,
 			},
@@ -215,9 +208,9 @@ func TestCallDetailed(t *testing.T) {
 		{
 			method: "eth_callDetailed",
 			args: []any{
-				map[string]any{
-					"to":   echoReverter,
-					"data": hexutil.Bytes(revertAsPanic),
+				ethapi.TransactionArgs{
+					To:   &echoReverter,
+					Data: new(hexutil.Bytes(revertAsPanic)),
 				},
 				latest,
 			},
@@ -231,8 +224,8 @@ func TestCallDetailed(t *testing.T) {
 		{
 			method: "eth_callDetailed",
 			args: []any{
-				map[string]any{
-					"to": invalidJumper,
+				ethapi.TransactionArgs{
+					To: &invalidJumper,
 				},
 				latest,
 			},

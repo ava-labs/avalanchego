@@ -12,6 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
+// ACP267UptimeRequirement is the 90% Primary Network uptime requirement
+// introduced by ACP-267.
+const ACP267UptimeRequirement = .9
+
 type StakingConfig struct {
 	// Staking uptime requirements
 	UptimeRequirement float64 `json:"uptimeRequirement"`

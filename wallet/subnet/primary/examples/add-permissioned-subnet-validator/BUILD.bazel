@@ -10,7 +10,7 @@ go_library(
         "//genesis",
         "//ids",
         "//utils/units",
-        "//vms/platformvm/txs",
+        "//vms/platformvm/platform",
         "//vms/secp256k1fx",
         "//wallet/subnet/primary",
     ],

@@ -5,9 +5,12 @@ package tx_test
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/params"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
@@ -16,12 +19,18 @@ import (
 	// Imported for [vm.VerifierBackend] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
@@ -139,6 +148,10 @@ func FuzzParseCompatibility(f *testing.F) {
 	}
 	f.Fuzz(func(t *testing.T, data []byte) {
 		_, oldErr := txtest.ParseOld(data)
+		// The new codec intentionally has no size limit.
+		if errors.Is(oldErr, codec.ErrUnmarshalTooBig) {
+			t.Skip("input exceeds legacy codec size limit")
+		}
 		oldOk := oldErr == nil
 
 		_, newErr := Parse(data)
@@ -229,6 +242,106 @@ func TestParseSlice(t *testing.T) {
 	}
 }
 
+func TestFromBlock(t *testing.T) {
+	newTxs := make([]*Tx, len(allTxs))
+	for i, tx := range allTxs {
+		newTxs[i] = tx.new
+	}
+
+	sliceBytes, err := MarshalSlice(newTxs)
+	require.NoError(t, err, "MarshalSlice()")
+
+	const (
+		preAP5Time uint64 = 0
+		ap5Time           = preAP5Time + 1
+	)
+	config := corethparams.WithExtra(
+		&params.ChainConfig{},
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
+				ApricotPhase5BlockTimestamp: new(ap5Time),
+			},
+		},
+	)
+
+	tests := []struct {
+		name    string
+		time    uint64
+		extData []byte
+		want    []*Tx
+		wantErr error
+	}{
+		{
+			name: "pre_ap5_empty",
+			time: preAP5Time,
+		},
+		{
+			name: "pre_ap5_empty_slice",
+			time: preAP5Time,
+			extData: []byte{
+				// codecVersion:
+				0x00, 0x00,
+				// len(txs):
+				0x00, 0x00, 0x00, 0x00,
+			},
+			wantErr: wrappers.ErrInsufficientLength,
+		},
+		{
+			name:    "pre_ap5_single",
+			time:    preAP5Time,
+			extData: importTx.bytes,
+			want:    []*Tx{importTx.new},
+		},
+		{
+			name: "ap5_empty",
+			time: ap5Time,
+		},
+		{
+			name: "ap5_empty_slice",
+			time: ap5Time,
+			extData: []byte{
+				// codecVersion:
+				0x00, 0x00,
+				// len(txs):
+				0x00, 0x00, 0x00, 0x00,
+			},
+			wantErr: ErrInefficientSlicePacking,
+		},
+		{
+			name:    "ap5_single",
+			time:    ap5Time,
+			extData: importTx.bytes,
+			wantErr: codec.ErrExtraSpace,
+		},
+		{
+			name:    "ap5_slice",
+			time:    ap5Time,
+			extData: sliceBytes,
+			want:    newTxs,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			block := customtypes.NewBlockWithExtData(
+				&types.Header{
+					Time: test.time,
+				},
+				nil, // txs
+				nil, // uncles
+				nil, // receipts
+				nil, // hasher, unused without txs
+				test.extData,
+				true, // update [customtypes.HeaderExtra.ExtDataHash]
+			)
+			got, err := FromBlock(config, block)
+			require.ErrorIs(t, err, test.wantErr, "FromBlock()")
+			if diff := cmp.Diff(test.want, got, txtest.CmpOpt()); diff != "" {
+				t.Errorf("FromBlock() diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
 func FuzzParseSliceRoundTrip(f *testing.F) {
 	{
 		newTxs := make([]*Tx, len(allTxs))
@@ -267,6 +380,10 @@ func FuzzParseSliceCompatibility(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		_, oldErr := txtest.ParseOlds(data)
+		// The new codec intentionally has no size limit.
+		if errors.Is(oldErr, codec.ErrUnmarshalTooBig) {
+			t.Skip("input exceeds legacy codec size limit")
+		}
 		oldOk := oldErr == nil
 
 		_, newErr := ParseSlice(data)

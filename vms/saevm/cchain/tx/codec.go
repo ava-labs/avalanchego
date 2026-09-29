@@ -5,12 +5,19 @@ package tx
 
 import (
 	"errors"
+	"math"
+
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 )
 
 const codecVersion uint16 = 0
@@ -18,7 +25,10 @@ const codecVersion uint16 = 0
 var c codec.Manager
 
 func init() {
-	c = codec.NewDefaultManager()
+	// The codec marshals both individual transactions and transaction slices,
+	// so size is enforced by the p2p layer, mempool, and block builder rather
+	// than by the codec itself.
+	c = codec.NewManager(math.MaxInt)
 
 	// Registration order impacts the typeID included in the canonical format.
 	// We skip registrations in specific locations so that UTXOs in shared
@@ -73,6 +83,23 @@ func ParseSlice(b []byte) ([]*Tx, error) {
 		return nil, errInefficientSlicePacking
 	}
 	return txs, nil
+}
+
+// FromBlock parses the transactions in b's extData, using the encoding that
+// config specifies at b's timestamp.
+func FromBlock(config *params.ChainConfig, b *types.Block) ([]*Tx, error) {
+	extData := customtypes.BlockExtData(b)
+	if corethparams.GetExtra(config).IsApricotPhase5(b.Time()) {
+		return ParseSlice(extData)
+	}
+	if len(extData) == 0 {
+		return nil, nil
+	}
+	t, err := Parse(extData)
+	if err != nil {
+		return nil, err
+	}
+	return []*Tx{t}, nil
 }
 
 // MarshalUTXO serializes an [avax.UTXO] to its canonical binary format.

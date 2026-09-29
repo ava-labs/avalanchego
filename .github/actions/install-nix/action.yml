@@ -29,15 +29,15 @@ runs:
     - name: Load flake dependencies
       run: nix develop --command echo "dependencies installed"
       shell: bash
-    # Cache Go modules (architecture-independent)
-    - uses: actions/cache@v5
+    # Restore Go modules (architecture-independent). setup-go-for-project owns cache writes.
+    - uses: actions/cache/restore@v5
       id: go-mod-cache
       with:
         path: ~/go/pkg/mod
         key: ${{ runner.os }}-go-mod-${{ hashFiles('go.work.sum', 'tools/external/go.sum') }}
         restore-keys: ${{ runner.os }}-go-mod-
-    # Cache Go build cache (architecture-specific)
-    - uses: actions/cache@v5
+    # Restore the Go build cache (architecture-specific). setup-go-for-project owns cache writes.
+    - uses: actions/cache/restore@v5
       with:
         path: ~/.cache/go-build
         key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.work.sum', 'tools/external/go.sum') }}

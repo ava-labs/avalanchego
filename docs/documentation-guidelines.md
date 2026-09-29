@@ -10,7 +10,7 @@ These guidelines apply to documentation for any repository content whose correct
 use, review, or evolution requires more context than code comments and tests
 alone can provide.
 
-## Index
+## Table of contents
 
 - [Motivation](#motivation)
 - [Definition](#definition)
@@ -78,7 +78,7 @@ after the current task or PR is finished.
 
 ## A four-layer framework
 
-A useful default is to think about repository documentation in four layers:
+One way to think about repository documentation is in four layers:
 
 1. **Why does this exist?**
    - what problem does it solve
@@ -116,13 +116,12 @@ layer 3 occasionally, and layer 4 rarely. It is also the layer where LLMs can be
 the most helpful because an LLM working with you already has much of the context
 needed to write it.
 
-Layer 4 should not be interpreted narrowly as only "validation steps" or
-"current invariants." It also includes enough preserved decision context that a
-future maintainer can understand why a different change may be wrong, or why it
-might only become appropriate under changed assumptions. Repository
-documentation should usually preserve enough context around meaningful
-alternatives that a future reader can understand why the current choice was
-made.
+Layer 4 is not just about validation steps or current invariants. It also
+includes enough decision context that a future maintainer can understand why a
+different change may be wrong, or why it might only become appropriate under
+changed assumptions. Repository documentation should preserve enough context
+around alternatives that a future reader can understand why the current choice
+was made.
 
 ### What this looks like in practice
 
@@ -187,6 +186,11 @@ This guide deliberately does not prescribe:
   produce it. The criteria for what belongs apply regardless of who writes it.
   The details of drafting, checking for drift, and using session history can
   evolve over time.
+
+This guide can help preserve the right information and catch common problems,
+but it cannot replace judgment. A document can be correct and still be clumsy,
+repetitive, or hard to use. Clarity, proportion, and restraint have to be
+learned through practice and review.
 
 ## When to add or expand documentation
 
@@ -257,7 +261,7 @@ Do not use repository documentation as:
 
 Some explored paths are worth preserving, but only after they are translated
 into a stable explanation such as a trade-off, rejected alternative, or
-important discovered constraint.
+constraint that still matters.
 
 When deciding whether to keep rationale from an explored path, ask whether a
 future maintainer would understand the trade-off, rejected alternative, or
@@ -288,7 +292,7 @@ include:
   repository
 
 The exact filename matters less than making the document easy to find and
-interpret.
+understand.
 
 ## Discoverability
 
@@ -324,8 +328,19 @@ looking for.
 
 Start simple. A single document is often enough.
 
-One useful default is to structure a document around the [four-layer
-framework](#a-four-layer-framework) above, often with sections such as:
+A good document is complete, but usability matters just as much. Write so a future
+reader can skim the document and quickly find what they need. In practice, that
+usually means:
+
+- front-load the principles or mental model
+- use headings that clearly describe what a section is doing
+- prefer plain language over jargon when the simpler wording is accurate
+- state the default guidance clearly, then explain exceptions briefly
+- use examples when a rule would otherwise stay abstract
+- remove repetition that restates a point without sharpening it
+
+A useful default is to structure a document around the [four-layer framework](#a-four-layer-framework)
+above, often with sections such as:
 
 1. **Overview**
 2. **Usage**
@@ -336,10 +351,14 @@ Use the earlier framework for the detailed questions each section may want to
 answer. This is a recommendation, not a rigid template. The important thing is
 to make it easy for a reader to find the right level of detail.
 
-A trailing **References** section pointing to the relevant code, tests, and
-related docs is often useful. It makes the links between the document and the
-code explicit, supports the discoverability conventions above, and helps
-reviewers see what parts of the repository the document covers.
+Include a table of contents in every dedicated document. Even when a document is
+still fairly short, a TOC makes the structure visible up front, helps readers
+jump to the part they need, and makes it easier to notice when the document's
+shape has drifted.
+
+Use an inline link when its text and the surrounding text explain the linked
+material. If readers need more explanation, link to the relevant item in a
+trailing **References** section.
 
 A README near the code can do more than explain usage. It can also preserve
 non-obvious context a future maintainer would otherwise need to reconstruct
@@ -392,3 +411,15 @@ maintainers will still need. The updated document does not need every detail
 from the original, but it should preserve the reasoning that still matters for
 future changes, including important constraints, relevant alternatives, and why
 those alternatives were not chosen.
+
+When revising a document that has grown by accretion, check whether the result
+is still easy to use. Questions like these may help:
+
+- Is the opening section really an overview, or is it principles, usage, or
+  maintainer guidance?
+- Are the main rules explained by a small number of reasons a reader can
+  remember?
+- Are the important exceptions concrete enough, or do they need examples?
+- Is any section repeating itself instead of helping the reader decide or act?
+- Have useful points from review discussion been folded back into the durable
+  document rather than left only in PR comments?

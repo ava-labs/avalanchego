@@ -12,7 +12,6 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool",
     deps = [
         "//graft/coreth/params",
-        "//graft/coreth/plugin/evm/customtypes",
         "//ids",
         "//snow",
         "//utils/heap",
@@ -20,6 +19,7 @@ go_library(
         "//utils/set",
         "//utils/setmap",
         "//vms/saevm/blocks",
+        "//vms/saevm/cchain/dynamic",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/hook",
         "@com_github_ava_labs_libevm//core",

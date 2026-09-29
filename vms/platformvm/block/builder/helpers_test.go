@@ -38,11 +38,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
 	"github.com/ava-labs/avalanchego/vms/platformvm/network"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
@@ -59,7 +59,7 @@ const (
 	defaultMaxStakingDuration = 365 * 24 * time.Hour
 )
 
-var testSubnet1 *txs.Tx
+var testSubnet1 *platform.Tx
 
 type mutableSharedMemory struct {
 	atomic.SharedMemory
@@ -110,13 +110,13 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 
 	res.fx = defaultFx(t, res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
-	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
 	res.state = statetest.New(t, statetest.Config{
-		DB:         res.baseDB,
-		Genesis:    genesistest.NewBytes(t, genesistest.Config{}),
-		Validators: res.config.Validators,
-		Context:    res.ctx,
-		Rewards:    rewardsCalc,
+		DB:           res.baseDB,
+		Genesis:      genesistest.NewBytes(t, genesistest.Config{}),
+		Validators:   res.config.Validators,
+		Upgrades:     res.config.UpgradeConfig,
+		Context:      res.ctx,
+		RewardConfig: res.config.RewardConfig,
 	})
 
 	res.uptimes = uptime.NewManager(res.state, res.clk)
@@ -131,7 +131,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		Fx:           res.fx,
 		FlowChecker:  res.utxosVerifier,
 		Uptimes:      res.uptimes,
-		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()

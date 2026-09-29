@@ -69,7 +69,7 @@ These changes prepare the merge commit that will be tagged.
    RPCChainVMProtocol uint = 45
    ```
 
-   And update [`version/compatibility.json`](version/compatibility.json) to add the new version.
+   And update [`version/compatibility.json`](version/compatibility.json) and [`proto/README.md`](proto/README.md) for the new version.
 
 **Note:** Coreth and Subnet-EVM versions are automatically derived from `version/constants.go` and do not require manual updates.
 
@@ -356,7 +356,10 @@ The tag push triggers these workflows automatically:
 
 - `build-linux-binaries.yml` - Linux amd64/arm64 tarballs
 - `build-macos-release.yml` - macOS zip
-- `build-ubuntu-amd64-release.yml` / `build-ubuntu-arm64-release.yml` - Debian packages
+- `build-linux-packages.yml` - Linux RPM/DEB packages (matrix over `{rpm, deb}` and `{amd64, arm64}` via the
+  `./.github/packaging/actions/build-package` composite action). On tag pushes, the `upload-debs-s3` job additionally
+  publishes `.deb` packages to `linux/debs/ubuntu/{jammy,noble}/{arch}/` and `GPG-KEY-avalanchego` to
+  `linux/debs/ubuntu/{jammy,noble}/`.
 - `publish_docker_image.yml` - Docker images
 
 Artifacts produced:
@@ -381,14 +384,10 @@ Artifacts produced:
 Antithesis test images are built and pushed to Google Artifact Registry on every merge to master via `publish_antithesis_images.yml`:
 
 - `antithesis-avalanchego-{config,node,workload}:latest`
-- `antithesis-xsvm-{config,node,workload}:latest`
 - `antithesis-subnet-evm-{config,node,workload}:latest`
 
-These are triggered daily for testing:
-
-- `trigger-antithesis-avalanchego.yml` - 10PM UTC
-- `trigger-antithesis-xsvm.yml` - 6AM UTC
-- `trigger-antithesis-subnet-evm.yml` - 2PM UTC
+See the [Antithesis testing documentation](tests/antithesis/README.md#scheduled-testing)
+for scheduled testing details.
 
 ### 10. Post-Release Version Bump
 

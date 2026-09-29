@@ -16,9 +16,8 @@ import (
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	block "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	set "github.com/ava-labs/avalanchego/utils/set"
-	block0 "github.com/ava-labs/avalanchego/vms/platformvm/block"
+	platform "github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	state "github.com/ava-labs/avalanchego/vms/platformvm/state"
-	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -77,10 +76,10 @@ func (mr *ManagerMockRecorder) GetState(blkID any) *gomock.Call {
 }
 
 // GetStatelessBlock mocks base method.
-func (m *Manager) GetStatelessBlock(blkID ids.ID) (block0.Block, error) {
+func (m *Manager) GetStatelessBlock(blkID ids.ID) (platform.Block, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStatelessBlock", blkID)
-	ret0, _ := ret[0].(block0.Block)
+	ret0, _ := ret[0].(platform.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -106,7 +105,7 @@ func (mr *ManagerMockRecorder) LastAccepted() *gomock.Call {
 }
 
 // NewBlock mocks base method.
-func (m *Manager) NewBlock(arg0 block0.Block) snowman.Block {
+func (m *Manager) NewBlock(arg0 platform.Block) snowman.Block {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewBlock", arg0)
 	ret0, _ := ret[0].(snowman.Block)
@@ -146,7 +145,7 @@ func (mr *ManagerMockRecorder) SetPreference(blkID, blockCtx any) *gomock.Call {
 }
 
 // VerifyTx mocks base method.
-func (m *Manager) VerifyTx(tx *txs.Tx) error {
+func (m *Manager) VerifyTx(tx *platform.Tx) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VerifyTx", tx)
 	ret0, _ := ret[0].(error)

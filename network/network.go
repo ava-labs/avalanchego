@@ -1185,7 +1185,16 @@ func (n *network) NodeUptime() (UptimeResult, error) {
 		totalWeight          = float64(totalWeightInt)
 		totalWeightedPercent = 100 * float64(myStake)
 		rewardingStake       = float64(myStake)
+		uptimeRequirement    = n.config.UptimeRequirement
 	)
+
+	startTime, err := n.config.UptimeCalculator.GetStartTime(n.config.MyNodeID)
+	if err != nil {
+		return UptimeResult{}, fmt.Errorf("error while fetching local validator start time %w", err)
+	}
+	if n.config.UpgradeConfig.IsHeliconActivated(startTime) {
+		uptimeRequirement = genesis.ACP267UptimeRequirement
+	}
 
 	n.peersLock.RLock()
 	defer n.peersLock.RUnlock()
@@ -1205,8 +1214,7 @@ func (n *network) NodeUptime() (UptimeResult, error) {
 		weightFloat := float64(weight)
 		totalWeightedPercent += percent * weightFloat
 
-		// if this peer thinks we're above requirement add the weight
-		if percent/100 >= n.config.UptimeRequirement {
+		if percent/100 >= uptimeRequirement {
 			rewardingStake += weightFloat
 		}
 	}

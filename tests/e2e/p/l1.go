@@ -35,7 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
@@ -233,7 +233,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				subnetID,
 				chainID,
 				address,
-				[]*txs.ConvertSubnetToL1Validator{
+				[]*platform.ConvertSubnetToL1Validator{
 					{
 						NodeID:  subnetGenesisNode.NodeID.Bytes(),
 						Weight:  genesisWeight,

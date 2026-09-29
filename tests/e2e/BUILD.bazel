@@ -13,7 +13,6 @@ go_test(
     srcs = ["e2e_test.go"],
     tags = ["manual"],  # keep
     deps = [
-        "//config",
         "//graft/coreth/plugin/evm",
         "//tests/e2e/banff",
         "//tests/e2e/c",
@@ -24,8 +23,6 @@ go_test(
         "//tests/e2e/x/transfer",
         "//tests/fixture/e2e",
         "//tests/fixture/tmpnet",
-        "//upgrade",
-        "//upgrade/upgradetest",
         "@com_github_onsi_ginkgo_v2//:ginkgo",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_zap//:zap",
