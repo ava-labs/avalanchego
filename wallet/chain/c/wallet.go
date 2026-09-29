@@ -210,12 +210,15 @@ func awaitTxAccepted(ctx context.Context, c txGetter, txID ids.ID, freq time.Dur
 	defer ticker.Stop()
 
 	for {
-		_, _, err := c.GetTx(ctx, txID)
-		if err == nil {
-			return nil
-		}
-		if !isTxNotFound(err) {
+		_, height, err := c.GetTx(ctx, txID)
+		if err != nil && !isTxNotFound(err) {
 			return err
+		}
+		// Pre-SAE nodes return processing txs without a height. The genesis
+		// block cannot include atomic txs, so a height of 0 means the tx is not
+		// accepted yet.
+		if err == nil && height != 0 {
+			return nil
 		}
 
 		select {
