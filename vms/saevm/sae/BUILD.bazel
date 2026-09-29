@@ -173,7 +173,7 @@ go_test(
         "vm_test.go",
         "worstcase_test.go",
     ],
-    args = ["-test.run=TestSubscriptions|TestAcceptBlock|TestWorstCase"],
+    args = ["-test.run=TestAcceptBlock|TestSubscriptions|TestWorstCase"],
     embed = [":sae"],
     env = {"SAEVM_TEST_FLAKY": "1"},
     flaky = True,
