@@ -120,7 +120,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		// the block that includes them is fully executed. It is not safe to
 		// assume that the "latest" block's nonce has been updated to reflect a
 		// transaction whose receipt has been returned.
-		nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
+		nonce, err := ethClient.NonceAt(tc.DefaultContext(), ethAddress, nil)
 		require.NoError(err)
 
 		var contractAddress common.Address
@@ -145,7 +145,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			nonce++
 		})
 
-		initialGasPrice, err := ethClient.EstimateBaseFee(tc.DefaultContext())
+		initialGasPrice, err := e2e.EstimateBaseFee(tc.DefaultContext(), ethClient)
 		require.NoError(err)
 
 		targetGasPrice := new(big.Int).Set(initialGasPrice)
@@ -167,7 +167,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 			tc.Eventually(func() bool {
 				// Check the gas price
-				gasPrice, err := ethClient.EstimateBaseFee(tc.DefaultContext())
+				gasPrice, err := e2e.EstimateBaseFee(tc.DefaultContext(), ethClient)
 				require.NoError(err)
 
 				// If the gas price has increased, stop the loop.
@@ -217,7 +217,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		tc.By("sending small transactions until a sufficient gas price decrease is detected", func() {
 			tc.Eventually(func() bool {
 				// Check the gas price
-				gasPrice, err := ethClient.EstimateBaseFee(tc.DefaultContext())
+				gasPrice, err := e2e.EstimateBaseFee(tc.DefaultContext(), ethClient)
 				require.NoError(err)
 
 				// If the gas price has decreased, stop the loop.

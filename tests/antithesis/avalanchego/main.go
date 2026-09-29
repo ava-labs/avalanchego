@@ -15,8 +15,10 @@ import (
 
 	"github.com/antithesishq/antithesis-sdk-go/assert"
 	"github.com/antithesishq/antithesis-sdk-go/lifecycle"
+	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -24,9 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
@@ -69,9 +68,6 @@ const (
 // TODO(marun) Extract the common elements of test execution for reuse across test setups
 
 func main() {
-	// Required for coreth ethclient block deserialization.
-	evm.RegisterAllLibEVMExtras()
-
 	// TODO(marun) Support choosing the log format
 	tc := antithesis.NewInstrumentedTestContext(tests.NewDefaultLogger(""))
 	defer tc.RecoverAndExit()
@@ -1011,8 +1007,9 @@ func (w *workload) confirmCChainTx(ctx context.Context, tx *types.Transaction) e
 			return fmt.Errorf("tx %s failed on %s with status %d", txHash, uri, receipt.Status)
 		}
 
-		// [workload.sendCChainTx] reads the next nonce at "latest".
-		if err := e2e.AwaitExecuted(ctx, client, receipt); err != nil {
+		// SAE serves state at a height only once it has executed, after which
+		// the next nonce read at "latest" is current.
+		if _, err := client.NonceAt(ctx, crypto.PubkeyToAddress(w.cChainKey.PublicKey), receipt.BlockNumber); err != nil {
 			return fmt.Errorf("awaiting execution of tx %s on %s: %w", txHash, uri, err)
 		}
 
@@ -1043,7 +1040,7 @@ func (w *workload) sendCChainTx(ctx context.Context, client *ethclient.Client, t
 		})
 		return nil, err
 	}
-	acceptedNonce, err := client.AcceptedNonceAt(ctx, senderAddr)
+	acceptedNonce, err := client.NonceAt(ctx, senderAddr, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch accepted nonce: %w", err)
 	}
@@ -1051,7 +1048,7 @@ func (w *workload) sendCChainTx(ctx context.Context, client *ethclient.Client, t
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch suggested gas tip: %w", err)
 	}
-	estimatedBaseFee, err := client.EstimateBaseFee(ctx)
+	estimatedBaseFee, err := e2e.EstimateBaseFee(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch estimated base fee: %w", err)
 	}

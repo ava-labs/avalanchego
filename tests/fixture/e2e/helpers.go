@@ -12,12 +12,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethclient"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -193,7 +194,10 @@ func SendEthTransaction(tc tests.TestContext, ethClient *ethclient.Client, signe
 		return true
 	}, DefaultTimeout, DefaultPollingInterval, "failed to see transaction acceptance before timeout")
 
-	require.NoError(AwaitExecuted(tc.DefaultContext(), ethClient, receipt), "AwaitExecuted()")
+	// SAE serves state at a height only once it has executed, after which
+	// "latest" includes the tx.
+	_, err := ethClient.NonceAt(tc.DefaultContext(), ethcommon.Address{}, receipt.BlockNumber)
+	require.NoError(err, "NonceAt()")
 
 	tc.Log().Info("eth transaction accepted",
 		zap.Stringer("txID", txID),
@@ -204,12 +208,13 @@ func SendEthTransaction(tc tests.TestContext, ethClient *ethclient.Client, signe
 	return receipt
 }
 
-// AwaitExecuted blocks until the block containing receipt is reflected at
-// "latest". SAE MAY issue a receipt before its block finishes executing, but
-// only serves state at a height once that block has executed.
-func AwaitExecuted(ctx context.Context, c ethereum.ChainStateReader, receipt *types.Receipt) error {
-	_, err := c.NonceAt(ctx, ethcommon.Address{}, receipt.BlockNumber)
-	return err
+// EstimateBaseFee returns the estimated base fee of the next block.
+func EstimateBaseFee(ctx context.Context, c *ethclient.Client) (*big.Int, error) {
+	var fee hexutil.Big
+	if err := c.Client().CallContext(ctx, &fee, "eth_baseFee"); err != nil {
+		return nil, err
+	}
+	return (*big.Int)(&fee), nil
 }
 
 // Determines the suggested gas price for the configured client that will

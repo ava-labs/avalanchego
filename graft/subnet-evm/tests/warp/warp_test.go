@@ -286,7 +286,6 @@ func (*warpTest) getBlockHashAndNumberFromTxReceipt(ctx context.Context, client 
 		require.NoError(ctx.Err())
 		receipt, err := client.TransactionReceipt(ctx, tx.Hash())
 		if err == nil {
-			require.NoError(e2e.AwaitExecuted(ctx, client, receipt), "e2e.AwaitExecuted()")
 			return receipt.BlockHash, receipt.BlockNumber.Uint64()
 		}
 	}
@@ -604,7 +603,6 @@ func (w *warpTest) warpBindingsTest() {
 	deployReceipt, err := bind.WaitMined(ctx, client, deployTx)
 	require.NoError(err)
 	require.Equal(types.ReceiptStatusSuccessful, deployReceipt.Status)
-	require.NoError(e2e.AwaitExecuted(ctx, client, deployReceipt), "e2e.AwaitExecuted()")
 
 	log.Info("Calling getBlockchainID via proxy contract")
 	returnedBlockchainID, err := warpTestContract.GetBlockchainID(&bind.CallOpts{Context: ctx})
@@ -621,7 +619,6 @@ func (w *warpTest) warpBindingsTest() {
 	sendReceipt, err := bind.WaitMined(ctx, client, sendTx)
 	require.NoError(err)
 	require.Equal(types.ReceiptStatusSuccessful, sendReceipt.Status)
-	require.NoError(e2e.AwaitExecuted(ctx, client, sendReceipt), "e2e.AwaitExecuted()")
 
 	unsignedMsg := verifyAndExtractWarpMessage(ctx, client, sendReceipt.BlockNumber.Uint64(), proxyAddr)
 
