@@ -14,12 +14,11 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
-	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -35,7 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest/rpctest"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
@@ -89,6 +88,12 @@ func (c *Client) getAllUTXOs(
 		}
 		startAddr, startUTXOID = endAddr, endUTXOID
 	}
+}
+
+// testRPC drives the [rpctest.Case] table against the SUT's RPC client.
+func (s *SUT) testRPC(ctx context.Context, t *testing.T, cases ...rpctest.Case) {
+	t.Helper()
+	rpctest.Run(ctx, t, s.ethclient.Client(), cases...)
 }
 
 // TestIssueTxRejectsInvalidTransaction asserts that [Client.IssueTx] surfaces
@@ -169,9 +174,7 @@ func TestGetTxNotFound(t *testing.T) {
 // endpoint on both the unknown and accepted branches.
 func TestGetAtomicTxStatus(t *testing.T) {
 	sk := txtest.NewKey(t)
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(sk.EthAddress())
-	}))
+	ctx, sut := newSUT(t, withMaxAllocFor(sk.EthAddress()))
 
 	stx := newWallet(sk, sut.ctx, sut.Client).newMinimalTx(t)
 	t.Run("before_execution", func(t *testing.T) {
@@ -245,7 +248,7 @@ func TestRPCExtras(t *testing.T) {
 	require.NotNilf(t, extra.SettledGasUnix, "%T.SettledGasUnix", extra)
 	require.NotNilf(t, extra.SettledGasNumerator, "%T.SettledGasNumerator", extra)
 	require.NotNilf(t, extra.SettledExcess, "%T.SettledExcess", extra)
-	wantHeaderExtras := map[string]string{
+	wantHeaderExtras := map[string]any{
 		"extDataHash":           extra.ExtDataHash.Hex(),
 		"extDataGasUsed":        hexutil.EncodeBig(extra.ExtDataGasUsed),
 		"blockGasCost":          hexutil.EncodeBig(extra.BlockGasCost),
@@ -267,43 +270,44 @@ func TestRPCExtras(t *testing.T) {
 	)
 	wantBlockExtras["blockExtraData"] = hexutil.Encode(extData)
 
-	tests := []struct {
-		method string
-		args   []any
-		want   map[string]string
-	}{
-		{
-			method: "eth_getHeaderByNumber",
-			args:   []any{blockNumber},
-			want:   wantHeaderExtras,
+	sut.testRPC(ctx, t, rpctest.WithCmpOpts(
+		[]rpctest.Case{
+			{
+				Method: "eth_getHeaderByNumber",
+				Args:   []any{blockNumber},
+				Want:   wantHeaderExtras,
+			},
+			{
+				Method: "eth_getHeaderByHash",
+				Args:   []any{blockHash},
+				Want:   wantHeaderExtras,
+			},
 		},
-		{
-			method: "eth_getHeaderByHash",
-			args:   []any{blockHash},
-			want:   wantHeaderExtras,
+		onlyKeysOf(wantHeaderExtras),
+	)...)
+	sut.testRPC(ctx, t, rpctest.WithCmpOpts(
+		[]rpctest.Case{
+			{
+				Method: "eth_getBlockByNumber",
+				Args:   []any{blockNumber, true},
+				Want:   wantBlockExtras,
+			},
+			{
+				Method: "eth_getBlockByHash",
+				Args:   []any{blockHash, true},
+				Want:   wantBlockExtras,
+			},
 		},
-		{
-			method: "eth_getBlockByNumber",
-			args:   []any{blockNumber, true},
-			want:   wantBlockExtras,
-		},
-		{
-			method: "eth_getBlockByHash",
-			args:   []any{blockHash, true},
-			want:   wantBlockExtras,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.method, func(t *testing.T) {
-			client := sut.ethclient.Client()
-			var got map[string]any
-			err := client.CallContext(ctx, &got, tt.method, tt.args...)
-			require.NoErrorf(t, err, "%s(%v)", tt.method, tt.args)
-			for k, want := range tt.want {
-				assert.Equalf(t, want, got[k], "field %q", k)
-			}
-		})
-	}
+		onlyKeysOf(wantBlockExtras),
+	)...)
+}
+
+// onlyKeysOf restricts a comparison of JSON objects to the keys of want.
+func onlyKeysOf(want map[string]any) cmp.Option {
+	return cmpopts.IgnoreMapEntries(func(k string, _ any) bool {
+		_, ok := want[k]
+		return !ok
+	})
 }
 
 // TestSynchronousRPCs replays JSON-RPC calls recorded from the synchronous VM
@@ -325,24 +329,18 @@ func TestSynchronousRPCs(t *testing.T) {
 		withArchival(),
 	)
 
-	for _, call := range fixture.RPCCalls {
-		t.Run(call.Name, func(t *testing.T) {
-			t.Parallel()
-
-			var got json.RawMessage
-			err := sut.ethclient.Client().CallContext(ctx, &got, call.Method, call.Args()...)
-			if call.Error != "" {
-				require.EqualErrorf(t, err, call.Error, "%s(%s)", call.Method, call.Params)
-				return
-			}
-			require.NoErrorf(t, err, "%s(%s)", call.Method, call.Params)
-
-			want := decodeRPCResult(t, call.Result)
-			if diff := cmp.Diff(want, decodeRPCResult(t, got)); diff != "" {
-				t.Errorf("%s(%s) response diff (-want +got):\n%s", call.Method, call.Params, diff)
-			}
-		})
+	cases := make([]rpctest.Case, len(fixture.RPCCalls))
+	for i, call := range fixture.RPCCalls {
+		cases[i] = rpctest.Case{
+			Name:     call.Name,
+			Method:   call.Method,
+			Args:     call.Args(),
+			Want:     call.Result,
+			WantErr:  errorMessage(call.Error),
+			Parallel: true,
+		}
 	}
+	sut.testRPC(ctx, t, rpctest.WithCmpOpts(cases, jsonContent())...)
 
 	// We test block lookups separately because SAE decided not to support
 	// totalDifficulty and always report 0.
@@ -376,15 +374,30 @@ func TestSynchronousRPCs(t *testing.T) {
 	}
 }
 
-// decodeRPCResult decodes a JSON-RPC result into its generic Go representation,
-// so that responses are compared by content rather than by encoding. Numbers
-// are preserved as [json.Number] to avoid precision loss.
-func decodeRPCResult(tb testing.TB, raw json.RawMessage) any {
-	tb.Helper()
+// jsonContent compares JSON-RPC results by content rather than by encoding.
+func jsonContent() cmp.Option {
+	return cmp.Transformer("decodeJSON", func(raw json.RawMessage) any {
+		if len(raw) == 0 {
+			return nil
+		}
+		dec := json.NewDecoder(bytes.NewReader(raw))
+		dec.UseNumber()
+		var v any
+		if err := dec.Decode(&v); err != nil {
+			return fmt.Sprintf("undecodable JSON %s: %v", raw, err)
+		}
+		return v
+	})
+}
 
-	dec := json.NewDecoder(bytes.NewReader(raw))
-	dec.UseNumber()
-	var v any
-	require.NoErrorf(tb, dec.Decode(&v), "decoding JSON-RPC result %s", raw)
-	return v
+func errorMessage(msg string) testerr.Want {
+	if msg == "" {
+		return nil
+	}
+	return testerr.Func(func(got error) string {
+		if got != nil && got.Error() == msg {
+			return ""
+		}
+		return fmt.Sprintf("error with message %q", msg)
+	})
 }

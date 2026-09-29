@@ -43,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetest/rpctest"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethereum "github.com/ava-labs/libevm"
@@ -55,16 +56,16 @@ func TestStateQueryOnNonCanonicalBlock(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 	b := unwrap(t, sut.createAndVerifyBlock(t, sut.lastAcceptedBlock(t)))
 
-	sut.testRPC(ctx, t, []rpcTest{
+	sut.testRPC(ctx, t, []rpctest.Case{
 		{
-			method:  "eth_getBalance",
-			args:    []any{sut.wallet.Addresses()[0], rpc.BlockNumberOrHashWithHash(b.Hash(), false)},
-			wantErr: testerr.Contains(blocks.ErrNonCanonicalBlock.Error()),
+			Method:  "eth_getBalance",
+			Args:    []any{sut.wallet.Addresses()[0], rpc.BlockNumberOrHashWithHash(b.Hash(), false)},
+			WantErr: testerr.Contains(blocks.ErrNonCanonicalBlock.Error()),
 		},
 		{
-			method: "eth_getBlockByHash",
-			args:   []any{b.Hash(), false},
-			want:   (*types.Header)(nil),
+			Method: "eth_getBlockByHash",
+			Args:   []any{b.Hash(), false},
+			Want:   (*types.Header)(nil),
 		},
 	}...)
 }
@@ -90,18 +91,18 @@ func TestStateQueryBlocksUntilExecuted(t *testing.T) {
 
 	// Running in parallel allows the main test to unblock() after the tests are
 	// started.
-	sut.testRPC(ctx, t, []rpcTest{
+	sut.testRPC(ctx, t, []rpctest.Case{
 		{
-			method:   "eth_getBalance",
-			args:     []any{addr, rpc.BlockNumberOrHashWithHash(b.Hash(), false)},
-			want:     (*hexutil.Big)(want),
-			parallel: true,
+			Method:   "eth_getBalance",
+			Args:     []any{addr, rpc.BlockNumberOrHashWithHash(b.Hash(), false)},
+			Want:     (*hexutil.Big)(want),
+			Parallel: true,
 		},
 		{
-			method:   "eth_getBalance",
-			args:     []any{addr, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(b.Number().Int64()))},
-			want:     (*hexutil.Big)(want),
-			parallel: true,
+			Method:   "eth_getBalance",
+			Args:     []any{addr, rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(b.Number().Int64()))},
+			Want:     (*hexutil.Big)(want),
+			Parallel: true,
 		},
 	}...)
 }
@@ -309,68 +310,68 @@ func TestDebugTrace(t *testing.T) {
 	}
 
 	t.Run("before_block_hook", func(t *testing.T) {
-		sut.testRPC(ctx, t, withCmpOpts(
-			[]rpcTest{
+		sut.testRPC(ctx, t, rpctest.WithCmpOpts(
+			[]rpctest.Case{
 				{
-					method: "debug_traceBlockByNumber",
-					args:   []any{hexutil.Uint64(ethBlock.NumberU64())},
-					want:   wantTracedResults,
+					Method: "debug_traceBlockByNumber",
+					Args:   []any{hexutil.Uint64(ethBlock.NumberU64())},
+					Want:   wantTracedResults,
 				},
 				{
-					name:   "latest_block",
-					method: "debug_traceBlockByNumber",
-					args:   []any{rpc.LatestBlockNumber},
-					want:   wantTracedResults,
+					Name:   "latest_block",
+					Method: "debug_traceBlockByNumber",
+					Args:   []any{rpc.LatestBlockNumber},
+					Want:   wantTracedResults,
 				},
 				{
-					method: "debug_traceBlockByHash",
-					args:   []any{ethBlock.Hash()},
-					want:   wantTracedResults,
+					Method: "debug_traceBlockByHash",
+					Args:   []any{ethBlock.Hash()},
+					Want:   wantTracedResults,
 				},
 				{
 					// Tracing by RLP MUST match tracing by number, so the fee the
 					// block is re-sealed with cannot reach the hook.
-					method: "debug_traceBlock",
-					args:   []any{blockRLP},
-					want:   wantTracedResults,
+					Method: "debug_traceBlock",
+					Args:   []any{blockRLP},
+					Want:   wantTracedResults,
 				},
 				{
-					method: "debug_traceBlockFromFile",
-					args:   []any{blockFile},
-					want:   wantTracedResults,
+					Method: "debug_traceBlockFromFile",
+					Args:   []any{blockFile},
+					Want:   wantTracedResults,
 				},
 				{
-					method: "debug_traceTransaction",
-					args:   []any{precompileTx.Hash()},
-					want: logger.ExecutionResult{
+					Method: "debug_traceTransaction",
+					Args:   []any{precompileTx.Hash()},
+					Want: logger.ExecutionResult{
 						ReturnValue: precompileResult(ethBlock).Hex(),
 					},
 				},
 				{
 					// The supplied block reaches the hook, not the canonical
 					// sibling at the same height.
-					name:   "supplied_sibling_of_canonical",
-					method: "debug_traceBlock",
-					args:   []any{encodeRLP(t, sibling)},
-					want:   wantPrecompileResults(sibling),
+					Name:   "supplied_sibling_of_canonical",
+					Method: "debug_traceBlock",
+					Args:   []any{encodeRLP(t, sibling)},
+					Want:   wantPrecompileResults(sibling),
 				},
 				{
-					name:   "supplied_unaccepted",
-					method: "debug_traceBlock",
-					args:   []any{unacceptedRLP},
-					want:   wantPrecompileResults(unaccepted),
+					Name:   "supplied_unaccepted",
+					Method: "debug_traceBlock",
+					Args:   []any{unacceptedRLP},
+					Want:   wantPrecompileResults(unaccepted),
 				},
 				{
-					name:   "supplied_unaccepted_from_file",
-					method: "debug_traceBlockFromFile",
-					args:   []any{unacceptedFile},
-					want:   wantPrecompileResults(unaccepted),
+					Name:   "supplied_unaccepted_from_file",
+					Method: "debug_traceBlockFromFile",
+					Args:   []any{unacceptedFile},
+					Want:   wantPrecompileResults(unaccepted),
 				},
 				{
-					name:   "call_on_latest",
-					method: "debug_traceCall",
-					args:   []any{callPrecompileArgs, rpc.LatestBlockNumber},
-					want: logger.ExecutionResult{
+					Name:   "call_on_latest",
+					Method: "debug_traceCall",
+					Args:   []any{callPrecompileArgs, rpc.LatestBlockNumber},
+					Want: logger.ExecutionResult{
 						ReturnValue: precompileResult(ethBlock).Hex(),
 					},
 				},
@@ -378,10 +379,10 @@ func TestDebugTrace(t *testing.T) {
 					// debug_traceCall applies no start-executing-block changes, so
 					// a result carrying the canonical child's would mean they
 					// leaked in.
-					name:   "call_on_parent",
-					method: "debug_traceCall",
-					args:   []any{callPrecompileArgs, rpc.BlockNumber(parent.NumberU64())}, // #nosec G115 -- block heights are small
-					want: logger.ExecutionResult{
+					Name:   "call_on_parent",
+					Method: "debug_traceCall",
+					Args:   []any{callPrecompileArgs, rpc.BlockNumber(parent.NumberU64())}, // #nosec G115 -- block heights are small
+					Want: logger.ExecutionResult{
 						ReturnValue: precompileResult(parent.EthBlock()).Hex(),
 					},
 				},
@@ -417,45 +418,45 @@ func TestDebugTrace(t *testing.T) {
 	}
 
 	t.Run("executed_base_fee", func(t *testing.T) {
-		sut.testRPC(ctx, t, withCmpOpts(
-			[]rpcTest{
+		sut.testRPC(ctx, t, rpctest.WithCmpOpts(
+			[]rpctest.Case{
 				{
-					method: "debug_traceBlockByNumber",
-					args:   []any{hexutil.Uint64(ethBlock.NumberU64())},
-					want:   wantBaseFeeBlockResults,
+					Method: "debug_traceBlockByNumber",
+					Args:   []any{hexutil.Uint64(ethBlock.NumberU64())},
+					Want:   wantBaseFeeBlockResults,
 				},
 				{
-					name:   "latest_block",
-					method: "debug_traceBlockByNumber",
-					args:   []any{rpc.LatestBlockNumber},
-					want:   wantBaseFeeBlockResults,
+					Name:   "latest_block",
+					Method: "debug_traceBlockByNumber",
+					Args:   []any{rpc.LatestBlockNumber},
+					Want:   wantBaseFeeBlockResults,
 				},
 				{
-					method: "debug_traceBlockByHash",
-					args:   []any{ethBlock.Hash()},
-					want:   wantBaseFeeBlockResults,
+					Method: "debug_traceBlockByHash",
+					Args:   []any{ethBlock.Hash()},
+					Want:   wantBaseFeeBlockResults,
 				},
 				{
 					// The supplied header carries the worst-case bound, so the
 					// executed fee in the result proves it was discarded.
-					method: "debug_traceBlock",
-					args:   []any{blockRLP},
-					want:   wantBaseFeeBlockResults,
+					Method: "debug_traceBlock",
+					Args:   []any{blockRLP},
+					Want:   wantBaseFeeBlockResults,
 				},
 				{
-					method: "debug_traceBlockFromFile",
-					args:   []any{blockFile},
-					want:   wantBaseFeeBlockResults,
+					Method: "debug_traceBlockFromFile",
+					Args:   []any{blockFile},
+					Want:   wantBaseFeeBlockResults,
 				},
 				{
-					method: "debug_traceTransaction",
-					args:   []any{baseFeeTx.Hash()},
-					want:   wantBaseFeeTxResult,
+					Method: "debug_traceTransaction",
+					Args:   []any{baseFeeTx.Hash()},
+					Want:   wantBaseFeeTxResult,
 				},
 				{
-					name:   "call_on_latest",
-					method: "debug_traceCall",
-					args: []any{
+					Name:   "call_on_latest",
+					Method: "debug_traceCall",
+					Args: []any{
 						ethapi.TransactionArgs{
 							From: new(sender),
 							Data: new(hexutil.Bytes(logBaseFeeCode)),
@@ -465,11 +466,11 @@ func TestDebugTrace(t *testing.T) {
 						},
 						rpc.LatestBlockNumber,
 					},
-					want: logger.ExecutionResult{
+					Want: logger.ExecutionResult{
 						StructLogs: wantBaseFeeTxResult.StructLogs,
 					},
 					// A call consumes different gas to the transaction above.
-					extraCmpOpts: cmp.Options{
+					ExtraCmpOpts: cmp.Options{
 						cmpopts.IgnoreFields(logger.ExecutionResult{}, "Gas"),
 					},
 				},
@@ -503,37 +504,37 @@ func TestDebugTrace(t *testing.T) {
 	}
 
 	t.Run("reported_block_hash", func(t *testing.T) {
-		sut.testRPC(ctx, t, withCmpOpts(
-			[]rpcTest{
+		sut.testRPC(ctx, t, rpctest.WithCmpOpts(
+			[]rpctest.Case{
 				{
-					name:   "canonical_by_hash",
-					method: "debug_traceBlockByHash",
-					args:   []any{ethBlock.Hash(), flatCallTracer},
-					want:   wantBlockHash(ethBlock),
+					Name:   "canonical_by_hash",
+					Method: "debug_traceBlockByHash",
+					Args:   []any{ethBlock.Hash(), flatCallTracer},
+					Want:   wantBlockHash(ethBlock),
 				},
 				{
-					name:   "canonical_by_number",
-					method: "debug_traceBlockByNumber",
-					args:   []any{hexutil.Uint64(ethBlock.NumberU64()), flatCallTracer},
-					want:   wantBlockHash(ethBlock),
+					Name:   "canonical_by_number",
+					Method: "debug_traceBlockByNumber",
+					Args:   []any{hexutil.Uint64(ethBlock.NumberU64()), flatCallTracer},
+					Want:   wantBlockHash(ethBlock),
 				},
 				{
-					name:   "supplied_sibling_of_canonical",
-					method: "debug_traceBlock",
-					args:   []any{encodeRLP(t, sibling), flatCallTracer},
-					want:   wantBlockHash(sibling),
+					Name:   "supplied_sibling_of_canonical",
+					Method: "debug_traceBlock",
+					Args:   []any{encodeRLP(t, sibling), flatCallTracer},
+					Want:   wantBlockHash(sibling),
 				},
 				{
-					name:   "supplied_unaccepted",
-					method: "debug_traceBlock",
-					args:   []any{unacceptedRLP, flatCallTracer},
-					want:   wantBlockHash(unaccepted),
+					Name:   "supplied_unaccepted",
+					Method: "debug_traceBlock",
+					Args:   []any{unacceptedRLP, flatCallTracer},
+					Want:   wantBlockHash(unaccepted),
 				},
 				{
-					name:   "supplied_unaccepted_from_file",
-					method: "debug_traceBlockFromFile",
-					args:   []any{unacceptedFile, flatCallTracer},
-					want:   wantBlockHash(unaccepted),
+					Name:   "supplied_unaccepted_from_file",
+					Method: "debug_traceBlockFromFile",
+					Args:   []any{unacceptedFile, flatCallTracer},
+					Want:   wantBlockHash(unaccepted),
 				},
 			},
 			cmp.Transformer("onlyBlockHash", func(f native.FlatCallFrame) *common.Hash {
@@ -548,36 +549,36 @@ func TestDebugTrace(t *testing.T) {
 	// package's force-load deleted. Nothing here imports the JavaScript
 	// evaluator, so that row does depend on the force-load, but is fragile.
 	t.Run("named_tracers", func(t *testing.T) {
-		sut.testRPC(ctx, t, []rpcTest{
+		sut.testRPC(ctx, t, []rpctest.Case{
 			{
-				name:   "call_tracer",
-				method: "debug_traceTransaction",
-				args: []any{precompileTx.Hash(), tracers.TraceConfig{
+				Name:   "call_tracer",
+				Method: "debug_traceTransaction",
+				Args: []any{precompileTx.Hash(), tracers.TraceConfig{
 					Tracer: new("callTracer"),
 				}},
-				want: native.CallFrame{
+				Want: native.CallFrame{
 					From:    sender,
 					To:      &precompile,
 					Gas:     precompileTx.Gas(),
 					GasUsed: b.Receipts()[0].GasUsed,
 					Value:   big.NewInt(0),
 				},
-				extraCmpOpts: cmp.Options{
+				ExtraCmpOpts: cmp.Options{
 					cmputils.BigInts(),
 					// Output belongs to the hook subtest.
 					cmpopts.IgnoreFields(native.CallFrame{}, "Output"),
 				},
 			},
 			{
-				name:   "javascript",
-				method: "debug_traceTransaction",
-				args: []any{precompileTx.Hash(), tracers.TraceConfig{
+				Name:   "javascript",
+				Method: "debug_traceTransaction",
+				Args: []any{precompileTx.Hash(), tracers.TraceConfig{
 					Tracer: new(`{
 						fault: function() {},
 						result: function() { return "ok" }
 					}`),
 				}},
-				want: "ok",
+				Want: "ok",
 			},
 		}...)
 	})
@@ -930,10 +931,10 @@ func TestStatefulRPCsEveryHeight(t *testing.T) {
 					// Can't trace genesis
 					if height > 0 {
 						// Checks `StateAtTransaction`
-						sut.testRPC(ctx, t, rpcTest{
-							method: "debug_traceTransaction",
-							args:   []any{txHashes[height-1]},
-							want:   wantTransferTrace,
+						sut.testRPC(ctx, t, rpctest.Case{
+							Method: "debug_traceTransaction",
+							Args:   []any{txHashes[height-1]},
+							Want:   wantTransferTrace,
 						})
 					}
 				})
@@ -1021,10 +1022,10 @@ func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 
 	// No need to wait until executed! #LiveReceipts
 
-	sut.testRPC(ctx, t, rpcTest{
-		method: "eth_getTransactionReceipt",
-		args:   []any{tx.Hash()},
-		want: &types.Receipt{
+	sut.testRPC(ctx, t, rpctest.Case{
+		Method: "eth_getTransactionReceipt",
+		Args:   []any{tx.Hash()},
+		Want: &types.Receipt{
 			Type:        tx.Type(),
 			Status:      types.ReceiptStatusSuccessful,
 			BlockHash:   b.Hash(),
@@ -1041,7 +1042,7 @@ func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 				deposit,
 			)},
 		},
-		extraCmpOpts: []cmp.Option{
+		ExtraCmpOpts: []cmp.Option{
 			cmpopts.IgnoreFields(
 				types.Receipt{},
 				"Bloom",
@@ -1064,10 +1065,10 @@ func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 			Gas:      1e6,
 		}))
 
-		sut.testRPC(ctx, t, rpcTest{
-			method: "eth_getHeaderByNumber",
-			args:   []any{rpc.PendingBlockNumber},
-			want:   b.Header(),
+		sut.testRPC(ctx, t, rpctest.Case{
+			Method: "eth_getHeaderByNumber",
+			Args:   []any{rpc.PendingBlockNumber},
+			Want:   b.Header(),
 		})
 	})
 }
