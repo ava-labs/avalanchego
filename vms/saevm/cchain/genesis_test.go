@@ -32,7 +32,6 @@ import (
 	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	evmutils "github.com/ava-labs/avalanchego/graft/evm/utils"
-	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -82,28 +81,28 @@ func TestParseGenesis(t *testing.T) {
 						PetersburgBlock:     big.NewInt(0),
 						IstanbulBlock:       big.NewInt(0),
 						MuirGlacierBlock:    big.NewInt(0),
-						BerlinBlock:         big.NewInt(1640340),                          // AP2 activation block
-						LondonBlock:         big.NewInt(3308552),                          // AP3 activation block
-						ShanghaiTime:        avalancheutils.PointerTo[uint64](1709740800), // Durango
-						CancunTime:          avalancheutils.PointerTo[uint64](1734368400), // Etna
+						BerlinBlock:         big.NewInt(1640340),     // AP2 activation block
+						LondonBlock:         big.NewInt(3308552),     // AP3 activation block
+						ShanghaiTime:        new(uint64(1709740800)), // Durango
+						CancunTime:          new(uint64(1734368400)), // Etna
 					},
 					&extras.ChainConfig{
 						NetworkUpgrades: extras.NetworkUpgrades{
-							ApricotPhase1BlockTimestamp:     avalancheutils.PointerTo[uint64](1617199200),
-							ApricotPhase2BlockTimestamp:     avalancheutils.PointerTo[uint64](1620644400),
-							ApricotPhase3BlockTimestamp:     avalancheutils.PointerTo[uint64](1629813600),
-							ApricotPhase4BlockTimestamp:     avalancheutils.PointerTo[uint64](1632344400),
-							ApricotPhase5BlockTimestamp:     avalancheutils.PointerTo[uint64](1638468000),
-							ApricotPhasePre6BlockTimestamp:  avalancheutils.PointerTo[uint64](1662341400),
-							ApricotPhase6BlockTimestamp:     avalancheutils.PointerTo[uint64](1662494400),
-							ApricotPhasePost6BlockTimestamp: avalancheutils.PointerTo[uint64](1662519600),
-							BanffBlockTimestamp:             avalancheutils.PointerTo[uint64](1666108800),
-							CortinaBlockTimestamp:           avalancheutils.PointerTo[uint64](1682434800),
-							DurangoBlockTimestamp:           avalancheutils.PointerTo[uint64](1709740800),
-							EtnaTimestamp:                   avalancheutils.PointerTo[uint64](1734368400),
-							FortunaTimestamp:                avalancheutils.PointerTo[uint64](1744124400),
-							GraniteTimestamp:                avalancheutils.PointerTo[uint64](1763568000),
-							HeliconTimestamp:                unscheduled,
+							ApricotPhase1BlockTimestamp:     new(uint64(1617199200)),
+							ApricotPhase2BlockTimestamp:     new(uint64(1620644400)),
+							ApricotPhase3BlockTimestamp:     new(uint64(1629813600)),
+							ApricotPhase4BlockTimestamp:     new(uint64(1632344400)),
+							ApricotPhase5BlockTimestamp:     new(uint64(1638468000)),
+							ApricotPhasePre6BlockTimestamp:  new(uint64(1662341400)),
+							ApricotPhase6BlockTimestamp:     new(uint64(1662494400)),
+							ApricotPhasePost6BlockTimestamp: new(uint64(1662519600)),
+							BanffBlockTimestamp:             new(uint64(1666108800)),
+							CortinaBlockTimestamp:           new(uint64(1682434800)),
+							DurangoBlockTimestamp:           new(uint64(1709740800)),
+							EtnaTimestamp:                   new(uint64(1734368400)),
+							FortunaTimestamp:                new(uint64(1744124400)),
+							GraniteTimestamp:                new(uint64(1763568000)),
+							HeliconTimestamp:                new(uint64(1790089200)),
 						},
 						AvalancheContext: extras.AvalancheContext{
 							SnowCtx: mainnetCtx,
@@ -112,7 +111,7 @@ func TestParseGenesis(t *testing.T) {
 							PrecompileUpgrades: []extras.PrecompileUpgrade{
 								{
 									Config: warp.NewDefaultConfig(
-										avalancheutils.PointerTo[uint64](1709740800), // Durango
+										new(uint64(1709740800)), // Durango
 									),
 								},
 							},
@@ -149,28 +148,28 @@ func TestParseGenesis(t *testing.T) {
 						PetersburgBlock:     big.NewInt(0),
 						IstanbulBlock:       big.NewInt(0),
 						MuirGlacierBlock:    big.NewInt(0),
-						BerlinBlock:         big.NewInt(184985),                           // AP2 activation block
-						LondonBlock:         big.NewInt(805078),                           // AP3 activation block
-						ShanghaiTime:        avalancheutils.PointerTo[uint64](1707840000), // Durango
-						CancunTime:          avalancheutils.PointerTo[uint64](1732550400), // Etna
+						BerlinBlock:         big.NewInt(184985),      // AP2 activation block
+						LondonBlock:         big.NewInt(805078),      // AP3 activation block
+						ShanghaiTime:        new(uint64(1707840000)), // Durango
+						CancunTime:          new(uint64(1732550400)), // Etna
 					},
 					&extras.ChainConfig{
 						NetworkUpgrades: extras.NetworkUpgrades{
-							ApricotPhase1BlockTimestamp:     avalancheutils.PointerTo[uint64](1616767200),
-							ApricotPhase2BlockTimestamp:     avalancheutils.PointerTo[uint64](1620223200),
-							ApricotPhase3BlockTimestamp:     avalancheutils.PointerTo[uint64](1629140400),
-							ApricotPhase4BlockTimestamp:     avalancheutils.PointerTo[uint64](1631826000),
-							ApricotPhase5BlockTimestamp:     avalancheutils.PointerTo[uint64](1637766000),
-							ApricotPhasePre6BlockTimestamp:  avalancheutils.PointerTo[uint64](1662494400),
-							ApricotPhase6BlockTimestamp:     avalancheutils.PointerTo[uint64](1662494400),
-							ApricotPhasePost6BlockTimestamp: avalancheutils.PointerTo[uint64](1662530400),
-							BanffBlockTimestamp:             avalancheutils.PointerTo[uint64](1664805600),
-							CortinaBlockTimestamp:           avalancheutils.PointerTo[uint64](1680793200),
-							DurangoBlockTimestamp:           avalancheutils.PointerTo[uint64](1707840000),
-							EtnaTimestamp:                   avalancheutils.PointerTo[uint64](1732550400),
-							FortunaTimestamp:                avalancheutils.PointerTo[uint64](1741878000),
-							GraniteTimestamp:                avalancheutils.PointerTo[uint64](1761750000),
-							HeliconTimestamp:                unscheduled,
+							ApricotPhase1BlockTimestamp:     new(uint64(1616767200)),
+							ApricotPhase2BlockTimestamp:     new(uint64(1620223200)),
+							ApricotPhase3BlockTimestamp:     new(uint64(1629140400)),
+							ApricotPhase4BlockTimestamp:     new(uint64(1631826000)),
+							ApricotPhase5BlockTimestamp:     new(uint64(1637766000)),
+							ApricotPhasePre6BlockTimestamp:  new(uint64(1662494400)),
+							ApricotPhase6BlockTimestamp:     new(uint64(1662494400)),
+							ApricotPhasePost6BlockTimestamp: new(uint64(1662530400)),
+							BanffBlockTimestamp:             new(uint64(1664805600)),
+							CortinaBlockTimestamp:           new(uint64(1680793200)),
+							DurangoBlockTimestamp:           new(uint64(1707840000)),
+							EtnaTimestamp:                   new(uint64(1732550400)),
+							FortunaTimestamp:                new(uint64(1741878000)),
+							GraniteTimestamp:                new(uint64(1761750000)),
+							HeliconTimestamp:                new(uint64(1785250800)),
 						},
 						AvalancheContext: extras.AvalancheContext{
 							SnowCtx: fujiCtx,
@@ -179,7 +178,7 @@ func TestParseGenesis(t *testing.T) {
 							PrecompileUpgrades: []extras.PrecompileUpgrade{
 								{
 									Config: warp.NewDefaultConfig(
-										avalancheutils.PointerTo[uint64](1707840000), // Durango
+										new(uint64(1707840000)), // Durango
 									),
 								},
 							},
@@ -469,7 +468,7 @@ func upgradeAt(fork upgradetest.Fork, t time.Time) upgrade.Config {
 	return c
 }
 
-func TestSetupGenesis(t *testing.T) {
+func TestWriteGenesis(t *testing.T) {
 	const emptyGenesis = `{
 		"config":{
 			"chainId":2
@@ -608,15 +607,13 @@ func TestSetupGenesis(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
-			trieConfig := triedb.HashDefaults
-
 			g, err := parseGenesis(
 				&snow.Context{NetworkUpgrades: tt.initial.upgrades},
 				[]byte(tt.initial.genesis),
 			)
 			require.NoError(t, err, "parseGenesis(initial)")
 
-			require.NoErrorf(t, g.setup(db, trieConfig), "%T.setup(initial)", g)
+			require.NoErrorf(t, g.verifyAndWriteBlock(db), "%T.verifyAndWriteBlock(initial)", g)
 
 			block, err := g.block()
 			require.NoErrorf(t, err, "%T.block()", g)
@@ -645,9 +642,9 @@ func TestSetupGenesis(t *testing.T) {
 			)
 			require.NoError(t, err, "parseGenesis(restart)")
 
-			err = g.setup(db, trieConfig)
+			err = g.verifyAndWriteBlock(db)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
-				t.Fatalf("%T.setup(restart) error (-want +got)\n%s", g, diff)
+				t.Fatalf("%T.verifyAndWriteBlock(restart) error (-want +got)\n%s", g, diff)
 			}
 			require.Equal(t, genesisHash, rawdb.ReadCanonicalHash(db, 0), "rawdb.ReadCanonicalHash(restart)")
 			if tt.wantErr != nil {
@@ -663,4 +660,31 @@ func TestSetupGenesis(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestWriteGenesisState ensures that the genesis changes are persisted to the
+// database.
+func TestWriteGenesisState(t *testing.T) {
+	genesis := avalanchegenesis.GetConfig(constants.MainnetID).CChainGenesis
+	ctx := &snow.Context{
+		NetworkUpgrades: upgrade.GetConfig(constants.MainnetID),
+	}
+
+	g, err := parseGenesis(ctx, []byte(genesis))
+	require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
+
+	block, err := g.block()
+	require.NoErrorf(t, err, "%T.block()", g)
+	root := block.Root()
+
+	db := rawdb.NewMemoryDatabase()
+	tdb := triedb.NewDatabase(db, triedb.HashDefaults)
+	defer func() {
+		require.NoErrorf(t, tdb.Close(), "%T.Close()", tdb)
+	}()
+
+	require.Falsef(t, tdb.Initialized(root), "%T.Initialized(%s)", tdb, root)
+	_, err = g.writeState(db, tdb)
+	require.NoErrorf(t, err, "%T.writeState()", g)
+	require.Truef(t, tdb.Initialized(root), "%T.Initialized(%s)", tdb, root)
 }

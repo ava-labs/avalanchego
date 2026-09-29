@@ -35,6 +35,7 @@ type Tracker interface {
 
 type Calculator interface {
 	CalculateUptime(nodeID ids.NodeID) (time.Duration, time.Time, error)
+	GetStartTime(nodeID ids.NodeID) (time.Time, error)
 	CalculateUptimePercent(nodeID ids.NodeID) (float64, error)
 	// CalculateUptimePercentFrom expects [startTime] to be truncated (floored) to the nearest second
 	CalculateUptimePercentFrom(nodeID ids.NodeID, startTime time.Time) (float64, error)
@@ -158,6 +159,10 @@ func (m *manager) CalculateUptime(nodeID ids.NodeID) (time.Duration, time.Time, 
 	durationConnected := now.Sub(timeConnected)
 	newUpDuration := upDuration + durationConnected
 	return newUpDuration, now, nil
+}
+
+func (m *manager) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
+	return m.state.GetStartTime(nodeID)
 }
 
 func (m *manager) CalculateUptimePercent(nodeID ids.NodeID) (float64, error) {

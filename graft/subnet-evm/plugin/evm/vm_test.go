@@ -72,7 +72,6 @@ import (
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
-	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	avagoconstants "github.com/ava-labs/avalanchego/utils/constants"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -1491,13 +1490,13 @@ func TestTimeSemanticVerify(t *testing.T) {
 			name:             "Granite with TimeMilliseconds",
 			fork:             upgradetest.Granite,
 			timeSeconds:      uint64(timestamp.Unix()),
-			timeMilliseconds: avalancheutils.PointerTo(uint64(timestamp.UnixMilli())),
+			timeMilliseconds: utils.PointerTo(uint64(timestamp.UnixMilli())),
 		},
 		{
 			name:             "Fortuna with TimeMilliseconds",
 			fork:             upgradetest.Fortuna,
 			timeSeconds:      uint64(timestamp.Unix()),
-			timeMilliseconds: avalancheutils.PointerTo(uint64(timestamp.UnixMilli())),
+			timeMilliseconds: utils.PointerTo(uint64(timestamp.UnixMilli())),
 			expectedError:    customheader.ErrTimeMillisecondsBeforeGranite,
 		},
 		{
@@ -1511,14 +1510,14 @@ func TestTimeSemanticVerify(t *testing.T) {
 			name:             "Granite with mismatched TimeMilliseconds",
 			fork:             upgradetest.Granite,
 			timeSeconds:      uint64(timestamp.Unix()),
-			timeMilliseconds: avalancheutils.PointerTo(uint64(timestamp.UnixMilli()) + 1000),
+			timeMilliseconds: utils.PointerTo(uint64(timestamp.UnixMilli()) + 1000),
 			expectedError:    customheader.ErrTimeMillisecondsMismatched,
 		},
 		{
 			name:             "Block too far in the future",
 			fork:             upgradetest.Granite,
 			timeSeconds:      uint64(timestamp.Add(2 * time.Hour).Unix()),
-			timeMilliseconds: avalancheutils.PointerTo(uint64(timestamp.Add(2 * time.Hour).UnixMilli())),
+			timeMilliseconds: utils.PointerTo(uint64(timestamp.Add(2 * time.Hour).UnixMilli())),
 			expectedError:    customheader.ErrBlockTooFarInFuture,
 		},
 	}
@@ -1594,7 +1593,7 @@ func TestBuildTimeMilliseconds(t *testing.T) {
 		{
 			name:                     "granite_should_have_timestamp_milliseconds",
 			fork:                     upgradetest.Granite,
-			expectedTimeMilliseconds: avalancheutils.PointerTo(uint64(buildTime.UnixMilli())),
+			expectedTimeMilliseconds: utils.PointerTo(uint64(buildTime.UnixMilli())),
 		},
 	}
 
@@ -1754,7 +1753,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Durango]))))
 	// this manager role should not be activated because DurangoTimestamp is in the future
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-		txallowlist.ConfigKey: txallowlist.NewConfig(avalancheutils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil),
+		txallowlist.ConfigKey: txallowlist.NewConfig(utils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil),
 	}
 	durangoTime := time.Now().Add(10 * time.Hour)
 	params.GetExtra(genesis.Config).DurangoTimestamp = utils.TimeToNewUint64(durangoTime)
@@ -1897,7 +1896,7 @@ func TestVerifyManagerConfig(t *testing.T) {
 	params.GetExtra(genesis.Config).DurangoTimestamp = utils.TimeToNewUint64(durangoTimestamp)
 	// this manager role should not be activated because DurangoTimestamp is in the future
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-		txallowlist.ConfigKey: txallowlist.NewConfig(avalancheutils.PointerTo[uint64](0), testEthAddrs[0:1], nil, []common.Address{testEthAddrs[1]}),
+		txallowlist.ConfigKey: txallowlist.NewConfig(utils.PointerTo[uint64](0), testEthAddrs[0:1], nil, []common.Address{testEthAddrs[1]}),
 	}
 
 	genesisJSON, err := genesis.MarshalJSON()
@@ -2049,7 +2048,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 	configExtra := params.GetExtra(genesis.Config)
 	configExtra.GenesisPrecompiles = extras.Precompiles{
-		feemanager.ConfigKey: feemanager.NewConfig(avalancheutils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil, nil),
+		feemanager.ConfigKey: feemanager.NewConfig(utils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil, nil),
 	}
 
 	// set a lower fee config now
@@ -2265,7 +2264,7 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-		rewardmanager.ConfigKey: rewardmanager.NewConfig(avalancheutils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil, nil),
+		rewardmanager.ConfigKey: rewardmanager.NewConfig(utils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil, nil),
 	}
 	params.GetExtra(genesis.Config).AllowFeeRecipients = true // enable this in genesis to test if this is recognized by the reward manager
 	genesisJSON, err := genesis.MarshalJSON()
@@ -2409,7 +2408,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-		rewardmanager.ConfigKey: rewardmanager.NewConfig(avalancheutils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil, nil),
+		rewardmanager.ConfigKey: rewardmanager.NewConfig(utils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil, nil),
 	}
 	params.GetExtra(genesis.Config).AllowFeeRecipients = false // disable this in genesis
 	genesisJSON, err := genesis.MarshalJSON()
@@ -2745,7 +2744,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	// Setup chain params
 	genesis := &core.Genesis{}
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
-	precompileActivationTime := avalancheutils.PointerTo(genesis.Timestamp + 5) // 5 seconds after genesis
+	precompileActivationTime := utils.PointerTo(genesis.Timestamp + 5) // 5 seconds after genesis
 	configExtra := params.GetExtra(genesis.Config)
 	configExtra.GenesisPrecompiles = extras.Precompiles{
 		feemanager.ConfigKey: feemanager.NewConfig(precompileActivationTime, testEthAddrs[0:1], nil, nil, nil),
@@ -3547,26 +3546,26 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 		{
 			name:                   "pre_granite_min_delay_excess",
 			fork:                   upgradetest.Fortuna,
-			desiredMinDelay:        avalancheutils.PointerTo[uint64](1000),
+			desiredMinDelay:        utils.PointerTo[uint64](1000),
 			expectedMinDelayExcess: nil,
 		},
 		{
 			name:                   "granite_first_block_initial_delay_excess",
 			fork:                   upgradetest.Granite,
 			desiredMinDelay:        nil,
-			expectedMinDelayExcess: avalancheutils.PointerTo(acp226.InitialDelayExcess),
+			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess),
 		},
 		{
 			name:                   "granite_with_excessive_desired_min_delay_excess",
 			fork:                   upgradetest.Granite,
-			desiredMinDelay:        avalancheutils.PointerTo[uint64](4000),
-			expectedMinDelayExcess: avalancheutils.PointerTo(acp226.InitialDelayExcess + acp226.MaxDelayExcessDiff),
+			desiredMinDelay:        utils.PointerTo[uint64](4000),
+			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess + acp226.MaxDelayExcessDiff),
 		},
 		{
 			name:                   "granite_with_zero_desired_min_delay_excess",
 			fork:                   upgradetest.Granite,
-			desiredMinDelay:        avalancheutils.PointerTo[uint64](0),
-			expectedMinDelayExcess: avalancheutils.PointerTo(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff),
+			desiredMinDelay:        utils.PointerTo[uint64](0),
+			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff),
 		},
 	}
 
@@ -3624,6 +3623,11 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 			// revision; every historical query is served directly from disk.
 			vmConfig: `{
 				"state-scheme": "firewood",
+				"eth-apis": [
+					"internal-blockchain",
+					"internal-transaction",
+					"debug-tracer"
+				],
 				"snapshot-cache": 0,
 				"pruning-enabled": false,
 				"state-sync-enabled": false,
@@ -3640,6 +3644,11 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 			// re-execute forward.
 			vmConfig: `{
 				"state-scheme": "firewood",
+				"eth-apis": [
+					"internal-blockchain",
+					"internal-transaction",
+					"debug-tracer"
+				],
 				"snapshot-cache": 0,
 				"pruning-enabled": false,
 				"state-sync-enabled": false,
@@ -3771,6 +3780,16 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 					// An EOA-to-EOA transfer does not touch any storage slots, and should not produce an access list.
 					require.Emptyf(t, *accessListResult.Accesslist, "unexpected access list at block %d", blockNum)
 					require.Equalf(t, ethparams.TxGas, uint64(accessListResult.GasUsed), "unexpected gas used at block %d", blockNum)
+
+					// debug_intermediateRoots intentionally rejects genesis blocks.
+					if blockNum > 0 {
+						block := vm.blockChain.GetBlockByNumber(blockNum)
+						require.NotNilf(t, block, "missing block %d", blockNum)
+
+						var roots []common.Hash
+						require.NoErrorf(t, rpcClient.CallContext(ctx, &roots, "debug_intermediateRoots", block.Hash()), "failed to get intermediate roots at block %d", blockNum)
+						require.Equalf(t, []common.Hash{block.Root()}, roots, "unexpected intermediate roots at block %d", blockNum)
+					}
 				}
 			})
 		})

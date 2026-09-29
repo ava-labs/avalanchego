@@ -13,7 +13,9 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/spf13/cast"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
@@ -133,13 +135,13 @@ type Config struct {
 	MaxOutboundActiveRequests int64 `json:"max-outbound-active-requests"`
 
 	// Sync settings
-	StateSyncEnabled         *bool  `json:"state-sync-enabled"`     // Pointer distinguishes false (no state sync) and not set (state sync only at genesis).
-	StateSyncSkipResume      bool   `json:"state-sync-skip-resume"` // Forces state sync to use the highest available summary block
-	StateSyncServerTrieCache int    `json:"state-sync-server-trie-cache"`
-	StateSyncIDs             string `json:"state-sync-ids"`
-	StateSyncCommitInterval  uint64 `json:"state-sync-commit-interval"`
-	StateSyncMinBlocks       uint64 `json:"state-sync-min-blocks"`
-	StateSyncRequestSize     uint16 `json:"state-sync-request-size"`
+	StateSyncEnabled         *bool               `json:"state-sync-enabled"`     // Pointer distinguishes false (no state sync) and not set (state sync only at genesis).
+	StateSyncSkipResume      bool                `json:"state-sync-skip-resume"` // Forces state sync to use the highest available summary block
+	StateSyncServerTrieCache int                 `json:"state-sync-server-trie-cache"`
+	StateSyncIDs             set.Set[ids.NodeID] `json:"state-sync-ids"`
+	StateSyncCommitInterval  uint64              `json:"state-sync-commit-interval"`
+	StateSyncMinBlocks       uint64              `json:"state-sync-min-blocks"`
+	StateSyncRequestSize     uint16              `json:"state-sync-request-size"`
 
 	// Database Settings
 	InspectDatabase bool `json:"inspect-database"` // Inspects the database on startup if enabled.

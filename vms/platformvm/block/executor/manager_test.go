@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 
 	snowmanblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -19,7 +19,7 @@ import (
 func TestGetBlock(t *testing.T) {
 	require := require.New(t)
 
-	statelessBlk, err := block.NewApricotCommitBlock(ids.GenerateTestID() /*parent*/, 2 /*height*/)
+	statelessBlk, err := platform.NewApricotCommitBlock(ids.GenerateTestID() /*parent*/, 2 /*height*/)
 	require.NoError(err)
 	state := statetest.New(t, statetest.Config{})
 	manager := &manager{

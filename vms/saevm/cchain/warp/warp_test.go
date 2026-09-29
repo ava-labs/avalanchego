@@ -145,7 +145,7 @@ func TestFromReceipts(t *testing.T) {
 // newRules returns rules with the warp precompile registered at each of the
 // given addresses.
 func newRules(contracts ...common.Address) *extras.Rules {
-	contract := corethwarp.NewDefaultConfig(utils.PointerTo[uint64](0))
+	contract := corethwarp.NewDefaultConfig(new(uint64))
 
 	predicaters := make(map[common.Address]precompileconfig.Predicater, len(contracts))
 	for _, addr := range contracts {
@@ -158,7 +158,7 @@ func newRules(contracts ...common.Address) *extras.Rules {
 
 func TestVerifyBlock(t *testing.T) {
 	var (
-		vdrs = warptest.NewValidators(t, 2)
+		vdrs = warptest.NewValidators(t, warptest.WithMinimum(2))
 
 		msg, _           = newAddressedCall(t)
 		validPredicate   = predicate.New(vdrs.Sign(t, msg).Bytes())
@@ -334,7 +334,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 	const numSigners = 10
 
 	rules := newRules(corethwarp.ContractAddress)
-	vdrs := warptest.NewValidators(b, numSigners)
+	vdrs := warptest.NewValidators(b, warptest.WithMinimum(numSigners))
 	snowContext := snowtest.Context(b, snowtest.CChainID)
 	warptest.SetValidators(b, snowContext, vdrs)
 	blockContext := &block.Context{}
@@ -357,7 +357,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 					// A unique nonce gives every transaction a distinct hash,
 					// matching the per-tx work of a real block.
 					txs[i] = types.NewTx(&types.DynamicFeeTx{
-						Nonce:      uint64(i), //#nosec G115 -- Known non-negative
+						Nonce:      uint64(i),
 						AccessList: accessList,
 					})
 				}

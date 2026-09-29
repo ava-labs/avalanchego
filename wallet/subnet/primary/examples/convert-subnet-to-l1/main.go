@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
@@ -81,7 +81,7 @@ func main() {
 		subnetID,
 		chainID,
 		address,
-		[]*txs.ConvertSubnetToL1Validator{
+		[]*platform.ConvertSubnetToL1Validator{
 			{
 				NodeID:                nodeID.Bytes(),
 				Weight:                weight,

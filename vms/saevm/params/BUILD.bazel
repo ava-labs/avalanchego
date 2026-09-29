@@ -5,4 +5,5 @@ go_library(
     srcs = ["params.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/params",
     visibility = ["//visibility:public"],
+    deps = ["//utils/units"],
 )

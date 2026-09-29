@@ -140,6 +140,9 @@ var _ = ginkgo.Describe("[Bootstrap Tester]", func() {
 		waitForPodCondition(tc, clientset, namespace, bootstrapPodName, corev1.PodReadyToStartContainers)
 		ginkgo.By(fmt.Sprintf("Created pod %s.%s", namespace, bootstrapPodName))
 
+		ginkgo.By(fmt.Sprintf("Waiting for the %q container to report deletion of its pod to prompt recreation with a digest-pinned image", initContainerName))
+		waitForLogOutput(tc, clientset, namespace, bootstrapPodName, initContainerName, bootstrapmonitor.PodDeletingMessage)
+
 		ginkgo.By("Waiting for the pod image to be updated to include an image digest")
 		var containerImage string
 		require.Eventually(func() bool {

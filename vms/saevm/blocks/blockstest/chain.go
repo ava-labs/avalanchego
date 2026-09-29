@@ -148,7 +148,7 @@ func (cb *ChainBuilder) ResolveBlockNumber(bn rpc.BlockNumber) (uint64, error) {
 		if bn < 0 {
 			return 0, fmt.Errorf("%s block unsupported", bn)
 		}
-		n := uint64(bn) //#nosec G115 -- Non-negative checked above
+		n := uint64(bn)
 		if n > head {
 			return 0, fmt.Errorf("%w: %d", ErrBlockNotFound, n)
 		}

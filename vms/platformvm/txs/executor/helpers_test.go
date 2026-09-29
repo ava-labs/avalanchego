@@ -31,11 +31,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -55,7 +55,7 @@ const (
 var (
 	lastAcceptedID = ids.GenerateTestID()
 
-	testSubnet1 *txs.Tx
+	testSubnet1 *platform.Tx
 )
 
 type mutableSharedMemory struct {
@@ -104,14 +104,13 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 
 	fx := defaultFx(clk, ctx.Log, isBootstrapped.Get())
 
-	rewards := reward.NewCalculator(config.RewardConfig)
 	baseState := statetest.New(t, statetest.Config{
-		DB:         baseDB,
-		Genesis:    genesistest.NewBytes(t, genesistest.Config{}),
-		Validators: config.Validators,
-		Upgrades:   config.UpgradeConfig,
-		Context:    ctx,
-		Rewards:    rewards,
+		DB:           baseDB,
+		Genesis:      genesistest.NewBytes(t, genesistest.Config{}),
+		Validators:   config.Validators,
+		Upgrades:     config.UpgradeConfig,
+		Context:      ctx,
+		RewardConfig: config.RewardConfig,
 	})
 	lastAcceptedID = baseState.GetLastAccepted()
 
@@ -126,7 +125,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 		Fx:           fx,
 		FlowChecker:  utxosVerifier,
 		Uptimes:      uptimes,
-		Rewards:      rewards,
 	}
 
 	env := &environment{

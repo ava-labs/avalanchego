@@ -9,12 +9,13 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
@@ -163,21 +164,27 @@ func advanceTimeTo(
 
 		stakerToAdd := *stakerToRemove
 		stakerToAdd.NextTime = stakerToRemove.EndTime
-		stakerToAdd.Priority = txs.PendingToCurrentPriorities[stakerToRemove.Priority]
+		stakerToAdd.Priority = platform.PendingToCurrentPriorities[stakerToRemove.Priority]
 
 		// Only permissionless networks (including the primary network) are eligible for rewards
-		if stakerToRemove.Priority != txs.SubnetPermissionedValidatorPendingPriority {
+		if stakerToRemove.Priority != platform.SubnetPermissionedValidatorPendingPriority {
 			supply, err := changes.GetCurrentSupply(stakerToRemove.SubnetID)
 			if err != nil {
 				return nil, false, err
 			}
 
-			rewards, err := GetRewardsCalculator(backend, parentState, stakerToRemove.SubnetID)
+			rewards, err := GetRewardsCalculator(
+				backend.Config.RewardConfig,
+				backend.Config.UpgradeConfig,
+				parentState,
+				stakerToRemove.SubnetID,
+			)
 			if err != nil {
 				return nil, false, err
 			}
 
 			potentialReward := rewards.Calculate(
+				stakerToRemove.StartTime,
 				stakerToRemove.EndTime.Sub(stakerToRemove.StartTime),
 				stakerToRemove.Weight,
 				supply,
@@ -238,7 +245,7 @@ func advanceTimeTo(
 
 		// Invariant: Permissioned stakers are encountered first for a given
 		//            timestamp because their priority is the smallest.
-		if stakerToRemove.Priority != txs.SubnetPermissionedValidatorCurrentPriority {
+		if stakerToRemove.Priority != platform.SubnetPermissionedValidatorCurrentPriority {
 			// Permissionless stakers are removed by the RewardValidatorTx (or a
 			// RewardAutoRenewedValidatorTx for auto-renewed validators), not an
 			// AdvanceTimeTx.
@@ -382,24 +389,28 @@ func advanceValidatorFeeState(
 	return changed, nil
 }
 
+// GetRewardsCalculator returns the reward calculator for a staker on subnetID.
+// Non-primary network stakers use their subnet's transformation config.
 func GetRewardsCalculator(
-	backend *Backend,
+	rewardConfig reward.Config,
+	upgradeConfig upgrade.Config,
 	parentState state.Chain,
 	subnetID ids.ID,
 ) (reward.Calculator, error) {
 	if subnetID == constants.PrimaryNetworkID {
-		return backend.Rewards, nil
+		return reward.NewPrimaryNetworkCalculator(rewardConfig, upgradeConfig), nil
 	}
 
+	// Non-primary reward-bearing stakers are permissionless stakers. They can
+	// only exist on transformed subnets, so the transform tx must exist.
 	transformSubnet, err := GetTransformSubnetTx(parentState, subnetID)
 	if err != nil {
 		return nil, err
 	}
-
 	return reward.NewCalculator(reward.Config{
 		MaxConsumptionRate: transformSubnet.MaxConsumptionRate,
 		MinConsumptionRate: transformSubnet.MinConsumptionRate,
-		MintingPeriod:      backend.Config.RewardConfig.MintingPeriod,
+		MintingPeriod:      rewardConfig.MintingPeriod,
 		SupplyCap:          transformSubnet.MaximumSupply,
 	}), nil
 }

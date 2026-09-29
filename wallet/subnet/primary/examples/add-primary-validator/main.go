@@ -12,8 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
@@ -58,7 +58,7 @@ func main() {
 
 	addValidatorStartTime := time.Now()
 	addValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{Validator: txs.Validator{
+		&platform.SubnetValidator{Validator: platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
 			End:    uint64(startTime.Add(duration).Unix()),

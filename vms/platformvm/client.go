@@ -20,8 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -654,12 +654,12 @@ func (c *Client) getAutoRenewedValidatorAuthorities(
 			return nil, err
 		}
 
-		tx, err := txs.Parse(txs.Codec, txBytes)
+		tx, err := platform.ParseTx(platform.Codec, txBytes)
 		if err != nil {
 			return nil, err
 		}
 
-		addTx, ok := tx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+		addTx, ok := tx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
 		if !ok {
 			return nil, fmt.Errorf("expected AddAutoRenewedValidatorTx but got %T for txID %s", tx.Unsigned, txID)
 		}

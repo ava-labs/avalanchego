@@ -165,9 +165,9 @@ func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
 const (
 	// intrinsicGas is an initial static amount of gas that every [Tx] must pay.
 	intrinsicGas = ap5.AtomicTxIntrinsicGas
-	// gasPerByte is an additional amount of gas that is charged per-byte of an
+	// GasPerByte is an additional amount of gas that is charged per-byte of an
 	// [Unsigned] transaction.
-	gasPerByte = 1 // [atomic.TxBytesGas]
+	GasPerByte = 1 // [atomic.TxBytesGas]
 	// gasPerSig is an additional amount of gas that is charged per-signature
 	// included in a [Tx].
 	gasPerSig = gas.Gas(secp256k1fx.CostPerSignature)
@@ -180,7 +180,7 @@ func gasUsed(t Unsigned) (gas.Gas, error) {
 	if err != nil {
 		return 0, err
 	}
-	bytesGas, err := math.Mul(gas.Gas(numBytes), gasPerByte) //#nosec G115 -- Known non-negative
+	bytesGas, err := math.Mul(gas.Gas(numBytes), GasPerByte) //#nosec G115 -- Known non-negative
 	if err != nil {
 		return 0, err
 	}

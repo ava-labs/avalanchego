@@ -11,10 +11,10 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 
@@ -113,7 +113,7 @@ type ChainConfig struct {
 	AllowFeeRecipients bool                 `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 	GenesisPrecompiles Precompiles          `json:"-"`                            // Config for enabling precompiles from genesis. JSON encode/decode will be handled by the custom marshaler/unmarshaler.
 	UpgradeConfig      `json:"-"`           // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
-	InitialMinDelayMS  uint64               `json:"initialMinDelayMS,omitempty"` // Seeds the ACP-226 min block delay at genesis, for benchmarking.
+	InitialMinDelayMS  uint64               `json:"initialMinDelayMS,omitempty"` // ACP-226 minimum block delay of the genesis block, in milliseconds. Requires Granite at genesis. Zero uses the ACP-226 default.
 }
 
 func (c *ChainConfig) CheckConfigCompatible(newConfig *ethparams.ChainConfig, headNumber *big.Int, headTimestamp uint64) *ethparams.ConfigCompatError {

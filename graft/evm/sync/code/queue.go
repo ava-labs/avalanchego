@@ -14,17 +14,12 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
 
-	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
 const defaultQueueCapacity = 5000
 
-var (
-	_ types.Finalizer = (*Queue)(nil)
-
-	ErrQueueClosed = errors.New("code queue is closed")
-)
+var ErrQueueClosed = errors.New("code queue is closed")
 
 // Queue is a fan-in/fan-out bridge between code hash producers (leaf sync workers)
 // and the code syncer consumer. Producers call [Queue.AddCode] which persists durable
@@ -96,14 +91,10 @@ func (q *Queue) CodeHashes() <-chan common.Hash {
 
 // AddCode persists code hashes as durable disk markers and enqueues them
 // for the forwarder goroutine. Never blocks the caller.
-// Returns [ErrQueueClosed] after [Queue.Shutdown] or [Queue.Finalize].
-func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
+// Returns [ErrQueueClosed] after [Queue.Shutdown] or [Queue.DoneAdding].
+func (q *Queue) AddCode(codeHashes []common.Hash) error {
 	if len(codeHashes) == 0 {
 		return nil
-	}
-
-	if err := ctx.Err(); err != nil {
-		return err
 	}
 
 	q.closeMu.RLock()
@@ -139,16 +130,15 @@ func (q *Queue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 	return nil
 }
 
-// Finalize waits for all pending hashes to be sent, then closes out.
-// Blocks if no consumer is draining [Queue.CodeHashes]. Idempotent with [Queue.Shutdown].
-func (q *Queue) Finalize() error {
+// DoneAdding waits for all pending hashes to be sent, then closes out. Blocks if
+// no consumer is draining [Queue.CodeHashes]. Idempotent with [Queue.Shutdown].
+func (q *Queue) DoneAdding() {
 	q.stop(false)
-	return nil
 }
 
-// Shutdown cancels the forwarder, waits for exit, then closes out.
-// Unsent hashes are safe as disk markers and will be recovered on restart.
-// Idempotent with [Queue.Finalize].
+// Shutdown cancels the forwarder, waits for exit, then closes out.  Unsent
+// hashes are safe as disk markers and will be recovered on restart.  Idempotent
+// with [Queue.DoneAdding].
 func (q *Queue) Shutdown() {
 	q.stop(true)
 }
@@ -227,9 +217,7 @@ func (q *Queue) init() error {
 		return fmt.Errorf("unable to recover previous sync state: %w", err)
 	}
 
-	// context.Background: init runs during construction before sync starts,
-	// the queue is not closed yet so AddCode will always succeed.
-	if err := q.AddCode(context.Background(), dbCodeHashes); err != nil {
+	if err := q.AddCode(dbCodeHashes); err != nil {
 		return fmt.Errorf("unable to resume previous sync: %w", err)
 	}
 

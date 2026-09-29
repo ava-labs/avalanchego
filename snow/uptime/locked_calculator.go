@@ -49,6 +49,20 @@ func (c *lockedCalculator) CalculateUptime(nodeID ids.NodeID) (time.Duration, ti
 	return c.c.CalculateUptime(nodeID)
 }
 
+func (c *lockedCalculator) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	if c.isBootstrapped == nil || !c.isBootstrapped.Get() {
+		return time.Time{}, errStillBootstrapping
+	}
+
+	c.calculatorLock.Lock()
+	defer c.calculatorLock.Unlock()
+
+	return c.c.GetStartTime(nodeID)
+}
+
 func (c *lockedCalculator) CalculateUptimePercent(nodeID ids.NodeID) (float64, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()

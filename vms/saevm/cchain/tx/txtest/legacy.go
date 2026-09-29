@@ -12,6 +12,7 @@ import (
 	// Imported for [vm.VerifierBackend] comment resolution.
 	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -65,6 +66,10 @@ func ToOld(tb testing.TB, newTx *tx.Tx) *atomic.Tx {
 	require.NoErrorf(tb, err, "%T.Bytes()", newTx)
 
 	oldTx, err := ParseOld(bytes)
+	// The new C-chain codec no longer enforces a size limit.
+	if errors.Is(err, codec.ErrUnmarshalTooBig) {
+		tb.Skipf("tx exceeds legacy codec size limit: %s", err)
+	}
 	require.NoError(tb, err, "ParseOld()")
 	return oldTx
 }

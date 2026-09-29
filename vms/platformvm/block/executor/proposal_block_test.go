@@ -20,13 +20,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -41,7 +40,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	// create apricotParentBlk. It's a standard one for simplicity
 	parentHeight := uint64(2022)
 
-	apricotParentBlk, err := block.NewApricotStandardBlock(
+	apricotParentBlk, err := platform.NewApricotStandardBlock(
 		ids.Empty, // does not matter
 		parentHeight,
 		nil, // txs do not matter in this test
@@ -53,9 +52,12 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	chainTime := env.clk.Time().Truncate(time.Second)
 
 	// create a proposal transaction to be included into proposal block
-	utx := &txs.AddValidatorTx{
-		BaseTx:    txs.BaseTx{},
-		Validator: txs.Validator{End: uint64(chainTime.Unix())},
+	utx := &platform.AddValidatorTx{
+		BaseTx: platform.BaseTx{},
+		Validator: platform.Validator{
+			End:  uint64(chainTime.Unix()),
+			Wght: 1,
+		},
 		StakeOuts: []*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{
@@ -69,10 +71,10 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		RewardsOwner:     &secp256k1fx.OutputOwners{},
 		DelegationShares: uint32(defaultTxFee),
 	}
-	addValTx := &txs.Tx{Unsigned: utx}
-	require.NoError(addValTx.Initialize(txs.Codec))
-	blkTx := &txs.Tx{
-		Unsigned: &txs.RewardValidatorTx{
+	addValTx := &platform.Tx{Unsigned: utx}
+	require.NoError(addValTx.Initialize(platform.Codec))
+	blkTx := &platform.Tx{
+		Unsigned: &platform.RewardValidatorTx{
 			TxID: addValTx.ID(),
 		},
 	}
@@ -83,6 +85,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 		TxID:      addValTx.ID(),
 		NodeID:    utx.NodeID(),
 		SubnetID:  utx.SubnetID(),
+		Weight:    utx.Weight(),
 		StartTime: utx.StartTime(),
 		EndTime:   chainTime,
 		NextTime:  chainTime,
@@ -98,7 +101,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	env.blkManager.(*manager).lastAccepted = parentID
 
 	// wrong height
-	statelessProposalBlock, err := block.NewApricotProposalBlock(
+	statelessProposalBlock, err := platform.NewApricotProposalBlock(
 		parentID,
 		parentHeight,
 		blkTx,
@@ -111,7 +114,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	require.ErrorIs(err, errIncorrectBlockHeight)
 
 	// valid
-	statelessProposalBlock, err = block.NewApricotProposalBlock(
+	statelessProposalBlock, err = platform.NewApricotProposalBlock(
 		parentID,
 		parentHeight+1,
 		blkTx,
@@ -131,7 +134,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	parentTime := genesistest.DefaultValidatorStartTime
 	parentHeight := uint64(2022)
 
-	banffParentBlk, err := block.NewApricotStandardBlock(
+	banffParentBlk, err := platform.NewApricotStandardBlock(
 		ids.GenerateTestID(), // does not matter
 		parentHeight,
 		nil, // txs do not matter in this test
@@ -144,9 +147,12 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	// setup state to validate proposal block transaction
 	nextStakerTime := chainTime.Add(executor.SyncBound).Add(-1 * time.Second)
-	unsignedNextStakerTx := &txs.AddValidatorTx{
-		BaseTx:    txs.BaseTx{},
-		Validator: txs.Validator{End: uint64(nextStakerTime.Unix())},
+	unsignedNextStakerTx := &platform.AddValidatorTx{
+		BaseTx: platform.BaseTx{},
+		Validator: platform.Validator{
+			End:  uint64(nextStakerTime.Unix()),
+			Wght: 1,
+		},
 		StakeOuts: []*avax.TransferableOutput{
 			{
 				Asset: avax.Asset{
@@ -160,8 +166,8 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		RewardsOwner:     &secp256k1fx.OutputOwners{},
 		DelegationShares: uint32(defaultTxFee),
 	}
-	nextStakerTx := &txs.Tx{Unsigned: unsignedNextStakerTx}
-	require.NoError(nextStakerTx.Initialize(txs.Codec))
+	nextStakerTx := &platform.Tx{Unsigned: unsignedNextStakerTx}
+	require.NoError(nextStakerTx.Initialize(platform.Codec))
 	nextStakerTxID := nextStakerTx.ID()
 
 	env.state.AddTx(nextStakerTx, status.Committed)
@@ -169,7 +175,8 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		TxID:      nextStakerTxID,
 		NodeID:    unsignedNextStakerTx.NodeID(),
 		SubnetID:  unsignedNextStakerTx.SubnetID(),
-		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+		Priority:  platform.PrimaryNetworkValidatorCurrentPriority,
+		Weight:    unsignedNextStakerTx.Weight(),
 		StartTime: nextStakerTime,
 		EndTime:   nextStakerTime,
 		NextTime:  nextStakerTime,
@@ -188,21 +195,21 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	env.state.AddStatelessBlock(banffParentBlk)
 
 	// create proposal tx to be included in the proposal block
-	blkTx := &txs.Tx{
-		Unsigned: &txs.RewardValidatorTx{
+	blkTx := &platform.Tx{
+		Unsigned: &platform.RewardValidatorTx{
 			TxID: nextStakerTxID,
 		},
 	}
-	require.NoError(blkTx.Initialize(txs.Codec))
+	require.NoError(blkTx.Initialize(platform.Codec))
 
 	{
 		// wrong height
-		statelessProposalBlock, err := block.NewBanffProposalBlock(
+		statelessProposalBlock, err := platform.NewBanffProposalBlock(
 			parentTime.Add(time.Second),
 			parentID,
 			banffParentBlk.Height(),
 			blkTx,
-			[]*txs.Tx{},
+			[]*platform.Tx{},
 		)
 		require.NoError(err)
 
@@ -213,7 +220,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	{
 		// wrong block version
-		statelessProposalBlock, err := block.NewApricotProposalBlock(
+		statelessProposalBlock, err := platform.NewApricotProposalBlock(
 			parentID,
 			banffParentBlk.Height()+1,
 			blkTx,
@@ -227,12 +234,12 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	{
 		// wrong timestamp, earlier than parent
-		statelessProposalBlock, err := block.NewBanffProposalBlock(
+		statelessProposalBlock, err := platform.NewBanffProposalBlock(
 			parentTime.Add(-1*time.Second),
 			parentID,
 			banffParentBlk.Height()+1,
 			blkTx,
-			[]*txs.Tx{},
+			[]*platform.Tx{},
 		)
 		require.NoError(err)
 
@@ -245,12 +252,12 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 		// wrong timestamp, violated synchrony bound
 		initClkTime := env.clk.Time()
 		env.clk.Set(parentTime.Add(-executor.SyncBound))
-		statelessProposalBlock, err := block.NewBanffProposalBlock(
+		statelessProposalBlock, err := platform.NewBanffProposalBlock(
 			parentTime.Add(time.Second),
 			parentID,
 			banffParentBlk.Height()+1,
 			blkTx,
-			[]*txs.Tx{},
+			[]*platform.Tx{},
 		)
 		require.NoError(err)
 
@@ -263,12 +270,12 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	{
 		// wrong timestamp, skipped staker set change event
 		skippedStakerEventTimeStamp := nextStakerTime.Add(time.Second)
-		statelessProposalBlock, err := block.NewBanffProposalBlock(
+		statelessProposalBlock, err := platform.NewBanffProposalBlock(
 			skippedStakerEventTimeStamp,
 			parentID,
 			banffParentBlk.Height()+1,
 			blkTx,
-			[]*txs.Tx{},
+			[]*platform.Tx{},
 		)
 		require.NoError(err)
 
@@ -279,18 +286,18 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	{
 		// wrong tx content (no advance time txs)
-		invalidTx := &txs.Tx{
-			Unsigned: &txs.AdvanceTimeTx{
+		invalidTx := &platform.Tx{
+			Unsigned: &platform.AdvanceTimeTx{
 				Time: uint64(nextStakerTime.Unix()),
 			},
 		}
-		require.NoError(invalidTx.Initialize(txs.Codec))
-		statelessProposalBlock, err := block.NewBanffProposalBlock(
+		require.NoError(invalidTx.Initialize(platform.Codec))
+		statelessProposalBlock, err := platform.NewBanffProposalBlock(
 			parentTime.Add(time.Second),
 			parentID,
 			banffParentBlk.Height()+1,
 			invalidTx,
-			[]*txs.Tx{},
+			[]*platform.Tx{},
 		)
 		require.NoError(err)
 
@@ -301,12 +308,12 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 
 	{
 		// valid
-		statelessProposalBlock, err := block.NewBanffProposalBlock(
+		statelessProposalBlock, err := platform.NewBanffProposalBlock(
 			nextStakerTime,
 			parentID,
 			banffParentBlk.Height()+1,
 			blkTx,
-			[]*txs.Tx{},
+			[]*platform.Tx{},
 		)
 		require.NoError(err)
 
@@ -484,7 +491,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				wallet := newWallet(t, env, walletConfig{})
 
 				tx, err := wallet.IssueAddValidatorTx(
-					&txs.Validator{
+					&platform.Validator{
 						NodeID: staker.nodeID,
 						Start:  uint64(staker.startTime.Unix()),
 						End:    uint64(staker.endTime.Unix()),
@@ -500,7 +507,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 				staker, err := state.NewPendingStaker(
 					tx.ID(),
-					tx.Unsigned.(*txs.AddValidatorTx),
+					tx.Unsigned.(*platform.AddValidatorTx),
 				)
 				require.NoError(err)
 
@@ -515,8 +522,8 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				})
 
 				tx, err := wallet.IssueAddSubnetValidatorTx(
-					&txs.SubnetValidator{
-						Validator: txs.Validator{
+					&platform.SubnetValidator{
+						Validator: platform.Validator{
 							NodeID: subStaker.nodeID,
 							Start:  uint64(subStaker.startTime.Unix()),
 							End:    uint64(subStaker.endTime.Unix()),
@@ -529,7 +536,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 
 				subnetStaker, err := state.NewPendingStaker(
 					tx.ID(),
-					tx.Unsigned.(*txs.AddSubnetValidatorTx),
+					tx.Unsigned.(*platform.AddSubnetValidatorTx),
 				)
 				require.NoError(err)
 
@@ -548,7 +555,7 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				wallet := newWallet(t, env, walletConfig{})
 
 				addStaker0, err := wallet.IssueAddValidatorTx(
-					&txs.Validator{
+					&platform.Validator{
 						NodeID: staker0.nodeID,
 						Start:  uint64(staker0.startTime.Unix()),
 						End:    uint64(staker0.endTime.Unix()),
@@ -563,11 +570,13 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				require.NoError(err)
 
 				// store Staker0 to state
-				addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
+				addValTx := addStaker0.Unsigned.(*platform.AddValidatorTx)
 				staker0, err := state.NewCurrentStaker(
 					addStaker0.ID(),
 					addValTx,
 					addValTx.StartTime(),
+					addValTx.EndTime(),
+					addValTx.Weight(),
 					0,
 				)
 				require.NoError(err)
@@ -576,24 +585,24 @@ func TestBanffProposalBlockUpdateStakers(t *testing.T) {
 				env.state.AddTx(addStaker0, status.Committed)
 				require.NoError(env.state.Commit())
 
-				s0RewardTx := &txs.Tx{
-					Unsigned: &txs.RewardValidatorTx{
+				s0RewardTx := &platform.Tx{
+					Unsigned: &platform.RewardValidatorTx{
 						TxID: staker0.TxID,
 					},
 				}
-				require.NoError(s0RewardTx.Initialize(txs.Codec))
+				require.NoError(s0RewardTx.Initialize(platform.Codec))
 
 				// build proposal block moving ahead chain time
 				// as well as rewarding staker0
 				preferredID := env.state.GetLastAccepted()
 				parentBlk, err := env.state.GetStatelessBlock(preferredID)
 				require.NoError(err)
-				statelessProposalBlock, err := block.NewBanffProposalBlock(
+				statelessProposalBlock, err := platform.NewBanffProposalBlock(
 					newTime,
 					parentBlk.ID(),
 					parentBlk.Height()+1,
 					s0RewardTx,
-					[]*txs.Tx{},
+					[]*platform.Tx{},
 				)
 				require.NoError(err)
 
@@ -654,8 +663,8 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	subnetValidatorNodeID := genesistest.DefaultNodeIDs[0]
 	subnetVdr1EndTime := genesistest.DefaultValidatorStartTime.Add(defaultMinStakingDuration)
 	tx, err := wallet.IssueAddSubnetValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: subnetValidatorNodeID,
 				Start:  genesistest.DefaultValidatorStartTimeUnix,
 				End:    uint64(subnetVdr1EndTime.Unix()),
@@ -666,11 +675,13 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	addSubnetValTx := tx.Unsigned.(*txs.AddSubnetValidatorTx)
+	addSubnetValTx := tx.Unsigned.(*platform.AddSubnetValidatorTx)
 	staker, err := state.NewCurrentStaker(
 		tx.ID(),
 		addSubnetValTx,
 		addSubnetValTx.StartTime(),
+		addSubnetValTx.EndTime(),
+		addSubnetValTx.Weight(),
 		0,
 	)
 	require.NoError(err)
@@ -684,8 +695,8 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	// Queue a staker that joins the staker set after the above validator leaves
 	subnetVdr2NodeID := genesistest.DefaultNodeIDs[1]
 	tx, err = wallet.IssueAddSubnetValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: subnetVdr2NodeID,
 				Start:  uint64(subnetVdr1EndTime.Add(time.Second).Unix()),
 				End:    uint64(subnetVdr1EndTime.Add(time.Second).Add(defaultMinStakingDuration).Unix()),
@@ -698,7 +709,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 
 	staker, err = state.NewPendingStaker(
 		tx.ID(),
-		tx.Unsigned.(*txs.AddSubnetValidatorTx),
+		tx.Unsigned.(*platform.AddSubnetValidatorTx),
 	)
 	require.NoError(err)
 
@@ -715,7 +726,7 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	// so to allow proposalBlk issuance
 	staker0EndTime := subnetVdr1EndTime
 	addStaker0, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: ids.GenerateTestNodeID(),
 			Start:  genesistest.DefaultValidatorStartTimeUnix,
 			End:    uint64(staker0EndTime.Unix()),
@@ -734,11 +745,13 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
-	addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
+	addValTx := addStaker0.Unsigned.(*platform.AddValidatorTx)
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		addValTx.EndTime(),
+		addValTx.Weight(),
 		0,
 	)
 	require.NoError(err)
@@ -748,23 +761,23 @@ func TestBanffProposalBlockRemoveSubnetValidator(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	// create rewardTx for staker0
-	s0RewardTx := &txs.Tx{
-		Unsigned: &txs.RewardValidatorTx{
+	s0RewardTx := &platform.Tx{
+		Unsigned: &platform.RewardValidatorTx{
 			TxID: addStaker0.ID(),
 		},
 	}
-	require.NoError(s0RewardTx.Initialize(txs.Codec))
+	require.NoError(s0RewardTx.Initialize(platform.Codec))
 
 	// build proposal block moving ahead chain time
 	preferredID := env.state.GetLastAccepted()
 	parentBlk, err := env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
-	statelessProposalBlock, err := block.NewBanffProposalBlock(
+	statelessProposalBlock, err := platform.NewBanffProposalBlock(
 		subnetVdr1EndTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
-		[]*txs.Tx{},
+		[]*platform.Tx{},
 	)
 	require.NoError(err)
 	propBlk := env.blkManager.NewBlock(statelessProposalBlock)
@@ -810,8 +823,8 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			subnetVdr1EndTime := genesistest.DefaultValidatorStartTime.Add(10 * defaultMinStakingDuration).Add(1 * time.Minute)
 
 			tx, err := wallet.IssueAddSubnetValidatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
+				&platform.SubnetValidator{
+					Validator: platform.Validator{
 						NodeID: subnetValidatorNodeID,
 						Start:  uint64(subnetVdr1StartTime.Unix()),
 						End:    uint64(subnetVdr1EndTime.Unix()),
@@ -824,7 +837,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 
 			staker, err := state.NewPendingStaker(
 				tx.ID(),
-				tx.Unsigned.(*txs.AddSubnetValidatorTx),
+				tx.Unsigned.(*platform.AddSubnetValidatorTx),
 			)
 			require.NoError(err)
 
@@ -841,7 +854,7 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			staker0EndTime := subnetVdr1StartTime
 
 			addStaker0, err := wallet.IssueAddValidatorTx(
-				&txs.Validator{
+				&platform.Validator{
 					NodeID: ids.GenerateTestNodeID(),
 					Start:  uint64(staker0StartTime.Unix()),
 					End:    uint64(staker0EndTime.Unix()),
@@ -856,11 +869,13 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			require.NoError(err)
 
 			// store Staker0 to state
-			addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
+			addValTx := addStaker0.Unsigned.(*platform.AddValidatorTx)
 			staker, err = state.NewCurrentStaker(
 				addStaker0.ID(),
 				addValTx,
 				addValTx.StartTime(),
+				addValTx.EndTime(),
+				addValTx.Weight(),
 				0,
 			)
 			require.NoError(err)
@@ -870,23 +885,23 @@ func TestBanffProposalBlockTrackedSubnet(t *testing.T) {
 			require.NoError(env.state.Commit())
 
 			// create rewardTx for staker0
-			s0RewardTx := &txs.Tx{
-				Unsigned: &txs.RewardValidatorTx{
+			s0RewardTx := &platform.Tx{
+				Unsigned: &platform.RewardValidatorTx{
 					TxID: addStaker0.ID(),
 				},
 			}
-			require.NoError(s0RewardTx.Initialize(txs.Codec))
+			require.NoError(s0RewardTx.Initialize(platform.Codec))
 
 			// build proposal block moving ahead chain time
 			preferredID := env.state.GetLastAccepted()
 			parentBlk, err := env.state.GetStatelessBlock(preferredID)
 			require.NoError(err)
-			statelessProposalBlock, err := block.NewBanffProposalBlock(
+			statelessProposalBlock, err := platform.NewBanffProposalBlock(
 				subnetVdr1StartTime,
 				parentBlk.ID(),
 				parentBlk.Height()+1,
 				s0RewardTx,
-				[]*txs.Tx{},
+				[]*platform.Tx{},
 			)
 			require.NoError(err)
 			propBlk := env.blkManager.NewBlock(statelessProposalBlock)
@@ -936,7 +951,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	staker0StartTime := genesistest.DefaultValidatorStartTime
 	staker0EndTime := pendingValidatorStartTime
 	addStaker0, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: ids.GenerateTestNodeID(),
 			Start:  uint64(staker0StartTime.Unix()),
 			End:    uint64(staker0EndTime.Unix()),
@@ -948,11 +963,13 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
-	addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
+	addValTx := addStaker0.Unsigned.(*platform.AddValidatorTx)
 	staker, err := state.NewCurrentStaker(
 		addStaker0.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		addValTx.EndTime(),
+		addValTx.Weight(),
 		0,
 	)
 	require.NoError(err)
@@ -962,23 +979,23 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	// create rewardTx for staker0
-	s0RewardTx := &txs.Tx{
-		Unsigned: &txs.RewardValidatorTx{
+	s0RewardTx := &platform.Tx{
+		Unsigned: &platform.RewardValidatorTx{
 			TxID: addStaker0.ID(),
 		},
 	}
-	require.NoError(s0RewardTx.Initialize(txs.Codec))
+	require.NoError(s0RewardTx.Initialize(platform.Codec))
 
 	// build proposal block moving ahead chain time
 	preferredID := env.state.GetLastAccepted()
 	parentBlk, err := env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
-	statelessProposalBlock, err := block.NewBanffProposalBlock(
+	statelessProposalBlock, err := platform.NewBanffProposalBlock(
 		pendingValidatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
-		[]*txs.Tx{},
+		[]*platform.Tx{},
 	)
 	require.NoError(err)
 	propBlk := env.blkManager.NewBlock(statelessProposalBlock)
@@ -1000,7 +1017,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(1 * time.Second)
 	addDelegatorTx, err := wallet.IssueAddDelegatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(pendingDelegatorStartTime.Unix()),
 			End:    uint64(pendingDelegatorEndTime.Unix()),
@@ -1012,7 +1029,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 
 	staker, err = state.NewPendingStaker(
 		addDelegatorTx.ID(),
-		addDelegatorTx.Unsigned.(*txs.AddDelegatorTx),
+		addDelegatorTx.Unsigned.(*platform.AddDelegatorTx),
 	)
 	require.NoError(err)
 
@@ -1025,7 +1042,7 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	// so to allow proposalBlk issuance
 	staker0EndTime = pendingDelegatorStartTime
 	addStaker0, err = wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: ids.GenerateTestNodeID(),
 			Start:  uint64(staker0StartTime.Unix()),
 			End:    uint64(staker0EndTime.Unix()),
@@ -1037,11 +1054,13 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
-	addValTx = addStaker0.Unsigned.(*txs.AddValidatorTx)
+	addValTx = addStaker0.Unsigned.(*platform.AddValidatorTx)
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		addValTx.EndTime(),
+		addValTx.Weight(),
 		0,
 	)
 	require.NoError(err)
@@ -1051,23 +1070,23 @@ func TestBanffProposalBlockDelegatorStakerWeight(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	// create rewardTx for staker0
-	s0RewardTx = &txs.Tx{
-		Unsigned: &txs.RewardValidatorTx{
+	s0RewardTx = &platform.Tx{
+		Unsigned: &platform.RewardValidatorTx{
 			TxID: addStaker0.ID(),
 		},
 	}
-	require.NoError(s0RewardTx.Initialize(txs.Codec))
+	require.NoError(s0RewardTx.Initialize(platform.Codec))
 
 	// Advance Time
 	preferredID = env.state.GetLastAccepted()
 	parentBlk, err = env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
-	statelessProposalBlock, err = block.NewBanffProposalBlock(
+	statelessProposalBlock, err = platform.NewBanffProposalBlock(
 		pendingDelegatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
-		[]*txs.Tx{},
+		[]*platform.Tx{},
 	)
 	require.NoError(err)
 
@@ -1121,7 +1140,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	staker0StartTime := genesistest.DefaultValidatorStartTime
 	staker0EndTime := pendingValidatorStartTime
 	addStaker0, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: ids.GenerateTestNodeID(),
 			Start:  uint64(staker0StartTime.Unix()),
 			End:    uint64(staker0EndTime.Unix()),
@@ -1133,11 +1152,13 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
-	addValTx := addStaker0.Unsigned.(*txs.AddValidatorTx)
+	addValTx := addStaker0.Unsigned.(*platform.AddValidatorTx)
 	staker, err := state.NewCurrentStaker(
 		addStaker0.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		addValTx.EndTime(),
+		addValTx.Weight(),
 		0,
 	)
 	require.NoError(err)
@@ -1147,23 +1168,23 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	// create rewardTx for staker0
-	s0RewardTx := &txs.Tx{
-		Unsigned: &txs.RewardValidatorTx{
+	s0RewardTx := &platform.Tx{
+		Unsigned: &platform.RewardValidatorTx{
 			TxID: addStaker0.ID(),
 		},
 	}
-	require.NoError(s0RewardTx.Initialize(txs.Codec))
+	require.NoError(s0RewardTx.Initialize(platform.Codec))
 
 	// build proposal block moving ahead chain time
 	preferredID := env.state.GetLastAccepted()
 	parentBlk, err := env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
-	statelessProposalBlock, err := block.NewBanffProposalBlock(
+	statelessProposalBlock, err := platform.NewBanffProposalBlock(
 		pendingValidatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
-		[]*txs.Tx{},
+		[]*platform.Tx{},
 	)
 	require.NoError(err)
 	propBlk := env.blkManager.NewBlock(statelessProposalBlock)
@@ -1185,7 +1206,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	pendingDelegatorStartTime := pendingValidatorStartTime.Add(1 * time.Second)
 	pendingDelegatorEndTime := pendingDelegatorStartTime.Add(defaultMinStakingDuration)
 	addDelegatorTx, err := wallet.IssueAddDelegatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(pendingDelegatorStartTime.Unix()),
 			End:    uint64(pendingDelegatorEndTime.Unix()),
@@ -1197,7 +1218,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 
 	staker, err = state.NewPendingStaker(
 		addDelegatorTx.ID(),
-		addDelegatorTx.Unsigned.(*txs.AddDelegatorTx),
+		addDelegatorTx.Unsigned.(*platform.AddDelegatorTx),
 	)
 	require.NoError(err)
 
@@ -1210,7 +1231,7 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	// so to allow proposalBlk issuance
 	staker0EndTime = pendingDelegatorStartTime
 	addStaker0, err = wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: ids.GenerateTestNodeID(),
 			Start:  uint64(staker0StartTime.Unix()),
 			End:    uint64(staker0EndTime.Unix()),
@@ -1222,11 +1243,13 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(err)
 
 	// store Staker0 to state
-	addValTx = addStaker0.Unsigned.(*txs.AddValidatorTx)
+	addValTx = addStaker0.Unsigned.(*platform.AddValidatorTx)
 	staker, err = state.NewCurrentStaker(
 		addStaker0.ID(),
 		addValTx,
 		addValTx.StartTime(),
+		addValTx.EndTime(),
+		addValTx.Weight(),
 		0,
 	)
 	require.NoError(err)
@@ -1236,23 +1259,23 @@ func TestBanffProposalBlockDelegatorStakers(t *testing.T) {
 	require.NoError(env.state.Commit())
 
 	// create rewardTx for staker0
-	s0RewardTx = &txs.Tx{
-		Unsigned: &txs.RewardValidatorTx{
+	s0RewardTx = &platform.Tx{
+		Unsigned: &platform.RewardValidatorTx{
 			TxID: addStaker0.ID(),
 		},
 	}
-	require.NoError(s0RewardTx.Initialize(txs.Codec))
+	require.NoError(s0RewardTx.Initialize(platform.Codec))
 
 	// Advance Time
 	preferredID = env.state.GetLastAccepted()
 	parentBlk, err = env.state.GetStatelessBlock(preferredID)
 	require.NoError(err)
-	statelessProposalBlock, err = block.NewBanffProposalBlock(
+	statelessProposalBlock, err = platform.NewBanffProposalBlock(
 		pendingDelegatorStartTime,
 		parentBlk.ID(),
 		parentBlk.Height()+1,
 		s0RewardTx,
-		[]*txs.Tx{},
+		[]*platform.Tx{},
 	)
 	require.NoError(err)
 	propBlk = env.blkManager.NewBlock(statelessProposalBlock)
@@ -1297,8 +1320,8 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	}
 
 	addValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(validatorStartTime.Unix()),
 				End:    uint64(validatorEndTime.Unix()),
@@ -1319,11 +1342,11 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	preferred, err := env.blkManager.GetStatelessBlock(preferredID)
 	require.NoError(err)
 
-	statelessBlk, err := block.NewBanffStandardBlock(
+	statelessBlk, err := platform.NewBanffStandardBlock(
 		now.Add(executor.SyncBound),
 		preferredID,
 		preferred.Height()+1,
-		[]*txs.Tx{addValidatorTx},
+		[]*platform.Tx{addValidatorTx},
 	)
 	require.NoError(err)
 	blk := env.blkManager.NewBlock(statelessBlk)
@@ -1352,7 +1375,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		preferred, err = env.blkManager.GetStatelessBlock(preferredID)
 		require.NoError(err)
 
-		statelessBlk, err = block.NewBanffStandardBlock(
+		statelessBlk, err = platform.NewBanffStandardBlock(
 			nextStakerChangeTime,
 			preferredID,
 			preferred.Height()+1,
@@ -1379,8 +1402,8 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	require.NoError(err)
 
 	addValidatorTx2, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(validatorStartTime.Unix()),
 				End:    uint64(validatorEndTime.Unix()),
@@ -1404,12 +1427,12 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	rewardValidatorTx, err := newRewardValidatorTx(t, addValidatorTx.ID())
 	require.NoError(err)
 
-	statelessProposalBlk, err := block.NewBanffProposalBlock(
+	statelessProposalBlk, err := platform.NewBanffProposalBlock(
 		now,
 		preferredID,
 		preferred.Height()+1,
 		rewardValidatorTx,
-		[]*txs.Tx{addValidatorTx2},
+		[]*platform.Tx{addValidatorTx2},
 	)
 	require.NoError(err)
 	blk = env.blkManager.NewBlock(statelessProposalBlk)
@@ -1433,9 +1456,9 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	require.NotEmpty(rewardUTXOs)
 }
 
-func newRewardValidatorTx(t testing.TB, txID ids.ID) (*txs.Tx, error) {
-	utx := &txs.RewardValidatorTx{TxID: txID}
-	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+func newRewardValidatorTx(t testing.TB, txID ids.ID) (*platform.Tx, error) {
+	utx := &platform.RewardValidatorTx{TxID: txID}
+	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
 	if err != nil {
 		return nil, err
 	}

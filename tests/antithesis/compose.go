@@ -309,3 +309,22 @@ func getServiceName(index int) string {
 	}
 	return fmt.Sprintf("%s-node-%d", baseName, index)
 }
+
+// WriteGuestScript writes an executable guest script to the root of the config
+// image. Antithesis's environment will execute this script on the host before
+// bringing the network up with `docker-compose up`. This provides a hook to
+// configure the host prior to network start.
+//
+// Configuration of the target path is set via env vars to simplify usage by
+// main entrypoints.
+func WriteGuestScript(content string) error {
+	targetPath := os.Getenv(targetPathEnvName)
+	if len(targetPath) == 0 {
+		return errTargetPathEnvVarNotSet
+	}
+	scriptPath := filepath.Join(targetPath, "guest.sh")
+	if err := os.WriteFile(scriptPath, []byte(content), perms.ReadWriteExecute); err != nil {
+		return fmt.Errorf("writing guest script: %w", err)
+	}
+	return nil
+}

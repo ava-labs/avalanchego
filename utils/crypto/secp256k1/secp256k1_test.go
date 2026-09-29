@@ -4,10 +4,13 @@
 package secp256k1
 
 import (
+	"sync"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/cb58"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 
@@ -51,6 +54,45 @@ func TestCachedRecover(t *testing.T) {
 
 	require.Equal(key.PublicKey(), pub1)
 	require.Equal(key.PublicKey(), pub2)
+}
+
+// TestConcurrentAccess checks that keys are safe for concurrent use. This
+// test is not meaningful without the race detector
+func TestConcurrentAccess(t *testing.T) {
+	sk, want := TestKeys()[0], TestKeys()[0]
+
+	msg := []byte{1, 2, 3}
+	sig, err := sk.Sign(msg)
+	require.NoError(t, err, "Sign()")
+
+	cache := NewRecoverCache(1)
+	cached, err := cache.RecoverPublicKey(msg, sig)
+	require.NoError(t, err, "RecoverPublicKey()")
+
+	type key interface {
+		Address() ids.ShortID
+		Bytes() []byte
+	}
+	tests := []struct {
+		name string
+		key  key
+		want key
+	}{
+		{name: "PrivateKey", key: sk, want: want},
+		{name: "cached PublicKey", key: cached, want: want.PublicKey()},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var wg sync.WaitGroup
+			for range 8 {
+				wg.Go(func() {
+					assert.Equal(t, tt.want.Address(), tt.key.Address(), "Address()")
+					assert.Equal(t, tt.want.Bytes(), tt.key.Bytes(), "Bytes()")
+				})
+			}
+			wg.Wait()
+		})
+	}
 }
 
 func TestExtensive(t *testing.T) {
@@ -255,9 +297,7 @@ func TestExportedMethods(t *testing.T) {
 	key := TestKeys()[0]
 
 	pubKey := key.PublicKey()
-	require.Equal("111111111111111111116DBWJs", pubKey.addr.String())
 	require.Equal("Q4MzFZZDPHRPAHFeDs3NiyyaZDvxHKivf", pubKey.Address().String())
-	require.Equal("Q4MzFZZDPHRPAHFeDs3NiyyaZDvxHKivf", pubKey.addr.String())
 	require.Equal("Q4MzFZZDPHRPAHFeDs3NiyyaZDvxHKivf", key.Address().String())
 
 	expectedPubKeyBytes := []byte{
@@ -267,7 +307,7 @@ func TestExportedMethods(t *testing.T) {
 		0xfb, 0x03, 0xda, 0x6f, 0x4d, 0xbc, 0x94, 0x35,
 		0x7d,
 	}
-	require.Equal(expectedPubKeyBytes, pubKey.bytes)
+	require.Equal(expectedPubKeyBytes, pubKey.Bytes())
 
 	expectedPubKey, err := ToPublicKey(expectedPubKeyBytes)
 	require.NoError(err)

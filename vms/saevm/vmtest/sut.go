@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -42,18 +43,21 @@ type SUT[VM rawVM] struct {
 	RawVM     VM
 	EthClient *ethclient.Client
 	AppSender *saetest.Sender
-	Logger    *loggingtest.Logger
+	Logger    logging.Logger
 }
 
 // Sender returns the mock app-message sender, satisfying [saetest.Peer].
 func (s *SUT[VM]) Sender() *saetest.Sender { return s.AppSender }
 
-// Context returns a [testing.TB]-scoped context that is cancelled when the
-// logger records a log at [logging.Error] or above.
+// Context returns a [testing.TB]-scoped context, cancelled on any log at
+// [logging.Error] or above if [SUT.Logger] is a [loggingtest.Logger].
 //
 //nolint:thelper // Not a helper
 func (s *SUT[VM]) Context(tb testing.TB) context.Context {
-	return s.Logger.CancelOnError(tb.Context())
+	if l, ok := s.Logger.(*loggingtest.Logger); ok {
+		return l.CancelOnError(tb.Context())
+	}
+	return tb.Context()
 }
 
 // LastAcceptedID returns the last-accepted block's ID.

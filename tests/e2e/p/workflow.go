@@ -18,8 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -105,8 +105,8 @@ var _ = e2e.DescribePChain("[Workflow]", func() {
 		validatorID, err := ids.ToNodeID(utils.RandomBytes(ids.NodeIDLen))
 		require.NoError(err)
 
-		vdr := &txs.SubnetValidator{
-			Validator: txs.Validator{
+		vdr := &platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: validatorID,
 				End:    uint64(time.Now().Add(72 * time.Hour).Unix()),
 				Wght:   minValStake,

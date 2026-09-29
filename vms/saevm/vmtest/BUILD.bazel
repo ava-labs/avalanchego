@@ -10,6 +10,7 @@ go_library(
         "//ids",
         "//snow/engine/common",
         "//snow/engine/snowman/block",
+        "//utils/logging",
         "//utils/logging/loggingtest",
         "//vms/saevm/blocks",
         "//vms/saevm/sae/rpc",

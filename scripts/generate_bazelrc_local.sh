@@ -18,14 +18,20 @@ OUT_PATH="${REPO_ROOT}/.bazelrc.local"
 ERR_FILE="$(mktemp)"
 trap 'rm -f "$ERR_FILE"' EXIT
 
-if ! DEVELOPER_DIR="$(xcode-select -p 2>"$ERR_FILE")"; then
+# Both callers run this inside the nix dev shell, whose DEVELOPER_DIR and SDKROOT
+# would make xcode-select and xcrun report nix's SDK instead of the host's.
+host_toolchain() {
+  env -u DEVELOPER_DIR -u SDKROOT "$@"
+}
+
+if ! DEVELOPER_DIR="$(host_toolchain /usr/bin/xcode-select -p 2>"$ERR_FILE")"; then
   echo "error: failed to determine the active Apple developer directory via xcode-select -p" >&2
   cat "$ERR_FILE" >&2
   echo "hint: install Apple CommandLineTools with 'xcode-select --install' or select an existing Xcode with 'sudo xcode-select -s /Applications/Xcode.app/Contents/Developer'" >&2
   exit 1
 fi
 
-if ! SDKROOT="$(xcrun --sdk macosx --show-sdk-path 2>"$ERR_FILE")"; then
+if ! SDKROOT="$(host_toolchain /usr/bin/xcrun --sdk macosx --show-sdk-path 2>"$ERR_FILE")"; then
   echo "error: failed to determine the macOS SDK path via xcrun --sdk macosx --show-sdk-path" >&2
   cat "$ERR_FILE" >&2
   echo "hint: install Apple CommandLineTools with 'xcode-select --install' or ensure the selected Xcode/CommandLineTools installation provides the macOS SDK" >&2

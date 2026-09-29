@@ -199,15 +199,13 @@ func TestReceiveWarpMessage(t *testing.T) {
 	const numTests = 8
 	var (
 		wallet     = saetest.NewUNSAFEWallet(t, numTests, types.LatestSigner(saetest.ChainConfig()))
-		vdrs       = warptest.NewValidators(t, 2)
+		vdrs       = warptest.NewValidators(t, warptest.WithMinimum(2))
 		warpLogger = common.Address{'l', 'o', 'g', 'g', 'e', 'r'}
 	)
-	timeOpt, clock := withVMTime(testStartTime)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(wallet.Addresses()...),
 		withAccount(warpLogger, types.Account{Code: forwardAndLogCode(t, corethwarp.ContractAddress)}),
 		withValidators(vdrs),
-		timeOpt,
 	)
 
 	getMessage, err := corethwarp.PackGetVerifiedWarpMessage(0)
@@ -346,7 +344,6 @@ func TestReceiveWarpMessage(t *testing.T) {
 
 			sut.WaitUntilTxsPending(t, tx)
 			built := sut.runConsensusLoop(t, withBlockContext(&block.Context{}))
-			clock.Set(earliestBuildTime(built))
 			receipts := built.Receipts()
 			require.Lenf(t, receipts, 1, "%T.Receipts()", built)
 			receipt := receipts[0]

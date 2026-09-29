@@ -3,9 +3,8 @@
 set -euo pipefail
 
 # e.g.,
-# ./scripts/run_bazel_ci_command.sh test //main:...
-# ./scripts/run_bazel_ci_command.sh test //... -- -//graft/...
-# BAZEL_CI_ENFORCE_DEPENDENCY_LIST=1 ./scripts/run_bazel_ci_command.sh test //graft/subnet-evm/...
+# ./scripts/run_bazel_ci_command.sh test //...
+# BAZEL_CI_ENFORCE_DEPENDENCY_LIST=1 ./scripts/run_bazel_ci_command.sh test //...
 #
 # This is the Bazel CI wrapper for Bazel commands that take target patterns.  In CI it
 # can reject commands whose target patterns are missing from
@@ -73,7 +72,13 @@ subcommand="$1"
 shift
 
 if [[ -n "${BAZEL_CI_ENFORCE_DEPENDENCY_LIST-}" ]]; then
-  target_patterns="$(extract_target_set "$@")"
+  # The Go test helper expands a checked-in target pattern into Go test labels.
+  # It supplies the source pattern because the expanded labels are not in the list.
+  if [[ -n "${BAZEL_CI_TARGET_PATTERNS:-}" ]]; then
+    target_patterns="${BAZEL_CI_TARGET_PATTERNS}"
+  else
+    target_patterns="$(extract_target_set "$@")"
+  fi
   [[ -n "${target_patterns}" ]] || {
     echo "error: unable to determine Bazel target patterns for CI dependency-list enforcement" >&2
     exit 1
