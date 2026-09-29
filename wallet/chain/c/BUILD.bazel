@@ -46,6 +46,7 @@ go_test(
     srcs = ["wallet_test.go"],
     embed = [":c"],
     deps = [
+        "//database",
         "//ids",
         "//utils/rpc",
         "//vms/saevm/cchain/tx",

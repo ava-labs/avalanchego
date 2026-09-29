@@ -283,10 +283,8 @@ func AddAllUTXOs(
 	return nil
 }
 
-// addAllCChainUTXOs fetches all the UTXOs referenced by [addrs] that were sent
-// from [sourceChainID] to the C-Chain from [client] and adds them into
-// [utxos]. If [ctx] expires, then the returned error will be immediately
-// reported.
+// addAllCChainUTXOs adds to utxos every UTXO owned by addrs that was exported
+// from sourceChainID to the C-Chain.
 func addAllCChainUTXOs(
 	ctx context.Context,
 	utxos walletcommon.UTXOs,
