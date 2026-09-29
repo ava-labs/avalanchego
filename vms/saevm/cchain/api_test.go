@@ -309,6 +309,8 @@ func TestRPCExtras(t *testing.T) {
 // TestSynchronousRPCs replays JSON-RPC calls recorded from the synchronous VM
 // and requires an identical response, covering state, receipt, log, and tracing
 // RPCs at every height for every pre-SAE network upgrade.
+//
+// TODO(StephenButtolph): Test RPCs re-executing synchronous blocks.
 func TestSynchronousRPCs(t *testing.T) {
 	// The fixture's keys are relative to the VM's own database rather than to
 	// the base database that contains it.
