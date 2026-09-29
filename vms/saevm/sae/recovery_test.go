@@ -284,8 +284,14 @@ func TestRecover(t *testing.T) {
 	}
 }
 
-// TestRecoverSnapshotAfterShutdown asserts a clean restart loads the persisted
-// snapshot as-is, avoiding an hours-long regeneration on mainnet-sized state.
+// TestRecoverSnapshotAfterShutdown cleanly restarts a VM. The snapshot
+// persisted at shutdown MUST be loaded as-is and MUST verify against the
+// recovered state.
+//
+// A snapshot that fails to load is regenerated, which may take hours on a
+// mainnet-sized state. Until that finishes, state reads and state-sync serving
+// fall back to the far slower trie. Clean restarts are routine and should not
+// result in a significant performance reduction.
 func TestRecoverSnapshotAfterShutdown(t *testing.T) {
 	t.Parallel()
 
