@@ -330,16 +330,15 @@ func TestSynchronousRPCs(t *testing.T) {
 	cases := make([]rpctest.Case, len(fixture.RPCCalls))
 	for i, call := range fixture.RPCCalls {
 		cases[i] = rpctest.Case{
-			Name:         call.Name,
-			Method:       call.Method,
-			Args:         call.Args(),
-			Want:         call.Result,
-			WantErr:      errorMessage(call.Error),
-			Parallel:     true,
-			ExtraCmpOpts: []cmp.Option{jsonContent()},
+			Name:     call.Name,
+			Method:   call.Method,
+			Args:     call.Args(),
+			Want:     call.Result,
+			WantErr:  errorMessage(call.Error),
+			Parallel: true,
 		}
 	}
-	rpctest.Run(ctx, t, sut.ethclient.Client(), cases...)
+	rpctest.Run(ctx, t, sut.ethclient.Client(), rpctest.WithCmpOpts(cases, jsonContent())...)
 
 	// We test block lookups separately because SAE decided not to support
 	// totalDifficulty and always report 0.

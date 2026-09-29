@@ -50,7 +50,7 @@ func WithCmpOpts(tests []Case, opts ...cmp.Option) []Case {
 // RPC assertion harness shared by the SAE and C-Chain suites.
 func Run(ctx context.Context, t *testing.T, client *rpc.Client, cases ...Case) {
 	t.Helper()
-	opts := []cmp.Option{
+	opts := cmp.Options{
 		cmputils.NilSlicesAreEmpty[hexutil.Bytes](),
 		cmputils.IfIn[params.ChainConfig](cmp.Options{
 			cmputils.BigInts(),
@@ -76,8 +76,7 @@ func Run(ctx context.Context, t *testing.T, client *rpc.Client, cases ...Case) {
 				t.Errorf("CallContext(...) %s", diff)
 				t.FailNow()
 			}
-			opts := append(opts, tc.ExtraCmpOpts...)
-			if diff := cmp.Diff(tc.Want, got.Elem().Interface(), opts...); diff != "" {
+			if diff := cmp.Diff(tc.Want, got.Elem().Interface(), opts, cmp.Options(tc.ExtraCmpOpts)); diff != "" {
 				t.Errorf("Unmarshalled %T diff (-want +got):\n%s", got.Elem().Interface(), diff)
 			}
 		}
