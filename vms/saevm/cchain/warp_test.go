@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/vmtest"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -140,9 +141,9 @@ func TestSendWarpMessage(t *testing.T) {
 		GasFeeCap: big.NewInt(1),
 		Data:      callData,
 	})
-	require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, tx), "%T.SendTransaction(...)", sut.ethclient)
+	require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction(...)", sut.EthClient())
 
-	built := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+	built := sut.BuildVerify(ctx, t, sut.LastAcceptedID(ctx, t))
 	if diff := cmp.Diff(types.Transactions{tx}, built.Transactions(), cmputils.TransactionsByHash()); diff != "" {
 		t.Errorf("%T eth txs (-want +got):\n%s", built, diff)
 	}
@@ -334,16 +335,16 @@ func TestReceiveWarpMessage(t *testing.T) {
 				Data:       tt.callData,
 				AccessList: warpAccessList(tt.msg),
 			})
-			err := sut.ethclient.SendTransaction(ctx, tx)
+			err := sut.EthClient().SendTransaction(ctx, tx)
 			if diff := testerr.Diff(err, tt.wantIssueErr); diff != "" {
-				t.Fatalf("%T.SendTransaction(...) error (-want +got)\n%s", sut.ethclient, diff)
+				t.Fatalf("%T.SendTransaction(...) error (-want +got)\n%s", sut.EthClient(), diff)
 			}
 			if err != nil {
 				return
 			}
 
-			sut.waitForPendingEthTxs(ctx, t, tx)
-			built := sut.runConsensusLoop(ctx, t, withBlockContext(&block.Context{}))
+			sut.WaitForPendingEthTxs(ctx, t, tx)
+			built := sut.runConsensusLoop(ctx, t, vmtest.WithBlockContext(&block.Context{}))
 			receipts := built.Receipts()
 			require.Lenf(t, receipts, 1, "%T.Receipts()", built)
 			receipt := receipts[0]
