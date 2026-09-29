@@ -36,6 +36,7 @@ func TestAcceptBlock(t *testing.T) {
 	}, 5*time.Second, 50*time.Millisecond)
 
 	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+
 	ctx, sut := newSUT(t, 1, opt)
 	// Causes [VM.AcceptBlock] to wait until the block has executed.
 	require.NoError(t, sut.SetState(ctx, snow.Bootstrapping), "SetState(Bootstrapping)")
