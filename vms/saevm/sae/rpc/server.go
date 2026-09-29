@@ -189,9 +189,8 @@ var apiServices = []apiService{
 		name: APISubscription, namespace: ethNamespace, defaultOn: true,
 		receiver: func(b *backend, filter *filters.FilterAPI) any {
 			return &filterAPI{
-				FilterAPI:           filter,
-				b:                   b,
-				maxBlocksPerRequest: b.config.MaxBlocksPerRequest,
+				FilterAPI: filter,
+				b:         b,
 			}
 		},
 	},

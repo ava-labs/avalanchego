@@ -191,6 +191,7 @@ After Helicon activates, the C-Chain ignores the following options. The node log
 - `transaction-history`
 - `tx-pool-account-queue`
 - `tx-pool-global-queue`
+- `api-max-blocks-per-request`
 
 ### Fixes
 

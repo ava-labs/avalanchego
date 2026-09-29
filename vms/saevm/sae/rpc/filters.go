@@ -15,17 +15,27 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 )
 
+// filterAPI is a replacement for a [filters.FilterAPI] which applies
+// [Config] for any call to [filters.FilterAPI.GetLogs].
 type filterAPI struct {
 	*filters.FilterAPI
-	b                   *backend
-	maxBlocksPerRequest int64
+	b *backend
 }
 
-// GetLogs overrides [filters.FilterAPI.GetLogs] to reject block ranges larger
-// than the configured maximum before asking libevm to scan them.
+// GetLogs overrides [filters.FilterAPI.GetLogs] to adjust the filter criteria
+// if necessary based on the [Config]. Only invalid criteria with respect to the
+// config will error before being sent to the inner call.
 func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) ([]*types.Log, error) {
-	if api.maxBlocksPerRequest <= 0 || crit.BlockHash != nil {
-		return api.FilterAPI.GetLogs(ctx, crit)
+	newCrit, err := api.updateFilterCriteria(crit)
+	if err != nil {
+		return nil, err
+	}
+	return api.FilterAPI.GetLogs(ctx, newCrit)
+}
+
+func (api *filterAPI) updateFilterCriteria(crit filters.FilterCriteria) (filters.FilterCriteria, error) {
+	if crit.BlockHash != nil {
+		return crit, nil
 	}
 
 	begin := rpc.LatestBlockNumber
@@ -39,27 +49,23 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 
 	resolvedBegin, err := blocks.ResolveRPCNumber(api.b, begin)
 	if err != nil {
-		return nil, fmt.Errorf("resolving beginning block: %w", err)
+		return crit, nil //nolint:nilerr // [filters.FilterAPI.GetLogs] will handle the error
 	}
 	resolvedEnd, err := blocks.ResolveRPCNumber(api.b, end)
 	if err != nil {
-		return nil, fmt.Errorf("resolving ending block: %w", err)
+		return crit, nil //nolint:nilerr // [filters.FilterAPI.GetLogs] will handle the error
 	}
 
 	if resolvedEnd < resolvedBegin {
-		return nil, fmt.Errorf(
-			"ending block %d is before beginning block %d",
-			resolvedEnd,
-			resolvedBegin,
-		)
+		return crit, nil
 	}
 
-	if int64(resolvedEnd-resolvedBegin) >= api.maxBlocksPerRequest { //#nosec G115 -- won't overflow for a while
-		return nil, fmt.Errorf(
+	if maxBlocks := api.b.config.MaxBlocksPerRequest; maxBlocks > 0 && resolvedEnd-resolvedBegin >= maxBlocks {
+		return crit, fmt.Errorf(
 			"requested too many blocks from %d to %d, maximum is set to %d",
 			resolvedBegin,
 			resolvedEnd,
-			api.maxBlocksPerRequest,
+			api.b.config.MaxBlocksPerRequest,
 		)
 	}
 
@@ -67,5 +73,5 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 	crit.FromBlock = new(big.Int).SetUint64(resolvedBegin)
 	crit.ToBlock = new(big.Int).SetUint64(resolvedEnd)
 
-	return api.FilterAPI.GetLogs(ctx, crit)
+	return crit, nil
 }

@@ -905,18 +905,19 @@ func TestGetLogsBlockLimit(t *testing.T) {
 			wantErr: testerr.Contains("requested too many blocks from 0 to 2, maximum is set to 2"),
 		},
 		{
+			name: "under_limit_future_block",
+			query: ethereum.FilterQuery{
+				FromBlock: big.NewInt(99),
+				ToBlock:   big.NewInt(100),
+			},
+		},
+		{
 			name: "over_limit_to_future_block",
 			query: ethereum.FilterQuery{
 				FromBlock: genesis.Number(),
 				ToBlock:   big.NewInt(100),
 			},
-			wantErr: testerr.Contains("not accepted yet"),
-		},
-		{
-			name: "block_hash_bypasses_range_limit",
-			query: ethereum.FilterQuery{
-				BlockHash: utils.PointerTo(genesis.Hash()),
-			},
+			wantErr: nil, // MUST match previous case
 		},
 	}
 

@@ -89,8 +89,6 @@ type config struct {
 	TxPoolAccountSlots uint64 `json:"tx-pool-account-slots"`
 	TxPoolGlobalSlots  uint64 `json:"tx-pool-global-slots"`
 
-	// APIs
-	MaxBlocksPerRequest int64 `json:"api-max-blocks-per-request"`
 	// APIs is the exhaustive set of JSON-RPC APIs this node serves. Methods of
 	// any other API return "method not found".
 	APIs                set.Set[rpc.API] `json:"apis"`
@@ -100,8 +98,11 @@ type config struct {
 	BatchRequestLimit uint64 `json:"batch-request-limit"`
 	// APIMaxDuration limits how long an eth_call (or eth_callDetailed) runs.
 	// Non-positive values result in no limit. Defaults to no limit.
-	APIMaxDuration               duration `json:"api-max-duration"`
-	ResolvePendingToLastExecuted bool     `json:"api-resolve-pending-to-last-executed"`
+	APIMaxDuration duration `json:"api-max-duration"`
+	// MaxBlocksPerRequest is the maximum block range (inclusive) that can be
+	// used in an eth_getLogs request.
+	MaxBlocksPerRequest          uint64 `json:"api-max-blocks-per-request"`
+	ResolvePendingToLastExecuted bool   `json:"api-resolve-pending-to-last-executed"`
 
 	// State sync
 	StateSyncEnabled bool `json:"state-sync-enabled"`
