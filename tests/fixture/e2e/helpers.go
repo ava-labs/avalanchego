@@ -5,13 +5,13 @@ package e2e
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/stretchr/testify/require"
@@ -180,7 +180,7 @@ func SendEthTransaction(tc tests.TestContext, ethClient *ethclient.Client, signe
 
 	require.NoError(ethClient.SendTransaction(tc.DefaultContext(), signedTx))
 
-	receipt, err := AwaitEthReceipt(tc.DefaultContext(), ethClient, txID)
+	receipt, err := AwaitEthReceipt(tc.DefaultContext(), ethClient, signedTx)
 	require.NoError(err, "AwaitEthReceipt()")
 
 	tc.Log().Info("eth transaction accepted",
@@ -194,26 +194,14 @@ func SendEthTransaction(tc tests.TestContext, ethClient *ethclient.Client, signe
 
 // AwaitEthReceipt returns the receipt of the transaction once its block has
 // been executed.
-func AwaitEthReceipt(ctx context.Context, c *ethclient.Client, txHash ethcommon.Hash) (*types.Receipt, error) {
-	ticker := time.NewTicker(DefaultPollingInterval)
-	defer ticker.Stop()
-
-	for {
-		receipt, err := c.TransactionReceipt(ctx, txHash)
-		if err == nil {
-			// SAE serves state at a height only once it has executed.
-			if _, err := c.NonceAt(ctx, ethcommon.Address{}, receipt.BlockNumber); err != nil {
-				return nil, fmt.Errorf("awaiting execution of block %d: %w", receipt.BlockNumber, err)
-			}
-			return receipt, nil
-		}
-
-		select {
-		case <-ctx.Done():
-			return nil, fmt.Errorf("awaiting receipt: %w", errors.Join(ctx.Err(), err))
-		case <-ticker.C:
-		}
+func AwaitEthReceipt(ctx context.Context, c *ethclient.Client, tx *types.Transaction) (*types.Receipt, error) {
+	receipt, err := bind.WaitMined(ctx, c, tx)
+	if err != nil {
+		return nil, err
 	}
+	// SAE serves state at a height only once it has executed.
+	_, err = c.NonceAt(ctx, ethcommon.Address{}, receipt.BlockNumber)
+	return receipt, err
 }
 
 // Determines the suggested gas price for the configured client that will

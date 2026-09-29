@@ -26,6 +26,7 @@ go_library(
         "//wallet/chain/p/builder",
         "//wallet/subnet/primary",
         "//wallet/subnet/primary/common",
+        "@com_github_ava_labs_libevm//accounts/abi/bind",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//ethclient",

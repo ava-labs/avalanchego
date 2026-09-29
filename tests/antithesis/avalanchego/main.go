@@ -987,7 +987,7 @@ func (w *workload) confirmCChainTx(ctx context.Context, tx *types.Transaction) e
 			return fmt.Errorf("failed to get C-Chain RPC client for %s: %w", uri, err)
 		}
 
-		receipt, err := e2e.AwaitEthReceipt(ctx, client, txHash)
+		receipt, err := e2e.AwaitEthReceipt(ctx, client, tx)
 		if err != nil {
 			return fmt.Errorf("awaiting tx %s on %s: %w", txHash, uri, err)
 		}
