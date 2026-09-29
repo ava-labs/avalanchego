@@ -17,7 +17,6 @@ import (
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
-	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
@@ -35,7 +34,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/rpctest"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
@@ -90,6 +88,12 @@ func (c *Client) getAllUTXOs(
 		}
 		startAddr, startUTXOID = endAddr, endUTXOID
 	}
+}
+
+// testRPC drives the [rpctest.Case] table against the SUT's RPC client.
+func (s *SUT) testRPC(ctx context.Context, t *testing.T, cases ...rpctest.Case) {
+	t.Helper()
+	rpctest.Run(ctx, t, s.ethclient.Client(), cases...)
 }
 
 // TestIssueTxRejectsInvalidTransaction asserts that [Client.IssueTx] surfaces
@@ -170,9 +174,7 @@ func TestGetTxNotFound(t *testing.T) {
 // endpoint on both the unknown and accepted branches.
 func TestGetAtomicTxStatus(t *testing.T) {
 	sk := txtest.NewKey(t)
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(sk.EthAddress())
-	}))
+	ctx, sut := newSUT(t, withMaxAllocFor(sk.EthAddress()))
 
 	stx := newWallet(sk, sut.ctx, sut.Client).newMinimalTx(t)
 	t.Run("before_execution", func(t *testing.T) {
@@ -268,7 +270,7 @@ func TestRPCExtras(t *testing.T) {
 	)
 	wantBlockExtras["blockExtraData"] = hexutil.Encode(extData)
 
-	rpctest.Run(ctx, t, sut.ethclient.Client(), rpctest.WithCmpOpts(
+	sut.testRPC(ctx, t, rpctest.WithCmpOpts(
 		[]rpctest.Case{
 			{
 				Method: "eth_getHeaderByNumber",
@@ -283,7 +285,7 @@ func TestRPCExtras(t *testing.T) {
 		},
 		onlyKeysOf(wantHeaderExtras),
 	)...)
-	rpctest.Run(ctx, t, sut.ethclient.Client(), rpctest.WithCmpOpts(
+	sut.testRPC(ctx, t, rpctest.WithCmpOpts(
 		[]rpctest.Case{
 			{
 				Method: "eth_getBlockByNumber",
@@ -338,7 +340,7 @@ func TestSynchronousRPCs(t *testing.T) {
 			Parallel: true,
 		}
 	}
-	rpctest.Run(ctx, t, sut.ethclient.Client(), rpctest.WithCmpOpts(cases, jsonContent())...)
+	sut.testRPC(ctx, t, rpctest.WithCmpOpts(cases, jsonContent())...)
 
 	// We test block lookups separately because SAE decided not to support
 	// totalDifficulty and always report 0.
