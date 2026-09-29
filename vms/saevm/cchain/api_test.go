@@ -375,7 +375,6 @@ func TestSynchronousRPCs(t *testing.T) {
 }
 
 // jsonContent compares JSON-RPC results by content rather than by encoding.
-// Numbers are preserved as [json.Number] to avoid precision loss.
 func jsonContent() cmp.Option {
 	return cmp.Transformer("decodeJSON", func(raw json.RawMessage) any {
 		if len(raw) == 0 {
@@ -391,8 +390,6 @@ func jsonContent() cmp.Option {
 	})
 }
 
-// errorMessage wants an error whose message is exactly msg, or no error if msg
-// is empty.
 func errorMessage(msg string) testerr.Want {
 	if msg == "" {
 		return nil
