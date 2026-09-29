@@ -140,7 +140,7 @@ func newSUT(tb testing.TB, state libevm.StateReader) (context.Context, *SUT) {
 	snowCtx.Log = log
 	pool, err := New(
 		snowCtx,
-		saetest.ChainConfig(),
+		cchaintest.ChainConfig(),
 		NewPending(),
 		backend,
 		maxSize,
