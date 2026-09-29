@@ -6,11 +6,13 @@ package c
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -45,7 +47,7 @@ func TestAwaitTxAccepted(t *testing.T) {
 		{
 			name: "not_found_then_accepted",
 			errs: []error{
-				errors.New("sending request: fetching tx: reading tx: not found"),
+				fmt.Errorf("sending request: fetching tx: reading tx: %w", database.ErrNotFound),
 				nil,
 			},
 			wantCalls: 2,
@@ -73,7 +75,7 @@ func TestAwaitTxAcceptedContextCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	g := &scriptedTxGetter{errs: []error{errors.New("fetching tx: reading tx: not found")}}
+	g := &scriptedTxGetter{errs: []error{fmt.Errorf("sending request: fetching tx: reading tx: %w", database.ErrNotFound)}}
 	err := awaitTxAccepted(ctx, g, ids.GenerateTestID(), time.Millisecond)
 	require.ErrorIs(t, err, context.Canceled)
 }

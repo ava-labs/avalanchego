@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/ethclient"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -226,8 +227,10 @@ func awaitTxAccepted(ctx context.Context, c txGetter, txID ids.ID, freq time.Dur
 }
 
 // isTxNotFound reports whether err means the node has not accepted the tx yet.
+//
+// The error chain does not survive JSON-RPC, so this matches on the message.
 func isTxNotFound(err error) bool {
-	return strings.Contains(err.Error(), "reading tx: not found")
+	return strings.HasSuffix(err.Error(), database.ErrNotFound.Error())
 }
 
 func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
