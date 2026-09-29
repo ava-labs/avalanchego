@@ -10,6 +10,7 @@
 
 ### Fixes
 
+- New Firewood archival nodes commit genesis state on all chains.
 - SAE `eth_estimateGas` and `eth_createAccessList` now include the minimum gas limit that the mempool requires for the transaction's size. Large transactions signed with the estimate were previously rejected with `insufficient gas limit for tx size`.
 
 ### Metrics
