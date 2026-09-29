@@ -71,7 +71,7 @@ These changes prepare the merge commit that will be tagged.
 
    And update [`version/compatibility.json`](version/compatibility.json) and [`proto/README.md`](proto/README.md) for the new version.
 
-1. If this release activates a new network upgrade on local networks:
+1. If this release activates a new network upgrade on Mainnet:
 
    1. In [`upgrade/upgrade.go`](upgrade/upgrade.go), set the upgrade's time in `Default`
       — the local-network schedule — to `InitiallyActiveTime`:
