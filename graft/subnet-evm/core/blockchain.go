@@ -409,8 +409,6 @@ func NewBlockChain(
 	if cacheConfig == nil {
 		return nil, errCacheConfigNotSpecified
 	}
-	// Open trie database with provided config
-	triedb := triedb.NewDatabase(db, cacheConfig.triedbConfig())
 
 	// Setup the genesis block, commit the provided genesis specification
 	// to database if the genesis block is not present yet, or load the
@@ -418,10 +416,19 @@ func NewBlockChain(
 	// Note: In go-ethereum, the code rewinds the chain on an incompatible config upgrade.
 	// We don't do this and expect the node operator to always update their node's configuration
 	// before network upgrades take effect.
-	chainConfig, _, err := SetupGenesisBlock(db, triedb, genesis, lastAcceptedHash, skipChainConfigCheckCompatible)
-	if err != nil {
-		return nil, err
+	//
+	// This MUST be closed and re-opened to guarantee Firewood persists the genesis root.
+	var chainConfig *params.ChainConfig
+	{
+		tdb := triedb.NewDatabase(db, cacheConfig.triedbConfig())
+		var err error
+		chainConfig, _, err = SetupGenesisBlock(db, tdb, genesis, lastAcceptedHash, skipChainConfigCheckCompatible)
+		err = errors.Join(err, tdb.Close())
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	log.Info("")
 	log.Info(strings.Repeat("-", 153))
 	for _, line := range strings.Split(chainConfig.Description(), "\n") {
@@ -435,7 +442,7 @@ func NewBlockChain(
 		chainConfig:         chainConfig,
 		cacheConfig:         cacheConfig,
 		db:                  db,
-		triedb:              triedb,
+		triedb:              triedb.NewDatabase(db, cacheConfig.triedbConfig()),
 		bodyCache:           lru.NewCache[common.Hash, *types.Body](bodyCacheLimit),
 		receiptsCache:       lru.NewCache[common.Hash, []*types.Receipt](receiptsCacheLimit),
 		blockCache:          lru.NewCache[common.Hash, *types.Block](blockCacheLimit),
@@ -454,6 +461,7 @@ func NewBlockChain(
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.processor = NewStateProcessor(chainConfig, bc, engine)
 
+	var err error
 	bc.hc, err = NewHeaderChain(db, chainConfig, cacheConfig, engine)
 	if err != nil {
 		return nil, err
@@ -819,6 +827,11 @@ func (bc *BlockChain) loadGenesisState() error {
 	bc.currentBlock.Store(bc.genesisBlock.Header())
 	bc.hc.SetGenesis(bc.genesisBlock.Header())
 	bc.hc.SetCurrentHeader(bc.genesisBlock.Header())
+
+	if tdb, ok := bc.triedb.Backend().(*firewood.TrieDB); ok {
+		tdb.SetHashAndHeight(bc.genesisBlock.Hash(), 0)
+	}
+
 	return nil
 }
 
