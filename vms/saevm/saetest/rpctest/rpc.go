@@ -22,8 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 )
 
-// Case specifies one RPC call and its expected outcome: a reply equal to Want,
-// or an error matching WantErr. Name labels the subtest and defaults to Method.
+// Case specifies one RPC call and its expected outcome.
 type Case struct {
 	Method       string
 	Name         string
@@ -46,8 +45,7 @@ func WithCmpOpts(tests []Case, opts ...cmp.Option) []Case {
 	return tests
 }
 
-// Run executes each Case against client and fails t on any mismatch. It is the
-// RPC assertion harness shared by the SAE and C-Chain suites.
+// Run executes each Case against client and fails t on any mismatch.
 func Run(ctx context.Context, t *testing.T, client *rpc.Client, cases ...Case) {
 	t.Helper()
 	opts := cmp.Options{
