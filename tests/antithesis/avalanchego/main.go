@@ -1041,8 +1041,12 @@ func (w *workload) sendCChainTx(ctx context.Context, client *ethclient.Client, t
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch suggested gas tip: %w", err)
 	}
-	// Not instrumented, so RPC errors aren't reported as bugs.
-	gasFeeCap := e2e.SuggestGasPrice(tests.NewTestContextWithArgs(ctx, w.log, nil, nil), client)
+	gasPrice, err := client.SuggestGasPrice(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch suggested gas price: %w", err)
+	}
+	// Double the suggested price to absorb base fee increases before inclusion.
+	gasFeeCap := new(big.Int).Mul(gasPrice, big.NewInt(2))
 
 	chainID := new(big.Int).Set(w.cChainID)
 	signer := types.LatestSignerForChainID(chainID)
