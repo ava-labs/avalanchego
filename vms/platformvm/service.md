@@ -596,6 +596,13 @@ platform.getCurrentValidators({
             publicKey: string,
             proofOfPosession: string
         },
+        validatorAuthority: {
+            locktime: string,
+            threshold: string,
+            addresses: string[]
+        },
+        nextPeriod: string,
+        autoCompoundRewardShares: string,
         delegatorCount: string,
         delegatorWeight: string,
         delegators: []{
@@ -645,6 +652,23 @@ platform.getCurrentValidators({
   - `connected` is if the node is connected and tracks the Subnet. Omitted if `subnetID` is not the Primary Network.
   - `signer` is the node's BLS public key and proof of possession. Omitted if the validator doesn't
     have a BLS public key. Omitted if `subnetID` is not the Primary Network.
+  - `validatorAuthority`, `nextPeriod` and `autoCompoundRewardShares` are returned only for
+    auto-renewed validators, that is, validators created with `AddAutoRenewedValidatorTx` (ACP-236,
+    Helicon). All three are omitted for every other validator, so their presence is how an
+    auto-renewed validator is distinguished from a fixed-term one. They are flattened into the
+    validator object rather than nested under a parent field.
+    - `validatorAuthority` is an `OutputOwners` output which includes `locktime`, `threshold` and
+      array of `addresses`. Specifies the owner authorized to change this validator's configuration
+      with a `SetAutoRenewedValidatorConfigTx`.
+    - `nextPeriod` is the duration in seconds of the next validation cycle.
+    - `autoCompoundRewardShares` is the percentage of rewards restaked at the end of each cycle,
+      expressed in millionths in the range `[0, 1000000]`. `500000` means half the rewards are
+      restaked and half are paid out.
+    - `endTime` for an auto-renewed validator is the end of the current cycle, not the end of the
+      validation. On renewal `startTime` becomes the old `endTime`, `endTime` moves forward by
+      `nextPeriod`, and `weight` grows by whatever share of the rewards was auto-compounded, capped
+      at `MaxValidatorStake`. `txID` stays the same across renewals, so a changed `endTime` must not
+      be treated as a new validator.
   - `delegatorCount` is the number of delegators on this validator.
     Omitted if `subnetID` is not the Primary Network.
   - `delegatorWeight` is total weight of delegators on this validator.
@@ -724,6 +748,55 @@ curl -X POST --data '{
   "id": 1
 }
 ```
+
+**Example Response (auto-renewed Primary Network validator):**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "validators": [
+      {
+        "txID": "2NNkpYTGfTFLSGXJcHtVv6drwVU2cczhmjK2uhvwDyxwsjzZMm",
+        "startTime": "1790089200",
+        "endTime": "1790262000",
+        "weight": "2000000000000",
+        "nodeID": "NodeID-5mb46qkSBj81k9g9e4VFjGGSbaaSLFRzD",
+        "validationRewardOwner": {
+          "locktime": "0",
+          "threshold": "1",
+          "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
+        },
+        "delegationRewardOwner": {
+          "locktime": "0",
+          "threshold": "1",
+          "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
+        },
+        "potentialReward": "620095131",
+        "delegationFee": "10.0000",
+        "uptime": "99.9800",
+        "connected": true,
+        "validatorAuthority": {
+          "locktime": "0",
+          "threshold": "1",
+          "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
+        },
+        "nextPeriod": "172800",
+        "autoCompoundRewardShares": "500000",
+        "delegatorCount": "0",
+        "delegatorWeight": "0",
+        "delegators": []
+      }
+    ]
+  },
+  "id": 1
+}
+```
+
+Here `nextPeriod` is `172800` seconds (48 hours) and `autoCompoundRewardShares` is `500000`,
+meaning half of each cycle's rewards are restaked into `weight` and half are paid out to
+`validationRewardOwner`. `startTime` is Helicon activation on Mainnet and `endTime` is one 48-hour
+cycle later, so this validator is in its first cycle.
 
 **Example Response (L1):**
 
