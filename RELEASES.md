@@ -15,6 +15,7 @@
 ### Fixes
 
 - Fixed SAE re-execution of pre-ApricotPhase5 C-Chain blocks containing cross-chain transactions, which caused historical state queries to fail on some API nodes.
+- Timely cancellation of `snapshot` generation, without which SAE block execution lags on large `hashdb` archives.
 
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 
