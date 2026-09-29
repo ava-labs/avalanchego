@@ -83,9 +83,8 @@ These changes prepare the merge commit that will be tagged.
       }
       ```
 
-      Then update the tests that pin the local schedule: `TestParseGenesis` and
-      `TestGenesisHash` (the local genesis hash changes) in
-      [`vms/saevm/cchain/genesis_test.go`](vms/saevm/cchain/genesis_test.go).
+      Then update any tests that pin the local network's upgrade schedule or genesis
+      (e.g. its genesis hash).
 
    1. In [`scripts/tests.upgrade.sh`](scripts/tests.upgrade.sh), set `DEFAULT_VERSION` to
       `$VERSION` without the leading `v`, naming the upgrade in the comment above it:
