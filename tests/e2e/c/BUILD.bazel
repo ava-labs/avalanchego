@@ -32,6 +32,7 @@ go_library(
         "@com_connectrpc_connect//:connect",
         "@com_github_ava_labs_libevm//accounts/abi",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//ethclient",
         "@com_github_ava_labs_libevm//params",

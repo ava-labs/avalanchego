@@ -1033,26 +1033,22 @@ func (w *workload) sendCChainTx(ctx context.Context, client *ethclient.Client, t
 		})
 		return nil, err
 	}
-	acceptedNonce, err := client.NonceAt(ctx, senderAddr, nil)
+	nonce, err := client.NonceAt(ctx, senderAddr, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch accepted nonce: %w", err)
+		return nil, fmt.Errorf("failed to fetch nonce: %w", err)
 	}
 	gasTipCap, err := client.SuggestGasTipCap(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch suggested gas tip: %w", err)
 	}
-	gasPrice, err := client.SuggestGasPrice(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch suggested gas price: %w", err)
-	}
-	// Double the suggested price to absorb base fee increases before inclusion.
-	gasFeeCap := new(big.Int).Mul(gasPrice, big.NewInt(2))
+	// Not instrumented, so RPC errors aren't reported as bugs.
+	gasFeeCap := e2e.SuggestGasPrice(tests.NewTestContextWithArgs(ctx, w.log, nil, nil), client)
 
 	chainID := new(big.Int).Set(w.cChainID)
 	signer := types.LatestSignerForChainID(chainID)
 	tx, err := types.SignNewTx(w.cChainKey, signer, &types.DynamicFeeTx{
 		ChainID:   chainID,
-		Nonce:     acceptedNonce,
+		Nonce:     nonce,
 		GasTipCap: gasTipCap,
 		GasFeeCap: gasFeeCap,
 		Gas:       params.TxGas,

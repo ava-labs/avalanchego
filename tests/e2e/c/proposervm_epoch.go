@@ -82,13 +82,13 @@ func issueTransaction(
 ) {
 	ctx := tc.DefaultContext()
 	addr := senderKey.EthAddress()
-	acceptedNonce, err := ethClient.NonceAt(ctx, addr, nil)
+	nonce, err := ethClient.NonceAt(ctx, addr, nil)
 	require.NoError(tc, err)
 
 	gasPrice := e2e.SuggestGasPrice(tc, ethClient)
 	const amount = 10 * units.Avax // Arbitrary amount to transfer
 	tx := types.NewTransaction(
-		acceptedNonce,
+		nonce,
 		addr,
 		new(big.Int).SetUint64(amount),
 		e2e.DefaultGasLimit,
