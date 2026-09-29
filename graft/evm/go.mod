@@ -7,7 +7,7 @@ require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
 	github.com/ava-labs/avalanchego v1.15.0
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0
-	github.com/ava-labs/libevm v1.13.15-0.20260923191746-ab188047d44a
+	github.com/ava-labs/libevm v1.13.15-0.20260929143550-dbf7ede95a25
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/deckarep/golang-set/v2 v2.1.0
 	github.com/gorilla/rpc v1.2.0
@@ -57,7 +57,7 @@ require (
 	github.com/google/renameio/v2 v2.0.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
-	github.com/klauspost/compress v1.18.0 // indirect
+	github.com/klauspost/compress v1.20.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect

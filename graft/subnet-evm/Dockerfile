@@ -14,7 +14,7 @@ WORKDIR /build
 
 # Copy avalanche dependencies first (intermediate docker image caching)
 # Note: Context is now the repo root, so we copy from there
-COPY go.mod go.sum ./
+COPY go.mod go.sum go.work go.work.sum ./
 COPY graft ./graft
 # Download avalanche dependencies using go mod
 # proxy.golang.org intermittently drops a module download mid-transfer with an
