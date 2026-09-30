@@ -17,6 +17,7 @@ This checklist ists all the required steps when when adding a new network upgrad
   - `Default` config
 - [ ] Add field to `Validate()` method's `upgrades` slice
 - [ ] Add `IsXActivated(time.Time) bool` method
+- [ ] Update `LatestTime() time.Time` method
 
 ### [`vms/rpcchainvm/vm_client.go`](../vms/rpcchainvm/vm_client.go)
 
