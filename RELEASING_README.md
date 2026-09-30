@@ -18,7 +18,7 @@ All components follow aligned versioning:
 
 - Same version number - When AvalancheGo releases v1.14.0, Subnet-EVM is also v1.14.0
 - Coordinated tags - Each release creates tags for the main module and all submodules (e.g., `v1.14.0`, `graft/evm/v1.14.0`, `graft/coreth/v1.14.0`, `graft/subnet-evm/v1.14.0`)
-- Minor version means network upgrade - The major version does not change. The minor version increases only for a release that schedules a new network upgrade (e.g., `v1.15.x` to `v1.16.0`). All other releases increase the patch version.
+- Confusingly, the minor version means network upgrade. Bump the minor version (e.g., `v1.15.x` to `v1.16.0`) only for a release that schedules a network upgrade. Bump the patch version for every other release.
 
 ### Component Release Notes
 
@@ -34,7 +34,7 @@ Master always names the next version in `version.Current` and the internal `requ
 
 ### 1. Preparation
 
-You should always create a release candidate first, and only if everything is fine, can you create a release. In this section we create a release candidate `v1.15.1-rc.0`. We therefore assign these environment variables to simplify copying instructions:
+Always cut a release candidate first, and release only after it passes. This section uses `v1.15.1-rc.0` as its example. Set these variables so you can copy the commands below as-is:
 
 ```bash
 export VERSION_RC=v1.15.1-rc.0
