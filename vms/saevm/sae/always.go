@@ -21,9 +21,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
-	"github.com/ava-labs/avalanchego/vms/saevm/types"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	ethcommon "github.com/ava-labs/libevm/common"
 )
 
@@ -60,7 +60,7 @@ func (vm *SinceGenesis[_]) Initialize(
 	fxs []*snowcommon.Fx,
 	appSender snowcommon.AppSender,
 ) error {
-	db := types.NewEthDB(avaDB)
+	db := saetypes.NewEthDB(avaDB)
 	tdbCfg := vm.config.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
 	config, err := setupGenesis(db, tdbCfg, genesisBytes)
 	if err != nil {

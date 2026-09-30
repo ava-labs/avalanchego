@@ -7,7 +7,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 const (
@@ -29,12 +29,12 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 }
 
 // NewHTTPHandler returns the HTTP handler that will be invoked if a client
-// passes this VM's chain ID via the routing header described in the [common.VM]
+// passes this VM's chain ID via the routing header described in the [snowcommon.VM]
 // documentation for this method.
 //
 // Ethereum-compatible VMs don't typically utilize HTTP2, so [VM.CreateHandlers]
 // is used instead, and this method returns `nil, nil`.
 func (*VM) NewHTTPHandler(context.Context) (http.Handler, error) {
-	var _ common.VM // maintain import for [comment] rendering
+	var _ snowcommon.VM // maintain import for [comment] rendering
 	return nil, nil
 }
