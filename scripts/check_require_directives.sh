@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
 # Checks that internal module require directives are consistent across all
-# go.mod files. Every require of an avalanchego submodule must reference the
-# same version.
+# go.mod files, and that they reference the next release. Every require of an
+# avalanchego submodule must reference the same version, and that version must
+# match version.Current and the top section of RELEASES.md.
 #
 # See docs/design/multi-module-release.md for background.
 
@@ -63,4 +64,29 @@ if [[ ${#mismatches[@]} -gt 0 ]]; then
   exit 1
 fi
 
-echo "All internal module require directives are consistent: $reference"
+# Check the require version matches the version being developed
+current_version=$(awk '
+  /Current = &Application\{/ { in_current = 1 }
+  in_current && /Major:/ { gsub(/[^0-9]/, ""); major = $0 }
+  in_current && /Minor:/ { gsub(/[^0-9]/, ""); minor = $0 }
+  in_current && /Patch:/ { gsub(/[^0-9]/, ""); print "v" major "." minor "." $0; exit }
+' version/constants.go)
+
+if [[ "$current_version" != "$reference" ]]; then
+  echo "Internal module require version $reference does not match version.Current $current_version" >&2
+  echo "" >&2
+  echo "Run './scripts/run_task.sh tags-update-require-directives -- $current_version' to fix." >&2
+  exit 1
+fi
+
+expected_heading="## [$reference](https://github.com/ava-labs/avalanchego/releases/tag/$reference)"
+actual_heading=$(grep -m1 '^## ' RELEASES.md || true)
+
+if [[ "$actual_heading" != "$expected_heading" ]]; then
+  echo "The first section of RELEASES.md must be the next release:" >&2
+  echo "  expected: $expected_heading" >&2
+  echo "  actual:   $actual_heading" >&2
+  exit 1
+fi
+
+echo "All internal module require directives reference the next release: $reference"

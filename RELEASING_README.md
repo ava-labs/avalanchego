@@ -29,142 +29,81 @@ All components follow aligned versioning:
 
 ## Release Procedure
 
+Master always names the next version in `version.Current`, the internal `require` directives, and the top section of [`RELEASES.md`](RELEASES.md) (enforced by [`check-require-directives`](#check-require-directives)). Any master commit can be tagged as a release candidate, the final release tags that same commit, and prep for the next version happens after the release.
+
 ### 1. Preparation
 
-You should always create a release candidate first, and only if everything is fine, can you create a release. In this section we create a release candidate `v1.14.1-rc.0`. We therefore assign these environment variables to simplify copying instructions:
+You should always create a release candidate first, and only if everything is fine, can you create a release. In this section we create a release candidate `v1.15.1-rc.0`. We therefore assign these environment variables to simplify copying instructions:
 
 ```bash
-export VERSION_RC=v1.14.1-rc.0
-export VERSION=v1.14.1
+export VERSION_RC=v1.15.1-rc.0
+export VERSION=v1.15.1
 ```
 
-### 2. Create Release Branch
+### 2. Pre-Release Changes (Network Upgrades Only)
 
-```bash
-git fetch origin master
-git checkout master
-git checkout -b "releases/$VERSION"
-```
+Skip this step unless this release activates a new network upgrade on Mainnet. In that
+case, merge a PR to master with the following changes before you tag the first release
+candidate:
 
-### 3. Prepare Release Changes
-
-These changes prepare the commit that will be tagged.
-
-1. Update [`version/constants.go`](version/constants.go):
+1. In [`upgrade/upgrade.go`](upgrade/upgrade.go), set the upgrade's time in `Default`
+   — the local-network schedule — to `InitiallyActiveTime`:
 
    ```go
-   Current = &Application{
-       Name:  Client,
-       Major: 1,
-       Minor: 14,
-       Patch: 1,
+   Default = Config{
+       // ...
+       HeliconTime: InitiallyActiveTime,
    }
    ```
 
-1. Update [`RELEASES.md`](RELEASES.md) - rename "Pending" section to the new version and create a new "Pending" section.
+   Then update any tests that pin the local network's upgrade schedule or genesis
+   (e.g. its genesis hash).
 
-1. If RPC chain VM protocol version changed, update [`version/constants.go`](version/constants.go):
-
-   ```go
-   RPCChainVMProtocol uint = 45
-   ```
-
-   And update [`version/compatibility.json`](version/compatibility.json) and [`proto/README.md`](proto/README.md) for the new version.
-
-1. If this release activates a new network upgrade on Mainnet:
-
-   1. In [`upgrade/upgrade.go`](upgrade/upgrade.go), set the upgrade's time in `Default`
-      — the local-network schedule — to `InitiallyActiveTime`:
-
-      ```go
-      Default = Config{
-          // ...
-          HeliconTime: InitiallyActiveTime,
-      }
-      ```
-
-      Then update any tests that pin the local network's upgrade schedule or genesis
-      (e.g. its genesis hash).
-
-   1. In [`scripts/tests.upgrade.sh`](scripts/tests.upgrade.sh), set `DEFAULT_VERSION` to
-      `$VERSION` without the leading `v`, naming the upgrade in the comment above it:
-
-      ```bash
-      # v1.15.1 is the earliest version that activates Helicon on local networks.
-      DEFAULT_VERSION="1.15.1"
-      ```
-
-   1. In [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml),
-      comment out the `Run e2e tests` step of the `upgrade` job, leaving `actions/checkout`
-      so the job still has a step:
-
-      ```yaml
-      upgrade:
-        runs-on: ubuntu-24.04
-        steps:
-          - uses: actions/checkout@v5
-          # TODO: Reactivate test once v1.15.1 is published
-          # - name: Run e2e tests
-          #   ...
-      ```
-
-   The test starts a network on the published `DEFAULT_VERSION` binary and restarts it on
-   the current code, so the two MUST agree on the local schedule. After this change only
-   `$VERSION` agrees, and it is not published until the release itself — so leave the job
-   off and re-enable it in [step 10](#10-post-release-version-bump).
-
-1. Update submodule require directives to reference the future tag:
+1. In [`scripts/tests.upgrade.sh`](scripts/tests.upgrade.sh), set `DEFAULT_VERSION` to
+   `$VERSION` without the leading `v`, naming the upgrade in the comment above it:
 
    ```bash
-   ./scripts/run_task.sh tags-update-require-directives -- "$VERSION_RC"
+   # v1.15.1 is the earliest version that activates Helicon on local networks.
+   DEFAULT_VERSION="1.15.1"
    ```
 
-### 4. Commit and Create PR
+1. In [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml),
+   comment out the `Run e2e tests` step of the `upgrade` job, leaving `actions/checkout`
+   so the job still has a step:
+
+   ```yaml
+   upgrade:
+     runs-on: ubuntu-24.04
+     steps:
+       - uses: actions/checkout@v5
+       # TODO: Reactivate test once v1.15.1 is published
+       # - name: Run e2e tests
+       #   ...
+   ```
+
+The test starts a network on the published `DEFAULT_VERSION` binary and restarts it on
+the current code, so the two MUST agree on the local schedule. After this change only
+`$VERSION` agrees, and it is not published until the release itself — so the job stays
+off until [step 8](#8-prepare-the-next-release) turns it back on.
+
+### 3. Create Release Candidate Tags
+
+Tag a commit on master. No branch or PR is needed:
 
 ```bash
-git add .
-git commit -S -m "chore: release $VERSION_RC"
-git push -u origin "releases/$VERSION"
-```
-
-Create a draft PR for review. Do not merge it until the final release is tagged in
-[step 7](#7-create-final-release-tags):
-
-```bash
-gh pr create --repo github.com/ava-labs/avalanchego --base master --draft --title "chore: release $VERSION"
-```
-
-Wait for checks:
-
-```bash
-gh pr checks --watch
-```
-
-### 5. Create Release Candidate Tags
-
-Tag the tip of the release branch:
-
-```bash
-git checkout "releases/$VERSION"
-git pull origin "releases/$VERSION"
-# Double check the tip of the release branch is the expected commit
+git fetch origin master
+git checkout --detach origin/master  # or any other commit on master
+# Double check this is the expected commit
 git log -1
 ./scripts/run_task.sh tags-create -- "$VERSION_RC"
 ./scripts/run_task.sh tags-push -- "$VERSION_RC"
 ```
 
-Optionally verify from a fresh directory (to avoid local replace directives):
+The `require` directives at this commit reference `$VERSION`, which is not tagged yet. So
+`go get github.com/ava-labs/avalanchego@$VERSION_RC` does not resolve outside the
+repository. Test the release candidate with the binaries and images built from its tag.
 
-```bash
-cd $(mktemp -d)
-go mod init test
-go get github.com/ava-labs/avalanchego@"$VERSION_RC"
-go list -m all | grep avalanchego
-```
-
-All submodules should resolve to matching versions.
-
-### 6. Test the Release Candidate
+### 4. Test the Release Candidate
 
 #### Local Deployment on Fuji
 
@@ -326,51 +265,44 @@ Echo and Dispatch deploy the public `avaplatform/subnet-evm` image.
 
 #### Fixing Issues Found in the Release Candidate
 
-If testing finds a bug, merge the fix to master first, so the next release keeps it.
-Then cherry-pick it onto the release branch and tag the next release candidate:
+If testing finds a bug, merge the fix to master. Then tag the next release candidate on a
+master commit that includes the fix:
 
 ```bash
-export VERSION_RC=v1.14.1-rc.1
-git checkout "releases/$VERSION"
-git cherry-pick -S <fix-commit>
-./scripts/run_task.sh tags-update-require-directives -- "$VERSION_RC"
-git add .
-git commit -S -m "chore: release $VERSION_RC"
-git push origin "releases/$VERSION"
-gh pr checks --watch
+export VERSION_RC=v1.15.1-rc.1
+git fetch origin master
+git checkout --detach origin/master
+git log -1
 ./scripts/run_task.sh tags-create -- "$VERSION_RC"
 ./scripts/run_task.sh tags-push -- "$VERSION_RC"
 ```
 
-Then test the new release candidate again.
+The new release candidate includes everything merged to master since the previous one.
+Test it again in full.
 
-### 7. Create Final Release Tags
+### 5. Create Final Release Tags
 
-After successful testing, update the require directives on the release branch from
-the RC version to the final version, then tag that commit:
+Tag the same commit as the release candidate that passed testing:
 
 ```bash
-git checkout "releases/$VERSION"
-git pull origin "releases/$VERSION"
-./scripts/run_task.sh tags-update-require-directives -- "$VERSION"
-git add .
-git commit -S -m "chore: set require directives for $VERSION"
-git push origin "releases/$VERSION"
-gh pr checks --watch
-# Only the go.mod files should differ from the tested release candidate
-git diff --stat "$VERSION_RC"
+git fetch origin --tags
+git checkout --detach "$VERSION_RC"
 ./scripts/run_task.sh tags-create -- "$VERSION"
 ./scripts/run_task.sh tags-push -- "$VERSION"
 ```
 
-Then merge the release PR into master:
+Optionally verify from a fresh directory (to avoid local replace directives):
 
 ```bash
-gh pr ready "releases/$VERSION"
-gh pr merge "releases/$VERSION" --squash --subject "chore: release $VERSION"
+cd $(mktemp -d)
+go mod init test
+go get github.com/ava-labs/avalanchego@"$VERSION"
+go list -m all | grep avalanchego
 ```
 
-### 8. Create GitHub Release
+All submodules should resolve to matching versions.
+
+### 6. Create GitHub Release
 
 Create a release at [github.com/ava-labs/avalanchego/releases/new](https://github.com/ava-labs/avalanchego/releases/new):
 
@@ -397,13 +329,13 @@ Create a release at [github.com/ava-labs/avalanchego/releases/new](https://githu
 
     ### Fixes
 
-    **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.14.0...v1.14.1
+    **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.15.0...v1.15.1
     ```
 
 1. Check "Set as the latest release"
 1. Publish
 
-### 9. Automated Builds
+### 7. Automated Builds
 
 The tag push triggers these workflows automatically:
 
@@ -442,33 +374,67 @@ Antithesis test images are built and pushed to Google Artifact Registry on every
 See the [Antithesis testing documentation](tests/antithesis/README.md#scheduled-testing)
 for scheduled testing details.
 
-### 10. Post-Release Version Bump
+### 8. Prepare the Next Release
 
-Prepare for the next release:
+Update master so that it describes the next release:
 
 ```bash
-export NEXT_VERSION=v1.14.2
+export NEXT_VERSION=v1.15.2
 ```
 
 1. Create branch:
 
    ```bash
    git fetch origin master
-   git checkout master
-   git checkout -b "prep-$NEXT_VERSION-release"
+   git checkout -b "prep-$NEXT_VERSION-release" origin/master
    ```
 
-1. Update all version files (as in step 3) to the next version.
+1. Update `Current` in [`version/constants.go`](version/constants.go):
 
-1. If you disabled the `upgrade` job in step 3, enable it again in
-   [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml).
+   ```go
+   Current = &Application{
+       Name:  Client,
+       Major: 1,
+       Minor: 15,
+       Patch: 2,
+   }
+   ```
+
+1. Update the submodule require directives:
+
+   ```bash
+   ./scripts/run_task.sh tags-update-require-directives -- "$NEXT_VERSION"
+   ```
+
+1. In [`version/compatibility.json`](version/compatibility.json), add `$NEXT_VERSION` to the
+   list for the current `RPCChainVMProtocol`.
+
+1. At the top of [`RELEASES.md`](RELEASES.md), add a section for the next release:
+
+   ```markdown
+   ## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
+   ```
+
+1. Compare the `$VERSION` section of [`RELEASES.md`](RELEASES.md) against what was released.
+   PRs merged after the release candidate commit added their notes to the `$VERSION`
+   section, but they are not part of `$VERSION`. This diff shows those notes:
+
+   ```bash
+   git diff "$VERSION" origin/master -- RELEASES.md
+   ```
+
+   Move each of them into the `$NEXT_VERSION` section. Check again if you rebase before
+   merging.
+
+1. If you disabled the `upgrade` job in [step 2](#2-pre-release-changes-network-upgrades-only),
+   enable it again in [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml).
    Uncomment the `Run e2e tests` step and delete the `TODO` comment.
 
 1. Create PR and merge:
 
    ```bash
    git add .
-   git commit -S -m "chore: prep release $NEXT_VERSION"
+   git commit -S -m "chore: prep next release $NEXT_VERSION"
    git push -u origin "prep-$NEXT_VERSION-release"
    gh pr create --repo github.com/ava-labs/avalanchego --base master --title "chore: prep next release $NEXT_VERSION"
    gh pr checks --watch
@@ -493,6 +459,8 @@ When the protocol version changes:
    "45": ["v1.14.1"]
    ```
 
+   The version listed is the one master is preparing (`version.Current`).
+
 To verify compatibility:
 
 ```bash
@@ -509,6 +477,9 @@ To share work-in-progress without merging to master:
 4. Run `./scripts/run_task.sh tags-push -- v0.0.0-mybranch`
 
 External consumers can then `go get github.com/ava-labs/avalanchego@v0.0.0-mybranch`.
+
+Do not merge these go.mod changes. [`check-require-directives`](#check-require-directives)
+rejects any version other than `version.Current`.
 
 ## Tagging Task Reference
 
@@ -536,7 +507,8 @@ re-check.
 ### `check-require-directives`
 
 Verifies that all internal module `require` directives across go.mod files reference
-the same version.
+the same version, and that this version matches `version.Current` and the first section of
+[`RELEASES.md`](RELEASES.md). Runs in CI.
 
 ## Troubleshooting
 
@@ -587,5 +559,5 @@ been updated while others haven't. The consistency check will catch this:
 To recover, re-run the update — it's idempotent:
 
 ```bash
-./scripts/run_task.sh tags-update-require-directives -- "$VERSION"
+./scripts/run_task.sh tags-update-require-directives -- "$NEXT_VERSION"
 ```
