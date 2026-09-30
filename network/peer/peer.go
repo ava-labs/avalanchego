@@ -276,15 +276,21 @@ func (p *Peer) ObservedUptime() uint32 {
 // for reference counting. This returns false if the message is guaranteed not
 // to be delivered to the peer.
 func (p *Peer) Send(ctx context.Context, msg *message.OutboundMessage) bool {
-	// The node-wide creator can build frames above this connection's limit;
+	// The node-wide creator can build messages above this connection's limit;
 	// refusing here, rather than at write time, lets the caller account the
 	// send as failed instead of waiting for a response that never comes.
-	if uint32(len(msg.Bytes)) > p.stack.MaxFrameSize {
+	//
+	// The peer bounds both the frame it reads and the size it decompresses
+	// that frame to, so the larger of the two must fit. Either can be the
+	// larger: an incompressible payload grows on the wire, a compressible one
+	// grows when decompressed.
+	msgLen := max(len(msg.Bytes), len(msg.Bytes)+msg.BytesSavedCompression)
+	if uint32(msgLen) > p.stack.MaxFrameSize {
 		p.Log.Debug("dropping outgoing message",
 			zap.String("reason", "exceeds frame size"),
 			zap.Stringer("messageOp", msg.Op),
 			zap.Stringer("nodeID", p.id),
-			zap.Int("messageLen", len(msg.Bytes)),
+			zap.Int("messageLen", msgLen),
 			zap.Uint32("frameSize", p.stack.MaxFrameSize),
 		)
 		p.Metrics.SendFailed(msg)

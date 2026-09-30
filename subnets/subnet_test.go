@@ -52,12 +52,16 @@ func (m testMembers) IsSubnetMember(subnetID ids.ID, nodeID ids.NodeID) bool {
 
 func TestIsAllowed(t *testing.T) {
 	var (
-		myNodeID = ids.GenerateTestNodeID()
-		subnetID = ids.GenerateTestID()
-		member   = ids.GenerateTestNodeID()
-		stranger = ids.GenerateTestNodeID()
+		myNodeID    = ids.GenerateTestNodeID()
+		subnetID    = ids.GenerateTestID()
+		member      = ids.GenerateTestNodeID()
+		stranger    = ids.GenerateTestNodeID()
+		otherMember = ids.GenerateTestNodeID()
 
-		members = testMembers{subnetID: set.Of(member)}
+		members = testMembers{
+			subnetID:             set.Of(member),
+			ids.GenerateTestID(): set.Of(otherMember),
+		}
 	)
 
 	tests := map[string]struct {
@@ -89,7 +93,7 @@ func TestIsAllowed(t *testing.T) {
 		},
 		"validator only, member of another subnet": {
 			config: Config{ValidatorOnly: true},
-			nodeID: ids.GenerateTestNodeID(),
+			nodeID: otherMember,
 		},
 	}
 

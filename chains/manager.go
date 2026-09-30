@@ -918,14 +918,13 @@ func (m *manager) createAvalancheChain(
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
 	vdrs.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
 
-	subnetConfig := m.SubnetConfigs[ctx.SubnetID]
 	snowGetHandler, err := snowgetter.New(
 		vmWrappingProposerVM,
 		snowmanMessageSender,
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
-		subnetConfig.MaxAncestorsBytes(),
+		subnetCfg.MaxAncestorsBytes(),
 		ctx.Registerer,
 	)
 	if err != nil {
@@ -1345,14 +1344,13 @@ func (m *manager) createSnowmanChain(
 	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
 	beacons.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
 
-	subnetConfig := m.SubnetConfigs[ctx.SubnetID]
 	snowGetHandler, err := snowgetter.New(
 		vm,
 		messageSender,
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
-		subnetConfig.MaxAncestorsBytes(),
+		subnetCfg.MaxAncestorsBytes(),
 		ctx.Registerer,
 	)
 	if err != nil {

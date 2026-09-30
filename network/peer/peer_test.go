@@ -691,14 +691,13 @@ func TestShouldDisconnect(t *testing.T) {
 	}
 }
 
-// newLargeMessageCreator returns an uncompressed creator that can build
-// payloads up to maxMessageSize. Compression is disabled so on-wire frame
-// sizes are deterministic regardless of payload contents.
-func newLargeMessageCreator(t *testing.T, maxMessageSize uint32) message.Creator {
+// newLargeMessageCreator returns a creator that can build payloads up to
+// maxMessageSize with the given compression.
+func newLargeMessageCreator(t *testing.T, maxMessageSize uint32, compressionType compression.Type) message.Creator {
 	t.Helper()
 	mc, err := message.NewCreatorWithMaxMessageSize(
 		prometheus.NewRegistry(),
-		compression.TypeNone,
+		compressionType,
 		10*time.Second,
 		int64(maxMessageSize),
 	)
@@ -706,16 +705,16 @@ func newLargeMessageCreator(t *testing.T, maxMessageSize uint32) message.Creator
 	return mc
 }
 
-// largeAppGossip builds an AppGossip message whose on-wire frame exceeds
+// largeAppGossip builds an AppGossip message whose uncompressed size exceeds
 // constants.DefaultMaxMessageSize using the supplied creator.
 func largeAppGossip(t *testing.T, mc message.Creator) *message.OutboundMessage {
 	t.Helper()
-	// A payload of exactly the default max size guarantees the framed message
-	// (payload + proto overhead) exceeds the default frame limit.
+	// A payload of exactly the default max size guarantees the message
+	// (payload + proto overhead) exceeds the default limit before compression.
 	payload := make([]byte, constants.DefaultMaxMessageSize)
 	msg, err := mc.AppGossip(ids.GenerateTestID(), payload)
 	require.NoError(t, err)
-	require.Greater(t, len(msg.Bytes), constants.DefaultMaxMessageSize)
+	require.Greater(t, len(msg.Bytes)+msg.BytesSavedCompression, constants.DefaultMaxMessageSize)
 	return msg
 }
 
@@ -729,7 +728,9 @@ func TestSendLargeMessageElevatedStack(t *testing.T) {
 	rawPeer0 := newRawTestPeer(t, newConfig(t))
 	rawPeer1 := newRawTestPeer(t, newConfig(t))
 
-	largeCreator := newLargeMessageCreator(t, elevatedMaxSize)
+	// Compression is disabled so on-wire frame sizes are deterministic
+	// regardless of payload contents.
+	largeCreator := newLargeMessageCreator(t, elevatedMaxSize, compression.TypeNone)
 	for _, p := range []*rawTestPeer{rawPeer0, rawPeer1} {
 		p.stack.MaxFrameSize = elevatedMaxSize
 		p.stack.MessageCreator = largeCreator
@@ -754,6 +755,10 @@ func TestSendLargeMessageElevatedStack(t *testing.T) {
 // TestLargeMessageRefusedByDefaultFrameSize verifies the Send path: an
 // oversized message offered to a default-frame peer is refused as a failed
 // send, and the connection survives so a subsequent normal message arrives.
+//
+// The message is compressed so that it fits the default frame on the wire:
+// the receiver bounds the decompressed size as well, so the refusal must
+// rest on that, not on the frame.
 func TestLargeMessageRefusedByDefaultFrameSize(t *testing.T) {
 	require := require.New(t)
 
@@ -765,7 +770,7 @@ func TestLargeMessageRefusedByDefaultFrameSize(t *testing.T) {
 	// Sender holds the large creator (as MsgCreator() would return node-wide)
 	// but its per-peer stack keeps the default frame size, mirroring a
 	// non-member peer.
-	largeCreator := newLargeMessageCreator(t, elevatedMaxSize)
+	largeCreator := newLargeMessageCreator(t, elevatedMaxSize, compression.TypeZstd)
 	rawPeer0.stack.MessageCreator = largeCreator
 	rawPeer0.stack.MaxFrameSize = constants.DefaultMaxMessageSize
 
@@ -779,6 +784,7 @@ func TestLargeMessageRefusedByDefaultFrameSize(t *testing.T) {
 	}()
 
 	largeMsg := largeAppGossip(t, largeCreator)
+	require.LessOrEqual(len(largeMsg.Bytes), constants.DefaultMaxMessageSize)
 	require.False(peer0.Send(t.Context(), largeMsg))
 
 	// Connection stays up; a normal follow-up is still delivered.

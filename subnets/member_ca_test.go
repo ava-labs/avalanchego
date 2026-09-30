@@ -79,10 +79,31 @@ func TestParseMemberCA(t *testing.T) {
 
 	t.Run("trailing garbage after a valid root", func(t *testing.T) {
 		// The shape a rotation file has when the second root was half written:
-		// the first root parses, so without the trailing check this loads as a
-		// CA that trusts only the old fleet.
+		// the first root parses, so without the check this loads as a CA that
+		// trusts only the old fleet.
 		_, err := ParseMemberCA(append(root.CertPEM(), "-----BEGIN CERTIFI"...))
-		require.ErrorIs(t, err, ErrTrailingMemberCAData)
+		require.ErrorIs(t, err, ErrUnexpectedMemberCAData)
+	})
+
+	t.Run("corrupt block before a valid root", func(t *testing.T) {
+		// pem.Decode skips a block it cannot decode and returns the next one,
+		// so without the check a corrupt new root ahead of the old one loads
+		// as a CA that trusts only the old fleet.
+		corrupt := []byte("-----BEGIN CERTIFICATE-----\nnot base64!!\n-----END CERTIFICATE-----\n")
+		_, err := ParseMemberCA(append(corrupt, root.CertPEM()...))
+		require.ErrorIs(t, err, errUndecodedMemberCABlock)
+	})
+
+	t.Run("leading garbage", func(t *testing.T) {
+		_, err := ParseMemberCA(append([]byte("not PEM\n"), root.CertPEM()...))
+		require.ErrorIs(t, err, ErrUnexpectedMemberCAData)
+	})
+
+	t.Run("garbage between roots", func(t *testing.T) {
+		otherRoot, _ := stakingtest.NewPKI(t)
+		pemBytes := append(root.CertPEM(), "not PEM\n"...)
+		_, err := ParseMemberCA(append(pemBytes, otherRoot.CertPEM()...))
+		require.ErrorIs(t, err, ErrUnexpectedMemberCAData)
 	})
 
 	t.Run("trailing whitespace is not garbage", func(t *testing.T) {
@@ -92,9 +113,8 @@ func TestParseMemberCA(t *testing.T) {
 	})
 
 	t.Run("garbage alone", func(t *testing.T) {
-		// Nothing parsed at all, which is the plainer error of the two.
 		_, err := ParseMemberCA([]byte("not PEM at all"))
-		require.ErrorIs(t, err, ErrNoMemberCACertificates)
+		require.ErrorIs(t, err, ErrUnexpectedMemberCAData)
 	})
 }
 
@@ -243,6 +263,6 @@ func TestConfigLoadMemberCA(t *testing.T) {
 	t.Run("malformed inline", func(t *testing.T) {
 		config := Config{MemberCA: []string{"not a PEM block"}}
 		_, err := config.LoadMemberCA()
-		require.ErrorIs(t, err, ErrNoMemberCACertificates)
+		require.ErrorIs(t, err, ErrUnexpectedMemberCAData)
 	})
 }

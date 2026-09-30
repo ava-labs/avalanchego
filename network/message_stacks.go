@@ -117,7 +117,10 @@ func newMessageStacks(
 		return stacks, nil
 	}
 
-	throttler := largeMessages.ThrottlerConfig()
+	throttler, err := largeMessages.ResolveThrottlerConfig()
+	if err != nil {
+		return nil, err
+	}
 	log.Warn(
 		"large message config enabled",
 		zap.Stringer("subnetID", elevatedSubnetID),

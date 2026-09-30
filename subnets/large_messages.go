@@ -4,6 +4,8 @@
 package subnets
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -11,20 +13,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-const (
-	// The elevated stack's throttler limits are derived from its frame size
-	// with these factors, which keep the headroom the default 2 MiB stack has
-	// under the default throttler flags; each trailing comment names it.
-	inboundAtLargeAllocMultiplier     = 3  // 6 MiB at-large
-	outboundAtLargeAllocMultiplier    = 16 // 32 MiB at-large
-	validatorAllocMultiplier          = 16 // 32 MiB validator
-	inboundBandwidthRefillRateDivisor = 4  // 512 KiB/s refill
-)
-
 var (
 	ErrLargeMessageSizeTooSmall = fmt.Errorf("largeMessages.maxMessageSize must be greater than the default %d bytes", constants.DefaultMaxMessageSize)
 
+	errInvalidThrottlerConfig = errors.New("invalid largeMessages.throttlerConfig")
 	errThrottlerValueTooSmall = errors.New("largeMessages.throttlerConfig value must be at least maxMessageSize")
+	errThrottlerValueZero     = errors.New("largeMessages.throttlerConfig value must be greater than zero")
 	errRecheckDelayTooSmall   = fmt.Errorf("largeMessages.throttlerConfig recheck delay must be at least %s", constants.MinInboundThrottlerMaxRecheckDelay)
 )
 
@@ -43,46 +37,37 @@ type LargeMessagesConfig struct {
 	// MaxMessageSize is the elevated frame and codec size, in bytes.
 	MaxMessageSize uint32 `json:"maxMessageSize" yaml:"maxMessageSize"`
 
-	// ThrottlerOverrides overrides individual elevated-stack throttler limits.
-	// Every field left at zero is derived from MaxMessageSize.
-	ThrottlerOverrides *LargeMessageThrottlerConfig `json:"throttlerConfig" yaml:"throttlerConfig"`
+	// ThrottlerConfig overrides individual elevated-stack throttler limits. It
+	// is decoded over the limits derived from MaxMessageSize, so a key left
+	// out keeps its derived value and an unknown key is rejected. It stays raw
+	// because that layering needs the derived defaults, which only exist once
+	// MaxMessageSize is known.
+	ThrottlerConfig json.RawMessage `json:"throttlerConfig" yaml:"throttlerConfig"`
 }
 
 // LargeMessageThrottlerConfig configures the elevated stack's message
-// throttlers. A zero field means "derive from the max message size"; none of
-// these limits is meaningfully zero.
+// throttlers. Its JSON keys are those of the node's own throttler
+// configuration types, nested the same way.
 type LargeMessageThrottlerConfig struct {
 	InboundMsgThrottlerConfig  throttling.InboundMsgThrottlerConfig `json:"inboundMsgThrottlerConfig"  yaml:"inboundMsgThrottlerConfig"`
 	OutboundMsgThrottlerConfig throttling.MsgByteThrottlerConfig    `json:"outboundMsgThrottlerConfig" yaml:"outboundMsgThrottlerConfig"`
 }
 
-// ThrottlerConfig returns the elevated stack's throttler configuration: the
-// limits derived from MaxMessageSize, with every non-zero override applied on
-// top.
-func (c *LargeMessagesConfig) ThrottlerConfig() LargeMessageThrottlerConfig {
+// ResolveThrottlerConfig returns the elevated stack's throttler configuration:
+// the limits derived from MaxMessageSize, with every key present in
+// ThrottlerConfig decoded on top.
+func (c *LargeMessagesConfig) ResolveThrottlerConfig() (LargeMessageThrottlerConfig, error) {
 	throttler := DefaultLargeMessageThrottlerConfig(uint64(c.MaxMessageSize))
-	if c.ThrottlerOverrides == nil {
-		return throttler
+	if len(c.ThrottlerConfig) == 0 {
+		return throttler, nil
 	}
 
-	var (
-		inbound   = &throttler.InboundMsgThrottlerConfig
-		outbound  = &throttler.OutboundMsgThrottlerConfig
-		oInbound  = c.ThrottlerOverrides.InboundMsgThrottlerConfig
-		oOutbound = c.ThrottlerOverrides.OutboundMsgThrottlerConfig
-	)
-	override(&inbound.AtLargeAllocSize, oInbound.AtLargeAllocSize)
-	override(&inbound.VdrAllocSize, oInbound.VdrAllocSize)
-	override(&inbound.NodeMaxAtLargeBytes, oInbound.NodeMaxAtLargeBytes)
-	override(&inbound.MaxProcessingMsgsPerNode, oInbound.MaxProcessingMsgsPerNode)
-	override(&inbound.RefillRate, oInbound.RefillRate)
-	override(&inbound.MaxBurstSize, oInbound.MaxBurstSize)
-	override(&inbound.CPUThrottlerConfig.MaxRecheckDelay, oInbound.CPUThrottlerConfig.MaxRecheckDelay)
-	override(&inbound.DiskThrottlerConfig.MaxRecheckDelay, oInbound.DiskThrottlerConfig.MaxRecheckDelay)
-	override(&outbound.AtLargeAllocSize, oOutbound.AtLargeAllocSize)
-	override(&outbound.VdrAllocSize, oOutbound.VdrAllocSize)
-	override(&outbound.NodeMaxAtLargeBytes, oOutbound.NodeMaxAtLargeBytes)
-	return throttler
+	decoder := json.NewDecoder(bytes.NewReader(c.ThrottlerConfig))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&throttler); err != nil {
+		return LargeMessageThrottlerConfig{}, fmt.Errorf("%w: %w", errInvalidThrottlerConfig, err)
+	}
+	return throttler, nil
 }
 
 // Verify returns nil iff this block, and the throttler configuration it
@@ -92,9 +77,12 @@ func (c *LargeMessagesConfig) Verify() error {
 		return ErrLargeMessageSizeTooSmall
 	}
 
+	throttler, err := c.ResolveThrottlerConfig()
+	if err != nil {
+		return err
+	}
 	var (
 		maxMessageSize = uint64(c.MaxMessageSize)
-		throttler      = c.ThrottlerConfig()
 		inbound        = throttler.InboundMsgThrottlerConfig
 		outbound       = throttler.OutboundMsgThrottlerConfig
 	)
@@ -107,14 +95,28 @@ func (c *LargeMessagesConfig) Verify() error {
 		name  string
 		value uint64
 	}{
-		{name: "inboundMsgThrottlerConfig.atLargeAllocSize", value: inbound.AtLargeAllocSize},
-		{name: "inboundMsgThrottlerConfig.nodeMaxAtLargeBytes", value: inbound.NodeMaxAtLargeBytes},
-		{name: "inboundMsgThrottlerConfig.maxBurstSize", value: inbound.MaxBurstSize},
+		{name: "inboundMsgThrottlerConfig.byteThrottlerConfig.atLargeAllocSize", value: inbound.AtLargeAllocSize},
+		{name: "inboundMsgThrottlerConfig.byteThrottlerConfig.nodeMaxAtLargeBytes", value: inbound.NodeMaxAtLargeBytes},
+		{name: "inboundMsgThrottlerConfig.bandwidthThrottlerConfig.bandwidthMaxBurstRate", value: inbound.MaxBurstSize},
 		{name: "outboundMsgThrottlerConfig.atLargeAllocSize", value: outbound.AtLargeAllocSize},
 		{name: "outboundMsgThrottlerConfig.nodeMaxAtLargeBytes", value: outbound.NodeMaxAtLargeBytes},
 	} {
 		if limit.value < maxMessageSize {
 			return fmt.Errorf("%w: %s is %d, want >= %d", errThrottlerValueTooSmall, limit.name, limit.value, maxMessageSize)
+		}
+	}
+
+	// Zero here is a peer that can never refill or never be handled, not
+	// "unlimited".
+	for _, limit := range []struct {
+		name  string
+		value uint64
+	}{
+		{name: "inboundMsgThrottlerConfig.bandwidthThrottlerConfig.bandwidthRefillRate", value: inbound.RefillRate},
+		{name: "inboundMsgThrottlerConfig.maxProcessingMsgsPerNode", value: inbound.MaxProcessingMsgsPerNode},
+	} {
+		if limit.value == 0 {
+			return fmt.Errorf("%w: %s", errThrottlerValueZero, limit.name)
 		}
 	}
 
@@ -126,20 +128,23 @@ func (c *LargeMessagesConfig) Verify() error {
 }
 
 // DefaultLargeMessageThrottlerConfig returns a complete elevated-stack
-// throttler configuration derived from [maxMessageSize]. The multipliers keep
-// the same headroom relative to the frame size that the default 2 MiB stack
-// has.
+// throttler configuration derived from [maxMessageSize]. Every byte limit
+// keeps the ratio it has to the frame size under the default flags, so the
+// elevated stack has the headroom the default stack has.
 func DefaultLargeMessageThrottlerConfig(maxMessageSize uint64) LargeMessageThrottlerConfig {
+	scale := func(defaultLimit uint64) uint64 {
+		return defaultLimit * maxMessageSize / constants.DefaultMaxMessageSize
+	}
 	return LargeMessageThrottlerConfig{
 		InboundMsgThrottlerConfig: throttling.InboundMsgThrottlerConfig{
 			MsgByteThrottlerConfig: throttling.MsgByteThrottlerConfig{
-				AtLargeAllocSize:    maxMessageSize * inboundAtLargeAllocMultiplier,
-				VdrAllocSize:        maxMessageSize * validatorAllocMultiplier,
-				NodeMaxAtLargeBytes: maxMessageSize,
+				AtLargeAllocSize:    scale(constants.DefaultInboundThrottlerAtLargeAllocSize),
+				VdrAllocSize:        scale(constants.DefaultInboundThrottlerVdrAllocSize),
+				NodeMaxAtLargeBytes: scale(constants.DefaultInboundThrottlerNodeMaxAtLargeBytes),
 			},
 			BandwidthThrottlerConfig: throttling.BandwidthThrottlerConfig{
-				RefillRate:   maxMessageSize / inboundBandwidthRefillRateDivisor,
-				MaxBurstSize: maxMessageSize,
+				RefillRate:   scale(constants.DefaultInboundThrottlerBandwidthRefillRate),
+				MaxBurstSize: scale(constants.DefaultInboundThrottlerBandwidthMaxBurstSize),
 			},
 			MaxProcessingMsgsPerNode: constants.DefaultInboundThrottlerMaxProcessingMsgsPerNode,
 			CPUThrottlerConfig: throttling.SystemThrottlerConfig{
@@ -150,17 +155,9 @@ func DefaultLargeMessageThrottlerConfig(maxMessageSize uint64) LargeMessageThrot
 			},
 		},
 		OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
-			AtLargeAllocSize:    maxMessageSize * outboundAtLargeAllocMultiplier,
-			VdrAllocSize:        maxMessageSize * validatorAllocMultiplier,
-			NodeMaxAtLargeBytes: maxMessageSize,
+			AtLargeAllocSize:    scale(constants.DefaultOutboundThrottlerAtLargeAllocSize),
+			VdrAllocSize:        scale(constants.DefaultOutboundThrottlerVdrAllocSize),
+			NodeMaxAtLargeBytes: scale(constants.DefaultOutboundThrottlerNodeMaxAtLargeBytes),
 		},
-	}
-}
-
-// override leaves *target at its derived default when [value] is unset.
-func override[T comparable](target *T, value T) {
-	var zero T
-	if value != zero {
-		*target = value
 	}
 }

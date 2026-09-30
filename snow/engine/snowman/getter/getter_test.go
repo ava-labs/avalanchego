@@ -59,8 +59,8 @@ func newTest(t *testing.T) (common.AllGetsServer, StateSyncEnabledMock, *enginet
 	return bs, vm, sender
 }
 
-// TestGetAncestorsByteBudget checks that the getter serves Ancestors from the
-// chain's configured budget, rather than resolving one per peer.
+// TestGetAncestorsByteBudget checks that the getter keeps the byte budget it
+// was built with, whichever value the chain's subnet config resolved to.
 func TestGetAncestorsByteBudget(t *testing.T) {
 	for _, maxBytes := range []int{
 		constants.MaxContainersLen,

@@ -14,6 +14,7 @@ import (
 
 const (
 	certificatePEMType = "CERTIFICATE"
+	pemBeginMarker     = "-----BEGIN "
 
 	// maxMemberChainLen bounds path building, not chain structure. Every
 	// certificate sharing the issuer's subject is a candidate parent whose
@@ -28,10 +29,11 @@ const (
 var (
 	ErrNoMemberCACertificates = errors.New("member CA holds no certificates")
 	ErrMalformedMemberCA      = errors.New("malformed member CA certificate")
-	ErrTrailingMemberCAData   = errors.New("trailing data after the last member CA certificate")
+	ErrUnexpectedMemberCAData = errors.New("member CA holds data that is not a PEM certificate block")
 
-	errUnexpectedPEMBlock = errors.New("unexpected PEM block type in member CA")
-	errMemberCANotACA     = errors.New("member CA certificate is not a certificate authority")
+	errUndecodedMemberCABlock = errors.New("member CA holds a PEM block that did not decode")
+	errUnexpectedPEMBlock     = errors.New("unexpected PEM block type in member CA")
+	errMemberCANotACA         = errors.New("member CA certificate is not a certificate authority")
 )
 
 // MemberCA holds the root certificates that a peer's staking certificate chain
@@ -53,13 +55,22 @@ func ParseMemberCA(pemBytes []byte) (*MemberCA, error) {
 			roots: x509.NewCertPool(),
 		}
 		numRoots int
-		rest     = pemBytes
 	)
-	for {
+	// pem.Decode skips whatever precedes the first block it can decode, so
+	// leading garbage, garbage between blocks and a corrupt block followed by a
+	// valid one all load as fewer roots than the file holds, with no error.
+	// That is exactly the shape a half-written rotation file has, and it would
+	// admit the old fleet while quietly dropping the new root. Requiring every
+	// block to start where the previous one ended, and every BEGIN marker to
+	// have decoded, refuses all three.
+	for rest := bytes.TrimSpace(pemBytes); len(rest) > 0; rest = bytes.TrimSpace(rest) {
+		if !bytes.HasPrefix(rest, []byte(pemBeginMarker)) {
+			return nil, ErrUnexpectedMemberCAData
+		}
 		var block *pem.Block
 		block, rest = pem.Decode(rest)
 		if block == nil {
-			break
+			return nil, ErrUnexpectedMemberCAData
 		}
 		if block.Type != certificatePEMType {
 			return nil, fmt.Errorf("%w: %q", errUnexpectedPEMBlock, block.Type)
@@ -83,12 +94,8 @@ func ParseMemberCA(pemBytes []byte) (*MemberCA, error) {
 	if numRoots == 0 {
 		return nil, ErrNoMemberCACertificates
 	}
-	// pem.Decode reports "no more PEM" and "this is not PEM" the same way, so
-	// without this a truncated or corrupt block silently loads only the roots
-	// ahead of it. That is exactly the shape a half-written rotation file has,
-	// and it would admit the old fleet while quietly dropping the new root.
-	if len(bytes.TrimSpace(rest)) > 0 {
-		return nil, ErrTrailingMemberCAData
+	if bytes.Count(pemBytes, []byte(pemBeginMarker)) != numRoots {
+		return nil, errUndecodedMemberCABlock
 	}
 	return ca, nil
 }

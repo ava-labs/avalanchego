@@ -129,7 +129,7 @@ func TestValidParameters(t *testing.T) {
 				MemberCA:       []string{"not a PEM block"},
 				SnowParameters: &validParameters,
 			},
-			expectedErr: ErrNoMemberCACertificates,
+			expectedErr: ErrUnexpectedMemberCAData,
 		},
 		{
 			name: "largeMessages at the default size",

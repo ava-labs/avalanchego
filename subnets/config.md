@@ -146,10 +146,9 @@ one that was missed during a rollout.
 `throttlerConfig` reuses the node's own inbound and outbound throttler
 configuration types, so its keys are nested the way those types are. It applies
 only to the elevated stack; the default 2 MiB stack keeps its node-level
-configuration. A key left out, or set to `0`, keeps the value derived from
-`maxMessageSize`; a key spelled differently from the ones below is ignored, not
-rejected, so check the derived values in the `large message config enabled`
-log line after a change.
+configuration. A key left out keeps the value derived from `maxMessageSize`; a
+key spelled differently from the ones below is rejected at startup. The derived
+values are printed in the `large message config enabled` log line.
 
 ```json
 {
@@ -198,10 +197,11 @@ nanoseconds.
 | `outboundMsgThrottlerConfig.vdrAllocSize` | `throttler-outbound-validator-alloc-size` |
 | `outboundMsgThrottlerConfig.nodeMaxAtLargeBytes` | `throttler-outbound-node-max-at-large-bytes` |
 
-The node refuses to start if `nodeMaxAtLargeBytes` or `bandwidthMaxBurstRate`
-is set below `maxMessageSize`, since a peer that cannot be granted a whole frame
-would stall on its first large message, or if a `maxRecheckDelay` is set below
-one millisecond.
+The node refuses to start if `atLargeAllocSize`, `nodeMaxAtLargeBytes` or
+`bandwidthMaxBurstRate` is set below `maxMessageSize`, since a peer that cannot
+be granted a whole frame would stall on its first large message; if
+`bandwidthRefillRate` or `maxProcessingMsgsPerNode` is `0`; or if a
+`maxRecheckDelay` is set below one millisecond.
 
 A connection's frame size is fixed for its lifetime, but membership is not: a
 peer that joins or leaves a validator set, or whose continuous-fee balance runs

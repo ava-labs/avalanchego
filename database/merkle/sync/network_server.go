@@ -79,7 +79,7 @@ func NewProofHandlerWithMaxMessageSize[R any, C any](
 	registerer prometheus.Registerer,
 	maxMessageSize uint32,
 ) (*ProofHandler[R, C], error) {
-	maxByteSizeLimit, err := proofByteSizeLimit(maxMessageSize)
+	byteSizeLimit, err := proofByteSizeLimit(maxMessageSize)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func NewProofHandlerWithMaxMessageSize[R any, C any](
 		db:                   db,
 		rangeProofMarshaler:  rangeProofMarshaler,
 		changeProofMarshaler: changeProofMarshaler,
-		maxByteSizeLimit:     maxByteSizeLimit,
+		maxByteSizeLimit:     byteSizeLimit,
 		metrics:              metrics,
 	}, nil
 }
