@@ -16,8 +16,8 @@ For the rationale behind the multi-module tagging process, see [Multi-Module Rel
 
 All components follow aligned versioning:
 
-- Same version number - When AvalancheGo releases v1.14.0, Subnet-EVM is also v1.14.0
-- Coordinated tags - Each release creates tags for the main module and all submodules (e.g., `v1.14.0`, `graft/evm/v1.14.0`, `graft/coreth/v1.14.0`, `graft/subnet-evm/v1.14.0`)
+- Same version number - When AvalancheGo releases v1.15.0, Subnet-EVM is also v1.15.0
+- Coordinated tags - Each release creates tags for the main module and all submodules (e.g., `v1.15.0`, `graft/evm/v1.15.0`, `graft/coreth/v1.15.0`, `graft/subnet-evm/v1.15.0`)
 
 ## Release Procedure
 
@@ -73,7 +73,7 @@ A release that schedules a new network upgrade increases the minor version (for 
 
 1. In [`version/compatibility.json`](version/compatibility.json), replace the patch version from the prep PR with `$VERSION`.
 
-1. In [`RELEASES.md`](RELEASES.md), rename the first section to `$VERSION`.
+1. In [`RELEASES.md`](RELEASES.md), change the version in the first section's heading and link to `$VERSION`.
 
 #### Activating a Network Upgrade on Mainnet
 
@@ -221,7 +221,7 @@ Create a release at [github.com/ava-labs/avalanchego/releases/new](https://githu
 
 1. Select tag `$VERSION`
 1. Set title to `$VERSION`
-1. For the release notes, copy the `$VERSION` section of [`RELEASES.md`](RELEASES.md) without its heading, and end it with the full changelog link:
+1. For the release notes, copy the `$VERSION` section of [`RELEASES.md`](RELEASES.md) without its heading or any empty sections, and end it with the full changelog link:
 
     ```markdown
     This release schedules the activation of the Helicon network upgrade...
@@ -241,7 +241,7 @@ Create a release at [github.com/ava-labs/avalanchego/releases/new](https://githu
     **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.14.2...v1.15.0
     ```
 
-1. Attach the **Binaries** listed in [step 6](#6-automated-builds), downloaded from the artifacts of the tag's `build-linux-release` and `build-macos-release` runs
+1. Attach the **Binaries** listed in [step 6](#6-automated-builds), downloaded from the artifacts of the tag's `build-linux-binaries.yml` and `build-macos-release.yml` runs
 1. Check "Set as the latest release"
 1. Publish
 
@@ -299,6 +299,14 @@ export NEXT_VERSION=v1.15.2
 
    ```markdown
    ## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
+
+   ### Features
+
+   ### APIs
+
+   ### Configs
+
+   ### Fixes
    ```
 
 1. PRs merged after the release candidate commit may have added notes to the `$VERSION` section of [`RELEASES.md`](RELEASES.md). Check with this diff, and move any you find to `$NEXT_VERSION`:
@@ -329,13 +337,13 @@ When the protocol version changes:
 1. Update [`version/constants.go`](version/constants.go):
 
    ```go
-   RPCChainVMProtocol uint = 45
+   RPCChainVMProtocol uint = 47
    ```
 
 2. Update [`version/compatibility.json`](version/compatibility.json):
 
    ```json
-   "45": ["v1.14.1"]
+   "47": ["v1.15.2"]
    ```
 
    The version listed is the one master is preparing (`version.Current`).
@@ -391,7 +399,7 @@ To recover, delete the partially created tags and re-run:
 
 ```bash
 # The error output lists existing tags. Delete them:
-git tag -d v1.14.1 graft/evm/v1.14.1
+git tag -d v1.15.1 graft/evm/v1.15.1
 # Then re-run:
 ./scripts/run_task.sh tags-create -- "$VERSION"
 ```
@@ -409,7 +417,7 @@ To recover, re-run the push — git push is idempotent for tags that already exi
 If a tag was pushed pointing to the wrong commit, delete the remote tag and re-push:
 
 ```bash
-git push origin :refs/tags/graft/evm/v1.14.1
+git push origin :refs/tags/graft/evm/v1.15.1
 ./scripts/run_task.sh tags-push -- "$VERSION"
 ```
 

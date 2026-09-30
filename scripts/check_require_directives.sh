@@ -74,9 +74,10 @@ fi
 current_version=$(<"$REPO_ROOT/version/current.txt")
 
 if [[ "$current_version" != "$reference" ]]; then
-  echo "Internal module require version $reference does not match version.Current $current_version" >&2
+  echo "Internal module require version $reference does not match version/current.txt $current_version" >&2
   echo "" >&2
-  echo "Run './scripts/run_task.sh tags-update-require-directives -- $current_version' to fix." >&2
+  echo "If version.Current changed, run './scripts/run_task.sh tags-update-require-directives -- $current_version'." >&2
+  echo "Otherwise, set version.Current and version/current.txt to $reference." >&2
   exit 1
 fi
 
