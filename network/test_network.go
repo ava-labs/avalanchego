@@ -224,7 +224,7 @@ func NewTestNetwork(
 	upgrades := upgrade.GetConfig(cfg.NetworkID)
 	return NewNetwork(
 		cfg,
-		upgrades.LatestScheduledTime(),
+		upgrades.LatestTime(),
 		msgCreator,
 		metrics,
 		log,

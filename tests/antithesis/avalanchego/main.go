@@ -168,7 +168,7 @@ func main() {
 
 	upgrades, err := info.NewClient(setupURI).Upgrades(ctx)
 	require.NoError(err, "failed to fetch the upgrade schedule")
-	nextUpgrade := upgrades.LatestScheduledTime()
+	nextUpgrade := upgrades.LatestTime()
 	timeUntilUpgrade := time.Until(nextUpgrade)
 	assert.Always(
 		timeUntilUpgrade > 0,

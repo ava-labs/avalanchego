@@ -632,7 +632,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
-		n.Config.UpgradeConfig.LatestScheduledTime(),
+		n.Config.UpgradeConfig.LatestTime(),
 		n.msgCreator,
 		reg,
 		n.Log,
@@ -1549,7 +1549,7 @@ func (n *Node) initHealthAPI() error {
 	// are expensive calls. This could be rewritten as an event based monitor to
 	// avoid expensive iteration.
 	var (
-		localUpgradeTime     = n.Config.UpgradeConfig.LatestScheduledTime()
+		localUpgradeTime     = n.Config.UpgradeConfig.LatestTime()
 		localUpgradeTimeUnix = uint64(localUpgradeTime.Unix())
 		lastLogTime          time.Time
 	)

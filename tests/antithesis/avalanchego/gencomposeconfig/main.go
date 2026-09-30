@@ -72,7 +72,7 @@ func newNetwork() (*tmpnet.Network, time.Time, error) {
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("getting upgrade flags: %w", err)
 	}
-	return network, upgrades.LatestScheduledTime(), nil
+	return network, upgrades.LatestTime(), nil
 }
 
 // guestScript returns a bash script that sets the system clock to a random
