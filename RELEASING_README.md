@@ -21,7 +21,7 @@ All components follow aligned versioning:
 
 ## Release Procedure
 
-Master always names the next version in `version.Current` and the internal `require` directives (enforced by [`check-require-directives`](#check-require-directives)). Any master commit can be tagged as a release candidate, the final release tags that same commit, and prep for the next version happens after the release.
+Master always names the next version in `version.Current`, the internal `require` directives, and the top section of [`RELEASES.md`](RELEASES.md) (enforced by [`check-require-directives`](#check-require-directives)). Any master commit can be tagged as a release candidate, the final release tags that same commit, and prep for the next version happens after the release.
 
 ### 1. Preparation
 
@@ -387,7 +387,7 @@ Verifies that tags for the main module and all submodules exist on the remote. A
 
 ### `check-require-directives`
 
-Verifies that all internal module `require` directives reference the same version, and that it matches `version.Current` or is a [development tag](#development-tags). Runs in CI.
+Verifies that all internal module `require` directives reference the same version, and that it either matches both `version.Current` and the first section of [`RELEASES.md`](RELEASES.md), or is a [development tag](#development-tags). Runs in CI.
 
 ## Troubleshooting
 
