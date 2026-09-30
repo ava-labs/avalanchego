@@ -41,7 +41,6 @@ import (
 	_ "github.com/ava-labs/libevm/core/txpool"
 	_ "github.com/ava-labs/libevm/eth/filters"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -1003,7 +1002,7 @@ func TestGetReceipts(t *testing.T) {
 			r.CumulativeGasUsed = totalGas
 			r.BlockHash = b.Hash()
 			r.BlockNumber = b.Number()
-			r.TransactionIndex = uint(i) //#nosec G115 -- Known non-negative
+			r.TransactionIndex = uint(i)
 		}
 		return b, rs
 	}
@@ -1181,9 +1180,9 @@ func TestFillTransaction(t *testing.T) {
 	}
 
 	args := ethapi.TransactionArgs{
-		From:  utils.PointerTo(sut.wallet.Addresses()[0]),
+		From:  new(sut.wallet.Addresses()[0]),
 		To:    &to,
-		Gas:   utils.PointerTo(hexutil.Uint64(gas)),
+		Gas:   new(hexutil.Uint64(gas)),
 		Value: hexBig(value),
 	}
 
@@ -1228,10 +1227,10 @@ func TestResend(t *testing.T) {
 		method: "eth_resend",
 		args: []any{
 			ethapi.TransactionArgs{
-				From:                 utils.PointerTo(sut.wallet.Addresses()[0]),
-				Nonce:                utils.PointerTo(hexutil.Uint64(tx.Nonce())),
+				From:                 new(sut.wallet.Addresses()[0]),
+				Nonce:                new(hexutil.Uint64(tx.Nonce())),
 				To:                   tx.To(),
-				Gas:                  utils.PointerTo(hexutil.Uint64(tx.Gas())),
+				Gas:                  new(hexutil.Uint64(tx.Gas())),
 				MaxFeePerGas:         (*hexutil.Big)(tx.GasFeeCap()),
 				MaxPriorityFeePerGas: (*hexutil.Big)(tx.GasTipCap()),
 			},
@@ -1250,10 +1249,10 @@ func TestEthSigningAPIs(t *testing.T) {
 	txFields := ethapi.TransactionArgs{
 		From:     &zeroAddr,
 		To:       &zeroAddr,
-		Gas:      utils.PointerTo(hexutil.Uint64(params.TxGas)),
+		Gas:      new(hexutil.Uint64(params.TxGas)),
 		GasPrice: hexBig(1),
 		Value:    hexBig(100),
-		Nonce:    utils.PointerTo(hexutil.Uint64(0)),
+		Nonce:    new(hexutil.Uint64),
 	}
 	sut.testRPC(ctx, t, []rpcTest{
 		{
@@ -1473,7 +1472,7 @@ func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block
 	}...)
 
 	for i, wantTx := range want.Transactions() {
-		txIdx := hexutil.Uint(i) //#nosec G115 -- Won't overflow
+		txIdx := hexutil.Uint(i)
 		marshaled, err := wantTx.MarshalBinary()
 		require.NoErrorf(t, err, "%T.MarshalBinary()", wantTx)
 
@@ -1506,7 +1505,7 @@ func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block
 		}...)
 	}
 
-	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1) //#nosec G115 -- Known to not overflow
+	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1)
 	s.testRPC(ctx, t, []rpcTest{
 		{
 			method: "eth_getTransactionByBlockHashAndIndex",
@@ -1619,7 +1618,7 @@ func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Blo
 	}...)
 
 	for i, wantTx := range want.Transactions() {
-		txIdx := hexutil.Uint(i) //#nosec G115 -- Won't overflow
+		txIdx := hexutil.Uint(i)
 		marshaled, err := wantTx.MarshalBinary()
 		require.NoErrorf(t, err, "%T.MarshalBinary()", wantTx)
 
@@ -1637,7 +1636,7 @@ func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Blo
 		}...)
 	}
 
-	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1) //#nosec G115 -- Known to not overflow
+	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1)
 	s.testRPC(ctx, t, []rpcTest{
 		{
 			method: "eth_getTransactionByBlockNumberAndIndex",
@@ -1803,7 +1802,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "both_num_and_hash",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockNumber: utils.PointerTo(rpc.LatestBlockNumber),
+				BlockNumber: new(rpc.LatestBlockNumber),
 				BlockHash:   &common.Hash{},
 			},
 			wantErr: blocks.ErrBothNumberAndHash,
@@ -1817,7 +1816,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "canonical_hash_in_memory",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash: utils.PointerTo(accepted.Hash()),
+				BlockHash: new(accepted.Hash()),
 			},
 			wantNum:  accepted.NumberU64(),
 			wantHash: accepted.Hash(),
@@ -1825,7 +1824,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "canonical_hash_on_disk",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash: utils.PointerTo(settled.Hash()),
+				BlockHash: new(settled.Hash()),
 			},
 			wantNum:  settled.NumberU64(),
 			wantHash: settled.Hash(),
@@ -1833,7 +1832,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "non_canonical_when_canonical_not_required",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash: utils.PointerTo(nonCanonical.Hash()),
+				BlockHash: new(nonCanonical.Hash()),
 			},
 			wantNum:  nonCanonical.NumberU64(),
 			wantHash: nonCanonical.Hash(),
@@ -1841,7 +1840,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "non_canonical_when_canonical_required",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash:        utils.PointerTo(nonCanonical.Hash()),
+				BlockHash:        new(nonCanonical.Hash()),
 				RequireCanonical: true,
 			},
 			wantErr: blocks.ErrNonCanonicalBlock,

@@ -48,7 +48,7 @@ func NewRandomTest(
 		return nil, err
 	}
 
-	if _, err := bind.WaitDeployed(ctx, worker.Client, tx); err != nil {
+	if err := WaitDeployed(ctx, worker.Client, tx); err != nil {
 		return nil, err
 	}
 
@@ -59,7 +59,7 @@ func NewRandomTest(
 		return nil, err
 	}
 
-	if _, err := bind.WaitDeployed(ctx, worker.Client, tx); err != nil {
+	if err := WaitDeployed(ctx, worker.Client, tx); err != nil {
 		return nil, err
 	}
 
@@ -357,6 +357,27 @@ func (e ERC20Test) Run(tc tests.TestContext, wallet *Wallet) {
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 		return e.Contract.Transfer(txOpts, recipient, e.Value)
 	})
+}
+
+// WaitDeployed waits for a contract deployment to execute successfully. Unlike
+// [bind.WaitDeployed], it reads code at the receipt's block rather than
+// "latest", which SAE may not have advanced to when it issues the receipt.
+func WaitDeployed(ctx context.Context, b bind.DeployBackend, tx *types.Transaction) error {
+	receipt, err := bind.WaitMined(ctx, b, tx)
+	if err != nil {
+		return err
+	}
+	if receipt.Status != types.ReceiptStatusSuccessful {
+		return errTxExecutionFailed
+	}
+	code, err := b.CodeAt(ctx, receipt.ContractAddress, receipt.BlockNumber)
+	if err != nil {
+		return err
+	}
+	if len(code) == 0 {
+		return bind.ErrNoCodeAfterDeploy
+	}
+	return nil
 }
 
 func executeContractTx(

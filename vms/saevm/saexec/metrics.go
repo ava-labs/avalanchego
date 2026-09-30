@@ -5,6 +5,7 @@ package saexec
 
 import (
 	"errors"
+	"math"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -179,7 +180,13 @@ func (m *metrics) setExecuted(block *blocks.Block) {
 	gasTime := block.ExecutedByGasTime()
 	gasClock := gasTime.AsTime()
 	m.lastExecutedGasTime.Set(float64(gasClock.UnixNano()) / 1e9)
-	m.gasTimeWallTimeGap.Set(gasClock.Sub(block.ExecutedByWallTime()).Seconds())
+	// Restored blocks have no wall time. Subtracting the zero [time.Time]
+	// maxes out the [time.Duration], so report the gap as unknown.
+	if byWall := block.ExecutedByWallTime(); byWall.IsZero() {
+		m.gasTimeWallTimeGap.Set(math.NaN())
+	} else {
+		m.gasTimeWallTimeGap.Set(gasClock.Sub(byWall).Seconds())
+	}
 
 	m.worstCaseBaseFee.Set(block.WorstCaseBaseFee().Float64())
 	m.executedBaseFee.Set(block.ExecutedBaseFee().Float64())

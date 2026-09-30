@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
@@ -190,7 +189,7 @@ func TestGetAtomicTxStatus(t *testing.T) {
 		require.NoErrorf(t, err, "%T.getTxStatus()", sut.Client)
 		want := TxStatus{
 			Status: choices.Accepted,
-			Height: utils.PointerTo(avajson.Uint64(blk.NumberU64())),
+			Height: new(avajson.Uint64(blk.NumberU64())),
 		}
 		require.Equalf(t, want, got, "%T.getTxStatus()", sut.Client)
 	})
@@ -310,6 +309,8 @@ func TestRPCExtras(t *testing.T) {
 // TestSynchronousRPCs replays JSON-RPC calls recorded from the synchronous VM
 // and requires an identical response, covering state, receipt, log, and tracing
 // RPCs at every height for every pre-SAE network upgrade.
+//
+// TODO(StephenButtolph): Test RPCs re-executing synchronous blocks.
 func TestSynchronousRPCs(t *testing.T) {
 	// The fixture's keys are relative to the VM's own database rather than to
 	// the base database that contains it.
