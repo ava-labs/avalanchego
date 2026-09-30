@@ -325,7 +325,7 @@ func (b *backend) minGasForArgs(args ethapi.TransactionArgs) (hexutil.Uint64, er
 		allowance = *args.Gas
 	}
 	// A dynamic-fee tx is the largest supported type. Supporting any new tx
-	// type (e.g. blob or frame txs) may invalidate this.
+	// type may invalidate this.
 	tx := types.NewTx(&types.DynamicFeeTx{
 		ChainID:    b.ChainConfig().ChainID,
 		Nonce:      nonce,
