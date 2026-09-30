@@ -81,7 +81,7 @@ func (m *Manager) RegisterChain(ctx *snow.ConsensusContext) error {
 	return nil
 }
 
-// RegisterRequest notes that we expect a response of type [op] from
+// RegisterRequest notes that we expect a response of type requestID.Op from
 // nodeID regarding chain chainID. If we don't receive a response in
 // time, timeoutHandler is executed.
 func (m *Manager) RegisterRequest(

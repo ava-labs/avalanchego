@@ -21,8 +21,8 @@ var (
 // existing staker and addition of a new staker from the pending set.
 //
 // The ordering of operations is:
-//   - Staker operations are performed in order of their [NextTime].
-//   - If operations have the same [NextTime], stakers are first added to the
+//   - Staker operations are performed in order of their [Staker.NextTime].
+//   - If operations have the same [Staker.NextTime], stakers are first added to the
 //     current staker set, then removed.
 //   - Further ties are broken by *Staker.Less(), returning the lesser staker
 //     first.

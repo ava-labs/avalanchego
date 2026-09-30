@@ -19,7 +19,7 @@ var (
 	_ InboundConnUpgradeThrottler = (*noInboundConnUpgradeThrottler)(nil)
 )
 
-// InboundConnUpgradeThrottler returns whether we should upgrade an inbound connection from IP [ipStr].
+// InboundConnUpgradeThrottler returns whether we should upgrade an inbound connection from IP ipStr.
 // If ShouldUpgrade(ipStr) returns false, the connection to that IP should be closed.
 // Note that InboundConnUpgradeThrottler rate-limits _upgrading_ of
 // inbound connections, whereas throttledListener rate-limits
@@ -54,7 +54,7 @@ type InboundConnUpgradeThrottlerConfig struct {
 }
 
 // Returns an InboundConnUpgradeThrottler that upgrades an inbound
-// connection from a given IP at most every [UpgradeCooldown].
+// connection from a given IP at most every [InboundConnUpgradeThrottlerConfig.UpgradeCooldown].
 func NewInboundConnUpgradeThrottler(config InboundConnUpgradeThrottlerConfig) InboundConnUpgradeThrottler {
 	if config.UpgradeCooldown <= 0 || config.MaxRecentConnsUpgraded <= 0 {
 		return &noInboundConnUpgradeThrottler{}

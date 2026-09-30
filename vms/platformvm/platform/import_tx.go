@@ -33,7 +33,7 @@ type ImportTx struct {
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
-// [ImportTx]. Also sets the ctx to the given [vm.ctx] so that
+// [ImportTx]. Also sets the ctx to the given ctx so that
 // the addresses can be json marshalled into human readable format
 func (tx *ImportTx) InitCtx(ctx *snow.Context) {
 	tx.BaseTx.InitCtx(ctx)

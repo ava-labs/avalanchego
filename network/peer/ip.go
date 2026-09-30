@@ -23,7 +23,7 @@ var (
 	errInvalidTLSSignature     = errors.New("invalid TLS signature")
 )
 
-// UnsignedIP is used for a validator to claim an IP. The [Timestamp] is used to
+// UnsignedIP is used for a validator to claim an IP. The [UnsignedIP.Timestamp] is used to
 // ensure that the most updated IP claim is tracked by peers for a given
 // validator.
 type UnsignedIP struct {

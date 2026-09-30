@@ -406,7 +406,7 @@ func (vm *VMServer) Disconnected(ctx context.Context, req *vmpb.DisconnectedRequ
 	return &emptypb.Empty{}, vm.vm.Disconnected(ctx, nodeID)
 }
 
-// If the underlying VM doesn't actually implement this method, its [BuildBlock]
+// If the underlying VM doesn't actually implement this method, its [block.ChainVM.BuildBlock]
 // method will be called instead.
 func (vm *VMServer) BuildBlock(ctx context.Context, req *vmpb.BuildBlockRequest) (*vmpb.BuildBlockResponse, error) {
 	var (

@@ -133,7 +133,7 @@ type handler struct {
 }
 
 // Initialize this consensus handler
-// [engine] must be initialized before initializing this handler
+// Engines are provided separately via [Handler.SetEngineManager].
 func New(
 	ctx *snow.ConsensusContext,
 	cn *block.ChangeNotifier,
