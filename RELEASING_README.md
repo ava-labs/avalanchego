@@ -357,10 +357,7 @@ See the [Antithesis testing documentation](tests/antithesis/README.md#scheduled-
 
 Only needed when `MinimumCompatibleVersion` changed in this release.
 
-The notify service warns node operators running below a configured version. Its config
-lives in `devops-argocd`, under the `uptime` job of
-[`aws/data/us-east-1/data-k8s/root/analytics/analytics-app.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/aws/data/us-east-1/data-k8s/root/analytics/analytics-app.yaml).
-Set both versions to `MinimumCompatibleVersion`, without the leading `v`:
+The notify service warns node operators running below a configured version. Its config lives in `devops-argocd`, under the `uptime` job of [`aws/data/us-east-1/data-k8s/root/analytics/analytics-app.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/aws/data/us-east-1/data-k8s/root/analytics/analytics-app.yaml). Set both versions to `MinimumCompatibleVersion`, without the leading `v`:
 
 ```yaml
 - cmd: uptime
@@ -398,9 +395,7 @@ export NEXT_VERSION=v1.15.2
    }
    ```
 
-   If `$NEXT_VERSION` is a minor release, also bump the compatibility floor in the same
-   file: `MinimumCompatibleVersion` to that minor and `PrevMinimumCompatibleVersion` to
-   the one before, both with `Patch: 0`. For example, for `v1.16.0`:
+   If `$NEXT_VERSION` is a minor release, also bump the compatibility floor in the same file: `MinimumCompatibleVersion` to that minor and `PrevMinimumCompatibleVersion` to the one before, both with `Patch: 0`. For example, for `v1.16.0`:
 
    ```go
    MinimumCompatibleVersion = &Application{
@@ -417,8 +412,7 @@ export NEXT_VERSION=v1.15.2
    }
    ```
 
-   Changing `MinimumCompatibleVersion` also means updating the notify service after that
-   release is published — see [step 8](#8-update-the-notify-service).
+   Changing `MinimumCompatibleVersion` also means updating the notify service after that release is published — see [step 8](#8-update-the-notify-service).
 
 1. Update the submodule require directives:
 
