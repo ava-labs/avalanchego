@@ -173,8 +173,7 @@ var errIncompleteBlockHistory = errors.New("incomplete block history when determ
 // [Block.MarkSettled] was called directly. However, it is valid with a
 // synchronous parent.
 //
-// See the Example for [Block.WhenChildSettles] for one usage of the returned
-// block.
+// See the Example for [Range] for one usage of the returned block.
 func LastToSettleAt(settleAt time.Time, parent *Block) (b *Block, ok bool, _ error) {
 	defer func() {
 		// Avoids having to perform this check at every return.

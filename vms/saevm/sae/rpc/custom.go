@@ -112,7 +112,7 @@ const (
 	fastTipPercent = 105
 )
 
-// NewPriceOptions returns slow, normal, and fast [priceOptions] derived from the given tip and base fee.
+// NewPriceOptions returns slow, normal, and fast [PriceOptions] derived from the given tip and base fee.
 // The slow tip is floored at [minGasTip], and normal/fast are floored at the
 // previous tier to guarantee slow <= normal <= fast.
 func NewPriceOptions(tip, baseFee *big.Int) *PriceOptions {

@@ -55,7 +55,7 @@ type ChainVMWithContext interface {
 	block.SetPreferenceWithContextChainVM
 }
 
-// Convert transforms a generic [ChainVM] into a [chainVMWithContext]. All
+// Convert transforms a generic [ChainVM] into a [ChainVMWithContext]. All
 // [snowman.Block] values returned by methods of the returned chain will be of
 // the concrete type [Block] with type parameter `BP`.
 func Convert[BP BlockProperties](vm ChainVM[BP]) ChainVMWithContext {
