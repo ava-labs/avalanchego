@@ -45,11 +45,11 @@ var _ = e2e.DescribeCChain("[Interchain Workflow]", func() {
 
 		tc.By("sending funds from one address to another on the C-Chain", func() {
 			// Create transaction
-			acceptedNonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), senderEthAddress)
+			nonce, err := ethClient.NonceAt(tc.DefaultContext(), senderEthAddress, nil)
 			require.NoError(err)
 			gasPrice := e2e.SuggestGasPrice(tc, ethClient)
 			tx := types.NewTransaction(
-				acceptedNonce,
+				nonce,
 				recipientEthAddress,
 				big.NewInt(int64(txAmount)),
 				e2e.DefaultGasLimit,
