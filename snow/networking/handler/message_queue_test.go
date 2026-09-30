@@ -167,3 +167,45 @@ func TestQueue(t *testing.T) {
 	require.Equal(msg3, gotMsg3)
 	require.Zero(u.Len())
 }
+
+func BenchmarkMessageQueuePushPop(b *testing.B) {
+	require := require.New(b)
+	ctrl := gomock.NewController(b)
+	cpuTracker := trackermock.NewTracker(ctrl)
+	cpuTracker.EXPECT().Usage(gomock.Any(), gomock.Any()).Return(0.0).AnyTimes()
+
+	vdrs := validators.NewManager()
+	vdrID := ids.GenerateTestNodeID()
+	require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, vdrID, nil, ids.Empty, 1))
+	mIntf, err := NewMessageQueue(
+		logging.NoLog{},
+		constants.PrimaryNetworkID,
+		vdrs,
+		cpuTracker,
+		"",
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+	u := mIntf.(*messageQueue)
+
+	msg := Message{
+		InboundMessage: message.InboundPullQuery(
+			ids.Empty,
+			0,
+			time.Hour, // never expires within the benchmark
+			ids.GenerateTestID(),
+			0,
+			vdrID,
+		),
+		EngineType: p2p.EngineType_ENGINE_TYPE_UNSPECIFIED,
+	}
+
+	b.ReportAllocs()
+	for b.Loop() {
+		u.Push(b.Context(), msg)
+		_, _, ok := u.Pop()
+		if !ok {
+			b.Fatal("queue closed")
+		}
+	}
+}
