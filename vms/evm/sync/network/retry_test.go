@@ -39,11 +39,11 @@ func TestNoPeersBackoff(t *testing.T) {
 		},
 		{
 			attempt: 1,
-			want:    15 * time.Millisecond,
+			want:    15 * time.Millisecond, // initial * factor
 		},
 		{
 			attempt: 1000,
-			want:    time.Second,
+			want:    time.Second, // max backoff
 		},
 	} {
 		require.Equal(t, tc.want, p.noPeersBackoff(tc.attempt))
@@ -123,10 +123,9 @@ func TestSend_NoPeersBackoffEscalates(t *testing.T) {
 		const (
 			initial = 30 * time.Millisecond
 			factor  = 4.0
-			// A working escalation only notices this at its next ~600ms wake-up. A
-			// flat or broken wait would notice within microseconds, well under minElapsed.
-			connectAfter = 150 * time.Millisecond
-			minElapsed   = 300 * time.Millisecond
+			// synctest advances time per timer: 0ms + 120ms + 480ms = 600ms total.
+			connectAfter    = 150 * time.Millisecond
+			expectedElapsed = 600 * time.Millisecond
 		)
 		ctx := t.Context()
 
@@ -150,8 +149,8 @@ func TestSend_NoPeersBackoffEscalates(t *testing.T) {
 
 		require.NoError(t, err)
 		require.Empty(t, cmp.Diff(want, got, protocmp.Transform()))
-		require.Greater(t, elapsed, minElapsed,
-			"Send noticed the connected peer too soon, the no-peers wait is not escalating")
+		require.Equal(t, expectedElapsed, elapsed,
+			"Send should only notice the peer after both no-peers backoffs")
 	})
 }
 
@@ -232,8 +231,8 @@ func TestDoRetry_FatalStopsRetrying(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
-// A peer-scoped failure and a verify rejection both reset the no-peers
-// streak, or a later wait inherits an escalation it never earned.
+// Both [errNoPeers] and any transient network error should prohibit compounding
+// of the exponential backoff.
 func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 	errInvalid := errors.New("invalid")
 
@@ -253,12 +252,10 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				const (
-					initial    = 100 * time.Millisecond
-					factor     = 10.0
-					maxBackoff = 10 * time.Second
-					// A reset streak's next wait is 0. An unreset streak inherits
-					// noPeersBackoff(2), exactly 10s under this policy, well over this.
-					threshold = 2 * time.Second
+					initial         = 100 * time.Millisecond
+					factor          = 10.0
+					maxBackoff      = 10 * time.Second
+					expectedElapsed = 1010 * time.Millisecond // noPeersBackoff(1) + peerFailureBackoff + 0
 				)
 				policy := *options.ApplyTo(defaultRetryPolicy(),
 					WithNoPeersInitialBackoff(initial),
@@ -270,10 +267,9 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 				_, tracker := newTestTracker(t)
 				calls := 0
 				rejected := false
-				// call 1: no-peers.
-				// call 2: no-peers, escalation would start here.
-				// call 3: resetError's branch, or verify's rejection if nil.
-				// call 4: a fresh no-peers streak, the one being checked.
+				// call 1,2: no-peers, building backoff.
+				// call 3: resetError or verify-rejects, resetting the no-peers count.
+				// call 4: no-peers again, should start from the lowest backoff.
 				// call 5+: success.
 				attempt := func() (*syncpb.GetLeafResponse, ids.NodeID, *Outcome, error) {
 					calls++
@@ -307,8 +303,8 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 
 				require.NoError(t, err)
 				require.Empty(t, cmp.Diff(want, got, protocmp.Transform()))
-				require.Less(t, elapsed, threshold,
-					"the no-peers streak was not reset in between")
+				require.Equal(t, expectedElapsed, elapsed,
+					"no-peers count should reset so the fourth attempt starts at backoff(0)")
 			})
 		})
 	}

@@ -103,6 +103,7 @@ func doRetry[Resp proto.Message, Out any](
 			lastErr = verifyErr
 			noPeerAttempts = 0
 			wait = policy.peerFailureBackoff
+		// attempt's send selects on ctx.Done(), so cancellation surfaces here.
 		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 			return zero, retryFailure(err, lastErr, attempts)
 		case errors.Is(err, errNoPeers):
