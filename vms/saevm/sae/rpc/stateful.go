@@ -317,13 +317,15 @@ func (b *backend) minGasForArgs(args ethapi.TransactionArgs) (hexutil.Uint64, er
 	if args.Nonce != nil {
 		nonce = uint64(*args.Nonce)
 	}
-	// Like the embedded estimate, respect a gas limit that the caller provides.
+	// Every tx needs at least [params.TxGas], so the embedded estimate treats
+	// a lower limit (e.g. 0) as unset, and thus we should do the same. See
+	// https://github.com/ava-labs/libevm/blob/dbf7ede95a25d8dfbdadafe53822022cba222d71/eth/gasestimator/gasestimator.go#L59-L62
 	allowance := hexutil.Uint64(math.MaxUint64)
 	if args.Gas != nil && uint64(*args.Gas) >= params.TxGas {
 		allowance = *args.Gas
 	}
-	// A dynamic-fee tx is the largest supported type. This would no longer
-	// hold if EIP-7702 set-code txs were supported.
+	// A dynamic-fee tx is the largest supported type. Supporting any new tx
+	// type (e.g. blob or frame txs) may invalidate this.
 	tx := types.NewTx(&types.DynamicFeeTx{
 		ChainID:    b.ChainConfig().ChainID,
 		Nonce:      nonce,
