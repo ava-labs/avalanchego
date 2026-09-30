@@ -51,10 +51,10 @@ ignored. Only require directives matter.
 
 See [Release Procedure](../../RELEASING_README.md) for the step-by-step process.
 
-Between updating the require directives and pushing the tags, local
-builds continue to work because replace directives redirect
-inter-module references to local paths. Once tags are pushed,
-external consumers can fetch the tagged versions.
+The require directives on master reference the next, untagged
+version. Local builds continue to work because replace directives
+redirect inter-module references to local paths. Once
+tags are pushed, external consumers can fetch the tagged versions.
 
 For user-facing documentation on consuming these modules, see
 [Depending on AvalancheGo Modules](../external_consumption.md).
