@@ -70,8 +70,7 @@ if [[ "$reference" == v0.0.0-* ]]; then
   exit 0
 fi
 
-# Check the require version matches the version being developed. A unit test
-# in the version package keeps this file in sync with version.Current.
+# Check the require version matches the version being developed.
 current_version=$(<"$REPO_ROOT/version/current.txt")
 
 if [[ "$current_version" != "$reference" ]]; then
