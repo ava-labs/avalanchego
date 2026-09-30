@@ -1030,7 +1030,7 @@ func TestSizeMinimumGas(t *testing.T) {
 		below := send(t, gas, nil)
 
 		_, err = sut.EstimateGas(ctx, below)
-		require.ErrorContains(t, err, errBelow, "EstimateGas() with gas %d", below.Gas)
+		require.ErrorContains(t, err, errBelow, "EstimateGas() with gas %d", below.Gas) //nolint:forbidigo // RPC error
 	})
 
 	t.Run("eth_createAccessList", func(t *testing.T) {
@@ -1040,7 +1040,7 @@ func TestSizeMinimumGas(t *testing.T) {
 		below := send(t, gas, *accessList)
 
 		_, _, _, err = gc.CreateAccessList(ctx, below)
-		require.ErrorContains(t, err, errBelow, "CreateAccessList() with gas %d", below.Gas)
+		require.ErrorContains(t, err, errBelow, "CreateAccessList() with gas %d", below.Gas) //nolint:forbidigo // RPC error
 	})
 }
 
