@@ -42,12 +42,9 @@ export VERSION=v1.15.1
 
 ### 2. Pre-Release Changes (Network Upgrades Only)
 
-Skip this step unless this release activates a new network upgrade on Mainnet. In that
-case, merge a PR to master with the following changes before you tag the first release
-candidate:
+Skip this step unless this release activates a new network upgrade on Mainnet. In that case, merge a PR to master with the following changes before you tag the first release candidate:
 
-1. In [`upgrade/upgrade.go`](upgrade/upgrade.go), set the upgrade's time in `Default`
-   — the local-network schedule — to `InitiallyActiveTime`:
+1. In [`upgrade/upgrade.go`](upgrade/upgrade.go), set the upgrade's time in `Default` — the local-network schedule — to `InitiallyActiveTime`:
 
    ```go
    Default = Config{
@@ -56,20 +53,16 @@ candidate:
    }
    ```
 
-   Then update any tests that pin the local network's upgrade schedule or genesis
-   (e.g. its genesis hash).
+   Then update any tests that pin the local network's upgrade schedule or genesis (e.g. its genesis hash).
 
-1. In [`scripts/tests.upgrade.sh`](scripts/tests.upgrade.sh), set `DEFAULT_VERSION` to
-   `$VERSION` without the leading `v`, naming the upgrade in the comment above it:
+1. In [`scripts/tests.upgrade.sh`](scripts/tests.upgrade.sh), set `DEFAULT_VERSION` to `$VERSION` without the leading `v`, naming the upgrade in the comment above it:
 
    ```bash
    # v1.15.1 is the earliest version that activates Helicon on local networks.
    DEFAULT_VERSION="1.15.1"
    ```
 
-1. In [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml),
-   comment out the `Run e2e tests` step of the `upgrade` job, leaving `actions/checkout`
-   so the job still has a step:
+1. In [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml), comment out the `Run e2e tests` step of the `upgrade` job, leaving `actions/checkout` so the job still has a step:
 
    ```yaml
    upgrade:
@@ -81,10 +74,7 @@ candidate:
        #   ...
    ```
 
-The test starts a network on the published `DEFAULT_VERSION` binary and restarts it on
-the current code, so the two MUST agree on the local schedule. After this change only
-`$VERSION` agrees, and it is not published until the release itself — so the job stays
-off until [step 8](#8-prepare-the-next-release) turns it back on.
+The test starts a network on the published `DEFAULT_VERSION` binary and restarts it on the current code, so the two MUST agree on the local schedule. After this change only `$VERSION` agrees, and it is not published until the release itself — so the job stays off until [step 8](#8-prepare-the-next-release) turns it back on.
 
 ### 3. Create Release Candidate Tags
 
@@ -99,9 +89,7 @@ git log -1
 ./scripts/run_task.sh tags-push -- "$VERSION_RC"
 ```
 
-The `require` directives at this commit reference `$VERSION`, which is not tagged yet. So
-`go get github.com/ava-labs/avalanchego@$VERSION_RC` does not resolve outside the
-repository. Test the release candidate with the binaries and images built from its tag.
+The `require` directives at this commit reference `$VERSION`, which is not tagged yet. So `go get github.com/ava-labs/avalanchego@$VERSION_RC` does not resolve outside the repository. Test the release candidate with the binaries and images built from its tag.
 
 ### 4. Test the Release Candidate
 
@@ -220,8 +208,7 @@ As of this writing:
 
 Echo and Dispatch deploy the public `avaplatform/subnet-evm` image.
 
-1. In `devops-argocd`, update the Dispatch and Echo image tags to
-   `$VERSION_RC`:
+1. In `devops-argocd`, update the Dispatch and Echo image tags to `$VERSION_RC`:
 
    - Echo: [`base/subnet/testnet/echo/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/echo/avalanchego/base/cornice.yaml)
    - Dispatch: [`base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml)
@@ -233,9 +220,7 @@ Echo and Dispatch deploy the public `avaplatform/subnet-evm` image.
      value: "$VERSION_RC"
    ```
 
-   The repository should already be `avaplatform/subnet-evm`, with
-   `global.vmAliases` containing the standard Subnet-EVM VM ID:
-   `srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy`.
+   The repository should already be `avaplatform/subnet-evm`, with `global.vmAliases` containing the standard Subnet-EVM VM ID: `srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy`.
 
 1. Open and merge the deployment change for both L1s, then monitor deployments:
    - **Dispatch**: [Logs][dispatch-logs] | [Dashboard][dispatch-dashboard]
@@ -265,8 +250,7 @@ Echo and Dispatch deploy the public `avaplatform/subnet-evm` image.
 
 #### Fixing Issues Found in the Release Candidate
 
-If testing finds a bug, merge the fix to master. Then tag the next release candidate on a
-master commit that includes the fix:
+If testing finds a bug, merge the fix to master. Then tag the next release candidate on a master commit that includes the fix:
 
 ```bash
 export VERSION_RC=v1.15.1-rc.1
@@ -277,8 +261,7 @@ git log -1
 ./scripts/run_task.sh tags-push -- "$VERSION_RC"
 ```
 
-The new release candidate includes everything merged to master since the previous one.
-Test it again in full.
+The new release candidate includes everything merged to master since the previous one. Test it again in full.
 
 ### 5. Create Final Release Tags
 
@@ -341,10 +324,7 @@ The tag push triggers these workflows automatically:
 
 - `build-linux-binaries.yml` - Linux amd64/arm64 tarballs
 - `build-macos-release.yml` - macOS zip
-- `build-linux-packages.yml` - Linux RPM/DEB packages (matrix over `{rpm, deb}` and `{amd64, arm64}` via the
-  `./.github/packaging/actions/build-package` composite action). On tag pushes, the `upload-debs-s3` job additionally
-  publishes `.deb` packages to `linux/debs/ubuntu/{jammy,noble}/{arch}/` and `GPG-KEY-avalanchego` to
-  `linux/debs/ubuntu/{jammy,noble}/`.
+- `build-linux-packages.yml` - Linux RPM/DEB packages (matrix over `{rpm, deb}` and `{amd64, arm64}` via the `./.github/packaging/actions/build-package` composite action). On tag pushes, the `upload-debs-s3` job additionally publishes `.deb` packages to `linux/debs/ubuntu/{jammy,noble}/{arch}/` and `GPG-KEY-avalanchego` to `linux/debs/ubuntu/{jammy,noble}/`.
 - `publish_docker_image.yml` - Docker images
 
 Artifacts produced:
@@ -371,8 +351,7 @@ Antithesis test images are built and pushed to Google Artifact Registry on every
 - `antithesis-avalanchego-{config,node,workload}:latest`
 - `antithesis-subnet-evm-{config,node,workload}:latest`
 
-See the [Antithesis testing documentation](tests/antithesis/README.md#scheduled-testing)
-for scheduled testing details.
+See the [Antithesis testing documentation](tests/antithesis/README.md#scheduled-testing) for scheduled testing details.
 
 ### 8. Prepare the Next Release
 
@@ -406,8 +385,7 @@ export NEXT_VERSION=v1.15.2
    ./scripts/run_task.sh tags-update-require-directives -- "$NEXT_VERSION"
    ```
 
-1. In [`version/compatibility.json`](version/compatibility.json), add `$NEXT_VERSION` to the
-   list for the current `RPCChainVMProtocol`.
+1. In [`version/compatibility.json`](version/compatibility.json), add `$NEXT_VERSION` to the list for the current `RPCChainVMProtocol`.
 
 1. At the top of [`RELEASES.md`](RELEASES.md), add a section for the next release:
 
@@ -415,20 +393,15 @@ export NEXT_VERSION=v1.15.2
    ## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
    ```
 
-1. Compare the `$VERSION` section of [`RELEASES.md`](RELEASES.md) against what was released.
-   PRs merged after the release candidate commit added their notes to the `$VERSION`
-   section, but they are not part of `$VERSION`. This diff shows those notes:
+1. Compare the `$VERSION` section of [`RELEASES.md`](RELEASES.md) against what was released. PRs merged after the release candidate commit added their notes to the `$VERSION` section, but they are not part of `$VERSION`. This diff shows those notes:
 
    ```bash
    git diff "$VERSION" origin/master -- RELEASES.md
    ```
 
-   Move each of them into the `$NEXT_VERSION` section. Check again if you rebase before
-   merging.
+   Move each of them into the `$NEXT_VERSION` section. Check again if you rebase before merging.
 
-1. If you disabled the `upgrade` job in [step 2](#2-pre-release-changes-network-upgrades-only),
-   enable it again in [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml).
-   Uncomment the `Run e2e tests` step and delete the `TODO` comment.
+1. If you disabled the `upgrade` job in [step 2](#2-pre-release-changes-network-upgrades-only), enable it again in [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml). Uncomment the `Run e2e tests` step and delete the `TODO` comment.
 
 1. Create PR and merge:
 
@@ -478,44 +451,35 @@ To share work-in-progress without merging to master:
 
 External consumers can then `go get github.com/ava-labs/avalanchego@v0.0.0-mybranch`.
 
-Do not merge these go.mod changes. [`check-require-directives`](#check-require-directives)
-rejects any version other than `version.Current`.
+Do not merge these go.mod changes. [`check-require-directives`](#check-require-directives) rejects any version other than `version.Current`.
 
 ## Tagging Task Reference
 
 ### `tags-update-require-directives`
 
-Updates `require` directives in all go.mod files to reference the specified
-version. Version must match `vX.Y.Z` or `vX.Y.Z-suffix`.
+Updates `require` directives in all go.mod files to reference the specified version. Version must match `vX.Y.Z` or `vX.Y.Z-suffix`.
 
 ### `tags-create`
 
-Creates signed tags for the main module and all submodules at the current commit. Pass
-`--no-sign` for unsigned tags (e.g., development tags).
+Creates signed tags for the main module and all submodules at the current commit. Pass `--no-sign` for unsigned tags (e.g., development tags).
 
 ### `tags-push`
 
-Pushes tags for the main module and all submodules, then verifies all tags exist on
-the remote. Set `GIT_REMOTE` to override the default remote (`origin`).
+Pushes tags for the main module and all submodules, then verifies all tags exist on the remote. Set `GIT_REMOTE` to override the default remote (`origin`).
 
 ### `tags-verify-remote`
 
-Verifies that tags for the main module and all submodules exist on the
-remote. Automatically run at the end of `tags-push`, but can be run standalone to
-re-check.
+Verifies that tags for the main module and all submodules exist on the remote. Automatically run at the end of `tags-push`, but can be run standalone to re-check.
 
 ### `check-require-directives`
 
-Verifies that all internal module `require` directives across go.mod files reference
-the same version, and that this version matches `version.Current`. Runs in CI.
+Verifies that all internal module `require` directives across go.mod files reference the same version, and that this version matches `version.Current`. Runs in CI.
 
 ## Troubleshooting
 
 ### Partial Tag Creation
 
-If `tags-create` fails after creating some tags (e.g. due to GPG signing error), the
-remaining tags won't exist. The script checks for existing tags before creating any,
-so re-running it will fail with details on which tags already exist.
+If `tags-create` fails after creating some tags (e.g. due to GPG signing error), the remaining tags won't exist. The script checks for existing tags before creating any, so re-running it will fail with details on which tags already exist.
 
 To recover, delete the partially created tags and re-run:
 
@@ -528,12 +492,9 @@ git tag -d v1.14.1 graft/evm/v1.14.1
 
 ### Tag Push Failure
 
-If `tags-push` fails partway through (e.g., network error), some tags may have been
-pushed while others haven't. The script validates all tags exist locally before
-pushing, but cannot guarantee atomic remote delivery.
+If `tags-push` fails partway through (e.g., network error), some tags may have been pushed while others haven't. The script validates all tags exist locally before pushing, but cannot guarantee atomic remote delivery.
 
-To recover, simply re-run the push — git push is idempotent for tags that already
-exist at the correct commit:
+To recover, simply re-run the push — git push is idempotent for tags that already exist at the correct commit:
 
 ```bash
 ./scripts/run_task.sh tags-push -- "$VERSION"
@@ -548,8 +509,7 @@ git push origin :refs/tags/graft/evm/v1.14.1
 
 ### Require Directive Update Failure
 
-If `tags-update-require-directives` fails partway through, some go.mod files may have
-been updated while others haven't. The consistency check will catch this:
+If `tags-update-require-directives` fails partway through, some go.mod files may have been updated while others haven't. The consistency check will catch this:
 
 ```bash
 ./scripts/run_task.sh check-require-directives
