@@ -227,12 +227,8 @@ func (t *Tracker) CommitInterval() uint64 {
 	return t.config.CommitInterval
 }
 
-// Track tracks the root and may commit the trie associated with the root
-// to the database if [ShouldCommitTrieDB] returns true, or the [Config]
-// specifies that the node is archival.
-//
-// This state will be available in memory until [Tracker.Untrack] has been
-// called for the root as many times as [Tracker.Track] has been called.
+// Track keeps the state at root available in memory until [Tracker.Untrack]
+// has been called for the root as many times as Track has been called.
 func (t *Tracker) Track(root common.Hash) {
 	// Never returns an error because it is a [triedb.HashDB].
 	if err := t.cache.TrieDB().Reference(root, common.Hash{}); err != nil {

@@ -36,7 +36,7 @@ type Resolver interface {
 // to resolve our public IP.
 // resolverName must be one of:
 // [OpenDNSName], [IFConfigName], [IFConfigCoName], [IFConfigMeName].
-// If [resolverService] isn't one of the above, returns an error
+// If resolverName isn't one of the above, returns an error
 func NewResolver(resolverName string) (Resolver, error) {
 	switch strings.ToLower(resolverName) {
 	case OpenDNSName:

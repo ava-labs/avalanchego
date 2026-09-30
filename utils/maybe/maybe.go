@@ -7,12 +7,12 @@ import "fmt"
 
 // Maybe T = Some T | Nothing.
 // A data wrapper that allows values to be something [Some T] or nothing [Nothing].
-// Invariant: If [hasValue] is false, then [value] is the zero value of type T.
 // Maybe is used to wrap types:
 // * That can't be represented by nil.
 // * That use nil as a valid value instead of an indicator of a missing value.
 // For more info see https://en.wikipedia.org/wiki/Option_type
 type Maybe[T any] struct {
+	// Invariant: If hasValue is false, then value is the zero value of type T.
 	hasValue bool
 	// If [hasValue] is false, [value] is the zero value of type T.
 	value T

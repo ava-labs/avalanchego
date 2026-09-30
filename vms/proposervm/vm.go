@@ -124,7 +124,7 @@ type VM struct {
 	lastAcceptedTimestampGaugeVec *prometheus.GaugeVec
 }
 
-// New performs best when [minBlkDelay] is whole seconds. This is because block
+// New performs best when [Config.MinBlkDelay] is whole seconds. This is because block
 // timestamps are only specific to the second.
 func New(
 	vm block.ChainVM,

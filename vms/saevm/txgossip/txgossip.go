@@ -73,7 +73,7 @@ type Set struct {
 // transactions to the pool, which SHOULD NOT be populated directly.
 //
 // Transactions are vetted against the gas limit of the next block, derived
-// from exec's last-executed block; see [minGasForSize].
+// from exec's last-executed block; see [Set.MinGasForSize].
 func NewSet(
 	exec *saexec.Executor,
 	pool *txpool.TxPool,
