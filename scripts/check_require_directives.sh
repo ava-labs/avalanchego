@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 #
 # Checks that internal module require directives are consistent across all
-# go.mod files, and that they reference the next release. Every require of an
-# avalanchego submodule must reference the same version, and that version must
-# match version.Current.
+# go.mod files, and that they match version.Current. Development tags
+# (v0.0.0-*) are exempt from the version.Current check.
 #
 # See docs/design/multi-module-release.md for background.
 
@@ -64,13 +63,16 @@ if [[ ${#mismatches[@]} -gt 0 ]]; then
   exit 1
 fi
 
-# Check the require version matches the version being developed
-current_version=$(awk '
-  /Current = &Application\{/ { in_current = 1 }
-  in_current && /Major:/ { gsub(/[^0-9]/, ""); major = $0 }
-  in_current && /Minor:/ { gsub(/[^0-9]/, ""); minor = $0 }
-  in_current && /Patch:/ { gsub(/[^0-9]/, ""); print "v" major "." minor "." $0; exit }
-' version/constants.go)
+# Development tags share work-in-progress from a branch, so they don't name the
+# version being developed
+if [[ "$reference" == v0.0.0-* ]]; then
+  echo "All internal module require directives reference development tag: $reference"
+  exit 0
+fi
+
+# Check the require version matches the version being developed. A unit test
+# in the version package keeps this file in sync with version.Current.
+current_version=$(tr -d '[:space:]' < "$REPO_ROOT/version/current.txt")
 
 if [[ "$current_version" != "$reference" ]]; then
   echo "Internal module require version $reference does not match version.Current $current_version" >&2
@@ -79,4 +81,4 @@ if [[ "$current_version" != "$reference" ]]; then
   exit 1
 fi
 
-echo "All internal module require directives reference the next release: $reference"
+echo "All internal module require directives match version.Current: $reference"

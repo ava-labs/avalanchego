@@ -5,10 +5,16 @@ package version
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	_ "embed"
 )
+
+//go:embed current.txt
+var currentFile string
 
 func TestCurrentRPCChainVMCompatible(t *testing.T) {
 	compatibleVersions := RPCChainVMProtocolCompatibility[RPCChainVMProtocol]
@@ -17,4 +23,8 @@ func TestCurrentRPCChainVMCompatible(t *testing.T) {
 		compatibleVersions,
 		fmt.Sprintf("v%d.%d.%d", Current.Major, Current.Minor, Current.Patch),
 	)
+}
+
+func TestCurrentFileMatchesCurrent(t *testing.T) {
+	require.Equal(t, Current.Semantic(), strings.TrimSpace(currentFile), "current.txt")
 }

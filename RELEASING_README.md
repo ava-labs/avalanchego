@@ -18,7 +18,6 @@ All components follow aligned versioning:
 
 - Same version number - When AvalancheGo releases v1.14.0, Subnet-EVM is also v1.14.0
 - Coordinated tags - Each release creates tags for the main module and all submodules (e.g., `v1.14.0`, `graft/evm/v1.14.0`, `graft/coreth/v1.14.0`, `graft/subnet-evm/v1.14.0`)
-- Confusingly, the minor version means network upgrade. Bump the minor version (e.g., `v1.15.x` to `v1.16.0`) only for a release that schedules a network upgrade. Bump the patch version for every other release.
 
 ### Component Release Notes
 
@@ -72,6 +71,8 @@ A release that schedules a new network upgrade increases the minor version (for 
    }
    ```
 
+1. Set [`version/current.txt`](version/current.txt) to `$VERSION`.
+
 1. Update the submodule require directives:
 
    ```bash
@@ -81,8 +82,6 @@ A release that schedules a new network upgrade increases the minor version (for 
 1. In [`version/compatibility.json`](version/compatibility.json), replace the patch version from the prep PR with `$VERSION`.
 
 1. In [`RELEASES.md`](RELEASES.md), rename the first section to `$VERSION`.
-
-After the release is published, update the notify service in [step 8](#8-update-the-notify-service).
 
 #### Activating a Network Upgrade on Mainnet
 
@@ -181,18 +180,7 @@ Once merged, monitor the deployments:
 
 #### Fixing Issues Found in the Release Candidate
 
-If testing finds a bug, merge the fix to master. Then tag the next release candidate on a master commit that includes the fix:
-
-```bash
-export VERSION_RC=v1.15.1-rc.1
-git fetch origin master
-git checkout --detach origin/master
-git log -1
-./scripts/run_task.sh tags-create -- "$VERSION_RC"
-./scripts/run_task.sh tags-push -- "$VERSION_RC"
-```
-
-The new release candidate includes everything merged to master since the previous one. Test it again in full.
+If testing finds a bug, merge the fix to master. Then set `VERSION_RC` to the next release candidate (e.g. `v1.15.1-rc.1`) and go back to [step 3](#3-create-release-candidate-tags).
 
 ### 5. Create Final Release Tags
 
@@ -216,7 +204,33 @@ go list -m all | grep avalanchego
 
 All submodules should resolve to matching versions.
 
-### 6. Create GitHub Release
+### 6. Automated Builds
+
+The tag push from [step 5](#5-create-final-release-tags) triggers these workflows automatically. Wait for them to finish before creating the GitHub release:
+
+- `build-linux-binaries.yml` - Linux amd64/arm64 tarballs
+- `build-macos-release.yml` - macOS zip
+- `build-linux-packages.yml` - Linux RPM/DEB packages (matrix over `{rpm, deb}` and `{amd64, arm64}` via the `./.github/packaging/actions/build-package` composite action). On tag pushes, the `upload-debs-s3` job additionally publishes `.deb` packages to `linux/debs/ubuntu/{jammy,noble}/{arch}/` and `GPG-KEY-avalanchego` to `linux/debs/ubuntu/{jammy,noble}/`.
+- `publish_docker_image.yml` - Docker images
+
+Artifacts produced:
+
+**Binaries:**
+
+- `avalanchego-linux-amd64-$VERSION.tar.gz`
+- `avalanchego-linux-arm64-$VERSION.tar.gz`
+- `avalanchego-macos-$VERSION.zip`
+- `subnet-evm-linux-amd64-$VERSION.tar.gz`
+- `subnet-evm-linux-arm64-$VERSION.tar.gz`
+- `subnet-evm-macos-$VERSION.zip`
+
+**Docker Images:**
+
+- `avaplatform/avalanchego:$VERSION` (multi-arch: linux/amd64, linux/arm64)
+- `avaplatform/subnet-evm:$VERSION` (multi-arch: linux/amd64, linux/arm64)
+- `avaplatform/bootstrap-monitor:$VERSION` (multi-arch: linux/amd64, linux/arm64)
+
+### 7. Create GitHub Release
 
 Create a release at [github.com/ava-labs/avalanchego/releases/new](https://github.com/ava-labs/avalanchego/releases/new):
 
@@ -246,59 +260,23 @@ Create a release at [github.com/ava-labs/avalanchego/releases/new](https://githu
     **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.15.0...v1.15.1
     ```
 
+1. Attach the **Binaries** listed in [step 6](#6-automated-builds), downloaded from the artifacts of the tag's `build-linux-release` and `build-macos-release` runs
 1. Check "Set as the latest release"
 1. Publish
 
-### 7. Automated Builds
-
-The tag push triggers these workflows automatically:
-
-- `build-linux-binaries.yml` - Linux amd64/arm64 tarballs
-- `build-macos-release.yml` - macOS zip
-- `build-linux-packages.yml` - Linux RPM/DEB packages (matrix over `{rpm, deb}` and `{amd64, arm64}` via the `./.github/packaging/actions/build-package` composite action). On tag pushes, the `upload-debs-s3` job additionally publishes `.deb` packages to `linux/debs/ubuntu/{jammy,noble}/{arch}/` and `GPG-KEY-avalanchego` to `linux/debs/ubuntu/{jammy,noble}/`.
-- `publish_docker_image.yml` - Docker images
-
-Artifacts produced:
-
-**Binaries:**
-
-- `avalanchego-linux-amd64-$VERSION.tar.gz`
-- `avalanchego-linux-arm64-$VERSION.tar.gz`
-- `avalanchego-macos-$VERSION.zip`
-- `subnet-evm-linux-amd64-$VERSION.tar.gz`
-- `subnet-evm-linux-arm64-$VERSION.tar.gz`
-- `subnet-evm-macos-$VERSION.zip`
-
-**Docker Images:**
-
-- `avaplatform/avalanchego:$VERSION` (multi-arch: linux/amd64, linux/arm64)
-- `avaplatform/subnet-evm:$VERSION` (multi-arch: linux/amd64, linux/arm64)
-- `avaplatform/bootstrap-monitor:$VERSION` (multi-arch: linux/amd64, linux/arm64)
-
-**Antithesis Images:**
-
-Antithesis test images are built and pushed to Google Artifact Registry on every merge to master via `publish_antithesis_images.yml`:
-
-- `antithesis-avalanchego-{config,node,workload}:latest`
-- `antithesis-subnet-evm-{config,node,workload}:latest`
-
-See the [Antithesis testing documentation](tests/antithesis/README.md#scheduled-testing) for scheduled testing details.
-
 ### 8. Update the Notify Service
 
-Only needed for a release that schedules a network upgrade, which changes `MinimumCompatibleVersion` in [step 2](#scheduling-a-network-upgrade).
-
-The notify service warns node operators running below a configured version. Its config lives in `devops-argocd`, under the `uptime` job of [`aws/data/us-east-1/data-k8s/root/analytics/analytics-app.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/aws/data/us-east-1/data-k8s/root/analytics/analytics-app.yaml). Set both versions to `MinimumCompatibleVersion`, without the leading `v`:
+The notify service warns node operators running old versions. In the `uptime` job of [`devops-argocd`'s `analytics-app.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/aws/data/us-east-1/data-k8s/root/analytics/analytics-app.yaml), set `optionalVersion` to `$VERSION` without the leading `v`. For network upgrade (or otherwise critical) releases, set `requiredVersion` too:
 
 ```yaml
 - cmd: uptime
   config:
     # ...
     requiredVersion: '1.15.0'
-    optionalVersion: '1.15.0'
+    optionalVersion: '1.15.1'
 ```
 
-Open the PR against `devops-argocd` ([example](https://github.com/ava-labs/devops-argocd/pull/17216)), get approval from the infra team, and merge it so the notify service picks up the new floor.
+Merge the PR after infra team approval ([example](https://github.com/ava-labs/devops-argocd/pull/17216)).
 
 ### 9. Prepare the Next Release
 
@@ -325,6 +303,8 @@ export NEXT_VERSION=v1.15.2
        Patch: 2,
    }
    ```
+
+1. Set [`version/current.txt`](version/current.txt) to `$NEXT_VERSION`.
 
 1. Update the submodule require directives:
 
@@ -398,7 +378,7 @@ To share work-in-progress without merging to master:
 
 External consumers can then `go get github.com/ava-labs/avalanchego@v0.0.0-mybranch`.
 
-Do not merge these go.mod changes. [`check-require-directives`](#check-require-directives) rejects any version other than `version.Current`.
+Do not merge these go.mod changes. [`check-require-directives`](#check-require-directives) accepts `v0.0.0-` versions so branch CI passes, but master must reference `version.Current`.
 
 ## Tagging Task Reference
 
@@ -420,7 +400,7 @@ Verifies that tags for the main module and all submodules exist on the remote. A
 
 ### `check-require-directives`
 
-Verifies that all internal module `require` directives across go.mod files reference the same version, and that this version matches `version.Current`. Runs in CI.
+Verifies that all internal module `require` directives reference the same version, and that it matches `version.Current` or is a [development tag](#development-tags). Runs in CI.
 
 ## Troubleshooting
 
