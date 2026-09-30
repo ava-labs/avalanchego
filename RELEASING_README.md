@@ -43,12 +43,12 @@ export VERSION=v1.14.1
 ```bash
 git fetch origin master
 git checkout master
-git checkout -b "releases/$VERSION_RC"
+git checkout -b "releases/$VERSION"
 ```
 
 ### 3. Prepare Release Changes
 
-These changes prepare the merge commit that will be tagged.
+These changes prepare the commit that will be tagged.
 
 1. Update [`version/constants.go`](version/constants.go):
 
@@ -124,13 +124,14 @@ These changes prepare the merge commit that will be tagged.
 ```bash
 git add .
 git commit -S -m "chore: release $VERSION_RC"
-git push -u origin "releases/$VERSION_RC"
+git push -u origin "releases/$VERSION"
 ```
 
-Create PR:
+Create a draft PR for review. Do not merge it until the final release is tagged in
+[step 7](#7-create-final-release-tags):
 
 ```bash
-gh pr create --repo github.com/ava-labs/avalanchego --base master --title "chore: release $VERSION_RC"
+gh pr create --repo github.com/ava-labs/avalanchego --base master --draft --title "chore: release $VERSION"
 ```
 
 Wait for checks:
@@ -139,21 +140,14 @@ Wait for checks:
 gh pr checks --watch
 ```
 
-Merge:
-
-```bash
-gh pr merge "releases/$VERSION_RC" --squash --subject "chore: release $VERSION_RC"
-```
-
 ### 5. Create Release Candidate Tags
 
-Tag the merge commit from step 4:
+Tag the tip of the release branch:
 
 ```bash
-git fetch origin master
-git checkout master
-# Double check the tip of the master branch is the expected commit
-# of the squashed release branch
+git checkout "releases/$VERSION"
+git pull origin "releases/$VERSION"
+# Double check the tip of the release branch is the expected commit
 git log -1
 ./scripts/run_task.sh tags-create -- "$VERSION_RC"
 ./scripts/run_task.sh tags-push -- "$VERSION_RC"
@@ -330,31 +324,50 @@ Echo and Dispatch deploy the public `avaplatform/subnet-evm` image.
    Apr 03 10:34:55.510 gke-subnets-testnet subnets Submitted transaction
    ```
 
-### 7. Create Final Release Tags
+#### Fixing Issues Found in the Release Candidate
 
-After successful testing, update the require directives from the RC version
-to the final version, merge, then tag the resulting commit:
+If testing finds a bug, merge the fix to master first, so the next release keeps it.
+Then cherry-pick it onto the release branch and tag the next release candidate:
 
 ```bash
-git fetch origin master
-git checkout -b "tags/$VERSION" origin/master
+export VERSION_RC=v1.14.1-rc.1
+git checkout "releases/$VERSION"
+git cherry-pick -S <fix-commit>
+./scripts/run_task.sh tags-update-require-directives -- "$VERSION_RC"
+git add .
+git commit -S -m "chore: release $VERSION_RC"
+git push origin "releases/$VERSION"
+gh pr checks --watch
+./scripts/run_task.sh tags-create -- "$VERSION_RC"
+./scripts/run_task.sh tags-push -- "$VERSION_RC"
+```
+
+Then test the new release candidate again.
+
+### 7. Create Final Release Tags
+
+After successful testing, update the require directives on the release branch from
+the RC version to the final version, then tag that commit:
+
+```bash
+git checkout "releases/$VERSION"
+git pull origin "releases/$VERSION"
 ./scripts/run_task.sh tags-update-require-directives -- "$VERSION"
 git add .
 git commit -S -m "chore: set require directives for $VERSION"
-git push -u origin "tags/$VERSION"
-gh pr create --repo github.com/ava-labs/avalanchego --base master --title "chore: set require directives for $VERSION"
+git push origin "releases/$VERSION"
 gh pr checks --watch
-gh pr merge "tags/$VERSION" --squash --subject "chore: set require directives for $VERSION"
-```
-
-Tag the merge commit:
-
-```bash
-git checkout master
-git pull origin
-git log -1  # Verify expected commit
+# Only the go.mod files should differ from the tested release candidate
+git diff --stat "$VERSION_RC"
 ./scripts/run_task.sh tags-create -- "$VERSION"
 ./scripts/run_task.sh tags-push -- "$VERSION"
+```
+
+Then merge the release PR into master:
+
+```bash
+gh pr ready "releases/$VERSION"
+gh pr merge "releases/$VERSION" --squash --subject "chore: release $VERSION"
 ```
 
 ### 8. Create GitHub Release
