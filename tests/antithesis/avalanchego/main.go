@@ -168,23 +168,24 @@ func main() {
 
 	upgrades, err := info.NewClient(setupURI).Upgrades(ctx)
 	require.NoError(err, "failed to fetch the upgrade schedule")
-	timeUntilHelicon := time.Until(upgrades.HeliconTime)
+	nextUpgrade := upgrades.LatestScheduledTime()
+	timeUntilUpgrade := time.Until(nextUpgrade)
 	assert.Always(
-		timeUntilHelicon > 0,
-		"Helicon activates after worker initialization",
+		timeUntilUpgrade > 0,
+		"Upgrade activates after worker initialization",
 		map[string]any{
-			"heliconTime":      upgrades.HeliconTime,
-			"timeUntilHelicon": timeUntilHelicon.String(),
+			"upgradeTime":      nextUpgrade,
+			"timeUntilUpgrade": timeUntilUpgrade.String(),
 		},
 	)
 
 	lifecycle.SetupComplete(map[string]any{
 		"msg":              "initialized workers",
 		"numWorkers":       NumKeys,
-		"timeUntilHelicon": timeUntilHelicon.String(),
+		"timeUntilUpgrade": timeUntilUpgrade.String(),
 	})
 
-	go awaitHeliconActivation(ctx, upgrades.HeliconTime)
+	go awaitActivation(ctx, nextUpgrade)
 
 	for _, w := range workloads[1:] {
 		go w.run(ctx)
@@ -192,17 +193,17 @@ func main() {
 	genesisWorkload.run(ctx)
 }
 
-// awaitHeliconActivation reports that Helicon activated. Nothing is reported if
-// ctx is canceled first, failing the reachability assertion for runs that end
-// before the activation.
-func awaitHeliconActivation(ctx context.Context, heliconTime time.Time) {
+// awaitActivation reports that the next upgrade activated. Nothing is reported
+// if ctx is canceled first, failing the reachability assertion for runs that
+// end before the activation.
+func awaitActivation(ctx context.Context, heliconTime time.Time) {
 	timer := time.NewTimer(time.Until(heliconTime))
 	defer timer.Stop()
 
 	select {
 	case <-timer.C:
-		assert.Reachable("Helicon activating", map[string]any{
-			"heliconTime": heliconTime,
+		assert.Reachable("Upgrade activating", map[string]any{
+			"upgradeTime": heliconTime,
 		})
 	case <-ctx.Done():
 	}

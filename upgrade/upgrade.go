@@ -6,6 +6,7 @@ package upgrade
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -109,8 +110,8 @@ type Config struct {
 	HeliconTime                  time.Time     `json:"heliconTime"`
 }
 
-func (c *Config) Validate() error {
-	upgrades := []time.Time{
+func (c *Config) upgrades() []time.Time {
+	return []time.Time{
 		c.ApricotPhase1Time,
 		c.ApricotPhase2Time,
 		c.ApricotPhase3Time,
@@ -127,6 +128,10 @@ func (c *Config) Validate() error {
 		c.GraniteTime,
 		c.HeliconTime,
 	}
+}
+
+func (c *Config) Validate() error {
+	upgrades := c.upgrades()
 	for i := 0; i < len(upgrades)-1; i++ {
 		if upgrades[i].After(upgrades[i+1]) {
 			return fmt.Errorf("%w: upgrade %d (%s) is after upgrade %d (%s)",
@@ -199,6 +204,15 @@ func (c *Config) IsGraniteActivated(t time.Time) bool {
 
 func (c *Config) IsHeliconActivated(t time.Time) bool {
 	return !t.Before(c.HeliconTime)
+}
+
+func (c *Config) LatestScheduledTime() time.Time {
+	for _, t := range slices.Backward(c.upgrades()) {
+		if t.Before(UnscheduledActivationTime) {
+			return t
+		}
+	}
+	return InitiallyActiveTime
 }
 
 func GetConfig(networkID uint32) Config {
