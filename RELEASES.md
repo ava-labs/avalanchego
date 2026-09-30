@@ -1,6 +1,6 @@
 # Release Notes
 
-## Pending (v1.15.2)
+## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
 
 - None (delete and fill in as you work)
 
