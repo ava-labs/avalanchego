@@ -72,7 +72,7 @@ fi
 
 # Check the require version matches the version being developed. A unit test
 # in the version package keeps this file in sync with version.Current.
-current_version=$(tr -d '[:space:]' < "$REPO_ROOT/version/current.txt")
+current_version=$(<"$REPO_ROOT/version/current.txt")
 
 if [[ "$current_version" != "$reference" ]]; then
   echo "Internal module require version $reference does not match version.Current $current_version" >&2

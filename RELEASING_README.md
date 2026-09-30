@@ -19,21 +19,13 @@ All components follow aligned versioning:
 - Same version number - When AvalancheGo releases v1.14.0, Subnet-EVM is also v1.14.0
 - Coordinated tags - Each release creates tags for the main module and all submodules (e.g., `v1.14.0`, `graft/evm/v1.14.0`, `graft/coreth/v1.14.0`, `graft/subnet-evm/v1.14.0`)
 
-### Component Release Notes
-
-| Component | Release Artifact | Notes |
-| --------- | ---------------- | ----- |
-| AvalancheGo | `avalanchego` binary | Main node binary |
-| Coreth | None (compiled into AvalancheGo) | No separate release |
-| Subnet-EVM | `subnet-evm` binary | Separate plugin binary for L1s |
-
 ## Release Procedure
 
 Master always names the next version in `version.Current` and the internal `require` directives (enforced by [`check-require-directives`](#check-require-directives)). Any master commit can be tagged as a release candidate, the final release tags that same commit, and prep for the next version happens after the release.
 
 ### 1. Preparation
 
-Always cut a release candidate first, and release only after it passes. This section uses `v1.15.1-rc.0` as its example. Set these variables so you can copy the commands below as-is:
+This section uses `v1.15.1-rc.0` as its example. Set these variables so you can copy the commands below as-is:
 
 ```bash
 export VERSION_RC=v1.15.1-rc.0
@@ -117,7 +109,7 @@ If this release activates a new network upgrade on Mainnet:
        #   ...
    ```
 
-The test starts a network on the published `DEFAULT_VERSION` binary and restarts it on the current code, so the two MUST agree on the local schedule. After this change only `$VERSION` agrees, and it is not published until the release itself — so the job stays off until [step 9](#9-prepare-the-next-release) turns it back on.
+The upgrade test runs the published `DEFAULT_VERSION` binary, which doesn't exist until `$VERSION` is released. [Step 9](#9-prepare-the-next-release) turns it back on.
 
 ### 3. Create Release Candidate Tags
 
@@ -132,7 +124,7 @@ git log -1
 ./scripts/run_task.sh tags-push -- "$VERSION_RC"
 ```
 
-The `require` directives at this commit reference `$VERSION`, which is not tagged yet. So `go get github.com/ava-labs/avalanchego@$VERSION_RC` does not resolve outside the repository. Test the release candidate with the binaries and images built from its tag.
+The `require` directives at this commit reference `$VERSION`, which is not tagged yet. So `go get github.com/ava-labs/avalanchego@$VERSION_RC` does not resolve outside the repository.
 
 ### 4. Test the Release Candidate
 
@@ -156,17 +148,10 @@ Set the canary image tags to `$VERSION_RC` on both Fuji and Mainnet (e.g. [#1734
 
 #### Echo and Dispatch
 
-Echo and Dispatch are Fuji chains that deploy the public `avaplatform/subnet-evm` image. Echo is an L1 and Dispatch is a subnet, so between them they cover both validator models. Set their image tags to `$VERSION_RC`:
+Echo and Dispatch are Fuji chains that deploy the public `avaplatform/subnet-evm` image. Echo is an L1 and Dispatch is a subnet, so between them they cover both validator models. Set their `api.image.tag` and `validator.image.tag` to `$VERSION_RC`:
 
 - Echo: [`base/subnet/testnet/echo/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/echo/avalanchego/base/cornice.yaml)
 - Dispatch: [`base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml)
-
-```yaml
-- name: api.image.tag
-  value: "$VERSION_RC"
-- name: validator.image.tag
-  value: "$VERSION_RC"
-```
 
 Once merged, monitor the deployments:
 
@@ -210,7 +195,7 @@ The tag push from [step 5](#5-create-final-release-tags) triggers these workflow
 
 - `build-linux-binaries.yml` - Linux amd64/arm64 tarballs
 - `build-macos-release.yml` - macOS zip
-- `build-linux-packages.yml` - Linux RPM/DEB packages (matrix over `{rpm, deb}` and `{amd64, arm64}` via the `./.github/packaging/actions/build-package` composite action). On tag pushes, the `upload-debs-s3` job additionally publishes `.deb` packages to `linux/debs/ubuntu/{jammy,noble}/{arch}/` and `GPG-KEY-avalanchego` to `linux/debs/ubuntu/{jammy,noble}/`.
+- `build-linux-packages.yml` - Linux RPM/DEB packages (`.deb`s are also published to S3)
 - `publish_docker_image.yml` - Docker images
 
 Artifacts produced:
@@ -224,11 +209,11 @@ Artifacts produced:
 - `subnet-evm-linux-arm64-$VERSION.tar.gz`
 - `subnet-evm-macos-$VERSION.zip`
 
-**Docker Images:**
+**Docker Images** (linux/amd64 and linux/arm64):
 
-- `avaplatform/avalanchego:$VERSION` (multi-arch: linux/amd64, linux/arm64)
-- `avaplatform/subnet-evm:$VERSION` (multi-arch: linux/amd64, linux/arm64)
-- `avaplatform/bootstrap-monitor:$VERSION` (multi-arch: linux/amd64, linux/arm64)
+- `avaplatform/avalanchego:$VERSION`
+- `avaplatform/subnet-evm:$VERSION`
+- `avaplatform/bootstrap-monitor:$VERSION`
 
 ### 7. Create GitHub Release
 
@@ -236,28 +221,24 @@ Create a release at [github.com/ava-labs/avalanchego/releases/new](https://githu
 
 1. Select tag `$VERSION`
 1. Set title to `$VERSION`
-1. Write release notes including:
-    - Network upgrade information (if applicable)
-    - Plugin version changes
-    - Breaking changes
-    - Features
-    - Fixes
-
-    Example:
+1. For the release notes, copy the `$VERSION` section of [`RELEASES.md`](RELEASES.md) without its heading, and end it with the full changelog link:
 
     ```markdown
-    This release schedules the activation of...
-
-
-    The plugin version is updated to `45`; all plugins must update to be compatible.
-
-    ### Breaking Changes
+    This release schedules the activation of the Helicon network upgrade...
 
     ### Features
+    ...
+
+    ### APIs
+    ...
+
+    ### Configs
+    ...
 
     ### Fixes
+    ...
 
-    **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.15.0...v1.15.1
+    **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.14.2...v1.15.0
     ```
 
 1. Attach the **Binaries** listed in [step 6](#6-automated-builds), downloaded from the artifacts of the tag's `build-linux-release` and `build-macos-release` runs
@@ -320,13 +301,11 @@ export NEXT_VERSION=v1.15.2
    ## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
    ```
 
-1. Compare the `$VERSION` section of [`RELEASES.md`](RELEASES.md) against what was released. PRs merged after the release candidate commit added their notes to the `$VERSION` section, but they are not part of `$VERSION`. This diff shows those notes:
+1. PRs merged after the release candidate commit may have added notes to the `$VERSION` section of [`RELEASES.md`](RELEASES.md). Check with this diff, and move any you find to `$NEXT_VERSION`:
 
    ```bash
    git diff "$VERSION" origin/master -- RELEASES.md
    ```
-
-   Move each of them into the `$NEXT_VERSION` section. Check again if you rebase before merging.
 
 1. If you disabled the `upgrade` job in [step 2](#activating-a-network-upgrade-on-mainnet), enable it again in [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml). Uncomment the `Run e2e tests` step and delete the `TODO` comment.
 
@@ -419,9 +398,9 @@ git tag -d v1.14.1 graft/evm/v1.14.1
 
 ### Tag Push Failure
 
-If `tags-push` fails partway through (e.g., network error), some tags may have been pushed while others haven't. The script validates all tags exist locally before pushing, but cannot guarantee atomic remote delivery.
+If `tags-push` fails partway through (e.g., network error), some tags may have been pushed while others haven't.
 
-To recover, simply re-run the push — git push is idempotent for tags that already exist at the correct commit:
+To recover, re-run the push — git push is idempotent for tags that already exist at the correct commit:
 
 ```bash
 ./scripts/run_task.sh tags-push -- "$VERSION"
@@ -445,5 +424,5 @@ If `tags-update-require-directives` fails partway through, some go.mod files may
 To recover, re-run the update — it's idempotent:
 
 ```bash
-./scripts/run_task.sh tags-update-require-directives -- "$NEXT_VERSION"
+./scripts/run_task.sh tags-update-require-directives -- <version>
 ```

@@ -5,7 +5,6 @@ package version
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -26,5 +25,5 @@ func TestCurrentRPCChainVMCompatible(t *testing.T) {
 }
 
 func TestCurrentFileMatchesCurrent(t *testing.T) {
-	require.Equal(t, Current.Semantic(), strings.TrimSpace(currentFile), "current.txt")
+	require.Equal(t, Current.Semantic(), currentFile, "current.txt")
 }
