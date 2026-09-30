@@ -12,10 +12,6 @@
 - Updated the minimum Go version from `1.25.10` to `1.26.8`.
 - Helicon is now active from genesis on local networks. A local network started on a previous version is not compatible with this version.
 
-### Fixes
-
-- New Firewood archival nodes commit genesis state on all chains.
-
 ### APIs
 
 - Added:
