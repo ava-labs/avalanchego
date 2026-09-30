@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/pchain"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -59,6 +60,10 @@ const (
 	// Antithesis run peaked around 120 self-transfers per worker.
 	initialCChainFunding = 10 * params.Ether
 	cChainTransferAmount = 10_000 // wei
+	// initialPChainFunding is the per-worker P-Chain top-up. Capped validators
+	// use a small share of it. The rest funds P-to-X transfers and delegations,
+	// whose stake stays locked until the delegatee's end time, after the run.
+	initialPChainFunding = 500 * units.KiloAvax
 	// txConfirmationTimeout bounds the total time spent waiting for a tx receipt
 	// across all nodes.
 	txConfirmationTimeout = 60 * time.Second
@@ -90,13 +95,24 @@ func main() {
 		zap.Duration("duration", time.Since(walletSyncStartTime)),
 	)
 
+	nodes := make([]pchain.Node, len(c.URIs))
+	for i, uri := range c.URIs {
+		nodeID, _, err := info.NewClient(uri).GetNodeID(ctx)
+		require.NoError(err, "failed to get node ID")
+		nodes[i] = pchain.NewNode(nodeID, uri)
+	}
+	monitor := newPChainMonitor(nodes, tc.Log())
+
 	genesisWorkload := &workload{
-		id:        0,
-		log:       tests.NewDefaultLogger(fmt.Sprintf("worker %d", 0)),
-		wallet:    wallet,
-		addrs:     set.Of(genesis.EWOQKey.Address()),
-		uris:      c.URIs,
-		cChainKey: genesis.EWOQKey.ToECDSA(),
+		id:            0,
+		log:           tests.NewDefaultLogger(fmt.Sprintf("worker %d", 0)),
+		wallet:        wallet,
+		keychain:      kc,
+		addrs:         set.Of(genesis.EWOQKey.Address()),
+		uris:          c.URIs,
+		cChainKey:     genesis.EWOQKey.ToECDSA(),
+		pChainNode:    nodes[0],
+		pChainMonitor: monitor,
 	}
 	require.NoError(genesisWorkload.initializeCChain(ctx, nil), "failed to initialize genesis C-Chain clients")
 
@@ -139,7 +155,10 @@ func main() {
 
 		require.NoError(genesisWorkload.confirmXChainTx(ctx, baseTx), "failed to confirm initial funding X-chain baseTx")
 
-		uri := c.URIs[i%len(c.URIs)]
+		require.NoError(genesisWorkload.fundPChainAddress(ctx, addr, initialPChainFunding), "failed to fund P-chain worker")
+
+		nodeIndex := i % len(nodes)
+		uri := c.URIs[nodeIndex]
 		kc := secp256k1fx.NewKeychain(key)
 		walletSyncStartTime := time.Now()
 		wallet := e2e.NewWallet(tc, kc, tmpnet.NodeURI{URI: uri})
@@ -155,12 +174,15 @@ func main() {
 		)
 
 		worker := &workload{
-			id:        i,
-			log:       tests.NewDefaultLogger(fmt.Sprintf("worker %d", i)),
-			wallet:    wallet,
-			addrs:     set.Of(addr),
-			uris:      c.URIs,
-			cChainKey: cChainKey,
+			id:            i,
+			log:           tests.NewDefaultLogger(fmt.Sprintf("worker %d", i)),
+			wallet:        wallet,
+			keychain:      kc,
+			addrs:         set.Of(addr),
+			uris:          c.URIs,
+			cChainKey:     cChainKey,
+			pChainNode:    nodes[nodeIndex],
+			pChainMonitor: monitor,
 		}
 		require.NoError(worker.initializeCChain(ctx, genesisWorkload.cChainID), "failed to initialize C-Chain clients")
 		workloads[i] = worker
@@ -185,6 +207,7 @@ func main() {
 	})
 
 	go awaitHeliconActivation(ctx, upgrades.HeliconTime)
+	go monitor.run(ctx)
 
 	for _, w := range workloads[1:] {
 		go w.run(ctx)
@@ -209,15 +232,31 @@ func awaitHeliconActivation(ctx context.Context, heliconTime time.Time) {
 }
 
 type workload struct {
-	id     int
-	log    logging.Logger
-	wallet *primary.Wallet
-	addrs  set.Set[ids.ShortID]
-	uris   []string
+	id       int
+	log      logging.Logger
+	wallet   *primary.Wallet
+	keychain *secp256k1fx.Keychain
+	addrs    set.Set[ids.ShortID]
+	uris     []string
 
 	cChainKey     *ecdsa.PrivateKey
 	cChainID      *big.Int
 	cChainClients map[string]*ethclient.Client
+
+	// pChainNode issues the worker's P-Chain transactions and is the
+	// delegatee of its delegations.
+	pChainNode    pchain.Node
+	pChainMonitor *pChainMonitor
+}
+
+// action is one operation a worker can select at random.
+type action struct {
+	name string
+	fn   func(ctx context.Context)
+	// maxRuns bounds how often this worker runs the action. Zero is unlimited.
+	// Every run counts, whether or not it produced a transaction.
+	maxRuns int
+	runs    int
 }
 
 // newTestContext returns a test context that ensures that log output and assertions are
@@ -285,12 +324,26 @@ func (w *workload) run(ctx context.Context) {
 		"pBalance": pAVAX,
 	})
 
+	actions := []action{
+		{name: "issueXChainBaseTx", fn: w.issueXChainBaseTx},
+		{name: "issueXChainCreateAssetTx", fn: w.issueXChainCreateAssetTx},
+		{name: "issueXChainOperationTx", fn: w.issueXChainOperationTx},
+		{name: "issueXToPTransfer", fn: w.issueXToPTransfer},
+		{name: "issuePToXTransfer", fn: w.issuePToXTransfer},
+		// Capped so validators spend a small share of initialPChainFunding and
+		// their non-voting stake stays a few percent of the total.
+		{name: "issuePChainAddValidatorTx", fn: w.issuePChainAddValidatorTx, maxRuns: 20},
+		{name: "issuePChainAddDelegatorTx", fn: w.issuePChainAddDelegatorTx},
+		{name: "issueCChainTransfer", fn: w.issueCChainTransfer},
+		{name: "sleep"},
+	}
+
 	for {
 		if ctx.Err() != nil {
 			return
 		}
 
-		w.executeTest(ctx)
+		w.executeAction(ctx, actions)
 
 		val, err := rand.Int(rand.Reader, big.NewInt(int64(time.Second)))
 		require.NoError(err, "failed to read randomness")
@@ -304,33 +357,26 @@ func (w *workload) run(ctx context.Context) {
 	}
 }
 
-// executeTest executes a test at random.
-func (w *workload) executeTest(ctx context.Context) {
+// executeAction executes an action at random, skipping actions that reached
+// their run limit.
+func (w *workload) executeAction(ctx context.Context, actions []action) {
 	tc := w.newTestContext(ctx)
 	// Panics will be recovered without being rethrown, ensuring that test failures are not fatal.
 	defer tc.Recover()
 	require := require.New(tc)
 
-	tests := []struct {
-		name string
-		fn   func(ctx context.Context)
-	}{
-		{"issueXChainBaseTx", w.issueXChainBaseTx},
-		{"issueXChainCreateAssetTx", w.issueXChainCreateAssetTx},
-		{"issueXChainOperationTx", w.issueXChainOperationTx},
-		{"issueXToPTransfer", w.issueXToPTransfer},
-		{"issuePToXTransfer", w.issuePToXTransfer},
-		{"issueCChainTransfer", w.issueCChainTransfer},
-		{"sleep", nil},
-	}
-
-	val, err := rand.Int(rand.Reader, big.NewInt(int64(len(tests))))
+	val, err := rand.Int(rand.Reader, big.NewInt(int64(len(actions))))
 	require.NoError(err, "failed to read randomness")
 
-	test := tests[val.Int64()]
-	w.log.Info("executing " + test.name)
-	if test.fn != nil {
-		test.fn(ctx)
+	selected := &actions[val.Int64()]
+	if selected.maxRuns > 0 && selected.runs >= selected.maxRuns {
+		w.log.Debug("skipping " + selected.name + ": run limit reached")
+		return
+	}
+	selected.runs++
+	w.log.Info("executing " + selected.name)
+	if selected.fn != nil {
+		selected.fn(ctx)
 	}
 
 	// TODO(marun) Enable execution of the banff e2e test as part of https://github.com/ava-labs/avalanchego/issues/4049

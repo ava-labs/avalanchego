@@ -1,0 +1,26 @@
+load("//.bazel:defs.bzl", "go_test")
+
+go_test(
+    name = "p_test",
+    srcs = [
+        "staking_test.go",
+        "tx_test.go",
+    ],
+    deps = [
+        "//genesis",
+        "//ids",
+        "//tests",
+        "//tests/fixture/pchain",
+        "//utils/constants",
+        "//utils/crypto/secp256k1",
+        "//vms/components/avax",
+        "//vms/platformvm/genesis/genesistest",
+        "//vms/platformvm/platform",
+        "//vms/platformvm/status",
+        "//vms/secp256k1fx",
+        "//wallet/chain/p/wallet",
+        "//wallet/subnet/primary",
+        "//wallet/subnet/primary/common",
+        "@com_github_stretchr_testify//require",
+    ],
+)
