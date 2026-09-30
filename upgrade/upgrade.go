@@ -107,6 +107,7 @@ type Config struct {
 	GraniteTime                  time.Time     `json:"graniteTime"`
 	GraniteEpochDuration         time.Duration `json:"graniteEpochDuration"`
 	HeliconTime                  time.Time     `json:"heliconTime"`
+	// When adding a new upgrade, follow new_upgrade_checklist.md.
 }
 
 func (c *Config) Validate() error {

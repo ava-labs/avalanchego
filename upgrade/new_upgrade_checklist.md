@@ -19,6 +19,10 @@ This checklist ists all the required steps when when adding a new network upgrad
 - [ ] Add `IsXActivated(time.Time) bool` method
 - [ ] Update `LatestTime() time.Time` method
 
+### [`proto/vm/vm.proto`](../proto/vm/vm.proto)
+  - [ ] Add new time field to the `NetworkUpgrades` message
+  - [ ] Regenerate [`proto/pb/vm/vm.pb.go`](../proto/pb/vm/vm.pb.go)
+
 ### [`vms/rpcchainvm/vm_client.go`](../vms/rpcchainvm/vm_client.go)
 
 - [ ] Add new time field to `NetworkUpgrades` struct in `getNetworkUpgrades()`
