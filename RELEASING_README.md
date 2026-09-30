@@ -18,6 +18,7 @@ All components follow aligned versioning:
 
 - Same version number - When AvalancheGo releases v1.14.0, Subnet-EVM is also v1.14.0
 - Coordinated tags - Each release creates tags for the main module and all submodules (e.g., `v1.14.0`, `graft/evm/v1.14.0`, `graft/coreth/v1.14.0`, `graft/subnet-evm/v1.14.0`)
+- Minor version means network upgrade - The major version does not change. The minor version increases only for a release that schedules a new network upgrade (e.g., `v1.15.x` to `v1.16.0`). All other releases increase the patch version.
 
 ### Component Release Notes
 
@@ -40,9 +41,52 @@ export VERSION_RC=v1.15.1-rc.0
 export VERSION=v1.15.1
 ```
 
-### 2. Pre-Release Changes (Network Upgrades Only)
+### 2. Pre-Release Changes
 
-Skip this step unless this release activates a new network upgrade on Mainnet. In that case, merge a PR to master with the following changes before you tag the first release candidate:
+If this release schedules or activates a network upgrade, merge a PR to master with the changes below before you tag the first release candidate. Otherwise, [skip to step 3](#3-create-release-candidate-tags).
+
+#### Scheduling a Network Upgrade
+
+A release that schedules a new network upgrade increases the minor version (for example, `v1.16.0`). The prep PR from [step 9](#9-prepare-the-next-release) sets master to the next patch version, so change master to `$VERSION`:
+
+1. In [`version/constants.go`](version/constants.go), set `Current` to `$VERSION`. Bump the compatibility floor in the same file: `MinimumCompatibleVersion` to this release's minor version and `PrevMinimumCompatibleVersion` to the one before, both with `Patch: 0`:
+
+   ```go
+   Current = &Application{
+       Name:  Client,
+       Major: 1,
+       Minor: 16,
+       Patch: 0,
+   }
+   MinimumCompatibleVersion = &Application{
+       Name:  Client,
+       Major: 1,
+       Minor: 16,
+       Patch: 0,
+   }
+   PrevMinimumCompatibleVersion = &Application{
+       Name:  Client,
+       Major: 1,
+       Minor: 15,
+       Patch: 0,
+   }
+   ```
+
+1. Update the submodule require directives:
+
+   ```bash
+   ./scripts/run_task.sh tags-update-require-directives -- "$VERSION"
+   ```
+
+1. In [`version/compatibility.json`](version/compatibility.json), replace the patch version from the prep PR with `$VERSION`.
+
+1. In [`RELEASES.md`](RELEASES.md), rename the first section to `$VERSION`.
+
+After the release is published, update the notify service in [step 8](#8-update-the-notify-service).
+
+#### Activating a Network Upgrade on Mainnet
+
+If this release activates a new network upgrade on Mainnet:
 
 1. In [`upgrade/upgrade.go`](upgrade/upgrade.go), set the upgrade's time in `Default` — the local-network schedule — to `InitiallyActiveTime`:
 
@@ -242,7 +286,7 @@ See the [Antithesis testing documentation](tests/antithesis/README.md#scheduled-
 
 ### 8. Update the Notify Service
 
-Only needed when `MinimumCompatibleVersion` changed in this release.
+Only needed for a release that schedules a network upgrade, which changes `MinimumCompatibleVersion` in [step 2](#scheduling-a-network-upgrade).
 
 The notify service warns node operators running below a configured version. Its config lives in `devops-argocd`, under the `uptime` job of [`aws/data/us-east-1/data-k8s/root/analytics/analytics-app.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/aws/data/us-east-1/data-k8s/root/analytics/analytics-app.yaml). Set both versions to `MinimumCompatibleVersion`, without the leading `v`:
 
@@ -282,25 +326,6 @@ export NEXT_VERSION=v1.15.2
    }
    ```
 
-   If `$NEXT_VERSION` is a minor release, also bump the compatibility floor in the same file: `MinimumCompatibleVersion` to that minor and `PrevMinimumCompatibleVersion` to the one before, both with `Patch: 0`. For example, for `v1.16.0`:
-
-   ```go
-   MinimumCompatibleVersion = &Application{
-       Name:  Client,
-       Major: 1,
-       Minor: 16,
-       Patch: 0,
-   }
-   PrevMinimumCompatibleVersion = &Application{
-       Name:  Client,
-       Major: 1,
-       Minor: 15,
-       Patch: 0,
-   }
-   ```
-
-   Changing `MinimumCompatibleVersion` also means updating the notify service after that release is published — see [step 8](#8-update-the-notify-service).
-
 1. Update the submodule require directives:
 
    ```bash
@@ -323,7 +348,7 @@ export NEXT_VERSION=v1.15.2
 
    Move each of them into the `$NEXT_VERSION` section. Check again if you rebase before merging.
 
-1. If you disabled the `upgrade` job in [step 2](#2-pre-release-changes-network-upgrades-only), enable it again in [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml). Uncomment the `Run e2e tests` step and delete the `TODO` comment.
+1. If you disabled the `upgrade` job in [step 2](#activating-a-network-upgrade-on-mainnet), enable it again in [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml). Uncomment the `Run e2e tests` step and delete the `TODO` comment.
 
 1. Create PR and merge:
 
