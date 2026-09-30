@@ -23,8 +23,8 @@ var errUnexpectedCredentialType = errors.New("unexpected credential type")
 // ParseOld parses a transaction using coreth's old parsing logic while
 // enforcing restrictions imposed by the new parsing logic.
 //
-// Coreth's parsing logic is overly permissive and depends on later verification
-// in [vm.VerifierBackend].
+// Coreth's parsing logic is overly permissive and depends on later
+// verification in [github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm.VerifierBackend].
 func ParseOld(b []byte) (*atomic.Tx, error) {
 	tx, err := atomic.ExtractAtomicTx(b, atomic.Codec)
 	if err != nil {
@@ -41,8 +41,8 @@ func ParseOld(b []byte) (*atomic.Tx, error) {
 // ParseOlds parses a slice of transaction using coreth's old parsing logic
 // while enforcing restrictions imposed by the new parsing logic.
 //
-// Coreth's parsing logic is overly permissive and depends on later verification
-// in [vm.VerifierBackend].
+// Coreth's parsing logic is overly permissive and depends on later
+// verification in [github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm.VerifierBackend].
 func ParseOlds(b []byte) ([]*atomic.Tx, error) {
 	txs, err := atomic.ExtractAtomicTxs(b, true, atomic.Codec)
 	if err != nil {

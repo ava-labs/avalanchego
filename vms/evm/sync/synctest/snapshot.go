@@ -14,9 +14,11 @@ type Pair struct {
 	K, V []byte
 }
 
-// Snapshot is an in-memory [evmstate.Snapshot] for tests. Accounts
-// and each Storage entry are sorted by K, accounts holding slim values. The root
-// is ignored, as a real disk layer serves whatever it last flushed.
+// Snapshot is an in-memory
+// [github.com/ava-labs/avalanchego/vms/evm/sync/hashdb.Snapshot] for tests.
+// Accounts and each Storage entry are sorted by K, accounts holding slim
+// values. The root is ignored, as a real disk layer serves whatever it last
+// flushed.
 type Snapshot struct {
 	Accounts []Pair
 	Storage  map[common.Hash][]Pair

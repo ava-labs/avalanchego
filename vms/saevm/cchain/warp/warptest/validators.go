@@ -179,7 +179,7 @@ func IncorrectlySign(tb testing.TB, msg *warp.UnsignedMessage) *warp.Message {
 // GetWarpValidatorSets and GetValidatorSet.
 //
 // ctx.ValidatorState MUST be a [validatorstest.State], which is the concrete
-// type installed by [snowtest.Context].
+// type installed by [github.com/ava-labs/avalanchego/snow/snowtest.Context].
 func SetValidators(tb testing.TB, ctx *snow.Context, vdrs *Validators) {
 	tb.Helper()
 

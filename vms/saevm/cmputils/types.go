@@ -85,7 +85,7 @@ func Blocks() cmp.Option {
 	}
 }
 
-// Headers returns a set of [cmp.Options] for comparing [type.Headers] values.
+// Headers returns a set of [cmp.Options] for comparing [types.Header] values.
 func Headers() cmp.Option {
 	return cmp.Options{
 		cmpopts.IgnoreFields(types.Header{}, "extra"),

@@ -12,7 +12,7 @@ import (
 
 // Staker is the representation of a staker sent via APIs.
 // [TxID] is the txID of the transaction that added this staker.
-// [Endtime] is the Unix time repr. of when they are done staking
+// [Staker.EndTime] is the Unix time repr. of when they are done staking
 // [NodeID] is the node ID of the staker
 // [Weight] is the validator weight (stake) when sampling validators
 type Staker struct {
