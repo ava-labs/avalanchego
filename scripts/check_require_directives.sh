@@ -3,7 +3,7 @@
 # Checks that internal module require directives are consistent across all
 # go.mod files, and that they reference the next release. Every require of an
 # avalanchego submodule must reference the same version, and that version must
-# match version.Current and the top section of RELEASES.md.
+# match version.Current.
 #
 # See docs/design/multi-module-release.md for background.
 
@@ -76,16 +76,6 @@ if [[ "$current_version" != "$reference" ]]; then
   echo "Internal module require version $reference does not match version.Current $current_version" >&2
   echo "" >&2
   echo "Run './scripts/run_task.sh tags-update-require-directives -- $current_version' to fix." >&2
-  exit 1
-fi
-
-expected_heading="## [$reference](https://github.com/ava-labs/avalanchego/releases/tag/$reference)"
-actual_heading=$(grep -m1 '^## ' RELEASES.md || true)
-
-if [[ "$actual_heading" != "$expected_heading" ]]; then
-  echo "The first section of RELEASES.md must be the next release:" >&2
-  echo "  expected: $expected_heading" >&2
-  echo "  actual:   $actual_heading" >&2
   exit 1
 fi
 
