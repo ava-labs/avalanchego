@@ -122,7 +122,7 @@ The test starts a network on the published `DEFAULT_VERSION` binary and restarts
 
 ### 3. Create Release Candidate Tags
 
-Tag a commit on master. No branch or PR is needed:
+Tag a commit on master:
 
 ```bash
 git fetch origin master
