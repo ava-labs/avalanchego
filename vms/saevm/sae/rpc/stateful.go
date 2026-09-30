@@ -317,10 +317,9 @@ func (b *backend) minGasForArgs(args ethapi.TransactionArgs) (hexutil.Uint64, er
 	if args.Nonce != nil {
 		nonce = uint64(*args.Nonce)
 	}
-	// Every tx needs at least [params.TxGas], so the embedded estimate treats
-	// a lower limit (e.g. 0) as unset, and thus we should do the same. See
-	// https://github.com/ava-labs/libevm/blob/dbf7ede95a25d8dfbdadafe53822022cba222d71/eth/gasestimator/gasestimator.go#L59-L62
 	allowance := hexutil.Uint64(math.MaxUint64)
+	// The embedded estimate treats a limit lower than [params.TxGas] as unset.
+	// See https://github.com/ava-labs/libevm/blob/dbf7ede95a25d8dfbdadafe53822022cba222d71/eth/gasestimator/gasestimator.go#L59-L62
 	if args.Gas != nil && uint64(*args.Gas) >= params.TxGas {
 		allowance = *args.Gas
 	}
