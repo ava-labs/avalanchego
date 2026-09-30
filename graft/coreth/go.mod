@@ -8,8 +8,8 @@ module github.com/ava-labs/avalanchego/graft/coreth
 go 1.26.8
 
 require (
-	github.com/ava-labs/avalanchego v1.15.0
-	github.com/ava-labs/avalanchego/graft/evm v1.15.0
+	github.com/ava-labs/avalanchego v1.15.1
+	github.com/ava-labs/avalanchego/graft/evm v1.15.1
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0
 	github.com/ava-labs/libevm v1.13.15-0.20260929143550-dbf7ede95a25
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
