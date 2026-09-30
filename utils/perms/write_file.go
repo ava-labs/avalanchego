@@ -10,7 +10,7 @@ import (
 	"github.com/google/renameio/v2/maybe"
 )
 
-// WriteFile writes [data] to [filename] and ensures that [filename] has [perm]
+// WriteFile writes data to filename and ensures that filename has perm
 // permissions. Will write atomically on linux/macos and fall back to non-atomic
 // ioutil.WriteFile on windows.
 func WriteFile(filename string, data []byte, perm os.FileMode) error {

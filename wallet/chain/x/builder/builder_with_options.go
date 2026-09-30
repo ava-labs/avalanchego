@@ -24,7 +24,7 @@ type builderWithOptions struct {
 //
 //   - [builder] is the builder that will be called to perform the underlying
 //     operations.
-//   - [options] will be provided to the builder in addition to the options
+//   - options will be provided to the builder in addition to the options
 //     provided in the method calls.
 func NewWithOptions(builder Builder, options ...common.Option) Builder {
 	return &builderWithOptions{

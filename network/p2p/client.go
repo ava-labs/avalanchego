@@ -58,7 +58,7 @@ func (c *Client) AppRequestAny(
 }
 
 // AppRequest issues an arbitrary request to a node.
-// [onResponse] is invoked upon an error or a response.
+// onResponse is invoked upon an error or a response.
 func (c *Client) AppRequest(
 	ctx context.Context,
 	nodeIDs set.Set[ids.NodeID],

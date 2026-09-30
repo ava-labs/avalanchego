@@ -477,7 +477,7 @@ type GetSubnetsResponse struct {
 	Subnets []APISubnet `json:"subnets"`
 }
 
-// GetSubnets returns the subnets whose ID are in [args.IDs]
+// GetSubnets returns the subnets whose ID are in args.IDs
 // The response will include the primary network
 func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *GetSubnetsResponse) error {
 	s.vm.ctx.Log.Debug("deprecated API called",
@@ -1176,7 +1176,7 @@ type GetBlockchainStatusReply struct {
 	Status status.BlockchainStatus `json:"status"`
 }
 
-// GetBlockchainStatus gets the status of a blockchain with the ID [args.BlockchainID].
+// GetBlockchainStatus gets the status of a blockchain with the ID args.BlockchainID.
 func (s *Service) GetBlockchainStatus(r *http.Request, args *GetBlockchainStatusArgs, reply *GetBlockchainStatusReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
@@ -1285,7 +1285,7 @@ type ValidatedByResponse struct {
 	SubnetID ids.ID `json:"subnetID"`
 }
 
-// ValidatedBy returns the ID of the Subnet that validates [args.BlockchainID]
+// ValidatedBy returns the ID of the Subnet that validates args.BlockchainID
 func (s *Service) ValidatedBy(r *http.Request, args *ValidatedByArgs, response *ValidatedByResponse) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
@@ -1311,7 +1311,7 @@ type ValidatesResponse struct {
 	BlockchainIDs []ids.ID `json:"blockchainIDs"`
 }
 
-// Validates returns the IDs of the blockchains validated by [args.SubnetID]
+// Validates returns the IDs of the blockchains validated by args.SubnetID
 func (s *Service) Validates(_ *http.Request, args *ValidatesArgs, response *ValidatesResponse) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
@@ -1571,7 +1571,7 @@ type GetStakeReply struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-// GetStake returns the amount of nAVAX that [args.Addresses] have cumulatively
+// GetStake returns the amount of nAVAX that args.Addresses have cumulatively
 // staked on the Primary Network.
 //
 // This method assumes that each stake output has only owner

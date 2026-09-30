@@ -149,14 +149,14 @@ func bech32ToID(addrStr string) (ids.ShortID, error) {
 }
 
 // New builds the genesis state of the P-Chain (and thereby the Avalanche network.)
-// [avaxAssetID] is the ID of the AVAX asset
-// [networkID] is the ID of the network
-// [allocations] are the UTXOs on the Platform Chain that exist at genesis.
-// [validators] are the validators of the primary network at genesis.
-// [chains] are the chains that exist at genesis.
+// avaxAssetID is the ID of the AVAX asset
+// networkID is the ID of the network
+// allocations are the UTXOs on the Platform Chain that exist at genesis.
+// validators are the validators of the primary network at genesis.
+// chains are the chains that exist at genesis.
 // [time] is the Platform Chain's time at network genesis.
-// [initialSupply] is the initial supply of the AVAX asset.
-// [message] is the message to be sent to the genesis UTXOs.
+// initialSupply is the initial supply of the AVAX asset.
+// message is the message to be sent to the genesis UTXOs.
 func New(
 	avaxAssetID ids.ID,
 	networkID uint32,

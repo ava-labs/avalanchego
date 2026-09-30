@@ -12,9 +12,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bloom"
 )
 
-// NewBloomFilter returns a new instance of a bloom filter with at least [minTargetElements] elements
-// anticipated at any moment, and a false positive probability of [targetFalsePositiveProbability]. If the
-// false positive probability exceeds [resetFalsePositiveProbability], the bloom filter will be reset.
+// NewBloomFilter returns a new instance of a bloom filter with at least minTargetElements elements
+// anticipated at any moment, and a false positive probability of targetFalsePositiveProbability. If the
+// false positive probability exceeds resetFalsePositiveProbability, the bloom filter will be reset.
 //
 // Invariant: The returned bloom filter is not safe to reset concurrently with
 // other operations. However, it is otherwise safe to access concurrently.
@@ -81,7 +81,7 @@ func (b *BloomFilter) BloomFilter() (*bloom.Filter, ids.ID) {
 
 // ResetBloomFilterIfNeeded resets a bloom filter if it breaches [targetFalsePositiveProbability].
 //
-// If [targetElements] exceeds [minTargetElements], the size of the bloom filter will grow to maintain
+// If targetElements exceeds [minTargetElements], the size of the bloom filter will grow to maintain
 // the same [targetFalsePositiveProbability].
 //
 // Returns true if the bloom filter was reset.

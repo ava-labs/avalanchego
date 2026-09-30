@@ -13,9 +13,9 @@ import (
 )
 
 // GetAtomicUTXOs returns exported UTXOs such that at least one of the
-// addresses in [addrs] is referenced.
+// addresses in addrs is referenced.
 //
-// Returns at most [limit] UTXOs.
+// Returns at most limit UTXOs.
 //
 // Returns:
 // * The fetched UTXOs

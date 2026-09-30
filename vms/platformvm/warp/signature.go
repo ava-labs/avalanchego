@@ -129,8 +129,8 @@ func (s *BitSetSignature) String() string {
 	return fmt.Sprintf("BitSetSignature(Signers = %x, Signature = %x)", s.Signers, s.Signature)
 }
 
-// VerifyWeight returns [nil] if [sigWeight] is at least [quorumNum]/[quorumDen]
-// of [totalWeight].
+// VerifyWeight returns [nil] if sigWeight is at least quorumNum/quorumDen
+// of totalWeight.
 // If [sigWeight >= totalWeight * quorumNum / quorumDen] then return [nil]
 func VerifyWeight(
 	sigWeight uint64,

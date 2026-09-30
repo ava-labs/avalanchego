@@ -151,8 +151,8 @@ func BuildHeader(
 }
 
 // BuildOption the option block
-// [parentID] is the ID of this option's wrapper parent block
-// [innerBytes] is the byte representation of a child option block
+// parentID is the ID of this option's wrapper parent block
+// innerBytes is the byte representation of a child option block
 func BuildOption(
 	parentID ids.ID,
 	innerBytes []byte,

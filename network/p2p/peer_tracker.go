@@ -156,9 +156,9 @@ func (p *PeerTracker) shouldSelectUntrackedPeer() bool {
 //
 // If we should track more peers, returns a random untracked peer, if any exist.
 // Otherwise, with probability [randomPeerProbability] returns a random peer
-// from [p.responsivePeers].
+// from p.responsivePeers.
 // With probability [1-randomPeerProbability] returns the peer in
-// [p.bandwidthHeap] with the highest bandwidth.
+// p.bandwidthHeap with the highest bandwidth.
 //
 // Returns false if there are no connected peers.
 func (p *PeerTracker) SelectPeer() (ids.NodeID, bool) {
@@ -210,7 +210,7 @@ func (p *PeerTracker) SelectPeer() (ids.NodeID, bool) {
 	return ids.EmptyNodeID, false
 }
 
-// Record that we sent a request to [nodeID].
+// Record that we sent a request to nodeID.
 //
 // Removes the peer's bandwidth averager from the bandwidth heap.
 func (p *PeerTracker) RegisterRequest(nodeID ids.NodeID) {
@@ -224,14 +224,14 @@ func (p *PeerTracker) RegisterRequest(nodeID ids.NodeID) {
 	p.metrics.numTrackedPeers.Set(float64(p.trackedPeers.Len()))
 }
 
-// Record that we observed that [nodeID]'s bandwidth is [bandwidth].
+// Record that we observed that nodeID's bandwidth is bandwidth.
 //
 // Adds the peer's bandwidth averager to the bandwidth heap.
 func (p *PeerTracker) RegisterResponse(nodeID ids.NodeID, bandwidth float64) {
 	p.updateBandwidth(nodeID, bandwidth, true)
 }
 
-// Record that a request failed to [nodeID].
+// Record that a request failed to nodeID.
 //
 // Adds the peer's bandwidth averager to the bandwidth heap.
 func (p *PeerTracker) RegisterFailure(nodeID ids.NodeID) {
@@ -271,7 +271,7 @@ func (p *PeerTracker) updateBandwidth(nodeID ids.NodeID, bandwidth float64, resp
 	p.metrics.averageBandwidth.Set(p.averageBandwidth.Read())
 }
 
-// Connected should be called when [nodeID] connects to this node.
+// Connected should be called when nodeID connects to this node.
 func (p *PeerTracker) Connected(nodeID ids.NodeID, nodeVersion *version.Application) {
 	// If this peer should be ignored, don't mark it as connected.
 	if p.ignoredNodes.Contains(nodeID) {
@@ -289,7 +289,7 @@ func (p *PeerTracker) Connected(nodeID ids.NodeID, nodeVersion *version.Applicat
 	p.untrackedPeers.Add(nodeID)
 }
 
-// Disconnected should be called when [nodeID] disconnects from this node.
+// Disconnected should be called when nodeID disconnects from this node.
 func (p *PeerTracker) Disconnected(nodeID ids.NodeID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()

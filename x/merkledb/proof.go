@@ -123,9 +123,9 @@ type Proof struct {
 	Value maybe.Maybe[[]byte]
 }
 
-// Verify returns nil if the trie given in [proof] has root [expectedRootID].
-// That is, this is a valid proof that [proof.Key] exists/doesn't exist
-// in the trie with root [expectedRootID].
+// Verify returns nil if the trie given in proof has root expectedRootID.
+// That is, this is a valid proof that proof.Key exists/doesn't exist
+// in the trie with root expectedRootID.
 func (proof *Proof) Verify(
 	ctx context.Context,
 	expectedRootID ids.ID,
@@ -300,9 +300,9 @@ func validateChangeProof(
 
 // Verify returns nil iff all the following hold:
 //   - The invariants of RangeProof hold.
-//   - [start] <= [end].
+//   - start <= end.
 //   - [proof] proves the key-value pairs in [proof.KeyValues] are in the trie
-//     whose root is [expectedRootID].
+//     whose root is expectedRootID.
 //
 // All keys in [proof.KeyValues] are in the range [start, end].
 //

@@ -135,9 +135,9 @@ func configForStakeStart(
 	return rewardConfig
 }
 
-// Split [totalAmount] into [totalAmount * shares percentage] and the remainder.
+// Split totalAmount into [totalAmount * shares percentage] and the remainder.
 //
-// Invariant: [shares] <= [PercentDenominator]
+// Invariant: shares <= [PercentDenominator]
 func Split(totalAmount uint64, shares uint32) (uint64, uint64) {
 	remainderShares := PercentDenominator - uint64(shares)
 	remainderAmount := remainderShares * (totalAmount / PercentDenominator)

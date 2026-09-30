@@ -91,7 +91,7 @@ type VM struct {
 }
 
 // Initialize this blockchain.
-// [vm.ChainManager] and [vm.vdrMgr] must be set before this function is called.
+// vm.ChainManager and vm.vdrMgr must be set before this function is called.
 func (vm *VM) Initialize(
 	ctx context.Context,
 	chainCtx *snow.Context,
@@ -425,7 +425,7 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
 	return vm.manager.LastAccepted(), nil
 }
 
-// SetPreference sets the preferred block to be the one with ID [blkID]
+// SetPreference sets the preferred block to be the one with ID blkID
 func (vm *VM) SetPreference(_ context.Context, blkID ids.ID) error {
 	vm.manager.SetPreference(blkID, nil)
 	return nil

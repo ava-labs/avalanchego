@@ -32,17 +32,17 @@ func Nothing[T any]() Maybe[T] {
 	return Maybe[T]{}
 }
 
-// IsNothing returns false iff [m] has a value.
+// IsNothing returns false iff m has a value.
 func (m Maybe[T]) IsNothing() bool {
 	return !m.hasValue
 }
 
-// HasValue returns true iff [m] has a value.
+// HasValue returns true iff m has a value.
 func (m Maybe[T]) HasValue() bool {
 	return m.hasValue
 }
 
-// Value returns the value of [m].
+// Value returns the value of m.
 func (m Maybe[T]) Value() T {
 	return m.value
 }
@@ -54,8 +54,8 @@ func (m Maybe[T]) String() string {
 	return fmt.Sprintf("Some[%T]{%v}", m.value, m.value)
 }
 
-// Bind returns Nothing iff [m] is Nothing.
-// Otherwise applies [f] to the value of [m] and returns the result as a Some.
+// Bind returns Nothing iff m is Nothing.
+// Otherwise applies f to the value of m and returns the result as a Some.
 func Bind[T, U any](m Maybe[T], f func(T) U) Maybe[U] {
 	if m.IsNothing() {
 		return Nothing[U]()
@@ -63,7 +63,7 @@ func Bind[T, U any](m Maybe[T], f func(T) U) Maybe[U] {
 	return Some(f(m.Value()))
 }
 
-// Equal returns true if both m1 and m2 are nothing or have the same value according to [equalFunc].
+// Equal returns true if both m1 and m2 are nothing or have the same value according to equalFunc.
 func Equal[T any](m1 Maybe[T], m2 Maybe[T], equalFunc func(T, T) bool) bool {
 	if m1.IsNothing() {
 		return m2.IsNothing()

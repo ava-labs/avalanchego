@@ -57,7 +57,7 @@ var (
 )
 
 // SufficientlyStrong returns true if [password] has strength greater than or
-// equal to [minimumStrength]
+// equal to minimumStrength
 func SufficientlyStrong(password string, minimumStrength Strength) bool {
 	if len(password) > maxCheckedPassLen {
 		password = password[:maxCheckedPassLen]
@@ -66,7 +66,7 @@ func SufficientlyStrong(password string, minimumStrength Strength) bool {
 }
 
 // IsValid returns nil if [password] is a reasonable length and has strength
-// greater than or equal to [minimumStrength]
+// greater than or equal to minimumStrength
 func IsValid(password string, minimumStrength Strength) error {
 	switch {
 	case len(password) == 0:

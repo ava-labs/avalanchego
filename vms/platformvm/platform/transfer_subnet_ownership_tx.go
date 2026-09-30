@@ -31,7 +31,7 @@ type TransferSubnetOwnershipTx struct {
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
-// [TransferSubnetOwnershipTx]. Also sets the [ctx] to the given [vm.ctx] so
+// [TransferSubnetOwnershipTx]. Also sets the ctx to the given [vm.ctx] so
 // that the addresses can be json marshalled into human readable format
 func (tx *TransferSubnetOwnershipTx) InitCtx(ctx *snow.Context) {
 	tx.BaseTx.InitCtx(ctx)

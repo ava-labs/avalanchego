@@ -60,7 +60,7 @@ type factory struct {
 }
 
 // NewFactory returns a new instance of a Factory producing loggers configured with
-// the values set in the [config] parameter
+// the values set in the config parameter
 func NewFactory(config Config) Factory {
 	return &factory{
 		config:  config,

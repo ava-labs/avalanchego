@@ -73,8 +73,8 @@ func (j *Jobs) PendingJobs() uint64 {
 	return j.state.numJobs
 }
 
-// Push adds a new job to the queue. Returns true if [job] was added to the queue and false
-// if [job] was already in the queue.
+// Push adds a new job to the queue. Returns true if job was added to the queue and false
+// if job was already in the queue.
 func (j *Jobs) Push(ctx context.Context, job Job) (bool, error) {
 	jobID := job.ID()
 	if has, err := j.state.HasJob(jobID); err != nil {
@@ -294,8 +294,8 @@ func (jm *JobsWithMissing) Has(jobID ids.ID) (bool, error) {
 	return jm.Jobs.Has(jobID)
 }
 
-// Push adds a new job to the queue. Returns true if [job] was added to the queue and false
-// if [job] was already in the queue.
+// Push adds a new job to the queue. Returns true if job was added to the queue and false
+// if job was already in the queue.
 func (jm *JobsWithMissing) Push(ctx context.Context, job Job) (bool, error) {
 	jobID := job.ID()
 	if has, err := jm.Has(jobID); err != nil {
@@ -330,7 +330,7 @@ func (jm *JobsWithMissing) Push(ctx context.Context, job Job) (bool, error) {
 	return true, nil
 }
 
-// AddMissingID adds [jobID] to missingIDs
+// AddMissingID adds jobID to missingIDs
 func (jm *JobsWithMissing) AddMissingID(jobIDs ...ids.ID) {
 	for _, jobID := range jobIDs {
 		if !jm.missingIDs.Contains(jobID) {
@@ -341,7 +341,7 @@ func (jm *JobsWithMissing) AddMissingID(jobIDs ...ids.ID) {
 	}
 }
 
-// RemoveMissingID removes [jobID] from missingIDs
+// RemoveMissingID removes jobID from missingIDs
 func (jm *JobsWithMissing) RemoveMissingID(jobIDs ...ids.ID) {
 	for _, jobID := range jobIDs {
 		if jm.missingIDs.Contains(jobID) {
