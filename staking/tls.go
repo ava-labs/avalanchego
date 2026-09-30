@@ -21,8 +21,8 @@ import (
 )
 
 // InitNodeStakingKeyPair generates a self-signed TLS key/cert pair to use in
-// staking. The key and files will be placed at [keyPath] and [certPath],
-// respectively. If there is already a file at [keyPath], returns nil.
+// staking. The key and files will be placed at keyPath and certPath,
+// respectively. If there is already a file at keyPath, returns nil.
 func InitNodeStakingKeyPair(keyPath, certPath string) error {
 	// If there is already a file at [keyPath], do nothing
 	if _, err := os.Stat(keyPath); !os.IsNotExist(err) {

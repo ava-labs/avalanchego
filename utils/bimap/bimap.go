@@ -40,7 +40,7 @@ func New[K, V comparable]() *BiMap[K, V] {
 	}
 }
 
-// Put the key value pair into the map. If either [key] or [val] was previously
+// Put the key value pair into the map. If either key or val was previously
 // in the map, the previous entries will be removed and returned.
 //
 // Note: Unlike normal maps, it's possible that Put removes 0, 1, or 2 existing
@@ -78,19 +78,19 @@ func (m *BiMap[K, V]) GetValue(key K) (V, bool) {
 	return val, ok
 }
 
-// HasKey returns true if [key] is in the map.
+// HasKey returns true if key is in the map.
 func (m *BiMap[K, _]) HasKey(key K) bool {
 	_, ok := m.keyToValue[key]
 	return ok
 }
 
-// HasValue returns true if [val] is in the map.
+// HasValue returns true if val is in the map.
 func (m *BiMap[_, V]) HasValue(val V) bool {
 	_, ok := m.valueToKey[val]
 	return ok
 }
 
-// DeleteKey removes [key] from the map and returns the value it mapped to.
+// DeleteKey removes key from the map and returns the value it mapped to.
 func (m *BiMap[K, V]) DeleteKey(key K) (V, bool) {
 	val, ok := m.keyToValue[key]
 	if !ok {
@@ -101,7 +101,7 @@ func (m *BiMap[K, V]) DeleteKey(key K) (V, bool) {
 	return val, true
 }
 
-// DeleteValue removes [val] from the map and returns the key that mapped to it.
+// DeleteValue removes val from the map and returns the key that mapped to it.
 func (m *BiMap[K, V]) DeleteValue(val V) (K, bool) {
 	key, ok := m.valueToKey[val]
 	if !ok {

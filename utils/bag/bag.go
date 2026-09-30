@@ -24,7 +24,7 @@ type Bag[T comparable] struct {
 	metThreshold set.Set[T]
 }
 
-// Of returns a Bag initialized with [elts]
+// Of returns a Bag initialized with elts
 func Of[T comparable](elts ...T) Bag[T] {
 	var b Bag[T]
 	b.Add(elts...)
@@ -60,8 +60,8 @@ func (b *Bag[T]) Add(elts ...T) {
 	}
 }
 
-// AddCount increases the number of times the element has been seen by [count].
-// If [count] <= 0 this is a no-op.
+// AddCount increases the number of times the element has been seen by count.
+// If count <= 0 this is a no-op.
 func (b *Bag[T]) AddCount(elt T, count int) {
 	if count <= 0 {
 		return
@@ -78,7 +78,7 @@ func (b *Bag[T]) AddCount(elt T, count int) {
 	}
 }
 
-// Count returns the number of [elt] in the bag.
+// Count returns the number of elt in the bag.
 func (b *Bag[T]) Count(elt T) int {
 	return b.counts[elt]
 }
@@ -121,7 +121,7 @@ func (b *Bag[T]) Threshold() set.Set[T] {
 	return b.metThreshold
 }
 
-// Returns a bag with the elements of this bag that return true for [filterFunc],
+// Returns a bag with the elements of this bag that return true for filterFunc,
 // along with their counts.
 // For example, if X is in this bag with count 5, and filterFunc(X) returns true,
 // then the returned bag contains X with count 5.
@@ -136,8 +136,8 @@ func (b *Bag[T]) Filter(filterFunc func(T) bool) Bag[T] {
 }
 
 // Returns:
-// 1. A bag containing the elements of this bag that return false for [splitFunc].
-// 2. A bag containing the elements of this bag that return true for [splitFunc].
+// 1. A bag containing the elements of this bag that return false for splitFunc.
+// 2. A bag containing the elements of this bag that return true for splitFunc.
 // Counts are preserved in the returned bags.
 // For example, if X is in this bag with count 5, and splitFunc(X) is false,
 // then the first returned bag has X in it with count 5.
@@ -153,7 +153,7 @@ func (b *Bag[T]) Split(splitFunc func(T) bool) [2]Bag[T] {
 	return splitVotes
 }
 
-// Remove all instances of [elt] from the bag.
+// Remove all instances of elt from the bag.
 func (b *Bag[T]) Remove(elt T) {
 	count := b.counts[elt]
 	delete(b.counts, elt)

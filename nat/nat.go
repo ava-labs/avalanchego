@@ -61,8 +61,8 @@ func NewPortMapper(log logging.Logger, r Router) *Mapper {
 	}
 }
 
-// Map external port [extPort] (exposed to the internet) to internal port [intPort] (where our process is listening)
-// and set [ip]. Does this every [updateTime]. [ip] may be nil.
+// Map external port extPort (exposed to the internet) to internal port intPort (where our process is listening)
+// and set ip. Does this every updateTime. ip may be nil.
 func (m *Mapper) Map(
 	intPort uint16,
 	extPort uint16,

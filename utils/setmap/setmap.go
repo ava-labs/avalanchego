@@ -28,7 +28,7 @@ func New[K, V comparable]() *SetMap[K, V] {
 }
 
 // Put the new entry into the map. Removes and returns:
-// * The existing entry for [key].
+// * The existing entry for key.
 // * Existing entries where the set overlaps with the [set].
 func (m *SetMap[K, V]) Put(key K, set set.Set[V]) []Entry[K, V] {
 	removed := m.DeleteOverlapping(set)
@@ -58,13 +58,13 @@ func (m *SetMap[K, V]) GetSet(key K) (set.Set[V], bool) {
 	return val, ok
 }
 
-// HasKey returns true if [key] is in the map.
+// HasKey returns true if key is in the map.
 func (m *SetMap[K, _]) HasKey(key K) bool {
 	_, ok := m.keyToSet[key]
 	return ok
 }
 
-// HasValue returns true if [val] is in a set in the map.
+// HasValue returns true if val is in a set in the map.
 func (m *SetMap[_, V]) HasValue(val V) bool {
 	_, ok := m.valueToKey[val]
 	return ok
@@ -88,7 +88,7 @@ func (m *SetMap[_, V]) HasOverlap(set set.Set[V]) bool {
 	return false
 }
 
-// DeleteKey removes [key] from the map and returns the set it mapped to.
+// DeleteKey removes key from the map and returns the set it mapped to.
 func (m *SetMap[K, V]) DeleteKey(key K) (set.Set[V], bool) {
 	set, ok := m.keyToSet[key]
 	if !ok {
@@ -102,7 +102,7 @@ func (m *SetMap[K, V]) DeleteKey(key K) (set.Set[V], bool) {
 	return set, true
 }
 
-// DeleteValue removes and returns the entry that contained [val].
+// DeleteValue removes and returns the entry that contained val.
 func (m *SetMap[K, V]) DeleteValue(val V) (K, set.Set[V], bool) {
 	key, ok := m.valueToKey[val]
 	if !ok {

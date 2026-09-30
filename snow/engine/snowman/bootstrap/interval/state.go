@@ -80,7 +80,7 @@ func GetBlockIterator(db database.Iteratee) database.Iterator {
 
 // GetBlockIteratorWithStart returns a block iterator that will produce values
 // corresponding to persisted blocks in order of increasing height starting at
-// [height].
+// height.
 func GetBlockIteratorWithStart(db database.Iteratee, height uint64) database.Iterator {
 	return db.NewIteratorWithStartAndPrefix(
 		makeBlockKey(height),

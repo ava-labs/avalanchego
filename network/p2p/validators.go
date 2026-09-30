@@ -167,7 +167,7 @@ func (v *Validators) Sample(ctx context.Context, limit int) []ids.NodeID {
 	return sampled
 }
 
-// Top returns the top [percentage] of validators, regardless of if they are
+// Top returns the top percentage of validators, regardless of if they are
 // connected or not.
 func (v *Validators) Top(ctx context.Context, percentage float64) []ids.NodeID {
 	percentage = max(0, min(1, percentage)) // bound percentage inside [0, 1]

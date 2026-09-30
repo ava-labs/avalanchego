@@ -140,10 +140,10 @@ func (cr *ChainRouter) Initialize(
 }
 
 // RegisterRequest marks that we should expect to receive a reply for a request
-// from the given node's [chainID] and
+// from the given node's chainID and
 // the reply should have the given requestID.
 //
-// The type of message we expect is [op].
+// The type of message we expect is op.
 //
 // Every registered request must be cleared either by receiving a valid reply
 // and passing it to the appropriate chain or by a timeout.

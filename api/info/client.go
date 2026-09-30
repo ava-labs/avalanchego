@@ -96,10 +96,10 @@ func (c *Client) GetVMs(ctx context.Context, options ...rpc.Option) (map[ids.ID]
 	return res.VMs, err
 }
 
-// AwaitBootstrapped polls the node every [freq] to check if [chainID] has
-// finished bootstrapping. Returns true once [chainID] reports that it has
+// AwaitBootstrapped polls the node every freq to check if chainID has
+// finished bootstrapping. Returns true once chainID reports that it has
 // finished bootstrapping.
-// Only returns an error if [ctx] returns an error.
+// Only returns an error if ctx returns an error.
 func AwaitBootstrapped(ctx context.Context, c *Client, chainID string, freq time.Duration, options ...rpc.Option) (bool, error) {
 	ticker := time.NewTicker(freq)
 	defer ticker.Stop()

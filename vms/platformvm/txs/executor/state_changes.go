@@ -25,13 +25,13 @@ var (
 	ErrChildBlockBeyondSyncBound       = errors.New("proposed timestamp is too far in the future relative to local time")
 )
 
-// VerifyNewChainTime returns nil if the [newChainTime] is a valid chain time.
+// VerifyNewChainTime returns nil if the newChainTime is a valid chain time.
 // Requires:
-//   - [newChainTime] >= [currentChainTime]: to ensure chain time advances
+//   - newChainTime >= currentChainTime: to ensure chain time advances
 //     monotonically.
-//   - [newChainTime] <= [now] + [SyncBound]: to ensure chain time approximates
+//   - newChainTime <= now + [SyncBound]: to ensure chain time approximates
 //     "real" time.
-//   - [newChainTime] <= [nextStakerChangeTime]: so that no staking set changes
+//   - newChainTime <= nextStakerChangeTime: so that no staking set changes
 //     are skipped.
 func VerifyNewChainTime(
 	config fee.Config,
@@ -84,8 +84,8 @@ func VerifyNewChainTime(
 	return nil
 }
 
-// AdvanceTimeTo applies all state changes to [parentState] resulting from
-// advancing the chain time to [newChainTime].
+// AdvanceTimeTo applies all state changes to parentState resulting from
+// advancing the chain time to newChainTime.
 //
 // Returns true iff the validator set changed.
 func AdvanceTimeTo(

@@ -140,12 +140,12 @@ func overDelegated(
 	return newMaxWeight > weightLimit, nil
 }
 
-// GetMaxWeight returns the maximum total weight of the [validator], including
-// its own weight, between [startTime] and [endTime].
+// GetMaxWeight returns the maximum total weight of the validator, including
+// its own weight, between startTime and endTime.
 // The weight changes are applied in the order they will be applied as chain
 // time advances.
 // Invariant:
-// - [validator.StartTime] <= [startTime] < [endTime] <= [validator.EndTime]
+// - validator.StartTime <= startTime < endTime <= validator.EndTime
 func GetMaxWeight(
 	chainState state.Chain,
 	validator *state.Staker,

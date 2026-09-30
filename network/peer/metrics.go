@@ -106,7 +106,7 @@ func NewMetrics(registerer prometheus.Registerer) (*Metrics, error) {
 	)
 }
 
-// Sent updates the metrics for having sent [msg].
+// Sent updates the metrics for having sent msg.
 func (m *Metrics) Sent(msg *message.OutboundMessage) {
 	op := msg.Op.String()
 	saved := msg.BytesSavedCompression
@@ -133,7 +133,7 @@ func (m *Metrics) MultipleSendsFailed(op message.Op, count int) {
 	}).Add(float64(count))
 }
 
-// SendFailed updates the metrics for having failed to send [msg].
+// SendFailed updates the metrics for having failed to send msg.
 func (m *Metrics) SendFailed(msg *message.OutboundMessage) {
 	op := msg.Op.String()
 	m.NumSendFailed.With(prometheus.Labels{

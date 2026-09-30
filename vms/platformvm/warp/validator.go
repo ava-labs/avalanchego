@@ -36,8 +36,8 @@ type (
 // Deprecated: use [validators.FlattenValidatorSet] instead.
 var FlattenValidatorSet = validators.FlattenValidatorSet
 
-// GetCanonicalValidatorSetFromSubnetID returns the CanonicalValidatorSet of [subnetID] at
-// [pChainHeight]. The returned CanonicalValidatorSet includes the validator set in a canonical ordering
+// GetCanonicalValidatorSetFromSubnetID returns the CanonicalValidatorSet of subnetID at
+// pChainHeight. The returned CanonicalValidatorSet includes the validator set in a canonical ordering
 // and the total weight.
 //
 // Deprecated: Use [validators.State.GetWarpValidatorSet] instead.
@@ -57,10 +57,10 @@ func GetCanonicalValidatorSetFromSubnetID(
 	return validators.FlattenValidatorSet(vdrSet)
 }
 
-// FilterValidators returns the validators in [vdrs] whose bit is set to 1 in
-// [indices].
+// FilterValidators returns the validators in vdrs whose bit is set to 1 in
+// indices.
 //
-// Returns an error if [indices] references an unknown validator.
+// Returns an error if indices references an unknown validator.
 func FilterValidators(
 	indices set.Bits,
 	vdrs []*validators.Warp,
@@ -103,7 +103,7 @@ func SumWeight(vdrs []*validators.Warp) (uint64, error) {
 
 // AggregatePublicKeys returns the public key of the provided validators.
 //
-// Invariant: All of the public keys in [vdrs] are valid.
+// Invariant: All of the public keys in vdrs are valid.
 func AggregatePublicKeys(vdrs []*validators.Warp) (*bls.PublicKey, error) {
 	pks := make([]*bls.PublicKey, len(vdrs))
 	for i, vdr := range vdrs {

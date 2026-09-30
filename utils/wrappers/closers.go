@@ -23,7 +23,7 @@ func (c *Closer) Add(closer io.Closer) {
 	c.closers = append(c.closers, closer)
 }
 
-// Close closes each of the closers add to [c] and returns the first error
+// Close closes each of the closers add to c and returns the first error
 // that occurs or nil if no error occurs.
 func (c *Closer) Close() error {
 	c.lock.Lock()

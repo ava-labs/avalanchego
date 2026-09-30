@@ -43,7 +43,7 @@ func SignatureFromBytes(sigBytes []byte) (*Signature, error) {
 
 // AggregateSignatures aggregates a non-zero number of signatures into a single
 // aggregated signature.
-// Invariant: all [sigs] have been validated.
+// Invariant: all sigs have been validated.
 func AggregateSignatures(sigs []*Signature) (*Signature, error) {
 	if len(sigs) == 0 {
 		return nil, ErrNoSignatures

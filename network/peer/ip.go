@@ -76,8 +76,8 @@ type SignedIP struct {
 }
 
 // Returns nil if:
-// * [ip.Timestamp] is not after [maxTimestamp].
-// * [ip.TLSSignature] is a valid signature over [ip.UnsignedIP] from [cert].
+// * ip.Timestamp is not after maxTimestamp.
+// * ip.TLSSignature is a valid signature over ip.UnsignedIP from cert.
 func (ip *SignedIP) Verify(
 	cert *staking.Certificate,
 	maxTimestamp time.Time,

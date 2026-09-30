@@ -34,7 +34,7 @@ type Resolver interface {
 
 // Returns a new Resolver that uses the given service
 // to resolve our public IP.
-// [resolverName] must be one of:
+// resolverName must be one of:
 // [OpenDNSName], [IFConfigName], [IFConfigCoName], [IFConfigMeName].
 // If [resolverService] isn't one of the above, returns an error
 func NewResolver(resolverName string) (Resolver, error) {

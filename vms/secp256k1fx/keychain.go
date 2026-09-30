@@ -36,7 +36,7 @@ type Keychain struct {
 	Keys     []*secp256k1.PrivateKey
 }
 
-// NewKeychain returns a new keychain containing [keys]
+// NewKeychain returns a new keychain containing keys
 func NewKeychain(keys ...*secp256k1.PrivateKey) *Keychain {
 	kc := &Keychain{
 		avaxAddrToKeyIndex: make(map[ids.ShortID]int),
@@ -136,7 +136,7 @@ func (kc *Keychain) Match(owners *OutputOwners, time uint64) ([]uint32, []*secp2
 	return sigs, keys, uint32(len(keys)) == owners.Threshold
 }
 
-// PrefixedString returns the key chain as a string representation with [prefix]
+// PrefixedString returns the key chain as a string representation with prefix
 // added before every line.
 func (kc *Keychain) PrefixedString(prefix string) string {
 	sb := strings.Builder{}

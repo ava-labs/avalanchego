@@ -92,7 +92,7 @@ type Internal struct {
 	UseCurrentHeight bool
 }
 
-// Create the blockchain described in [tx], but only if this node is a member of
+// Create the blockchain described in tx, but only if this node is a member of
 // the subnet that validates the chain
 func (c *Internal) CreateChain(chainID ids.ID, tx *platform.CreateChainTx) {
 	if c.SybilProtectionEnabled && // Sybil protection is enabled, so nodes might not validate all chains

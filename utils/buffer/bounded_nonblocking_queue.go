@@ -43,10 +43,10 @@ type boundedQueue[T any] struct {
 	onEvict func(T)
 }
 
-// Returns a new bounded, non-blocking queue that holds up to [maxSize] elements.
-// When an element is evicted, [onEvict] is called with the evicted element.
-// If [onEvict] is nil, this is a no-op.
-// [maxSize] must be >= 1.
+// Returns a new bounded, non-blocking queue that holds up to maxSize elements.
+// When an element is evicted, onEvict is called with the evicted element.
+// If onEvict is nil, this is a no-op.
+// maxSize must be >= 1.
 // Not safe for concurrent use.
 func NewBoundedQueue[T any](maxSize int, onEvict func(T)) (Queue[T], error) {
 	if maxSize < 1 {
