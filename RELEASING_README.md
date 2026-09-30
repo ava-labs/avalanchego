@@ -93,160 +93,47 @@ The `require` directives at this commit reference `$VERSION`, which is not tagge
 
 ### 4. Test the Release Candidate
 
-#### Local Deployment on Fuji
+Deploy `$VERSION_RC` by bumping image tags in [`devops-argocd`](https://github.com/ava-labs/devops-argocd).
 
-If your machine is too low on resources, you can run an [AWS EC2 instance](https://github.com/ava-labs/eng-resources/blob/main/dev-node-setup.md).
+#### Primary Network Canaries
 
-##### Find L1 Info
+Set the canary image tags to `$VERSION_RC` on both Fuji and Mainnet (e.g. [#17347](https://github.com/ava-labs/devops-argocd/pull/17347) and [#17348](https://github.com/ava-labs/devops-argocd/pull/17348)):
 
-Get Dispatch and Echo L1 details:
+- Fuji: [`base/network/testnet/avalanchego/base-canary/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/network/testnet/avalanchego/base-canary/cornice.yaml)
+- Mainnet: [`base/network/mainnet/avalanchego/base-canary/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/network/mainnet/avalanchego/base-canary/cornice.yaml)
 
-- [Dispatch L1 details](https://subnets-test.avax.network/dispatch/details) - Subnet ID: `7WtoAMPhrmh5KosDUsFL9yTcvw7YSxiKHPpdfs4JsgW47oZT5`
-- [Echo L1 details](https://subnets-test.avax.network/echo/details) - Subnet ID: `i9gFpZQHPLcGfZaQLiwFAStddQD7iTKBpFfurPFJsXm1CkTZK`
-
-Get blockchain and VM IDs:
-
-```bash
-# Dispatch
-curl -X POST --silent -H 'content-type:application/json' --data '{
-    "jsonrpc": "2.0",
-    "method": "platform.getBlockchains",
-    "params": {},
-    "id": 1
-}'  https://api.avax-test.network/ext/bc/P | \
-jq -r '.result.blockchains[] | select(.subnetID=="7WtoAMPhrmh5KosDUsFL9yTcvw7YSxiKHPpdfs4JsgW47oZT5") |  "\(.name)\nBlockchain id: \(.id)\nVM id: \(.vmID)\n"'
-
-# Echo
-curl -X POST --silent -H 'content-type:application/json' --data '{
-    "jsonrpc": "2.0",
-    "method": "platform.getBlockchains",
-    "params": {},
-    "id": 1
-}'  https://api.avax-test.network/ext/bc/P | \
-jq -r '.result.blockchains[] | select(.subnetID=="i9gFpZQHPLcGfZaQLiwFAStddQD7iTKBpFfurPFJsXm1CkTZK") |  "\(.name)\nBlockchain id: \(.id)\nVM id: \(.vmID)\n"'
+```yaml
+########## Canary version. ##########
+- name: api.image.tag
+  value: "$VERSION_RC"
+- name: validator.image.tag
+  value: "$VERSION_RC"
+########## End of Canary version ##########
 ```
 
-As of this writing:
+#### Echo and Dispatch
 
-- **Dispatch**: Blockchain `2D8RG4UpSXbPbvPCAWppNJyqTG2i2CAXSkTgmTBBvs7GKNZjsY`, VM `mDtV8ES8wRL1j2m6Kvc1qRFAvnpq4kufhueAY1bwbzVhk336o`
-- **Echo**: Blockchain `98qnjenm7MBd8G2cPZoRvZrgJC33JGSAAKghsQ6eojbLCeRNp`, VM `meq3bv7qCMZZ69L8xZRLwyKnWp6chRwyscq8VPtHWignRQVVF`
+Echo and Dispatch are Fuji chains that deploy the public `avaplatform/subnet-evm` image. Echo is an L1 and Dispatch is a subnet, so between them they cover both validator models. Set their image tags to `$VERSION_RC`:
 
-##### Build and Deploy
+- Echo: [`base/subnet/testnet/echo/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/echo/avalanchego/base/cornice.yaml)
+- Dispatch: [`base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml)
 
-1. Build Subnet-EVM:
+```yaml
+- name: api.image.tag
+  value: "$VERSION_RC"
+- name: validator.image.tag
+  value: "$VERSION_RC"
+```
 
-   ```bash
-   cd graft/subnet-evm
-   ./scripts/build.sh vm.bin
-   ```
+Once merged, monitor the deployments:
 
-1. Install the VM plugin:
-
-   ```bash
-   mkdir -p ~/.avalanchego/plugins
-   cp vm.bin ~/.avalanchego/plugins/mDtV8ES8wRL1j2m6Kvc1qRFAvnpq4kufhueAY1bwbzVhk336o
-   cp vm.bin ~/.avalanchego/plugins/meq3bv7qCMZZ69L8xZRLwyKnWp6chRwyscq8VPtHWignRQVVF
-   rm vm.bin
-   ```
-
-1. Get chain upgrades:
-
-   ```bash
-   # Dispatch
-   mkdir -p ~/.avalanchego/configs/chains/2D8RG4UpSXbPbvPCAWppNJyqTG2i2CAXSkTgmTBBvs7GKNZjsY
-   curl -X POST --silent --header 'Content-Type: application/json' --data '{
-       "jsonrpc": "2.0",
-       "method": "eth_getChainConfig",
-       "params": [],
-       "id": 1
-   }' https://subnets.avax.network/dispatch/testnet/rpc | \
-   jq -r '.result.upgrades' > ~/.avalanchego/configs/chains/2D8RG4UpSXbPbvPCAWppNJyqTG2i2CAXSkTgmTBBvs7GKNZjsY/upgrade.json
-
-   # Echo
-   mkdir -p ~/.avalanchego/configs/chains/98qnjenm7MBd8G2cPZoRvZrgJC33JGSAAKghsQ6eojbLCeRNp
-   curl -X POST --silent --header 'Content-Type: application/json' --data '{
-       "jsonrpc": "2.0",
-       "method": "eth_getChainConfig",
-       "params": [],
-       "id": 1
-   }' https://subnets.avax.network/echo/testnet/rpc | \
-   jq -r '.result.upgrades' > ~/.avalanchego/configs/chains/98qnjenm7MBd8G2cPZoRvZrgJC33JGSAAKghsQ6eojbLCeRNp/upgrade.json
-   ```
-
-1. Build and run AvalancheGo:
-
-   ```bash
-   cd ../..
-   ./scripts/build.sh
-   ./build/avalanchego --network-id=fuji --partial-sync-primary-network --public-ip=127.0.0.1 \
-     --track-subnets=7WtoAMPhrmh5KosDUsFL9yTcvw7YSxiKHPpdfs4JsgW47oZT5,i9gFpZQHPLcGfZaQLiwFAStddQD7iTKBpFfurPFJsXm1CkTZK
-   ```
-
-1. Wait for bootstrap (look for `check started passing`, `consensus started`, `bootstrapped healthy nodes`).
-
-1. Verify block production:
-
-   ```bash
-   # Dispatch
-   curl -X POST --silent --header 'Content-Type: application/json' --data '{
-       "jsonrpc": "2.0",
-       "method": "eth_blockNumber",
-       "params": [],
-       "id": 1
-   }' localhost:9650/ext/bc/2D8RG4UpSXbPbvPCAWppNJyqTG2i2CAXSkTgmTBBvs7GKNZjsY/rpc
-
-   # Echo
-   curl -X POST --silent --header 'Content-Type: application/json' --data '{
-       "jsonrpc": "2.0",
-       "method": "eth_blockNumber",
-       "params": [],
-       "id": 1
-   }' localhost:9650/ext/bc/98qnjenm7MBd8G2cPZoRvZrgJC33JGSAAKghsQ6eojbLCeRNp/rpc
-   ```
-
-#### Canary Deployment
-
-Echo and Dispatch deploy the public `avaplatform/subnet-evm` image.
-
-1. In `devops-argocd`, update the Dispatch and Echo image tags to `$VERSION_RC`:
-
-   - Echo: [`base/subnet/testnet/echo/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/echo/avalanchego/base/cornice.yaml)
-   - Dispatch: [`base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml)
-
-   ```yaml
-   - name: api.image.tag
-     value: "$VERSION_RC"
-   - name: validator.image.tag
-     value: "$VERSION_RC"
-   ```
-
-   The repository should already be `avaplatform/subnet-evm`, with `global.vmAliases` containing the standard Subnet-EVM VM ID: `srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy`.
-
-1. Open and merge the deployment change for both L1s, then monitor deployments:
-   - **Dispatch**: [Logs][dispatch-logs] | [Dashboard][dispatch-dashboard]
-   - **Echo**: [Logs][echo-logs] | [Dashboard][echo-dashboard]
+- **Dispatch**: [Logs][dispatch-logs] | [Dashboard][dispatch-dashboard]
+- **Echo**: [Logs][echo-logs] | [Dashboard][echo-dashboard]
 
 [dispatch-logs]: https://avalabs.grafana.net/explore?schemaVersion=1&orgId=1&panes=%7B%22subnet-logs%22%3A%7B%22datasource%22%3A%22grafanacloud-logs%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22%7Bcluster%3D%5C%22subnets-testnet%5C%22%2Cservice_name%3D%5C%22avago%5C%22%2Csubnet%3D%5C%22dispatch%5C%22%7D%22%2C%22queryType%22%3A%22range%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D
 [dispatch-dashboard]: https://avalabs.grafana.net/d/12154d054f846686fc46ad306e451c30/dispatch-testnet-subnets
 [echo-logs]: https://avalabs.grafana.net/explore?schemaVersion=1&orgId=1&panes=%7B%22subnet-logs%22%3A%7B%22datasource%22%3A%22grafanacloud-logs%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22%7Bcluster%3D%5C%22subnets-testnet%5C%22%2Cservice_name%3D%5C%22avago%5C%22%2Csubnet%3D%5C%22echo%5C%22%7D%22%2C%22queryType%22%3A%22range%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D
 [echo-dashboard]: https://avalabs.grafana.net/d/87d80a2c2c15b54189eac1ae9c0241e4/echo-testnet-subnets
-
-1. Test transactions:
-   1. If you have no wallet setup, create a new one using the [Core wallet](https://core.app/)
-   1. Go to the settings and enable **Testnet Mode**
-   1. You need DIS (Dispatch) and ECH (Echo) testnet tokens. If you don't have one or the other, send your C-chain AVAX address to one of the team members who can send you some DIS/ECH testnet tokens. The portfolio section of the core wallet should then show the DIS and ECH tokens available.
-   1. For both Dispatch and Echo, in the "Command center", select **Send**, enter your own C-Chain AVAX address in the **Send To** field, set the **Amount** to 1 and click on **Send**. Finally, select a maximum network fee, usually *Slow* works, and click on **Approve**.
-
-1. You should then see the transaction impact the logs and metrics, for example:
-
-   ```log
-   Apr 03 10:35:00.000 i-0158b0eef8b774d39 subnets Commit new mining work
-   Apr 03 10:34:59.599 i-0158b0eef8b774d39 subnets Resetting chain preference
-   Apr 03 10:34:56.085 i-0aca0a4088f607b7e subnets Served eth_getBlockByNumber
-   Apr 03 10:34:55.619 i-0ccd28afbac6d9bfc subnets built block
-   Apr 03 10:34:55.611 i-0ccd28afbac6d9bfc subnets Commit new mining work
-   Apr 03 10:34:55.510 gke-subnets-testnet subnets Submitted transaction
-   ```
 
 #### Fixing Issues Found in the Release Candidate
 
