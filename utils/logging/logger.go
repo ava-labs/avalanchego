@@ -53,6 +53,11 @@ type Logger interface {
 	Enabled(lvl Level) bool
 
 	// Recovers a panic, logs the error, and rethrows the panic.
+	//
+	// StopOnPanic MUST be used as `defer log.StopOnPanic()`. Wrapping it in a
+	// closure (`defer func() { log.StopOnPanic() }()`) places the internal
+	// recover() one frame too deep, where it always returns nil and the panic
+	// goes unlogged.
 	StopOnPanic()
 	// If a function panics, this will log that panic and then re-panic ensuring
 	// that the program logs the error before exiting.

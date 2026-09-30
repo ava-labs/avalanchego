@@ -268,7 +268,7 @@ func TestMessage(t *testing.T) {
 			},
 			compressionType:  compression.TypeZstd,
 			bypassThrottling: true,
-			bytesSaved:       true,
+			bytesSaved:       false,
 		},
 		{
 			desc: "accepted_state_summary message with no compression",

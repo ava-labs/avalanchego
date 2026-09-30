@@ -4,7 +4,7 @@
 
 To start developing on AvalancheGo, you'll need a few things installed.
 
-- Golang version >= 1.25.10
+- Golang version >= 1.26.8
 - gcc
 - g++
 
