@@ -74,7 +74,7 @@ Skip this step unless this release activates a new network upgrade on Mainnet. I
        #   ...
    ```
 
-The test starts a network on the published `DEFAULT_VERSION` binary and restarts it on the current code, so the two MUST agree on the local schedule. After this change only `$VERSION` agrees, and it is not published until the release itself — so the job stays off until [step 8](#8-prepare-the-next-release) turns it back on.
+The test starts a network on the published `DEFAULT_VERSION` binary and restarts it on the current code, so the two MUST agree on the local schedule. After this change only `$VERSION` agrees, and it is not published until the release itself — so the job stays off until [step 9](#9-prepare-the-next-release) turns it back on.
 
 ### 3. Create Release Candidate Tags
 
@@ -353,7 +353,26 @@ Antithesis test images are built and pushed to Google Artifact Registry on every
 
 See the [Antithesis testing documentation](tests/antithesis/README.md#scheduled-testing) for scheduled testing details.
 
-### 8. Prepare the Next Release
+### 8. Update the Notify Service
+
+Only needed when `MinimumCompatibleVersion` changed in this release.
+
+The notify service warns node operators running below a configured version. Its config
+lives in `devops-argocd`, under the `uptime` job of
+[`aws/data/us-east-1/data-k8s/root/analytics/analytics-app.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/aws/data/us-east-1/data-k8s/root/analytics/analytics-app.yaml).
+Set both versions to `MinimumCompatibleVersion`, without the leading `v`:
+
+```yaml
+- cmd: uptime
+  config:
+    # ...
+    requiredVersion: '1.15.0'
+    optionalVersion: '1.15.0'
+```
+
+Open the PR against `devops-argocd` ([example](https://github.com/ava-labs/devops-argocd/pull/17216)), get approval from the infra team, and merge it so the notify service picks up the new floor.
+
+### 9. Prepare the Next Release
 
 Update master so that it describes the next release:
 
@@ -378,6 +397,28 @@ export NEXT_VERSION=v1.15.2
        Patch: 2,
    }
    ```
+
+   If `$NEXT_VERSION` is a minor release, also bump the compatibility floor in the same
+   file: `MinimumCompatibleVersion` to that minor and `PrevMinimumCompatibleVersion` to
+   the one before, both with `Patch: 0`. For example, for `v1.16.0`:
+
+   ```go
+   MinimumCompatibleVersion = &Application{
+       Name:  Client,
+       Major: 1,
+       Minor: 16,
+       Patch: 0,
+   }
+   PrevMinimumCompatibleVersion = &Application{
+       Name:  Client,
+       Major: 1,
+       Minor: 15,
+       Patch: 0,
+   }
+   ```
+
+   Changing `MinimumCompatibleVersion` also means updating the notify service after that
+   release is published — see [step 8](#8-update-the-notify-service).
 
 1. Update the submodule require directives:
 
