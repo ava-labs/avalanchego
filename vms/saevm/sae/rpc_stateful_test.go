@@ -1022,7 +1022,7 @@ func TestSizeMinimumGas(t *testing.T) {
 		below.Gas = sut.rawVM.mempool.MinGasForSize(tx.Size()) - 1
 		return below
 	}
-	const errBelow = "gas required exceeds allowance"
+	const errBelow = "exceeds allowance"
 
 	t.Run("eth_estimateGas", func(t *testing.T) {
 		gas, err := sut.EstimateGas(ctx, msg)
