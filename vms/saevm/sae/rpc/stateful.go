@@ -340,7 +340,7 @@ func (b *backend) minGasForArgs(args ethapi.TransactionArgs) (hexutil.Uint64, er
 	})
 	minForBytes := hexutil.Uint64(b.MinGasForSize(tx.Size()))
 	if minForBytes > allowance {
-		return 0, fmt.Errorf("gas required exceeds allowance (%d): tx size %d bytes requires gas limit at least %d", allowance, tx.Size(), minForBytes)
+		return 0, fmt.Errorf("gas required (%d) exceeds allowance (%d)", minForBytes, allowance)
 	}
 	return minForBytes, nil
 }
