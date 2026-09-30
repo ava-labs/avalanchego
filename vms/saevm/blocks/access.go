@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rpc"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/types"
+	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 type (
@@ -21,7 +21,7 @@ type (
 		ConsensusCritical
 		Frontier
 		DB() ethdb.Database
-		XDB() types.ExecutionResults
+		XDB() saetypes.ExecutionResults
 
 		// ResolvePendingToLastExecuted allows overriding of the default
 		// behaviour of [ResolveRPCNumber], which is to resolve

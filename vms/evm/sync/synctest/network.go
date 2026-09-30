@@ -14,13 +14,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
+
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 // NewSelfNetwork returns a single-node [p2p.Network] that loops requests back
@@ -58,7 +59,7 @@ func NewSelfNetwork(t *testing.T, ctx context.Context, nodeID ids.NodeID) (*p2p.
 	}
 	sender.SendAppErrorF = func(ctx context.Context, _ ids.NodeID, requestID uint32, code int32, message string) error {
 		deliveries.Go(func() error {
-			return net.AppRequestFailed(ctx, nodeID, requestID, &common.AppError{Code: code, Message: message})
+			return net.AppRequestFailed(ctx, nodeID, requestID, &snowcommon.AppError{Code: code, Message: message})
 		})
 		return nil
 	}
@@ -72,15 +73,15 @@ func NewSelfNetwork(t *testing.T, ctx context.Context, nodeID ids.NodeID) (*p2p.
 	return net, tracker
 }
 
-// reserved is every [common.AppError] a sync handler can return without
+// reserved is every [snowcommon.AppError] a sync handler can return without
 // declaring it, so a per-RPC sentinel must avoid all of them.
-var reserved = []*common.AppError{
+var reserved = []*snowcommon.AppError{
 	p2p.ErrUnexpected,
 	p2p.ErrUnregisteredHandler,
 	p2p.ErrNotValidator,
 	p2p.ErrThrottled,
-	common.ErrUndefined,
-	common.ErrTimeout,
+	snowcommon.ErrUndefined,
+	snowcommon.ErrTimeout,
 	handlers.ErrMalformedRequest,
 	handlers.ErrMarshalResponse,
 }
@@ -89,14 +90,14 @@ var reserved = []*common.AppError{
 // that the code is positive, and that it collides with neither the p2p
 // framework nor the handler shell.
 //
-// [common.AppError.Is] compares Code and nothing else, so a shared code makes
+// [snowcommon.AppError.Is] compares Code and nothing else, so a shared code makes
 // two sentinels the same error whatever their messages say.
-func RequireDistinctAppErrors(tb testing.TB, sentinels map[string]*common.AppError) {
+func RequireDistinctAppErrors(tb testing.TB, sentinels map[string]*snowcommon.AppError) {
 	tb.Helper()
 
 	seen := make(map[int32]string, len(sentinels))
 	for name, sentinel := range sentinels {
-		require.ErrorIsf(tb, sentinel, &common.AppError{Code: sentinel.Code},
+		require.ErrorIsf(tb, sentinel, &snowcommon.AppError{Code: sentinel.Code},
 			"%s is not matchable by its code", name)
 		require.Positivef(tb, sentinel.Code,
 			"%s needs a positive code, p2p and the engine own the rest", name)

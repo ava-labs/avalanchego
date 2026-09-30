@@ -16,33 +16,34 @@ import (
 	_ "github.com/ava-labs/avalanchego/snow/snowtest"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
+
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 // Peer defines the minimal surface for using the [Sender] and [Connect]
 // helpers.
 type Peer interface {
-	common.AppHandler
+	snowcommon.AppHandler
 	validators.Connector
 	NodeID() ids.NodeID
 	Sender() *Sender
 }
 
-var _ common.AppSender = (*Sender)(nil)
+var _ snowcommon.AppSender = (*Sender)(nil)
 
-// Sender is a test [common.AppSender] that routes messages between in-process
+// Sender is a test [snowcommon.AppSender] that routes messages between in-process
 // peers registered via [Sender.AddPeer]. Like the production avalanchego
 // instance, each call is delivered in its own goroutine.
 type Sender struct {
 	tb   testing.TB
 	vdrs set.Set[ids.NodeID]
 
-	self   eventual.Value[common.AppHandler]
+	self   eventual.Value[snowcommon.AppHandler]
 	selfID ids.NodeID
 
 	wgLock  sync.Mutex
@@ -50,7 +51,7 @@ type Sender struct {
 	wg      sync.WaitGroup
 
 	peersLock sync.RWMutex
-	peers     map[ids.NodeID]common.AppHandler
+	peers     map[ids.NodeID]snowcommon.AppHandler
 }
 
 // NewSender returns a [Sender] whose validator-set sampling is driven by vdrs.
@@ -60,9 +61,9 @@ type Sender struct {
 func NewSender(tb testing.TB, vdrs set.Set[ids.NodeID]) *Sender {
 	return &Sender{
 		tb:    tb,
-		self:  eventual.New[common.AppHandler](),
+		self:  eventual.New[snowcommon.AppHandler](),
 		vdrs:  vdrs,
-		peers: make(map[ids.NodeID]common.AppHandler),
+		peers: make(map[ids.NodeID]snowcommon.AppHandler),
 	}
 }
 
@@ -109,7 +110,7 @@ func (s *Sender) SendAppError(_ context.Context, nodeID ids.NodeID, requestID ui
 	return nil
 }
 
-func (s *Sender) SendAppGossip(_ context.Context, c common.SendConfig, b []byte) error {
+func (s *Sender) SendAppGossip(_ context.Context, c snowcommon.SendConfig, b []byte) error {
 	s.send(func() { s.sendAppGossip(c, b) })
 	return nil
 }
@@ -131,7 +132,7 @@ func (s *Sender) sendAppRequest(to set.Set[ids.NodeID], requestID uint32, b []by
 		if peer, ok := s.getPeer(peerID); ok {
 			assert.NoErrorf(s.tb, peer.AppRequest(ctx, selfID, requestID, mockable.MaxTime, b), "%T.AppRequest(%s)", peer, selfID)
 		} else {
-			assert.NoErrorf(s.tb, self.AppRequestFailed(ctx, peerID, requestID, common.ErrTimeout), "%T.AppRequestFailed(%s)", self, peerID)
+			assert.NoErrorf(s.tb, self.AppRequestFailed(ctx, peerID, requestID, snowcommon.ErrTimeout), "%T.AppRequestFailed(%s)", self, peerID)
 		}
 	}
 }
@@ -155,14 +156,14 @@ func (s *Sender) sendAppError(to ids.NodeID, requestID uint32, code int32, messa
 		return
 	}
 	ctx := s.tb.Context()
-	appErr := &common.AppError{
+	appErr := &snowcommon.AppError{
 		Code:    code,
 		Message: message,
 	}
 	assert.NoErrorf(s.tb, peer.AppRequestFailed(ctx, selfID, requestID, appErr), "%T.AppRequestFailed(%s)", peer, selfID)
 }
 
-func (s *Sender) sendAppGossip(c common.SendConfig, b []byte) {
+func (s *Sender) sendAppGossip(c snowcommon.SendConfig, b []byte) {
 	var (
 		ctx       = s.tb.Context()
 		_, selfID = s.getSelf()
@@ -172,10 +173,10 @@ func (s *Sender) sendAppGossip(c common.SendConfig, b []byte) {
 	}
 }
 
-func (s *Sender) sample(c common.SendConfig) []common.AppHandler {
+func (s *Sender) sample(c snowcommon.SendConfig) []snowcommon.AppHandler {
 	var (
 		sent   set.Set[ids.NodeID]
-		toSend []common.AppHandler
+		toSend []snowcommon.AppHandler
 	)
 	if self, selfID := s.getSelf(); c.NodeIDs.Contains(selfID) {
 		sent.Add(selfID)
@@ -206,12 +207,12 @@ func (s *Sender) sample(c common.SendConfig) []common.AppHandler {
 	return toSend
 }
 
-func (s *Sender) getSelf() (common.AppHandler, ids.NodeID) {
+func (s *Sender) getSelf() (snowcommon.AppHandler, ids.NodeID) {
 	self := s.self.Peek() // ensure SetSelf is called before accessing selfID
 	return self, s.selfID
 }
 
-func (s *Sender) getPeer(peerID ids.NodeID) (common.AppHandler, bool) {
+func (s *Sender) getPeer(peerID ids.NodeID) (snowcommon.AppHandler, bool) {
 	if self, selfID := s.getSelf(); selfID == peerID {
 		return self, true
 	}

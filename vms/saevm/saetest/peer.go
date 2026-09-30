@@ -10,10 +10,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
+
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 var _ Peer = (*CapturingPeer)(nil)
@@ -33,7 +34,7 @@ type peerResponse struct {
 	nodeID    ids.NodeID
 	requestID uint32
 	bytes     []byte
-	err       *common.AppError
+	err       *snowcommon.AppError
 }
 
 type peerGossip struct {
@@ -56,7 +57,7 @@ func NewCapturingPeer(tb testing.TB, vdrs set.Set[ids.NodeID]) *CapturingPeer {
 
 // Response blocks until the peer captures an AppResponse or AppRequestFailed
 // to return.
-func (p *CapturingPeer) Response() (ids.NodeID, uint32, []byte, *common.AppError) {
+func (p *CapturingPeer) Response() (ids.NodeID, uint32, []byte, *snowcommon.AppError) {
 	r, _ := p.response.PopLeft()
 	return r.nodeID, r.requestID, r.bytes, r.err
 }
@@ -79,7 +80,7 @@ func (p *CapturingPeer) AppResponse(_ context.Context, from ids.NodeID, requestI
 	return nil
 }
 
-func (p *CapturingPeer) AppRequestFailed(_ context.Context, from ids.NodeID, requestID uint32, appErr *common.AppError) error {
+func (p *CapturingPeer) AppRequestFailed(_ context.Context, from ids.NodeID, requestID uint32, appErr *snowcommon.AppError) error {
 	p.response.PushRight(peerResponse{
 		nodeID:    from,
 		requestID: requestID,
