@@ -61,7 +61,8 @@
 		"fortunaTime": "2020-12-18T05:00:00Z",
 		"graniteTime": "2020-12-19T05:00:00Z",
 		"graniteEpochDuration": 30000000000,
-		"heliconTime": "9999-12-01T00:00:00Z"
+		"heliconTime": "9999-12-01T00:00:00Z",
+		"iglooTime": "9999-12-01T00:00:00Z"
 	},
 	"blocks": [
 		{

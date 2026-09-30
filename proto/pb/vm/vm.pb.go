@@ -412,6 +412,7 @@ type NetworkUpgrades struct {
 	GraniteTime                   *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=granite_time,json=graniteTime,proto3" json:"granite_time,omitempty"`
 	GraniteEpochDuration          *durationpb.Duration   `protobuf:"bytes,17,opt,name=granite_epoch_duration,json=graniteEpochDuration,proto3" json:"granite_epoch_duration,omitempty"`
 	HeliconTime                   *timestamppb.Timestamp `protobuf:"bytes,18,opt,name=helicon_time,json=heliconTime,proto3" json:"helicon_time,omitempty"`
+	IglooTime                     *timestamppb.Timestamp `protobuf:"bytes,19,opt,name=igloo_time,json=iglooTime,proto3" json:"igloo_time,omitempty"`
 	unknownFields                 protoimpl.UnknownFields
 	sizeCache                     protoimpl.SizeCache
 }
@@ -568,6 +569,13 @@ func (x *NetworkUpgrades) GetGraniteEpochDuration() *durationpb.Duration {
 func (x *NetworkUpgrades) GetHeliconTime() *timestamppb.Timestamp {
 	if x != nil {
 		return x.HeliconTime
+	}
+	return nil
+}
+
+func (x *NetworkUpgrades) GetIglooTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.IglooTime
 	}
 	return nil
 }
@@ -2893,7 +2901,7 @@ const file_vm_vm_proto_rawDesc = "" +
 	"\x0edb_server_addr\x18\r \x01(\tR\fdbServerAddr\x12\x1f\n" +
 	"\vserver_addr\x18\x0e \x01(\tR\n" +
 	"serverAddr\x12>\n" +
-	"\x10network_upgrades\x18\x0f \x01(\v2\x13.vm.NetworkUpgradesR\x0fnetworkUpgrades\"\x96\n" +
+	"\x10network_upgrades\x18\x0f \x01(\v2\x13.vm.NetworkUpgradesR\x0fnetworkUpgrades\"\xd1\n" +
 	"\n" +
 	"\x0fNetworkUpgrades\x12K\n" +
 	"\x14apricot_phase_1_time\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x11apricotPhase1Time\x12K\n" +
@@ -2915,7 +2923,9 @@ const file_vm_vm_proto_rawDesc = "" +
 	"\ffortuna_time\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\vfortunaTime\x12=\n" +
 	"\fgranite_time\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\vgraniteTime\x12O\n" +
 	"\x16granite_epoch_duration\x18\x11 \x01(\v2\x19.google.protobuf.DurationR\x14graniteEpochDuration\x12=\n" +
-	"\fhelicon_time\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampR\vheliconTime\"\xdd\x01\n" +
+	"\fhelicon_time\x18\x12 \x01(\v2\x1a.google.protobuf.TimestampR\vheliconTime\x129\n" +
+	"\n" +
+	"igloo_time\x18\x13 \x01(\v2\x1a.google.protobuf.TimestampR\tiglooTime\"\xdd\x01\n" +
 	"\x12InitializeResponse\x12(\n" +
 	"\x10last_accepted_id\x18\x01 \x01(\fR\x0elastAcceptedId\x125\n" +
 	"\x17last_accepted_parent_id\x18\x02 \x01(\fR\x14lastAcceptedParentId\x12\x16\n" +
@@ -3204,94 +3214,95 @@ var file_vm_vm_proto_depIdxs = []int32{
 	48, // 14: vm.NetworkUpgrades.granite_time:type_name -> google.protobuf.Timestamp
 	49, // 15: vm.NetworkUpgrades.granite_epoch_duration:type_name -> google.protobuf.Duration
 	48, // 16: vm.NetworkUpgrades.helicon_time:type_name -> google.protobuf.Timestamp
-	48, // 17: vm.InitializeResponse.timestamp:type_name -> google.protobuf.Timestamp
-	0,  // 18: vm.SetStateRequest.state:type_name -> vm.State
-	48, // 19: vm.SetStateResponse.timestamp:type_name -> google.protobuf.Timestamp
-	10, // 20: vm.CreateHandlersResponse.handlers:type_name -> vm.Handler
-	2,  // 21: vm.WaitForEventResponse.message:type_name -> vm.Message
-	48, // 22: vm.BuildBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
-	48, // 23: vm.ParseBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
-	48, // 24: vm.GetBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
-	1,  // 25: vm.GetBlockResponse.err:type_name -> vm.Error
-	48, // 26: vm.BlockVerifyResponse.timestamp:type_name -> google.protobuf.Timestamp
-	48, // 27: vm.AppRequestMsg.deadline:type_name -> google.protobuf.Timestamp
-	16, // 28: vm.BatchedParseBlockResponse.response:type_name -> vm.ParseBlockResponse
-	1,  // 29: vm.GetBlockIDAtHeightResponse.err:type_name -> vm.Error
-	50, // 30: vm.GatherResponse.metric_families:type_name -> io.prometheus.client.MetricFamily
-	1,  // 31: vm.StateSyncEnabledResponse.err:type_name -> vm.Error
-	1,  // 32: vm.GetOngoingSyncStateSummaryResponse.err:type_name -> vm.Error
-	1,  // 33: vm.GetLastStateSummaryResponse.err:type_name -> vm.Error
-	1,  // 34: vm.ParseStateSummaryResponse.err:type_name -> vm.Error
-	1,  // 35: vm.GetStateSummaryResponse.err:type_name -> vm.Error
-	3,  // 36: vm.StateSummaryAcceptResponse.mode:type_name -> vm.StateSummaryAcceptResponse.Mode
-	1,  // 37: vm.StateSummaryAcceptResponse.err:type_name -> vm.Error
-	4,  // 38: vm.VM.Initialize:input_type -> vm.InitializeRequest
-	7,  // 39: vm.VM.SetState:input_type -> vm.SetStateRequest
-	51, // 40: vm.VM.Shutdown:input_type -> google.protobuf.Empty
-	51, // 41: vm.VM.CreateHandlers:input_type -> google.protobuf.Empty
-	51, // 42: vm.VM.NewHTTPHandler:input_type -> google.protobuf.Empty
-	51, // 43: vm.VM.WaitForEvent:input_type -> google.protobuf.Empty
-	30, // 44: vm.VM.Connected:input_type -> vm.ConnectedRequest
-	31, // 45: vm.VM.Disconnected:input_type -> vm.DisconnectedRequest
-	13, // 46: vm.VM.BuildBlock:input_type -> vm.BuildBlockRequest
-	15, // 47: vm.VM.ParseBlock:input_type -> vm.ParseBlockRequest
-	17, // 48: vm.VM.GetBlock:input_type -> vm.GetBlockRequest
-	19, // 49: vm.VM.SetPreference:input_type -> vm.SetPreferenceRequest
-	51, // 50: vm.VM.Health:input_type -> google.protobuf.Empty
-	51, // 51: vm.VM.Version:input_type -> google.protobuf.Empty
-	26, // 52: vm.VM.AppRequest:input_type -> vm.AppRequestMsg
-	27, // 53: vm.VM.AppRequestFailed:input_type -> vm.AppRequestFailedMsg
-	28, // 54: vm.VM.AppResponse:input_type -> vm.AppResponseMsg
-	29, // 55: vm.VM.AppGossip:input_type -> vm.AppGossipMsg
-	51, // 56: vm.VM.Gather:input_type -> google.protobuf.Empty
-	32, // 57: vm.VM.GetAncestors:input_type -> vm.GetAncestorsRequest
-	34, // 58: vm.VM.BatchedParseBlock:input_type -> vm.BatchedParseBlockRequest
-	36, // 59: vm.VM.GetBlockIDAtHeight:input_type -> vm.GetBlockIDAtHeightRequest
-	51, // 60: vm.VM.StateSyncEnabled:input_type -> google.protobuf.Empty
-	51, // 61: vm.VM.GetOngoingSyncStateSummary:input_type -> google.protobuf.Empty
-	51, // 62: vm.VM.GetLastStateSummary:input_type -> google.protobuf.Empty
-	42, // 63: vm.VM.ParseStateSummary:input_type -> vm.ParseStateSummaryRequest
-	44, // 64: vm.VM.GetStateSummary:input_type -> vm.GetStateSummaryRequest
-	20, // 65: vm.VM.BlockVerify:input_type -> vm.BlockVerifyRequest
-	22, // 66: vm.VM.BlockAccept:input_type -> vm.BlockAcceptRequest
-	23, // 67: vm.VM.BlockReject:input_type -> vm.BlockRejectRequest
-	46, // 68: vm.VM.StateSummaryAccept:input_type -> vm.StateSummaryAcceptRequest
-	6,  // 69: vm.VM.Initialize:output_type -> vm.InitializeResponse
-	8,  // 70: vm.VM.SetState:output_type -> vm.SetStateResponse
-	51, // 71: vm.VM.Shutdown:output_type -> google.protobuf.Empty
-	9,  // 72: vm.VM.CreateHandlers:output_type -> vm.CreateHandlersResponse
-	11, // 73: vm.VM.NewHTTPHandler:output_type -> vm.NewHTTPHandlerResponse
-	12, // 74: vm.VM.WaitForEvent:output_type -> vm.WaitForEventResponse
-	51, // 75: vm.VM.Connected:output_type -> google.protobuf.Empty
-	51, // 76: vm.VM.Disconnected:output_type -> google.protobuf.Empty
-	14, // 77: vm.VM.BuildBlock:output_type -> vm.BuildBlockResponse
-	16, // 78: vm.VM.ParseBlock:output_type -> vm.ParseBlockResponse
-	18, // 79: vm.VM.GetBlock:output_type -> vm.GetBlockResponse
-	51, // 80: vm.VM.SetPreference:output_type -> google.protobuf.Empty
-	24, // 81: vm.VM.Health:output_type -> vm.HealthResponse
-	25, // 82: vm.VM.Version:output_type -> vm.VersionResponse
-	51, // 83: vm.VM.AppRequest:output_type -> google.protobuf.Empty
-	51, // 84: vm.VM.AppRequestFailed:output_type -> google.protobuf.Empty
-	51, // 85: vm.VM.AppResponse:output_type -> google.protobuf.Empty
-	51, // 86: vm.VM.AppGossip:output_type -> google.protobuf.Empty
-	38, // 87: vm.VM.Gather:output_type -> vm.GatherResponse
-	33, // 88: vm.VM.GetAncestors:output_type -> vm.GetAncestorsResponse
-	35, // 89: vm.VM.BatchedParseBlock:output_type -> vm.BatchedParseBlockResponse
-	37, // 90: vm.VM.GetBlockIDAtHeight:output_type -> vm.GetBlockIDAtHeightResponse
-	39, // 91: vm.VM.StateSyncEnabled:output_type -> vm.StateSyncEnabledResponse
-	40, // 92: vm.VM.GetOngoingSyncStateSummary:output_type -> vm.GetOngoingSyncStateSummaryResponse
-	41, // 93: vm.VM.GetLastStateSummary:output_type -> vm.GetLastStateSummaryResponse
-	43, // 94: vm.VM.ParseStateSummary:output_type -> vm.ParseStateSummaryResponse
-	45, // 95: vm.VM.GetStateSummary:output_type -> vm.GetStateSummaryResponse
-	21, // 96: vm.VM.BlockVerify:output_type -> vm.BlockVerifyResponse
-	51, // 97: vm.VM.BlockAccept:output_type -> google.protobuf.Empty
-	51, // 98: vm.VM.BlockReject:output_type -> google.protobuf.Empty
-	47, // 99: vm.VM.StateSummaryAccept:output_type -> vm.StateSummaryAcceptResponse
-	69, // [69:100] is the sub-list for method output_type
-	38, // [38:69] is the sub-list for method input_type
-	38, // [38:38] is the sub-list for extension type_name
-	38, // [38:38] is the sub-list for extension extendee
-	0,  // [0:38] is the sub-list for field type_name
+	48, // 17: vm.NetworkUpgrades.igloo_time:type_name -> google.protobuf.Timestamp
+	48, // 18: vm.InitializeResponse.timestamp:type_name -> google.protobuf.Timestamp
+	0,  // 19: vm.SetStateRequest.state:type_name -> vm.State
+	48, // 20: vm.SetStateResponse.timestamp:type_name -> google.protobuf.Timestamp
+	10, // 21: vm.CreateHandlersResponse.handlers:type_name -> vm.Handler
+	2,  // 22: vm.WaitForEventResponse.message:type_name -> vm.Message
+	48, // 23: vm.BuildBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
+	48, // 24: vm.ParseBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
+	48, // 25: vm.GetBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
+	1,  // 26: vm.GetBlockResponse.err:type_name -> vm.Error
+	48, // 27: vm.BlockVerifyResponse.timestamp:type_name -> google.protobuf.Timestamp
+	48, // 28: vm.AppRequestMsg.deadline:type_name -> google.protobuf.Timestamp
+	16, // 29: vm.BatchedParseBlockResponse.response:type_name -> vm.ParseBlockResponse
+	1,  // 30: vm.GetBlockIDAtHeightResponse.err:type_name -> vm.Error
+	50, // 31: vm.GatherResponse.metric_families:type_name -> io.prometheus.client.MetricFamily
+	1,  // 32: vm.StateSyncEnabledResponse.err:type_name -> vm.Error
+	1,  // 33: vm.GetOngoingSyncStateSummaryResponse.err:type_name -> vm.Error
+	1,  // 34: vm.GetLastStateSummaryResponse.err:type_name -> vm.Error
+	1,  // 35: vm.ParseStateSummaryResponse.err:type_name -> vm.Error
+	1,  // 36: vm.GetStateSummaryResponse.err:type_name -> vm.Error
+	3,  // 37: vm.StateSummaryAcceptResponse.mode:type_name -> vm.StateSummaryAcceptResponse.Mode
+	1,  // 38: vm.StateSummaryAcceptResponse.err:type_name -> vm.Error
+	4,  // 39: vm.VM.Initialize:input_type -> vm.InitializeRequest
+	7,  // 40: vm.VM.SetState:input_type -> vm.SetStateRequest
+	51, // 41: vm.VM.Shutdown:input_type -> google.protobuf.Empty
+	51, // 42: vm.VM.CreateHandlers:input_type -> google.protobuf.Empty
+	51, // 43: vm.VM.NewHTTPHandler:input_type -> google.protobuf.Empty
+	51, // 44: vm.VM.WaitForEvent:input_type -> google.protobuf.Empty
+	30, // 45: vm.VM.Connected:input_type -> vm.ConnectedRequest
+	31, // 46: vm.VM.Disconnected:input_type -> vm.DisconnectedRequest
+	13, // 47: vm.VM.BuildBlock:input_type -> vm.BuildBlockRequest
+	15, // 48: vm.VM.ParseBlock:input_type -> vm.ParseBlockRequest
+	17, // 49: vm.VM.GetBlock:input_type -> vm.GetBlockRequest
+	19, // 50: vm.VM.SetPreference:input_type -> vm.SetPreferenceRequest
+	51, // 51: vm.VM.Health:input_type -> google.protobuf.Empty
+	51, // 52: vm.VM.Version:input_type -> google.protobuf.Empty
+	26, // 53: vm.VM.AppRequest:input_type -> vm.AppRequestMsg
+	27, // 54: vm.VM.AppRequestFailed:input_type -> vm.AppRequestFailedMsg
+	28, // 55: vm.VM.AppResponse:input_type -> vm.AppResponseMsg
+	29, // 56: vm.VM.AppGossip:input_type -> vm.AppGossipMsg
+	51, // 57: vm.VM.Gather:input_type -> google.protobuf.Empty
+	32, // 58: vm.VM.GetAncestors:input_type -> vm.GetAncestorsRequest
+	34, // 59: vm.VM.BatchedParseBlock:input_type -> vm.BatchedParseBlockRequest
+	36, // 60: vm.VM.GetBlockIDAtHeight:input_type -> vm.GetBlockIDAtHeightRequest
+	51, // 61: vm.VM.StateSyncEnabled:input_type -> google.protobuf.Empty
+	51, // 62: vm.VM.GetOngoingSyncStateSummary:input_type -> google.protobuf.Empty
+	51, // 63: vm.VM.GetLastStateSummary:input_type -> google.protobuf.Empty
+	42, // 64: vm.VM.ParseStateSummary:input_type -> vm.ParseStateSummaryRequest
+	44, // 65: vm.VM.GetStateSummary:input_type -> vm.GetStateSummaryRequest
+	20, // 66: vm.VM.BlockVerify:input_type -> vm.BlockVerifyRequest
+	22, // 67: vm.VM.BlockAccept:input_type -> vm.BlockAcceptRequest
+	23, // 68: vm.VM.BlockReject:input_type -> vm.BlockRejectRequest
+	46, // 69: vm.VM.StateSummaryAccept:input_type -> vm.StateSummaryAcceptRequest
+	6,  // 70: vm.VM.Initialize:output_type -> vm.InitializeResponse
+	8,  // 71: vm.VM.SetState:output_type -> vm.SetStateResponse
+	51, // 72: vm.VM.Shutdown:output_type -> google.protobuf.Empty
+	9,  // 73: vm.VM.CreateHandlers:output_type -> vm.CreateHandlersResponse
+	11, // 74: vm.VM.NewHTTPHandler:output_type -> vm.NewHTTPHandlerResponse
+	12, // 75: vm.VM.WaitForEvent:output_type -> vm.WaitForEventResponse
+	51, // 76: vm.VM.Connected:output_type -> google.protobuf.Empty
+	51, // 77: vm.VM.Disconnected:output_type -> google.protobuf.Empty
+	14, // 78: vm.VM.BuildBlock:output_type -> vm.BuildBlockResponse
+	16, // 79: vm.VM.ParseBlock:output_type -> vm.ParseBlockResponse
+	18, // 80: vm.VM.GetBlock:output_type -> vm.GetBlockResponse
+	51, // 81: vm.VM.SetPreference:output_type -> google.protobuf.Empty
+	24, // 82: vm.VM.Health:output_type -> vm.HealthResponse
+	25, // 83: vm.VM.Version:output_type -> vm.VersionResponse
+	51, // 84: vm.VM.AppRequest:output_type -> google.protobuf.Empty
+	51, // 85: vm.VM.AppRequestFailed:output_type -> google.protobuf.Empty
+	51, // 86: vm.VM.AppResponse:output_type -> google.protobuf.Empty
+	51, // 87: vm.VM.AppGossip:output_type -> google.protobuf.Empty
+	38, // 88: vm.VM.Gather:output_type -> vm.GatherResponse
+	33, // 89: vm.VM.GetAncestors:output_type -> vm.GetAncestorsResponse
+	35, // 90: vm.VM.BatchedParseBlock:output_type -> vm.BatchedParseBlockResponse
+	37, // 91: vm.VM.GetBlockIDAtHeight:output_type -> vm.GetBlockIDAtHeightResponse
+	39, // 92: vm.VM.StateSyncEnabled:output_type -> vm.StateSyncEnabledResponse
+	40, // 93: vm.VM.GetOngoingSyncStateSummary:output_type -> vm.GetOngoingSyncStateSummaryResponse
+	41, // 94: vm.VM.GetLastStateSummary:output_type -> vm.GetLastStateSummaryResponse
+	43, // 95: vm.VM.ParseStateSummary:output_type -> vm.ParseStateSummaryResponse
+	45, // 96: vm.VM.GetStateSummary:output_type -> vm.GetStateSummaryResponse
+	21, // 97: vm.VM.BlockVerify:output_type -> vm.BlockVerifyResponse
+	51, // 98: vm.VM.BlockAccept:output_type -> google.protobuf.Empty
+	51, // 99: vm.VM.BlockReject:output_type -> google.protobuf.Empty
+	47, // 100: vm.VM.StateSummaryAccept:output_type -> vm.StateSummaryAcceptResponse
+	70, // [70:101] is the sub-list for method output_type
+	39, // [39:70] is the sub-list for method input_type
+	39, // [39:39] is the sub-list for extension type_name
+	39, // [39:39] is the sub-list for extension extendee
+	0,  // [0:39] is the sub-list for field type_name
 }
 
 func init() { file_vm_vm_proto_init() }

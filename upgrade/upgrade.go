@@ -39,6 +39,7 @@ var (
 		GraniteTime:               time.Date(2025, time.November, 19, 16, 0, 0, 0, time.UTC),
 		GraniteEpochDuration:      5 * time.Minute,
 		HeliconTime:               time.Date(2026, time.September, 22, 15, 0, 0, 0, time.UTC),
+		IglooTime:                 UnscheduledActivationTime,
 	}
 	Fuji = Config{
 		ApricotPhase1Time:            time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
@@ -63,6 +64,7 @@ var (
 		GraniteTime:               time.Date(2025, time.October, 29, 15, 0, 0, 0, time.UTC),
 		GraniteEpochDuration:      5 * time.Minute,
 		HeliconTime:               time.Date(2026, time.July, 28, 15, 0, 0, 0, time.UTC),
+		IglooTime:                 UnscheduledActivationTime,
 	}
 	Default = Config{
 		ApricotPhase1Time:            InitiallyActiveTime,
@@ -83,6 +85,7 @@ var (
 		GraniteTime:                  InitiallyActiveTime,
 		GraniteEpochDuration:         30 * time.Second,
 		HeliconTime:                  InitiallyActiveTime,
+		IglooTime:                    UnscheduledActivationTime,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
@@ -107,6 +110,7 @@ type Config struct {
 	GraniteTime                  time.Time     `json:"graniteTime"`
 	GraniteEpochDuration         time.Duration `json:"graniteEpochDuration"`
 	HeliconTime                  time.Time     `json:"heliconTime"`
+	IglooTime                    time.Time     `json:"iglooTime"`
 	// When adding a new upgrade, follow new_upgrade_checklist.md.
 }
 
@@ -127,6 +131,7 @@ func (c *Config) Validate() error {
 		c.FortunaTime,
 		c.GraniteTime,
 		c.HeliconTime,
+		c.IglooTime,
 	}
 	for i := 0; i < len(upgrades)-1; i++ {
 		if upgrades[i].After(upgrades[i+1]) {
@@ -202,8 +207,12 @@ func (c *Config) IsHeliconActivated(t time.Time) bool {
 	return !t.Before(c.HeliconTime)
 }
 
+func (c *Config) IsIglooActivated(t time.Time) bool {
+	return !t.Before(c.IglooTime)
+}
+
 func (c *Config) LatestTime() time.Time {
-	return c.HeliconTime
+	return c.IglooTime
 }
 
 func GetConfig(networkID uint32) Config {

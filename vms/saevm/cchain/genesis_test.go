@@ -433,6 +433,7 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 		// Added the SAE fields: the ACP-176 target exponent, the ACP-283 min
 		// price exponent, and the settlement markers.
 		upgradetest.Helicon: "0xa8ba8fe99b2affb0ed27d0d8c825f6292c3c6f5eb9d53707504bea02ac9c1a9b",
+		upgradetest.Igloo:   "0xa8ba8fe99b2affb0ed27d0d8c825f6292c3c6f5eb9d53707504bea02ac9c1a9b",
 	}
 	_ = hashes[upgradetest.Latest] // Enforce completeness at compile time.
 
