@@ -1064,6 +1064,11 @@ func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 			Gas:      1e6,
 		}))
 
+		// Although we don't have to wait for execution when testing receipts
+		// above, there is a tiny chance that the block's execution is still
+		// finishing up, which would cause the next assertion to see the
+		// previous block.
+		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 		sut.testRPC(ctx, t, rpcTest{
 			method: "eth_getHeaderByNumber",
 			args:   []any{rpc.PendingBlockNumber},

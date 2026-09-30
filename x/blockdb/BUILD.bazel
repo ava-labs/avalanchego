@@ -19,7 +19,7 @@ go_library(
         "//utils/logging",
         "//utils/math",
         "@com_github_cespare_xxhash_v2//:xxhash",
-        "@com_github_datadog_zstd//:zstd",
+        "@com_github_klauspost_compress//zstd",
         "@org_uber_go_zap//:zap",
     ],
 )
@@ -44,7 +44,7 @@ go_test(
         "//utils/compression",
         "//utils/logging",
         "//utils/math",
-        "@com_github_datadog_zstd//:zstd",
+        "@com_github_klauspost_compress//zstd",
         "@com_github_stretchr_testify//require",
     ],
 )

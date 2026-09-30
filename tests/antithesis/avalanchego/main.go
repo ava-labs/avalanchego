@@ -17,6 +17,7 @@ import (
 	"github.com/antithesishq/antithesis-sdk-go/lifecycle"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -24,9 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
@@ -69,9 +67,6 @@ const (
 // TODO(marun) Extract the common elements of test execution for reuse across test setups
 
 func main() {
-	// Required for coreth ethclient block deserialization.
-	evm.RegisterAllLibEVMExtras()
-
 	// TODO(marun) Support choosing the log format
 	tc := antithesis.NewInstrumentedTestContext(tests.NewDefaultLogger(""))
 	defer tc.RecoverAndExit()
@@ -992,9 +987,9 @@ func (w *workload) confirmCChainTx(ctx context.Context, tx *types.Transaction) e
 			return fmt.Errorf("failed to get C-Chain RPC client for %s: %w", uri, err)
 		}
 
-		receipt, err := bind.WaitMined(ctx, client, tx)
+		receipt, err := e2e.AwaitEthReceipt(ctx, client, tx)
 		if err != nil {
-			return fmt.Errorf("failed to get receipt for tx %s on %s: %w", txHash, uri, err)
+			return fmt.Errorf("awaiting tx %s on %s: %w", txHash, uri, err)
 		}
 
 		if receipt.Status != types.ReceiptStatusSuccessful {
@@ -1038,28 +1033,26 @@ func (w *workload) sendCChainTx(ctx context.Context, client *ethclient.Client, t
 		})
 		return nil, err
 	}
-	acceptedNonce, err := client.AcceptedNonceAt(ctx, senderAddr)
+	nonce, err := client.NonceAt(ctx, senderAddr, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch accepted nonce: %w", err)
+		return nil, fmt.Errorf("failed to fetch nonce: %w", err)
 	}
 	gasTipCap, err := client.SuggestGasTipCap(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch suggested gas tip: %w", err)
 	}
-	estimatedBaseFee, err := client.EstimateBaseFee(ctx)
+	gasPrice, err := client.SuggestGasPrice(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch estimated base fee: %w", err)
+		return nil, fmt.Errorf("failed to fetch suggested gas price: %w", err)
 	}
-	gasFeeCap := new(big.Int).Add(
-		gasTipCap,
-		new(big.Int).Mul(estimatedBaseFee, big.NewInt(2)),
-	)
+	// Double the suggested price to absorb base fee increases before inclusion.
+	gasFeeCap := new(big.Int).Mul(gasPrice, big.NewInt(2))
 
 	chainID := new(big.Int).Set(w.cChainID)
 	signer := types.LatestSignerForChainID(chainID)
 	tx, err := types.SignNewTx(w.cChainKey, signer, &types.DynamicFeeTx{
 		ChainID:   chainID,
-		Nonce:     acceptedNonce,
+		Nonce:     nonce,
 		GasTipCap: gasTipCap,
 		GasFeeCap: gasFeeCap,
 		Gas:       params.TxGas,
