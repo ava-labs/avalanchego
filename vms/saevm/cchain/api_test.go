@@ -17,18 +17,15 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
-	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -36,24 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
-
-	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
-
-// getTxStatus exposes the deprecated [service.GetAtomicTxStatus] endpoint.
-func (c *Client) getTxStatus(ctx context.Context, txID ids.ID) (TxStatus, error) {
-	var resp TxStatus
-	err := c.r.SendRequest(
-		ctx,
-		"avax.getAtomicTxStatus",
-		&api.JSONTxID{
-			TxID: txID,
-		},
-		&resp,
-	)
-	return resp, err
-}
 
 // TestIssueTxRejectsInvalidTransaction asserts that [Client.IssueTx] surfaces
 // an error from the transaction pool's verification pipeline.
@@ -149,36 +129,6 @@ func TestAwaitTxAccepted(t *testing.T) {
 		err := sut.AwaitTxAccepted(ctx, stx.ID(), time.Millisecond)
 		require.NoErrorf(t, err, "%T.AwaitTxAccepted()", sut.Client)
 		sut.assertTxAccepted(ctx, t, stx, blk.NumberU64())
-	})
-}
-
-// TestGetAtomicTxStatus exercises the deprecated avax.getAtomicTxStatus
-// endpoint on both the unknown and accepted branches.
-func TestGetAtomicTxStatus(t *testing.T) {
-	sk := txtest.NewKey(t)
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(sk.EthAddress())
-	}))
-
-	stx := newWallet(sk, sut.ctx, sut.Client).newMinimalTx(t)
-	t.Run("before_execution", func(t *testing.T) {
-		got, err := sut.getTxStatus(ctx, stx.ID())
-		require.NoErrorf(t, err, "%T.getTxStatus()", sut.Client)
-		want := TxStatus{
-			Status: choices.Unknown,
-		}
-		require.Equalf(t, want, got, "%T.getTxStatus()", sut.Client)
-	})
-
-	blk := sut.issueAndExecute(ctx, t, stx)
-	t.Run("after_execution", func(t *testing.T) {
-		got, err := sut.getTxStatus(ctx, stx.ID())
-		require.NoErrorf(t, err, "%T.getTxStatus()", sut.Client)
-		want := TxStatus{
-			Status: choices.Accepted,
-			Height: new(avajson.Uint64(blk.NumberU64())),
-		}
-		require.Equalf(t, want, got, "%T.getTxStatus()", sut.Client)
 	})
 }
 
