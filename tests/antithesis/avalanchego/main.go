@@ -196,14 +196,14 @@ func main() {
 // awaitActivation reports that the next upgrade activated. Nothing is reported
 // if ctx is canceled first, failing the reachability assertion for runs that
 // end before the activation.
-func awaitActivation(ctx context.Context, heliconTime time.Time) {
-	timer := time.NewTimer(time.Until(heliconTime))
+func awaitActivation(ctx context.Context, upgradeTime time.Time) {
+	timer := time.NewTimer(time.Until(upgradeTime))
 	defer timer.Stop()
 
 	select {
 	case <-timer.C:
 		assert.Reachable("Upgrade activating", map[string]any{
-			"upgradeTime": heliconTime,
+			"upgradeTime": upgradeTime,
 		})
 	case <-ctx.Done():
 	}
