@@ -157,7 +157,7 @@ func (p *PeerTracker) shouldSelectUntrackedPeer() bool {
 // If we should track more peers, returns a random untracked peer, if any exist.
 // Otherwise, with probability [randomPeerProbability] returns a random peer
 // from p.responsivePeers.
-// With probability [1-randomPeerProbability] returns the peer in
+// With probability 1-randomPeerProbability returns the peer in
 // p.bandwidthHeap with the highest bandwidth.
 //
 // Returns false if there are no connected peers.

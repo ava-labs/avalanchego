@@ -126,11 +126,11 @@ type PermissionlessValidator struct {
 }
 
 // Chain defines a chain that exists at the network's genesis
-// [GenesisData] is the initial state of the chain.
-// [VMID] is the ID of the VM this chain runs.
-// [FxIDs] are the IDs of the Fxs the chain supports.
-// [Name] is a human-readable, non-unique name for the chain.
-// [SubnetID] is the ID of the subnet that validates the chain
+// [Chain.GenesisData] is the initial state of the chain.
+// [Chain.VMID] is the ID of the VM this chain runs.
+// [Chain.FxIDs] are the IDs of the Fxs the chain supports.
+// [Chain.Name] is a human-readable, non-unique name for the chain.
+// [Chain.SubnetID] is the ID of the subnet that validates the chain
 type Chain struct {
 	GenesisData []byte
 	VMID        ids.ID

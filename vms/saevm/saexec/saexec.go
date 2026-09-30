@@ -102,13 +102,13 @@ func New(
 	return e, nil
 }
 
-// Unhealthy is the [error] type returned by [Executor.HealthCheck].
+// Unhealthy is the error type returned by [Executor.HealthCheck].
 type Unhealthy struct {
 	err   error
 	cause *blocks.Block
 }
 
-// Error implements [error].
+// Error implements error.
 func (e *Unhealthy) Error() string {
 	return fmt.Sprintf("saexec.Executor unhealthy due to block %d (%#x): %s", e.cause.NumberU64(), e.cause.Hash(), e.err.Error())
 }

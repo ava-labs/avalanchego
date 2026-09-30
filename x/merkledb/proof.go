@@ -301,10 +301,10 @@ func validateChangeProof(
 // Verify returns nil iff all the following hold:
 //   - The invariants of RangeProof hold.
 //   - start <= end.
-//   - [proof] proves the key-value pairs in [proof.KeyValues] are in the trie
+//   - r proves the key-value pairs in r.KeyChanges are in the trie
 //     whose root is expectedRootID.
 //
-// All keys in [proof.KeyValues] are in the range [start, end].
+// All keys in r.KeyChanges are in the range [start, end].
 //
 //	If [start] is Nothing, all keys are considered > [start].
 //	If [end] is Nothing, all keys are considered < [end].

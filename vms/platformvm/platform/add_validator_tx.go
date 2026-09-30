@@ -42,7 +42,7 @@ type AddValidatorTx struct {
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
-// [AddValidatorTx]. Also sets the ctx to the given [vm.ctx] so that
+// [AddValidatorTx]. Also sets the ctx to the given ctx so that
 // the addresses can be json marshalled into human readable format
 func (tx *AddValidatorTx) InitCtx(ctx *snow.Context) {
 	tx.BaseTx.InitCtx(ctx)

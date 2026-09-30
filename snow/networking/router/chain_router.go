@@ -95,7 +95,7 @@ type ChainRouter struct {
 // Initialize the router.
 //
 // When this router receives an incoming message, it cancels the timeout in
-// [timeouts] associated with the request that caused the incoming message, if
+// timeoutManager associated with the request that caused the incoming message, if
 // applicable.
 func (cr *ChainRouter) Initialize(
 	nodeID ids.NodeID,

@@ -23,7 +23,7 @@ var (
 
 // AppResponseCallback is called upon receiving an AppResponse for an AppRequest
 // issued by Client.
-// Callers should check [err] to see whether the AppRequest failed or not.
+// Callers should check err to see whether the AppRequest failed or not.
 type AppResponseCallback func(
 	ctx context.Context,
 	nodeID ids.NodeID,

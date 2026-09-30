@@ -1165,13 +1165,14 @@ func (s *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, 
 }
 
 // GetBlockchainStatusArgs is the arguments for calling GetBlockchainStatus
-// [BlockchainID] is the ID of or an alias of the blockchain to get the status of.
+// [GetBlockchainStatusArgs.BlockchainID] is the ID of or an alias of the blockchain to get the
+// status of.
 type GetBlockchainStatusArgs struct {
 	BlockchainID string `json:"blockchainID"`
 }
 
 // GetBlockchainStatusReply is the reply from calling GetBlockchainStatus
-// [Status] is the blockchain's status.
+// [GetBlockchainStatusReply.Status] is the blockchain's status.
 type GetBlockchainStatusReply struct {
 	Status status.BlockchainStatus `json:"status"`
 }

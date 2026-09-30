@@ -355,7 +355,7 @@ func (s *State) BatchedParseBlock(ctx context.Context, blksBytes [][]byte) ([]sn
 
 // BuildBlockWithContext attempts to build a new internal Block, wraps it, and
 // adds it to the appropriate caching layer if successful.
-// If s.buildBlockWithContext is nil, returns [BuildBlock].
+// If s.buildBlockWithContext is nil, returns [State.BuildBlock].
 func (s *State) BuildBlockWithContext(ctx context.Context, blockCtx *block.Context) (snowman.Block, error) {
 	if s.buildBlockWithContext == nil {
 		return s.BuildBlock(ctx)

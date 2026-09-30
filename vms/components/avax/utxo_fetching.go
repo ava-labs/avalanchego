@@ -49,10 +49,10 @@ func GetAllUTXOs(db UTXOReader, addrs set.Set[ids.ShortID]) ([]*UTXO, error) {
 //
 // Returns at most limit UTXOs.
 //
-// Only returns UTXOs associated with addresses >= [startAddr].
+// Only returns UTXOs associated with addresses >= lastAddr.
 //
-// For address [startAddr], only returns UTXOs whose IDs are greater than
-// [startUTXOID].
+// For address lastAddr, only returns UTXOs whose IDs are greater than
+// lastUTXOID.
 //
 // Returns:
 // * The fetched UTXOs

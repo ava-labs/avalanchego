@@ -44,7 +44,7 @@ func NewDispatcher[Req, Resp proto.Message](
 	}
 }
 
-// Send picks a peer and forwards to [SendTo], or returns errNoPeers
+// Send picks a peer and forwards to [Dispatcher.SendTo], or returns errNoPeers
 // (unscored) when none is available.
 func (d *Dispatcher[Req, Resp]) Send(ctx context.Context, req Req, resp Resp) (*Outcome, error) {
 	nodeID, ok := d.peers.SelectPeer()
