@@ -23,9 +23,9 @@ require (
 	github.com/StephenButtolph/canoto v0.18.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/arr4n/shed v0.0.0-20260908170710-35e123a98127
-	github.com/ava-labs/avalanchego/graft/coreth v1.15.1-rc.0
-	github.com/ava-labs/avalanchego/graft/evm v1.15.1-rc.0
-	github.com/ava-labs/avalanchego/graft/subnet-evm v1.15.1-rc.0
+	github.com/ava-labs/avalanchego/graft/coreth v1.15.1
+	github.com/ava-labs/avalanchego/graft/evm v1.15.1
+	github.com/ava-labs/avalanchego/graft/subnet-evm v1.15.1
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0
 	github.com/ava-labs/libevm v1.13.15-0.20260929143550-dbf7ede95a25
 	github.com/ava-labs/simplex v0.0.0-20260429081342-03ce910391ad
