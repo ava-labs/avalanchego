@@ -98,7 +98,7 @@ type Index struct {
 // Returns at most [GetUTXOsArgs.Limit] addresses.
 // If specified, [GetUTXOsArgs.SourceChain] is the chain where the atomic UTXOs were exported from.
 // If empty, or the Chain ID of this VM is specified, then GetUTXOs fetches the native UTXOs.
-// If [GetUTXOsArgs.Limit] == 0 or > [maxUTXOsToFetch], fetches up to [maxUTXOsToFetch].
+// If [GetUTXOsArgs.Limit] is 0 or exceeds the VM's maximum, fetches up to that maximum.
 // [GetUTXOsArgs.StartIndex] defines where to start fetching UTXOs (for pagination.)
 // UTXOs fetched are from addresses equal to or greater than StartIndex.Address
 // For address StartIndex.Address, only UTXOs with IDs greater than StartIndex.UTXO will be returned.

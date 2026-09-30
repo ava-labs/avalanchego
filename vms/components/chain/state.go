@@ -278,8 +278,8 @@ func (s *State) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error)
 
 // BatchedParseBlock implements part of the block.BatchedChainVM interface. In
 // addition to performing all the caching as the ParseBlock function, it
-// performs at most one call to the underlying VM if [batchedUnmarshalBlock] was
-// provided.
+// performs at most one call to the underlying VM if
+// [Config.BatchedUnmarshalBlock] was provided.
 func (s *State) BatchedParseBlock(ctx context.Context, blksBytes [][]byte) ([]snowman.Block, error) {
 	blks := make([]snowman.Block, len(blksBytes))
 	idWasCached := make([]bool, len(blksBytes))

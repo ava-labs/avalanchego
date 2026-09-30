@@ -113,7 +113,7 @@ const (
 )
 
 // NewPriceOptions returns slow, normal, and fast [PriceOptions] derived from the given tip and base fee.
-// The slow tip is floored at [minGasTip], and normal/fast are floored at the
+// The slow tip is floored at 1 Wei, and normal/fast are floored at the
 // previous tier to guarantee slow <= normal <= fast.
 func NewPriceOptions(tip, baseFee *big.Int) *PriceOptions {
 	slowTip := new(big.Int).Set(math.BigMax(scale(tip, slowTipPercent), minGasTip))

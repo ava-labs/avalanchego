@@ -203,7 +203,7 @@ func (p *Packer) UnpackBytes() []byte {
 }
 
 // UnpackLimitedBytes unpacks a byte slice. If the size of the slice is greater
-// than limit, adds [errOversized] to the packer and returns nil.
+// than limit, adds an error to the packer and returns nil.
 func (p *Packer) UnpackLimitedBytes(limit uint32) []byte {
 	size := p.UnpackInt()
 	if size > limit {
@@ -231,7 +231,7 @@ func (p *Packer) UnpackStr() string {
 }
 
 // UnpackLimitedStr unpacks a string. If the size of the string is greater than
-// limit, adds [errOversized] to the packer and returns the empty string.
+// limit, adds an error to the packer and returns the empty string.
 func (p *Packer) UnpackLimitedStr(limit uint16) string {
 	strSize := p.UnpackShort()
 	if strSize > limit {
