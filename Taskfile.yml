@@ -236,7 +236,7 @@ tasks:
     cmd: '{{.NIX_RUN}} ./scripts/check_go_version.sh'
 
   check-require-directives:
-    desc: Checks that internal module require directives reference the same version, matching version.Current
+    desc: Checks that internal module require directives reference the same version and match version.Current
     cmd: '{{.NIX_RUN}} ./scripts/check_require_directives.sh'
 
   check-require-directives-round-trip:
