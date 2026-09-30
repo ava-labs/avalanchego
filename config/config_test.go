@@ -581,7 +581,9 @@ func TestGetSubnetConfigsMembership(t *testing.T) {
 				return fmt.Sprintf(`{"validatorOnly": true, "memberCAPath": %q, %s}`, caPath, largeMessages)
 			},
 			verify: func(require *require.Assertions, config subnets.Config) {
-				_, ok := config.MemberCA().VerifyUntil(memberChain)
+				ca, err := config.LoadMemberCA()
+				require.NoError(err)
+				_, ok := ca.VerifyUntil(memberChain)
 				require.True(ok)
 				require.Equal(uint32(160*units.MiB), config.LargeMessages.MaxMessageSize)
 			},
@@ -593,7 +595,9 @@ func TestGetSubnetConfigsMembership(t *testing.T) {
 				return fmt.Sprintf(`{"validatorOnly": true, "memberCA": %s, %s}`, inline, largeMessages)
 			},
 			verify: func(require *require.Assertions, config subnets.Config) {
-				_, ok := config.MemberCA().VerifyUntil(memberChain)
+				ca, err := config.LoadMemberCA()
+				require.NoError(err)
+				_, ok := ca.VerifyUntil(memberChain)
 				require.True(ok)
 			},
 		},
@@ -602,7 +606,9 @@ func TestGetSubnetConfigsMembership(t *testing.T) {
 				return `{"validatorOnly": true}`
 			},
 			verify: func(require *require.Assertions, config subnets.Config) {
-				require.Nil(config.MemberCA())
+				ca, err := config.LoadMemberCA()
+				require.NoError(err)
+				require.Nil(ca)
 				require.Nil(config.LargeMessages)
 			},
 		},

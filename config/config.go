@@ -236,12 +236,6 @@ func getSubnetConfigFromBytes(rawBytes []byte, v *viper.Viper) (subnets.Config, 
 		return subnets.Config{}, err
 	}
 
-	// Load the member CA now so that an unreadable or malformed file is a
-	// startup error rather than a subnet that silently admits nobody.
-	if err := config.LoadMemberCA(); err != nil {
-		return subnets.Config{}, err
-	}
-
 	return config, nil
 }
 

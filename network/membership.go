@@ -5,6 +5,7 @@ package network
 
 import (
 	"crypto/x509"
+	"fmt"
 	"sync"
 	"time"
 
@@ -43,11 +44,12 @@ func (c certifiedSubnets) contains(subnetID ids.ID, now time.Time) bool {
 // membership changes underneath a live connection and is read from the
 // validator manager on every call.
 type membership struct {
-	// memberCAs holds the member CA of every subnet that declares one, and
-	// allowedNodes the allowedNodes of every subnet that lists any. Both are
-	// extracted from the subnet configs once, so that the per-connection and
-	// per-message paths below neither walk configs that declare nothing nor
-	// copy a config per call.
+	// memberCAs holds the member CA of every tracked subnet that declares one,
+	// and allowedNodes the allowedNodes of every subnet that lists any.
+	//
+	// Invariant: memberCAs covers tracked subnets only, so that a chain
+	// [findCertifiedSubnets] verifies proves membership of a tracked subnet.
+	// [network.upgrade] admits a connection on that alone.
 	memberCAs    map[ids.ID]*subnets.MemberCA
 	allowedNodes map[ids.ID]set.Set[ids.NodeID]
 	// trackedSubnets are the subnets this node runs chains for. It never
@@ -67,7 +69,7 @@ func newMembership(
 	subnetConfigs map[ids.ID]subnets.Config,
 	trackedSubnets set.Set[ids.ID],
 	vdrs validators.Manager,
-) *membership {
+) (*membership, error) {
 	m := &membership{
 		memberCAs:      make(map[ids.ID]*subnets.MemberCA),
 		allowedNodes:   make(map[ids.ID]set.Set[ids.NodeID]),
@@ -76,14 +78,18 @@ func newMembership(
 		certMembers:    make(map[ids.NodeID]certifiedSubnets),
 	}
 	for subnetID, config := range subnetConfigs {
-		if ca := config.MemberCA(); ca != nil {
+		ca, err := config.LoadMemberCA()
+		if err != nil {
+			return nil, fmt.Errorf("loading member CA of subnet %s: %w", subnetID, err)
+		}
+		if ca != nil && trackedSubnets.Contains(subnetID) {
 			m.memberCAs[subnetID] = ca
 		}
 		if config.AllowedNodes.Len() > 0 {
 			m.allowedNodes[subnetID] = config.AllowedNodes
 		}
 	}
-	return m
+	return m, nil
 }
 
 // findCertifiedSubnets returns the subnets whose member CA verifies [chain], a
@@ -139,33 +145,24 @@ func (m *membership) certified(nodeID ids.NodeID) certifiedSubnets {
 // IsSubnetMember reports whether [nodeID] is a member of [subnetID], reading
 // certificate membership from the record of its connection.
 //
-// This is deliberately the one predicate behind both subnet admission and the
-// elevated message stack, so that the chains this node runs ask the same
-// question the network answers for itself, every admitted peer is elevated at
-// the same size, and no unadmitted peer holds an elevated throttler
+// This is deliberately the one predicate behind subnet admission, the elevated
+// message stack and connection admission, so that the chains this node runs
+// ask the same question the network answers for itself, every admitted peer is
+// elevated at the same size, and no unadmitted peer holds an elevated throttler
 // allocation.
+//
+// An expired record is simply not a member: every read checks the expiry, so
+// leaving it in place until the peer disconnects saves sweeping the map on a
+// timer. Expiry alone does not close the connection; the next Ping does, if
+// the peer is then on the wrong stack or no longer wanted under
+// network-require-validator-to-connect.
 func (m *membership) IsSubnetMember(subnetID ids.ID, nodeID ids.NodeID) bool {
-	return m.isSubnetMember(subnetID, nodeID, m.certified(nodeID))
-}
-
-// isSubnetMember is [membership.IsSubnetMember] with the certificate source
-// supplied by the caller: the record of a connected peer, or the freshly
-// verified chain of one that is not recorded yet.
-//
-// An expired entry is simply not a member: every read checks the expiry, so
-// leaving it in place until the peer disconnects costs nothing but a map entry
-// and saves sweeping the map on a timer.
-//
-// Expiry does not by itself close the connection. It stops the peer being
-// admitted to the subnet, which is what [subnets.Subnet.IsAllowed] enforces on
-// every message. Only when the subnet declares largeMessages does the peer also
-// fall off the elevated stack, and its next Ping then finds it on the wrong one
-// and reconnects on the default stack.
-func (m *membership) isSubnetMember(subnetID ids.ID, nodeID ids.NodeID, certified certifiedSubnets) bool {
+	// Validators, the common case on the per-message path, never reach the
+	// record's lock.
 	if _, isValidator := m.validators.GetValidator(subnetID, nodeID); isValidator {
 		return true
 	}
-	if certified.contains(subnetID, time.Now()) {
+	if m.certified(nodeID).contains(subnetID, time.Now()) {
 		return true
 	}
 	allowedNodes := m.allowedNodes[subnetID]
@@ -173,17 +170,14 @@ func (m *membership) isSubnetMember(subnetID ids.ID, nodeID ids.NodeID, certifie
 }
 
 // isMemberOfAny reports whether [nodeID] is a member of any subnet this node
-// tracks, with [certified] as in [membership.isSubnetMember]. It is what lets
-// network-require-validator-to-connect keep the non-validator members of a
-// private subnet.
+// tracks. It is what lets network-require-validator-to-connect keep the
+// non-validator members of a private subnet.
 //
-// The primary network is deliberately not consulted. Its validators are already
-// wanted by the ip tracker, which [network.allowConnection] checks first, so
-// including it here would only let the primary network's allowedNodes and
-// member CA decide connection admission for the whole node.
-func (m *membership) isMemberOfAny(nodeID ids.NodeID, certified certifiedSubnets) bool {
+// The primary network is deliberately not consulted: its validators are already
+// wanted by the ip tracker, which [network.AllowConnection] checks first.
+func (m *membership) isMemberOfAny(nodeID ids.NodeID) bool {
 	for subnetID := range m.trackedSubnets {
-		if m.isSubnetMember(subnetID, nodeID, certified) {
+		if m.IsSubnetMember(subnetID, nodeID) {
 			return true
 		}
 	}

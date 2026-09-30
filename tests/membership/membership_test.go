@@ -163,6 +163,7 @@ var _ = ginkgo.Describe("[Membership]", func() {
 		require.NoError(err)
 
 		tc.By("starting a node with a stock self-signed certificate")
+		droppedBefore := droppedUnallowed(tc, validators)
 		outsider := tmpnet.NewEphemeralNode(tmpnet.FlagsMap{
 			config.TrackSubnetsKey: subnetID.String(),
 		})
@@ -180,7 +181,7 @@ var _ = ginkgo.Describe("[Membership]", func() {
 		requirePeerFrameSize(tc, observer, outsider.NodeID, constants.DefaultMaxMessageSize)
 
 		tc.By("confirming the validators drop the outsider's subnet messages")
-		awaitDroppedMessages(tc, validators, outsider.NodeID)
+		awaitDroppedUnallowed(tc, validators, droppedBefore)
 
 		tc.By(fmt.Sprintf("confirming the outsider is still shut out after %s", exclusionWindow))
 		requireNeverBootstraps(tc, outsider, chainID)
@@ -433,43 +434,36 @@ func chainMessages(tc tests.TestContext, node *tmpnet.Node, chainID ids.ID) map[
 	return handled
 }
 
-// awaitDroppedMessages blocks until one of [validators] logs that it dropped a
-// message from [nodeID], which is the enforcement point itself: the chain
-// router refuses to hand a non-member's message to the subnet's handler.
-func awaitDroppedMessages(tc tests.TestContext, validators []*tmpnet.Node, nodeID ids.NodeID) {
-	const marker = "received message from non-allowed node"
+// droppedUnallowedMetric counts the enforcement point itself: the chain router
+// refusing to hand a non-member's message to a subnet's handler.
+const droppedUnallowedMetric = "avalanche_requests_dropped_unallowed"
 
+// awaitDroppedUnallowed blocks until one of [validators] has dropped a message
+// from a non-member since [before] was taken. The outsider is the only
+// non-member connected, so the increase is its traffic.
+func awaitDroppedUnallowed(tc tests.TestContext, validators []*tmpnet.Node, before map[ids.NodeID]float64) {
 	tc.Eventually(func() bool {
-		for _, validator := range validators {
-			if logContains(validator, nodeID.String(), marker) {
+		for nodeID, dropped := range droppedUnallowed(tc, validators) {
+			if dropped > before[nodeID] {
 				return true
 			}
 		}
 		return false
-	}, exclusionWindow, pollInterval, fmt.Sprintf("no validator reported dropping a message from %s", nodeID))
+	}, exclusionWindow, pollInterval, "no validator dropped a message from a non-member")
 }
 
-// logContains reports whether any line of [node]'s main log holds all of
-// [substrings]. A log that cannot be read yet simply holds nothing.
-func logContains(node *tmpnet.Node, substrings ...string) bool {
-	logBytes, err := os.ReadFile(filepath.Join(node.DataDir, "logs", "main.log"))
-	if err != nil {
-		return false
-	}
+func droppedUnallowed(tc tests.TestContext, validators []*tmpnet.Node) map[ids.NodeID]float64 {
+	dropped := make(map[ids.NodeID]float64, len(validators))
+	for _, validator := range validators {
+		families, err := metrics.NewClient(validator.GetAccessibleURI()).
+			GetMetrics(tc.ContextWithTimeout(tests.DefaultTimeout))
+		require.NoError(tc, err)
 
-	for _, line := range strings.Split(string(logBytes), "\n") {
-		matched := true
-		for _, substring := range substrings {
-			if !strings.Contains(line, substring) {
-				matched = false
-				break
-			}
-		}
-		if matched {
-			return true
+		for _, metric := range families[droppedUnallowedMetric].GetMetric() {
+			dropped[validator.NodeID] = metric.GetCounter().GetValue()
 		}
 	}
-	return false
+	return dropped
 }
 
 // fleetState is what onboarding must leave alone: the flags a node was started

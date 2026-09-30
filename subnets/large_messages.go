@@ -43,9 +43,9 @@ type LargeMessagesConfig struct {
 	// MaxMessageSize is the elevated frame and codec size, in bytes.
 	MaxMessageSize uint32 `json:"maxMessageSize" yaml:"maxMessageSize"`
 
-	// ThrottlerConfig overrides individual elevated-stack throttler limits.
+	// ThrottlerOverrides overrides individual elevated-stack throttler limits.
 	// Every field left at zero is derived from MaxMessageSize.
-	ThrottlerConfig *LargeMessageThrottlerConfig `json:"throttlerConfig" yaml:"throttlerConfig"`
+	ThrottlerOverrides *LargeMessageThrottlerConfig `json:"throttlerConfig" yaml:"throttlerConfig"`
 }
 
 // LargeMessageThrottlerConfig configures the elevated stack's message
@@ -56,19 +56,20 @@ type LargeMessageThrottlerConfig struct {
 	OutboundMsgThrottlerConfig throttling.MsgByteThrottlerConfig    `json:"outboundMsgThrottlerConfig" yaml:"outboundMsgThrottlerConfig"`
 }
 
-// Throttler returns the elevated stack's throttler configuration: the limits
-// derived from MaxMessageSize, with every non-zero override applied on top.
-func (c *LargeMessagesConfig) Throttler() LargeMessageThrottlerConfig {
+// ThrottlerConfig returns the elevated stack's throttler configuration: the
+// limits derived from MaxMessageSize, with every non-zero override applied on
+// top.
+func (c *LargeMessagesConfig) ThrottlerConfig() LargeMessageThrottlerConfig {
 	throttler := DefaultLargeMessageThrottlerConfig(uint64(c.MaxMessageSize))
-	if c.ThrottlerConfig == nil {
+	if c.ThrottlerOverrides == nil {
 		return throttler
 	}
 
 	var (
 		inbound   = &throttler.InboundMsgThrottlerConfig
 		outbound  = &throttler.OutboundMsgThrottlerConfig
-		oInbound  = c.ThrottlerConfig.InboundMsgThrottlerConfig
-		oOutbound = c.ThrottlerConfig.OutboundMsgThrottlerConfig
+		oInbound  = c.ThrottlerOverrides.InboundMsgThrottlerConfig
+		oOutbound = c.ThrottlerOverrides.OutboundMsgThrottlerConfig
 	)
 	override(&inbound.AtLargeAllocSize, oInbound.AtLargeAllocSize)
 	override(&inbound.VdrAllocSize, oInbound.VdrAllocSize)
@@ -93,21 +94,15 @@ func (c *LargeMessagesConfig) Verify() error {
 
 	var (
 		maxMessageSize = uint64(c.MaxMessageSize)
-		throttler      = c.Throttler()
+		throttler      = c.ThrottlerConfig()
 		inbound        = throttler.InboundMsgThrottlerConfig
 		outbound       = throttler.OutboundMsgThrottlerConfig
 	)
-	// A peer that cannot be granted a whole frame's worth of budget would stall
-	// on the first large message.
-	//
-	// The at-large pools are in this list because both throttlers draw from
-	// them before the validator allocation, and a member admitted by its
-	// certificate alone carries no primary network weight, so the at-large pool
-	// is the only budget it ever draws from. An at-large pool below the frame
-	// size never grants a whole frame, however much is released: inbound the
-	// peer blocks forever, outbound every large message is dropped. VdrAllocSize
-	// is deliberately absent - it is drawn second, so a small one only costs a
-	// validator its head start.
+	// A peer that cannot be granted a whole frame's worth of budget stalls on
+	// its first large message. The at-large pools are included because a
+	// certificate-only member carries no primary network weight and so draws
+	// from nothing else; VdrAllocSize is drawn second, so a small one only
+	// costs a validator its head start.
 	for _, limit := range []struct {
 		name  string
 		value uint64

@@ -89,7 +89,7 @@ the node a new ID. That costs a non-validator a restart and nothing else.
 ```json
 {
   "validatorOnly": true,
-  "memberCAPath": "/etc/settl/member-ca.pem"
+  "memberCAPath": "/etc/avalanchego/member-ca.pem"
 }
 ```
 
@@ -136,7 +136,7 @@ one that was missed during a rollout.
 ```json
 {
   "validatorOnly": true,
-  "memberCAPath": "/etc/settl/member-ca.pem",
+  "memberCAPath": "/etc/avalanchego/member-ca.pem",
   "largeMessages": {
     "maxMessageSize": 167772160
   }

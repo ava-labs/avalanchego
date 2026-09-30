@@ -108,7 +108,7 @@ func TestValidParameters(t *testing.T) {
 		{
 			name: "memberCA on public subnet",
 			s: Config{
-				MemberCAPEMs:   []string{"-----BEGIN CERTIFICATE-----"},
+				MemberCA:       []string{"-----BEGIN CERTIFICATE-----"},
 				SnowParameters: &validParameters,
 			},
 			expectedErr: ErrMemberCAWhenNotValidatorOnly,
@@ -116,11 +116,20 @@ func TestValidParameters(t *testing.T) {
 		{
 			name: "largeMessages with member CA on public subnet",
 			s: Config{
-				MemberCAPEMs:   []string{"-----BEGIN CERTIFICATE-----"},
+				MemberCA:       []string{"-----BEGIN CERTIFICATE-----"},
 				LargeMessages:  &LargeMessagesConfig{MaxMessageSize: 160 * units.MiB},
 				SnowParameters: &validParameters,
 			},
 			expectedErr: ErrLargeMessagesWhenNotValidatorOnly,
+		},
+		{
+			name: "malformed memberCA",
+			s: Config{
+				ValidatorOnly:  true,
+				MemberCA:       []string{"not a PEM block"},
+				SnowParameters: &validParameters,
+			},
+			expectedErr: ErrNoMemberCACertificates,
 		},
 		{
 			name: "largeMessages at the default size",

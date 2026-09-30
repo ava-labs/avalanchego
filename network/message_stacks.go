@@ -24,11 +24,11 @@ const largeMessageMetricsPrefix = "large_message_"
 
 var errTooManyLargeMessageSubnets = errors.New("only one tracked subnet may declare largeMessages; the node builds a single elevated message stack")
 
-// MessageStacks holds the default and, when a tracked subnet declares
+// messageStacks holds the default and, when a tracked subnet declares
 // largeMessages, the elevated per-peer P2P resource stack. Which one a
 // connection gets is decided per peer by [network.stackFor].
-type MessageStacks struct {
-	Default peer.MessageStack
+type messageStacks struct {
+	defaultStack peer.MessageStack
 
 	// elevated is only populated when a tracked subnet declares largeMessages.
 	elevated elevatedStack
@@ -48,9 +48,9 @@ type elevatedStack struct {
 // sender can build oversized payloads at all; per-peer frame enforcement at
 // write time is what keeps them from reaching an unelevated peer. Within the
 // default size both creators produce identical bytes.
-func (s *MessageStacks) MsgCreator() message.Creator {
+func (s *messageStacks) MsgCreator() message.Creator {
 	if !s.elevated.hasElevated {
-		return s.Default.MessageCreator
+		return s.defaultStack.MessageCreator
 	}
 	return s.elevated.messageStack.MessageCreator
 }
@@ -91,7 +91,7 @@ func newMessageStacks(
 	registerer prometheus.Registerer,
 	vdrs validators.Manager,
 	config *Config,
-) (*MessageStacks, error) {
+) (*messageStacks, error) {
 	defaultStack, err := newMessageStack(
 		log,
 		registerer,
@@ -105,8 +105,8 @@ func newMessageStacks(
 		return nil, fmt.Errorf("initializing default message stack: %w", err)
 	}
 
-	stacks := &MessageStacks{
-		Default: defaultStack,
+	stacks := &messageStacks{
+		defaultStack: defaultStack,
 	}
 
 	elevatedSubnetID, largeMessages, err := largeMessagesSubnet(config.SubnetConfigs)
@@ -117,7 +117,7 @@ func newMessageStacks(
 		return stacks, nil
 	}
 
-	throttler := largeMessages.Throttler()
+	throttler := largeMessages.ThrottlerConfig()
 	log.Warn(
 		"large message config enabled",
 		zap.Stringer("subnetID", elevatedSubnetID),

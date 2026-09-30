@@ -127,7 +127,7 @@ type network struct {
 	peerConfig *peer.Config
 	metrics    *metrics
 
-	messageStacks *MessageStacks
+	messageStacks *messageStacks
 
 	// membership decides which subnets a peer belongs to. It is the single
 	// predicate behind subnet admission, elevated frame size, and, with
@@ -234,7 +234,10 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing message stacks failed with: %w", err)
 	}
 
-	membership := newMembership(config.SubnetConfigs, config.TrackedSubnets, config.Validators)
+	membership, err := newMembership(config.SubnetConfigs, config.TrackedSubnets, config.Validators)
+	if err != nil {
+		return nil, fmt.Errorf("initializing membership failed with: %w", err)
+	}
 
 	peerMetrics, err := peer.NewMetrics(metricsRegisterer)
 	if err != nil {
@@ -502,25 +505,14 @@ func (n *network) Connected(nodeID ids.NodeID) {
 // provided nodeID. If the node is attempting to connect to the minimum number
 // of peers, then it should only connect if this node is a validator, or the
 // peer is a validator, a beacon, or a member of a subnet this node tracks.
-//
-// Certificate membership is read from the record of the peer's connection.
-// [network.upgrade] decides admission for a connection that is not recorded
-// yet through [network.allowConnection].
 func (n *network) AllowConnection(nodeID ids.NodeID) bool {
-	return n.allowConnection(nodeID, n.membership.certified(nodeID))
-}
-
-// allowConnection is [network.AllowConnection] with the certificate membership
-// source supplied by the caller: what [nodeID]'s chain proved, whether or not
-// that has been recorded yet.
-func (n *network) allowConnection(nodeID ids.NodeID, certified certifiedSubnets) bool {
 	if !n.config.RequireValidatorToConnect {
 		return true
 	}
 	_, areWeAPrimaryNetworkAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
 	return areWeAPrimaryNetworkAValidator ||
 		n.ipTracker.WantsConnection(nodeID) ||
-		n.membership.isMemberOfAny(nodeID, certified)
+		n.membership.isMemberOfAny(nodeID)
 }
 
 // FrameSize returns the maximum P2P frame size this node currently wants to use
@@ -544,7 +536,7 @@ func (n *network) stackFor(nodeID ids.NodeID) peer.MessageStack {
 	if elevated.hasElevated && n.membership.IsSubnetMember(elevated.subnetID, nodeID) {
 		return elevated.messageStack
 	}
-	return n.messageStacks.Default
+	return n.messageStacks.defaultStack
 }
 
 // IsSubnetMember implements [subnets.MembershipChecker] so that the chains this
@@ -1105,7 +1097,13 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 	// [network.track].
 	certified := n.membership.findCertifiedSubnets(chain)
 
-	if !n.allowConnection(nodeID, certified) {
+	// A verified chain is already tracked-subnet membership (see
+	// [membership.memberCAs]), so it admits on its own. Anything else asks the
+	// same question the Ping loop asks. That reads the record of any earlier
+	// connection from this node that is still live; if it admits a chain that
+	// no longer verifies, de-duplication below drops the connection, or it is
+	// started with an empty record and its first Ping closes it.
+	if len(certified) == 0 && !n.AllowConnection(nodeID) {
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
 			"dropping undesired connection",
@@ -1151,11 +1149,9 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 		return nil
 	}
 
-	// Record what the chain proved only now, under peersLock and after the
-	// de-duplication checks, so that the record lives exactly as long as the
-	// peer it describes: a Disconnected for an earlier connection to the same
-	// node cannot remove the record this one is started on. It selects the
-	// stack below and answers every later membership question about the peer.
+	// Recorded under peersLock and after the de-duplication checks, so that a
+	// Disconnected for an earlier connection to the same node cannot remove the
+	// record this one is started on.
 	n.membership.track(nodeID, certified)
 
 	n.peerConfig.Log.Verbo("starting handshake",

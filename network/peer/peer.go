@@ -276,6 +276,20 @@ func (p *Peer) ObservedUptime() uint32 {
 // for reference counting. This returns false if the message is guaranteed not
 // to be delivered to the peer.
 func (p *Peer) Send(ctx context.Context, msg *message.OutboundMessage) bool {
+	// The node-wide creator can build frames above this connection's limit;
+	// refusing here, rather than at write time, lets the caller account the
+	// send as failed instead of waiting for a response that never comes.
+	if uint32(len(msg.Bytes)) > p.stack.MaxFrameSize {
+		p.Log.Debug("dropping outgoing message",
+			zap.String("reason", "exceeds frame size"),
+			zap.Stringer("messageOp", msg.Op),
+			zap.Stringer("nodeID", p.id),
+			zap.Int("messageLen", len(msg.Bytes)),
+			zap.Uint32("frameSize", p.stack.MaxFrameSize),
+		)
+		p.Metrics.SendFailed(msg)
+		return false
+	}
 	return p.messageQueue.Push(ctx, msg)
 }
 
@@ -677,8 +691,11 @@ func (p *Peer) sendNetworkMessages() {
 // The frame size is never negotiated, so this is the only place a disagreement
 // about it becomes observable. It is a warning only for a peer we elevated,
 // where the likely cause is a different maxMessageSize on its side; every other
-// peer stays at Verbo, so that an arbitrary peer cannot write to the log.
+// peer stays at Verbo, so that an arbitrary peer cannot write to the log. The
+// counter covers both, since a member that has not yet synced the validator
+// set rejects a validator's frames from the default stack.
 func (p *Peer) logRejectedMsgLen(err error) {
+	p.Metrics.NumRejectedMsgLen.Inc()
 	if p.stack.MaxFrameSize <= constants.DefaultMaxMessageSize {
 		p.Log.Verbo("error parsing message length",
 			zap.Stringer("nodeID", p.id),

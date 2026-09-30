@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
@@ -750,11 +751,10 @@ func TestSendLargeMessageElevatedStack(t *testing.T) {
 	require.Equal(message.AppGossipOp, inbound.Op)
 }
 
-// TestLargeMessageDroppedByDefaultFrameSize verifies the Send path: an oversized
-// message queued on a default-frame peer is dropped at write time rather than
-// delivered, and the connection survives so a subsequent normal message
-// arrives.
-func TestLargeMessageDroppedByDefaultFrameSize(t *testing.T) {
+// TestLargeMessageRefusedByDefaultFrameSize verifies the Send path: an
+// oversized message offered to a default-frame peer is refused as a failed
+// send, and the connection survives so a subsequent normal message arrives.
+func TestLargeMessageRefusedByDefaultFrameSize(t *testing.T) {
 	require := require.New(t)
 
 	const elevatedMaxSize = 2 * constants.DefaultMaxMessageSize
@@ -764,7 +764,7 @@ func TestLargeMessageDroppedByDefaultFrameSize(t *testing.T) {
 
 	// Sender holds the large creator (as MsgCreator() would return node-wide)
 	// but its per-peer stack keeps the default frame size, mirroring a
-	// non-allowlisted peer.
+	// non-member peer.
 	largeCreator := newLargeMessageCreator(t, elevatedMaxSize)
 	rawPeer0.stack.MessageCreator = largeCreator
 	rawPeer0.stack.MaxFrameSize = constants.DefaultMaxMessageSize
@@ -779,14 +779,7 @@ func TestLargeMessageDroppedByDefaultFrameSize(t *testing.T) {
 	}()
 
 	largeMsg := largeAppGossip(t, largeCreator)
-	require.True(peer0.Send(t.Context(), largeMsg))
-
-	// Give the send goroutine time to dequeue and attempt the write.
-	select {
-	case msg := <-peer1.inboundMsgChan:
-		require.FailNowf("unexpected inbound message", "got %v", msg.Op)
-	case <-time.After(200 * time.Millisecond):
-	}
+	require.False(peer0.Send(t.Context(), largeMsg))
 
 	// Connection stays up; a normal follow-up is still delivered.
 	outboundGetMsg, err := rawPeer0.stack.MessageCreator.Get(ids.Empty, 1, time.Second, ids.Empty)
@@ -889,16 +882,20 @@ func TestLogRejectedMsgLen(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 
+			metrics, err := NewMetrics(prometheus.NewRegistry())
+			require.NoError(err)
+
 			core, logs := observer.New(zapcore.Level(logging.Verbo))
 			p := &Peer{
 				Config: &Config{
-					Log: logging.NewLogger("", logging.WrappedCore{Core: core}),
+					Log:     logging.NewLogger("", logging.WrappedCore{Core: core}),
+					Metrics: metrics,
 				},
 				id:    ids.GenerateTestNodeID(),
 				stack: MessageStack{MaxFrameSize: test.frameSize},
 			}
 
-			_, err := readMsgLen([]byte{0xff, 0xff, 0xff, 0xff}, p.stack.MaxFrameSize)
+			_, err = readMsgLen([]byte{0xff, 0xff, 0xff, 0xff}, p.stack.MaxFrameSize)
 			require.ErrorIs(err, errMaxMessageLengthExceeded)
 
 			p.logRejectedMsgLen(err)
@@ -906,6 +903,7 @@ func TestLogRejectedMsgLen(t *testing.T) {
 			entries := logs.All()
 			require.Len(entries, 1)
 			require.Equal(test.wantLevel, entries[0].Level)
+			require.Equal(float64(1), testutil.ToFloat64(metrics.NumRejectedMsgLen))
 		})
 	}
 }

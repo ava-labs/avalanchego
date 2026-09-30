@@ -56,12 +56,10 @@ func newTestPKI(t *testing.T) testPKI {
 func memberCAConfig(t *testing.T, rootPEM []byte) subnets.Config {
 	t.Helper()
 
-	config := subnets.Config{
+	return subnets.Config{
 		ValidatorOnly: true,
-		MemberCAPEMs:  []string{string(rootPEM)},
+		MemberCA:      []string{string(rootPEM)},
 	}
-	require.NoError(t, config.LoadMemberCA())
-	return config
 }
 
 // trackedSubnetsOf returns the subnets a node with [configs] tracks: every
@@ -77,10 +75,15 @@ func trackedSubnetsOf(configs map[ids.ID]subnets.Config) set.Set[ids.ID] {
 }
 
 func newTestMembership(
+	t *testing.T,
 	configs map[ids.ID]subnets.Config,
 	vdrs validators.Manager,
 ) *membership {
-	return newMembership(configs, trackedSubnetsOf(configs), vdrs)
+	t.Helper()
+
+	m, err := newMembership(configs, trackedSubnetsOf(configs), vdrs)
+	require.NoError(t, err)
+	return m
 }
 
 // isCertMember reports certificate membership alone, apart from the validator
@@ -97,7 +100,7 @@ func TestMembershipCertSubnets(t *testing.T) {
 		otherPKI      = newTestPKI(t)
 	)
 
-	m := newTestMembership(map[ids.ID]subnets.Config{
+	m := newTestMembership(t, map[ids.ID]subnets.Config{
 		constants.PrimaryNetworkID: {},
 		subnetID:                   memberCAConfig(t, pki.rootPEM),
 		otherSubnetID:              memberCAConfig(t, otherPKI.rootPEM),
@@ -114,7 +117,7 @@ func TestMembershipCertSubnets(t *testing.T) {
 func TestMembershipNoMemberCA(t *testing.T) {
 	pki := newTestPKI(t)
 
-	m := newTestMembership(map[ids.ID]subnets.Config{
+	m := newTestMembership(t, map[ids.ID]subnets.Config{
 		constants.PrimaryNetworkID: {},
 		ids.GenerateTestID():       {ValidatorOnly: true},
 	}, validators.NewManager())
@@ -131,7 +134,7 @@ func TestMembershipTracking(t *testing.T) {
 		stranger = ids.GenerateTestNodeID()
 	)
 
-	m := newTestMembership(map[ids.ID]subnets.Config{
+	m := newTestMembership(t, map[ids.ID]subnets.Config{
 		constants.PrimaryNetworkID: {},
 		subnetID:                   memberCAConfig(t, pki.rootPEM),
 	}, validators.NewManager())
@@ -162,7 +165,7 @@ func TestMembershipExpiresCertificateMember(t *testing.T) {
 		subnetID = ids.GenerateTestID()
 	)
 
-	m := newTestMembership(map[ids.ID]subnets.Config{
+	m := newTestMembership(t, map[ids.ID]subnets.Config{
 		constants.PrimaryNetworkID: {},
 		subnetID:                   memberCAConfig(t, pki.rootPEM),
 	}, validators.NewManager())
@@ -192,7 +195,7 @@ func TestMembershipIsMember(t *testing.T) {
 	vdrs := validators.NewManager()
 	require.NoError(t, vdrs.AddStaker(subnetID, validator, nil, ids.GenerateTestID(), 1))
 
-	m := newTestMembership(map[ids.ID]subnets.Config{
+	m := newTestMembership(t, map[ids.ID]subnets.Config{
 		constants.PrimaryNetworkID: {},
 		subnetID:                   subnetConfig,
 	}, vdrs)
@@ -209,7 +212,7 @@ func TestMembershipIsMember(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			require.Equal(t, test.want, m.IsSubnetMember(subnetID, test.nodeID))
-			require.Equal(t, test.want, m.isMemberOfAny(test.nodeID, m.certified(test.nodeID)))
+			require.Equal(t, test.want, m.isMemberOfAny(test.nodeID))
 		})
 	}
 
@@ -221,14 +224,13 @@ func TestMembershipIsMember(t *testing.T) {
 	primaryValidator := ids.GenerateTestNodeID()
 	require.NoError(t, vdrs.AddStaker(constants.PrimaryNetworkID, primaryValidator, nil, ids.GenerateTestID(), 1))
 	require.False(t, m.IsSubnetMember(subnetID, primaryValidator))
-	require.False(t, m.isMemberOfAny(primaryValidator, nil))
+	require.False(t, m.isMemberOfAny(primaryValidator))
 }
 
 // TestAllowConnectionKeepsMembers checks that with
 // network-require-validator-to-connect on, a non-validator member is kept while
-// a stranger is refused, on both admission paths: the connection path decides
-// from the freshly verified chain before anything is recorded, and the ping
-// path decides from the record.
+// a stranger is refused. The connection path admits on the freshly verified
+// chain alone, before anything is recorded; the ping path reads the record.
 func TestAllowConnectionKeepsMembers(t *testing.T) {
 	var (
 		pki      = newTestPKI(t)
@@ -245,10 +247,10 @@ func TestAllowConnectionKeepsMembers(t *testing.T) {
 	})
 
 	// Nothing is recorded yet, so the ping path sees a stranger while the
-	// connection path, holding the verified chain, sees a member.
+	// verified chain is what admits the connection.
 	certified := n.membership.findCertifiedSubnets(pki.chain)
+	require.NotEmpty(t, certified)
 	require.False(t, n.AllowConnection(pki.nodeID))
-	require.True(t, n.allowConnection(pki.nodeID, certified))
 
 	// Once recorded, the ping path agrees.
 	n.membership.track(pki.nodeID, certified)
@@ -256,7 +258,7 @@ func TestAllowConnectionKeepsMembers(t *testing.T) {
 	require.True(t, isCertMember(n.membership, subnetID, pki.nodeID))
 
 	// A self-signed chain proves nothing on either path.
-	require.False(t, n.allowConnection(stranger, n.membership.findCertifiedSubnets(stakingtest.SelfSignedChain(t))))
+	require.Empty(t, n.membership.findCertifiedSubnets(stakingtest.SelfSignedChain(t)))
 	require.False(t, n.AllowConnection(stranger))
 }
 
@@ -285,7 +287,7 @@ func TestAllowConnectionKeepsPrimaryNetworkValidators(t *testing.T) {
 		1,
 	))
 
-	require.False(n.membership.isMemberOfAny(primaryValidator, nil))
+	require.False(n.membership.isMemberOfAny(primaryValidator))
 	require.True(n.AllowConnection(primaryValidator))
 }
 
@@ -341,11 +343,10 @@ func TestConnectionGrantsMembership(t *testing.T) {
 
 		subnetConfig = subnets.Config{
 			ValidatorOnly: true,
-			MemberCAPEMs:  []string{string(root.CertPEM())},
+			MemberCA:      []string{string(root.CertPEM())},
 			LargeMessages: &subnets.LargeMessagesConfig{MaxMessageSize: elevatedSize},
 		}
 	)
-	require.NoError(subnetConfig.LoadMemberCA())
 
 	base := defaultConfig
 	base.RequireValidatorToConnect = true
@@ -356,7 +357,9 @@ func TestConnectionGrantsMembership(t *testing.T) {
 	}
 
 	// The validator keeps its self-signed certificate; only the non-validator
-	// needs one from the CA.
+	// needs one from the CA. The validator deliberately does not validate the
+	// primary network, which would make it keep every connection: its admission
+	// of the member must rest on the certificate alone.
 	dialer, listeners, validatorIDs, validatorConfigs := newTestNetwork(t, 1, base)
 	validatorConfig := validatorConfigs[0]
 	validatorID := validatorIDs[0]
@@ -367,7 +370,6 @@ func TestConnectionGrantsMembership(t *testing.T) {
 	memberID := memberConfig.MyNodeID
 
 	vdrs := validators.NewManager()
-	require.NoError(vdrs.AddStaker(constants.PrimaryNetworkID, validatorID, nil, ids.GenerateTestID(), 1))
 	require.NoError(vdrs.AddStaker(subnetID, validatorID, nil, ids.GenerateTestID(), 1))
 
 	connected := make(chan ids.NodeID, 2)
@@ -418,7 +420,11 @@ func TestConnectionGrantsMembership(t *testing.T) {
 	}()
 
 	for range 2 {
-		<-connected
+		select {
+		case <-connected:
+		case <-time.After(10 * time.Second):
+			require.FailNow("validator and member never connected")
+		}
 	}
 
 	// The validator verified the member's chain during the handshake.
@@ -438,12 +444,10 @@ func TestConnectionGrantsMembership(t *testing.T) {
 	require.Len(info, 1)
 	require.Equal(elevatedSize, info[0].MaxFrameSize)
 
-	// A stranger is neither a member nor elevated. Only the member can refuse
-	// it: a primary network validator keeps every connection under
-	// network-require-validator-to-connect, so a fleet that wants to refuse
-	// strangers must not validate the primary network.
+	// A stranger is neither a member nor elevated, and both sides refuse it.
 	stranger := ids.GenerateTestNodeID()
 	require.False(memberNet.AllowConnection(stranger))
+	require.False(validatorNet.AllowConnection(stranger))
 	require.Equal(uint32(constants.DefaultMaxMessageSize), memberNet.FrameSize(stranger))
 	require.Equal(uint32(constants.DefaultMaxMessageSize), validatorNet.FrameSize(stranger))
 }

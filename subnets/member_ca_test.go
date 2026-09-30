@@ -202,41 +202,47 @@ func TestConfigLoadMemberCA(t *testing.T) {
 		require.NoError(os.WriteFile(path, root.CertPEM(), 0o600))
 
 		config := Config{MemberCAPath: path}
-		require.NoError(config.LoadMemberCA())
-		require.True(verifies(config.MemberCA(), chain))
+		ca, err := config.LoadMemberCA()
+		require.NoError(err)
+		require.True(verifies(ca, chain))
 	})
 
 	t.Run("inline", func(t *testing.T) {
 		require := require.New(t)
 
-		config := Config{MemberCAPEMs: []string{string(root.CertPEM())}}
-		require.NoError(config.LoadMemberCA())
-		require.True(verifies(config.MemberCA(), chain))
+		config := Config{MemberCA: []string{string(root.CertPEM())}}
+		ca, err := config.LoadMemberCA()
+		require.NoError(err)
+		require.True(verifies(ca, chain))
 	})
 
 	t.Run("unset", func(t *testing.T) {
 		require := require.New(t)
 
 		config := Config{}
-		require.NoError(config.LoadMemberCA())
-		require.Nil(config.MemberCA())
+		ca, err := config.LoadMemberCA()
+		require.NoError(err)
+		require.Nil(ca)
 	})
 
 	t.Run("both sources set", func(t *testing.T) {
 		config := Config{
 			MemberCAPath: "member-ca.pem",
-			MemberCAPEMs: []string{string(root.CertPEM())},
+			MemberCA:     []string{string(root.CertPEM())},
 		}
-		require.ErrorIs(t, config.LoadMemberCA(), ErrTooManyMemberCASources)
+		_, err := config.LoadMemberCA()
+		require.ErrorIs(t, err, ErrTooManyMemberCASources)
 	})
 
 	t.Run("missing file", func(t *testing.T) {
 		config := Config{MemberCAPath: filepath.Join(t.TempDir(), "absent.pem")}
-		require.ErrorIs(t, config.LoadMemberCA(), os.ErrNotExist)
+		_, err := config.LoadMemberCA()
+		require.ErrorIs(t, err, os.ErrNotExist)
 	})
 
 	t.Run("malformed inline", func(t *testing.T) {
-		config := Config{MemberCAPEMs: []string{"not a PEM block"}}
-		require.ErrorIs(t, config.LoadMemberCA(), ErrNoMemberCACertificates)
+		config := Config{MemberCA: []string{"not a PEM block"}}
+		_, err := config.LoadMemberCA()
+		require.ErrorIs(t, err, ErrNoMemberCACertificates)
 	})
 }

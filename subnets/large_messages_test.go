@@ -73,14 +73,14 @@ func TestLargeMessagesThrottlerJSON(t *testing.T) {
 			VdrAllocSize:        2 * units.GiB,
 			NodeMaxAtLargeBytes: testMaxMessageSize,
 		},
-	}, config.Throttler())
+	}, config.ThrottlerConfig())
 }
 
 func TestLargeMessagesThrottlerDefaults(t *testing.T) {
 	require := require.New(t)
 
 	config := LargeMessagesConfig{MaxMessageSize: testMaxMessageSize}
-	throttler := config.Throttler()
+	throttler := config.ThrottlerConfig()
 	require.Equal(DefaultLargeMessageThrottlerConfig(testMaxMessageSize), throttler)
 
 	// Nothing may be smaller than a single frame, or a peer would stall on its
@@ -97,7 +97,7 @@ func TestLargeMessagesThrottlerOverrides(t *testing.T) {
 
 	config := LargeMessagesConfig{
 		MaxMessageSize: testMaxMessageSize,
-		ThrottlerConfig: &LargeMessageThrottlerConfig{
+		ThrottlerOverrides: &LargeMessageThrottlerConfig{
 			InboundMsgThrottlerConfig: throttling.InboundMsgThrottlerConfig{
 				MsgByteThrottlerConfig: throttling.MsgByteThrottlerConfig{
 					AtLargeAllocSize: units.GiB,
@@ -118,7 +118,7 @@ func TestLargeMessagesThrottlerOverrides(t *testing.T) {
 	}
 
 	var (
-		throttler = config.Throttler()
+		throttler = config.ThrottlerConfig()
 		inbound   = throttler.InboundMsgThrottlerConfig
 		outbound  = throttler.OutboundMsgThrottlerConfig
 		defaults  = DefaultLargeMessageThrottlerConfig(testMaxMessageSize)
@@ -157,7 +157,7 @@ func TestLargeMessagesVerify(t *testing.T) {
 		"per-node budget below one frame": {
 			config: LargeMessagesConfig{
 				MaxMessageSize: testMaxMessageSize,
-				ThrottlerConfig: &LargeMessageThrottlerConfig{
+				ThrottlerOverrides: &LargeMessageThrottlerConfig{
 					InboundMsgThrottlerConfig: throttling.InboundMsgThrottlerConfig{
 						MsgByteThrottlerConfig: throttling.MsgByteThrottlerConfig{
 							NodeMaxAtLargeBytes: testMaxMessageSize - 1,
@@ -170,7 +170,7 @@ func TestLargeMessagesVerify(t *testing.T) {
 		"outbound per-node budget below one frame": {
 			config: LargeMessagesConfig{
 				MaxMessageSize: testMaxMessageSize,
-				ThrottlerConfig: &LargeMessageThrottlerConfig{
+				ThrottlerOverrides: &LargeMessageThrottlerConfig{
 					OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
 						NodeMaxAtLargeBytes: testMaxMessageSize - 1,
 					},
@@ -183,7 +183,7 @@ func TestLargeMessagesVerify(t *testing.T) {
 			// a pool this small stalls it on its first large message.
 			config: LargeMessagesConfig{
 				MaxMessageSize: testMaxMessageSize,
-				ThrottlerConfig: &LargeMessageThrottlerConfig{
+				ThrottlerOverrides: &LargeMessageThrottlerConfig{
 					InboundMsgThrottlerConfig: throttling.InboundMsgThrottlerConfig{
 						MsgByteThrottlerConfig: throttling.MsgByteThrottlerConfig{
 							AtLargeAllocSize: testMaxMessageSize - 1,
@@ -196,7 +196,7 @@ func TestLargeMessagesVerify(t *testing.T) {
 		"outbound at-large pool below one frame": {
 			config: LargeMessagesConfig{
 				MaxMessageSize: testMaxMessageSize,
-				ThrottlerConfig: &LargeMessageThrottlerConfig{
+				ThrottlerOverrides: &LargeMessageThrottlerConfig{
 					OutboundMsgThrottlerConfig: throttling.MsgByteThrottlerConfig{
 						AtLargeAllocSize: testMaxMessageSize - 1,
 					},
@@ -209,7 +209,7 @@ func TestLargeMessagesVerify(t *testing.T) {
 			// its head start and nothing more.
 			config: LargeMessagesConfig{
 				MaxMessageSize: testMaxMessageSize,
-				ThrottlerConfig: &LargeMessageThrottlerConfig{
+				ThrottlerOverrides: &LargeMessageThrottlerConfig{
 					InboundMsgThrottlerConfig: throttling.InboundMsgThrottlerConfig{
 						MsgByteThrottlerConfig: throttling.MsgByteThrottlerConfig{
 							VdrAllocSize: testMaxMessageSize - 1,
@@ -221,7 +221,7 @@ func TestLargeMessagesVerify(t *testing.T) {
 		"recheck delay below the minimum": {
 			config: LargeMessagesConfig{
 				MaxMessageSize: testMaxMessageSize,
-				ThrottlerConfig: &LargeMessageThrottlerConfig{
+				ThrottlerOverrides: &LargeMessageThrottlerConfig{
 					InboundMsgThrottlerConfig: throttling.InboundMsgThrottlerConfig{
 						DiskThrottlerConfig: throttling.SystemThrottlerConfig{
 							MaxRecheckDelay: constants.MinInboundThrottlerMaxRecheckDelay - time.Nanosecond,

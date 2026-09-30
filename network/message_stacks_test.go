@@ -58,10 +58,13 @@ func newMembershipTestNetwork(t *testing.T, configure func(*Config)) *network {
 	)
 	require.NoError(t, err)
 
+	membership, err := newMembership(cfg.SubnetConfigs, cfg.TrackedSubnets, cfg.Validators)
+	require.NoError(t, err)
+
 	return &network{
 		config:        cfg,
 		messageStacks: stacks,
-		membership:    newMembership(cfg.SubnetConfigs, cfg.TrackedSubnets, cfg.Validators),
+		membership:    membership,
 		ipTracker:     ipTracker,
 	}
 }
@@ -109,7 +112,7 @@ func TestStackForMembership(t *testing.T) {
 		"stranger":           {nodeID: stranger, elevated: false},
 	} {
 		t.Run(name, func(t *testing.T) {
-			want := n.messageStacks.Default
+			want := n.messageStacks.defaultStack
 			if test.elevated {
 				want = n.messageStacks.elevated.messageStack
 			}
@@ -120,8 +123,8 @@ func TestStackForMembership(t *testing.T) {
 
 	// The two stacks must be distinct, otherwise an elevated peer would inherit
 	// the default frame limit.
-	require.NotEqual(t, n.messageStacks.Default.MessageCreator, n.messageStacks.elevated.messageStack.MessageCreator)
-	require.NotEqual(t, n.messageStacks.Default.MaxFrameSize, n.messageStacks.elevated.messageStack.MaxFrameSize)
+	require.NotEqual(t, n.messageStacks.defaultStack.MessageCreator, n.messageStacks.elevated.messageStack.MessageCreator)
+	require.NotEqual(t, n.messageStacks.defaultStack.MaxFrameSize, n.messageStacks.elevated.messageStack.MaxFrameSize)
 }
 
 // TestStackForReadsTrackedMembership checks that stackFor reads the certificate
@@ -135,7 +138,7 @@ func TestStackForReadsTrackedMembership(t *testing.T) {
 
 	n := newMembershipTestNetwork(t, withElevatedSubnet(subnetID, elevatedSubnetConfig()))
 
-	require.Equal(t, n.messageStacks.Default, n.stackFor(nodeID))
+	require.Equal(t, n.messageStacks.defaultStack, n.stackFor(nodeID))
 
 	n.membership.track(nodeID, certifiedSubnets{
 		subnetID: time.Now().Add(time.Hour),
@@ -147,7 +150,7 @@ func TestStackForDisabled(t *testing.T) {
 	n := newMembershipTestNetwork(t, nil)
 
 	require.False(t, n.messageStacks.elevated.hasElevated)
-	require.Equal(t, n.messageStacks.Default, n.stackFor(ids.GenerateTestNodeID()))
+	require.Equal(t, n.messageStacks.defaultStack, n.stackFor(ids.GenerateTestNodeID()))
 	require.Equal(t, uint32(constants.DefaultMaxMessageSize), n.FrameSize(ids.GenerateTestNodeID()))
 }
 
@@ -239,12 +242,12 @@ func TestMsgCreator(t *testing.T) {
 		n := newMembershipTestNetwork(t, withElevatedSubnet(ids.GenerateTestID(), elevatedSubnetConfig()))
 
 		require.Equal(t, n.messageStacks.elevated.messageStack.MessageCreator, n.MsgCreator())
-		require.NotEqual(t, n.messageStacks.Default.MessageCreator, n.MsgCreator())
+		require.NotEqual(t, n.messageStacks.defaultStack.MessageCreator, n.MsgCreator())
 	})
 
 	t.Run("no elevated stack", func(t *testing.T) {
 		n := newMembershipTestNetwork(t, nil)
 
-		require.Equal(t, n.messageStacks.Default.MessageCreator, n.MsgCreator())
+		require.Equal(t, n.messageStacks.defaultStack.MessageCreator, n.MsgCreator())
 	})
 }

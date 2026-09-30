@@ -34,7 +34,7 @@ type Config struct {
 	// AllowedNodes is the set of node IDs that are explicitly allowed to connect to this Subnet when
 	// ValidatorOnly is enabled.
 	//
-	// It marks members by node ID, complementing [MemberCAPath] / [MemberCAPEMs],
+	// It marks members by node ID, complementing [MemberCAPath] / [MemberCA],
 	// which mark them by certificate. Adding a node this way means editing every
 	// other node's config, so a CA scales better for a fleet, but both are
 	// supported and may be used side by side.
@@ -44,21 +44,17 @@ type Config struct {
 	// certificates. A peer whose staking certificate chain verifies against one
 	// of them is a member of this Subnet, whether or not it validates it.
 	//
-	// Exactly one of MemberCAPath and MemberCAPEMs may be set.
+	// Exactly one of MemberCAPath and MemberCA may be set.
 	MemberCAPath string `json:"memberCAPath" yaml:"memberCAPath"`
 
-	// MemberCAPEMs inlines the same root certificates as PEM text, for
-	// deployments that would rather not manage a second file.
-	MemberCAPEMs []string `json:"memberCA" yaml:"memberCA"`
+	// MemberCA inlines the same root certificates as PEM text, for deployments
+	// that would rather not manage a second file.
+	MemberCA []string `json:"memberCA" yaml:"memberCA"`
 
 	// LargeMessages, when set, declares that members of this Subnet exchange
 	// P2P frames larger than the default and fixes their size. The node builds
 	// a single elevated stack, so at most one tracked Subnet may set it.
 	LargeMessages *LargeMessagesConfig `json:"largeMessages" yaml:"largeMessages"`
-
-	// memberCA is the parsed form of MemberCAPath / MemberCAPEMs, populated by
-	// [Config.LoadMemberCA]. It is nil when this Subnet has no member CA.
-	memberCA *MemberCA
 
 	// Deprecated: Use either SnowParameters or SimplexParameters instead.
 	ConsensusParameters *snowball.Parameters `json:"consensusParameters" yaml:"consensusParameters"`
@@ -112,46 +108,38 @@ func (c *Config) MaxAncestorsBytes() int {
 	if c.LargeMessages == nil {
 		return constants.MaxContainersLen
 	}
-	// Four fifths of the frame: the ratio [constants.MaxContainersLen] applies
-	// to the default frame, kept so that an elevated frame fills the same way.
-	// The budget counts only the raw container bytes that GetAncestors
-	// accumulates; the remaining fifth is headroom for what wraps them on the
-	// wire - the Ancestors message envelope, a length prefix per container,
-	// and any growth from compressing bytes that are already compressed - so
-	// that a full response still fits the frame. The arithmetic is done in
-	// uint64 because 4 * MaxMessageSize overflows uint32 above 1 GiB.
+	// Same 4/5 ratio as [constants.MaxContainersLen]: the remaining fifth is
+	// headroom for the envelope, per-container length prefixes and compression
+	// growth. uint64 because 4 * MaxMessageSize overflows uint32 above 1 GiB.
 	return int(4 * uint64(c.LargeMessages.MaxMessageSize) / 5)
 }
 
-// MemberCA returns the roots that a peer's certificate chain must verify
-// against to be a member of this Subnet, or nil if it declares none.
-func (c *Config) MemberCA() *MemberCA {
-	return c.memberCA
-}
-
-// LoadMemberCA parses MemberCAPath or MemberCAPEMs into the CA returned by
-// [Config.MemberCA]. It is a no-op when neither is set.
-func (c *Config) LoadMemberCA() error {
+// LoadMemberCA parses MemberCAPath or MemberCA into the roots that a peer's
+// certificate chain must verify against to be a member of this Subnet. It
+// returns nil when the Subnet declares none.
+func (c *Config) LoadMemberCA() (*MemberCA, error) {
 	switch {
-	case c.MemberCAPath != "" && len(c.MemberCAPEMs) > 0:
-		return ErrTooManyMemberCASources
+	case c.MemberCAPath != "" && len(c.MemberCA) > 0:
+		return nil, ErrTooManyMemberCASources
 	case c.MemberCAPath != "":
 		pemBytes, err := os.ReadFile(c.MemberCAPath)
 		if err != nil {
-			return fmt.Errorf("reading memberCAPath: %w", err)
+			return nil, fmt.Errorf("reading memberCAPath: %w", err)
 		}
-		c.memberCA, err = ParseMemberCA(pemBytes)
+		ca, err := ParseMemberCA(pemBytes)
 		if err != nil {
-			return fmt.Errorf("parsing %q: %w", c.MemberCAPath, err)
+			return nil, fmt.Errorf("parsing %q: %w", c.MemberCAPath, err)
 		}
-	case len(c.MemberCAPEMs) > 0:
-		var err error
-		c.memberCA, err = ParseMemberCA([]byte(strings.Join(c.MemberCAPEMs, "\n")))
+		return ca, nil
+	case len(c.MemberCA) > 0:
+		ca, err := ParseMemberCA([]byte(strings.Join(c.MemberCA, "\n")))
 		if err != nil {
-			return fmt.Errorf("parsing memberCA: %w", err)
+			return nil, fmt.Errorf("parsing memberCA: %w", err)
 		}
+		return ca, nil
+	default:
+		return nil, nil
 	}
-	return nil
 }
 
 func (c *Config) validateValidatorOnlyOptions() error {
@@ -164,7 +152,7 @@ func (c *Config) validateValidatorOnlyOptions() error {
 	if c.LargeMessages != nil {
 		return ErrLargeMessagesWhenNotValidatorOnly
 	}
-	if c.MemberCAPath != "" || len(c.MemberCAPEMs) > 0 {
+	if c.MemberCAPath != "" || len(c.MemberCA) > 0 {
 		return ErrMemberCAWhenNotValidatorOnly
 	}
 	return nil
@@ -172,6 +160,13 @@ func (c *Config) validateValidatorOnlyOptions() error {
 
 func (c *Config) ValidParameters() error {
 	if err := c.validateValidatorOnlyOptions(); err != nil {
+		return err
+	}
+
+	// Parsed again by the network layer; doing it here turns an unreadable or
+	// malformed CA into a startup error naming the file, rather than a Subnet
+	// that silently admits nobody.
+	if _, err := c.LoadMemberCA(); err != nil {
 		return err
 	}
 
