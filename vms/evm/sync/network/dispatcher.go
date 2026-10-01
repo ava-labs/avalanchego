@@ -97,13 +97,9 @@ func (d *Dispatcher[Req, In, Resp, Out]) sendBytes(
 		out Out
 		err error
 	}
-	// Closed before parse runs, so a cancelled caller can tell a reply being
-	// parsed from one that never came.
-	arrived := make(chan struct{})
 	// Buffered so a reply landing after ctx ends never blocks the handler.
 	resultCh := make(chan result, 1)
 	onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, appErr error) error {
-		close(arrived)
 		out, err := decode[In, Resp](responseBytes, appErr, parse)
 		resultCh <- result{out: out, err: err}
 		return err
@@ -117,13 +113,7 @@ func (d *Dispatcher[Req, In, Resp, Out]) sendBytes(
 	case r := <-resultCh:
 		return r.out, r.err
 	case <-ctx.Done():
-		select {
-		case <-arrived:
-			r := <-resultCh
-			return r.out, r.err
-		default:
-			return zero, ctx.Err()
-		}
+		return zero, ctx.Err()
 	}
 }
 

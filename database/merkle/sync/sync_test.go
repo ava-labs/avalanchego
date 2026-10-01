@@ -428,7 +428,7 @@ func TestSyncerScoresProofSource(t *testing.T) {
 			}
 
 			reg := prometheus.NewRegistry()
-			tracker := p2ptest.NewTrackerWithRegistry(t, "sync", reg)
+			tracker := p2ptest.NewTrackerWithMetrics(t, "sync", reg)
 
 			syncer, err := NewSyncer(
 				&db{id: ids.Empty},

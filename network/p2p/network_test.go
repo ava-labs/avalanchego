@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -1007,16 +1008,17 @@ func TestPeers_Has(t *testing.T) {
 	require.True(peers.Has(ids.EmptyNodeID))
 }
 
-// trackedPeer is one connected peer and a TrackingClient that scores it.
-type trackedPeer struct {
+// trackedConnection is a network holding one connected peer, with a
+// TrackingClient that scores it.
+type trackedConnection struct {
 	network *Network
 	tracker *PeerTracker
 	client  *TrackingClient
 	nodeID  ids.NodeID
 }
 
-// newTrackedPeer connects one peer whose sends fail with sendErr.
-func newTrackedPeer(t *testing.T, sendErr error) trackedPeer {
+// newTrackedConnection connects one peer whose sends fail with sendErr.
+func newTrackedConnection(t *testing.T, sendErr error) trackedConnection {
 	t.Helper()
 
 	sender := &enginetest.Sender{
@@ -1036,7 +1038,7 @@ func newTrackedPeer(t *testing.T, sendErr error) trackedPeer {
 	nodeID := ids.GenerateTestNodeID()
 	tracker.Connected(nodeID, nil)
 
-	return trackedPeer{
+	return trackedConnection{
 		network: network,
 		tracker: tracker,
 		client:  network.NewTrackingClient(handlerID, tracker),
@@ -1116,7 +1118,7 @@ func TestTrackingClientScoresRequests(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			ctx := t.Context()
 
-			peer := newTrackedPeer(t, test.sendErr)
+			conn := newTrackedConnection(t, test.sendErr)
 
 			requestCtx := ctx
 			if test.preCancel {
@@ -1125,9 +1127,9 @@ func TestTrackingClientScoresRequests(t *testing.T) {
 				cancel()
 			}
 
-			err := peer.client.AppRequest(
+			err := conn.client.AppRequest(
 				requestCtx,
-				set.Of(peer.nodeID),
+				set.Of(conn.nodeID),
 				[]byte("request"),
 				func(context.Context, ids.NodeID, []byte, error) error {
 					return test.callbackErr
@@ -1141,13 +1143,13 @@ func TestTrackingClientScoresRequests(t *testing.T) {
 				require.ErrorIs(t, err, test.sendErr)
 			case test.appErr != nil:
 				require.NoError(t, err)
-				require.NoError(t, peer.network.AppRequestFailed(ctx, peer.nodeID, 1, test.appErr))
+				require.NoError(t, conn.network.AppRequestFailed(ctx, conn.nodeID, 1, test.appErr))
 			default:
 				require.NoError(t, err)
-				require.NoError(t, peer.network.AppResponse(ctx, peer.nodeID, 1, test.response))
+				require.NoError(t, conn.network.AppResponse(ctx, conn.nodeID, 1, test.response))
 			}
 
-			tracked, responsive, inHeap := trackerState(peer.tracker, peer.nodeID)
+			tracked, responsive, inHeap := trackerState(conn.tracker, conn.nodeID)
 			require.Equal(t, test.wantTracked, tracked)
 			require.Equal(t, test.wantResponsive, responsive)
 			require.Equal(t, test.wantInHeap, inHeap)
@@ -1162,25 +1164,27 @@ func TestTrackingClientScoresBandwidthBeforeVerification(t *testing.T) {
 	// magnitude, so the assertion below needs no timing tolerance.
 	const verification = 50 * time.Millisecond
 
-	ctx := t.Context()
-	peer := newTrackedPeer(t, nil)
-	response := []byte("response")
+	synctest.Test(t, func(t *testing.T) {
+		ctx := t.Context()
+		conn := newTrackedConnection(t, nil)
+		response := []byte("response")
 
-	require.NoError(t, peer.client.AppRequest(
-		ctx,
-		set.Of(peer.nodeID),
-		[]byte("request"),
-		func(context.Context, ids.NodeID, []byte, error) error {
-			time.Sleep(verification)
-			return nil
-		},
-	))
-	require.NoError(t, peer.network.AppResponse(ctx, peer.nodeID, 1, response))
+		require.NoError(t, conn.client.AppRequest(
+			ctx,
+			set.Of(conn.nodeID),
+			[]byte("request"),
+			func(context.Context, ids.NodeID, []byte, error) error {
+				time.Sleep(verification)
+				return nil
+			},
+		))
+		require.NoError(t, conn.network.AppResponse(ctx, conn.nodeID, 1, response))
 
-	// Charging the verification caps bandwidth at len(response)/verification,
-	// so anything near that ceiling means the measurement started too early.
-	ceiling := float64(len(response)) / verification.Seconds()
-	require.Greater(t, peerBandwidth(peer.tracker, peer.nodeID), 10*ceiling)
+		// Fake time does not advance before the callback, so a measurement
+		// taken first divides by bandwidthEpsilon alone.
+		want := float64(len(response)) / bandwidthEpsilon
+		require.Equal(t, want, peerBandwidth(conn.tracker, conn.nodeID))
+	})
 }
 
 func TestTrackingClientScoresEachPeer(t *testing.T) {

@@ -238,7 +238,7 @@ const trackerNamespace = "test_peer_tracker"
 func newTestTracker(t *testing.T, peers ...ids.NodeID) (*prometheus.Registry, *p2p.PeerTracker) {
 	t.Helper()
 	reg := prometheus.NewRegistry()
-	tracker := p2ptest.NewTrackerWithRegistry(t, trackerNamespace, reg)
+	tracker := p2ptest.NewTrackerWithMetrics(t, trackerNamespace, reg)
 	for _, nodeID := range peers {
 		tracker.Connected(nodeID, &version.Application{Major: 99})
 	}

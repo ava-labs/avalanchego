@@ -15,9 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 )
 
-// NewTrackerWithRegistry returns an empty [p2p.PeerTracker] publishing under
+// NewTrackerWithMetrics returns an empty [p2p.PeerTracker] publishing under
 // namespace to registerer. Read its gauges back with [TrackerGauge].
-func NewTrackerWithRegistry(t *testing.T, namespace string, registerer prometheus.Registerer) *p2p.PeerTracker {
+func NewTrackerWithMetrics(t *testing.T, namespace string, registerer prometheus.Registerer) *p2p.PeerTracker {
 	t.Helper()
 
 	tracker, err := p2p.NewPeerTracker(loggingtest.New(t, logging.Debug), namespace, registerer, nil, nil)
@@ -30,7 +30,7 @@ func NewTrackerWithRegistry(t *testing.T, namespace string, registerer prometheu
 func NewTracker(t *testing.T) *p2p.PeerTracker {
 	t.Helper()
 
-	return NewTrackerWithRegistry(t, "", prometheus.NewRegistry())
+	return NewTrackerWithMetrics(t, "", prometheus.NewRegistry())
 }
 
 // TrackerGauge returns the value a [p2p.PeerTracker] published for one of its
