@@ -400,6 +400,11 @@ jobs:
         shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
+      # Bazel is required by lint-all-ci since it runs check-go-mod-tidy, which
+      # invokes `bazelisk mod tidy`. Since preparation of Bazel dependencies may
+      # involve downloading Go modules, it needs to happen before install-nix disables
+      # GOPROXY.
+      - uses: ./.github/actions/setup-bazel
       - uses: ./.github/actions/install-nix
       - name: Runs all lint checks
         run: ./scripts/run_task.sh lint-all-ci

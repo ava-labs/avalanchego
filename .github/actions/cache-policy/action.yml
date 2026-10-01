@@ -25,7 +25,11 @@ runs:
         REQUEST_CACHE_SAVE: ${{ inputs.request-cache-save }}
       run: |
         cache_save_allowed=false
-        if [[ "$REQUEST_CACHE_SAVE" == 'true' ]] && [[ "$GITHUB_REF" == 'refs/heads/master' ]]; then
+        # Temporary: allow PR 6065 to test cache saves. Remove before merging.
+        if [[ "$REQUEST_CACHE_SAVE" == 'true' ]] && {
+          [[ "$GITHUB_REF" == 'refs/heads/master' ]] ||
+          { [[ "$GITHUB_EVENT_NAME" == 'pull_request' ]] && [[ "$GITHUB_REF" == 'refs/pull/6065/merge' ]]; }
+        }; then
           cache_save_allowed=true
         fi
         echo "cache-save-allowed=$cache_save_allowed" >> "$GITHUB_OUTPUT"
