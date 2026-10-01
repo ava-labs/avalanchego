@@ -21,18 +21,22 @@ import (
 // RetryOption overrides a retry setting on [NewDispatcher].
 type RetryOption = options.Option[retryPolicy]
 
+// WithPeerFailureBackoff sets the flat wait after a peer or verify failure.
 func WithPeerFailureBackoff(d time.Duration) RetryOption {
 	return options.Func[retryPolicy](func(p *retryPolicy) { p.peerFailureBackoff = d })
 }
 
+// WithNoPeersInitialBackoff sets the first wait when no peer is available.
 func WithNoPeersInitialBackoff(d time.Duration) RetryOption {
 	return options.Func[retryPolicy](func(p *retryPolicy) { p.noPeersInitialBackoff = d })
 }
 
+// WithNoPeersMaxBackoff caps the exponential no-peers wait.
 func WithNoPeersMaxBackoff(d time.Duration) RetryOption {
 	return options.Func[retryPolicy](func(p *retryPolicy) { p.noPeersMaxBackoff = d })
 }
 
+// WithNoPeersFactor sets the exponential growth factor for the no-peers wait.
 func WithNoPeersFactor(f float64) RetryOption {
 	return options.Func[retryPolicy](func(p *retryPolicy) { p.noPeersFactor = f })
 }
