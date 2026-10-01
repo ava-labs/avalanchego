@@ -65,48 +65,47 @@ func TestSend_RetriesThenSucceeds(t *testing.T) {
 	require.NoError(t, err)
 
 	tests := []struct {
-		name       string
-		responses  []scriptResponse
-		failVerify bool
+		name            string
+		firstFail       scriptResponse
+		wantVerifyCalls int
 	}{
 		{
-			name:      "handler_error",
-			responses: []scriptResponse{{appErr: &common.AppError{Code: 1, Message: "boom"}}, {bytes: wantBytes}},
+			name:            "handler_error",
+			firstFail:       scriptResponse{appErr: &common.AppError{Code: 1, Message: "boom"}},
+			wantVerifyCalls: 1,
 		},
 		{
-			name:      "unmarshal_error",
-			responses: []scriptResponse{{bytes: []byte{0xff, 0xff}}, {bytes: wantBytes}},
+			name:            "unmarshal_error",
+			firstFail:       scriptResponse{bytes: []byte{0xff, 0xff}},
+			wantVerifyCalls: 1,
 		},
 		{
-			name:       "verify_failure",
-			responses:  []scriptResponse{{bytes: wantBytes}, {bytes: wantBytes}},
-			failVerify: true,
+			name:            "verify_failure",
+			firstFail:       scriptResponse{bytes: wantBytes},
+			wantVerifyCalls: 2,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			handler, calls := scriptedHandler(tt.responses...)
+			handler, _ := scriptedHandler(tt.firstFail, scriptResponse{bytes: wantBytes})
 			_, tracker := newTestTracker(t, nodeID)
 			c := newRetryDispatcher(t, ctx, nodeID, handler, tracker)
 
-			verify := acceptLeaf
-			if tt.failVerify {
-				rejected := false
-				verify = func(resp *syncpb.GetLeafResponse, _ ids.NodeID) (*syncpb.GetLeafResponse, error) {
-					if !rejected {
-						rejected = true
-						return nil, errors.New("invalid")
-					}
-					return resp, nil
+			verifyCalls := 0
+			verify := func(resp *syncpb.GetLeafResponse, _ ids.NodeID) (*syncpb.GetLeafResponse, error) {
+				verifyCalls++
+				if verifyCalls < tt.wantVerifyCalls {
+					return nil, errors.New("invalid")
 				}
+				return resp, nil
 			}
 
 			got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, verify)
 			require.NoError(t, err)
 			require.Empty(t, cmp.Diff(want, got, protocmp.Transform()))
 			require.Len(t, got.GetKeys(), 1) // fresh response per attempt, no merge
-			require.Equal(t, int32(2), calls.Load())
+			require.Equal(t, tt.wantVerifyCalls, verifyCalls)
 		})
 	}
 }
