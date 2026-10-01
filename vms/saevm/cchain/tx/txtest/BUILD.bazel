@@ -19,6 +19,7 @@ go_library(
     deps = [
         "//codec",
         "//graft/coreth/plugin/evm/atomic",
+        "//graft/coreth/plugin/evm/atomic/vm",
         "//ids",
         "//utils/crypto/keychain",
         "//utils/crypto/secp256k1",

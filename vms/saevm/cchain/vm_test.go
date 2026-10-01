@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -74,7 +75,6 @@ import (
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
-	cchainextras "github.com/ava-labs/avalanchego/vms/saevm/cchain/extras"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethereum "github.com/ava-labs/libevm"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -82,7 +82,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	cchainextras.RegisterLibEVM()
+	evm.RegisterAllLibEVMExtras()
 	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
 

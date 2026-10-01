@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
@@ -39,12 +40,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	cchainextras "github.com/ava-labs/avalanchego/vms/saevm/cchain/extras"
 )
 
 func TestMain(m *testing.M) {
-	cchainextras.RegisterLibEVM()
+	evm.RegisterAllLibEVMExtras()
 	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
 }
 

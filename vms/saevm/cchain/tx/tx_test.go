@@ -20,9 +20,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	// Imported for [vm.VerifierBackend] comment resolution.
+	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
+
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras/extrastest"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -34,7 +38,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/extras"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -47,7 +50,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	extras.RegisterLibEVM()
+	evm.RegisterAllLibEVMExtras()
 	os.Exit(m.Run())
 }
 
@@ -1717,8 +1720,8 @@ func oldSanityCheck(tx *atomic.Tx, ctx *snow.Context) error {
 	if err := tx.UnsignedAtomicTx.Verify(ctx, rules); err != nil {
 		return err
 	}
-	// Coreth's semantic verification isn't called here because it additionally
-	// performs signature verification.
+	// We can't call [vm.VerifierBackend.SemanticVerify] here because that
+	// additionally performs signature verification.
 	fc := avax.NewFlowChecker()
 	switch tx := tx.UnsignedAtomicTx.(type) {
 	case *atomic.UnsignedImportTx:

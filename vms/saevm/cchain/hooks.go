@@ -99,7 +99,7 @@ func newHooks(
 }
 
 func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], error) {
-	rawTxs, err := tx.FromBlock(h.chainConfig, b)
+	rawTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))
 	if err != nil {
 		return nil, fmt.Errorf("parsing txs: %w", err)
 	}
@@ -447,7 +447,7 @@ func (b *builder) PotentialEndOfBlockOps(
 		// between the block we are building and the last executed block. Since
 		// we know the settled block has been executed, we use that as our
 		// reference point.
-		inputs, err := ancestorInputIDs(b.chainConfig, building, settledHash, source)
+		inputs, err := ancestorInputIDs(building, settledHash, source)
 		if err != nil {
 			b.ctx.Log.Error("failed to get ancestor input IDs",
 				zap.Error(err),
@@ -498,7 +498,7 @@ var errMissingBlock = errors.New("missing block")
 
 // ancestorInputIDs returns the set of input IDs of all cross-chain transactions
 // in the block range (h, settled), both exclusive.
-func ancestorInputIDs(c *params.ChainConfig, h *types.Header, settled common.Hash, source saetypes.BlockSource) (set.Set[ids.ID], error) {
+func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.BlockSource) (set.Set[ids.ID], error) {
 	var s set.Set[ids.ID]
 	for h.ParentHash != settled {
 		parentNumber := h.Number.Uint64() - 1
@@ -507,7 +507,7 @@ func ancestorInputIDs(c *params.ChainConfig, h *types.Header, settled common.Has
 			return nil, fmt.Errorf("%w: %s (%d)", errMissingBlock, h.ParentHash, parentNumber)
 		}
 
-		txs, err := tx.FromBlock(c, p)
+		txs, err := tx.ParseSlice(customtypes.BlockExtData(p))
 		if err != nil {
 			return nil, fmt.Errorf("parsing txs: %s (%d): %w", h.ParentHash, parentNumber, err)
 		}
