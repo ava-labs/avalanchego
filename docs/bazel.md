@@ -585,13 +585,12 @@ This is especially useful for pull requests tested against a moving base
 branch, where the metadata included in the PR may be stale relative to
 the current merge target.
 
-In GitHub Actions, the Bazel jobs use the local `./.github/actions/setup-bazel`
-composite action. It applies the shared runner disk guard described in
-[CI disk space](./ci-disk-space.md) before Bazel cache restore and setup work. The
-Bazel-specific action then restores the pinned Task binary with the shared
-`setup-task` action and prepares cache state for the dependencies those jobs are
-expected to need. Local developer use still defaults to the Go-based Task bootstrap
-when Task is not already on `PATH`.
+In GitHub Actions, Bazel jobs use the local `./.github/actions/setup-bazel`
+composite action. The `lint-avalanchego` job also uses this action before it runs
+`bazelisk mod tidy`. The action applies the shared runner disk guard described in
+[CI disk space](./ci-disk-space.md) before it restores and prepares the cache. It
+then restores the pinned Task binary with `setup-task`. Local developer use still
+uses the Go-based Task bootstrap when Task is not on `PATH`.
 
 See [Bazel CI External Dependency
 Caching](#bazel-ci-external-dependency-caching) for the motivation,
@@ -732,16 +731,28 @@ configuration are outside this repository's scope.
 
 ### What is cached
 
-The Bazel CI cache setup configures three kinds of cached data:
+The Bazel CI cache setup configures four types of cached data:
 
 - Bazel `repository_cache`
 - shared Gazelle `GOMODCACHE`
+- the Bazel binary in a versioned `~/.cache/bazelisk` subdirectory
 - Bazel remote action and test-result data
 
-GitHub Actions restores the repository cache and `GOMODCACHE` on each runner.  These
-caches contain downloaded external dependencies. On `master`, the setup job prepares
-and saves a cache entry for later jobs on the same platform.  On other refs, later
-Bazel-consuming jobs prepare their own non-exact restores but do not save them.
+GitHub Actions restores the repository cache, `GOMODCACHE`, and the Bazelisk
+cache directory on each runner. The first two caches contain downloaded external
+dependencies. `setup-bazel` sets `BAZELISK_HOME` to a subdirectory named after
+`.bazelversion`. That subdirectory contains the selected Bazel release. Before it
+saves a cache entry, the action removes the other Bazelisk version subdirectories.
+This prevents old Bazel releases from accumulating in new cache entries. On
+`master`, the setup job prepares and saves a cache entry for later jobs on the same
+platform. On other refs, later Bazel-consuming jobs prepare their own non-exact
+restores but do not save them.
+
+The `lint-avalanchego` job restores this cache before it runs `bazelisk mod tidy`.
+This prevents the command from downloading Bazel or cached external tools when the
+cache contains them. The job cannot depend on the Bazel workflow setup job because
+`needs` does not cross workflows. The Bazel workflow keeps the only cache-writing
+setup job.
 
 The shared `GOMODCACHE` is required because Gazelle `go_repository` otherwise
 keeps Go module downloads in each Bazel work area. Thus, a later job can use the
@@ -768,7 +779,8 @@ patterns. The key must include every input that Gazelle reads through `go_deps`.
 
 That split is intentional:
 - `runner.os` and `runner.arch` separate caches by platform
-- `.bazelversion` invalidates the cache when the Bazel version changes
+- `.bazelversion` invalidates the cache when the Bazel version changes, so
+  Bazelisk downloads the selected Bazel release again
 - `MODULE.bazel` and `MODULE.bazel.lock` invalidate the cache when Bazel module
   resolution or module-extension configuration changes
 - `go.work`, `go.work.sum`, and the `go.mod` and `go.sum` files for each
@@ -777,9 +789,9 @@ That split is intentional:
   input to `go_deps`.
 - `scripts/bazel_ci_dependency_list.sh` invalidates the cache when the
   checked-in Bazel CI target patterns used by setup change
-- the broader same-platform restore key still gives a useful warm start
-  because these caches store downloaded dependency data, not per-run
-  build outputs
+- the broader same-platform restore key still gives a useful warm start for
+  unchanged external dependencies and tools, such as Buildozer
+- the GitHub Actions cache does not store Bazel build outputs
 
 The remote cache does not use the GitHub Actions cache key. Bazel computes its
 remote keys from action inputs and build configuration. Platform and race

@@ -198,9 +198,11 @@ if [[ -e "${workdir}/go-args" ]]; then
 fi
 
 # CI fails clearly when neither PATH nor the setup-task cache provides Task.
+# Use an empty runner cache even if the calling job already restored Task.
 reset_observations
 status=0
-if CI=true PATH="${stub_dir}:${util_dir}" "${bash_bin}" "${launcher}" hello world >"${workdir}/stdout" 2>"${workdir}/stderr"; then
+if CI=true RUNNER_TEMP="${workdir}/empty-runner-temp" RUNNER_OS=Linux RUNNER_ARCH=X64 \
+  PATH="${stub_dir}:${util_dir}" "${bash_bin}" "${launcher}" hello world >"${workdir}/stdout" 2>"${workdir}/stderr"; then
   echo "expected CI task fallback to fail" >&2
   exit 1
 else
