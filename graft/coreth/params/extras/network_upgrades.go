@@ -58,8 +58,11 @@ type NetworkUpgrades struct {
 	FortunaTimestamp *uint64 `json:"fortunaTimestamp,omitempty"`
 	// Granite adds a millisecond timestamp, precompile updates, and P-Chain epochs
 	GraniteTimestamp *uint64 `json:"graniteTimestamp,omitempty"`
-	// Helicon is a placeholder for the next upgrade
+	// Helicon activates async execution (ACP-194) and the dynamic minimum gas
+	// price (ACP-283).
 	HeliconTimestamp *uint64 `json:"heliconTimestamp,omitempty"`
+	// Igloo is our next upcoming upgarde.
+	IglooTimestamp *uint64 `json:"iglooTimestamp,omitempty"`
 }
 
 func (n *NetworkUpgrades) Equal(other *NetworkUpgrades) bool {
@@ -226,6 +229,12 @@ func (n *NetworkUpgrades) IsHelicon(time uint64) bool {
 	return isTimestampForked(n.HeliconTimestamp, time)
 }
 
+// IsIgloo returns whether [time] represents a block
+// with a timestamp after the Igloo upgrade time.
+func (n *NetworkUpgrades) IsIgloo(time uint64) bool {
+	return isTimestampForked(n.IglooTimestamp, time)
+}
+
 func (n NetworkUpgrades) Description() string {
 	var banner string
 	banner += fmt.Sprintf(" - Apricot Phase 1 Timestamp:        @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.3.0)\n", ptrToString(n.ApricotPhase1BlockTimestamp))
@@ -276,6 +285,7 @@ type AvalancheRules struct {
 	IsFortuna                                                                           bool
 	IsGranite                                                                           bool
 	IsHelicon                                                                           bool
+	IsIgloo                                                                             bool
 }
 
 // IsGraniteActivated is used by the warp precompile to determine which gas costs to use.
@@ -306,6 +316,7 @@ func (n *NetworkUpgrades) GetAvalancheRules(timestamp uint64) AvalancheRules {
 		IsFortuna:           n.IsFortuna(timestamp),
 		IsGranite:           n.IsGranite(timestamp),
 		IsHelicon:           n.IsHelicon(timestamp),
+		IsIgloo:             n.IsIgloo(timestamp),
 	}
 }
 

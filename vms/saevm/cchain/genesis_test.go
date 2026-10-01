@@ -53,6 +53,7 @@ func TestParseGenesis(t *testing.T) {
 		localCtx   = &snow.Context{NetworkUpgrades: upgrade.Default}
 
 		initiallyActive = evmutils.TimeToNewUint64(upgrade.InitiallyActiveTime)
+		unscheduled     = evmutils.TimeToNewUint64(upgrade.UnscheduledActivationTime)
 	)
 	tests := []struct {
 		name    string
@@ -102,6 +103,7 @@ func TestParseGenesis(t *testing.T) {
 							FortunaTimestamp:                new(uint64(1744124400)),
 							GraniteTimestamp:                new(uint64(1763568000)),
 							HeliconTimestamp:                new(uint64(1790089200)),
+							IglooTimestamp:                  unscheduled,
 						},
 						AvalancheContext: extras.AvalancheContext{
 							SnowCtx: mainnetCtx,
@@ -169,6 +171,7 @@ func TestParseGenesis(t *testing.T) {
 							FortunaTimestamp:                new(uint64(1741878000)),
 							GraniteTimestamp:                new(uint64(1761750000)),
 							HeliconTimestamp:                new(uint64(1785250800)),
+							IglooTimestamp:                  unscheduled,
 						},
 						AvalancheContext: extras.AvalancheContext{
 							SnowCtx: fujiCtx,
@@ -236,6 +239,7 @@ func TestParseGenesis(t *testing.T) {
 							FortunaTimestamp:                initiallyActive,
 							GraniteTimestamp:                initiallyActive,
 							HeliconTimestamp:                initiallyActive,
+							IglooTimestamp:                  unscheduled,
 						},
 						AvalancheContext: extras.AvalancheContext{
 							SnowCtx: localCtx,

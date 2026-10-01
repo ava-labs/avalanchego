@@ -45,6 +45,13 @@ This checklist ists all the required steps when when adding a new network upgrad
 ### [`vms/saevm/cchain/genesis_test.go`](../vms/saevm/cchain/genesis_test.go)
 
 - [ ] Add the fork's genesis hash to `hashes` (reuse the previous fork's hash if the genesis doesn't change)
+- [ ] Add the fork's timestamp to each network's `want` in `TestParseGenesis`
+
+## 3. C-Chain Configuration
+
+### [`vms/saevm/cchain/genesis.go`](../vms/saevm/cchain/genesis.go)
+
+- [ ] Add the fork's timestamp to the `extras.NetworkUpgrades` built in `parseGenesis()`
 
 ---
 
