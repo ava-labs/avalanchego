@@ -55,7 +55,6 @@ func TestGasUsedHeader(t *testing.T) {
 		To:   &echoReverter,
 		Data: new(hexutil.Bytes{42}),
 	}
-	// Gas values match those asserted by [TestCallDetailed].
 	const (
 		balanceOfGas = "23675"
 		revertGas    = "21035"
