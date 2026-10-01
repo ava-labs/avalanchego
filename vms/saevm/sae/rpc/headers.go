@@ -15,6 +15,12 @@ import (
 // is omitted if no eth_call executed.
 const GasUsedHeader = "Gas-Used"
 
+// ErrorCodesHeader is the HTTP response header listing each JSON-RPC error
+// code in the response with the number of times it occurred, as an RFC 8941
+// list sorted by code, e.g. `-32002;count=1, 3;count=2`. It is omitted if no
+// response has an error.
+const ErrorCodesHeader = "Rpc-Errors"
+
 type responseHeadersKey struct{}
 
 // responseHeaders accumulates per-request values that are reported as response
@@ -46,9 +52,10 @@ func addGas(ctx context.Context, gas uint64) {
 	rh.hasGas = true
 }
 
-// seal stops further updates and sets the accumulated headers on h. Only the
-// first call has any effect.
-func (rh *responseHeaders) seal(h http.Header) {
+// seal stops further updates and sets the accumulated headers on h. Error
+// codes are read from body, which MUST be either empty or the entire response
+// body. Only the first call has any effect.
+func (rh *responseHeaders) seal(h http.Header, body []byte) {
 	rh.mu.Lock()
 	defer rh.mu.Unlock()
 	if rh.sealed {
@@ -57,6 +64,9 @@ func (rh *responseHeaders) seal(h http.Header) {
 	rh.sealed = true
 	if rh.hasGas {
 		h.Set(GasUsedHeader, strconv.FormatUint(rh.gas, 10))
+	}
+	if v := formatErrorCodesHeader(parseErrorCodes(body)); v != "" {
+		h.Set(ErrorCodesHeader, v)
 	}
 }
 
@@ -70,7 +80,7 @@ func withResponseHeaders(next http.Handler) http.Handler {
 		// JSON-RPC "notifications" run without writing a response, so the
 		// headers are still unsent. The libevm RPC server waits for all calls
 		// before returning, so no more updates can arrive.
-		rh.seal(w.Header())
+		rh.seal(w.Header(), nil)
 	})
 }
 
@@ -80,19 +90,20 @@ var (
 )
 
 // headerWriter sets the headers in [responseHeaders] immediately before the
-// response header is written.
+// response header is written. The libevm RPC server writes each response,
+// batches included, in a single call to Write.
 type headerWriter struct {
 	http.ResponseWriter
 	headers *responseHeaders
 }
 
 func (w *headerWriter) WriteHeader(code int) {
-	w.headers.seal(w.Header())
+	w.headers.seal(w.Header(), nil)
 	w.ResponseWriter.WriteHeader(code)
 }
 
 func (w *headerWriter) Write(b []byte) (int, error) {
-	w.headers.seal(w.Header())
+	w.headers.seal(w.Header(), b)
 	return w.ResponseWriter.Write(b)
 }
 
