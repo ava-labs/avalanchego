@@ -290,55 +290,69 @@ func TestStateSyncDisabled(t *testing.T) {
 }
 
 // TestStateSyncDBFailure checks that a database failure is surfaced to the
-// engine.
+// engine. Only the database fails, so this doesn't cover Firewood writes; see
+// [TestStateSyncFirewoodInterrupted].
 func TestStateSyncDBFailure(t *testing.T) {
-	const commitInterval = 4
-
-	key := txtest.NewKey(t)
-	ethW := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
-	timeOpt, _ := withVMTime(testStartTime)
-	sharedOpts := []sutOption{
-		timeOpt,
-		withMaxAllocFor(key.EthAddress(), ethW.Addresses()[0]),
-		withCommitInterval(commitInterval),
+	tests := []struct {
+		name string
+		opts []sutOption
+	}{
+		{name: "hashdb"},
+		{name: "firewood", opts: []sutOption{withFirewood()}},
 	}
-	srcCtx, src := newSUT(t, sharedOpts...)
-	w := newWallet(key, src.ctx, src.Client)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			const commitInterval = 4
 
-	src.produceBlocks(srcCtx, t, w, ethW, commitInterval+1)
+			key := txtest.NewKey(t)
+			ethW := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
+			timeOpt, _ := withVMTime(testStartTime)
+			sharedOpts := slices.Concat(tt.opts, []sutOption{
+				timeOpt,
+				withMaxAllocFor(key.EthAddress(), ethW.Addresses()[0]),
+				withCommitInterval(commitInterval),
+			})
+			srcCtx, src := newSUT(t, sharedOpts...)
+			w := newWallet(key, src.ctx, src.Client)
 
-	for numOps := 0; ; numOps++ {
-		flaky := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
-		ctx, dst := newSUT(t, append(slices.Clone(sharedOpts), withState(snow.StateSyncing), withDB(flaky))...)
-		saetest.ConnectTo(t, dst, src)
+			src.produceBlocks(srcCtx, t, w, ethW, commitInterval+1)
 
-		flaky.SetFailAfter(numOps)
+			for numOps := 0; ; numOps++ {
+				flaky := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
+				dir := t.TempDir()
+				dstOpts := slices.Concat(sharedOpts, []sutOption{withState(snow.StateSyncing), withDB(flaky), withChainDataDir(dir)})
+				ctx, dst := newSUT(t, dstOpts...)
+				saetest.ConnectTo(t, dst, src)
 
-		dst.startStateSyncFrom(ctx, t, src)
-		msg, err := dst.WaitForEvent(ctx)
-		require.NoErrorf(t, err, "%T.WaitForEvent()", dst.VM)
-		require.Equalf(t, snowcommon.StateSyncDone, msg, "%T.WaitForEvent()", dst.VM)
+				flaky.SetFailAfter(numOps)
 
-		var wantErr error
-		if flaky.Failed() {
-			wantErr = saetest.ErrInjected
-		}
-		// We MUST restore the db to allow a graceful transition, we're not testing DB failures there.
-		flaky.SetFailAfter(math.MaxInt)
+				dst.startStateSyncFrom(ctx, t, src)
+				msg, err := dst.WaitForEvent(ctx)
+				require.NoErrorf(t, err, "%T.WaitForEvent()", dst.VM)
+				require.Equalf(t, snowcommon.StateSyncDone, msg, "%T.WaitForEvent()", dst.VM)
 
-		err = dst.SetState(ctx, snow.Bootstrapping)
-		require.ErrorIsf(t, err, wantErr, "%T.SetState(%s)", dst.VM, snow.Bootstrapping)
-		if wantErr == nil {
-			return
-		}
+				var wantErr error
+				if flaky.Failed() {
+					wantErr = saetest.ErrInjected
+				}
+				// We MUST restore the db to allow a graceful transition, we're not testing DB failures there.
+				flaky.SetFailAfter(math.MaxInt)
 
-		t.Run("second_try", func(t *testing.T) {
-			ctx, dst := newSUT(t, append(slices.Clone(sharedOpts), withState(snow.StateSyncing), withDB(flaky))...)
-			saetest.ConnectTo(t, dst, src)
-			summaryHeight := dst.startStateSyncFrom(ctx, t, src)
-			dst.awaitStateSync(ctx, t)
-			dst.bootstrapFrom(ctx, t, src, summaryHeight)
-			dst.assertChainsMatch(ctx, t, src)
+				err = dst.SetState(ctx, snow.Bootstrapping)
+				require.ErrorIsf(t, err, wantErr, "%T.SetState(%s)", dst.VM, snow.Bootstrapping)
+				if wantErr == nil {
+					return
+				}
+
+				t.Run("second_try", func(t *testing.T) {
+					ctx, dst := newSUT(t, dstOpts...)
+					saetest.ConnectTo(t, dst, src)
+					summaryHeight := dst.startStateSyncFrom(ctx, t, src)
+					dst.awaitStateSync(ctx, t)
+					dst.bootstrapFrom(ctx, t, src, summaryHeight)
+					dst.assertChainsMatch(ctx, t, src)
+				})
+			}
 		})
 	}
 }

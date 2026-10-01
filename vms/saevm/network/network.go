@@ -63,6 +63,7 @@ var syncHandlerIDs = map[string]uint64{
 	"code":        p2p.EVMCodeRequestHandlerID,
 	"block":       p2p.EVMBlockRequestHandlerID,
 	"cchain_leaf": p2p.EVMAtomicLeafRequestHandlerID,
+	"firewood":    p2p.FirewoodProofHandlerID,
 }
 
 // SyncClient returns a client for the sync protocol served under handlerID,

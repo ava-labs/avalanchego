@@ -7,6 +7,7 @@ import (
 	"context"
 	"math"
 	"math/big"
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -81,41 +83,52 @@ func TestShouldAcceptSummary(t *testing.T) {
 // a VM over the synced database and keeps accepting blocks to prove that
 // settlement of the synced state was persisted correctly.
 func TestStateSyncEndToEnd(t *testing.T) {
-	t.Parallel()
-
-	const numBlocks = defaultCommitInterval + 2
-	sourceVM := newVM(t)
-	sourceVM.acceptBlocks(t, numBlocks)
-
-	// Handler to state sync
-	xdb := saetest.NewExecutionResultsDB()
-	db := memdb.New()
-	client := newSUT(t, withDatabase(db), withXDB(xdb))
-	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
-
-	ctx := t.Context()
-
-	summary, err := sourceVM.Handler.GetLastStateSummary(ctx)
-	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
-	require.Equal(t, uint64(defaultCommitInterval), summary.Height(), "summary at last commit boundary")
-
-	require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo(%v)", client, summary)
-
-	// During the sync, the network continued processing
-	sourceVM.acceptBlocks(t, numBlocks)
-
-	// catch up a new VM
-	clientVM := client.asVM(t, sourceVM.hooks.Now())
-	lastHeight := sourceVM.lastAcceptedBlock(t).Height()
-	for height := summary.Height() + 1; height <= lastHeight; height++ {
-		b := sourceVM.blockAtHeight(t, height)
-		parsed, err := clientVM.ParseBlock(ctx, b.Bytes())
-		require.NoErrorf(t, err, "ParseBlock(%d)", b.Height())
-		require.NoErrorf(t, clientVM.vm.VerifyBlock(ctx, nil, parsed), "VerifyBlock(%d)", b.Height())
-		require.NoErrorf(t, clientVM.vm.AcceptBlock(ctx, parsed), "AcceptBlock(%d)", b.Height())
-		require.NoErrorf(t, parsed.WaitUntilExecuted(ctx), "WaitUntilExecuted(%d)", b.Height())
+	tests := []struct {
+		name string
+		opts []sutOption
+	}{
+		{name: "hashdb"},
+		{name: "firewood", opts: []sutOption{withFirewood()}},
 	}
-	sourceVM.compareVMs(t, clientVM)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			const numBlocks = defaultCommitInterval + 2
+			sourceVM := newVM(t, tt.opts...)
+			sourceVM.acceptBlocks(t, numBlocks)
+
+			// Handler to state sync
+			xdb := saetest.NewExecutionResultsDB()
+			db := memdb.New()
+			client := newSUT(t, slices.Concat(tt.opts, []sutOption{withDatabase(db), withXDB(xdb)})...)
+			saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+
+			ctx := t.Context()
+
+			summary, err := sourceVM.Handler.GetLastStateSummary(ctx)
+			require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
+			require.Equal(t, uint64(defaultCommitInterval), summary.Height(), "summary at last commit boundary")
+
+			require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo(%v)", client, summary)
+
+			// During the sync, the network continued processing
+			sourceVM.acceptBlocks(t, numBlocks)
+
+			// catch up a new VM
+			clientVM := client.asVM(t, sourceVM.hooks.Now())
+			lastHeight := sourceVM.lastAcceptedBlock(t).Height()
+			for height := summary.Height() + 1; height <= lastHeight; height++ {
+				b := sourceVM.blockAtHeight(t, height)
+				parsed, err := clientVM.ParseBlock(ctx, b.Bytes())
+				require.NoErrorf(t, err, "ParseBlock(%d)", b.Height())
+				require.NoErrorf(t, clientVM.vm.VerifyBlock(ctx, nil, parsed), "VerifyBlock(%d)", b.Height())
+				require.NoErrorf(t, clientVM.vm.AcceptBlock(ctx, parsed), "AcceptBlock(%d)", b.Height())
+				require.NoErrorf(t, parsed.WaitUntilExecuted(ctx), "WaitUntilExecuted(%d)", b.Height())
+			}
+			sourceVM.compareVMs(t, clientVM)
+		})
+	}
 }
 
 // TestStateSyncWithSettlementLag syncs a fresh node from a source
@@ -200,42 +213,86 @@ func TestCancelSync(t *testing.T) {
 }
 
 // TestSyncErrorRecovers checks that any error in the sync process gracefully
-// errors and is recoverable.
+// errors and is recoverable. Only the [ethdb.Database] fails, so this doesn't
+// cover Firewood writes; see [TestFirewoodSyncInterrupted].
 func TestSyncErrorRecovers(t *testing.T) {
-	ctx := t.Context()
+	tests := []struct {
+		name       string
+		opts       []sutOption
+		checkState func(*testing.T, *sut, common.Hash)
+	}{
+		{
+			name: "hashdb",
+			checkState: func(t *testing.T, s *sut, root common.Hash) {
+				requireSnapshotOnDisk(t, s.db, root)
+			},
+		},
+		{
+			name: "firewood",
+			opts: []sutOption{withFirewood()},
+			checkState: func(t *testing.T, s *sut, root common.Hash) {
+				requireFirewoodAtTip(t, s, root)
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := t.Context()
 
-	source := newVM(t)
-	source.acceptBlocks(t, defaultCommitInterval+2)
+			source := newVM(t, tt.opts...)
+			source.acceptBlocks(t, defaultCommitInterval+2)
 
-	summary, err := source.GetLastStateSummary(ctx)
-	require.NoErrorf(t, err, "%T.GetLastStateSummary()", source.Handler)
-	expectedRoot := source.getBlock(t, ids.ID(summary.AcceptedHash)).SettledStateRoot()
+			summary, err := source.GetLastStateSummary(ctx)
+			require.NoErrorf(t, err, "%T.GetLastStateSummary()", source.Handler)
+			expectedRoot := source.getBlock(t, ids.ID(summary.AcceptedHash)).SettledStateRoot()
 
-	for failAfter := 0; ; failAfter++ {
-		fdb := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
-		client := newSUT(t, withDatabase(fdb))
-		saetest.ConnectTo[saetest.Peer](t, client, source)
-		fdb.SetFailAfter(failAfter) // Setup (e.g. the genesis commit) is done.
+			for failAfter := 0; ; failAfter++ {
+				fdb := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
+				dir := t.TempDir()
+				newClient := func(t *testing.T, opts ...sutOption) *sut {
+					client := newSUT(t, slices.Concat(tt.opts, []sutOption{withDatabase(fdb), withChainDataDir(dir)}, opts)...)
+					saetest.ConnectTo[saetest.Peer](t, client, source)
+					return client
+				}
 
-		err = client.syncTo(ctx, t, summary)
-		if !fdb.Failed() {
-			require.NoErrorf(t, err, "%T.syncTo", client)
-			// Opening the snapshot also reads through the flaky database.
-			fdb.SetFailAfter(math.MaxInt)
-			requireSnapshotOnDisk(t, client.db, expectedRoot)
-			return
-		}
-		require.ErrorIsf(t, err, saetest.ErrInjected, "%T.syncTo()", client)
+				client := newClient(t)
+				fdb.SetFailAfter(failAfter) // Setup (e.g. the genesis commit) is done.
 
-		// Any error should be recoverable.
-		t.Run("second_try", func(t *testing.T) {
-			fdb.SetFailAfter(math.MaxInt)
-			client := newSUT(t, withDatabase(fdb))
-			saetest.ConnectTo[saetest.Peer](t, client, source)
-			require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo()", client)
-			requireSnapshotOnDisk(t, client.db, expectedRoot)
+				err = client.syncTo(ctx, t, summary)
+				if !fdb.Failed() {
+					require.NoErrorf(t, err, "%T.syncTo", client)
+					// Opening the snapshot also reads through the flaky database.
+					fdb.SetFailAfter(math.MaxInt)
+					tt.checkState(t, client, expectedRoot)
+					return
+				}
+				require.ErrorIsf(t, err, saetest.ErrInjected, "%T.syncTo()", client)
+
+				// Any error should be recoverable.
+				t.Run("second_try", func(t *testing.T) {
+					fdb.SetFailAfter(math.MaxInt)
+					client := newClient(t)
+					require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo()", client)
+					tt.checkState(t, client, expectedRoot)
+				})
+			}
 		})
 	}
+}
+
+// requireFirewoodAtTip returns the root persisted to the Firewood database
+// as the last revision.
+func requireFirewoodAtTip(t *testing.T, s *sut, root common.Hash) {
+	t.Helper()
+
+	tdb := triedb.NewDatabase(s.db, s.cfg.syncConfig.DBConfig.TrieDBConfig(s.snowCtx.ChainDataDir, s.snowCtx.Log))
+	defer func() {
+		require.NoError(t, tdb.Close(), "triedb.Close()")
+	}()
+	fw, ok := tdb.Backend().(*firewood.TrieDB)
+	require.Truef(t, ok, "%T.Backend() is %T", tdb, tdb.Backend())
+
+	require.Equal(t, root, common.Hash(fw.Firewood.Root()), "Firewood root")
 }
 
 // requireSnapshotOnDisk checks that a completed sync left a snapshot that can
@@ -338,36 +395,46 @@ func TestWriteBloomIndexer(t *testing.T) {
 // finalized. This is the disk state of a node that shut down before
 // [Syncer.WriteSynced] and was offered a newer summary on restart.
 func TestSyncAfterAbandonedSync(t *testing.T) {
-	t.Parallel()
+	tests := []struct {
+		name string
+		opts []sutOption
+	}{
+		{name: "hashdb"},
+		{name: "firewood", opts: []sutOption{withFirewood()}},
+	}
 
-	ctx := t.Context()
-	sourceVM := newVM(t)
-	sourceVM.acceptBlocks(t, defaultCommitInterval)
+	for _, tt := range tests {
+		ctx := t.Context()
+		sourceVM := newVM(t, tt.opts...)
+		sourceVM.acceptBlocks(t, defaultCommitInterval)
 
-	db := memdb.New()
-	client := newSUT(t, withDatabase(db))
-	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+		db := memdb.New()
+		dir := t.TempDir()
+		opts := slices.Concat(tt.opts, []sutOption{withDatabase(db), withChainDataDir(dir)})
+		client := newSUT(t, opts...)
+		saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
 
-	abandoned, err := sourceVM.GetLastStateSummary(ctx)
-	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
-	syncer := client.syncer()
-	require.NoErrorf(t, syncer.Sync(ctx, abandoned), "%T.Sync(%v)", syncer, abandoned)
-	// [Syncer.WriteSynced] is deliberately skipped, as if the node shut down.
+		abandoned, err := sourceVM.GetLastStateSummary(ctx)
+		require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
+		syncer := client.syncer()
+		require.NoErrorf(t, syncer.Sync(ctx, abandoned), "%T.Sync(%v)", syncer, abandoned)
+		// [Syncer.WriteSynced] is deliberately skipped, as if the node shut down.
 
-	// The network moved on while the node was down.
-	sourceVM.acceptBlocks(t, defaultCommitInterval)
-	summary, err := sourceVM.GetLastStateSummary(ctx)
-	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
+		// The network moved on while the node was down.
+		sourceVM.acceptBlocks(t, defaultCommitInterval)
+		summary, err := sourceVM.GetLastStateSummary(ctx)
+		require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
 
-	// Test invariant: the two summaries commit to different state.
-	abandonedRoot := sourceVM.blockAtHeight(t, abandoned.Height()).Header().Root
-	summaryRoot := sourceVM.blockAtHeight(t, summary.Height()).Header().Root
-	require.NotEqual(t, abandonedRoot, summaryRoot, "state roots of the two summaries")
+		// Test invariant: the two summaries commit to different state.
+		abandonedRoot := sourceVM.blockAtHeight(t, abandoned.Height()).Header().Root
+		summaryRoot := sourceVM.blockAtHeight(t, summary.Height()).Header().Root
+		require.NotEqual(t, abandonedRoot, summaryRoot, "state roots of the two summaries")
 
-	// A restarted node constructs a fresh handler over the same database.
-	client = newSUT(t, withDatabase(db))
-	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
-	require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
+		// A restarted node constructs a fresh handler over the same database.
+		client = newSUT(t, opts...)
+		saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+		require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
+	}
 }
 
 func TestSyncToSynchronousBlock(t *testing.T) {
