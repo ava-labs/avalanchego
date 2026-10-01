@@ -47,15 +47,15 @@ var (
 	errUnexpectedStakerTxType        = errors.New("unexpected staker transaction type")
 )
 
-// ProposalTx executes the proposal transaction [tx].
+// ProposalTx executes the proposal transaction tx.
 //
-// [onCommitState] will be modified to reflect the changes made to the state if
+// onCommitState will be modified to reflect the changes made to the state if
 // the proposal is committed.
 //
-// [onAbortState] will be modified to reflect the changes made to the state if
+// onAbortState will be modified to reflect the changes made to the state if
 // the proposal is aborted.
 //
-// Invariant: It is assumed that [onCommitState] and [onAbortState] represent
+// Invariant: It is assumed that onCommitState and onAbortState represent
 // the same state when passed into this function.
 func ProposalTx(
 	backend *Backend,

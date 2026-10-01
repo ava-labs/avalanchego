@@ -48,7 +48,7 @@ func (s *Set) Add(peer *Peer) {
 }
 
 // GetByID attempts to fetch a [Peer] whose [Peer.ID] is equal to nodeID.
-// If no such peer exists in the set, then [false] will be returned.
+// If no such peer exists in the set, then false will be returned.
 func (s *Set) GetByID(nodeID ids.NodeID) (*Peer, bool) {
 	index, ok := s.peersMap[nodeID]
 	if !ok {

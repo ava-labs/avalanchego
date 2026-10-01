@@ -126,11 +126,11 @@ type PermissionlessValidator struct {
 }
 
 // Chain defines a chain that exists at the network's genesis
-// [GenesisData] is the initial state of the chain.
-// [VMID] is the ID of the VM this chain runs.
-// [FxIDs] are the IDs of the Fxs the chain supports.
-// [Name] is a human-readable, non-unique name for the chain.
-// [SubnetID] is the ID of the subnet that validates the chain
+// [Chain.GenesisData] is the initial state of the chain.
+// [Chain.VMID] is the ID of the VM this chain runs.
+// [Chain.FxIDs] are the IDs of the Fxs the chain supports.
+// [Chain.Name] is a human-readable, non-unique name for the chain.
+// [Chain.SubnetID] is the ID of the subnet that validates the chain
 type Chain struct {
 	GenesisData []byte
 	VMID        ids.ID
@@ -149,14 +149,14 @@ func bech32ToID(addrStr string) (ids.ShortID, error) {
 }
 
 // New builds the genesis state of the P-Chain (and thereby the Avalanche network.)
-// [avaxAssetID] is the ID of the AVAX asset
-// [networkID] is the ID of the network
-// [allocations] are the UTXOs on the Platform Chain that exist at genesis.
-// [validators] are the validators of the primary network at genesis.
-// [chains] are the chains that exist at genesis.
+// avaxAssetID is the ID of the AVAX asset
+// networkID is the ID of the network
+// allocations are the UTXOs on the Platform Chain that exist at genesis.
+// validators are the validators of the primary network at genesis.
+// chains are the chains that exist at genesis.
 // [time] is the Platform Chain's time at network genesis.
-// [initialSupply] is the initial supply of the AVAX asset.
-// [message] is the message to be sent to the genesis UTXOs.
+// initialSupply is the initial supply of the AVAX asset.
+// message is the message to be sent to the genesis UTXOs.
 func New(
 	avaxAssetID ids.ID,
 	networkID uint32,

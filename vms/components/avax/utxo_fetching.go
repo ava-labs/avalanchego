@@ -15,7 +15,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// GetBalance returns the current balance of [addrs]
+// GetBalance returns the current balance of addrs
 func GetBalance(db UTXOReader, addrs set.Set[ids.ShortID]) (uint64, error) {
 	utxos, err := GetAllUTXOs(db, addrs)
 	if err != nil {
@@ -45,14 +45,14 @@ func GetAllUTXOs(db UTXOReader, addrs set.Set[ids.ShortID]) ([]*UTXO, error) {
 }
 
 // GetPaginatedUTXOs returns UTXOs such that at least one of the addresses in
-// [addrs] is referenced.
+// addrs is referenced.
 //
-// Returns at most [limit] UTXOs.
+// Returns at most limit UTXOs.
 //
-// Only returns UTXOs associated with addresses >= [startAddr].
+// Only returns UTXOs associated with addresses >= lastAddr.
 //
-// For address [startAddr], only returns UTXOs whose IDs are greater than
-// [startUTXOID].
+// For address lastAddr, only returns UTXOs whose IDs are greater than
+// lastUTXOID.
 //
 // Returns:
 // * The fetched UTXOs

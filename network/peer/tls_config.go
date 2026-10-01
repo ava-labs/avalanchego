@@ -25,8 +25,8 @@ var (
 // TLSConfig returns the TLS config that will allow secure connections to other
 // peers.
 //
-// It is safe, and typically expected, for [keyLogWriter] to be [nil].
-// [keyLogWriter] should only be enabled for debugging.
+// It is safe, and typically expected, for keyLogWriter to be nil.
+// keyLogWriter should only be enabled for debugging.
 func TLSConfig(cert tls.Certificate, keyLogWriter io.Writer) *tls.Config {
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},

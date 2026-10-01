@@ -15,9 +15,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
+
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 // ServeResponder registers r at handlerID on a single-node loopback network.
@@ -48,7 +49,7 @@ func NewRecordingResponder[Req, Resp proto.Message](inner handlers.Responder[Req
 	return &RecordingResponder[Req, Resp]{inner: inner}
 }
 
-func (r *RecordingResponder[Req, Resp]) Respond(ctx context.Context, nodeID ids.NodeID, req Req) (Resp, *common.AppError) {
+func (r *RecordingResponder[Req, Resp]) Respond(ctx context.Context, nodeID ids.NodeID, req Req) (Resp, *snowcommon.AppError) {
 	r.lock.Lock()
 	r.requests = append(r.requests, req)
 	r.lock.Unlock()
@@ -84,7 +85,7 @@ func NewMutatingResponder[Req, Resp proto.Message](
 	return &MutatingResponder[Req, Resp]{inner: inner, mutate: mutate, numBad: numBad}
 }
 
-func (m *MutatingResponder[Req, Resp]) Respond(ctx context.Context, nodeID ids.NodeID, req Req) (Resp, *common.AppError) {
+func (m *MutatingResponder[Req, Resp]) Respond(ctx context.Context, nodeID ids.NodeID, req Req) (Resp, *snowcommon.AppError) {
 	resp, appErr := m.inner.Respond(ctx, nodeID, req)
 	if appErr != nil {
 		return resp, appErr
@@ -99,7 +100,7 @@ func (m *MutatingResponder[Req, Resp]) Respond(ctx context.Context, nodeID ids.N
 // mirroring a peer that cannot serve the request.
 type ErroringResponder[Req, Resp proto.Message] struct {
 	inner  handlers.Responder[Req, Resp]
-	err    *common.AppError
+	err    *snowcommon.AppError
 	numBad int
 
 	served atomic.Int32
@@ -110,12 +111,12 @@ type ErroringResponder[Req, Resp proto.Message] struct {
 func NewErroringResponder[Req, Resp proto.Message](
 	inner handlers.Responder[Req, Resp],
 	numBad int,
-	err *common.AppError,
+	err *snowcommon.AppError,
 ) *ErroringResponder[Req, Resp] {
 	return &ErroringResponder[Req, Resp]{inner: inner, numBad: numBad, err: err}
 }
 
-func (e *ErroringResponder[Req, Resp]) Respond(ctx context.Context, nodeID ids.NodeID, req Req) (Resp, *common.AppError) {
+func (e *ErroringResponder[Req, Resp]) Respond(ctx context.Context, nodeID ids.NodeID, req Req) (Resp, *snowcommon.AppError) {
 	resp, appErr := e.inner.Respond(ctx, nodeID, req)
 	if served := int(e.served.Add(1)); served <= e.numBad {
 		var zero Resp
@@ -144,7 +145,7 @@ func NewCancelAfter[Req, Resp proto.Message](
 	return &CancelAfter[Req, Resp]{inner: inner, cancel: cancel, at: at}
 }
 
-func (c *CancelAfter[Req, Resp]) Respond(ctx context.Context, nodeID ids.NodeID, req Req) (Resp, *common.AppError) {
+func (c *CancelAfter[Req, Resp]) Respond(ctx context.Context, nodeID ids.NodeID, req Req) (Resp, *snowcommon.AppError) {
 	resp, appErr := c.inner.Respond(ctx, nodeID, req)
 	if int(c.seen.Add(1)) >= c.at {
 		c.cancel()

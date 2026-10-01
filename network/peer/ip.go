@@ -23,7 +23,7 @@ var (
 	errInvalidTLSSignature     = errors.New("invalid TLS signature")
 )
 
-// UnsignedIP is used for a validator to claim an IP. The [Timestamp] is used to
+// UnsignedIP is used for a validator to claim an IP. The [UnsignedIP.Timestamp] is used to
 // ensure that the most updated IP claim is tracked by peers for a given
 // validator.
 type UnsignedIP struct {
@@ -76,8 +76,8 @@ type SignedIP struct {
 }
 
 // Returns nil if:
-// * [ip.Timestamp] is not after [maxTimestamp].
-// * [ip.TLSSignature] is a valid signature over [ip.UnsignedIP] from [cert].
+// * ip.Timestamp is not after maxTimestamp.
+// * ip.TLSSignature is a valid signature over ip.UnsignedIP from cert.
 func (ip *SignedIP) Verify(
 	cert *staking.Certificate,
 	maxTimestamp time.Time,

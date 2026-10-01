@@ -16,7 +16,7 @@ import (
 
 var _ platform.TxVisitor = (*atomicTxExecutor)(nil)
 
-// AtomicTx executes the atomic transaction [tx] and returns the resulting state
+// AtomicTx executes the atomic transaction tx and returns the resulting state
 // modifications.
 //
 // This is only used to execute atomic transactions pre-AP5. After AP5 the

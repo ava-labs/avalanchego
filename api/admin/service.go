@@ -63,7 +63,7 @@ type Admin struct {
 }
 
 // NewService returns a new admin API service.
-// All of the fields in [config] must be set.
+// All of the fields in config must be set.
 func NewService(config Config) (http.Handler, error) {
 	server := rpc.NewServer()
 	codec := json.NewCodec()
@@ -245,7 +245,7 @@ type LoggerLevelReply struct {
 }
 
 // SetLoggerLevel sets the log level and/or display level for loggers.
-// If len([args.LoggerName]) == 0, sets the log/display level of all loggers.
+// If len(args.LoggerName) == 0, sets the log/display level of all loggers.
 // Otherwise, sets the log/display level of the loggers named in that argument.
 // Sets the log level of these loggers to args.LogLevel.
 // If args.LogLevel == nil, doesn't set the log level of these loggers.

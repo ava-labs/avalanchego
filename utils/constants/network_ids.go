@@ -94,7 +94,7 @@ func GetHRP(networkID uint32) string {
 }
 
 // NetworkName returns a human readable name for the network with
-// ID [networkID]
+// ID networkID
 func NetworkName(networkID uint32) string {
 	if name, exists := NetworkIDToNetworkName[networkID]; exists {
 		return name
@@ -102,7 +102,7 @@ func NetworkName(networkID uint32) string {
 	return fmt.Sprintf("network-%d", networkID)
 }
 
-// NetworkID returns the ID of the network with name [networkName]
+// NetworkID returns the ID of the network with name networkName
 func NetworkID(networkName string) (uint32, error) {
 	networkName = strings.ToLower(networkName)
 	if id, exists := NetworkNameToNetworkID[networkName]; exists {

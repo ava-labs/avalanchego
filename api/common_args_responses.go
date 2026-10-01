@@ -70,7 +70,7 @@ type GetTxArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-// GetTxReply defines an object containing a single [Tx] object along with Encoding
+// GetTxReply defines an object containing a single [GetTxReply.Tx] object along with Encoding
 type GetTxReply struct {
 	// If [GetTxArgs.Encoding] is [Hex], [Tx] is the string representation of
 	// the tx under hex encoding.
@@ -94,17 +94,18 @@ type Index struct {
 }
 
 // GetUTXOsArgs are arguments for passing into GetUTXOs.
-// Gets the UTXOs that reference at least one address in [Addresses].
-// Returns at most [limit] addresses.
-// If specified, [SourceChain] is the chain where the atomic UTXOs were exported from. If empty,
-// or the Chain ID of this VM is specified, then GetUTXOs fetches the native UTXOs.
-// If [limit] == 0 or > [maxUTXOsToFetch], fetches up to [maxUTXOsToFetch].
-// [StartIndex] defines where to start fetching UTXOs (for pagination.)
-// UTXOs fetched are from addresses equal to or greater than [StartIndex.Address]
-// For address [StartIndex.Address], only UTXOs with IDs greater than [StartIndex.UTXO] will be returned.
-// If [StartIndex] is omitted, gets all UTXOs.
-// If GetUTXOs is called multiple times, with our without [StartIndex], it is not guaranteed
-// that returned UTXOs are unique. That is, the same UTXO may appear in the response of multiple calls.
+// Gets the UTXOs that reference at least one address in [GetUTXOsArgs.Addresses].
+// Returns at most [GetUTXOsArgs.Limit] addresses.
+// If specified, [GetUTXOsArgs.SourceChain] is the chain where the atomic UTXOs were exported from.
+// If empty, or the Chain ID of this VM is specified, then GetUTXOs fetches the native UTXOs.
+// If [GetUTXOsArgs.Limit] is 0 or exceeds the VM's maximum, fetches up to that maximum.
+// [GetUTXOsArgs.StartIndex] defines where to start fetching UTXOs (for pagination.)
+// UTXOs fetched are from addresses equal to or greater than StartIndex.Address
+// For address StartIndex.Address, only UTXOs with IDs greater than StartIndex.UTXO will be returned.
+// If [GetUTXOsArgs.StartIndex] is omitted, gets all UTXOs.
+// If GetUTXOs is called multiple times, with our without [GetUTXOsArgs.StartIndex], it is not
+// guaranteed that returned UTXOs are unique. That is, the same UTXO may appear in the response of
+// multiple calls.
 type GetUTXOsArgs struct {
 	Addresses   []string            `json:"addresses"`
 	SourceChain string              `json:"sourceChain"`

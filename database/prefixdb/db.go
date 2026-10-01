@@ -171,7 +171,7 @@ func (db *Database) NewIteratorWithPrefix(prefix []byte) database.Iterator {
 }
 
 // Assumes it is safe to modify the arguments to db.db.NewIteratorWithStartAndPrefix after it returns.
-// It is safe to modify [start] and [prefix] after this method returns.
+// It is safe to modify start and prefix after this method returns.
 func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database.Iterator {
 	db.lock.RLock()
 	defer db.lock.RUnlock()

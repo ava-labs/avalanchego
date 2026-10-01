@@ -210,7 +210,7 @@ func validateConfig(networkID uint32, config *Config, stakingCfg *StakingConfig)
 // defining the genesis state of the network.
 //
 // FromFile accepts:
-// 1) The ID of the new network. [networkID]
+// 1) The ID of the new network. networkID
 // 2) The location of a custom genesis config to load. [filepath]
 //
 // If [filepath] is empty or the given network ID is Mainnet, Testnet, or Local, returns error.
@@ -252,12 +252,12 @@ func FromFile(networkID uint32, filepath string, stakingCfg *StakingConfig) ([]b
 // defining the genesis state of the network.
 //
 // FromFlag accepts:
-// 1) The ID of the new network. [networkID]
-// 2) The content of a custom genesis config to load. [genesisContent]
+// 1) The ID of the new network. networkID
+// 2) The content of a custom genesis config to load. genesisContent
 //
-// If [genesisContent] is empty or the given network ID is Mainnet, Testnet, or Local, returns error.
-// If [genesisContent] is non-empty and networkID isn't Mainnet, Testnet, or Local,
-// loads the network genesis data from [genesisContent].
+// If genesisContent is empty or the given network ID is Mainnet, Testnet, or Local, returns error.
+// If genesisContent is non-empty and networkID isn't Mainnet, Testnet, or Local,
+// loads the network genesis data from genesisContent.
 //
 // FromFlag returns:
 //

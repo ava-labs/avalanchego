@@ -59,7 +59,7 @@ type Sender struct {
 	SendAppGossipF               func(context.Context, common.SendConfig, []byte) error
 }
 
-// Default set the default callable value to [cant]
+// Default set the default callable value to cant
 func (s *Sender) Default(cant bool) {
 	s.CantSendGetStateSummaryFrontier = cant
 	s.CantSendStateSummaryFrontier = cant

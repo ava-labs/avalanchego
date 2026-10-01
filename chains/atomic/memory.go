@@ -49,7 +49,7 @@ func (m *Memory) NewSharedMemory(chainID ids.ID) SharedMemory {
 // database
 //
 // Invariant: ReleaseSharedDatabase must be called after to free the database
-// associated with [sharedID]
+// associated with sharedID
 func (m *Memory) GetSharedDatabase(db database.Database, sharedID ids.ID) database.Database {
 	lock := m.makeLock(sharedID)
 	lock.Lock()

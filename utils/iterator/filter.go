@@ -12,8 +12,8 @@ type filtered[T any] struct {
 	filter func(T) bool
 }
 
-// Filter returns an iterator that skips the elements in [it] that return true
-// from [filter].
+// Filter returns an iterator that skips the elements in it that return true
+// from filter.
 func Filter[T any](it Iterator[T], filter func(T) bool) Iterator[T] {
 	return &filtered[T]{
 		it:     it,
@@ -22,7 +22,7 @@ func Filter[T any](it Iterator[T], filter func(T) bool) Iterator[T] {
 }
 
 // Deduplicate returns an iterator that skips the elements that have already
-// been returned from [it].
+// been returned from it.
 func Deduplicate[T comparable](it Iterator[T]) Iterator[T] {
 	var seen set.Set[T]
 	return Filter(it, func(e T) bool {

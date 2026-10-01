@@ -2490,7 +2490,7 @@ func (s *State) init(genesisBytes []byte) error {
 }
 
 // AddStatelessBlock stores block as an accepted block.
-// Invariant: [block] is an accepted block.
+// Invariant: block is an accepted block.
 func (s *State) AddStatelessBlock(block platform.Block) {
 	blkID := block.ID()
 	s.addedBlockIDs[block.Height()] = blkID

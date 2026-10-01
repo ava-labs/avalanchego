@@ -27,11 +27,11 @@ type BlockWrapper struct {
 	state *State
 }
 
-// Verify verifies the underlying block, evicts from the unverified block cache
-// and if the block passes verification, adds it to [cache.verifiedBlocks].
+// Verify verifies the underlying block, evicts it from the unverified block
+// cache and, if it passes verification, caches it as verified.
 // Note: it is guaranteed that if a block passes verification it will be added to
 // consensus and eventually be decided ie. either Accept/Reject will be called
-// on [bw] removing it from [verifiedBlocks].
+// on bw, evicting it from the verified block cache.
 func (bw *BlockWrapper) Verify(ctx context.Context) error {
 	if err := bw.Block.Verify(ctx); err != nil {
 		// Note: we cannot cache blocks failing verification in case
@@ -59,11 +59,11 @@ func (bw *BlockWrapper) ShouldVerifyWithContext(ctx context.Context) (bool, erro
 }
 
 // VerifyWithContext verifies the underlying block with the given block context,
-// evicts from the unverified block cache and if the block passes verification,
-// adds it to [cache.verifiedBlocks].
+// evicts it from the unverified block cache and, if it passes verification,
+// caches it as verified.
 // Note: it is guaranteed that if a block passes verification it will be added
 // to consensus and eventually be decided ie. either Accept/Reject will be
-// called on [bw] removing it from [verifiedBlocks].
+// called on bw, evicting it from the verified block cache.
 //
 // Note: If the underlying block does not implement the block.WithVerifyContext
 // interface, an error is always returned because ShouldVerifyWithContext will
