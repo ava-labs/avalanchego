@@ -28,11 +28,13 @@ runs:
       run: |
         repository_cache_dir="$HOME/.cache/bazel-repository-cache"
         go_mod_cache_dir="$HOME/.cache/bazel-go-repository-modcache"
-        mkdir -p "$repository_cache_dir" "$go_mod_cache_dir"
+        bazelisk_home="$HOME/.cache/bazelisk/$(<.bazelversion)"
+        mkdir -p "$repository_cache_dir" "$go_mod_cache_dir" "$bazelisk_home"
         {
           echo "repository_cache=$repository_cache_dir"
           echo "go_mod_cache=$go_mod_cache_dir"
         } >> "$GITHUB_OUTPUT"
+        echo "BAZELISK_HOME=$bazelisk_home" >> "$GITHUB_ENV"
 
     - name: Restore Bazel dependency cache
       id: cache
@@ -41,6 +43,7 @@ runs:
         path: |
           ${{ steps.cache-paths.outputs.repository_cache }}
           ${{ steps.cache-paths.outputs.go_mod_cache }}
+          ~/.cache/bazelisk
         key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh') }}
         restore-keys: |
           bazel-repo-${{ runner.os }}-${{ runner.arch }}-
@@ -85,6 +88,11 @@ runs:
       shell: bash
       run: ./scripts/run_task.sh bazel-cache-ci-build-dependencies
 
+    - name: Prune old Bazelisk downloads
+      if: ${{ steps.cache-operations.outputs.save-cache == 'true' }}
+      shell: bash
+      run: ${{ github.action_path }}/prune-bazelisk-cache.sh "$BAZELISK_HOME"
+
     - name: Save Bazel dependency cache
       # Setup jobs can race to publish a cache miss. Immutable keys prevent an
       # earlier archive from being overwritten.
@@ -94,6 +102,7 @@ runs:
         path: |
           ${{ steps.cache-paths.outputs.repository_cache }}
           ${{ steps.cache-paths.outputs.go_mod_cache }}
+          ~/.cache/bazelisk
         key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh') }}
 
     - name: Disable Bazel repository downloads after cache preparation

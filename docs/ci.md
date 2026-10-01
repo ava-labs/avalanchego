@@ -402,18 +402,20 @@ post-job save cannot be limited to `master` runs by `cache-policy`.
 #### Bazel dependency cache
 
 [`setup-bazel`](../.github/actions/setup-bazel/action.yml) runs each Bazel
-setup job. It restores the Bazel repository cache and Bazel-specific Go module
-cache, then checks metadata. A non-exact consumer restore runs the checked-in
-dependency list through `bazelisk fetch`. On `master`, a non-exact setup restore
-also prepares and saves the cache. Setup jobs can duplicate this cold-cache
-work. After an exact restore or local preparation, the action enables
+setup job and the `lint-avalanchego` job. It restores the Bazel repository cache,
+the Bazel-specific Go module cache, and Bazelisk's downloaded Bazel binary. It
+checks metadata only in setup jobs. A non-exact consumer restore runs the
+checked-in dependency list through `bazelisk fetch`. On `master`, a non-exact
+setup restore also prepares and saves the cache. Setup jobs can duplicate this
+cold-cache work. After an exact restore or local preparation, the action enables
 `--repository_disable_download`; see [Bazel CI external dependency
 caching](./bazel.md#bazel-ci-external-dependency-caching).
 
-The cache contains only external Bazel dependency input. It is separate from
-the Bazel remote action and test-result cache. See
-[Bazel CI external dependency caching](./bazel.md#bazel-ci-external-dependency-caching)
-for its key and dependency-list rules.
+The cache contains external Bazel dependency input and the Bazelisk-downloaded
+Bazel binary. It does not contain Bazel build outputs. It is separate from the
+Bazel remote action and test-result cache. See [Bazel CI external dependency
+caching](./bazel.md#bazel-ci-external-dependency-caching) for its key and
+dependency-list rules.
 
 #### Nix store cache
 
