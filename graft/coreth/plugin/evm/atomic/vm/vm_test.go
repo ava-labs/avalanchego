@@ -1686,13 +1686,13 @@ func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
 
 	ctx := t.Context()
 
-	// Creating the genesis state (block 0) is a commit operation and so Firewood first persists at block 3.
-	// Placing the import at block 4 ensures that it is not persisted.
+	// Creating the genesis state (block 0) is a commit operation and so Firewood first persists at block 4.
+	// Placing the import at block 5 ensures that it is not persisted.
 	var (
 		recipient          = common.HexToAddress("0x1234567890abcdef1234567890abcdef12345678")
 		importAmount       = uint64(50_000_000)
 		fork               = upgradetest.Fortuna
-		numPreImportBlocks = 3
+		numPreImportBlocks = 4
 		targetBlockHeight  = numPreImportBlocks + 1
 		configJSON         = `{
 			"pruning-enabled": false,

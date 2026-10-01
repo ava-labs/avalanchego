@@ -4,13 +4,16 @@
 package c
 
 import (
+	"context"
 	"math/big"
 	"strings"
 	"time"
 
 	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/params"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
@@ -120,7 +123,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		// the block that includes them is fully executed. It is not safe to
 		// assume that the "latest" block's nonce has been updated to reflect a
 		// transaction whose receipt has been returned.
-		nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
+		nonce, err := ethClient.NonceAt(tc.DefaultContext(), ethAddress, nil)
 		require.NoError(err)
 
 		var contractAddress common.Address
@@ -145,7 +148,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			nonce++
 		})
 
-		initialGasPrice, err := ethClient.EstimateBaseFee(tc.DefaultContext())
+		initialGasPrice, err := estimateBaseFee(tc.DefaultContext(), ethClient)
 		require.NoError(err)
 
 		targetGasPrice := new(big.Int).Set(initialGasPrice)
@@ -167,7 +170,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 			tc.Eventually(func() bool {
 				// Check the gas price
-				gasPrice, err := ethClient.EstimateBaseFee(tc.DefaultContext())
+				gasPrice, err := estimateBaseFee(tc.DefaultContext(), ethClient)
 				require.NoError(err)
 
 				// If the gas price has increased, stop the loop.
@@ -217,7 +220,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		tc.By("sending small transactions until a sufficient gas price decrease is detected", func() {
 			tc.Eventually(func() bool {
 				// Check the gas price
-				gasPrice, err := ethClient.EstimateBaseFee(tc.DefaultContext())
+				gasPrice, err := estimateBaseFee(tc.DefaultContext(), ethClient)
 				require.NoError(err)
 
 				// If the gas price has decreased, stop the loop.
@@ -258,3 +261,12 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		_ = e2e.CheckBootstrapIsPossible(tc, privateNetwork)
 	})
 })
+
+// estimateBaseFee returns the node's estimate of the next block's base fee.
+func estimateBaseFee(ctx context.Context, c *ethclient.Client) (*big.Int, error) {
+	var baseFee hexutil.Big
+	if err := c.Client().CallContext(ctx, &baseFee, "eth_baseFee"); err != nil {
+		return nil, err
+	}
+	return baseFee.ToInt(), nil
+}

@@ -18,7 +18,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
@@ -186,7 +185,7 @@ func TestResponder(t *testing.T) {
 		},
 		{
 			name: "storage_trie_with_wrong_account",
-			req:  LeafRange{Root: storageRoot, Account: utils.PointerTo(common.HexToHash("0xa11ce")), Limit: numLeaves},
+			req:  LeafRange{Root: storageRoot, Account: new(common.HexToHash("0xa11ce")), Limit: numLeaves},
 			want: Leaves{Keys: storageKeys, Vals: storageVals},
 		},
 		{
