@@ -23,9 +23,16 @@ runs:
       shell: bash
       env:
         REQUEST_CACHE_SAVE: ${{ inputs.request-cache-save }}
+        PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
       run: |
         cache_save_allowed=false
-        if [[ "$REQUEST_CACHE_SAVE" == 'true' ]] && [[ "$GITHUB_REF" == 'refs/heads/master' ]]; then
+        if [[ "$REQUEST_CACHE_SAVE" == 'true' ]] && {
+          [[ "$GITHUB_REF" == 'refs/heads/master' ]] || {
+            # Temporary: validate cache saves in pull request 6025.
+            [[ "$GITHUB_EVENT_NAME" == 'pull_request' ]] &&
+            [[ "$PULL_REQUEST_NUMBER" == '6025' ]]
+          }
+        }; then
           cache_save_allowed=true
         fi
         echo "cache-save-allowed=$cache_save_allowed" >> "$GITHUB_OUTPUT"
