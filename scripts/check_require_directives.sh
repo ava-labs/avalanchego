@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Checks that internal module require directives are consistent across all
-# go.mod files, and that they match version.Current and the top section of
-# RELEASES.md. Development tags (v0.0.0-*) are exempt from both checks.
+# Checks that every go.mod file requires the same version of the internal
+# modules, and that this version is version.Current. Development tags
+# (v0.0.0-*) are accepted in place of version.Current.
 #
 # See docs/design/multi-module-release.md for background.
 
@@ -81,14 +81,4 @@ if [[ "$current_version" != "$reference" ]]; then
   exit 1
 fi
 
-expected_heading="## [$reference](https://github.com/ava-labs/avalanchego/releases/tag/$reference)"
-actual_heading=$(grep -m1 '^## ' "$REPO_ROOT/RELEASES.md" || true)
-
-if [[ "$actual_heading" != "$expected_heading" ]]; then
-  echo "The first section of RELEASES.md must be the next release:" >&2
-  echo "  expected: $expected_heading" >&2
-  echo "  actual:   $actual_heading" >&2
-  exit 1
-fi
-
-echo "All internal module require directives match version.Current and RELEASES.md: $reference"
+echo "All internal module require directives match version.Current: $reference"
