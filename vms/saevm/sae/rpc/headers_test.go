@@ -12,14 +12,17 @@ import (
 )
 
 func TestHeaderNamesCanonical(t *testing.T) {
-	require.Equal(t, GasUsedHeader, http.CanonicalHeaderKey(GasUsedHeader))
+	for _, h := range []string{GasUsedHeader, ErrorCodesHeader} {
+		require.Equal(t, h, http.CanonicalHeaderKey(h))
+	}
 }
 
 func TestWithResponseHeaders(t *testing.T) {
 	tests := []struct {
-		name    string
-		handler http.HandlerFunc
-		want    []string // nil if the header must be absent
+		name           string
+		handler        http.HandlerFunc
+		wantGas        []string // nil if the header must be absent
+		wantErrorCodes []string
 	}{
 		{
 			name: "no_gas",
@@ -35,7 +38,7 @@ func TestWithResponseHeaders(t *testing.T) {
 				addGas(r.Context(), 2675)
 				_, _ = w.Write([]byte("{}"))
 			},
-			want: []string{"23675"},
+			wantGas: []string{"23675"},
 		},
 		{
 			name: "zero_gas_reported",
@@ -43,7 +46,7 @@ func TestWithResponseHeaders(t *testing.T) {
 				addGas(r.Context(), 0)
 				_, _ = w.Write([]byte("{}"))
 			},
-			want: []string{"0"},
+			wantGas: []string{"0"},
 		},
 		{
 			name: "set_on_write_header",
@@ -51,7 +54,7 @@ func TestWithResponseHeaders(t *testing.T) {
 				addGas(r.Context(), 1)
 				w.WriteHeader(http.StatusOK)
 			},
-			want: []string{"1"},
+			wantGas: []string{"1"},
 		},
 		{
 			name: "set_on_flush",
@@ -59,7 +62,7 @@ func TestWithResponseHeaders(t *testing.T) {
 				addGas(r.Context(), 1)
 				w.(http.Flusher).Flush()
 			},
-			want: []string{"1"},
+			wantGas: []string{"1"},
 		},
 		{
 			name: "dropped_after_write",
@@ -69,7 +72,14 @@ func TestWithResponseHeaders(t *testing.T) {
 				addGas(r.Context(), 2)
 				_, _ = w.Write([]byte("}"))
 			},
-			want: []string{"1"},
+			wantGas: []string{"1"},
+		},
+		{
+			name: "error_codes",
+			handler: func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"x"}}`))
+			},
+			wantErrorCodes: []string{"-32000;count=1"},
 		},
 	}
 
@@ -79,7 +89,9 @@ func TestWithResponseHeaders(t *testing.T) {
 			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/", nil)
 			withResponseHeaders(tt.handler).ServeHTTP(rec, req)
 
-			require.Equalf(t, tt.want, rec.Result().Header[GasUsedHeader], "%q header", GasUsedHeader)
+			got := rec.Result().Header
+			require.Equalf(t, tt.wantGas, got[GasUsedHeader], "%q header", GasUsedHeader)
+			require.Equalf(t, tt.wantErrorCodes, got[ErrorCodesHeader], "%q header", ErrorCodesHeader)
 		})
 	}
 }
