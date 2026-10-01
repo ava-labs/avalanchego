@@ -2,7 +2,9 @@
 
 ## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
 
-- None (delete and fill in as you work)
+### Metrics
+
+- Added `avalanche_evm_transition_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
 
 ## [v1.15.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.1)
 

@@ -100,11 +100,12 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		if err := s.MarkSettled(&vm.last.settled); err != nil {
 			return err
 		}
-		vm.metrics.markSettled(s.Height())
+		vm.metrics.markSettled(s)
 	}
 
 	// I(s ∈ S) above, before I(b ∈ A) before X(b ∈ A)
 	vm.last.accepted.Store(b)
+	vm.metrics.markAccepted(b)
 	vm.acceptedBlocks.Send(b)
 	if err := vm.exec.Enqueue(ctx, b); err != nil {
 		return err
