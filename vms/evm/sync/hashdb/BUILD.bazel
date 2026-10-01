@@ -45,7 +45,6 @@ go_test(
         "//network/p2p",
         "//proto/pb/sync",
         "//snow/engine/common",
-        "//utils",
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//vms/evm/sync/synctest",

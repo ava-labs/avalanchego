@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -24,7 +24,7 @@ var (
 
 // Exported for testing in platformvm package.
 type Block struct {
-	block.Block
+	platform.Block
 	manager *manager
 }
 

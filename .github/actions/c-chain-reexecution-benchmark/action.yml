@@ -53,6 +53,12 @@ inputs:
   github-token:
     description: 'GitHub token provided to GitHub Action Benchmark.'
     required: true
+  firewood-ref:
+    description: 'Firewood revision to use for the benchmark.'
+    default: ''
+  libevm-ref:
+    description: 'Libevm revision to use for the benchmark.'
+    default: ''
   push-github-action-benchmark:
     description: 'Whether to push the benchmark result to GitHub.'
     required: true
@@ -83,44 +89,20 @@ inputs:
 runs:
   using: composite
   steps:
-    # Nix installation is idempotent skipped if already installed by the calling workflow.
-    #
-    # TODO(marun) Switch to ./.github/actions/install-nix once this action is no
-    # longer used from outside this repo.
-    # Reference: https://github.com/ava-labs/avalanchego/issues/5599
-    - uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
+    - name: Provision dependencies
+      uses: ./.github/actions/install-nix
       with:
-        github_access_token: ${{ inputs.github-token }}
-    # Mirror the repo install-nix cache here so jobs do not need to fetch the
-    # same flake inputs on every run.
-    - name: Restore and save Nix store cache
-      if: runner.os == 'Linux' || runner.os == 'macOS'
-      uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
-      with:
-        primary-key: nix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}
-        restore-prefixes-first-match: |
-          nix-${{ runner.os }}-${{ runner.arch }}-
-        gc-max-store-size-linux: 5G
-        gc-max-store-size-macos: 5G
-    - run: echo "dependencies installed"
-      shell: nix develop --command bash {0}
-    # Cache Go modules (architecture-independent)
-    - uses: actions/cache@v5
-      id: go-mod-cache
-      with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.work.sum') }}
-        restore-keys: ${{ runner.os }}-go-mod-
-    # Cache Go build cache (architecture-specific)
-    - uses: actions/cache@v5
-      with:
-        path: ~/.cache/go-build
-        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.work.sum') }}
-        restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
-    # Download modules only on cache miss
-    - run: go mod download
-      if: steps.go-mod-cache.outputs.cache-hit != 'true'
+        github_token: ${{ inputs.github-token }}
+    - name: Configure dependency versions
+      if: ${{ inputs.libevm-ref != '' || inputs.firewood-ref != '' }}
       shell: nix develop --command bash -x {0}
+      run: ./scripts/run_task.sh run-polyrepo
+      env:
+        LIBEVM_REF: ${{ inputs.libevm-ref }}
+        FIREWOOD_REF: ${{ inputs.firewood-ref }}
+        # Required for Nix builds on ARC runners
+        TMPDIR: /tmp
+        NIX_BUILD_TOP: /tmp
     - name: Notify of metrics availability
       if: inputs.prometheus-username != ''
       shell: bash

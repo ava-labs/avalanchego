@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 )
 
 func TestDynamicCalculator(t *testing.T) {
@@ -21,7 +21,7 @@ func TestDynamicCalculator(t *testing.T) {
 			txBytes, err := hex.DecodeString(test.tx)
 			require.NoError(err)
 
-			tx, err := txs.Parse(txs.Codec, txBytes)
+			tx, err := platform.ParseTx(platform.Codec, txBytes)
 			require.NoError(err)
 
 			fee, err := calculator.CalculateFee(tx.Unsigned)

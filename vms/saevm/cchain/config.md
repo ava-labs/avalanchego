@@ -40,8 +40,8 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
-| `pruning-enabled` | bool | Enable state pruning to save disk space. If disabled, the node runs in archival mode and retains all historical state. When enabled, trie roots are only persisted every `commit-interval` blocks. | `true` |
-| `commit-interval` | uint64 | Number of blocks between writes of the state trie to disk. Omit this option to use the default, which Mainnet and Fuji MUST use. The node does not accept an explicit `0`. | `4096` |
+| `pruning-enabled` | bool | Enable state pruning to save disk space. If disabled, the node runs in archival mode and retains all historical state. | `true` |
+| `commit-interval` | uint64 | For HashDB, this sets the number of blocks between state-trie writes to disk. For Firewood, it sets the maximum number of revisions that may remain unpersisted at once. Omit this option to use the default; Mainnet and Fuji MUST use the default with HashDB. The node does not accept an explicit 0. | `4096` |
 | `trie-clean-cache` | int | Size of the trie clean cache in MB. | `512` |
 | `snapshot-cache` | int | Size of the snapshot disk layer clean cache in MB. | `256` |
 | `allow-missing-tries` | bool | Suppress warnings about an incomplete trie index. | `false` |

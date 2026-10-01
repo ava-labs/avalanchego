@@ -14,10 +14,17 @@ WORKDIR /build
 
 # Copy avalanche dependencies first (intermediate docker image caching)
 # Note: Context is now the repo root, so we copy from there
-COPY go.mod go.sum ./
+COPY go.mod go.sum go.work go.work.sum ./
 COPY graft ./graft
 # Download avalanche dependencies using go mod
-RUN go mod download && go mod tidy
+# proxy.golang.org intermittently drops a module download mid-transfer with an
+# HTTP/2 INTERNAL_ERROR, failing the whole build. Retry before giving up.
+RUN for i in 1 2 3 4 5; do \
+        go mod download && break; \
+        if [ "$i" -eq 5 ]; then echo "go mod download failed after $i attempts" >&2; exit 1; fi; \
+        echo "go mod download failed (attempt $i/5), retrying in 15s" >&2; \
+        sleep 15; \
+    done && go mod tidy
 
 # Copy the entire repo to preserve module structure
 COPY . .

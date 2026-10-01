@@ -15,15 +15,14 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 )
 
 var (
-	_ block.Visitor = (*options)(nil)
+	_ platform.BlockVisitor = (*options)(nil)
 
 	errUnexpectedProposalTxType           = errors.New("unexpected proposal transaction type")
 	errFailedFetchingStakerTx             = errors.New("failed fetching staker transaction")
@@ -43,24 +42,24 @@ type options struct {
 	state                   state.Chain
 
 	// outputs populated by this struct's methods:
-	preferredBlock block.Block
-	alternateBlock block.Block
+	preferredBlock platform.Block
+	alternateBlock platform.Block
 }
 
-func (*options) BanffAbortBlock(*block.BanffAbortBlock) error {
+func (*options) BanffAbortBlock(*platform.BanffAbortBlock) error {
 	return snowman.ErrNotOracle
 }
 
-func (*options) BanffCommitBlock(*block.BanffCommitBlock) error {
+func (*options) BanffCommitBlock(*platform.BanffCommitBlock) error {
 	return snowman.ErrNotOracle
 }
 
-func (o *options) BanffProposalBlock(b *block.BanffProposalBlock) error {
+func (o *options) BanffProposalBlock(b *platform.BanffProposalBlock) error {
 	timestamp := b.Timestamp()
 	blkID := b.ID()
 	nextHeight := b.Height() + 1
 
-	commitBlock, err := block.NewBanffCommitBlock(timestamp, blkID, nextHeight)
+	commitBlock, err := platform.NewBanffCommitBlock(timestamp, blkID, nextHeight)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to create commit block: %w",
@@ -68,7 +67,7 @@ func (o *options) BanffProposalBlock(b *block.BanffProposalBlock) error {
 		)
 	}
 
-	abortBlock, err := block.NewBanffAbortBlock(timestamp, blkID, nextHeight)
+	abortBlock, err := platform.NewBanffAbortBlock(timestamp, blkID, nextHeight)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to create abort block: %w",
@@ -100,24 +99,24 @@ func (o *options) BanffProposalBlock(b *block.BanffProposalBlock) error {
 	return nil
 }
 
-func (*options) BanffStandardBlock(*block.BanffStandardBlock) error {
+func (*options) BanffStandardBlock(*platform.BanffStandardBlock) error {
 	return snowman.ErrNotOracle
 }
 
-func (*options) ApricotAbortBlock(*block.ApricotAbortBlock) error {
+func (*options) ApricotAbortBlock(*platform.ApricotAbortBlock) error {
 	return snowman.ErrNotOracle
 }
 
-func (*options) ApricotCommitBlock(*block.ApricotCommitBlock) error {
+func (*options) ApricotCommitBlock(*platform.ApricotCommitBlock) error {
 	return snowman.ErrNotOracle
 }
 
-func (o *options) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
+func (o *options) ApricotProposalBlock(b *platform.ApricotProposalBlock) error {
 	blkID := b.ID()
 	nextHeight := b.Height() + 1
 
 	var err error
-	o.preferredBlock, err = block.NewApricotCommitBlock(blkID, nextHeight)
+	o.preferredBlock, err = platform.NewApricotCommitBlock(blkID, nextHeight)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to create commit block: %w",
@@ -125,7 +124,7 @@ func (o *options) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 		)
 	}
 
-	o.alternateBlock, err = block.NewApricotAbortBlock(blkID, nextHeight)
+	o.alternateBlock, err = platform.NewApricotAbortBlock(blkID, nextHeight)
 	if err != nil {
 		return fmt.Errorf(
 			"failed to create abort block: %w",
@@ -135,16 +134,16 @@ func (o *options) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
 	return nil
 }
 
-func (*options) ApricotStandardBlock(*block.ApricotStandardBlock) error {
+func (*options) ApricotStandardBlock(*platform.ApricotStandardBlock) error {
 	return snowman.ErrNotOracle
 }
 
-func (*options) ApricotAtomicBlock(*block.ApricotAtomicBlock) error {
+func (*options) ApricotAtomicBlock(*platform.ApricotAtomicBlock) error {
 	return snowman.ErrNotOracle
 }
 
-func (o *options) prefersCommit(tx *txs.Tx) (bool, error) {
-	unsignedTx, ok := tx.Unsigned.(txs.RewardTx)
+func (o *options) prefersCommit(tx *platform.Tx) (bool, error) {
+	unsignedTx, ok := tx.Unsigned.(platform.RewardTx)
 	if !ok {
 		return false, fmt.Errorf("%w: %T", errUnexpectedProposalTxType, tx.Unsigned)
 	}
@@ -154,7 +153,7 @@ func (o *options) prefersCommit(tx *txs.Tx) (bool, error) {
 		return false, fmt.Errorf("%w: %w", errFailedFetchingStakerTx, err)
 	}
 
-	staker, ok := stakerTx.Unsigned.(txs.Staker)
+	staker, ok := stakerTx.Unsigned.(platform.Staker)
 	if !ok {
 		return false, fmt.Errorf("%w: %T", errUnexpectedStakerTxType, stakerTx.Unsigned)
 	}

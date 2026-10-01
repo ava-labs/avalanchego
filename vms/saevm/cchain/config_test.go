@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -70,24 +71,24 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "block_building/min_price_target",
 			json: `{"min-price-target":1000}`,
-			want: with(func(c *config) { c.PriceTarget = utils.PointerTo(gas.Price(1000)) }),
+			want: with(func(c *config) { c.PriceTarget = new(gas.Price(1000)) }),
 		},
 		{
 			// An explicit 0 is a vote for the minimum, distinct from an absent
 			// field, which is no vote.
 			name: "block_building/min_price_target_explicit_zero",
 			json: `{"min-price-target":0}`,
-			want: with(func(c *config) { c.PriceTarget = utils.PointerTo(gas.Price(0)) }),
+			want: with(func(c *config) { c.PriceTarget = new(gas.Price) }),
 		},
 		{
 			name: "block_building/gas_target",
 			json: `{"gas-target":1000}`,
-			want: with(func(c *config) { c.GasTarget = utils.PointerTo(gas.Gas(1000)) }),
+			want: with(func(c *config) { c.GasTarget = new(gas.Gas(1000)) }),
 		},
 		{
 			name: "block_building/min_delay_target",
 			json: `{"min-delay-target":2000}`,
-			want: with(func(c *config) { c.MinDelayTarget = utils.PointerTo[uint64](2000) }),
+			want: with(func(c *config) { c.MinDelayTarget = new(uint64(2000)) }),
 		},
 
 		// State & trie
@@ -108,10 +109,19 @@ func TestParseConfig(t *testing.T) {
 			want:      with(func(c *config) { c.CommitInterval = 256 }),
 		},
 		{
-			name:      "state/commit_interval_production_network",
+			name:      "state/hash_commit_interval_production_network",
 			json:      `{"commit-interval":256}`,
 			networkID: constants.MainnetID,
 			wantErr:   testerr.Is(errProductionCommitInterval),
+		},
+		{
+			name:      "state/production_firewood",
+			json:      `{"state-scheme":"firewood","commit-interval":256}`,
+			networkID: constants.MainnetID,
+			want: with(func(c *config) {
+				c.StateScheme = customrawdb.FirewoodScheme
+				c.CommitInterval = 256
+			}),
 		},
 		{
 			name: "state/trie_clean_cache",
@@ -271,9 +281,9 @@ func TestParseConfig(t *testing.T) {
 				"state-sync-ids":["` + nodeID.String() + `"]
 			}`,
 			want: config{
-				PriceTarget:                  utils.PointerTo(gas.Price(500)),
-				GasTarget:                    utils.PointerTo(gas.Gas(1500)),
-				MinDelayTarget:               utils.PointerTo[uint64](3000),
+				PriceTarget:                  new(gas.Price(500)),
+				GasTarget:                    new(gas.Gas(1500)),
+				MinDelayTarget:               new(uint64(3000)),
 				Pruning:                      false,
 				StateScheme:                  customrawdb.FirewoodScheme,
 				CommitInterval:               256,
@@ -307,6 +317,44 @@ func TestParseConfig(t *testing.T) {
 			}
 			require.Equal(t, test.want, got, "parseConfig(...)")
 			require.Equal(t, test.wantWarnings, log.Records, "parseConfig(...) logs")
+		})
+	}
+}
+
+func TestConfigStateSyncInterval(t *testing.T) {
+	tests := []struct {
+		name           string
+		networkID      uint32
+		commitInterval uint64
+		want           uint64
+	}{
+		{
+			name:           "custom_network",
+			networkID:      constants.UnitTestID,
+			commitInterval: 256,
+			want:           256,
+		},
+		{
+			name:           "mainnet",
+			networkID:      constants.MainnetID,
+			commitInterval: 256,
+			want:           saedb.DefaultCommitInterval,
+		},
+		{
+			name:           "fuji",
+			networkID:      constants.FujiID,
+			commitInterval: 256,
+			want:           saedb.DefaultCommitInterval,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := defaultConfig()
+			c.StateScheme = customrawdb.FirewoodScheme
+			c.CommitInterval = tt.commitInterval
+
+			got := c.stateSyncConfig(tt.networkID).DBConfig.CommitInterval
+			require.Equal(t, tt.want, got, "%T.stateSyncConfig(%d).DBConfig.CommitInterval", c, tt.networkID)
 		})
 	}
 }

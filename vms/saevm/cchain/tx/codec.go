@@ -85,12 +85,11 @@ func ParseSlice(b []byte) ([]*Tx, error) {
 	return txs, nil
 }
 
-// FromBlock returns the transactions carried in b's extData. Blocks before
-// ApricotPhase5 carry at most one transaction, encoded on its own rather than
-// as a slice.
-func FromBlock(c *params.ChainConfig, b *types.Block) ([]*Tx, error) {
+// FromBlock parses the transactions in b's extData, using the encoding that
+// config specifies at b's timestamp.
+func FromBlock(config *params.ChainConfig, b *types.Block) ([]*Tx, error) {
 	extData := customtypes.BlockExtData(b)
-	if corethparams.GetExtra(c).IsApricotPhase5(b.Time()) {
+	if corethparams.GetExtra(config).IsApricotPhase5(b.Time()) {
 		return ParseSlice(extData)
 	}
 	if len(extData) == 0 {

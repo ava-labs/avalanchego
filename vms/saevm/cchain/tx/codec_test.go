@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/params"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
@@ -17,16 +19,15 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
-	ethparams "github.com/ava-labs/libevm/params"
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
@@ -238,32 +239,53 @@ func TestParseSlice(t *testing.T) {
 	}
 }
 
-// FromBlock MUST decode extData under the encoding of the block's own upgrade
-// rules, a single transaction before ApricotPhase5 and a slice from then on.
 func TestFromBlock(t *testing.T) {
-	const ap5Time = 100
-	config := cparams.WithExtra(&ethparams.ChainConfig{}, &extras.ChainConfig{
-		NetworkUpgrades: extras.NetworkUpgrades{
-			ApricotPhase5BlockTimestamp: utils.PointerTo[uint64](ap5Time),
-		},
-	})
+	newTxs := make([]*Tx, len(allTxs))
+	for i, tx := range allTxs {
+		newTxs[i] = tx.new
+	}
 
-	slice, err := MarshalSlice([]*Tx{importTx.new, exportTx.new})
+	sliceBytes, err := MarshalSlice(newTxs)
 	require.NoError(t, err, "MarshalSlice()")
+
+	const (
+		preAP5Time uint64 = 0
+		ap5Time           = preAP5Time + 1
+	)
+	config := corethparams.WithExtra(
+		&params.ChainConfig{},
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
+				ApricotPhase5BlockTimestamp: new(ap5Time),
+			},
+		},
+	)
 
 	tests := []struct {
 		name    string
 		time    uint64
 		extData []byte
 		want    []*Tx
+		wantErr error
 	}{
 		{
 			name: "pre_ap5_empty",
-			time: ap5Time - 1,
+			time: preAP5Time,
+		},
+		{
+			name: "pre_ap5_empty_slice",
+			time: preAP5Time,
+			extData: []byte{
+				// codecVersion:
+				0x00, 0x00,
+				// len(txs):
+				0x00, 0x00, 0x00, 0x00,
+			},
+			wantErr: wrappers.ErrInsufficientLength,
 		},
 		{
 			name:    "pre_ap5_single",
-			time:    ap5Time - 1,
+			time:    preAP5Time,
 			extData: importTx.bytes,
 			want:    []*Tx{importTx.new},
 		},
@@ -272,20 +294,44 @@ func TestFromBlock(t *testing.T) {
 			time: ap5Time,
 		},
 		{
+			name: "ap5_empty_slice",
+			time: ap5Time,
+			extData: []byte{
+				// codecVersion:
+				0x00, 0x00,
+				// len(txs):
+				0x00, 0x00, 0x00, 0x00,
+			},
+			wantErr: ErrInefficientSlicePacking,
+		},
+		{
+			name:    "ap5_single",
+			time:    ap5Time,
+			extData: importTx.bytes,
+			wantErr: codec.ErrExtraSpace,
+		},
+		{
 			name:    "ap5_slice",
 			time:    ap5Time,
-			extData: slice,
-			want:    []*Tx{importTx.new, exportTx.new},
+			extData: sliceBytes,
+			want:    newTxs,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			block := cchaintest.NewTestBlock(t,
-				cchaintest.WithTimestamp(test.time),
-				cchaintest.WithExtData(test.extData),
+			block := customtypes.NewBlockWithExtData(
+				&types.Header{
+					Time: test.time,
+				},
+				nil, // txs
+				nil, // uncles
+				nil, // receipts
+				nil, // hasher, unused without txs
+				test.extData,
+				true, // update [customtypes.HeaderExtra.ExtDataHash]
 			)
 			got, err := FromBlock(config, block)
-			require.NoError(t, err, "FromBlock()")
+			require.ErrorIs(t, err, test.wantErr, "FromBlock()")
 			if diff := cmp.Diff(test.want, got, txtest.CmpOpt()); diff != "" {
 				t.Errorf("FromBlock() diff (-want +got):\n%s", diff)
 			}

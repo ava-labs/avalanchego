@@ -14,7 +14,9 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
   - [Go unit test platforms](#go-unit-test-platforms)
   - [Local composite actions define reusable GitHub Actions behavior](#local-composite-actions-define-reusable-github-actions-behavior)
   - [CI-only helpers implement CI-specific behavior](#ci-only-helpers-implement-ci-specific-behavior)
+  - [C-Chain reexecution benchmarks](#c-chain-reexecution-benchmarks)
 - [Provision CI job dependencies](#provision-ci-job-dependencies)
+  - [Task](#task)
 - [Using Nix in GitHub Actions](#using-nix-in-github-actions)
   - [Run `install-nix` jobs in the Nix dev shell](#run-install-nix-jobs-in-the-nix-dev-shell)
   - [Start the Nix dev shell in composite actions](#start-the-nix-dev-shell-in-composite-actions)
@@ -166,6 +168,18 @@ feature-specific helpers with the feature, such as
 `scripts/actionlint.sh` allows workflow calls to helpers named `workflow-*.sh`. Do
 not use that allowance for an operation that should be a task or normal script.
 
+### C-Chain reexecution benchmarks
+
+The C-Chain reexecution benchmark workflows call the
+[`c-chain-reexecution-benchmark`](../.github/actions/c-chain-reexecution-benchmark/action.yml)
+action. The action owns the benchmark setup: it invokes
+[`install-nix`](../.github/actions/install-nix/action.yml) and, when its
+`firewood-ref` or `libevm-ref` input is set, runs `run-polyrepo` before the
+benchmark. Firewood triggers benchmark requests through the GitHub API. The
+pull-request trigger verifies that this machinery remains usable in avalanchego
+CI. Keep workflow-specific triggers, matrices, and runner setup in the workflows.
+Do not duplicate dependency provisioning or `run-polyrepo` there.
+
 ## Provision CI job dependencies
 
 Nix provides the repository's preferred local development environment. See
@@ -184,7 +198,50 @@ reserved for jobs with dependencies that another setup action does not provide.
 
 `setup-go-for-project`, `setup-bazel`, and `install-nix` are alternative Go
 provisioning mechanisms. A job that uses `setup-bazel` can also use `install-nix`
-for dependencies that Bazel does not provide.
+for dependencies that Bazel does not provide. `install-nix` restores Go caches but
+does not save them. [`setup-go-for-project`](../.github/actions/setup-go-for-project/action.yml)
+is the designated Go-cache writer. Keep `install-nix` restore-only.
+
+### Task
+
+[Task](https://taskfile.dev) runs repository operations in CI. The local
+[`setup-task`](../.github/actions/setup-task/action.yml) action makes the Task
+binary available to Go, Bazel, and Docker jobs. Run this action after checkout
+because it reads `tools/external/go.mod`.
+
+CI never compiles Task from source. Every CI path that uses
+`./scripts/run_task.sh` must run `setup-task`, `setup-go-for-project`, or
+`setup-bazel` first, unless a Nix development shell provides `task`.
+
+See [Task version](./tasks.md#task-version) for the version policy and update
+commands.
+
+The action uses a GitHub Actions cache, not an artifact. A cache lets unrelated
+jobs and workflow runs reuse one binary. An artifact belongs to one workflow
+run. The cache key includes the Task version, operating system, and
+architecture. Each job restores the matching cache. Only runs on `master` save
+a cache entry. Pull request and merge-queue jobs download Task on a cache miss.
+They do not save the binary. This policy limits cache storage to merged versions
+and prevents unmerged code from producing shared cache contents. Scheduled
+`master` jobs can save entries for platforms not tested on each push.
+
+A cache entry exists only after a `master` job runs on the same operating system
+and architecture. When you add a CI platform, add a `master` job for that
+platform if it needs a reusable Task cache. Otherwise, cache-miss jobs download
+Task.
+
+On a cache miss, the action downloads the platform release from the Task GitHub
+release and checks its SHA-256 value against the checked-in value in
+`setup_task.sh`. This avoids a host Go dependency in Bazel jobs. A source build would
+require host Go before Task can run. The checked-in checksum detects a damaged or
+changed archive in transit and makes release-archive changes visible in repository
+review.
+
+When changing this setup, keep these rules:
+
+- Keep Nix and `tools/external/go.mod` on the same Task version.
+- Keep cache writes limited to runs on `master`.
+- Keep the release platform mapping compatible with every CI runner.
 
 ## Using Nix in GitHub Actions
 
@@ -198,7 +255,7 @@ A job that directly uses `./.github/actions/install-nix` must set its default sh
 
 CI previously failed when a job installed Nix but ran `scripts/run_task.sh` from a
 step outside the dev shell. In these jobs, the dev shell, rather than
-`setup-go-for-project`, supplies `task` and the required Go version.
+`setup-go-for-project`, supplies Task and the required Go version.
 
 The failure occurred as follows:
 
@@ -233,11 +290,6 @@ example, a step that reads GitHub Actions environment variables can use `nix dev
 A composite action cannot set `defaults.run.shell`. A calling job's default shell does
 not apply to the action. Set `shell:` on each `run:` step that needs the Nix dev
 shell.
-
-Composite actions that use the Nix dev shell currently expect the calling job to
-install Nix. Future work could remove this requirement by making the `install-nix`
-composite action idempotent so that jobs and custom actions could safely invoke it
-repeatedly.
 
 ## Runners and external actions
 

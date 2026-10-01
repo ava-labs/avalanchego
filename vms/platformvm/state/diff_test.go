@@ -21,8 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 type nilStateGetter struct{}
@@ -414,7 +414,7 @@ func TestDiffL1ValidatorsErrors(t *testing.T) {
 			// constant among all tests.
 			test.l1Validator.SubnetID = l1Validator.SubnetID
 			test.l1Validator.Weight = 1                        // Not removed
-			test.l1Validator.EndAccumulatedFee = rand.Uint64() //#nosec G404
+			test.l1Validator.EndAccumulatedFee = rand.Uint64() // #nosec G404
 			err = d.PutL1Validator(test.l1Validator)
 			require.ErrorIs(err, test.expectedErr)
 
@@ -565,8 +565,8 @@ func TestDiffSubnet(t *testing.T) {
 	state := newTestState(t, memdb.New())
 
 	// Initialize parent with one subnet
-	parentStateCreateSubnetTx := &txs.Tx{
-		Unsigned: &txs.CreateSubnetTx{
+	parentStateCreateSubnetTx := &platform.Tx{
+		Unsigned: &platform.CreateSubnetTx{
 			Owner: fxmock.NewOwner(ctrl),
 		},
 	}
@@ -586,8 +586,8 @@ func TestDiffSubnet(t *testing.T) {
 	require.NoError(err)
 
 	// Put a subnet
-	createSubnetTx := &txs.Tx{
-		Unsigned: &txs.CreateSubnetTx{
+	createSubnetTx := &platform.Tx{
+		Unsigned: &platform.CreateSubnetTx{
 			Owner: fxmock.NewOwner(ctrl),
 		},
 	}
@@ -615,8 +615,8 @@ func TestDiffChain(t *testing.T) {
 	subnetID := ids.GenerateTestID()
 
 	// Initialize parent with one chain
-	parentStateCreateChainTx := &txs.Tx{
-		Unsigned: &txs.CreateChainTx{
+	parentStateCreateChainTx := &platform.Tx{
+		Unsigned: &platform.CreateChainTx{
 			SubnetID: subnetID,
 		},
 	}
@@ -626,7 +626,7 @@ func TestDiffChain(t *testing.T) {
 	chains, err := state.GetChains(subnetID)
 	require.NoError(err)
 	require.Equal(
-		[]*txs.Tx{
+		[]*platform.Tx{
 			parentStateCreateChainTx,
 		},
 		chains,
@@ -636,8 +636,8 @@ func TestDiffChain(t *testing.T) {
 	require.NoError(err)
 
 	// Put a chain
-	createChainTx := &txs.Tx{
-		Unsigned: &txs.CreateChainTx{
+	createChainTx := &platform.Tx{
+		Unsigned: &platform.CreateChainTx{
 			SubnetID: subnetID, // note this is the same subnet as [parentStateCreateChainTx]
 		},
 	}
@@ -650,7 +650,7 @@ func TestDiffChain(t *testing.T) {
 	chains, err = state.GetChains(subnetID)
 	require.NoError(err)
 	require.Equal(
-		[]*txs.Tx{
+		[]*platform.Tx{
 			parentStateCreateChainTx,
 			createChainTx,
 		},
@@ -668,8 +668,8 @@ func TestDiffTx(t *testing.T) {
 
 	// Put a tx
 	subnetID := ids.GenerateTestID()
-	tx := &txs.Tx{
-		Unsigned: &txs.CreateChainTx{
+	tx := &platform.Tx{
+		Unsigned: &platform.CreateChainTx{
 			SubnetID: subnetID,
 		},
 	}
@@ -687,8 +687,8 @@ func TestDiffTx(t *testing.T) {
 	{
 		// Assert that we can get a tx from the parent state
 		// [state] returns 1 tx.
-		parentTx := &txs.Tx{
-			Unsigned: &txs.CreateChainTx{
+		parentTx := &platform.Tx{
+			Unsigned: &platform.CreateChainTx{
 				SubnetID: subnetID,
 			},
 		}
@@ -884,9 +884,9 @@ func TestDiffSubnetOwner(t *testing.T) {
 		owner1 = fxmock.NewOwner(ctrl)
 		owner2 = fxmock.NewOwner(ctrl)
 
-		createSubnetTx = &txs.Tx{
-			Unsigned: &txs.CreateSubnetTx{
-				BaseTx: txs.BaseTx{},
+		createSubnetTx = &platform.Tx{
+			Unsigned: &platform.CreateSubnetTx{
+				BaseTx: platform.BaseTx{},
 				Owner:  owner1,
 			},
 		}
@@ -979,7 +979,7 @@ func TestDiffSubnetTransformation(t *testing.T) {
 	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
 	require.NoError(t, err)
 
-	wantTx := &txs.Tx{Unsigned: &txs.TransformSubnetTx{Subnet: subnetID}}
+	wantTx := &platform.Tx{Unsigned: &platform.TransformSubnetTx{Subnet: subnetID}}
 	d.AddSubnetTransformation(wantTx)
 
 	gotTx, err := d.GetSubnetTransformation(subnetID)
@@ -1005,9 +1005,9 @@ func TestDiffStacking(t *testing.T) {
 		owner2 = fxmock.NewOwner(ctrl)
 		owner3 = fxmock.NewOwner(ctrl)
 
-		createSubnetTx = &txs.Tx{
-			Unsigned: &txs.CreateSubnetTx{
-				BaseTx: txs.BaseTx{},
+		createSubnetTx = &platform.Tx{
+			Unsigned: &platform.CreateSubnetTx{
+				BaseTx: platform.BaseTx{},
 				Owner:  owner1,
 			},
 		}

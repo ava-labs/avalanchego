@@ -1,8 +1,35 @@
 # Release Notes
 
-## Pending (v1.15.1)
+## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
 
-- None (delete and fill in as you work)
+### Metrics
+
+- Added `avalanche_evm_transition_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
+
+## [v1.15.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.1)
+
+### Features
+
+- SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
+- Updated the minimum Go version from `1.25.10` to `1.26.8`.
+- Helicon is now active from genesis on local networks. A local network started on a previous version is not compatible with this version.
+
+### APIs
+
+- Added:
+  - `restakedValidationRewards` and `restakedDelegateeRewards` fields to `platform.getCurrentValidators` results for auto-renewed validators
+
+### Metrics
+
+- Added `avalanche_platformvm_local_delegated_staked` (gauge): amount (in nAVAX) of AVAX delegated to this node on the Primary Network.
+- Route all go-ethereum metrics to `transition` after transition, allowing use after node restart.
+
+### Fixes
+
+- Fixed SAE re-execution of pre-ApricotPhase5 C-Chain blocks containing cross-chain transactions, which caused historical state queries to fail on some API nodes.
+- Timely cancellation of `snapshot` generation, without which SAE block execution lags on large `hashdb` archives.
+- New Firewood archival nodes commit genesis state on all chains.
+- SAE `eth_estimateGas` and `eth_createAccessList` now include the minimum gas limit that the mempool requires for the transaction's size. Large transactions signed with the estimate were previously rejected with `insufficient gas limit for tx size`.
 
 ## [v1.15.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)
 

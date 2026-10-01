@@ -40,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -49,7 +48,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -57,6 +55,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
@@ -269,6 +268,13 @@ func withCommitInterval(n uint64) sutOption {
 	})
 }
 
+// withFirewood selects Firewood as the trie database
+func withFirewood() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.StateScheme = customrawdb.FirewoodScheme
+	})
+}
+
 // withStateSyncDisabled clears [config.StateSyncEnabled], which defaults to
 // true.
 func withStateSyncDisabled() sutOption {
@@ -352,14 +358,10 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 	tb.Helper()
 
-	// Run under the latest network upgrade rules by default.
-	chainConfig := cparams.Copy(saetest.ChainConfig())
-	cparams.WithExtra(&chainConfig, extras.TestChainConfig)
-
 	var (
 		cfg = options.ApplyTo(&sutConfig{
 			genesis: core.Genesis{
-				Config:     &chainConfig,
+				Config:     cchaintest.ChainConfig(),
 				Timestamp:  uint64(upgrade.InitiallyActiveTime.Unix()), //#nosec G115 -- Known non-negative
 				Difficulty: big.NewInt(0),                              // irrelevant but required to marshal
 				Alloc:      types.GenesisAlloc{},
@@ -1017,11 +1019,13 @@ func addNAVAX(tb testing.TB, balance uint256.Int, nAVAXDelta int64) uint256.Int 
 
 	var (
 		op       = balance.AddOverflow
-		absDelta = uint64(nAVAXDelta)
+		absDelta uint64
 	)
 	if nAVAXDelta < 0 {
 		op = balance.SubOverflow
-		absDelta = -absDelta
+		absDelta = uint64(-nAVAXDelta)
+	} else {
+		absDelta = uint64(nAVAXDelta)
 	}
 
 	delta := tx.ScaleAVAX(absDelta)
@@ -1089,6 +1093,57 @@ func TestImport(t *testing.T) {
 	)
 	sut.assertAccount(t, receiver, nonce, tx.ScaleAVAX(amountMinted))
 	sut.assertUTXOsMissing(t, sut.ctx.ChainID, sourceChain, utxo)
+}
+
+func TestStatefulRPCsReconstructExtraState(t *testing.T) {
+	const (
+		commitInterval uint64 = 4
+		numBlocks             = 2*commitInterval + 3
+	)
+
+	tests := []struct {
+		name string
+		opts []sutOption
+	}{
+		{
+			name: "hashdb_pruning",
+			opts: []sutOption{withCommitInterval(commitInterval)},
+		},
+		{
+			name: "firewood_commit_interval",
+			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(commitInterval)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := txtest.NewKey(t)
+			sender := key.EthAddress()
+			timeOpt, clock := withVMTime(testStartTime)
+			opts := []sutOption{withMaxAllocFor(sender), timeOpt, withDB(memdb.New()), withChainDataDir(t.TempDir())}
+			opts = append(opts, tt.opts...)
+
+			ctx, node := newSUT(t, opts...)
+			w := newWallet(key, node.ctx, node.Client)
+			for range numBlocks {
+				blk := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+				clock.AdvanceToSettle(ctx, t, blk)
+			}
+
+			// Restarting the VM clears all caches so that every uncommitted
+			// state root MUST be reconstructed by re-execution.
+			require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+			t.Run("restart", func(t *testing.T) {
+				ctx, sut := newSUT(t, opts...)
+
+				for h := range numBlocks + 1 {
+					got, err := sut.ethclient.NonceAt(ctx, sender, new(big.Int).SetUint64(h))
+					require.NoErrorf(t, err, "%T.NonceAt(%d)", sut.ethclient, h)
+					assert.Equalf(t, h, got, "%T.NonceAt(%d): one export per block", sut.ethclient, h)
+				}
+			})
+		})
+	}
 }
 
 // TestBuildBlockOnProcessing verifies that the block builder excludes a mempool
@@ -1712,7 +1767,7 @@ func TestDynamicPriceExponent(t *testing.T) {
 		},
 		{
 			name:    "max_diff",
-			desired: utils.PointerTo[gas.Price](2),
+			desired: new(gas.Price(2)),
 			want: []dynamic.PriceExponent{
 				maxDiff,
 				2 * maxDiff,
@@ -1765,7 +1820,7 @@ func TestDynamicTargetExponent(t *testing.T) {
 		},
 		{
 			name:    "max_diff",
-			desired: utils.PointerTo[gas.Gas](15_000_000),
+			desired: new(gas.Gas(15_000_000)),
 			want: []dynamic.TargetExponent{
 				maxDiff,
 				2 * maxDiff,
@@ -1818,7 +1873,7 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 		},
 		{
 			name:    "votes_up_capped",
-			desired: utils.PointerTo[uint64](4000), // above the ~2000ms initial
+			desired: new(uint64(4000)), // above the ~2000ms initial
 			want: []dynamic.DelayExponent{
 				dynamic.InitialDelayExponent + maxDiff,
 				dynamic.InitialDelayExponent + 2*maxDiff,
@@ -1826,7 +1881,7 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 		},
 		{
 			name:    "votes_down_capped",
-			desired: utils.PointerTo[uint64](1000),
+			desired: new(uint64(1000)),
 			want: []dynamic.DelayExponent{
 				dynamic.InitialDelayExponent - maxDiff,
 				dynamic.InitialDelayExponent - 2*maxDiff,
@@ -1910,7 +1965,7 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 	require.NoErrorf(t, sut.IssueTx(ctx, w.newMinimalTx(t)), "%T.IssueTx()", sut.Client)
 	child := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
-	earlyMS := uint64(earliestBuildTime(parent).UnixMilli()) - 1 //#nosec G115 -- Known non-negative
+	earlyMS := uint64(earliestBuildTime(parent).UnixMilli()) - 1
 	err := sut.verifyTampered(ctx, t, child, func(hdr *types.Header) {
 		hdr.Time = earlyMS / 1000
 		tamperExtra(func(e *customtypes.HeaderExtra) {
@@ -2096,7 +2151,7 @@ func TestPreHeliconBlocksDisallowed(t *testing.T) {
 		valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
 		hdr := valid.Header()
-		preHeliconMS := uint64(preHeliconTime.UnixMilli()) //#nosec G115 -- Known non-negative
+		preHeliconMS := uint64(preHeliconTime.UnixMilli())
 		hdr.Time = preHeliconMS / 1000
 		customtypes.GetHeaderExtra(hdr).TimeMilliseconds = &preHeliconMS
 

@@ -25,7 +25,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
@@ -41,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	cchainextras "github.com/ava-labs/avalanchego/vms/saevm/cchain/extras"
 )
 
@@ -141,12 +139,9 @@ func newSUT(tb testing.TB, state libevm.StateReader) (context.Context, *SUT) {
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
-	// Cross-chain transactions are decoded under the block's upgrade rules, so
-	// the test blocks' slice encoding requires ApricotPhase5 to be active.
-	chainConfig := cparams.Copy(saetest.ChainConfig())
 	pool, err := New(
 		snowCtx,
-		cparams.WithExtra(&chainConfig, extras.TestChainConfig),
+		cchaintest.ChainConfig(),
 		NewPending(),
 		backend,
 		maxSize,
@@ -345,7 +340,7 @@ func TestAdd(t *testing.T) {
 	for i := range maxSizeTxs {
 		sk := newKey(t)
 		allKeys = append(allKeys, sk)
-		amount := lowFee + uint64(i) //#nosec G115 -- Won't overflow
+		amount := lowFee + uint64(i)
 		maxSizeTxs[i] = newExport(t, []*secp256k1.PrivateKey{sk}, withAmount(amount))
 	}
 	slices.Reverse(maxSizeTxs) // Sorted by descending fee.

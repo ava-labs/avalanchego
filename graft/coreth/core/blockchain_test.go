@@ -46,6 +46,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
 	ethparams "github.com/ava-labs/libevm/params"
@@ -513,6 +514,48 @@ func testArchiveUngracefulShutdown(t *testing.T, scheme string) {
 		}
 	}
 	blockchain.Stop()
+}
+
+func TestFirewoodGenesisPersisted(t *testing.T) {
+	var (
+		key, _  = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+		addr    = crypto.PubkeyToAddress(key.PublicKey)
+		chainDB = rawdb.NewMemoryDatabase()
+		gspec   = &Genesis{
+			Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
+			Alloc:  types.GenesisAlloc{addr: {Balance: big.NewInt(1000000)}},
+		}
+		config = DefaultCacheConfigWithScheme(customrawdb.FirewoodScheme)
+	)
+	config.Pruning = false
+	config.CommitInterval = 16 // Firewood defers persistence when this is not 1
+	config.ChainDataDir = t.TempDir()
+
+	blockchain, err := createBlockChain(chainDB, config, gspec, common.Hash{})
+	require.NoError(t, err, "createBlockChain()")
+
+	// Accept fewer blocks than the commit interval so that genesis is not the
+	// latest revision when Firewood is closed.
+	signer := types.HomesteadSigner{}
+	_, blocks, _, err := GenerateChainWithGenesis(gspec, blockchain.engine, 3, 10, func(_ int, gen *BlockGen) {
+		tx, err := types.SignTx(types.NewTransaction(gen.TxNonce(addr), common.Address{1}, big.NewInt(10000), ethparams.TxGas, nil, nil), signer, key)
+		require.NoError(t, err)
+		gen.AddTx(tx)
+	})
+	require.NoError(t, err)
+	_, err = blockchain.InsertChain(blocks)
+	require.NoError(t, err, "InsertChain()")
+	for _, b := range blocks {
+		require.NoError(t, blockchain.Accept(b), "Accept()")
+	}
+	blockchain.Stop()
+
+	tdb := triedb.NewDatabase(chainDB, config.triedbConfig())
+	defer func() {
+		require.NoErrorf(t, tdb.Close(), "%T.Close", tdb)
+	}()
+	_, err = tdb.Reader(gspec.ToBlock().Root())
+	require.NoError(t, err, "genesis state not persisted")
 }
 
 // TestPruningToNonPruning tests that opening a previously pruned database as a

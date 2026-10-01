@@ -15,8 +15,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/DataDog/zstd"
 	"github.com/cespare/xxhash/v2"
+	"github.com/klauspost/compress/zstd"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
@@ -208,9 +208,9 @@ func New(config DatabaseConfig, log logging.Logger) (_ database.HeightIndex, err
 		databaseLog = logging.NoLog{}
 	}
 
-	// from benchmarks, zstd.BestSpeed is about 100% faster than the default
+	// from benchmarks, zstd.SpeedFastest is about 100% faster than the default
 	// compression level while giving us ~5% better compression ratio than Snappy.
-	compressor, err := compression.NewZstdCompressorWithLevel(math.MaxUint32, zstd.BestSpeed)
+	compressor, err := compression.NewZstdCompressorWithLevel(math.MaxUint32, zstd.SpeedFastest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize compressor: %w", err)
 	}
@@ -493,6 +493,9 @@ func (db *Database) Get(height BlockHeight) (BlockData, error) {
 	var bh blockEntryHeader
 	if err := bh.UnmarshalBinary(buf[:int(sizeOfBlockEntryHeader)]); err != nil {
 		return nil, fmt.Errorf("failed to deserialize block header: %w", err)
+	}
+	if bh.Height != height {
+		return nil, fmt.Errorf("%w: requested block height %d does not match stored height %d", ErrCorrupted, height, bh.Height)
 	}
 	compressedData := buf[int(sizeOfBlockEntryHeader):]
 	decompressed, err := db.compressor.Decompress(compressedData)
@@ -932,7 +935,13 @@ func (db *Database) openAndInitializeIndex() error {
 	if err != nil {
 		return fmt.Errorf("failed to open index file %s: %w", indexPath, err)
 	}
-	return db.loadOrInitializeHeader()
+	if err := db.loadOrInitializeHeader(); err != nil {
+		if closeErr := db.indexFile.Close(); closeErr != nil {
+			return errors.Join(err, fmt.Errorf("failed to close index file after initialization failure: %w", closeErr))
+		}
+		return err
+	}
+	return nil
 }
 
 func (db *Database) initializeDataFiles() error {
@@ -992,29 +1001,17 @@ func (db *Database) loadOrInitializeHeader() error {
 	}
 	db.nextDataWriteOffset.Store(db.header.NextWriteOffset)
 	db.maxBlockHeight.Store(db.header.MaxHeight)
-	db.logConfigAndHeaderMismatches()
-
-	return nil
+	return db.validateConfigMatchesHeader()
 }
 
-func (db *Database) logConfigAndHeaderMismatches() {
-	// Some config values cannot be changed after index initialization.
-	// If they do not match the index header, log an info that
-	// the index header values will be used instead.
+func (db *Database) validateConfigMatchesHeader() error {
 	if db.config.MinimumHeight != db.header.MinHeight {
-		db.log.Info(
-			"MinimumHeight in config does not match the index header. The MinimumHeight in the index header will be used.",
-			zap.Uint64("configMinimumHeight", db.config.MinimumHeight),
-			zap.Uint64("headerMinimumHeight", db.header.MinHeight),
-		)
+		return fmt.Errorf("%w: MinimumHeight configured=%d persisted=%d", errConfigMismatch, db.config.MinimumHeight, db.header.MinHeight)
 	}
 	if db.config.MaxDataFileSize != db.header.MaxDataFileSize {
-		db.log.Info(
-			"MaxDataFileSize in config does not match the index header. The MaxDataFileSize in the index header will be used.",
-			zap.Uint64("configMaxDataFileSize", db.config.MaxDataFileSize),
-			zap.Uint64("headerMaxDataFileSize", db.header.MaxDataFileSize),
-		)
+		return fmt.Errorf("%w: MaxDataFileSize configured=%d bytes persisted=%d bytes", errConfigMismatch, db.config.MaxDataFileSize, db.header.MaxDataFileSize)
 	}
+	return nil
 }
 
 func (db *Database) closeFiles() {

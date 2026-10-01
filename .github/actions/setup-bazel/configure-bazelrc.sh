@@ -36,5 +36,3 @@ build --remote_cache_compression
 build --remote_header="${BAZEL_REMOTE_CACHE_AUTH_HEADER}"
 EOF
 fi
-
-echo 'RUN_TASK_PREFER_BAZEL=1' >> "$GITHUB_ENV"

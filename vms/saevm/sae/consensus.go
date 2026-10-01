@@ -103,11 +103,12 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		if err := s.MarkSettled(&vm.last.settled); err != nil {
 			return err
 		}
-		vm.metrics.markSettled(s.Height())
+		vm.metrics.markSettled(s)
 	}
 
 	// I(s ∈ S) above, before I(b ∈ A) before X(b ∈ A)
 	vm.last.accepted.Store(b)
+	vm.metrics.markAccepted(b)
 	vm.acceptedBlocks.Send(b)
 	if err := vm.exec.Enqueue(ctx, b); err != nil {
 		return err
@@ -184,8 +185,9 @@ func (vm *VM) acceptSynchronous(ctx context.Context, b *blocks.Block) error {
 	if err := b.MarkSettled(&vm.last.settled); err != nil {
 		return err
 	}
-	vm.metrics.markSettled(b.Height())
 	vm.last.accepted.Store(b)
+	vm.metrics.markAccepted(b)
+	vm.metrics.markSettled(b)
 	vm.acceptedBlocks.Send(b)
 
 	vm.log().Debug(
