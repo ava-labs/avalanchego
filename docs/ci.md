@@ -135,7 +135,7 @@ The `unit` job in `go-ci-pre-merge.yml` calls the reusable
 [`go-ci.yml`](../.github/workflows/go-ci.yml) workflow on Linux AMD64. It runs
 the unified unit test suite ([`scripts/tests.unit.sh`](../scripts/tests.unit.sh))
 through the `test-unit` task. That task disables race detection and test
-shuffling so the Go build and test cache can serve repeated runs.
+shuffling so the cross-run Go build and test cache can serve repeated runs.
 
 On macOS, the `smoke` job calls
 [`go-ci-smoke.yml`](../.github/workflows/go-ci-smoke.yml). macOS runners are
@@ -150,7 +150,9 @@ workflow is defined in
 [`go-ci.yml`](../.github/workflows/go-ci.yml) for each platform. Only the Ubuntu
 24.04 AMD64 job runs `test-unit-race-shuffle`. This task enables race detection
 and shuffled test order. The other scheduled jobs run `test-unit` to check
-platform compatibility without race detection or shuffled test order.
+platform compatibility without race detection or shuffled test order. Scheduled
+jobs restore the cross-run `GOCACHE` for compiler output, then clear its test
+results so scheduled jobs run every test.
 
 ### Local composite actions define reusable GitHub Actions behavior
 
@@ -405,11 +407,35 @@ post-job save cannot be limited to `master` runs by `cache-policy`.
 
 #### Go unit-test cache
 
-The Go `unit` job restores and saves `GOCACHE`, which contains compiler output
-and Go test results. Its key includes the runner platform, `testdata` contents,
-Go source, workspace metadata, and module metadata. A matching `testdata`
-prefix is restored before a platform-only fallback so compiler output remains
-reusable.
+The Go `unit` job restores and saves `GOCACHE`. This archive contains two
+separate kinds of data: compiled package output (the build cache) and Go package
+test results (the test-result cache). `go clean -testcache` expires cached test
+results without removing compiled package output. The key includes the runner label
+and architecture (so different Ubuntu versions have separate exact keys), a
+`build` or `build-and-test` mode, and one content hash. The content hash covers
+tracked Go source, workspace and module metadata, `testdata`, and embedded
+files discovered by `go list`, including test-only embeds. A matching mode
+prefix is restored before a same-runner fallback so compiled package output
+remains reusable across modes. A pre-merge fallback can also reuse test results
+for packages whose inputs have not changed.
+
+| Event | Restore build cache | Reuse test-result cache | Save `GOCACHE` |
+| --- | --- | --- | --- |
+| Pull request | Yes | On an exact hit or a compatible fallback | No |
+| `master` push | Yes | On an exact hit or a compatible fallback | Yes, including test results |
+| Scheduled | Yes | No | Yes, with test results expired |
+
+`clear_unit_test_results` defaults to `true`, so a new caller retains build
+cache entries but runs its tests. The pre-merge workflow is the only caller that
+sets it to `false`. Scheduled jobs retain restored build-cache entries but clear
+test results before testing and expire them again after successful tests,
+before a cache save. They run all tests to expose intermittent failures that
+reused test results could conceal. The two modes use different exact keys:
+a `build` entry has expired test results, so treating it as an exact
+`build-and-test` hit would make pre-merge cache validation fail when tests run.
+Pre-merge can instead restore it as a fallback, run the tests, and save a new
+`build-and-test` entry on `master`. GitHub Actions cannot add those test results
+to the existing immutable `build` entry.
 
 ##### Stable fixture modification times
 
@@ -417,12 +443,17 @@ Git checkout assigns fresh modification times. Go includes fixture modification
 times in its test-result cache keys, so an otherwise exact `GOCACHE` restore on
 a new runner would run fixture-using tests again. The job normalizes every
 `testdata` file and directory to a fixed time before it restores `GOCACHE`.
-The fixture-content hash in the cache key ensures that a fixture change selects
-a different primary key. If the restore falls back to an entry with different
-fixture contents, the job clears test results but keeps compiler output. On an
-exact restore, non-race unit jobs run
+The content hash in the cache key ensures that a fixture change selects
+a different primary key. A saved marker inside `GOCACHE` records the fixture
+hash. On a fallback with different fixtures, or without a marker, the job
+expires test results but keeps compiler output. When fixtures match, it lets Go
+reuse results for unaffected packages. On an exact `build-and-test` restore,
+non-race unit jobs run
 [`workflow-validate-go-unit-cache.sh`](../scripts/workflow-validate-go-unit-cache.sh).
 It fails if no Go package result is present or if any package was not cached.
+Scheduled jobs skip this validation because they intentionally expire test
+results after restoring the cache. They must rerun every test to expose
+intermittent failures that a cached passing result could hide.
 
 The unit job is the cache producer. It saves only after tests finish and when
 `cache-policy` permits it. See [Validate cache saves before

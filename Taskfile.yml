@@ -369,6 +369,8 @@ tasks:
       - test-setup-task
       - test-sync-task-version
       - test-unit-script
+      - test-workflow-hash-go-unit-inputs
+      - test-workflow-prepare-go-unit-cache
       - test-workflow-validate-go-unit-cache
       - check-go-version
       - check-require-directives
@@ -394,6 +396,8 @@ tasks:
       - task: test-setup-task
       - task: test-sync-task-version
       - task: test-unit-script
+      - task: test-workflow-hash-go-unit-inputs
+      - task: test-workflow-prepare-go-unit-cache
       - task: test-workflow-validate-go-unit-cache
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
@@ -644,6 +648,14 @@ tasks:
   test-unit-script:
     desc: Tests unified unit-test script behavior
     cmd: '{{.NIX_RUN}} ./scripts/test_tests_unit.sh'
+
+  test-workflow-hash-go-unit-inputs:
+    desc: Tests hashing of Go unit-test cache inputs
+    cmd: '{{.NIX_RUN}} ./scripts/test_workflow_hash_go_unit_inputs.sh'
+
+  test-workflow-prepare-go-unit-cache:
+    desc: Tests fallback reuse and fixture invalidation for Go unit caching
+    cmd: '{{.NIX_RUN}} ./scripts/test_workflow_prepare_go_unit_cache.sh'
 
   test-workflow-validate-go-unit-cache:
     desc: Tests Go unit-test cache validation

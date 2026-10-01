@@ -530,6 +530,7 @@ jobs:
     with:
       platform_name: linux-amd64
       runner: ubuntu-24.04
+      clear_unit_test_results: false
     secrets: inherit
 
   upgrade:

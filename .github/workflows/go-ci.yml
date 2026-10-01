@@ -15,6 +15,11 @@ on:
         required: false
         type: boolean
         default: false
+      clear_unit_test_results:
+        description: 'Clear restored Go test results before running tests'
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   actions: write
@@ -40,9 +45,13 @@ jobs:
         name: Determine Go unit-test cache key
         shell: bash
         run: |
-          cache_key_platform_prefix="go-unit-v2-${{ runner.os }}-${{ runner.arch }}-"
-          cache_key_prefix="${cache_key_platform_prefix}${{ hashFiles('**/testdata/**') }}-"
-          cache_key="${cache_key_prefix}${{ hashFiles('**/*.go', 'go.work.sum', '**/go.mod', '**/go.sum') }}"
+          set -euo pipefail
+          # Separate scheduled build entries from entries whose test results
+          # must be complete on an exact restore. Runner labels distinguish OS versions.
+          cache_mode=${{ inputs.clear_unit_test_results && 'build' || 'build-and-test' }}
+          cache_key_platform_prefix="go-unit-${{ inputs.runner }}-${{ runner.arch }}-"
+          cache_key_prefix="${cache_key_platform_prefix}${cache_mode}-"
+          cache_key="${cache_key_prefix}$(./scripts/workflow-hash-go-unit-inputs.sh)"
           {
             echo "cache-key=${cache_key}"
             echo "cache-key-prefix=${cache_key_prefix}"
@@ -57,12 +66,16 @@ jobs:
           restore-keys: |
             ${{ steps.cache-key.outputs.cache-key-prefix }}
             ${{ steps.cache-key.outputs.cache-key-platform-prefix }}
-      # A fallback with changed fixtures may have test results keyed by the
-      # same fixed testdata mtimes. Keep its build cache, not its test results.
-      - name: Clear test results from a changed-fixture cache
-        if: ${{ steps.unit-cache.outputs.cache-matched-key != '' && !startsWith(steps.unit-cache.outputs.cache-matched-key, steps.cache-key.outputs.cache-key-prefix) }}
+      # Preserve reusable test results on fallbacks with unchanged fixtures.
+      # Scheduled jobs still rerun every test, including after exact hits.
+      - name: Prepare restored Go unit cache
         shell: bash
-        run: go clean -testcache
+        env:
+          GO_BUILD_CACHE: ${{ steps.setup-go.outputs.go-build-cache-path }}
+          FIXTURE_HASH: ${{ hashFiles('**/testdata/**') }}
+          CLEAR_TEST_RESULTS: ${{ inputs.clear_unit_test_results }}
+          MATCHED_KEY: ${{ steps.unit-cache.outputs.cache-matched-key }}
+        run: ./scripts/workflow-prepare-go-unit-cache.sh "$GO_BUILD_CACHE" "$FIXTURE_HASH" "$CLEAR_TEST_RESULTS" "$MATCHED_KEY"
       - name: Run unit tests
         shell: bash
         run: |
@@ -72,9 +85,14 @@ jobs:
           TIMEOUT: 900s
       - name: Validate restored unit-test results
         # Race-and-shuffle tests intentionally bypass Go test-result caching.
-        if: ${{ steps.unit-cache.outputs.cache-hit == 'true' && !inputs.run_race_shuffle_unit_tests }}
+        if: ${{ !inputs.clear_unit_test_results && steps.unit-cache.outputs.cache-hit == 'true' && !inputs.run_race_shuffle_unit_tests }}
         shell: bash
         run: ./scripts/workflow-validate-go-unit-cache.sh "$RUNNER_TEMP/go-unit-test.log"
+      # Expire scheduled test results before saving; retain compiled output.
+      - name: Clear scheduled test results before saving
+        if: ${{ inputs.clear_unit_test_results && steps.cache-policy.outputs.cache-save-allowed == 'true' && steps.unit-cache.outputs.cache-hit != 'true' }}
+        shell: bash
+        run: go clean -testcache
       - name: Save Go unit-test cache
         if: ${{ steps.cache-policy.outputs.cache-save-allowed == 'true' && steps.unit-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5
