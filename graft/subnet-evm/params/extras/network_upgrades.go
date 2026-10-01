@@ -40,7 +40,7 @@ type NetworkUpgrades struct {
 	FortunaTimestamp *uint64 `json:"fortunaTimestamp,omitempty"`
 	// Granite adds a millisecond timestamp, precompile updates, and P-Chain epochs
 	GraniteTimestamp *uint64 `json:"graniteTimestamp,omitempty"`
-	// The Helicon upgrade happened frfr no cap ong.
+	// Helicon has no effect on Subnet-EVM by itself, but is included for completeness.
 	HeliconTimestamp *uint64 `json:"heliconTimestamp,omitempty"`
 	// Igloo is our next upcoming upgrade.
 	IglooTimestamp *uint64 `json:"iglooTimestamp,omitempty"`

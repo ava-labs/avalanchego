@@ -53,6 +53,10 @@ This checklist ists all the required steps when when adding a new network upgrad
 
 - [ ] Add the fork's timestamp to the `extras.NetworkUpgrades` built in `parseGenesis()`
 
+### [`vms/saevm/cchain/cchaintest/config.go`](../vms/saevm/cchain/cchaintest/config.go)
+
+- [ ] Update `ChainConfig()` to use the new fork's `extras.TestXChainConfig`
+
 ---
 
 ## After Initial Implementation
