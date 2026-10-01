@@ -5,6 +5,17 @@ the backends expected by libevm's `ethapi`, `tracers`, and `filters` packages
 and registers every namespace (`eth`, `debug`, `txpool`, `net`, `web3`, …) on a
 single `rpc.Server`; see `server.go` for the full endpoint list.
 
+## HTTP response headers
+
+JSON-RPC over HTTP is served through `Provider.HTTPHandler`, which wraps the
+`rpc.Server` to add response headers; websocket connections are not wrapped.
+Methods record values in the request context, and the headers are set
+just before the response is written.
+
+| Header | Value |
+| --- | --- |
+| `Gas-Used` | Total gas used by every `eth_call` in the request, batches included. Omitted if no `eth_call` executed. |
+
 ## Stateful RPCs
 
 Blocks are executed after acceptance, so a stored header carries the worst-case

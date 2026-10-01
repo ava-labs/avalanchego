@@ -11,10 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestHeaderNamesCanonical(t *testing.T) {
-	require.Equal(t, GasUsedHeader, http.CanonicalHeaderKey(GasUsedHeader))
-}
-
 func TestWithResponseHeaders(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -79,7 +75,7 @@ func TestWithResponseHeaders(t *testing.T) {
 			req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/", nil)
 			withResponseHeaders(tt.handler).ServeHTTP(rec, req)
 
-			require.Equalf(t, tt.want, rec.Result().Header[GasUsedHeader], "%q header", GasUsedHeader)
+			require.Equalf(t, tt.want, rec.Result().Header.Values(GasUsedHeader), "%q header", GasUsedHeader)
 		})
 	}
 }

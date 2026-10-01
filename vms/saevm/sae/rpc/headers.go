@@ -100,3 +100,8 @@ func (w *headerWriter) Flush() {
 		f.Flush()
 	}
 }
+
+// Unwrap allows [http.ResponseController] to reach the underlying writer.
+func (w *headerWriter) Unwrap() http.ResponseWriter {
+	return w.ResponseWriter
+}

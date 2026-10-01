@@ -12,8 +12,10 @@ import (
 )
 
 // Call overrides [ethapi.BlockChainAPI.Call] to record the gas used for
-// [GasUsedHeader]. It otherwise mirrors the libevm implementation, which
-// discards the gas.
+// [GasUsedHeader], which libevm discards.
+//
+// Copied from [ethapi.BlockChainAPI.Call], with the addition of [addGas].
+// See https://github.com/ava-labs/libevm/blob/dbf7ede95a25d8dfbdadafe53822022cba222d71/internal/ethapi/api.go#L1147-L1161
 func (b *blockChainAPI) Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash *rpc.BlockNumberOrHash, overrides *ethapi.StateOverride, blockOverrides *ethapi.BlockOverrides) (hexutil.Bytes, error) {
 	if blockNrOrHash == nil {
 		latest := rpc.BlockNumberOrHashWithNumber(rpc.LatestBlockNumber)

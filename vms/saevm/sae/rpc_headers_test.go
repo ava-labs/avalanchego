@@ -120,9 +120,9 @@ func TestGasUsedHeader(t *testing.T) {
 			defer resp.Body.Close()
 
 			require.Equal(t, http.StatusOK, resp.StatusCode, "status code")
-			got, ok := resp.Header[saerpc.GasUsedHeader]
+			got := resp.Header.Values(saerpc.GasUsedHeader)
 			if tt.want == "" {
-				require.Falsef(t, ok, "%q header present with value %q", saerpc.GasUsedHeader, got)
+				require.Emptyf(t, got, "%q header", saerpc.GasUsedHeader)
 				return
 			}
 			require.Equalf(t, []string{tt.want}, got, "%q header", saerpc.GasUsedHeader)
