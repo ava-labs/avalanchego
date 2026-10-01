@@ -178,8 +178,15 @@ func TestDoRetry_CtxEndReportsFailure(t *testing.T) {
 		attemptErr error // nil picks the verify-rejects path
 		wantLast   error
 	}{
-		{name: "verify_rejects", wantLast: errInvalid},
-		{name: "no_peers", attemptErr: errNoPeers, wantLast: errNoPeers},
+		{
+			name:     "verify_rejects",
+			wantLast: errInvalid,
+		},
+		{
+			name:       "no_peers",
+			attemptErr: errNoPeers,
+			wantLast:   errNoPeers,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
