@@ -457,14 +457,12 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 		return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
 	}
 
-	// A synchronous header commits to its own post-execution state and
-	// receipts. Bootstrapping verifies such a block by hash alone, so
-	// reproducing both is the only check that it executed correctly.
+	// Sanity check that synchronous blocks are executed correctly.
 	if b.Synchronous() {
 		if want := b.SettledStateRoot(); root != want {
 			return fmt.Errorf("%w: synchronous block %d executed to state root %#x, header commits to %#x", errFatal, b.NumberU64(), root, want)
 		}
-		if got, want := types.DeriveSha(r.Receipts, trie.NewStackTrie(nil)), b.Header().ReceiptHash; got != want {
+		if got, want := types.DeriveSha(r.Receipts, trie.NewStackTrie(nil)), b.SettledReceiptsRoot(); got != want {
 			return fmt.Errorf("%w: synchronous block %d executed to receipts root %#x, header commits to %#x", errFatal, b.NumberU64(), got, want)
 		}
 	}

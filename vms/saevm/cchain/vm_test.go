@@ -827,9 +827,8 @@ func (s *SUT) acceptSynchronousBlocks(ctx context.Context, tb testing.TB, blks [
 		// Accepting while bootstrapping blocks until the block has executed.
 		require.NoErrorf(tb, s.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", s.VM, blk.Number)
 
-		hdr := parsed.Header()
-		assert.Equalf(tb, hdr.Root, parsed.PostExecutionStateRoot(), "post-execution state root of height %d", blk.Number)
-		assert.Equalf(tb, hdr.ReceiptHash, types.DeriveSha(parsed.Receipts(), saetest.TrieHasher()), "receipts root of height %d", blk.Number)
+		assert.Equalf(tb, parsed.SettledStateRoot(), parsed.PostExecutionStateRoot(), "post-execution state root of height %d", blk.Number)
+		assert.Equalf(tb, parsed.SettledReceiptsRoot(), types.DeriveSha(parsed.Receipts(), saetest.TrieHasher()), "receipts root of height %d", blk.Number)
 	}
 }
 

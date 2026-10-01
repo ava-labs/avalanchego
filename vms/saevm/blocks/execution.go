@@ -317,11 +317,10 @@ func (b *Block) synchronousExecutionResults() (*executionResults, error) {
 		return nil, err
 	}
 
-	ethB := b.EthBlock()
 	e := &executionResults{
 		byGas:         *execTime.Clone(),
-		receiptRoot:   ethB.ReceiptHash(),
-		stateRootPost: ethB.Root(),
+		receiptRoot:   b.SettledReceiptsRoot(),
+		stateRootPost: b.SettledStateRoot(),
 		// receipts are populated in [Block.RestoreExecutionArtefacts], which
 		// calls this method, because this logic is shared.
 	}
