@@ -18,6 +18,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
   - [C-Chain reexecution benchmarks](#c-chain-reexecution-benchmarks)
 - [Provision CI job dependencies](#provision-ci-job-dependencies)
 - [CI cache policy](#ci-cache-policy)
+  - [Cache policy overview](#cache-policy-overview)
   - [Input-cache lifecycle](#input-cache-lifecycle)
     - [Event behavior](#event-behavior)
     - [Go module cache](#go-module-cache)
@@ -235,6 +236,28 @@ caches without writing them.
 
 ## CI cache policy
 
+### Cache policy overview
+
+CI caches tools and dependencies, not build or test output. Two rules govern
+these input caches:
+
+- **Save shared entries only from designated setup jobs on `master`.** Pull
+  requests and other refs may restore entries and prepare missing inputs locally,
+  but cannot save them. This reserves limited cache storage for merged code.
+- **Verify Go and Bazel dependency inputs before using them.** On an exact cache
+  hit, use the restored entry. On a non-exact hit or miss, prepare the inputs
+  locally (and save them if permitted). Then disable downloads for the workload:
+  `GOPROXY=off` for Go modules and `--repository_disable_download` for Bazel.
+  If a dependency is missing, the workload fails instead of fetching it silently.
+
+The second rule checks whether cache preparation covers what CI actually uses;
+restricting writes alone cannot do that. It catches missing preparation inputs
+when a pull request adds a dependency, as well as on `master`. Disabling
+downloads detects gaps in cache preparation as CI changes; it is not a
+prerequisite for preparing the cache, which can use the network. The Task cache
+can download a release on a miss, and the Nix store cache can fetch missing
+flake store paths. Those caches do not use the offline completeness check.
+
 ### Input-cache lifecycle
 
 GitHub-hosted runners are temporary. GitHub Actions caching is currently used
@@ -248,9 +271,9 @@ depends on GitHub Actions caching for its repository inputs.
 
 The Go module and Bazel dependency caches restore their exact key first and may
 restore a same-platform prefix as a warm start. An exact hit skips preparation.
-A non-exact hit or miss prepares the input locally. After preparation, the job
-disables further download. This makes a missing prepared input fail in the job
-that uses it instead of being silently downloaded later.
+A non-exact hit or miss prepares the input locally. For Go and Bazel dependency
+caches, the workload then runs with downloads disabled, so a missing input fails
+instead of being silently downloaded later.
 
 Only `github.ref == 'refs/heads/master'` can save an input cache. Pull request,
 merge-queue, tag, and non-`master` branch runs can restore entries and prepare a
@@ -268,6 +291,16 @@ entry. The restriction on writes instead protects the repository's limited
 cache storage. High pull-request traffic can evict useful entries from `master`
 and cause repeated cache misses. Restricting writes to `master` reserves cache
 storage for merged code and makes cache usage predictable.
+
+GitHub's
+[`cache-mode: read`](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#controlling-cache-access-with-cache-mode)
+can prevent a job from saving caches, but it is set at the workflow or job
+level, before a cache setup action runs. Using it to implement this policy
+would repeat the save decision across workflow jobs. Instead, `cache-policy`
+makes that decision once for the Go, Bazel, Nix, and Task cache actions. The
+same actions restore and prepare inputs on every ref; only permitted setup
+jobs save. This also provides one place to add a temporary exception when a
+pull request needs to test cache writes.
 
 To validate cache saves before merge, add a temporary exception for that pull
 request to `cache-policy`. This confines write permission to one reviewable pull
@@ -325,7 +358,11 @@ restores `GOMODCACHE`. On a non-exact hit it runs
 all repository modules and the checked-in
 [`go_module_cache_manifest.tsv`](../scripts/go_module_cache_manifest.tsv).
 The manifest covers CI tools and pinned module graphs that repository modules
-do not reach. After preparation, the action sets `GOPROXY=off`.
+do not reach. After an exact restore or local preparation, the action sets
+`GOPROXY=off` before the workload runs. This verifies that the restored or
+prepared module set is complete. If the workload needs another module, it fails
+instead of downloading it silently; that failure requires updating the
+cache-preparation inputs or manifest.
 
 Callers that configure custom polyrepo refs should keep `GOPROXY` enabled during
 setup because those refs can require modules that are not represented by the
