@@ -910,6 +910,10 @@ func convertNetworkUpgrades(pbUpgrades *vmpb.NetworkUpgrades) (upgrade.Config, e
 	if err != nil {
 		return upgrade.Config{}, err
 	}
+	igloo, err := grpcutils.TimestampAsTime(pbUpgrades.IglooTime)
+	if err != nil {
+		return upgrade.Config{}, err
+	}
 
 	return upgrade.Config{
 		ApricotPhase1Time:            ap1,
@@ -930,5 +934,6 @@ func convertNetworkUpgrades(pbUpgrades *vmpb.NetworkUpgrades) (upgrade.Config, e
 		GraniteTime:                  granite,
 		GraniteEpochDuration:         graniteEpochDuration,
 		HeliconTime:                  helicon,
+		IglooTime:                    igloo,
 	}, nil
 }
