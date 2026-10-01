@@ -39,6 +39,7 @@ graft_go_test(
     ],
     embed = [":feemanager"],
     deps = [
+        "//graft/evm/utils",
         "//graft/subnet-evm/accounts/abi/bind",
         "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/core",
@@ -54,7 +55,6 @@ graft_go_test(
         "//graft/subnet-evm/precompile/contracts/utilstest",
         "//graft/subnet-evm/precompile/precompileconfig",
         "//graft/subnet-evm/precompile/precompiletest",
-        "//utils",
         "@com_github_ava_labs_libevm//accounts/abi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/math",

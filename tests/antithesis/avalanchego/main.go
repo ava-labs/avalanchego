@@ -17,6 +17,7 @@ import (
 	"github.com/antithesishq/antithesis-sdk-go/lifecycle"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -24,9 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/antithesis"
@@ -69,9 +67,6 @@ const (
 // TODO(marun) Extract the common elements of test execution for reuse across test setups
 
 func main() {
-	// Required for coreth ethclient block deserialization.
-	evm.RegisterAllLibEVMExtras()
-
 	// TODO(marun) Support choosing the log format
 	tc := antithesis.NewInstrumentedTestContext(tests.NewDefaultLogger(""))
 	defer tc.RecoverAndExit()
@@ -173,23 +168,24 @@ func main() {
 
 	upgrades, err := info.NewClient(setupURI).Upgrades(ctx)
 	require.NoError(err, "failed to fetch the upgrade schedule")
-	timeUntilHelicon := time.Until(upgrades.HeliconTime)
+	nextUpgrade := upgrades.LatestTime()
+	timeUntilUpgrade := time.Until(nextUpgrade)
 	assert.Always(
-		timeUntilHelicon > 0,
-		"Helicon activates after worker initialization",
+		timeUntilUpgrade > 0,
+		"Upgrade activates after worker initialization",
 		map[string]any{
-			"heliconTime":      upgrades.HeliconTime,
-			"timeUntilHelicon": timeUntilHelicon.String(),
+			"upgradeTime":      nextUpgrade,
+			"timeUntilUpgrade": timeUntilUpgrade.String(),
 		},
 	)
 
 	lifecycle.SetupComplete(map[string]any{
 		"msg":              "initialized workers",
 		"numWorkers":       NumKeys,
-		"timeUntilHelicon": timeUntilHelicon.String(),
+		"timeUntilUpgrade": timeUntilUpgrade.String(),
 	})
 
-	go awaitHeliconActivation(ctx, upgrades.HeliconTime)
+	go awaitActivation(ctx, nextUpgrade)
 
 	for _, w := range workloads[1:] {
 		go w.run(ctx)
@@ -197,17 +193,17 @@ func main() {
 	genesisWorkload.run(ctx)
 }
 
-// awaitHeliconActivation reports that Helicon activated. Nothing is reported if
-// ctx is canceled first, failing the reachability assertion for runs that end
-// before the activation.
-func awaitHeliconActivation(ctx context.Context, heliconTime time.Time) {
-	timer := time.NewTimer(time.Until(heliconTime))
+// awaitActivation reports that the next upgrade activated. Nothing is reported
+// if ctx is canceled first, failing the reachability assertion for runs that
+// end before the activation.
+func awaitActivation(ctx context.Context, upgradeTime time.Time) {
+	timer := time.NewTimer(time.Until(upgradeTime))
 	defer timer.Stop()
 
 	select {
 	case <-timer.C:
-		assert.Reachable("Helicon activating", map[string]any{
-			"heliconTime": heliconTime,
+		assert.Reachable("Upgrade activating", map[string]any{
+			"upgradeTime": upgradeTime,
 		})
 	case <-ctx.Done():
 	}
@@ -992,9 +988,9 @@ func (w *workload) confirmCChainTx(ctx context.Context, tx *types.Transaction) e
 			return fmt.Errorf("failed to get C-Chain RPC client for %s: %w", uri, err)
 		}
 
-		receipt, err := bind.WaitMined(ctx, client, tx)
+		receipt, err := e2e.AwaitEthReceipt(ctx, client, tx)
 		if err != nil {
-			return fmt.Errorf("failed to get receipt for tx %s on %s: %w", txHash, uri, err)
+			return fmt.Errorf("awaiting tx %s on %s: %w", txHash, uri, err)
 		}
 
 		if receipt.Status != types.ReceiptStatusSuccessful {
@@ -1038,28 +1034,26 @@ func (w *workload) sendCChainTx(ctx context.Context, client *ethclient.Client, t
 		})
 		return nil, err
 	}
-	acceptedNonce, err := client.AcceptedNonceAt(ctx, senderAddr)
+	nonce, err := client.NonceAt(ctx, senderAddr, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch accepted nonce: %w", err)
+		return nil, fmt.Errorf("failed to fetch nonce: %w", err)
 	}
 	gasTipCap, err := client.SuggestGasTipCap(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch suggested gas tip: %w", err)
 	}
-	estimatedBaseFee, err := client.EstimateBaseFee(ctx)
+	gasPrice, err := client.SuggestGasPrice(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch estimated base fee: %w", err)
+		return nil, fmt.Errorf("failed to fetch suggested gas price: %w", err)
 	}
-	gasFeeCap := new(big.Int).Add(
-		gasTipCap,
-		new(big.Int).Mul(estimatedBaseFee, big.NewInt(2)),
-	)
+	// Double the suggested price to absorb base fee increases before inclusion.
+	gasFeeCap := new(big.Int).Mul(gasPrice, big.NewInt(2))
 
 	chainID := new(big.Int).Set(w.cChainID)
 	signer := types.LatestSignerForChainID(chainID)
 	tx, err := types.SignNewTx(w.cChainKey, signer, &types.DynamicFeeTx{
 		ChainID:   chainID,
-		Nonce:     acceptedNonce,
+		Nonce:     nonce,
 		GasTipCap: gasTipCap,
 		GasFeeCap: gasFeeCap,
 		Gas:       params.TxGas,

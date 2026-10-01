@@ -82,7 +82,7 @@ var (
 		FortunaTime:                  InitiallyActiveTime,
 		GraniteTime:                  InitiallyActiveTime,
 		GraniteEpochDuration:         30 * time.Second,
-		HeliconTime:                  UnscheduledActivationTime,
+		HeliconTime:                  InitiallyActiveTime,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
@@ -107,6 +107,7 @@ type Config struct {
 	GraniteTime                  time.Time     `json:"graniteTime"`
 	GraniteEpochDuration         time.Duration `json:"graniteEpochDuration"`
 	HeliconTime                  time.Time     `json:"heliconTime"`
+	// When adding a new upgrade, follow new_upgrade_checklist.md.
 }
 
 func (c *Config) Validate() error {
@@ -199,6 +200,10 @@ func (c *Config) IsGraniteActivated(t time.Time) bool {
 
 func (c *Config) IsHeliconActivated(t time.Time) bool {
 	return !t.Before(c.HeliconTime)
+}
+
+func (c *Config) LatestTime() time.Time {
+	return c.HeliconTime
 }
 
 func GetConfig(networkID uint32) Config {

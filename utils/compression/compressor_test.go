@@ -9,7 +9,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/DataDog/zstd"
+	"github.com/klauspost/compress/zstd"
 	"github.com/stretchr/testify/require"
 
 	_ "embed"
@@ -57,7 +57,7 @@ func TestDecompressZipBombs(t *testing.T) {
 			_, err = compressor.Decompress(zipBomb)
 			runtime.ReadMemStats(&afterDecompressionStats)
 
-			require.ErrorIs(err, ErrDecompressedMsgTooLarge)
+			require.ErrorIs(err, zstd.ErrDecoderSizeExceeded)
 
 			// Make sure that we didn't allocate significantly more memory than
 			// the max message size.
@@ -130,28 +130,49 @@ func TestSizeLimiting(t *testing.T) {
 			require.NoError(err)
 
 			_, err = compressor.Decompress(dataCompressed) // should be too large
-			require.ErrorIs(err, ErrDecompressedMsgTooLarge)
+			require.ErrorIs(err, zstd.ErrDecoderSizeExceeded)
 		})
 	}
 }
 
-// Attempts to create a compressor with math.MaxInt64
-// which leads to undefined decompress behavior due to integer overflow
-// in limit reader creation.
-func TestNewCompressorWithInvalidLimit(t *testing.T) {
+func TestNewCompressor(t *testing.T) {
+	tests := []struct {
+		maxSize int64
+		want    error
+	}{
+		{
+			maxSize: -1,
+			want:    ErrInvalidMaxSizeCompressor,
+		},
+		{
+			maxSize: 0,
+			want:    ErrInvalidMaxSizeCompressor,
+		},
+		{
+			maxSize: 100,
+		},
+		{
+			maxSize: math.MaxInt64,
+			want:    ErrInvalidMaxSizeCompressor,
+		},
+	}
+
 	for compressionType, compressorFunc := range newCompressorFuncs {
 		if compressionType == TypeNone {
 			continue
 		}
-		t.Run(compressionType.String(), func(t *testing.T) {
-			_, err := compressorFunc(math.MaxInt64)
-			require.ErrorIs(t, err, ErrInvalidMaxSizeCompressor)
-		})
+
+		for _, tt := range tests {
+			t.Run(fmt.Sprintf("%s_with_max_size_%d", compressionType.String(), tt.maxSize), func(t *testing.T) {
+				_, err := compressorFunc(tt.maxSize)
+				require.ErrorIs(t, err, tt.want)
+			})
+		}
 	}
 }
 
 func TestNewZstdCompressorWithLevel(t *testing.T) {
-	compressor, err := NewZstdCompressorWithLevel(maxMessageSize, zstd.BestSpeed)
+	compressor, err := NewZstdCompressorWithLevel(maxMessageSize, zstd.SpeedFastest)
 	require.NoError(t, err)
 
 	data := utils.RandomBytes(4096)
