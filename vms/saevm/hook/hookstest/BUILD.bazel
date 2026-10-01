@@ -4,6 +4,7 @@ go_library(
     name = "hookstest",
     testonly = True,
     srcs = [
+        "hookstest.go",
         "stub.canoto.go",
         "stub.go",
     ],
@@ -26,5 +27,6 @@ go_library(
         "@com_github_ava_labs_libevm//params",
         "@com_github_holiman_uint256//:uint256",
         "@com_github_stephenbuttolph_canoto//:canoto",
+        "@com_github_stretchr_testify//require",
     ],
 )
