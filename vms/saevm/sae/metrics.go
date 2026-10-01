@@ -62,5 +62,7 @@ func (m *metrics) markAccepted(b *blocks.Block) {
 
 func (m *metrics) markSettled(b *blocks.Block) {
 	m.lastSettledHeight.Set(float64(b.Height()))
+	// Subtracting worst-case instead of consumed undoes [metrics.setFrontiers]
+	// and [metrics.markAccepted].
 	m.unsettledGasLimit.Sub(float64(b.WorstCaseGasUsed()))
 }
