@@ -97,7 +97,7 @@ offset=$(( min_offset + rand %% (max_offset - min_offset + 1) ))
 
 start_epoch=$(( activation_epoch - offset ))
 start_time=$(date -u -d "@${start_epoch}" +"%%Y-%%m-%%d %%H:%%M:%%S")
-echo "Setting system clock to ${start_time} UTC; Helicon activates in ${offset}s"
+echo "Setting system clock to ${start_time} UTC; latest upgrade activates in ${offset}s"
 timedatectl set-time "${start_time}"
 `,
 		activationTime.Unix(),

@@ -15,7 +15,7 @@ const (
 	// RPCChainVMProtocol should be bumped anytime changes are made which
 	// require the plugin vm to upgrade to latest avalanchego release to be
 	// compatible.
-	RPCChainVMProtocol uint = 46
+	RPCChainVMProtocol uint = 47
 
 	CurrentDatabase = "v1.4.5"
 	PrevDatabase    = "v1.0.0"
