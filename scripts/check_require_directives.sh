@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
 # Checks that internal module require directives are consistent across all
-# go.mod files. Every require of an avalanchego submodule must reference the
-# same version.
+# go.mod files, and that they match version.Current. Development tags
+# (v0.0.0-*) are exempt from the version.Current check.
 #
 # See docs/design/multi-module-release.md for background.
 
@@ -63,4 +63,22 @@ if [[ ${#mismatches[@]} -gt 0 ]]; then
   exit 1
 fi
 
-echo "All internal module require directives are consistent: $reference"
+# Development tags share work-in-progress from a branch, so they don't name the
+# version being developed
+if [[ "$reference" == v0.0.0-* ]]; then
+  echo "All internal module require directives reference development tag: $reference"
+  exit 0
+fi
+
+# Check the require version matches the version being developed.
+current_version=$(<"$REPO_ROOT/version/current.txt")
+
+if [[ "$current_version" != "$reference" ]]; then
+  echo "Internal module require version $reference does not match version/current.txt $current_version" >&2
+  echo "" >&2
+  echo "If version.Current changed, run './scripts/run_task.sh tags-update-require-directives -- $current_version'." >&2
+  echo "Otherwise, set version.Current and version/current.txt to $reference." >&2
+  exit 1
+fi
+
+echo "All internal module require directives match version.Current: $reference"
