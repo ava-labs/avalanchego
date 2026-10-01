@@ -131,7 +131,7 @@ func TestSend_NoPeersBackoffEscalates(t *testing.T) {
 		handler, _ := scriptedHandler(scriptResponse{bytes: wantBytes})
 		_, tracker := newTestTracker(t)
 		c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](t, ctx, nodeID, handler, tracker)
-		c.policy = *options.ApplyTo(defaultRetryPolicy(),
+		c.policy = testRetryPolicy(
 			WithNoPeersInitialBackoff(initial),
 			WithNoPeersFactor(factor),
 			WithNoPeersMaxBackoff(time.Second),
@@ -263,7 +263,7 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 					maxBackoff      = 10 * time.Second
 					expectedElapsed = 1010 * time.Millisecond // noPeersBackoff(1) + peerFailureBackoff + 0
 				)
-				policy := *options.ApplyTo(defaultRetryPolicy(),
+				policy := testRetryPolicy(
 					WithNoPeersInitialBackoff(initial),
 					WithNoPeersFactor(factor),
 					WithNoPeersMaxBackoff(maxBackoff),
@@ -320,6 +320,10 @@ func acceptLeaf(resp *syncpb.GetLeafResponse, _ ids.NodeID) (*syncpb.GetLeafResp
 	return resp, nil
 }
 
+func testRetryPolicy(opts ...RetryOption) retryPolicy {
+	return *options.ApplyTo(defaultRetryPolicy(), opts...)
+}
+
 type leafRetryDispatcher = Dispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse]
 
 func newRetryDispatcher(
@@ -331,7 +335,7 @@ func newRetryDispatcher(
 ) *leafRetryDispatcher {
 	t.Helper()
 	c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](t, ctx, nodeID, h, tracker)
-	c.policy = *options.ApplyTo(defaultRetryPolicy(),
+	c.policy = testRetryPolicy(
 		WithPeerFailureBackoff(time.Millisecond),
 		WithNoPeersInitialBackoff(time.Millisecond),
 		WithNoPeersMaxBackoff(5*time.Millisecond),
