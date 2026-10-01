@@ -326,11 +326,9 @@ func (b *Block) synchronousExecutionResults() (*executionResults, error) {
 	return e, nil
 }
 
-// SynchronousGasTime returns the gas time at which a synchronous block finished
-// executing. Such a block has no predecessor clock to advance, so the time is
-// derived from its header alone and every node agrees on it whether it executed
-// the block or restored it from disk. Inverting the base fee only approximates
-// the excess.
+// SynchronousGasTime derives the gas time of a synchronous block, which has no
+// predecessor clock to advance. Inverting the base fee only approximates the
+// excess.
 func (b *Block) SynchronousGasTime() (*gastime.Time, error) {
 	target, cfg := b.hooks.GasConfigAfter(b.Header())
 	return gastime.New(
