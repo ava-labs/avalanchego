@@ -56,9 +56,7 @@ type Executor struct {
 
 // New constructs and starts a new [Executor]. Call [Executor.Close] to stop it.
 //
-// The last-executed block MAY be the genesis block for an always-SAE chain, any
-// synchronous block whose post-execution state is committed, or the last
-// asynchronously executed block after shutdown and recovery.
+// The post-execution state of the last-executed block MUST be available.
 func New(
 	lastExecuted *blocks.Block,
 	headerSrc saetypes.HeaderSource,
