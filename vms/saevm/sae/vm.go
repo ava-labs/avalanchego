@@ -217,7 +217,7 @@ func NewVM[T hook.Transaction](
 
 		s := e.LastSettled()
 		vm.last.settled.Store(s)
-		metrics.markSettled(s.Height())
+		metrics.setFrontiers(s, blocks.Range(s, e))
 	}
 
 	// ==========  RPC Provider  ==========
