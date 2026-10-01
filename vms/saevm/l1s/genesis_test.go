@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	ethcore "github.com/ava-labs/libevm/core"
 )
 
 func TestMain(m *testing.M) {
@@ -287,6 +288,18 @@ func TestParseGenesis(t *testing.T) {
 			wantErr: testerr.Contains("granite fork block timestamp is invalid"),
 		},
 		{
+			name:    "out_of_order_network_upgrade_overrides",
+			ctx:     latest,
+			genesis: testGenesisJSON(),
+			upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
+				NetworkUpgradeOverrides: &extras.NetworkUpgrades{
+					// Granite remains active at [testGenesisTime]
+					EtnaTimestamp: new(testGenesisTime + 1),
+				},
+			})),
+			wantErr: testerr.Contains("unsupported fork ordering: etnaTimestamp enabled at timestamp"),
+		},
+		{
 			name:         "invalid_upgrade_bytes",
 			ctx:          latest,
 			genesis:      testGenesisJSON(),
@@ -304,18 +317,16 @@ func TestParseGenesis(t *testing.T) {
 				return
 			}
 
-			require.Equal(t, test.airdropData, g.AirdropData, "airdrop data mismatch")
-
-			// Everything other than the config and the airdrop data must be
+			// Everything other than the config must be
 			// passed through unmodified.
-			var want core.Genesis
+			var want ethcore.Genesis
 			require.NoError(t, json.Unmarshal([]byte(test.genesis), &want))
 			opts := cmp.Options{
 				cmputils.BigInts(),
 				cmpopts.EquateEmpty(),
-				cmpopts.IgnoreFields(core.Genesis{}, "Config", "AirdropData"),
+				cmpopts.IgnoreFields(ethcore.Genesis{}, "Config"),
 			}
-			if diff := cmp.Diff(&want, (*core.Genesis)(g), opts); diff != "" {
+			if diff := cmp.Diff(&want, g.Genesis, opts); diff != "" {
 				t.Errorf("parseGenesis(...) (-want +got)\n%s", diff)
 			}
 		})
@@ -389,7 +400,11 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 
 			got, err := g.block()
 			require.NoErrorf(t, err, "%T.block()", g)
-			want := (*core.Genesis)(g).ToBlock()
+			var legacy core.Genesis
+			require.NoError(t, json.Unmarshal([]byte(s.genesis), &legacy))
+			legacy.Config = g.Config
+			legacy.AirdropData = s.airdropData
+			want := legacy.ToBlock()
 
 			require.Equalf(t, want.Root(), got.Root(), "%T.block().Root()", g)
 			require.Equalf(t, want.Hash(), got.Hash(), "%T.block().Hash()", g)
@@ -410,12 +425,29 @@ func TestGenesisAirdrop(t *testing.T) {
 		name        string
 		opts        []genesisOption
 		airdropData []byte
+		want        []common.Address
 		wantErr     testerr.Want
 	}{
 		{
 			name:        "valid",
 			opts:        []genesisOption{withValidAirdrop()},
 			airdropData: testAirdropData,
+			want:        []common.Address{testAirdropAddr, testAllocAddr},
+		},
+		{
+			name: "absent",
+		},
+		{
+			name:        "empty_list",
+			opts:        []genesisOption{withValidAirdrop(), withAirdropHashOf([]byte("[]"))},
+			airdropData: []byte("[]"),
+			want:        []common.Address{},
+		},
+		{
+			name:        "null_list",
+			opts:        []genesisOption{withValidAirdrop(), withAirdropHashOf([]byte("null"))},
+			airdropData: []byte("null"),
+			want:        []common.Address{},
 		},
 		{
 			name:    "missing_data",
@@ -450,12 +482,16 @@ func TestGenesisAirdrop(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			genesis := testGenesisJSON(tt.opts...)
 			g, err := parseGenesis(newContext(t, upgradetest.Latest), []byte(genesis), nil, tt.airdropData)
-			require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
-
-			_, err = g.block()
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
-				t.Errorf("%T.block() error (-want +got)\n%s", g, diff)
+				t.Fatalf("parseGenesis(...) error (-want +got)\n%s", diff)
 			}
+			if err != nil {
+				return
+			}
+			require.Equal(t, tt.want, g.airdrops)
+			require.Equal(t, testGenesis(tt.opts...).AirdropAmount, g.airdropAmount)
+			_, err = g.block()
+			require.NoError(t, err)
 		})
 	}
 }
@@ -571,7 +607,7 @@ func TestWriteGenesis(t *testing.T) {
 					g.Alloc[testAllocAddr] = types.Account{Balance: big.NewInt(1)}
 				})),
 			},
-			wantErr: errIsType[*core.GenesisMismatchError](),
+			wantErr: errIsType[*ethcore.GenesisMismatchError](),
 		},
 		{
 			name: "schedule_future_upgrade",
