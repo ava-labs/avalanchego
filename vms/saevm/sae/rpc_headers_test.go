@@ -137,8 +137,8 @@ func TestResponseHeaders(t *testing.T) {
 			defer resp.Body.Close()
 
 			require.Equal(t, http.StatusOK, resp.StatusCode, "status code")
-			require.Equalf(t, tt.wantGas, resp.Header[saerpc.GasUsedHeader], "%q header", saerpc.GasUsedHeader)
-			require.Equalf(t, tt.wantErrorCodes, resp.Header[saerpc.ErrorCodesHeader], "%q header", saerpc.ErrorCodesHeader)
+			require.Equalf(t, tt.wantGas, resp.Header.Values(saerpc.GasUsedHeader), "%q header", saerpc.GasUsedHeader)
+			require.Equalf(t, tt.wantErrorCodes, resp.Header.Values(saerpc.ErrorCodesHeader), "%q header", saerpc.ErrorCodesHeader)
 		})
 	}
 }
