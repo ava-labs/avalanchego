@@ -2,7 +2,9 @@
 
 ## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
 
-- None (delete and fill in as you work)
+### Features
+
+- Consensus parameter validation (`snowball.Parameters.Verify` and `simplex.Parameters.Verify`) now reports every violated condition instead of only the first one.
 
 ## [v1.15.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.1)
 

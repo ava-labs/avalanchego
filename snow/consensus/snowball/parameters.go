@@ -47,6 +47,15 @@ var (
 	}
 
 	ErrParametersInvalid = errors.New("parameters invalid")
+
+	errAlphaPreferenceNotAboveHalfK        = errors.New("fails the condition that: k/2 < alphaPreference")
+	errAlphaConfidenceBelowAlphaPreference = errors.New("fails the condition that: alphaPreference <= alphaConfidence")
+	errAlphaConfidenceAboveK               = errors.New("fails the condition that: alphaConfidence <= k")
+	errConcurrentRepollsNotPositive        = errors.New("fails the condition that: 0 < concurrentRepolls")
+	errConcurrentRepollsAboveBeta          = errors.New("fails the condition that: concurrentRepolls <= beta")
+	errOptimalProcessingNotPositive        = errors.New("fails the condition that: 0 < optimalProcessing")
+	errMaxOutstandingItemsNotPositive      = errors.New("fails the condition that: 0 < maxOutstandingItems")
+	errMaxItemProcessingTimeNotPositive    = errors.New("fails the condition that: 0 < maxItemProcessingTime")
 )
 
 // Parameters required for snowball consensus
@@ -88,31 +97,43 @@ type Parameters struct {
 // - 0 < MaxOutstandingItems
 // - 0 < MaxItemProcessingTime
 //
+// If any condition is violated, the returned error is the [errors.Join] of
+// one error per violated condition, each wrapping [ErrParametersInvalid],
+// rather than only the first violation.
+//
 // Note: K/2 < K implies that 0 <= K/2, so we don't need an explicit check that
 // AlphaPreference is positive.
 func (p Parameters) Verify() error {
-	switch {
-	case p.AlphaPreference <= p.K/2:
-		return fmt.Errorf("%w: k = %d, alphaPreference = %d: fails the condition that: k/2 < alphaPreference", ErrParametersInvalid, p.K, p.AlphaPreference)
-	case p.AlphaConfidence < p.AlphaPreference:
-		return fmt.Errorf("%w: alphaPreference = %d, alphaConfidence = %d: fails the condition that: alphaPreference <= alphaConfidence", ErrParametersInvalid, p.AlphaPreference, p.AlphaConfidence)
-	case p.K < p.AlphaConfidence:
-		return fmt.Errorf("%w: k = %d, alphaConfidence = %d: fails the condition that: alphaConfidence <= k", ErrParametersInvalid, p.K, p.AlphaConfidence)
-	case p.AlphaConfidence == 3 && p.AlphaPreference == 28:
-		return fmt.Errorf("%w: alphaConfidence = %d, alphaPreference = %d: fails the condition that: alphaPreference <= alphaConfidence\n%s", ErrParametersInvalid, p.AlphaConfidence, p.AlphaPreference, errMsg)
-	case p.ConcurrentRepolls <= 0:
-		return fmt.Errorf("%w: concurrentRepolls = %d: fails the condition that: 0 < concurrentRepolls", ErrParametersInvalid, p.ConcurrentRepolls)
-	case p.ConcurrentRepolls > p.Beta:
-		return fmt.Errorf("%w: concurrentRepolls = %d, beta = %d: fails the condition that: concurrentRepolls <= beta", ErrParametersInvalid, p.ConcurrentRepolls, p.Beta)
-	case p.OptimalProcessing <= 0:
-		return fmt.Errorf("%w: optimalProcessing = %d: fails the condition that: 0 < optimalProcessing", ErrParametersInvalid, p.OptimalProcessing)
-	case p.MaxOutstandingItems <= 0:
-		return fmt.Errorf("%w: maxOutstandingItems = %d: fails the condition that: 0 < maxOutstandingItems", ErrParametersInvalid, p.MaxOutstandingItems)
-	case p.MaxItemProcessingTime <= 0:
-		return fmt.Errorf("%w: maxItemProcessingTime = %d: fails the condition that: 0 < maxItemProcessingTime", ErrParametersInvalid, p.MaxItemProcessingTime)
-	default:
-		return nil
+	var errs []error
+	if p.AlphaPreference <= p.K/2 {
+		errs = append(errs, fmt.Errorf("%w: k = %d, alphaPreference = %d: %w", ErrParametersInvalid, p.K, p.AlphaPreference, errAlphaPreferenceNotAboveHalfK))
 	}
+	if p.AlphaConfidence < p.AlphaPreference {
+		if p.AlphaConfidence == 3 && p.AlphaPreference == 28 {
+			errs = append(errs, fmt.Errorf("%w: alphaConfidence = %d, alphaPreference = %d: %w\n%s", ErrParametersInvalid, p.AlphaConfidence, p.AlphaPreference, errAlphaConfidenceBelowAlphaPreference, errMsg))
+		} else {
+			errs = append(errs, fmt.Errorf("%w: alphaPreference = %d, alphaConfidence = %d: %w", ErrParametersInvalid, p.AlphaPreference, p.AlphaConfidence, errAlphaConfidenceBelowAlphaPreference))
+		}
+	}
+	if p.K < p.AlphaConfidence {
+		errs = append(errs, fmt.Errorf("%w: k = %d, alphaConfidence = %d: %w", ErrParametersInvalid, p.K, p.AlphaConfidence, errAlphaConfidenceAboveK))
+	}
+	if p.ConcurrentRepolls <= 0 {
+		errs = append(errs, fmt.Errorf("%w: concurrentRepolls = %d: %w", ErrParametersInvalid, p.ConcurrentRepolls, errConcurrentRepollsNotPositive))
+	}
+	if p.ConcurrentRepolls > p.Beta {
+		errs = append(errs, fmt.Errorf("%w: concurrentRepolls = %d, beta = %d: %w", ErrParametersInvalid, p.ConcurrentRepolls, p.Beta, errConcurrentRepollsAboveBeta))
+	}
+	if p.OptimalProcessing <= 0 {
+		errs = append(errs, fmt.Errorf("%w: optimalProcessing = %d: %w", ErrParametersInvalid, p.OptimalProcessing, errOptimalProcessingNotPositive))
+	}
+	if p.MaxOutstandingItems <= 0 {
+		errs = append(errs, fmt.Errorf("%w: maxOutstandingItems = %d: %w", ErrParametersInvalid, p.MaxOutstandingItems, errMaxOutstandingItemsNotPositive))
+	}
+	if p.MaxItemProcessingTime <= 0 {
+		errs = append(errs, fmt.Errorf("%w: maxItemProcessingTime = %d: %w", ErrParametersInvalid, p.MaxItemProcessingTime, errMaxItemProcessingTimeNotPositive))
+	}
+	return errors.Join(errs...)
 }
 
 func (p Parameters) MinPercentConnectedHealthy() float64 {
