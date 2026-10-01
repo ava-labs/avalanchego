@@ -136,6 +136,7 @@ graft_go_test(
         "//graft/subnet-evm/core/coretest",
         "//graft/subnet-evm/params",
         "//graft/subnet-evm/params/extras",
+        "//graft/subnet-evm/params/extras/extrastest",
         "//graft/subnet-evm/params/paramstest",
         "//graft/subnet-evm/plugin/evm/customheader",
         "//graft/subnet-evm/plugin/evm/customtypes",

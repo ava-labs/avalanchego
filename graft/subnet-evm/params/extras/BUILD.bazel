@@ -46,6 +46,7 @@ graft_go_test(
     ],
     embed = [":extras"],
     deps = [
+        "//graft/evm/params",
         "//graft/evm/utils",
         "//graft/evm/utils/utilstest",
         "//graft/subnet-evm/commontype",

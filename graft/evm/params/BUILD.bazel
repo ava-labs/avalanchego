@@ -1,8 +1,31 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
 
 go_library(
     name = "params",
-    srcs = ["rules.go"],
+    srcs = [
+        "fork_order.go",
+        "network_upgrades.go",
+        "network_upgrades_json.go",
+        "rules.go",
+    ],
     importpath = "github.com/ava-labs/avalanchego/graft/evm/params",
     visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//params",
+    ],
+)
+
+graft_go_test(
+    name = "params_test",
+    srcs = [
+        "fork_order_test.go",
+        "network_upgrades_json_test.go",
+    ],
+    embed = [":params"],
+    deps = [
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_stretchr_testify//require",
+    ],
 )

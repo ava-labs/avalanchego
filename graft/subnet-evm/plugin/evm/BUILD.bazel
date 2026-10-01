@@ -125,6 +125,7 @@ graft_go_test(
         "block_builder_test.go",
         "block_test.go",
         "gossip_test.go",
+        "network_upgrades_test.go",
         "syncervm_test.go",
         "tx_gossip_test.go",
         "vm_test.go",

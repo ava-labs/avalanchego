@@ -1756,7 +1756,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 		txallowlist.ConfigKey: txallowlist.NewConfig(utils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil),
 	}
 	durangoTime := time.Now().Add(10 * time.Hour)
-	params.GetExtra(genesis.Config).DurangoTimestamp = utils.TimeToNewUint64(durangoTime)
+	params.GetExtra(genesis.Config).DurangoBlockTimestamp = utils.TimeToNewUint64(durangoTime)
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
 
@@ -1893,7 +1893,7 @@ func TestVerifyManagerConfig(t *testing.T) {
 	require.NoError(t, genesis.UnmarshalJSON(genesisBytes))
 
 	durangoTimestamp := time.Now().Add(10 * time.Hour)
-	params.GetExtra(genesis.Config).DurangoTimestamp = utils.TimeToNewUint64(durangoTimestamp)
+	params.GetExtra(genesis.Config).DurangoBlockTimestamp = utils.TimeToNewUint64(durangoTimestamp)
 	// this manager role should not be activated because DurangoTimestamp is in the future
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 		txallowlist.ConfigKey: txallowlist.NewConfig(utils.PointerTo[uint64](0), testEthAddrs[0:1], nil, []common.Address{testEthAddrs[1]}),
@@ -1917,7 +1917,7 @@ func TestVerifyManagerConfig(t *testing.T) {
 
 	genesis = &core.Genesis{}
 	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Durango]))))
-	params.GetExtra(genesis.Config).DurangoTimestamp = utils.TimeToNewUint64(durangoTimestamp)
+	params.GetExtra(genesis.Config).DurangoBlockTimestamp = utils.TimeToNewUint64(durangoTimestamp)
 	genesisJSON, err = genesis.MarshalJSON()
 	require.NoError(t, err)
 	// use an invalid upgrade now with managers set before Durango

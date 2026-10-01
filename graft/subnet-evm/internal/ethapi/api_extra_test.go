@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras/extrastest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 
 	ethparams "github.com/ava-labs/libevm/params"
@@ -217,8 +218,8 @@ func TestGetActiveRulesAtSerialization(t *testing.T) {
 		config := *params.TestChainConfig
 		extra := *params.GetExtra(&config)
 		activation := uint64(100)
-		extra.SubnetEVMTimestamp = &activation
-		extra.DurangoTimestamp = &activation
+		extrastest.SetSubnetEVMTimestamp(&extra.NetworkUpgrades, &activation)
+		extra.DurangoBlockTimestamp = &activation
 		extra.EtnaTimestamp = &activation
 		extra.FortunaTimestamp = &activation
 		extra.GraniteTimestamp = &activation

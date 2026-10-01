@@ -22,7 +22,6 @@ go_library(
         "//graft/evm/params",
         "//graft/evm/utils",
         "//snow",
-        "//upgrade",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//params",
     ],
@@ -30,10 +29,15 @@ go_library(
 
 graft_go_test(
     name = "extras_test",
-    srcs = ["config_extra_test.go"],
+    srcs = [
+        "config_extra_test.go",
+        "network_upgrades_test.go",
+    ],
     embed = [":extras"],
     deps = [
+        "//graft/evm/params",
         "//graft/evm/utils",
+        "@com_github_ava_labs_libevm//libevm",
         "@com_github_stretchr_testify//require",
     ],
 )

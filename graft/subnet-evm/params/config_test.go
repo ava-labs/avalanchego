@@ -37,6 +37,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras/extrastest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
@@ -124,9 +125,9 @@ func TestCheckCompatible(t *testing.T) {
 			headBlock:     0,
 			headTimestamp: 0,
 			wantErr: &ethparams.ConfigCompatError{
-				What:         "SubnetEVM fork block timestamp",
+				What:         "ApricotPhase1 fork block timestamp",
 				StoredTime:   utils.PointerTo[uint64](0),
-				NewTime:      GetExtra(TestPreSubnetEVMChainConfig).NetworkUpgrades.SubnetEVMTimestamp,
+				NewTime:      GetExtra(TestPreSubnetEVMChainConfig).ApricotPhase1BlockTimestamp,
 				RewindToTime: 0,
 			},
 		},
@@ -136,9 +137,9 @@ func TestCheckCompatible(t *testing.T) {
 			headBlock:     10,
 			headTimestamp: 100,
 			wantErr: &ethparams.ConfigCompatError{
-				What:         "SubnetEVM fork block timestamp",
+				What:         "ApricotPhase1 fork block timestamp",
 				StoredTime:   utils.PointerTo[uint64](0),
-				NewTime:      GetExtra(TestPreSubnetEVMChainConfig).NetworkUpgrades.SubnetEVMTimestamp,
+				NewTime:      GetExtra(TestPreSubnetEVMChainConfig).ApricotPhase1BlockTimestamp,
 				RewindToTime: 0,
 			},
 		},
@@ -153,14 +154,9 @@ func TestCheckCompatible(t *testing.T) {
 }
 
 func TestConfigRules(t *testing.T) {
-	c := WithExtra(
-		&ChainConfig{},
-		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](500),
-			},
-		},
-	)
+	extra := &extras.ChainConfig{}
+	extrastest.SetSubnetEVMTimestamp(&extra.NetworkUpgrades, utils.PointerTo[uint64](500))
+	c := WithExtra(&ChainConfig{}, extra)
 
 	var stamp uint64
 	if r := c.Rules(big.NewInt(0), IsMergeTODO, stamp); GetRulesExtra(r).IsApricotPhase1 {
@@ -284,10 +280,7 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 			&extras.ChainConfig{
 				FeeConfig:          DefaultFeeConfig,
 				AllowFeeRecipients: false,
-				NetworkUpgrades: extras.NetworkUpgrades{
-					SubnetEVMTimestamp: utils.PointerTo[uint64](0),
-					DurangoTimestamp:   utils.PointerTo[uint64](0),
-				},
+				NetworkUpgrades:    extras.TestDurangoChainConfig.NetworkUpgrades,
 				GenesisPrecompiles: extras.Precompiles{},
 			},
 		),

@@ -49,6 +49,7 @@ graft_go_test(
         "//graft/evm/utils",
         "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/params/extras",
+        "//graft/subnet-evm/params/extras/extrastest",
         "//graft/subnet-evm/plugin/evm/customtypes",
         "//graft/subnet-evm/plugin/evm/upgrade/subnetevm",
         "//vms/evm/acp226",
