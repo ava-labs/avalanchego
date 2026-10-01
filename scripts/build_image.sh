@@ -70,23 +70,23 @@ prepare_go_module_cache "${AVALANCHE_PATH}"
 # simplifies creation of multi-arch images.
 #
 # Reference: https://docs.docker.com/build/buildkit/
-DOCKER_CMD="docker buildx build ${*}"
+DOCKER_CMD=("docker" "buildx" "build" "$@")
 
 # Pass the host's local module-proxy cache to the builder.
-DOCKER_CMD="${DOCKER_CMD} --build-context gomodcache=$(go_module_proxy_cache)"
+DOCKER_CMD+=("--build-context" "gomodcache=$(go_module_proxy_cache)")
 
 # The dockerfile doesn't specify the golang version to minimize the
 # changes required to bump the version. Instead, the golang version is
 # provided as an argument. Use head -1 because go workspaces list multiple
 # modules; CI validates all modules use the same Go version.
 GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
-DOCKER_CMD="${DOCKER_CMD} --build-arg GO_VERSION=${GO_VERSION}"
+DOCKER_CMD+=("--build-arg" "GO_VERSION=${GO_VERSION}")
 
 # Provide the git commit as a build argument to avoid requiring this
 # to be discovered within the image. This enables image builds from
 # git worktrees since a non-primary worktree won't have a .git
 # directory to copy into the image.
-DOCKER_CMD="${DOCKER_CMD} --build-arg AVALANCHEGO_COMMIT=${git_commit}"
+DOCKER_CMD+=("--build-arg" "AVALANCHEGO_COMMIT=${git_commit}")
 
 if [[ "${DOCKER_IMAGE}" == *"/"* ]]; then
   # Default to pushing when the image name includes a slash which indicates the
@@ -94,11 +94,11 @@ if [[ "${DOCKER_IMAGE}" == *"/"* ]]; then
   #
   #  - dockerhub: [repo]/[image name]:[tag]
   #  - private registry: [private registry hostname]/[image name]:[tag]
-  DOCKER_CMD="${DOCKER_CMD} --push"
+  DOCKER_CMD+=("--push")
 
   # Build a multi-arch image if requested
   if [[ -n "${BUILD_MULTI_ARCH}" ]]; then
-    DOCKER_CMD="${DOCKER_CMD} --platform=${PLATFORMS:-linux/amd64,linux/arm64}"
+    DOCKER_CMD+=("--platform" "${PLATFORMS:-linux/amd64,linux/arm64}")
   fi
 
   # A populated DOCKER_USERNAME env var triggers login
@@ -112,17 +112,17 @@ else
   # Building a single-arch image with buildx and having the resulting image show up
   # in the local store of docker images (ala 'docker build') requires explicitly
   # loading it from the buildx store with '--load'.
-  DOCKER_CMD="${DOCKER_CMD} --load"
+  DOCKER_CMD+=("--load")
 fi
 
 echo "Building Docker Image with tags: $DOCKER_IMAGE:$commit_hash , $DOCKER_IMAGE:$image_tag"
-${DOCKER_CMD} -t "$DOCKER_IMAGE:$commit_hash" -t "$DOCKER_IMAGE:$image_tag" \
-              "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
+"${DOCKER_CMD[@]}" -t "$DOCKER_IMAGE:$commit_hash" -t "$DOCKER_IMAGE:$image_tag" \
+  "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
 
 if [[ -z "${SKIP_BUILD_RACE}" ]]; then
    echo "Building Docker Image with tags (race detector): $DOCKER_IMAGE:$commit_hash-r , $DOCKER_IMAGE:$image_tag-r"
-   ${DOCKER_CMD} --build-arg="RACE_FLAG=-r" -t "$DOCKER_IMAGE:$commit_hash-r" -t "$DOCKER_IMAGE:$image_tag-r" \
-                 "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
+  "${DOCKER_CMD[@]}" --build-arg="RACE_FLAG=-r" -t "$DOCKER_IMAGE:$commit_hash-r" -t "$DOCKER_IMAGE:$image_tag-r" \
+    "$AVALANCHE_PATH" -f "$AVALANCHE_PATH/Dockerfile"
 fi
 
 # Tag latest when pushing to a registry and the tag is a release (vMAJOR.MINOR.PATCH)

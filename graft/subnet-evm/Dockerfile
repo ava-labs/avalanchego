@@ -15,10 +15,6 @@ ENV GOPROXY=file:///gomodproxy,off
 
 WORKDIR /build
 
-# Copy avalanche dependencies first (intermediate docker image caching)
-# Note: Context is now the repo root, so we copy from there
-COPY go.mod go.sum go.work go.work.sum ./
-COPY graft ./graft
 # Copy the entire repo to preserve module structure
 COPY . .
 

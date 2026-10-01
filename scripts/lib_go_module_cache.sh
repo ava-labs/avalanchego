@@ -18,9 +18,9 @@ function go_module_proxy_cache {
 }
 
 function prepare_go_module_cache {
-  # CI prepares this cache before it runs an image-build task and then disables
-  # external module proxy access. Do not download the modules again.
-  if [[ -n "${CI:-}" ]]; then
+  # The caller has disabled module-proxy access. This requires a compatible
+  # module cache to have been prepared before invoking this script.
+  if [[ "${GOPROXY:-}" == "off" ]]; then
     return
   fi
 

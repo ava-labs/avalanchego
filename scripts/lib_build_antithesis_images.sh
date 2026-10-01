@@ -71,14 +71,15 @@ function build_antithesis_images {
   fi
 
   # Define default build command
-  local docker_cmd
-  docker_cmd="docker buildx build\
- --build-context gomodcache=$(go_module_proxy_cache)\
- --build-arg GO_VERSION=${go_version}\
- --build-arg BUILDER_IMAGE_TAG=${image_tag}\
- --build-arg BUILDER_WORKDIR=${builder_workdir}"
+  local -a docker_cmd=(
+    "docker" "buildx" "build"
+    "--build-context" "gomodcache=$(go_module_proxy_cache)"
+    "--build-arg" "GO_VERSION=${go_version}"
+    "--build-arg" "BUILDER_IMAGE_TAG=${image_tag}"
+    "--build-arg" "BUILDER_WORKDIR=${builder_workdir}"
+  )
   if [[ -n "${avalanchego_commit}" ]]; then
-    docker_cmd="${docker_cmd} --build-arg AVALANCHEGO_COMMIT=${avalanchego_commit}"
+    docker_cmd+=("--build-arg" "AVALANCHEGO_COMMIT=${avalanchego_commit}")
   fi
 
   # By default the node image is intended to be local-only.
@@ -87,17 +88,17 @@ function build_antithesis_images {
   if [[ -n "${image_prefix}" && -z "${node_only}" ]]; then
     # Push images with an image prefix since the prefix defines a registry location, and only if building
     # all images. When building just the node image the image is only intended to be used locally.
-    docker_cmd="${docker_cmd} --push"
+    docker_cmd+=("--push")
 
     # When the node image is pushed as part of the build, references to the image must be qualified.
     AVALANCHEGO_NODE_IMAGE="${image_prefix}/${AVALANCHEGO_NODE_IMAGE}"
   fi
 
   # Ensure the correct node image name is configured
-  docker_cmd="${docker_cmd} --build-arg AVALANCHEGO_NODE_IMAGE=${AVALANCHEGO_NODE_IMAGE}"
+  docker_cmd+=("--build-arg" "AVALANCHEGO_NODE_IMAGE=${AVALANCHEGO_NODE_IMAGE}")
 
   # Build node image first to allow the workload image to use it.
-  ${docker_cmd} -t "${node_image_name}" -f "${node_dockerfile}" "${target_path}"
+  "${docker_cmd[@]}" -t "${node_image_name}" -f "${node_dockerfile}" "${target_path}"
 
   if [[ -n "${node_only}" ]]; then
     # Skip building the config and workload images. Supports building the avalanchego node image as the
@@ -106,10 +107,10 @@ function build_antithesis_images {
   fi
 
   # Build the config image
-  ${docker_cmd} -t "${config_image_name}" -f "${base_dockerfile}.config" "${target_path}"
+  "${docker_cmd[@]}" -t "${config_image_name}" -f "${base_dockerfile}.config" "${target_path}"
 
   # Build the workload image
-  ${docker_cmd} -t "${workload_image_name}" -f "${base_dockerfile}.workload" "${target_path}"
+  "${docker_cmd[@]}" -t "${workload_image_name}" -f "${base_dockerfile}.workload" "${target_path}"
 }
 
 # Generate the docker compose configuration for the antithesis config image.

@@ -11,15 +11,6 @@ ENV GOPROXY=file:///gomodproxy,off
 
 WORKDIR /build
 
-# Copy Avalanche dependency metadata first
-COPY go.mod .
-COPY go.sum .
-COPY go.work .
-COPY go.work.sum .
-COPY graft/coreth ./graft/coreth
-COPY graft/subnet-evm ./graft/subnet-evm
-COPY graft/evm ./graft/evm
-
 # Copy the code into the container
 COPY . .
 
