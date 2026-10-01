@@ -2,6 +2,8 @@
 
 ## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
 
+This release updates the plugin version to `47`. All plugins must update to remain compatible.
+
 ### Metrics
 
 - Added `avalanche_evm_transition_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.

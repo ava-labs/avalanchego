@@ -116,6 +116,7 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 				FortunaTimestamp:                utils.TimeToNewUint64(u.FortunaTime),
 				GraniteTimestamp:                utils.TimeToNewUint64(u.GraniteTime),
 				HeliconTimestamp:                utils.TimeToNewUint64(u.HeliconTime),
+				IglooTimestamp:                  utils.TimeToNewUint64(u.IglooTime),
 			},
 			AvalancheContext: extras.AvalancheContext{
 				SnowCtx: ctx,
