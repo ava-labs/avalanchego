@@ -89,8 +89,8 @@ func (e *executionResults) setBaseFee(bf *big.Int) error {
 // This method MUST NOT be called more than once. The wall-clock [time.Time] is
 // for metrics only.
 //
-// Synchronous blocks do not persist their execution results, which are instead
-// derived from the header by [Block.RestoreExecutionArtefacts].
+// A synchronous block's header determines its execution results, so they are
+// not persisted.
 func (b *Block) MarkExecuted(
 	db ethdb.Database,
 	xdb saetypes.ExecutionResults,
@@ -137,12 +137,10 @@ func (b *Block) MarkExecuted(
 	return b.markExecutedAfterDiskArtefacts(e, lastExecuted)
 }
 
-// markExecutedOnDisk updates the [saetypes.ExecutionResults], for asynchronous
-// blocks, and the head block in the database. The batch is `Write()`n (yeah,
-// it's a word now) after all disk artefacts are persisted.
+// markExecutedOnDisk updates the head block in the database, and the
+// [saetypes.ExecutionResults] of an asynchronous block. The batch is `Write()`n
+// (yeah, it's a word now) after all disk artefacts are persisted.
 func (b *Block) markExecutedOnDisk(batch ethdb.Batch, xdb saetypes.ExecutionResults, e *executionResults) error {
-	// Synchronous blocks derive their results from their header, as in
-	// [Block.RestoreExecutionArtefacts], so persisting them would be dead data.
 	if !b.Synchronous() {
 		n := b.NumberU64()
 		if err := xdb.Put(n, e.MarshalCanoto()); err != nil {
