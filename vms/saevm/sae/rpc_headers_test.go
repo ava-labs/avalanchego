@@ -82,6 +82,11 @@ func TestGasUsedHeader(t *testing.T) {
 			want: balanceOfGas,
 		},
 		{
+			name: "eth_call_default_block",
+			body: newReq("eth_call", balanceOf),
+			want: balanceOfGas,
+		},
+		{
 			name: "eth_call_revert",
 			body: newReq("eth_call", revert, latest),
 			want: revertGas,
