@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -71,7 +70,7 @@ func TestDispatcher_SendBytes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			_, tracker := newTestTracker(t, nodeID)
+			tracker := newTestTracker(t, nodeID)
 			c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 				t, ctx, nodeID, tt.handler, tracker,
 			)
@@ -110,8 +109,8 @@ func TestDispatcher_CancelInFlight(t *testing.T) {
 		},
 	}
 
-	reg, tracker := newTestTracker(t, nodeID)
-	seedResponsive(t, reg, tracker, nodeID)
+	tracker := newTestTracker(t, nodeID)
+	seedResponsive(t, tracker, nodeID)
 	c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 		t, t.Context(), nodeID, handler, tracker,
 	)
@@ -121,7 +120,7 @@ func TestDispatcher_CancelInFlight(t *testing.T) {
 
 	_, err = c.sendBytes(ctx, nodeID, reqBytes, acceptLeaf)
 	require.ErrorIsf(t, err, context.Canceled, "%T.sendBytes()", c)
-	assert.Equal(t, 1.0, responsivePeers(t, reg), "responsivePeers()")
+	assert.Truef(t, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
 }
 
 // Success scores the peer responsive, failure de-scores it. De-score rows
@@ -134,17 +133,17 @@ func TestDispatcher_PeerScoring(t *testing.T) {
 	require.NoError(t, err, "proto.Marshal(req)")
 
 	tests := []struct {
-		name       string
-		seed       bool
-		handler    p2p.Handler
-		wantErr    error
-		rejectResp bool
-		wantPeers  float64
+		name           string
+		seed           bool
+		handler        p2p.Handler
+		wantErr        error
+		rejectResp     bool
+		wantResponsive bool
 	}{
 		{
-			name:      "success scores responsive",
-			handler:   echoHandler(okBytes),
-			wantPeers: 1,
+			name:           "success scores responsive",
+			handler:        echoHandler(okBytes),
+			wantResponsive: true,
 		},
 		{
 			name:       "rejected response de-scores",
@@ -152,14 +151,12 @@ func TestDispatcher_PeerScoring(t *testing.T) {
 			handler:    echoHandler(okBytes),
 			rejectResp: true,
 			wantErr:    errRejected,
-			wantPeers:  0,
 		},
 		{
-			name:      "handler error de-scores",
-			seed:      true,
-			handler:   errorHandler(),
-			wantErr:   errHandlerFailed,
-			wantPeers: 0,
+			name:    "handler error de-scores",
+			seed:    true,
+			handler: errorHandler(),
+			wantErr: errHandlerFailed,
 		},
 	}
 
@@ -167,9 +164,9 @@ func TestDispatcher_PeerScoring(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
 			nodeID := ids.GenerateTestNodeID()
-			reg, tracker := newTestTracker(t, nodeID)
+			tracker := newTestTracker(t, nodeID)
 			if tt.seed {
-				seedResponsive(t, reg, tracker, nodeID)
+				seedResponsive(t, tracker, nodeID)
 			}
 			c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 				t, ctx, nodeID, tt.handler, tracker,
@@ -182,7 +179,7 @@ func TestDispatcher_PeerScoring(t *testing.T) {
 			_, err := c.sendBytes(ctx, nodeID, reqBytes, verify)
 			require.ErrorIsf(t, err, tt.wantErr, "%T.sendBytes()", c)
 
-			assert.Equal(t, tt.wantPeers, responsivePeers(t, reg), "responsivePeers()")
+			assert.Equalf(t, tt.wantResponsive, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
 		})
 	}
 }
@@ -226,23 +223,20 @@ func scriptedHandler(responses ...scriptResponse) (p2p.Handler, *atomic.Int32) {
 
 // seedResponsive marks nodeID responsive so a later de-score is a real
 // 1 -> 0 transition.
-func seedResponsive(t *testing.T, reg *prometheus.Registry, tracker *p2p.PeerTracker, nodeID ids.NodeID) {
+func seedResponsive(t *testing.T, tracker *p2p.PeerTracker, nodeID ids.NodeID) {
 	t.Helper()
 	tracker.RegisterRequest(nodeID)
 	tracker.RegisterResponse(nodeID, 1)
-	require.Equal(t, 1.0, responsivePeers(t, reg), "responsivePeers()")
+	require.Truef(t, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
 }
 
-const trackerNamespace = "test_peer_tracker"
-
-func newTestTracker(t *testing.T, peers ...ids.NodeID) (*prometheus.Registry, *p2p.PeerTracker) {
+func newTestTracker(t *testing.T, peers ...ids.NodeID) *p2p.PeerTracker {
 	t.Helper()
-	reg := prometheus.NewRegistry()
-	tracker := p2ptest.NewTrackerWithMetrics(t, trackerNamespace, reg)
+	tracker := p2ptest.NewTracker(t)
 	for _, nodeID := range peers {
 		tracker.Connected(nodeID, &version.Application{Major: 99})
 	}
-	return reg, tracker
+	return tracker
 }
 
 func newTestDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any](
@@ -260,8 +254,7 @@ func newTestDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any
 	}
 }
 
-// responsivePeers reads the num_responsive_peers gauge from reg.
-func responsivePeers(t *testing.T, reg *prometheus.Registry) float64 {
-	t.Helper()
-	return p2ptest.TrackerGauge(t, reg, trackerNamespace, "num_responsive_peers")
+func responsive(tracker *p2p.PeerTracker, nodeID ids.NodeID) bool {
+	peers := tracker.ResponsivePeers()
+	return peers.Contains(nodeID)
 }

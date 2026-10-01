@@ -389,12 +389,12 @@ func TestSyncerScoresProofSource(t *testing.T) {
 	tests := []struct {
 		name           string
 		validProof     bool
-		wantResponsive float64
+		wantResponsive bool
 	}{
 		{
 			name:           "valid_proof_keeps_the_peer_responsive",
 			validProof:     true,
-			wantResponsive: 1,
+			wantResponsive: true,
 		},
 		{
 			name: "unusable_proof_leaves_the_peer_unresponsive",
@@ -427,8 +427,7 @@ func TestSyncerScoresProofSource(t *testing.T) {
 				},
 			}
 
-			reg := prometheus.NewRegistry()
-			tracker := p2ptest.NewTrackerWithMetrics(t, "sync", reg)
+			tracker := p2ptest.NewTracker(t)
 
 			syncer, err := NewSyncer(
 				&db{id: ids.Empty},
@@ -452,8 +451,9 @@ func TestSyncerScoresProofSource(t *testing.T) {
 				require.Errorf(t, syncer.Sync(ctx), "%T.Sync()", syncer)
 			}
 
-			assert.Equal(t, 1.0, p2ptest.TrackerGauge(t, reg, "sync", "num_tracked_peers"), "num_tracked_peers")
-			assert.Equal(t, tt.wantResponsive, p2ptest.TrackerGauge(t, reg, "sync", "num_responsive_peers"), "num_responsive_peers")
+			tracked, responsive := tracker.TrackedPeers(), tracker.ResponsivePeers()
+			assert.Truef(t, tracked.Contains(nodeID), "%T.TrackedPeers()", tracker)
+			assert.Equalf(t, tt.wantResponsive, responsive.Contains(nodeID), "%T.ResponsivePeers()", tracker)
 		})
 	}
 }

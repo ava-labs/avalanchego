@@ -318,6 +318,22 @@ func (p *PeerTracker) Disconnected(nodeID ids.NodeID) {
 	p.metrics.numResponsivePeers.Set(float64(p.responsivePeers.Len()))
 }
 
+// TrackedPeers returns the peers with a request registered against them.
+func (p *PeerTracker) TrackedPeers() set.Set[ids.NodeID] {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return set.Of(p.trackedPeers.List()...)
+}
+
+// ResponsivePeers returns the tracked peers that answered their last request.
+func (p *PeerTracker) ResponsivePeers() set.Set[ids.NodeID] {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return set.Of(p.responsivePeers.List()...)
+}
+
 // Returns the number of peers the node is connected to.
 func (p *PeerTracker) Size() int {
 	p.lock.RLock()

@@ -84,7 +84,7 @@ func TestSend_RetriesThenSucceeds(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
 			handler, _ := scriptedHandler(tt.firstFail, scriptResponse{bytes: wantBytes})
-			_, tracker := newTestTracker(t, nodeID)
+			tracker := newTestTracker(t, nodeID)
 			c := newRetryDispatcher(t, ctx, nodeID, handler, tracker)
 
 			verifyCalls := 0
@@ -124,7 +124,7 @@ func TestSend_NoPeersBackoffEscalates(t *testing.T) {
 		ctx := t.Context()
 
 		handler, _ := scriptedHandler(scriptResponse{bytes: wantBytes})
-		_, tracker := newTestTracker(t)
+		tracker := newTestTracker(t)
 		c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](t, ctx, nodeID, handler, tracker)
 		// The constructor connects nodeID. Undo it so SelectPeer starts with no
 		// peers and the goroutine below is what makes one appear.
@@ -157,7 +157,7 @@ func TestSend_CtxCancelledBeforeStart(t *testing.T) {
 	cancel()
 
 	handler, calls := scriptedHandler(scriptResponse{bytes: []byte{}})
-	_, tracker := newTestTracker(t, nodeID)
+	tracker := newTestTracker(t, nodeID)
 	c := newRetryDispatcher(t, ctx, nodeID, handler, tracker)
 
 	got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, acceptLeaf)

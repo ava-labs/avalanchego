@@ -717,17 +717,17 @@ func TestSendAppRequestErrorBalancesTracker(t *testing.T) {
 	require.NoError(t, net.Connected(t.Context(), nodeID, defaultPeerVersion))
 
 	// Seed the peer responsive, so a missing failure registration is visible as
-	// the gauge staying at 1.
+	// the peer staying responsive.
 	p2ptest.SeedResponsive(t, net.PeerTracker(), nodeID)
-	require.Equal(t, 1.0, responsivePeers(t, reg), "seeded")
+	require.True(t, responsive(net, nodeID), "seeded")
 
 	_, err = net.SendSyncedAppRequest(t.Context(), nodeID, []byte("request"))
 	require.ErrorIs(t, err, errSend)
 
-	require.Equal(t, 0.0, responsivePeers(t, reg), "num_responsive_peers")
+	require.Falsef(t, responsive(net, nodeID), "%T.PeerTracker().ResponsivePeers()", net)
 }
 
-func responsivePeers(t *testing.T, reg *prometheus.Registry) float64 {
-	t.Helper()
-	return p2ptest.TrackerGauge(t, reg, "sync_peer_tracker", "num_responsive_peers")
+func responsive(net Network, nodeID ids.NodeID) bool {
+	peers := net.PeerTracker().ResponsivePeers()
+	return peers.Contains(nodeID)
 }
