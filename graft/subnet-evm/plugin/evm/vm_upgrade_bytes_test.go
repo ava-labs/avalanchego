@@ -156,7 +156,7 @@ func TestNetworkUpgradesOverridden(t *testing.T) {
 
 	// verify initial state
 	require.True(t, tvm.vm.chainConfigExtra().IsGranite(uint64(upgrade.InitiallyActiveTime.Unix())))
-	require.True(t, tvm.vm.currentRules().IsSubnetEVM)
+	require.True(t, tvm.vm.currentRules().IsApricotPhase1)
 	require.False(t, tvm.vm.currentRules().IsGranite)
 
 	// restart the vm with overrides

@@ -4,6 +4,7 @@
 package ethapi
 
 import (
+	"encoding/json"
 	"errors"
 	"math/big"
 	"os"
@@ -208,5 +209,37 @@ func TestBlockChainAPI_stateQueryBlockNumberAllowed(t *testing.T) {
 				require.EqualError(t, err, testCase.wantErrMessage)
 			}
 		})
+	}
+}
+
+func TestGetActiveRulesAtSerialization(t *testing.T) {
+	for _, timestamp := range []uint64{0, 99, 100, 101} {
+		config := *params.TestChainConfig
+		extra := *params.GetExtra(&config)
+		activation := uint64(100)
+		extra.SubnetEVMTimestamp = &activation
+		extra.DurangoTimestamp = &activation
+		extra.EtnaTimestamp = &activation
+		extra.FortunaTimestamp = &activation
+		extra.GraniteTimestamp = &activation
+		extra.HeliconTimestamp = &activation
+		extra.IglooTimestamp = &activation
+		params.WithExtra(&config, &extra)
+		backend := NewMockBackend(gomock.NewController(t))
+		backend.EXPECT().ChainConfig().Return(&config)
+		result := NewBlockChainAPI(backend).GetActiveRulesAt(t.Context(), &timestamp)
+		data, err := json.Marshal(result)
+		require.NoError(t, err)
+		var fields map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(data, &fields))
+		require.Len(t, fields, 3)
+		expected := `{"IsSubnetEVM":false,"IsDurango":false,"IsEtna":false,"IsFortuna":false,"IsGranite":false,"IsHelicon":false,"IsIgloo":false}`
+		if timestamp >= activation {
+			expected = `{"IsSubnetEVM":true,"IsDurango":true,"IsEtna":true,"IsFortuna":true,"IsGranite":true,"IsHelicon":true,"IsIgloo":true}`
+		}
+		require.Equal(t, expected, string(fields["avalancheRules"]))
+		var decoded ActiveRulesResult
+		require.NoError(t, json.Unmarshal(data, &decoded))
+		require.Equal(t, result.AvalancheRules, decoded.AvalancheRules)
 	}
 }

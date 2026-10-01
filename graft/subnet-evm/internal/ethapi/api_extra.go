@@ -144,8 +144,20 @@ type ActivePrecompilesResult struct {
 
 type ActiveRulesResult struct {
 	EthRules          params.Rules                       `json:"ethRules"`
-	AvalancheRules    extras.AvalancheRules              `json:"avalancheRules"`
+	AvalancheRules    avalancheRulesJSON                 `json:"avalancheRules"`
 	ActivePrecompiles map[string]ActivePrecompilesResult `json:"precompiles"`
+}
+
+// avalancheRulesJSON preserves the historical RPC representation independently
+// of the shared execution rules.
+type avalancheRulesJSON struct {
+	IsSubnetEVM bool
+	IsDurango   bool
+	IsEtna      bool
+	IsFortuna   bool
+	IsGranite   bool
+	IsHelicon   bool
+	IsIgloo     bool
 }
 
 // GetActiveRulesAt returns the active rules at the given block timestamp.
@@ -157,9 +169,18 @@ func (s *BlockChainAPI) GetActiveRulesAt(_ context.Context, blockTimestamp *uint
 		timestamp = *blockTimestamp
 	}
 	rules := s.b.ChainConfig().Rules(common.Big0, params.IsMergeTODO, timestamp)
+	avalancheRules := params.GetRulesExtra(rules).AvalancheRules
 	res := ActiveRulesResult{
-		EthRules:       rules,
-		AvalancheRules: params.GetRulesExtra(rules).AvalancheRules,
+		EthRules: rules,
+		AvalancheRules: avalancheRulesJSON{
+			IsSubnetEVM: avalancheRules.IsCortina,
+			IsDurango:   avalancheRules.IsDurango,
+			IsEtna:      avalancheRules.IsEtna,
+			IsFortuna:   avalancheRules.IsFortuna,
+			IsGranite:   avalancheRules.IsGranite,
+			IsHelicon:   avalancheRules.IsHelicon,
+			IsIgloo:     avalancheRules.IsIgloo,
+		},
 	}
 	res.ActivePrecompiles = make(map[string]ActivePrecompilesResult)
 	for _, precompileConfig := range params.GetRulesExtra(rules).Precompiles {

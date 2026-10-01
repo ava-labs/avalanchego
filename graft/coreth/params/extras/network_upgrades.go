@@ -11,8 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/upgrade"
 
+	evmparams "github.com/ava-labs/avalanchego/graft/evm/params"
 	ethparams "github.com/ava-labs/libevm/params"
 )
+
+type AvalancheRules = evmparams.AvalancheRules
 
 // NetworkUpgrades tracks the timestamps of all the Avalanche upgrades.
 //
@@ -279,30 +282,6 @@ func GetNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
 		HeliconTimestamp:                utils.TimeToNewUint64(agoUpgrade.HeliconTime),
 		IglooTimestamp:                  utils.TimeToNewUint64(agoUpgrade.IglooTime),
 	}
-}
-
-type AvalancheRules struct {
-	IsApricotPhase1, IsApricotPhase2, IsApricotPhase3, IsApricotPhase4, IsApricotPhase5 bool
-	IsApricotPhasePre6, IsApricotPhase6, IsApricotPhasePost6                            bool
-	IsBanff                                                                             bool
-	IsCortina                                                                           bool
-	IsDurango                                                                           bool
-	IsEtna                                                                              bool
-	IsFortuna                                                                           bool
-	IsGranite                                                                           bool
-	IsHelicon                                                                           bool
-	IsIgloo                                                                             bool
-}
-
-// IsGraniteActivated is used by the warp precompile to determine which gas costs to use.
-func (a AvalancheRules) IsGraniteActivated() bool {
-	return a.IsGranite
-}
-
-// IsDurangoActivated is used by the precompileconfig to determine if the Durango upgrade is activated.
-// For Coreth we don't really need this, but need to implement it to satisfy the interface.
-func (a AvalancheRules) IsDurangoActivated() bool {
-	return a.IsDurango
 }
 
 func (n *NetworkUpgrades) GetAvalancheRules(timestamp uint64) AvalancheRules {

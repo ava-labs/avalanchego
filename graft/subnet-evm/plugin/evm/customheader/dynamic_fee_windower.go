@@ -28,7 +28,7 @@ var (
 func baseFeeFromWindow(config *extras.ChainConfig, feeConfig commontype.FeeConfig, parent *types.Header, timestamp uint64) (*big.Int, error) {
 	// If the current block is the first EIP-1559 block, or it is the genesis block
 	// return the initial slice and initial base fee.
-	if !config.IsSubnetEVM(parent.Time) || parent.Number.Cmp(common.Big0) == 0 {
+	if !config.IsApricotPhase3(parent.Time) || parent.Number.Cmp(common.Big0) == 0 {
 		return big.NewInt(feeConfig.MinBaseFee.Int64()), nil
 	}
 
@@ -122,7 +122,7 @@ func feeWindow(
 ) (subnetevm.Window, error) {
 	// If the current block is the first EIP-1559 block, or it is the genesis block
 	// return the initial window.
-	if !config.IsSubnetEVM(parent.Time) || parent.Number.Cmp(common.Big0) == 0 {
+	if !config.IsApricotPhase3(parent.Time) || parent.Number.Cmp(common.Big0) == 0 {
 		return subnetevm.Window{}, nil
 	}
 
