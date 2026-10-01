@@ -61,7 +61,7 @@ type NetworkUpgrades struct {
 	// Helicon activates async execution (ACP-194) and the dynamic minimum gas
 	// price (ACP-283).
 	HeliconTimestamp *uint64 `json:"heliconTimestamp,omitempty"`
-	// Igloo is our next upcoming upgarde.
+	// Igloo is our next upcoming upgrade.
 	IglooTimestamp *uint64 `json:"iglooTimestamp,omitempty"`
 }
 
@@ -115,6 +115,9 @@ func (n *NetworkUpgrades) checkNetworkUpgradesCompatible(newcfg *NetworkUpgrades
 	if isForkTimestampIncompatible(n.HeliconTimestamp, newcfg.HeliconTimestamp, time) {
 		return ethparams.NewTimestampCompatError("Helicon fork block timestamp", n.HeliconTimestamp, newcfg.HeliconTimestamp)
 	}
+	if isForkTimestampIncompatible(n.IglooTimestamp, newcfg.IglooTimestamp, time) {
+		return ethparams.NewTimestampCompatError("Igloo fork block timestamp", n.IglooTimestamp, newcfg.IglooTimestamp)
+	}
 
 	return nil
 }
@@ -136,6 +139,7 @@ func (n *NetworkUpgrades) forkOrder() []fork {
 		{name: "fortunaTimestamp", timestamp: n.FortunaTimestamp},
 		{name: "graniteTimestamp", timestamp: n.GraniteTimestamp},
 		{name: "heliconTimestamp", timestamp: n.HeliconTimestamp},
+		{name: "iglooTimestamp", timestamp: n.IglooTimestamp},
 	}
 }
 
@@ -251,7 +255,8 @@ func (n NetworkUpgrades) Description() string {
 	banner += fmt.Sprintf(" - Etna Timestamp:                   @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(n.EtnaTimestamp))
 	banner += fmt.Sprintf(" - Fortuna Timestamp:                @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0)\n", ptrToString(n.FortunaTimestamp))
 	banner += fmt.Sprintf(" - Granite Timestamp:                @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0)\n", ptrToString(n.GraniteTimestamp))
-	banner += fmt.Sprintf(" - Helicon Timestamp:                @%-10v (Unscheduled)\n", ptrToString(n.HeliconTimestamp))
+	banner += fmt.Sprintf(" - Helicon Timestamp:                @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)\n", ptrToString(n.HeliconTimestamp))
+	banner += fmt.Sprintf(" - Igloo Timestamp:                  @%-10v (Unscheduled)\n", ptrToString(n.IglooTimestamp))
 	return banner
 }
 
@@ -272,6 +277,7 @@ func GetNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
 		FortunaTimestamp:                utils.TimeToNewUint64(agoUpgrade.FortunaTime),
 		GraniteTimestamp:                utils.TimeToNewUint64(agoUpgrade.GraniteTime),
 		HeliconTimestamp:                utils.TimeToNewUint64(agoUpgrade.HeliconTime),
+		IglooTimestamp:                  utils.TimeToNewUint64(agoUpgrade.IglooTime),
 	}
 }
 
