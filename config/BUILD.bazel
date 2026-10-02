@@ -71,6 +71,7 @@ go_test(
         "//utils",
         "//utils/constants",
         "//utils/perms",
+        "//utils/set",
         "//utils/units",
         "@com_github_spf13_pflag//:pflag",
         "@com_github_spf13_viper//:viper",
