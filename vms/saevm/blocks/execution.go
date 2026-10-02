@@ -101,10 +101,7 @@ func (b *Block) MarkExecuted(
 	stateRootPost common.Hash,
 	lastExecuted *atomic.Pointer[Block],
 ) error {
-	// A synchronous block's final gas time is derived from its header rather
-	// than from the clock that recorded its interim times, so the two are not
-	// comparable.
-	if it := b.interimExecutionTime.Load(); it != nil && !b.Synchronous() && byGas.Compare(it) < 0 {
+	if it := b.interimExecutionTime.Load(); it != nil && byGas.Compare(it) < 0 {
 		// The final execution time is scaled to the new gas target but interim
 		// times are not, which can result in rounding errors. Scaling always
 		// rounds up, to maintain a monotonic clock, but we confirm for safety.

@@ -360,9 +360,12 @@ func Execute(
 		perTxClock.Tick(gas.Gas(receipt.GasUsed))
 		// Interim execution time reports live canonical progress. Historical
 		// execution can run only part of the same in-memory block and overwrite
-		// that progress with an earlier time. This violates monotonicity and can
-		// change the settlement decision made by LastToSettleAt.
-		if config.canonical {
+		// that progress with an earlier time. This violates monotonicity and
+		// can change the settlement decision made by LastToSettleAt.
+		//
+		// A synchronous block's final gas time is derived from its header, not
+		// from this clock, so it records no interim time.
+		if config.canonical && !synchronous {
 			b.SwapInterimExecutionTime(perTxClock)
 			// TODO(arr4n) investigate calling the same method on pending blocks in
 			// the queue. It's only worth it if [blocks.LastToSettleAt] regularly
@@ -405,7 +408,7 @@ func Execute(
 		b.CheckOpBurnerBalanceBounds(stateDB, numTxs+i, o)
 		res.GasConsumed += o.Gas
 		perTxClock.Tick(o.Gas)
-		if config.canonical {
+		if config.canonical && !synchronous {
 			b.SwapInterimExecutionTime(perTxClock)
 		}
 
