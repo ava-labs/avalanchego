@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras/extrastest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/subnetevm"
 )
@@ -45,9 +46,11 @@ func TestExtraPrefix(t *testing.T) {
 		},
 		{
 			name: "subnet_evm_first_block",
-			upgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-			},
+			upgrades: func() extras.NetworkUpgrades {
+				var n extras.NetworkUpgrades
+				extrastest.SetSubnetEVMTimestamp(&n, utils.PointerTo[uint64](1))
+				return n
+			}(),
 			parent: &types.Header{
 				Number: big.NewInt(1),
 			},

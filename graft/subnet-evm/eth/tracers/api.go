@@ -1081,29 +1081,39 @@ func overrideConfig(original *params.ChainConfig, override *params.ChainConfig) 
 	*copy = params.Copy(original)
 	canon := true
 
+	extra := params.GetExtra(copy)
 	overrideExtra := params.GetExtra(override)
-	if timestamp := overrideExtra.SubnetEVMTimestamp; timestamp != nil {
-		params.GetExtra(copy).SubnetEVMTimestamp = timestamp
+	if timestamp := overrideExtra.CortinaBlockTimestamp; timestamp != nil {
+		extra.ApricotPhase1BlockTimestamp = timestamp
+		extra.ApricotPhase2BlockTimestamp = timestamp
+		extra.ApricotPhase3BlockTimestamp = timestamp
+		extra.ApricotPhase4BlockTimestamp = timestamp
+		extra.ApricotPhase5BlockTimestamp = timestamp
+		extra.ApricotPhasePre6BlockTimestamp = timestamp
+		extra.ApricotPhase6BlockTimestamp = timestamp
+		extra.ApricotPhasePost6BlockTimestamp = timestamp
+		extra.BanffBlockTimestamp = timestamp
+		extra.CortinaBlockTimestamp = timestamp
 		canon = false
 	}
-	if timestamp := overrideExtra.DurangoTimestamp; timestamp != nil {
-		params.GetExtra(copy).DurangoTimestamp = timestamp
+	if timestamp := overrideExtra.DurangoBlockTimestamp; timestamp != nil {
+		extra.DurangoBlockTimestamp = timestamp
 		canon = false
 	}
 	if timestamp := overrideExtra.EtnaTimestamp; timestamp != nil {
-		params.GetExtra(copy).EtnaTimestamp = timestamp
+		extra.EtnaTimestamp = timestamp
 		canon = false
 	}
 	if timestamp := overrideExtra.FortunaTimestamp; timestamp != nil {
-		params.GetExtra(copy).FortunaTimestamp = timestamp
+		extra.FortunaTimestamp = timestamp
 		canon = false
 	}
 	if timestamp := overrideExtra.GraniteTimestamp; timestamp != nil {
-		params.GetExtra(copy).GraniteTimestamp = timestamp
+		extra.GraniteTimestamp = timestamp
 		canon = false
 	}
 	if timestamp := overrideExtra.HeliconTimestamp; timestamp != nil {
-		params.GetExtra(copy).HeliconTimestamp = timestamp
+		extra.HeliconTimestamp = timestamp
 		canon = false
 	}
 	if timestamp := overrideExtra.IglooTimestamp; timestamp != nil {

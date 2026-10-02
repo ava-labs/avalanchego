@@ -24,6 +24,7 @@ go_library(
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/modules",
         "//graft/coreth/precompile/precompileconfig",
+        "//graft/evm/params",
         "//graft/evm/precompileconfig",
         "//graft/evm/utils",
         "//snow",
@@ -51,7 +52,6 @@ graft_go_test(
     deps = [
         "//graft/coreth/params/extras",
         "//graft/evm/utils",
-        "//upgrade/upgradetest",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//params",
         "@com_github_stretchr_testify//assert",

@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 
+	evmparams "github.com/ava-labs/avalanchego/graft/evm/params"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -32,6 +33,7 @@ func extrasToRegister() ethparams.Extras[*extras.ChainConfig, RulesExtra] {
 // will work, and most will simply panic.
 func RegisterExtras() {
 	payloads = ethparams.RegisterExtras(extrasToRegister())
+	evmparams.RegisterJSON(extras.CorethJSON{})
 }
 
 // WithTempRegisteredExtras runs `fn` with temporary registration otherwise
@@ -46,9 +48,9 @@ func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
 
 	return ethparams.WithTempRegisteredExtras(
 		lock, extrasToRegister(),
-		func(extras ethparams.ExtraPayloads[*extras.ChainConfig, RulesExtra]) error {
-			payloads = extras
-			return fn()
+		func(p ethparams.ExtraPayloads[*extras.ChainConfig, RulesExtra]) error {
+			payloads = p
+			return evmparams.WithTempRegisteredJSON(lock, extras.CorethJSON{}, fn)
 		},
 	)
 }

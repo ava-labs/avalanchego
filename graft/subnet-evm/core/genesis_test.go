@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras/extrastest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
@@ -81,7 +82,7 @@ func TestSetupGenesis(t *testing.T) {
 
 func testSetupGenesis(t *testing.T, scheme string) {
 	preSubnetConfig := params.Copy(params.TestPreSubnetEVMChainConfig)
-	params.GetExtra(&preSubnetConfig).SubnetEVMTimestamp = utils.PointerTo[uint64](100)
+	extrastest.SetSubnetEVMTimestamp(&params.GetExtra(&preSubnetConfig).NetworkUpgrades, utils.PointerTo[uint64](100))
 	var (
 		customghash = common.HexToHash("0x4a12fe7bf8d40d152d7e9de22337b115186a4662aa3a97217b36146202bbfc66")
 		customg     = Genesis{
@@ -95,7 +96,7 @@ func testSetupGenesis(t *testing.T, scheme string) {
 	)
 
 	rollbackpreSubnetConfig := params.Copy(&preSubnetConfig)
-	params.GetExtra(&rollbackpreSubnetConfig).SubnetEVMTimestamp = utils.PointerTo[uint64](90)
+	extrastest.SetSubnetEVMTimestamp(&params.GetExtra(&rollbackpreSubnetConfig).NetworkUpgrades, utils.PointerTo[uint64](90))
 	oldcustomg.Config = &rollbackpreSubnetConfig
 
 	tests := []struct {
@@ -179,7 +180,7 @@ func testSetupGenesis(t *testing.T, scheme string) {
 			wantHash:   customghash,
 			wantConfig: customg.Config,
 			wantErr: &ethparams.ConfigCompatError{
-				What:         "SubnetEVM fork block timestamp",
+				What:         "ApricotPhase1 fork block timestamp",
 				StoredTime:   u64(90),
 				NewTime:      u64(100),
 				RewindToTime: 89,

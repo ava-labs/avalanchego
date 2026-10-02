@@ -66,12 +66,14 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -483,7 +485,7 @@ func parseGenesis(ctx *snow.Context, bytes []byte) (*core.Genesis, error) {
 	configExtra.AvalancheContext = extras.AvalancheContext{
 		SnowCtx: ctx,
 	}
-	configExtra.NetworkUpgrades = extras.GetNetworkUpgrades(ctx.NetworkUpgrades)
+	configExtra.NetworkUpgrades = getNetworkUpgrades(ctx.NetworkUpgrades)
 
 	// If Durango is scheduled, schedule the Warp Precompile at the same time.
 	if configExtra.DurangoBlockTimestamp != nil {
@@ -500,6 +502,27 @@ func parseGenesis(ctx *snow.Context, bytes []byte) (*core.Genesis, error) {
 		return nil, fmt.Errorf("setting eth upgrades: %w", err)
 	}
 	return g, nil
+}
+
+func getNetworkUpgrades(u upgrade.Config) extras.NetworkUpgrades {
+	return extras.NetworkUpgrades{
+		ApricotPhase1BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase1Time),
+		ApricotPhase2BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase2Time),
+		ApricotPhase3BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase3Time),
+		ApricotPhase4BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase4Time),
+		ApricotPhase5BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase5Time),
+		ApricotPhasePre6BlockTimestamp:  utils.TimeToNewUint64(u.ApricotPhasePre6Time),
+		ApricotPhase6BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase6Time),
+		ApricotPhasePost6BlockTimestamp: utils.TimeToNewUint64(u.ApricotPhasePost6Time),
+		BanffBlockTimestamp:             utils.TimeToNewUint64(u.BanffTime),
+		CortinaBlockTimestamp:           utils.TimeToNewUint64(u.CortinaTime),
+		DurangoBlockTimestamp:           utils.TimeToNewUint64(u.DurangoTime),
+		EtnaTimestamp:                   utils.TimeToNewUint64(u.EtnaTime),
+		FortunaTimestamp:                utils.TimeToNewUint64(u.FortunaTime),
+		GraniteTimestamp:                utils.TimeToNewUint64(u.GraniteTime),
+		HeliconTimestamp:                utils.TimeToNewUint64(u.HeliconTime),
+		IglooTimestamp:                  utils.TimeToNewUint64(u.IglooTime),
+	}
 }
 
 func (vm *VM) initializeMetrics() error {

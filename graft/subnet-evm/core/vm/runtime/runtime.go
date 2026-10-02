@@ -88,7 +88,16 @@ func setDefaults(cfg *Config) {
 			},
 			&extras.ChainConfig{
 				NetworkUpgrades: extras.NetworkUpgrades{
-					SubnetEVMTimestamp: new(uint64),
+					ApricotPhase1BlockTimestamp:     new(uint64),
+					ApricotPhase2BlockTimestamp:     new(uint64),
+					ApricotPhase3BlockTimestamp:     new(uint64),
+					ApricotPhase4BlockTimestamp:     new(uint64),
+					ApricotPhase5BlockTimestamp:     new(uint64),
+					ApricotPhasePre6BlockTimestamp:  new(uint64),
+					ApricotPhase6BlockTimestamp:     new(uint64),
+					ApricotPhasePost6BlockTimestamp: new(uint64),
+					BanffBlockTimestamp:             new(uint64),
+					CortinaBlockTimestamp:           new(uint64),
 				},
 			},
 		)

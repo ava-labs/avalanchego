@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
 
 func TestMain(m *testing.M) {
@@ -22,13 +21,15 @@ func TestMain(m *testing.M) {
 
 func TestSetEthUpgrades(t *testing.T) {
 	genesisBlock := big.NewInt(0)
-	genesisTimestamp := utils.PointerTo(initiallyActive)
+	genesisTimestamp := utils.PointerTo[uint64](0) // extras.Test*Config activate at 0
 	tests := []struct {
-		fork     upgradetest.Fork
-		expected *ChainConfig
+		name        string
+		extraConfig *extras.ChainConfig
+		expected    *ChainConfig
 	}{
 		{
-			fork: upgradetest.NoUpgrades,
+			name:        "launch",
+			extraConfig: extras.TestLaunchConfig,
 			expected: &ChainConfig{
 				HomesteadBlock:      genesisBlock,
 				DAOForkBlock:        genesisBlock,
@@ -48,7 +49,8 @@ func TestSetEthUpgrades(t *testing.T) {
 			},
 		},
 		{
-			fork: upgradetest.ApricotPhase1,
+			name:        "apricot phase 1",
+			extraConfig: extras.TestApricotPhase1Config,
 			expected: &ChainConfig{
 				HomesteadBlock:      genesisBlock,
 				DAOForkBlock:        genesisBlock,
@@ -68,7 +70,8 @@ func TestSetEthUpgrades(t *testing.T) {
 			},
 		},
 		{
-			fork: upgradetest.ApricotPhase2,
+			name:        "apricot phase 2",
+			extraConfig: extras.TestApricotPhase2Config,
 			expected: &ChainConfig{
 				HomesteadBlock:      genesisBlock,
 				DAOForkBlock:        genesisBlock,
@@ -88,7 +91,8 @@ func TestSetEthUpgrades(t *testing.T) {
 			},
 		},
 		{
-			fork: upgradetest.ApricotPhase3,
+			name:        "apricot phase 3",
+			extraConfig: extras.TestApricotPhase3Config,
 			expected: &ChainConfig{
 				HomesteadBlock:      genesisBlock,
 				DAOForkBlock:        genesisBlock,
@@ -108,7 +112,8 @@ func TestSetEthUpgrades(t *testing.T) {
 			},
 		},
 		{
-			fork: upgradetest.Durango,
+			name:        "durango",
+			extraConfig: extras.TestDurangoChainConfig,
 			expected: &ChainConfig{
 				HomesteadBlock:      genesisBlock,
 				DAOForkBlock:        genesisBlock,
@@ -128,7 +133,8 @@ func TestSetEthUpgrades(t *testing.T) {
 			},
 		},
 		{
-			fork: upgradetest.Etna,
+			name:        "etna",
+			extraConfig: extras.TestEtnaChainConfig,
 			expected: &ChainConfig{
 				HomesteadBlock:      genesisBlock,
 				DAOForkBlock:        genesisBlock,
@@ -149,21 +155,19 @@ func TestSetEthUpgrades(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.fork.String(), func(t *testing.T) {
+		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			extraConfig := &extras.ChainConfig{
-				NetworkUpgrades: extras.GetNetworkUpgrades(upgradetest.GetConfig(test.fork)),
-			}
+			cpy := *test.extraConfig
 			actual := WithExtra(
 				&ChainConfig{},
-				extraConfig,
+				&cpy,
 			)
 			require.NoError(SetEthUpgrades(actual))
 
 			expected := WithExtra(
 				test.expected,
-				extraConfig,
+				&cpy,
 			)
 			require.Equal(expected, actual)
 		})

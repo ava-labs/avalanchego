@@ -30,7 +30,7 @@ func TestChainConfigDescription(t *testing.T) {
 		"empty": {
 			config: &ChainConfig{},
 			wantRegex: `Avalanche Upgrades \(timestamp based\)\:
- - SubnetEVM Timestamp: ( )+@nil( )+\(https:\/\/github\.com\/ava-labs\/avalanchego\/releases\/tag\/v1\.10\.0\)
+ - Apricot Phase 1 Timestamp: ( )+@nil( )+\(https:\/\/github\.com\/ava-labs\/avalanchego\/releases\/tag\/v1\.3\.0\)
 ( - .+Timestamp: .+\n)+
 Upgrade Config: {}
 Fee Config: {}
@@ -39,12 +39,11 @@ $`,
 		},
 		"set": {
 			config: &ChainConfig{
-				NetworkUpgrades: NetworkUpgrades{
-					SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-					DurangoTimestamp:   utils.PointerTo[uint64](2),
-					EtnaTimestamp:      utils.PointerTo[uint64](3),
-					FortunaTimestamp:   utils.PointerTo[uint64](4),
-				},
+				NetworkUpgrades: *withSubnetEVM(utils.PointerTo[uint64](1), &NetworkUpgrades{
+					DurangoBlockTimestamp: utils.PointerTo[uint64](2),
+					EtnaTimestamp:         utils.PointerTo[uint64](3),
+					FortunaTimestamp:      utils.PointerTo[uint64](4),
+				}),
 				FeeConfig: commontype.FeeConfig{
 					GasLimit:                 big.NewInt(5),
 					TargetBlockRate:          6,
@@ -57,9 +56,7 @@ $`,
 				},
 				AllowFeeRecipients: true,
 				UpgradeConfig: UpgradeConfig{
-					NetworkUpgradeOverrides: &NetworkUpgrades{
-						SubnetEVMTimestamp: utils.PointerTo[uint64](13),
-					},
+					NetworkUpgradeOverrides: withSubnetEVM(utils.PointerTo[uint64](13), &NetworkUpgrades{}),
 					StateUpgrades: []StateUpgrade{
 						{
 							BlockTimestamp: utils.PointerTo[uint64](14),
@@ -73,7 +70,7 @@ $`,
 				},
 			},
 			wantRegex: `Avalanche Upgrades \(timestamp based\)\:
- - SubnetEVM Timestamp: ( )+@1( )+\(https:\/\/github\.com\/ava-labs\/avalanchego\/releases\/tag\/v1\.10\.0\)
+ - Apricot Phase 1 Timestamp: ( )+@1( )+\(https:\/\/github\.com\/ava-labs\/avalanchego\/releases\/tag\/v1\.3\.0\)
 ( - .+Timestamp: .+\n)+
 Upgrade Config: {"networkUpgradeOverrides":{"subnetEVMTimestamp":13},"stateUpgrades":\[{"blockTimestamp":14,"accounts":{"0x0f00000000000000000000000000000000000000":{"code":"0x10"}}}\]}
 Fee Config: {"gasLimit":5,"targetBlockRate":6,"minBaseFee":7,"targetGas":8,"baseFeeChangeDenominator":9,"minBlockGasCost":10,"maxBlockGasCost":11,"blockGasCostStep":12}
@@ -107,12 +104,11 @@ func TestChainConfigVerify(t *testing.T) {
 	validConfig := func(initialMinDelayMS uint64) ChainConfig {
 		return ChainConfig{
 			FeeConfig: validFeeConfig,
-			NetworkUpgrades: NetworkUpgrades{
-				SubnetEVMTimestamp: utils.PointerTo[uint64](1),
-				DurangoTimestamp:   utils.PointerTo[uint64](2),
-				EtnaTimestamp:      utils.PointerTo[uint64](3),
-				FortunaTimestamp:   utils.PointerTo[uint64](4),
-			},
+			NetworkUpgrades: *withSubnetEVM(utils.PointerTo[uint64](1), &NetworkUpgrades{
+				DurangoBlockTimestamp: utils.PointerTo[uint64](2),
+				EtnaTimestamp:         utils.PointerTo[uint64](3),
+				FortunaTimestamp:      utils.PointerTo[uint64](4),
+			}),
 			AvalancheContext: AvalancheContext{SnowCtx: &snow.Context{
 				NetworkUpgrades: upgrade.Config{
 					DurangoTime: time.Unix(2, 0),
@@ -163,10 +159,8 @@ func TestChainConfigVerify(t *testing.T) {
 		},
 		"invalid_network_upgrades": {
 			config: ChainConfig{
-				FeeConfig: validFeeConfig,
-				NetworkUpgrades: NetworkUpgrades{
-					SubnetEVMTimestamp: nil,
-				},
+				FeeConfig:        validFeeConfig,
+				NetworkUpgrades:  NetworkUpgrades{},
 				AvalancheContext: AvalancheContext{SnowCtx: &snow.Context{}},
 			},
 			wantError: errCannotBeNil,

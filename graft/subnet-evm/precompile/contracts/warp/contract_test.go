@@ -12,10 +12,10 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras/extrastest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
 	"github.com/ava-labs/avalanchego/ids"
@@ -39,7 +39,7 @@ func runTests(
 ) {
 	for _, fork := range forks {
 		t.Run(fork.String(), func(t *testing.T) {
-			rules := extrastest.ForkToAvalancheRules(fork)
+			rules := paramstest.ForkToAvalancheRules(fork)
 			tests := makeTests(t, rules)
 			precompiletest.RunPrecompileTests(t, Module, tests)
 		})
@@ -52,7 +52,7 @@ func runBenchmarks(
 ) {
 	for _, fork := range forks {
 		b.Run(fork.String(), func(b *testing.B) {
-			rules := extrastest.ForkToAvalancheRules(fork)
+			rules := paramstest.ForkToAvalancheRules(fork)
 			tests := makeTests(b, rules)
 			precompiletest.RunPrecompileBenchmarks(b, Module, tests)
 		})

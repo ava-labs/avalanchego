@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras/extrastest"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompiletest"
+	"github.com/ava-labs/avalanchego/graft/evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -38,7 +38,7 @@ func runTests(
 ) {
 	for _, fork := range forks {
 		t.Run(fork.String(), func(t *testing.T) {
-			rules := extrastest.ForkToAvalancheRules(fork)
+			rules := paramstest.ForkToAvalancheRules(fork)
 			tests := makeTests(t, rules)
 			precompiletest.RunPrecompileTests(t, Module, tests)
 		})
@@ -51,7 +51,7 @@ func runBenchmarks(
 ) {
 	for _, fork := range forks {
 		b.Run(fork.String(), func(b *testing.B) {
-			rules := extrastest.ForkToAvalancheRules(fork)
+			rules := paramstest.ForkToAvalancheRules(fork)
 			tests := makeTests(b, rules)
 			precompiletest.RunPrecompileBenchmarks(b, Module, tests)
 		})

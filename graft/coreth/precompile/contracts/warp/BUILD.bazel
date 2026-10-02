@@ -43,10 +43,10 @@ graft_go_test(
     embed = [":warp"],
     deps = [
         "//graft/coreth/params/extras",
-        "//graft/coreth/params/extras/extrastest",
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/precompileconfig",
         "//graft/coreth/precompile/precompiletest",
+        "//graft/evm/params/paramstest",
         "//graft/evm/utils",
         "//ids",
         "//snow",

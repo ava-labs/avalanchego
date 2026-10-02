@@ -72,7 +72,7 @@ func SetEthUpgrades(c *ChainConfig) error {
 
 	extra := GetExtra(c)
 	// We only mark Eth upgrades as enabled if we have marked them as scheduled.
-	if durango := extra.DurangoTimestamp; durango != nil && *durango < unscheduledActivation {
+	if durango := extra.DurangoBlockTimestamp; durango != nil && *durango < unscheduledActivation {
 		c.ShanghaiTime = utils.PointerTo(*durango)
 	}
 
@@ -170,8 +170,4 @@ func ToWithUpgradesJSON(c *ChainConfig) *ChainConfigWithUpgradesJSON {
 		ChainConfig:   *c,
 		UpgradeConfig: GetExtra(c).UpgradeConfig,
 	}
-}
-
-func SetNetworkUpgradeDefaults(c *ChainConfig) {
-	GetExtra(c).NetworkUpgrades.SetDefaults(GetExtra(c).SnowCtx.NetworkUpgrades)
 }
