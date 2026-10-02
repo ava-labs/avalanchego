@@ -7,8 +7,8 @@ package tx
 // in a separate package to allow for the usage of the txtest package.
 
 const (
-	X2CRate      = _x2cRate
 	CodecVersion = codecVersion
+	X2CRate      = _x2cRate
 )
 
 var (
