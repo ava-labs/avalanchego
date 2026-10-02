@@ -4,6 +4,10 @@
 
 This release updates the plugin version to `47`. All plugins must update to remain compatible.
 
+### Configs
+
+- Fixed C-Chain `api-max-duration` only limiting `eth_call` since Helicon. It again limits every call to the `/rpc` and `/ws` endpoints, and a WebSocket call that times out doesn't close its connection.
+
 ### Metrics
 
 - Added `avalanche_evm_transition_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
