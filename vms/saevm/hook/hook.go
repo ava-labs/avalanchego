@@ -235,6 +235,15 @@ func Synchronous(h Points, hdr *types.Header) bool {
 	return h.SettledBy(hdr) == (Settled{})
 }
 
+// SettledHeight returns the height of the last block settled by the header. A
+// synchronous block settles itself.
+func SettledHeight(h Points, hdr *types.Header) uint64 {
+	if s := h.SettledBy(hdr); s != (Settled{}) {
+		return s.Height
+	}
+	return hdr.Number.Uint64()
+}
+
 // SettledGasTime is a helper that given a header and its settler, returns the
 // [gastime.Time] associated with the post-execution state of the header.
 func SettledGasTime(h Points, settled, settler *types.Header) (*gastime.Time, error) {
