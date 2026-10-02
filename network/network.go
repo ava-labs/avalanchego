@@ -238,6 +238,7 @@ func NewNetwork(
 	if err != nil {
 		return nil, fmt.Errorf("initializing membership failed with: %w", err)
 	}
+	membership.logOwnCertificate(log, config.TLSConfig)
 
 	peerMetrics, err := peer.NewMetrics(metricsRegisterer)
 	if err != nil {

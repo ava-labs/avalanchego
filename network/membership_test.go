@@ -5,13 +5,17 @@ package network
 
 import (
 	"crypto"
+	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -450,4 +454,149 @@ func TestConnectionGrantsMembership(t *testing.T) {
 	require.False(validatorNet.AllowConnection(stranger))
 	require.Equal(uint32(constants.DefaultMaxMessageSize), memberNet.FrameSize(stranger))
 	require.Equal(uint32(constants.DefaultMaxMessageSize), validatorNet.FrameSize(stranger))
+}
+
+// TestLogOwnCertificate checks the startup report on this node's own staking
+// certificate: silent without a member CA or for the stock self-signed
+// certificate, a confirmation naming the subnet for a bundle the roots verify,
+// a warning when that membership expires soon, and a warning for anything
+// else.
+func TestLogOwnCertificate(t *testing.T) {
+	// Membership expires with the earliest certificate in the chain, so the
+	// roots must outlive the warning window for only the short leaf to trip it.
+	const longValidity = 2 * memberCertExpiryWarning
+	root, err := stakingtest.NewRootCA("Test Root CA", longValidity)
+	require.NoError(t, err)
+	nodesCA, err := root.NewIntermediateCA("Test Nodes CA", longValidity)
+	require.NoError(t, err)
+	_, otherNodesCA := stakingtest.NewPKI(t)
+	subnetID := ids.GenerateTestID()
+
+	withMemberCA := map[ids.ID]subnets.Config{
+		constants.PrimaryNetworkID: {},
+		subnetID:                   memberCAConfig(t, root.CertPEM()),
+	}
+	withoutMemberCA := map[ids.ID]subnets.Config{
+		constants.PrimaryNetworkID: {},
+		subnetID:                   {ValidatorOnly: true},
+	}
+
+	issue := func(ca *stakingtest.CA, validity time.Duration) (certPEM, keyPEM []byte) {
+		certPEM, keyPEM, err := ca.IssueNodeCert("rpc-01", validity)
+		require.NoError(t, err)
+		return certPEM, keyPEM
+	}
+	tlsConfigOf := func(certPEM, keyPEM []byte) *tls.Config {
+		tlsCert, err := staking.LoadTLSCertFromBytes(keyPEM, certPEM)
+		require.NoError(t, err)
+		return peer.TLSConfig(*tlsCert, nil)
+	}
+	// leafOnly drops the intermediate from a bundle: the likeliest install
+	// mistake, a certificate file holding the leaf alone.
+	leafOnly := func(certPEM []byte) []byte {
+		block, _ := pem.Decode(certPEM)
+		require.NotNil(t, block)
+		return pem.EncodeToMemory(block)
+	}
+
+	selfSigned, err := staking.NewTLSCert()
+	require.NoError(t, err)
+
+	bundlePEM, bundleKeyPEM := issue(nodesCA, longValidity)
+	shortBundlePEM, shortBundleKeyPEM := issue(nodesCA, time.Hour)
+	otherBundlePEM, otherBundleKeyPEM := issue(otherNodesCA, longValidity)
+
+	// The leaf parses, so the file loads, but the intermediate behind it is
+	// garbage that every peer's handshake would choke on.
+	unparsable := tlsConfigOf(bundlePEM, bundleKeyPEM)
+	unparsable.Certificates[0].Certificate = [][]byte{
+		unparsable.Certificates[0].Certificate[0],
+		[]byte("not a certificate"),
+	}
+
+	const (
+		verified  = "staking certificate chains to member CA"
+		expiring  = "staking certificate membership expires soon"
+		rejected  = "staking certificate does not chain to any tracked subnet's member CA"
+		malformed = "staking certificate chain does not parse"
+	)
+	tests := []struct {
+		name      string
+		configs   map[ids.ID]subnets.Config
+		tlsConfig *tls.Config
+		wantMsg   string
+	}{
+		{
+			name:      "self-signed is silent",
+			configs:   withMemberCA,
+			tlsConfig: peer.TLSConfig(*selfSigned, nil),
+		},
+		{
+			name:    "no tls config is silent",
+			configs: withMemberCA,
+		},
+		{
+			name:      "bundle verifies",
+			configs:   withMemberCA,
+			tlsConfig: tlsConfigOf(bundlePEM, bundleKeyPEM),
+			wantMsg:   verified,
+		},
+		{
+			name:      "bundle expiring soon",
+			configs:   withMemberCA,
+			tlsConfig: tlsConfigOf(shortBundlePEM, shortBundleKeyPEM),
+			wantMsg:   expiring,
+		},
+		{
+			name:      "leaf without intermediate",
+			configs:   withMemberCA,
+			tlsConfig: tlsConfigOf(leafOnly(bundlePEM), bundleKeyPEM),
+			wantMsg:   rejected,
+		},
+		{
+			name:      "bundle from another root",
+			configs:   withMemberCA,
+			tlsConfig: tlsConfigOf(otherBundlePEM, otherBundleKeyPEM),
+			wantMsg:   rejected,
+		},
+		{
+			name:      "no member CA configured is silent",
+			configs:   withoutMemberCA,
+			tlsConfig: tlsConfigOf(bundlePEM, bundleKeyPEM),
+		},
+		{
+			name:      "unparsable chain",
+			configs:   withMemberCA,
+			tlsConfig: unparsable,
+			wantMsg:   malformed,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			core, logs := observer.New(zapcore.Level(logging.Info))
+			m := newTestMembership(t, tt.configs, validators.NewManager())
+			m.logOwnCertificate(logging.NewLogger("", logging.WrappedCore{Core: core}), tt.tlsConfig)
+
+			entries := logs.All()
+			if tt.wantMsg == "" {
+				require.Empty(entries)
+				return
+			}
+			require.Len(entries, 1)
+			require.Equal(tt.wantMsg, entries[0].Message)
+			switch tt.wantMsg {
+			case verified:
+				require.Equal(zapcore.Level(logging.Info), entries[0].Level)
+				require.Equal(subnetID.String(), entries[0].ContextMap()["subnetID"])
+			case expiring:
+				require.Equal(zapcore.Level(logging.Warn), entries[0].Level)
+				require.Equal(subnetID.String(), entries[0].ContextMap()["subnetID"])
+				require.Contains(entries[0].ContextMap(), "expiresAt")
+			default:
+				require.Equal(zapcore.Level(logging.Warn), entries[0].Level)
+			}
+		})
+	}
 }

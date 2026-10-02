@@ -4,18 +4,27 @@
 package network
 
 import (
+	"bytes"
+	"crypto/tls"
 	"crypto/x509"
 	"fmt"
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ subnets.MembershipChecker = (*membership)(nil)
+
+// memberCertExpiryWarning is how far ahead of its membership expiring a node
+// is warned at startup.
+const memberCertExpiryWarning = 30 * 24 * time.Hour
 
 // certifiedSubnets records, for one peer, each subnet whose member CA verified
 // its staking certificate chain and when that verification expires.
@@ -182,4 +191,70 @@ func (m *membership) isMemberOfAny(nodeID ids.NodeID) bool {
 		}
 	}
 	return false
+}
+
+// ownCertificateChain returns the chain this node presents to peers, leaf
+// first. The leaf is already parsed by the TLS loader; only the rest of the
+// bundle is parsed here.
+func ownCertificateChain(tlsConfig *tls.Config) ([]*x509.Certificate, error) {
+	if tlsConfig == nil || len(tlsConfig.Certificates) == 0 {
+		return nil, nil
+	}
+
+	tlsCert := tlsConfig.Certificates[0]
+	chain := make([]*x509.Certificate, 0, len(tlsCert.Certificate))
+	for i, raw := range tlsCert.Certificate {
+		cert := tlsCert.Leaf
+		if i > 0 || cert == nil {
+			var err error
+			if cert, err = x509.ParseCertificate(raw); err != nil {
+				return nil, fmt.Errorf("parsing certificate %d of the staking certificate chain: %w", i, err)
+			}
+		}
+		chain = append(chain, cert)
+	}
+	return chain, nil
+}
+
+// logOwnCertificate reports once, at startup, whether this node's own staking
+// certificate chain verifies against a tracked subnet's member CA. It is
+// advisory: peers decide membership. A node that tracks no subnet with a
+// member CA, or that holds the stock self-signed certificate, logs nothing.
+func (m *membership) logOwnCertificate(log logging.Logger, tlsConfig *tls.Config) {
+	if len(m.memberCAs) == 0 {
+		return
+	}
+
+	chain, err := ownCertificateChain(tlsConfig)
+	if err != nil {
+		log.Warn("staking certificate chain does not parse",
+			zap.Error(err),
+		)
+		return
+	}
+	if len(chain) == 0 || (len(chain) == 1 && bytes.Equal(chain[0].RawIssuer, chain[0].RawSubject)) {
+		return
+	}
+
+	certified := m.findCertifiedSubnets(chain)
+	if len(certified) == 0 {
+		log.Warn("staking certificate does not chain to any tracked subnet's member CA",
+			zap.Int("chainLen", len(chain)),
+		)
+		return
+	}
+	for subnetID, expiresAt := range certified {
+		fields := []zap.Field{
+			zap.Stringer("subnetID", subnetID),
+			// RFC 3339 rather than zap.Time: the log format drops the year.
+			zap.String("expiresAt", expiresAt.UTC().Format(time.RFC3339)),
+		}
+		if remaining := time.Until(expiresAt); remaining < memberCertExpiryWarning {
+			log.Warn("staking certificate membership expires soon",
+				append(fields, zap.Duration("remaining", remaining))...,
+			)
+			continue
+		}
+		log.Info("staking certificate chains to member CA", fields...)
+	}
 }

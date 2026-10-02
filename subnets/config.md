@@ -93,6 +93,15 @@ the node a new ID. That costs a non-validator a restart and nothing else.
 }
 ```
 
+At startup, a node that tracks a Subnet with a member CA checks its own staking
+certificate against those roots, unless it is the stock self-signed one, and
+logs `staking certificate chains to member CA` with the Subnet and expiry, the
+warning `staking certificate membership expires soon` when that expiry is less
+than 30 days away, or the warning `staking certificate does not chain to any
+tracked subnet's member CA`. The last usually means the intermediate is
+missing from the bundle or the configured root is not the one that signed it.
+The check is advisory; peers decide membership.
+
 :::tip
 
 Unlike `allowedNodes`, this does not have to be edited when a node is added.
