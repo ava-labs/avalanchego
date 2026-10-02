@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/eventual"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
@@ -273,7 +274,8 @@ func stateBeforeTransactions(hooks hook.Points, rules params.Rules, stateDB *sta
 // execution after a transaction prefix for intra-block inspection.
 //
 // The gas clock and base fee come from the parent's post-execution clock,
-// except pre-SAE blocks, which use their own header's fee.
+// except pre-SAE blocks, which use their own header's fee and finish at the gas
+// time derived from their header.
 //
 // Execute only runs the deterministic hooks, so it is also safe to use for
 // historical execution. Canonical-only side effects belong in
@@ -316,7 +318,8 @@ func Execute(
 	}
 
 	baseFee := gasClock.BaseFee()
-	if hook.Synchronous(hooks, header) {
+	synchronous := hook.Synchronous(hooks, header)
+	if synchronous {
 		baseFee = b.WorstCaseBaseFee()
 	} else {
 		b.CheckBaseFeeBound(baseFee)
@@ -357,9 +360,12 @@ func Execute(
 		perTxClock.Tick(gas.Gas(receipt.GasUsed))
 		// Interim execution time reports live canonical progress. Historical
 		// execution can run only part of the same in-memory block and overwrite
-		// that progress with an earlier time. This violates monotonicity and can
-		// change the settlement decision made by LastToSettleAt.
-		if config.canonical {
+		// that progress with an earlier time. This violates monotonicity and
+		// can change the settlement decision made by LastToSettleAt.
+		//
+		// A synchronous block's final gas time is derived from its header, not
+		// from this clock, so it records no interim time.
+		if config.canonical && !synchronous {
 			b.SwapInterimExecutionTime(perTxClock)
 			// TODO(arr4n) investigate calling the same method on pending blocks in
 			// the queue. It's only worth it if [blocks.LastToSettleAt] regularly
@@ -402,7 +408,7 @@ func Execute(
 		b.CheckOpBurnerBalanceBounds(stateDB, numTxs+i, o)
 		res.GasConsumed += o.Gas
 		perTxClock.Tick(o.Gas)
-		if config.canonical {
+		if config.canonical && !synchronous {
 			b.SwapInterimExecutionTime(perTxClock)
 		}
 
@@ -416,9 +422,18 @@ func Execute(
 	}
 
 	endTime := time.Now()
-	target, gasCfg := hooks.GasConfigAfter(b.Header())
-	if err := gasClock.AfterBlock(res.GasConsumed, target, gasCfg); err != nil {
-		return nil, fmt.Errorf("after-block gas time update: %w", err)
+	if synchronous {
+		// Pre-SAE blocks never ran this clock, so recovery and the first
+		// asynchronous block use the header's gas time.
+		gasClock, err = b.SynchronousGasTime()
+		if err != nil {
+			return nil, fmt.Errorf("%w: synchronous gas time: %v", errFatal, err)
+		}
+	} else {
+		target, gasCfg := hooks.GasConfigAfter(b.Header())
+		if err := gasClock.AfterBlock(res.GasConsumed, target, gasCfg); err != nil {
+			return nil, fmt.Errorf("after-block gas time update: %w", err)
+		}
 	}
 
 	log.Trace(
@@ -444,6 +459,18 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 	if err != nil {
 		return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
 	}
+
+	// Since the roots aren't sanity checked during verification for synchronous
+	// blocks, we do it here.
+	if b.Synchronous() {
+		if want := b.SettledStateRoot(); root != want {
+			return fmt.Errorf("%w: synchronous block %d executed to state root %#x, header commits to %#x", errFatal, b.NumberU64(), root, want)
+		}
+		if got, want := types.DeriveSha(r.Receipts, trie.NewStackTrie(nil)), b.SettledReceiptsRoot(); got != want {
+			return fmt.Errorf("%w: synchronous block %d executed to receipts root %#x, header commits to %#x", errFatal, b.NumberU64(), got, want)
+		}
+	}
+
 	if err := e.Tracker.BlockExecuted(b.SettledStateRoot(), root, b.NumberU64()); err != nil {
 		return err
 	}

@@ -46,6 +46,8 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 	return blocks.New(ethB, parent, nil, rec.hooks, rec.snowCtx.Log)
 }
 
+var errGenesisStateUnavailable = errors.New("genesis has no available post-execution state")
+
 // lastCommittedBlock returns the highest settled block whose post-execution
 // state is available on disk. This is required because its post-execution state
 // is the basis for the worst-case checks needed for block verifications.
@@ -78,8 +80,8 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 	// disk. Therefore, the state can only lag behind the block read.
 	// Additionally, we assume any block has been written atomically, so
 	// if the last settled height was found, the underlying block is present.
-	// At minimum, [NewVM] requires a genesis block to be written (which is
-	// synchronous by definition).
+	// At minimum, [NewVM] requires a genesis block to be written with its
+	// post-execution state committed, so the search always finds a state.
 	//
 	// There's no reasonable cap on how far back to search, since the distance
 	// between the settler and settled block is unbounded, and node crashes
@@ -104,8 +106,8 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 			return b, nil
 		}
 
-		if b.Synchronous() {
-			return nil, fmt.Errorf("last synchronous block %d has no available post-execution state", height)
+		if height == 0 {
+			return nil, errGenesisStateUnavailable
 		}
 	}
 }
@@ -243,7 +245,7 @@ func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Execut
 
 	// Consensus only requires post-execution state after and including the
 	// last-settled block.
-	keepFrom := rec.hooks.SettledBy(last.Header()).Height
+	keepFrom := hook.SettledHeight(rec.hooks, last.Header())
 	for b := last; b.NumberU64() > after.NumberU64(); b = b.ParentBlock() {
 		if b.NumberU64() < keepFrom {
 			exec.Tracker.Untrack(b.PostExecutionStateRoot())

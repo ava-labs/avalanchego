@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -306,11 +307,8 @@ func TestRPCExtras(t *testing.T) {
 	}
 }
 
-// TestSynchronousRPCs replays JSON-RPC calls recorded from the synchronous VM
-// and requires an identical response, covering state, receipt, log, and tracing
-// RPCs at every height for every pre-SAE network upgrade.
-//
-// TODO(StephenButtolph): Test RPCs re-executing synchronous blocks.
+// TestSynchronousRPCs serves the database written by the synchronous VM and
+// requires every recorded JSON-RPC call to be answered identically.
 func TestSynchronousRPCs(t *testing.T) {
 	// The fixture's keys are relative to the VM's own database rather than to
 	// the base database that contains it.
@@ -326,13 +324,35 @@ func TestSynchronousRPCs(t *testing.T) {
 		// to refuse later pruning runs.
 		withArchival(),
 	)
+	sut.requireSynchronousRPCs(ctx, t, fixture)
+}
+
+// TestBootstrappedSynchronousRPCs executes the synchronous history during
+// bootstrapping and requires every recorded JSON-RPC call to be answered
+// identically.
+func TestBootstrappedSynchronousRPCs(t *testing.T) {
+	fixture, opts, _ := synchronousFixture(t)
+	// Archival is needed because the recorded calls get proofs at every height.
+	ctx, sut := newSUT(t, append(opts, withArchival())...)
+	sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
+
+	require.NoErrorf(t, sut.SetPreference(ctx, sut.lastAccepted(ctx, t), nil), "%T.SetPreference()", sut.VM)
+	require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", sut.VM)
+	sut.requireSynchronousRPCs(ctx, t, fixture)
+}
+
+// requireSynchronousRPCs replays the JSON-RPC calls recorded from the
+// synchronous VM and requires an identical response, covering state, receipt,
+// log, and tracing RPCs at every height for every pre-SAE network upgrade.
+func (s *SUT) requireSynchronousRPCs(ctx context.Context, t *testing.T, fixture *synchronoustest.Fixture) {
+	t.Helper()
 
 	for _, call := range fixture.RPCCalls {
 		t.Run(call.Name, func(t *testing.T) {
 			t.Parallel()
 
 			var got json.RawMessage
-			err := sut.ethclient.Client().CallContext(ctx, &got, call.Method, call.Args()...)
+			err := s.ethclient.Client().CallContext(ctx, &got, call.Method, call.Args()...)
 			if call.Error != "" {
 				require.EqualErrorf(t, err, call.Error, "%s(%s)", call.Method, call.Params)
 				return
@@ -363,13 +383,13 @@ func TestSynchronousRPCs(t *testing.T) {
 			t.Logf("%s", block.Description)
 			want := block.EthBlock(t)
 
-			byNumber, err := sut.ethclient.BlockByNumber(ctx, new(big.Int).SetUint64(block.Number))
+			byNumber, err := s.ethclient.BlockByNumber(ctx, new(big.Int).SetUint64(block.Number))
 			require.NoErrorf(t, err, "BlockByNumber(%d)", block.Number)
 			if diff := cmp.Diff(want, byNumber, opts); diff != "" {
 				t.Errorf("BlockByNumber(%d) diff (-want +got):\n%s", block.Number, diff)
 			}
 
-			byHash, err := sut.ethclient.BlockByHash(ctx, block.Hash)
+			byHash, err := s.ethclient.BlockByHash(ctx, block.Hash)
 			require.NoErrorf(t, err, "BlockByHash(%s)", block.Hash)
 			if diff := cmp.Diff(want, byHash, opts); diff != "" {
 				t.Errorf("BlockByHash(%s) diff (-want +got):\n%s", block.Hash, diff)

@@ -218,8 +218,8 @@ func LastToSettleAt(settleAt time.Time, parent *Block) (b *Block, ok bool, _ err
 			)
 			return nil, false, fmt.Errorf("%w: settling at %v with parent %#x (%v)", errIncompleteBlockHistory, settleAt, parent.Hash(), parent.Number())
 		}
-		// Guarantees that the loop will always exit as the last pre-SAE block
-		// (perhaps the genesis) is always settled, by definition.
+		// Guarantees that the loop will always exit as every block's ancestry
+		// ends at a settled block (perhaps the genesis).
 		if block.Settled() {
 			return block, known, nil
 		}

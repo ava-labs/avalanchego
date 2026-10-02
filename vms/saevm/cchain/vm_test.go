@@ -59,6 +59,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
@@ -303,6 +304,26 @@ func withMinDelayTarget(ms uint64) sutOption {
 // chainDBPrefix locates the VM's database within the SUT's base database,
 // mirroring the prefix avalanchego's chain manager applies.
 var chainDBPrefix = []byte("chain")
+
+// synchronousFixture loads the pre-generated synchronous C-Chain history and
+// returns the options that start a fresh VM on its genesis in
+// [snow.Bootstrapping], with the clock past every fixture block. Helicon is
+// scheduled a day after Granite, following the fixture's one-upgrade-per-day
+// cadence, so every synchronous block predates it.
+func synchronousFixture(tb testing.TB) (*synchronoustest.Fixture, []sutOption, *saetest.Clock) {
+	tb.Helper()
+
+	fixture := synchronoustest.Load(tb)
+	upgrades := fixture.Upgrades
+	upgrades.HeliconTime = upgrades.GraniteTime.Add(24 * time.Hour)
+	timeOpt, clock := withVMTime(upgrades.HeliconTime)
+	return fixture, []sutOption{
+		withGenesis(fixture.CoreGenesis(tb)),
+		withUpgrades(upgrades),
+		timeOpt,
+		withState(snow.Bootstrapping),
+	}, clock
+}
 
 // newSUT initializes a cchain [VM], transitions it to the configured
 // [snow.State] (default [snow.NormalOp]), and
@@ -775,6 +796,24 @@ func (s *SUT) parseVerifyAccept(ctx context.Context, tb testing.TB, blk *blocks.
 	require.NoErrorf(tb, s.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", s.VM, blk.Height())
 	require.NoErrorf(tb, s.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", s.VM, blk.Height())
 	return parsed
+}
+
+// acceptSynchronousBlocks drives blks, in order, through parse, verify, and
+// accept, asserting that each re-executes to the state and receipts roots its
+// header commits to.
+func (s *SUT) acceptSynchronousBlocks(ctx context.Context, tb testing.TB, blks []synchronoustest.Block) {
+	tb.Helper()
+
+	for _, blk := range blks {
+		parsed, err := s.ParseBlock(ctx, blk.RLP)
+		require.NoErrorf(tb, err, "%T.ParseBlock(height %d)", s.VM, blk.Number)
+		require.NoErrorf(tb, s.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", s.VM, blk.Number)
+		require.NoErrorf(tb, s.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", s.VM, blk.Number)
+		require.NoErrorf(tb, parsed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(height %d)", parsed, blk.Number)
+
+		assert.Equalf(tb, parsed.SettledStateRoot(), parsed.PostExecutionStateRoot(), "post-execution state root of height %d", blk.Number)
+		assert.Equalf(tb, parsed.SettledReceiptsRoot(), types.DeriveSha(parsed.Receipts(), saetest.TrieHasher()), "receipts root of height %d", blk.Number)
+	}
 }
 
 // verifyTampered re-seals valid with a mutated header and returns the
@@ -1612,6 +1651,32 @@ func TestRestartWithSettledAsynchronousBlock(t *testing.T) {
 
 	restartedCtx, restarted := newSUT(t, alloc, timeOpt, withDB(db), withChainDataDir(dataDir))
 	require.Equal(t, settler.ID(), restarted.lastAccepted(restartedCtx, t), "restarted last-accepted")
+}
+
+// A node bootstrapping from genesis must be able to execute the synchronous
+// history and extend the chain asynchronously.
+func TestBootstrapSynchronousBlocks(t *testing.T) {
+	fixture, opts, clock := synchronousFixture(t)
+	ctx, sut := newSUT(t, opts...)
+	require.Equal(t, ids.ID(fixture.Blocks[0].Hash), sut.lastAccepted(ctx, t), "genesis")
+
+	sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
+	tip := fixture.Blocks[len(fixture.Blocks)-1]
+	require.Equal(t, ids.ID(tip.Hash), sut.lastAccepted(ctx, t), "last accepted after bootstrapping")
+
+	require.NoErrorf(t, sut.SetPreference(ctx, sut.lastAccepted(ctx, t), nil), "%T.SetPreference()", sut.VM)
+	require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", sut.VM)
+
+	// The fixture funds three accounts and only the first two ever transact,
+	// so the third still has its genesis balance and a zero nonce.
+	w := newWallet(secp256k1.TestKeys()[2], sut.ctx, sut.Client)
+	first := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	require.Equal(t, tip.Number+1, first.Height(), "first asynchronous block height")
+	require.Equal(t, ids.ID(tip.Hash), first.LastSettled().ID(), "first asynchronous block settles the synchronous tip")
+
+	clock.AdvanceToSettle(ctx, t, first)
+	second := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	require.Equal(t, first.ID(), second.LastSettled().ID(), "second asynchronous block settles the first")
 }
 
 // Verifies a built block splits its timestamp: seconds in Header.Time, the full
