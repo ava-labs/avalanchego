@@ -49,9 +49,9 @@ type Consensus interface {
 	// Returns the ID and height of the last accepted decision.
 	LastAccepted() (ids.ID, uint64)
 
-	// Returns the ID of the tail of the strongly preferred sequence of
+	// Returns the ID, height of the tail of the strongly preferred sequence of
 	// decisions.
-	Preference() ids.ID
+	Preference() (ids.ID, uint64)
 
 	// Returns the ID of the strongly preferred decision with the provided
 	// height. Only the last accepted decision and processing decisions are
