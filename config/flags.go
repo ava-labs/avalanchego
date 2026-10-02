@@ -183,6 +183,18 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint(NetworkPeerReadBufferSizeKey, constants.DefaultNetworkPeerReadBufferSize, "Size, in bytes, of the buffer that we read peer messages into (there is one buffer per peer)")
 	fs.Uint(NetworkPeerWriteBufferSizeKey, constants.DefaultNetworkPeerWriteBufferSize, "Size, in bytes, of the buffer that we write peer messages into (there is one buffer per peer)")
 
+	// Deprecated. TODO: remove.
+	fs.Uint64(NetworkLargeMessageSizeKey, 0, "Deprecated. Elevated P2P message size in KiB")
+	fs.StringSlice(NetworkLargeMessagePeerIDsKey, nil, "Deprecated. Node IDs to add to the subnet's allowedNodes")
+	for key := range deprecatedLargeMessageThrottlerFlags {
+		switch key {
+		case NetworkLargeMessageInboundCPUMaxRecheckDelayKey, NetworkLargeMessageInboundDiskMaxRecheckDelayKey:
+			fs.Duration(key, 0, "Deprecated. Elevated stack throttler limit")
+		default:
+			fs.Uint64(key, 0, "Deprecated. Elevated stack throttler limit")
+		}
+	}
+
 	fs.Bool(NetworkTCPProxyEnabledKey, constants.DefaultNetworkTCPProxyEnabled, "Require all P2P connections to be initiated with a TCP proxy header")
 	// The PROXY protocol specification recommends setting this value to be at
 	// least 3 seconds to cover a TCP retransmit.

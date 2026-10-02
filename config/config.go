@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/storage"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -74,7 +75,44 @@ var (
 	deprecatedKeys = map[string]string{
 		SystemTrackerRequiredAvailableDiskSpaceKey:         fmt.Sprintf("Use %s instead", SystemTrackerRequiredAvailableDiskSpacePercentageKey),
 		SystemTrackerWarningThresholdAvailableDiskSpaceKey: fmt.Sprintf("Use %s instead", SystemTrackerWarningAvailableDiskSpacePercentageKey),
+
+		// TODO: remove.
+		NetworkLargeMessageSizeKey:                         "Use largeMessages.maxMessageSize (in bytes) in the subnet config instead",
+		NetworkLargeMessagePeerIDsKey:                      "Use allowedNodes in the subnet config instead; the subnet's members are elevated",
+		NetworkLargeMessageInboundAtLargeAllocSizeKey:      throttlerFlagDeprecation(NetworkLargeMessageInboundAtLargeAllocSizeKey),
+		NetworkLargeMessageInboundValidatorAllocSizeKey:    throttlerFlagDeprecation(NetworkLargeMessageInboundValidatorAllocSizeKey),
+		NetworkLargeMessageInboundNodeMaxAtLargeBytesKey:   throttlerFlagDeprecation(NetworkLargeMessageInboundNodeMaxAtLargeBytesKey),
+		NetworkLargeMessageInboundMaxProcessingMsgsKey:     throttlerFlagDeprecation(NetworkLargeMessageInboundMaxProcessingMsgsKey),
+		NetworkLargeMessageInboundBandwidthRefillRateKey:   throttlerFlagDeprecation(NetworkLargeMessageInboundBandwidthRefillRateKey),
+		NetworkLargeMessageInboundBandwidthMaxBurstSizeKey: throttlerFlagDeprecation(NetworkLargeMessageInboundBandwidthMaxBurstSizeKey),
+		NetworkLargeMessageInboundCPUMaxRecheckDelayKey:    throttlerFlagDeprecation(NetworkLargeMessageInboundCPUMaxRecheckDelayKey),
+		NetworkLargeMessageInboundDiskMaxRecheckDelayKey:   throttlerFlagDeprecation(NetworkLargeMessageInboundDiskMaxRecheckDelayKey),
+		NetworkLargeMessageOutboundAtLargeAllocSizeKey:     throttlerFlagDeprecation(NetworkLargeMessageOutboundAtLargeAllocSizeKey),
+		NetworkLargeMessageOutboundValidatorAllocSizeKey:   throttlerFlagDeprecation(NetworkLargeMessageOutboundValidatorAllocSizeKey),
+		NetworkLargeMessageOutboundNodeMaxAtLargeBytesKey:  throttlerFlagDeprecation(NetworkLargeMessageOutboundNodeMaxAtLargeBytesKey),
 	}
+
+	// deprecatedLargeMessageThrottlerFlags maps each deprecated flag to its
+	// largeMessages.throttlerConfig key.
+	deprecatedLargeMessageThrottlerFlags = map[string]string{
+		NetworkLargeMessageInboundAtLargeAllocSizeKey:      "inboundMsgThrottlerConfig.byteThrottlerConfig.atLargeAllocSize",
+		NetworkLargeMessageInboundValidatorAllocSizeKey:    "inboundMsgThrottlerConfig.byteThrottlerConfig.vdrAllocSize",
+		NetworkLargeMessageInboundNodeMaxAtLargeBytesKey:   "inboundMsgThrottlerConfig.byteThrottlerConfig.nodeMaxAtLargeBytes",
+		NetworkLargeMessageInboundMaxProcessingMsgsKey:     "inboundMsgThrottlerConfig.maxProcessingMsgsPerNode",
+		NetworkLargeMessageInboundBandwidthRefillRateKey:   "inboundMsgThrottlerConfig.bandwidthThrottlerConfig.bandwidthRefillRate",
+		NetworkLargeMessageInboundBandwidthMaxBurstSizeKey: "inboundMsgThrottlerConfig.bandwidthThrottlerConfig.bandwidthMaxBurstRate",
+		NetworkLargeMessageInboundCPUMaxRecheckDelayKey:    "inboundMsgThrottlerConfig.cpuThrottlerConfig.maxRecheckDelay",
+		NetworkLargeMessageInboundDiskMaxRecheckDelayKey:   "inboundMsgThrottlerConfig.diskThrottlerConfig.maxRecheckDelay",
+		NetworkLargeMessageOutboundAtLargeAllocSizeKey:     "outboundMsgThrottlerConfig.atLargeAllocSize",
+		NetworkLargeMessageOutboundValidatorAllocSizeKey:   "outboundMsgThrottlerConfig.vdrAllocSize",
+		NetworkLargeMessageOutboundNodeMaxAtLargeBytesKey:  "outboundMsgThrottlerConfig.nodeMaxAtLargeBytes",
+	}
+
+	errLargeMessageFlagsWithoutSize     = fmt.Errorf("network-large-message-* flags require %s", NetworkLargeMessageSizeKey)
+	errLargeMessageFlagsNeedOneSubnet   = errors.New("network-large-message-* flags apply to the single tracked subnet; track exactly one or use largeMessages in its subnet config")
+	errLargeMessageFlagsAndSubnetConfig = errors.New("largeMessages is set both in the subnet config and by network-large-message-* flags")
+	errLargeMessageSizeTooLarge         = fmt.Errorf("%s must be at most %d KiB", NetworkLargeMessageSizeKey, math.MaxUint32/units.KiB)
+	errLargeMessagePeerID               = fmt.Errorf("invalid node ID in %s", NetworkLargeMessagePeerIDsKey)
 
 	errConflictingACPOpinion                  = errors.New("supporting and objecting to the same ACP")
 	errConflictingImplicitACPOpinion          = errors.New("objecting to enabled ACP")
@@ -1228,6 +1266,110 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 	return subnetConfigs, nil
 }
 
+func throttlerFlagDeprecation(key string) string {
+	return "Use largeMessages.throttlerConfig." + deprecatedLargeMessageThrottlerFlags[key] + " in the subnet config instead"
+}
+
+// applyDeprecatedLargeMessageFlags maps the deprecated network-large-message-*
+// flags onto the single tracked subnet's largeMessages block. Peer IDs become
+// allowedNodes; "*" is dropped since members are elevated anyway.
+//
+// TODO: remove.
+func applyDeprecatedLargeMessageFlags(
+	v *viper.Viper,
+	trackedSubnets set.Set[ids.ID],
+	subnetConfigs map[ids.ID]subnets.Config,
+) error {
+	if !v.IsSet(NetworkLargeMessageSizeKey) {
+		if v.IsSet(NetworkLargeMessagePeerIDsKey) {
+			return fmt.Errorf("%w: %s is set", errLargeMessageFlagsWithoutSize, NetworkLargeMessagePeerIDsKey)
+		}
+		for key := range deprecatedLargeMessageThrottlerFlags {
+			if v.IsSet(key) {
+				return fmt.Errorf("%w: %s is set", errLargeMessageFlagsWithoutSize, key)
+			}
+		}
+		return nil
+	}
+
+	subnetID, ok := trackedSubnets.Peek()
+	if !ok || trackedSubnets.Len() != 1 {
+		return fmt.Errorf("%w: tracking %d subnets", errLargeMessageFlagsNeedOneSubnet, trackedSubnets.Len())
+	}
+	config := subnetConfigs[subnetID]
+	if config.LargeMessages != nil {
+		return errLargeMessageFlagsAndSubnetConfig
+	}
+
+	sizeKiB := v.GetUint64(NetworkLargeMessageSizeKey)
+	if sizeKiB > math.MaxUint32/units.KiB {
+		return errLargeMessageSizeTooLarge
+	}
+	throttlerConfig, err := deprecatedLargeMessageThrottlerConfig(v)
+	if err != nil {
+		return err
+	}
+	config.LargeMessages = &subnets.LargeMessagesConfig{
+		MaxMessageSize:  uint32(sizeKiB * units.KiB),
+		ThrottlerConfig: throttlerConfig,
+	}
+
+	// A config file may hold one comma-joined string.
+	for _, entry := range v.GetStringSlice(NetworkLargeMessagePeerIDsKey) {
+		for _, idStr := range strings.Split(entry, ",") {
+			idStr = strings.TrimSpace(idStr)
+			if idStr == "" || idStr == "*" {
+				continue
+			}
+			nodeID, err := ids.NodeIDFromString(idStr)
+			if err != nil {
+				return fmt.Errorf("%w: %q: %w", errLargeMessagePeerID, idStr, err)
+			}
+			config.AllowedNodes.Add(nodeID)
+		}
+	}
+
+	if err := config.ValidParameters(); err != nil {
+		return fmt.Errorf("network-large-message-* flags for subnet %s: %w", subnetID, err)
+	}
+	subnetConfigs[subnetID] = config
+	return nil
+}
+
+// deprecatedLargeMessageThrottlerConfig returns the throttlerConfig JSON for the
+// set throttler flags only, so the rest stay derived.
+func deprecatedLargeMessageThrottlerConfig(v *viper.Viper) (json.RawMessage, error) {
+	root := make(map[string]any)
+	for key, path := range deprecatedLargeMessageThrottlerFlags {
+		var value any
+		switch key {
+		case NetworkLargeMessageInboundCPUMaxRecheckDelayKey, NetworkLargeMessageInboundDiskMaxRecheckDelayKey:
+			value = v.GetDuration(key)
+		default:
+			value = v.GetUint64(key)
+		}
+		if value == time.Duration(0) || value == uint64(0) {
+			continue
+		}
+
+		node := root
+		keys := strings.Split(path, ".")
+		for _, k := range keys[:len(keys)-1] {
+			child, ok := node[k].(map[string]any)
+			if !ok {
+				child = make(map[string]any)
+				node[k] = child
+			}
+			node = child
+		}
+		node[keys[len(keys)-1]] = value
+	}
+	if len(root) == 0 {
+		return nil, nil
+	}
+	return json.Marshal(root)
+}
+
 func getPrimaryNetworkConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
 		SnowParameters:              getPrimaryNetworkSnowConfig(v),
@@ -1453,6 +1595,9 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	subnetConfigs, err := getSubnetConfigs(v, nodeConfig.TrackedSubnets.List())
 	if err != nil {
 		return node.Config{}, fmt.Errorf("couldn't read subnet configs: %w", err)
+	}
+	if err := applyDeprecatedLargeMessageFlags(v, nodeConfig.TrackedSubnets, subnetConfigs); err != nil {
+		return node.Config{}, err
 	}
 
 	primaryNetworkConfig := getPrimaryNetworkConfig(v)

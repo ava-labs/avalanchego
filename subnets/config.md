@@ -218,6 +218,10 @@ dry, is on the wrong stack. Every peer is re-checked when a Ping is sent, and a
 connection on the wrong stack is closed and re-established on the right one, so
 a newly registered validator gets the elevated frame within a ping tick.
 
+The deprecated `network-large-message-*` node flags still work for a node that
+tracks a single Subnet: they are mapped onto this block, and peer IDs onto
+`allowedNodes`.
+
 The larger `GetAncestors` byte budget applies only to chains in the Subnet that
 declares `largeMessages`. Membership in that Subnet still selects the elevated
 connection-wide frame stack, so a peer can carry large messages for that
