@@ -45,7 +45,7 @@ rm -rf "/tmp/avalanchego-v${VERSION}"
 rm -rf /tmp/avalanchego-build
 
 echo "downloading avalanchego ${VERSION} at ${DOWNLOAD_URL}"
-curl -L "${DOWNLOAD_URL}" -o "${DOWNLOAD_PATH}"
+curl -fL "${DOWNLOAD_URL}" -o "${DOWNLOAD_PATH}"
 
 echo "extracting downloaded avalanchego"
 if [[ ${GOOS} == "linux" ]]; then
