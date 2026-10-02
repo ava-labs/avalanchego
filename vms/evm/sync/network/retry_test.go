@@ -6,6 +6,7 @@ package network
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -46,7 +47,9 @@ func TestNoPeersBackoff(t *testing.T) {
 			want:    time.Second, // max backoff
 		},
 	} {
-		require.Equal(t, tc.want, p.noPeersBackoff(tc.attempt))
+		t.Run(fmt.Sprintf("attempt=%d", tc.attempt), func(t *testing.T) {
+			require.Equal(t, tc.want, p.noPeersBackoff(tc.attempt))
+		})
 	}
 }
 
