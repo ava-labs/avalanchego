@@ -10,10 +10,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
-	// Imported for [atomic.UnsignedExportTx.Burned] comment resolution.
-	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
@@ -81,9 +77,8 @@ func AccountInputID(address common.Address, nonce uint64) ids.ID {
 	return id
 }
 
-// Like [atomic.UnsignedExportTx.Burned], burned will error if the sum of the
-// inputs exceeds MaxUint64, even if the total amount burned could be
-// represented as a uint64.
+// burned will error if the sum of the inputs exceeds MaxUint64, even if the
+// total amount burned could be represented as a uint64.
 //
 // Because the total supply of AVAX fits in a uint64, this doesn't matter in
 // practice and allows for easier fuzzing.
@@ -153,9 +148,9 @@ func (e *Export) sanityCheck(ctx *snow.Context) error {
 	if !utils.IsSortedAndUnique(e.Ins) {
 		return errInputsNotSortedUnique
 	}
-	// Like [atomic.UnsignedExportTx.Verify], outputs aren't enforced to be
-	// unique. This is safe because each output's UTXO is keyed by txID and
-	// outputIndex, so duplicate outputs still produce distinct UTXOs.
+	// Outputs aren't enforced to be unique. This is safe because each output's
+	// UTXO is keyed by txID and outputIndex, so duplicate outputs still produce
+	// distinct UTXOs.
 	if !avax.IsSortedTransferableOutputs(e.ExportedOutputs, c) {
 		return errOutputsNotSorted
 	}
@@ -263,7 +258,7 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, er
 var errInsufficientFunds = errors.New("insufficient funds")
 
 // transferNonAVAX subtracts the non-AVAX balances from the statedb.
-func (e *Export) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+func (e *Export) transferNonAVAX(avaxAssetID ids.ID, statedb MultiCoinStateDB) error {
 	for _, in := range e.Ins {
 		if in.AssetID == avaxAssetID {
 			continue

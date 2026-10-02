@@ -7,37 +7,22 @@ import (
 	"context"
 	"math"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/state"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	// Imported for [vm.VerifierBackend] comment resolution.
-	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
-
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras/extrastest"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -49,15 +34,9 @@ import (
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
 
-func TestMain(m *testing.M) {
-	evm.RegisterAllLibEVMExtras()
-	os.Exit(m.Run())
-}
-
 type txData struct {
 	name  string
-	old   *atomic.Tx
-	new   *Tx
+	tx    *Tx
 	id    ids.ID
 	bytes []byte
 }
@@ -74,41 +53,7 @@ var (
 var (
 	importTx = txData{
 		name: "import", // Included in https://subnets.avax.network/c-chain/block/4
-		old: &atomic.Tx{
-			UnsignedAtomicTx: &atomic.UnsignedImportTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: cChainID,
-				SourceChain:  xChainID,
-				ImportedInputs: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID:        ids.FromStringOrPanic("2VqSFA5hxukiv1FSAB8ShjwHwmPev9ZS8VD9aUTCDRoff7T5Bi"),
-						OutputIndex: 1,
-					},
-					Asset: avax.Asset{
-						ID: avaxAssetID,
-					},
-					In: &secp256k1fx.TransferInput{
-						Amt: 50000000,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{0},
-						},
-					},
-				}},
-				Outs: []atomic.EVMOutput{{
-					Address: common.HexToAddress("0xb8b5a87d1c05676f1f966da49151fa54dbe68c33"),
-					Amount:  50000000,
-					AssetID: avaxAssetID,
-				}},
-			},
-			Creds: []verify.Verifiable{
-				&secp256k1fx.Credential{
-					Sigs: []txtest.Signature{
-						txtest.Signature(common.FromHex("0x3e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01")),
-					},
-				},
-			},
-		},
-		new: &Tx{
+		tx: &Tx{
 			Unsigned: &Import{
 				NetworkID:    constants.MainnetID,
 				BlockchainID: cChainID,
@@ -148,40 +93,7 @@ var (
 
 	exportTx = txData{
 		name: "export", // Included in https://subnets.avax.network/c-chain/block/48
-		old: &atomic.Tx{
-			UnsignedAtomicTx: &atomic.UnsignedExportTx{
-				NetworkID:        constants.MainnetID,
-				BlockchainID:     cChainID,
-				DestinationChain: xChainID,
-				Ins: []atomic.EVMInput{{
-					Address: common.HexToAddress("0xeb019ccd325ad53543a7e7e3b04828bdecf3cff6"),
-					Amount:  1000001,
-					AssetID: avaxAssetID,
-				}},
-				ExportedOutputs: []*avax.TransferableOutput{{
-					Asset: avax.Asset{
-						ID: avaxAssetID,
-					},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: 1,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs: []ids.ShortID{
-								ids.ShortFromStringOrPanic("LanVZgBDVvtarbTXD1uU7r1nXVJyLmPUz"),
-							},
-						},
-					},
-				}},
-			},
-			Creds: []verify.Verifiable{
-				&secp256k1fx.Credential{
-					Sigs: []txtest.Signature{
-						txtest.Signature(common.FromHex("0x254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01")),
-					},
-				},
-			},
-		},
-		new: &Tx{
+		tx: &Tx{
 			Unsigned: &Export{
 				NetworkID:        constants.MainnetID,
 				BlockchainID:     cChainID,
@@ -220,86 +132,7 @@ var (
 
 	importMultiInputTx = txData{
 		name: "import_multi_input", // Included in https://subnets.avax.network/c-chain/block/132481
-		old: &atomic.Tx{
-			UnsignedAtomicTx: &atomic.UnsignedImportTx{
-				NetworkID:    constants.MainnetID,
-				BlockchainID: cChainID,
-				SourceChain:  xChainID,
-				ImportedInputs: []*avax.TransferableInput{
-					{
-						UTXOID: avax.UTXOID{
-							TxID: ids.FromStringOrPanic("DqRKjysHeiKWetgyqqM2WdnX56yg8wBdY95RhuP3eDbbVoMCH"),
-						},
-						Asset: avax.Asset{ID: avaxAssetID},
-						In: &secp256k1fx.TransferInput{
-							Amt: 99000000,
-							Input: secp256k1fx.Input{
-								SigIndices: []uint32{0},
-							},
-						},
-					},
-					{
-						UTXOID: avax.UTXOID{
-							TxID: ids.FromStringOrPanic("25YuXY1zoYY3DgLsRbGjdNSx3jYtvqZRgFo6jpy7EMCfUn4S74"),
-						},
-						Asset: avax.Asset{ID: avaxAssetID},
-						In: &secp256k1fx.TransferInput{
-							Amt: 399000000,
-							Input: secp256k1fx.Input{
-								SigIndices: []uint32{0},
-							},
-						},
-					},
-					{
-						UTXOID: avax.UTXOID{
-							TxID: ids.FromStringOrPanic("2DXSj1kzqWM5HWS2PXcDSD3GUNpEGinynV1qD6LxiECHmZC8fj"),
-						},
-						Asset: avax.Asset{ID: avaxAssetID},
-						In: &secp256k1fx.TransferInput{
-							Amt: 99000000,
-							Input: secp256k1fx.Input{
-								SigIndices: []uint32{0},
-							},
-						},
-					},
-				},
-				Outs: []atomic.EVMOutput{
-					{
-						Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
-						Amount:  99000000,
-						AssetID: avaxAssetID,
-					},
-					{
-						Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
-						Amount:  99000000,
-						AssetID: avaxAssetID,
-					},
-					{
-						Address: common.HexToAddress("0x383c293db6be7ac246f0956ad632344dc2cd1da3"),
-						Amount:  399000000,
-						AssetID: avaxAssetID,
-					},
-				},
-			},
-			Creds: []verify.Verifiable{
-				&secp256k1fx.Credential{
-					Sigs: []txtest.Signature{
-						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
-					},
-				},
-				&secp256k1fx.Credential{
-					Sigs: []txtest.Signature{
-						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
-					},
-				},
-				&secp256k1fx.Credential{
-					Sigs: []txtest.Signature{
-						txtest.Signature(common.FromHex("0x4e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700")),
-					},
-				},
-			},
-		},
-		new: &Tx{
+		tx: &Tx{
 			Unsigned: &Import{
 				NetworkID:    constants.MainnetID,
 				BlockchainID: cChainID,
@@ -384,44 +217,7 @@ var (
 
 	exportSameAddressMultiAssetTx = txData{
 		name: "export_same_address_multi_asset", // Synthetic
-		old: &atomic.Tx{
-			UnsignedAtomicTx: &atomic.UnsignedExportTx{
-				Ins: []atomic.EVMInput{
-					{
-						Amount: 999,
-						Nonce:  5,
-					},
-					{
-						Amount:  1_000_000,
-						AssetID: avaxAssetID,
-						Nonce:   5,
-					},
-				},
-				ExportedOutputs: []*avax.TransferableOutput{
-					{
-						Out: &secp256k1fx.TransferOutput{
-							Amt: 100,
-							OutputOwners: secp256k1fx.OutputOwners{
-								Threshold: 1,
-								Addrs:     []ids.ShortID{{0xaa}},
-							},
-						},
-					},
-					{
-						Asset: avax.Asset{ID: avaxAssetID},
-						Out: &secp256k1fx.TransferOutput{
-							Amt: 100_000,
-							OutputOwners: secp256k1fx.OutputOwners{
-								Threshold: 1,
-								Addrs:     []ids.ShortID{{0xaa}},
-							},
-						},
-					},
-				},
-			},
-			Creds: []verify.Verifiable{},
-		},
-		new: &Tx{
+		tx: &Tx{
 			Unsigned: &Export{
 				Ins: []Input{
 					{
@@ -464,46 +260,7 @@ var (
 
 	exportMultiAddressMultiAssetTx = txData{
 		name: "export_multi_address_multi_asset", // Synthetic
-		old: &atomic.Tx{
-			UnsignedAtomicTx: &atomic.UnsignedExportTx{
-				Ins: []atomic.EVMInput{
-					{
-						Address: common.Address{1},
-						Amount:  999,
-						Nonce:   5,
-					},
-					{
-						Address: common.Address{2},
-						Amount:  1_000_000,
-						AssetID: avaxAssetID,
-						Nonce:   7,
-					},
-				},
-				ExportedOutputs: []*avax.TransferableOutput{
-					{
-						Out: &secp256k1fx.TransferOutput{
-							Amt: 500,
-							OutputOwners: secp256k1fx.OutputOwners{
-								Threshold: 2,
-								Addrs:     []ids.ShortID{{0xbb}, {0xcc}},
-							},
-						},
-					},
-					{
-						Asset: avax.Asset{ID: avaxAssetID},
-						Out: &secp256k1fx.TransferOutput{
-							Amt: 500_000,
-							OutputOwners: secp256k1fx.OutputOwners{
-								Threshold: 2,
-								Addrs:     []ids.ShortID{{0xbb}, {0xcc}},
-							},
-						},
-					},
-				},
-			},
-			Creds: []verify.Verifiable{},
-		},
-		new: &Tx{
+		tx: &Tx{
 			Unsigned: &Export{
 				Ins: []Input{
 					{
@@ -548,23 +305,7 @@ var (
 
 	importNonAVAXTx = txData{
 		name: "import_non_avax", // Synthetic
-		old: &atomic.Tx{
-			UnsignedAtomicTx: &atomic.UnsignedImportTx{
-				ImportedInputs: []*avax.TransferableInput{{
-					In: &secp256k1fx.TransferInput{
-						Amt: 999,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{},
-						},
-					},
-				}},
-				Outs: []atomic.EVMOutput{{
-					Amount: 999,
-				}},
-			},
-			Creds: []verify.Verifiable{},
-		},
-		new: &Tx{
+		tx: &Tx{
 			Unsigned: &Import{
 				ImportedInputs: []*avax.TransferableInput{{
 					In: &secp256k1fx.TransferInput{
@@ -587,23 +328,23 @@ var (
 
 func TestInputIDs(t *testing.T) {
 	tests := []struct {
-		tx   txData
-		want set.Set[ids.ID]
+		golden txData
+		want   set.Set[ids.ID]
 	}{
 		{
-			tx: importTx,
+			golden: importTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0xfd9e10917c4a2dab395683cfb766cdc584eba118bc22d3d0fc356fb79345cf64")),
 			),
 		},
 		{
-			tx: exportTx,
+			golden: exportTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0x000000000000000000000014eb019ccd325ad53543a7e7e3b04828bdecf3cff6")),
 			),
 		},
 		{
-			tx: importMultiInputTx,
+			golden: importMultiInputTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0x821514ed5d925142159bc2c78bc56b043200e53aab79e97ca75e7ca7f6a96d05")),
 				ids.ID(common.FromHex("0xea05e5c7135613b689d9f6b9903f431067ed72a2957ca82a652de1e8fef2c630")),
@@ -611,28 +352,28 @@ func TestInputIDs(t *testing.T) {
 			),
 		},
 		{
-			tx: exportSameAddressMultiAssetTx,
+			golden: exportSameAddressMultiAssetTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0x0000000000000005000000140000000000000000000000000000000000000000")),
 			),
 		},
 		{
-			tx: exportMultiAddressMultiAssetTx,
+			golden: exportMultiAddressMultiAssetTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0x0000000000000005000000140100000000000000000000000000000000000000")),
 				ids.ID(common.FromHex("0x0000000000000007000000140200000000000000000000000000000000000000")),
 			),
 		},
 		{
-			tx: importNonAVAXTx,
+			golden: importNonAVAXTx,
 			want: set.Of(
 				ids.ID(common.FromHex("0x2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb")),
 			),
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.tx.name, func(t *testing.T) {
-			tx := test.tx.new
+		t.Run(test.golden.name, func(t *testing.T) {
+			tx := test.golden.tx
 			got := tx.InputIDs()
 			assert.Equalf(t, test.want, got, "%T.InputIDs()", tx)
 		})
@@ -673,11 +414,11 @@ func TestAccountInputID(t *testing.T) {
 
 func TestAsOp(t *testing.T) {
 	tests := []struct {
-		tx   txData
-		want hook.Op
+		golden txData
+		want   hook.Op
 	}{
 		{
-			tx: importTx,
+			golden: importTx,
 			want: hook.Op{
 				ID:  importTx.id,
 				Gas: 11230,
@@ -687,7 +428,7 @@ func TestAsOp(t *testing.T) {
 			},
 		},
 		{
-			tx: exportTx,
+			golden: exportTx,
 			want: hook.Op{
 				ID:        exportTx.id,
 				Gas:       11230,
@@ -701,7 +442,7 @@ func TestAsOp(t *testing.T) {
 			},
 		},
 		{
-			tx: importMultiInputTx,
+			golden: importMultiInputTx,
 			want: hook.Op{
 				ID:  importMultiInputTx.id,
 				Gas: 13526,
@@ -711,7 +452,7 @@ func TestAsOp(t *testing.T) {
 			},
 		},
 		{
-			tx: exportSameAddressMultiAssetTx,
+			golden: exportSameAddressMultiAssetTx,
 			want: hook.Op{
 				ID:        exportSameAddressMultiAssetTx.id,
 				Gas:       12378,
@@ -726,7 +467,7 @@ func TestAsOp(t *testing.T) {
 			},
 		},
 		{
-			tx: exportMultiAddressMultiAssetTx,
+			golden: exportMultiAddressMultiAssetTx,
 			want: hook.Op{
 				ID:        exportMultiAddressMultiAssetTx.id,
 				Gas:       12418,
@@ -744,7 +485,7 @@ func TestAsOp(t *testing.T) {
 			},
 		},
 		{
-			tx: importNonAVAXTx,
+			golden: importNonAVAXTx,
 			want: hook.Op{
 				ID:   importNonAVAXTx.id,
 				Gas:  10226,
@@ -753,8 +494,8 @@ func TestAsOp(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.tx.name, func(t *testing.T) {
-			tx := test.tx.new
+		t.Run(test.golden.name, func(t *testing.T) {
+			tx := test.golden.tx
 			got, err := tx.AsOp(avaxAssetID)
 			require.NoErrorf(t, err, "%T.AsOp(AVAXAssetID)", tx)
 			assert.Equalf(t, test.want, got, "%T.AsOp(AVAXAssetID)", tx)
@@ -922,100 +663,14 @@ func TestAsOp_Errors(t *testing.T) {
 	}
 }
 
-// asOpStateDB is an in-memory [atomic.StateDB] for [FuzzAsOpCompatibility]. It
-// constructs a [hook.Op] from [atomic.UnsignedAtomicTx.EVMStateTransfer].
-type asOpStateDB struct {
-	initialNonces map[common.Address]uint64
-	op            hook.Op
-}
-
-func newAsOpStateDB() *asOpStateDB {
-	return &asOpStateDB{
-		initialNonces: make(map[common.Address]uint64),
-		op: hook.Op{
-			Burn: make(map[common.Address]hook.AccountDebit),
-			Mint: make(map[common.Address]uint256.Int),
-		},
-	}
-}
-
-func (s *asOpStateDB) SetNonce(addr common.Address, nonce uint64) {
-	d := s.op.Burn[addr]
-	// The op specifies what nonce is being consumed, not the next nonce. So we
-	// need to subtract 1.
-	d.Nonce = nonce - 1
-	s.op.Burn[addr] = d
-}
-
-func (s *asOpStateDB) SubBalance(addr common.Address, amount *uint256.Int) {
-	d := s.op.Burn[addr]
-	d.Amount.Add(&d.Amount, amount)
-	d.MinBalance = d.Amount
-	s.op.Burn[addr] = d
-}
-
-func (s *asOpStateDB) AddBalance(addr common.Address, amount *uint256.Int) {
-	b := s.op.Mint[addr]
-	b.Add(&b, amount)
-	s.op.Mint[addr] = b
-}
-
-// largeUint256 and largeBigInt return a balance large enough to never underflow
-// but small enough to never overflow during test arithmetic.
-func largeUint256() *uint256.Int { return new(uint256.Int).Lsh(uint256.NewInt(1), 128) }
-func largeBigInt() *big.Int      { return new(big.Int).Lsh(big.NewInt(1), 128) }
-
-func (s *asOpStateDB) GetNonce(addr common.Address) uint64                     { return s.initialNonces[addr] }
-func (*asOpStateDB) GetBalance(common.Address) *uint256.Int                    { return largeUint256() }
-func (*asOpStateDB) AddBalanceMultiCoin(common.Address, common.Hash, *big.Int) {}
-func (*asOpStateDB) SubBalanceMultiCoin(common.Address, common.Hash, *big.Int) {}
-func (*asOpStateDB) GetBalanceMultiCoin(common.Address, common.Hash) *big.Int  { return largeBigInt() }
-
-func FuzzAsOpCompatibility(f *testing.F) {
-	fuzz(f, func(t *testing.T, newTx *Tx) {
-		got, err := newTx.AsOp(avaxAssetID)
-		if err != nil {
-			t.Skip("invalid tx")
-		}
-
-		oldTx := txtest.ToOld(t, newTx)
-		gasUsed, err := oldTx.UnsignedAtomicTx.GasUsed(true)
-		require.NoErrorf(t, err, "%T.GasUsed(true)", oldTx.UnsignedAtomicTx)
-
-		gasPrice, err := atomic.EffectiveGasPrice(oldTx.UnsignedAtomicTx, avaxAssetID, true)
-		require.NoErrorf(t, err, "atomic.EffectiveGasPrice(%T, avaxAssetID, true)", oldTx)
-
-		state := newAsOpStateDB()
-		if export, ok := oldTx.UnsignedAtomicTx.(*atomic.UnsignedExportTx); ok {
-			for _, in := range export.Ins {
-				state.initialNonces[in.Address] = in.Nonce
-			}
-		}
-
-		ctx := &snow.Context{AVAXAssetID: avaxAssetID}
-		require.NoErrorf(t, oldTx.UnsignedAtomicTx.EVMStateTransfer(ctx, state), "%T.EVMStateTransfer()", oldTx.UnsignedAtomicTx)
-
-		want := hook.Op{
-			ID:        oldTx.ID(),
-			Gas:       gas.Gas(gasUsed),
-			GasFeeCap: gasPrice,
-			Burn:      state.op.Burn,
-			Mint:      state.op.Mint,
-		}
-		if diff := cmp.Diff(want, got, cmpopts.EquateEmpty()); diff != "" {
-			t.Errorf("%T.AsOp() diff (-want +got):\n%s", newTx, diff)
-		}
-	})
-}
-
 func TestAtomicRequests(t *testing.T) {
 	tests := []struct {
-		tx           txData
+		golden       txData
 		wantChainID  ids.ID
 		wantRequests *chainsatomic.Requests
 	}{
 		{
-			tx:          importTx,
+			golden:      importTx,
 			wantChainID: xChainID,
 			wantRequests: &chainsatomic.Requests{
 				RemoveRequests: [][]byte{
@@ -1024,7 +679,7 @@ func TestAtomicRequests(t *testing.T) {
 			},
 		},
 		{
-			tx:          exportTx,
+			golden:      exportTx,
 			wantChainID: xChainID,
 			wantRequests: &chainsatomic.Requests{
 				PutRequests: []*chainsatomic.Element{{
@@ -1037,7 +692,7 @@ func TestAtomicRequests(t *testing.T) {
 			},
 		},
 		{
-			tx:          importMultiInputTx,
+			golden:      importMultiInputTx,
 			wantChainID: xChainID,
 			wantRequests: &chainsatomic.Requests{
 				RemoveRequests: [][]byte{
@@ -1048,7 +703,7 @@ func TestAtomicRequests(t *testing.T) {
 			},
 		},
 		{
-			tx: exportSameAddressMultiAssetTx,
+			golden: exportSameAddressMultiAssetTx,
 			wantRequests: &chainsatomic.Requests{
 				PutRequests: []*chainsatomic.Element{
 					{
@@ -1069,7 +724,7 @@ func TestAtomicRequests(t *testing.T) {
 			},
 		},
 		{
-			tx: exportMultiAddressMultiAssetTx,
+			golden: exportMultiAddressMultiAssetTx,
 			wantRequests: &chainsatomic.Requests{
 				PutRequests: []*chainsatomic.Element{
 					{
@@ -1092,7 +747,7 @@ func TestAtomicRequests(t *testing.T) {
 			},
 		},
 		{
-			tx: importNonAVAXTx,
+			golden: importNonAVAXTx,
 			wantRequests: &chainsatomic.Requests{
 				RemoveRequests: [][]byte{
 					common.FromHex("0x2c34ce1df23b838c5abf2a7f6437cca3d3067ed509ff25f11df6b11b582b51eb"),
@@ -1101,8 +756,8 @@ func TestAtomicRequests(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.tx.name, func(t *testing.T) {
-			tx := test.tx.new
+		t.Run(test.golden.name, func(t *testing.T) {
+			tx := test.golden.tx
 			gotChainID, gotRequests, err := tx.AtomicRequests()
 			require.NoErrorf(t, err, "%T.AtomicRequests()", tx)
 			assert.Equalf(t, test.wantChainID, gotChainID, "%T.AtomicRequests().ChainID", tx)
@@ -1111,41 +766,36 @@ func TestAtomicRequests(t *testing.T) {
 	}
 }
 
-func FuzzAtomicRequestsCompatibility(f *testing.F) {
-	fuzz(f, func(t *testing.T, newTx *Tx) {
-		oldTx := txtest.ToOld(t, newTx)
-		wantChainID, wantRequests, err := oldTx.UnsignedAtomicTx.AtomicOps()
-		require.NoErrorf(t, err, "%T.AtomicOps()", oldTx.UnsignedAtomicTx)
+// multiCoinStateDB is an in-memory [MultiCoinStateDB].
+type multiCoinStateDB map[common.Address]map[common.Hash]*big.Int
 
-		gotChainID, gotRequests, err := newTx.AtomicRequests()
-		require.NoErrorf(t, err, "%T.AtomicRequests()", newTx)
-		assert.Equal(t, wantChainID, gotChainID, "chainID")
-		assert.Equal(t, wantRequests, gotRequests, "requests")
-	})
+func (s multiCoinStateDB) GetBalanceMultiCoin(addr common.Address, coinID common.Hash) *big.Int {
+	if b, ok := s[addr][coinID]; ok {
+		return new(big.Int).Set(b)
+	}
+	return new(big.Int)
 }
 
-func newEmptyStateDB(t testing.TB) *extstate.StateDB {
-	t.Helper()
-
-	db := state.NewDatabase(rawdb.NewMemoryDatabase())
-	sdb, err := state.New(types.EmptyRootHash, db, nil)
-	require.NoError(t, err)
-	return extstate.New(sdb)
+func (s multiCoinStateDB) AddBalanceMultiCoin(addr common.Address, coinID common.Hash, amount *big.Int) {
+	s.setBalanceMultiCoin(addr, coinID, new(big.Int).Add(s.GetBalanceMultiCoin(addr, coinID), amount))
 }
 
-func compareStateDBs(want, got *extstate.StateDB) string {
-	// Finalize the trie structures so that the state DB comparison includes
-	// any changes.
-	for _, v := range []*extstate.StateDB{want, got} {
-		v.Finalise(true)
-		v.IntermediateRoot(true)
-	}
+func (s multiCoinStateDB) SubBalanceMultiCoin(addr common.Address, coinID common.Hash, amount *big.Int) {
+	s.setBalanceMultiCoin(addr, coinID, new(big.Int).Sub(s.GetBalanceMultiCoin(addr, coinID), amount))
+}
 
-	opts := []cmp.Option{
-		cmpopts.IgnoreUnexported(extstate.StateDB{}),
-		cmputils.StateDBs(),
+func (s multiCoinStateDB) setBalanceMultiCoin(addr common.Address, coinID common.Hash, amount *big.Int) {
+	if amount.Sign() == 0 {
+		delete(s[addr], coinID)
+		if len(s[addr]) == 0 {
+			delete(s, addr)
+		}
+		return
 	}
-	return cmp.Diff(want, got, opts...)
+	if s[addr] == nil {
+		s[addr] = make(map[common.Hash]*big.Int)
+	}
+	s[addr][coinID] = amount
 }
 
 func TestTransferNonAVAX(t *testing.T) {
@@ -1315,7 +965,7 @@ func TestTransferNonAVAX(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				want  = newEmptyStateDB(t)
+				want  = multiCoinStateDB{}
 				toBig = func(v uint64) *big.Int { return new(big.Int).SetUint64(v) }
 			)
 			for addr, balances := range test.want {
@@ -1325,7 +975,7 @@ func TestTransferNonAVAX(t *testing.T) {
 				}
 			}
 
-			got := newEmptyStateDB(t)
+			got := multiCoinStateDB{}
 			for addr, balances := range test.init {
 				for assetID, amount := range balances {
 					coinID := common.Hash(assetID)
@@ -1338,53 +988,11 @@ func TestTransferNonAVAX(t *testing.T) {
 			}
 			err := tx.TransferNonAVAX(avaxAssetID, got)
 			require.ErrorIsf(t, err, test.wantErr, "%T.TransferNonAVAX()", tx)
-			if diff := compareStateDBs(want, got); diff != "" {
+			if diff := cmp.Diff(want, got, cmputils.BigInts()); diff != "" {
 				t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", tx, diff)
 			}
 		})
 	}
-}
-
-func FuzzTransferNonAVAXCompatibility(f *testing.F) {
-	fuzz(f, func(t *testing.T, newTx *Tx) {
-		op, err := newTx.AsOp(avaxAssetID)
-		if err != nil {
-			t.Skip("invalid tx")
-		}
-
-		oldState := newEmptyStateDB(t)
-		newState := newEmptyStateDB(t)
-		states := []*extstate.StateDB{oldState, newState}
-
-		if tx, ok := newTx.Unsigned.(*Export); ok {
-			for _, in := range tx.Ins {
-				// Coreth silently overflows the nonce, whereas SAE will leave
-				// the nonce unmodified. This difference doesn't matter on live
-				// networks.
-				if in.Nonce == math.MaxUint64 {
-					t.Skip("nonce overflow")
-				}
-
-				for _, state := range states {
-					state.AddBalance(in.Address, largeUint256())
-					state.SetNonce(in.Address, in.Nonce)
-					state.AddBalanceMultiCoin(in.Address, common.Hash(in.AssetID), largeBigInt())
-				}
-			}
-		}
-
-		var (
-			oldTx = txtest.ToOld(t, newTx)
-			ctx   = &snow.Context{AVAXAssetID: avaxAssetID}
-		)
-		require.NoErrorf(t, oldTx.EVMStateTransfer(ctx, oldState), "%T.EVMStateTransfer()", oldTx)
-		require.NoErrorf(t, newTx.TransferNonAVAX(avaxAssetID, newState), "%T.TransferNonAVAX()", newTx)
-		require.NoErrorf(t, op.ApplyTo(newState.StateDB), "%T.ApplyTo(%T)", op, newState.StateDB)
-
-		if diff := compareStateDBs(oldState, newState); diff != "" {
-			t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", newTx, diff)
-		}
-	})
 }
 
 // mainnetContext returns a [snow.Context] with mainnet values.
@@ -1473,7 +1081,7 @@ func TestSanityCheck(t *testing.T) {
 		},
 		{
 			name: "import_mainnet",
-			tx:   importTx.new.Unsigned,
+			tx:   importTx.tx.Unsigned,
 		},
 		{
 			name:    "import_wrong_network_id",
@@ -1614,7 +1222,7 @@ func TestSanityCheck(t *testing.T) {
 		},
 		{
 			name: "export_mainnet",
-			tx:   exportTx.new.Unsigned,
+			tx:   exportTx.tx.Unsigned,
 		},
 		{
 			name:    "export_wrong_network_id",
@@ -1712,44 +1320,6 @@ func TestSanityCheck(t *testing.T) {
 			require.ErrorIsf(t, err, test.wantErr, "%T.SanityCheck()", tx)
 		})
 	}
-}
-
-// oldSanityCheck behaves like [Tx.SanityCheck] for the legacy [atomic.Tx].
-func oldSanityCheck(tx *atomic.Tx, ctx *snow.Context) error {
-	rules := *extrastest.ForkToRules(upgradetest.Latest)
-	if err := tx.UnsignedAtomicTx.Verify(ctx, rules); err != nil {
-		return err
-	}
-	// We can't call [vm.VerifierBackend.SemanticVerify] here because that
-	// additionally performs signature verification.
-	fc := avax.NewFlowChecker()
-	switch tx := tx.UnsignedAtomicTx.(type) {
-	case *atomic.UnsignedImportTx:
-		for _, in := range tx.ImportedInputs {
-			fc.Consume(in.Asset.ID, in.Input().Amount())
-		}
-		for _, out := range tx.Outs {
-			fc.Produce(out.AssetID, out.Amount)
-		}
-	case *atomic.UnsignedExportTx:
-		for _, in := range tx.Ins {
-			fc.Consume(in.AssetID, in.Amount)
-		}
-		for _, out := range tx.ExportedOutputs {
-			fc.Produce(out.Asset.ID, out.Output().Amount())
-		}
-	}
-	return fc.Verify()
-}
-
-func FuzzSanityCheckCompatibility(f *testing.F) {
-	ctx := mainnetContext()
-	fuzz(f, func(t *testing.T, newTx *Tx) {
-		oldTx := txtest.ToOld(t, newTx)
-		want := oldSanityCheck(oldTx, ctx) == nil
-		got := newTx.SanityCheck(ctx) == nil
-		assert.Equal(t, want, got, "%T.SanityCheck() == OldSanityCheck(%T)", newTx, oldTx)
-	})
 }
 
 func TestVerifyCredentials(t *testing.T) {

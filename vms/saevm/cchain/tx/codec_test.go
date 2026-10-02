@@ -4,33 +4,20 @@
 package tx_test
 
 import (
+	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/params"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	// Imported for [vm.VerifierBackend] comment resolution.
-	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
-
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
-	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
@@ -45,73 +32,36 @@ var allTxs = [...]txData{
 }
 
 func TestID(t *testing.T) {
-	for _, tx := range allTxs {
-		t.Run(tx.name, func(t *testing.T) {
-			t.Run("old", func(t *testing.T) {
-				// We must parse the old tx to properly initialize the ID.
-				old, err := txtest.ParseOld(tx.bytes)
-				require.NoError(t, err, "txtest.ParseOld()")
-				assert.Equalf(t, tx.id, old.ID(), "%T.ID()", old)
-			})
-			t.Run("new", func(t *testing.T) {
-				assert.Equalf(t, tx.id, tx.new.ID(), "%T.ID()", tx.new)
-			})
+	for _, golden := range allTxs {
+		t.Run(golden.name, func(t *testing.T) {
+			assert.Equalf(t, golden.id, golden.tx.ID(), "%T.ID()", golden.tx)
 		})
 	}
 }
 
 func TestBytes(t *testing.T) {
-	for _, tx := range allTxs {
-		t.Run(tx.name, func(t *testing.T) {
-			t.Run("old", func(t *testing.T) {
-				got, err := atomic.Codec.Marshal(atomic.CodecVersion, tx.old)
-				require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, tx.old)
-				assert.Equalf(t, tx.bytes, got, "%T.Marshal(, %T)", atomic.Codec, tx.old)
-			})
-			t.Run("new", func(t *testing.T) {
-				got, err := tx.new.Bytes()
-				require.NoErrorf(t, err, "%T.Bytes()", tx.new)
-				assert.Equalf(t, tx.bytes, got, "%T.Bytes()", tx.new)
-			})
+	for _, golden := range allTxs {
+		t.Run(golden.name, func(t *testing.T) {
+			got, err := golden.tx.Bytes()
+			require.NoErrorf(t, err, "%T.Bytes()", golden.tx)
+			assert.Equalf(t, golden.bytes, got, "%T.Bytes()", golden.tx)
 		})
 	}
-}
-
-// oldCmpOpt returns a configuration for [cmp.Diff] to compare [atomic.Tx]
-// instances.
-func oldCmpOpt() cmp.Option {
-	return cmputils.IfIn[atomic.Tx](cmp.Options{
-		cmpopts.IgnoreUnexported(
-			atomic.Metadata{},
-			avax.UTXOID{},
-			secp256k1fx.OutputOwners{},
-		),
-		cmpopts.EquateEmpty(),
-	})
 }
 
 func TestParse(t *testing.T) {
-	for _, tx := range allTxs {
-		t.Run(tx.name, func(t *testing.T) {
-			t.Run("old", func(t *testing.T) {
-				got, err := txtest.ParseOld(tx.bytes)
-				require.NoError(t, err, "txtest.ParseOld()")
-				if diff := cmp.Diff(tx.old, got, oldCmpOpt()); diff != "" {
-					t.Errorf("%T.Unmarshal(, %T) diff (-want +got):\n%s", atomic.Codec, got, diff)
-				}
-			})
-			t.Run("new", func(t *testing.T) {
-				got, err := Parse(tx.bytes)
-				require.NoError(t, err, "Parse()")
-				if diff := cmp.Diff(tx.new, got, txtest.CmpOpt()); diff != "" {
-					t.Errorf("Parse() diff (-want +got):\n%s", diff)
-				}
-			})
+	for _, golden := range allTxs {
+		t.Run(golden.name, func(t *testing.T) {
+			got, err := Parse(golden.bytes)
+			require.NoError(t, err, "Parse()")
+			if diff := cmp.Diff(golden.tx, got, txtest.CmpOpt()); diff != "" {
+				t.Errorf("Parse() diff (-want +got):\n%s", diff)
+			}
 		})
 	}
 }
 
-// fuzz seeds f with [newTxs], specifies simple alphabets used to bias the
+// fuzz seeds f with [allTxs], specifies simple alphabets used to bias the
 // fuzzer, and fuzzes the test.
 func fuzz(f *testing.F, ff func(t *testing.T, tx *Tx)) {
 	fuzzer := &txtest.F{
@@ -123,8 +73,8 @@ func fuzz(f *testing.F, ff func(t *testing.T, tx *Tx)) {
 			avaxAssetID,
 		},
 	}
-	for _, tx := range allTxs {
-		fuzzer.Add(tx.new)
+	for _, golden := range allTxs {
+		fuzzer.Add(golden.tx)
 	}
 	fuzzer.Fuzz(ff)
 }
@@ -142,35 +92,23 @@ func FuzzParseRoundTrip(f *testing.F) {
 	})
 }
 
-func FuzzParseCompatibility(f *testing.F) {
-	for _, tx := range allTxs {
-		f.Add(tx.bytes)
+// allTxsSlice returns [allTxs] along with their expected encoding as a slice.
+func allTxsSlice() ([]*Tx, []byte) {
+	const codecVersionLen = 2
+	var (
+		txs   = make([]*Tx, len(allTxs))
+		bytes = make([]byte, codecVersionLen, 64)
+	)
+	bytes = binary.BigEndian.AppendUint32(bytes, uint32(len(allTxs)))
+	for i, golden := range allTxs {
+		txs[i] = golden.tx
+		bytes = append(bytes, golden.bytes[codecVersionLen:]...)
 	}
-	f.Fuzz(func(t *testing.T, data []byte) {
-		_, oldErr := txtest.ParseOld(data)
-		// The new codec intentionally has no size limit.
-		if errors.Is(oldErr, codec.ErrUnmarshalTooBig) {
-			t.Skip("input exceeds legacy codec size limit")
-		}
-		oldOk := oldErr == nil
-
-		_, newErr := Parse(data)
-		newOk := newErr == nil
-
-		assert.Equal(t, oldOk, newOk, "Parse(b) == txtest.ParseOld(b)")
-	})
+	return txs, bytes
 }
 
 func TestMarshalSlice(t *testing.T) {
-	oldTxs := make([]*atomic.Tx, len(allTxs))
-	newTxs := make([]*Tx, len(allTxs))
-	for i, tx := range allTxs {
-		oldTxs[i] = tx.old
-		newTxs[i] = tx.new
-	}
-
-	want, err := atomic.Codec.Marshal(atomic.CodecVersion, oldTxs)
-	require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, oldTxs)
+	txs, want := allTxsSlice()
 
 	tests := []struct {
 		name string
@@ -179,7 +117,7 @@ func TestMarshalSlice(t *testing.T) {
 	}{
 		{
 			name: "mainnet",
-			txs:  newTxs,
+			txs:  txs,
 			want: want,
 		},
 		{
@@ -196,15 +134,7 @@ func TestMarshalSlice(t *testing.T) {
 }
 
 func TestParseSlice(t *testing.T) {
-	oldTxs := make([]*atomic.Tx, len(allTxs))
-	newTxs := make([]*Tx, len(allTxs))
-	for i, tx := range allTxs {
-		oldTxs[i] = tx.old
-		newTxs[i] = tx.new
-	}
-
-	bytes, err := atomic.Codec.Marshal(atomic.CodecVersion, oldTxs)
-	require.NoErrorf(t, err, "%T.Marshal(, %T)", atomic.Codec, oldTxs)
+	txs, bytes := allTxsSlice()
 
 	tests := []struct {
 		name    string
@@ -215,7 +145,7 @@ func TestParseSlice(t *testing.T) {
 		{
 			name:  "mainnet",
 			bytes: bytes,
-			want:  newTxs,
+			want:  txs,
 		},
 		{
 			name: "empty",
@@ -242,101 +172,64 @@ func TestParseSlice(t *testing.T) {
 	}
 }
 
-func TestFromBlock(t *testing.T) {
-	newTxs := make([]*Tx, len(allTxs))
-	for i, tx := range allTxs {
-		newTxs[i] = tx.new
+func TestFromExtData(t *testing.T) {
+	txs, sliceBytes := allTxsSlice()
+	emptySlice := []byte{
+		// codecVersion:
+		0x00, 0x00,
+		// len(txs):
+		0x00, 0x00, 0x00, 0x00,
 	}
 
-	sliceBytes, err := MarshalSlice(newTxs)
-	require.NoError(t, err, "MarshalSlice()")
-
-	const (
-		preAP5Time uint64 = 0
-		ap5Time           = preAP5Time + 1
-	)
-	config := corethparams.WithExtra(
-		&params.ChainConfig{},
-		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase5BlockTimestamp: new(ap5Time),
-			},
-		},
-	)
-
 	tests := []struct {
-		name    string
-		time    uint64
-		extData []byte
-		want    []*Tx
-		wantErr error
+		name            string
+		isApricotPhase5 bool
+		extData         []byte
+		want            []*Tx
+		wantErr         error
 	}{
 		{
 			name: "pre_ap5_empty",
-			time: preAP5Time,
 		},
 		{
-			name: "pre_ap5_empty_slice",
-			time: preAP5Time,
-			extData: []byte{
-				// codecVersion:
-				0x00, 0x00,
-				// len(txs):
-				0x00, 0x00, 0x00, 0x00,
-			},
+			name:    "pre_ap5_empty_slice",
+			extData: emptySlice,
 			wantErr: wrappers.ErrInsufficientLength,
 		},
 		{
 			name:    "pre_ap5_single",
-			time:    preAP5Time,
 			extData: importTx.bytes,
-			want:    []*Tx{importTx.new},
+			want:    []*Tx{importTx.tx},
 		},
 		{
-			name: "ap5_empty",
-			time: ap5Time,
+			name:            "ap5_empty",
+			isApricotPhase5: true,
 		},
 		{
-			name: "ap5_empty_slice",
-			time: ap5Time,
-			extData: []byte{
-				// codecVersion:
-				0x00, 0x00,
-				// len(txs):
-				0x00, 0x00, 0x00, 0x00,
-			},
-			wantErr: ErrInefficientSlicePacking,
+			name:            "ap5_empty_slice",
+			isApricotPhase5: true,
+			extData:         emptySlice,
+			wantErr:         ErrInefficientSlicePacking,
 		},
 		{
-			name:    "ap5_single",
-			time:    ap5Time,
-			extData: importTx.bytes,
-			wantErr: codec.ErrExtraSpace,
+			name:            "ap5_single",
+			isApricotPhase5: true,
+			extData:         importTx.bytes,
+			wantErr:         codec.ErrExtraSpace,
 		},
 		{
-			name:    "ap5_slice",
-			time:    ap5Time,
-			extData: sliceBytes,
-			want:    newTxs,
+			name:            "ap5_slice",
+			isApricotPhase5: true,
+			extData:         sliceBytes,
+			want:            txs,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			block := customtypes.NewBlockWithExtData(
-				&types.Header{
-					Time: test.time,
-				},
-				nil, // txs
-				nil, // uncles
-				nil, // receipts
-				nil, // hasher, unused without txs
-				test.extData,
-				true, // update [customtypes.HeaderExtra.ExtDataHash]
-			)
-			got, err := FromBlock(config, block)
-			require.ErrorIs(t, err, test.wantErr, "FromBlock()")
+			got, err := FromExtData(test.extData, test.isApricotPhase5)
+			require.ErrorIs(t, err, test.wantErr, "FromExtData()")
 			if diff := cmp.Diff(test.want, got, txtest.CmpOpt()); diff != "" {
-				t.Errorf("FromBlock() diff (-want +got):\n%s", diff)
+				t.Errorf("FromExtData() diff (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -344,11 +237,11 @@ func TestFromBlock(t *testing.T) {
 
 func FuzzParseSliceRoundTrip(f *testing.F) {
 	{
-		newTxs := make([]*Tx, len(allTxs))
-		for i, tx := range allTxs {
-			newTxs[i] = tx.new
+		txs := make([]*Tx, len(allTxs))
+		for i, golden := range allTxs {
+			txs[i] = golden.tx
 		}
-		b, err := MarshalSlice(newTxs)
+		b, err := MarshalSlice(txs)
 		require.NoError(f, err, "MarshalSlice()")
 		f.Add(b)
 	}
@@ -367,39 +260,13 @@ func FuzzParseSliceRoundTrip(f *testing.F) {
 	})
 }
 
-func FuzzParseSliceCompatibility(f *testing.F) {
-	{
-		newTxs := make([]*Tx, len(allTxs))
-		for i, tx := range allTxs {
-			newTxs[i] = tx.new
-		}
-		b, err := MarshalSlice(newTxs)
-		require.NoError(f, err, "MarshalSlice()")
-		f.Add(b)
-	}
-
-	f.Fuzz(func(t *testing.T, data []byte) {
-		_, oldErr := txtest.ParseOlds(data)
-		// The new codec intentionally has no size limit.
-		if errors.Is(oldErr, codec.ErrUnmarshalTooBig) {
-			t.Skip("input exceeds legacy codec size limit")
-		}
-		oldOk := oldErr == nil
-
-		_, newErr := ParseSlice(data)
-		newOk := newErr == nil
-
-		assert.Equal(t, oldOk, newOk, "ParseSlice(b) == txtest.ParseOlds(b)")
-	})
-}
-
 func TestJSONMarshal(t *testing.T) {
 	tests := []struct {
-		tx   txData
-		want string
+		golden txData
+		want   string
 	}{
 		{
-			tx: importTx,
+			golden: importTx,
 			want: `{
 				"unsignedTx":{
 					"networkID":1,
@@ -429,7 +296,7 @@ func TestJSONMarshal(t *testing.T) {
 			}`,
 		},
 		{
-			tx: exportTx,
+			golden: exportTx,
 			want: `{
 				"unsignedTx":{
 					"networkID":1,
@@ -460,7 +327,7 @@ func TestJSONMarshal(t *testing.T) {
 			}`,
 		},
 		{
-			tx: importMultiInputTx,
+			golden: importMultiInputTx,
 			want: `{
 				"unsignedTx":{
 					"networkID":1,
@@ -503,7 +370,7 @@ func TestJSONMarshal(t *testing.T) {
 			}`,
 		},
 		{
-			tx: exportSameAddressMultiAssetTx,
+			golden: exportSameAddressMultiAssetTx,
 			want: `{
 				"unsignedTx":{
 					"networkID":0,
@@ -540,7 +407,7 @@ func TestJSONMarshal(t *testing.T) {
 			}`,
 		},
 		{
-			tx: exportMultiAddressMultiAssetTx,
+			golden: exportMultiAddressMultiAssetTx,
 			want: `{
 				"unsignedTx":{
 					"networkID":0,
@@ -577,7 +444,7 @@ func TestJSONMarshal(t *testing.T) {
 			}`,
 		},
 		{
-			tx: importNonAVAXTx,
+			golden: importNonAVAXTx,
 			want: `{
 				"unsignedTx":{
 					"networkID":0,
@@ -601,31 +468,11 @@ func TestJSONMarshal(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.tx.name, func(t *testing.T) {
-			t.Run("old", func(t *testing.T) {
-				tx := test.tx.old
-				got, err := json.Marshal(tx)
-				require.NoErrorf(t, err, "json.Marshal(%T)", tx)
-				assert.JSONEqf(t, test.want, string(got), "json.Marshal(%T)", tx)
-			})
-			t.Run("new", func(t *testing.T) {
-				tx := test.tx.new
-				got, err := json.Marshal(tx)
-				require.NoErrorf(t, err, "json.Marshal(%T)", tx)
-				assert.JSONEqf(t, test.want, string(got), "json.Marshal(%T)", tx)
-			})
+		t.Run(test.golden.name, func(t *testing.T) {
+			tx := test.golden.tx
+			got, err := json.Marshal(tx)
+			require.NoErrorf(t, err, "json.Marshal(%T)", tx)
+			assert.JSONEqf(t, test.want, string(got), "json.Marshal(%T)", tx)
 		})
 	}
-}
-
-func FuzzJSONCompatibility(f *testing.F) {
-	fuzz(f, func(t *testing.T, newTx *Tx) {
-		oldTx := txtest.ToOld(t, newTx)
-		want, err := json.Marshal(oldTx)
-		require.NoErrorf(t, err, "json.Marshal(%T)", oldTx)
-
-		got, err := json.Marshal(newTx)
-		require.NoErrorf(t, err, "json.Marshal(%T)", newTx)
-		assert.JSONEq(t, string(want), string(got))
-	})
 }
