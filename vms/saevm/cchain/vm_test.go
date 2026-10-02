@@ -799,8 +799,8 @@ func (s *SUT) parseVerifyAccept(ctx context.Context, tb testing.TB, blk *blocks.
 }
 
 // acceptSynchronousBlocks drives blks, in order, through parse, verify, and
-// accept while the SUT is bootstrapping, asserting that each re-executes to the
-// state and receipts roots its header commits to.
+// accept, asserting that each re-executes to the state and receipts roots its
+// header commits to.
 func (s *SUT) acceptSynchronousBlocks(ctx context.Context, tb testing.TB, blks []synchronoustest.Block) {
 	tb.Helper()
 
@@ -808,8 +808,8 @@ func (s *SUT) acceptSynchronousBlocks(ctx context.Context, tb testing.TB, blks [
 		parsed, err := s.ParseBlock(ctx, blk.RLP)
 		require.NoErrorf(tb, err, "%T.ParseBlock(height %d)", s.VM, blk.Number)
 		require.NoErrorf(tb, s.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", s.VM, blk.Number)
-		// Accepting while bootstrapping blocks until the block has executed.
 		require.NoErrorf(tb, s.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", s.VM, blk.Number)
+		require.NoErrorf(tb, parsed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(height %d)", parsed, blk.Number)
 
 		assert.Equalf(tb, parsed.SettledStateRoot(), parsed.PostExecutionStateRoot(), "post-execution state root of height %d", blk.Number)
 		assert.Equalf(tb, parsed.SettledReceiptsRoot(), types.DeriveSha(parsed.Receipts(), saetest.TrieHasher()), "receipts root of height %d", blk.Number)
@@ -1653,10 +1653,8 @@ func TestRestartWithSettledAsynchronousBlock(t *testing.T) {
 	require.Equal(t, settler.ID(), restarted.lastAccepted(restartedCtx, t), "restarted last-accepted")
 }
 
-// A node bootstrapping from genesis MUST execute the synchronous history
-// itself, reproducing each block's committed state and receipts roots, and MUST
-// then extend the chain asynchronously with the last synchronous block as the
-// initial settled block.
+// A node bootstrapping from genesis must be able to execute the synchronous
+// history and extend the chain asynchronously.
 func TestBootstrapSynchronousBlocks(t *testing.T) {
 	fixture, opts, clock := synchronousFixture(t)
 	ctx, sut := newSUT(t, opts...)
