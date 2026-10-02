@@ -4,6 +4,10 @@
 
 This release updates the plugin version to `47`. All plugins must update to remain compatible.
 
+### Configs
+
+- Restored the C-Chain `api-max-duration` limit on every HTTP request and WebSocket call after Helicon. It previously limited only `eth_call`. A WebSocket call that times out doesn't close its connection.
+
 ### Metrics
 
 - Added `avalanche_evm_transition_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
