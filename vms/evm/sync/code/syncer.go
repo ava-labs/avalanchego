@@ -14,10 +14,8 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -286,13 +284,9 @@ func persist(db ethdb.Batcher, hashes []common.Hash, codes [][]byte) error {
 // response. It retries until a peer returns valid code or ctx is cancelled.
 func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common.Hash) ([][]byte, error) {
 	return c.Send(ctx, &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)},
-		func(resp *syncpb.GetCodeResponse, nodeID ids.NodeID) ([][]byte, error) {
+		func(resp *syncpb.GetCodeResponse) ([][]byte, error) {
 			code := resp.GetData()
 			if err := verifyCode(hashes, code); err != nil {
-				log.Debug("invalid code response, re-requesting",
-					zap.Stringer("nodeID", nodeID),
-					zap.Error(err),
-				)
 				return nil, err
 			}
 			return code, nil

@@ -65,7 +65,7 @@ func NewDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any](
 func (d *Dispatcher[Req, In, Resp, Out]) Send(
 	ctx context.Context,
 	req Req,
-	parse func(Resp, ids.NodeID) (Out, error),
+	parse func(Resp) (Out, error),
 ) (Out, error) {
 	requestBytes, err := proto.Marshal(req)
 	if err != nil {

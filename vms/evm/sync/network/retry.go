@@ -81,7 +81,7 @@ func doRetry[Resp proto.Message, Out any](
 	ctx context.Context,
 	log logging.Logger,
 	policy retryPolicy,
-	parse func(Resp, ids.NodeID) (Out, error),
+	parse func(Resp) (Out, error),
 	attempt func(context.Context) (Resp, ids.NodeID, *Outcome, error),
 ) (Out, error) {
 	var (
@@ -96,13 +96,15 @@ func doRetry[Resp proto.Message, Out any](
 		var wait time.Duration
 		switch {
 		case err == nil:
-			// parse reports its own rejection, since only the caller knows what
-			// made the response wrong, and returns the value Send hands back.
-			out, parseErr := parse(resp, nodeID)
+			out, parseErr := parse(resp)
 			if parseErr == nil {
 				outcome.Success()
 				return out, nil
 			}
+			log.Debug("invalid response, re-requesting",
+				zap.Stringer("nodeID", nodeID),
+				zap.Error(parseErr),
+			)
 			outcome.Failure()
 			lastErr = parseErr
 			noPeerAttempts = 0

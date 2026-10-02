@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
@@ -126,16 +125,8 @@ func (s *Syncer) getBlocks(ctx context.Context, hash common.Hash, height uint64,
 			// The field counts parents, so it excludes the block at height.
 			NumParents: uint32(maxBlocks - 1),
 		},
-		func(resp *syncpb.GetBlockResponse, nodeID ids.NodeID) ([]*types.Block, error) {
-			blocks, err := verifyBlocks(hash, maxBlocks, resp.GetBlocks(), s.parseBlock)
-			if err != nil {
-				s.log.Debug("invalid block response, re-requesting",
-					zap.Stringer("nodeID", nodeID),
-					zap.Error(err),
-				)
-				return nil, err
-			}
-			return blocks, nil
+		func(resp *syncpb.GetBlockResponse) ([]*types.Block, error) {
+			return verifyBlocks(hash, maxBlocks, resp.GetBlocks(), s.parseBlock)
 		},
 	)
 }

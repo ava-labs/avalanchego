@@ -85,7 +85,7 @@ func TestSend_RetriesThenSucceeds(t *testing.T) {
 			c := newRetryDispatcher(t, ctx, nodeID, handler, tracker)
 
 			verifyCalls := 0
-			verify := func(resp *syncpb.GetLeafResponse, _ ids.NodeID) (*syncpb.GetLeafResponse, error) {
+			verify := func(resp *syncpb.GetLeafResponse) (*syncpb.GetLeafResponse, error) {
 				verifyCalls++
 				if verifyCalls < tt.wantVerifyCalls {
 					return nil, errors.New("invalid")
@@ -195,7 +195,7 @@ func TestDoRetry_CtxEndReportsFailure(t *testing.T) {
 				_, tracker := newTestTracker(t, nodeID)
 				return &syncpb.GetLeafResponse{}, nodeID, &Outcome{peers: tracker, nodeID: nodeID}, nil
 			}
-			parse := func(*syncpb.GetLeafResponse, ids.NodeID) (*syncpb.GetLeafResponse, error) {
+			parse := func(*syncpb.GetLeafResponse) (*syncpb.GetLeafResponse, error) {
 				cancel()
 				return nil, errInvalid
 			}
@@ -281,7 +281,7 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 						return want, nodeID, &Outcome{peers: tracker, nodeID: nodeID}, nil
 					}
 				}
-				parse := func(resp *syncpb.GetLeafResponse, _ ids.NodeID) (*syncpb.GetLeafResponse, error) {
+				parse := func(resp *syncpb.GetLeafResponse) (*syncpb.GetLeafResponse, error) {
 					if tt.resetError == nil && !rejected {
 						rejected = true
 						return nil, errInvalid
@@ -308,7 +308,7 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 	}
 }
 
-func acceptLeaf(resp *syncpb.GetLeafResponse, _ ids.NodeID) (*syncpb.GetLeafResponse, error) {
+func acceptLeaf(resp *syncpb.GetLeafResponse) (*syncpb.GetLeafResponse, error) {
 	return resp, nil
 }
 
