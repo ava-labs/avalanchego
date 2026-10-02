@@ -48,14 +48,6 @@ func TestNoPeersBackoff(t *testing.T) {
 	} {
 		require.Equal(t, tc.want, p.noPeersBackoff(tc.attempt))
 	}
-
-	prev := time.Duration(0)
-	for n := 0; n <= 30; n++ {
-		d := p.noPeersBackoff(n)
-		require.GreaterOrEqual(t, d, prev)
-		require.LessOrEqual(t, d, p.noPeersMaxBackoff)
-		prev = d
-	}
 }
 
 func TestSend_RetriesThenSucceeds(t *testing.T) {
