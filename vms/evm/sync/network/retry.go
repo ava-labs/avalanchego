@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/libevm/libevm/options"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -75,14 +74,14 @@ func (p retryPolicy) noPeersBackoff(attempt int) time.Duration {
 	return time.Duration(d)
 }
 
-// doRetry retries attempt until parse accepts a response, ctx ends, or a fatal
-// error. attempt must return a fresh response each call so failures never merge.
-func doRetry[Resp proto.Message, Out any](
+// doRetry retries attempt until it succeeds, ctx ends, or a fatal error. A
+// rejection by the caller's parse arrives as the attempt's error, since parse
+// runs on the handler goroutine where it can de-score the peer.
+func doRetry[Out any](
 	ctx context.Context,
 	log logging.Logger,
 	policy retryPolicy,
-	parse func(Resp) (Out, error),
-	attempt func(context.Context) (Resp, ids.NodeID, *Outcome, error),
+	attempt func(context.Context) (Out, ids.NodeID, error),
 ) (Out, error) {
 	var (
 		zero           Out
@@ -92,23 +91,11 @@ func doRetry[Resp proto.Message, Out any](
 	)
 	for {
 		attempts++
-		resp, nodeID, outcome, err := attempt(ctx)
+		out, nodeID, err := attempt(ctx)
 		var wait time.Duration
 		switch {
 		case err == nil:
-			out, parseErr := parse(resp)
-			if parseErr == nil {
-				outcome.Success()
-				return out, nil
-			}
-			log.Debug("invalid response, re-requesting",
-				zap.Stringer("nodeID", nodeID),
-				zap.Error(parseErr),
-			)
-			outcome.Failure()
-			lastErr = parseErr
-			noPeerAttempts = 0
-			wait = policy.peerFailureBackoff
+			return out, nil
 		// attempt surfaces ctx cancellation via ctx.Err(), which only returns
 		// Canceled or DeadlineExceeded, making this match exhaustive.
 		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):

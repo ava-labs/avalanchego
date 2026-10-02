@@ -5,6 +5,7 @@ package block
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -221,13 +222,16 @@ func TestSyncer_ResumesAfterCancellation(t *testing.T) {
 	log := loggingtest.New(t, logging.Debug)
 	target := rawdb.NewMemoryDatabase()
 
-	// Cancel while the first batch is being verified, so the sync stops with
-	// that batch written and the rest of the chain unfetched. The network runs
-	// on the test ctx so it outlives the cancellation.
+	// Cancel during the second batch, so the first is written and the rest of
+	// the chain is unfetched. The network runs on the test ctx so it outlives
+	// the cancellation.
 	syncCtx, cancel := context.WithCancel(t.Context())
 	defer cancel()
+	var parsed atomic.Int64
 	parse := func(b []byte) (*types.Block, error) {
-		cancel()
+		if parsed.Add(1) > maxBlocksPerResponse {
+			cancel()
+		}
 		return decodeBlock(b)
 	}
 

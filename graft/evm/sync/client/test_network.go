@@ -28,10 +28,6 @@ func (*testNetwork) P2PNetwork() *p2p.Network {
 	panic("P2PNetwork unimplemented")
 }
 
-func (*testNetwork) Sample(context.Context, int) []ids.NodeID {
-	panic("Sample unimplemented")
-}
-
 func (t *testNetwork) SendSyncedAppRequestAny(_ context.Context, _ []byte) ([]byte, ids.NodeID, error) {
 	if len(t.response) == 0 {
 		return nil, ids.EmptyNodeID, errors.New("no tested response to return in testNetwork")
@@ -87,6 +83,10 @@ func (t *testNetwork) testResponses(callback func(), responses ...[]byte) {
 	t.response = responses
 	t.callback = callback
 	t.numCalls = 0
+}
+
+func (*testNetwork) PeerTracker() *p2p.PeerTracker {
+	panic("PeerTracker unimplemented")
 }
 
 func (*testNetwork) RegisterResponse(ids.NodeID, float64) {}

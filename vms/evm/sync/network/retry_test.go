@@ -84,11 +84,11 @@ func TestSend_RetriesThenSucceeds(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
 			handler, _ := scriptedHandler(tt.firstFail, scriptResponse{bytes: wantBytes})
-			_, tracker := newTestTracker(t, nodeID)
+			tracker := newTestTracker(t, nodeID)
 			c := newRetryDispatcher(t, ctx, nodeID, handler, tracker)
 
 			verifyCalls := 0
-			verify := func(resp *syncpb.GetLeafResponse) (*syncpb.GetLeafResponse, error) {
+			parse := func(resp *syncpb.GetLeafResponse) (*syncpb.GetLeafResponse, error) {
 				verifyCalls++
 				if verifyCalls < tt.wantVerifyCalls {
 					return nil, errors.New("invalid")
@@ -96,7 +96,7 @@ func TestSend_RetriesThenSucceeds(t *testing.T) {
 				return resp, nil
 			}
 
-			got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, verify)
+			got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, parse)
 			require.NoError(t, err)
 			require.Empty(t, cmp.Diff(want, got, protocmp.Transform()))
 			require.Len(t, got.GetKeys(), 1) // fresh response per attempt, no merge
@@ -124,8 +124,11 @@ func TestSend_NoPeersBackoffEscalates(t *testing.T) {
 		ctx := t.Context()
 
 		handler, _ := scriptedHandler(scriptResponse{bytes: wantBytes})
-		_, tracker := newTestTracker(t)
+		tracker := newTestTracker(t)
 		c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](t, ctx, nodeID, handler, tracker)
+		// The constructor connects nodeID. Undo it so SelectPeer starts with no
+		// peers and the goroutine below is what makes one appear.
+		tracker.Disconnected(nodeID)
 		c.policy = testRetryPolicy(
 			WithNoPeersInitialBackoff(initial),
 			WithNoPeersFactor(factor),
@@ -154,7 +157,7 @@ func TestSend_CtxCancelledBeforeStart(t *testing.T) {
 	cancel()
 
 	handler, calls := scriptedHandler(scriptResponse{bytes: []byte{}})
-	_, tracker := newTestTracker(t, nodeID)
+	tracker := newTestTracker(t, nodeID)
 	c := newRetryDispatcher(t, ctx, nodeID, handler, tracker)
 
 	got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, acceptLeaf)
@@ -188,22 +191,18 @@ func TestDoRetry_CtxEndReportsFailure(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
-			attempt := func(_ context.Context) (*syncpb.GetLeafResponse, ids.NodeID, *Outcome, error) {
-				if tt.attemptErr != nil {
-					cancel()
-					var zero *syncpb.GetLeafResponse
-					return zero, ids.EmptyNodeID, nil, tt.attemptErr
-				}
-				nodeID := ids.GenerateTestNodeID()
-				_, tracker := newTestTracker(t, nodeID)
-				return &syncpb.GetLeafResponse{}, nodeID, &Outcome{peers: tracker, nodeID: nodeID}, nil
+			// verify now runs inside the attempt, so its rejection arrives as
+			// the attempt's error.
+			attemptErr := tt.attemptErr
+			if attemptErr == nil {
+				attemptErr = errInvalid
 			}
-			parse := func(*syncpb.GetLeafResponse) (*syncpb.GetLeafResponse, error) {
+			attempt := func(context.Context) (*syncpb.GetLeafResponse, ids.NodeID, error) {
 				cancel()
-				return nil, errInvalid
+				return nil, ids.EmptyNodeID, attemptErr
 			}
 
-			got, err := doRetry(ctx, loggingtest.New(t, logging.Debug), *defaultRetryPolicy(), parse, attempt)
+			got, err := doRetry(ctx, loggingtest.New(t, logging.Debug), *defaultRetryPolicy(), attempt)
 			require.Nil(t, got)
 			require.ErrorIs(t, err, context.Canceled)
 			require.ErrorIs(t, err, tt.wantLast)
@@ -218,15 +217,15 @@ func TestDoRetry_FatalStopsRetrying(t *testing.T) {
 	defer cancel()
 
 	calls := 0
-	attempt := func(_ context.Context) (*syncpb.GetLeafResponse, ids.NodeID, *Outcome, error) {
+	attempt := func(context.Context) (*syncpb.GetLeafResponse, ids.NodeID, error) {
 		calls++
 		if calls > 1 {
 			cancel()
 		}
-		return nil, ids.EmptyNodeID, nil, context.Canceled
+		return nil, ids.EmptyNodeID, context.Canceled
 	}
 
-	got, err := doRetry(ctx, loggingtest.New(t, logging.Debug), *defaultRetryPolicy(), acceptLeaf, attempt)
+	got, err := doRetry(ctx, loggingtest.New(t, logging.Debug), *defaultRetryPolicy(), attempt)
 	require.Nil(t, got)
 	require.Equal(t, 1, calls, "doRetry called attempt again after a fatal classification")
 	require.ErrorIs(t, err, context.Canceled)
@@ -265,31 +264,26 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 				)
 
 				want := &syncpb.GetLeafResponse{Keys: [][]byte{{1}}}
-				_, tracker := newTestTracker(t)
 				calls := 0
 				rejected := false
 				// call 1,2: no-peers, building backoff.
 				// call 3: resetError or verify-rejects, resetting the no-peers count.
 				// call 4: no-peers again, should start from the lowest backoff.
 				// call 5+: success.
-				attempt := func(_ context.Context) (*syncpb.GetLeafResponse, ids.NodeID, *Outcome, error) {
+				attempt := func(context.Context) (*syncpb.GetLeafResponse, ids.NodeID, error) {
 					calls++
 					switch {
 					case calls == 1, calls == 2, calls == 4:
-						return nil, ids.EmptyNodeID, nil, errNoPeers
+						return nil, ids.EmptyNodeID, errNoPeers
 					case calls == 3 && tt.resetError != nil:
-						return nil, ids.EmptyNodeID, nil, tt.resetError
-					default:
-						nodeID := ids.GenerateTestNodeID()
-						return want, nodeID, &Outcome{peers: tracker, nodeID: nodeID}, nil
-					}
-				}
-				parse := func(resp *syncpb.GetLeafResponse) (*syncpb.GetLeafResponse, error) {
-					if tt.resetError == nil && !rejected {
+						return nil, ids.EmptyNodeID, tt.resetError
+					case calls == 3 && !rejected:
+						// The verify rejection, now reported by the attempt.
 						rejected = true
-						return nil, errInvalid
+						return nil, ids.GenerateTestNodeID(), errInvalid
+					default:
+						return want, ids.GenerateTestNodeID(), nil
 					}
-					return resp, nil
 				}
 
 				start := time.Now()
@@ -297,7 +291,6 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 					t.Context(),
 					loggingtest.New(t, logging.Debug),
 					policy,
-					parse,
 					attempt,
 				)
 				elapsed := time.Since(start)
@@ -309,6 +302,12 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 			})
 		})
 	}
+}
+
+var errRejected = errors.New("rejected by caller")
+
+func rejectLeaf(*syncpb.GetLeafResponse) (*syncpb.GetLeafResponse, error) {
+	return nil, errRejected
 }
 
 func acceptLeaf(resp *syncpb.GetLeafResponse) (*syncpb.GetLeafResponse, error) {

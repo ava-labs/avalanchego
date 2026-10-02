@@ -11,6 +11,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -101,4 +103,66 @@ func TestPeerTracker(t *testing.T) {
 	responsive, ok := responsivePeers[peer]
 	require.True(ok)
 	require.Falsef(responsive, "expected connecting to a non-responsive peer, but got a peer that was responsive: peer %s", peer)
+}
+
+func TestRegisterRequestIgnoresUnknownPeers(t *testing.T) {
+	var (
+		self       = ids.GenerateTestNodeID()
+		connected  = ids.GenerateTestNodeID()
+		unknown    = ids.GenerateTestNodeID()
+		outdated   = ids.GenerateTestNodeID()
+		minVersion = &version.Application{Major: 2}
+		current    = &version.Application{Major: 2}
+		old        = &version.Application{Major: 1}
+	)
+
+	tests := []struct {
+		name    string
+		nodeID  ids.NodeID
+		tracked bool
+	}{
+		{
+			name:    "connected_peer",
+			nodeID:  connected,
+			tracked: true,
+		},
+		{
+			name:   "never_connected",
+			nodeID: unknown,
+		},
+		{
+			name:   "ignored_node",
+			nodeID: self,
+		},
+		{
+			name:   "below_min_version",
+			nodeID: outdated,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			p, err := NewPeerTracker(
+				loggingtest.New(t, logging.Debug),
+				"",
+				prometheus.NewRegistry(),
+				set.Of(self),
+				minVersion,
+			)
+			require.NoError(t, err)
+
+			p.Connected(connected, current)
+			p.Connected(self, current)
+			p.Connected(outdated, old)
+
+			p.RegisterRequest(test.nodeID)
+			require.Equal(t, test.tracked, p.trackedPeers.Contains(test.nodeID))
+
+			// Scoring pushes a tracked peer onto the bandwidth heap. An
+			// unregistered peer must stay off it.
+			p.RegisterFailure(test.nodeID)
+			_, inHeap := p.bandwidthHeap.Get(test.nodeID)
+			require.Equal(t, test.tracked, inHeap)
+		})
+	}
 }
