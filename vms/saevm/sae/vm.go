@@ -60,11 +60,7 @@ func ExecutionResultsPath(chainDataDir string) string {
 }
 
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,
-// which needs to be provided by a harness. In all cases, the harness MUST
-// ensure that the genesis block is canonical on disk and that the
-// post-execution state of at least one canonical block up to the finalized
-// block, at minimum the genesis, is committed before [NewVM] is called. Later
-// accepted blocks, synchronous or not, are re-executed on startup.
+// which needs to be provided by a harness.
 type VM struct {
 	network *network.Network
 	hooks   hook.Points
@@ -117,10 +113,10 @@ type Config struct {
 // NewVM returns a new [VM] that is ready for use immediately upon return.
 // [VM.Shutdown] MUST be called to release resources.
 //
-// The post-execution state root of at least one canonical block up to the
-// finalized block, at minimum the genesis, MUST be available when creating a
-// [triedb.Database] from the provided [ethdb.Database] and [triedb.Config]
-// (the latter provided via the [Config]).
+// The genesis block MUST be canonical in the provided [ethdb.Database]. The
+// post-execution state of the genesis, or of a later settled block, MUST be
+// available when creating a [triedb.Database] from the provided
+// [ethdb.Database] and [triedb.Config] (the latter provided via the [Config]).
 func NewVM[T hook.Transaction](
 	ctx context.Context,
 	hooks hook.PointsG[T],
