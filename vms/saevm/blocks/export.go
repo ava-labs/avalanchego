@@ -34,8 +34,8 @@ func (b *Block) SettledStateRoot() common.Hash {
 	return b.b.Root()
 }
 
-// SettledReceiptsRoot returns the receipts root after execution of the last
-// block settled by b. It is a convenience wrapper for calling
+// SettledReceiptsRoot returns the root of the receipts of every block settled
+// by b, in height order. It is a convenience wrapper for calling
 // [types.Block.ReceiptHash] on the wrapped [types.Block].
 func (b *Block) SettledReceiptsRoot() common.Hash {
 	return b.b.ReceiptHash()
