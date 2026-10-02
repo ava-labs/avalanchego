@@ -269,8 +269,6 @@ func TestApply(t *testing.T) {
 			for i, b := range test.blocks {
 				s.apply(t, b)
 
-				// Reopening the SUT verifies that the state is correctly
-				// flushed to disk and can be reloaded from it.
 				reopened := newSUT(t, withDB(s.db))
 				reopened.assertEqual(t, s)
 				for _, sut := range []*SUT{s, reopened} {

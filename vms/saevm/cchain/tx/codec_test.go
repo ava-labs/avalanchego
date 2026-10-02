@@ -4,8 +4,8 @@
 package tx_test
 
 import (
-	"encoding/binary"
 	"encoding/json"
+	"math"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -100,17 +100,17 @@ func FuzzParseRoundTrip(f *testing.F) {
 
 // goldensSlice returns [goldens] along with their expected encoding as a slice.
 func goldensSlice() ([]*Tx, []byte) {
-	const codecVersionLen = 2
-	var (
-		txs   = make([]*Tx, len(goldens))
-		bytes = make([]byte, codecVersionLen, 64)
-	)
-	bytes = binary.BigEndian.AppendUint32(bytes, uint32(len(goldens)))
+	txs := make([]*Tx, len(goldens))
+	p := wrappers.Packer{MaxSize: math.MaxInt}
+	p.PackShort(0) // codec version
+	p.PackInt(uint32(len(goldens)))
 	for i, golden := range goldens {
 		txs[i] = golden.tx
-		bytes = append(bytes, golden.bytes[codecVersionLen:]...)
+		// The codec version is only written once, at the start of the slice,
+		// so it is stripped from each tx.
+		p.PackFixedBytes(golden.bytes[wrappers.ShortLen:])
 	}
-	return txs, bytes
+	return txs, p.Bytes
 }
 
 func TestMarshalSlice(t *testing.T) {
@@ -179,13 +179,7 @@ func TestParseSlice(t *testing.T) {
 }
 
 func TestFromBlock(t *testing.T) {
-	txs := make([]*Tx, len(goldens))
-	for i, golden := range goldens {
-		txs[i] = golden.tx
-	}
-
-	sliceBytes, err := MarshalSlice(txs)
-	require.NoError(t, err, "MarshalSlice()")
+	txs, sliceBytes := goldensSlice()
 
 	const (
 		preAP5Time uint64 = 0
@@ -279,15 +273,8 @@ func TestFromBlock(t *testing.T) {
 }
 
 func FuzzParseSliceRoundTrip(f *testing.F) {
-	{
-		txs := make([]*Tx, len(goldens))
-		for i, golden := range goldens {
-			txs[i] = golden.tx
-		}
-		b, err := MarshalSlice(txs)
-		require.NoError(f, err, "MarshalSlice()")
-		f.Add(b)
-	}
+	_, b := goldensSlice()
+	f.Add(b)
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		txs, err := ParseSlice(data)
