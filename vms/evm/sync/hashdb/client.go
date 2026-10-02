@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
-	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -23,13 +22,19 @@ import (
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
+// leafResult is what one FetchLeaves attempt hands back once a peer's
+// response proves out.
+type leafResult struct {
+	leaves Leaves
+	more   bool
+}
+
 // sender is the transport a [Client] sends requests over.
-type sender = network.Dispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse]
+type sender = network.Dispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, leafResult]
 
 // Client reads verified leaf ranges over the proto protocol. A caller never
 // sees a range that failed its proof.
 type Client struct {
-	log    logging.Logger
 	sender *sender
 	minKey []byte // read-only stand-in for an absent start key
 }
@@ -43,8 +48,8 @@ func NewClient(
 	peers *p2p.PeerTracker,
 ) *Client {
 	return &Client{
-		log: log,
-		sender: network.NewDispatcher[*syncpb.GetLeafRequest, *syncpb.GetLeafResponse](
+		sender: network.NewDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, leafResult](
+			log,
 			n,
 			handlerID,
 			peers,
@@ -80,36 +85,25 @@ func (c *Client) FetchLeaves(ctx context.Context, req LeafRange) (Leaves, bool, 
 		reqPB.AccountHash = req.Account.Bytes()
 	}
 
-	for {
-		if err := ctx.Err(); err != nil {
-			return Leaves{}, false, err
-		}
-
-		var resp syncpb.GetLeafResponse
-		outcome, err := c.sender.Send(ctx, reqPB, &resp)
-		if err != nil {
-			// Send already de-scored the peer, re-request from another.
-			c.log.Debug("leaf request failed, re-requesting",
-				zap.Error(err),
-			)
-			continue
-		}
-
-		more, err := verifyRange(c.minKey, req, &resp)
-		if err != nil {
-			outcome.Failure()
-			c.log.Debug("invalid leaf response, re-requesting",
-				zap.Error(err),
-			)
-			continue
-		}
-
-		outcome.Success()
-		return Leaves{
-			Keys: resp.GetKeys(),
-			Vals: resp.GetValues(),
-		}, more, nil
+	r, err := c.sender.Send(ctx, reqPB,
+		func(resp *syncpb.GetLeafResponse) (leafResult, error) {
+			more, err := verifyRange(c.minKey, req, resp)
+			if err != nil {
+				return leafResult{}, err
+			}
+			return leafResult{
+				leaves: Leaves{
+					Keys: resp.GetKeys(),
+					Vals: resp.GetValues(),
+				},
+				more: more,
+			}, nil
+		},
+	)
+	if err != nil {
+		return Leaves{}, false, err
 	}
+	return r.leaves, r.more, nil
 }
 
 var (
