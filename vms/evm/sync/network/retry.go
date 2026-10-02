@@ -109,8 +109,8 @@ func doRetry[Resp proto.Message, Out any](
 			lastErr = parseErr
 			noPeerAttempts = 0
 			wait = policy.peerFailureBackoff
-		// ctx.Err() only returns these two values, so this covers all context
-		// endings and stops the loop without a retry.
+		// attempt surfaces ctx cancellation via ctx.Err(), which only returns
+		// Canceled or DeadlineExceeded, making this match exhaustive.
 		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 			return zero, retryFailure(err, lastErr, attempts)
 		case errors.Is(err, errNoPeers):
