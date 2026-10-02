@@ -4,7 +4,6 @@
 package cchain
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -324,21 +323,6 @@ func synchronousFixture(tb testing.TB) (*synchronoustest.Fixture, []sutOption, *
 		timeOpt,
 		withState(snow.Bootstrapping),
 	}, clock
-}
-
-// cloneDB copies db as it is right now. A VM started on the copy models a
-// restart after a crash, because no graceful shutdown ever reaches the copy.
-func cloneDB(tb testing.TB, db database.Iteratee) database.Database {
-	tb.Helper()
-
-	clone := memdb.New()
-	it := db.NewIterator()
-	defer it.Release()
-	for it.Next() {
-		require.NoError(tb, clone.Put(bytes.Clone(it.Key()), bytes.Clone(it.Value())), "cloning database")
-	}
-	require.NoError(tb, it.Error(), "iterating database")
-	return clone
 }
 
 // newSUT initializes a cchain [VM], transitions it to the configured
@@ -1711,7 +1695,7 @@ func TestRestartDuringSynchronousBootstrap(t *testing.T) {
 	// roots has reached disk, so re-execution starts from genesis.
 	const crashAfter = 7
 	node.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:crashAfter+1])
-	crashed := cloneDB(t, db)
+	crashed := saetest.CopyDB(t, db)
 
 	// The copy predates this shutdown, so it never receives the state that a
 	// shutdown commits. Shutting down only releases the chain data directory.
