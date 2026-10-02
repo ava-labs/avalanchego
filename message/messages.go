@@ -81,7 +81,19 @@ func newMsgBuilder(
 	metrics prometheus.Registerer,
 	maxMessageTimeout time.Duration,
 ) (*msgBuilder, error) {
-	zstdCompressor, err := compression.NewZstdCompressor(constants.DefaultMaxMessageSize)
+	return newMsgBuilderWithMaxMessageSize(
+		metrics,
+		maxMessageTimeout,
+		constants.DefaultMaxMessageSize,
+	)
+}
+
+func newMsgBuilderWithMaxMessageSize(
+	metrics prometheus.Registerer,
+	maxMessageTimeout time.Duration,
+	maxMessageSize int64,
+) (*msgBuilder, error) {
+	zstdCompressor, err := compression.NewZstdCompressor(maxMessageSize)
 	if err != nil {
 		return nil, err
 	}

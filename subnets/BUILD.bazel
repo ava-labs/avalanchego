@@ -5,6 +5,8 @@ go_library(
     name = "subnets",
     srcs = [
         "config.go",
+        "large_messages.go",
+        "member_ca.go",
         "no_op_allower.go",
         "subnet.go",
     ],
@@ -12,9 +14,11 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//ids",
+        "//network/throttling",
         "//snow/consensus/simplex",
         "//snow/consensus/snowball",
         "//snow/engine/common",
+        "//utils/constants",
         "//utils/set",
     ],
 )
@@ -23,14 +27,20 @@ go_test(
     name = "subnets_test",
     srcs = [
         "config_test.go",
+        "large_messages_test.go",
+        "member_ca_test.go",
         "subnet_test.go",
     ],
     embed = [":subnets"],
     deps = [
         "//ids",
+        "//network/throttling",
         "//snow/consensus/simplex",
         "//snow/consensus/snowball",
+        "//staking/stakingtest",
+        "//utils/constants",
         "//utils/set",
+        "//utils/units",
         "@com_github_stretchr_testify//require",
     ],
 )

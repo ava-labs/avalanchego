@@ -18,6 +18,7 @@ var ErrNoPrimaryNetworkConfig = errors.New("no subnet config for primary network
 type Subnets struct {
 	nodeID  ids.NodeID
 	configs map[ids.ID]subnets.Config
+	members subnets.MembershipChecker
 
 	lock    sync.RWMutex
 	subnets map[ids.ID]subnets.Subnet
@@ -40,7 +41,7 @@ func (s *Subnets) GetOrCreate(subnetID ids.ID) (subnets.Subnet, bool) {
 		config = s.configs[constants.PrimaryNetworkID]
 	}
 
-	subnet := subnets.New(s.nodeID, config)
+	subnet := subnets.New(s.nodeID, subnetID, config, s.members)
 	s.subnets[subnetID] = subnet
 
 	return subnet, true
@@ -62,10 +63,12 @@ func (s *Subnets) Bootstrapping() []ids.ID {
 	return subnetsBootstrapping
 }
 
-// NewSubnets returns an instance of Subnets
+// NewSubnets returns an instance of Subnets. [members] reports which connected
+// peers are members of a subnet; it is the network layer in production.
 func NewSubnets(
 	nodeID ids.NodeID,
 	configs map[ids.ID]subnets.Config,
+	members subnets.MembershipChecker,
 ) (*Subnets, error) {
 	if _, ok := configs[constants.PrimaryNetworkID]; !ok {
 		return nil, ErrNoPrimaryNetworkConfig
@@ -74,6 +77,7 @@ func NewSubnets(
 	s := &Subnets{
 		nodeID:  nodeID,
 		configs: configs,
+		members: members,
 		subnets: make(map[ids.ID]subnets.Subnet),
 	}
 

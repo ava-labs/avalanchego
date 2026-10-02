@@ -179,9 +179,21 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	// networkID is mainnet. The real default value of NetworkAllowPrivateIPs is
 	// based on the networkID.
 	fs.Bool(NetworkAllowPrivateIPsKey, false, fmt.Sprintf("Allows the node to initiate outbound connection attempts to peers with private IPs. If the provided --%s is one of [%s, %s] the default is false. Oterhwise, the default is true", NetworkNameKey, constants.MainnetName, constants.FujiName))
-	fs.Bool(NetworkRequireValidatorToConnectKey, constants.DefaultNetworkRequireValidatorToConnect, "If true, this node will only maintain a connection with another node if this node is a validator, the other node is a validator, or the other node is a beacon")
+	fs.Bool(NetworkRequireValidatorToConnectKey, constants.DefaultNetworkRequireValidatorToConnect, "If true, this node will only maintain a connection with another node if this node is a validator, the other node is a validator, a beacon, or a member of a tracked subnet")
 	fs.Uint(NetworkPeerReadBufferSizeKey, constants.DefaultNetworkPeerReadBufferSize, "Size, in bytes, of the buffer that we read peer messages into (there is one buffer per peer)")
 	fs.Uint(NetworkPeerWriteBufferSizeKey, constants.DefaultNetworkPeerWriteBufferSize, "Size, in bytes, of the buffer that we write peer messages into (there is one buffer per peer)")
+
+	// Deprecated. TODO: remove.
+	fs.Uint64(NetworkLargeMessageSizeKey, 0, "Deprecated. Elevated P2P message size in KiB")
+	fs.StringSlice(NetworkLargeMessagePeerIDsKey, nil, "Deprecated. Node IDs to add to the subnet's allowedNodes")
+	for key := range deprecatedLargeMessageThrottlerFlags {
+		switch key {
+		case NetworkLargeMessageInboundCPUMaxRecheckDelayKey, NetworkLargeMessageInboundDiskMaxRecheckDelayKey:
+			fs.Duration(key, 0, "Deprecated. Elevated stack throttler limit")
+		default:
+			fs.Uint64(key, 0, "Deprecated. Elevated stack throttler limit")
+		}
+	}
 
 	fs.Bool(NetworkTCPProxyEnabledKey, constants.DefaultNetworkTCPProxyEnabled, "Require all P2P connections to be initiated with a TCP proxy header")
 	// The PROXY protocol specification recommends setting this value to be at

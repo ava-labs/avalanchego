@@ -115,7 +115,7 @@ func TestBlockClientsWithIncorrectRSAKeys(t *testing.T) {
 					return err
 				}
 
-				_, _, _, err = upgrader.Upgrade(conn)
+				_, _, _, _, err = upgrader.Upgrade(conn)
 				return err
 			})
 

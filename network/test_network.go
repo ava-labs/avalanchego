@@ -15,7 +15,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network/dialer"
 	"github.com/ava-labs/avalanchego/network/peer"
 	"github.com/ava-labs/avalanchego/network/throttling"
@@ -212,19 +211,9 @@ func NewTestNetwork(
 	cfg *Config,
 	router router.ExternalHandler,
 ) (Network, error) {
-	msgCreator, err := message.NewCreator(
-		metrics,
-		constants.DefaultNetworkCompressionType,
-		constants.DefaultNetworkMaximumInboundTimeout,
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	return NewNetwork(
 		cfg,
 		upgrade.GetConfig(cfg.NetworkID).HeliconTime, // Must be updated for each network upgrade
-		msgCreator,
 		metrics,
 		log,
 		newNoopListener(),
@@ -248,6 +237,6 @@ func newNodeIDConnector(nodeID ids.NodeID) *nodeIDConnector {
 	return &nodeIDConnector{nodeID: nodeID}
 }
 
-func (f *nodeIDConnector) IsAllowed(nodeID ids.NodeID, _ bool) bool {
+func (f *nodeIDConnector) IsAllowed(nodeID ids.NodeID) bool {
 	return nodeID == f.nodeID
 }

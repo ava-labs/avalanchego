@@ -61,6 +61,7 @@ go_test(
         "//snow/engine/snowman/getter",
         "//snow/snowtest",
         "//snow/validators",
+        "//utils/constants",
         "//utils/logging",
         "//utils/set",
         "//version",

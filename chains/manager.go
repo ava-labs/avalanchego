@@ -924,6 +924,7 @@ func (m *manager) createAvalancheChain(
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
+		subnetCfg.MaxAncestorsBytes(),
 		ctx.Registerer,
 	)
 	if err != nil {
@@ -1349,6 +1350,7 @@ func (m *manager) createSnowmanChain(
 		ctx.Log,
 		m.BootstrapMaxTimeGetAncestors,
 		m.BootstrapAncestorsMaxContainersSent,
+		subnetCfg.MaxAncestorsBytes(),
 		ctx.Registerer,
 	)
 	if err != nil {

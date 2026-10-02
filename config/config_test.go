@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"maps"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -23,9 +25,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
+	"github.com/ava-labs/avalanchego/staking/stakingtest"
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/perms"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const chainConfigFilenameExtension = ".ex"
@@ -551,6 +557,239 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 				return
 			}
 			test.testF(require, subnetConfigs)
+		})
+	}
+}
+
+// TestGetSubnetConfigsMembership checks that the subnet config file carries the
+// member CA and the elevated stack, in both the path and the inline form, and
+// that a CA that cannot be read is a startup error rather than a subnet that
+// silently admits nobody.
+func TestGetSubnetConfigsMembership(t *testing.T) {
+	subnetID, err := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+	require.NoError(t, err)
+
+	root, nodesCA := stakingtest.NewPKI(t)
+	memberChain := stakingtest.NodeChain(t, nodesCA, "rpc-01", stakingtest.DefaultValidity)
+
+	const largeMessages = `"largeMessages": {"maxMessageSize": 167772160}`
+
+	tests := map[string]struct {
+		givenJSON   func(caPath string) string
+		expectedErr error
+		verify      func(*require.Assertions, subnets.Config)
+	}{
+		"memberCAPath": {
+			givenJSON: func(caPath string) string {
+				return fmt.Sprintf(`{"validatorOnly": true, "memberCAPath": %q, %s}`, caPath, largeMessages)
+			},
+			verify: func(require *require.Assertions, config subnets.Config) {
+				ca, err := config.LoadMemberCA()
+				require.NoError(err)
+				_, ok := ca.VerifyUntil(memberChain)
+				require.True(ok)
+				require.Equal(uint32(160*units.MiB), config.LargeMessages.MaxMessageSize)
+			},
+		},
+		"inline memberCA": {
+			givenJSON: func(string) string {
+				inline, err := json.Marshal([]string{string(root.CertPEM())})
+				require.NoError(t, err)
+				return fmt.Sprintf(`{"validatorOnly": true, "memberCA": %s, %s}`, inline, largeMessages)
+			},
+			verify: func(require *require.Assertions, config subnets.Config) {
+				ca, err := config.LoadMemberCA()
+				require.NoError(err)
+				_, ok := ca.VerifyUntil(memberChain)
+				require.True(ok)
+			},
+		},
+		"no member CA": {
+			givenJSON: func(string) string {
+				return `{"validatorOnly": true}`
+			},
+			verify: func(require *require.Assertions, config subnets.Config) {
+				ca, err := config.LoadMemberCA()
+				require.NoError(err)
+				require.Nil(ca)
+				require.Nil(config.LargeMessages)
+			},
+		},
+		// The field-level validation cases live with subnets.Config; this one
+		// proves the file loader reaches them.
+		"missing member CA file": {
+			givenJSON: func(string) string {
+				return `{"validatorOnly": true, "memberCAPath": "/nonexistent/member-ca.pem"}`
+			},
+			expectedErr: os.ErrNotExist,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			dir := t.TempDir()
+			caPath := filepath.Join(dir, "member-ca.pem")
+			require.NoError(os.WriteFile(caPath, root.CertPEM(), perms.ReadWrite))
+
+			subnetPath := filepath.Join(dir, "subnets")
+			configFilePath := setupConfigJSON(t, dir, fmt.Sprintf(`{%q: %q}`, SubnetConfigDirKey, subnetPath))
+			setupFile(t, subnetPath, subnetID.String()+".json", test.givenJSON(caPath))
+
+			subnetConfigs, err := getSubnetConfigs(setupViper(configFilePath), []ids.ID{subnetID})
+			if test.expectedErr != nil {
+				require.ErrorIs(err, test.expectedErr)
+				return
+			}
+			require.NoError(err)
+			test.verify(require, subnetConfigs[subnetID])
+		})
+	}
+}
+
+// TODO: remove with the deprecated flags.
+func TestDeprecatedLargeMessageFlags(t *testing.T) {
+	var (
+		subnetID = ids.GenerateTestID()
+		nodeA    = ids.GenerateTestNodeID()
+		nodeB    = ids.GenerateTestNodeID()
+
+		sizeKiB = 160 * units.MiB / units.KiB
+	)
+
+	tests := map[string]struct {
+		flags        map[string]any
+		subnetConfig string
+		tracked      set.Set[ids.ID]
+		expectedErr  error
+		verify       func(*require.Assertions, subnets.Config)
+	}{
+		"flags map onto the tracked subnet": {
+			flags: map[string]any{
+				NetworkLargeMessageSizeKey:                      sizeKiB,
+				NetworkLargeMessagePeerIDsKey:                   []string{nodeA.String(), nodeB.String()},
+				NetworkLargeMessageInboundAtLargeAllocSizeKey:   units.GiB,
+				NetworkLargeMessageInboundCPUMaxRecheckDelayKey: "7s",
+			},
+			verify: func(require *require.Assertions, config subnets.Config) {
+				require.Equal(uint32(160*units.MiB), config.LargeMessages.MaxMessageSize)
+				require.Equal(set.Of(nodeA, nodeB), config.AllowedNodes)
+
+				throttler, err := config.LargeMessages.ResolveThrottlerConfig()
+				require.NoError(err)
+				require.Equal(uint64(units.GiB), throttler.InboundMsgThrottlerConfig.AtLargeAllocSize)
+				require.Equal(7*time.Second, throttler.InboundMsgThrottlerConfig.CPUThrottlerConfig.MaxRecheckDelay)
+				// Flags left unset stay derived.
+				defaults := subnets.DefaultLargeMessageThrottlerConfig(160 * units.MiB)
+				require.Equal(defaults.InboundMsgThrottlerConfig.NodeMaxAtLargeBytes, throttler.InboundMsgThrottlerConfig.NodeMaxAtLargeBytes)
+				require.Equal(defaults.OutboundMsgThrottlerConfig, throttler.OutboundMsgThrottlerConfig)
+			},
+		},
+		"comma-joined peer IDs with the wildcard": {
+			flags: map[string]any{
+				NetworkLargeMessageSizeKey:    sizeKiB,
+				NetworkLargeMessagePeerIDsKey: nodeA.String() + ",*," + nodeB.String(),
+			},
+			verify: func(require *require.Assertions, config subnets.Config) {
+				require.Equal(set.Of(nodeA, nodeB), config.AllowedNodes)
+			},
+		},
+		"flags absent": {
+			verify: func(require *require.Assertions, config subnets.Config) {
+				require.Nil(config.LargeMessages)
+				require.Empty(config.AllowedNodes)
+			},
+		},
+		"string values, as a config file written from a flags map carries them": {
+			flags: map[string]any{
+				NetworkLargeMessageSizeKey:                     "163840",
+				NetworkLargeMessagePeerIDsKey:                  "*",
+				NetworkLargeMessageInboundAtLargeAllocSizeKey:  "10737418240",
+				NetworkLargeMessageInboundMaxProcessingMsgsKey: "100000",
+			},
+			verify: func(require *require.Assertions, config subnets.Config) {
+				require.Equal(uint32(160*units.MiB), config.LargeMessages.MaxMessageSize)
+				require.Empty(config.AllowedNodes)
+
+				throttler, err := config.LargeMessages.ResolveThrottlerConfig()
+				require.NoError(err)
+				require.Equal(uint64(10*units.GiB), throttler.InboundMsgThrottlerConfig.AtLargeAllocSize)
+				require.Equal(uint64(100_000), throttler.InboundMsgThrottlerConfig.MaxProcessingMsgsPerNode)
+			},
+		},
+		"peer IDs without the size": {
+			flags:       map[string]any{NetworkLargeMessagePeerIDsKey: []string{nodeA.String()}},
+			expectedErr: errLargeMessageFlagsWithoutSize,
+		},
+		"throttler flag without the size": {
+			flags:       map[string]any{NetworkLargeMessageOutboundValidatorAllocSizeKey: 1},
+			expectedErr: errLargeMessageFlagsWithoutSize,
+		},
+		"two tracked subnets": {
+			flags:       map[string]any{NetworkLargeMessageSizeKey: sizeKiB},
+			tracked:     set.Of(subnetID, ids.GenerateTestID()),
+			expectedErr: errLargeMessageFlagsNeedOneSubnet,
+		},
+		"subnet config already declares largeMessages": {
+			flags:        map[string]any{NetworkLargeMessageSizeKey: sizeKiB},
+			subnetConfig: `{"validatorOnly": true, "largeMessages": {"maxMessageSize": 167772160}}`,
+			expectedErr:  errLargeMessageFlagsAndSubnetConfig,
+		},
+		"size above uint32": {
+			flags:       map[string]any{NetworkLargeMessageSizeKey: math.MaxUint32/units.KiB + 1},
+			expectedErr: errLargeMessageSizeTooLarge,
+		},
+		"size at the default": {
+			flags:       map[string]any{NetworkLargeMessageSizeKey: constants.DefaultMaxMessageSize / units.KiB},
+			expectedErr: subnets.ErrLargeMessageSizeTooSmall,
+		},
+		"public subnet": {
+			flags:        map[string]any{NetworkLargeMessageSizeKey: sizeKiB},
+			subnetConfig: `{}`,
+			expectedErr:  subnets.ErrLargeMessagesWhenNotValidatorOnly,
+		},
+		"malformed peer ID": {
+			flags: map[string]any{
+				NetworkLargeMessageSizeKey:    sizeKiB,
+				NetworkLargeMessagePeerIDsKey: []string{"not-a-node-id"},
+			},
+			expectedErr: errLargeMessagePeerID,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			dir := t.TempDir()
+			subnetPath := filepath.Join(dir, "subnets")
+			subnetConfig := test.subnetConfig
+			if subnetConfig == "" {
+				subnetConfig = `{"validatorOnly": true}`
+			}
+			setupFile(t, subnetPath, subnetID.String()+".json", subnetConfig)
+
+			nodeConfig := map[string]any{SubnetConfigDirKey: subnetPath}
+			maps.Copy(nodeConfig, test.flags)
+			nodeConfigJSON, err := json.Marshal(nodeConfig)
+			require.NoError(err)
+			v := setupViper(setupConfigJSON(t, dir, string(nodeConfigJSON)))
+
+			tracked := test.tracked
+			if tracked == nil {
+				tracked = set.Of(subnetID)
+			}
+			subnetConfigs, err := getSubnetConfigs(v, []ids.ID{subnetID})
+			require.NoError(err)
+
+			err = applyDeprecatedLargeMessageFlags(v, tracked, subnetConfigs)
+			if test.expectedErr != nil {
+				require.ErrorIs(err, test.expectedErr)
+				return
+			}
+			require.NoError(err)
+			test.verify(require, subnetConfigs[subnetID])
 		})
 	}
 }

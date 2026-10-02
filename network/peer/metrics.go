@@ -34,8 +34,9 @@ type Metrics struct {
 	RTTCount prometheus.Counter
 	RTTSum   prometheus.Gauge
 
-	NumFailedToParse prometheus.Counter
-	NumSendFailed    *prometheus.CounterVec // op
+	NumFailedToParse  prometheus.Counter
+	NumRejectedMsgLen prometheus.Counter
+	NumSendFailed     *prometheus.CounterVec // op
 
 	Messages   *prometheus.CounterVec // io + op + compressed
 	Bytes      *prometheus.CounterVec // io + op
@@ -63,6 +64,10 @@ func NewMetrics(registerer prometheus.Registerer) (*Metrics, error) {
 		NumFailedToParse: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "msgs_failed_to_parse",
 			Help: "number of received messages that could not be parsed",
+		}),
+		NumRejectedMsgLen: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "msgs_rejected_length",
+			Help: "number of connections closed because a peer sent a message longer than the connection's frame size",
 		}),
 		NumSendFailed: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
@@ -99,6 +104,7 @@ func NewMetrics(registerer prometheus.Registerer) (*Metrics, error) {
 		registerer.Register(m.ClockSkewCount),
 		registerer.Register(m.ClockSkewSum),
 		registerer.Register(m.NumFailedToParse),
+		registerer.Register(m.NumRejectedMsgLen),
 		registerer.Register(m.NumSendFailed),
 		registerer.Register(m.Messages),
 		registerer.Register(m.Bytes),

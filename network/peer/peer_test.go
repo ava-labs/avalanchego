@@ -8,11 +8,15 @@ import (
 	"crypto"
 	"net"
 	"net/netip"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -24,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -41,6 +46,7 @@ type testPeer struct {
 
 type rawTestPeer struct {
 	config         *Config
+	stack          MessageStack
 	cert           *staking.Certificate
 	inboundMsgChan <-chan *message.InboundMessage
 }
@@ -77,9 +83,7 @@ func newConfig(t *testing.T) *Config {
 		ReadBufferSize:       constants.DefaultNetworkPeerReadBufferSize,
 		WriteBufferSize:      constants.DefaultNetworkPeerWriteBufferSize,
 		Metrics:              metrics,
-		MessageCreator:       newMessageCreator(t),
 		Log:                  logging.NoLog{},
-		InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
 		Network:              TestNetwork,
 		Router:               nil,
 		VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
@@ -123,6 +127,7 @@ func newRawTestPeer(t *testing.T, config *Config) *rawTestPeer {
 
 	return &rawTestPeer{
 		config:         config,
+		stack:          NewTestMessageStack(newMessageCreator(t)),
 		cert:           cert,
 		inboundMsgChan: inboundMsgChan,
 	}
@@ -132,6 +137,7 @@ func startTestPeer(self *rawTestPeer, peer *rawTestPeer, conn net.Conn) *testPee
 	return &testPeer{
 		Peer: Start(
 			self.config,
+			self.stack,
 			conn,
 			peer.cert,
 			peer.config.MyNodeID,
@@ -205,7 +211,7 @@ func TestSend(t *testing.T) {
 	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
 	awaitReady(t, peer0, peer1)
 
-	outboundGetMsg, err := config0.MessageCreator.Get(ids.Empty, 1, time.Second, ids.Empty)
+	outboundGetMsg, err := rawPeer0.stack.MessageCreator.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	require.True(peer0.Send(t.Context(), outboundGetMsg))
@@ -237,7 +243,7 @@ func TestPingUptimes(t *testing.T) {
 		require.NoError(peer0.AwaitClosed(t.Context()))
 		require.NoError(peer1.AwaitClosed(t.Context()))
 	}()
-	pingMsg, err := config0.MessageCreator.Ping(1)
+	pingMsg, err := rawPeer0.stack.MessageCreator.Ping(1)
 	require.NoError(err)
 	require.True(peer0.Send(t.Context(), pingMsg))
 
@@ -685,6 +691,111 @@ func TestShouldDisconnect(t *testing.T) {
 	}
 }
 
+// newLargeMessageCreator returns a creator that can build payloads up to
+// maxMessageSize with the given compression.
+func newLargeMessageCreator(t *testing.T, maxMessageSize uint32, compressionType compression.Type) message.Creator {
+	t.Helper()
+	mc, err := message.NewCreatorWithMaxMessageSize(
+		prometheus.NewRegistry(),
+		compressionType,
+		10*time.Second,
+		int64(maxMessageSize),
+	)
+	require.NoError(t, err)
+	return mc
+}
+
+// largeAppGossip builds an AppGossip message whose uncompressed size exceeds
+// constants.DefaultMaxMessageSize using the supplied creator.
+func largeAppGossip(t *testing.T, mc message.Creator) *message.OutboundMessage {
+	t.Helper()
+	// A payload of exactly the default max size guarantees the message
+	// (payload + proto overhead) exceeds the default limit before compression.
+	payload := make([]byte, constants.DefaultMaxMessageSize)
+	msg, err := mc.AppGossip(ids.GenerateTestID(), payload)
+	require.NoError(t, err)
+	require.Greater(t, len(msg.Bytes)+msg.BytesSavedCompression, constants.DefaultMaxMessageSize)
+	return msg
+}
+
+// TestSendLargeMessageElevatedStack verifies that two peers using an elevated
+// stack can exchange a message larger than the default max message size.
+func TestSendLargeMessageElevatedStack(t *testing.T) {
+	require := require.New(t)
+
+	const elevatedMaxSize = 2 * constants.DefaultMaxMessageSize
+
+	rawPeer0 := newRawTestPeer(t, newConfig(t))
+	rawPeer1 := newRawTestPeer(t, newConfig(t))
+
+	// Compression is disabled so on-wire frame sizes are deterministic
+	// regardless of payload contents.
+	largeCreator := newLargeMessageCreator(t, elevatedMaxSize, compression.TypeNone)
+	for _, p := range []*rawTestPeer{rawPeer0, rawPeer1} {
+		p.stack.MaxFrameSize = elevatedMaxSize
+		p.stack.MessageCreator = largeCreator
+	}
+
+	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
+	awaitReady(t, peer0, peer1)
+	defer func() {
+		peer1.StartClose()
+		peer0.StartClose()
+		require.NoError(peer0.AwaitClosed(t.Context()))
+		require.NoError(peer1.AwaitClosed(t.Context()))
+	}()
+
+	msg := largeAppGossip(t, largeCreator)
+	require.True(peer0.Send(t.Context(), msg))
+
+	inbound := <-peer1.inboundMsgChan
+	require.Equal(message.AppGossipOp, inbound.Op)
+}
+
+// TestLargeMessageRefusedByDefaultFrameSize verifies the Send path: an
+// oversized message offered to a default-frame peer is refused as a failed
+// send, and the connection survives so a subsequent normal message arrives.
+//
+// The message is compressed so that it fits the default frame on the wire:
+// the receiver bounds the decompressed size as well, so the refusal must
+// rest on that, not on the frame.
+func TestLargeMessageRefusedByDefaultFrameSize(t *testing.T) {
+	require := require.New(t)
+
+	const elevatedMaxSize = 2 * constants.DefaultMaxMessageSize
+
+	rawPeer0 := newRawTestPeer(t, newConfig(t))
+	rawPeer1 := newRawTestPeer(t, newConfig(t))
+
+	// Sender holds the large creator (as MsgCreator() would return node-wide)
+	// but its per-peer stack keeps the default frame size, mirroring a
+	// non-member peer.
+	largeCreator := newLargeMessageCreator(t, elevatedMaxSize, compression.TypeZstd)
+	rawPeer0.stack.MessageCreator = largeCreator
+	rawPeer0.stack.MaxFrameSize = constants.DefaultMaxMessageSize
+
+	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
+	awaitReady(t, peer0, peer1)
+	defer func() {
+		peer1.StartClose()
+		peer0.StartClose()
+		require.NoError(peer0.AwaitClosed(t.Context()))
+		require.NoError(peer1.AwaitClosed(t.Context()))
+	}()
+
+	largeMsg := largeAppGossip(t, largeCreator)
+	require.LessOrEqual(len(largeMsg.Bytes), constants.DefaultMaxMessageSize)
+	require.False(peer0.Send(t.Context(), largeMsg))
+
+	// Connection stays up; a normal follow-up is still delivered.
+	outboundGetMsg, err := rawPeer0.stack.MessageCreator.Get(ids.Empty, 1, time.Second, ids.Empty)
+	require.NoError(err)
+	require.True(peer0.Send(t.Context(), outboundGetMsg))
+
+	inboundGetMsg := <-peer1.inboundMsgChan
+	require.Equal(message.GetOp, inboundGetMsg.Op)
+}
+
 // Helper to send a message from sender to receiver and assert that the
 // receiver receives the message. This can be used to test a prior message
 // was handled by the peer.
@@ -696,4 +807,109 @@ func sendAndFlush(t *testing.T, sender *testPeer, receiver *testPeer) {
 	require.True(t, sender.Send(t.Context(), outboundGetMsg))
 	inboundGetMsg := <-receiver.inboundMsgChan
 	require.Equal(t, message.GetOp, inboundGetMsg.Op)
+}
+
+// frameSizeNetwork is a Network whose desired frame size can be changed while a
+// peer is running, standing in for a peer's membership changing underneath a
+// live connection.
+type frameSizeNetwork struct {
+	Network
+	frameSize atomic.Uint32
+}
+
+func (n *frameSizeNetwork) FrameSize(ids.NodeID) uint32 {
+	return n.frameSize.Load()
+}
+
+// TestPingReBindsWrongStack checks that a peer whose stack no longer matches
+// what the network wants is closed on the next ping, so that the network can
+// re-establish the connection on the right stack. This is what gives a newly
+// registered validator the elevated frame size within a ping tick, and what
+// takes it away again when it stops being a member.
+func TestPingReBindsWrongStack(t *testing.T) {
+	tests := map[string]uint32{
+		"became a member":        2 * constants.DefaultMaxMessageSize,
+		"stopped being a member": constants.DefaultMaxMessageSize / 2,
+	}
+
+	for name, desiredFrameSize := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			config0 := newConfig(t)
+			config0.PingFrequency = 10 * time.Millisecond
+
+			net := &frameSizeNetwork{Network: TestNetwork}
+			net.frameSize.Store(constants.DefaultMaxMessageSize)
+			config0.Network = net
+
+			rawPeer0 := newRawTestPeer(t, config0)
+			rawPeer1 := newRawTestPeer(t, newConfig(t))
+
+			peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
+			awaitReady(t, peer0, peer1)
+			defer func() {
+				peer1.StartClose()
+				require.NoError(peer1.AwaitClosed(t.Context()))
+			}()
+
+			// The connection stays up while the stacks agree.
+			agreeCtx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+			defer cancel()
+			require.ErrorIs(peer0.AwaitClosed(agreeCtx), context.DeadlineExceeded)
+
+			net.frameSize.Store(desiredFrameSize)
+			require.NoError(peer0.AwaitClosed(t.Context()))
+		})
+	}
+}
+
+// TestLogRejectedMsgLen pins the log level, which is the whole point of the
+// check: a frame size disagreement is never negotiated away, so this warning is
+// the only runtime signal that two nodes of the same subnet are configured with
+// different maxMessageSize values. Peers we did not elevate stay at Verbo so
+// that an arbitrary peer cannot write to the log.
+func TestLogRejectedMsgLen(t *testing.T) {
+	tests := map[string]struct {
+		frameSize uint32
+		wantLevel zapcore.Level
+	}{
+		"peer we elevated": {
+			frameSize: 4 * constants.DefaultMaxMessageSize,
+			wantLevel: zapcore.Level(logging.Warn),
+		},
+		"peer on the default stack": {
+			frameSize: constants.DefaultMaxMessageSize,
+			wantLevel: zapcore.Level(logging.Verbo),
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			require := require.New(t)
+
+			metrics, err := NewMetrics(prometheus.NewRegistry())
+			require.NoError(err)
+
+			core, logs := observer.New(zapcore.Level(logging.Verbo))
+			p := &Peer{
+				Config: &Config{
+					Log:     logging.NewLogger("", logging.WrappedCore{Core: core}),
+					Metrics: metrics,
+				},
+				id:    ids.GenerateTestNodeID(),
+				stack: MessageStack{MaxFrameSize: test.frameSize},
+			}
+
+			_, err = readMsgLen([]byte{0xff, 0xff, 0xff, 0xff}, p.stack.MaxFrameSize)
+			require.ErrorIs(err, errMaxMessageLengthExceeded)
+
+			p.logRejectedMsgLen(err)
+
+			entries := logs.All()
+			require.Len(entries, 1)
+			require.Equal(test.wantLevel, entries[0].Level)
+			require.Equal(float64(1), testutil.ToFloat64(metrics.NumRejectedMsgLen))
+		})
+	}
 }

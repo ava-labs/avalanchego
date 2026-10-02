@@ -5,6 +5,7 @@ package peer
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"net"
 
@@ -22,8 +23,15 @@ var (
 )
 
 type Upgrader interface {
-	// Must be thread safe
-	Upgrade(net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error)
+	// Upgrade performs the TLS handshake and returns the peer's node ID, the
+	// upgraded connection, the peer's leaf certificate, and the full
+	// certificate chain the peer sent, leaf first.
+	//
+	// The node ID is derived from the leaf alone; the rest of the chain is
+	// what member CA verification checks.
+	//
+	// Must be thread safe.
+	Upgrade(net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, []*x509.Certificate, error)
 }
 
 type tlsServerUpgrader struct {
@@ -38,7 +46,7 @@ func NewTLSServerUpgrader(config *tls.Config, invalidCerts prometheus.Counter) U
 	}
 }
 
-func (t *tlsServerUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
+func (t *tlsServerUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, []*x509.Certificate, error) {
 	return connToIDAndCert(tls.Server(conn, t.config), t.invalidCerts)
 }
 
@@ -54,27 +62,27 @@ func NewTLSClientUpgrader(config *tls.Config, invalidCerts prometheus.Counter) U
 	}
 }
 
-func (t *tlsClientUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, error) {
+func (t *tlsClientUpgrader) Upgrade(conn net.Conn) (ids.NodeID, net.Conn, *staking.Certificate, []*x509.Certificate, error) {
 	return connToIDAndCert(tls.Client(conn, t.config), t.invalidCerts)
 }
 
-func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter) (ids.NodeID, net.Conn, *staking.Certificate, error) {
+func connToIDAndCert(conn *tls.Conn, invalidCerts prometheus.Counter) (ids.NodeID, net.Conn, *staking.Certificate, []*x509.Certificate, error) {
 	if err := conn.Handshake(); err != nil {
-		return ids.EmptyNodeID, nil, nil, err
+		return ids.EmptyNodeID, nil, nil, nil, err
 	}
 
 	state := conn.ConnectionState()
 	if len(state.PeerCertificates) == 0 {
-		return ids.EmptyNodeID, nil, nil, errNoCert
+		return ids.EmptyNodeID, nil, nil, nil, errNoCert
 	}
 
 	tlsCert := state.PeerCertificates[0]
 	peerCert, err := staking.ParseCertificate(tlsCert.Raw)
 	if err != nil {
 		invalidCerts.Inc()
-		return ids.EmptyNodeID, nil, nil, err
+		return ids.EmptyNodeID, nil, nil, nil, err
 	}
 
 	nodeID := ids.NodeIDFromCert(peerCert)
-	return nodeID, conn, peerCert, nil
+	return nodeID, conn, peerCert, state.PeerCertificates, nil
 }

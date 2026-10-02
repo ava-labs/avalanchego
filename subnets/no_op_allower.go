@@ -10,6 +10,6 @@ var NoOpAllower Allower = noOpAllower{}
 
 type noOpAllower struct{}
 
-func (noOpAllower) IsAllowed(ids.NodeID, bool) bool {
+func (noOpAllower) IsAllowed(ids.NodeID) bool {
 	return true
 }
