@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
+
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/network"
@@ -34,7 +35,6 @@ type sender = network.Dispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse,
 // Client reads verified leaf ranges over the proto protocol. A caller never
 // sees a range that failed its proof.
 type Client struct {
-	log    logging.Logger
 	sender *sender
 	minKey []byte // read-only stand-in for an absent start key
 }
@@ -48,7 +48,6 @@ func NewClient(
 	peers *p2p.PeerTracker,
 ) *Client {
 	return &Client{
-		log: log,
 		sender: network.NewDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, leafResult](
 			log,
 			n,
