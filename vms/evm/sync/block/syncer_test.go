@@ -185,19 +185,21 @@ func TestSyncer(t *testing.T) {
 
 			log := loggingtest.New(t, logging.Debug)
 			requests := synctest.NewRecordingResponder(&responder{
-				log: log,
-				db:  synctest.NewBlockDB(blocks),
+				log:     log,
+				db:      synctest.NewBlockDB(blocks),
+				metrics: newTestHandlerMetrics(t),
 			})
 			from := blocks[tt.fromHeight]
+			net, tracker := synctest.ServeResponder(
+				t,
+				ctx,
+				log,
+				p2p.EVMBlockRequestHandlerID,
+				requests,
+			)
 			syncer := NewSyncer(
 				log,
-				NewClient(synctest.ServeResponder(
-					t,
-					ctx,
-					log,
-					p2p.EVMBlockRequestHandlerID,
-					requests,
-				)),
+				NewClient(net, tracker, synctest.NewRequestMetrics(t)),
 				target,
 				decodeBlock,
 				from.Hash(),
@@ -230,18 +232,20 @@ func TestSyncer_ResumesAfterCancellation(t *testing.T) {
 		return decodeBlock(b)
 	}
 
+	net, tracker := synctest.ServeResponder(
+		t,
+		t.Context(),
+		log,
+		p2p.EVMBlockRequestHandlerID,
+		&responder{
+			log:     log,
+			db:      synctest.NewBlockDB(blocks),
+			metrics: newTestHandlerMetrics(t),
+		},
+	)
 	syncer := NewSyncer(
 		log,
-		NewClient(synctest.ServeResponder(
-			t,
-			t.Context(),
-			log,
-			p2p.EVMBlockRequestHandlerID,
-			&responder{
-				log: log,
-				db:  synctest.NewBlockDB(blocks),
-			},
-		)),
+		NewClient(net, tracker, synctest.NewRequestMetrics(t)),
 		target,
 		parse,
 		tip.Hash(),
@@ -285,8 +289,9 @@ func TestSyncer_RetriesBadResponses(t *testing.T) {
 			// every later response is honest.
 			tamperer := synctest.NewMutatingResponder(
 				&responder{
-					log: log,
-					db:  synctest.NewBlockDB(blocks),
+					log:     log,
+					db:      synctest.NewBlockDB(blocks),
+					metrics: newTestHandlerMetrics(t),
 				},
 				1,
 				func(resp *syncpb.GetBlockResponse) {
@@ -299,7 +304,7 @@ func TestSyncer_RetriesBadResponses(t *testing.T) {
 			target := rawdb.NewMemoryDatabase()
 			syncer := NewSyncer(
 				log,
-				NewClient(net, tracker),
+				NewClient(net, tracker, synctest.NewRequestMetrics(t)),
 				target,
 				decodeBlock,
 				tip.Hash(),

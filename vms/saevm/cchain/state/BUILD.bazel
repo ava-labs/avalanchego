@@ -31,6 +31,7 @@ go_library(
         "//utils/units",
         "//utils/wrappers",
         "//vms/evm/sync/hashdb",
+        "//vms/evm/sync/network",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/types",
         "@com_github_ava_labs_libevm//common",
@@ -39,6 +40,7 @@ go_library(
         "@com_github_ava_labs_libevm//trie/trienode",
         "@com_github_ava_labs_libevm//triedb",
         "@com_github_ava_labs_libevm//triedb/hashdb",
+        "@com_github_prometheus_client_golang//prometheus",
         "@org_uber_go_zap//:zap",
     ],
 )
@@ -81,6 +83,7 @@ go_test(
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_google_go_cmp//cmp",
+        "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
