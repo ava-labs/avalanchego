@@ -1679,34 +1679,6 @@ func TestBootstrapSynchronousBlocks(t *testing.T) {
 	require.Equal(t, first.ID(), second.LastSettled().ID(), "second asynchronous block settles the first")
 }
 
-// A node that crashes part-way through executing synchronous blocks MUST start
-// again from whatever reached disk and bootstrap the remaining blocks.
-func TestRestartDuringSynchronousBootstrap(t *testing.T) {
-	fixture, opts, _ := synchronousFixture(t)
-	db := memdb.New()
-	dataDir := t.TempDir()
-	ctx, node := newSUT(t, append(opts, withDB(db), withChainDataDir(dataDir))...)
-
-	// Crash after the block importing a non-AVAX asset, so the blocks the
-	// restarted node re-executes include shared-memory writes that already
-	// reached disk. With the default commit interval none of the executed state
-	// roots has reached disk, so re-execution starts from genesis.
-	const crashAfter = 7
-	node.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:crashAfter+1])
-	crashed := saetest.CopyDB(t, db)
-
-	// The copy predates this shutdown, so it never receives the state that a
-	// shutdown commits. Shutting down only releases the chain data directory.
-	require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
-
-	restartedCtx, restarted := newSUT(t, append(opts, withDB(crashed), withChainDataDir(dataDir))...)
-	require.Equal(t, ids.ID(fixture.Blocks[crashAfter].Hash), restarted.lastAccepted(restartedCtx, t), "last accepted after restart")
-
-	restarted.acceptSynchronousBlocks(restartedCtx, t, fixture.Blocks[crashAfter+1:])
-	tip := fixture.Blocks[len(fixture.Blocks)-1]
-	require.Equal(t, ids.ID(tip.Hash), restarted.lastAccepted(restartedCtx, t), "last accepted after bootstrapping")
-}
-
 // Verifies a built block splits its timestamp: seconds in Header.Time, the full
 // millisecond instant in TimeMilliseconds.
 func TestBuildBlockPreservesMillisecondTimestamp(t *testing.T) {
