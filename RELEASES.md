@@ -21,6 +21,10 @@ This release updates the plugin version to `47`. All plugins must update to rema
 - Added:
   - `restakedValidationRewards` and `restakedDelegateeRewards` fields to `platform.getCurrentValidators` results for auto-renewed validators
 
+### Fixes
+
+- Fixed a segfault in `pebbledb` iterator `Release` after iterating to the end when the last value is large.
+
 ### Metrics
 
 - Added `avalanche_platformvm_local_delegated_staked` (gauge): amount (in nAVAX) of AVAX delegated to this node on the Primary Network.
