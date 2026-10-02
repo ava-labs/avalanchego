@@ -102,7 +102,7 @@ func FuzzParseRoundTrip(f *testing.F) {
 func goldensSlice() ([]*Tx, []byte) {
 	txs := make([]*Tx, len(goldens))
 	p := wrappers.Packer{MaxSize: math.MaxInt}
-	p.PackShort(0) // codec version
+	p.PackShort(CodecVersion)
 	p.PackInt(uint32(len(goldens)))
 	for i, golden := range goldens {
 		txs[i] = golden.tx
