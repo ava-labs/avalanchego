@@ -22,6 +22,7 @@ go_library(
         "//codec/linearcodec",
         "//database",
         "//database/prefixdb",
+        "//graft/coreth/plugin/evm/atomic/state",
         "//ids",
         "//network/p2p",
         "//snow",

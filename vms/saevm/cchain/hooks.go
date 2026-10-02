@@ -230,15 +230,8 @@ func blockTime(h *types.Header) time.Time {
 	return time.Unix(int64(h.Time), subSecondNanos) //#nosec G115 -- Won't overflow for a few millennia
 }
 
-// parseTxs parses the transactions in b's extData, using the encoding that
-// the chain config specifies at b's timestamp.
-func (h *hooks) parseTxs(b *types.Block) ([]*tx.Tx, error) {
-	isApricotPhase5 := corethparams.GetExtra(h.chainConfig).IsApricotPhase5(b.Time())
-	return tx.FromExtData(customtypes.BlockExtData(b), isApricotPhase5)
-}
-
 func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
-	txs, err := h.parseTxs(b)
+	txs, err := tx.FromBlock(h.chainConfig, b)
 	if err != nil {
 		return nil, fmt.Errorf("parsing txs: %w", err)
 	}
@@ -267,7 +260,7 @@ func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, 
 }
 
 func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ types.Receipts) error {
-	txs, err := h.parseTxs(b)
+	txs, err := tx.FromBlock(h.chainConfig, b)
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
 	}
@@ -284,7 +277,7 @@ func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
 	h.metrics.setMinBlockDelay(delayExponent(b.Header()).DelayDuration())
 
-	txs, err := h.parseTxs(b)
+	txs, err := tx.FromBlock(h.chainConfig, b)
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
 	}

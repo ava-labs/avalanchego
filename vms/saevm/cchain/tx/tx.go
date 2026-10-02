@@ -9,11 +9,11 @@ package tx
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -83,18 +83,7 @@ type Unsigned interface {
 
 	// transferNonAVAX transfers the non-AVAX balances requested by this
 	// transaction.
-	transferNonAVAX(avaxAssetID ids.ID, statedb MultiCoinStateDB) error
-}
-
-// A MultiCoinStateDB provides access to the non-AVAX balances of accounts.
-//
-// TODO(JonathanOppenheimer): The only implementation is coreth's
-// extstate.StateDB -- when it is ported out of coreth, consider moving
-// this interface alongside the new implementation?
-type MultiCoinStateDB interface {
-	GetBalanceMultiCoin(addr common.Address, coinID common.Hash) *big.Int
-	AddBalanceMultiCoin(addr common.Address, coinID common.Hash, amount *big.Int)
-	SubBalanceMultiCoin(addr common.Address, coinID common.Hash, amount *big.Int)
+	transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error
 }
 
 // op contains the state changes of [hook.Op]
@@ -264,7 +253,7 @@ func (t *Tx) AtomicRequests() (chainID ids.ID, r *chainsatomic.Requests, err err
 // transaction.
 //
 // Non-AVAX transfers were only allowed prior to the Banff upgrade.
-func (t *Tx) TransferNonAVAX(avaxAssetID ids.ID, statedb MultiCoinStateDB) error {
+func (t *Tx) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
 	return t.Unsigned.transferNonAVAX(avaxAssetID, statedb)
 }
 

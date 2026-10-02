@@ -9,20 +9,26 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/params"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
 
-var allTxs = [...]txData{
+var goldens = [...]goldenTx{
 	importTx,
 	exportTx,
 	importMultiInputTx,
@@ -32,7 +38,7 @@ var allTxs = [...]txData{
 }
 
 func TestID(t *testing.T) {
-	for _, golden := range allTxs {
+	for _, golden := range goldens {
 		t.Run(golden.name, func(t *testing.T) {
 			assert.Equalf(t, golden.id, golden.tx.ID(), "%T.ID()", golden.tx)
 		})
@@ -40,7 +46,7 @@ func TestID(t *testing.T) {
 }
 
 func TestBytes(t *testing.T) {
-	for _, golden := range allTxs {
+	for _, golden := range goldens {
 		t.Run(golden.name, func(t *testing.T) {
 			got, err := golden.tx.Bytes()
 			require.NoErrorf(t, err, "%T.Bytes()", golden.tx)
@@ -50,7 +56,7 @@ func TestBytes(t *testing.T) {
 }
 
 func TestParse(t *testing.T) {
-	for _, golden := range allTxs {
+	for _, golden := range goldens {
 		t.Run(golden.name, func(t *testing.T) {
 			got, err := Parse(golden.bytes)
 			require.NoError(t, err, "Parse()")
@@ -61,7 +67,7 @@ func TestParse(t *testing.T) {
 	}
 }
 
-// fuzz seeds f with [allTxs], specifies simple alphabets used to bias the
+// fuzz seeds f with [goldens], specifies simple alphabets used to bias the
 // fuzzer, and fuzzes the test.
 func fuzz(f *testing.F, ff func(t *testing.T, tx *Tx)) {
 	fuzzer := &txtest.F{
@@ -73,7 +79,7 @@ func fuzz(f *testing.F, ff func(t *testing.T, tx *Tx)) {
 			avaxAssetID,
 		},
 	}
-	for _, golden := range allTxs {
+	for _, golden := range goldens {
 		fuzzer.Add(golden.tx)
 	}
 	fuzzer.Fuzz(ff)
@@ -92,15 +98,15 @@ func FuzzParseRoundTrip(f *testing.F) {
 	})
 }
 
-// allTxsSlice returns [allTxs] along with their expected encoding as a slice.
-func allTxsSlice() ([]*Tx, []byte) {
+// goldensSlice returns [goldens] along with their expected encoding as a slice.
+func goldensSlice() ([]*Tx, []byte) {
 	const codecVersionLen = 2
 	var (
-		txs   = make([]*Tx, len(allTxs))
+		txs   = make([]*Tx, len(goldens))
 		bytes = make([]byte, codecVersionLen, 64)
 	)
-	bytes = binary.BigEndian.AppendUint32(bytes, uint32(len(allTxs)))
-	for i, golden := range allTxs {
+	bytes = binary.BigEndian.AppendUint32(bytes, uint32(len(goldens)))
+	for i, golden := range goldens {
 		txs[i] = golden.tx
 		bytes = append(bytes, golden.bytes[codecVersionLen:]...)
 	}
@@ -108,7 +114,7 @@ func allTxsSlice() ([]*Tx, []byte) {
 }
 
 func TestMarshalSlice(t *testing.T) {
-	txs, want := allTxsSlice()
+	txs, want := goldensSlice()
 
 	tests := []struct {
 		name string
@@ -134,7 +140,7 @@ func TestMarshalSlice(t *testing.T) {
 }
 
 func TestParseSlice(t *testing.T) {
-	txs, bytes := allTxsSlice()
+	txs, bytes := goldensSlice()
 
 	tests := []struct {
 		name    string
@@ -172,64 +178,101 @@ func TestParseSlice(t *testing.T) {
 	}
 }
 
-func TestFromExtData(t *testing.T) {
-	txs, sliceBytes := allTxsSlice()
-	emptySlice := []byte{
-		// codecVersion:
-		0x00, 0x00,
-		// len(txs):
-		0x00, 0x00, 0x00, 0x00,
+func TestFromBlock(t *testing.T) {
+	txs := make([]*Tx, len(goldens))
+	for i, golden := range goldens {
+		txs[i] = golden.tx
 	}
 
+	sliceBytes, err := MarshalSlice(txs)
+	require.NoError(t, err, "MarshalSlice()")
+
+	const (
+		preAP5Time uint64 = 0
+		ap5Time           = preAP5Time + 1
+	)
+	config := corethparams.WithExtra(
+		&params.ChainConfig{},
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
+				ApricotPhase5BlockTimestamp: new(ap5Time),
+			},
+		},
+	)
+
 	tests := []struct {
-		name            string
-		isApricotPhase5 bool
-		extData         []byte
-		want            []*Tx
-		wantErr         error
+		name    string
+		time    uint64
+		extData []byte
+		want    []*Tx
+		wantErr error
 	}{
 		{
 			name: "pre_ap5_empty",
+			time: preAP5Time,
 		},
 		{
-			name:    "pre_ap5_empty_slice",
-			extData: emptySlice,
+			name: "pre_ap5_empty_slice",
+			time: preAP5Time,
+			extData: []byte{
+				// codecVersion:
+				0x00, 0x00,
+				// len(txs):
+				0x00, 0x00, 0x00, 0x00,
+			},
 			wantErr: wrappers.ErrInsufficientLength,
 		},
 		{
 			name:    "pre_ap5_single",
+			time:    preAP5Time,
 			extData: importTx.bytes,
 			want:    []*Tx{importTx.tx},
 		},
 		{
-			name:            "ap5_empty",
-			isApricotPhase5: true,
+			name: "ap5_empty",
+			time: ap5Time,
 		},
 		{
-			name:            "ap5_empty_slice",
-			isApricotPhase5: true,
-			extData:         emptySlice,
-			wantErr:         ErrInefficientSlicePacking,
+			name: "ap5_empty_slice",
+			time: ap5Time,
+			extData: []byte{
+				// codecVersion:
+				0x00, 0x00,
+				// len(txs):
+				0x00, 0x00, 0x00, 0x00,
+			},
+			wantErr: ErrInefficientSlicePacking,
 		},
 		{
-			name:            "ap5_single",
-			isApricotPhase5: true,
-			extData:         importTx.bytes,
-			wantErr:         codec.ErrExtraSpace,
+			name:    "ap5_single",
+			time:    ap5Time,
+			extData: importTx.bytes,
+			wantErr: codec.ErrExtraSpace,
 		},
 		{
-			name:            "ap5_slice",
-			isApricotPhase5: true,
-			extData:         sliceBytes,
-			want:            txs,
+			name:    "ap5_slice",
+			time:    ap5Time,
+			extData: sliceBytes,
+			want:    txs,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := FromExtData(test.extData, test.isApricotPhase5)
-			require.ErrorIs(t, err, test.wantErr, "FromExtData()")
+			block := customtypes.NewBlockWithExtData(
+				&types.Header{
+					Time: test.time,
+				},
+				nil, // txs
+				nil, // uncles
+				nil, // receipts
+				nil, // hasher, unused without txs
+				test.extData,
+				true, // update [customtypes.HeaderExtra.ExtDataHash]
+			)
+			got, err := FromBlock(config, block)
+			require.ErrorIs(t, err, test.wantErr, "FromBlock()")
 			if diff := cmp.Diff(test.want, got, txtest.CmpOpt()); diff != "" {
-				t.Errorf("FromExtData() diff (-want +got):\n%s", diff)
+				t.Errorf("FromBlock() diff (-want +got):\n%s", diff)
 			}
 		})
 	}
@@ -237,8 +280,8 @@ func TestFromExtData(t *testing.T) {
 
 func FuzzParseSliceRoundTrip(f *testing.F) {
 	{
-		txs := make([]*Tx, len(allTxs))
-		for i, golden := range allTxs {
+		txs := make([]*Tx, len(goldens))
+		for i, golden := range goldens {
 			txs[i] = golden.tx
 		}
 		b, err := MarshalSlice(txs)
@@ -262,7 +305,7 @@ func FuzzParseSliceRoundTrip(f *testing.F) {
 
 func TestJSONMarshal(t *testing.T) {
 	tests := []struct {
-		golden txData
+		golden goldenTx
 		want   string
 	}{
 		{

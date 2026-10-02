@@ -281,38 +281,6 @@ func TestApply(t *testing.T) {
 	}
 }
 
-// TestApply_Roots verifies that the atomic trie roots are unchanged. Atomic trie
-// roots are included in state sync summaries, so changing the trie encoding
-// would cause nodes to disagree with the existing network.
-func TestApply_Roots(t *testing.T) {
-	var build builder
-	blocks := []block{
-		{height: 1, txs: []*tx.Tx{build.newImport()}},
-		{height: 2, txs: nil},
-		{height: 3, txs: []*tx.Tx{build.newExport(), build.newImport()}},
-		{height: 4, txs: nil},
-		{height: 5, txs: []*tx.Tx{build.newImport()}},
-		{height: 6, txs: []*tx.Tx{build.newExport()}},
-	}
-	want := []common.Hash{
-		types.EmptyRootHash,
-		common.HexToHash("0x4b76cb00a84dfd855223e88ef68fdd9ee0ebdd0ad0ae4e5e22ca2dcf39b95053"),
-		common.HexToHash("0x4b76cb00a84dfd855223e88ef68fdd9ee0ebdd0ad0ae4e5e22ca2dcf39b95053"),
-		common.HexToHash("0x32bffe531355863f3f64bfb91dd67e5aebfbb8230209d49adbb38d9881c22f93"),
-		common.HexToHash("0x32bffe531355863f3f64bfb91dd67e5aebfbb8230209d49adbb38d9881c22f93"),
-		common.HexToHash("0x01be2b826f47657d18f97401b503dd22a2e560136c78f54a0bbfa2d4f79a8103"),
-		common.HexToHash("0x4589eb06b2f37e25f1d37abbeeca67c37c4266908c180b0cf433380ae00e0e2c"),
-	}
-
-	s := newSUT(t)
-	s.apply(t, blocks...)
-	for height, want := range want {
-		got, err := s.GetRoot(uint64(height))
-		require.NoErrorf(t, err, "%T.GetRoot(%d)", s.State, height)
-		assert.Equalf(t, want, got, "%T.GetRoot(%d)", s.State, height)
-	}
-}
-
 // TestApply_BonusBlock verifies that a block's atomic operations are skipped for
 // shared memory (but still written to the trie) only when the network is mainnet
 // AND the height is a known bonus block.

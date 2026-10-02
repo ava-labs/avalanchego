@@ -7,15 +7,22 @@ import (
 	"context"
 	"math"
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
@@ -34,7 +41,14 @@ import (
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
 
-type txData struct {
+func TestMain(m *testing.M) {
+	evm.RegisterAllLibEVMExtras()
+	os.Exit(m.Run())
+}
+
+// A goldenTx is a known transaction along with its expected ID and canonical
+// encoding.
+type goldenTx struct {
 	name  string
 	tx    *Tx
 	id    ids.ID
@@ -51,7 +65,7 @@ var (
 // Golden transactions are defined at the package level to allow sharing between
 // various fuzz tests and unit tests.
 var (
-	importTx = txData{
+	importTx = goldenTx{
 		name: "import", // Included in https://subnets.avax.network/c-chain/block/4
 		tx: &Tx{
 			Unsigned: &Import{
@@ -91,7 +105,7 @@ var (
 		bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001c52b712aa7dce27a650bf509f799673e245edd4fa9e4e1700eb6105202fe579a0000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000002faf080000000010000000000000001b8b5a87d1c05676f1f966da49151fa54dbe68c330000000002faf08021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000100000009000000013e6614876ee01d3b8b27480c00bdcb0ae84ee3e8346d2d5f08320f7dd3e76c4540be021fe85e91817654c9310b54e8f2e88d81db52b8693842b90f3dbd23bd5c01"),
 	}
 
-	exportTx = txData{
+	exportTx = goldenTx{
 		name: "export", // Included in https://subnets.avax.network/c-chain/block/48
 		tx: &Tx{
 			Unsigned: &Export{
@@ -130,7 +144,7 @@ var (
 		bytes: common.FromHex("0x000000000001000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b00000001eb019ccd325ad53543a7e7e3b04828bdecf3cff600000000000f424121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000000000000121e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000000000100000000000000000000000100000001d6ce17826dd7c12a7577af257e82d99143b72500000000010000000900000001254d11f1adbd5dfb556855d02ac236ea2dd45d1463459b73714f55ab8d34a4b74a1f18c2868b886e83a5463c422ea3ccc7e9783d5620b1f5695646b0cb1e4dfa01"),
 	}
 
-	importMultiInputTx = txData{
+	importMultiInputTx = goldenTx{
 		name: "import_multi_input", // Included in https://subnets.avax.network/c-chain/block/132481
 		tx: &Tx{
 			Unsigned: &Import{
@@ -215,7 +229,7 @@ var (
 		bytes: common.FromHex("0x000000000000000000010427d4b22a2a78bcddd456742caf91b56badbff985ee19aef14573e7343fd652ed5f38341e436e5d46e2bb00b45d62ae97d1b050c64bc634ae10626739e35c4b000000031d249d0aab138afe01e6eff9c4789018a600771d94f5396b5df7b9d05298714d0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec000000001000000008e0713e47bfc29bef4cee6e4635da1c74a3aabade68ccad6fca3e99fd827eb1c0000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000017c841c00000000100000000a022a8b069a5d5e54c7e09c5c5b0f762c6751068bef15fe951a5e4b349d642200000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000050000000005e69ec0000000010000000000000003383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000005e69ec021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff383c293db6be7ac246f0956ad632344dc2cd1da30000000017c841c021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000300000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b342570000000009000000014e14b32cb790fdccc3ee4700c84d0d53986ea8f125bd69ce771d9db45f86705c48b01bbe763dddea3d27069ed12f9b3050c9dcd487830d03d6a4d90e21b3425700"),
 	}
 
-	exportSameAddressMultiAssetTx = txData{
+	exportSameAddressMultiAssetTx = goldenTx{
 		name: "export_same_address_multi_asset", // Synthetic
 		tx: &Tx{
 			Unsigned: &Export{
@@ -258,7 +272,7 @@ var (
 		bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff000000000000000500000002000000000000000000000000000000000000000000000000000000000000000000000007000000000000006400000000000000000000000100000001aa0000000000000000000000000000000000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff0000000700000000000186a000000000000000000000000100000001aa0000000000000000000000000000000000000000000000"),
 	}
 
-	exportMultiAddressMultiAssetTx = txData{
+	exportMultiAddressMultiAssetTx = goldenTx{
 		name: "export_multi_address_multi_asset", // Synthetic
 		tx: &Tx{
 			Unsigned: &Export{
@@ -303,7 +317,7 @@ var (
 		bytes: common.FromHex("0x000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002010000000000000000000000000000000000000000000000000003e700000000000000000000000000000000000000000000000000000000000000000000000000000005020000000000000000000000000000000000000000000000000f424021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000000000000070000000200000000000000000000000000000000000000000000000000000000000000000000000700000000000001f400000000000000000000000200000002bb00000000000000000000000000000000000000cc0000000000000000000000000000000000000021e67317cbc4be2aeb00677ad6462778a8f52274b9d605df2591b23027a87dff00000007000000000007a12000000000000000000000000200000002bb00000000000000000000000000000000000000cc0000000000000000000000000000000000000000000000"),
 	}
 
-	importNonAVAXTx = txData{
+	importNonAVAXTx = goldenTx{
 		name: "import_non_avax", // Synthetic
 		tx: &Tx{
 			Unsigned: &Import{
@@ -328,7 +342,7 @@ var (
 
 func TestInputIDs(t *testing.T) {
 	tests := []struct {
-		golden txData
+		golden goldenTx
 		want   set.Set[ids.ID]
 	}{
 		{
@@ -414,7 +428,7 @@ func TestAccountInputID(t *testing.T) {
 
 func TestAsOp(t *testing.T) {
 	tests := []struct {
-		golden txData
+		golden goldenTx
 		want   hook.Op
 	}{
 		{
@@ -665,7 +679,7 @@ func TestAsOp_Errors(t *testing.T) {
 
 func TestAtomicRequests(t *testing.T) {
 	tests := []struct {
-		golden       txData
+		golden       goldenTx
 		wantChainID  ids.ID
 		wantRequests *chainsatomic.Requests
 	}{
@@ -766,36 +780,28 @@ func TestAtomicRequests(t *testing.T) {
 	}
 }
 
-// multiCoinStateDB is an in-memory [MultiCoinStateDB].
-type multiCoinStateDB map[common.Address]map[common.Hash]*big.Int
+func newEmptyStateDB(t testing.TB) *extstate.StateDB {
+	t.Helper()
 
-func (s multiCoinStateDB) GetBalanceMultiCoin(addr common.Address, coinID common.Hash) *big.Int {
-	if b, ok := s[addr][coinID]; ok {
-		return new(big.Int).Set(b)
-	}
-	return new(big.Int)
+	db := state.NewDatabase(rawdb.NewMemoryDatabase())
+	sdb, err := state.New(types.EmptyRootHash, db, nil)
+	require.NoError(t, err)
+	return extstate.New(sdb)
 }
 
-func (s multiCoinStateDB) AddBalanceMultiCoin(addr common.Address, coinID common.Hash, amount *big.Int) {
-	s.setBalanceMultiCoin(addr, coinID, new(big.Int).Add(s.GetBalanceMultiCoin(addr, coinID), amount))
-}
-
-func (s multiCoinStateDB) SubBalanceMultiCoin(addr common.Address, coinID common.Hash, amount *big.Int) {
-	s.setBalanceMultiCoin(addr, coinID, new(big.Int).Sub(s.GetBalanceMultiCoin(addr, coinID), amount))
-}
-
-func (s multiCoinStateDB) setBalanceMultiCoin(addr common.Address, coinID common.Hash, amount *big.Int) {
-	if amount.Sign() == 0 {
-		delete(s[addr], coinID)
-		if len(s[addr]) == 0 {
-			delete(s, addr)
-		}
-		return
+func compareStateDBs(want, got *extstate.StateDB) string {
+	// Finalize the trie structures so that the state DB comparison includes
+	// any changes.
+	for _, v := range []*extstate.StateDB{want, got} {
+		v.Finalise(true)
+		v.IntermediateRoot(true)
 	}
-	if s[addr] == nil {
-		s[addr] = make(map[common.Hash]*big.Int)
+
+	opts := []cmp.Option{
+		cmpopts.IgnoreUnexported(extstate.StateDB{}),
+		cmputils.StateDBs(),
 	}
-	s[addr][coinID] = amount
+	return cmp.Diff(want, got, opts...)
 }
 
 func TestTransferNonAVAX(t *testing.T) {
@@ -965,7 +971,7 @@ func TestTransferNonAVAX(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			var (
-				want  = multiCoinStateDB{}
+				want  = newEmptyStateDB(t)
 				toBig = func(v uint64) *big.Int { return new(big.Int).SetUint64(v) }
 			)
 			for addr, balances := range test.want {
@@ -975,7 +981,7 @@ func TestTransferNonAVAX(t *testing.T) {
 				}
 			}
 
-			got := multiCoinStateDB{}
+			got := newEmptyStateDB(t)
 			for addr, balances := range test.init {
 				for assetID, amount := range balances {
 					coinID := common.Hash(assetID)
@@ -988,7 +994,7 @@ func TestTransferNonAVAX(t *testing.T) {
 			}
 			err := tx.TransferNonAVAX(avaxAssetID, got)
 			require.ErrorIsf(t, err, test.wantErr, "%T.TransferNonAVAX()", tx)
-			if diff := cmp.Diff(want, got, cmputils.BigInts()); diff != "" {
+			if diff := compareStateDBs(want, got); diff != "" {
 				t.Errorf("%T.TransferNonAVAX() diff (-want +got):\n%s", tx, diff)
 			}
 		})
