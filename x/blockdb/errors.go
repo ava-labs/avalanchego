@@ -10,5 +10,6 @@ var (
 	ErrCorrupted          = errors.New("blockdb: unrecoverable corruption detected")
 	ErrBlockTooLarge      = errors.New("blockdb: block size too large")
 
-	errDatabaseInUse = errors.New("database directory is locked by another process")
+	errConfigMismatch = errors.New("blockdb: config does not match persisted index header")
+	errDatabaseInUse  = errors.New("database directory is locked by another process")
 )

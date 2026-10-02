@@ -988,6 +988,62 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 	})
 }
 
+// TestSizeMinimumGas tests that gas limits recommended by RPCs satisfy the
+// mempool's size-based minimum, even when execution uses less gas.
+func TestSizeMinimumGas(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+	gc := gethclient.New(sut.rpcClient)
+
+	// Execution uses ~54k gas but the mempool requires ~420k because of the
+	// tx size.
+	msg := ethereum.CallMsg{
+		From:      sut.wallet.Addresses()[0],
+		To:        &common.Address{},
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		GasTipCap: big.NewInt(1),
+		Data:      make([]byte, 8192),
+	}
+	// send signs msg with the recommended gas and access list, and requires the
+	// mempool to accept it. It returns msg with a gas allowance just below the
+	// mempool's minimum for the signed tx.
+	send := func(t *testing.T, gas uint64, accessList types.AccessList) ethereum.CallMsg {
+		t.Helper()
+		tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:         msg.To,
+			GasFeeCap:  msg.GasFeeCap,
+			GasTipCap:  msg.GasTipCap,
+			Data:       msg.Data,
+			Gas:        gas,
+			AccessList: accessList,
+		})
+		sut.mustSendTx(t, tx)
+
+		below := msg
+		below.Gas = sut.rawVM.mempool.MinGasForSize(tx.Size()) - 1
+		return below
+	}
+	const errBelow = "exceeds allowance"
+
+	t.Run("eth_estimateGas", func(t *testing.T) {
+		gas, err := sut.EstimateGas(ctx, msg)
+		require.NoError(t, err, "EstimateGas()")
+		below := send(t, gas, nil)
+
+		_, err = sut.EstimateGas(ctx, below)
+		require.ErrorContains(t, err, errBelow, "EstimateGas() with gas %d", below.Gas) //nolint:forbidigo // RPC error
+	})
+
+	t.Run("eth_createAccessList", func(t *testing.T) {
+		accessList, gas, vmErr, err := gc.CreateAccessList(ctx, msg)
+		require.NoError(t, err, "CreateAccessList()")
+		require.Empty(t, vmErr, "CreateAccessList() execution error")
+		below := send(t, gas, *accessList)
+
+		_, _, _, err = gc.CreateAccessList(ctx, below)
+		require.ErrorContains(t, err, errBelow, "CreateAccessList() with gas %d", below.Gas) //nolint:forbidigo // RPC error
+	})
+}
+
 func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 	blocking := common.Address{'b', 'l', 'o', 'c', 'k'}
 	opt, unblock := withBlockingPrecompile(blocking)
@@ -1064,6 +1120,11 @@ func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 			Gas:      1e6,
 		}))
 
+		// Although we don't have to wait for execution when testing receipts
+		// above, there is a tiny chance that the block's execution is still
+		// finishing up, which would cause the next assertion to see the
+		// previous block.
+		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 		sut.testRPC(ctx, t, rpcTest{
 			method: "eth_getHeaderByNumber",
 			args:   []any{rpc.PendingBlockNumber},
