@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/upgrade"
 
+	evmparams "github.com/ava-labs/avalanchego/graft/evm/params"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -23,6 +24,8 @@ var (
 	errTimestampTooEarly       = errors.New("provided timestamp must be greater than or equal to the default timestamp")
 	errUnsupportedForkOrdering = errors.New("unsupported fork ordering")
 )
+
+type AvalancheRules = evmparams.AvalancheRules
 
 // NetworkUpgrades contains timestamps that enable network upgrades.
 // Avalanche specific network upgrades are also included here.
@@ -171,9 +174,58 @@ func (n *NetworkUpgrades) Override(o *NetworkUpgrades) {
 	}
 }
 
-// IsSubnetEVM returns whether [time] represents a block
-// with a timestamp after the SubnetEVM upgrade time.
-func (n NetworkUpgrades) IsSubnetEVM(time uint64) bool {
+// IsApricotPhase1 reports whether the ApricotPhase1 rules are active.
+func (n NetworkUpgrades) IsApricotPhase1(time uint64) bool {
+	return n.isSubnetEVM(time)
+}
+
+// IsApricotPhase2 reports whether the ApricotPhase2 rules are active.
+func (n NetworkUpgrades) IsApricotPhase2(time uint64) bool {
+	return n.isSubnetEVM(time)
+}
+
+// IsApricotPhase3 reports whether the ApricotPhase3 rules are active.
+func (n *NetworkUpgrades) IsApricotPhase3(time uint64) bool {
+	return n.isSubnetEVM(time)
+}
+
+// IsApricotPhase4 reports whether the ApricotPhase4 rules are active.
+func (n NetworkUpgrades) IsApricotPhase4(time uint64) bool {
+	return n.isSubnetEVM(time)
+}
+
+// IsApricotPhase5 reports whether the ApricotPhase5 rules are active.
+func (n NetworkUpgrades) IsApricotPhase5(time uint64) bool {
+	return n.isSubnetEVM(time)
+}
+
+// IsApricotPhasePre6 reports whether the ApricotPhasePre6 rules are active.
+func (n NetworkUpgrades) IsApricotPhasePre6(time uint64) bool {
+	return n.isSubnetEVM(time)
+}
+
+// IsApricotPhase6 reports whether the ApricotPhase6 rules are active.
+func (n NetworkUpgrades) IsApricotPhase6(time uint64) bool {
+	return n.isSubnetEVM(time)
+}
+
+// IsApricotPhasePost6 reports whether the ApricotPhasePost6 rules are active.
+func (n NetworkUpgrades) IsApricotPhasePost6(time uint64) bool {
+	return n.isSubnetEVM(time)
+}
+
+// IsBanff reports whether the Banff rules are active.
+func (n NetworkUpgrades) IsBanff(time uint64) bool {
+	return n.isSubnetEVM(time)
+}
+
+// IsCortina reports whether the Cortina rules are active.
+func (n NetworkUpgrades) IsCortina(time uint64) bool {
+	return n.isSubnetEVM(time)
+}
+
+// Subnet-EVM bundles the pre-Durango rules under its existing timestamp field.
+func (n NetworkUpgrades) isSubnetEVM(time uint64) bool {
 	return isTimestampForked(n.SubnetEVMTimestamp, time)
 }
 
@@ -225,35 +277,24 @@ func (n *NetworkUpgrades) Description() string {
 	return banner
 }
 
-type AvalancheRules struct {
-	IsSubnetEVM bool
-	IsDurango   bool
-	IsEtna      bool
-	IsFortuna   bool
-	IsGranite   bool
-	IsHelicon   bool
-	IsIgloo     bool
-}
-
-// IsGraniteActivated is used by the warp precompile to determine which gas costs to use.
-func (a AvalancheRules) IsGraniteActivated() bool {
-	return a.IsGranite
-}
-
-// IsDurangoActivated is used by the warp precompile to determine which gas costs to use.
-func (a AvalancheRules) IsDurangoActivated() bool {
-	return a.IsDurango
-}
-
-func (n *NetworkUpgrades) GetAvalancheRules(time uint64) AvalancheRules {
+func (n *NetworkUpgrades) GetAvalancheRules(timestamp uint64) AvalancheRules {
 	return AvalancheRules{
-		IsSubnetEVM: n.IsSubnetEVM(time),
-		IsDurango:   n.IsDurango(time),
-		IsEtna:      n.IsEtna(time),
-		IsFortuna:   n.IsFortuna(time),
-		IsGranite:   n.IsGranite(time),
-		IsHelicon:   n.IsHelicon(time),
-		IsIgloo:     n.IsIgloo(time),
+		IsApricotPhase1:     n.IsApricotPhase1(timestamp),
+		IsApricotPhase2:     n.IsApricotPhase2(timestamp),
+		IsApricotPhase3:     n.IsApricotPhase3(timestamp),
+		IsApricotPhase4:     n.IsApricotPhase4(timestamp),
+		IsApricotPhase5:     n.IsApricotPhase5(timestamp),
+		IsApricotPhasePre6:  n.IsApricotPhasePre6(timestamp),
+		IsApricotPhase6:     n.IsApricotPhase6(timestamp),
+		IsApricotPhasePost6: n.IsApricotPhasePost6(timestamp),
+		IsBanff:             n.IsBanff(timestamp),
+		IsCortina:           n.IsCortina(timestamp),
+		IsDurango:           n.IsDurango(timestamp),
+		IsEtna:              n.IsEtna(timestamp),
+		IsFortuna:           n.IsFortuna(timestamp),
+		IsGranite:           n.IsGranite(timestamp),
+		IsHelicon:           n.IsHelicon(timestamp),
+		IsIgloo:             n.IsIgloo(timestamp),
 	}
 }
 

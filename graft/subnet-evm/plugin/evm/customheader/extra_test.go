@@ -204,25 +204,25 @@ func TestVerifyExtra(t *testing.T) {
 			expected: errInvalidExtraLength,
 		},
 		{
-			name: "subnet_evm_valid",
+			name: "apricot_3_invalid",
 			rules: extras.AvalancheRules{
-				IsSubnetEVM: true,
+				IsApricotPhase3: true,
 			},
 			extra:    make([]byte, subnetevm.WindowSize),
 			expected: nil,
 		},
 		{
-			name: "subnet_evm_invalid_less",
+			name: "apricot_3_invalid_less",
 			rules: extras.AvalancheRules{
-				IsSubnetEVM: true,
+				IsApricotPhase3: true,
 			},
 			extra:    make([]byte, subnetevm.WindowSize-1),
 			expected: errInvalidExtraLength,
 		},
 		{
-			name: "subnet_evm_invalid_more",
+			name: "apricot_3_invalid_more",
 			rules: extras.AvalancheRules{
-				IsSubnetEVM: true,
+				IsApricotPhase3: true,
 			},
 			extra:    make([]byte, subnetevm.WindowSize+1),
 			expected: errInvalidExtraLength,
