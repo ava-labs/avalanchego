@@ -75,7 +75,7 @@ func (p retryPolicy) noPeersBackoff(attempt int) time.Duration {
 }
 
 // doRetry retries attempt until it succeeds, ctx ends, or a fatal error. A
-// rejection by the caller's parse arrives as the attempt's error, since verify
+// rejection by the caller's parse arrives as the attempt's error, since parse
 // runs on the handler goroutine where it can de-score the peer.
 func doRetry[Out any](
 	ctx context.Context,
