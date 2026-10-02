@@ -66,6 +66,7 @@ go_test(
     srcs = [
         "batched_vm_test.go",
         "block_test.go",
+        "height_indexed_vm_test.go",
         "main_test.go",
         "mocks_generate_test.go",
         "mocks_test.go",
@@ -86,6 +87,7 @@ go_test(
         "//database",
         "//database/memdb",
         "//database/prefixdb",
+        "//database/versiondb",
         "//ids",
         "//snow",
         "//snow/consensus/snowman",
@@ -110,6 +112,7 @@ go_test(
         "//vms/proposervm/block",
         "//vms/proposervm/proposer",
         "//vms/proposervm/proposer/proposermock",
+        "//vms/proposervm/state",
         "//vms/proposervm/summary",
         "@com_connectrpc_connect//:connect",
         "@com_github_prometheus_client_golang//prometheus",
