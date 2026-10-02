@@ -6,7 +6,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 ### Configs
 
-- Restored the C-Chain `api-max-duration` limit on every HTTP request and WebSocket call after Helicon. It previously limited only `eth_call`. A WebSocket call that times out doesn't close its connection.
+- Fixed C-Chain `api-max-duration` only limiting `eth_call` since Helicon. It again limits every call to the `/rpc` and `/ws` endpoints, and a WebSocket call that times out doesn't close its connection.
 
 ### Metrics
 
