@@ -193,7 +193,7 @@ func TestDoRetry_CtxEndReportsFailure(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
-			attempt := func() (*syncpb.GetLeafResponse, ids.NodeID, *Outcome, error) {
+			attempt := func(_ context.Context) (*syncpb.GetLeafResponse, ids.NodeID, *Outcome, error) {
 				if tt.attemptErr != nil {
 					cancel()
 					var zero *syncpb.GetLeafResponse
@@ -203,12 +203,12 @@ func TestDoRetry_CtxEndReportsFailure(t *testing.T) {
 				_, tracker := newTestTracker(t, nodeID)
 				return &syncpb.GetLeafResponse{}, nodeID, &Outcome{peers: tracker, nodeID: nodeID}, nil
 			}
-			verify := func(*syncpb.GetLeafResponse, ids.NodeID) (*syncpb.GetLeafResponse, error) {
+			parse := func(*syncpb.GetLeafResponse, ids.NodeID) (*syncpb.GetLeafResponse, error) {
 				cancel()
 				return nil, errInvalid
 			}
 
-			got, err := doRetry(ctx, loggingtest.New(t, logging.Debug), *defaultRetryPolicy(), verify, attempt)
+			got, err := doRetry(ctx, loggingtest.New(t, logging.Debug), *defaultRetryPolicy(), parse, attempt)
 			require.Nil(t, got)
 			require.ErrorIs(t, err, context.Canceled)
 			require.ErrorIs(t, err, tt.wantLast)
@@ -223,7 +223,7 @@ func TestDoRetry_FatalStopsRetrying(t *testing.T) {
 	defer cancel()
 
 	calls := 0
-	attempt := func() (*syncpb.GetLeafResponse, ids.NodeID, *Outcome, error) {
+	attempt := func(_ context.Context) (*syncpb.GetLeafResponse, ids.NodeID, *Outcome, error) {
 		calls++
 		if calls > 1 {
 			cancel()
@@ -277,7 +277,7 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 				// call 3: resetError or verify-rejects, resetting the no-peers count.
 				// call 4: no-peers again, should start from the lowest backoff.
 				// call 5+: success.
-				attempt := func() (*syncpb.GetLeafResponse, ids.NodeID, *Outcome, error) {
+				attempt := func(_ context.Context) (*syncpb.GetLeafResponse, ids.NodeID, *Outcome, error) {
 					calls++
 					switch {
 					case calls == 1, calls == 2, calls == 4:
@@ -289,7 +289,7 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 						return want, nodeID, &Outcome{peers: tracker, nodeID: nodeID}, nil
 					}
 				}
-				verify := func(resp *syncpb.GetLeafResponse, _ ids.NodeID) (*syncpb.GetLeafResponse, error) {
+				parse := func(resp *syncpb.GetLeafResponse, _ ids.NodeID) (*syncpb.GetLeafResponse, error) {
 					if tt.resetError == nil && !rejected {
 						rejected = true
 						return nil, errInvalid
@@ -302,7 +302,7 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 					t.Context(),
 					loggingtest.New(t, logging.Debug),
 					policy,
-					verify,
+					parse,
 					attempt,
 				)
 				elapsed := time.Since(start)

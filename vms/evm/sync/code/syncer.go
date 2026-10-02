@@ -287,14 +287,15 @@ func persist(db ethdb.Batcher, hashes []common.Hash, codes [][]byte) error {
 func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common.Hash) ([][]byte, error) {
 	return c.Send(ctx, &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)},
 		func(resp *syncpb.GetCodeResponse, nodeID ids.NodeID) ([][]byte, error) {
-			if err := verifyCode(hashes, resp.GetData()); err != nil {
+			code := resp.GetData()
+			if err := verifyCode(hashes, code); err != nil {
 				log.Debug("invalid code response, re-requesting",
 					zap.Stringer("nodeID", nodeID),
 					zap.Error(err),
 				)
 				return nil, err
 			}
-			return resp.GetData(), nil
+			return code, nil
 		},
 	)
 }

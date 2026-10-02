@@ -61,18 +61,18 @@ func NewDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any](
 	}
 }
 
-// Send retries req until a peer sends a response that verify accepts or ctx ends.
+// Send retries req until a peer sends a response that parse accepts or ctx ends.
 func (d *Dispatcher[Req, In, Resp, Out]) Send(
 	ctx context.Context,
 	req Req,
-	verify func(Resp, ids.NodeID) (Out, error),
+	parse func(Resp, ids.NodeID) (Out, error),
 ) (Out, error) {
 	requestBytes, err := proto.Marshal(req)
 	if err != nil {
 		var zero Out
 		return zero, fmt.Errorf("%w: %w", errMarshalRequest, err)
 	}
-	return doRetry(ctx, d.log, d.policy, verify, func() (Resp, ids.NodeID, *Outcome, error) {
+	return doRetry(ctx, d.log, d.policy, parse, func(ctx context.Context) (Resp, ids.NodeID, *Outcome, error) {
 		nodeID, ok := d.peers.SelectPeer()
 		if !ok {
 			var zero Resp

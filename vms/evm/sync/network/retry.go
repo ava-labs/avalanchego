@@ -75,14 +75,14 @@ func (p retryPolicy) noPeersBackoff(attempt int) time.Duration {
 	return time.Duration(d)
 }
 
-// doRetry retries attempt until verify accepts a response, ctx ends, or a fatal
+// doRetry retries attempt until parse accepts a response, ctx ends, or a fatal
 // error. attempt must return a fresh response each call so failures never merge.
 func doRetry[Resp proto.Message, Out any](
 	ctx context.Context,
 	log logging.Logger,
 	policy retryPolicy,
-	verify func(Resp, ids.NodeID) (Out, error),
-	attempt func() (Resp, ids.NodeID, *Outcome, error),
+	parse func(Resp, ids.NodeID) (Out, error),
+	attempt func(context.Context) (Resp, ids.NodeID, *Outcome, error),
 ) (Out, error) {
 	var (
 		zero           Out
@@ -92,22 +92,23 @@ func doRetry[Resp proto.Message, Out any](
 	)
 	for {
 		attempts++
-		resp, nodeID, outcome, err := attempt()
+		resp, nodeID, outcome, err := attempt(ctx)
 		var wait time.Duration
 		switch {
 		case err == nil:
-			// verify reports its own rejection, since only the caller knows what
+			// parse reports its own rejection, since only the caller knows what
 			// made the response wrong, and returns the value Send hands back.
-			out, verifyErr := verify(resp, nodeID)
-			if verifyErr == nil {
+			out, parseErr := parse(resp, nodeID)
+			if parseErr == nil {
 				outcome.Success()
 				return out, nil
 			}
 			outcome.Failure()
-			lastErr = verifyErr
+			lastErr = parseErr
 			noPeerAttempts = 0
 			wait = policy.peerFailureBackoff
-		// attempt's send selects on ctx.Done(), so cancellation surfaces here.
+		// ctx.Err() only returns these two values, so this covers all context
+		// endings and stops the loop without a retry.
 		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 			return zero, retryFailure(err, lastErr, attempts)
 		case errors.Is(err, errNoPeers):
@@ -144,12 +145,10 @@ func backoff(ctx context.Context, d time.Duration) error {
 	if d <= 0 {
 		return nil
 	}
-	timer := time.NewTimer(d)
-	defer timer.Stop()
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-timer.C:
+	case <-time.After(d):
 		return nil
 	}
 }
