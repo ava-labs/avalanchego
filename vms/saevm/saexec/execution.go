@@ -423,8 +423,8 @@ func Execute(
 
 	endTime := time.Now()
 	if synchronous {
-		// The block's gas time is a property of its header, not of the clock
-		// that ran here; see [blocks.Block.SynchronousGasTime].
+		// Pre-SAE blocks never ran this clock, so recovery and the first
+		// asynchronous block use the header's gas time.
 		gasClock, err = b.SynchronousGasTime()
 		if err != nil {
 			return nil, fmt.Errorf("%w: synchronous gas time: %v", errFatal, err)
