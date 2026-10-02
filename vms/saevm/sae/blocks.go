@@ -116,7 +116,7 @@ func (vm *VM) verifyWhenBootstrapping(b, parent *blocks.Block) error {
 
 	// Sanity checks to ensure the in-memory settled block matches the expected
 	// settled block. A synchronous header commits to its own post-execution
-	// state and carries no settled marker, so it has nothing to check against.
+	// state so this is sanity checked by the executor.
 	if !b.Synchronous() {
 		if got, want := lastSettled.PostExecutionStateRoot(), b.SettledStateRoot(); got != want {
 			return fmt.Errorf("%w: got %#x ; want %#x", errSettledRootMismatch, got, want)
