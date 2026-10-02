@@ -80,14 +80,12 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 	// disk. Therefore, the state can only lag behind the block read.
 	// Additionally, we assume any block has been written atomically, so
 	// if the last settled height was found, the underlying block is present.
-	// At minimum, [NewVM] requires a genesis block to be written (which is
-	// synchronous by definition) with its post-execution state committed, so
-	// the search always terminates.
+	// At minimum, [NewVM] requires a genesis block to be written with its
+	// post-execution state committed, so the search always finds a state.
 	//
 	// There's no reasonable cap on how far back to search, since the distance
 	// between the settler and settled block is unbounded, and node crashes
-	// must be accounted for. Synchronous blocks are re-executed like any other,
-	// so the search continues through them.
+	// must be accounted for.
 	for height := *lastSettledHeight; ; height-- {
 		ethB, err := canonicalBlock(rec.db, height)
 		if err != nil {
@@ -107,6 +105,7 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 			)
 			return b, nil
 		}
+
 		if height == 0 {
 			return nil, errGenesisStateUnavailable
 		}
@@ -245,7 +244,7 @@ func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Execut
 	)
 
 	// Consensus only requires post-execution state after and including the
-	// last-settled block, which a synchronous block is itself.
+	// last-settled block.
 	keepFrom := rec.hooks.SettledBy(last.Header()).Height
 	if last.Synchronous() {
 		keepFrom = last.Height()
