@@ -21,12 +21,15 @@ fi
 VERSION="${1:?Usage: push_tags.sh <version>}"
 REMOTE="${GIT_REMOTE:-origin}"
 
-if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/lib_version.sh
+source "$REPO_ROOT/scripts/lib_version.sh"
+
+if [[ ! "$VERSION" =~ $SEMVER_REGEX ]]; then
     echo "Error: Version must match vX.Y.Z or vX.Y.Z-suffix" >&2
     exit 1
 fi
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$REPO_ROOT/scripts/lib_go_modules.sh"
 
 TAGS=()
@@ -44,9 +47,6 @@ for tag in "${TAGS[@]}"; do
 done
 
 echo "Pushing tags for $VERSION to $REMOTE:"
-# GitHub does not create tag push/create events when more than three tags are
-# pushed at once, which prevents release workflows from running. Push the tags
-# individually so each push stays under that limit.
-for tag in "${TAGS[@]}"; do
-    git push "$REMOTE" "$tag"
-done
+# --atomic: all tags land or none do, so a partial push can't leave the remote
+# with an inconsistent subset of the release's coordinated tags.
+git push --atomic "$REMOTE" "${TAGS[@]}"
