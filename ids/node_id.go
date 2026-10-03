@@ -57,13 +57,21 @@ func (id *NodeID) UnmarshalJSON(b []byte) error {
 		return errMissingQuotes
 	}
 
-	var err error
-	*id, err = NodeIDFromString(str[1:lastIndex])
-	return err
+	return id.UnmarshalText([]byte(str[1:lastIndex]))
 }
 
+// UnmarshalText decodes a prefixed, CB58-formatted string, as produced by
+// [NodeID.MarshalText], into a NodeID. Unlike UnmarshalJSON, text MUST NOT be
+// quoted: this is called directly (not via UnmarshalJSON) when decoding a
+// NodeID used as a JSON object key, per [encoding.TextUnmarshaler].
 func (id *NodeID) UnmarshalText(text []byte) error {
-	return id.UnmarshalJSON(text)
+	if len(text) <= len(NodeIDPrefix) {
+		return fmt.Errorf("%w: expected to be > %d", errShortNodeID, len(NodeIDPrefix))
+	}
+
+	var err error
+	*id, err = NodeIDFromString(string(text))
+	return err
 }
 
 func (id NodeID) Compare(other NodeID) int {
