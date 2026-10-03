@@ -295,7 +295,7 @@ func TestRPCExtras(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.method, func(t *testing.T) {
-			client := sut.ethclient.Client()
+			client := sut.EthClient.Client()
 			var got map[string]any
 			err := client.CallContext(ctx, &got, tt.method, tt.args...)
 			require.NoErrorf(t, err, "%s(%v)", tt.method, tt.args)
@@ -332,7 +332,7 @@ func TestSynchronousRPCs(t *testing.T) {
 			t.Parallel()
 
 			var got json.RawMessage
-			err := sut.ethclient.Client().CallContext(ctx, &got, call.Method, call.Args()...)
+			err := sut.EthClient.Client().CallContext(ctx, &got, call.Method, call.Args()...)
 			if call.Error != "" {
 				require.EqualErrorf(t, err, call.Error, "%s(%s)", call.Method, call.Params)
 				return
@@ -363,13 +363,13 @@ func TestSynchronousRPCs(t *testing.T) {
 			t.Logf("%s", block.Description)
 			want := block.EthBlock(t)
 
-			byNumber, err := sut.ethclient.BlockByNumber(ctx, new(big.Int).SetUint64(block.Number))
+			byNumber, err := sut.EthClient.BlockByNumber(ctx, new(big.Int).SetUint64(block.Number))
 			require.NoErrorf(t, err, "BlockByNumber(%d)", block.Number)
 			if diff := cmp.Diff(want, byNumber, opts); diff != "" {
 				t.Errorf("BlockByNumber(%d) diff (-want +got):\n%s", block.Number, diff)
 			}
 
-			byHash, err := sut.ethclient.BlockByHash(ctx, block.Hash)
+			byHash, err := sut.EthClient.BlockByHash(ctx, block.Hash)
 			require.NoErrorf(t, err, "BlockByHash(%s)", block.Hash)
 			if diff := cmp.Diff(want, byHash, opts); diff != "" {
 				t.Errorf("BlockByHash(%s) diff (-want +got):\n%s", block.Hash, diff)

@@ -32,8 +32,8 @@ import (
 func (s *SUT) acceptBlockWith(ctx context.Context, tb testing.TB, stx *tx.Tx, ethTx *types.Transaction) *blocks.Block {
 	tb.Helper()
 
-	require.NoErrorf(tb, s.ethclient.SendTransaction(ctx, ethTx), "%T.SendTransaction()", s.ethclient)
-	s.waitForPendingEthTxs(ctx, tb, ethTx)
+	require.NoErrorf(tb, s.EthClient.SendTransaction(ctx, ethTx), "%T.SendTransaction()", s.EthClient)
+	s.WaitUntilTxsPending(tb, ethTx)
 	blk := s.issueAndExecute(ctx, tb, stx)
 	assertBlockIncludes(tb, blk, types.Transactions{ethTx}, []*tx.Tx{stx})
 
@@ -107,13 +107,13 @@ func (s *SUT) bootstrapFrom(ctx context.Context, t *testing.T, src *SUT, fromHei
 
 	require.NoErrorf(t, s.SetState(ctx, snow.Bootstrapping), "%T.SetState(Bootstrapping)", s.VM)
 
-	head := src.lastAcceptedHeight(ctx, t)
+	head := src.LastAcceptedBlock(t).Height()
 	for height := fromHeight + 1; height <= head; height++ {
 		s.parseVerifyAccept(ctx, t, src.blockAtHeight(ctx, t, height))
 	}
 
 	require.NoErrorf(t, s.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", s.VM)
-	require.NoErrorf(t, s.SetPreference(ctx, s.lastAccepted(ctx, t), nil), "%T.SetPreference()", s.VM)
+	require.NoErrorf(t, s.SetPreference(ctx, s.LastAcceptedID(t), nil), "%T.SetPreference()", s.VM)
 }
 
 // assertChainsMatch asserts that s and other agree on the last-accepted block
@@ -121,9 +121,9 @@ func (s *SUT) bootstrapFrom(ctx context.Context, t *testing.T, src *SUT, fromHei
 func (s *SUT) assertChainsMatch(ctx context.Context, t *testing.T, other *SUT) {
 	t.Helper()
 
-	require.Equalf(t, other.lastAccepted(ctx, t), s.lastAccepted(ctx, t), "%T.LastAccepted()", s.VM)
+	require.Equalf(t, other.LastAcceptedID(t), s.LastAcceptedID(t), "%T.LastAccepted()", s.VM)
 
-	head := s.lastAcceptedHeight(ctx, t)
+	head := s.LastAcceptedBlock(t).Height()
 	headBlk := s.blockAtHeight(ctx, t, head)
 	otherHeadBlk := other.blockAtHeight(ctx, t, head)
 	require.NoErrorf(t, headBlk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(height %d)", headBlk, head)

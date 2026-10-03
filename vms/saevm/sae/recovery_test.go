@@ -241,21 +241,21 @@ func TestRecover(t *testing.T) {
 				// CommitTrieDBEvery boundaries where the settled state was
 				// written to disk. Otherwise, the memory will leak.
 				t.Run("unavailable_outside_window", func(t *testing.T) {
-					lastSettled := sut.rawVM.last.settled.Load().NumberU64()
+					lastSettled := sut.RawVM.last.settled.Load().NumberU64()
 					committedHeight := saedb.LastCommittedTrieDBHeight(lastSettled, commitInterval)
-					lastOnDisk, err := canonicalBlock(sut.rawVM.db, committedHeight)
+					lastOnDisk, err := canonicalBlock(sut.RawVM.db, committedHeight)
 					require.NoErrorf(t, err, "canonicalBlock(): %d", committedHeight)
 
 					for i := sut.hooks.SettledBy(lastOnDisk.Header()).Height + 1; i < lastSettled; i++ {
-						ethB, err := canonicalBlock(sut.rawVM.db, i)
+						ethB, err := canonicalBlock(sut.RawVM.db, i)
 						require.NoErrorf(t, err, "canonicalBlock(%d)", i)
-						b, err := blocks.RestoreSettledBlock(ethB, sut.hooks, sut.logger, sut.db, sut.rawVM.xdb, sut.rawVM.exec.ChainConfig())
+						b, err := blocks.RestoreSettledBlock(ethB, sut.hooks, sut.Logger, sut.db, sut.RawVM.xdb, sut.RawVM.exec.ChainConfig())
 						require.NoErrorf(t, err, "RestoreSettledBlock(%d)", i)
 
 						// If these states were available they would eventually
 						// result in an OOM as the triedb leaked memory.
 						root := b.PostExecutionStateRoot()
-						_, err = sut.rawVM.exec.StateDB(root)
+						_, err = sut.RawVM.exec.StateDB(root)
 						want := testerr.As(func(got *trie.MissingNodeError) string {
 							if got.NodeHash != root {
 								return fmt.Sprintf("%T for hash %#x", got, root)
@@ -263,14 +263,14 @@ func TestRecover(t *testing.T) {
 							return ""
 						})
 						if diff := testerr.Diff(err, want); diff != "" {
-							t.Errorf("%T.StateDB([post-execution root of block %d]) %s", sut.rawVM.exec, b.NumberU64(), diff)
+							t.Errorf("%T.StateDB([post-execution root of block %d]) %s", sut.RawVM.exec, b.NumberU64(), diff)
 						}
 					}
 				})
 			}
 
 			t.Run("settle_after_recovery", func(t *testing.T) {
-				vmTime.AdvanceToSettle(ctx, t, sut.lastAcceptedBlock(t))
+				vmTime.AdvanceToSettle(ctx, t, sut.LastAcceptedBlock(t))
 				// use old wallet for correct nonce.
 				tx := src.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 					To:        &common.Address{},
@@ -326,7 +326,7 @@ func TestRecoverSnapshotAfterShutdown(t *testing.T) {
 	require.Equal(t, settled.PostExecutionStateRoot(), settler.SettledStateRoot(), "the settled root should have advanced")
 
 	sut.verifySnapshot(t)
-	snaps := sut.rawVM.exec.Snapshot()
+	snaps := sut.RawVM.exec.Snapshot()
 	sut.close()
 
 	// Closing flattens every diff layer into the disk layer before persisting
@@ -338,8 +338,8 @@ func TestRecoverSnapshotAfterShutdown(t *testing.T) {
 		c.db = saetest.CopyDB(t, db)
 	}))...)
 
-	snaps = sut.rawVM.exec.Snapshot()
-	require.NotNilf(t, snaps, "%T.Snapshot()", sut.rawVM.exec)
+	snaps = sut.RawVM.exec.Snapshot()
+	require.NotNilf(t, snaps, "%T.Snapshot()", sut.RawVM.exec)
 	require.Equalf(t, want, snaps.DiskRoot(), "%T.DiskRoot() after restart MUST be the root persisted at shutdown", snaps)
 	sut.verifySnapshot(t)
 }
@@ -378,7 +378,7 @@ func TestNewVMIncompatibleExecutionResults(t *testing.T) {
 	vmTime.AdvanceToSettle(ctx, t, b)
 	settler := src.runConsensusLoop(t)
 	require.NoErrorf(t, settler.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", settler)
-	require.Equal(t, b.Height(), src.rawVM.last.settled.Load().Height(), "settled height after accepting settler")
+	require.Equal(t, b.Height(), src.RawVM.last.settled.Load().Height(), "settled height after accepting settler")
 
 	_, err := tryNewSUT(t, 0, options.Func[sutConfig](func(c *sutConfig) {
 		c.hooks = hookstest.NewStub(100e6, hookstest.WithExecutionResultsDBFn(func(string) (saetypes.ExecutionResults, error) {
@@ -400,12 +400,12 @@ func requireConsensusCriticalBlocks(t *testing.T, src, sut *SUT) {
 	}
 
 	t.Run("consensus_critical", func(t *testing.T) {
-		if diff := cmp.Diff(src.rawVM.consensusCritical.m, sut.rawVM.consensusCritical.m, opts); diff != "" {
-			t.Errorf("%T.consensusCritical diff (-source +recovered):\n%s", src.rawVM, diff)
+		if diff := cmp.Diff(src.RawVM.consensusCritical.m, sut.RawVM.consensusCritical.m, opts); diff != "" {
+			t.Errorf("%T.consensusCritical diff (-source +recovered):\n%s", src.RawVM, diff)
 		}
-		for _, b := range sut.rawVM.consensusCritical.m {
+		for _, b := range sut.RawVM.consensusCritical.m {
 			root := b.PostExecutionStateRoot()
-			_, err := sut.rawVM.exec.StateDB(root)
+			_, err := sut.RawVM.exec.StateDB(root)
 			assert.NoErrorf(t, err, "post-execution state root %#x of consensus-critical block[%d] with hash %#x", root, b.Height(), b.Hash())
 		}
 	})
@@ -417,8 +417,8 @@ func requireConsensusCriticalBlocks(t *testing.T, src, sut *SUT) {
 			"settled":  func(vm *VM) *blocks.Block { return vm.last.settled.Load() },
 		} {
 			t.Run(name, func(t *testing.T) {
-				got := fn(sut.rawVM)
-				want := fn(src.rawVM)
+				got := fn(sut.RawVM)
+				want := fn(src.RawVM)
 				if diff := cmp.Diff(want, got, opts); diff != "" {
 					t.Errorf("(-want +got):\n%s", diff)
 				}
