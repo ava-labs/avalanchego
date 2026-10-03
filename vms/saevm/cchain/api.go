@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
@@ -429,6 +431,36 @@ func (c *Client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) 
 		return nil, 0, err
 	}
 	return t, uint64(resp.Height), nil
+}
+
+// AwaitTxAccepted polls [Client.GetTx] every freq until txID is accepted or
+// ctx is cancelled.
+func (c *Client) AwaitTxAccepted(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) error {
+	ticker := time.NewTicker(freq)
+	defer ticker.Stop()
+
+	for {
+		_, height, err := c.GetTx(ctx, txID, options...)
+		// SAE nodes report an unknown tx as database.ErrNotFound. The error
+		// chain does not survive JSON-RPC, so it is matched on the message.
+		if err != nil && !strings.HasSuffix(err.Error(), database.ErrNotFound.Error()) {
+			return err
+		}
+		// Pre-SAE nodes return processing txs without a height. The genesis
+		// block cannot include atomic txs, so a height of 0 means the tx is not
+		// accepted yet.
+		//
+		// TODO(owenwahlgren): Remove the height check during the coreth removal.
+		if err == nil && height != 0 {
+			return nil
+		}
+
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }
 
 func encodeTx(t *tx.Tx, encoding formatting.Encoding) (string, error) {

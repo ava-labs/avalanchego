@@ -4,19 +4,15 @@
 package c
 
 import (
-	"context"
 	"fmt"
 	"math/big"
-	"strings"
 	"time"
 
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/ethclient"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -179,7 +175,7 @@ func (w *wallet) IssueAtomicTx(
 		return w.Backend.AcceptAtomicTx(ctx, atx)
 	}
 
-	if err := awaitTxAccepted(ctx, w.avaxClient, txID, ops.PollFrequency()); err != nil {
+	if err := w.avaxClient.AwaitTxAccepted(ctx, txID, ops.PollFrequency()); err != nil {
 		return err
 	}
 
@@ -196,44 +192,6 @@ func (w *wallet) IssueAtomicTx(
 	}
 
 	return w.Backend.AcceptAtomicTx(ctx, atx)
-}
-
-// txGetter returns an accepted atomic tx and its block height.
-type txGetter interface {
-	GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) (*tx.Tx, uint64, error)
-}
-
-// awaitTxAccepted polls avax.getAtomicTx every freq until txID is accepted or
-// ctx is cancelled.
-func awaitTxAccepted(ctx context.Context, c txGetter, txID ids.ID, freq time.Duration) error {
-	ticker := time.NewTicker(freq)
-	defer ticker.Stop()
-
-	for {
-		_, height, err := c.GetTx(ctx, txID)
-		if err != nil && !isTxNotFound(err) {
-			return err
-		}
-		// Pre-SAE nodes return processing txs without a height. The genesis
-		// block cannot include atomic txs, so a height of 0 means the tx is not
-		// accepted yet.
-		if err == nil && height != 0 {
-			return nil
-		}
-
-		select {
-		case <-ticker.C:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-}
-
-// isTxNotFound reports whether err means the node has not accepted the tx yet.
-//
-// The error chain does not survive JSON-RPC, so this matches on the message.
-func isTxNotFound(err error) bool {
-	return strings.HasSuffix(err.Error(), database.ErrNotFound.Error())
 }
 
 func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
