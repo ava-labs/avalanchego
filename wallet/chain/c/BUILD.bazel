@@ -1,5 +1,4 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
-load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "c",
@@ -26,7 +25,6 @@ go_library(
         "//utils/crypto/secp256k1",
         "//utils/logging",
         "//utils/math",
-        "//utils/rpc",
         "//utils/set",
         "//vms/avm",
         "//vms/components/avax",
@@ -38,18 +36,5 @@ go_library(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//ethclient",
-    ],
-)
-
-go_test(
-    name = "c_test",
-    srcs = ["wallet_test.go"],
-    embed = [":c"],
-    deps = [
-        "//database",
-        "//ids",
-        "//utils/rpc",
-        "//vms/saevm/cchain/tx",
-        "@com_github_stretchr_testify//require",
     ],
 )

@@ -10,9 +10,12 @@ import (
 	"fmt"
 	"maps"
 	"math/big"
+	"net/http/httptrace"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -163,6 +166,46 @@ func TestGetTxNotFound(t *testing.T) {
 
 	_, _, err := sut.GetTx(ctx, ids.GenerateTestID())
 	require.ErrorContainsf(t, err, errFetchingTx.Error(), "%T.GetTx()", sut.Client)
+}
+
+// TestAwaitTxAccepted asserts that [Client.AwaitTxAccepted] keeps polling while
+// the tx is unknown and returns once the tx is accepted.
+func TestAwaitTxAccepted(t *testing.T) {
+	sk := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(sk.EthAddress()))
+
+	stx := newWallet(sk, sut.ctx, sut.Client).newMinimalTx(t)
+	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
+
+	// The tx is accepted only after a second poll, which proves that the first
+	// unknown response did not end the wait.
+	var (
+		polls  atomic.Int32
+		polled = make(chan struct{})
+	)
+	// Bound the wait so a regression that never returns fails fast with a
+	// clear message rather than hanging until the test-wide timeout.
+	pollCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	pollCtx = httptrace.WithClientTrace(pollCtx, &httptrace.ClientTrace{
+		GotFirstResponseByte: func() {
+			if polls.Add(1) == 2 {
+				close(polled)
+			}
+		},
+	})
+	errs := make(chan error, 1)
+	go func() {
+		errs <- sut.AwaitTxAccepted(pollCtx, stx.ID(), time.Millisecond)
+	}()
+	select {
+	case <-polled:
+	case err := <-errs:
+		t.Fatalf("%T.AwaitTxAccepted() returned before the tx was accepted: %v", sut.Client, err)
+	}
+
+	sut.runConsensusLoop(ctx, t)
+	require.NoErrorf(t, <-errs, "%T.AwaitTxAccepted()", sut.Client)
 }
 
 // TestGetAtomicTxStatus exercises the deprecated avax.getAtomicTxStatus
