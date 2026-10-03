@@ -104,6 +104,11 @@ type Bootstrapper struct {
 	// Tracks the last requestID that was used in a request
 	requestID uint32
 
+	// linearized is set once the DAG has been fully executed and the VM has
+	// been linearized in this process.
+	// Linearize initializes the snowman VM stack, which is not idempotent.
+	linearized bool
+
 	// Called when bootstrapping is done on a specific chain
 	onFinished func(ctx context.Context, lastReqID uint32) error
 }
@@ -626,9 +631,18 @@ func (b *Bootstrapper) checkFinish(ctx context.Context) error {
 	// Invariant: edge will only be the stop vertex
 	edge := b.Manager.Edge(ctx)
 	stopVertexID := edge[0]
+
+	if b.linearized {
+		// Bootstrapping already finished. Avoid linearizing the DAG again, which would re-initialize the VM stack and cause errors.
+		b.Ctx.Log.Debug("skipping linearization because the DAG has already been linearized")
+		return nil
+	}
+
 	if err := b.VM.Linearize(ctx, stopVertexID); err != nil {
 		return err
 	}
+	// Mark that the DAG has been fully executed and the VM has been linearized.
+	b.linearized = true
 
 	b.processedCache.Flush()
 	return b.onFinished(ctx, b.requestID)

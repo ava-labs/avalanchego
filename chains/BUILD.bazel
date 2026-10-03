@@ -75,12 +75,30 @@ go_library(
 
 go_test(
     name = "chains_test",
-    srcs = ["subnets_test.go"],
+    srcs = [
+        "linearizable_vm_test.go",
+        "subnets_test.go",
+    ],
     embed = [":chains"],
     deps = [
+        "//database/memdb",
+        "//database/prefixdb",
         "//ids",
+        "//network/p2p",
+        "//snow/choices",
+        "//snow/consensus/avalanche",
+        "//snow/engine/avalanche/bootstrap",
+        "//snow/engine/avalanche/bootstrap/queue",
+        "//snow/engine/avalanche/vertex/vertextest",
+        "//snow/engine/common",
+        "//snow/engine/enginetest",
+        "//snow/snowtest",
         "//subnets",
         "//utils/constants",
+        "//utils/logging",
+        "//version",
+        "//vms/metervm",
+        "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",
     ],
 )
