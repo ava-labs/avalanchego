@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"math"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -23,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/ava-labs/avalanchego/utils/set"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -38,19 +36,13 @@ const (
 )
 
 var (
-	ErrAlreadyStarted                 = errors.New("cannot start a Syncer that has already been started")
-	ErrAlreadyClosed                  = errors.New("Syncer is closed")
-	ErrNoRangeProofMarshalerProvided  = errors.New("range proof marshaler is a required field of the sync config")
-	ErrNoChangeProofMarshalerProvided = errors.New("change proof marshaler is a required field of the sync config")
-	ErrNoProofClientProvided          = errors.New("proof client is a required field of the sync config")
-	ErrNoDatabaseProvided             = errors.New("sync database is a required field of the sync config")
-	ErrNoLogProvided                  = errors.New("log is a required field of the sync config")
-	ErrZeroWorkLimit                  = errors.New("simultaneous work limit must be greater than 0")
-	ErrFinishedWithUnexpectedRoot     = errors.New("finished syncing with an unexpected root")
-	errInvalidRangeProof              = errors.New("failed to verify range proof")
-	errInvalidChangeProof             = errors.New("failed to verify change proof")
-	errTooManyBytes                   = errors.New("response contains more than requested bytes")
-	errUnexpectedResponseType         = errors.New("unexpected response type")
+	ErrAlreadyStarted             = errors.New("cannot start a Syncer that has already been started")
+	ErrAlreadyClosed              = errors.New("Syncer is closed")
+	ErrFinishedWithUnexpectedRoot = errors.New("finished syncing with an unexpected root")
+	errInvalidRangeProof          = errors.New("failed to verify range proof")
+	errInvalidChangeProof         = errors.New("failed to verify change proof")
+	errTooManyBytes               = errors.New("response contains more than requested bytes")
+	errUnexpectedResponseType     = errors.New("unexpected response type")
 )
 
 type priority byte
@@ -100,11 +92,16 @@ type Syncer[R any, C any] struct {
 	// The database to sync.
 	db DB[R, C]
 
-	// Must be held when accessing [config.TargetRoot].
-	syncTargetLock sync.RWMutex
-	config         Config[R, C]
+	syncTargetLock sync.RWMutex // CANNOT be held inside workLock
+	targetRoot     ids.ID
 
-	workLock sync.Mutex
+	rangeProofMarshaler  Marshaler[R]
+	changeProofMarshaler Marshaler[C]
+	client               *p2p.Client
+	config               Config[R, C]
+
+	workLock sync.Mutex // CANNOT be held outside targetLock
+
 	// The number of work items currently being processed.
 	// Namely, the number of goroutines executing [doWork].
 	// [workLock] must be held when accessing [processingWorkItems].
@@ -138,54 +135,84 @@ type Syncer[R any, C any] struct {
 	syncing   bool
 	closeOnce sync.Once
 
-	stateSyncNodeIdx uint32
-	metrics          *syncerMetrics
+	metrics *syncerMetrics
 }
 
-// TODO remove non-config values out of this struct
+type PeerTracker interface {
+	RegisterFailure(nodeID ids.NodeID)
+	RegisterRequest(nodeID ids.NodeID)
+	RegisterResponse(nodeID ids.NodeID, bandwidth float64)
+}
+
+var (
+	_ PeerTracker = (*p2p.PeerTracker)(nil)
+	_ PeerTracker = (*noopTracker)(nil)
+)
+
+type noopTracker struct{}
+
+func (noopTracker) RegisterFailure(ids.NodeID)           {}
+func (noopTracker) RegisterRequest(ids.NodeID)           {}
+func (noopTracker) RegisterResponse(ids.NodeID, float64) {}
+
+// Config provides all optional arguments for the syncer.
 type Config[R any, C any] struct {
-	RangeProofMarshaler   Marshaler[R]
-	ChangeProofMarshaler  Marshaler[C]
-	ProofClient           *p2p.Client
+	// Registerer is the Prometheus registerer at which metrics will be
+	// recorded under the "sync" prefix.
+	Registerer prometheus.Registerer
+	// PeerTracker records bandwidth usage for peers.
+	PeerTracker PeerTracker
+	// Defaults to [logging.NoLog]
+	Log logging.Logger
+	// EmptyRoot is the root of an empty trie. Defaults to [ids.Empty].
+	EmptyRoot ids.ID
+	// SimultaneousWorkLimit is the maximum number of work items that can be
+	// processed concurrently. Defaults to 1.
 	SimultaneousWorkLimit int
-	Log                   logging.Logger
-	TargetRoot            ids.ID
-	EmptyRoot             ids.ID
-	StateSyncNodes        []ids.NodeID
+}
+
+func (c Config[R, C]) applyDefaults() Config[R, C] {
+	if c.Registerer == nil {
+		c.Registerer = prometheus.NewRegistry()
+	}
+	if c.PeerTracker == nil {
+		c.PeerTracker = noopTracker{}
+	}
+	if c.Log == nil {
+		c.Log = logging.NoLog{}
+	}
+	if c.SimultaneousWorkLimit == 0 {
+		c.SimultaneousWorkLimit = 1
+	}
+	return c
 }
 
 func NewSyncer[R any, C any](
-	db DB[R, C],
 	config Config[R, C],
-	registerer prometheus.Registerer,
+	db DB[R, C],
+	targetRoot ids.ID,
+	rangeProofMarshaler Marshaler[R],
+	changeProofMarshaler Marshaler[C],
+	proofClient *p2p.Client,
 ) (*Syncer[R, C], error) {
-	switch {
-	case db == nil:
-		return nil, ErrNoDatabaseProvided
-	case config.RangeProofMarshaler == nil:
-		return nil, ErrNoRangeProofMarshalerProvided
-	case config.ChangeProofMarshaler == nil:
-		return nil, ErrNoChangeProofMarshalerProvided
-	case config.ProofClient == nil:
-		return nil, ErrNoProofClientProvided
-	case config.Log == nil:
-		return nil, ErrNoLogProvided
-	case config.SimultaneousWorkLimit == 0:
-		return nil, ErrZeroWorkLimit
-	}
+	config = config.applyDefaults()
 
-	metrics, err := newSyncerMetrics("sync", registerer)
+	metrics, err := newSyncerMetrics("sync", config.Registerer)
 	if err != nil {
 		return nil, err
 	}
 
 	s := &Syncer[R, C]{
-		db:              db,
-		config:          config,
-		doneChan:        make(chan struct{}),
-		unprocessedWork: newWorkHeap(),
-		processedWork:   newWorkHeap(),
-		metrics:         metrics,
+		db:                   db,
+		config:               config,
+		targetRoot:           targetRoot,
+		rangeProofMarshaler:  rangeProofMarshaler,
+		changeProofMarshaler: changeProofMarshaler,
+		client:               proofClient,
+		doneChan:             make(chan struct{}),
+		unprocessedWork:      newWorkHeap(),
+		processedWork:        newWorkHeap(),
+		metrics:              metrics,
 	}
 	s.unprocessedWorkCond = lock.NewCond(&s.workLock)
 
@@ -228,6 +255,8 @@ func (s *Syncer[_, _]) Sync(ctx context.Context) error {
 
 // setup initiates the work queue and enables cancellation through a new context.
 func (s *Syncer[_, _]) setup(ctx context.Context) (context.Context, error) {
+	s.syncTargetLock.RLock()
+	defer s.syncTargetLock.RUnlock()
 	s.workLock.Lock()
 	defer s.workLock.Unlock()
 
@@ -235,7 +264,7 @@ func (s *Syncer[_, _]) setup(ctx context.Context) (context.Context, error) {
 		return ctx, ErrAlreadyStarted
 	}
 
-	s.config.Log.Info("starting sync", zap.Stringer("target root", s.config.TargetRoot))
+	s.config.Log.Info("starting sync", zap.Stringer("target root", s.targetRoot))
 
 	// Add work item to fetch the entire key range.
 	// Note that this will be the first work item to be processed.
@@ -418,18 +447,16 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, err error) {
+	onResponse := func(ctx context.Context, responseBytes []byte, appErr error) error {
 		defer s.finishWorkItem()
-
-		if err := s.handleChangeProofResponse(ctx, targetRootID, work, changeReq, responseBytes, err); err != nil {
-			// TODO log responses
-			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
+		if err := s.handleChangeProofResponse(ctx, targetRootID, work, changeReq, responseBytes, appErr); err != nil {
 			s.retryWork(work)
-			return
+			return err
 		}
+		return nil
 	}
 
-	if err := s.sendRequest(ctx, s.config.ProofClient, requestBytes, onResponse); err != nil {
+	if err := s.sendRequest(ctx, requestBytes, onResponse); err != nil {
 		s.finishWorkItem()
 		s.setError(err)
 		return
@@ -473,18 +500,16 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) {
+	onResponse := func(ctx context.Context, responseBytes []byte, appErr error) error {
 		defer s.finishWorkItem()
-
 		if err := s.handleRangeProofResponse(ctx, targetRootID, work, rangeReq, responseBytes, appErr); err != nil {
-			// TODO log responses
-			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
-			return
+			return err
 		}
+		return nil
 	}
 
-	if err := s.sendRequest(ctx, s.config.ProofClient, requestBytes, onResponse); err != nil {
+	if err := s.sendRequest(ctx, requestBytes, onResponse); err != nil {
 		s.finishWorkItem()
 		s.setError(err)
 		return
@@ -495,20 +520,25 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 
 func (s *Syncer[_, _]) sendRequest(
 	ctx context.Context,
-	client *p2p.Client,
 	requestBytes []byte,
-	onResponse p2p.AppResponseCallback,
+	onResponse func(ctx context.Context, responseBytes []byte, appErr error) error,
 ) error {
-	if len(s.config.StateSyncNodes) == 0 {
-		return client.AppRequestAny(ctx, requestBytes, onResponse)
-	}
+	pt := s.config.PeerTracker
+	start := time.Now()
+	return s.client.AppRequestAny(ctx, requestBytes, func(ctx context.Context, nodeID ids.NodeID, responseBytes []byte, appErr error) {
+		pt.RegisterRequest(nodeID)
 
-	// Get the next nodeID to query using the [nodeIdx] offset.
-	// If we're out of nodes, loop back to 0.
-	// We do this try to query a different node each time if possible.
-	nodeIdx := atomic.AddUint32(&s.stateSyncNodeIdx, 1)
-	nodeID := s.config.StateSyncNodes[nodeIdx%uint32(len(s.config.StateSyncNodes))]
-	return client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse)
+		timeToRespond := time.Since(start)
+		if err := onResponse(ctx, responseBytes, appErr); err != nil {
+			s.config.Log.Debug("dropping response", zap.Stringer("peer", nodeID), zap.Error(err))
+			pt.RegisterFailure(nodeID)
+			return
+		}
+
+		const epsilon = 1e-9 // avoid division by zero
+		bandwidth := float64(len(responseBytes)) / float64(timeToRespond.Seconds()+epsilon)
+		pt.RegisterResponse(nodeID, bandwidth)
+	})
 }
 
 func (s *Syncer[_, _]) retryWork(work *workItem) {
@@ -526,11 +556,11 @@ func (s *Syncer[_, _]) retryWork(work *workItem) {
 func (s *Syncer[_, _]) shouldHandleResponse(
 	bytesLimit uint32,
 	responseBytes []byte,
-	err error,
+	appErr error,
 ) error {
-	if err != nil {
+	if appErr != nil {
 		s.metrics.requestFailed()
-		return err
+		return appErr
 	}
 
 	s.metrics.requestSucceeded()
@@ -568,7 +598,7 @@ func (s *Syncer[R, _]) handleRangeProofResponse(
 	}
 
 	// A change proof returned is unexpected.
-	rangeProof, err := s.config.RangeProofMarshaler.Unmarshal(response.GetRangeProof())
+	rangeProof, err := s.rangeProofMarshaler.Unmarshal(response.GetRangeProof())
 	if err != nil {
 		return err
 	}
@@ -622,7 +652,7 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 	switch response := response.Response.(type) {
 	case *pb.ProofResponse_ChangeProof:
 		// The server had enough history to send us a change proof
-		changeProof, err := s.config.ChangeProofMarshaler.Unmarshal(response.ChangeProof)
+		changeProof, err := s.changeProofMarshaler.Unmarshal(response.ChangeProof)
 		if err != nil {
 			return err
 		}
@@ -654,7 +684,7 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 
 		s.completeWorkItem(work, nextKey, targetRootID)
 	case *pb.ProofResponse_RangeProof:
-		rangeProof, err := s.config.RangeProofMarshaler.Unmarshal(response.RangeProof)
+		rangeProof, err := s.rangeProofMarshaler.Unmarshal(response.RangeProof)
 		if err != nil {
 			return err
 		}
@@ -735,13 +765,13 @@ func (s *Syncer[_, _]) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 	default:
 	}
 
-	if s.config.TargetRoot == syncTargetRoot {
+	if s.targetRoot == syncTargetRoot {
 		// the target hasn't changed, so there is nothing to do
 		return nil
 	}
 
 	s.config.Log.Debug("updated sync target", zap.Stringer("target", syncTargetRoot))
-	s.config.TargetRoot = syncTargetRoot
+	s.targetRoot = syncTargetRoot
 
 	// move all completed ranges into the work heap with high priority
 	shouldSignal := s.processedWork.Len() > 0
@@ -765,7 +795,7 @@ func (s *Syncer[_, _]) getTargetRoot() ids.ID {
 	s.syncTargetLock.RLock()
 	defer s.syncTargetLock.RUnlock()
 
-	return s.config.TargetRoot
+	return s.targetRoot
 }
 
 // Record that there was a fatal error and begin shutting down.
@@ -773,8 +803,13 @@ func (s *Syncer[_, _]) setError(err error) {
 	s.errLock.Lock()
 	defer s.errLock.Unlock()
 
+	if s.fatalError != nil {
+		return
+	}
+
 	s.config.Log.Error("sync errored", zap.Error(err))
 	s.fatalError = err
+
 	// Call in goroutine because we might be holding [s.workLock]
 	go func() {
 		s.workLock.Lock()
@@ -814,7 +849,7 @@ func (s *Syncer[_, _]) completeWorkItem(
 	s.syncTargetLock.RLock()
 	defer s.syncTargetLock.RUnlock()
 
-	stale := s.config.TargetRoot != rootID
+	stale := s.targetRoot != rootID
 	if stale {
 		// the root has changed, so reinsert with high priority
 		s.enqueueWork(newWorkItem(rootID, work.start, largestHandledKey, highPriority, time.Now()))
