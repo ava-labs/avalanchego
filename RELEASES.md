@@ -14,6 +14,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 - Updated the minimum Go version from `1.25.10` to `1.26.8`.
+- Optimized iteration over the C-Chain cross-chain transaction pool: block building and gossip now iterate a constant-time, copy-on-write snapshot of the pool instead of copying and sorting every pending transaction on each call. Transactions with equal gas prices are now ordered by ID.
 - Helicon is now active from genesis on local networks. A local network started on a previous version is not compatible with this version.
 
 ### APIs

@@ -5,6 +5,7 @@ package txpool
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"slices"
 	"testing"
@@ -608,5 +609,176 @@ func TestVerifyOp(t *testing.T) {
 			err := verifyOp(sdb, op)
 			require.ErrorIsf(t, err, tt.want, "verifyOp(%T, %T)", sdb, op)
 		})
+	}
+}
+
+// TestIterTieBreak verifies that transactions with equal gas prices are
+// yielded in ascending ID order regardless of the order in which they were
+// added, so block builders observe a deterministic order.
+func TestIterTieBreak(t *testing.T) {
+	const fee = 50
+	var (
+		alice = newKey(t)
+		bob   = newKey(t)
+
+		aliceTx = newExport(t, []*secp256k1.PrivateKey{alice}, withAmount(fee))
+		bobTx   = newExport(t, []*secp256k1.PrivateKey{bob}, withAmount(fee))
+	)
+
+	// Guard the premise of the test: both transactions have the same gas
+	// price, so only the tie-break determines their relative order.
+	aliceData, err := newTxData(aliceTx, snowtest.AVAXAssetID)
+	require.NoError(t, err)
+	bobData, err := newTxData(bobTx, snowtest.AVAXAssetID)
+	require.NoError(t, err)
+	require.Equal(t, aliceData.op.GasFeeCap, bobData.op.GasFeeCap, "gas prices must be equal")
+
+	want := []*tx.Tx{aliceTx, bobTx}
+	slices.SortFunc(want, func(a, b *tx.Tx) int {
+		return a.ID().Compare(b.ID())
+	})
+
+	tests := []struct {
+		name string
+		init []*tx.Tx
+	}{
+		{
+			name: "alice_then_bob",
+			init: []*tx.Tx{aliceTx, bobTx},
+		},
+		{
+			name: "bob_then_alice",
+			init: []*tx.Tx{bobTx, aliceTx},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, sut := newSUT(t, newState(t, alice, bob))
+			for i, raw := range tt.init {
+				require.NoErrorf(t, sut.Add(raw), "%T.Add([%d])", sut, i)
+			}
+			sut.assertEquals(ctx, t, want...)
+		})
+	}
+}
+
+// TestIterSnapshot verifies that [Pending.Iter] ranges over the pool as it was
+// when Iter was called, and that the pool can be queried and modified while
+// iterating.
+func TestIterSnapshot(t *testing.T) {
+	const (
+		highFee = 100
+		lowFee  = 50
+	)
+	var (
+		alice = newKey(t)
+		bob   = newKey(t)
+
+		aliceLow = newExport(t, []*secp256k1.PrivateKey{alice}, withAmount(lowFee))
+		bobHigh  = newExport(t, []*secp256k1.PrivateKey{bob}, withAmount(highFee))
+	)
+
+	ctx, sut := newSUT(t, newState(t, alice, bob))
+	require.NoError(t, sut.Add(aliceLow))
+
+	// The snapshot is taken when Iter is called, not when the loop starts.
+	it := sut.Iter()
+
+	var got []*tx.Tx
+	for pooled := range it {
+		got = append(got, pooled)
+
+		// Modifying and querying the pool from within the loop must neither
+		// deadlock nor change what the iterator yields.
+		require.NoError(t, sut.Add(bobHigh))
+		require.True(t, sut.Has(bobHigh.ID()))
+		require.Equal(t, 2, sut.Len())
+	}
+	if diff := cmp.Diff([]*tx.Tx{aliceLow}, got, txtest.CmpOpt()); diff != "" {
+		t.Errorf("%T.Iter() during modification diff (-want +got):\n%s", sut, diff)
+	}
+
+	// A fresh iterator observes the modification, and the snapshot taken
+	// before bobHigh was added is unaffected by a later removal.
+	sut.assertEquals(ctx, t, bobHigh, aliceLow)
+	stale := sut.Iter()
+	sut.markAsExecuted(t, cchaintest.NewTestBlock(t, cchaintest.WithCrossChainTxs(aliceLow)), newState(t, alice, bob))
+	sut.assertEquals(ctx, t, bobHigh)
+	if diff := cmp.Diff([]*tx.Tx{bobHigh, aliceLow}, slices.Collect(stale), txtest.CmpOpt()); diff != "" {
+		t.Errorf("stale %T.Iter() diff (-want +got):\n%s", sut, diff)
+	}
+}
+
+// BenchmarkIter measures the cost of iterating over a pool of n transactions.
+// "first" stops after the first transaction, isolating the cost of starting an
+// iteration from the cost of visiting every transaction.
+func BenchmarkIter(b *testing.B) {
+	for _, n := range []int{64, 1024} {
+		p := NewPending()
+		for i := range n {
+			raw := newExport(b, []*secp256k1.PrivateKey{newKey(b)}, withAmount(uint64(i+1))) //#nosec G115 -- Won't overflow
+			t, err := newTxData(raw, snowtest.AVAXAssetID)
+			require.NoError(b, err)
+			p.add(t)
+		}
+
+		b.Run(fmt.Sprintf("n=%d/first", n), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				for range p.Iter() {
+					break
+				}
+			}
+		})
+		b.Run(fmt.Sprintf("n=%d/all", n), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				var visited int
+				for range p.Iter() {
+					visited++
+				}
+				if visited != n {
+					b.Fatalf("visited %d of %d transactions", visited, n)
+				}
+			}
+		})
+	}
+}
+
+// BenchmarkReplace measures the cost of removing and re-adding a transaction
+// in a pool of n transactions. "after_snapshot" takes an [Pending.Iter]
+// snapshot before every replacement, so it includes the cost that
+// copy-on-write mutations pay for preserving the snapshot.
+func BenchmarkReplace(b *testing.B) {
+	for _, n := range []int{64, 1024} {
+		p := NewPending()
+		txs := make([]*txData, n)
+		for i := range n {
+			raw := newExport(b, []*secp256k1.PrivateKey{newKey(b)}, withAmount(uint64(i+1))) //#nosec G115 -- Won't overflow
+			t, err := newTxData(raw, snowtest.AVAXAssetID)
+			require.NoError(b, err)
+			p.add(t)
+			txs[i] = t
+		}
+		replaced := txs[n/2]
+
+		b.Run(fmt.Sprintf("n=%d/no_snapshot", n), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				p.removeConflicts(replaced.inputs)
+				p.add(replaced)
+			}
+		})
+		b.Run(fmt.Sprintf("n=%d/after_snapshot", n), func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				_ = p.Iter()
+				p.removeConflicts(replaced.inputs)
+				p.add(replaced)
+			}
+		})
+		if p.Len() != n {
+			b.Fatalf("pool has %d of %d transactions", p.Len(), n)
+		}
 	}
 }
