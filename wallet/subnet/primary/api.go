@@ -133,16 +133,14 @@ func FetchState(
 		}
 	}
 	for _, sourceChainID := range sourceChainIDs {
-		err = addAllCChainUTXOs(
-			ctx,
-			utxos,
-			cClient,
-			sourceChainID,
-			cCTX.BlockchainID,
-			addrList,
-		)
+		cUTXOs, err := cClient.GetAllUTXOs(ctx, addrList, sourceChainID)
 		if err != nil {
 			return nil, err
+		}
+		for _, utxo := range cUTXOs {
+			if err := utxos.AddUTXO(ctx, sourceChainID, cCTX.BlockchainID, utxo); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return &AVAXState{
@@ -281,47 +279,4 @@ func AddAllUTXOs(
 		startUTXO = endUTXO
 	}
 	return nil
-}
-
-// addAllCChainUTXOs adds to utxos every UTXO owned by addrs that was exported
-// from sourceChainID to the C-Chain.
-func addAllCChainUTXOs(
-	ctx context.Context,
-	utxos walletcommon.UTXOs,
-	client *cchain.Client,
-	sourceChainID ids.ID,
-	cChainID ids.ID,
-	addrs []ids.ShortID,
-) error {
-	var (
-		startAddr ids.ShortID
-		startUTXO ids.ID
-	)
-	for {
-		page, endAddr, endUTXO, err := client.GetUTXOs(
-			ctx,
-			addrs,
-			sourceChainID,
-			fetchLimit,
-			startAddr,
-			startUTXO,
-		)
-		if err != nil {
-			return err
-		}
-
-		for _, utxo := range page {
-			if err := utxos.AddUTXO(ctx, sourceChainID, cChainID, utxo); err != nil {
-				return err
-			}
-		}
-
-		if len(page) < fetchLimit {
-			return nil
-		}
-
-		// Update the vars to query the next page of UTXOs.
-		startAddr = endAddr
-		startUTXO = endUTXO
-	}
 }

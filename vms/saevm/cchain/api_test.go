@@ -57,43 +57,6 @@ func (c *Client) getTxStatus(ctx context.Context, txID ids.ID) (TxStatus, error)
 	return resp, err
 }
 
-// getAllUTXOs drains [Client.GetUTXOs] for addrs by walking pages of size limit
-// until a short page signals the end of the result set.
-func (c *Client) getAllUTXOs(
-	ctx context.Context,
-	tb testing.TB,
-	sourceChain ids.ID,
-	limit uint32,
-	addrs ...ids.ShortID,
-) []*avax.UTXO {
-	tb.Helper()
-
-	var (
-		startAddr   ids.ShortID
-		startUTXOID ids.ID
-		utxos       []*avax.UTXO
-	)
-	for {
-		page, endAddr, endUTXOID, err := c.GetUTXOs(
-			ctx,
-			addrs,
-			sourceChain,
-			limit,
-			startAddr,
-			startUTXOID,
-		)
-		require.NoErrorf(tb, err, "%T.GetUTXOs()", c)
-		utxos = append(utxos, page...)
-		// This termination condition matches the original synchronous C-Chain
-		// API behavior. Changing the expected termination condition could
-		// accidentally break legacy users.
-		if uint64(len(page)) < uint64(limit) {
-			return utxos
-		}
-		startAddr, startUTXOID = endAddr, endUTXOID
-	}
-}
-
 // TestIssueTxRejectsInvalidTransaction asserts that [Client.IssueTx] surfaces
 // an error from the transaction pool's verification pipeline.
 func TestIssueTxRejectsInvalidTransaction(t *testing.T) {
@@ -238,13 +201,15 @@ func TestGetAtomicTxStatus(t *testing.T) {
 	})
 }
 
-// TestGetUTXOsPagination asserts that walking [Client.GetUTXOs] yields each
-// seeded UTXO exactly once.
+// TestGetUTXOsPagination asserts that [Client.GetAllUTXOs] yields each seeded
+// UTXO exactly once.
 func TestGetUTXOsPagination(t *testing.T) {
 	ctx, sut := newSUT(t)
 
 	sourceChain := sut.ctx.XChainID
-	const numUTXOs uint64 = 5
+	// Two full pages cross one page boundary. Because the last page is full,
+	// one more request is needed, and it returns no UTXOs.
+	const numUTXOs uint64 = 2 * maxGetUTXOsLimit
 	want := make([]*avax.UTXO, numUTXOs)
 	addr := txtest.NewKey(t).Address()
 	for i := range numUTXOs {
@@ -252,11 +217,16 @@ func TestGetUTXOsPagination(t *testing.T) {
 	}
 	sut.addUTXOs(t, sut.ctx.ChainID, sourceChain, want...)
 
-	// pageSize=1 stresses the boundary behavior so any off-by-one in the cursor
-	// logic will surface here.
-	const pageSize = 1
-	got := sut.Client.getAllUTXOs(ctx, t, sourceChain, pageSize, addr)
-	if diff := cmp.Diff(want, got, txtest.UTXOCmpOpt()); diff != "" {
+	got, err := sut.Client.GetAllUTXOs(ctx, []ids.ShortID{addr}, sourceChain)
+	require.NoErrorf(t, err, "%T.GetAllUTXOs()", sut.Client)
+	// Walking this many UTXOs field by field takes seconds under -race, so
+	// compare each pair by its encoding.
+	byEncoding := cmp.Comparer(func(a, b *avax.UTXO) bool {
+		aBytes, aErr := tx.MarshalUTXO(a)
+		bBytes, bErr := tx.MarshalUTXO(b)
+		return aErr == nil && bErr == nil && bytes.Equal(aBytes, bBytes)
+	})
+	if diff := cmp.Diff(want, got, txtest.UTXOCmpOpt(), byEncoding); diff != "" {
 		t.Errorf("paginated UTXOs (-want +got):\n%s", diff)
 	}
 }
