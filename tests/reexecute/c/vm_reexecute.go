@@ -84,6 +84,15 @@ var (
 			"pruning-enabled": false,
 			"state-sync-enabled": false
 		}`,
+		"firewood-warmup": `{
+			"state-scheme": "firewood",
+			"snapshot-cache": 0,
+			"pruning-enabled": true,
+			"state-sync-enabled": false,
+			"commit-interval": 4096,
+			"state-history": 8192,
+			"speculative-warmup-enabled": true
+		}`,
 	}
 
 	configNameArg  string

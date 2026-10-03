@@ -63,6 +63,10 @@ type Config struct {
 	TriePrefetcherParallelism int `json:"trie-prefetcher-parallelism"` // Max concurrent disk reads trie prefetcher should perform at once
 	SnapshotCache             int `json:"snapshot-cache"`              // Size of the snapshot disk layer clean cache (MB)
 
+	// SpeculativeWarmup warms the state caches by speculatively executing a
+	// block's transactions in parallel with the sequential execution.
+	SpeculativeWarmup bool `json:"speculative-warmup-enabled"`
+
 	// Eth Settings
 	Preimages      bool `json:"preimages-enabled"`
 	SnapshotWait   bool `json:"snapshot-wait"`

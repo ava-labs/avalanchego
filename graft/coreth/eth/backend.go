@@ -221,6 +221,7 @@ func New(
 			TrieDirtyLimit:                  config.TrieDirtyCache,
 			TrieDirtyCommitTarget:           config.TrieDirtyCommitTarget,
 			TriePrefetcherParallelism:       config.TriePrefetcherParallelism,
+			SpeculativeWarmup:               config.SpeculativeWarmup,
 			Pruning:                         config.Pruning,
 			AcceptorQueueLimit:              config.AcceptorQueueLimit,
 			CommitInterval:                  config.CommitInterval,
