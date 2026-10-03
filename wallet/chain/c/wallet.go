@@ -202,6 +202,8 @@ func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
 	}
 
 	ctx := ops.Context()
+	// TODO(owenwahlgren): Expose an SAE client that includes the
+	// Avalanche-custom eth RPCs, such as eth_baseFee, and use it here.
 	var fee hexutil.Big
 	if err := w.ethClient.Client().CallContext(ctx, &fee, "eth_baseFee"); err != nil {
 		return nil, err
