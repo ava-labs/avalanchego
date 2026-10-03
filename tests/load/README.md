@@ -45,7 +45,7 @@ The generator executes multiple tests concurrently against the network. The key 
 generator are as follows:
 
 - **Parallel Execution**: Runs a goroutine per wallet for concurrent test execution.
-- **Timeout Management**: Supports both overall load test timeout and a timeout per-test.
+- **Timeout Management**: Supports both an overall load test timeout and a per-test timeout. The load timeout stops new tests from being started but lets in-flight tests finish, so a run may overrun the load timeout by at most the per-test timeout.
 - **Error Recovery**: Automatically recovers from test failures to ensure continuous load generation.
 - **Metrics**: Creates metrics during wallet initialization and tracks performance throughout execution.
 
