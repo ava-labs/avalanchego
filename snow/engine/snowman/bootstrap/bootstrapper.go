@@ -33,6 +33,11 @@ const (
 	// Delay bootstrapping to avoid potential CPU burns
 	bootstrappingDelay = 10 * time.Second
 
+	// followOnlyPollInterval is how long a [FollowOnly] chain waits before
+	// re-checking the beacon frontier for new blocks. Roughly the P-chain
+	// block cadence.
+	followOnlyPollInterval = 2 * time.Second
+
 	// statusUpdateFrequency is how many containers should be processed between
 	// logs
 	statusUpdateFrequency = 5000
@@ -113,6 +118,15 @@ type Bootstrapper struct {
 	executedStateTransitions uint64
 	awaitingTimeout          bool
 
+	// followOnlyTimer re-arms a [FollowOnly] chain's bootstrap loop. Unlike
+	// [TimeoutRegistrar], it is NOT preempted by AllBootstrapped (which is
+	// already closed once the chain has synced), so the delay actually applies
+	// instead of firing instantly and spinning the CPU.
+	followOnlyTimer common.TimeoutRegistrar
+	// followOnlyTipID is the last frontier a [FollowOnly] chain synced to, used
+	// to skip re-fetching when the frontier hasn't advanced.
+	followOnlyTipID ids.ID
+
 	tree            *interval.Tree
 	missingBlockIDs set.Set[ids.ID]
 
@@ -158,9 +172,17 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 
 		if err := bs.Timeout(); err != nil {
 			bs.Config.Ctx.Log.Warn("Encountered error during bootstrapping: %w", zap.Error(err))
+			if bs.Config.FollowOnly && !bs.Halted() {
+				// Keep polling; otherwise this chain would stop tracking the
+				// tip forever.
+				bs.awaitingTimeout = true
+				bs.followOnlyTimer.RegisterTimeout(followOnlyPollInterval)
+			}
 		}
 	}
 	bs.TimeoutRegistrar = common.NewTimeoutScheduler(timeout, config.BootstrapTracker.AllBootstrapped())
+	// A nil preemption signal is never closed, so this timer is never preempted.
+	bs.followOnlyTimer = common.NewTimeoutScheduler(timeout, nil)
 
 	return bs, err
 }
@@ -387,6 +409,15 @@ func (b *Bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 }
 
 func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedBlockIDs []ids.ID) error {
+	// On a [FollowOnly] re-arm, if the beacon frontier holds no block we don't
+	// already have (beacons with briefly divergent tips may return several),
+	// don't re-fetch and re-execute the same window; just schedule the next poll.
+	if b.Config.FollowOnly && b.restarted && b.isKnownFrontier(ctx, acceptedBlockIDs) {
+		b.awaitingTimeout = true
+		b.followOnlyTimer.RegisterTimeout(followOnlyPollInterval)
+		return nil
+	}
+
 	knownBlockIDs := genesis.GetCheckpoints(b.Ctx.NetworkID, b.Ctx.ChainID)
 	b.missingBlockIDs.Union(knownBlockIDs)
 	b.missingBlockIDs.Add(acceptedBlockIDs...)
@@ -734,6 +765,20 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 	// Notify the subnet that this chain is synced
 	b.Config.BootstrapTracker.Bootstrapped(b.Ctx.ChainID)
 
+	// Follow-only chains never hand off to consensus; re-arm to keep tracking
+	// the tip.
+	if b.Config.FollowOnly {
+		// Re-fetch the tip: execute advanced it past [lastAccepted].
+		if tip, err := b.getLastAccepted(ctx); err != nil {
+			b.Ctx.Log.Warn("failed to get last accepted block", zap.Error(err))
+		} else {
+			b.followOnlyTipID = tip.ID()
+		}
+		b.awaitingTimeout = true
+		b.followOnlyTimer.RegisterTimeout(followOnlyPollInterval)
+		return nil
+	}
+
 	// If the subnet hasn't finished bootstrapping, this chain should remain
 	// syncing.
 	if !b.Config.BootstrapTracker.IsBootstrapped() {
@@ -745,6 +790,24 @@ func (b *Bootstrapper) tryStartExecuting(ctx context.Context) error {
 		return nil
 	}
 	return b.onFinished(ctx, b.requestID)
+}
+
+// isKnownFrontier reports whether every block in a non-empty frontier is
+// already available locally. The tip fast path keeps the common
+// single-upstream idle poll free of VM calls.
+func (b *Bootstrapper) isKnownFrontier(ctx context.Context, acceptedBlockIDs []ids.ID) bool {
+	if len(acceptedBlockIDs) == 1 {
+		return acceptedBlockIDs[0] == b.followOnlyTipID
+	}
+	if len(acceptedBlockIDs) == 0 {
+		return false
+	}
+	for _, blkID := range acceptedBlockIDs {
+		if _, err := b.VM.GetBlock(ctx, blkID); err != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func (b *Bootstrapper) getLastAccepted(ctx context.Context) (snowman.Block, error) {
@@ -765,7 +828,12 @@ func (b *Bootstrapper) Timeout() error {
 	}
 	b.awaitingTimeout = false
 
-	if !b.Config.BootstrapTracker.IsBootstrapped() {
+	// The chain may have been shut down while this timeout was pending.
+	if b.Halted() {
+		return nil
+	}
+
+	if b.Config.FollowOnly || !b.Config.BootstrapTracker.IsBootstrapped() {
 		return b.restartBootstrapping(context.TODO())
 	}
 	return b.onFinished(context.TODO(), b.requestID)
