@@ -106,6 +106,13 @@ tasks:
       - cmd: |
           {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.sh --ginkgo.focus-file=c/api.go'
 
+  test-e2e-tmpnet:
+    desc: Run tmpnet archive e2e test with bazel-built binary
+    cmds:
+      - task: bazel-build
+      - cmd: |
+          {{.NIX_RUN}} bash -c 'unset AVALANCHEGO_PATH; AVALANCHEGO_PATH="$(pwd)/$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null)"; export AVALANCHEGO_PATH; bazelisk test //tests/fixture/tmpnet/e2e:e2e_test --test_output=errors --test_env=AVALANCHEGO_PATH'
+
   bazel-test-unit:
     desc: Run cacheable Go unit tests with Bazel
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh all'

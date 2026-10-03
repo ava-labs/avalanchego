@@ -4,6 +4,7 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "tmpnet",
     srcs = [
+        "archive.go",
         "check_monitoring.go",
         "defaults.go",
         "detached_process_default.go",
@@ -51,6 +52,7 @@ go_library(
         "//utils/rpc",
         "//utils/set",
         "//utils/units",
+        "//version",
         "//vms/platformvm",
         "//vms/platformvm/platform",
         "//vms/platformvm/reward",
@@ -102,6 +104,7 @@ go_test(
     deps = [
         "//config",
         "//utils/logging",
+        "//version",
         "@com_github_stretchr_testify//require",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_api//discovery/v1:discovery",
