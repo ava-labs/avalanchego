@@ -63,7 +63,7 @@ func TestGasUsedHeader(t *testing.T) {
 
 	type request struct {
 		JSONRPC string `json:"jsonrpc"`
-		ID      int    `json:"id"`
+		ID      int    `json:"id,omitempty"`
 		Method  string `json:"method"`
 		Params  []any  `json:"params"`
 	}
@@ -99,6 +99,12 @@ func TestGasUsedHeader(t *testing.T) {
 				newReq("eth_blockNumber"),
 			},
 			want: batchGas,
+		},
+		{
+			// Without an ID, the call runs but no response is written.
+			name: "notification",
+			body: request{JSONRPC: "2.0", Method: "eth_call", Params: []any{balanceOf, latest}},
+			want: balanceOfGas,
 		},
 		{
 			name: "no_calls",

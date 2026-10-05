@@ -67,6 +67,10 @@ func withResponseHeaders(next http.Handler) http.Handler {
 		rh := new(responseHeaders)
 		ctx := context.WithValue(r.Context(), responseHeadersKey{}, rh)
 		next.ServeHTTP(&headerWriter{ResponseWriter: w, headers: rh}, r.WithContext(ctx))
+		// Notifications run without writing a response, so the headers are
+		// still unsent. The libevm RPC server waits for all calls before
+		// returning, so no more updates can arrive.
+		rh.seal(w.Header())
 	})
 }
 

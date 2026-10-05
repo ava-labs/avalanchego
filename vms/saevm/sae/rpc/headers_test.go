@@ -67,6 +67,13 @@ func TestWithResponseHeaders(t *testing.T) {
 			},
 			want: []string{"1"},
 		},
+		{
+			name: "set_without_write",
+			handler: func(_ http.ResponseWriter, r *http.Request) {
+				addGas(r.Context(), 1)
+			},
+			want: []string{"1"},
+		},
 	}
 
 	for _, tt := range tests {
