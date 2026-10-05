@@ -109,7 +109,6 @@ var fixtureJSON []byte
 //   - eth_getProof: each account at each height, proving slot 0.
 //   - eth_call: the counter contract at each height, with call data that makes
 //     it return the slot rather than increment it.
-//   - eth_callDetailed: that same call at each height.
 //   - eth_getBlockReceipts: each height.
 //   - eth_getTransactionReceipt: each transaction hash.
 //   - eth_getTransactionByHash: each transaction hash.

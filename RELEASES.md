@@ -4,6 +4,11 @@
 
 This release updates the plugin version to `47`. All plugins must update to remain compatible.
 
+### APIs
+
+- Removed:
+  - SAE `eth_callDetailed`. Use `eth_call` and read the gas used from the `Gas-Used` response header.
+
 ### Metrics
 
 - Added `avalanche_evm_transition_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.

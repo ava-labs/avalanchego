@@ -96,7 +96,6 @@ func (g *generator) rpcRequests(t *testing.T) []rpcRequest {
 		}
 		reqs = append(reqs,
 			newRPCRequest(block+"/eth_call", "eth_call", readCounter, at),
-			newRPCRequest(block+"/eth_callDetailed", "eth_callDetailed", readCounter, at),
 			newRPCRequest(block+"/eth_getBlockReceipts", "eth_getBlockReceipts", at),
 			newRPCRequest(block+"/eth_getLogs", "eth_getLogs", logFilter{
 				FromBlock: &at,
