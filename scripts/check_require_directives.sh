@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Checks that internal module require directives are consistent across all
-# go.mod files, and that they match version.Current. Development tags
-# (v0.0.0-*) are exempt from the version.Current check.
+# Checks that every go.mod file requires the same version of the internal
+# modules, and that this version is version.Current. Development tags
+# (v0.0.0-*) are accepted in place of version.Current.
 #
 # See docs/design/multi-module-release.md for background.
 

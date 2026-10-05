@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -101,21 +102,23 @@ func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkB
 
 	childID := child.ID()
 	childPChainHeight := child.PChainHeight()
-	currentPChainHeight, err := b.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
-	if err != nil {
-		b.vm.ctx.Log.Error("block verification failed",
-			zap.String("reason", "failed to get current P-Chain height"),
-			zap.Stringer("blkID", childID),
-			zap.Error(err),
-		)
-		return err
-	}
-	if childPChainHeight > currentPChainHeight {
-		return fmt.Errorf("%w: %d > %d",
-			errPChainHeightNotReached,
-			childPChainHeight,
-			currentPChainHeight,
-		)
+	if b.vm.consensusState == snow.NormalOp {
+		// Only enforce this check once we're in normal operation; while bootstrapping
+		// or state-syncing we don't assume the P-chain is caught up yet.
+		currentPChainHeight, err := b.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
+		if err != nil {
+			logUnexpectedPChainError(b.vm.ctx.Log, err, "block verification failed",
+				zap.String("reason", "failed to get current P-Chain height"),
+				zap.Stringer("blkID", childID))
+			return err
+		}
+		if childPChainHeight > currentPChainHeight {
+			return fmt.Errorf("%w: %d > %d",
+				errPChainHeightNotReached,
+				childPChainHeight,
+				currentPChainHeight,
+			)
+		}
 	}
 	if childPChainHeight < b.vm.Upgrades.ApricotPhase4MinPChainHeight {
 		return errPChainHeightTooLow
