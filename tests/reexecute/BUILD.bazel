@@ -4,7 +4,6 @@ go_library(
     name = "reexecute",
     srcs = [
         "db.go",
-        "libevm.go",
         "vm.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/tests/reexecute",
@@ -16,10 +15,6 @@ go_library(
         "//database/leveldb",
         "//database/prefixdb",
         "//genesis",
-        "//graft/coreth/core",
-        "//graft/coreth/core/extstate",
-        "//graft/coreth/params",
-        "//graft/coreth/plugin/evm/customtypes",
         "//ids",
         "//snow",
         "//snow/engine/enginetest",
