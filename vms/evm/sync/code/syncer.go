@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/utils/lock"
@@ -233,7 +232,7 @@ func (s *Syncer) batchHashes(ctx context.Context, eg *errgroup.Group) error {
 
 // fetchAndPersist downloads the code for hashes and writes it to disk.
 func (s *Syncer) fetchAndPersist(ctx context.Context, hashes []common.Hash) error {
-	data, err := getCode(ctx, s.log, s.client, hashes)
+	data, err := getCode(ctx, s.client, hashes)
 	if err != nil {
 		return err
 	}
@@ -283,36 +282,16 @@ func persist(db ethdb.Batcher, hashes []common.Hash, codes [][]byte) error {
 
 // getCode fetches the code for hashes through c, scoring each peer on its
 // response. It retries until a peer returns valid code or ctx is cancelled.
-func getCode(ctx context.Context, log logging.Logger, c *Client, hashes []common.Hash) ([][]byte, error) {
-	req := &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)}
-	for {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
-		resp := &syncpb.GetCodeResponse{}
-		outcome, err := c.Send(ctx, req, resp)
-		if err != nil {
-			// Send already de-scored any peer it reached, re-request.
-			log.Debug("code request failed, re-requesting",
-				zap.Error(err),
-			)
-			continue
-		}
-
-		codes := resp.GetData()
-		if err := verifyCode(hashes, codes); err != nil {
-			outcome.Failure()
-			log.Debug("invalid code response, re-requesting",
-				zap.Stringer("nodeID", outcome.NodeID()),
-				zap.Error(err),
-			)
-			continue
-		}
-
-		outcome.Success()
-		return codes, nil
-	}
+func getCode(ctx context.Context, c *Client, hashes []common.Hash) ([][]byte, error) {
+	return c.Send(ctx, &syncpb.GetCodeRequest{Hashes: hashBytes(hashes)},
+		func(resp *syncpb.GetCodeResponse) ([][]byte, error) {
+			code := resp.GetData()
+			if err := verifyCode(hashes, code); err != nil {
+				return nil, err
+			}
+			return code, nil
+		},
+	)
 }
 
 var (

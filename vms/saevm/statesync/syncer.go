@@ -105,7 +105,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 
 	blockSyncer := syncblock.NewSyncer(
 		s.snowCtx.Log,
-		syncblock.NewClient(s.network.Network, s.network.PeerTracker),
+		syncblock.NewClient(s.snowCtx.Log, s.network.Network, s.network.PeerTracker),
 		s.db,
 		s.blockParser,
 		summary.AcceptedHash,
@@ -129,7 +129,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 
 	codeSyncer, err := code.NewSyncer(
 		s.snowCtx.Log,
-		code.NewClient(s.network.Network, s.network.PeerTracker),
+		code.NewClient(s.snowCtx.Log, s.network.Network, s.network.PeerTracker),
 		s.db,
 	)
 	if err != nil {

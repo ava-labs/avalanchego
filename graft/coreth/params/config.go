@@ -72,7 +72,8 @@ var (
 	TestEtnaChainConfig,
 	TestFortunaChainConfig,
 	TestGraniteChainConfig,
-	TestHeliconChainConfig *ChainConfig
+	TestHeliconChainConfig,
+	TestIglooChainConfig *ChainConfig
 
 	TestRules Rules
 )
@@ -424,6 +425,28 @@ func initialiseChainConfigs() {
 			CancunTime:          utils.PointerTo[uint64](0),
 		},
 		extras.TestHeliconChainConfig,
+	)
+
+	TestIglooChainConfig = WithExtra(
+		&ChainConfig{
+			ChainID:             big.NewInt(1),
+			HomesteadBlock:      big.NewInt(0),
+			DAOForkBlock:        big.NewInt(0),
+			DAOForkSupport:      true,
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0),
+			ConstantinopleBlock: big.NewInt(0),
+			PetersburgBlock:     big.NewInt(0),
+			IstanbulBlock:       big.NewInt(0),
+			MuirGlacierBlock:    big.NewInt(0),
+			BerlinBlock:         big.NewInt(0),
+			LondonBlock:         big.NewInt(0),
+			ShanghaiTime:        utils.PointerTo[uint64](0),
+			CancunTime:          utils.PointerTo[uint64](0),
+		},
+		extras.TestIglooChainConfig,
 	)
 
 	TestRules = TestChainConfig.Rules(new(big.Int), IsMergeTODO, 0)
