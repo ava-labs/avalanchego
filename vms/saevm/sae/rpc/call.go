@@ -15,9 +15,9 @@ import (
 // Call overrides [ethapi.BlockChainAPI.Call] to record the gas used for
 // [GasUsedHeader].
 func (b *blockChainAPI) Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash *rpc.BlockNumberOrHash, overrides *ethapi.StateOverride, blockOverrides *ethapi.BlockOverrides) (hexutil.Bytes, error) {
-	record := ethapi.WithCallResultInterceptor(func(r *core.ExecutionResult) error {
+	recordGas := func(r *core.ExecutionResult) error {
 		addGas(ctx, r.UsedGas)
 		return nil
-	})
-	return b.BlockChainAPI.Call(ctx, args, blockNrOrHash, overrides, blockOverrides, record)
+	}
+	return b.BlockChainAPI.Call(ctx, args, blockNrOrHash, overrides, blockOverrides, ethapi.WithCallResultInterceptor(recordGas))
 }
