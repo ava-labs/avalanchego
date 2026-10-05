@@ -13,8 +13,8 @@ import (
 // RegisterLibEVMExtras configures libevm for C-Chain behaviour. It MUST NOT be
 // called more than once.
 //
-// TODO(JonathanOppenhemer delete this after full sae-ification and this
-// registration is removed form the production code!
+// TODO(JonathanOppenheimer): Delete this once production code no longer
+// registers the extras through coreth.
 func RegisterLibEVMExtras() {
 	core.RegisterExtras()
 	customtypes.Register()

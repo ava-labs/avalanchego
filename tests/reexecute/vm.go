@@ -62,6 +62,12 @@ func NewMainnetCChainVM(
 	sharedMemoryDB := prefixdb.New([]byte("sharedmemory"), vmAndSharedMemoryDB)
 	atomicMemory := atomic.NewMemory(sharedMemoryDB)
 
+	// The VM requires the C-Chain's alias, which the node normally registers.
+	bcLookup := ids.NewAliaser()
+	if err := bcLookup.Alias(mainnetCChainID, "C"); err != nil {
+		return nil, fmt.Errorf("aliasing C-Chain: %w", err)
+	}
+
 	chainIDToSubnetID := map[ids.ID]ids.ID{
 		mainnetXChainID: constants.PrimaryNetworkID,
 		mainnetCChainID: constants.PrimaryNetworkID,
@@ -86,7 +92,7 @@ func NewMainnetCChainVM(
 
 			Log:          tests.NewDefaultLogger("mainnet-vm-reexecution"),
 			SharedMemory: atomicMemory.NewSharedMemory(mainnetCChainID),
-			BCLookup:     ids.NewAliaser(),
+			BCLookup:     bcLookup,
 			Metrics:      vmMultiGatherer,
 
 			WarpSigner: warpSigner,
