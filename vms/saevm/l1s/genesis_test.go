@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
@@ -57,16 +56,8 @@ const testChainID = 43111
 var (
 	testGenesisTime = uint64(upgrade.InitiallyActiveTime.Unix())
 
-	testAllocAddr   = common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")
-	testAirdropAddr = common.HexToAddress("0x0100000000000000000000000000000000000001")
-	testAllocFund   = big.NewInt(1_000_000_000_000_000_000)
-	testAirdropFund = big.NewInt(1_000)
-
-	testAirdropData = mustMarshal([]*core.Airdrop{
-		{Address: testAirdropAddr},
-		{Address: testAllocAddr}, // overridden by the alloc
-	})
-	testAirdropHash = common.BytesToHash(crypto.Keccak256(testAirdropData))
+	testAllocAddr = common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")
+	testAllocFund = big.NewInt(1_000_000_000_000_000_000)
 )
 
 // mutateFeeConfig returns a copy of the default fee config with `mutate`
@@ -132,10 +123,10 @@ func testGenesisJSON(opts ...genesisOption) string {
 	return string(mustMarshal(testGenesis(opts...)))
 }
 
-func withValidAirdrop() genesisOption {
+func withAirdrop(airdropHash common.Hash) genesisOption {
 	return options.Func[core.Genesis](func(g *core.Genesis) {
-		g.AirdropHash = testAirdropHash
-		g.AirdropAmount = testAirdropFund
+		g.AirdropHash = airdropHash
+		g.AirdropAmount = nil
 	})
 }
 
@@ -169,7 +160,6 @@ func TestParseGenesis(t *testing.T) {
 		ctx          *snow.Context
 		genesis      string
 		upgradeBytes string
-		airdropData  []byte
 		wantErr      testerr.Want
 	}{
 		{
@@ -191,12 +181,6 @@ func TestParseGenesis(t *testing.T) {
 					DurangoTimestamp: delayedTS,
 				},
 			})),
-		},
-		{
-			name:        "airdrop",
-			ctx:         latest,
-			genesis:     testGenesisJSON(withValidAirdrop()),
-			airdropData: testAirdropData,
 		},
 		{
 			name:    "invalid_json",
@@ -306,10 +290,16 @@ func TestParseGenesis(t *testing.T) {
 			upgradeBytes: "not json",
 			wantErr:      errIsType[*json.SyntaxError](),
 		},
+		{
+			name:    "airdrop_unsupported",
+			ctx:     latest,
+			genesis: testGenesisJSON(withAirdrop(common.Hash{0x1})),
+			wantErr: testerr.Is(errAirdropHash),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			g, err := parseGenesis(test.ctx, []byte(test.genesis), []byte(test.upgradeBytes), test.airdropData)
+			g, err := parseGenesis(test.ctx, []byte(test.genesis), []byte(test.upgradeBytes))
 			if diff := testerr.Diff(err, test.wantErr); diff != "" {
 				t.Fatalf("parseGenesis(...) error (-want +got)\n%s", diff)
 			}
@@ -326,7 +316,7 @@ func TestParseGenesis(t *testing.T) {
 				cmpopts.EquateEmpty(),
 				cmpopts.IgnoreFields(ethcore.Genesis{}, "Config"),
 			}
-			if diff := cmp.Diff(&want, g.Genesis, opts); diff != "" {
+			if diff := cmp.Diff(&want, (*ethcore.Genesis)(g), opts); diff != "" {
 				t.Errorf("parseGenesis(...) (-want +got)\n%s", diff)
 			}
 		})
@@ -340,10 +330,9 @@ func TestParseGenesis(t *testing.T) {
 // TODO: Delete this test when graft/subnet-evm is being deleted.
 func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 	type spec struct {
-		name        string
-		upgrades    upgradetest.Fork
-		genesis     string
-		airdropData []byte
+		name     string
+		upgrades upgradetest.Fork
+		genesis  string
 	}
 	var specs []spec
 	for fork := upgradetest.NoUpgrades; fork <= upgradetest.Latest; fork++ {
@@ -354,12 +343,6 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 		})
 	}
 	specs = append(specs,
-		spec{
-			name:        "airdrop",
-			upgrades:    upgradetest.Latest,
-			genesis:     testGenesisJSON(withValidAirdrop()),
-			airdropData: testAirdropData,
-		},
 		spec{
 			name:     "initial_min_delay",
 			upgrades: upgradetest.Latest,
@@ -395,7 +378,7 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 
 	for _, s := range specs {
 		t.Run(s.name, func(t *testing.T) {
-			g, err := parseGenesis(newContext(t, s.upgrades), []byte(s.genesis), nil, s.airdropData)
+			g, err := parseGenesis(newContext(t, s.upgrades), []byte(s.genesis), nil)
 			require.NoErrorf(t, err, "parseGenesis(%s)", s.genesis)
 
 			got, err := g.block()
@@ -403,95 +386,10 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 			var legacy core.Genesis
 			require.NoError(t, json.Unmarshal([]byte(s.genesis), &legacy))
 			legacy.Config = g.Config
-			legacy.AirdropData = s.airdropData
 			want := legacy.ToBlock()
 
 			require.Equalf(t, want.Root(), got.Root(), "%T.block().Root()", g)
 			require.Equalf(t, want.Hash(), got.Hash(), "%T.block().Hash()", g)
-		})
-	}
-}
-
-func TestGenesisAirdrop(t *testing.T) {
-	withAirdropHashOf := func(data []byte) genesisOption {
-		return options.Func[core.Genesis](func(g *core.Genesis) {
-			g.AirdropHash = common.BytesToHash(crypto.Keccak256(data))
-		})
-	}
-
-	invalidData := []byte("not json")
-
-	tests := []struct {
-		name        string
-		opts        []genesisOption
-		airdropData []byte
-		want        []common.Address
-		wantErr     testerr.Want
-	}{
-		{
-			name:        "valid",
-			opts:        []genesisOption{withValidAirdrop()},
-			airdropData: testAirdropData,
-			want:        []common.Address{testAirdropAddr, testAllocAddr},
-		},
-		{
-			name: "absent",
-		},
-		{
-			name:        "empty_list",
-			opts:        []genesisOption{withValidAirdrop(), withAirdropHashOf([]byte("[]"))},
-			airdropData: []byte("[]"),
-			want:        []common.Address{},
-		},
-		{
-			name:        "null_list",
-			opts:        []genesisOption{withValidAirdrop(), withAirdropHashOf([]byte("null"))},
-			airdropData: []byte("null"),
-			want:        []common.Address{},
-		},
-		{
-			name:    "missing_data",
-			opts:    []genesisOption{withValidAirdrop()},
-			wantErr: testerr.Is(errAirdropHashMismatch),
-		},
-		{
-			name:        "mismatched_data",
-			opts:        []genesisOption{withValidAirdrop()},
-			airdropData: mustMarshal([]*core.Airdrop{{Address: common.Address{0xff}}}),
-			wantErr:     testerr.Is(errAirdropHashMismatch),
-		},
-		{
-			name:        "data_without_hash",
-			airdropData: testAirdropData,
-			wantErr:     testerr.Is(errAirdropHashMismatch),
-		},
-		{
-			name:        "invalid_json",
-			opts:        []genesisOption{withAirdropHashOf(invalidData)},
-			airdropData: invalidData,
-			wantErr:     errIsType[*json.SyntaxError](),
-		},
-		{
-			name:        "no_amount",
-			opts:        []genesisOption{withAirdropHashOf(testAirdropData)},
-			airdropData: testAirdropData,
-			wantErr:     testerr.Is(errNoAirdropAmount),
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			genesis := testGenesisJSON(tt.opts...)
-			g, err := parseGenesis(newContext(t, upgradetest.Latest), []byte(genesis), nil, tt.airdropData)
-			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
-				t.Fatalf("parseGenesis(...) error (-want +got)\n%s", diff)
-			}
-			if err != nil {
-				return
-			}
-			require.Equal(t, tt.want, g.airdrops)
-			require.Equal(t, testGenesis(tt.opts...).AirdropAmount, g.airdropAmount)
-			_, err = g.block()
-			require.NoError(t, err)
 		})
 	}
 }
@@ -530,7 +428,7 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 		fork := upgradetest.Fork(_fork)
 		t.Run(fork.String(), func(t *testing.T) {
 			genesis := testGenesisJSON()
-			g, err := parseGenesis(newContext(t, fork), []byte(genesis), nil, nil)
+			g, err := parseGenesis(newContext(t, fork), []byte(genesis), nil)
 			require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
 
 			block, err := g.block()
@@ -762,7 +660,6 @@ func TestWriteGenesis(t *testing.T) {
 				newSpecContext(t, tt.initial),
 				[]byte(tt.initial.genesis),
 				[]byte(tt.initial.upgradeBytes),
-				nil,
 			)
 			require.NoError(t, err, "parseGenesis(initial)")
 			require.NoErrorf(t, g.verifyAndWriteBlock(db), "%T.verifyAndWriteBlock(initial)", g)
@@ -789,7 +686,6 @@ func TestWriteGenesis(t *testing.T) {
 				newSpecContext(t, tt.restart),
 				[]byte(tt.restart.genesis),
 				[]byte(tt.restart.upgradeBytes),
-				nil,
 			)
 			require.NoError(t, err, "parseGenesis(restart)")
 
@@ -851,8 +747,8 @@ func requireStoredConfig(t *testing.T, db ethdb.Database, genesisHash common.Has
 // is persisted to the database and matches the root committed to by the
 // written genesis header.
 func TestWriteGenesisState(t *testing.T) {
-	genesis := testGenesisJSON(withValidAirdrop())
-	g, err := parseGenesis(newContext(t, upgradetest.Latest), []byte(genesis), nil, testAirdropData)
+	genesis := testGenesisJSON()
+	g, err := parseGenesis(newContext(t, upgradetest.Latest), []byte(genesis), nil)
 	require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
 
 	block, err := g.block()
@@ -879,10 +775,6 @@ func TestWriteGenesisState(t *testing.T) {
 	require.NotNil(t, stored, "rawdb.ReadHeader()")
 	require.Equal(t, root, stored.Root, "stored genesis header state root")
 
-	statedb, err := state.New(root, state.NewDatabaseWithNodeDB(db, tdb), nil)
+	_, err = state.New(root, state.NewDatabaseWithNodeDB(db, tdb), nil)
 	require.NoError(t, err, "state.New()")
-
-	// The airdrop is applied, but the explicit alloc takes precedence.
-	require.Equal(t, testAirdropFund, statedb.GetBalance(testAirdropAddr).ToBig(), "airdrop balance")
-	require.Equal(t, testAllocFund, statedb.GetBalance(testAllocAddr).ToBig(), "alloc balance")
 }

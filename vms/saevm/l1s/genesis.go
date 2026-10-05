@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
@@ -45,19 +44,16 @@ var (
 	errNonNilGenesisExcessBlobGas = errors.New("non-nil genesis excessBlobGas")
 	errNonNilGenesisBlobGasUsed   = errors.New("non-nil genesis blobGasUsed")
 	errGasLimitMismatch           = errors.New("gas limit mismatch")
+	errAirdropHash                = errors.New("airdrops are not supported")
 )
 
-type genesis struct {
-	*core.Genesis
-	airdrops      []common.Address
-	airdropAmount *big.Int
-}
+type genesis core.Genesis
 
 // parseGenesis decodes the genesis bytes and populates the upgrade schedule.
 //
 // airdropData is the content of the airdrop file referenced by the genesis
 // AirdropHash, if any.
-func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes, airdropData []byte) (*genesis, error) {
+func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesis, error) {
 	var g legacy.Genesis
 	if err := json.Unmarshal(genesisBytes, &g); err != nil {
 		return nil, fmt.Errorf("unmarshalling genesis: %w", err)
@@ -89,6 +85,8 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes, airdropData []b
 		return nil, fmt.Errorf("%w: %d", errNonNilGenesisExcessBlobGas, *g.ExcessBlobGas)
 	case g.BlobGasUsed != nil:
 		return nil, fmt.Errorf("%w: %d", errNonNilGenesisBlobGasUsed, *g.BlobGasUsed)
+	case g.AirdropHash != (common.Hash{}):
+		return nil, fmt.Errorf("%w: %s", errAirdropHash, g.AirdropHash)
 	}
 
 	extras, err := newExtras(ctx, g.Config, upgradeConfig)
@@ -100,7 +98,7 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes, airdropData []b
 	}
 
 	chainID := g.Config.ChainID
-	g.Config = l1params.WithExtra(
+	cfg := l1params.WithExtra(
 		&params.ChainConfig{
 			ChainID:             chainID,
 			HomesteadBlock:      big.NewInt(0),
@@ -121,33 +119,25 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes, airdropData []b
 		},
 		extras,
 	)
-	if err := g.Config.CheckConfigForkOrder(); err != nil {
-		return nil, err
-	}
-	airdrops, err := parseAirdrop(airdropData, g.AirdropHash, g.AirdropAmount)
-	if err != nil {
+	if err := cfg.CheckConfigForkOrder(); err != nil {
 		return nil, err
 	}
 	return &genesis{
-		Genesis: &core.Genesis{
-			Config:        g.Config,
-			Nonce:         g.Nonce,
-			Timestamp:     g.Timestamp,
-			ExtraData:     g.ExtraData,
-			Difficulty:    g.Difficulty,
-			Mixhash:       g.Mixhash,
-			Coinbase:      g.Coinbase,
-			Alloc:         g.Alloc,
-			BaseFee:       g.BaseFee,
-			Number:        g.Number,
-			GasLimit:      g.GasLimit,
-			GasUsed:       g.GasUsed,
-			ParentHash:    g.ParentHash,
-			ExcessBlobGas: g.ExcessBlobGas,
-			BlobGasUsed:   g.BlobGasUsed,
-		},
-		airdrops:      airdrops,
-		airdropAmount: g.AirdropAmount,
+		Config:        cfg,
+		Nonce:         g.Nonce,
+		Timestamp:     g.Timestamp,
+		ExtraData:     g.ExtraData,
+		Difficulty:    g.Difficulty,
+		Mixhash:       g.Mixhash,
+		Coinbase:      g.Coinbase,
+		Alloc:         g.Alloc,
+		BaseFee:       g.BaseFee,
+		Number:        g.Number,
+		GasLimit:      g.GasLimit,
+		GasUsed:       g.GasUsed,
+		ParentHash:    g.ParentHash,
+		ExcessBlobGas: g.ExcessBlobGas,
+		BlobGasUsed:   g.BlobGasUsed,
 	}, nil
 }
 
@@ -396,11 +386,6 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 		return common.Hash{}, err
 	}
 
-	amount := uint256.MustFromBig(g.airdropAmount)
-	for _, addr := range g.airdrops {
-		statedb.SetBalance(addr, amount)
-	}
-
 	// TODO: Register precompiles. See [legacy.ApplyPrecompileActivations].
 
 	// The explicit allocation is applied last so that it takes precedence
@@ -424,37 +409,4 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 		return common.Hash{}, fmt.Errorf("committing triedb: %w", err)
 	}
 	return root, nil
-}
-
-var (
-	errAirdropHashMismatch = errors.New("airdrop hash mismatch")
-	errNoAirdropAmount     = errors.New("no airdrop amount")
-)
-
-// parseAirdrop verifies the airdrop data against the configured hash and decodes
-// the airdrop addresses.
-func parseAirdrop(data []byte, hash common.Hash, amount *big.Int) ([]common.Address, error) {
-	if len(data) == 0 {
-		if hash != (common.Hash{}) {
-			return nil, fmt.Errorf("%w: missing expected airdrop data", errAirdropHashMismatch)
-		}
-		return nil, nil
-	}
-
-	if h := common.BytesToHash(crypto.Keccak256(data)); h != hash {
-		return nil, fmt.Errorf("%w: expected %s but got %s", errAirdropHashMismatch, hash, h)
-	}
-	var airdrop []*legacy.Airdrop
-	if err := json.Unmarshal(data, &airdrop); err != nil {
-		return nil, fmt.Errorf("unmarshalling airdrop: %w", err)
-	}
-
-	if amount == nil {
-		return nil, errNoAirdropAmount
-	}
-	addresses := make([]common.Address, len(airdrop))
-	for i, a := range airdrop {
-		addresses[i] = a.Address
-	}
-	return addresses, nil
 }
