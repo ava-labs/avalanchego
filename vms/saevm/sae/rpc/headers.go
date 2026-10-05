@@ -52,10 +52,10 @@ func addGas(ctx context.Context, gas uint64) {
 	rh.hasGas = true
 }
 
-// seal stops further updates and sets the accumulated headers on h. Error
-// codes are read from body, which MUST be either empty or the entire response
-// body. Only the first call has any effect.
-func (rh *responseHeaders) seal(h http.Header, body []byte) {
+// seal stops further updates and sets the accumulated headers on h, along with
+// errorCodes as counted by [parseErrorCodes]. Only the first call has any
+// effect.
+func (rh *responseHeaders) seal(h http.Header, errorCodes map[int]int) {
 	rh.mu.Lock()
 	defer rh.mu.Unlock()
 	if rh.sealed {
@@ -65,7 +65,7 @@ func (rh *responseHeaders) seal(h http.Header, body []byte) {
 	if rh.hasGas {
 		h.Set(GasUsedHeader, strconv.FormatUint(rh.gas, 10))
 	}
-	if v := formatErrorCodesHeader(parseErrorCodes(body)); v != "" {
+	if v := formatErrorCodesHeader(errorCodes); v != "" {
 		h.Set(ErrorCodesHeader, v)
 	}
 }
@@ -103,7 +103,7 @@ func (w *headerWriter) WriteHeader(code int) {
 }
 
 func (w *headerWriter) Write(b []byte) (int, error) {
-	w.headers.seal(w.Header(), b)
+	w.headers.seal(w.Header(), parseErrorCodes(b))
 	return w.ResponseWriter.Write(b)
 }
 
