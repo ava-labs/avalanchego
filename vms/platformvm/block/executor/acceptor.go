@@ -6,6 +6,7 @@ package executor
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -28,6 +29,9 @@ type acceptor struct {
 	*backend
 	metrics    metrics.Metrics
 	validators *validators.Manager
+
+	forkTime     time.Time
+	onForkHeight func(height uint64)
 }
 
 func (a *acceptor) BanffAbortBlock(b *platform.BanffAbortBlock) error {
@@ -276,5 +280,33 @@ func (a *acceptor) commonAccept(b *blockState) error {
 	a.state.SetHeight(blk.Height())
 	a.state.AddStatelessBlock(blk)
 	a.validators.OnAcceptedBlockID(blkID)
+	a.recordForkHeight(blk)
 	return nil
+}
+
+// recordForkHeight records H_fork when fork mode is on and [blk] is the first
+// accepted block timestamped at or after the fork time. The height is
+// persisted in the same commit as [blk].
+func (a *acceptor) recordForkHeight(blk platform.Block) {
+	if a.forkTime.IsZero() {
+		return
+	}
+	if _, ok := a.state.GetForkHeight(); ok {
+		return
+	}
+	banffBlk, ok := blk.(platform.BanffBlock)
+	if !ok || banffBlk.Timestamp().Before(a.forkTime) {
+		return
+	}
+
+	height := blk.Height()
+	a.state.SetForkHeight(height)
+	a.ctx.Log.Info("recorded P-chain fork height",
+		zap.Uint64("height", height),
+		zap.Stringer("blkID", blk.ID()),
+		zap.Time("timestamp", banffBlk.Timestamp()),
+	)
+	if a.onForkHeight != nil {
+		a.onForkHeight(height)
+	}
 }

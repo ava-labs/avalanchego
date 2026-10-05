@@ -18,6 +18,8 @@ const (
 	GenesisFileContentKey                    = "genesis-file-content"
 	UpgradeFileKey                           = "upgrade-file"
 	UpgradeFileContentKey                    = "upgrade-file-content"
+	ForkConfigFileKey                        = "fork-config-file"
+	ForkConfigFileContentKey                 = "fork-config-file-content"
 	NetworkNameKey                           = "network-id"
 	ACPSupportKey                            = "acp-support"
 	ACPObjectKey                             = "acp-object"

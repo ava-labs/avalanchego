@@ -79,6 +79,10 @@ type VM struct {
 	state.State
 
 	proposer.Windower
+	// forkWindower schedules proposers for blocks timestamped at or after the
+	// fork time. Only set in fork mode.
+	forkWindower   proposer.Windower
+	forkPointKnown bool
 	tree.Tree
 	mockable.Clock
 	finishedBootstrappingAt time.Time
@@ -162,6 +166,9 @@ func (vm *VM) Initialize(
 	}
 	vm.State = baseState
 	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID, vm.ctx.Log)
+	if err := vm.initFork(); err != nil {
+		return err
+	}
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
@@ -576,7 +583,42 @@ func (vm *VM) getPostDurangoSlotTime(
 	slot uint64,
 	parentTimestamp time.Time,
 ) (time.Time, error) {
-	delay, err := vm.Windower.MinDelayForProposer(
+	if vm.Fork == nil {
+		return vm.slotTimeFor(ctx, vm.Windower, blkHeight, pChainHeight, slot, parentTimestamp)
+	}
+
+	forkTime := vm.Fork.Time
+	forkSlot := proposer.TimeToSlot(parentTimestamp, forkTime)
+	if parentTimestamp.Before(forkTime) && slot < forkSlot {
+		// Slots that start before T are scheduled by the source windower.
+		// Use one only if building in it would produce a block before T.
+		if t, err := vm.slotTimeFor(ctx, vm.Windower, blkHeight, pChainHeight, slot, parentTimestamp); err == nil && t.Before(forkTime) {
+			return t, nil
+		}
+	}
+
+	t, err := vm.slotTimeFor(ctx, vm.forkWindower, blkHeight, pChainHeight, max(slot, forkSlot), parentTimestamp)
+	if err != nil {
+		return time.Time{}, err
+	}
+	// A slot that starts before T can only be used for a fork block from T
+	// onward. Without this, the node would wake early, fail to build, and
+	// spin until T.
+	if t.Before(forkTime) {
+		t = forkTime
+	}
+	return t, nil
+}
+
+func (vm *VM) slotTimeFor(
+	ctx context.Context,
+	windower proposer.Windower,
+	blkHeight,
+	pChainHeight,
+	slot uint64,
+	parentTimestamp time.Time,
+) (time.Time, error) {
+	delay, err := windower.MinDelayForProposer(
 		ctx,
 		blkHeight,
 		pChainHeight,
@@ -834,6 +876,9 @@ func (vm *VM) acceptPostForkBlock(blk PostForkBlock) error {
 		return err
 	}
 	if err := vm.updateHeightIndex(height, blkID); err != nil {
+		return err
+	}
+	if err := vm.recordForkPoint(blk); err != nil {
 		return err
 	}
 	return vm.db.Commit()

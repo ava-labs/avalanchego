@@ -73,9 +73,11 @@ func NewManager(
 	return &manager{
 		backend: backend,
 		acceptor: &acceptor{
-			backend:    backend,
-			metrics:    metrics,
-			validators: validatorManager,
+			backend:      backend,
+			metrics:      metrics,
+			validators:   validatorManager,
+			forkTime:     txExecutorBackend.Config.ForkTime,
+			onForkHeight: txExecutorBackend.Config.OnForkHeight,
 		},
 		rejector: &rejector{
 			backend:         backend,

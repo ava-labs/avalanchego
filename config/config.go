@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/config/node"
+	"github.com/ava-labs/avalanchego/fork"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
@@ -100,6 +101,8 @@ var (
 	errInvalidSignerConfig                    = fmt.Errorf("only one of the following flags can be set: %s, %s, %s, %s", StakingEphemeralSignerEnabledKey, StakingSignerKeyContentKey, StakingSignerKeyPathKey, StakingRPCSignerEndpointKey)
 	errDiskSpaceOutOfRange                    = fmt.Errorf("out of range [0,%d]", maxDiskSpaceThreshold)
 	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
+	errCannotConfigureUpgrades                = errors.New("cannot configure upgrades for this network")
+	errForkRequiresSybilProtection            = errors.New("fork mode requires sybil protection to be enabled")
 )
 
 func getPrimaryNetworkSnowConfig(v *viper.Viper) *snowball.Parameters {
@@ -898,14 +901,43 @@ func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
 	return genesis.GetTxFeeConfig(networkID)
 }
 
-func getUpgradeConfig(v *viper.Viper, networkID uint32) (upgrade.Config, error) {
+func getForkConfig(v *viper.Viper, sybilProtectionEnabled bool) (*fork.Config, error) {
+	var (
+		forkBytes []byte
+		err       error
+	)
+	switch {
+	case v.IsSet(ForkConfigFileKey):
+		forkBytes, err = os.ReadFile(getExpandedArg(v, ForkConfigFileKey))
+		if err != nil {
+			return nil, fmt.Errorf("unable to read fork config file: %w", err)
+		}
+	case v.IsSet(ForkConfigFileContentKey):
+		forkBytes, err = base64.StdEncoding.DecodeString(v.GetString(ForkConfigFileContentKey))
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode fork config base64 content: %w", err)
+		}
+	default:
+		return nil, nil
+	}
+
+	if !sybilProtectionEnabled {
+		return nil, errForkRequiresSybilProtection
+	}
+	return fork.Parse(forkBytes)
+}
+
+func getUpgradeConfig(v *viper.Viper, networkID uint32, forkConfig *fork.Config) (upgrade.Config, error) {
 	if !v.IsSet(UpgradeFileKey) && !v.IsSet(UpgradeFileContentKey) {
 		return upgrade.GetConfig(networkID), nil
 	}
 
-	switch networkID {
-	case constants.MainnetID, constants.TestnetID, constants.LocalID:
-		return upgrade.Config{}, fmt.Errorf("cannot configure upgrades for networkID: %s",
+	isPredefinedNetwork := networkID == constants.MainnetID ||
+		networkID == constants.TestnetID ||
+		networkID == constants.LocalID
+	if isPredefinedNetwork && forkConfig == nil {
+		return upgrade.Config{}, fmt.Errorf("%w: %s",
+			errCannotConfigureUpgrades,
 			constants.NetworkName(networkID),
 		)
 	}
@@ -932,6 +964,12 @@ func getUpgradeConfig(v *viper.Viper, networkID uint32) (upgrade.Config, error) 
 	var upgradeConfig upgrade.Config
 	if err := json.Unmarshal(upgradeBytes, &upgradeConfig); err != nil {
 		return upgrade.Config{}, fmt.Errorf("unable to unmarshal upgrade bytes: %w", err)
+	}
+
+	if isPredefinedNetwork {
+		if err := fork.VerifyUpgradeOverride(upgrade.GetConfig(networkID), upgradeConfig, forkConfig.Time); err != nil {
+			return upgrade.Config{}, err
+		}
 	}
 	return upgradeConfig, nil
 }
@@ -1437,8 +1475,14 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, err
 	}
 
+	// Fork config
+	nodeConfig.ForkConfig, err = getForkConfig(v, nodeConfig.SybilProtectionEnabled)
+	if err != nil {
+		return node.Config{}, err
+	}
+
 	// Upgrade config
-	nodeConfig.UpgradeConfig, err = getUpgradeConfig(v, nodeConfig.NetworkID)
+	nodeConfig.UpgradeConfig, err = getUpgradeConfig(v, nodeConfig.NetworkID, nodeConfig.ForkConfig)
 	if err != nil {
 		return node.Config{}, err
 	}

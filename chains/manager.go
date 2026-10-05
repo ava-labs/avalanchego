@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/fork"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
@@ -245,6 +246,11 @@ type ManagerConfig struct {
 	ChainDataDir string
 
 	Subnets *Subnets
+
+	// Fork, if non-nil, enables fork mode on the primary network's chains.
+	// ForkStatus must be non-nil whenever Fork is.
+	Fork       *fork.Config
+	ForkStatus *fork.Status
 }
 
 type manager struct {
@@ -788,6 +794,8 @@ func (m *manager) createAvalancheChain(
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
 			Registerer:          proposervmReg,
+			Fork:                m.forkConfigFor(ctx.SubnetID),
+			ForkStatus:          m.ForkStatus,
 		},
 	)
 
@@ -1062,6 +1070,15 @@ func (m *manager) createAvalancheChain(
 	}, nil
 }
 
+// forkConfigFor returns the fork config if fork mode applies to chains of
+// [subnetID].
+func (m *manager) forkConfigFor(subnetID ids.ID) *fork.Config {
+	if subnetID != constants.PrimaryNetworkID {
+		return nil
+	}
+	return m.Fork
+}
+
 // Create a linear chain using the Snowman consensus engine
 func (m *manager) createSnowmanChain(
 	ctx *snow.ConsensusContext,
@@ -1156,6 +1173,11 @@ func (m *manager) createSnowmanChain(
 			valState = validators.NewNoValidatorsState(valState)
 			ctx.ValidatorState = validators.NewNoValidatorsState(ctx.ValidatorState)
 		}
+
+		if m.Fork != nil {
+			valState = fork.NewState(valState, m.Fork, m.ForkStatus.ForkHeight)
+			ctx.ValidatorState = fork.NewState(ctx.ValidatorState, m.Fork, m.ForkStatus.ForkHeight)
+		}
 		m.validatorState = valState
 
 		// Set this func only for platform
@@ -1210,6 +1232,8 @@ func (m *manager) createSnowmanChain(
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
 			Registerer:          proposervmReg,
+			Fork:                m.forkConfigFor(ctx.SubnetID),
+			ForkStatus:          m.ForkStatus,
 		},
 	)
 

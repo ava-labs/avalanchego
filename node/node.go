@@ -8,6 +8,7 @@ import (
 	"crypto"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/fork"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/indexer"
@@ -209,6 +211,10 @@ func New(
 		return nil, fmt.Errorf("problem initializing database: %w", err)
 	}
 
+	if err := n.initFork(); err != nil {
+		return nil, fmt.Errorf("problem initializing fork mode: %w", err)
+	}
+
 	n.initSharedMemory() // Initialize shared memory
 
 	// message.Creator is shared between networking, chainManager and the engine.
@@ -238,6 +244,14 @@ func New(
 		logger.Warn("sybil control is not enforced")
 		n.vdrs = newOverriddenManager(constants.PrimaryNetworkID, n.vdrs)
 	}
+	if cfg := n.Config.ForkConfig; cfg != nil {
+		n.pChainValidators = n.vdrs
+		n.forkManager, err = fork.NewManager(n.vdrs, cfg, n.forkStartSwitched)
+		if err != nil {
+			return nil, fmt.Errorf("problem initializing fork validator manager: %w", err)
+		}
+		n.vdrs = n.forkManager
+	}
 	if err := n.initResourceManager(); err != nil {
 		return nil, fmt.Errorf("problem initializing resource manager: %w", err)
 	}
@@ -246,6 +260,7 @@ func New(
 	if err := n.initNetworking(networkRegisterer); err != nil { // Set up networking layer.
 		return nil, fmt.Errorf("problem initializing networking: %w", err)
 	}
+	n.startForkSwitch()
 
 	n.initEventDispatchers()
 
@@ -361,6 +376,16 @@ type Node struct {
 
 	// current validators of the network
 	vdrs validators.Manager
+
+	// Fork mode. All nil/zero when fork mode is off.
+	forkManager       *fork.Manager
+	forkStatus        *fork.Status
+	forkStartSwitched bool
+	forkSwitchTimer   *time.Timer
+	forkTimeTimer     *time.Timer
+	// pChainValidators is the manager the P-chain populates in fork mode. The
+	// rest of the node sees it only through forkManager.
+	pChainValidators validators.Manager
 
 	apiURI string
 
@@ -619,6 +644,13 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
 	n.Config.NetworkConfig.UpgradeConfig = n.Config.UpgradeConfig
 	n.Config.NetworkConfig.Validators = n.vdrs
+	if n.forkManager != nil {
+		forkPeers := n.Config.ForkConfig.NodeIDs()
+		forkManager := n.forkManager
+		n.Config.NetworkConfig.AllowedPeers = func() (set.Set[ids.NodeID], bool) {
+			return forkPeers, forkManager.Switched()
+		}
+	}
 	n.Config.NetworkConfig.Beacons = n.bootstrappers
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
 	n.Config.NetworkConfig.TLSKey = tlsKey
@@ -719,6 +751,17 @@ func (n *Node) Dispatch() error {
 	// Add bootstrap nodes to the peer network
 	for _, bootstrapper := range n.Config.Bootstrappers {
 		n.Net.ManuallyTrack(bootstrapper.ID, bootstrapper.IP)
+	}
+
+	// Fork validators are not source-network validators, so their IPs are not
+	// gossiped. Connect to them explicitly. A node that started switched
+	// already tracks them as bootstrappers.
+	if cfg := n.Config.ForkConfig; cfg != nil && !n.forkStartSwitched {
+		for _, v := range cfg.Validators {
+			if v.NodeID != n.ID {
+				n.Net.ManuallyTrack(v.NodeID, v.IP)
+			}
+		}
 	}
 
 	// Start P2P connections
@@ -864,6 +907,82 @@ func (n *Node) initBootstrappers() error {
 		}
 	}
 	return nil
+}
+
+// initFork arms fork mode, if configured. A node that starts at or after the
+// fork time starts switched and uses the fork validators as beacons.
+func (n *Node) initFork() error {
+	cfg := n.Config.ForkConfig
+	if cfg == nil {
+		return nil
+	}
+
+	startSwitched, err := fork.Arm(prefixdb.New([]byte("fork"), n.DB), cfg, time.Now())
+	if err != nil {
+		return err
+	}
+	n.forkStartSwitched = startSwitched
+	n.forkStatus = fork.NewStatus(cfg, time.Now)
+
+	if startSwitched {
+		n.forkStatus.MarkSwitched()
+		bootstrappers := make([]genesis.Bootstrapper, 0, len(cfg.Validators))
+		for _, v := range cfg.Validators {
+			if v.NodeID != n.ID {
+				bootstrappers = append(bootstrappers, genesis.Bootstrapper{ID: v.NodeID, IP: v.IP})
+			}
+		}
+		n.Log.Info("fork mode: using fork validators as bootstrappers",
+			zap.Int("numBootstrappers", len(bootstrappers)),
+		)
+		n.Config.Bootstrappers = bootstrappers
+		if err := n.initBootstrappers(); err != nil {
+			return err
+		}
+	}
+
+	// fork.Config guarantees the total weight does not overflow.
+	var totalWeight uint64
+	for _, v := range cfg.Validators {
+		totalWeight += v.Weight
+	}
+	configHash := cfg.Hash()
+	n.Log.Info("fork mode enabled",
+		zap.Time("forkTime", cfg.Time),
+		zap.Duration("gracePeriod", cfg.GracePeriod),
+		zap.String("configHash", hex.EncodeToString(configHash[:])),
+		zap.Int("numValidators", len(cfg.Validators)),
+		zap.Uint64("totalWeight", totalWeight),
+		zap.Stringer("phase", n.forkStatus.Phase()),
+	)
+	return nil
+}
+
+// startForkSwitch schedules the fork switchover at T+Δ, and a log of the
+// Observing to Grace transition at T. A node that started switched only
+// registers the switch hook, which then runs immediately.
+func (n *Node) startForkSwitch() {
+	if n.forkManager == nil {
+		return
+	}
+	n.forkManager.OnSwitch(func() {
+		n.forkStatus.MarkSwitched()
+		n.Net.DisconnectDisallowed()
+		n.Log.Info("fork switchover complete: polling and peering with fork validators only")
+	})
+	if n.forkStartSwitched {
+		return
+	}
+	cfg := n.Config.ForkConfig
+	switchTime := cfg.SwitchTime()
+	if time.Now().Before(cfg.Time) {
+		n.forkTimeTimer = time.AfterFunc(time.Until(cfg.Time), func() {
+			n.Log.Info("fork time reached: proposer rule active, polling and peering unchanged until the switch",
+				zap.Time("switchTime", switchTime),
+			)
+		})
+	}
+	n.forkSwitchTimer = time.AfterFunc(time.Until(switchTime), n.forkManager.Switch)
 }
 
 // Create the EventDispatcher used for hooking events
@@ -1172,6 +1291,8 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			Tracer:                                  n.tracer,
 			ChainDataDir:                            n.Config.ChainDataDir,
 			Subnets:                                 subnets,
+			Fork:                                    n.Config.ForkConfig,
+			ForkStatus:                              n.forkStatus,
 		},
 	)
 	if err != nil {
@@ -1196,6 +1317,21 @@ func (n *Node) initVMs() error {
 		vdrs = validators.NewManager()
 	}
 
+	// In fork mode the P-chain populates the manager that fork.Manager wraps,
+	// so its bookkeeping always reflects the real staker set.
+	if n.pChainValidators != nil {
+		vdrs = n.pChainValidators
+	}
+
+	var (
+		forkTime     time.Time
+		onForkHeight func(uint64)
+	)
+	if n.forkStatus != nil {
+		forkTime = n.Config.ForkConfig.Time
+		onForkHeight = n.forkStatus.SetForkHeight
+	}
+
 	// Register the VMs that Avalanche supports
 	err := errors.Join(
 		n.VMManager.RegisterFactory(context.TODO(), constants.PlatformVMID, &platformvm.Factory{
@@ -1218,6 +1354,8 @@ func (n *Node) initVMs() error {
 				HeliconMinStakeDuration:   n.Config.HeliconMinStakeDuration,
 				RewardConfig:              n.Config.RewardConfig,
 				UpgradeConfig:             n.Config.UpgradeConfig,
+				ForkTime:                  forkTime,
+				OnForkHeight:              onForkHeight,
 				UseCurrentHeight:          n.Config.UseCurrentHeight,
 			},
 		}),
@@ -1647,6 +1785,19 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register future upgrade health check: %w", err)
 	}
 
+	if n.forkStatus != nil {
+		if err := n.health.RegisterHealthCheck("fork", n.forkStatus, health.ApplicationTag); err != nil {
+			return fmt.Errorf("couldn't register fork health check: %w", err)
+		}
+		forkReg, err := metrics.MakeAndRegister(n.MetricsGatherer, "fork")
+		if err != nil {
+			return fmt.Errorf("couldn't register fork metrics: %w", err)
+		}
+		if err := n.forkStatus.RegisterMetrics(forkReg); err != nil {
+			return fmt.Errorf("couldn't register fork metrics: %w", err)
+		}
+	}
+
 	handler, err := health.NewGetAndPostHandler(n.Log, n.health)
 	if err != nil {
 		return err
@@ -1852,6 +2003,13 @@ func (n *Node) shutdown() {
 	n.Log.Info("shutting down node",
 		zap.Int("exitCode", n.ExitCode()),
 	)
+
+	if n.forkTimeTimer != nil {
+		n.forkTimeTimer.Stop()
+	}
+	if n.forkSwitchTimer != nil {
+		n.forkSwitchTimer.Stop()
+	}
 
 	if n.health != nil {
 		// Passes if the node is not shutting down

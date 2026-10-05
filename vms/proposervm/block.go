@@ -132,6 +132,16 @@ func (p *postForkCommonComponents) Verify(
 	}
 
 	childEpoch := child.PChainEpoch()
+	isForkBlock := p.vm.isForkBlock(childTimestamp)
+	if isForkBlock {
+		// Fork mode checks blocks at or after the fork time against the fork
+		// validators in every consensus state. A node that bootstraps after
+		// the fork can therefore never accept a block proposed by the source
+		// network.
+		if err := p.verifyForkProposer(ctx, parentTimestamp, parentPChainHeight, child); err != nil {
+			return err
+		}
+	}
 	if p.vm.consensusState == snow.NormalOp {
 		// Some L1s that missed the Granite upgrade accepted blocks without
 		// epochs enabled. By enforcing this check only after syncing, new nodes
@@ -158,19 +168,21 @@ func (p *postForkCommonComponents) Verify(
 			)
 		}
 
-		var shouldHaveProposer bool
-		if p.vm.Upgrades.IsDurangoActivated(parentTimestamp) {
-			shouldHaveProposer, err = p.verifyPostDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
-		} else {
-			shouldHaveProposer, err = p.verifyPreDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
-		}
-		if err != nil {
-			return err
-		}
+		if !isForkBlock {
+			var shouldHaveProposer bool
+			if p.vm.Upgrades.IsDurangoActivated(parentTimestamp) {
+				shouldHaveProposer, err = p.verifyPostDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
+			} else {
+				shouldHaveProposer, err = p.verifyPreDurangoBlockDelay(ctx, parentTimestamp, parentPChainHeight, child)
+			}
+			if err != nil {
+				return err
+			}
 
-		hasProposer := child.SignedBlock.Proposer() != ids.EmptyNodeID
-		if shouldHaveProposer != hasProposer {
-			return fmt.Errorf("%w: shouldHaveProposer (%v) != hasProposer (%v)", errProposerMismatch, shouldHaveProposer, hasProposer)
+			hasProposer := child.SignedBlock.Proposer() != ids.EmptyNodeID
+			if shouldHaveProposer != hasProposer {
+				return fmt.Errorf("%w: shouldHaveProposer (%v) != hasProposer (%v)", errProposerMismatch, shouldHaveProposer, hasProposer)
+			}
 		}
 
 		p.vm.ctx.Log.Debug("verified post-fork block",
@@ -443,7 +455,7 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 ) (bool, error) {
 	parentHeight := p.innerBlk.Height()
 	currentSlot := proposer.TimeToSlot(parentTimestamp, newTimestamp)
-	expectedProposerID, err := p.vm.Windower.ExpectedProposer(
+	expectedProposerID, err := p.vm.windowerFor(newTimestamp).ExpectedProposer(
 		ctx,
 		parentHeight+1,
 		parentPChainHeight,

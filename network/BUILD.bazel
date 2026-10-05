@@ -62,6 +62,7 @@ go_test(
         "handler_test.go",
         "ip_tracker_test.go",
         "listener_test.go",
+        "network_fork_test.go",
         "network_test.go",
         "no_ingress_conn_alert_test.go",
         "tracked_ip_test.go",

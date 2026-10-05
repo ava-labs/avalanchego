@@ -73,6 +73,10 @@ type Network interface {
 	// StartClose multiple times is handled gracefully.
 	StartClose()
 
+	// DisconnectDisallowed closes connections to peers that AllowConnection
+	// no longer permits.
+	DisconnectDisallowed()
+
 	// Should only be called once, will run until either a fatal error occurs,
 	// or the network is closed.
 	Dispatch() error
@@ -500,6 +504,11 @@ func (n *network) Connected(nodeID ids.NodeID) {
 // of peers, then it should only connect if this node is a validator, or the
 // peer is a validator/beacon.
 func (n *network) AllowConnection(nodeID ids.NodeID) bool {
+	if n.config.AllowedPeers != nil {
+		if allowed, active := n.config.AllowedPeers(); active {
+			return allowed.Contains(nodeID)
+		}
+	}
 	if !n.config.RequireValidatorToConnect {
 		return true
 	}
@@ -1168,6 +1177,28 @@ func (n *network) StartClose() {
 			peer.StartClose()
 		}
 	})
+}
+
+// DisconnectDisallowed closes connections to peers that AllowConnection no
+// longer permits. AllowConnection takes no network locks (ipTracker.
+// WantsConnection only takes ipTracker's own internal lock), so it is safe to
+// call while holding peersLock here, mirroring StartClose.
+func (n *network) DisconnectDisallowed() {
+	n.peersLock.Lock()
+	defer n.peersLock.Unlock()
+
+	for i := 0; i < n.connectingPeers.Len(); i++ {
+		peer, _ := n.connectingPeers.GetByIndex(i)
+		if !n.AllowConnection(peer.ID()) {
+			peer.StartClose()
+		}
+	}
+	for i := 0; i < n.connectedPeers.Len(); i++ {
+		peer, _ := n.connectedPeers.GetByIndex(i)
+		if !n.AllowConnection(peer.ID()) {
+			peer.StartClose()
+		}
+	}
 }
 
 func (n *network) NodeUptime() (UptimeResult, error) {

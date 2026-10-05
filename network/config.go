@@ -160,6 +160,11 @@ type Config struct {
 	// the network negatively.
 	RequireValidatorToConnect bool `json:"requireValidatorToConnect"`
 
+	// AllowedPeers, if non-nil and active, restricts connections to the
+	// returned node IDs. Fork mode uses it to isolate the fork after the
+	// switchover.
+	AllowedPeers func() (allowed set.Set[ids.NodeID], active bool) `json:"-"`
+
 	// MaximumInboundMessageTimeout is the maximum deadline duration in a
 	// message. Messages sent by clients setting values higher than this value
 	// will be reset to this value.

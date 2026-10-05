@@ -81,6 +81,7 @@ go_test(
         "staker_diff_iterator_test.go",
         "staker_test.go",
         "stakers_test.go",
+        "state_fork_test.go",
         "state_test.go",
         "subnet_id_node_id_test.go",
     ],

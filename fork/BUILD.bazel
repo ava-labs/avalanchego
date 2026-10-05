@@ -1,0 +1,54 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "fork",
+    srcs = [
+        "config.go",
+        "manager.go",
+        "state.go",
+        "status.go",
+        "upgrade.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/fork",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow/validators",
+        "//upgrade",
+        "//utils/constants",
+        "//utils/crypto/bls",
+        "//utils/hashing",
+        "//utils/math",
+        "//utils/set",
+        "//vms/platformvm/signer",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)
+
+go_test(
+    name = "fork_test",
+    srcs = [
+        "config_test.go",
+        "manager_test.go",
+        "state_test.go",
+        "status_test.go",
+        "upgrade_test.go",
+    ],
+    embed = [":fork"],
+    deps = [
+        "//database/memdb",
+        "//fork/forktest",
+        "//ids",
+        "//snow/validators",
+        "//snow/validators/validatorstest",
+        "//upgrade",
+        "//utils/constants",
+        "//utils/crypto/bls",
+        "//utils/math",
+        "//vms/platformvm/signer",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

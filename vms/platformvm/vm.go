@@ -146,6 +146,10 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	if height, ok := vm.state.GetForkHeight(); ok && vm.Internal.OnForkHeight != nil {
+		vm.Internal.OnForkHeight(height)
+	}
+
 	validatorManager := pvalidators.NewManager(vm.Internal, vm.state, vm.metrics, &vm.clock)
 	vm.State = validatorManager
 	utxoVerifier := utxo.NewVerifier(vm.ctx, &vm.clock, vm.fx)
