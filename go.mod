@@ -27,7 +27,7 @@ require (
 	github.com/ava-labs/avalanchego/graft/evm v1.15.2
 	github.com/ava-labs/avalanchego/graft/subnet-evm v1.15.2
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0
-	github.com/ava-labs/libevm v1.13.15-0.20261002201840-aacdf4363095
+	github.com/ava-labs/libevm v1.13.15-0.20261005085333-91e8349e7488
 	github.com/ava-labs/simplex v0.0.0-20260429081342-03ce910391ad
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
