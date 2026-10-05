@@ -277,8 +277,8 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 	// extend appends to the chain all the blocks in settler's ancestry up to
 	// and including the block that it settled.
 	extend := func(settler *blocks.Block) error {
-		end := rec.hooks.SettledBy(settler.Header()).Height
-		for b := lastOf(chain); b.Height() > end && !b.Synchronous(); b = lastOf(chain) {
+		end := hook.SettledHeight(rec.hooks, settler.Header())
+		for b := lastOf(chain); b.Height() > end; b = lastOf(chain) {
 			parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
 			if err != nil {
 				return err
