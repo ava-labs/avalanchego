@@ -1664,26 +1664,19 @@ func TestBootstrapSynchronousBlocks(t *testing.T) {
 	ctx, want := newSUT(t, append(opts, withDB(db))...)
 	want.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
 
-	// Crashing after every write is equivalent to a node that never crashed.
 	for crashAfter := range db.Ops() + 1 {
 		t.Run(fmt.Sprintf("crash_after_op_%d", crashAfter), func(t *testing.T) {
 			t.Parallel()
 
-			// Each node advances its own clock to settle blocks.
 			_, opts, clock := synchronousFixture(t)
 			db := saetest.NewCaptureDB(memdb.New(), crashAfter)
 
 			dataDir := t.TempDir()
 			ctx, node := newSUT(t, append(opts, withDB(db), withChainDataDir(dataDir))...)
 			node.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
-			crashed := db.Captured(t)
-
-			// The crash image predates this shutdown, so it never receives the
-			// state that a shutdown commits. Shutting down only releases the
-			// chain data directory.
 			require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
 
-			ctx, sut := newSUT(t, append(opts, withDB(crashed), withChainDataDir(dataDir))...)
+			ctx, sut := newSUT(t, append(opts, withDB(db.Captured(t)), withChainDataDir(dataDir))...)
 			last := sut.lastAccepted(ctx, t)
 			height, ok := heights[last]
 			require.Truef(t, ok, "last accepted %s after restart is not a fixture block", last)
