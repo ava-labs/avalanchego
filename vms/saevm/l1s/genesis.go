@@ -170,6 +170,7 @@ func newNetworkUpgrades(ctx *snow.Context, upgradeConfig extras.UpgradeConfig) e
 		FortunaTimestamp:   nil,
 		GraniteTimestamp:   utils.TimeToNewUint64(u.GraniteTime),
 		HeliconTimestamp:   utils.TimeToNewUint64(u.HeliconTime),
+		IglooTimestamp:     utils.TimeToNewUint64(u.IglooTime),
 	}
 
 	overrides := extras.NetworkUpgrades{}
@@ -194,6 +195,9 @@ func newNetworkUpgrades(ctx *snow.Context, upgradeConfig extras.UpgradeConfig) e
 	}
 	if overrides.HeliconTimestamp != nil {
 		upgrades.HeliconTimestamp = overrides.HeliconTimestamp
+	}
+	if overrides.IglooTimestamp != nil {
+		upgrades.IglooTimestamp = overrides.IglooTimestamp
 	}
 	return upgrades
 }

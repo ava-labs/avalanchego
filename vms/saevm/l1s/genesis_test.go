@@ -24,7 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
@@ -38,6 +37,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 
+	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	ethcore "github.com/ava-labs/libevm/core"
 )
@@ -97,13 +97,13 @@ func testEthConfig() *params.ChainConfig {
 	}
 }
 
-type genesisOption = options.Option[core.Genesis]
+type genesisOption = options.Option[legacy.Genesis]
 
 // testGenesis returns a minimal L1 genesis. Upgrade timestamps other than
 // SubnetEVM are left unset so that they default to the network upgrades of
 // the context used to parse the genesis.
-func testGenesis(opts ...genesisOption) *core.Genesis {
-	return options.ApplyTo(&core.Genesis{
+func testGenesis(opts ...genesisOption) *legacy.Genesis {
+	return options.ApplyTo(&legacy.Genesis{
 		Config: l1params.WithExtra(testEthConfig(), &extras.ChainConfig{
 			NetworkUpgrades: extras.NetworkUpgrades{
 				SubnetEVMTimestamp: new(uint64),
@@ -124,20 +124,20 @@ func testGenesisJSON(opts ...genesisOption) string {
 }
 
 func withAirdrop(airdropHash common.Hash) genesisOption {
-	return options.Func[core.Genesis](func(g *core.Genesis) {
+	return options.Func[legacy.Genesis](func(g *legacy.Genesis) {
 		g.AirdropHash = airdropHash
 		g.AirdropAmount = nil
 	})
 }
 
 func withInitialMinDelay(delayMS uint64) genesisOption {
-	return options.Func[core.Genesis](func(g *core.Genesis) {
+	return options.Func[legacy.Genesis](func(g *legacy.Genesis) {
 		l1params.GetExtra(g.Config).InitialMinDelayMS = delayMS
 	})
 }
 
 func withFeeConfig(c commontype.FeeConfig) genesisOption {
-	return options.Func[core.Genesis](func(g *core.Genesis) {
+	return options.Func[legacy.Genesis](func(g *legacy.Genesis) {
 		l1params.GetExtra(g.Config).FeeConfig = c
 	})
 }
@@ -239,7 +239,7 @@ func TestParseGenesis(t *testing.T) {
 		{
 			name: "gas_limit_mismatch",
 			ctx:  latest,
-			genesis: testGenesisJSON(options.Func[core.Genesis](func(g *core.Genesis) {
+			genesis: testGenesisJSON(options.Func[legacy.Genesis](func(g *legacy.Genesis) {
 				g.GasLimit++
 			})),
 			wantErr: testerr.Is(errGasLimitMismatch),
@@ -351,7 +351,7 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 		spec{
 			name:     "explicit_base_fee",
 			upgrades: upgradetest.Latest,
-			genesis: testGenesisJSON(options.Func[core.Genesis](func(g *core.Genesis) {
+			genesis: testGenesisJSON(options.Func[legacy.Genesis](func(g *legacy.Genesis) {
 				g.BaseFee = big.NewInt(1_000)
 			})),
 		},
@@ -359,14 +359,14 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 			// subnet-evm commits the genesis state with deleteEmptyObjects=false.
 			name:     "empty_account",
 			upgrades: upgradetest.Latest,
-			genesis: testGenesisJSON(options.Func[core.Genesis](func(g *core.Genesis) {
+			genesis: testGenesisJSON(options.Func[legacy.Genesis](func(g *legacy.Genesis) {
 				g.Alloc[common.Address{0xe0}] = types.Account{Balance: new(big.Int)}
 			})),
 		},
 		spec{
 			name:     "header_fields",
 			upgrades: upgradetest.Latest,
-			genesis: testGenesisJSON(options.Func[core.Genesis](func(g *core.Genesis) {
+			genesis: testGenesisJSON(options.Func[legacy.Genesis](func(g *legacy.Genesis) {
 				g.Nonce = 42
 				g.ExtraData = []byte("extra")
 				g.Mixhash = common.Hash{1}
@@ -383,7 +383,7 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 
 			got, err := g.block()
 			require.NoErrorf(t, err, "%T.block()", g)
-			var legacy core.Genesis
+			var legacy legacy.Genesis
 			require.NoError(t, json.Unmarshal([]byte(s.genesis), &legacy))
 			legacy.Config = g.Config
 			want := legacy.ToBlock()
@@ -421,6 +421,7 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 		upgradetest.Helicon: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
 
 		// TODO: Add SAE required fields
+		upgradetest.Igloo: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
 	}
 	_ = hashes[upgradetest.Latest] // Enforce completeness at compile time.
 
@@ -456,7 +457,7 @@ func TestWriteGenesis(t *testing.T) {
 	newSpecContext := func(t *testing.T, s spec) *snow.Context {
 		ctx := newContext(t, s.fork)
 		if !s.latestUpgradeTime.IsZero() {
-			ctx.NetworkUpgrades.HeliconTime = s.latestUpgradeTime
+			ctx.NetworkUpgrades.IglooTime = s.latestUpgradeTime
 		}
 		return ctx
 	}
@@ -501,7 +502,7 @@ func TestWriteGenesis(t *testing.T) {
 			},
 			restart: spec{
 				fork: upgradetest.Latest,
-				genesis: testGenesisJSON(options.Func[core.Genesis](func(g *core.Genesis) {
+				genesis: testGenesisJSON(options.Func[legacy.Genesis](func(g *legacy.Genesis) {
 					g.Alloc[testAllocAddr] = types.Account{Balance: big.NewInt(1)}
 				})),
 			},
@@ -558,7 +559,7 @@ func TestWriteGenesis(t *testing.T) {
 				genesis:           testGenesisJSON(),
 				upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
 					NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-						HeliconTimestamp: new(testGenesisTime + 2_000),
+						IglooTimestamp: new(testGenesisTime + 2_000),
 					},
 				})),
 			},
@@ -578,7 +579,7 @@ func TestWriteGenesis(t *testing.T) {
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
 				upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
 					NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-						HeliconTimestamp: new(testGenesisTime + 3_000),
+						IglooTimestamp: new(testGenesisTime + 3_000),
 					},
 				})),
 			},
@@ -599,7 +600,7 @@ func TestWriteGenesis(t *testing.T) {
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
 				upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
 					NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-						HeliconTimestamp: new(testGenesisTime + 3_000),
+						IglooTimestamp: new(testGenesisTime + 3_000),
 					},
 				})),
 			},
