@@ -305,11 +305,8 @@ func withMinDelayTarget(ms uint64) sutOption {
 // mirroring the prefix avalanchego's chain manager applies.
 var chainDBPrefix = []byte("chain")
 
-// synchronousFixture loads the pre-generated synchronous C-Chain history and
-// returns the options that start a fresh VM on its genesis in
-// [snow.Bootstrapping], with the clock past every fixture block. Helicon is
-// scheduled a day after Granite, following the fixture's one-upgrade-per-day
-// cadence, so every synchronous block predates it.
+// synchronousFixture returns the fixture and options to bootstrap it from
+// genesis, with Helicon after its last block.
 func synchronousFixture(tb testing.TB) (*synchronoustest.Fixture, []sutOption, *saetest.Clock) {
 	tb.Helper()
 
@@ -1653,30 +1650,57 @@ func TestRestartWithSettledAsynchronousBlock(t *testing.T) {
 	require.Equal(t, settler.ID(), restarted.lastAccepted(restartedCtx, t), "restarted last-accepted")
 }
 
-// A node bootstrapping from genesis must be able to execute the synchronous
-// history and extend the chain asynchronously.
+// A node bootstrapping from genesis must recover from a crash after any number
+// of database writes and be able to extend the chain asynchronously.
 func TestBootstrapSynchronousBlocks(t *testing.T) {
-	fixture, opts, clock := synchronousFixture(t)
-	ctx, sut := newSUT(t, opts...)
-	require.Equal(t, ids.ID(fixture.Blocks[0].Hash), sut.lastAccepted(ctx, t), "genesis")
-
-	sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
+	fixture, opts, _ := synchronousFixture(t)
+	heights := make(map[ids.ID]int, len(fixture.Blocks))
+	for i, blk := range fixture.Blocks {
+		heights[ids.ID(blk.Hash)] = i
+	}
 	tip := fixture.Blocks[len(fixture.Blocks)-1]
-	require.Equal(t, ids.ID(tip.Hash), sut.lastAccepted(ctx, t), "last accepted after bootstrapping")
 
-	require.NoErrorf(t, sut.SetPreference(ctx, sut.lastAccepted(ctx, t), nil), "%T.SetPreference()", sut.VM)
-	require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", sut.VM)
+	db := saetest.NewCaptureDB(memdb.New(), math.MaxInt)
+	ctx, want := newSUT(t, append(opts, withDB(db))...)
+	want.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
 
-	// The fixture funds three accounts and only the first two ever transact,
-	// so the third still has its genesis balance and a zero nonce.
-	w := newWallet(secp256k1.TestKeys()[2], sut.ctx, sut.Client)
-	first := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
-	require.Equal(t, tip.Number+1, first.Height(), "first asynchronous block height")
-	require.Equal(t, ids.ID(tip.Hash), first.LastSettled().ID(), "first asynchronous block settles the synchronous tip")
+	for crashAfter := range db.Ops() + 1 {
+		t.Run(fmt.Sprintf("crash_after_op_%d", crashAfter), func(t *testing.T) {
+			t.Parallel()
 
-	clock.AdvanceToSettle(ctx, t, first)
-	second := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
-	require.Equal(t, first.ID(), second.LastSettled().ID(), "second asynchronous block settles the first")
+			_, opts, clock := synchronousFixture(t)
+			db := saetest.NewCaptureDB(memdb.New(), crashAfter)
+
+			dataDir := t.TempDir()
+			ctx, node := newSUT(t, append(opts, withDB(db), withChainDataDir(dataDir))...)
+			node.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
+			require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+
+			ctx, sut := newSUT(t, append(opts, withDB(db.Captured(t)), withChainDataDir(dataDir))...)
+			last := sut.lastAccepted(ctx, t)
+			height, ok := heights[last]
+			require.Truef(t, ok, "last accepted %s after restart is not a fixture block", last)
+
+			sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[height+1:])
+			require.Equal(t, ids.ID(tip.Hash), sut.lastAccepted(ctx, t), "last accepted after bootstrapping")
+			saetest.AssertEqualDBs(t, want.sharedMemoryDB, sut.sharedMemoryDB, "shared memory")
+
+			require.NoErrorf(t, sut.SetPreference(ctx, sut.lastAccepted(ctx, t), nil), "%T.SetPreference()", sut.VM)
+			require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", sut.VM)
+
+			// The fixture funds three accounts and only the first two ever
+			// transact, so the third still has its genesis balance and a zero
+			// nonce.
+			w := newWallet(secp256k1.TestKeys()[2], sut.ctx, sut.Client)
+			first := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+			require.Equal(t, tip.Number+1, first.Height(), "first asynchronous block height")
+			require.Equal(t, ids.ID(tip.Hash), first.LastSettled().ID(), "first asynchronous block settles the synchronous tip")
+
+			clock.AdvanceToSettle(ctx, t, first)
+			second := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+			require.Equal(t, first.ID(), second.LastSettled().ID(), "second asynchronous block settles the first")
+		})
+	}
 }
 
 // Verifies a built block splits its timestamp: seconds in Header.Time, the full

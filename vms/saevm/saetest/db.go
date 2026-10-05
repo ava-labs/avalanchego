@@ -6,6 +6,7 @@ package saetest
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -21,19 +22,29 @@ import (
 // ErrInjected is returned by [FlakyDB] once its op budget is spent.
 var ErrInjected = errors.New("injected fault")
 
-// CopyDB returns an in-memory copy of src, used to hand a fresh VM the persisted
-// state of a prior one without sharing the live database.
+// CopyDB returns an in-memory copy of src, used to hand a fresh VM the
+// persisted state of a prior one without sharing the live database.
 func CopyDB(tb testing.TB, src database.Database) database.Database {
 	tb.Helper()
 
+	dst, err := copyDB(src)
+	require.NoErrorf(tb, err, "copying %T", src)
+	return dst
+}
+
+func copyDB(src database.Database) (database.Database, error) {
 	dst := memdb.New()
 	it := src.NewIterator()
 	defer it.Release()
 	for it.Next() {
-		require.NoErrorf(tb, dst.Put(it.Key(), it.Value()), "%T.Put() during database copy", dst)
+		if err := dst.Put(it.Key(), it.Value()); err != nil {
+			return nil, fmt.Errorf("%T.Put() during database copy: %w", dst, err)
+		}
 	}
-	require.NoErrorf(tb, it.Error(), "%T.Error() after database copy", it)
-	return dst
+	if err := it.Error(); err != nil {
+		return nil, fmt.Errorf("%T.Error() after database copy: %w", it, err)
+	}
+	return dst, nil
 }
 
 // AssertEqualDBs asserts that got holds exactly the same key/value pairs as
@@ -159,6 +170,98 @@ func (b *flakyBatch) Write() error {
 // Inner returns the wrapper itself, so callers that unwrap batches still commit
 // through the fault counter.
 func (b *flakyBatch) Inner() database.Batch { return b }
+
+// CaptureDB copies the contents of the wrapped database as they were after a
+// chosen number of mutating ops. Unlike [FlakyDB], every op succeeds.
+// A Put, a Delete and a batch write each count as one op. Safe for concurrent
+// use.
+type CaptureDB struct {
+	database.Database
+
+	lock      sync.Mutex
+	ops       int
+	captureAt int
+	captured  database.Database
+	err       error
+}
+
+// NewCaptureDB returns a [CaptureDB] that copies db as it was after its first n
+// mutating ops.
+func NewCaptureDB(db database.Database, n int) *CaptureDB {
+	return &CaptureDB{
+		Database:  db,
+		captureAt: n,
+	}
+}
+
+// Ops returns the number of mutating ops performed.
+func (c *CaptureDB) Ops() int {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	return c.ops
+}
+
+// Captured returns the copy taken after n mutating ops, or a copy of the
+// current contents if no more than n ops have been performed.
+func (c *CaptureDB) Captured(tb testing.TB) database.Database {
+	tb.Helper()
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.captured != nil || c.err != nil {
+		require.NoErrorf(tb, c.err, "%T copying database at capture point", c)
+		return c.captured
+	}
+
+	captured, err := copyDB(c.Database)
+	require.NoErrorf(tb, err, "%T copying database on demand", c)
+	return captured
+}
+
+// mutate counts and performs a mutating op, first copying the database if
+// exactly n ops have been performed. The op runs under the lock so that the
+// copy contains exactly the earlier ops.
+func (c *CaptureDB) mutate(op func() error) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if c.ops == c.captureAt {
+		c.captured, c.err = copyDB(c.Database)
+	}
+	c.ops++
+	return op()
+}
+
+func (c *CaptureDB) Put(key, value []byte) error {
+	return c.mutate(func() error {
+		return c.Database.Put(key, value)
+	})
+}
+
+func (c *CaptureDB) Delete(key []byte) error {
+	return c.mutate(func() error {
+		return c.Database.Delete(key)
+	})
+}
+
+func (c *CaptureDB) NewBatch() database.Batch {
+	return &captureBatch{Batch: c.Database.NewBatch(), db: c}
+}
+
+type captureBatch struct {
+	database.Batch
+	db *CaptureDB
+}
+
+func (b *captureBatch) Write() error {
+	return b.db.mutate(b.Batch.Write)
+}
+
+// Inner returns the wrapper itself, so callers that unwrap batches still commit
+// through the op counter.
+func (b *captureBatch) Inner() database.Batch { return b }
 
 // UnreadableOnceDB fails the first read of one key with [ErrInjected] and
 // serves every other read from the wrapped database. Safe for concurrent use.

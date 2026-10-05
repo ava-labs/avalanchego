@@ -157,13 +157,21 @@ func recoverExecutor(
 
 	consensusCritical := newSyncMap[common.Hash, *blocks.Block](
 		func(b *blocks.Block) {
-			tracker.Track(b.SettledStateRoot())
+			// A synchronous block settles its own post-execution root, which
+			// the [saexec.Executor] already tracks. The root MAY not exist yet,
+			// making a track here a noop, but the untrack below would still
+			// release a reference.
+			if !b.Synchronous() {
+				tracker.Track(b.SettledStateRoot())
+			}
 			// The post-execution root is tracked by the [saexec.Executor]
 			// as soon as it's known. In the case of database recovery,
 			// this occurred in [recovery.executeAllAccepted].
 		},
 		func(b *blocks.Block) {
-			tracker.Untrack(b.SettledStateRoot())
+			if !b.Synchronous() {
+				tracker.Untrack(b.SettledStateRoot())
+			}
 			if b.Executed() { // i.e. deleted due to settlement not rejection
 				tracker.Untrack(b.PostExecutionStateRoot())
 			}
@@ -269,8 +277,8 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 	// extend appends to the chain all the blocks in settler's ancestry up to
 	// and including the block that it settled.
 	extend := func(settler *blocks.Block) error {
-		end := rec.hooks.SettledBy(settler.Header()).Height
-		for b := lastOf(chain); b.Height() > end && !b.Synchronous(); b = lastOf(chain) {
+		end := hook.SettledHeight(rec.hooks, settler.Header())
+		for b := lastOf(chain); b.Height() > end; b = lastOf(chain) {
 			parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
 			if err != nil {
 				return err
