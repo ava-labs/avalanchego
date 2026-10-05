@@ -1654,9 +1654,7 @@ func TestRestartWithSettledAsynchronousBlock(t *testing.T) {
 }
 
 // A node bootstrapping from genesis must recover from a crash after any number
-// of database writes, finish executing the synchronous history, and extend the
-// chain asynchronously. Its shared memory must match a node that never
-// crashed.
+// of database writes and be able to extend the chain asynchronously.
 func TestBootstrapSynchronousBlocks(t *testing.T) {
 	fixture, opts, _ := synchronousFixture(t)
 	heights := make(map[ids.ID]int, len(fixture.Blocks))
