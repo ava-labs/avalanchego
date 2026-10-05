@@ -117,7 +117,8 @@ func NewMainnetCChainVM(
 	); err != nil {
 		return nil, fmt.Errorf("failed to initialize VM: %w", err)
 	}
-	// The VM only serves blocks once it has left state sync.
+	// The VM starts in [snow.Initializing] and only serves blocks from
+	// [snow.Bootstrapping] onwards.
 	if err := vm.SetState(ctx, snow.Bootstrapping); err != nil {
 		return nil, fmt.Errorf("setting VM state to %s: %w", snow.Bootstrapping, err)
 	}
