@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
@@ -1357,4 +1358,39 @@ func TestProcessBeaconBlockRoot(t *testing.T) {
 			assert.Equal(t, tt.want, got, "parent beacon root returned by beacon-roots contract")
 		})
 	}
+}
+
+// failingDB wraps a [state.Database] such that every account read from the
+// returned tries errors.
+type failingDB struct{ state.Database }
+
+type failingTrie struct{ state.Trie }
+
+var errAccountRead = errors.New("account read failed")
+
+func (db failingDB) OpenTrie(root common.Hash) (state.Trie, error) {
+	t, err := db.Database.OpenTrie(root)
+	return failingTrie{t}, err
+}
+
+func (failingTrie) GetAccount(common.Address) (*types.StateAccount, error) {
+	return nil, errAccountRead
+}
+
+func TestExecuteReturnsStateDBError(t *testing.T) {
+	hooks := defaultHooks()
+	hooks.FinishExecutingBlockFn = func(sdb *state.StateDB, _ *types.Block, _ types.Receipts) error {
+		sdb.GetBalance(common.Address{}) // triggers the failing account read
+		return nil
+	}
+	_, sut := newSUT(t, withHooks(hooks))
+	b := sut.chain.NewBlock(t, nil)
+
+	// No snapshot, so account reads go through the trie.
+	db := failingDB{state.NewDatabase(rawdb.NewMemoryDatabase())}
+	sdb, err := state.New(types.EmptyRootHash, db, nil)
+	require.NoError(t, err, "state.New()")
+
+	_, err = Execute(b, sdb, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger)
+	require.ErrorIs(t, err, errAccountRead, "Execute()")
 }

@@ -415,6 +415,11 @@ func Execute(
 		return nil, fmt.Errorf("finish-executing-block hook: %v", err)
 	}
 
+	// Any DB error isn't captured in regular execution.
+	if err := stateDB.Error(); err != nil {
+		return nil, fmt.Errorf("during execution: %w", err)
+	}
+
 	endTime := time.Now()
 	target, gasCfg := hooks.GasConfigAfter(b.Header())
 	if err := gasClock.AfterBlock(res.GasConsumed, target, gasCfg); err != nil {
