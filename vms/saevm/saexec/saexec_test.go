@@ -1379,18 +1379,34 @@ func (failingTrie) GetAccount(common.Address) (*types.StateAccount, error) {
 
 func TestExecuteReturnsStateDBError(t *testing.T) {
 	hooks := defaultHooks()
-	hooks.FinishExecutingBlockFn = func(sdb *state.StateDB, _ *types.Block, _ types.Receipts) error {
+	hooks.StartExecutingBlockFn = func(_ params.Rules, sdb *state.StateDB, _ *types.Header, _ *types.Block) error {
 		sdb.GetBalance(common.Address{}) // triggers the failing account read
 		return nil
 	}
 	_, sut := newSUT(t, withHooks(hooks))
 	b := sut.chain.NewBlock(t, nil)
 
-	// No snapshot, so account reads go through the trie.
-	db := failingDB{state.NewDatabase(rawdb.NewMemoryDatabase())}
-	sdb, err := state.New(types.EmptyRootHash, db, nil)
-	require.NoError(t, err, "state.New()")
+	tests := []struct {
+		name string
+		opts []Option
+	}{
+		{
+			name: "full execution",
+		},
+		{
+			name: "skip end-of-block ops",
+			opts: []Option{SkipEndOfBlockOps()},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// No snapshot, so account reads go through the trie.
+			db := failingDB{state.NewDatabase(rawdb.NewMemoryDatabase())}
+			sdb, err := state.New(types.EmptyRootHash, db, nil)
+			require.NoError(t, err, "state.New()")
 
-	_, err = Execute(b, sdb, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger)
-	require.ErrorIs(t, err, errAccountRead, "Execute()")
+			_, err = Execute(b, sdb, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger, tt.opts...)
+			require.ErrorIs(t, err, errAccountRead, "Execute()")
+		})
+	}
 }
