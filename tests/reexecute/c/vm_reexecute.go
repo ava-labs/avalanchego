@@ -59,13 +59,12 @@ var (
 		"network_uuid":      networkUUID,
 	}
 
-	configKey         = "config"
-	defaultConfigKey  = "default"
+	configKey        = "config"
+	defaultConfigKey = "default"
+
 	predefinedConfigs = map[string]string{
-		defaultConfigKey: `{}`,
-		"archive": `{
-			"pruning-enabled": false
-		}`,
+		defaultConfigKey: `{"state-sync-enabled": false}`,
+		"archive":        `{"pruning-enabled": false, "state-sync-enabled": false}`,
 		"pathdb": `{
 			"state-scheme": "path",
 			"state-sync-enabled": false
@@ -75,8 +74,7 @@ var (
 			"snapshot-cache": 0,
 			"pruning-enabled": true,
 			"state-sync-enabled": false,
-			"commit-interval": 4096,
-			"state-history": 8192
+			"commit-interval": 4096
 		}`,
 		"firewood-archive": `{
 			"state-scheme": "firewood",
@@ -144,7 +142,9 @@ func init() {
 
 func main() {
 	tc := tests.NewTestContext(tests.NewDefaultLogger("c-chain-reexecution"))
-	tc.SetDefaultContextParent(context.Background())
+	// SIGINT and SIGTERM cancel the context so the VM shuts down cleanly;
+	// otherwise saevm rebuilds its snapshot from scratch on the next start.
+	tc.SetDefaultContextParent(tests.DefaultNotifyContext(0, tc.DeferCleanup))
 	defer tc.RecoverAndExit()
 
 	benchmarkName := fmt.Sprintf(
@@ -279,7 +279,8 @@ func benchmarkReexecuteRange(
 	r.NoError(err)
 	defer func() {
 		log.Info("shutting down VM")
-		r.NoError(vm.Shutdown(ctx))
+		// Shutdown must complete even after an interrupt so the run can resume.
+		r.NoError(vm.Shutdown(context.WithoutCancel(ctx)))
 	}()
 
 	config := vmExecutorConfig{
@@ -375,6 +376,10 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan reexecu
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", blk.Height()),
 	)
+	// The VM only accepts the child of its last accepted block.
+	if want := blk.Height() + 1; e.config.StartBlock != want {
+		return fmt.Errorf("start block %d does not follow last accepted height %d; pass --start-block=%d", e.config.StartBlock, blk.Height(), want)
+	}
 
 	// Initialize ETA tracking with a baseline sample at 0 progress
 	totalWork := e.config.EndBlock - e.config.StartBlock
@@ -408,6 +413,14 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan reexecu
 			}
 		}
 		if err := e.execute(ctx, blkResult.BlockBytes); err != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				// Interrupted; return nil so the deferred shutdown runs.
+				e.config.Log.Info("exiting early due to interrupt",
+					zap.Uint64("height", blkResult.Height),
+					zap.Error(ctxErr),
+				)
+				return nil
+			}
 			return err
 		}
 

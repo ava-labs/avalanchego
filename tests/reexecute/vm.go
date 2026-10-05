@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/factory"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -27,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
 )
 
 var (
@@ -43,12 +43,18 @@ func NewMainnetCChainVM(
 	vmMultiGatherer metrics.MultiGatherer,
 	meterVMRegistry prometheus.Registerer,
 ) (block.ChainVM, error) {
-	factory := factory.Factory{}
+	factory := cchain.Factory{}
 	vmIntf, err := factory.New(logging.NoLog{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create VM from factory: %w", err)
 	}
 	vm := vmIntf.(block.ChainVM)
+
+	// The VM's AVAX API resolves the chain's primary alias at initialization.
+	aliaser := ids.NewAliaser()
+	if err := aliaser.Alias(mainnetCChainID, "C"); err != nil {
+		return nil, err
+	}
 
 	blsKey, err := localsigner.New()
 	if err != nil {
@@ -87,7 +93,7 @@ func NewMainnetCChainVM(
 
 			Log:          tests.NewDefaultLogger("mainnet-vm-reexecution"),
 			SharedMemory: atomicMemory.NewSharedMemory(mainnetCChainID),
-			BCLookup:     ids.NewAliaser(),
+			BCLookup:     aliaser,
 			Metrics:      vmMultiGatherer,
 
 			WarpSigner: warpSigner,
@@ -113,5 +119,10 @@ func NewMainnetCChainVM(
 		return nil, fmt.Errorf("failed to initialize VM: %w", err)
 	}
 
+	// Bootstrapping finishes the VM's initialization: blocks are verified by
+	// hash and Accept waits for execution.
+	if err := vm.SetState(ctx, snow.Bootstrapping); err != nil {
+		return nil, fmt.Errorf("failed to set VM state to bootstrapping: %w", err)
+	}
 	return vm, nil
 }

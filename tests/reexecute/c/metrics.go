@@ -21,9 +21,11 @@ const (
 )
 
 var (
+	// gasMetric normalises the benchmark results. It includes end-of-block
+	// operation gas, so mgas/s is not comparable with historical coreth results.
 	gasMetric = topLevelMetric{
 		name:  "gas",
-		query: "avalanche_evm_eth_chain_block_gas_used_processed",
+		query: "avalanche_evm_sae_executed_gas_charged_total",
 		kind:  counter,
 	}
 	meterVMMetrics = []topLevelMetric{
