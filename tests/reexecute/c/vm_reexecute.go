@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/meterdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -94,7 +93,7 @@ var (
 )
 
 func init() {
-	evm.RegisterAllLibEVMExtras()
+	reexecute.RegisterLibEVMExtras()
 
 	flag.StringVar(&blockDirArg, "block-dir", blockDirArg, "Block DB directory to read from during re-execution.")
 	flag.StringVar(&currentStateDirArg, "current-state-dir", currentStateDirArg, "Current state directory including VM DB and Chain Data Directory for re-execution.")
@@ -292,12 +291,14 @@ func benchmarkReexecuteRange(
 	executor, err := newVMExecutor(vm, config)
 	r.NoError(err)
 
+	startGas, err := getMetricValue(prefixGatherer, gasMetric)
+	r.NoError(err)
 	start := time.Now()
 	r.NoError(executor.executeSequence(ctx, blockChan))
 	elapsed := time.Since(start)
 
 	benchmarkTool := newBenchmarkTool(benchmarkName)
-	getTopLevelMetrics(tc, benchmarkTool, prefixGatherer, elapsed) // Report the desired top-level metrics
+	getTopLevelMetrics(tc, benchmarkTool, prefixGatherer, elapsed, startGas) // Report the desired top-level metrics
 
 	benchmarkTool.logResults(log)
 	if len(benchmarkOutputFile) != 0 {

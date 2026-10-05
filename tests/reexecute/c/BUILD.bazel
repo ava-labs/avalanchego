@@ -12,7 +12,6 @@ go_library(
         "//api/metrics",
         "//database/leveldb",
         "//database/meterdb",
-        "//graft/coreth/plugin/evm",
         "//snow/engine/snowman/block",
         "//tests",
         "//tests/fixture/tmpnet",

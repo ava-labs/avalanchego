@@ -15,6 +15,7 @@ package_group(
         "//graft/coreth/plugin/evm/customtypes",
         "//node",
         "//tests/e2e/p",
+        "//tests/reexecute",
     ],
 )
 

@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/factory"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -27,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
 )
 
 var (
@@ -43,8 +43,7 @@ func NewMainnetCChainVM(
 	vmMultiGatherer metrics.MultiGatherer,
 	meterVMRegistry prometheus.Registerer,
 ) (block.ChainVM, error) {
-	factory := factory.Factory{}
-	vmIntf, err := factory.New(logging.NoLog{})
+	vmIntf, err := (&cchain.Factory{}).New(logging.NoLog{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create VM from factory: %w", err)
 	}
@@ -111,6 +110,10 @@ func NewMainnetCChainVM(
 		&enginetest.Sender{},
 	); err != nil {
 		return nil, fmt.Errorf("failed to initialize VM: %w", err)
+	}
+	// The VM only serves blocks once it has left state sync.
+	if err := vm.SetState(ctx, snow.Bootstrapping); err != nil {
+		return nil, fmt.Errorf("setting VM state to %s: %w", snow.Bootstrapping, err)
 	}
 
 	return vm, nil

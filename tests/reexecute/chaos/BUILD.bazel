@@ -9,7 +9,6 @@ go_library(
         "//api/metrics",
         "//database",
         "//database/leveldb",
-        "//graft/coreth/plugin/evm",
         "//tests",
         "//tests/reexecute",
         "//utils/logging",
