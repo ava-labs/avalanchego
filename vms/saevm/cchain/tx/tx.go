@@ -13,11 +13,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 
-	// Imported for [atomic.TxBytesGas] comment resolution.
-	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -164,10 +160,10 @@ func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
 
 const (
 	// intrinsicGas is an initial static amount of gas that every [Tx] must pay.
-	intrinsicGas = ap5.AtomicTxIntrinsicGas
+	intrinsicGas = 10_000
 	// GasPerByte is an additional amount of gas that is charged per-byte of an
 	// [Unsigned] transaction.
-	GasPerByte = 1 // [atomic.TxBytesGas]
+	GasPerByte = 1
 	// gasPerSig is an additional amount of gas that is charged per-signature
 	// included in a [Tx].
 	gasPerSig = gas.Gas(secp256k1fx.CostPerSignature)
