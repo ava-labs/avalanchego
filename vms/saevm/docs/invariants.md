@@ -49,6 +49,33 @@ Mirroring this on disk allows for simple integration with the upstream API imple
 > [!NOTE]
 > These also provide an unambiguous inverse, allowing for recovery from disk.
 
+## Synchronous era
+
+A **synchronous block** is one whose header `hook.Synchronous` classifies as
+such (no settled-* fields). The **synchronous era** is the contiguous prefix of
+synchronous blocks from genesis up to and including the transition block; on an
+always-SAE chain it is just the genesis. The **era base** is the highest block
+whose post-execution state is committed.
+
+Invariants:
+
+- A synchronous block is self-settling: `Settles()` returns only itself and its
+  header root is its own post-execution root.
+- During bootstrapping a synchronous block is verified by parent hash and height
+  only. It carries a parent pointer until it is settled.
+- Accepting a synchronous block enqueues it for execution; the executor proves
+  the computed state root and receipts root against its header and only then
+  marks it settled. Settled therefore still implies executed. A mismatch stops
+  the executor and fails `AcceptBlock`.
+- Synchronous blocks never persist execution results; their artefacts are
+  derived from the header.
+- `AcceptBlock` records a synchronous block as accepted before it executes and
+  returns once the executor has settled it, so the disk MAY record an accepted
+  synchronous block that is not yet settled; recovery re-executes it.
+- Recovery starts from the era base and re-executes every accepted block above
+  it, synchronous or not.
+- No synchronous block is verified or built outside bootstrapping.
+
 ## Timing
 
 ### Ordering guarantees

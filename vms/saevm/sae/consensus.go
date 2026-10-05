@@ -41,7 +41,10 @@ func (vm *VM) GetPreference() *blocks.Block {
 	return vm.preference.Load()
 }
 
-var errUnverifiedBlock = errors.New("block not verified")
+var (
+	errUnverifiedBlock   = errors.New("block not verified")
+	errAwaitingExecution = errors.New("waiting for block to execute")
+)
 
 // AcceptBlock marks the block as [accepted], resulting in:
 //   - All blocks settled by this block having their [blocks.Block.MarkSettled]
@@ -121,9 +124,11 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 	// either `Verify` or `Accept` is considered FATAL during this process.
 	// Therefore, we must ensure that avalanchego does not get too far ahead of
 	// the execution thread and FATAL during block verification.
+	//
+	// The Executor's wait reports a stopped executor instead of waiting forever.
 	if vm.consensusState.Get() == snow.Bootstrapping {
-		if err := b.WaitUntilExecuted(ctx); err != nil {
-			return fmt.Errorf("waiting for block %d to execute: %v", b.Height(), err)
+		if err := vm.exec.WaitUntilExecuted(ctx, b); err != nil {
+			return fmt.Errorf("%w: height %d: %w", errAwaitingExecution, b.Height(), err)
 		}
 	}
 
@@ -171,13 +176,15 @@ func (vm *VM) acceptSynchronous(ctx context.Context, b *blocks.Block) error {
 	if err := vm.exec.Enqueue(ctx, b); err != nil {
 		return err
 	}
-	if err := b.WaitUntilSettled(ctx); err != nil {
-		return fmt.Errorf("waiting for synchronous block %d to settle: %w", b.Height(), err)
+	// A header mismatch stops the executor; the Executor's wait reports that
+	// instead of waiting forever, and returning it makes it fatal to bootstrapping.
+	if err := vm.exec.WaitUntilSettled(ctx, b); err != nil {
+		return fmt.Errorf("%w: height %d: %w", errAwaitingExecution, b.Height(), err)
 	}
 	vm.metrics.markSettled(b)
 
 	vm.log().Debug(
-		"Accepted block",
+		"Accepted synchronous block",
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("hash", b.Hash()),
 	)

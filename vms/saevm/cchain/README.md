@@ -63,7 +63,7 @@ Hooks are the seam through which SAE calls into C-Chain-specific code. SAE invok
 
 ### Block format changes
 
-`cchain` modifies the standard Ethereum block format. The C-Chain transitioned to this VM from coreth on the same database and block format, so historical blocks must keep parsing and hashing identically and vestigial fields cannot be removed.
+`cchain` modifies the standard Ethereum block format. The C-Chain transitioned to this VM from coreth on the same database and block format, so historical blocks must keep parsing, hashing, and executing identically and vestigial fields cannot be removed. A node bootstrapping from genesis re-executes every coreth-era block and proves it against its header; see `docs/invariants.md`, "Synchronous era".
 
 #### Block header changes
 

@@ -106,6 +106,8 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 			return b, nil
 		}
 
+		// Synchronous blocks are not a stopping point: only every commit
+		// interval has committed state. Genesis always does.
 		if height == 0 {
 			return nil, errGenesisStateUnavailable
 		}

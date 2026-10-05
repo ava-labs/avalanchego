@@ -64,6 +64,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
+	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -117,6 +118,9 @@ type (
 		validators      set.Set[ids.NodeID]
 		dataDir         string
 		wantShutdownErr testerr.Want
+		// allowUnexecutedLastAccepted relaxes the shutdown check that every
+		// accepted block has executed.
+		allowUnexecutedLastAccepted bool
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -223,7 +227,9 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 	}
 	closeOnce := sync.OnceFunc(func() {
 		ctx := context.WithoutCancel(tb.Context())
-		require.NoError(tb, vm.last.accepted.Load().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
+		if !conf.allowUnexecutedLastAccepted {
+			require.NoError(tb, vm.last.accepted.Load().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
+		}
 		if diff := testerr.Diff(snow.Shutdown(ctx), conf.wantShutdownErr); diff != "" {
 			tb.Errorf("%T.Shutdown() %s", snow, diff)
 		}
@@ -344,6 +350,24 @@ func withFirewood() sutOption {
 func withArchival() sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.DBConfig.Archival = true
+	})
+}
+
+// withLogger overrides the SUT's logger. Unlike the default, the override
+// neither fails the test on Error logs nor cancels the context, so tests that
+// deliberately log a failure MUST use it.
+func withLogger(l logging.Logger) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.logger = l
+	})
+}
+
+// withStoppedExecutor configures the SUT for a test that stops the executor
+// fatally, so Shutdown reports the [saexec.Unhealthy] cause instead of nil.
+func withStoppedExecutor() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.allowUnexecutedLastAccepted = true
+		c.wantShutdownErr = testerr.As[*saexec.Unhealthy](nil)
 	})
 }
 
@@ -1354,4 +1378,168 @@ func storageTrieRoot(tb testing.TB, slot, value common.Hash) common.Hash {
 	st := trie.NewStackTrie(nil)
 	require.NoErrorf(tb, st.Update(crypto.Keccak256(slot[:]), encoded), "%T.Update()", st)
 	return st.Hash()
+}
+
+// newSynchronousEthBlock constructs a synchronous child whose header commits
+// to the parent's post-execution root and empty receipts, unless `opts` say
+// otherwise.
+func newSynchronousEthBlock(tb testing.TB, parent *blocks.Block, opts ...blockstest.EthBlockOption) *types.Block {
+	tb.Helper()
+	return newSynchronousEthBlockOn(tb, parent.EthBlock(), parent.PostExecutionStateRoot(), opts...)
+}
+
+// newSynchronousEthBlockOn is [newSynchronousEthBlock] with an explicit parent
+// root, for a parent that will never execute.
+func newSynchronousEthBlockOn(tb testing.TB, parent *types.Block, stateRoot common.Hash, opts ...blockstest.EthBlockOption) *types.Block {
+	tb.Helper()
+	return blockstest.NewEthBlock(tb, parent, nil, append([]blockstest.EthBlockOption{
+		blockstest.WithSettled(hook.Settled{}), // synchronous
+		blockstest.ModifyHeader(func(h *types.Header) {
+			h.Root = stateRoot
+			h.ReceiptHash = types.EmptyReceiptsHash
+			h.Time = parent.Time() + 1
+			// Coreth-era headers predate Shanghai, whose empty withdrawals
+			// hash [blocks.ParseEth] rejects.
+			h.WithdrawalsHash = nil
+			h.BlobGasUsed = nil
+			h.ExcessBlobGas = nil
+		}),
+	}, opts...)...)
+}
+
+// parseAndVerifySynchronous parses and verifies `eth` as a synchronous block.
+func (s *SUT) parseAndVerifySynchronous(ctx context.Context, tb testing.TB, eth *types.Block) (snowman.Block, *blocks.Block) {
+	tb.Helper()
+
+	buf, err := rlp.EncodeToBytes(eth)
+	require.NoErrorf(tb, err, "rlp.EncodeToBytes(block %d)", eth.NumberU64())
+	blk, err := s.ParseBlock(ctx, buf)
+	require.NoErrorf(tb, err, "ParseBlock(block %d)", eth.NumberU64())
+	require.NoErrorf(tb, blk.Verify(ctx), "Verify(block %d)", eth.NumberU64())
+
+	b := unwrap(tb, blk)
+	require.Truef(tb, b.Synchronous(), "block %d Synchronous()", eth.NumberU64())
+	return blk, b
+}
+
+// TestAcceptSynchronousExecutionFailure asserts that a synchronous block whose
+// header commits to the wrong root is reported by [VM.AcceptBlock] instead of
+// waited on forever.
+func TestAcceptSynchronousExecutionFailure(t *testing.T) {
+	rec := loggingtest.NewRecorder(logging.Error)
+	ctx, sut := newSUT(t, 0, withLogger(rec), withStoppedExecutor())
+	require.NoError(t, sut.SetState(ctx, snow.Bootstrapping), "SetState(Bootstrapping)")
+
+	var (
+		parent    = sut.lastAcceptedBlock(t)
+		settled   = sut.rawVM.last.settled.Load()
+		finalized = rawdb.ReadFinalizedBlockHash(sut.rawVM.db)
+	)
+
+	eth := newSynchronousEthBlock(t, parent, blockstest.ModifyHeader(func(h *types.Header) {
+		h.Root = common.Hash{0xba, 0xd}
+	}))
+	buf, err := rlp.EncodeToBytes(eth)
+	require.NoError(t, err, "rlp.EncodeToBytes()")
+	blk, err := sut.ParseBlock(ctx, buf)
+	require.NoError(t, err, "ParseBlock()")
+	require.NoError(t, blk.Verify(ctx), "Verify()")
+
+	// Bounds a regression that would otherwise hang.
+	acceptCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	err = blk.Accept(acceptCtx)
+	require.ErrorIs(t, err, errAwaitingExecution, "Accept(block with a bad state root)")
+	require.ErrorIs(t, err, saexec.ErrExecutorClosed, "Accept(block with a bad state root)")
+
+	b := unwrap(t, blk)
+	require.False(t, b.Executed(), "*blocks.Block.Executed() after a failed Accept()")
+	require.False(t, b.Settled(), "*blocks.Block.Settled() after a failed Accept()")
+	require.Equal(t, settled, sut.rawVM.last.settled.Load(), "last-settled block after a failed Accept()")
+	require.Equal(t, finalized, rawdb.ReadFinalizedBlockHash(sut.rawVM.db), "rawdb.ReadFinalizedBlockHash() after a failed Accept()")
+
+	// The executor only logs the cause; Accept() MUST also return it.
+	logged := rec.Filter(func(r *loggingtest.Record) bool {
+		return r.Level == logging.Error && r.Msg == "Error of unknown severity in block execution"
+	})
+	require.Lenf(t, logged, 1, "%T records of the executor's error", rec)
+}
+
+// TestAcceptExecutionFailureWhileBootstrapping is
+// [TestAcceptSynchronousExecutionFailure] for SAE blocks.
+func TestAcceptExecutionFailureWhileBootstrapping(t *testing.T) {
+	rec := loggingtest.NewRecorder(logging.Warn)
+	// Only canonical execution calls AfterExecutingBlock, so only the executor fails.
+	hookErr := errors.New("after-executing-block hook failure")
+	ctx, sut := newSUT(t, 0,
+		withLogger(rec),
+		withStoppedExecutor(),
+		options.Func[sutConfig](func(c *sutConfig) {
+			c.hooks.AfterExecutingBlockFn = func(*types.Block, types.Receipts) error {
+				return hookErr
+			}
+		}),
+	)
+	require.NoError(t, sut.SetState(ctx, snow.Bootstrapping), "SetState(Bootstrapping)")
+
+	var (
+		settled   = sut.rawVM.last.settled.Load()
+		finalized = rawdb.ReadFinalizedBlockHash(sut.rawVM.db)
+	)
+
+	blk := sut.createAndVerifyBlock(t, sut.lastAcceptedBlock(t))
+	b := unwrap(t, blk)
+	require.Falsef(t, b.Synchronous(), "%T.Synchronous()", b)
+	// The block settles nothing, so neither marker may advance.
+	require.Emptyf(t, b.Settles(), "%T.Settles() for the first block after genesis", b)
+
+	// Bounds a regression that would otherwise hang.
+	acceptCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	err := blk.Accept(acceptCtx)
+	require.ErrorIs(t, err, errAwaitingExecution, "Accept(block whose execution fails)")
+	require.ErrorIs(t, err, saexec.ErrExecutorClosed, "Accept(block whose execution fails)")
+
+	require.Falsef(t, b.Executed(), "%T.Executed() after a failed Accept()", b)
+	require.Falsef(t, b.Settled(), "%T.Settled() after a failed Accept()", b)
+	require.Equal(t, settled, sut.rawVM.last.settled.Load(), "last-settled block after a failed Accept()")
+	require.Equal(t, finalized, rawdb.ReadFinalizedBlockHash(sut.rawVM.db), "rawdb.ReadFinalizedBlockHash() after a failed Accept()")
+
+	// The executor only logs the cause; Accept() MUST also return it.
+	logged := rec.Filter(func(r *loggingtest.Record) bool {
+		return r.Level == logging.Error && r.Msg == "Error of unknown severity in block execution"
+	})
+	require.Lenf(t, logged, 1, "%T records of the executor's error", rec)
+}
+
+// TestVerifySynchronousBlockRequiresLastAcceptedParent asserts that a
+// synchronous block descending from a sibling of the last-accepted block is
+// rejected even though its parent is known and its height increments.
+func TestVerifySynchronousBlockRequiresLastAcceptedParent(t *testing.T) {
+	ctx, sut := newSUT(t, 0)
+	require.NoError(t, sut.SetState(ctx, snow.Bootstrapping), "SetState(Bootstrapping)")
+
+	genesis := sut.lastAcceptedBlock(t)
+	genesisRoot := genesis.PostExecutionStateRoot()
+
+	// Two synchronous children of genesis, distinguished by their timestamps.
+	// Both verify while genesis is the last-accepted block.
+	acceptedBlk, accepted := sut.parseAndVerifySynchronous(ctx, t, newSynchronousEthBlock(t, genesis))
+	forkEth := newSynchronousEthBlock(t, genesis, blockstest.ModifyHeader(func(h *types.Header) {
+		h.Time = genesis.BuildTime() + 2
+	}))
+	_, fork := sut.parseAndVerifySynchronous(ctx, t, forkEth)
+	require.NotEqual(t, accepted.Hash(), fork.Hash(), "hashes of two synchronous children of genesis")
+
+	require.NoError(t, acceptedBlk.Accept(ctx), "Accept(one child of genesis)")
+	require.Equal(t, accepted, sut.rawVM.last.accepted.Load(), "last-accepted block")
+
+	// SetAncestors alone would accept the fork's child.
+	child := newSynchronousEthBlockOn(t, forkEth, genesisRoot)
+	require.Equal(t, accepted.Height()+1, child.NumberU64(), "height of the fork's child")
+	buf, err := rlp.EncodeToBytes(child)
+	require.NoError(t, err, "rlp.EncodeToBytes(child of the fork)")
+	blk, err := sut.ParseBlock(ctx, buf)
+	require.NoError(t, err, "ParseBlock(child of the fork)")
+	require.ErrorIs(t, blk.Verify(ctx), errParentNotLastAccepted, "Verify(child of the fork)")
 }

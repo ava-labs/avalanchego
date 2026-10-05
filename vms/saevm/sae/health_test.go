@@ -79,7 +79,7 @@ func TestExecutorHealthCheck(t *testing.T) {
 				return f.Key != key
 			}),
 		}
-		if diff := cmp.Diff(want, logs.Records, ignore); diff != "" {
+		if diff := cmp.Diff(want, logs.Records(), ignore); diff != "" {
 			t.Errorf("Logged records diff (-want +got):\n%s", diff)
 		}
 	})

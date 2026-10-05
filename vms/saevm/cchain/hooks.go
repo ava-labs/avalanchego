@@ -99,7 +99,7 @@ func newHooks(
 }
 
 func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], error) {
-	rawTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	rawTxs, err := tx.FromBlock(h.chainConfig, b)
 	if err != nil {
 		return nil, fmt.Errorf("parsing txs: %w", err)
 	}
@@ -170,7 +170,7 @@ func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.Target
 		return dynamic.InitialTargetExponent, nil
 	}
 
-	// The block might be the last synchronous block running with ACP-176.
+	// The block might be a synchronous block running with ACP-176.
 	state, err := acp176.ParseState(h.Extra)
 	if err != nil {
 		return 0, fmt.Errorf("parsing fee state: %w", err)
