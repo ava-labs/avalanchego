@@ -305,11 +305,8 @@ func withMinDelayTarget(ms uint64) sutOption {
 // mirroring the prefix avalanchego's chain manager applies.
 var chainDBPrefix = []byte("chain")
 
-// synchronousFixture loads the pre-generated synchronous C-Chain history and
-// returns the options that start a fresh VM on its genesis in
-// [snow.Bootstrapping], with the clock past every fixture block. Helicon is
-// scheduled a day after Granite, following the fixture's one-upgrade-per-day
-// cadence, so every synchronous block predates it.
+// synchronousFixture returns the fixture and options to bootstrap it from
+// genesis, with Helicon after its last block.
 func synchronousFixture(tb testing.TB) (*synchronoustest.Fixture, []sutOption, *saetest.Clock) {
 	tb.Helper()
 
