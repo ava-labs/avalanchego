@@ -97,9 +97,9 @@ func (w *headerWriter) Write(b []byte) (int, error) {
 }
 
 // Flush implements [http.Flusher], which the libevm RPC server relies on when
-// writing error responses.
+// writing error responses. It doesn't seal because libevm only flushes after
+// [headerWriter.Write].
 func (w *headerWriter) Flush() {
-	w.headers.seal(w.Header())
 	if f, ok := w.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}

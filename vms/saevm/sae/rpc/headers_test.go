@@ -50,9 +50,10 @@ func TestWithResponseHeaders(t *testing.T) {
 			want: []string{"1"},
 		},
 		{
-			name: "set_on_flush",
+			name: "set_on_write_then_flush",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				addGas(r.Context(), 1)
+				_, _ = w.Write([]byte("{}"))
 				w.(http.Flusher).Flush()
 			},
 			want: []string{"1"},
