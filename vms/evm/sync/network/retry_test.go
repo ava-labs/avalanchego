@@ -173,17 +173,15 @@ func TestDoRetry_CtxEndReportsFailure(t *testing.T) {
 
 	tests := []struct {
 		name       string
-		attemptErr error // nil picks the verify-rejects path
-		wantLast   error
+		attemptErr error
 	}{
 		{
-			name:     "verify_rejects",
-			wantLast: errInvalid,
+			name:       "parse_rejects",
+			attemptErr: errInvalid,
 		},
 		{
 			name:       "no_peers",
 			attemptErr: errNoPeers,
-			wantLast:   errNoPeers,
 		},
 	}
 	for _, tt := range tests {
@@ -191,21 +189,17 @@ func TestDoRetry_CtxEndReportsFailure(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
-			// verify now runs inside the attempt, so its rejection arrives as
-			// the attempt's error.
-			attemptErr := tt.attemptErr
-			if attemptErr == nil {
-				attemptErr = errInvalid
-			}
-			attempt := func(context.Context) (*syncpb.GetLeafResponse, ids.NodeID, error) {
+			// parse runs inside the attempt, so its rejection arrives as the
+			// attempt's error.
+			attempt := func(context.Context) (*syncpb.GetLeafResponse, error) {
 				cancel()
-				return nil, ids.EmptyNodeID, attemptErr
+				return nil, tt.attemptErr
 			}
 
 			got, err := doRetry(ctx, loggingtest.New(t, logging.Debug), *defaultRetryPolicy(), attempt)
 			require.Nil(t, got)
 			require.ErrorIs(t, err, context.Canceled)
-			require.ErrorIs(t, err, tt.wantLast)
+			require.ErrorIs(t, err, tt.attemptErr)
 		})
 	}
 }
@@ -217,12 +211,12 @@ func TestDoRetry_FatalStopsRetrying(t *testing.T) {
 	defer cancel()
 
 	calls := 0
-	attempt := func(context.Context) (*syncpb.GetLeafResponse, ids.NodeID, error) {
+	attempt := func(context.Context) (*syncpb.GetLeafResponse, error) {
 		calls++
 		if calls > 1 {
 			cancel()
 		}
-		return nil, ids.EmptyNodeID, context.Canceled
+		return nil, context.Canceled
 	}
 
 	got, err := doRetry(ctx, loggingtest.New(t, logging.Debug), *defaultRetryPolicy(), attempt)
@@ -270,19 +264,19 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 				// call 3: resetError or verify-rejects, resetting the no-peers count.
 				// call 4: no-peers again, should start from the lowest backoff.
 				// call 5+: success.
-				attempt := func(context.Context) (*syncpb.GetLeafResponse, ids.NodeID, error) {
+				attempt := func(context.Context) (*syncpb.GetLeafResponse, error) {
 					calls++
 					switch {
 					case calls == 1, calls == 2, calls == 4:
-						return nil, ids.EmptyNodeID, errNoPeers
+						return nil, errNoPeers
 					case calls == 3 && tt.resetError != nil:
-						return nil, ids.EmptyNodeID, tt.resetError
+						return nil, tt.resetError
 					case calls == 3 && !rejected:
 						// The verify rejection, now reported by the attempt.
 						rejected = true
-						return nil, ids.GenerateTestNodeID(), errInvalid
+						return nil, errInvalid
 					default:
-						return want, ids.GenerateTestNodeID(), nil
+						return want, nil
 					}
 				}
 

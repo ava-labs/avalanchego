@@ -71,14 +71,13 @@ func (d *Dispatcher[Req, In, Resp, Out]) Send(
 		var zero Out
 		return zero, fmt.Errorf("%w: %w", errMarshalRequest, err)
 	}
-	return doRetry(ctx, d.log, d.policy, func(ctx context.Context) (Out, ids.NodeID, error) {
+	return doRetry(ctx, d.log, d.policy, func(ctx context.Context) (Out, error) {
 		nodeID, ok := d.peers.SelectPeer()
 		if !ok {
 			var zero Out
-			return zero, ids.EmptyNodeID, errNoPeers
+			return zero, errNoPeers
 		}
-		out, err := d.sendBytes(ctx, nodeID, requestBytes, parse)
-		return out, nodeID, err
+		return d.sendBytes(ctx, nodeID, requestBytes, parse)
 	})
 }
 

@@ -387,17 +387,18 @@ func Test_Midpoint(t *testing.T) {
 // since an unusable proof also ends the sync by cancellation, which de-scores.
 func TestSyncerScoresProofSource(t *testing.T) {
 	tests := []struct {
-		name           string
-		validProof     bool
-		wantResponsive bool
+		name       string
+		validProof bool
+		wantErr    error
 	}{
 		{
-			name:           "valid_proof_keeps_the_peer_responsive",
-			validProof:     true,
-			wantResponsive: true,
+			name:       "valid_proof_keeps_the_peer_responsive",
+			validProof: true,
 		},
 		{
 			name: "unusable_proof_leaves_the_peer_unresponsive",
+			// The handler ends the sync by cancelling on the second request.
+			wantErr: context.Canceled,
 		},
 	}
 
@@ -445,15 +446,11 @@ func TestSyncerScoresProofSource(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			if tt.validProof {
-				require.NoErrorf(t, syncer.Sync(ctx), "%T.Sync()", syncer)
-			} else {
-				require.Errorf(t, syncer.Sync(ctx), "%T.Sync()", syncer)
-			}
+			require.ErrorIsf(t, syncer.Sync(ctx), tt.wantErr, "%T.Sync()", syncer)
 
 			tracked, responsive := tracker.TrackedPeers(), tracker.ResponsivePeers()
 			assert.Truef(t, tracked.Contains(nodeID), "%T.TrackedPeers()", tracker)
-			assert.Equalf(t, tt.wantResponsive, responsive.Contains(nodeID), "%T.ResponsivePeers()", tracker)
+			assert.Equalf(t, tt.validProof, responsive.Contains(nodeID), "%T.ResponsivePeers()", tracker)
 		})
 	}
 }

@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -81,7 +80,7 @@ func doRetry[Out any](
 	ctx context.Context,
 	log logging.Logger,
 	policy retryPolicy,
-	attempt func(context.Context) (Out, ids.NodeID, error),
+	attempt func(context.Context) (Out, error),
 ) (Out, error) {
 	var (
 		zero           Out
@@ -91,7 +90,7 @@ func doRetry[Out any](
 	)
 	for {
 		attempts++
-		out, nodeID, err := attempt(ctx)
+		out, err := attempt(ctx)
 		var wait time.Duration
 		switch {
 		case err == nil:
@@ -106,10 +105,7 @@ func doRetry[Out any](
 			wait = policy.noPeersBackoff(noPeerAttempts)
 			noPeerAttempts++
 		default:
-			log.Debug("request failed, retrying",
-				zap.Stringer("nodeID", nodeID),
-				zap.Error(err),
-			)
+			log.Debug("request failed, retrying", zap.Error(err))
 			lastErr = err
 			noPeerAttempts = 0
 			wait = policy.peerFailureBackoff
