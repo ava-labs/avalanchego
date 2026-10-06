@@ -1667,8 +1667,8 @@ func TestBootstrapSynchronousBlocks(t *testing.T) {
 	}
 	tip := fixture.Blocks[len(fixture.Blocks)-1]
 
-	// The fixture's Imports consume UTXOs that the X-Chain put into shared
-	// memory before the chain was bootstrapped.
+	// Write the X-chain's UTXOs so that we can use the fixture's shared memory
+	// as the expected shared memory.
 	funded := memdb.New()
 	fixture.PutUTXOs(
 		t,
