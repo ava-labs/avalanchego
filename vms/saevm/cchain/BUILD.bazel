@@ -25,7 +25,6 @@ go_library(
     srcs = [
         "api.go",
         "config.go",
-        "deprecated.go",
         "factory.go",
         "genesis.go",
         "gossip.go",
@@ -59,7 +58,6 @@ go_library(
         "//network/p2p/acp118",
         "//network/p2p/gossip",
         "//snow",
-        "//snow/choices",
         "//snow/engine/common",
         "//snow/engine/snowman/block",
         "//utils",
@@ -118,7 +116,6 @@ go_test(
     srcs = [
         "api_test.go",
         "config_test.go",
-        "deprecated_test.go",
         "genesis_test.go",
         "gossip_test.go",
         "hooks_test.go",
@@ -129,7 +126,6 @@ go_test(
     ],
     embed = [":cchain"],
     deps = [
-        "//api",
         "//chains/atomic",
         "//database",
         "//database/memdb",
@@ -147,7 +143,6 @@ go_test(
         "//network/p2p/acp118",
         "//proto/pb/sdk",
         "//snow",
-        "//snow/choices",
         "//snow/engine/common",
         "//snow/engine/snowman/block",
         "//snow/snowtest",
@@ -158,7 +153,6 @@ go_test(
         "//utils/constants",
         "//utils/crypto/bls",
         "//utils/crypto/secp256k1",
-        "//utils/json",
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//utils/set",
