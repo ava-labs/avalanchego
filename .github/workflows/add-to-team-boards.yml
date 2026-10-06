@@ -16,10 +16,18 @@ jobs:
   route_team_items:
     runs-on: ubuntu-24.04
     steps:
+      - name: Mint installation token
+        id: token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.TEAM_BOARDS_APP_ID }}
+          private-key: ${{ secrets.TEAM_BOARDS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
       - name: Determine author team membership
         id: membership
         env:
-          GH_TOKEN: ${{ secrets.TEAM_BOARDS_GH_PAT }}
+          GH_TOKEN: ${{ steps.token.outputs.token }}
           AUTHOR: ${{ github.event.sender.login }}
         run: |
           is_active_member() {
@@ -35,7 +43,7 @@ jobs:
         uses: actions/add-to-project@v2.0.0
         with:
           project-url: https://github.com/orgs/ava-labs/projects/23
-          github-token: ${{ secrets.TEAM_BOARDS_GH_PAT }}
+          github-token: ${{ steps.token.outputs.token }}
 
       - name: Add evm label
         if: steps.membership.outputs.evm == 'true'
@@ -50,4 +58,4 @@ jobs:
         uses: actions/add-to-project@v2.0.0
         with:
           project-url: https://github.com/orgs/ava-labs/projects/36
-          github-token: ${{ secrets.TEAM_BOARDS_GH_PAT }}
+          github-token: ${{ steps.token.outputs.token }}
