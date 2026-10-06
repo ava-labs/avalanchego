@@ -182,9 +182,9 @@ func TestGetAtomicTxStatus(t *testing.T) {
 	})
 }
 
-// TestGetUTXOsPagination asserts that [Client.GetAllUTXOs] yields each seeded
-// UTXO exactly once.
-func TestGetUTXOsPagination(t *testing.T) {
+// TestGetAllUTXOs asserts that [Client.GetAllUTXOs] yields each seeded UTXO
+// exactly once.
+func TestGetAllUTXOs(t *testing.T) {
 	ctx, sut := newSUT(t)
 
 	sourceChain := sut.ctx.XChainID
@@ -200,12 +200,9 @@ func TestGetUTXOsPagination(t *testing.T) {
 
 	got, err := sut.Client.GetAllUTXOs(ctx, []ids.ShortID{addr}, sourceChain)
 	require.NoErrorf(t, err, "%T.GetAllUTXOs()", sut.Client)
-	// Walking this many UTXOs field by field takes seconds under -race, so
-	// compare each pair by its encoding.
+	// Comparing this many UTXOs field by field takes seconds under -race.
 	byEncoding := cmp.Comparer(func(a, b *avax.UTXO) bool {
-		aBytes, aErr := tx.MarshalUTXO(a)
-		bBytes, bErr := tx.MarshalUTXO(b)
-		return aErr == nil && bErr == nil && bytes.Equal(aBytes, bBytes)
+		return bytes.Equal(txtest.MarshalUTXO(t, a), txtest.MarshalUTXO(t, b))
 	})
 	if diff := cmp.Diff(want, got, txtest.UTXOCmpOpt(), byEncoding); diff != "" {
 		t.Errorf("paginated UTXOs (-want +got):\n%s", diff)
