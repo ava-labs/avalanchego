@@ -4,6 +4,11 @@
 
 This release updates the plugin version to `47`. All plugins must update to remain compatible.
 
+### APIs
+
+- Added:
+  - `Gas-Used` header to SAE `/rpc` responses: the total gas used by every `eth_call` in the request, omitted if none executed
+
 ### Metrics
 
 - Added `avalanche_evm_transition_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
