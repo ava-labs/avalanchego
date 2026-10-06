@@ -496,6 +496,8 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 			return err
 		}
 	}
+	// b's settled root stays tracked until settlement passes b, which requires a
+	// later block to execute, so the root is still available here.
 	return e.Tracker.BlockExecuted(b.SettledStateRoot(), root, b.NumberU64()) // (5)
 }
 
