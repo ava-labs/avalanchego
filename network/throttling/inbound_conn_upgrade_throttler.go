@@ -19,11 +19,10 @@ var (
 	_ InboundConnUpgradeThrottler = (*noInboundConnUpgradeThrottler)(nil)
 )
 
-// InboundConnUpgradeThrottler returns whether we should upgrade an inbound connection from IP ipStr.
-// If ShouldUpgrade(ipStr) returns false, the connection to that IP should be closed.
-// Note that InboundConnUpgradeThrottler rate-limits _upgrading_ of
-// inbound connections, whereas throttledListener rate-limits
-// _acceptance_ of inbound connections.
+// InboundConnUpgradeThrottler rate-limits the upgrading of inbound connections
+// per IP. Inbound connections that should not be upgraded should be closed.
+// This differs from [NewThrottledListener], which rate-limits the acceptance
+// of inbound connections.
 type InboundConnUpgradeThrottler interface {
 	// Dispatch starts this InboundConnUpgradeThrottler.
 	// Must be called before [ShouldUpgrade].
@@ -33,17 +32,17 @@ type InboundConnUpgradeThrottler interface {
 	// Should be called when we're done with this InboundConnUpgradeThrottler.
 	// This InboundConnUpgradeThrottler must not be used after [Stop] is called.
 	Stop()
-	// Returns whether we should upgrade an inbound connection from [ipStr].
+	// ShouldUpgrade returns whether we should upgrade an inbound connection from ip.
 	// Must only be called after [Dispatch] has been called.
-	// If [ip] is a local IP, this method always returns true.
+	// If ip is a local IP, this method always returns true.
 	// Must not be called after [Stop] has been called.
 	ShouldUpgrade(ip netip.AddrPort) bool
 }
 
 type InboundConnUpgradeThrottlerConfig struct {
-	// ShouldUpgrade(ipStr) returns true if it has been at least [UpgradeCooldown]
-	// since the last time ShouldUpgrade(ipStr) returned true or if
-	// ShouldUpgrade(ipStr) has never been called.
+	// ShouldUpgrade(ip) returns true if it has been at least [UpgradeCooldown]
+	// since the last time ShouldUpgrade(ip) returned true or if
+	// ShouldUpgrade(ip) has never been called.
 	// If <= 0, inbound connections not rate-limited.
 	UpgradeCooldown time.Duration `json:"upgradeCooldown"`
 	// Maximum number of inbound connections upgraded within [UpgradeCooldown].
@@ -89,17 +88,17 @@ type inboundConnUpgradeThrottler struct {
 	clock mockable.Clock
 	// When [done] is closed, Dispatch returns.
 	done chan struct{}
-	// IP --> Present if ShouldUpgrade(ipStr) returned true
+	// IP --> Present if ShouldUpgrade(ip) returned true
 	// within the last [UpgradeCooldown].
 	recentIPs set.Set[netip.Addr]
 	// Sorted in order of increasing time
 	// of last call to ShouldUpgrade that returned true.
-	// For each IP in this channel, ShouldUpgrade(ipStr)
+	// For each IP in this channel, ShouldUpgrade(ip)
 	// returned true within the last [UpgradeCooldown].
 	recentIPsAndTimes chan ipAndTime
 }
 
-// Returns whether we should upgrade an inbound connection from [ipStr].
+// ShouldUpgrade returns whether we should upgrade an inbound connection from addrPort.
 func (n *inboundConnUpgradeThrottler) ShouldUpgrade(addrPort netip.AddrPort) bool {
 	// Only use addr (not port). This mitigates DoS attacks from many nodes on one
 	// host.

@@ -105,7 +105,7 @@ func (s *Storage) NumBlocks() uint64 {
 }
 
 // Retrieve returns the block and finalization at seq.
-// If seq is not found, returns simplex.ErrBlockNotFound.
+// If seq is not found, returns [simplex.ErrBlockNotFound].
 func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalization, error) {
 	// The genesis block doesn't have a finalization, so we need to handle it specifically.
 	if seq == 0 {
