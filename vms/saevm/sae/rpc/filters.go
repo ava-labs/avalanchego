@@ -16,8 +16,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 )
 
-// filterAPI is a replacement for a [filters.FilterAPI] which applies
-// [Config] for any call to [filters.FilterAPI.GetLogs].
+// filterAPI is a replacement for a [filters.FilterAPI] which applies [Config]
+// for any call to [filters.FilterAPI.GetLogs]. This does NOT apply to any
+// other methods in [filters.FilterAPI].
 type filterAPI struct {
 	*filters.FilterAPI
 	b *backend

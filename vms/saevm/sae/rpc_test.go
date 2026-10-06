@@ -918,6 +918,15 @@ func TestGetLogsBlockLimit(t *testing.T) {
 			},
 			wantErr: nil, // MUST match previous case
 		},
+		{
+			name: "with_hash_ignores_args",
+			query: ethereum.FilterQuery{
+				BlockHash: new(first.Hash()),
+				FromBlock: genesis.Number(),
+			},
+			// If the numbers were resolved, it would have gotten the "over limit" error
+			wantErr: testerr.Contains("cannot specify both BlockHash and FromBlock/ToBlock"),
+		},
 	}
 
 	for _, tt := range tests {
