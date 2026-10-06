@@ -91,7 +91,7 @@ func (e *executionResults) setBaseFee(bf *big.Int) error {
 //
 // A synchronous block's header determines its [saetypes.ExecutionResults], so
 // they are not persisted. An error is returned, before any persistence, if they
-// differ from stateRootPost or the root of receipts.
+// differ from the stateRootPost or the receipts root.
 func (b *Block) MarkExecuted(
 	db ethdb.Database,
 	xdb saetypes.ExecutionResults,
