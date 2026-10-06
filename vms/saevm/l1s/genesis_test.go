@@ -344,6 +344,15 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 	}
 	specs = append(specs,
 		spec{
+			name:     "genesis_network_upgrades",
+			upgrades: upgradetest.Etna,
+			genesis: testGenesisJSON(options.Func[legacy.Genesis](func(g *legacy.Genesis) {
+				extra := l1params.GetExtra(g.Config)
+				extra.DurangoTimestamp = new(testGenesisTime + 1)
+				extra.EtnaTimestamp = new(testGenesisTime + 2)
+			})),
+		},
+		spec{
 			name:     "initial_min_delay",
 			upgrades: upgradetest.Latest,
 			genesis:  testGenesisJSON(withInitialMinDelay(1_500)),
@@ -378,14 +387,18 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 
 	for _, s := range specs {
 		t.Run(s.name, func(t *testing.T) {
-			g, err := parseGenesis(newContext(t, s.upgrades), []byte(s.genesis), nil)
+			ctx := newContext(t, s.upgrades)
+			g, err := parseGenesis(ctx, []byte(s.genesis), nil)
 			require.NoErrorf(t, err, "parseGenesis(%s)", s.genesis)
 
 			got, err := g.block()
 			require.NoErrorf(t, err, "%T.block()", g)
+
+			// A subset of graft/subnet-evm/plugin/evm's parseGenesis function
 			var legacy legacy.Genesis
 			require.NoError(t, json.Unmarshal([]byte(s.genesis), &legacy), "json.Unmarshal()")
-			legacy.Config = g.Config
+			l1params.GetExtra(legacy.Config).NetworkUpgrades.SetDefaults(ctx.NetworkUpgrades)
+			require.NoError(t, l1params.SetEthUpgrades(legacy.Config))
 			want := legacy.ToBlock()
 
 			require.Equalf(t, want.Root(), got.Root(), "%T.block().Root()", g)

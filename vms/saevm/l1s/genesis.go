@@ -140,7 +140,7 @@ func newExtras(ctx *snow.Context, cfg *params.ChainConfig, upgradeConfig extras.
 		cpy.FeeConfig = l1params.DefaultFeeConfig
 	}
 
-	cpy.NetworkUpgrades = newNetworkUpgrades(ctx, upgradeConfig)
+	cpy.NetworkUpgrades = networkUpgrades(provided.NetworkUpgrades, ctx, upgradeConfig)
 	cpy.UpgradeConfig = upgradeConfig
 	cpy.AvalancheContext = extras.AvalancheContext{
 		SnowCtx: ctx,
@@ -153,7 +153,7 @@ func newExtras(ctx *snow.Context, cfg *params.ChainConfig, upgradeConfig extras.
 	return &cpy, nil
 }
 
-func newNetworkUpgrades(ctx *snow.Context, upgradeConfig extras.UpgradeConfig) extras.NetworkUpgrades {
+func networkUpgrades(existing extras.NetworkUpgrades, ctx *snow.Context, upgradeConfig extras.UpgradeConfig) extras.NetworkUpgrades {
 	u := &ctx.NetworkUpgrades
 	upgrades := extras.NetworkUpgrades{
 		SubnetEVMTimestamp: new(uint64),
@@ -164,12 +164,15 @@ func newNetworkUpgrades(ctx *snow.Context, upgradeConfig extras.UpgradeConfig) e
 		HeliconTimestamp:   utils.TimeToNewUint64(u.HeliconTime),
 		IglooTimestamp:     utils.TimeToNewUint64(u.IglooTime),
 	}
-
-	overrides := extras.NetworkUpgrades{}
+	override(&upgrades, existing)
 	if upgradeConfig.NetworkUpgradeOverrides != nil {
-		overrides = *upgradeConfig.NetworkUpgradeOverrides
+		override(&upgrades, *upgradeConfig.NetworkUpgradeOverrides)
 	}
+	return upgrades
+}
 
+// override sets upgrades to any non-nil value from overrides.
+func override(upgrades *extras.NetworkUpgrades, overrides extras.NetworkUpgrades) {
 	if overrides.SubnetEVMTimestamp != nil {
 		upgrades.SubnetEVMTimestamp = overrides.SubnetEVMTimestamp
 	}
@@ -191,7 +194,6 @@ func newNetworkUpgrades(ctx *snow.Context, upgradeConfig extras.UpgradeConfig) e
 	if overrides.IglooTimestamp != nil {
 		upgrades.IglooTimestamp = overrides.IglooTimestamp
 	}
-	return upgrades
 }
 
 var errNoHeadHeader = errors.New("no head header")
