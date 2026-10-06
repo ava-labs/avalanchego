@@ -19,7 +19,9 @@ import (
 
 	_ "embed"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade"
 )
 
@@ -38,6 +40,19 @@ type Fixture struct {
 	// Database holds every key-value pair of the VM's database after all
 	// Blocks were accepted.
 	Database map[string]hexutil.Bytes `json:"database"`
+	// UTXOs holds the elements the X-Chain put into shared memory for the
+	// C-Chain to import, in order.
+	UTXOs []Element `json:"utxos"`
+	// SharedMemory holds every key-value pair of the shared memory database
+	// after all Blocks were accepted.
+	SharedMemory map[string]hexutil.Bytes `json:"sharedMemory"`
+}
+
+// An Element is a json-marshallable [atomic.Element].
+type Element struct {
+	Key    hexutil.Bytes   `json:"key"`
+	Value  hexutil.Bytes   `json:"value"`
+	Traits []hexutil.Bytes `json:"traits"`
 }
 
 //go:embed fixture.json
@@ -178,11 +193,43 @@ func (f *Fixture) CoreGenesis(tb testing.TB) core.Genesis {
 // recreating the database a synchronous node would hand to its successor VM.
 func (f *Fixture) WriteDatabase(tb testing.TB, db database.KeyValueWriter) {
 	tb.Helper()
+	write(tb, f.Database, db)
+}
 
-	for keyHex, value := range f.Database {
+// WriteSharedMemory writes every [Fixture.SharedMemory] key-value pair to db.
+func (f *Fixture) WriteSharedMemory(tb testing.TB, db database.KeyValueWriter) {
+	tb.Helper()
+	write(tb, f.SharedMemory, db)
+}
+
+func write(tb testing.TB, entries map[string]hexutil.Bytes, db database.KeyValueWriter) {
+	tb.Helper()
+
+	for keyHex, value := range entries {
 		key, err := hexutil.Decode(keyHex)
 		require.NoError(tb, err, "decoding key %s", keyHex)
 		require.NoError(tb, db.Put(key, value), "writing entry %s", keyHex)
+	}
+}
+
+// PutUTXOs puts every [Fixture.UTXOs] element into shared memory, from the
+// X-Chain for the C-Chain to import.
+func (f *Fixture) PutUTXOs(tb testing.TB, memory *atomic.Memory, xChainID, cChainID ids.ID) {
+	tb.Helper()
+
+	sm := memory.NewSharedMemory(xChainID)
+	for _, e := range f.UTXOs {
+		traits := make([][]byte, len(e.Traits))
+		for i, t := range e.Traits {
+			traits[i] = t
+		}
+		require.NoError(tb, sm.Apply(map[ids.ID]*atomic.Requests{
+			cChainID: {PutRequests: []*atomic.Element{{
+				Key:    e.Key,
+				Value:  e.Value,
+				Traits: traits,
+			}}},
+		}), "putting UTXO %s", e.Key)
 	}
 }
 

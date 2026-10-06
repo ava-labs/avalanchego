@@ -15,6 +15,8 @@ graft_go_test(
     deps = [
         "//chains/atomic",
         "//database",
+        "//database/memdb",
+        "//database/prefixdb",
         "//graft/coreth/core/extstate",
         "//graft/coreth/nativeasset",
         "//graft/coreth/params",
@@ -31,7 +33,9 @@ graft_go_test(
         "//ids",
         "//snow",
         "//snow/engine/common",
+        "//snow/engine/enginetest",
         "//snow/engine/snowman/block",
+        "//snow/snowtest",
         "//snow/validators",
         "//snow/validators/validatorstest",
         "//upgrade",

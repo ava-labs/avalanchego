@@ -6,7 +6,8 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 ### Metrics
 
-- Added `avalanche_evm_transition_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
+- C-Chain metrics no longer include the `transition` prefix. For example, `avalanche_evm_transition_sae_last_executed_height` is now `avalanche_evm_sae_last_executed_height`.
+- Added `avalanche_evm_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
 
 ## [v1.15.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.1)
 
