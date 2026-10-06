@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
@@ -471,25 +472,30 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 		}
 	}
 
-	if err := e.Tracker.BlockExecuted(b.SettledStateRoot(), root, b.NumberU64()); err != nil {
-		return err
-	}
-
 	// Responsibility for untracking lies with the VM once it deems this block's
 	// post-execution state to no longer be consensus-critical.
 	e.Tracker.Track(root)
 
-	// The strict ordering of the next 3 calls guarantees invariants that MUST
-	// NOT be broken:
+	// The strict ordering of the remaining calls guarantees invariants that
+	// MUST NOT be broken:
 	//
 	// 1. [blocks.Block.MarkExecuted] guarantees disk then in-memory changes.
 	// 2. Internal indicator of last executed MUST follow in-memory change.
 	// 3. External indicator of last executed MUST follow internal indicator.
+	// 4. A synchronous block settles itself, which MUST follow its execution.
+	// 5. Settlement MUST be persisted before [saedb.Tracker.BlockExecuted] MAY
+	//    commit the settled state, so the committed state never leads it.
 	if err := b.MarkExecuted(e.db, e.xdb, r.FinishBy.Gas.Clone(), r.FinishBy.Wall, r.BaseFee.ToBig(), r.Receipts, root, &e.lastExecuted /* (2) */); err != nil {
 		return err
 	}
 	e.sendPostExecutionEvents(b, r) // (3)
-	return nil
+	if b.Synchronous() {            // (4)
+		rawdb.WriteFinalizedBlockHash(e.db, b.Hash())
+		if err := b.MarkSettled(e.lastSettled); err != nil {
+			return err
+		}
+	}
+	return e.Tracker.BlockExecuted(b.SettledStateRoot(), root, b.NumberU64()) // (5)
 }
 
 // NullReceiptStore discards transaction receipts.

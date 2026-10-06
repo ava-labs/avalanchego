@@ -112,6 +112,11 @@ An example is a chain-head subscription, be it in the same binary or over a webs
 > Although by definition $b_n \in A$ i.f.f. $\Sigma_n \subset S$, in practice it may not be possible to realise side effects atomically.
 > The chosen ordering of settlement then acceptance is for practical reasons as code with access to $b_n$ can typically access $\Sigma_n$ but not vice versa, so inverting the order would provide zero benefit.
 
+> [!NOTE]
+> A synchronous block settles itself, so $\Sigma_n = \{b_n\}$.
+> Execution after acceptance and settlement after execution then contradict (2), so (2) does not apply to synchronous blocks.
+> Their acceptance is realised before their settlement, as for any asynchronous block awaiting settlement.
+
 #### Polling vs Broadcast
 
 Note that no guarantees exist _within_ a class of side effects with respect to the _same_ block.

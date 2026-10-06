@@ -75,7 +75,8 @@ type VM struct {
 
 	preference atomic.Pointer[blocks.Block]
 	last       struct {
-		accepted, settled atomic.Pointer[blocks.Block]
+		accepted atomic.Pointer[blocks.Block]
+		settled  *atomic.Pointer[blocks.Block]
 	}
 	acceptedBlocks event.FeedOf[*blocks.Block]
 	// Consensus-critical blocks are those either (a) undergoing a consensus
@@ -161,7 +162,8 @@ func NewVM[T hook.Transaction](
 	closers.Push(&xdb)
 
 	// ==========  Block State  ==========
-	exec, consensusCritical, err := recoverExecutor(ctx, db, xdb, chainConfig, snowCtx, hooks, cfg, reg)
+	lastSettled := new(atomic.Pointer[blocks.Block])
+	exec, consensusCritical, err := recoverExecutor(ctx, db, xdb, lastSettled, chainConfig, snowCtx, hooks, cfg, reg)
 	if err != nil {
 		return nil, fmt.Errorf("creating new execution: %w", err)
 	}
@@ -206,6 +208,7 @@ func NewVM[T hook.Transaction](
 		newTxs:  newTxs,
 		closers: closers,
 	}
+	vm.last.settled = lastSettled
 
 	// ==========  Frontiers  ==========
 	{

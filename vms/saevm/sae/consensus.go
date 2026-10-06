@@ -10,6 +10,8 @@ import (
 
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/libevm"
 	"go.uber.org/zap"
@@ -46,6 +48,9 @@ var errUnverifiedBlock = errors.New("block not verified")
 //     method called; and
 //   - The block being propagated to [saexec.Executor.Enqueue].
 //
+// A synchronous block settles itself, so the [saexec.Executor] settles it after
+// execution and AcceptBlock returns once it is settled.
+//
 // [accepted]: https://github.com/ava-labs/avalanchego/tree/master/vms#block-statuses
 func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 	// Recall the terminology and ordering from the invariants document:
@@ -80,11 +85,8 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 			rawdb.WriteFinalizedBlockHash(batch, b.LastSettled().Hash())
 		}
 
-		rawdb.WriteBlock(batch, b.EthBlock())
-		rawdb.WriteTxLookupEntriesByBlock(batch, b.EthBlock())
 		// D(b ∈ A)
-		rawdb.WriteCanonicalHash(batch, b.Hash(), b.NumberU64())
-		rawdb.WriteHeadFastBlockHash(batch, b.Hash())
+		writeAccepted(batch, b.EthBlock())
 
 		if err := batch.Write(); err != nil {
 			return err
@@ -100,7 +102,7 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 	//
 	// [blocks.Block.MarkSettled] guarantees M before I (i.e. `vm.last.settled`)
 	for _, s := range settles {
-		if err := s.MarkSettled(&vm.last.settled); err != nil {
+		if err := s.MarkSettled(vm.last.settled); err != nil {
 			return err
 		}
 		vm.metrics.markSettled(s)
@@ -151,44 +153,28 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 }
 
 // acceptSynchronous accepts a synchronous block. Such a block settles itself,
-// which is only possible once it has executed, so execution runs first and the
-// settlement then acceptance artefacts follow in their usual order. Every
-// guarantee in the invariants document therefore holds without the disk ever
-// recording an accepted block that is not yet settled.
+// which is only possible once it has executed, so the [saexec.Executor]
+// settles it after execution. Unlike other blocks, its acceptance therefore
+// precedes the settlement it causes.
 func (vm *VM) acceptSynchronous(ctx context.Context, b *blocks.Block) error {
-	// Execution marks b as the head block, which MUST resolve to a stored
-	// block. Storing a block by hash does not mark it canonical, so this is not
-	// yet D(b ∈ A).
-	rawdb.WriteBlock(vm.db, b.EthBlock())
-
-	if err := vm.exec.Enqueue(ctx, b); err != nil {
-		return err
-	}
-	if err := b.WaitUntilExecuted(ctx); err != nil {
-		return fmt.Errorf("waiting for synchronous block %d to execute: %w", b.Height(), err)
-	}
-
-	// Settlement severs the ancestry, so the parent is captured first.
-	parent := b.ParentBlock()
-
-	// D(b ∈ S) then D(b ∈ A); yes, I know it's in a batch.
+	// D(b ∈ A)
 	batch := vm.db.NewBatch()
-	rawdb.WriteFinalizedBlockHash(batch, b.Hash())
-	rawdb.WriteTxLookupEntriesByBlock(batch, b.EthBlock())
-	rawdb.WriteCanonicalHash(batch, b.Hash(), b.NumberU64())
-	rawdb.WriteHeadFastBlockHash(batch, b.Hash())
+	writeAccepted(batch, b.EthBlock())
 	if err := batch.Write(); err != nil {
 		return err
 	}
 
-	// M(b ∈ S) and I(b ∈ S), before I(b ∈ A) and X(b ∈ A).
-	if err := b.MarkSettled(&vm.last.settled); err != nil {
-		return err
-	}
+	// I(b ∈ A) before X(b ∈ A)
 	vm.last.accepted.Store(b)
 	vm.metrics.markAccepted(b)
-	vm.metrics.markSettled(b)
 	vm.acceptedBlocks.Send(b)
+	if err := vm.exec.Enqueue(ctx, b); err != nil {
+		return err
+	}
+	if err := b.WaitUntilSettled(ctx); err != nil {
+		return fmt.Errorf("waiting for synchronous block %d to settle: %w", b.Height(), err)
+	}
+	vm.metrics.markSettled(b)
 
 	vm.log().Debug(
 		"Accepted block",
@@ -196,10 +182,18 @@ func (vm *VM) acceptSynchronous(ctx context.Context, b *blocks.Block) error {
 		zap.Stringer("hash", b.Hash()),
 	)
 
-	// The parent was the last-settled block until now, so consensus no longer
-	// needs it.
-	vm.consensusCritical.Delete(parent.Hash())
+	// This block replaced the parent as the last-settled block.
+	vm.consensusCritical.Delete(b.ParentHash())
 	return nil
+}
+
+// writeAccepted writes b and the indices that record it as accepted to w.
+func writeAccepted(w ethdb.KeyValueWriter, b *types.Block) {
+	rawdb.WriteBlock(w, b)
+	rawdb.WriteTxLookupEntriesByBlock(w, b)
+	hash := b.Hash()
+	rawdb.WriteCanonicalHash(w, hash, b.NumberU64())
+	rawdb.WriteHeadFastBlockHash(w, hash)
 }
 
 // LastAccepted returns the ID of the last block received by [VM.AcceptBlock].

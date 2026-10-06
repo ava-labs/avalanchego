@@ -122,6 +122,7 @@ func recoverExecutor(
 	ctx context.Context,
 	db ethdb.Database,
 	xdb saetypes.ExecutionResults,
+	lastSettled *atomic.Pointer[blocks.Block],
 	chainConfig *params.ChainConfig,
 	snowCtx *snow.Context,
 	hooks hook.Points,
@@ -180,6 +181,7 @@ func recoverExecutor(
 
 	exec, err := saexec.New(
 		lastCommitted,
+		lastSettled,
 		headerSource(consensusCritical, rec.db),
 		rec.chainConfig,
 		rec.db,
@@ -231,7 +233,7 @@ func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Bloc
 
 func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Executor) error {
 	after := exec.LastExecuted()
-	last := after
+	var executed []*blocks.Block
 	for b, err := range rec.canonicalAfter(after) {
 		if err != nil {
 			return err
@@ -239,9 +241,19 @@ func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Execut
 		if err := exec.Enqueue(ctx, b); err != nil {
 			return err
 		}
-		last = b
+		executed = append(executed, b)
 	}
-	if err := last.WaitUntilExecuted(ctx); err != nil {
+	last := after
+	if len(executed) > 0 {
+		last = lastOf(executed)
+	}
+	// The [saexec.Executor] settles a synchronous block after executing it, so
+	// waiting for execution alone would race with that settlement.
+	wait := last.WaitUntilExecuted
+	if last.Synchronous() {
+		wait = last.WaitUntilSettled
+	}
+	if err := wait(ctx); err != nil {
 		return err
 	}
 
@@ -254,7 +266,7 @@ func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Execut
 	// Consensus only requires post-execution state after and including the
 	// last-settled block.
 	keepFrom := hook.SettledHeight(rec.hooks, last.Header())
-	for b := last; b.NumberU64() > after.NumberU64(); b = b.ParentBlock() {
+	for _, b := range executed {
 		if b.NumberU64() < keepFrom {
 			exec.Tracker.Untrack(b.PostExecutionStateRoot())
 		}
