@@ -301,13 +301,6 @@ func withMinDelayTarget(ms uint64) sutOption {
 	})
 }
 
-// chainDBPrefix locates the VM's database within the SUT's base database,
-// mirroring the prefix avalanchego's chain manager applies.
-var chainDBPrefix = []byte("chain")
-
-// sharedMemoryPrefix locates shared memory within the SUT's base database.
-var sharedMemoryPrefix = []byte("sharedmemory")
-
 // synchronousFixture returns the fixture and options to bootstrap it from
 // genesis, with Helicon after its last block.
 func synchronousFixture(tb testing.TB) (*synchronoustest.Fixture, []sutOption, *saetest.Clock) {
@@ -336,6 +329,14 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	require.NoError(tb, err, "tryNewSUT()")
 	return sut.logger.CancelOnError(tb.Context()), sut
 }
+
+var (
+	// chainDBPrefix locates the VM's database within the SUT's base database,
+	// mirroring the prefix avalanchego's chain manager applies.
+	chainDBPrefix = []byte("chain")
+	// sharedMemoryPrefix locates shared memory within the SUT's base database.
+	sharedMemoryPrefix = []byte("sharedmemory")
+)
 
 // tryNewSUT is [newSUT], returning any startup error. Tests SHOULD use
 // [newSUT] unless asserting on such errors.
