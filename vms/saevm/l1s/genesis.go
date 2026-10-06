@@ -157,12 +157,12 @@ func newNetworkUpgrades(ctx *snow.Context, upgradeConfig extras.UpgradeConfig) e
 	u := &ctx.NetworkUpgrades
 	upgrades := extras.NetworkUpgrades{
 		SubnetEVMTimestamp: new(uint64),
-		DurangoTimestamp:   upgrade.UnixTimestamp(u.DurangoTime),
-		EtnaTimestamp:      upgrade.UnixTimestamp(u.EtnaTime),
+		DurangoTimestamp:   new(upgrade.UnixTimestamp(u.DurangoTime)),
+		EtnaTimestamp:      new(upgrade.UnixTimestamp(u.EtnaTime)),
 		FortunaTimestamp:   nil,
-		GraniteTimestamp:   upgrade.UnixTimestamp(u.GraniteTime),
-		HeliconTimestamp:   upgrade.UnixTimestamp(u.HeliconTime),
-		IglooTimestamp:     upgrade.UnixTimestamp(u.IglooTime),
+		GraniteTimestamp:   new(upgrade.UnixTimestamp(u.GraniteTime)),
+		HeliconTimestamp:   new(upgrade.UnixTimestamp(u.HeliconTime)),
+		IglooTimestamp:     new(upgrade.UnixTimestamp(u.IglooTime)),
 	}
 
 	overrides := extras.NetworkUpgrades{}

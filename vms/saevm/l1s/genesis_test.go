@@ -54,7 +54,7 @@ func errIsType[T error]() testerr.Want {
 const testChainID = 43111
 
 var (
-	testGenesisTime = uint64(upgrade.InitiallyActiveTime.Unix())
+	testGenesisTime = upgrade.UnixTimestamp(upgrade.InitiallyActiveTime)
 
 	testAllocAddr = common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")
 	testAllocFund = big.NewInt(1_000_000_000_000_000_000)
