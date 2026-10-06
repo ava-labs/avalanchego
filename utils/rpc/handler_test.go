@@ -24,18 +24,14 @@ func TestNewHandler(t *testing.T) {
 	handler, err := NewHandler("echo", echoService{})
 	require.NoError(t, err, "NewHandler()")
 
+	server := httptest.NewServer(handler)
+	t.Cleanup(server.Close)
+
 	const msg = "austin, ive been trying to reach you about your car's extended warranty"
 
-	// The avalanchego codec capitalizes the method name, so "echo.echo" resolves
-	// to [echoService.Echo]. The default gorilla codec would not find it.
-	body := fmt.Sprintf(`{"jsonrpc":"2.0","method":"echo.echo","params":%q,"id":1}`, msg)
-	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-
-	handler.ServeHTTP(rec, req)
-
-	require.Equal(t, http.StatusOK, rec.Code, "ServeHTTP() status code")
-	want := fmt.Sprintf(`{"jsonrpc":"2.0","result":%q,"id":1}`, msg)
-	require.JSONEq(t, want, rec.Body.String(), "ServeHTTP() body")
+	var reply string
+	requester := NewEndpointRequester(server.URL)
+	err = requester.SendRequest(t.Context(), "echo.echo", msg, &reply)
+	require.NoErrorf(t, err, "%T.SendRequest()", requester)
+	require.Equalf(t, msg, reply, "%T.SendRequest() reply", requester)
 }
