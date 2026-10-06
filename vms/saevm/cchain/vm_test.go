@@ -1677,11 +1677,11 @@ func TestBootstrapSynchronousBlocks(t *testing.T) {
 		snowtest.CChainID,
 	)
 
-	db := saetest.NewCaptureDB(saetest.CopyDB(t, funded), math.MaxInt)
-	ctx, want := newSUT(t, append(opts, withDB(db))...)
-	want.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
+	counterDB := saetest.NewCaptureDB(saetest.CopyDB(t, funded), math.MaxInt)
+	ctx, counterSUT := newSUT(t, append(opts, withDB(counterDB))...)
+	counterSUT.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
 
-	for crashAfter := range db.Ops() + 1 {
+	for crashAfter := range counterDB.Ops() + 1 {
 		t.Run(fmt.Sprintf("crash_after_op_%d", crashAfter), func(t *testing.T) {
 			t.Parallel()
 

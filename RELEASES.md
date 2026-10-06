@@ -4,6 +4,8 @@
 
 This release updates the plugin version to `47`. All plugins must update to remain compatible.
 
+**Nodes that last ran before Helicon activated must first run v1.15.0 or v1.15.1 until the C-Chain has bootstrapped past Helicon, or resync from an empty database.**
+
 ### Metrics
 
 - C-Chain metrics no longer include the `transition` prefix. For example, `avalanche_evm_transition_sae_last_executed_height` is now `avalanche_evm_sae_last_executed_height`.
