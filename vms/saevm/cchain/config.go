@@ -230,7 +230,6 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			APIs:                c.APIs,
 			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
 			BatchRequestLimit:   c.BatchRequestLimit,
-			EVMTimeout:          c.APIMaxDuration.Duration,
 			CallTimeout:         c.APIMaxDuration.Duration,
 			// GasCap and TxFeeCap are set to reasonable values for mainnet
 			// C-Chain. They are left unconfigurable to minimize the size of the

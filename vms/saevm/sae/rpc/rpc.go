@@ -69,7 +69,6 @@ type Config struct {
 
 	// Resource limits
 	BlocksPerBloomSection uint64
-	EVMTimeout            time.Duration
 	GasCap                uint64
 	BatchRequestLimit     uint64        // 0 = no limit
 	CallTimeout           time.Duration // per HTTP request or WebSocket call; 0 = no limit
