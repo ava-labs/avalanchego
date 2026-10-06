@@ -53,6 +53,12 @@ func (tx *BaseTx) Outputs() []*avax.TransferableOutput {
 	return tx.Outs
 }
 
+// MemoData returns the memo of tx. It is promoted to every tx type that embeds
+// [BaseTx], so the memo-length rule can be checked uniformly across them.
+func (tx *BaseTx) MemoData() []byte {
+	return tx.Memo
+}
+
 // InitCtx sets the FxID fields in the inputs and outputs of this [BaseTx]. Also
 // sets the [ctx] to the given [vm.ctx] so that the addresses can be json
 // marshalled into human readable format

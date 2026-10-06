@@ -92,7 +92,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	// Case: signed tx not initialized
 	stx = &Tx{Unsigned: addDelegatorTx}
 	err = stx.SyntacticVerify(ctx)
-	require.ErrorIs(err, errSignedTxNotInitialized)
+	require.ErrorIs(err, ErrSignedTxNotInitialized)
 
 	// Case: valid tx
 	stx, err = NewSignedTx(addDelegatorTx, Codec, signers)
