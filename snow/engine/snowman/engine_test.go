@@ -3855,6 +3855,20 @@ func newFakeEngine(
 	vm *snowmanenginetest.VM,
 	peers ...ids.NodeID,
 ) *Engine {
+	return newObservedFakeEngine(t, network, self, vm, func(e *Engine) common.Handler { return e }, peers...)
+}
+
+// newObservedFakeEngine is [newFakeEngine], but registers [observe(e)] on the
+// network in place of the engine, so a test can intercept the messages the
+// engine receives.
+func newObservedFakeEngine(
+	t *testing.T,
+	network *snowmanenginetest.Network,
+	self ids.NodeID,
+	vm *snowmanenginetest.VM,
+	observe func(*Engine) common.Handler,
+	peers ...ids.NodeID,
+) *Engine {
 	require := require.New(t)
 
 	cfg := DefaultConfig(t)
@@ -3872,7 +3886,7 @@ func newFakeEngine(
 
 	e, err := New(cfg)
 	require.NoError(err)
-	network.Register(self, e)
+	network.Register(self, observe(e))
 	require.NoError(e.Start(t.Context(), 0))
 	return e
 }
@@ -4370,6 +4384,91 @@ func TestEngineRecoversFromIngestionCap(t *testing.T) {
 
 	acceptedID, _ = node.Consensus.LastAccepted()
 	require.Equal(tip.ID(), acceptedID)
+}
+
+// TestEngineIgnoresBlocksFromNonValidators checks that a query from a non-validator is still
+// answered, but the block it tells about (PullQuery) or gives us (PushQuery) is
+// neither fetched nor issued. The same query from a validator is acted on.
+func TestEngineIgnoresBlocksFromNonValidators(t *testing.T) {
+	tests := []struct {
+		name  string
+		query func(ctx context.Context, e *Engine, from ids.NodeID, blk *snowmantest.Block) error
+	}{
+		{
+			name: "pull query",
+			query: func(ctx context.Context, e *Engine, from ids.NodeID, blk *snowmantest.Block) error {
+				return e.PullQuery(ctx, from, 0, blk.ID(), 0)
+			},
+		},
+		{
+			name: "push query",
+			query: func(ctx context.Context, e *Engine, from ids.NodeID, blk *snowmantest.Block) error {
+				return e.PushQuery(ctx, from, 0, blk.Bytes(), 0)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			chain := snowmantest.BuildDescendants(snowmantest.Genesis, 1)
+			blk := chain[0]
+
+			network := snowmanenginetest.NewNetwork(t)
+			nodeID := ids.GenerateTestNodeID()
+			validatorID := ids.GenerateTestNodeID()
+			nonValidatorID := ids.GenerateTestNodeID()
+
+			nodeVM := snowmanenginetest.NewVM(t, chain)
+			nodeVM.Has = func(*snowmantest.Block) bool {
+				return false
+			}
+
+			// Both the validator and non validator have [blk].
+			requestedFrom := set.Set[ids.NodeID]{}
+			newPeerVM := func(peerID ids.NodeID) *snowmanenginetest.VM {
+				vm := snowmanenginetest.NewVM(t, chain)
+				vm.Has = func(b *snowmantest.Block) bool {
+					if b.ID() == blk.ID() {
+						// Record that the node asked this peer for [blk],
+						// so we can check that the node never asks a non-validator for it.
+						requestedFrom.Add(peerID)
+					}
+					return true
+				}
+				return vm
+			}
+
+			// Only [validatorID] and [nodeVM] are validators, not [nonValidatorID].
+			validators := []ids.NodeID{validatorID, nodeID}
+			node := newFakeEngine(t, network, nodeID, nodeVM, validators...)
+			newFakeEngine(t, network, validatorID, newPeerVM(validatorID), validators...)
+			newFakeEngine(t, network, nonValidatorID, newPeerVM(nonValidatorID), validators...)
+
+			// A non-validator tells the node about [blk]. The node ignores the block.
+			require.NoError(test.query(t.Context(), node, nonValidatorID, blk))
+			require.NoError(network.DeliverMessages())
+			require.False(network.HasQueuedMessagesToDispatch())
+
+			require.NotContains(requestedFrom, nonValidatorID) // The node never asked the non-validator for [blk].
+			require.Zero(node.pending.Len())
+			require.Zero(node.Consensus.NumProcessing())
+			require.Equal(snowtest.Undecided, blk.Status)
+			_, lastAcceptedHeight := node.Consensus.LastAccepted()
+			require.Zero(lastAcceptedHeight)
+
+			// The same query from a validator is processed
+			require.NoError(test.query(t.Context(), node, validatorID, blk))
+			require.NoError(network.DeliverMessages())
+			require.False(network.HasQueuedMessagesToDispatch())
+
+			require.Equal(snowtest.Accepted, blk.Status)
+			acceptedID, _ := node.Consensus.LastAccepted()
+			require.Equal(blk.ID(), acceptedID)
+			require.Contains(requestedFrom, validatorID) // The node asked the validator for [blk].
+		})
+	}
 }
 
 // queryObserver forwards a node's messages to the wrapped handler and reports

@@ -345,10 +345,13 @@ func (e *Engine) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uin
 
 	issuedMetric := e.metrics.issued.WithLabelValues(pushGossipSource)
 
-	// Try to issue [blkID] to consensus.
-	// If we're missing an ancestor, request it from [vdr]
-	if err := e.issueFromByID(ctx, nodeID, blkID, issuedMetric); err != nil {
-		return err
+	// Only issue the block if the node that sent us this query is a validator.
+	if e.Validators.GetWeight(e.Ctx.SubnetID, nodeID) > 0 {
+		// Try to issue [blkID] to consensus.
+		// If we're missing an ancestor, request it from [vdr]
+		if err := e.issueFromByID(ctx, nodeID, blkID, issuedMetric); err != nil {
+			return err
+		}
 	}
 
 	return e.executeDeferredWork(ctx)
@@ -356,6 +359,10 @@ func (e *Engine) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uin
 
 func (e *Engine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte, requestedHeight uint64) error {
 	e.sendChits(ctx, nodeID, requestID, requestedHeight)
+
+	if e.Validators.GetWeight(e.Ctx.SubnetID, nodeID) == 0 {
+		return e.executeDeferredWork(ctx)
+	}
 
 	blk, err := e.VM.ParseBlock(ctx, blkBytes)
 	// If parsing fails, we just drop the request, as we didn't ask for it
