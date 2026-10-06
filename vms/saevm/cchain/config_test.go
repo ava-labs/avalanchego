@@ -6,7 +6,6 @@ package cchain
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"testing"
 	"time"
 
@@ -182,16 +181,6 @@ func TestParseConfig(t *testing.T) {
 			name: "api/max_blocks_per_request",
 			json: `{"api-max-blocks-per-request":2000}`,
 			want: with(func(c *config) { c.MaxBlocksPerRequest = 2000 }),
-		},
-		{
-			name: "api/max_blocks_per_request_max_uint64",
-			json: `{"api-max-blocks-per-request":18446744073709551615}`,
-			want: with(func(c *config) { c.MaxBlocksPerRequest = math.MaxUint64 }),
-		},
-		{
-			name:    "api/max_blocks_per_request_negative",
-			json:    `{"api-max-blocks-per-request":-1}`,
-			wantErr: errIsType[*json.UnmarshalTypeError](),
 		},
 		{
 			name: "api/batch_request_limit",

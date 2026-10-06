@@ -5,6 +5,7 @@ package rpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 
@@ -35,25 +36,17 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 
 func (api *filterAPI) updateFilterCriteria(crit filters.FilterCriteria) (filters.FilterCriteria, error) {
 	if crit.BlockHash != nil {
+		// crit.FromBlock and crit.ToBlock are ignored
 		return crit, nil
 	}
 
-	begin := rpc.LatestBlockNumber
-	if crit.FromBlock != nil {
-		begin = rpc.BlockNumber(crit.FromBlock.Int64())
+	resolvedBegin, ok := api.resolve(crit.FromBlock)
+	if !ok {
+		return crit, nil
 	}
-	end := rpc.LatestBlockNumber
-	if crit.ToBlock != nil {
-		end = rpc.BlockNumber(crit.ToBlock.Int64())
-	}
-
-	resolvedBegin, err := blocks.ResolveRPCNumber(api.b, begin)
-	if err != nil {
-		return crit, nil //nolint:nilerr // [filters.FilterAPI.GetLogs] will handle the error
-	}
-	resolvedEnd, err := blocks.ResolveRPCNumber(api.b, end)
-	if err != nil {
-		return crit, nil //nolint:nilerr // [filters.FilterAPI.GetLogs] will handle the error
+	resolvedEnd, ok := api.resolve(crit.ToBlock)
+	if !ok {
+		return crit, nil
 	}
 
 	if resolvedEnd < resolvedBegin {
@@ -69,9 +62,30 @@ func (api *filterAPI) updateFilterCriteria(crit filters.FilterCriteria) (filters
 		)
 	}
 
-	// Uses [Config.ResolvePendingToLastExecuted] and avoids unintuitive geth handling
+	// libevm MAY resolve this differently, but we should use the node's config.
 	crit.FromBlock = new(big.Int).SetUint64(resolvedBegin)
 	crit.ToBlock = new(big.Int).SetUint64(resolvedEnd)
 
 	return crit, nil
+}
+
+// resolve attempts to determine the block number corresponding to the given
+// big.Int. Any errors encountered during the resolution can still be handled
+// by [filters.FilterAPI.GetLogs].
+func (api *filterAPI) resolve(number *big.Int) (uint64, bool) {
+	block := rpc.LatestBlockNumber
+	if number != nil {
+		block = rpc.BlockNumber(number.Int64())
+	}
+
+	resolved, err := blocks.ResolveRPCNumber(api.b, block)
+	switch {
+	case errors.Is(err, blocks.ErrFutureBlockNotResolved):
+		// libevm would otherwise scan through the provided block number.
+		return api.b.LastAccepted().Height(), true
+	case err != nil:
+		return 0, false
+	}
+
+	return resolved, true
 }

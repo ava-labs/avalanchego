@@ -7,6 +7,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 ### Features
 
 - `api-max-blocks-per-request` was added back to the C-Chain config.
+- `eth_getLogs` now respects the node's C-Chain config option for "resolve-pending-to-last-executed".
 
 ### Metrics
 
