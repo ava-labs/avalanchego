@@ -51,8 +51,9 @@ ignored. Only require directives matter.
 
 See [Release Procedure](../../RELEASING_README.md) for the step-by-step process.
 
-Between merge and tag, local builds continue to work because replace
-directives redirect inter-module references to local paths. Once
+The require directives on master reference the next, untagged
+version. Local builds continue to work because replace directives
+redirect inter-module references to local paths. Once
 tags are pushed, external consumers can fetch the tagged versions.
 
 For user-facing documentation on consuming these modules, see
