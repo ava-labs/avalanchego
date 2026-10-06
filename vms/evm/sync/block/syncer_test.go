@@ -190,7 +190,7 @@ func TestSyncer(t *testing.T) {
 				db:  synctest.NewBlockDB(blocks),
 			})
 			from := blocks[tt.fromHeight]
-			net, tracker := synctest.ServeResponder(
+			p2pClient := synctest.ServeResponder(
 				t,
 				ctx,
 				log,
@@ -199,7 +199,7 @@ func TestSyncer(t *testing.T) {
 			)
 			syncer := NewSyncer(
 				log,
-				NewClient(log, net, tracker),
+				NewClient(log, p2pClient),
 				target,
 				decodeBlock,
 				from.Hash(),
@@ -235,7 +235,7 @@ func TestSyncer_ResumesAfterCancellation(t *testing.T) {
 		return decodeBlock(b)
 	}
 
-	net, tracker := synctest.ServeResponder(
+	p2pClient := synctest.ServeResponder(
 		t,
 		t.Context(),
 		log,
@@ -247,7 +247,7 @@ func TestSyncer_ResumesAfterCancellation(t *testing.T) {
 	)
 	syncer := NewSyncer(
 		log,
-		NewClient(log, net, tracker),
+		NewClient(log, p2pClient),
 		target,
 		parse,
 		tip.Hash(),
@@ -300,12 +300,12 @@ func TestSyncer_RetriesBadResponses(t *testing.T) {
 				},
 			)
 			recorder := synctest.NewRecordingResponder(tamperer)
-			net, tracker := synctest.ServeResponder(t, ctx, log, p2p.EVMBlockRequestHandlerID, recorder)
+			p2pClient := synctest.ServeResponder(t, ctx, log, p2p.EVMBlockRequestHandlerID, recorder)
 
 			target := rawdb.NewMemoryDatabase()
 			syncer := NewSyncer(
 				log,
-				NewClient(log, net, tracker),
+				NewClient(log, p2pClient),
 				target,
 				decodeBlock,
 				tip.Hash(),

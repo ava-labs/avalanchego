@@ -64,14 +64,14 @@ func TestClient_Retries(t *testing.T) {
 				*resp = syncpb.GetLeafResponse{} // Empty responses are invalid.
 			})
 			recording := synctest.NewRecordingResponder(tampering)
-			net, tracker := synctest.ServeResponder(
+			p2pClient := synctest.ServeResponder(
 				t,
 				ctx,
 				log,
 				p2p.EVMLeafRequestHandlerID,
 				synctest.NewCancelAfter(recording, cancelAfter, cancel),
 			)
-			client := NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker)
+			client := NewClient(log, p2pClient, common.HashLength)
 
 			got, more, err := client.FetchLeaves(ctx, LeafRange{Root: root, Limit: maxLimit})
 			require.ErrorIs(t, err, tt.wantErr)

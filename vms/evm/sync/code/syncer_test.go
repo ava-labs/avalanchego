@@ -117,14 +117,14 @@ func tryNewSUT(t *testing.T, opts ...sutOption) (*SUT, error) {
 	if config.wrapResponder != nil {
 		wrappedResponder = config.wrapResponder(wrappedResponder)
 	}
-	net, tracker := synctest.ServeResponder(
+	p2pClient := synctest.ServeResponder(
 		t,
 		t.Context(),
 		log,
 		p2p.EVMCodeRequestHandlerID,
 		wrappedResponder,
 	)
-	client := NewClient(log, net, tracker)
+	client := NewClient(log, p2pClient)
 
 	avadb := memdb.New()
 	flakydb := saetest.NewFlakyDB(avadb, config.flake)

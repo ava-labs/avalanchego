@@ -181,7 +181,7 @@ func TestDoRetry_CtxEndReportsFailure(t *testing.T) {
 		},
 		{
 			name:       "no_peers",
-			attemptErr: errNoPeers,
+			attemptErr: p2p.ErrNoPeers,
 		},
 	}
 	for _, tt := range tests {
@@ -225,7 +225,7 @@ func TestDoRetry_FatalStopsRetrying(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
-// Both [errNoPeers] and any transient network error should prohibit compounding
+// Both [p2p.ErrNoPeers] and any transient network error should prohibit compounding
 // of the exponential backoff.
 func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 	errInvalid := errors.New("invalid")
@@ -268,7 +268,7 @@ func TestDoRetry_NoPeersStreakResets(t *testing.T) {
 					calls++
 					switch {
 					case calls == 1, calls == 2, calls == 4:
-						return nil, errNoPeers
+						return nil, p2p.ErrNoPeers
 					case calls == 3 && tt.resetError != nil:
 						return nil, tt.resetError
 					case calls == 3 && !rejected:

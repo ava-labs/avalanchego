@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -99,7 +100,7 @@ func doRetry[Out any](
 		// Canceled or DeadlineExceeded, making this match exhaustive.
 		case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
 			return zero, retryFailure(err, lastErr, attempts)
-		case errors.Is(err, errNoPeers):
+		case errors.Is(err, p2p.ErrNoPeers):
 			log.Debug("no peer available, retrying", zap.Error(err))
 			lastErr = err
 			wait = policy.noPeersBackoff(noPeerAttempts)

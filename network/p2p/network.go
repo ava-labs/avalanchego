@@ -135,8 +135,9 @@ func (n *Network) NewTrackingClient(handlerID uint64, pt *PeerTracker) *Tracking
 	// No nodeSampler, since TrackingClient selects with pt and never routes
 	// through Client.AppRequestAny.
 	return &TrackingClient{
-		client: n.newClient(handlerID, nil),
-		peers:  pt,
+		handlerID: handlerID,
+		client:    n.newClient(handlerID, nil),
+		peers:     pt,
 	}
 }
 

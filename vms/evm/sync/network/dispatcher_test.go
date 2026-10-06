@@ -81,7 +81,7 @@ func TestDispatcher_SendBytes(t *testing.T) {
 				cancel()
 			}
 
-			got, err := c.sendBytes(ctx, nodeID, reqBytes, acceptLeaf)
+			got, err := c.sendBytes(ctx, reqBytes, acceptLeaf)
 			require.ErrorIsf(t, err, tt.wantErr, "%T.sendBytes()", c)
 			if tt.wantErr != nil {
 				return
@@ -118,7 +118,7 @@ func TestDispatcher_CancelInFlight(t *testing.T) {
 	reqBytes, err := proto.Marshal(&syncpb.GetLeafRequest{})
 	require.NoError(t, err, "proto.Marshal(req)")
 
-	_, err = c.sendBytes(ctx, nodeID, reqBytes, acceptLeaf)
+	_, err = c.sendBytes(ctx, reqBytes, acceptLeaf)
 	require.ErrorIsf(t, err, context.Canceled, "%T.sendBytes()", c)
 	assert.Truef(t, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
 }
@@ -176,7 +176,7 @@ func TestDispatcher_PeerScoring(t *testing.T) {
 			if tt.rejectResp {
 				verify = rejectLeaf
 			}
-			_, err := c.sendBytes(ctx, nodeID, reqBytes, verify)
+			_, err := c.sendBytes(ctx, reqBytes, verify)
 			require.ErrorIsf(t, err, tt.wantErr, "%T.sendBytes()", c)
 
 			assert.Equalf(t, tt.wantResponsive, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
@@ -250,7 +250,6 @@ func newTestDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any
 	return &Dispatcher[Req, In, Resp, Out]{
 		log:    loggingtest.New(t, logging.Debug),
 		client: p2ptest.NewSelfTrackingClientWithTracker(t, ctx, nodeID, h, peers),
-		peers:  peers,
 	}
 }
 

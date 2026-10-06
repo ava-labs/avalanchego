@@ -105,7 +105,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 
 	blockSyncer := syncblock.NewSyncer(
 		s.snowCtx.Log,
-		syncblock.NewClient(s.snowCtx.Log, s.network.Network, s.network.PeerTracker),
+		syncblock.NewClient(s.snowCtx.Log, s.network.NewTrackingClient(p2p.EVMBlockRequestHandlerID, s.network.PeerTracker)),
 		s.db,
 		s.blockParser,
 		summary.AcceptedHash,
@@ -129,7 +129,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 
 	codeSyncer, err := code.NewSyncer(
 		s.snowCtx.Log,
-		code.NewClient(s.snowCtx.Log, s.network.Network, s.network.PeerTracker),
+		code.NewClient(s.snowCtx.Log, s.network.NewTrackingClient(p2p.EVMCodeRequestHandlerID, s.network.PeerTracker)),
 		s.db,
 	)
 	if err != nil {
@@ -150,10 +150,8 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		s.snowCtx.Log,
 		hashdb.NewClient(
 			s.snowCtx.Log,
-			s.network.Network,
-			p2p.EVMLeafRequestHandlerID,
+			s.network.NewTrackingClient(p2p.EVMLeafRequestHandlerID, s.network.PeerTracker),
 			common.HashLength,
-			s.network.PeerTracker,
 		),
 		s.db,
 		hdr.Root,

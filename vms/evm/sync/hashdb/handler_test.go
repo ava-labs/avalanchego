@@ -213,10 +213,8 @@ func TestResponder(t *testing.T) {
 			))
 			client := NewClient(
 				log,
-				net,
-				p2p.EVMLeafRequestHandlerID,
+				net.NewTrackingClient(p2p.EVMLeafRequestHandlerID, tracker),
 				common.HashLength,
-				tracker,
 			)
 
 			got, more, err := client.FetchLeaves(ctx, tt.req)

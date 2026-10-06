@@ -15,11 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
-	errNoPeers           = errors.New("no peers available")
 	errSendRequest       = errors.New("send request")
 	errHandlerFailed     = errors.New("handler request failed")
 	errMarshalRequest    = errors.New("marshal request")
@@ -38,29 +36,24 @@ type ProtoMessage[T any] interface {
 type Dispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any] struct {
 	log    logging.Logger
 	client *p2p.TrackingClient
-	peers  *p2p.PeerTracker
 	policy retryPolicy
 }
 
-// NewDispatcher returns a [Dispatcher] bound to handlerID on n.
+// NewDispatcher returns a [Dispatcher] that sends through client.
 func NewDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any](
 	log logging.Logger,
-	n *p2p.Network,
-	handlerID uint64,
-	peers *p2p.PeerTracker,
+	client *p2p.TrackingClient,
 	opts ...RetryOption,
 ) *Dispatcher[Req, In, Resp, Out] {
 	return &Dispatcher[Req, In, Resp, Out]{
 		// Tagged once, so every retry line names the RPC without each caller repeating it.
-		log:    log.With(zap.Uint64("handlerID", handlerID)),
-		client: n.NewTrackingClient(handlerID, peers),
-		peers:  peers,
+		log:    log.With(zap.Uint64("handlerID", client.HandlerID())),
+		client: client,
 		policy: *options.ApplyTo(defaultRetryPolicy(), opts...),
 	}
 }
 
-// Send retries req until a peer sends a response that parse accepts or ctx
-// ends. req is marshaled once since it never changes across attempts.
+// Send retries req until a peer sends a response that parse accepts or ctx ends.
 func (d *Dispatcher[Req, In, Resp, Out]) Send(
 	ctx context.Context,
 	req Req,
@@ -72,18 +65,12 @@ func (d *Dispatcher[Req, In, Resp, Out]) Send(
 		return zero, fmt.Errorf("%w: %w", errMarshalRequest, err)
 	}
 	return doRetry(ctx, d.log, d.policy, func(ctx context.Context) (Out, error) {
-		nodeID, ok := d.peers.SelectPeer()
-		if !ok {
-			var zero Out
-			return zero, errNoPeers
-		}
-		return d.sendBytes(ctx, nodeID, requestBytes, parse)
+		return d.sendBytes(ctx, requestBytes, parse)
 	})
 }
 
 func (d *Dispatcher[Req, In, Resp, Out]) sendBytes(
 	ctx context.Context,
-	nodeID ids.NodeID,
 	requestBytes []byte,
 	parse func(Resp) (Out, error),
 ) (Out, error) {
@@ -104,7 +91,7 @@ func (d *Dispatcher[Req, In, Resp, Out]) sendBytes(
 		return err
 	}
 
-	if err := d.client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse); err != nil {
+	if err := d.client.AppRequestAny(ctx, requestBytes, onResponse); err != nil {
 		return zero, fmt.Errorf("%w: %w", errSendRequest, err)
 	}
 

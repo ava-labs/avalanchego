@@ -30,8 +30,14 @@ type AppResponseVerifier func(
 // TrackingClient issues requests through a [Client] and scores each one
 // against its [PeerTracker].
 type TrackingClient struct {
-	client *Client
-	peers  *PeerTracker
+	handlerID uint64
+	client    *Client
+	peers     *PeerTracker
+}
+
+// HandlerID returns the ID of the protocol this client sends requests to.
+func (c *TrackingClient) HandlerID() uint64 {
+	return c.handlerID
 }
 
 // AppRequestAny issues an AppRequest to the peer the [PeerTracker] selects.

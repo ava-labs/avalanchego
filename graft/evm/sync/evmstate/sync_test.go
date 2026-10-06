@@ -633,7 +633,7 @@ func TestSyncOverProtoLeafProtocol(t *testing.T) {
 
 	stateSyncer, err := NewSyncer(
 		log,
-		leafproto.NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker),
+		leafproto.NewClient(log, net.NewTrackingClient(p2p.EVMLeafRequestHandlerID, tracker), common.HashLength),
 		clientEthDB,
 		root,
 		codeQueue,
