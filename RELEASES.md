@@ -4,8 +4,13 @@
 
 This release updates the plugin version to `47`. All plugins must update to remain compatible.
 
+### APIs
+
+- The `avax.getAtomicTxStatus` C-Chain RPC, deprecated in v1.15.0, is removed. Use `avax.getAtomicTx`, which fails for a tx that has not been accepted.
+
 ### Configs
 
+- The `eth-apis` C-Chain option, deprecated in v1.15.0, is removed. The node now ignores it and logs a warning like any other unrecognized option. Set `apis` instead.
 - Fixed C-Chain `api-max-duration` only limiting `eth_call` since Helicon. It again limits every call to the `/rpc` and `/ws` endpoints, and a WebSocket call that times out doesn't close its connection.
 
 ### Metrics
