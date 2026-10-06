@@ -114,8 +114,8 @@ An example is a chain-head subscription, be it in the same binary or over a webs
 
 > [!NOTE]
 > A synchronous block settles itself, so $\Sigma_n = \{b_n\}$.
-> Execution after acceptance and settlement after execution then contradict (2), so (2) does not apply to synchronous blocks.
-> Their acceptance is realised before their settlement, as for any asynchronous block awaiting settlement.
+> It must be accepted before it can be executed, and executed before it can be settled. This ordering conflicts with (2), so synchronous blocks are exempt from that rule.
+> Their acceptance is realised before their settlement, just as for asynchronous blocks awaiting settlement.
 
 #### Polling vs Broadcast
 
