@@ -12,11 +12,11 @@ fi
 CONTRACTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 readonly abigen_version='v1.13.14-0.2.0.release'
 
-# Developers use the versioned package path so generation works from a clean
-# checkout. CI prepares this module graph before disabling GOPROXY, then uses
-# its cached source so a missing input fails rather than downloading here.
+# Use the versioned package path when module-proxy access is available so
+# generation works from a clean checkout. If the caller disables module-proxy
+# access, a compatible module cache must be prepared before invoking this script.
 run_abigen() {
-  if [[ "${CI:-}" == 'true' ]]; then
+  if [[ "${GOPROXY:-}" == "off" ]]; then
     local abigen_dir
     abigen_dir="$(go env GOMODCACHE)/github.com/ava-labs/libevm@${abigen_version}"
     (
