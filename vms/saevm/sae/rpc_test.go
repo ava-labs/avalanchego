@@ -913,7 +913,7 @@ func TestGetLogsBlockLimit(t *testing.T) {
 		{
 			name: "over_limit_to_future_block",
 			query: ethereum.FilterQuery{
-				FromBlock: genesis.Number(),
+				FromBlock: big.NewInt(1),
 				ToBlock:   big.NewInt(100),
 			},
 			wantErr: nil, // MUST match previous case
