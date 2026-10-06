@@ -90,7 +90,8 @@ func (e *executionResults) setBaseFee(bf *big.Int) error {
 // for metrics only.
 //
 // A synchronous block's header determines its [saetypes.ExecutionResults], so
-// they are not persisted.
+// they are not persisted. An error is returned, before any persistence, if they
+// differ from stateRootPost or the root of receipts.
 func (b *Block) MarkExecuted(
 	db ethdb.Database,
 	xdb saetypes.ExecutionResults,
@@ -112,9 +113,21 @@ func (b *Block) MarkExecuted(
 		)
 	}
 
+	receiptRoot := types.DeriveSha(receipts, trie.NewStackTrie(nil))
+	// The roots aren't sanity checked during verification for synchronous
+	// blocks, so we do it here.
+	if b.Synchronous() {
+		if want := b.SettledStateRoot(); stateRootPost != want {
+			return fmt.Errorf("synchronous block %d executed to state root %#x, header commits to %#x", b.NumberU64(), stateRootPost, want)
+		}
+		if want := b.SettledReceiptsRoot(); receiptRoot != want {
+			return fmt.Errorf("synchronous block %d executed to receipts root %#x, header commits to %#x", b.NumberU64(), receiptRoot, want)
+		}
+	}
+
 	e := &executionResults{
 		byGas:         *byGas.Clone(),
-		receiptRoot:   types.DeriveSha(receipts, trie.NewStackTrie(nil)),
+		receiptRoot:   receiptRoot,
 		stateRootPost: stateRootPost,
 		ephemeralExecutionResults: ephemeralExecutionResults{
 			byWall:   byWall,

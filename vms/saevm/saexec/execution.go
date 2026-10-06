@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/libevm/libevm/eventual"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/libevm/trie"
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
@@ -460,17 +459,6 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 	root, err := stateDB.Commit(b.NumberU64(), true)
 	if err != nil {
 		return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
-	}
-
-	// The roots aren't sanity checked during verification for synchronous
-	// blocks, so we do it here.
-	if b.Synchronous() {
-		if want := b.SettledStateRoot(); root != want {
-			return fmt.Errorf("%w: synchronous block %d executed to state root %#x, header commits to %#x", errFatal, b.NumberU64(), root, want)
-		}
-		if got, want := types.DeriveSha(r.Receipts, trie.NewStackTrie(nil)), b.SettledReceiptsRoot(); got != want {
-			return fmt.Errorf("%w: synchronous block %d executed to receipts root %#x, header commits to %#x", errFatal, b.NumberU64(), got, want)
-		}
 	}
 
 	// Responsibility for untracking lies with the VM once it deems this block's

@@ -115,8 +115,8 @@ func (vm *VM) verifyWhenBootstrapping(b, parent *blocks.Block) error {
 	}
 
 	// Sanity checks to ensure the in-memory settled block matches the expected
-	// settled block. A synchronous block settles itself, so the executor
-	// performs the equivalent checks once the block has executed.
+	// settled block. [blocks.Block.MarkExecuted] performs the equivalent checks
+	// for a synchronous block once the roots are available.
 	if !b.Synchronous() {
 		if got, want := lastSettled.PostExecutionStateRoot(), b.SettledStateRoot(); got != want {
 			return fmt.Errorf("%w: got %#x ; want %#x", errSettledRootMismatch, got, want)
