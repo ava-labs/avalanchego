@@ -424,8 +424,9 @@ func Execute(
 
 	endTime := time.Now()
 	if synchronous {
-		// Pre-SAE blocks never ran this clock, so recovery and the first
-		// asynchronous block use the header's gas time.
+		// Recovery derives synchronous gas times from the header. Execution
+		// MUST match, because the first asynchronous block advances the last
+		// synchronous block's gas time.
 		gasClock, err = b.SynchronousGasTime()
 		if err != nil {
 			return nil, fmt.Errorf("%w: synchronous gas time: %v", errFatal, err)
