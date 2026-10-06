@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/holiman/uint256"
@@ -477,18 +476,7 @@ func (c *Client) AwaitTxAccepted(ctx context.Context, txID ids.ID, freq time.Dur
 	defer ticker.Stop()
 
 	for {
-		_, height, err := c.GetTx(ctx, txID, options...)
-		// SAE nodes report an unknown tx as database.ErrNotFound. The error
-		// chain does not survive JSON-RPC, so it is matched on the message.
-		if err != nil && !strings.HasSuffix(err.Error(), database.ErrNotFound.Error()) {
-			return err
-		}
-		// Pre-SAE nodes return processing txs without a height. The genesis
-		// block cannot include atomic txs, so a height of 0 means the tx is not
-		// accepted yet.
-		//
-		// TODO(owenwahlgren): Remove the height check during the coreth removal.
-		if err == nil && height != 0 {
+		if _, _, err := c.GetTx(ctx, txID, options...); err == nil {
 			return nil
 		}
 
