@@ -4,6 +4,10 @@
 
 This release updates the plugin version to `47`. All plugins must update to remain compatible.
 
+### Features
+
+- New RPC client for all EVM uses was added to `vms/saevm/client`.
+
 ### Metrics
 
 - Added `avalanche_evm_transition_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.

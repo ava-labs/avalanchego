@@ -7,13 +7,13 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/client"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
+	ethclient "github.com/ava-labs/avalanchego/vms/saevm/client"
 	ethcommon "github.com/ava-labs/libevm/common"
 )
 

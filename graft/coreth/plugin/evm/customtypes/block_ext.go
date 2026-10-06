@@ -4,6 +4,7 @@
 package customtypes
 
 import (
+	"encoding/json"
 	"math/big"
 	"slices"
 	"time"
@@ -80,6 +81,20 @@ func (b *BlockBodyExtra) PostRPCMarshal(_ *ethtypes.Block, m map[string]any) {
 		extData = *b.ExtData
 	}
 	m["blockExtraData"] = extData
+	m["version"] = b.Version
+}
+
+func (b *BlockBodyExtra) PostRPCUnmarshal(_ *ethtypes.Block, raw []byte) error {
+	var fields struct {
+		BlockExtraData *hexutil.Bytes `json:"blockExtraData"`
+		Version        uint32         `json:"version"`
+	}
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return err
+	}
+	b.ExtData = (*[]byte)(fields.BlockExtraData)
+	b.Version = fields.Version
+	return nil
 }
 
 func BlockExtData(b *ethtypes.Block) []byte {

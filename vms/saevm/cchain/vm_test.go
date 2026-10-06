@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
-	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/google/go-cmp/cmp"
@@ -63,6 +62,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
+	"github.com/ava-labs/avalanchego/vms/saevm/client"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -91,7 +91,7 @@ var _ saetest.Peer = (*SUT)(nil)
 type SUT struct {
 	*VM
 	*Client
-	ethclient  *ethclient.Client
+	ethclient  *client.Client
 	clientOnce func()
 
 	ctx            *snow.Context
@@ -435,7 +435,7 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 		tb.Cleanup(ethRPCClient.Close)
 
 		sut.Client = NewClient(server.URL)
-		sut.ethclient = ethclient.NewClient(ethRPCClient)
+		sut.ethclient = client.New(ethRPCClient)
 	})
 
 	if cfg.state == snow.NormalOp {
