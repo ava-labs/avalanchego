@@ -138,7 +138,7 @@ type Peer struct {
 // Start a new peer instance.
 //
 // Invariant: There must only be one peer running at a time with a reference to
-// the same config.InboundMsgThrottler.
+// the same [Config.InboundMsgThrottler].
 func Start(
 	config *Config,
 	conn net.Conn,
