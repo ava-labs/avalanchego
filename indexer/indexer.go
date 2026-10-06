@@ -8,7 +8,6 @@ import (
 	"io"
 	"sync"
 
-	"github.com/gorilla/rpc/v2"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/server"
@@ -21,8 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -329,11 +328,8 @@ func (i *indexer) registerChainHelper(
 	}
 
 	// Create an API endpoint for this index
-	apiServer := rpc.NewServer()
-	codec := json.NewCodec()
-	apiServer.RegisterCodec(codec, "application/json")
-	apiServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	if err := apiServer.RegisterService(&service{index: index}, "index"); err != nil {
+	apiServer, err := rpc.NewHandler("index", &service{index: index})
+	if err != nil {
 		_ = index.Close()
 		return nil, err
 	}

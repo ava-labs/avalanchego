@@ -86,10 +86,9 @@ import (
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheUtils "github.com/ava-labs/avalanchego/utils"
-	avajson "github.com/ava-labs/avalanchego/utils/json"
+	utilsrpc "github.com/ava-labs/avalanchego/utils/rpc"
 	avalanchegoprometheus "github.com/ava-labs/avalanchego/vms/evm/metrics/prometheus"
 	ethparams "github.com/ava-labs/libevm/params"
-	avalancheRPC "github.com/gorilla/rpc/v2"
 )
 
 var (
@@ -1128,17 +1127,6 @@ func (*VM) Version(context.Context) (string, error) {
 	return version.Current.Semantic(), nil
 }
 
-// NewHandler returns a new Handler for a service where:
-//   - The handler's functionality is defined by [service]
-//     [service] should be a gorilla RPC service (see https://www.gorillatoolkit.org/pkg/rpc/v2)
-//   - The name of the service is [name]
-func newHandler(name string, service interface{}) (http.Handler, error) {
-	server := avalancheRPC.NewServer()
-	server.RegisterCodec(avajson.NewCodec(), "application/json")
-	server.RegisterCodec(avajson.NewCodec(), "application/json;charset=UTF-8")
-	return server, server.RegisterService(service, name)
-}
-
 // CreateHandlers makes new http handlers that can handle API calls
 func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	handler := rpc.NewServer(vm.config.APIMaxDuration.Duration)
@@ -1156,7 +1144,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 
 	apis := make(map[string]http.Handler)
 	if vm.config.AdminAPIEnabled {
-		adminAPI, err := newHandler("admin", NewAdminService(vm, os.ExpandEnv(fmt.Sprintf("%s_subnet_evm_performance_%s", vm.config.AdminAPIDir, vm.chainAlias))))
+		adminAPI, err := utilsrpc.NewHandler("admin", NewAdminService(vm, os.ExpandEnv(fmt.Sprintf("%s_subnet_evm_performance_%s", vm.config.AdminAPIDir, vm.chainAlias))))
 		if err != nil {
 			return nil, fmt.Errorf("failed to register service for admin API due to %w", err)
 		}
@@ -1165,7 +1153,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	}
 
 	if vm.config.ValidatorsAPIEnabled {
-		validatorsAPI, err := newHandler("validators", &ValidatorsAPI{vm})
+		validatorsAPI, err := utilsrpc.NewHandler("validators", &ValidatorsAPI{vm})
 		if err != nil {
 			return nil, fmt.Errorf("failed to register service for validators API due to %w", err)
 		}

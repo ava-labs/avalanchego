@@ -9,7 +9,6 @@ import (
 	"net/http"
 
 	"connectrpc.com/grpcreflect"
-	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
@@ -23,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/builder"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/chain"
@@ -138,9 +137,6 @@ func (*VM) Version(context.Context) (string, error) {
 }
 
 func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
-	server := rpc.NewServer()
-	server.RegisterCodec(json.NewCodec(), "application/json")
-	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
 	jsonRPCAPI := api.NewServer(
 		vm.chainContext,
 		vm.genesis,
@@ -148,9 +144,10 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		vm.chain,
 		vm.builder,
 	)
+	server, err := rpc.NewHandler(constants.XSVMName, jsonRPCAPI)
 	return map[string]http.Handler{
 		"": server,
-	}, server.RegisterService(jsonRPCAPI, constants.XSVMName)
+	}, err
 }
 
 func (vm *VM) NewHTTPHandler(context.Context) (http.Handler, error) {

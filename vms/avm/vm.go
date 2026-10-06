@@ -11,7 +11,6 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
@@ -24,8 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/linked"
+	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
@@ -291,25 +290,16 @@ func (*VM) Version(context.Context) (string, error) {
 }
 
 func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
-	codec := json.NewCodec()
-
-	rpcServer := rpc.NewServer()
-	rpcServer.RegisterCodec(codec, "application/json")
-	rpcServer.RegisterCodec(codec, "application/json;charset=UTF-8")
-	rpcServer.RegisterInterceptFunc(vm.metrics.InterceptRequest)
-	rpcServer.RegisterAfterFunc(vm.metrics.AfterRequest)
-	// name this service "avm"
-	if err := rpcServer.RegisterService(&Service{vm: vm}, "avm"); err != nil {
+	rpcServer, err := rpc.NewHandler("avm", &Service{vm: vm})
+	if err != nil {
 		return nil, err
 	}
+	rpcServer.RegisterInterceptFunc(vm.metrics.InterceptRequest)
+	rpcServer.RegisterAfterFunc(vm.metrics.AfterRequest)
 
-	walletServer := rpc.NewServer()
-	walletServer.RegisterCodec(codec, "application/json")
-	walletServer.RegisterCodec(codec, "application/json;charset=UTF-8")
+	walletServer, err := rpc.NewHandler("wallet", &vm.walletService)
 	walletServer.RegisterInterceptFunc(vm.metrics.InterceptRequest)
 	walletServer.RegisterAfterFunc(vm.metrics.AfterRequest)
-	// name this service "wallet"
-	err := walletServer.RegisterService(&vm.walletService, "wallet")
 
 	return map[string]http.Handler{
 		"":        rpcServer,
