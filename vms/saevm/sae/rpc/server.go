@@ -199,7 +199,6 @@ var apiServices = []apiService{
 	{
 		// Avalanche-custom eth extensions:
 		// - eth_baseFee
-		// - eth_callDetailed
 		// - eth_getChainConfig
 		// - eth_suggestPriceOptions
 		name: APIAvalanche, namespace: ethNamespace, defaultOn: true,

@@ -4,27 +4,20 @@
 package sae
 
 import (
-	"fmt"
 	"math/big"
-	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/core/vm"
-	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/libevm/rpc"
 	"github.com/google/go-cmp/cmp"
-	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
 	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 )
@@ -112,127 +105,4 @@ func TestNewAcceptedTransactions(t *testing.T) {
 			t.Errorf("full tx diff (-want +got):\n%s", diff)
 		}
 	})
-}
-
-func TestCallDetailed(t *testing.T) {
-	echoReverter := common.Address{'e', 'c', 'h', 'o'}
-	invalidJumper := common.Address{'i', 'n', 'v', 'a', 'l', 'i', 'd'}
-	const gasCap = 100e6
-	ctx, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.RPCConfig.GasCap = gasCap
-
-		c.genesis.Alloc[echoReverter] = types.Account{
-			Code: saetest.Ops(
-				vm.CALLDATASIZE, vm.PUSH0, vm.PUSH0, vm.CALLDATACOPY, // https://www.evm.codes/#37
-				vm.CALLDATASIZE, vm.PUSH0, vm.REVERT,
-			),
-			Balance: new(big.Int),
-		}
-		c.genesis.Alloc[invalidJumper] = types.Account{
-			// Jumping back to PC=0 is invalid because it's not a [vm.JUMPDEST]
-			Code:    saetest.Ops(vm.PUSH0, vm.JUMP),
-			Balance: new(big.Int),
-		}
-	}))
-
-	const escrowDepositVal = 42
-	recipient := common.Address{'r', 'e', 'c', 'v'}
-	escrowAddr := sut.deployEscrow(t)
-	sut.depositToEscrow(t, escrowAddr, recipient, big.NewInt(escrowDepositVal))
-
-	const revertWith = 12345
-	revertAsPanic := slices.Concat(
-		crypto.Keccak256([]byte("Panic(uint256)"))[:4],
-		uint256.NewInt(revertWith).PaddedBytes(32),
-	)
-
-	noBalance := common.Address{'b', 'a', 'n', 'k', 'r', 'u', 'p', 't'}
-	latest := rpc.LatestBlockNumber.String()
-
-	// revertErrCode is the JSON-RPC error code for execution reverts, matching the
-	// value returned by [ethapi.RevertError.ErrorCode].
-	const revertErrCode = 3
-
-	sut.testRPC(ctx, t, []rpcTest{
-		{
-			method: "eth_callDetailed",
-			args: []any{
-				ethapi.TransactionArgs{
-					To:   &escrowAddr,
-					Data: new(hexutil.Bytes(escrow.CallDataForBalance(recipient))),
-				},
-				latest,
-			},
-			want: saerpc.DetailedExecutionResult{
-				UsedGas:    23675,
-				ReturnData: uint256.NewInt(escrowDepositVal).PaddedBytes(32),
-			},
-		},
-		{
-			method: "eth_callDetailed",
-			args: []any{
-				ethapi.TransactionArgs{
-					From: &noBalance,
-					To:   &escrowAddr,
-					Data: new(hexutil.Bytes(escrow.CallDataToWithdraw())),
-				},
-				latest,
-			},
-			want: saerpc.DetailedExecutionResult{
-				UsedGas: 23451,
-				ErrCode: revertErrCode,
-				Err:     vm.ErrExecutionReverted.Error(),
-				ReturnData: slices.Concat(
-					crypto.Keccak256([]byte("ZeroBalance(address)"))[:4],
-					make([]byte, common.HashLength-common.AddressLength),
-					noBalance.Bytes(),
-				),
-			},
-		},
-		{
-			method: "eth_callDetailed",
-			args: []any{
-				ethapi.TransactionArgs{
-					To:   &echoReverter,
-					Data: new(hexutil.Bytes{42}),
-				},
-				latest,
-			},
-			want: saerpc.DetailedExecutionResult{
-				UsedGas:    21035,
-				ErrCode:    revertErrCode,
-				Err:        vm.ErrExecutionReverted.Error(),
-				ReturnData: hexutil.Bytes{42},
-			},
-		},
-		{
-			method: "eth_callDetailed",
-			args: []any{
-				ethapi.TransactionArgs{
-					To:   &echoReverter,
-					Data: new(hexutil.Bytes(revertAsPanic)),
-				},
-				latest,
-			},
-			want: saerpc.DetailedExecutionResult{
-				UsedGas:    21241,
-				ErrCode:    revertErrCode,
-				Err:        fmt.Sprintf("%v: unknown panic code: %#x", vm.ErrExecutionReverted, revertWith),
-				ReturnData: hexutil.Bytes(revertAsPanic),
-			},
-		},
-		{
-			method: "eth_callDetailed",
-			args: []any{
-				ethapi.TransactionArgs{
-					To: &invalidJumper,
-				},
-				latest,
-			},
-			want: saerpc.DetailedExecutionResult{
-				UsedGas: gasCap,
-				Err:     vm.ErrInvalidJump.Error(),
-			},
-		},
-	}...)
 }

@@ -1668,7 +1668,7 @@ func TestAPIsServed(t *testing.T) {
 		saerpc.APIChain:        "eth_blockNumber",
 		saerpc.APITx:           "eth_getTransactionCount",
 		saerpc.APISubscription: "eth_getLogs",
-		saerpc.APIAvalanche:    "eth_callDetailed",
+		saerpc.APIAvalanche:    "eth_getChainConfig",
 		saerpc.APIDB:           "debug_dbGet",
 		saerpc.APIProfile:      "debug_gcStats",
 		saerpc.APITrace:        "debug_traceBlockByNumber",

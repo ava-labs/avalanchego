@@ -563,23 +563,6 @@
 			"result": "0x"
 		},
 		{
-			"name": "block_00_noUpgrades/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x0"
-			],
-			"result": {
-				"gas": 21016,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x"
-			}
-		},
-		{
 			"name": "block_00_noUpgrades/eth_getBlockReceipts",
 			"method": "eth_getBlockReceipts",
 			"params": [
@@ -1015,23 +998,6 @@
 				"0x1"
 			],
 			"result": "0x"
-		},
-		{
-			"name": "block_01_noUpgrades/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x1"
-			],
-			"result": {
-				"gas": 21016,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x"
-			}
 		},
 		{
 			"name": "block_01_noUpgrades/eth_getBlockReceipts",
@@ -1945,23 +1911,6 @@
 				"0x2"
 			],
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000000"
-		},
-		{
-			"name": "block_02_apricotPhase1/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x2"
-			],
-			"result": {
-				"gas": 21850,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000000"
-			}
 		},
 		{
 			"name": "block_02_apricotPhase1/eth_getBlockReceipts",
@@ -3122,23 +3071,6 @@
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000000"
 		},
 		{
-			"name": "block_03_apricotPhase2/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x3"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000000"
-			}
-		},
-		{
 			"name": "block_03_apricotPhase2/eth_getBlockReceipts",
 			"method": "eth_getBlockReceipts",
 			"params": [
@@ -3814,23 +3746,6 @@
 				"0x4"
 			],
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000000"
-		},
-		{
-			"name": "block_04_apricotPhase2/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x4"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000000"
-			}
 		},
 		{
 			"name": "block_04_apricotPhase2/eth_getBlockReceipts",
@@ -4517,23 +4432,6 @@
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000000"
 		},
 		{
-			"name": "block_05_apricotPhase3/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x5"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000000"
-			}
-		},
-		{
 			"name": "block_05_apricotPhase3/eth_getBlockReceipts",
 			"method": "eth_getBlockReceipts",
 			"params": [
@@ -5211,23 +5109,6 @@
 				"0x6"
 			],
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000001"
-		},
-		{
-			"name": "block_06_apricotPhase3/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x6"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000001"
-			}
 		},
 		{
 			"name": "block_06_apricotPhase3/eth_getBlockReceipts",
@@ -5935,23 +5816,6 @@
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000001"
 		},
 		{
-			"name": "block_07_apricotPhase3/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x7"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000001"
-			}
-		},
-		{
 			"name": "block_07_apricotPhase3/eth_getBlockReceipts",
 			"method": "eth_getBlockReceipts",
 			"params": [
@@ -6637,23 +6501,6 @@
 				"0x8"
 			],
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000001"
-		},
-		{
-			"name": "block_08_apricotPhase3/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x8"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000001"
-			}
 		},
 		{
 			"name": "block_08_apricotPhase3/eth_getBlockReceipts",
@@ -7389,23 +7236,6 @@
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000001"
 		},
 		{
-			"name": "block_09_apricotPhase4/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x9"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000001"
-			}
-		},
-		{
 			"name": "block_09_apricotPhase4/eth_getBlockReceipts",
 			"method": "eth_getBlockReceipts",
 			"params": [
@@ -8087,23 +7917,6 @@
 				"0xa"
 			],
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000001"
-		},
-		{
-			"name": "block_10_apricotPhase5/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0xa"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000001"
-			}
 		},
 		{
 			"name": "block_10_apricotPhase5/eth_getBlockReceipts",
@@ -8789,23 +8602,6 @@
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000001"
 		},
 		{
-			"name": "block_11_apricotPhasePre6/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0xb"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000001"
-			}
-		},
-		{
 			"name": "block_11_apricotPhasePre6/eth_getBlockReceipts",
 			"method": "eth_getBlockReceipts",
 			"params": [
@@ -9485,23 +9281,6 @@
 				"0xc"
 			],
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000001"
-		},
-		{
-			"name": "block_12_apricotPhase6/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0xc"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000001"
-			}
 		},
 		{
 			"name": "block_12_apricotPhase6/eth_getBlockReceipts",
@@ -10241,23 +10020,6 @@
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000001"
 		},
 		{
-			"name": "block_13_apricotPhasePost6/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0xd"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000001"
-			}
-		},
-		{
 			"name": "block_13_apricotPhasePost6/eth_getBlockReceipts",
 			"method": "eth_getBlockReceipts",
 			"params": [
@@ -10941,23 +10703,6 @@
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000001"
 		},
 		{
-			"name": "block_14_banff/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0xe"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000001"
-			}
-		},
-		{
 			"name": "block_14_banff/eth_getBlockReceipts",
 			"method": "eth_getBlockReceipts",
 			"params": [
@@ -11639,23 +11384,6 @@
 				"0xf"
 			],
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000002"
-		},
-		{
-			"name": "block_15_cortina/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0xf"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000002"
-			}
 		},
 		{
 			"name": "block_15_cortina/eth_getBlockReceipts",
@@ -12366,23 +12094,6 @@
 				"0x10"
 			],
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000002"
-		},
-		{
-			"name": "block_16_durango/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x10"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000002"
-			}
 		},
 		{
 			"name": "block_16_durango/eth_getBlockReceipts",
@@ -13120,23 +12831,6 @@
 				"0x11"
 			],
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000002"
-		},
-		{
-			"name": "block_17_durango/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x11"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000002"
-			}
 		},
 		{
 			"name": "block_17_durango/eth_getBlockReceipts",
@@ -14076,23 +13770,6 @@
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000002"
 		},
 		{
-			"name": "block_18_etna/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x12"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000002"
-			}
-		},
-		{
 			"name": "block_18_etna/eth_getBlockReceipts",
 			"method": "eth_getBlockReceipts",
 			"params": [
@@ -14778,23 +14455,6 @@
 				"0x13"
 			],
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000002"
-		},
-		{
-			"name": "block_19_fortuna/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x13"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000002"
-			}
 		},
 		{
 			"name": "block_19_fortuna/eth_getBlockReceipts",
@@ -15484,23 +15144,6 @@
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000002"
 		},
 		{
-			"name": "block_20_granite/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x14"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000002"
-			}
-		},
-		{
 			"name": "block_20_granite/eth_getBlockReceipts",
 			"method": "eth_getBlockReceipts",
 			"params": [
@@ -16182,23 +15825,6 @@
 				"0x15"
 			],
 			"result": "0x0000000000000000000000000000000000000000000000000000000000000002"
-		},
-		{
-			"name": "block_21_granite/eth_callDetailed",
-			"method": "eth_callDetailed",
-			"params": [
-				{
-					"to": "0x107215bc754afc18e7ab262d4bcb7456ca20d22d",
-					"data": "0x01"
-				},
-				"0x15"
-			],
-			"result": {
-				"gas": 23150,
-				"errCode": 0,
-				"err": "",
-				"returnData": "0x0000000000000000000000000000000000000000000000000000000000000002"
-			}
 		},
 		{
 			"name": "block_21_granite/eth_getBlockReceipts",
