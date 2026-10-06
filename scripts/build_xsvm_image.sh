@@ -12,12 +12,16 @@ if ! [[ "$0" =~ scripts/build_xsvm_image.sh ]]; then
 fi
 
 source ./scripts/image_tag.sh
+source ./scripts/lib_go_module_cache.sh
 
 AVALANCHEGO_IMAGE="${AVALANCHEGO_IMAGE:-avalanchego}"
 XSVM_IMAGE="${XSVM_IMAGE:-avalanchego-xsvm}"
 
 # Build the avalanchego base image
 SKIP_BUILD_RACE=1 DOCKER_IMAGE="${AVALANCHEGO_IMAGE}" bash -x ./scripts/build_image.sh
+
+# Populate the host cache with the workspace module graph before Buildx starts.
+prepare_go_module_cache "$(pwd)"
 
 DOCKER_CMD=("docker" "buildx" "build")
 if [[ "${XSVM_IMAGE}" == *"/"* ]]; then
@@ -34,4 +38,5 @@ fi
 GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
 
 "${DOCKER_CMD[@]}" --build-arg GO_VERSION="${GO_VERSION}" --build-arg AVALANCHEGO_NODE_IMAGE="${AVALANCHEGO_IMAGE}:${image_tag}" \
+  --build-context "gomodcache=$(go_module_proxy_cache)" \
   -t "${XSVM_IMAGE}" -f ./vms/example/xsvm/Dockerfile .

@@ -17,6 +17,11 @@ This checklist ists all the required steps when when adding a new network upgrad
   - `Default` config
 - [ ] Add field to `Validate()` method's `upgrades` slice
 - [ ] Add `IsXActivated(time.Time) bool` method
+- [ ] Update `LatestTime() time.Time` method
+
+### [`proto/vm/vm.proto`](../proto/vm/vm.proto)
+  - [ ] Add new time field to the `NetworkUpgrades` message
+  - [ ] Regenerate [`proto/pb/vm/vm.pb.go`](../proto/pb/vm/vm.pb.go)
 
 ### [`vms/rpcchainvm/vm_client.go`](../vms/rpcchainvm/vm_client.go)
 
@@ -36,6 +41,21 @@ This checklist ists all the required steps when when adding a new network upgrad
 ### [`upgrade/upgradetest/config.go`](./upgradetest/config.go)
 
 - [ ] Add case to `SetTimesTo()` function
+
+### [`vms/saevm/cchain/genesis_test.go`](../vms/saevm/cchain/genesis_test.go)
+
+- [ ] Add the fork's genesis hash to `hashes` (reuse the previous fork's hash if the genesis doesn't change)
+- [ ] Add the fork's timestamp to each network's `want` in `TestParseGenesis`
+
+## 3. C-Chain Configuration
+
+### [`vms/saevm/cchain/genesis.go`](../vms/saevm/cchain/genesis.go)
+
+- [ ] Add the fork's timestamp to the `extras.NetworkUpgrades` built in `parseGenesis()`
+
+### [`vms/saevm/cchain/cchaintest/config.go`](../vms/saevm/cchain/cchaintest/config.go)
+
+- [ ] Update `ChainConfig()` to use the new fork's `extras.TestXChainConfig`
 
 ---
 

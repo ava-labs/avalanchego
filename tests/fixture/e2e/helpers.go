@@ -5,19 +5,19 @@ package e2e
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethclient"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
-	ethereum "github.com/ava-labs/libevm"
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 const (
@@ -180,17 +180,8 @@ func SendEthTransaction(tc tests.TestContext, ethClient *ethclient.Client, signe
 
 	require.NoError(ethClient.SendTransaction(tc.DefaultContext(), signedTx))
 
-	// Wait for the receipt
-	var receipt *types.Receipt
-	tc.Eventually(func() bool {
-		var err error
-		receipt, err = ethClient.TransactionReceipt(tc.DefaultContext(), txID)
-		if errors.Is(err, ethereum.NotFound) {
-			return false // Transaction is still pending
-		}
-		require.NoError(err)
-		return true
-	}, DefaultTimeout, DefaultPollingInterval, "failed to see transaction acceptance before timeout")
+	receipt, err := AwaitEthReceipt(tc.DefaultContext(), ethClient, signedTx)
+	require.NoError(err, "AwaitEthReceipt()")
 
 	tc.Log().Info("eth transaction accepted",
 		zap.Stringer("txID", txID),
@@ -199,6 +190,18 @@ func SendEthTransaction(tc tests.TestContext, ethClient *ethclient.Client, signe
 		zap.Stringer("blockNumber", receipt.BlockNumber),
 	)
 	return receipt
+}
+
+// AwaitEthReceipt returns the receipt of the transaction once its block has
+// been executed.
+func AwaitEthReceipt(ctx context.Context, c *ethclient.Client, tx *types.Transaction) (*types.Receipt, error) {
+	receipt, err := bind.WaitMined(ctx, c, tx)
+	if err != nil {
+		return nil, err
+	}
+	// SAE serves state at a height only once it has executed.
+	_, err = c.NonceAt(ctx, ethcommon.Address{}, receipt.BlockNumber)
+	return receipt, err
 }
 
 // Determines the suggested gas price for the configured client that will

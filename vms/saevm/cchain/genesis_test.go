@@ -103,6 +103,7 @@ func TestParseGenesis(t *testing.T) {
 							FortunaTimestamp:                new(uint64(1744124400)),
 							GraniteTimestamp:                new(uint64(1763568000)),
 							HeliconTimestamp:                new(uint64(1790089200)),
+							IglooTimestamp:                  unscheduled,
 						},
 						AvalancheContext: extras.AvalancheContext{
 							SnowCtx: mainnetCtx,
@@ -170,6 +171,7 @@ func TestParseGenesis(t *testing.T) {
 							FortunaTimestamp:                new(uint64(1741878000)),
 							GraniteTimestamp:                new(uint64(1761750000)),
 							HeliconTimestamp:                new(uint64(1785250800)),
+							IglooTimestamp:                  unscheduled,
 						},
 						AvalancheContext: extras.AvalancheContext{
 							SnowCtx: fujiCtx,
@@ -236,7 +238,8 @@ func TestParseGenesis(t *testing.T) {
 							EtnaTimestamp:                   initiallyActive,
 							FortunaTimestamp:                initiallyActive,
 							GraniteTimestamp:                initiallyActive,
-							HeliconTimestamp:                unscheduled,
+							HeliconTimestamp:                initiallyActive,
+							IglooTimestamp:                  unscheduled,
 						},
 						AvalancheContext: extras.AvalancheContext{
 							SnowCtx: localCtx,
@@ -384,7 +387,7 @@ func TestGenesisHash(t *testing.T) {
 		{
 			name:      "local",
 			networkID: constants.LocalID,
-			want:      "0x608ddbd611241719b64642d8e152537e2a5bdf46b6ddb9e8f15340c5e007b8b1",
+			want:      "0xa8ba8fe99b2affb0ed27d0d8c825f6292c3c6f5eb9d53707504bea02ac9c1a9b",
 		},
 	}
 	for _, test := range tests {
@@ -434,6 +437,7 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 		// Added the SAE fields: the ACP-176 target exponent, the ACP-283 min
 		// price exponent, and the settlement markers.
 		upgradetest.Helicon: "0xa8ba8fe99b2affb0ed27d0d8c825f6292c3c6f5eb9d53707504bea02ac9c1a9b",
+		upgradetest.Igloo:   "0xa8ba8fe99b2affb0ed27d0d8c825f6292c3c6f5eb9d53707504bea02ac9c1a9b",
 	}
 	_ = hashes[upgradetest.Latest] // Enforce completeness at compile time.
 

@@ -79,6 +79,10 @@ var (
 		c.NetworkUpgrades.HeliconTimestamp = utils.PointerTo[uint64](0)
 	})
 
+	TestIglooChainConfig = copyAndSet(TestHeliconChainConfig, func(c *ChainConfig) {
+		c.NetworkUpgrades.IglooTimestamp = utils.PointerTo[uint64](0)
+	})
+
 	TestChainConfig = copyConfig(TestGraniteChainConfig)
 )
 
