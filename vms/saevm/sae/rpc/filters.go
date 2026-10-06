@@ -5,7 +5,6 @@ package rpc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -28,34 +27,34 @@ type filterAPI struct {
 // if necessary based on the [Config]. Only invalid criteria with respect to the
 // config will error before being sent to the inner call.
 func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) ([]*types.Log, error) {
-	newCrit, err := api.updateFilterCriteria(crit)
-	if err != nil {
-		return nil, err
-	}
-	return api.FilterAPI.GetLogs(ctx, newCrit)
-}
-
-func (api *filterAPI) updateFilterCriteria(crit filters.FilterCriteria) (filters.FilterCriteria, error) {
 	if crit.BlockHash != nil {
 		// crit.FromBlock and crit.ToBlock are ignored
-		return crit, nil
+		return api.FilterAPI.GetLogs(ctx, crit)
 	}
 
-	resolvedBegin, ok := api.resolve(crit.FromBlock)
-	if !ok {
-		return crit, nil
-	}
-	resolvedEnd, ok := api.resolve(crit.ToBlock)
-	if !ok {
-		return crit, nil
+	resolvedBegin, err := api.resolve(crit.FromBlock)
+	if err != nil {
+		// start block isn't found, no hope of finding logs
+		return nil, nil //nolint:nilerr // match libevm behavior for unknown blocks
 	}
 
+	resolvedEnd, err := api.resolve(crit.ToBlock)
+	if err != nil {
+		// libevm will iterate through all blocks through to the end searching
+		// for logs. To save this iteration, we can cap the end block to the last
+		// block possible to have logs, but still >= resolvedBegin
+		resolvedEnd = api.b.LastAccepted().Height()
+	}
+
+	// libevm would resolve this differently
+	crit.FromBlock = new(big.Int).SetUint64(resolvedBegin)
+	crit.ToBlock = new(big.Int).SetUint64(resolvedEnd)
 	if resolvedEnd < resolvedBegin {
-		return crit, nil
+		return api.FilterAPI.GetLogs(ctx, crit) // allow libevm to handle error
 	}
 
 	if maxBlocks := api.b.config.MaxBlocksPerRequest; maxBlocks > 0 && resolvedEnd-resolvedBegin >= maxBlocks {
-		return crit, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"requested too many blocks from %d to %d, maximum is set to %d",
 			resolvedBegin,
 			resolvedEnd,
@@ -63,30 +62,16 @@ func (api *filterAPI) updateFilterCriteria(crit filters.FilterCriteria) (filters
 		)
 	}
 
-	// libevm MAY resolve this differently, but we should use the node's config.
-	crit.FromBlock = new(big.Int).SetUint64(resolvedBegin)
-	crit.ToBlock = new(big.Int).SetUint64(resolvedEnd)
-
-	return crit, nil
+	return api.FilterAPI.GetLogs(ctx, crit)
 }
 
 // resolve attempts to determine the block number corresponding to the given
-// big.Int. Any errors encountered during the resolution can still be handled
-// by [filters.FilterAPI.GetLogs].
-func (api *filterAPI) resolve(number *big.Int) (uint64, bool) {
+// big.Int. Any error indicates the block can't be found.
+func (api *filterAPI) resolve(number *big.Int) (uint64, error) {
 	block := rpc.LatestBlockNumber
 	if number != nil {
 		block = rpc.BlockNumber(number.Int64())
 	}
 
-	resolved, err := blocks.ResolveRPCNumber(api.b, block)
-	switch {
-	case errors.Is(err, blocks.ErrFutureBlockNotResolved):
-		// libevm would otherwise scan through the provided block number.
-		return api.b.LastAccepted().Height(), true
-	case err != nil:
-		return 0, false
-	}
-
-	return resolved, true
+	return blocks.ResolveRPCNumber(api.b, block)
 }

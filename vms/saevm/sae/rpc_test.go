@@ -916,7 +916,6 @@ func TestGetLogsBlockLimit(t *testing.T) {
 				FromBlock: big.NewInt(1),
 				ToBlock:   big.NewInt(100),
 			},
-			wantErr: nil, // MUST match previous case
 		},
 		{
 			name: "with_hash_ignores_args",
