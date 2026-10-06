@@ -461,8 +461,8 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 		return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
 	}
 
-	// Since the roots aren't sanity checked during verification for synchronous
-	// blocks, we do it here.
+	// The roots aren't sanity checked during verification for synchronous
+	// blocks, so we do it here.
 	if b.Synchronous() {
 		if want := b.SettledStateRoot(); root != want {
 			return fmt.Errorf("%w: synchronous block %d executed to state root %#x, header commits to %#x", errFatal, b.NumberU64(), root, want)

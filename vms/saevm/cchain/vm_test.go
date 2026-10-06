@@ -1652,6 +1652,8 @@ func TestRestartWithSettledAsynchronousBlock(t *testing.T) {
 
 // A node bootstrapping from genesis must recover from a crash after any number
 // of database writes and be able to extend the chain asynchronously.
+//
+// TODO(StephenButtolph): Also crash with Firewood.
 func TestBootstrapSynchronousBlocks(t *testing.T) {
 	fixture, opts, _ := synchronousFixture(t)
 	heights := make(map[ids.ID]int, len(fixture.Blocks))
