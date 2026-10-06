@@ -582,13 +582,6 @@ func TestTransferSubnetOwnershipTxSyntacticVerify(t *testing.T) {
 
 	tests := []test{
 		{
-			name: "nil tx",
-			txFunc: func(*gomock.Controller) *TransferSubnetOwnershipTx {
-				return nil
-			},
-			expectedErr: ErrNilTx,
-		},
-		{
 			name: "already verified",
 			txFunc: func(*gomock.Controller) *TransferSubnetOwnershipTx {
 				return &TransferSubnetOwnershipTx{BaseTx: verifiedBaseTx}

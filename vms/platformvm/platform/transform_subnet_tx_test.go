@@ -665,13 +665,6 @@ func TestTransformSubnetTxSyntacticVerify(t *testing.T) {
 
 	tests := []test{
 		{
-			name: "nil tx",
-			txFunc: func(*gomock.Controller) *TransformSubnetTx {
-				return nil
-			},
-			err: ErrNilTx,
-		},
-		{
 			name: "already verified",
 			txFunc: func(*gomock.Controller) *TransformSubnetTx {
 				return &TransformSubnetTx{

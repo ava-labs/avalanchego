@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -36,11 +37,8 @@ var (
 	_ platform.TxVisitor = (*standardTxExecutor)(nil)
 
 	errEmptyNodeID                      = errors.New("validator nodeID cannot be empty")
-	errMaxStakeDurationTooLarge         = errors.New("max stake duration must be less than or equal to the global max stake duration")
 	errMissingStartTimePreDurango       = errors.New("staker transactions must have a StartTime pre-Durango")
-	errEtnaUpgradeNotActive             = errors.New("attempting to use an Etna-upgrade feature prior to activation")
-	errHeliconUpgradeNotActive          = errors.New("attempting to use a Helicon-upgrade feature prior to activation")
-	errTransformSubnetTxPostEtna        = errors.New("TransformSubnetTx is not permitted post-Etna")
+	errMaxStakeDurationTooLarge         = errors.New("max stake duration must be less than or equal to the global max stake duration")
 	errMaxNumActiveValidators           = errors.New("already at the max number of active validators")
 	errCouldNotLoadSubnetToL1Conversion = errors.New("could not load subnet conversion")
 	errWrongWarpMessageSourceChainID    = errors.New("wrong warp message source chain ID")
@@ -54,10 +52,23 @@ var (
 	errStateCorruption                  = errors.New("state corruption")
 )
 
-// StandardTx executes the standard transaction [tx].
+// registerL1ValidatorTxExpiryWindow bounds how far in the future a
+// RegisterL1ValidatorTx's warp message may expire.
 //
-// [state] is modified to represent the state of the chain after the execution
-// of [tx].
+// TODO: Before Etna, ensure that the maximum number of expiries to track is
+// limited to a reasonable number by this window.
+const (
+	second                            = 1
+	minute                            = 60 * second
+	hour                              = 60 * minute
+	day                               = 24 * hour
+	registerL1ValidatorTxExpiryWindow = day
+)
+
+// StandardTx executes the standard transaction tx.
+//
+// state is modified to represent the state of the chain after the execution
+// of tx.
 //
 // Returns:
 //   - The IDs of any import UTXOs consumed.
@@ -84,6 +95,11 @@ func StandardTx(
 	return standardExecutor.inputs, standardExecutor.atomicRequests, standardExecutor.onAccept, nil
 }
 
+// standardTxExecutor verifies a standard tx and applies its state changes.
+// Each execution method first runs [verifyTx], then the state-dependent rules
+// of its tx type.
+//
+// Proposal-only txs are rejected with errWrongTxType before any verification.
 type standardTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	backend       *Backend
@@ -106,23 +122,22 @@ func (*standardTxExecutor) RewardValidatorTx(*platform.RewardValidatorTx) error 
 }
 
 func (e *standardTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
+		return err
+	}
+
+	if err := verifyAddValidatorTx(e.backend, e.state, tx); err != nil {
+		return err
+	}
+
 	// The empty node ID check must stay scoped to the standard (post-Banff)
 	// execution path. Validators with the empty node ID were accepted
 	// pre-Banff through proposal blocks, so this check can live neither in
-	// [txs.AddValidatorTx.SyntacticVerify] nor in verifyAddValidatorTx (both
-	// are also exercised when replaying that history); enforcing it there
-	// would reject accepted blocks during bootstrapping.
+	// [platform.AddValidatorTx] nor in verifyAddValidatorTx (both are also
+	// exercised when replaying that history); enforcing it there would reject
+	// accepted blocks during bootstrapping.
 	if tx.Validator.NodeID == ids.EmptyNodeID {
 		return errEmptyNodeID
-	}
-
-	if err := verifyAddValidatorTx(
-		e.backend,
-		e.state,
-		e.tx,
-		tx,
-	); err != nil {
-		return err
 	}
 
 	if err := e.applySpend(e.tx.Creds); err != nil {
@@ -146,12 +161,11 @@ func (e *standardTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 }
 
 func (e *standardTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidatorTx) error {
-	if err := verifyAddSubnetValidatorTx(
-		e.backend,
-		e.state,
-		e.tx,
-		tx,
-	); err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
+		return err
+	}
+
+	if err := verifyAddSubnetValidatorTx(e.backend, e.state, e.tx, tx); err != nil {
 		return err
 	}
 
@@ -163,12 +177,11 @@ func (e *standardTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidato
 }
 
 func (e *standardTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
-	if err := verifyAddDelegatorTx(
-		e.backend,
-		e.state,
-		e.tx,
-		tx,
-	); err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
+		return err
+	}
+
+	if err := verifyAddDelegatorTx(e.backend, e.state, tx); err != nil {
 		return err
 	}
 
@@ -180,25 +193,18 @@ func (e *standardTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 }
 
 func (e *standardTxExecutor) CreateChainTx(tx *platform.CreateChainTx) error {
-	// Verify the tx is well-formed
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
 		return err
 	}
 
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		isDurangoActive  = e.backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
-	)
-	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
-		return err
+	// Not bootstrapped yet -- don't need to do full verification.
+	if e.backend.Bootstrapped.Get() {
+		if err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.SubnetID, tx.SubnetAuth); err != nil {
+			return err
+		}
 	}
 
-	baseTxCreds, err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.SubnetID, tx.SubnetAuth)
-	if err != nil {
-		return err
-	}
-
-	if err := e.applySpend(baseTxCreds); err != nil {
+	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
 		return err
 	}
 
@@ -216,16 +222,7 @@ func (e *standardTxExecutor) CreateChainTx(tx *platform.CreateChainTx) error {
 }
 
 func (e *standardTxExecutor) CreateSubnetTx(tx *platform.CreateSubnetTx) error {
-	// Verify the tx is well-formed
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
-		return err
-	}
-
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		isDurangoActive  = e.backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
-	)
-	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
 		return err
 	}
 
@@ -233,24 +230,20 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *platform.CreateSubnetTx) error {
 		return err
 	}
 
-	// Add the new subnet to the database
 	txID := e.tx.ID()
+
+	// Add the new subnet to the database
 	e.state.AddSubnet(txID)
 	e.state.SetSubnetOwner(txID, tx.Owner)
 	return nil
 }
 
 func (e *standardTxExecutor) ImportTx(tx *platform.ImportTx) error {
-	// Verify the tx is well-formed
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
 		return err
 	}
 
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		isDurangoActive  = e.backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
-	)
-	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+	if err := e.verifyImportTx(tx); err != nil {
 		return err
 	}
 
@@ -263,70 +256,11 @@ func (e *standardTxExecutor) ImportTx(tx *platform.ImportTx) error {
 		utxoIDs[i] = utxoID[:]
 	}
 
-	// Skip verification of the shared memory inputs if the other primary
-	// network chains are not guaranteed to be up-to-date.
-	if e.backend.Bootstrapped.Get() && !e.backend.Config.PartialSyncPrimaryNetwork {
-		if err := verify.SameSubnet(context.TODO(), e.backend.Ctx, tx.SourceChain); err != nil {
-			return err
-		}
-
-		allUTXOBytes, err := e.backend.Ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
-		if err != nil {
-			return fmt.Errorf("failed to get shared memory: %w", err)
-		}
-
-		utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
-		for index, input := range tx.Ins {
-			utxo, err := e.state.GetUTXO(input.InputID())
-			if err != nil {
-				return fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err)
-			}
-			utxos[index] = utxo
-		}
-		for i, utxoBytes := range allUTXOBytes {
-			utxo := &avax.UTXO{}
-			if _, err := platform.Codec.Unmarshal(utxoBytes, utxo); err != nil {
-				return fmt.Errorf("failed to unmarshal UTXO: %w", err)
-			}
-			utxos[i+len(tx.Ins)] = utxo
-		}
-
-		ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-		if err != nil {
-			return fmt.Errorf("getting utxos %w", err)
-		}
-
-		// Verify the flowcheck
-		fee, err := e.feeCalculator.CalculateFee(tx)
-		if err != nil {
-			return err
-		}
-
-		producedAVAX, err = math.Add(producedAVAX, fee)
-		if err != nil {
-			return fmt.Errorf("adding fee: %w", err)
-		}
-
-		if err := e.backend.FlowChecker.VerifySpendUTXOs(
-			tx,
-			utxos,
-			ins,
-			outs,
-			e.tx.Creds,
-			map[ids.ID]uint64{
-				e.backend.Ctx.AVAXAssetID: producedAVAX,
-			},
-		); err != nil {
-			return err
-		}
-	}
-
-	txID := e.tx.ID()
-
-	// Consume the UTXOS
+	// The imported inputs are not in e.state, so the local UTXOs are spent
+	// directly rather than through [applySpend]. verifyImportTx performed the
+	// flow check over both the local and the imported inputs.
 	avax.Consume(e.state, tx.Ins)
-	// Produce the UTXOS
-	avax.Produce(e.state, txID, tx.Outs)
+	avax.Produce(e.state, e.tx.ID(), tx.Outs)
 
 	// Note: We apply atomic requests even if we are not verifying atomic
 	// requests to ensure the shared state will be correct if we later start
@@ -339,17 +273,81 @@ func (e *standardTxExecutor) ImportTx(tx *platform.ImportTx) error {
 	return nil
 }
 
-func (e *standardTxExecutor) ExportTx(tx *platform.ExportTx) error {
-	// Verify the tx is well-formed
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+// verifyImportTx verifies that the imported UTXOs exist in shared memory and
+// that, together with the local inputs of tx, they fund its outputs plus the
+// fee. The flow check is performed here rather than through [applySpend]
+// because [applySpend] does not account for the imported inputs.
+func (e *standardTxExecutor) verifyImportTx(tx *platform.ImportTx) error {
+	// Skip verification of the shared memory inputs if the other primary
+	// network chains are not guaranteed to be up-to-date.
+	if !e.backend.Bootstrapped.Get() || e.backend.Config.PartialSyncPrimaryNetwork {
+		return nil
+	}
+
+	if err := verify.SameSubnet(context.TODO(), e.backend.Ctx, tx.SourceChain); err != nil {
 		return err
 	}
 
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		isDurangoActive  = e.backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
-	)
-	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+	utxoIDs := make([][]byte, len(tx.ImportedInputs))
+	for i, in := range tx.ImportedInputs {
+		utxoID := in.UTXOID.InputID()
+		utxoIDs[i] = utxoID[:]
+	}
+
+	allUTXOBytes, err := e.backend.Ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
+	if err != nil {
+		return fmt.Errorf("failed to get shared memory: %w", err)
+	}
+
+	utxos := make([]*avax.UTXO, len(tx.Ins)+len(tx.ImportedInputs))
+	for index, input := range tx.Ins {
+		utxo, err := e.state.GetUTXO(input.InputID())
+		if err != nil {
+			return fmt.Errorf("failed to get UTXO %s: %w", &input.UTXOID, err)
+		}
+		utxos[index] = utxo
+	}
+	for i, utxoBytes := range allUTXOBytes {
+		utxo := &avax.UTXO{}
+		if _, err := platform.Codec.Unmarshal(utxoBytes, utxo); err != nil {
+			return fmt.Errorf("failed to unmarshal UTXO: %w", err)
+		}
+		utxos[i+len(tx.Ins)] = utxo
+	}
+
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
+	if err != nil {
+		return fmt.Errorf("getting utxos %w", err)
+	}
+
+	// Verify the flowcheck
+	txFee, err := e.feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+
+	producedAVAX, err = math.Add(producedAVAX, txFee)
+	if err != nil {
+		return fmt.Errorf("adding fee: %w", err)
+	}
+
+	if err := e.backend.FlowChecker.VerifySpendUTXOs(
+		tx,
+		utxos,
+		ins,
+		outs,
+		e.tx.Creds,
+		map[ids.ID]uint64{
+			e.backend.Ctx.AVAXAssetID: producedAVAX,
+		},
+	); err != nil {
+		return fmt.Errorf("%w: %w", errFlowCheckFailed, err)
+	}
+	return nil
+}
+
+func (e *standardTxExecutor) ExportTx(tx *platform.ExportTx) error {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
 		return err
 	}
 
@@ -402,20 +400,39 @@ func (e *standardTxExecutor) ExportTx(tx *platform.ExportTx) error {
 	return nil
 }
 
-// Verifies a [*platform.RemoveSubnetValidatorTx] and, if it passes, executes it on
-// [e.State]. For verification rules, see [verifyRemoveSubnetValidatorTx]. This
-// transaction will result in [tx.NodeID] being removed as a validator of
-// [tx.SubnetID].
-// Note: [tx.NodeID] may be either a current or pending validator.
+// Verifies a [*platform.RemoveSubnetValidatorTx] and, if it passes, executes
+// it on e.state. For verification rules, see [verifyRemoveSubnetValidatorTx].
+// This transaction will result in tx.NodeID being removed as a validator of
+// tx.Subnet.
+// Note: tx.NodeID may be either a current or pending validator.
 func (e *standardTxExecutor) RemoveSubnetValidatorTx(tx *platform.RemoveSubnetValidatorTx) error {
-	staker, err := verifyRemoveSubnetValidatorTx(
-		e.backend,
-		e.state,
-		e.tx,
-		tx,
-	)
-	if err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
 		return err
+	}
+
+	staker, err := e.state.GetCurrentValidator(tx.Subnet, tx.NodeID)
+	if err == database.ErrNotFound {
+		staker, err = e.state.GetPendingValidator(tx.Subnet, tx.NodeID)
+	}
+	if err != nil {
+		// It isn't a current or pending validator.
+		return fmt.Errorf(
+			"%s %w of %s: %w",
+			tx.NodeID,
+			errNotValidator,
+			tx.Subnet,
+			err,
+		)
+	}
+
+	if !staker.Priority.IsPermissionedValidator() {
+		return errRemovePermissionlessValidator
+	}
+
+	if e.backend.Bootstrapped.Get() {
+		if err := verifySubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth); err != nil {
+			return err
+		}
 	}
 
 	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
@@ -436,18 +453,7 @@ func (e *standardTxExecutor) RemoveSubnetValidatorTx(tx *platform.RemoveSubnetVa
 }
 
 func (e *standardTxExecutor) TransformSubnetTx(tx *platform.TransformSubnetTx) error {
-	currentTimestamp := e.state.GetTimestamp()
-	if e.backend.Config.UpgradeConfig.IsEtnaActivated(currentTimestamp) {
-		return errTransformSubnetTxPostEtna
-	}
-
-	// Verify the tx is well-formed
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
-		return err
-	}
-
-	isDurangoActive := e.backend.Config.UpgradeConfig.IsDurangoActivated(currentTimestamp)
-	if err := avax.VerifyMemoFieldLength(tx.Memo, isDurangoActive); err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
 		return err
 	}
 
@@ -457,51 +463,25 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *platform.TransformSubnetTx) e
 		return errMaxStakeDurationTooLarge
 	}
 
-	baseTxCreds, err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth)
-	if err != nil {
-		return err
+	if e.backend.Bootstrapped.Get() {
+		if err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth); err != nil {
+			return err
+		}
 	}
 
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
-	if err != nil {
-		return fmt.Errorf("getting utxos %w", err)
-	}
-
-	// Verify the flowcheck
-	fee, err := e.feeCalculator.CalculateFee(tx)
-	if err != nil {
-		return err
-	}
-
-	producedAVAX, err = math.Add(producedAVAX, fee)
-	if err != nil {
-		return fmt.Errorf("adding fee: %w", err)
-	}
-
+	// The tx must additionally fund the reward supply of the subnet asset.
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
-	if err := e.backend.FlowChecker.VerifySpend(
-		tx,
+	if err := applySpend(
+		e.backend,
+		e.feeCalculator,
 		e.state,
-		ins,
-		outs,
-		baseTxCreds,
-		// Invariant: [tx.AssetID != e.Ctx.AVAXAssetID]. This prevents the first
-		//            entry in this map literal from being overwritten by the
-		//            second entry.
-		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: producedAVAX,
-			tx.AssetID:                totalRewardAmount,
-		},
+		e.tx,
+		baseTxCreds(e.tx),
+		map[ids.ID]uint64{tx.AssetID: totalRewardAmount},
 	); err != nil {
 		return err
 	}
 
-	txID := e.tx.ID()
-
-	// Consume the UTXOS
-	avax.Consume(e.state, tx.Ins)
-	// Produce the UTXOS
-	avax.Produce(e.state, txID, tx.Outs)
 	// Transform the new subnet in the database
 	e.state.AddSubnetTransformation(e.tx)
 	e.state.SetCurrentSupply(tx.Subnet, tx.InitialSupply)
@@ -509,12 +489,11 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *platform.TransformSubnetTx) e
 }
 
 func (e *standardTxExecutor) AddPermissionlessValidatorTx(tx *platform.AddPermissionlessValidatorTx) error {
-	if err := verifyAddPermissionlessValidatorTx(
-		e.backend,
-		e.state,
-		e.tx,
-		tx,
-	); err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
+		return err
+	}
+
+	if err := verifyAddPermissionlessValidatorTx(e.backend, e.state, tx); err != nil {
 		return err
 	}
 
@@ -527,6 +506,7 @@ func (e *standardTxExecutor) AddPermissionlessValidatorTx(tx *platform.AddPermis
 	}
 
 	txID := e.tx.ID()
+
 	if e.backend.Config.PartialSyncPrimaryNetwork &&
 		tx.Subnet == constants.PrimaryNetworkID &&
 		tx.Validator.NodeID == e.backend.Ctx.NodeID {
@@ -542,12 +522,11 @@ func (e *standardTxExecutor) AddPermissionlessValidatorTx(tx *platform.AddPermis
 }
 
 func (e *standardTxExecutor) AddPermissionlessDelegatorTx(tx *platform.AddPermissionlessDelegatorTx) error {
-	if err := verifyAddPermissionlessDelegatorTx(
-		e.backend,
-		e.state,
-		e.tx,
-		tx,
-	); err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
+		return err
+	}
+
+	if err := verifyAddPermissionlessDelegatorTx(e.backend, e.state, tx); err != nil {
 		return err
 	}
 
@@ -558,18 +537,19 @@ func (e *standardTxExecutor) AddPermissionlessDelegatorTx(tx *platform.AddPermis
 	return e.putStaker(tx)
 }
 
-// Verifies a [*platform.TransferSubnetOwnershipTx] and, if it passes, executes it on
-// [e.State]. For verification rules, see [verifyTransferSubnetOwnershipTx].
-// This transaction will result in the ownership of [tx.Subnet] being transferred
-// to [tx.Owner].
+// Verifies a [*platform.TransferSubnetOwnershipTx] and, if it passes, executes
+// it on e.state. For verification rules, see
+// [verifyTransferSubnetOwnershipTx]. This transaction will result in the
+// ownership of tx.Subnet being transferred to tx.Owner.
 func (e *standardTxExecutor) TransferSubnetOwnershipTx(tx *platform.TransferSubnetOwnershipTx) error {
-	if err := verifyTransferSubnetOwnershipTx(
-		e.backend,
-		e.state,
-		e.tx,
-		tx,
-	); err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
 		return err
+	}
+
+	if e.backend.Bootstrapped.Get() {
+		if err := verifySubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth); err != nil {
+			return err
+		}
 	}
 
 	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
@@ -580,19 +560,8 @@ func (e *standardTxExecutor) TransferSubnetOwnershipTx(tx *platform.TransferSubn
 	return nil
 }
 
-func (e *standardTxExecutor) BaseTx(tx *platform.BaseTx) error {
-	currentTimestamp := e.state.GetTimestamp()
-	upgrades := e.backend.Config.UpgradeConfig
-	if !upgrades.IsDurangoActivated(currentTimestamp) {
-		return errDurangoUpgradeNotActive
-	}
-
-	// Verify the tx is well-formed
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
-		return err
-	}
-
-	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+func (e *standardTxExecutor) BaseTx(*platform.BaseTx) error {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
 		return err
 	}
 
@@ -600,31 +569,28 @@ func (e *standardTxExecutor) BaseTx(tx *platform.BaseTx) error {
 }
 
 func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1Tx) error {
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		upgrades         = e.backend.Config.UpgradeConfig
-	)
-	if !upgrades.IsEtnaActivated(currentTimestamp) {
-		return errEtnaUpgradeNotActive
-	}
-
-	// Verify the tx is well-formed
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
 		return err
 	}
 
-	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
-		return err
-	}
-
-	baseTxCreds, err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth)
-	if err != nil {
-		return err
+	// Not bootstrapped yet -- don't need to do full verification.
+	if e.backend.Bootstrapped.Get() {
+		if err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth); err != nil {
+			return err
+		}
 	}
 
 	var (
-		startTime                = uint64(currentTimestamp.Unix())
-		currentFees              = e.state.GetAccruedFees()
+		currentTimestamp = e.state.GetTimestamp()
+		startTime        = uint64(currentTimestamp.Unix())
+		currentFees      = e.state.GetAccruedFees()
+		// numActiveL1Validators simulates the number of active L1
+		// validators as if the validators of this tx had already been
+		// added: each validator with a non-zero balance activates exactly
+		// one new validator. This is equivalent to the historical check
+		// that ran against state between the individual additions.
+		numActiveL1Validators    = gas.Gas(e.state.NumActiveL1Validators())
+		l1Validators             = make([]state.L1Validator, len(tx.Validators))
 		subnetToL1ConversionData = message.SubnetToL1ConversionData{
 			SubnetID:       tx.Subnet,
 			ManagerChainID: tx.ChainID,
@@ -661,9 +627,10 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1T
 		}
 		if vdr.Balance != 0 {
 			// We are attempting to add an active validator
-			if gas.Gas(e.state.NumActiveL1Validators()) >= e.backend.Config.ValidatorFeeConfig.Capacity {
+			if numActiveL1Validators >= e.backend.Config.ValidatorFeeConfig.Capacity {
 				return errMaxNumActiveValidators
 			}
+			numActiveL1Validators++
 
 			l1Validator.EndAccumulatedFee, err = math.Add(vdr.Balance, currentFees)
 			if err != nil {
@@ -671,9 +638,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1T
 			}
 		}
 
-		if err := e.state.PutL1Validator(l1Validator); err != nil {
-			return err
-		}
+		l1Validators[i] = l1Validator
 
 		subnetToL1ConversionData.Validators[i] = message.SubnetToL1ConversionValidatorData{
 			NodeID:       vdr.NodeID,
@@ -682,13 +647,19 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1T
 		}
 	}
 
-	if err := e.applySpend(baseTxCreds); err != nil {
-		return err
-	}
-
 	conversionID, err := message.SubnetToL1ConversionID(subnetToL1ConversionData)
 	if err != nil {
 		return err
+	}
+
+	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
+		return err
+	}
+
+	for _, l1Validator := range l1Validators {
+		if err := e.state.PutL1Validator(l1Validator); err != nil {
+			return err
+		}
 	}
 
 	// Track the subnet conversion in the database
@@ -704,24 +675,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1T
 }
 
 func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1ValidatorTx) error {
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		upgrades         = e.backend.Config.UpgradeConfig
-	)
-	if !upgrades.IsEtnaActivated(currentTimestamp) {
-		return errEtnaUpgradeNotActive
-	}
-
-	// Verify the tx is well-formed
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
-		return err
-	}
-
-	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
-		return err
-	}
-
-	if err := e.applySpend(e.tx.Creds); err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
 		return err
 	}
 
@@ -749,15 +703,13 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1Valida
 	}
 
 	// Verify that the message contains a valid expiry time.
+	currentTimestamp := e.state.GetTimestamp()
 	currentTimestampUnix := uint64(currentTimestamp.Unix())
 	if msg.Expiry <= currentTimestampUnix {
 		return fmt.Errorf("%w at %d and it is currently %d", errWarpMessageExpired, msg.Expiry, currentTimestampUnix)
 	}
-
-	// TODO: Ensure that the maximum number of expiries to track is limited to a reasonable number by this window.
-	const registerL1ValidatorTxExpiryWindowSeconds = uint64(24 * time.Hour / time.Second)
-	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > registerL1ValidatorTxExpiryWindowSeconds {
-		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, registerL1ValidatorTxExpiryWindowSeconds)
+	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > registerL1ValidatorTxExpiryWindow {
+		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, registerL1ValidatorTxExpiryWindow)
 	}
 
 	// Verify that this warp message isn't being replayed.
@@ -780,6 +732,7 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1Valida
 		PublicKey:         msg.BLSPublicKey,
 		ProofOfPossession: tx.ProofOfPossession,
 	}
+
 	if err := pop.Verify(); err != nil {
 		return err
 	}
@@ -825,6 +778,10 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1Valida
 		}
 	}
 
+	if err := e.applySpend(e.tx.Creds); err != nil {
+		return err
+	}
+
 	if err := e.state.PutL1Validator(l1Validator); err != nil {
 		return err
 	}
@@ -835,20 +792,7 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1Valida
 }
 
 func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorWeightTx) error {
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		upgrades         = e.backend.Config.UpgradeConfig
-	)
-	if !upgrades.IsEtnaActivated(currentTimestamp) {
-		return errEtnaUpgradeNotActive
-	}
-
-	// Verify the tx is well-formed
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
-		return err
-	}
-
-	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
 		return err
 	}
 
@@ -884,9 +828,8 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorW
 		return err
 	}
 
-	txID := e.tx.ID()
-
 	// Check if we are removing the validator.
+	var refundUTXO *avax.UTXO
 	if msg.Weight == 0 {
 		// Verify that we are not removing the last validator.
 		weight, err := e.state.WeightOfL1Validators(l1Validator.SubnetID)
@@ -914,9 +857,9 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorW
 			}
 			remainingBalance := l1Validator.EndAccumulatedFee - accruedFees
 
-			utxo := &avax.UTXO{
+			refundUTXO = &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        txID,
+					TxID:        e.tx.ID(),
 					OutputIndex: uint32(len(tx.Outs)),
 				},
 				Asset: avax.Asset{
@@ -930,43 +873,29 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorW
 					},
 				},
 			}
-			e.state.AddUTXO(utxo)
 		}
+	}
+
+	if err := e.applySpend(e.tx.Creds); err != nil {
+		return err
+	}
+
+	if refundUTXO != nil {
+		e.state.AddUTXO(refundUTXO)
 	}
 
 	// If the weight is being set to 0, it is possible for the nonce increment
 	// to overflow. However, the validator is being removed and the nonce
-	// doesn't matter. If weight is not 0, [msg.Nonce] is enforced by
-	// [msg.Verify()] to be less than MaxUInt64 and can therefore be incremented
+	// doesn't matter. If weight is not 0, msg.Nonce is enforced by
+	// msg.Verify() to be less than MaxUInt64 and can therefore be incremented
 	// without overflow.
 	l1Validator.MinNonce = msg.Nonce + 1
 	l1Validator.Weight = msg.Weight
-	if err := e.state.PutL1Validator(l1Validator); err != nil {
-		return err
-	}
-
-	return e.applySpend(e.tx.Creds)
+	return e.state.PutL1Validator(l1Validator)
 }
 
 func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *platform.IncreaseL1ValidatorBalanceTx) error {
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		upgrades         = e.backend.Config.UpgradeConfig
-	)
-	if !upgrades.IsEtnaActivated(currentTimestamp) {
-		return errEtnaUpgradeNotActive
-	}
-
-	// Verify the tx is well-formed
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
-		return err
-	}
-
-	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
-		return err
-	}
-
-	if err := e.applySpend(e.tx.Creds); err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
 		return err
 	}
 
@@ -988,24 +917,15 @@ func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *platform.IncreaseL
 		return err
 	}
 
+	if err := e.applySpend(e.tx.Creds); err != nil {
+		return err
+	}
+
 	return e.state.PutL1Validator(l1Validator)
 }
 
 func (e *standardTxExecutor) DisableL1ValidatorTx(tx *platform.DisableL1ValidatorTx) error {
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		upgrades         = e.backend.Config.UpgradeConfig
-	)
-	if !upgrades.IsEtnaActivated(currentTimestamp) {
-		return errEtnaUpgradeNotActive
-	}
-
-	// Verify the tx is well-formed
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
-		return err
-	}
-
-	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
 		return err
 	}
 
@@ -1019,26 +939,23 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *platform.DisableL1Validato
 		return err
 	}
 
-	baseTxCreds, err := verifyAuthorization(
-		e.backend.Fx,
-		e.tx,
-		&secp256k1fx.OutputOwners{
-			Threshold: disableOwner.Threshold,
-			Addrs:     disableOwner.Addresses,
-		},
-		tx.DisableAuth,
-	)
-	if err != nil {
-		return err
+	if e.backend.Bootstrapped.Get() {
+		if err := verifyAuthorization(
+			e.backend.Fx,
+			e.tx,
+			&secp256k1fx.OutputOwners{
+				Threshold: disableOwner.Threshold,
+				Addrs:     disableOwner.Addresses,
+			},
+			tx.DisableAuth,
+		); err != nil {
+			return err
+		}
 	}
 
-	if err := e.applySpend(baseTxCreds); err != nil {
-		return err
-	}
-
-	// If the validator is already disabled, there is nothing to do.
+	// If the validator is already disabled, there is nothing to refund.
 	if l1Validator.EndAccumulatedFee == 0 {
-		return nil
+		return e.applySpend(baseTxCreds(e.tx))
 	}
 
 	var remainingBalanceOwner message.PChainOwner
@@ -1055,7 +972,11 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *platform.DisableL1Validato
 	}
 	remainingBalance := l1Validator.EndAccumulatedFee - accruedFees
 
-	utxo := &avax.UTXO{
+	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
+		return err
+	}
+
+	e.state.AddUTXO(&avax.UTXO{
 		UTXOID: avax.UTXOID{
 			TxID:        e.tx.ID(),
 			OutputIndex: uint32(len(tx.Outs)),
@@ -1070,8 +991,7 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *platform.DisableL1Validato
 				Addrs:     remainingBalanceOwner.Addresses,
 			},
 		},
-	}
-	e.state.AddUTXO(utxo)
+	})
 
 	// Disable the validator
 	l1Validator.EndAccumulatedFee = 0
@@ -1079,7 +999,11 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *platform.DisableL1Validato
 }
 
 func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenewedValidatorTx) error {
-	if err := verifyAddAutoRenewedValidatorTx(e.backend, e.state, e.tx, tx); err != nil {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
+		return err
+	}
+
+	if err := verifyAddAutoRenewedValidatorTx(e.backend, e.state, tx); err != nil {
 		return err
 	}
 
@@ -1159,6 +1083,10 @@ func (e *standardTxExecutor) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenew
 }
 
 func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *platform.SetAutoRenewedValidatorConfigTx) error {
+	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
+		return err
+	}
+
 	validator, err := verifySetAutoRenewedValidatorConfigTx(e.backend, e.state, e.tx, tx)
 	if err != nil {
 		return err
@@ -1187,7 +1115,7 @@ func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRene
 	return errWrongTxType
 }
 
-// Creates the staker as defined in [stakerTx] and adds it to [e.State].
+// Creates the staker as defined in stakerTx and adds it to e.state.
 func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 	var (
 		chainTime = e.state.GetTimestamp()
@@ -1197,9 +1125,9 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 	)
 
 	if !e.backend.Config.UpgradeConfig.IsDurangoActivated(chainTime) {
-		// Pre-Durango, stakers set a future [StartTime] and are added to the
+		// Pre-Durango, stakers set a future StartTime and are added to the
 		// pending staker set. They are promoted to the current staker set once
-		// the chain time reaches [StartTime].
+		// the chain time reaches StartTime.
 		scheduledStakerTx, ok := stakerTx.(platform.ScheduledStaker)
 		if !ok {
 			return fmt.Errorf("%w: %T", errMissingStartTimePreDurango, stakerTx)
@@ -1207,7 +1135,7 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 		staker, err = state.NewPendingStaker(txID, scheduledStakerTx)
 	} else {
 		// Post-Durango, stakers are immediately added to the current staker
-		// set. Their [StartTime] is the current chain time.
+		// set. Their StartTime is the current chain time.
 		stakeStartTime := chainTime
 
 		// Only calculate the potentialReward for permissionless stakers.
@@ -1277,58 +1205,18 @@ func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 }
 
 func (e *standardTxExecutor) applySpend(creds []verify.Verifiable) error {
-	return applySpend(e.backend, e.feeCalculator, e.state, e.tx, creds)
+	return applySpend(e.backend, e.feeCalculator, e.state, e.tx, creds, nil)
 }
 
-// applySpend spends the UTXOs of tx in chainState: it consumes the inputs of
-// tx and produces its base outputs. Unless the node is still bootstrapping, it
-// first verifies via [verifySpend] that the inputs, authorized by creds, fund
-// the outputs plus the fee.
-//
-// Callers must syntactically verify tx and select its spending credentials
-// before calling applySpend. Transaction-specific verification may continue
-// afterward. Callers must discard the state diff if transaction execution fails.
-//
-// Must not be used for [platform.ImportTx]. The inputs from [utxo.GetInputOutputs]
-// include the imported inputs.
-func applySpend(
-	backend *Backend,
-	feeCalculator fee.Calculator,
-	diff *state.Diff,
-	tx *platform.Tx,
-	creds []verify.Verifiable,
-) error {
-	unsignedTx := tx.Unsigned
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(unsignedTx)
-	if err != nil {
-		return fmt.Errorf("getting utxos: %w", err)
-	}
-
-	// Blocks executed while bootstrapping were already accepted by the
-	// network, so their txs are known to have passed the flow check.
-	if backend.Bootstrapped.Get() {
-		if err := verifySpend(backend, feeCalculator, diff, unsignedTx, ins, outs, producedAVAX, creds); err != nil {
-			return err
-		}
-	}
-
-	avax.Consume(diff, ins)
-	// Only the base outputs become UTXOs. outs additionally holds the outputs
-	// that the flow check must account for but that are not spendable on this
-	// chain, such as staked or exported outputs.
-	avax.Produce(diff, tx.ID(), unsignedTx.Outputs())
-	return nil
-}
-
-// verifyL1Conversion verifies that the L1 conversion of [subnetID] references
-// the [expectedChainID] and [expectedAddress].
+// verifyL1Conversion verifies that the L1 conversion of subnetID references
+// the expectedChainID and expectedAddress.
 func verifyL1Conversion(
-	state state.Chain,
+	chainState state.Chain,
 	subnetID ids.ID,
 	expectedChainID ids.ID,
 	expectedAddress []byte,
 ) error {
-	subnetToL1Conversion, err := state.GetSubnetToL1Conversion(subnetID)
+	subnetToL1Conversion, err := chainState.GetSubnetToL1Conversion(subnetID)
 	if err != nil {
 		return fmt.Errorf("%w for %s with: %w", errCouldNotLoadSubnetToL1Conversion, subnetID, err)
 	}

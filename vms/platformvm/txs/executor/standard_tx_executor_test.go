@@ -50,14 +50,14 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 			tx: func() (*platform.Tx, error) {
 				return wallet.IssueAddValidatorTx(validator, newOwner(), reward.PercentDenominator)
 			},
-			want: errAddValidatorTxPostDurango,
+			want: durango.errDeprecated,
 		},
 		{
 			name: "AddDelegatorTx",
 			tx: func() (*platform.Tx, error) {
 				return wallet.IssueAddDelegatorTx(validator, newOwner())
 			},
-			want: errAddDelegatorTxPostDurango,
+			want: durango.errDeprecated,
 		},
 	}
 
@@ -332,7 +332,7 @@ func TestEtnaDisabledTransactions(t *testing.T) {
 		tx,
 		diff,
 	)
-	require.ErrorIs(err, errTransformSubnetTxPostEtna)
+	require.ErrorIs(err, etna.errDeprecated)
 }
 
 // TestStandardExecutorBaseTxErrors verifies the failure cases of [platform.BaseTx]
@@ -351,7 +351,7 @@ func TestStandardExecutorBaseTxErrors(t *testing.T) {
 			updateState: func(diff *state.Diff) {
 				diff.SetTimestamp(env.config.UpgradeConfig.DurangoTime.Add(-1 * time.Second))
 			},
-			want: errDurangoUpgradeNotActive,
+			want: durango.errNotActive,
 		},
 		{
 			name: "tx_fails_syntactic_verification",

@@ -309,11 +309,6 @@ func TestSetL1ValidatorWeightTxSyntacticVerify(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			name:        "nil tx",
-			tx:          nil,
-			expectedErr: ErrNilTx,
-		},
-		{
 			name: "already verified",
 			// The tx includes invalid data to verify that a cached result is
 			// returned.

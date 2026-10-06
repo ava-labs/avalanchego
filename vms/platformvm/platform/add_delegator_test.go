@@ -32,14 +32,6 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 		err            error
 	)
 
-	// Case : signed tx is nil
-	err = stx.SyntacticVerify(ctx)
-	require.ErrorIs(err, ErrNilSignedTx)
-
-	// Case : unsigned tx is nil
-	err = addDelegatorTx.SyntacticVerify(ctx)
-	require.ErrorIs(err, ErrNilTx)
-
 	validatorWeight := uint64(2022)
 	inputs := []*avax.TransferableInput{{
 		UTXOID: avax.UTXOID{
@@ -100,7 +92,7 @@ func TestAddDelegatorTxSyntacticVerify(t *testing.T) {
 	// Case: signed tx not initialized
 	stx = &Tx{Unsigned: addDelegatorTx}
 	err = stx.SyntacticVerify(ctx)
-	require.ErrorIs(err, errSignedTxNotInitialized)
+	require.ErrorIs(err, ErrSignedTxNotInitialized)
 
 	// Case: valid tx
 	stx, err = NewSignedTx(addDelegatorTx, Codec, signers)

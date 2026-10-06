@@ -30,73 +30,69 @@ func verifyPoASubnetAuthorization(
 	sTx *platform.Tx,
 	subnetID ids.ID,
 	subnetAuth verify.Verifiable,
-) ([]verify.Verifiable, error) {
-	creds, err := verifySubnetAuthorization(fx, chainState, sTx, subnetID, subnetAuth)
-	if err != nil {
-		return nil, err
+) error {
+	if err := verifySubnetAuthorization(fx, chainState, sTx, subnetID, subnetAuth); err != nil {
+		return err
 	}
 
-	_, err = chainState.GetSubnetTransformation(subnetID)
+	_, err := chainState.GetSubnetTransformation(subnetID)
 	if err == nil {
-		return nil, fmt.Errorf("%q %w", subnetID, errIsImmutable)
+		return fmt.Errorf("%q %w", subnetID, errIsImmutable)
 	}
 	if err != database.ErrNotFound {
-		return nil, err
+		return err
 	}
 
 	_, err = chainState.GetSubnetToL1Conversion(subnetID)
 	if err == nil {
-		return nil, fmt.Errorf("%q %w", subnetID, errIsImmutable)
+		return fmt.Errorf("%q %w", subnetID, errIsImmutable)
 	}
 	if err != database.ErrNotFound {
-		return nil, err
+		return err
 	}
 
-	return creds, nil
+	return nil
 }
 
 // verifySubnetAuthorization carries out the validation for modifying a subnet.
-// The last credential in [tx.Creds] is used as the subnet authorization.
-// Returns the remaining tx credentials that should be used to authorize the
-// other operations in the tx.
+// The last credential in tx.Creds is used as the subnet authorization. The
+// remaining credentials, returned by [baseTxCreds], authorize the other
+// operations in the tx.
 func verifySubnetAuthorization(
 	fx fx.Fx,
 	chainState state.Chain,
 	tx *platform.Tx,
 	subnetID ids.ID,
 	subnetAuth verify.Verifiable,
-) ([]verify.Verifiable, error) {
+) error {
 	subnetOwner, err := chainState.GetSubnetOwner(subnetID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	return verifyAuthorization(fx, tx, subnetOwner, subnetAuth)
 }
 
 // verifyAuthorization carries out the validation of an auth. The last
-// credential in [tx.Creds] is used as the authorization.
-// Returns the remaining tx credentials that should be used to authorize the
-// other operations in the tx.
+// credential in tx.Creds is used as the authorization. The remaining
+// credentials, returned by [baseTxCreds], authorize the other operations in
+// the tx.
 func verifyAuthorization(
 	fx fx.Fx,
 	tx *platform.Tx,
 	owner fx.Owner,
 	auth verify.Verifiable,
-) ([]verify.Verifiable, error) {
+) error {
 	if len(tx.Creds) == 0 {
 		// Ensure there is at least one credential for the subnet authorization
-		return nil, errWrongNumberOfCredentials
+		return errWrongNumberOfCredentials
 	}
 
-	baseTxCredsLen := len(tx.Creds) - 1
-	authCred := tx.Creds[baseTxCredsLen]
-
+	authCred := tx.Creds[len(tx.Creds)-1]
 	if err := fx.VerifyPermission(tx.Unsigned, auth, authCred, owner); err != nil {
-		return nil, fmt.Errorf("%w: %w", errUnauthorizedModification, err)
+		return fmt.Errorf("%w: %w", errUnauthorizedModification, err)
 	}
-
-	return tx.Creds[:baseTxCredsLen], nil
+	return nil
 }
 
 // baseTxCreds returns the credentials of sTx that authorize the spend of its

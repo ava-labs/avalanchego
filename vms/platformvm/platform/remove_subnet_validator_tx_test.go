@@ -555,13 +555,6 @@ func TestRemoveSubnetValidatorTxSyntacticVerify(t *testing.T) {
 
 	tests := []test{
 		{
-			name: "nil tx",
-			txFunc: func(*gomock.Controller) *RemoveSubnetValidatorTx {
-				return nil
-			},
-			expectedErr: ErrNilTx,
-		},
-		{
 			name: "already verified",
 			txFunc: func(*gomock.Controller) *RemoveSubnetValidatorTx {
 				return &RemoveSubnetValidatorTx{BaseTx: verifiedBaseTx}

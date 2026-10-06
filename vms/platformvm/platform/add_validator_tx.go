@@ -92,8 +92,6 @@ func (tx *AddValidatorTx) Shares() uint32 {
 // SyntacticVerify returns nil iff [tx] is valid
 func (tx *AddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
-	case tx == nil:
-		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case tx.DelegationShares > reward.PercentDenominator: // Ensure delegators shares are in the allowed amount

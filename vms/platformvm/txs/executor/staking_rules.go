@@ -32,6 +32,30 @@ type addValidatorRules struct {
 	minDelegationFee  uint32
 }
 
+// verifyValidator ensures the weight, delegation shares, and staking duration
+// of a validator are within the bounds of r.
+func (r *addValidatorRules) verifyValidator(
+	weight uint64,
+	delegationShares uint32,
+	duration time.Duration,
+) error {
+	switch {
+	case weight < r.minValidatorStake:
+		// Ensure validator is staking at least the minimum amount
+		return errWeightTooSmall
+
+	case weight > r.maxValidatorStake:
+		// Ensure validator isn't staking too much
+		return errWeightTooLarge
+
+	case delegationShares < r.minDelegationFee:
+		// Ensure the validator fee is at least the minimum amount
+		return errInsufficientDelegationFee
+	}
+
+	return verifyStakeDuration(duration, r.minStakeDuration, r.maxStakeDuration)
+}
+
 // GetTransformSubnetTx returns the TransformSubnetTx that transformed
 // subnetID, if any.
 func GetTransformSubnetTx(chain state.Chain, subnetID ids.ID) (*platform.TransformSubnetTx, error) {
@@ -93,6 +117,33 @@ type addDelegatorRules struct {
 	minStakeDuration         time.Duration
 	maxStakeDuration         time.Duration
 	maxValidatorWeightFactor byte
+}
+
+// verifyDelegator ensures the weight and staking duration of a delegator are
+// within the bounds of r.
+func (r *addDelegatorRules) verifyDelegator(weight uint64, duration time.Duration) error {
+	if weight < r.minDelegatorStake {
+		// Ensure delegator is staking at least the minimum amount
+		return errWeightTooSmall
+	}
+
+	return verifyStakeDuration(duration, r.minStakeDuration, r.maxStakeDuration)
+}
+
+// verifyStakeDuration ensures duration is within minStakeDuration and
+// maxStakeDuration, inclusive.
+func verifyStakeDuration(duration, minStakeDuration, maxStakeDuration time.Duration) error {
+	switch {
+	case duration < minStakeDuration:
+		// Ensure staking length is not too short
+		return errStakeTooShort
+
+	case duration > maxStakeDuration:
+		// Ensure staking length is not too long
+		return ErrStakeTooLong
+	}
+
+	return nil
 }
 
 func getDelegatorRules(

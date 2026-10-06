@@ -18,8 +18,6 @@ import (
 var (
 	_ UnsignedTx = (*BaseTx)(nil)
 
-	ErrNilTx = errors.New("tx is nil")
-
 	errOutputsNotSorted      = errors.New("outputs not sorted")
 	errInputsNotSortedUnique = errors.New("inputs not sorted and unique")
 )
@@ -55,6 +53,12 @@ func (tx *BaseTx) Outputs() []*avax.TransferableOutput {
 	return tx.Outs
 }
 
+// MemoData returns the memo of tx. It is promoted to every tx type that embeds
+// [BaseTx], so the memo-length rule can be checked uniformly across them.
+func (tx *BaseTx) MemoData() []byte {
+	return tx.Memo
+}
+
 // InitCtx sets the FxID fields in the inputs and outputs of this [BaseTx]. Also
 // sets the [ctx] to the given [vm.ctx] so that the addresses can be json
 // marshalled into human readable format
@@ -70,12 +74,10 @@ func (tx *BaseTx) InitCtx(ctx *snow.Context) {
 
 // SyntacticVerify returns nil iff this tx is well formed
 func (tx *BaseTx) SyntacticVerify(ctx *snow.Context) error {
-	switch {
-	case tx == nil:
-		return ErrNilTx
-	case tx.SyntacticallyVerified: // already passed syntactic verification
+	if tx.SyntacticallyVerified {
 		return nil
 	}
+
 	if err := tx.BaseTx.Verify(ctx); err != nil {
 		return fmt.Errorf("metadata failed verification: %w", err)
 	}

@@ -508,11 +508,6 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 		want error
 	}{
 		{
-			name: "nil_tx",
-			tx:   nil,
-			want: ErrNilTx,
-		},
-		{
 			name: "already_verified",
 			tx: &BaseTx{
 				// Would fail verification if it were re-verified

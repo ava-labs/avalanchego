@@ -162,7 +162,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 			updateState: func(diff *state.Diff) {
 				diff.SetTimestamp(env.backend.Config.UpgradeConfig.HeliconTime.Add(-1 * time.Second))
 			},
-			want: errHeliconUpgradeNotActive,
+			want: helicon.errNotActive,
 		},
 		{
 			name: "tx_fails_syntactic_verification",
@@ -475,7 +475,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 			updateState: func(_ testing.TB, diff *state.Diff) {
 				diff.SetTimestamp(env.backend.Config.UpgradeConfig.HeliconTime.Add(-1 * time.Second))
 			},
-			wantErr: errHeliconUpgradeNotActive,
+			wantErr: helicon.errNotActive,
 		},
 		{
 			name: "tx_fails_syntactic_verification",

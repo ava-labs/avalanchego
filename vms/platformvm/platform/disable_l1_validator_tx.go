@@ -21,11 +21,7 @@ type DisableL1ValidatorTx struct {
 }
 
 func (tx *DisableL1ValidatorTx) SyntacticVerify(ctx *snow.Context) error {
-	switch {
-	case tx == nil:
-		return ErrNilTx
-	case tx.SyntacticallyVerified:
-		// already passed syntactic verification
+	if tx.SyntacticallyVerified {
 		return nil
 	}
 

@@ -140,7 +140,7 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.SetTimestamp(env.config.UpgradeConfig.EtnaTime.Add(-1 * time.Second))
 			},
-			want: errEtnaUpgradeNotActive,
+			want: etna.errNotActive,
 		},
 		{
 			name: "tx_fails_syntactic_verification",
@@ -507,7 +507,7 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.SetTimestamp(env.config.UpgradeConfig.EtnaTime.Add(-1 * time.Second))
 			},
-			want: errEtnaUpgradeNotActive,
+			want: etna.errNotActive,
 		},
 		{
 			name: "tx_fails_syntactic_verification",
@@ -1028,7 +1028,7 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.SetTimestamp(env.config.UpgradeConfig.EtnaTime.Add(-1 * time.Second))
 			},
-			want: errEtnaUpgradeNotActive,
+			want: etna.errNotActive,
 		},
 		{
 			name: "tx_fails_syntactic_verification",
@@ -1484,7 +1484,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.SetTimestamp(env.config.UpgradeConfig.EtnaTime.Add(-1 * time.Second))
 			},
-			want: errEtnaUpgradeNotActive,
+			want: etna.errNotActive,
 		},
 		{
 			name: "tx_fails_syntactic_verification",
@@ -1721,7 +1721,7 @@ func TestStandardExecutorDisableL1ValidatorTxErrors(t *testing.T) {
 			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.SetTimestamp(env.config.UpgradeConfig.EtnaTime.Add(-1 * time.Second))
 			},
-			want: errEtnaUpgradeNotActive,
+			want: etna.errNotActive,
 		},
 		{
 			name: "tx_fails_syntactic_verification",

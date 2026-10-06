@@ -457,7 +457,7 @@ func TestStandardExecutorTransferSubnetOwnershipTxErrors(t *testing.T) {
 			updateState: func(diff *state.Diff) {
 				diff.SetTimestamp(env.config.UpgradeConfig.DurangoTime.Add(-1 * time.Second))
 			},
-			want: errDurangoUpgradeNotActive,
+			want: durango.errNotActive,
 		},
 		{
 			name: "tx_fails_syntactic_verification",
