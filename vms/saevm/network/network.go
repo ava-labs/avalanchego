@@ -6,11 +6,9 @@ package network
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/ava-labs/libevm/libevm/options"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
@@ -57,14 +55,12 @@ type Network struct {
 
 // syncHandlerIDs each get their own [peertracker.PeerTracker], because bandwidth
 // scales with response size and so is only comparable within one protocol.
-var syncHandlerIDs = []uint64{
-	p2p.EVMLeafRequestHandlerID,
-	p2p.EVMCodeRequestHandlerID,
-	p2p.EVMBlockRequestHandlerID,
-	p2p.EVMAtomicLeafRequestHandlerID,
+var syncHandlerIDs = map[string]uint64{
+	"leaf":        p2p.EVMLeafRequestHandlerID,
+	"code":        p2p.EVMCodeRequestHandlerID,
+	"block":       p2p.EVMBlockRequestHandlerID,
+	"atomic_leaf": p2p.EVMAtomicLeafRequestHandlerID,
 }
-
-const handlerIDLabel = "handlerID"
 
 // TrackingClient returns a client for the sync protocol served under handlerID,
 // scored by that protocol's own [peertracker.PeerTracker]. handlerID MUST be a sync protocol.
@@ -95,19 +91,16 @@ func New(
 
 	connectionHandlers := []p2p.ConnectionHandler{peers, validatorPeers}
 	peerTrackers := make(map[uint64]*peertracker.PeerTracker, len(syncHandlerIDs))
-	for _, handlerID := range syncHandlerIDs {
+	for name, handlerID := range syncHandlerIDs {
 		peerTracker, err := peertracker.New(
 			snowCtx.Log,
-			"peer_tracker",
-			prometheus.WrapRegistererWith(
-				prometheus.Labels{handlerIDLabel: strconv.FormatUint(handlerID, 10)},
-				reg,
-			),
+			"peer_tracker_"+name,
+			reg,
 			set.Of(snowCtx.NodeID),
 			nil,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("creating peer tracker for handler %d: %w", handlerID, err)
+			return nil, fmt.Errorf("creating %s peer tracker: %w", name, err)
 		}
 		peerTrackers[handlerID] = peerTracker
 		connectionHandlers = append(connectionHandlers, withFilter(peerTracker, cfg.trackedPeers))

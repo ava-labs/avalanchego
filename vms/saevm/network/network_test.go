@@ -96,33 +96,22 @@ func TestTrackingClientsAreIsolated(t *testing.T) {
 	}
 }
 
-func TestPeerTrackerMetricsLabelledByHandlerID(t *testing.T) {
+func TestPeerTrackerMetricsNamedByProtocol(t *testing.T) {
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	_, err := New(snowCtx, &enginetest.Sender{})
 	require.NoError(t, err, "New()")
 
 	families, err := snowCtx.Metrics.Gather()
 	require.NoError(t, err, "Gather()")
+	got := set.Set[string]{}
+	for _, family := range families {
+		got.Add(family.GetName())
+	}
 
-	want := set.Of("4", "5", "6", "7")
-	for _, name := range []string{
-		"p2p_peer_tracker_num_tracked_peers",
-		"p2p_peer_tracker_num_responsive_peers",
-		"p2p_peer_tracker_average_bandwidth",
-	} {
-		got := set.Set[string]{}
-		for _, family := range families {
-			if family.GetName() != name {
-				continue
-			}
-			for _, metric := range family.GetMetric() {
-				for _, label := range metric.GetLabel() {
-					if label.GetName() == "handlerID" {
-						got.Add(label.GetValue())
-					}
-				}
-			}
+	for _, protocol := range []string{"leaf", "code", "block", "atomic_leaf"} {
+		for _, metric := range []string{"num_tracked_peers", "num_responsive_peers", "average_bandwidth"} {
+			name := "p2p_peer_tracker_" + protocol + "_" + metric
+			require.Truef(t, got.Contains(name), "%s registered", name)
 		}
-		require.Equalf(t, want, got, "%s handler ID labels", name)
 	}
 }
