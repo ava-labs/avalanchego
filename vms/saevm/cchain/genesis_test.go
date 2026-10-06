@@ -51,8 +51,8 @@ func TestParseGenesis(t *testing.T) {
 		fujiCtx    = &snow.Context{NetworkUpgrades: upgrade.Fuji}
 		localCtx   = &snow.Context{NetworkUpgrades: upgrade.Default}
 
-		initiallyActive = upgrade.UnixTimestamp(upgrade.InitiallyActiveTime)
-		unscheduled     = upgrade.UnixTimestamp(upgrade.UnscheduledActivationTime)
+		initiallyActive = new(upgrade.UnixTimestamp(upgrade.InitiallyActiveTime))
+		unscheduled     = new(upgrade.UnixTimestamp(upgrade.UnscheduledActivationTime))
 	)
 	tests := []struct {
 		name    string
