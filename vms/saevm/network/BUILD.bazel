@@ -16,6 +16,7 @@ go_library(
         "//utils/set",
         "//version",
         "@com_github_ava_labs_libevm//libevm/options",
+        "@com_github_prometheus_client_golang//prometheus",
     ],
 )
 
@@ -25,6 +26,7 @@ go_test(
     embed = [":network"],
     deps = [
         "//ids",
+        "//network/p2p",
         "//snow/engine/enginetest",
         "//snow/snowtest",
         "//utils/set",
