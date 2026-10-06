@@ -16,9 +16,7 @@ go_library(
     deps = [
         "//api/info",
         "//database",
-        "//graft/coreth/ethclient",
         "//graft/coreth/plugin/evm/atomic",
-        "//graft/coreth/plugin/evm/client",
         "//ids",
         "//snow",
         "//utils",
@@ -31,8 +29,12 @@ go_library(
         "//vms/avm",
         "//vms/components/avax",
         "//vms/components/verify",
+        "//vms/saevm/cchain",
+        "//vms/saevm/cchain/tx",
         "//vms/secp256k1fx",
         "//wallet/subnet/primary/common",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//ethclient",
     ],
 )
