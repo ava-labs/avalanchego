@@ -8,6 +8,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 - Added:
   - `Gas-Used` header to SAE `/rpc` responses: the total gas used by every `eth_call` in the request, omitted if none executed
+  - `Rpc-Error-Codes` header to SAE `/rpc` responses: each JSON-RPC error code in the response with its count (e.g. `-32601;count=1, 3;count=2`), omitted if no response has an error
 
 ### Metrics
 

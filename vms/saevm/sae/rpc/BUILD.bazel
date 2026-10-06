@@ -9,6 +9,7 @@ go_library(
         "call.go",
         "custom.go",
         "debug.go",
+        "errorcodes.go",
         "gasprice.go",
         "headers.go",
         "indexing.go",
@@ -72,6 +73,7 @@ go_test(
     name = "rpc_test",
     srcs = [
         "custom_test.go",
+        "errorcodes_test.go",
         "headers_test.go",
     ],
     embed = [":rpc"],
