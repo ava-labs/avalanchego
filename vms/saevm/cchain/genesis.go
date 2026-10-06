@@ -23,8 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
@@ -96,27 +96,27 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(berlinBlock(chainID)),
 			LondonBlock:         big.NewInt(londonBlock(chainID)),
-			ShanghaiTime:        utils.TimeToNewUint64(u.DurangoTime),
-			CancunTime:          utils.TimeToNewUint64(u.EtnaTime),
+			ShanghaiTime:        upgrade.UnixTimestamp(u.DurangoTime),
+			CancunTime:          upgrade.UnixTimestamp(u.EtnaTime),
 		},
 		&extras.ChainConfig{
 			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase1Time),
-				ApricotPhase2BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase2Time),
-				ApricotPhase3BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase3Time),
-				ApricotPhase4BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase4Time),
-				ApricotPhase5BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase5Time),
-				ApricotPhasePre6BlockTimestamp:  utils.TimeToNewUint64(u.ApricotPhasePre6Time),
-				ApricotPhase6BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase6Time),
-				ApricotPhasePost6BlockTimestamp: utils.TimeToNewUint64(u.ApricotPhasePost6Time),
-				BanffBlockTimestamp:             utils.TimeToNewUint64(u.BanffTime),
-				CortinaBlockTimestamp:           utils.TimeToNewUint64(u.CortinaTime),
-				DurangoBlockTimestamp:           utils.TimeToNewUint64(u.DurangoTime),
-				EtnaTimestamp:                   utils.TimeToNewUint64(u.EtnaTime),
-				FortunaTimestamp:                utils.TimeToNewUint64(u.FortunaTime),
-				GraniteTimestamp:                utils.TimeToNewUint64(u.GraniteTime),
-				HeliconTimestamp:                utils.TimeToNewUint64(u.HeliconTime),
-				IglooTimestamp:                  utils.TimeToNewUint64(u.IglooTime),
+				ApricotPhase1BlockTimestamp:     upgrade.UnixTimestamp(u.ApricotPhase1Time),
+				ApricotPhase2BlockTimestamp:     upgrade.UnixTimestamp(u.ApricotPhase2Time),
+				ApricotPhase3BlockTimestamp:     upgrade.UnixTimestamp(u.ApricotPhase3Time),
+				ApricotPhase4BlockTimestamp:     upgrade.UnixTimestamp(u.ApricotPhase4Time),
+				ApricotPhase5BlockTimestamp:     upgrade.UnixTimestamp(u.ApricotPhase5Time),
+				ApricotPhasePre6BlockTimestamp:  upgrade.UnixTimestamp(u.ApricotPhasePre6Time),
+				ApricotPhase6BlockTimestamp:     upgrade.UnixTimestamp(u.ApricotPhase6Time),
+				ApricotPhasePost6BlockTimestamp: upgrade.UnixTimestamp(u.ApricotPhasePost6Time),
+				BanffBlockTimestamp:             upgrade.UnixTimestamp(u.BanffTime),
+				CortinaBlockTimestamp:           upgrade.UnixTimestamp(u.CortinaTime),
+				DurangoBlockTimestamp:           upgrade.UnixTimestamp(u.DurangoTime),
+				EtnaTimestamp:                   upgrade.UnixTimestamp(u.EtnaTime),
+				FortunaTimestamp:                upgrade.UnixTimestamp(u.FortunaTime),
+				GraniteTimestamp:                upgrade.UnixTimestamp(u.GraniteTime),
+				HeliconTimestamp:                upgrade.UnixTimestamp(u.HeliconTime),
+				IglooTimestamp:                  upgrade.UnixTimestamp(u.IglooTime),
 			},
 			AvalancheContext: extras.AvalancheContext{
 				SnowCtx: ctx,
@@ -125,7 +125,7 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 				PrecompileUpgrades: []extras.PrecompileUpgrade{
 					{
 						Config: warp.NewDefaultConfig(
-							utils.TimeToNewUint64(u.DurangoTime),
+							upgrade.UnixTimestamp(u.DurangoTime),
 						),
 					},
 				},
@@ -142,11 +142,11 @@ var (
 
 func berlinBlock(chainID *big.Int) int64 {
 	switch {
-	case utils.BigEqual(chainID, mainnetChainID):
+	case chainID.Cmp(mainnetChainID) == 0:
 		return 1_640_340 // https://snowtrace.io/block/1640340?chainid=43114, AP2 activation block
-	case utils.BigEqual(chainID, fujiChainID):
+	case chainID.Cmp(fujiChainID) == 0:
 		return 184_985 // https://testnet.snowtrace.io/block/184985?chainid=43113, AP2 activation block
-	case utils.BigEqual(chainID, corethparams.TestFixtureChainID):
+	case chainID.Cmp(corethparams.TestFixtureChainID) == 0:
 		return corethparams.TestFixtureBerlinBlock
 	default:
 		return 0
@@ -155,11 +155,11 @@ func berlinBlock(chainID *big.Int) int64 {
 
 func londonBlock(chainID *big.Int) int64 {
 	switch {
-	case utils.BigEqual(chainID, mainnetChainID):
+	case chainID.Cmp(mainnetChainID) == 0:
 		return 3_308_552 // https://snowtrace.io/block/3308552?chainid=43114, AP3 activation block
-	case utils.BigEqual(chainID, fujiChainID):
+	case chainID.Cmp(fujiChainID) == 0:
 		return 805_078 // https://testnet.snowtrace.io/block/805078?chainid=43113, AP3 activation block
-	case utils.BigEqual(chainID, corethparams.TestFixtureChainID):
+	case chainID.Cmp(corethparams.TestFixtureChainID) == 0:
 		return corethparams.TestFixtureLondonBlock
 	default:
 		return 0
