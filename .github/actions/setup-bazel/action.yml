@@ -34,6 +34,16 @@ runs:
           echo "go_mod_cache=$go_mod_cache_dir"
         } >> "$GITHUB_OUTPUT"
 
+    - id: cache-key
+      name: Determine Bazel dependency cache key
+      shell: bash
+      run: |
+        cache_key_prefix="bazel-repo-${{ runner.os }}-${{ runner.arch }}-"
+        {
+          echo "cache-key-prefix=$cache_key_prefix"
+          echo "cache-key=${cache_key_prefix}${{ hashFiles('.bazelversion', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.work', 'go.work.sum', 'go.mod', 'go.sum', 'graft/coreth/go.mod', 'graft/coreth/go.sum', 'graft/evm/go.mod', 'graft/evm/go.sum', 'graft/subnet-evm/go.mod', 'graft/subnet-evm/go.sum', 'scripts/bazel_ci_dependency_list.sh') }}"
+        } >> "$GITHUB_OUTPUT"
+
     - name: Restore Bazel dependency cache
       id: cache
       uses: actions/cache/restore@v5
@@ -41,9 +51,9 @@ runs:
         path: |
           ${{ steps.cache-paths.outputs.repository_cache }}
           ${{ steps.cache-paths.outputs.go_mod_cache }}
-        key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh') }}
+        key: ${{ steps.cache-key.outputs.cache-key }}
         restore-keys: |
-          bazel-repo-${{ runner.os }}-${{ runner.arch }}-
+          ${{ steps.cache-key.outputs.cache-key-prefix }}
 
     # Consumers prepare non-exact restores and misses locally. Setup jobs prepare
     # them only when they may save the result.
@@ -64,12 +74,14 @@ runs:
         GO_MOD_CACHE_DIR: ${{ steps.cache-paths.outputs.go_mod_cache }}
       run: ${{ github.action_path }}/configure-bazelrc.sh
 
-    # Disable downloads after an exact cache hit so an incomplete cache fails
-    # instead of fetching a missing dependency.
-    - name: Disable Bazel repository downloads on direct cache hit
+    # This must precede the metadata check: an exact cache hit must satisfy both
+    # metadata validation and the later workload without downloading inputs.
+    - name: Disable dependency downloads on direct cache hit
       if: ${{ steps.cache-operations.outputs.disable-downloads-on-cache-hit == 'true' }}
       shell: bash
-      run: echo 'common --repository_disable_download' >> "$HOME/.bazelrc"
+      run: |
+        echo 'common --repository_disable_download' >> "$HOME/.bazelrc"
+        echo 'common --repo_env=GOPROXY=off' >> "$HOME/.bazelrc"
 
     # Bazel metadata must be consistent before any other bazel operations are
     # performed including build dependency caching.
@@ -94,12 +106,16 @@ runs:
         path: |
           ${{ steps.cache-paths.outputs.repository_cache }}
           ${{ steps.cache-paths.outputs.go_mod_cache }}
-        key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh') }}
+        key: ${{ steps.cache-key.outputs.cache-key }}
 
-    - name: Disable Bazel repository downloads after cache preparation
+    # This cannot share the exact-hit step above: a miss must allow metadata
+    # validation and dependency prefetch to download inputs before going offline.
+    - name: Disable dependency downloads after cache preparation
       if: ${{ steps.cache-operations.outputs.prepare-dependencies == 'true' }}
       shell: bash
-      run: echo 'common --repository_disable_download' >> "$HOME/.bazelrc"
+      run: |
+        echo 'common --repository_disable_download' >> "$HOME/.bazelrc"
+        echo 'common --repo_env=GOPROXY=off' >> "$HOME/.bazelrc"
 
     - name: Log Bazel disk diagnostics
       if: ${{ failure() }}
