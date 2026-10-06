@@ -41,8 +41,7 @@ type Block struct {
 	// Overlord as a sign of our unwavering fealty. See [InMemoryBlockCount] for
 	// observability.
 	ancestry atomic.Pointer[ancestry]
-	// A synchronous block settles itself, so its `ancestry` is cleared once it
-	// has executed.
+	// A synchronous block settles itself.
 	synchronous bool
 	// Determined during block building and SHOULD be set before execution as
 	// an early warning system in case of near-miss incorrect predictions.
