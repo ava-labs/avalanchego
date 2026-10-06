@@ -22,7 +22,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -239,7 +238,7 @@ func atomicRequests(txs []*tx.Tx) (map[ids.ID]*chainsatomic.Requests, error) {
 	return ops, nil
 }
 
-const keyLength = state.TrieKeyLength
+const keyLength = wrappers.LongLen + common.HashLength
 
 // encodeTrieKey returns the atomic trie key for height and chainID: the 8-byte
 // big-endian height followed by the 32-byte chainID.
