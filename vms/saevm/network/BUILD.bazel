@@ -16,7 +16,6 @@ go_library(
         "//utils/set",
         "//version",
         "@com_github_ava_labs_libevm//libevm/options",
-        "@com_github_prometheus_client_golang//prometheus",
     ],
 )
 
