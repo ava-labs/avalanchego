@@ -21,6 +21,9 @@ func NewGetAndPostHandler(log logging.Logger, reporter Reporter) (http.Handler, 
 			health: reporter,
 		},
 	)
+	if err != nil {
+		return nil, err
+	}
 
 	getHandler := NewGetHandler(reporter.Health)
 
@@ -34,7 +37,7 @@ func NewGetAndPostHandler(log logging.Logger, reporter Reporter) (http.Handler, 
 
 		getHandler.ServeHTTP(w, r)
 	})
-	return handler, err
+	return handler, nil
 }
 
 // NewGetHandler return a health handler that supports GET requests reporting

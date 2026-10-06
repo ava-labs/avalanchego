@@ -298,13 +298,16 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	rpcServer.RegisterAfterFunc(vm.metrics.AfterRequest)
 
 	walletServer, err := rpc.NewHandler("wallet", &vm.walletService)
+	if err != nil {
+		return nil, err
+	}
 	walletServer.RegisterInterceptFunc(vm.metrics.InterceptRequest)
 	walletServer.RegisterAfterFunc(vm.metrics.AfterRequest)
 
 	return map[string]http.Handler{
 		"":        rpcServer,
 		"/wallet": walletServer,
-	}, err
+	}, nil
 }
 
 func (*VM) NewHTTPHandler(context.Context) (http.Handler, error) {

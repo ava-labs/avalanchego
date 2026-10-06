@@ -9,12 +9,15 @@ import (
 	"github.com/ava-labs/avalanchego/utils/json"
 )
 
-// NewHandler returns a JSON-RPC server that serves the gorilla RPC [service]
-// (see https://pkg.go.dev/github.com/gorilla/rpc/v2) under [name].
+// NewHandler returns a JSON-RPC server that serves the methods of the gorilla
+// RPC service under name.
 func NewHandler(name string, service any) (*rpc.Server, error) {
 	server := rpc.NewServer()
+	if err := server.RegisterService(service, name); err != nil {
+		return nil, err
+	}
 	codec := json.NewCodec()
 	server.RegisterCodec(codec, "application/json")
 	server.RegisterCodec(codec, "application/json;charset=UTF-8")
-	return server, server.RegisterService(service, name)
+	return server, nil
 }

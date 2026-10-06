@@ -145,9 +145,12 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		vm.builder,
 	)
 	server, err := rpc.NewHandler(constants.XSVMName, jsonRPCAPI)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]http.Handler{
 		"": server,
-	}, err
+	}, nil
 }
 
 func (vm *VM) NewHTTPHandler(context.Context) (http.Handler, error) {

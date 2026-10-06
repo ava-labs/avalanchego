@@ -449,11 +449,14 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 		stakerAttributesCache: lru.NewCache[ids.ID, *stakerAttributes](stakerAttributesCacheSize),
 	}
 	server, err := rpc.NewHandler("platform", service)
+	if err != nil {
+		return nil, err
+	}
 	server.RegisterInterceptFunc(vm.metrics.InterceptRequest)
 	server.RegisterAfterFunc(vm.metrics.AfterRequest)
 	return map[string]http.Handler{
 		"": server,
-	}, err
+	}, nil
 }
 
 func (*VM) NewHTTPHandler(context.Context) (http.Handler, error) {

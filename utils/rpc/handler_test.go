@@ -26,7 +26,8 @@ func TestNewHandler(t *testing.T) {
 
 	const msg = "austin, ive been trying to reach you about your car's extended warranty"
 
-	// The lowercase method name verifies the avalanchego codec is used.
+	// The avalanchego codec capitalizes the method name, so "echo.echo" resolves
+	// to [echoService.Echo]. The default gorilla codec would not find it.
 	body := fmt.Sprintf(`{"jsonrpc":"2.0","method":"echo.echo","params":%q,"id":1}`, msg)
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
