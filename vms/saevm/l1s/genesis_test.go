@@ -310,7 +310,7 @@ func TestParseGenesis(t *testing.T) {
 			// Everything other than the config must be
 			// passed through unmodified.
 			var want ethcore.Genesis
-			require.NoError(t, json.Unmarshal([]byte(test.genesis), &want))
+			require.NoError(t, json.Unmarshal([]byte(test.genesis), &want), "json.Marshal()")
 			opts := cmp.Options{
 				cmputils.BigInts(),
 				cmpopts.EquateEmpty(),
@@ -384,7 +384,7 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 			got, err := g.block()
 			require.NoErrorf(t, err, "%T.block()", g)
 			var legacy legacy.Genesis
-			require.NoError(t, json.Unmarshal([]byte(s.genesis), &legacy))
+			require.NoError(t, json.Unmarshal([]byte(s.genesis), &legacy), "json.Unmarshal()")
 			legacy.Config = g.Config
 			want := legacy.ToBlock()
 
@@ -565,7 +565,6 @@ func TestWriteGenesis(t *testing.T) {
 			},
 		},
 		{
-			// L1 missed upgrade, allows override to recover
 			name: "delay_activated_network_override",
 			initial: spec{
 				fork:              upgradetest.Latest,
@@ -744,9 +743,8 @@ func requireStoredConfig(t *testing.T, db ethdb.Database, genesisHash common.Has
 	}
 }
 
-// TestWriteGenesisState ensures that the genesis state, including the airdrop,
-// is persisted to the database and matches the root committed to by the
-// written genesis header.
+// TestWriteGenesisState ensures that the genesis state is persisted to the
+// database and matches the root committed to by the written genesis header.
 func TestWriteGenesisState(t *testing.T) {
 	genesis := testGenesisJSON()
 	g, err := parseGenesis(newContext(t, upgradetest.Latest), []byte(genesis), nil)

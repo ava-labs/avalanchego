@@ -184,11 +184,10 @@ func (g *genesis) verifyAndWriteBlock(db ethdb.Database) error {
 	}
 
 	hash := block.Hash()
-	if prev := rawdb.ReadCanonicalHash(db, genesisNumber); prev == (common.Hash{}) {
-		if err := writeGenesisBlock(db, block, g.Config); err != nil {
-			return fmt.Errorf("writing block: %w", err)
-		}
-	} else if prev != hash {
+	switch prev := rawdb.ReadCanonicalHash(db, genesisNumber); {
+	case prev == (common.Hash{}):
+		return writeGenesisBlock(db, block, g.Config)
+	case prev != hash:
 		return &core.GenesisMismatchError{
 			Stored: prev,
 			New:    hash,

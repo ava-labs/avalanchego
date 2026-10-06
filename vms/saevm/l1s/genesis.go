@@ -50,9 +50,6 @@ var (
 type genesis core.Genesis
 
 // parseGenesis decodes the genesis bytes and populates the upgrade schedule.
-//
-// airdropData is the content of the airdrop file referenced by the genesis
-// AirdropHash, if any.
 func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesis, error) {
 	var g legacy.Genesis
 	if err := json.Unmarshal(genesisBytes, &g); err != nil {
@@ -123,21 +120,16 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 		return nil, err
 	}
 	return &genesis{
-		Config:        cfg,
-		Nonce:         g.Nonce,
-		Timestamp:     g.Timestamp,
-		ExtraData:     g.ExtraData,
-		Difficulty:    g.Difficulty,
-		Mixhash:       g.Mixhash,
-		Coinbase:      g.Coinbase,
-		Alloc:         g.Alloc,
-		BaseFee:       g.BaseFee,
-		Number:        g.Number,
-		GasLimit:      g.GasLimit,
-		GasUsed:       g.GasUsed,
-		ParentHash:    g.ParentHash,
-		ExcessBlobGas: g.ExcessBlobGas,
-		BlobGasUsed:   g.BlobGasUsed,
+		Config:     cfg,
+		Nonce:      g.Nonce,
+		Timestamp:  g.Timestamp,
+		ExtraData:  g.ExtraData,
+		Difficulty: g.Difficulty,
+		Mixhash:    g.Mixhash,
+		Coinbase:   g.Coinbase,
+		Alloc:      g.Alloc,
+		BaseFee:    g.BaseFee,
+		GasLimit:   g.GasLimit,
 	}, nil
 }
 
@@ -217,11 +209,10 @@ func (g *genesis) verifyAndWriteBlock(db ethdb.Database) error {
 	}
 
 	hash := block.Hash()
-	if prev := rawdb.ReadCanonicalHash(db, genesisNumber); prev == (common.Hash{}) {
-		if err := writeGenesisBlock(db, block, g.Config); err != nil {
-			return fmt.Errorf("writing block: %w", err)
-		}
-	} else if prev != hash {
+	switch prev := rawdb.ReadCanonicalHash(db, genesisNumber); {
+	case prev == (common.Hash{}):
+		return writeGenesisBlock(db, block, g.Config)
+	case prev != hash:
 		return &core.GenesisMismatchError{
 			Stored: prev,
 			New:    hash,
@@ -306,9 +297,6 @@ func (g *genesis) block() (*types.Block, error) {
 		// WithdrawalsHash is not serialized by the libevm hooks, so it is
 		// always nil.
 	}
-	if h.GasLimit == 0 {
-		h.GasLimit = params.GenesisGasLimit
-	}
 
 	c := l1params.GetExtra(g.Config)
 	if c.IsSubnetEVM(g.Timestamp) { // Includes London
@@ -392,8 +380,6 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 
 	// TODO: Register precompiles. See [legacy.ApplyPrecompileActivations].
 
-	// The explicit allocation is applied last so that it takes precedence
-	// over the airdrop.
 	for addr, account := range g.Alloc {
 		statedb.SetBalance(addr, uint256.MustFromBig(account.Balance))
 		statedb.SetCode(addr, account.Code)
