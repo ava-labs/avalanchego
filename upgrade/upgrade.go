@@ -225,3 +225,9 @@ func GetConfig(networkID uint32) Config {
 		return Default
 	}
 }
+
+// UnixTimestamp returns t as Unix seconds, the format EVM chain configs use for
+// fork activation times.
+func UnixTimestamp(t time.Time) uint64 {
+	return uint64(t.Unix()) //#nosec G115 -- Upgrade times are after the Unix epoch
+}

@@ -31,7 +31,6 @@ import (
 
 	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
-	evmutils "github.com/ava-labs/avalanchego/graft/evm/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -52,8 +51,8 @@ func TestParseGenesis(t *testing.T) {
 		fujiCtx    = &snow.Context{NetworkUpgrades: upgrade.Fuji}
 		localCtx   = &snow.Context{NetworkUpgrades: upgrade.Default}
 
-		initiallyActive = evmutils.TimeToNewUint64(upgrade.InitiallyActiveTime)
-		unscheduled     = evmutils.TimeToNewUint64(upgrade.UnscheduledActivationTime)
+		initiallyActive = new(upgrade.UnixTimestamp(upgrade.InitiallyActiveTime))
+		unscheduled     = new(upgrade.UnixTimestamp(upgrade.UnscheduledActivationTime))
 	)
 	tests := []struct {
 		name    string

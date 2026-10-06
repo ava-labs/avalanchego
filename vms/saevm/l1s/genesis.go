@@ -21,11 +21,11 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
@@ -157,12 +157,12 @@ func networkUpgrades(existing extras.NetworkUpgrades, ctx *snow.Context, upgrade
 	u := &ctx.NetworkUpgrades
 	upgrades := extras.NetworkUpgrades{
 		SubnetEVMTimestamp: new(uint64),
-		DurangoTimestamp:   utils.TimeToNewUint64(u.DurangoTime),
-		EtnaTimestamp:      utils.TimeToNewUint64(u.EtnaTime),
+		DurangoTimestamp:   new(upgrade.UnixTimestamp(u.DurangoTime)),
+		EtnaTimestamp:      new(upgrade.UnixTimestamp(u.EtnaTime)),
 		FortunaTimestamp:   nil,
-		GraniteTimestamp:   utils.TimeToNewUint64(u.GraniteTime),
-		HeliconTimestamp:   utils.TimeToNewUint64(u.HeliconTime),
-		IglooTimestamp:     utils.TimeToNewUint64(u.IglooTime),
+		GraniteTimestamp:   new(upgrade.UnixTimestamp(u.GraniteTime)),
+		HeliconTimestamp:   new(upgrade.UnixTimestamp(u.HeliconTime)),
+		IglooTimestamp:     new(upgrade.UnixTimestamp(u.IglooTime)),
 	}
 	override(&upgrades, existing)
 	if upgradeConfig.NetworkUpgradeOverrides != nil {
