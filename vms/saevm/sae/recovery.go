@@ -216,8 +216,8 @@ func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Bloc
 		)
 
 		if lastAcceptedHash == (common.Hash{}) {
-			// SAE writes this hash on [VM.AcceptBlock], so the set of accepted,
-			// asynchronous blocks MUST be empty.
+			// SAE writes this hash on [VM.AcceptBlock], so no block after the
+			// genesis has been accepted.
 			return
 		}
 
