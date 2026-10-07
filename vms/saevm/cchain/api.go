@@ -8,16 +8,15 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
@@ -267,42 +266,6 @@ func (s *service) GetAtomicTx(_ *http.Request, args *api.GetTxArgs, resp *GetTxR
 	return nil
 }
 
-// TxStatus is the response to the avax.getAtomicTxStatus API method.
-//
-// It MUST be exported for gorilla RPC to publicly expose the method.
-type TxStatus struct {
-	Status choices.Status `json:"status"`
-	Height *json.Uint64   `json:"blockHeight,omitempty"`
-}
-
-// GetAtomicTxStatus reports whether txID has been accepted on the C-Chain and,
-// if so, the block height at which it was accepted.
-//
-// Deprecated: prefer [service.GetAtomicTx], which returns the transaction along
-// with its height in a single call. This endpoint reflects whether the tx has
-// been written to state, which can briefly precede the corresponding block
-// being fully executed.
-func (s *service) GetAtomicTxStatus(_ *http.Request, args *api.JSONTxID, resp *TxStatus) error {
-	s.ctx.Log.Debug("deprecated API called",
-		zap.String("service", "avax"),
-		zap.String("method", "getAtomicTxStatus"),
-		zap.Stringer("txID", args.TxID),
-	)
-
-	_, height, err := s.state.GetTx(args.TxID)
-	if errors.Is(err, database.ErrNotFound) {
-		resp.Status = choices.Unknown
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("%w: %w", errFetchingTx, err)
-	}
-
-	resp.Status = choices.Accepted
-	resp.Height = (*json.Uint64)(&height)
-	return nil
-}
-
 // Client interacts with the avax API served by the C-Chain.
 type Client struct {
 	r rpc.EndpointRequester
@@ -382,6 +345,43 @@ func (c *Client) GetUTXOs(
 	return utxos, endAddr, endUTXOID, nil
 }
 
+// GetAllUTXOs returns all the UTXOs controlled by addrs that have been exported
+// to the C-Chain from sourceChain.
+func (c *Client) GetAllUTXOs(
+	ctx context.Context,
+	addrs []ids.ShortID,
+	sourceChain ids.ID,
+	options ...rpc.Option,
+) ([]*avax.UTXO, error) {
+	var (
+		startAddr   ids.ShortID
+		startUTXOID ids.ID
+		utxos       []*avax.UTXO
+	)
+	for {
+		page, endAddr, endUTXOID, err := c.GetUTXOs(
+			ctx,
+			addrs,
+			sourceChain,
+			maxGetUTXOsLimit,
+			startAddr,
+			startUTXOID,
+			options...,
+		)
+		if err != nil {
+			return nil, err
+		}
+		utxos = append(utxos, page...)
+		// This termination condition matches the original synchronous C-Chain
+		// API behavior. Changing the expected termination condition could
+		// accidentally break legacy users.
+		if len(page) < maxGetUTXOsLimit {
+			return utxos, nil
+		}
+		startAddr, startUTXOID = endAddr, endUTXOID
+	}
+}
+
 // IssueTx submits t to the txpool.
 func (c *Client) IssueTx(ctx context.Context, t *tx.Tx, options ...rpc.Option) error {
 	txStr, err := encodeTx(t, clientEncoding)
@@ -428,6 +428,25 @@ func (c *Client) GetTx(ctx context.Context, txID ids.ID, options ...rpc.Option) 
 		return nil, 0, err
 	}
 	return t, uint64(resp.Height), nil
+}
+
+// AwaitTxAccepted polls [Client.GetTx] every freq until txID is accepted or
+// ctx is cancelled.
+func (c *Client) AwaitTxAccepted(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) error {
+	ticker := time.NewTicker(freq)
+	defer ticker.Stop()
+
+	for {
+		if _, _, err := c.GetTx(ctx, txID, options...); err == nil {
+			return nil
+		}
+
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
 }
 
 func encodeTx(t *tx.Tx, encoding formatting.Encoding) (string, error) {

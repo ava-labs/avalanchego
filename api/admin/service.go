@@ -9,7 +9,6 @@ import (
 	"path"
 	"sync"
 
-	"github.com/gorilla/rpc/v2"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -21,10 +20,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
+	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/registry"
 
@@ -65,16 +64,12 @@ type Admin struct {
 // NewService returns a new admin API service.
 // All of the fields in the provided [Config] must be set.
 func NewService(config Config) (http.Handler, error) {
-	server := rpc.NewServer()
-	codec := json.NewCodec()
-	server.RegisterCodec(codec, "application/json")
-	server.RegisterCodec(codec, "application/json;charset=UTF-8")
-	return server, server.RegisterService(
+	return rpc.NewHandler(
+		"admin",
 		&Admin{
 			Config:   config,
 			profiler: profiler.New(config.ProfileDir),
 		},
-		"admin",
 	)
 }
 
