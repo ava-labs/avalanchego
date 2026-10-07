@@ -899,10 +899,12 @@ func (w *wallet) newImportTx(
 ) *tx.Tx {
 	tb.Helper()
 
+	utxos, err := w.client.GetAllUTXOs(ctx, []ids.ShortID{w.sk.Address()}, sourceChain)
+	require.NoErrorf(tb, err, "%T.GetAllUTXOs()", w.client)
+
 	var (
 		avaxAssetID  = w.snowCtx.AVAXAssetID
 		importedAVAX uint64
-		utxos        = w.client.getAllUTXOs(ctx, tb, sourceChain, maxGetUTXOsLimit, w.sk.Address())
 		inputs       = make([]*avax.TransferableInput, 0, len(utxos))
 	)
 	for _, utxo := range utxos {

@@ -1,0 +1,15 @@
+# CI Go dependency manifest
+#
+# Fields: kind, module directory or pinned module version, package.
+# "local" resolves a CI tool from the listed repository module. "pinned"
+# resolves an exceptional module graph in an isolated temporary module.
+#
+# This deliberately excludes Task: CI installs its release binary through
+# setup-task rather than resolving its Go package graph.
+local	.	github.com/StephenButtolph/canoto/canoto
+local	.	go.uber.org/mock/mockgen
+local	tools/external	github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+local	tools/external	github.com/palantir/go-license
+local	tools/external	github.com/rhysd/actionlint/cmd/actionlint
+pinned	github.com/ava-labs/libevm@v1.13.14-0.2.0.release	github.com/ava-labs/libevm/cmd/abigen
+pinned	google.golang.org/genproto@v0.0.0-20210624195500-8bfb893ecb84	google.golang.org/genproto/googleapis/rpc/errdetails

@@ -1,15 +1,21 @@
 name: 'Setup Bazel'
-description: 'Prepare Bazel CI for this job and, during initial setup, for the later Bazel CI jobs on this platform'
+description: 'Prepare Bazel CI for this job and the later Bazel CI jobs on this platform'
 
 inputs:
-  initial-setup:
-    description: 'Whether this is the initial setup pass that checks metadata, caches dependencies needed by subsequent Bazel CI jobs, and saves the resulting cache state'
+  is-setup-job:
+    description: 'Whether this invocation is the dedicated Bazel setup job'
     required: false
     default: 'false'
 
 runs:
   using: composite
   steps:
+    - id: cache-policy
+      uses: ./.github/actions/cache-policy
+      with:
+        request-cache-save: ${{ inputs.is-setup-job }}
+
+    # The Go workflow owns Task cache writes.
     - uses: ./.github/actions/setup-task
 
     - name: Ensure runner disk space
@@ -28,19 +34,8 @@ runs:
           echo "go_mod_cache=$go_mod_cache_dir"
         } >> "$GITHUB_OUTPUT"
 
-    - name: Perform initial setup of Bazel dependency cache
-      if: ${{ inputs.initial-setup == 'true' }}
-      uses: actions/cache@v5
-      with:
-        path: |
-          ${{ steps.cache-paths.outputs.repository_cache }}
-          ${{ steps.cache-paths.outputs.go_mod_cache }}
-        key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh') }}
-        restore-keys: |
-          bazel-repo-${{ runner.os }}-${{ runner.arch }}-
-
     - name: Restore Bazel dependency cache
-      if: ${{ inputs.initial-setup != 'true' }}
+      id: cache
       uses: actions/cache/restore@v5
       with:
         path: |
@@ -50,6 +45,18 @@ runs:
         restore-keys: |
           bazel-repo-${{ runner.os }}-${{ runner.arch }}-
 
+    # Consumers prepare non-exact restores and misses locally. Setup jobs prepare
+    # them only when they may save the result.
+    - name: Determine Bazel cache operations
+      id: cache-operations
+      shell: bash
+      run: |
+        {
+          echo "disable-downloads-on-cache-hit=${{ steps.cache.outputs.cache-hit == 'true' && (inputs.is-setup-job != 'true' || steps.cache-policy.outputs.cache-save-allowed == 'true') }}"
+          echo "prepare-dependencies=${{ steps.cache.outputs.cache-hit != 'true' && (inputs.is-setup-job != 'true' || steps.cache-policy.outputs.cache-save-allowed == 'true') }}"
+          echo "save-cache=${{ steps.cache.outputs.cache-hit != 'true' && steps.cache-policy.outputs.cache-save-allowed == 'true' }}"
+        } >> "$GITHUB_OUTPUT"
+
     - name: Configure Bazel to use dependency cache
       shell: bash
       env:
@@ -57,14 +64,44 @@ runs:
         GO_MOD_CACHE_DIR: ${{ steps.cache-paths.outputs.go_mod_cache }}
       run: ${{ github.action_path }}/configure-bazelrc.sh
 
+    # Disable downloads after an exact cache hit so an incomplete cache fails
+    # instead of fetching a missing dependency.
+    - name: Disable Bazel repository downloads on direct cache hit
+      if: ${{ steps.cache-operations.outputs.disable-downloads-on-cache-hit == 'true' }}
+      shell: bash
+      run: echo 'common --repository_disable_download' >> "$HOME/.bazelrc"
+
     # Bazel metadata must be consistent before any other bazel operations are
     # performed including build dependency caching.
     - name: Check Bazel metadata
-      if: ${{ inputs.initial-setup == 'true' }}
+      if: ${{ inputs.is-setup-job == 'true' }}
       shell: bash
       run: ./scripts/run_task.sh bazel-check-metadata
 
     - name: Cache Bazel CI build dependencies
-      if: ${{ inputs.initial-setup == 'true' }}
+      # A setup job prepares data for a cache save. Consumers prepare only their local
+      # cache on a miss, then run offline.
+      if: ${{ steps.cache-operations.outputs.prepare-dependencies == 'true' }}
       shell: bash
       run: ./scripts/run_task.sh bazel-cache-ci-build-dependencies
+
+    - name: Save Bazel dependency cache
+      # Setup jobs can race to publish a cache miss. Immutable keys prevent an
+      # earlier archive from being overwritten.
+      if: ${{ steps.cache-operations.outputs.save-cache == 'true' }}
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          ${{ steps.cache-paths.outputs.repository_cache }}
+          ${{ steps.cache-paths.outputs.go_mod_cache }}
+        key: bazel-repo-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh') }}
+
+    - name: Disable Bazel repository downloads after cache preparation
+      if: ${{ steps.cache-operations.outputs.prepare-dependencies == 'true' }}
+      shell: bash
+      run: echo 'common --repository_disable_download' >> "$HOME/.bazelrc"
+
+    - name: Log Bazel disk diagnostics
+      if: ${{ failure() }}
+      shell: bash
+      run: ./scripts/run_task.sh log-ci-disk-state-bazel
