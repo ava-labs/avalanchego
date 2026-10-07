@@ -30,7 +30,7 @@ type External struct {
 	SendF func(msg *message.OutboundMessage, config common.SendConfig, subnetID ids.ID, allower subnets.Allower) set.Set[ids.NodeID]
 }
 
-// Default set the default callable value to cant
+// Default set the default callable value to the provided value.
 func (s *External) Default(cant bool) {
 	s.CantSend = cant
 }

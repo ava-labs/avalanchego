@@ -32,7 +32,7 @@ func (b *UniqueBag[T]) Add(n uint, keys ...T) {
 	}
 }
 
-// Unions [set] with the bitset associated with key.
+// Unions set with the bitset associated with key.
 func (b *UniqueBag[T]) UnionSet(key T, set set.Bits64) {
 	b.init()
 
@@ -41,7 +41,7 @@ func (b *UniqueBag[T]) UnionSet(key T, set set.Bits64) {
 	(*b)[key] = previousSet
 }
 
-// Removes each element of [set] from the bitset associated with key.
+// Removes each element of set from the bitset associated with key.
 func (b *UniqueBag[T]) DifferenceSet(key T, set set.Bits64) {
 	b.init()
 
