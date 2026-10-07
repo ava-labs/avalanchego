@@ -12,6 +12,8 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -41,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -2278,4 +2281,36 @@ func TestWaitForEventInitializing(t *testing.T) {
 	cancel()
 	_, err := sut.WaitForEvent(ctx)
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+// Re-executing synchronous blocks after a Firewood crash MUST NOT regress the
+// finalized block. Startup only searches for state at and below it, and
+// Firewood only serves its most recently persisted root.
+func TestRecoverFirewoodAcrossSynchronousTransition(t *testing.T) {
+	fixture, opts, clock := synchronousFixture(t)
+	dataDir := t.TempDir()
+	opts = append(opts, withFirewood(), withDB(memdb.New()), withChainDataDir(dataDir))
+
+	ctx, sut := newSUT(t, opts...)
+	sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
+	require.NoErrorf(t, sut.SetPreference(ctx, sut.lastAccepted(ctx, t), nil), "%T.SetPreference()", sut.VM)
+	require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", sut.VM)
+
+	w := newWallet(secp256k1.TestKeys()[2], sut.ctx, sut.Client) // the fixture's only unused account
+	for range 2 {
+		blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+		clock.AdvanceToSettle(ctx, t, blk)
+	}
+	require.NoErrorf(t, sut.Shutdown(ctx), "%T.Shutdown()", sut.VM)
+
+	// Simulates a crash rolling Firewood back before it persisted anything.
+	firewoodDir := filepath.Join(dataDir, firewood.Directory)
+	require.NoError(t, os.RemoveAll(firewoodDir), "removing Firewood directory")
+
+	// Shutdown persists the settled asynchronous root, which will then be the
+	// only root Firewood serves.
+	ctx, sut = newSUT(t, opts...)
+	require.NoErrorf(t, sut.Shutdown(ctx), "%T.Shutdown()", sut.VM)
+
+	newSUT(t, opts...)
 }

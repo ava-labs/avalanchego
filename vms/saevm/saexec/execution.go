@@ -491,7 +491,9 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 	}
 	e.sendPostExecutionEvents(b, r) // (3)
 	if b.Synchronous() {            // (4)
-		rawdb.WriteFinalizedBlockHash(e.db, b.Hash())
+		if b.ParentHash() == rawdb.ReadFinalizedBlockHash(e.db) {
+			rawdb.WriteFinalizedBlockHash(e.db, b.Hash())
+		}
 		if err := b.MarkSettled(e.lastSettled); err != nil {
 			return err
 		}
