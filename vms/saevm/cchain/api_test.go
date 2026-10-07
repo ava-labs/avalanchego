@@ -278,13 +278,20 @@ func TestBootstrappedSynchronousRPCs(t *testing.T) {
 		calls []synchronoustest.RPCCall
 	}{
 		{
-			name:  "hashdb_pruning",
+			name: "hashdb_archival",
+			opts: []sutOption{withArchival()},
+			// Archival hashdb nodes are the only nodes that are guaranteed to
+			// support eth_getProof.
 			calls: fixture.AllRPCCalls(),
 		},
 		{
-			name:  "hashdb_archival",
-			opts:  []sutOption{withArchival()},
-			calls: fixture.AllRPCCalls(),
+			name:  "hashdb_pruning",
+			calls: fixture.RPCCalls,
+		},
+		{
+			name:  "hashdb_pruning_no_snapshot",
+			opts:  []sutOption{withSnapshotDisabled()},
+			calls: fixture.RPCCalls,
 		},
 		{
 			name:  "firewood",

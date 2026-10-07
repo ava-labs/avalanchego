@@ -274,6 +274,13 @@ func withFirewood() sutOption {
 	})
 }
 
+// withSnapshotDisabled disables the snapshot.
+func withSnapshotDisabled() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.SnapshotCache = 0
+	})
+}
+
 // withStateSyncDisabled clears [config.StateSyncEnabled], which defaults to
 // true.
 func withStateSyncDisabled() sutOption {
