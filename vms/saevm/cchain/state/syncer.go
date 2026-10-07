@@ -36,15 +36,11 @@ type Syncer struct {
 	targetHeight uint64
 }
 
-// NewSyncer creates a new cross-chain trie syncer. The [State] MUST NOT be
-// altered concurrently with the syncer.
-func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Hash, height uint64) *Syncer {
+// NewSyncer creates a cross-chain trie syncer over a client bound to
+// [p2p.EVMAtomicLeafRequestHandlerID]. The [State] MUST NOT be altered concurrently.
+func NewSyncer(client *p2p.TrackingClient, state *State, root common.Hash, height uint64) *Syncer {
 	return &Syncer{
-		fetcher: hashdb.NewClient(
-			state.snowCtx.Log,
-			n.NewTrackingClient(p2p.EVMAtomicLeafRequestHandlerID, pt),
-			keyLength,
-		),
+		fetcher:      hashdb.NewClient(state.snowCtx.Log, client, keyLength),
 		targetRoot:   root,
 		targetHeight: height,
 		state:        state,
