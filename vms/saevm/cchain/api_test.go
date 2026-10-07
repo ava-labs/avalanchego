@@ -269,8 +269,7 @@ func TestSynchronousRPCs(t *testing.T) {
 }
 
 // TestBootstrappedSynchronousRPCs executes the synchronous history during
-// bootstrapping and requires every recorded JSON-RPC call to be answered
-// identically. eth_getProof is not supported on Firewood nodes.
+// bootstrapping and verifies that JSON-RPC responses are correct.
 func TestBootstrappedSynchronousRPCs(t *testing.T) {
 	fixture, opts, _ := synchronousFixture(t)
 	tests := []struct {
