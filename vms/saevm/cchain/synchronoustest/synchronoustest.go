@@ -8,6 +8,7 @@ package synchronoustest
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -37,6 +38,10 @@ type Fixture struct {
 	// RPCCalls holds JSON-RPC calls and the responses the synchronous VM
 	// returned.
 	RPCCalls []RPCCall `json:"rpcCalls"`
+	// ProofCalls holds eth_getProof calls and the responses the synchronous VM
+	// returned. They are kept apart from RPCCalls because eth_getProof is not
+	// supported on Firewood nodes.
+	ProofCalls []RPCCall `json:"proofCalls"`
 	// Database holds every key-value pair of the VM's database after all
 	// Blocks were accepted.
 	Database map[string]hexutil.Bytes `json:"database"`
@@ -121,7 +126,8 @@ var fixtureJSON []byte
 //   - eth_getTransactionCount: each account at each height.
 //   - eth_getCode: each account at each height.
 //   - eth_getStorageAt: slot 0 of each account at each height.
-//   - eth_getProof: each account at each height, proving slot 0.
+//   - eth_getProof: each account at each height, proving slot 0. Recorded in
+//     [Fixture.ProofCalls] rather than [Fixture.RPCCalls].
 //   - eth_call: the counter contract at each height, with call data that makes
 //     it return the slot rather than increment it.
 //   - eth_callDetailed: that same call at each height.
@@ -178,6 +184,11 @@ func (r *RPCCall) Args() []any {
 		args[i] = p
 	}
 	return args
+}
+
+// AllRPCCalls returns [Fixture.RPCCalls] followed by [Fixture.ProofCalls].
+func (f *Fixture) AllRPCCalls() []RPCCall {
+	return slices.Concat(f.RPCCalls, f.ProofCalls)
 }
 
 // CoreGenesis decodes [Fixture.Genesis].

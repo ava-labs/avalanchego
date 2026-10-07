@@ -265,30 +265,60 @@ func TestSynchronousRPCs(t *testing.T) {
 		// to refuse later pruning runs.
 		withArchival(),
 	)
-	sut.requireSynchronousRPCs(ctx, t, fixture)
+	sut.requireSynchronousRPCs(ctx, t, fixture.AllRPCCalls(), fixture.Blocks)
 }
 
 // TestBootstrappedSynchronousRPCs executes the synchronous history during
 // bootstrapping and requires every recorded JSON-RPC call to be answered
-// identically.
+// identically. eth_getProof is not supported on Firewood nodes.
 func TestBootstrappedSynchronousRPCs(t *testing.T) {
 	fixture, opts, _ := synchronousFixture(t)
-	// Archival is needed because the recorded calls get proofs at every height.
-	ctx, sut := newSUT(t, append(opts, withArchival())...)
-	sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
+	tests := []struct {
+		name  string
+		opts  []sutOption
+		calls []synchronoustest.RPCCall
+	}{
+		{
+			name:  "hashdb_pruning",
+			calls: fixture.AllRPCCalls(),
+		},
+		{
+			name:  "hashdb_archival",
+			opts:  []sutOption{withArchival()},
+			calls: fixture.AllRPCCalls(),
+		},
+		{
+			name:  "firewood",
+			opts:  []sutOption{withFirewood()},
+			calls: fixture.RPCCalls,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	require.NoErrorf(t, sut.SetPreference(ctx, sut.lastAccepted(ctx, t), nil), "%T.SetPreference()", sut.VM)
-	require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", sut.VM)
-	sut.requireSynchronousRPCs(ctx, t, fixture)
+			ctx, sut := newSUT(t, append(opts, tt.opts...)...)
+			sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
+
+			require.NoErrorf(t, sut.SetPreference(ctx, sut.lastAccepted(ctx, t), nil), "%T.SetPreference()", sut.VM)
+			require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", sut.VM)
+			sut.requireSynchronousRPCs(ctx, t, tt.calls, fixture.Blocks)
+		})
+	}
 }
 
-// requireSynchronousRPCs replays the JSON-RPC calls recorded from the
-// synchronous VM and requires an identical response, covering state, receipt,
-// log, and tracing RPCs at every height for every pre-SAE network upgrade.
-func (s *SUT) requireSynchronousRPCs(ctx context.Context, t *testing.T, fixture *synchronoustest.Fixture) {
+// requireSynchronousRPCs replays calls, recorded from the synchronous VM, and
+// requires an identical response. It also requires every block to be served
+// identically by number and by hash.
+func (s *SUT) requireSynchronousRPCs(
+	ctx context.Context,
+	t *testing.T,
+	calls []synchronoustest.RPCCall,
+	blocks []synchronoustest.Block,
+) {
 	t.Helper()
 
-	for _, call := range fixture.RPCCalls {
+	for _, call := range calls {
 		t.Run(call.Name, func(t *testing.T) {
 			t.Parallel()
 
@@ -317,7 +347,7 @@ func (s *SUT) requireSynchronousRPCs(ctx context.Context, t *testing.T, fixture 
 		cmputils.Headers(),
 		cmpopts.EquateEmpty(),
 	}
-	for _, block := range fixture.Blocks {
+	for _, block := range blocks {
 		t.Run(fmt.Sprintf("block_%02d_%s", block.Number, block.Fork), func(t *testing.T) {
 			t.Parallel()
 
