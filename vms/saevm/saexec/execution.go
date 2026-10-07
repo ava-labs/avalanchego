@@ -390,6 +390,12 @@ func Execute(
 		// TODO(JonathanOppenheimer): skipping the FinishExecutingBlock hook
 		// leaks goroutines from an in-flight parallel.Processor, which requires
 		// a FinishBlock call.
+
+		// This captures MOST read errors. For the subset of DB errors through
+		// leveldb that have ignored errors in geth, we rely on the corruptabledb.
+		if err := stateDB.Error(); err != nil {
+			return nil, fmt.Errorf("during execution: %w", err)
+		}
 		return res, nil
 	}
 
@@ -413,6 +419,12 @@ func Execute(
 
 	if err := hooks.FinishExecutingBlock(stateDB, b.EthBlock(), res.Receipts); err != nil {
 		return nil, fmt.Errorf("finish-executing-block hook: %v", err)
+	}
+
+	// This captures MOST read errors. For the subset of DB errors through
+	// leveldb that have ignored errors in geth, we rely on the corruptabledb.
+	if err := stateDB.Error(); err != nil {
+		return nil, fmt.Errorf("during execution: %w", err)
 	}
 
 	endTime := time.Now()
