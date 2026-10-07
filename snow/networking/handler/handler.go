@@ -132,7 +132,7 @@ type handler struct {
 	p2pTracker  *p2p.PeerTracker
 }
 
-// Initialize this consensus handler
+// New returns a consensus handler.
 // Engines are provided separately via [Handler.SetEngineManager].
 func New(
 	ctx *snow.ConsensusContext,

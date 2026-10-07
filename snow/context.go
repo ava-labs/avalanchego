@@ -27,13 +27,13 @@ type ContextInitializable interface {
 }
 
 // Context is information about the current execution.
-// [Context.NetworkID] is the ID of the network this context exists within.
-// [Context.ChainID] is the ID of the chain this context exists within.
-// [Context.NodeID] is the ID of this node
 type Context struct {
-	NetworkID       uint32
-	SubnetID        ids.ID
-	ChainID         ids.ID
+	// NetworkID is the ID of the network this context exists within.
+	NetworkID uint32
+	SubnetID  ids.ID
+	// ChainID is the ID of the chain this context exists within.
+	ChainID ids.ID
+	// NodeID is the ID of this node.
 	NodeID          ids.NodeID
 	PublicKey       *bls.PublicKey
 	NetworkUpgrades upgrade.Config
