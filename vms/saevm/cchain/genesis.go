@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
-	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -117,6 +116,7 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 				FortunaTimestamp:                utils.TimeToNewUint64(u.FortunaTime),
 				GraniteTimestamp:                utils.TimeToNewUint64(u.GraniteTime),
 				HeliconTimestamp:                utils.TimeToNewUint64(u.HeliconTime),
+				IglooTimestamp:                  utils.TimeToNewUint64(u.IglooTime),
 			},
 			AvalancheContext: extras.AvalancheContext{
 				SnowCtx: ctx,
@@ -284,13 +284,13 @@ func (g *genesis) block() (*types.Block, error) {
 	}
 
 	if c.IsGranite(g.Timestamp) {
-		headerExtra.TimeMilliseconds = avalancheutils.PointerTo(g.Timestamp * 1000)
-		headerExtra.MinDelayExcess = avalancheutils.PointerTo(acp226.InitialDelayExcess)
+		headerExtra.TimeMilliseconds = new(g.Timestamp * 1000)
+		headerExtra.MinDelayExcess = new(acp226.InitialDelayExcess)
 	}
 
 	if c.IsHelicon(g.Timestamp) {
-		headerExtra.TargetExponent = avalancheutils.PointerTo(dynamic.InitialTargetExponent)
-		headerExtra.MinPriceExponent = avalancheutils.PointerTo(dynamic.InitialPriceExponent)
+		headerExtra.TargetExponent = new(dynamic.InitialTargetExponent)
+		headerExtra.MinPriceExponent = new(dynamic.InitialPriceExponent)
 
 		// The genesis block is synchronous, so the markers must be zero to
 		// conform with [hook.Synchronous]. Most synchronous blocks omit these

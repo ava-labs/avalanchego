@@ -226,12 +226,12 @@ func (*hooks) BlockTime(h *types.Header) time.Time {
 
 func blockTime(h *types.Header) time.Time {
 	ms := customtypes.HeaderTimeMilliseconds(h)
-	subSecondNanos := int64(ms%1000) * int64(time.Millisecond) //#nosec G115 -- ms%1000 < 1000
-	return time.Unix(int64(h.Time), subSecondNanos)            //#nosec G115 -- Won't overflow for a few millennia
+	subSecondNanos := int64(ms%1000) * int64(time.Millisecond)
+	return time.Unix(int64(h.Time), subSecondNanos) //#nosec G115 -- Won't overflow for a few millennia
 }
 
 func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	txs, err := tx.FromBlock(h.chainConfig, b)
 	if err != nil {
 		return nil, fmt.Errorf("parsing txs: %w", err)
 	}
@@ -260,7 +260,7 @@ func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, 
 }
 
 func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ types.Receipts) error {
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	txs, err := tx.FromBlock(h.chainConfig, b)
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
 	}
@@ -277,7 +277,7 @@ func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
 	h.metrics.setMinBlockDelay(delayExponent(b.Header()).DelayDuration())
 
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	txs, err := tx.FromBlock(h.chainConfig, b)
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
 	}
@@ -389,7 +389,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			errBelowMinBlockDelay, now, minTime, parentTime, de.DelayDuration())
 	}
 
-	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
+	nowMS := uint64(now.UnixMilli())
 
 	config := corethparams.GetExtra(b.chainConfig)
 	te, err := targetExponent(config, parent)

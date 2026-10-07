@@ -4,13 +4,17 @@
 package c
 
 import (
+	"fmt"
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
+	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/ethclient"
+
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/client"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
@@ -64,7 +68,7 @@ type Wallet interface {
 func NewWallet(
 	builder Builder,
 	signer Signer,
-	avaxClient *client.Client,
+	avaxClient *cchain.Client,
 	ethClient *ethclient.Client,
 	backend Backend,
 ) Wallet {
@@ -81,7 +85,7 @@ type wallet struct {
 	Backend
 	builder    Builder
 	signer     Signer
-	avaxClient *client.Client
+	avaxClient *cchain.Client
 	ethClient  *ethclient.Client
 }
 
@@ -142,16 +146,21 @@ func (w *wallet) IssueUnsignedAtomicTx(
 }
 
 func (w *wallet) IssueAtomicTx(
-	tx *atomic.Tx,
+	atx *atomic.Tx,
 	options ...common.Option,
 ) error {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
 	startTime := time.Now()
-	txID, err := w.avaxClient.IssueTx(ctx, tx.SignedBytes())
+
+	t, err := tx.Parse(atx.SignedBytes())
 	if err != nil {
+		return fmt.Errorf("parsing atomic tx: %w", err)
+	}
+	if err := w.avaxClient.IssueTx(ctx, t); err != nil {
 		return err
 	}
+	txID := t.ID()
 
 	issuanceDuration := time.Since(startTime)
 	if f := ops.IssuanceHandler(); f != nil {
@@ -163,7 +172,7 @@ func (w *wallet) IssueAtomicTx(
 	}
 
 	if ops.AssumeDecided() {
-		return w.Backend.AcceptAtomicTx(ctx, tx)
+		return w.Backend.AcceptAtomicTx(ctx, atx)
 	}
 
 	if err := w.avaxClient.AwaitTxAccepted(ctx, txID, ops.PollFrequency()); err != nil {
@@ -182,7 +191,7 @@ func (w *wallet) IssueAtomicTx(
 		})
 	}
 
-	return w.Backend.AcceptAtomicTx(ctx, tx)
+	return w.Backend.AcceptAtomicTx(ctx, atx)
 }
 
 func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
@@ -193,5 +202,11 @@ func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
 	}
 
 	ctx := ops.Context()
-	return w.ethClient.EstimateBaseFee(ctx)
+	// TODO(owenwahlgren): Expose an SAE client that includes the
+	// Avalanche-custom eth RPCs, such as eth_baseFee, and use it here.
+	var fee hexutil.Big
+	if err := w.ethClient.Client().CallContext(ctx, &fee, "eth_baseFee"); err != nil {
+		return nil, err
+	}
+	return (*big.Int)(&fee), nil
 }

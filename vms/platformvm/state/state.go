@@ -2705,15 +2705,51 @@ func (s *State) updateL1ValidatorManager(
 	return nil
 }
 
+// updateStakeMetrics must run after updates to the validator manager and
+// current staker state.
 func (s *State) updateStakeMetrics() error {
 	totalWeight, err := s.validators.TotalWeight(constants.PrimaryNetworkID)
 	if err != nil {
 		return fmt.Errorf("failed to get total weight of primary network: %w", err)
 	}
 
-	s.metrics.SetLocalStake(s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID))
+	localStake, delegatedStake := s.localAndDelegatedStake()
+
+	s.metrics.SetLocalStake(localStake)
+	s.metrics.SetLocalDelegatedStake(delegatedStake)
 	s.metrics.SetTotalStake(totalWeight)
 	return nil
+}
+
+// localAndDelegatedStake returns this node's total weight and the delegated
+// portion of that weight.
+//
+// Failures are logged and the delegated portion reported as 0 rather than
+// stopping the chain over a gauge.
+func (s *State) localAndDelegatedStake() (uint64, uint64) {
+	localStake := s.validators.GetWeight(constants.PrimaryNetworkID, s.ctx.NodeID)
+	if localStake == 0 {
+		return 0, 0
+	}
+
+	vdr, err := s.GetCurrentValidator(constants.PrimaryNetworkID, s.ctx.NodeID)
+	if err != nil {
+		s.ctx.Log.Debug("failed to get local validator",
+			zap.Error(err),
+		)
+		return localStake, 0
+	}
+
+	delegatedStake, err := safemath.Sub(localStake, vdr.Weight)
+	if err != nil {
+		s.ctx.Log.Debug("validator manager stake is lower than the validator's weight",
+			zap.Uint64("managerWeight", localStake),
+			zap.Uint64("validatorWeight", vdr.Weight),
+			zap.Error(err),
+		)
+		return localStake, 0
+	}
+	return localStake, delegatedStake
 }
 
 type validatorDiff struct {

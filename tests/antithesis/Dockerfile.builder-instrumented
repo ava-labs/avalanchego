@@ -8,15 +8,13 @@ FROM docker.io/antithesishq/go-instrumentor AS instrumentor
 # ============= Instrumentation Stage ================
 FROM golang:$GO_VERSION-bookworm
 
+# Dependencies are served from the host's local module-proxy cache.
+ENV GOPROXY=file:///gomodproxy,off
+
 WORKDIR /build
-# Copy and download dependencies using go mod
-COPY go.mod .
-COPY go.sum .
 # Copy graft if it exists to support local replace directives
 RUN --mount=type=bind,source=.,target=/context \
     if [ -d /context/graft ]; then cp -r /context/graft ./graft; fi
-RUN go mod download
-
 # Copy the code into the container
 COPY . .
 
@@ -38,12 +36,12 @@ RUN mkdir -p /opt/tmp/
 RUN cp -r .git /opt/tmp/
 
 # Instrument the code
-RUN /opt/antithesis/bin/goinstrumentor \
+RUN --network=none --mount=type=bind,from=gomodcache,source=.,target=/gomodproxy,ro \
+    /opt/antithesis/bin/goinstrumentor \
     -stderrthreshold=INFO \
     -antithesis /opt/antithesis/instrumentation \
     . \
     /instrumented
 
 WORKDIR /instrumented/customer
-RUN go mod download
 RUN ln -s /opt/tmp/.git .git

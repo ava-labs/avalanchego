@@ -140,7 +140,7 @@ func newSUT(tb testing.TB, state libevm.StateReader) (context.Context, *SUT) {
 	snowCtx.Log = log
 	pool, err := New(
 		snowCtx,
-		saetest.ChainConfig(),
+		cchaintest.ChainConfig(),
 		NewPending(),
 		backend,
 		maxSize,
@@ -339,7 +339,7 @@ func TestAdd(t *testing.T) {
 	for i := range maxSizeTxs {
 		sk := newKey(t)
 		allKeys = append(allKeys, sk)
-		amount := lowFee + uint64(i) //#nosec G115 -- Won't overflow
+		amount := lowFee + uint64(i)
 		maxSizeTxs[i] = newExport(t, []*secp256k1.PrivateKey{sk}, withAmount(amount))
 	}
 	slices.Reverse(maxSizeTxs) // Sorted by descending fee.

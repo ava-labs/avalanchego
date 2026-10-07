@@ -46,7 +46,6 @@ go_test(
     data = glob(["testdata/**"]),
     embed = [":saexec"],
     deps = [
-        "//utils",
         "//utils/logging",
         "//utils/logging/loggingtest",
         "//vms/components/gas",
@@ -64,6 +63,7 @@ go_test(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//crypto",

@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethclient"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -82,13 +82,13 @@ func issueTransaction(
 ) {
 	ctx := tc.DefaultContext()
 	addr := senderKey.EthAddress()
-	acceptedNonce, err := ethClient.AcceptedNonceAt(ctx, addr)
+	nonce, err := ethClient.NonceAt(ctx, addr, nil)
 	require.NoError(tc, err)
 
 	gasPrice := e2e.SuggestGasPrice(tc, ethClient)
 	const amount = 10 * units.Avax // Arbitrary amount to transfer
 	tx := types.NewTransaction(
-		acceptedNonce,
+		nonce,
 		addr,
 		new(big.Int).SetUint64(amount),
 		e2e.DefaultGasLimit,

@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
@@ -929,7 +928,7 @@ func TestGetStakingConfig_Helicon(t *testing.T) {
 		},
 		{
 			name: "overridden",
-			set:  utils.PointerTo(15 * time.Minute),
+			set:  new(15 * time.Minute),
 			want: 15 * time.Minute,
 		},
 	}
