@@ -817,8 +817,6 @@ func (s *SUT) acceptSynchronousBlocks(ctx context.Context, tb testing.TB, blks [
 		require.NoErrorf(tb, err, "%T.ParseBlock(height %d)", s.VM, blk.Number)
 		require.NoErrorf(tb, s.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", s.VM, blk.Number)
 		require.NoErrorf(tb, s.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", s.VM, blk.Number)
-		require.NoErrorf(tb, parsed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(height %d)", parsed, blk.Number)
-		require.NoErrorf(tb, parsed.WaitUntilSettled(ctx), "%T.WaitUntilSettled(height %d)", parsed, blk.Number)
 
 		assert.Equalf(tb, parsed.SettledStateRoot(), parsed.PostExecutionStateRoot(), "post-execution state root of height %d", blk.Number)
 		assert.Equalf(tb, parsed.SettledReceiptsRoot(), types.DeriveSha(parsed.Receipts(), saetest.TrieHasher()), "receipts root of height %d", blk.Number)

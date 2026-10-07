@@ -234,16 +234,14 @@ func (f *Fixture) PutUTXOs(tb testing.TB, memory *atomic.Memory, xChainID, cChai
 		for i, t := range e.Traits {
 			traits[i] = t
 		}
-		require.NoError(tb,
-			sm.Apply(map[ids.ID]*atomic.Requests{
-				cChainID: {PutRequests: []*atomic.Element{{
-					Key:    e.Key,
-					Value:  e.Value,
-					Traits: traits,
-				}}},
-			}),
-			"%T.Apply(UTXO %s)", sm, e.Key,
-		)
+		requests := map[ids.ID]*atomic.Requests{
+			cChainID: {PutRequests: []*atomic.Element{{
+				Key:    e.Key,
+				Value:  e.Value,
+				Traits: traits,
+			}}},
+		}
+		require.NoErrorf(tb, sm.Apply(requests), "%T.Apply(UTXO %s)", sm, e.Key)
 	}
 }
 

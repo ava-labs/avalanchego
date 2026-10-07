@@ -80,8 +80,8 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 	// disk. Therefore, the state can only lag behind the block read.
 	// Additionally, we assume any block has been written atomically, so
 	// if the last settled height was found, the underlying block is present.
-	// At minimum, [NewVM] requires a genesis block to be written with its
-	// post-execution state committed, so the search always finds a state.
+	// [NewVM] requires a settled block's state to be available, so the search
+	// always finds one between the last settled block and genesis.
 	//
 	// There's no reasonable cap on how far back to search, since the distance
 	// between the settler and settled block is unbounded, and node crashes

@@ -440,7 +440,7 @@ func Execute(
 		// synchronous block's gas time.
 		gasClock, err = b.SynchronousGasTime()
 		if err != nil {
-			return nil, fmt.Errorf("%w: synchronous gas time: %v", errFatal, err)
+			return nil, fmt.Errorf("%w: deriving synchronous gas time: %v", errFatal, err)
 		}
 	} else {
 		target, gasCfg := hooks.GasConfigAfter(b.Header())

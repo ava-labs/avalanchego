@@ -89,9 +89,9 @@ func (e *executionResults) setBaseFee(bf *big.Int) error {
 // This method MUST NOT be called more than once. The wall-clock [time.Time] is
 // for metrics only.
 //
-// A synchronous block's header determines its [saetypes.ExecutionResults], so
-// they are not persisted. An error is returned, before any persistence, if they
-// differ from the stateRootPost or the receipts root.
+// A synchronous block's header commits to its state and receipts roots, so
+// nothing is written to xdb. If either root differs from the header, an error
+// is returned before anything is written.
 func (b *Block) MarkExecuted(
 	db ethdb.Database,
 	xdb saetypes.ExecutionResults,
