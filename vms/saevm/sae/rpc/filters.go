@@ -38,7 +38,7 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 	case !foundStart && !foundEnd:
 		// With neither end found, one can assume there are no intermediate
 		// known blocks either.
-		return nil, nil //nolint:nilerr // match libevm behavior for unknown blocks
+		return nil, nil
 	case !foundStart:
 		// There MAY be intermediate blocks available (e.g. statesync).
 		// crit.FromBlock MUST be non-negative, otherwise it would have been found.
