@@ -47,6 +47,7 @@ func verifyAddValidatorTx(
 	tx *platform.AddValidatorTx,
 ) error {
 	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet, don't need to do full verification.
 		return nil
 	}
 
@@ -103,6 +104,7 @@ func verifyAddSubnetValidatorTx(
 	tx *platform.AddSubnetValidatorTx,
 ) error {
 	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet, don't need to do full verification.
 		return nil
 	}
 
@@ -117,14 +119,13 @@ func verifyAddSubnetValidatorTx(
 		startTime = tx.StartTime()
 	}
 
-	switch duration := endTime.Sub(startTime); {
-	case duration < backend.Config.MinStakeDuration:
-		// Ensure staking length is not too short
-		return errStakeTooShort
-
-	case duration > backend.Config.MaxStakeDuration:
-		// Ensure staking length is not too long
-		return ErrStakeTooLong
+	duration := endTime.Sub(startTime)
+	if err := verifyStakeDuration(
+		duration,
+		backend.Config.MinStakeDuration,
+		backend.Config.MaxStakeDuration,
+	); err != nil {
+		return err
 	}
 
 	if err := verifyStakerStartTime(isDurangoActive, currentTimestamp, startTime); err != nil {
@@ -148,7 +149,7 @@ func verifyAddSubnetValidatorTx(
 		)
 	}
 
-	if err := verifySubnetValidatorPrimaryNetworkRequirements(backend, chainState, tx.Validator); err != nil {
+	if err := verifySubnetValidatorPrimaryNetworkRequirements(chainState, tx.Validator, startTime); err != nil {
 		return err
 	}
 
@@ -164,6 +165,7 @@ func verifyAddDelegatorTx(
 	tx *platform.AddDelegatorTx,
 ) error {
 	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet, don't need to do full verification.
 		return nil
 	}
 
@@ -235,6 +237,7 @@ func verifyAddPermissionlessValidatorTx(
 	tx *platform.AddPermissionlessValidatorTx,
 ) error {
 	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet, don't need to do full verification.
 		return nil
 	}
 
@@ -291,7 +294,7 @@ func verifyAddPermissionlessValidatorTx(
 	}
 
 	if tx.Subnet != constants.PrimaryNetworkID {
-		if err := verifySubnetValidatorPrimaryNetworkRequirements(backend, chainState, tx.Validator); err != nil {
+		if err := verifySubnetValidatorPrimaryNetworkRequirements(chainState, tx.Validator, startTime); err != nil {
 			return err
 		}
 	}
@@ -307,6 +310,7 @@ func verifyAddPermissionlessDelegatorTx(
 	tx *platform.AddPermissionlessDelegatorTx,
 ) error {
 	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet, don't need to do full verification.
 		return nil
 	}
 
@@ -411,7 +415,7 @@ func verifyAddAutoRenewedValidatorTx(
 	tx *platform.AddAutoRenewedValidatorTx,
 ) error {
 	if !backend.Bootstrapped.Get() {
-		// Not bootstrapped yet -- don't need to do full verification.
+		// Not bootstrapped yet, don't need to do full verification.
 		return nil
 	}
 
@@ -482,7 +486,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 	}
 
 	if !backend.Bootstrapped.Get() {
-		// Not bootstrapped yet -- don't need to do full verification.
+		// Not bootstrapped yet, don't need to do full verification.
 		return validator, nil
 	}
 
@@ -523,12 +527,12 @@ func periodToDuration(period uint64, maxStakeDuration time.Duration) (time.Durat
 }
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
-// network requirements for subnetValidator. An error is returned if they
-// are not fulfilled.
+// network requirements for subnetValidator, which starts validating at
+// startTime. An error is returned if they are not fulfilled.
 func verifySubnetValidatorPrimaryNetworkRequirements(
-	backend *Backend,
 	chainState state.Chain,
 	subnetValidator platform.Validator,
+	startTime time.Time,
 ) error {
 	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, subnetValidator.NodeID)
 	if err == database.ErrNotFound {
@@ -548,11 +552,6 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 
 	// Ensure that the period this validator validates the specified subnet
 	// is a subset of the time they validate the primary network.
-	chainTime := chainState.GetTimestamp()
-	startTime := chainTime
-	if !backend.Config.UpgradeConfig.IsDurangoActivated(chainTime) {
-		startTime = subnetValidator.StartTime()
-	}
 	if !platform.BoundedBy(
 		startTime,
 		subnetValidator.EndTime(),

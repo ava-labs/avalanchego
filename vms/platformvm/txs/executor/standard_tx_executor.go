@@ -52,18 +52,12 @@ var (
 	errStateCorruption                  = errors.New("state corruption")
 )
 
-// registerL1ValidatorTxExpiryWindow bounds how far in the future a
+// registerL1ValidatorTxExpiryWindowSeconds bounds how far in the future a
 // RegisterL1ValidatorTx's warp message may expire.
 //
-// TODO: Before Etna, ensure that the maximum number of expiries to track is
-// limited to a reasonable number by this window.
-const (
-	second                            = 1
-	minute                            = 60 * second
-	hour                              = 60 * minute
-	day                               = 24 * hour
-	registerL1ValidatorTxExpiryWindow = day
-)
+// TODO: Ensure that the maximum number of expiries to track is limited to a
+// reasonable number by this window.
+const registerL1ValidatorTxExpiryWindowSeconds = uint64(24 * time.Hour / time.Second)
 
 // StandardTx executes the standard transaction tx.
 //
@@ -197,11 +191,8 @@ func (e *standardTxExecutor) CreateChainTx(tx *platform.CreateChainTx) error {
 		return err
 	}
 
-	// Not bootstrapped yet -- don't need to do full verification.
-	if e.backend.Bootstrapped.Get() {
-		if err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.SubnetID, tx.SubnetAuth); err != nil {
-			return err
-		}
+	if err := e.verifyPoASubnetAuth(tx.SubnetID, tx.SubnetAuth); err != nil {
+		return err
 	}
 
 	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
@@ -243,10 +234,6 @@ func (e *standardTxExecutor) ImportTx(tx *platform.ImportTx) error {
 		return err
 	}
 
-	if err := e.verifyImportTx(tx); err != nil {
-		return err
-	}
-
 	e.inputs = set.NewSet[ids.ID](len(tx.ImportedInputs))
 	utxoIDs := make([][]byte, len(tx.ImportedInputs))
 	for i, in := range tx.ImportedInputs {
@@ -254,6 +241,10 @@ func (e *standardTxExecutor) ImportTx(tx *platform.ImportTx) error {
 
 		e.inputs.Add(utxoID)
 		utxoIDs[i] = utxoID[:]
+	}
+
+	if err := e.verifyImportTx(tx, utxoIDs); err != nil {
+		return err
 	}
 
 	// The imported inputs are not in e.state, so the local UTXOs are spent
@@ -273,11 +264,12 @@ func (e *standardTxExecutor) ImportTx(tx *platform.ImportTx) error {
 	return nil
 }
 
-// verifyImportTx verifies that the imported UTXOs exist in shared memory and
-// that, together with the local inputs of tx, they fund its outputs plus the
-// fee. The flow check is performed here rather than through [applySpend]
-// because [applySpend] does not account for the imported inputs.
-func (e *standardTxExecutor) verifyImportTx(tx *platform.ImportTx) error {
+// verifyImportTx verifies that the imported UTXOs, identified by utxoIDs,
+// exist in shared memory and that, together with the local inputs of tx, they
+// fund its outputs plus the fee. The flow check is performed here rather than
+// through [applySpend] because [applySpend] does not account for the imported
+// inputs.
+func (e *standardTxExecutor) verifyImportTx(tx *platform.ImportTx, utxoIDs [][]byte) error {
 	// Skip verification of the shared memory inputs if the other primary
 	// network chains are not guaranteed to be up-to-date.
 	if !e.backend.Bootstrapped.Get() || e.backend.Config.PartialSyncPrimaryNetwork {
@@ -286,12 +278,6 @@ func (e *standardTxExecutor) verifyImportTx(tx *platform.ImportTx) error {
 
 	if err := verify.SameSubnet(context.TODO(), e.backend.Ctx, tx.SourceChain); err != nil {
 		return err
-	}
-
-	utxoIDs := make([][]byte, len(tx.ImportedInputs))
-	for i, in := range tx.ImportedInputs {
-		utxoID := in.UTXOID.InputID()
-		utxoIDs[i] = utxoID[:]
 	}
 
 	allUTXOBytes, err := e.backend.Ctx.SharedMemory.Get(tx.SourceChain, utxoIDs)
@@ -351,6 +337,7 @@ func (e *standardTxExecutor) ExportTx(tx *platform.ExportTx) error {
 		return err
 	}
 
+	// Not bootstrapped yet, don't need to do full verification.
 	if e.backend.Bootstrapped.Get() {
 		if err := verify.SameSubnet(context.TODO(), e.backend.Ctx, tx.DestinationChain); err != nil {
 			return err
@@ -401,9 +388,8 @@ func (e *standardTxExecutor) ExportTx(tx *platform.ExportTx) error {
 }
 
 // Verifies a [*platform.RemoveSubnetValidatorTx] and, if it passes, executes
-// it on e.state. For verification rules, see [verifyRemoveSubnetValidatorTx].
-// This transaction will result in tx.NodeID being removed as a validator of
-// tx.Subnet.
+// it on e.state. This transaction will result in tx.NodeID being removed as a
+// validator of tx.Subnet.
 // Note: tx.NodeID may be either a current or pending validator.
 func (e *standardTxExecutor) RemoveSubnetValidatorTx(tx *platform.RemoveSubnetValidatorTx) error {
 	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
@@ -429,10 +415,8 @@ func (e *standardTxExecutor) RemoveSubnetValidatorTx(tx *platform.RemoveSubnetVa
 		return errRemovePermissionlessValidator
 	}
 
-	if e.backend.Bootstrapped.Get() {
-		if err := verifySubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth); err != nil {
-			return err
-		}
+	if err := e.verifySubnetAuth(tx.Subnet, tx.SubnetAuth); err != nil {
+		return err
 	}
 
 	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
@@ -463,10 +447,8 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *platform.TransformSubnetTx) e
 		return errMaxStakeDurationTooLarge
 	}
 
-	if e.backend.Bootstrapped.Get() {
-		if err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth); err != nil {
-			return err
-		}
+	if err := e.verifyPoASubnetAuth(tx.Subnet, tx.SubnetAuth); err != nil {
+		return err
 	}
 
 	// The tx must additionally fund the reward supply of the subnet asset.
@@ -538,18 +520,15 @@ func (e *standardTxExecutor) AddPermissionlessDelegatorTx(tx *platform.AddPermis
 }
 
 // Verifies a [*platform.TransferSubnetOwnershipTx] and, if it passes, executes
-// it on e.state. For verification rules, see
-// [verifyTransferSubnetOwnershipTx]. This transaction will result in the
-// ownership of tx.Subnet being transferred to tx.Owner.
+// it on e.state. This transaction will result in the ownership of tx.Subnet
+// being transferred to tx.Owner.
 func (e *standardTxExecutor) TransferSubnetOwnershipTx(tx *platform.TransferSubnetOwnershipTx) error {
 	if err := verifyTx(e.backend, e.state.GetTimestamp(), e.tx); err != nil {
 		return err
 	}
 
-	if e.backend.Bootstrapped.Get() {
-		if err := verifySubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth); err != nil {
-			return err
-		}
+	if err := e.verifySubnetAuth(tx.Subnet, tx.SubnetAuth); err != nil {
+		return err
 	}
 
 	if err := e.applySpend(baseTxCreds(e.tx)); err != nil {
@@ -573,11 +552,8 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1T
 		return err
 	}
 
-	// Not bootstrapped yet -- don't need to do full verification.
-	if e.backend.Bootstrapped.Get() {
-		if err := verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, tx.Subnet, tx.SubnetAuth); err != nil {
-			return err
-		}
+	if err := e.verifyPoASubnetAuth(tx.Subnet, tx.SubnetAuth); err != nil {
+		return err
 	}
 
 	var (
@@ -708,8 +684,8 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1Valida
 	if msg.Expiry <= currentTimestampUnix {
 		return fmt.Errorf("%w at %d and it is currently %d", errWarpMessageExpired, msg.Expiry, currentTimestampUnix)
 	}
-	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > registerL1ValidatorTxExpiryWindow {
-		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, registerL1ValidatorTxExpiryWindow)
+	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > registerL1ValidatorTxExpiryWindowSeconds {
+		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, registerL1ValidatorTxExpiryWindowSeconds)
 	}
 
 	// Verify that this warp message isn't being replayed.
@@ -939,6 +915,7 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *platform.DisableL1Validato
 		return err
 	}
 
+	// Not bootstrapped yet, don't need to do full verification.
 	if e.backend.Bootstrapped.Get() {
 		if err := verifyAuthorization(
 			e.backend.Fx,
@@ -1113,6 +1090,26 @@ func (e *standardTxExecutor) SetAutoRenewedValidatorConfigTx(tx *platform.SetAut
 
 func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedValidatorTx) error {
 	return errWrongTxType
+}
+
+// verifySubnetAuth verifies that subnetAuth authorizes modifying subnetID. It
+// is skipped while bootstrapping.
+func (e *standardTxExecutor) verifySubnetAuth(subnetID ids.ID, subnetAuth verify.Verifiable) error {
+	if !e.backend.Bootstrapped.Get() {
+		// Not bootstrapped yet, don't need to do full verification.
+		return nil
+	}
+	return verifySubnetAuthorization(e.backend.Fx, e.state, e.tx, subnetID, subnetAuth)
+}
+
+// verifyPoASubnetAuth verifies that subnetAuth authorizes modifying subnetID
+// and that subnetID is still a PoA subnet. It is skipped while bootstrapping.
+func (e *standardTxExecutor) verifyPoASubnetAuth(subnetID ids.ID, subnetAuth verify.Verifiable) error {
+	if !e.backend.Bootstrapped.Get() {
+		// Not bootstrapped yet, don't need to do full verification.
+		return nil
+	}
+	return verifyPoASubnetAuthorization(e.backend.Fx, e.state, e.tx, subnetID, subnetAuth)
 }
 
 // Creates the staker as defined in stakerTx and adds it to e.state.
