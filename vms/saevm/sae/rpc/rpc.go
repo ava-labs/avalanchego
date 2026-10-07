@@ -69,9 +69,9 @@ type Config struct {
 
 	// Resource limits
 	BlocksPerBloomSection uint64
+	CallTimeout           time.Duration // per call or batch; 0 = no limit
 	GasCap                uint64
-	BatchRequestLimit     uint64        // 0 = no limit
-	CallTimeout           time.Duration // per HTTP request or WebSocket call; 0 = no limit
+	BatchRequestLimit     uint64 // 0 = no limit
 
 	// Transaction submission
 	TxFeeCap            float64 // 0 = no cap

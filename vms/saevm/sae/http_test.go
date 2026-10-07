@@ -4,7 +4,6 @@
 package sae
 
 import (
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -24,25 +23,17 @@ func TestCallTimeout(t *testing.T) {
 	}))
 	defer unblock()
 
-	handlers, err := sut.CreateHandlers(ctx)
-	require.NoErrorf(t, err, "%T.CreateHandlers()", sut.ChainVM)
-	server := httptest.NewServer(handlers[rpcHTTPExtensionPath])
-	t.Cleanup(server.Close)
-	httpClient, err := rpc.DialContext(ctx, server.URL)
-	require.NoErrorf(t, err, "rpc.DialContext(%q)", server.URL)
-	t.Cleanup(httpClient.Close)
-
 	tests := []struct {
 		name   string
 		client *rpc.Client
 	}{
 		{
 			name:   "http",
-			client: httpClient,
+			client: sut.httpClient,
 		},
 		{
 			name:   "ws",
-			client: sut.rpcClient,
+			client: sut.wsClient,
 		},
 	}
 
