@@ -12,8 +12,7 @@ type filtered[T any] struct {
 	filter func(T) bool
 }
 
-// Filter returns an iterator that skips the elements in it that return true
-// from filter.
+// Filter returns an iterator that skips the elements that return true from the filter.
 func Filter[T any](it Iterator[T], filter func(T) bool) Iterator[T] {
 	return &filtered[T]{
 		it:     it,
