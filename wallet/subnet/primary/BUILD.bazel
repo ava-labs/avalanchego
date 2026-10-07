@@ -12,8 +12,6 @@ go_library(
     deps = [
         "//api/info",
         "//codec",
-        "//graft/coreth/plugin/evm/atomic",
-        "//graft/coreth/plugin/evm/client",
         "//ids",
         "//utils/constants",
         "//utils/crypto/keychain",
@@ -23,6 +21,7 @@ go_library(
         "//vms/components/avax",
         "//vms/platformvm",
         "//vms/platformvm/platform",
+        "//vms/saevm/cchain",
         "//vms/saevm/client",
         "//wallet/chain/c",
         "//wallet/chain/p",

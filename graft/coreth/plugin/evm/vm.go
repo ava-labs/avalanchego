@@ -86,10 +86,10 @@ import (
 	corethlog "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/log"
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
-	utilsrpc "github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheUtils "github.com/ava-labs/avalanchego/utils"
+	utilsrpc "github.com/ava-labs/avalanchego/utils/rpc"
 	avalanchegoprometheus "github.com/ava-labs/avalanchego/vms/evm/metrics/prometheus"
 	ethparams "github.com/ava-labs/libevm/params"
 )

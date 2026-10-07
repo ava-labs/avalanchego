@@ -64,7 +64,6 @@ go_library(
         "//vms/secp256k1fx",
         "//vms/txs/mempool",
         "//vms/types",
-        "@com_github_gorilla_rpc//v2:rpc",
         "@org_uber_go_zap//:zap",
     ],
 )
