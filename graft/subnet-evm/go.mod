@@ -12,7 +12,7 @@ require (
 	github.com/ava-labs/avalanchego v1.15.2
 	github.com/ava-labs/avalanchego/graft/evm v1.15.2
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0
-	github.com/ava-labs/libevm v1.13.15-0.20261005085333-91e8349e7488
+	github.com/ava-labs/libevm v1.13.15-0.20261007152454-3b8aa2df2704
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-cmd/cmd v1.4.3
 	github.com/gorilla/rpc v1.2.0

@@ -6,7 +6,6 @@ package sae
 import (
 	"context"
 	"net/http"
-	"time"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 )
@@ -24,22 +23,9 @@ var HandlerPaths = []string{rpcHTTPExtensionPath, wsHTTPExtensionPath}
 func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	s := vm.rpcProvider.Server()
 	return map[string]http.Handler{
-		rpcHTTPExtensionPath: withTimeout(s, vm.config.RPCConfig.CallTimeout),
+		rpcHTTPExtensionPath: s,
 		wsHTTPExtensionPath:  s.WebsocketHandler([]string{"*"}),
 	}, nil
-}
-
-// withTimeout returns h with each request's context limited to timeout, or h
-// itself if timeout is non-positive.
-func withTimeout(h http.Handler, timeout time.Duration) http.Handler {
-	if timeout <= 0 {
-		return h
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx, cancel := context.WithTimeout(r.Context(), timeout)
-		defer cancel()
-		h.ServeHTTP(w, r.WithContext(ctx))
-	})
 }
 
 // NewHTTPHandler returns the HTTP handler that will be invoked if a client
