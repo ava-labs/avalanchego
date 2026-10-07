@@ -24,7 +24,7 @@ type Bag[T comparable] struct {
 	metThreshold set.Set[T]
 }
 
-// Of returns a Bag initialized with elts
+// Of returns a [Bag] initialized with elts.
 func Of[T comparable](elts ...T) Bag[T] {
 	var b Bag[T]
 	b.Add(elts...)

@@ -23,7 +23,7 @@ type BootstrapTracker struct {
 	OnBootstrapCompletedF func() chan struct{}
 }
 
-// Default set the default callable value to cant
+// Default set the default callable value to the provided value.
 func (s *BootstrapTracker) Default(cant bool) {
 	s.CantIsBootstrapped = cant
 	s.CantBootstrapped = cant
