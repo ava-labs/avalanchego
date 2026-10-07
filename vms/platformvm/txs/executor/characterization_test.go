@@ -39,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -124,14 +123,10 @@ func TestCharacterizationForkGates(t *testing.T) {
 	postBanff := []upgradetest.Fork{upgradetest.Banff, upgradetest.Durango, upgradetest.Etna, upgradetest.Helicon}
 
 	tests := []gateTest{
-		// Pre-Durango staker txs are disabled post-Durango. Note: on the
-		// standard path the empty-nodeID check fires BEFORE the Durango
-		// gate, so the minimal tx must carry a nodeID to reach the gate.
+		// Pre-Durango staker txs are disabled post-Durango.
 		{
-			txType: "AddValidatorTx",
-			buildTx: minimal(&platform.AddValidatorTx{
-				Validator: platform.Validator{NodeID: ids.GenerateTestNodeID()},
-			}),
+			txType:      "AddValidatorTx",
+			buildTx:     minimal(&platform.AddValidatorTx{}),
 			execute:     executeStandardCharTx,
 			wantGateErr: durango.errDeprecated,
 			gatedForks:  postDurango,
@@ -376,22 +371,14 @@ func deleteInputUTXOs(diff *state.Diff, tx *platform.Tx) {
 	}
 }
 
-// findPrimaryValidator returns a current primary-network validator from
+// findPrimaryValidator returns the genesis primary-network validator from
 // env's state.
 func findPrimaryValidator(t *testing.T, env *environment) *state.Staker {
 	t.Helper()
 
-	it, err := env.state.GetCurrentStakerIterator()
+	staker, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, genesistest.DefaultNodeIDs[0])
 	require.NoError(t, err)
-	defer it.Release()
-	for it.Next() {
-		staker := it.Value()
-		if staker.Priority == platform.PrimaryNetworkValidatorCurrentPriority {
-			return staker
-		}
-	}
-	t.Fatal("no primary network validator found")
-	return nil
+	return staker
 }
 
 // charUnfundedInput returns an input referencing a UTXO that does not exist
@@ -451,24 +438,13 @@ func charRegisterL1ValidatorTx(
 		message.PChainOwner{},
 		1, // weight
 	))
-	unsignedWarp := must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
-		env.ctx.NetworkID,
-		chainID,
-		must[*payload.AddressedCall](t)(payload.NewAddressedCall(
-			address,
-			registerPayload.Bytes(),
-		)).Bytes(),
-	))
-	warpMessage := must[*warp.Message](t)(warp.NewMessage(
-		unsignedWarp,
-		&warp.BitSetSignature{},
-	))
+	warpMessage := newWarpMessageBytes(t, env, chainID, address, &warp.BitSetSignature{}, registerPayload.Bytes())
 
 	wallet := newWallet(t, env, walletConfig{})
 	tx, err := wallet.IssueRegisterL1ValidatorTx(
 		0, // balance: the test environment has no validator fee capacity
 		proofOfPossession,
-		warpMessage.Bytes(),
+		warpMessage,
 	)
 	require.NoError(t, err)
 	return tx
@@ -489,11 +465,8 @@ func charBaseTx(env *environment) platform.BaseTx {
 					ID: env.ctx.AVAXAssetID,
 				},
 				Out: &secp256k1fx.TransferOutput{
-					Amt: 1,
-					OutputOwners: secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-					},
+					Amt:          1,
+					OutputOwners: *newOwner(),
 				},
 			}},
 		},
@@ -560,16 +533,12 @@ type charFlowTest struct {
 // charFlowTests is the per-tx-type characterization table. THE EXPECTATIONS
 // ENCODE CURRENT BEHAVIOR, INCONSISTENCIES INCLUDED — see the file header.
 func charFlowTests() []charFlowTest {
-	rewardsOwner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-	}
+	rewardsOwner := newOwner()
 
 	return []charFlowTest{
 		{
-			// todo: outdated comment
-			// Bootstrap short-circuit placement: after the static parameter
-			// checks, before the duplicate-validator check and flow check.
+			// Bootstrap short-circuit placement: right after verifyTx, before
+			// the staking rules, duplicate-validator check, and flow check.
 			name:   "AddValidatorTx",
 			txType: "AddValidatorTx",
 			fork:   upgradetest.Cortina,
@@ -627,9 +596,9 @@ func charFlowTests() []charFlowTest {
 			wantWrapsFlowCheck:     true,
 		},
 		{
-			// Bootstrap short-circuit placement: after the duration checks,
-			// before the duplicate-validator check, subnet auth, and flow
-			// check.
+			// Bootstrap short-circuit placement: right after verifyTx, before
+			// the duration checks, duplicate-validator check, subnet auth,
+			// and flow check.
 			name:   "AddSubnetValidatorTx",
 			txType: "AddSubnetValidatorTx",
 			fork:   upgradetest.Durango,
@@ -657,9 +626,9 @@ func charFlowTests() []charFlowTest {
 			wantWrapsFlowCheck:     true,
 		},
 		{
-			// Bootstrap short-circuit placement: after the static parameter
-			// checks and GetInputOutputs, before the validator lookup and
-			// delegation-limit checks.
+			// Bootstrap short-circuit placement: right after verifyTx, before
+			// the staking rules, validator lookup, and delegation-limit
+			// checks.
 			name:   "AddDelegatorTx",
 			txType: "AddDelegatorTx",
 			fork:   upgradetest.Cortina,
@@ -688,8 +657,8 @@ func charFlowTests() []charFlowTest {
 			wantWrapsFlowCheck:     true,
 		},
 		{
-			// Bootstrap short-circuit placement: EARLY — before the staking
-			// rules and duration checks (unlike the pre-Durango staker txs).
+			// Bootstrap short-circuit placement: right after verifyTx, before
+			// the staking rules and duration checks, like every staker tx.
 			name:   "AddPermissionlessValidatorTx",
 			txType: "AddPermissionlessValidatorTx",
 			fork:   upgradetest.Latest,
@@ -986,11 +955,8 @@ func charFlowTests() []charFlowTest {
 					[]*avax.TransferableOutput{{
 						Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
-							Amt: units.Avax,
-							OutputOwners: secp256k1fx.OutputOwners{
-								Threshold: 1,
-								Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-							},
+							Amt:          units.Avax,
+							OutputOwners: *newOwner(),
 						},
 					}},
 				)
@@ -1084,24 +1050,18 @@ func charFlowTests() []charFlowTest {
 					message.PChainOwner{},
 					1, // weight
 				))
-				unsignedWarp := must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
-					env.ctx.NetworkID,
+				warpMessage := newWarpMessageBytes(
+					t,
+					env,
 					ids.GenerateTestID(), // source chain
-					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
-						[]byte{'a', 'd', 'd', 'r'},
-						registerPayload.Bytes(),
-					)).Bytes(),
-				))
-				warpMessage := must[*warp.Message](t)(warp.NewMessage(
-					unsignedWarp,
-					&warp.BitSetSignature{
-						Signature: [bls.SignatureLen]byte{},
-					},
-				))
+					[]byte{'a', 'd', 'd', 'r'},
+					&warp.BitSetSignature{},
+					registerPayload.Bytes(),
+				)
 				return charSignedTx(t, &platform.RegisterL1ValidatorTx{
 					BaseTx:  charBaseTx(env),
 					Balance: 1,
-					Message: warpMessage.Bytes(),
+					Message: warpMessage,
 				}, 1)
 			},
 			skipValid:              true,
@@ -1154,23 +1114,17 @@ func charFlowTests() []charFlowTest {
 					1,                    // nonce
 					0,                    // weight
 				))
-				unsignedWarp := must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
-					env.ctx.NetworkID,
+				warpMessage := newWarpMessageBytes(
+					t,
+					env,
 					ids.GenerateTestID(), // source chain
-					must[*payload.AddressedCall](t)(payload.NewAddressedCall(
-						[]byte{'a', 'd', 'd', 'r'},
-						weightPayload.Bytes(),
-					)).Bytes(),
-				))
-				warpMessage := must[*warp.Message](t)(warp.NewMessage(
-					unsignedWarp,
-					&warp.BitSetSignature{
-						Signature: [bls.SignatureLen]byte{},
-					},
-				))
+					[]byte{'a', 'd', 'd', 'r'},
+					&warp.BitSetSignature{},
+					weightPayload.Bytes(),
+				)
 				return charSignedTx(t, &platform.SetL1ValidatorWeightTx{
 					BaseTx:  charBaseTx(env),
-					Message: warpMessage.Bytes(),
+					Message: warpMessage,
 				}, 1)
 			},
 			skipValid:              true,
@@ -1218,9 +1172,9 @@ func charFlowTests() []charFlowTest {
 			wantWrapsFlowCheck:     false,
 		},
 		{
-			// Bootstrap short-circuit placement: EARLY — right after the
-			// Helicon gate, syntactic, and memo checks. The flow check uses
-			// the verifySpend helper, which wraps with errFlowCheckFailed.
+			// Bootstrap short-circuit placement: right after verifyTx (the
+			// Helicon gate, syntactic, and memo checks), before the staking
+			// rules and flow check.
 			name:   "AddAutoRenewedValidatorTx",
 			txType: "AddAutoRenewedValidatorTx",
 			fork:   upgradetest.Latest,
@@ -1246,8 +1200,8 @@ func charFlowTests() []charFlowTest {
 					ids.GenerateTestNodeID(),
 					2*env.config.MinValidatorStake,
 					newProofOfPossession(t),
-					&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
-					&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+					newOwner(),
+					newOwner(),
 					&secp256k1fx.OutputOwners{},
 					100_000,
 					200_000,
@@ -1442,10 +1396,7 @@ func TestCharacterizationImportTx(t *testing.T) {
 			})
 			tx, err := wallet.IssueImportTx(
 				sourceChain,
-				&secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-				},
+				newOwner(),
 			)
 			require.NoError(t, err)
 

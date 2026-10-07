@@ -44,17 +44,17 @@ var (
 // tx types that are not enabled at the current chain time. It reads nothing
 // but the static upgrade schedule and a snapshot of the chain time, so it
 // runs before any other work is spent on the tx.
-func verifyTxActivation(upgrades upgrade.Config, timestamp time.Time, tx platform.UnsignedTx) error {
+func verifyTxActivation(upgrades *upgrade.Config, timestamp time.Time, tx platform.UnsignedTx) error {
 	var lifetime txLifetime
 	if err := tx.Visit(&lifetime); err != nil {
 		return err
 	}
 
-	if lifetime.introduced != nil && !lifetime.introduced.isActivated(&upgrades, timestamp) {
+	if lifetime.introduced != nil && !lifetime.introduced.isActivated(upgrades, timestamp) {
 		return fmt.Errorf("%w: %T", lifetime.introduced.errNotActive, tx)
 	}
 
-	if lifetime.deprecated != nil && lifetime.deprecated.isActivated(&upgrades, timestamp) {
+	if lifetime.deprecated != nil && lifetime.deprecated.isActivated(upgrades, timestamp) {
 		return fmt.Errorf("%w: %T", lifetime.deprecated.errDeprecated, tx)
 	}
 

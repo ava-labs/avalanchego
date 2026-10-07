@@ -25,7 +25,7 @@ type memoTx interface {
 // the tx is known to belong to that executor: a tx dispatched to the wrong
 // executor is rejected with errWrongTxType before any of these checks run.
 func verifyTx(backend *Backend, timestamp time.Time, tx *platform.Tx) error {
-	upgrades := backend.Config.UpgradeConfig
+	upgrades := &backend.Config.UpgradeConfig
 	if err := verifyTxActivation(upgrades, timestamp, tx.Unsigned); err != nil {
 		return err
 	}
@@ -34,9 +34,9 @@ func verifyTx(backend *Backend, timestamp time.Time, tx *platform.Tx) error {
 		return err
 	}
 
-	memoTx, ok := tx.Unsigned.(memoTx)
-	if !ok {
-		return nil
+	if memoTx, ok := tx.Unsigned.(memoTx); ok {
+		return avax.VerifyMemoFieldLength(memoTx.MemoData(), upgrades.IsDurangoActivated(timestamp))
 	}
-	return avax.VerifyMemoFieldLength(memoTx.MemoData(), upgrades.IsDurangoActivated(timestamp))
+
+	return nil
 }
