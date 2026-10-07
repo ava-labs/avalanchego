@@ -1058,7 +1058,7 @@ func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 	require.NoError(t, err, "bind.NewKeyedTransactorWithChainID(...)")
 
 	addr := sut.deployEscrow(t)
-	ec := sut.Client.EthClient()
+	ec := sut.Client.Eth
 	contract := bind.NewBoundContract(addr, escrow.ABI(t), ec, ec, ec)
 
 	deposit := uint256.NewInt(42)

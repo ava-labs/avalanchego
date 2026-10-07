@@ -17,22 +17,25 @@ import (
 	ethereum "github.com/ava-labs/libevm"
 )
 
+// Disambiguation of the different client types to allow for embedding all in
+// the same struct.
 type (
-	ec = ethclient.Client
-	gc = gethclient.Client
+	Eth struct {
+		*ethclient.Client
+	}
+	Geth struct {
+		*gethclient.Client
+	}
+	RPC struct {
+		*rpc.Client
+	}
 )
 
-// Client unites [ethclient.Client] and [gethclient.Client] with additional methods.
+// Client unites [ethclient.Client], [gethclient.Client] and [rpc.Client].
 type Client struct {
-	*ec
-	*gc
-
-	client *rpc.Client
-}
-
-// Dial connects a client to the given URL.
-func Dial(rawurl string) (*Client, error) {
-	return DialContext(context.Background(), rawurl)
+	Eth
+	Geth
+	RPC
 }
 
 // DialContext connects a client to the given URL with context.
@@ -47,42 +50,21 @@ func DialContext(ctx context.Context, rawurl string) (*Client, error) {
 // New creates a [Client] that uses the given RPC client.
 func New(c *rpc.Client) *Client {
 	return &Client{
-		ec:     ethclient.NewClient(c),
-		gc:     gethclient.New(c),
-		client: c,
+		Eth:  Eth{ethclient.NewClient(c)},
+		Geth: Geth{gethclient.New(c)},
+		RPC:  RPC{c},
 	}
-}
-
-// EthClient returns the embedded [ethclient.Client].
-func (c *Client) EthClient() *ethclient.Client {
-	return c.ec
-}
-
-// GethClient returns the embedded [gethclient.Client].
-func (c *Client) GethClient() *gethclient.Client {
-	return c.gc
 }
 
 // Close closes the RPC client.
 func (c *Client) Close() {
-	c.ec.Close()
-}
-
-// CallContext invokes the given RPC method with the provided arguments and
-// stores the result.
-func (c *Client) CallContext(ctx context.Context, result any, method string, args ...any) error {
-	return c.client.CallContext(ctx, result, method, args...)
-}
-
-// EthSubscribe calls [rpc.Client.EthSubscribe].
-func (c *Client) EthSubscribe(ctx context.Context, channel any, args ...any) (ethereum.Subscription, error) {
-	return c.client.EthSubscribe(ctx, channel, args...)
+	c.RPC.Close() // [ethclient.Client.Close] just closes this
 }
 
 // CallContract invokes [ethclient.Client.CallContract]. For
-// [gethclient.CallContract], use [Client.GethClient].
+// [gethclient.Client.CallContract], use [Client.Geth].
 func (c *Client) CallContract(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
-	return c.ec.CallContract(ctx, msg, blockNumber)
+	return c.Eth.CallContract(ctx, msg, blockNumber)
 }
 
 // EstimateBaseFee tries to estimate the base fee for the next block if it were
@@ -91,8 +73,7 @@ func (c *Client) CallContract(ctx context.Context, msg ethereum.CallMsg, blockNu
 // the returned value.
 func (c *Client) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
 	var hex hexutil.Big
-	err := c.client.CallContext(ctx, &hex, "eth_baseFee")
-	if err != nil {
+	if err := c.CallContext(ctx, &hex, "eth_baseFee"); err != nil {
 		return nil, err
 	}
 	return (*big.Int)(&hex), nil
