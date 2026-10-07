@@ -36,9 +36,9 @@ type (
 // Deprecated: use [validators.FlattenValidatorSet] instead.
 var FlattenValidatorSet = validators.FlattenValidatorSet
 
-// GetCanonicalValidatorSetFromSubnetID returns the CanonicalValidatorSet of subnetID at
-// pChainHeight. The returned CanonicalValidatorSet includes the validator set in a canonical ordering
-// and the total weight.
+// GetCanonicalValidatorSetFromSubnetID returns the [validators.WarpSet] of
+// subnetID at pChainHeight. The returned set includes the validators in a
+// canonical ordering and the total weight.
 //
 // Deprecated: Use [validators.State.GetWarpValidatorSet] instead.
 func GetCanonicalValidatorSetFromSubnetID(

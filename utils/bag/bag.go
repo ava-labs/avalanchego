@@ -78,7 +78,7 @@ func (b *Bag[T]) AddCount(elt T, count int) {
 	}
 }
 
-// Count returns the number of elt in the bag.
+// Count returns the number of times elt is in the bag.
 func (b *Bag[T]) Count(elt T) int {
 	return b.counts[elt]
 }
@@ -121,8 +121,8 @@ func (b *Bag[T]) Threshold() set.Set[T] {
 	return b.metThreshold
 }
 
-// Returns a bag with the elements of this bag that return true for filterFunc,
-// along with their counts.
+// Filter returns a bag with the elements of this bag that return true for
+// filterFunc, along with their counts.
 // For example, if X is in this bag with count 5, and filterFunc(X) returns true,
 // then the returned bag contains X with count 5.
 func (b *Bag[T]) Filter(filterFunc func(T) bool) Bag[T] {
@@ -135,7 +135,7 @@ func (b *Bag[T]) Filter(filterFunc func(T) bool) Bag[T] {
 	return newBag
 }
 
-// Returns:
+// Split returns:
 // 1. A bag containing the elements of this bag that return false for splitFunc.
 // 2. A bag containing the elements of this bag that return true for splitFunc.
 // Counts are preserved in the returned bags.

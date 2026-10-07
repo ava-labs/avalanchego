@@ -611,7 +611,8 @@ func (p *PushGossiper[_]) updateMetrics(nowUnixNano float64) {
 	p.metrics.trackingLifetimeAverage.Set(averageLifetime)
 }
 
-// Every calls [Gossiper.Gossip] every period amount of time.
+// Every calls [Gossiper.Gossip] on gossiper once every period until ctx is
+// done.
 func Every(ctx context.Context, log logging.Logger, gossiper Gossiper, period time.Duration) {
 	if period <= 0 {
 		period = defaultRequestPeriod

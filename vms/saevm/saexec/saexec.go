@@ -108,7 +108,8 @@ type Unhealthy struct {
 	cause *blocks.Block
 }
 
-// Error implements error.
+// Error returns the unhealthy block's number and hash, and the underlying
+// error.
 func (e *Unhealthy) Error() string {
 	return fmt.Sprintf("saexec.Executor unhealthy due to block %d (%#x): %s", e.cause.NumberU64(), e.cause.Hash(), e.err.Error())
 }

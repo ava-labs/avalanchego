@@ -52,8 +52,9 @@ type InboundConnUpgradeThrottlerConfig struct {
 	MaxRecentConnsUpgraded int `json:"maxRecentConnsUpgraded"`
 }
 
-// Returns an InboundConnUpgradeThrottler that upgrades an inbound
-// connection from a given IP at most every [InboundConnUpgradeThrottlerConfig.UpgradeCooldown].
+// NewInboundConnUpgradeThrottler returns an [InboundConnUpgradeThrottler] that
+// upgrades an inbound connection from a given IP at most every
+// [InboundConnUpgradeThrottlerConfig.UpgradeCooldown].
 func NewInboundConnUpgradeThrottler(config InboundConnUpgradeThrottlerConfig) InboundConnUpgradeThrottler {
 	if config.UpgradeCooldown <= 0 || config.MaxRecentConnsUpgraded <= 0 {
 		return &noInboundConnUpgradeThrottler{}

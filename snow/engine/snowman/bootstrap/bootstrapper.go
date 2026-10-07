@@ -463,7 +463,7 @@ func (b *Bootstrapper) fetch(ctx context.Context, blkID ids.ID) error {
 }
 
 // Ancestors handles the receipt of multiple containers. Should be received in
-// response to a GetAncestors message to nodeID with request ID requestID
+// response to a GetAncestors message to nodeID with request ID requestID.
 func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) error {
 	// Make sure this is in response to a request we made
 	request := common.Request{

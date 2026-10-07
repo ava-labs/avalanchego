@@ -124,7 +124,7 @@ type Proof struct {
 }
 
 // Verify returns nil if the trie given in proof has root expectedRootID.
-// That is, this is a valid proof that proof.Key exists/doesn't exist
+// That is, this is a valid proof that [Proof.Key] exists/doesn't exist
 // in the trie with root expectedRootID.
 func (proof *Proof) Verify(
 	ctx context.Context,
@@ -301,7 +301,7 @@ func validateChangeProof(
 // Verify returns nil iff all the following hold:
 //   - The invariants of RangeProof hold.
 //   - start <= end.
-//   - r proves the key-value pairs in r.KeyChanges are in the trie
+//   - The proof shows the key-value pairs in r.KeyChanges are in the trie
 //     whose root is expectedRootID.
 //
 // All keys in r.KeyChanges are in the range [start, end].

@@ -70,16 +70,16 @@ func AggregatePublicKeys(pks []*PublicKey) (*PublicKey, error) {
 	return agg.ToAffine(), nil
 }
 
-// Verify the sig of msg against the pk.
-// The sig and pk may have been an aggregation of other signatures and keys.
+// Verify verifies sig of msg against pk.
+// sig and pk may be aggregations of other signatures and keys.
 // Invariant: pk and sig have both been validated.
 func Verify(pk *PublicKey, sig *Signature, msg []byte) bool {
 	return sig.Verify(false, pk, false, msg, CiphersuiteSignature.Bytes())
 }
 
-// Verify the possession of the secret pre-image of sk by verifying a sig of
-// msg against the pk.
-// The sig and pk may have been an aggregation of other signatures and keys.
+// VerifyProofOfPossession verifies possession of the secret key corresponding
+// to pk by verifying sig of msg against pk.
+// sig and pk may be aggregations of other signatures and keys.
 // Invariant: pk and sig have both been validated.
 func VerifyProofOfPossession(pk *PublicKey, sig *Signature, msg []byte) bool {
 	return sig.Verify(false, pk, false, msg, CiphersuiteProofOfPossession.Bytes())

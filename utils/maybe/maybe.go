@@ -14,8 +14,7 @@ import "fmt"
 type Maybe[T any] struct {
 	// Invariant: If hasValue is false, then value is the zero value of type T.
 	hasValue bool
-	// If [hasValue] is false, [value] is the zero value of type T.
-	value T
+	value    T
 }
 
 // Some returns a new Maybe[T] with the value val.
@@ -54,8 +53,8 @@ func (m Maybe[T]) String() string {
 	return fmt.Sprintf("Some[%T]{%v}", m.value, m.value)
 }
 
-// Bind returns Nothing iff m is Nothing.
-// Otherwise applies f to the value of m and returns the result as a Some.
+// Bind returns [Nothing] iff m is Nothing.
+// Otherwise applies f to the value of m and returns the result as a [Some].
 func Bind[T, U any](m Maybe[T], f func(T) U) Maybe[U] {
 	if m.IsNothing() {
 		return Nothing[U]()

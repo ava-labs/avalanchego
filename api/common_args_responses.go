@@ -70,7 +70,7 @@ type GetTxArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-// GetTxReply defines an object containing a single [GetTxReply.Tx] object along with Encoding
+// GetTxReply defines an object containing a single tx along with its encoding.
 type GetTxReply struct {
 	// If [GetTxArgs.Encoding] is [Hex], [Tx] is the string representation of
 	// the tx under hex encoding.

@@ -477,8 +477,8 @@ type GetSubnetsResponse struct {
 	Subnets []APISubnet `json:"subnets"`
 }
 
-// GetSubnets returns the subnets whose ID are in args.IDs
-// The response will include the primary network
+// GetSubnets returns the subnets whose IDs are in [GetSubnetsArgs.IDs].
+// The response will include the primary network.
 func (s *Service) GetSubnets(_ *http.Request, args *GetSubnetsArgs, response *GetSubnetsResponse) error {
 	s.vm.ctx.Log.Debug("deprecated API called",
 		zap.String("service", "platform"),
@@ -1166,20 +1166,22 @@ func (s *Service) SampleValidators(_ *http.Request, args *SampleValidatorsArgs, 
 	return nil
 }
 
-// GetBlockchainStatusArgs is the arguments for calling GetBlockchainStatus
-// [GetBlockchainStatusArgs.BlockchainID] is the ID of or an alias of the blockchain to get the
-// status of.
+// GetBlockchainStatusArgs is the arguments for calling
+// [Service.GetBlockchainStatus].
 type GetBlockchainStatusArgs struct {
+	// BlockchainID is the ID or an alias of the blockchain to get the status of.
 	BlockchainID string `json:"blockchainID"`
 }
 
-// GetBlockchainStatusReply is the reply from calling GetBlockchainStatus
-// [GetBlockchainStatusReply.Status] is the blockchain's status.
+// GetBlockchainStatusReply is the reply from calling
+// [Service.GetBlockchainStatus].
 type GetBlockchainStatusReply struct {
+	// Status is the blockchain's status.
 	Status status.BlockchainStatus `json:"status"`
 }
 
-// GetBlockchainStatus gets the status of a blockchain with the ID args.BlockchainID.
+// GetBlockchainStatus gets the status of a blockchain with the ID
+// [GetBlockchainStatusArgs.BlockchainID].
 func (s *Service) GetBlockchainStatus(r *http.Request, args *GetBlockchainStatusArgs, reply *GetBlockchainStatusReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
@@ -1288,7 +1290,8 @@ type ValidatedByResponse struct {
 	SubnetID ids.ID `json:"subnetID"`
 }
 
-// ValidatedBy returns the ID of the Subnet that validates args.BlockchainID
+// ValidatedBy returns the ID of the Subnet that validates
+// [ValidatedByArgs.BlockchainID].
 func (s *Service) ValidatedBy(r *http.Request, args *ValidatedByArgs, response *ValidatedByResponse) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
@@ -1314,7 +1317,8 @@ type ValidatesResponse struct {
 	BlockchainIDs []ids.ID `json:"blockchainIDs"`
 }
 
-// Validates returns the IDs of the blockchains validated by args.SubnetID
+// Validates returns the IDs of the blockchains validated by
+// [ValidatesArgs.SubnetID].
 func (s *Service) Validates(_ *http.Request, args *ValidatesArgs, response *ValidatesResponse) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),

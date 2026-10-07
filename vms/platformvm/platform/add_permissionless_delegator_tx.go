@@ -37,8 +37,9 @@ type AddPermissionlessDelegatorTx struct {
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
-// [AddPermissionlessDelegatorTx]. Also sets the ctx to the given ctx so
-// that the addresses can be json marshalled into human readable format
+// [AddPermissionlessDelegatorTx] and initializes the outputs and owner with
+// ctx so that their addresses can be JSON marshalled into a human-readable
+// format.
 func (tx *AddPermissionlessDelegatorTx) InitCtx(ctx *snow.Context) {
 	tx.BaseTx.InitCtx(ctx)
 	for _, out := range tx.StakeOuts {

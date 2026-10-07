@@ -48,8 +48,8 @@ func (m *Memory) NewSharedMemory(chainID ids.ID) SharedMemory {
 // GetSharedDatabase returns a new locked prefix db on top of an existing
 // database
 //
-// Invariant: ReleaseSharedDatabase must be called after to free the database
-// associated with sharedID
+// Invariant: [Memory.ReleaseSharedDatabase] must be called after to free the
+// database associated with sharedID.
 func (m *Memory) GetSharedDatabase(db database.Database, sharedID ids.ID) database.Database {
 	lock := m.makeLock(sharedID)
 	lock.Lock()

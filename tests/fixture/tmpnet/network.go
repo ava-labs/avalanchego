@@ -607,8 +607,9 @@ func WaitForHealthyNodes(ctx context.Context, log logging.Logger, nodes []*Node)
 	return nil
 }
 
-// Ensures the provided node has the configuration it needs to start. If the data dir is not
-// set, it will be defaulted to [Network.Dir]/[Node.NodeID].
+// EnsureNodeConfig ensures the provided node has the configuration it needs to
+// start. If the data dir is not set, it will be defaulted to
+// [Network.Dir]/[Node.NodeID].
 func (n *Network) EnsureNodeConfig(node *Node) error {
 	// Ensure the node has access to network configuration
 	node.network = n

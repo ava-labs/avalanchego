@@ -56,8 +56,8 @@ var (
 	ErrWeakPassword  = errors.New("password is too weak")
 )
 
-// SufficientlyStrong returns true if [password] has strength greater than or
-// equal to minimumStrength
+// SufficientlyStrong returns true if password has strength greater than or
+// equal to minimumStrength.
 func SufficientlyStrong(password string, minimumStrength Strength) bool {
 	if len(password) > maxCheckedPassLen {
 		password = password[:maxCheckedPassLen]
@@ -65,8 +65,8 @@ func SufficientlyStrong(password string, minimumStrength Strength) bool {
 	return zxcvbn.PasswordStrength(password, nil).Score >= int(minimumStrength)
 }
 
-// IsValid returns nil if [password] is a reasonable length and has strength
-// greater than or equal to minimumStrength
+// IsValid returns nil if password is a reasonable length and has strength
+// greater than or equal to minimumStrength.
 func IsValid(password string, minimumStrength Strength) error {
 	switch {
 	case len(password) == 0:

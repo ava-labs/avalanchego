@@ -176,10 +176,10 @@ type chain struct {
 }
 
 // ChainConfig is configuration settings for the current execution.
-// [ChainConfig.Config] is the user-provided config blob for the chain.
-// [ChainConfig.Upgrade] is a chain-specific blob for coordinating upgrades.
 type ChainConfig struct {
-	Config  []byte
+	// Config is the user-provided config blob for the chain.
+	Config []byte
+	// Upgrade is a chain-specific blob for coordinating upgrades.
 	Upgrade []byte
 }
 

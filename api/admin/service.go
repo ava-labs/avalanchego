@@ -63,7 +63,7 @@ type Admin struct {
 }
 
 // NewService returns a new admin API service.
-// All of the fields in config must be set.
+// All of the fields in the provided [Config] must be set.
 func NewService(config Config) (http.Handler, error) {
 	server := rpc.NewServer()
 	codec := json.NewCodec()

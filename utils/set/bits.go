@@ -30,29 +30,29 @@ func NewBits(bits ...int) Bits {
 	return b
 }
 
-// Add sets the i'th bit to 1
+// Add sets the i'th bit to 1.
 func (b Bits) Add(i int) {
 	b.bits.SetBit(b.bits, i, 1)
 }
 
 // Union performs the set union with another set.
-// This adds all elements in other to b
+// This adds all elements in other to b.
 func (b Bits) Union(other Bits) {
 	b.bits.Or(b.bits, other.bits)
 }
 
-// Intersection performs the set intersection with another set
-// This sets b to include only elements in both b and other
+// Intersection performs the set intersection with another set.
+// This sets b to include only elements in both b and other.
 func (b Bits) Intersection(other Bits) {
 	b.bits.And(b.bits, other.bits)
 }
 
-// Difference removes all the elements in other from this set
+// Difference removes all the elements in other from this set.
 func (b Bits) Difference(other Bits) {
 	b.bits.AndNot(b.bits, other.bits)
 }
 
-// Remove sets the i'th bit to 0
+// Remove sets the i'th bit to 0.
 func (b Bits) Remove(i int) {
 	b.bits.SetBit(b.bits, i, 0)
 }
@@ -62,7 +62,7 @@ func (b Bits) Clear() {
 	b.bits.SetUint64(0)
 }
 
-// Contains returns true if the i'th bit is 1, and false otherwise
+// Contains returns true if the i'th bit is 1, and false otherwise.
 func (b Bits) Contains(i int) bool {
 	return b.bits.Bit(i) == 1
 }

@@ -18,8 +18,8 @@ type Credential struct {
 	Sigs [][secp256k1.SignatureLen]byte `serialize:"true" json:"signatures"`
 }
 
-// MarshalJSON marshals cr to JSON
-// The string representation of each signature is created using the hex formatter
+// MarshalJSON marshals the credential to JSON. The string representation of
+// each signature is created using the hex formatter.
 func (cr *Credential) MarshalJSON() ([]byte, error) {
 	signatures := make([]string, len(cr.Sigs))
 	for i, sig := range cr.Sigs {

@@ -152,7 +152,7 @@ func (p *PeerTracker) shouldSelectUntrackedPeer() bool {
 	return rand.Float64() < newPeerProbability // #nosec G404
 }
 
-// SelectPeer that we could send a request to.
+// SelectPeer returns a peer that we could send a request to.
 //
 // If we should track more peers, returns a random untracked peer, if any exist.
 // Otherwise, usually returns the peer with the highest observed bandwidth, and
@@ -208,7 +208,7 @@ func (p *PeerTracker) SelectPeer() (ids.NodeID, bool) {
 	return ids.EmptyNodeID, false
 }
 
-// Record that we sent a request to nodeID.
+// RegisterRequest records that we sent a request to nodeID.
 //
 // Removes the peer's bandwidth averager from the bandwidth heap.
 func (p *PeerTracker) RegisterRequest(nodeID ids.NodeID) {
@@ -222,14 +222,14 @@ func (p *PeerTracker) RegisterRequest(nodeID ids.NodeID) {
 	p.metrics.numTrackedPeers.Set(float64(p.trackedPeers.Len()))
 }
 
-// Record that we observed that nodeID's bandwidth is bandwidth.
+// RegisterResponse records a response from nodeID with the observed bandwidth.
 //
 // Adds the peer's bandwidth averager to the bandwidth heap.
 func (p *PeerTracker) RegisterResponse(nodeID ids.NodeID, bandwidth float64) {
 	p.updateBandwidth(nodeID, bandwidth, true)
 }
 
-// Record that a request failed to nodeID.
+// RegisterFailure records that a request to nodeID failed.
 //
 // Adds the peer's bandwidth averager to the bandwidth heap.
 func (p *PeerTracker) RegisterFailure(nodeID ids.NodeID) {

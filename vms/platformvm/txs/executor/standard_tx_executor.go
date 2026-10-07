@@ -66,7 +66,7 @@ var (
 
 // StandardTx executes the standard transaction tx.
 //
-// [state] is modified to represent the state of the chain after the execution
+// state is modified to represent the state of the chain after the execution
 // of tx.
 //
 // Returns:

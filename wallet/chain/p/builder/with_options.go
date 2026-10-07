@@ -24,7 +24,7 @@ type withOptions struct {
 
 // WithOptions returns a new builder that will use the given options by default.
 //
-//   - [builder] is the builder that will be called to perform the underlying
+//   - builder is the builder that will be called to perform the underlying
 //     operations.
 //   - options will be provided to the builder in addition to the options
 //     provided in the method calls.

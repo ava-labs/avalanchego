@@ -217,10 +217,10 @@ func FetchEthState(
 	}, nil
 }
 
-// AddAllUTXOs fetches all the UTXOs referenced by addrs that were sent
-// from sourceChainID to destinationChainID from the [client]. It then uses
-// [codec] to parse the returned UTXOs and it adds them into utxos. If ctx
-// expires, then the returned error will be immediately reported.
+// AddAllUTXOs fetches from client all the UTXOs referenced by addrs that were
+// sent from sourceChainID to destinationChainID. It then uses codec to parse
+// the returned UTXOs and adds them into utxos. If ctx expires, then the
+// returned error will be immediately reported.
 func AddAllUTXOs(
 	ctx context.Context,
 	utxos walletcommon.UTXOs,

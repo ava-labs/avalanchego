@@ -90,8 +90,9 @@ type VM struct {
 	onShutdownCtxCancel context.CancelFunc
 }
 
-// Initialize this blockchain.
-// vm.ChainManager and vm.vdrMgr must be set before this function is called.
+// Initialize initializes this blockchain.
+// [config.Internal.Chains] and [config.Internal.Validators] MUST be set before
+// this function is called.
 func (vm *VM) Initialize(
 	ctx context.Context,
 	chainCtx *snow.Context,

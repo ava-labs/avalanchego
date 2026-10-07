@@ -73,7 +73,8 @@ func parser(hooks hook.Points) syncblocks.Parser {
 }
 
 // GetLastStateSummary returns the summary of the highest block, at or below the
-// last accepted block, whose height is a multiple of the commit interval.
+// last accepted block, whose height is a multiple of
+// [saedb.Config.CommitInterval].
 func (h *Handler) GetLastStateSummary(context.Context) (*Summary, error) {
 	hash, err := h.lastAcceptedHash()
 	if err != nil {

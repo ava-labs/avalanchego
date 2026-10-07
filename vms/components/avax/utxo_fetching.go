@@ -15,7 +15,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// GetBalance returns the current balance of addrs
+// GetBalance returns the current balance of addrs.
 func GetBalance(db UTXOReader, addrs set.Set[ids.ShortID]) (uint64, error) {
 	utxos, err := GetAllUTXOs(db, addrs)
 	if err != nil {

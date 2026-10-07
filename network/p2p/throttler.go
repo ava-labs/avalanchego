@@ -59,8 +59,8 @@ type SlidingWindowThrottler struct {
 	windows [2]window
 }
 
-// Handle returns true if the amount of calls received in the last s.period
-// time is less than s.limit
+// Handle returns true if the number of calls received from nodeID in the last
+// period is less than the limit.
 //
 // This is calculated by adding the current period's count to a weighted count
 // of the previous period.
