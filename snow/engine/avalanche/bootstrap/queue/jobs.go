@@ -330,7 +330,7 @@ func (jm *JobsWithMissing) Push(ctx context.Context, job Job) (bool, error) {
 	return true, nil
 }
 
-// AddMissingID adds jobID to missingIDs
+// AddMissingID adds jobIDs to the set of missing IDs.
 func (jm *JobsWithMissing) AddMissingID(jobIDs ...ids.ID) {
 	for _, jobID := range jobIDs {
 		if !jm.missingIDs.Contains(jobID) {
@@ -341,7 +341,7 @@ func (jm *JobsWithMissing) AddMissingID(jobIDs ...ids.ID) {
 	}
 }
 
-// RemoveMissingID removes jobID from missingIDs
+// RemoveMissingID removes jobIDs from the set of missing IDs.
 func (jm *JobsWithMissing) RemoveMissingID(jobIDs ...ids.ID) {
 	for _, jobID := range jobIDs {
 		if jm.missingIDs.Contains(jobID) {

@@ -29,7 +29,7 @@ func New[K, V comparable]() *SetMap[K, V] {
 
 // Put the new entry into the map. Removes and returns:
 // * The existing entry for key.
-// * Existing entries where the set overlaps with the [set].
+// * Existing entries where the set overlaps with the provided set.
 func (m *SetMap[K, V]) Put(key K, set set.Set[V]) []Entry[K, V] {
 	removed := m.DeleteOverlapping(set)
 	if removedSet, ok := m.DeleteKey(key); ok {
@@ -70,7 +70,8 @@ func (m *SetMap[_, V]) HasValue(val V) bool {
 	return ok
 }
 
-// HasOverlap returns true if [set] overlaps with any of the sets in the map.
+// HasOverlap returns true if the provided set overlaps with any of the sets in
+// the map.
 func (m *SetMap[_, V]) HasOverlap(set set.Set[V]) bool {
 	if set.Len() < len(m.valueToKey) {
 		for val := range set {
@@ -113,7 +114,7 @@ func (m *SetMap[K, V]) DeleteValue(val V) (K, set.Set[V], bool) {
 }
 
 // DeleteOverlapping removes and returns all the entries where the set overlaps
-// with [set].
+// with the provided set.
 func (m *SetMap[K, V]) DeleteOverlapping(set set.Set[V]) []Entry[K, V] {
 	var removed []Entry[K, V]
 	for val := range set {

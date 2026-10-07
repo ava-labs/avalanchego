@@ -18,7 +18,8 @@ type BlockingDeque[T any] interface {
 	Close()
 }
 
-// Returns a new unbounded deque with the given initial size.
+// NewUnboundedBlockingDeque returns a new [UnboundedBlockingDeque] with the
+// given initial size.
 // Note that the returned deque is always empty -- initSize is just
 // a hint to prevent unnecessary resizing.
 func NewUnboundedBlockingDeque[T any](initSize int) *UnboundedBlockingDeque[T] {

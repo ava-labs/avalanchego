@@ -46,7 +46,7 @@ type updater struct {
 	updateFreq time.Duration
 }
 
-// Returns a new Updater that updates dynamicIP
+// NewUpdater returns a new [Updater] that updates dynamicIP
 // every updateFreq. Uses resolver to find
 // out what our public IP is.
 func NewUpdater(

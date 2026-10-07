@@ -171,7 +171,7 @@ type builder struct {
 //
 //   - addrs is the set of addresses that the builder assumes can be used when
 //     signing the transactions in the future.
-//   - [context] provides the chain's configuration.
+//   - context provides the chain's configuration.
 //   - backend provides the chain's state.
 func New(
 	addrs set.Set[ids.ShortID],

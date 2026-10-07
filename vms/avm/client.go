@@ -84,7 +84,7 @@ func (c *Client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Opt
 	return res.TxID, err
 }
 
-// GetTxStatus returns the status of txID
+// GetTxStatus returns the status of txID.
 //
 // Deprecated: GetTxStatus only returns Accepted or Unknown, GetTx should be
 // used instead to determine if the tx was accepted.

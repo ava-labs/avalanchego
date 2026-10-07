@@ -52,7 +52,8 @@ const (
 	BranchFactorLargest = BranchFactor256
 )
 
-// Valid checks if BranchFactor b is one of the predefined valid options for BranchFactor
+// Valid checks if BranchFactor b is one of the predefined valid options for
+// BranchFactor.
 func (b BranchFactor) Valid() error {
 	if slices.Contains(validBranchFactors, b) {
 		return nil
@@ -99,8 +100,9 @@ type Key struct {
 	value string
 }
 
-// ToKey returns keyBytes as a new key
-// Assumes all bits of the keyBytes are part of the Key, call Key.Take if that is not the case
+// ToKey returns keyBytes as a new key.
+// Assumes all bits of keyBytes are part of the Key; call [Key.Take] if that is
+// not the case.
 // Creates a copy of keyBytes, so keyBytes are safe to edit after the call
 func ToKey(keyBytes []byte) Key {
 	return toKey(slices.Clone(keyBytes))
@@ -121,7 +123,8 @@ func (k Key) hasPartialByte() bool {
 	return k.length%8 > 0
 }
 
-// HasPrefix returns true iff prefix is a prefix of k or equal to it.
+// HasPrefix returns true iff the provided prefix is a prefix of k or equal to
+// it.
 func (k Key) HasPrefix(prefix Key) bool {
 	// [prefix] must be shorter than [k] to be a prefix.
 	if k.length < prefix.length {
@@ -152,8 +155,8 @@ func (k Key) HasPrefix(prefix Key) bool {
 	return strings.HasPrefix(k.value, prefixWithoutPartialByte)
 }
 
-// HasStrictPrefix returns true iff prefix is a prefix of k
-// but is not equal to it.
+// HasStrictPrefix returns true iff the provided prefix is a prefix of k but is
+// not equal to it.
 func (k Key) HasStrictPrefix(prefix Key) bool {
 	return k != prefix && k.HasPrefix(prefix)
 }
@@ -180,7 +183,8 @@ func (k Key) Compare(other Key) int {
 	return cmp.Compare(k.length, other.length)
 }
 
-// Extend returns a new Key that is the in-order aggregation of Key k with keys
+// Extend returns a new Key that is the in-order concatenation of k and the
+// provided keys.
 func (k Key) Extend(keys ...Key) Key {
 	totalBitLength := k.length
 	for _, key := range keys {

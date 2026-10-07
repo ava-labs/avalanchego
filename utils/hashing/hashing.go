@@ -68,10 +68,8 @@ func ComputeHash160(buf []byte) []byte {
 	return ripe.Sum(nil)
 }
 
-// Checksum creates a checksum of length bytes from the 256 bit hash of the
-// byte slice.
+// Checksum returns the last length bytes of the 256-bit hash of bytes.
 //
-// Returns: the lower length bytes of the hash
 // Panics if length > 32.
 func Checksum(bytes []byte, length int) []byte {
 	hash := ComputeHash256Array(bytes)

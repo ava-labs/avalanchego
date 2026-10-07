@@ -138,7 +138,7 @@ func GetBool(db KeyValueReader, key []byte) (bool, error) {
 }
 
 // WithDefault returns the value at key in db. If the key doesn't exist, it
-// returns def.
+// returns the provided default value.
 func WithDefault[V any](
 	get func(KeyValueReader, []byte) (V, error),
 	db KeyValueReader,
@@ -192,13 +192,13 @@ func AtomicClearPrefix(readerDB Iteratee, deleterDB KeyValueDeleter, prefix []by
 	return iterator.Error()
 }
 
-// Remove all key-value pairs from db.
+// Clear removes all key-value pairs from db.
 // Writes each batch when it reaches writeSize.
 func Clear(db Database, writeSize int) error {
 	return ClearPrefix(db, nil, writeSize)
 }
 
-// Removes all keys with the given prefix from db.
+// ClearPrefix removes all keys with the given prefix from db.
 // Writes each batch when it reaches writeSize.
 func ClearPrefix(db Database, prefix []byte, writeSize int) error {
 	b := db.NewBatch()

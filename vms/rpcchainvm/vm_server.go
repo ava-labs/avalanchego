@@ -406,8 +406,10 @@ func (vm *VMServer) Disconnected(ctx context.Context, req *vmpb.DisconnectedRequ
 	return &emptypb.Empty{}, vm.vm.Disconnected(ctx, nodeID)
 }
 
-// If the underlying VM doesn't actually implement this method, its [block.ChainVM.BuildBlock]
-// method will be called instead.
+// BuildBlock builds a block with
+// [block.BuildBlockWithContextChainVM.BuildBlockWithContext] if the underlying
+// VM implements it and a P-chain height is provided. Otherwise it falls back to
+// [block.ChainVM.BuildBlock].
 func (vm *VMServer) BuildBlock(ctx context.Context, req *vmpb.BuildBlockRequest) (*vmpb.BuildBlockResponse, error) {
 	var (
 		blk snowman.Block

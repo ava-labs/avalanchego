@@ -75,7 +75,7 @@ type SignedIP struct {
 	BLSSignatureBytes []byte
 }
 
-// Returns nil if:
+// Verify returns nil if:
 // * ip.Timestamp is not after maxTimestamp.
 // * ip.TLSSignature is a valid signature over ip.UnsignedIP from cert.
 func (ip *SignedIP) Verify(

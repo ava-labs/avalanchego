@@ -33,7 +33,7 @@ func NewTimer(handler func()) *Timer {
 	return timer
 }
 
-// SetTimeoutIn will set the timer to fire the handler in duration
+// SetTimeoutIn sets the timer to fire the handler after duration.
 func (t *Timer) SetTimeoutIn(duration time.Duration) {
 	t.lock.Lock()
 	defer t.lock.Unlock()

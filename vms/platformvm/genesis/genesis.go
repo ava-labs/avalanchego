@@ -125,18 +125,18 @@ type PermissionlessValidator struct {
 	Signer             *signer.ProofOfPossession
 }
 
-// Chain defines a chain that exists at the network's genesis
-// [Chain.GenesisData] is the initial state of the chain.
-// [Chain.VMID] is the ID of the VM this chain runs.
-// [Chain.FxIDs] are the IDs of the Fxs the chain supports.
-// [Chain.Name] is a human-readable, non-unique name for the chain.
-// [Chain.SubnetID] is the ID of the subnet that validates the chain
+// Chain defines a chain that exists at the network's genesis.
 type Chain struct {
+	// GenesisData is the initial state of the chain.
 	GenesisData []byte
-	VMID        ids.ID
-	FxIDs       []ids.ID
-	Name        string
-	SubnetID    ids.ID
+	// VMID is the ID of the VM this chain runs.
+	VMID ids.ID
+	// FxIDs are the IDs of the Fxs the chain supports.
+	FxIDs []ids.ID
+	// Name is a human-readable, non-unique name for the chain.
+	Name string
+	// SubnetID is the ID of the subnet that validates the chain.
+	SubnetID ids.ID
 }
 
 // bech32ToID takes bech32 address and produces a shortID
@@ -154,7 +154,7 @@ func bech32ToID(addrStr string) (ids.ShortID, error) {
 // allocations are the UTXOs on the Platform Chain that exist at genesis.
 // validators are the validators of the primary network at genesis.
 // chains are the chains that exist at genesis.
-// [time] is the Platform Chain's time at network genesis.
+// time is the Platform Chain's time at network genesis.
 // initialSupply is the initial supply of the AVAX asset.
 // message is the message to be sent to the genesis UTXOs.
 func New(

@@ -22,9 +22,9 @@ var (
 //
 // The ordering of operations is:
 //   - Staker operations are performed in order of their [Staker.NextTime].
-//   - If operations have the same [Staker.NextTime], stakers are first added to the
-//     current staker set, then removed.
-//   - Further ties are broken by *Staker.Less(), returning the lesser staker
+//   - If operations have the same [Staker.NextTime], stakers are first added
+//     to the current staker set, then removed.
+//   - Further ties are broken by [Staker.Less], returning the lesser staker
 //     first.
 type StakerDiffIterator interface {
 	Next() bool

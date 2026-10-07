@@ -11,16 +11,16 @@ import (
 )
 
 // Staker is the representation of a staker sent via APIs.
-// [Staker.TxID] is the txID of the transaction that added this staker.
-// [Staker.EndTime] is the Unix time repr. of when they are done staking
-// [Staker.NodeID] is the node ID of the staker
-// [Staker.Weight] is the validator weight (stake) when sampling validators
 type Staker struct {
+	// TxID is the ID of the transaction that added this staker.
 	TxID      ids.ID      `json:"txID"`
 	StartTime json.Uint64 `json:"startTime"`
-	EndTime   json.Uint64 `json:"endTime"`
-	Weight    json.Uint64 `json:"weight"`
-	NodeID    ids.NodeID  `json:"nodeID"`
+	// EndTime is the Unix time at which the staker stops staking.
+	EndTime json.Uint64 `json:"endTime"`
+	// Weight is the validator weight (stake) used when sampling validators.
+	Weight json.Uint64 `json:"weight"`
+	// NodeID is the node ID of the staker.
+	NodeID ids.NodeID `json:"nodeID"`
 }
 
 // Owner is the repr. of a reward owner sent over APIs.

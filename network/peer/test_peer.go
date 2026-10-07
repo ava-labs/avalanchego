@@ -45,7 +45,7 @@ const maxMessageToSend = 1024
 //   - networkID will be sent to the peer during the handshake. If the peer is
 //     expecting a different networkID, the handshake will fail and an error
 //     will be returned.
-//   - [router] will be called with all non-handshake messages received by the
+//   - router will be called with all non-handshake messages received by the
 //     peer.
 func StartTestPeer(
 	ctx context.Context,
