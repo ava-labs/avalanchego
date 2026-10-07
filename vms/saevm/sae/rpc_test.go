@@ -842,6 +842,21 @@ func TestGetLogs(t *testing.T) {
 			},
 			wantLogs: logsFrom(indexed...),
 		},
+		{
+			name: "to_future_block",
+			query: ethereum.FilterQuery{
+				FromBlock: executed.Number(),
+				ToBlock:   new(big.Int).Add(executed.Number(), big.NewInt(10)),
+			},
+			wantLogs: logsFrom(executed),
+		},
+		{
+			name: "future_range",
+			query: ethereum.FilterQuery{
+				FromBlock: new(big.Int).Add(executed.Number(), big.NewInt(1)),
+				ToBlock:   new(big.Int).Add(executed.Number(), big.NewInt(10)),
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -911,11 +926,19 @@ func TestGetLogsBlockLimit(t *testing.T) {
 			},
 		},
 		{
-			name: "over_limit_to_future_block",
+			name: "over_limit_to_future_block_resolves",
 			query: ethereum.FilterQuery{
 				FromBlock: big.NewInt(1),
 				ToBlock:   big.NewInt(100),
 			},
+		},
+		{
+			name: "over_limit_to_future_block",
+			query: ethereum.FilterQuery{
+				FromBlock: big.NewInt(0),
+				ToBlock:   big.NewInt(100),
+			},
+			wantErr: testerr.Contains("requested too many blocks from 0 to 2, maximum is set to 2"),
 		},
 		{
 			name: "with_hash_ignores_args",
@@ -925,6 +948,14 @@ func TestGetLogsBlockLimit(t *testing.T) {
 			},
 			// If the numbers were resolved, it would have gotten the "over limit" error
 			wantErr: testerr.Contains("cannot specify both BlockHash and FromBlock/ToBlock"),
+		},
+		{
+			name: "from_greater_than_to",
+			query: ethereum.FilterQuery{
+				FromBlock: second.Number(),
+				ToBlock:   first.Number(),
+			},
+			wantErr: testerr.Contains("invalid block range params"), // from libevm
 		},
 	}
 
