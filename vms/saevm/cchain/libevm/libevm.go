@@ -5,6 +5,8 @@
 package libevm
 
 import (
+	"github.com/ava-labs/libevm/libevm"
+
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -24,4 +26,21 @@ func RegisterExtras() {
 	customtypes.Register()
 	extstate.RegisterExtras()
 	params.RegisterExtras()
+}
+
+// WithTempRegisteredExtras runs `fn` with temporary registration otherwise
+// equivalent to a call to [RegisterExtras], but limited to the life of `fn`.
+func WithTempRegisteredExtras(fn func() error) error {
+	return libevm.WithTemporaryExtrasLock(func(lock libevm.ExtrasLock) error {
+		for _, wrap := range []func(libevm.ExtrasLock, func() error) error{
+			core.WithTempRegisteredExtras,
+			customtypes.WithTempRegisteredExtras,
+			extstate.WithTempRegisteredExtras,
+			params.WithTempRegisteredExtras,
+		} {
+			inner := fn
+			fn = func() error { return wrap(lock, inner) }
+		}
+		return fn()
+	})
 }

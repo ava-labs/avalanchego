@@ -17,6 +17,7 @@ package_group(
         "//node",
         "//tests/e2e",
         "//tests/e2e/p",
+        "//vms/evm/emulate",
         "//wallet/chain/c",
         "//wallet/subnet/primary",
     ],
