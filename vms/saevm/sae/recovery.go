@@ -232,8 +232,11 @@ func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Bloc
 }
 
 func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Executor) error {
-	after := exec.LastExecuted()
-	var executed []*blocks.Block
+	var (
+		after    = exec.LastExecuted()
+		last     = after
+		executed []*blocks.Block
+	)
 	for b, err := range rec.canonicalAfter(after) {
 		if err != nil {
 			return err
@@ -242,10 +245,7 @@ func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Execut
 			return err
 		}
 		executed = append(executed, b)
-	}
-	last := after
-	if len(executed) > 0 {
-		last = lastOf(executed)
+		last = b
 	}
 	// The [saexec.Executor] settles a synchronous block after executing it, so
 	// waiting for execution alone would race with that settlement.

@@ -53,7 +53,7 @@ type Fixture struct {
 	SharedMemory map[string]hexutil.Bytes `json:"sharedMemory"`
 }
 
-// An Element is a json-marshallable [atomic.Element].
+// An Element is a JSON-marshalable [atomic.Element].
 type Element struct {
 	Key    hexutil.Bytes   `json:"key"`
 	Value  hexutil.Bytes   `json:"value"`
