@@ -294,7 +294,7 @@ func (b *builder) NewExportTx(
 	}
 
 	// Inputs are fixed-size, so every input adds the same amount of gas.
-	utx.Ins = []tx.Input{{}}
+	utx.Ins = make([]tx.Input, 1)
 	gasUsedWithInput, err := tx.GasUsed(utx)
 	if err != nil {
 		return nil, err
