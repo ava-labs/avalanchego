@@ -417,13 +417,13 @@ setup job and the `lint-avalanchego` job. It restores the Bazel repository cache
 the Bazel-specific Go module cache, and Bazelisk's downloaded Bazel binary. It
 checks metadata only in setup jobs.
 
-A non-exact consumer restore prepares the checked-in Bazel dependency list. On
-`master`, a non-exact setup restore also prepares that list. The setup job then
-disables downloads, checks metadata, and saves the cache. This order prevents a
-metadata check from adding undeclared inputs to a saved cache. Setup jobs can
-duplicate this cold-cache work. After an exact restore or local preparation, the
-action enables `--repository_disable_download` and sets `GOPROXY=off` for
-repository rules. `GOPROXY=off` prevents Gazelle from fetching a missing module.
+Each non-exact restore prepares the checked-in Bazel dependency list. The action
+then disables downloads. The setup job checks metadata after downloads are
+disabled. On `master`, that job saves the cache after the check succeeds. This
+order prevents a metadata check from adding undeclared inputs to a saved cache.
+Setup jobs can duplicate this cold-cache work. The action enables
+`--repository_disable_download` and sets `GOPROXY=off` for repository rules.
+`GOPROXY=off` prevents Gazelle from fetching a missing module.
 See [Bazel CI external dependency caching](./bazel.md#checked-in-bazel-dependency-list).
 
 The cache contains external Bazel dependency input and the Bazelisk-downloaded

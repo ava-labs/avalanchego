@@ -62,18 +62,6 @@ runs:
         restore-keys: |
           ${{ steps.cache-key.outputs.cache-key-prefix }}
 
-    # Consumers prepare non-exact restores and misses locally. Setup jobs prepare
-    # them only when they may save the result.
-    - name: Determine Bazel cache operations
-      id: cache-operations
-      shell: bash
-      run: |
-        {
-          echo "prepare-dependencies=${{ steps.cache.outputs.cache-hit != 'true' && (inputs.is-setup-job != 'true' || steps.cache-policy.outputs.cache-save-allowed == 'true') }}"
-          echo "disable-dependency-downloads=${{ inputs.is-setup-job != 'true' || steps.cache-policy.outputs.cache-save-allowed == 'true' }}"
-          echo "save-cache=${{ steps.cache.outputs.cache-hit != 'true' && steps.cache-policy.outputs.cache-save-allowed == 'true' }}"
-        } >> "$GITHUB_OUTPUT"
-
     - name: Configure Bazel to use dependency cache
       shell: bash
       env:
@@ -81,37 +69,32 @@ runs:
         GO_MOD_CACHE_DIR: ${{ steps.cache-paths.outputs.go_mod_cache }}
       run: ${{ github.action_path }}/configure-bazelrc.sh
 
-    # A setup job prepares data for a cache save. Consumers prepare only their local
-    # cache on a miss, then run offline.
     - name: Cache Bazel CI build dependencies
-      if: ${{ steps.cache-operations.outputs.prepare-dependencies == 'true' }}
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       shell: bash
       run: ./scripts/run_task.sh bazel-cache-ci-build-dependencies
 
-    # On a direct hit preparation is skipped; on a miss it must finish before
-    # later commands run offline.
+    # All Bazel commands subsequent to cache preparation run offline to ensure an
+    # incomplete cache results in an error rather than silently downloading a missing
+    # dependency.
     - name: Disable dependency downloads
-      if: ${{ steps.cache-operations.outputs.disable-dependency-downloads == 'true' }}
       shell: bash
       run: |
         echo 'common --repository_disable_download' >> "$HOME/.bazelrc"
         echo 'common --repo_env=GOPROXY=off' >> "$HOME/.bazelrc"
 
-    # Metadata validation must not add undeclared inputs to a cache entry.
     - name: Check Bazel metadata
       if: ${{ inputs.is-setup-job == 'true' }}
       shell: bash
       run: ./scripts/run_task.sh bazel-check-metadata
 
     - name: Prune old Bazelisk downloads
-      if: ${{ steps.cache-operations.outputs.save-cache == 'true' }}
+      if: ${{ steps.cache.outputs.cache-hit != 'true' && steps.cache-policy.outputs.cache-save-allowed == 'true' }}
       shell: bash
       run: ${{ github.action_path }}/prune-bazelisk-cache.sh "$BAZELISK_HOME"
 
     - name: Save Bazel dependency cache
-      # Setup jobs can race to publish a cache miss. Immutable keys prevent an
-      # earlier archive from being overwritten.
-      if: ${{ steps.cache-operations.outputs.save-cache == 'true' }}
+      if: ${{ steps.cache.outputs.cache-hit != 'true' && steps.cache-policy.outputs.cache-save-allowed == 'true' }}
       uses: actions/cache/save@v5
       with:
         path: |

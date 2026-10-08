@@ -644,7 +644,7 @@ Bazel metadata. On `master`, a cache miss makes each setup job prepare the CI
 dependency list. The job then disables downloads, checks metadata, and saves the
 cache. Setup jobs can duplicate this work when they share a key. On other refs,
 each Bazel-consuming job prepares its own non-exact restore before it runs
-offline.
+offline. Those jobs do not save the cache.
 
 The daily scheduled workflow runs one full unit-test job on Ubuntu 22.04 and
 24.04, on AMD64 and ARM64, and on macOS 26 ARM64. It also runs the same focused
@@ -821,10 +821,10 @@ checked-in dependency list. It also runs `bazel mod deps` to prepare the module
 graph. The action then disables downloads and checks Bazel metadata. It saves
 the cache only after that check succeeds.
 
-On other refs, the setup job restores the cache and checks metadata. It does not
-prepare or save a cache entry. Each later Bazel-consuming job restores the cache.
-On a non-exact restore, that job prepares dependencies locally. It then enables
-`--repository_disable_download` and sets `GOPROXY=off` for repository rules.
+On other refs, a non-exact restore also prepares dependencies. These jobs do
+not save a cache entry. The setup job disables downloads and checks metadata.
+Later Bazel-consuming jobs also disable downloads after preparation. The action
+sets `--repository_disable_download` and `GOPROXY=off` for repository rules.
 `--repository_disable_download` blocks Bazel downloads. `GOPROXY=off` blocks
 Gazelle `go_repository` subprocesses. If a later rule needs a missing download,
 Bazel fails instead of downloading it.
