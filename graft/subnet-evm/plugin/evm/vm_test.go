@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
@@ -66,6 +65,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -2192,7 +2192,7 @@ func testAllowFeeRecipientDisabled(t *testing.T, scheme string) {
 	require.NoError(t, err) // this won't return an error since miner will set the etherbase to blackhole address
 
 	ethBlock := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
-	require.Equal(t, constants.BlackholeAddr, ethBlock.Coinbase())
+	require.Equal(t, blackhole.Address, ethBlock.Coinbase())
 
 	// Create empty block from blk
 	internalBlk := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock)
@@ -2468,7 +2468,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	newHead := <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
-	require.Equal(t, constants.BlackholeAddr, ethBlock.Coinbase()) // reward address is activated at this block so this is fine
+	require.Equal(t, blackhole.Address, ethBlock.Coinbase()) // reward address is activated at this block so this is fine
 
 	tx1 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice*3), nil)
 	signedTx1, err := types.SignTx(tx1, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[1].ToECDSA())
@@ -2493,7 +2493,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 
 	// Test Case: Disable reward manager
 	// This should revert back to burning fees
-	previousBalance := blkState.GetBalance(constants.BlackholeAddr)
+	previousBalance := blkState.GetBalance(blackhole.Address)
 
 	tvm.vm.clock.Set(disableTime) // upgrade takes effect after a block is issued, so we can set vm's clock here.
 	tx2 := types.NewTransaction(uint64(1), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
@@ -2526,14 +2526,14 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock = blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
-	require.Equal(t, constants.BlackholeAddr, ethBlock.Coinbase()) // reward address was activated at previous block
+	require.Equal(t, blackhole.Address, ethBlock.Coinbase()) // reward address was activated at previous block
 	require.Greater(t, int64(ethBlock.Time()), disableTime.Unix())
 
 	// Verify that Blackhole has received fees
 	blkState, err = tvm.vm.blockChain.StateAt(ethBlock.Root())
 	require.NoError(t, err)
 
-	balance = blkState.GetBalance(constants.BlackholeAddr)
+	balance = blkState.GetBalance(blackhole.Address)
 	require.Equal(t, 1, balance.Cmp(previousBalance))
 }
 
