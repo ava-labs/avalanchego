@@ -21,7 +21,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
@@ -32,7 +31,11 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-const genesisNumber = 0
+const (
+	genesisNumber = 0
+
+	ap3BaseFee = 225 * ethparams.GWei
+)
 
 var (
 	errNoGenesisChainConfig       = errors.New("no genesis chainConfig")
@@ -269,7 +272,7 @@ func (g *genesis) block() (*types.Block, error) {
 	if c.IsApricotPhase3(g.Timestamp) { // Also called London
 		h.BaseFee = g.BaseFee
 		if h.BaseFee == nil {
-			h.BaseFee = big.NewInt(ap3.InitialBaseFee)
+			h.BaseFee = big.NewInt(ap3BaseFee)
 		}
 	}
 

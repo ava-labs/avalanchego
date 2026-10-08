@@ -16,12 +16,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
@@ -155,7 +156,7 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 		}
 		var predicateResults predicate.BlockResults
 		rules := GetRulesExtra(env.Rules()).AvalancheRules
-		if predicateResultsBytes := customheader.PredicateBytesFromExtra(rules, header.Extra); len(predicateResultsBytes) > 0 {
+		if predicateResultsBytes := predicateBytesFromExtra(rules, header.Extra); len(predicateResultsBytes) > 0 {
 			predicateResults, err = predicate.ParseBlockResults(predicateResultsBytes)
 			if err != nil {
 				panic(err) // Should never happen, as results are already validated in block validation
@@ -183,6 +184,29 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 		return contract.Run(accessibleState, env.Addresses().EVMSemantic.Caller, env.Addresses().EVMSemantic.Self, input, suppliedGas, env.ReadOnly())
 	}
 	return vm.NewStatefulPrecompile(legacy.PrecompiledStatefulContract(run).Upgrade())
+}
+
+// predicateBytesFromExtra returns the predicate result bytes from the header's
+// extra data. If the extra data is not long enough, an empty slice is returned.
+func predicateBytesFromExtra(rules extras.AvalancheRules, extra []byte) []byte {
+	const apricotPhase3WindowSize = 10 * wrappers.LongLen
+
+	var offset int
+	switch {
+	case rules.IsHelicon:
+		offset = 0
+	case rules.IsFortuna:
+		offset = acp176.StateSize
+	default:
+		offset = apricotPhase3WindowSize
+	}
+	// Prior to Durango, the VM enforces the extra data is smaller than or equal
+	// to `offset`.
+	// After Durango, the VM pre-verifies the extra data past `offset` is valid.
+	if len(extra) <= offset {
+		return nil
+	}
+	return extra[offset:]
 }
 
 func (r RulesExtra) PrecompileOverride(addr common.Address) (libevm.PrecompiledContract, bool) {
