@@ -73,11 +73,14 @@ func (c *Clock) Advance(d time.Duration) {
 func (c *Clock) AdvanceToSettle(ctx context.Context, tb testing.TB, b SettlingBlock) {
 	tb.Helper()
 	require.NoErrorf(tb, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-	to := b.ExecutedByGasTime().AsTime().Add(params.Tau + c.settleResolution - time.Nanosecond).Truncate(c.settleResolution)
+	c.AdvanceTo(b.ExecutedByGasTime().AsTime().Add(params.Tau + c.settleResolution - time.Nanosecond).Truncate(c.settleResolution))
+}
 
+// AdvanceTo moves the clock forward to t, leaving it unchanged if already past.
+func (c *Clock) AdvanceTo(t time.Time) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.now.Before(to) {
-		c.now = to
+	if c.now.Before(t) {
+		c.now = t
 	}
 }

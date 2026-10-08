@@ -448,14 +448,14 @@ func TestConfigResolvePendingToLastExecuted(t *testing.T) {
 				options.Func[sutConfig](tt.opt),
 			)
 
-			got, err := sut.ethclient.PendingCodeAt(ctx, addr)
+			got, err := sut.EthClient.PendingCodeAt(ctx, addr)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
-				t.Fatalf("%T.PendingCodeAt(%v): %s", sut.ethclient, addr, diff)
+				t.Fatalf("%T.PendingCodeAt(%v): %s", sut.EthClient, addr, diff)
 			}
 			if tt.wantErr != nil {
 				return
 			}
-			assert.Equalf(t, code, got, "%T.PendingCodeAt(%v)", sut.ethclient, addr)
+			assert.Equalf(t, code, got, "%T.PendingCodeAt(%v)", sut.EthClient, addr)
 		})
 	}
 }

@@ -217,7 +217,7 @@ func TestSubscriptions(t *testing.T) {
 	mustSendTx := func(tx *types.Transaction) {
 		t.Helper()
 
-		sut.mustSendTx(t, tx)
+		sut.MustSendTxs(t, tx)
 		require.Equal(t, tx.Hash(), <-newTxs, "tx hash from newPendingTransactions subscription")
 	}
 
@@ -284,7 +284,7 @@ func TestWeb3Namespace(t *testing.T) {
 func TestNetNamespace(t *testing.T) {
 	testRPCMethodsWithPeers := func(sut *SUT, wantPeerCount hexutil.Uint) {
 		t.Helper()
-		sut.testRPC(sut.context(t), t, []rpcTest{
+		sut.testRPC(sut.Context(t), t, []rpcTest{
 			{
 				method: "net_listening",
 				want:   true,
@@ -341,8 +341,8 @@ func TestTxPoolNamespace(t *testing.T) {
 	queuedTx := makeTx(queuedAccount)
 	queuedRPCTx := ethapi.NewRPCPendingTransaction(queuedTx, nil, saetest.ChainConfig())
 
-	sut.mustSendTx(t, queuedTx, pendingTx)
-	sut.waitUntilTxsPending(t, pendingTx)
+	sut.MustSendTxs(t, queuedTx, pendingTx)
+	sut.WaitUntilTxsPending(t, pendingTx)
 
 	// TODO: This formatting is copied from libevm, consider exposing it somehow
 	// or removing the dependency on the exact format.
@@ -486,7 +486,7 @@ func TestFilterAPIs(t *testing.T) {
 		GasPrice: big.NewInt(1),
 		Gas:      1e6,
 	})
-	sut.sendTxsAndWaitUntilPending(t, tx)
+	sut.SendTxsAndWaitUntilPending(t, tx)
 	sut.testRPC(ctx, t, rpcTest{
 		method:     "eth_getFilterChanges",
 		args:       []any{txFilterID},
@@ -578,7 +578,7 @@ func TestEthGetters(t *testing.T) {
 		sut.testGetByUnknownNumber(ctx, t)
 	})
 
-	genesis := sut.lastAcceptedBlock(t)
+	genesis := sut.LastAcceptedBlock(t)
 
 	createTx := func(t *testing.T, to common.Address) *types.Transaction {
 		t.Helper()
@@ -667,8 +667,8 @@ func TestMempoolTxGetters(t *testing.T) {
 		Gas:       params.TxGas,
 		GasFeeCap: big.NewInt(1),
 	})
-	sut.mustSendTx(t, pendingTx, queuedTx)
-	sut.waitUntilTxsPending(t, pendingTx)
+	sut.MustSendTxs(t, pendingTx, queuedTx)
+	sut.WaitUntilTxsPending(t, pendingTx)
 
 	for _, tt := range []struct {
 		name string
@@ -720,7 +720,7 @@ func TestGetLogs(t *testing.T) {
 	})
 
 	ctx, sut := newSUT(t, 1, timeOpt, withBloomSectionSize(bloomSectionSize), withPrecompile(emitter, precompile))
-	genesis := sut.lastAcceptedBlock(t)
+	genesis := sut.LastAcceptedBlock(t)
 
 	txWithLog := func(t *testing.T) *types.Transaction {
 		t.Helper()
@@ -758,7 +758,7 @@ func TestGetLogs(t *testing.T) {
 	// Although the FiltersAPI will work without any blocks indexed, such a
 	// scenario would not test the functionality of the bloom indexer.
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
-		be := sut.rawVM.GethRPCBackends()
+		be := sut.RawVM.GethRPCBackends()
 		_, got := be.BloomStatus()
 		require.Equal(c, uint64(1), got, "%T.BloomStatus() sections", be)
 	}, 5*time.Second, 100*time.Millisecond, "bloom indexer never finished")
@@ -867,7 +867,7 @@ func TestEthPendingTransactions(t *testing.T) {
 		GasFeeCap: big.NewInt(1),
 		Value:     big.NewInt(100),
 	})
-	sut.sendTxsAndWaitUntilPending(t, tx)
+	sut.SendTxsAndWaitUntilPending(t, tx)
 
 	// eth_pendingTransactions filters results to only transactions from
 	// accounts configured in the AccountManager, which is always empty.
@@ -935,7 +935,7 @@ func TestGetReceipts(t *testing.T) {
 		return b, rs
 	}
 
-	genesis := sut.lastAcceptedBlock(t)
+	genesis := sut.LastAcceptedBlock(t)
 
 	onDisk, wantOnDisk := slice(t, 0, 2)
 	settled, wantSettled := slice(t, 2, 4)
@@ -1052,7 +1052,7 @@ func TestGetTransactionCount(t *testing.T) {
 		Gas:       params.TxGas,
 		GasFeeCap: big.NewInt(1),
 	})
-	sut.sendTxsAndWaitUntilPending(t, tx)
+	sut.SendTxsAndWaitUntilPending(t, tx)
 
 	sut.testRPC(ctx, t, rpcTest{
 		method: "eth_getTransactionCount",
@@ -1127,7 +1127,7 @@ func TestFillTransaction(t *testing.T) {
 		Gas:       params.TxGas,
 		GasFeeCap: big.NewInt(1),
 	})
-	sut.sendTxsAndWaitUntilPending(t, tx)
+	sut.SendTxsAndWaitUntilPending(t, tx)
 
 	sut.testRPC(ctx, t, rpcTest{
 		method: "eth_fillTransaction",
@@ -1149,7 +1149,7 @@ func TestResend(t *testing.T) {
 		Gas:       params.TxGas,
 		GasFeeCap: big.NewInt(1),
 	})
-	sut.sendTxsAndWaitUntilPending(t, tx)
+	sut.SendTxsAndWaitUntilPending(t, tx)
 
 	sut.testRPC(ctx, t, rpcTest{
 		method: "eth_resend",
@@ -1240,7 +1240,7 @@ func TestRPCTxFeeCap(t *testing.T) {
 				Gas:      params.TxGas,
 				GasPrice: tt.gasPrice,
 			})
-			err := sut.Client.SendTransaction(sut.context(t), tx)
+			err := sut.Client.SendTransaction(sut.Context(t), tx)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("SendTransaction() %s", diff)
 			}
@@ -1277,7 +1277,7 @@ func TestUnprotectedTxs(t *testing.T) {
 			})
 			require.False(t, tx.Protected(), "tx.Protected()")
 
-			err := sut.Client.SendTransaction(sut.context(t), tx)
+			err := sut.Client.SendTransaction(sut.Context(t), tx)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("SendTransaction() %s", diff)
 			}
@@ -1703,7 +1703,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		b := sut.runConsensusLoop(t)
 		vmTime.AdvanceToSettle(ctx, t, b)
 	}
-	_, ok := sut.rawVM.consensusCritical.Load(settled.Hash())
+	_, ok := sut.RawVM.consensusCritical.Load(settled.Hash())
 	require.False(t, ok, "settled block still in VM memory")
 
 	accepted := sut.runConsensusLoop(t)
@@ -1777,7 +1777,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			chain := sut.rawVM.chain()
+			chain := sut.RawVM.chain()
 			gotNum, gotHash, err := blocks.ResolveRPCNumberOrHash(chain, tt.nOrH)
 			t.Logf("blocks.ResolveRPCNumberOrHash(%T, %+v)", chain, tt.nOrH) // avoids having to repeat in failure messages
 			require.ErrorIs(t, err, tt.wantErr)

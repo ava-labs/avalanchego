@@ -53,7 +53,7 @@ import (
 // [blocks.ErrNonCanonicalBlock], while non-state lookups return nil (not found).
 func TestStateQueryOnNonCanonicalBlock(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
-	b := unwrap(t, sut.createAndVerifyBlock(t, sut.lastAcceptedBlock(t)))
+	b := unwrap(t, sut.createAndVerifyBlock(t, sut.LastAcceptedBlock(t)))
 
 	sut.testRPC(ctx, t, []rpcTest{
 		{
@@ -276,7 +276,7 @@ func TestDebugTrace(t *testing.T) {
 	sibling := ethBlock.WithSeal(siblingHeader)
 
 	unacceptedTx := callPrecompile()
-	unaccepted := unwrap(t, sut.buildAndParseBlock(t, sut.lastAcceptedBlock(t), unacceptedTx)).EthBlock()
+	unaccepted := unwrap(t, sut.buildAndParseBlock(t, sut.LastAcceptedBlock(t), unacceptedTx)).EthBlock()
 	unacceptedRLP, unacceptedFile := writeRLPToFile(t, unaccepted)
 
 	// precompileResult is what the precompile should return during the provided
@@ -698,7 +698,7 @@ func TestDebugIntermediateRoots(t *testing.T) {
 
 			blks := make([]*blocks.Block, 0, numBlocks)
 			for range numBlocks {
-				vmTime.AdvanceToSettle(ctx, t, src.lastAcceptedBlock(t))
+				vmTime.AdvanceToSettle(ctx, t, src.LastAcceptedBlock(t))
 				txs := make([]*types.Transaction, txsPerBlock)
 				for i := range txs {
 					txs[i] = src.wallet.SetNonceAndSign(t, i, &types.LegacyTx{
@@ -758,7 +758,7 @@ func TestStatefulRPCs(t *testing.T) {
 		bb := sut.runConsensusLoop(t)
 		vmTime.AdvanceToSettle(ctx, t, bb)
 	}
-	_, ok := sut.rawVM.consensusCritical.Load(b.Hash())
+	_, ok := sut.RawVM.consensusCritical.Load(b.Hash())
 	require.Falsef(t, ok, "%T[%#x] still in VM memory", b, b.Hash())
 
 	storageKey := escrow.StorageKeyForBalance(recipient)
@@ -889,7 +889,7 @@ func TestStatefulRPCsEveryHeight(t *testing.T) {
 			)...)
 
 			txHashes := make([]common.Hash, 0, numBlocks)
-			prev := src.lastAcceptedBlock(t)
+			prev := src.LastAcceptedBlock(t)
 			for range numBlocks {
 				// Settling the parent before building the next block evicts all
 				// but the most recent blocks from memory.
@@ -1072,7 +1072,7 @@ func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 	tx, err := contract.Transact(opts, "deposit", recipient)
 	require.NoErrorf(t, err, "%T.Transact(..., %q, %v)", contract, "deposit", recipient)
 
-	sut.waitUntilTxsPending(t, tx)
+	sut.WaitUntilTxsPending(t, tx)
 	b := sut.runConsensusLoop(t)
 
 	// No need to wait until executed! #LiveReceipts

@@ -33,7 +33,7 @@ func TestExecutorHealthCheck(t *testing.T) {
 	b := sut.runConsensusLoop(t)
 	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 	_, err := sut.HealthCheck(ctx)
-	require.NoErrorf(t, err, "%T.HealthCheck() after executing first (good) block", sut.rawVM)
+	require.NoErrorf(t, err, "%T.HealthCheck() after executing first (good) block", sut.RawVM)
 
 	want := testerr.AnyOf(
 		// As [saexec.Executor.Enqueue] just pushes to the back of the queue, no
@@ -44,8 +44,8 @@ func TestExecutorHealthCheck(t *testing.T) {
 		// failure is surfaced.
 		unhealthy,
 	)
-	if diff := testerr.Diff(sut.rawVM.exec.Enqueue(ctx, b), want); diff != "" {
-		t.Fatalf("%T.Enqueue([same block as already accepted]) %s", sut.rawVM.exec, diff)
+	if diff := testerr.Diff(sut.RawVM.exec.Enqueue(ctx, b), want); diff != "" {
+		t.Fatalf("%T.Enqueue([same block as already accepted]) %s", sut.RawVM.exec, diff)
 	}
 
 	t.Run("HealthCheck", func(t *testing.T) {
@@ -58,7 +58,7 @@ func TestExecutorHealthCheck(t *testing.T) {
 		require.EventuallyWithT(t, func(c *assert.CollectT) {
 			_, err := sut.HealthCheck(ctx)
 			if diff := testerr.Diff(err, want); diff != "" {
-				c.Errorf("%T.HealthCheck() after enqueue with same block again; %s", sut.rawVM, diff)
+				c.Errorf("%T.HealthCheck() after enqueue with same block again; %s", sut.RawVM, diff)
 			}
 		}, 10*time.Second, 10*time.Millisecond)
 	})

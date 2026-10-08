@@ -53,7 +53,7 @@ func TestGasPriceAPIs(t *testing.T) {
 				}))
 			}
 
-			b := sut.lastAcceptedBlock(t)
+			b := sut.LastAcceptedBlock(t)
 			require.NoError(t, b.WaitUntilExecuted(ctx), "last-accepted %T.WaitUntilExecuted()", b)
 			baseFee := b.ExecutedBaseFee()
 			sut.testRPC(ctx, t,
@@ -84,7 +84,7 @@ func TestFeeHistory(t *testing.T) {
 			GasFeeCap: new(big.Int).SetUint64(math.MaxUint64),
 		}))
 	}
-	require.NoError(t, sut.lastAcceptedBlock(t).WaitUntilExecuted(ctx), "last-accepted Block.WaitUntilExecuted()")
+	require.NoError(t, sut.LastAcceptedBlock(t).WaitUntilExecuted(ctx), "last-accepted Block.WaitUntilExecuted()")
 
 	gasRate := sut.hooks.Target * gastime.TargetToRate
 	blockGasLimit := gasRate * saeparams.TauSeconds * saeparams.Lambda // by definition
