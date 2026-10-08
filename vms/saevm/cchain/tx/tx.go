@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/math/intmath"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -232,19 +233,15 @@ func gasPrice(cost nAVAX, gas gas.Gas) uint256.Int {
 // Fee returns the minimum amount of nAVAX that a transaction consuming gas MUST
 // burn for its gas price to be at least price, in aAVAX/gas.
 //
-// Fee returns an error if gas*price overflows a uint64, so it can't compute
+// Fee returns an error if gasUsed*price overflows a uint64, so it can't compute
 // fees above ~18.4 AVAX.
-func Fee(gas gas.Gas, price gas.Price) (nAVAX, error) {
-	cost, err := gas.Cost(price)
+func Fee(gasUsed gas.Gas, price gas.Price) (nAVAX, error) {
+	cost, err := gasUsed.Cost(price)
 	if err != nil {
 		return 0, err
 	}
 	// [gasPrice] rounds down, so the fee must be rounded up.
-	fee := cost / _x2cRate
-	if cost%_x2cRate != 0 {
-		fee++
-	}
-	return fee, nil
+	return intmath.CeilDiv(cost, _x2cRate), nil
 }
 
 // SanityCheck verifies that the transaction's structural invariants hold

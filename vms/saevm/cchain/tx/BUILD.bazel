@@ -31,6 +31,7 @@ go_library(
         "//utils/hashing",
         "//utils/logging",
         "//utils/math",
+        "//utils/math/intmath",
         "//utils/set",
         "//utils/timer/mockable",
         "//utils/wrappers",

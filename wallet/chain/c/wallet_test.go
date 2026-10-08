@@ -4,7 +4,6 @@
 package c
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/ava-labs/libevm/common/hexutil"
@@ -20,8 +19,8 @@ import (
 // ethService serves eth_baseFee in the same format as a node.
 type ethService struct{}
 
-func (ethService) BaseFee() *hexutil.Big {
-	return (*hexutil.Big)(big.NewInt(25 * params.GWei))
+func (ethService) BaseFee() hexutil.Uint64 {
+	return 25 * params.GWei
 }
 
 // TestBaseFee checks the node's base fee is used only when no option sets one.

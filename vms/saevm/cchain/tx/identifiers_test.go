@@ -11,8 +11,6 @@ const (
 	X2CRate      = _x2cRate
 )
 
-var GasPrice = gasPrice
-
 var (
 	// tx errors:
 	ErrWrongNetworkID          = errWrongNetworkID

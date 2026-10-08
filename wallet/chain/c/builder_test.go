@@ -96,8 +96,8 @@ func TestNewExportTx(t *testing.T) {
 	keyA := txtest.NewKey(t)
 	keyB := txtest.NewKey(t)
 	accounts := map[ethcommon.Address]*Account{
-		keyA.EthAddress(): {Balance: big.NewInt(balanceA * params.GWei)},
-		keyB.EthAddress(): {Balance: big.NewInt(balanceB * params.GWei)},
+		keyA.EthAddress(): {Balance: big.NewInt(balanceA * params.GWei), Nonce: 1},
+		keyB.EthAddress(): {Balance: big.NewInt(balanceB * params.GWei), Nonce: 2},
 	}
 
 	kc := secp256k1fx.NewKeychain(keyA, keyB)
@@ -117,8 +117,8 @@ func TestNewExportTx(t *testing.T) {
 		BlockchainID:     cChainID,
 		DestinationChain: xChainID,
 		Ins: []tx.Input{
-			{Address: keyA.EthAddress(), Amount: balanceA, AssetID: avaxAssetID},
-			{Address: keyB.EthAddress(), Amount: balanceB, AssetID: avaxAssetID},
+			{Address: keyA.EthAddress(), Amount: balanceA, AssetID: avaxAssetID, Nonce: 1},
+			{Address: keyB.EthAddress(), Amount: balanceB, AssetID: avaxAssetID, Nonce: 2},
 		},
 		// Sorted by canonical bytes, which lead with the amount.
 		ExportedOutputs: []*avax.TransferableOutput{

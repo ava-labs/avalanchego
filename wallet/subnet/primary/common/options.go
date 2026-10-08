@@ -179,6 +179,7 @@ func WithCustomEthAddresses(addrs set.Set[ethcommon.Address]) Option {
 	}
 }
 
+// WithBaseFee sets the C-Chain fee price in aAVAX/gas.
 func WithBaseFee(baseFee gas.Price) Option {
 	return func(o *Options) {
 		o.baseFeeSet = true

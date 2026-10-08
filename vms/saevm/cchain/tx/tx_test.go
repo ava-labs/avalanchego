@@ -475,12 +475,13 @@ func TestFee(t *testing.T) {
 			}
 			require.Equalf(t, test.want, got, "Fee(%d, %d)", test.gas, test.price)
 
-			// The fee MUST be the minimum that SAE prices at or above price.
-			price := uint256.NewInt(uint64(test.price))
-			gotPrice := GasPrice(got, test.gas)
-			assert.Falsef(t, gotPrice.Lt(price), "GasPrice(%d, %d) = %s; want >= %s", got, test.gas, &gotPrice, price)
-			lowerPrice := GasPrice(got-1, test.gas)
-			assert.Truef(t, lowerPrice.Lt(price), "GasPrice(%d, %d) = %s; want < %s", got-1, test.gas, &lowerPrice, price)
+			// The fee MUST be the minimum nAVAX amount that covers the cost.
+			requiredCost := uint256.NewInt(uint64(test.gas))
+			requiredCost.Mul(requiredCost, uint256.NewInt(uint64(test.price)))
+			paid := ScaleAVAX(got)
+			assert.Falsef(t, paid.Lt(requiredCost), "ScaleAVAX(Fee(%d, %d)) = %s; want >= %s", test.gas, test.price, &paid, requiredCost)
+			paidBelow := ScaleAVAX(got - 1)
+			assert.Truef(t, paidBelow.Lt(requiredCost), "ScaleAVAX(Fee(%d, %d) - 1) = %s; want < %s", test.gas, test.price, &paidBelow, requiredCost)
 		})
 	}
 }

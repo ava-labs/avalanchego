@@ -65,7 +65,8 @@ type Builder interface {
 	//
 	// - [chainID] specifies the chain to be importing funds from.
 	// - [to] specifies where to send the imported funds to.
-	// - [baseFee] specifies the fee price willing to be paid by this tx.
+	// - [baseFee] specifies the fee price, in aAVAX/gas, willing to be paid by
+	//   this tx.
 	NewImportTx(
 		chainID ids.ID,
 		to ethcommon.Address,
@@ -78,7 +79,8 @@ type Builder interface {
 	//
 	// - [chainID] specifies the chain to be exporting the funds to.
 	// - [outputs] specifies the outputs to send to the [chainID].
-	// - [baseFee] specifies the fee price willing to be paid by this tx.
+	// - [baseFee] specifies the fee price, in aAVAX/gas, willing to be paid by
+	//   this tx.
 	NewExportTx(
 		chainID ids.ID,
 		outputs []*secp256k1fx.TransferOutput,
@@ -315,17 +317,17 @@ func (b *builder) NewExportTx(
 
 		// Inputs are fixed-size, so a placeholder prices the next input.
 		utx.Ins = append(utx.Ins, tx.Input{})
-		newGasUsed, err := tx.GasUsed(utx)
+		gasUsedWithInput, err := tx.GasUsed(utx)
 		utx.Ins = utx.Ins[:len(utx.Ins)-1]
 		if err != nil {
 			return nil, err
 		}
-		newFee, err := tx.Fee(newGasUsed, baseFee)
+		feeWithInput, err := tx.Fee(gasUsedWithInput, baseFee)
 		if err != nil {
 			return nil, err
 		}
 
-		additionalFee := newFee - fee
+		additionalFee := feeWithInput - fee
 
 		balance, err := b.backend.Balance(ctx, addr)
 		if err != nil {
@@ -345,7 +347,7 @@ func (b *builder) NewExportTx(
 		}
 
 		// Update the fee for the next iteration
-		fee = newFee
+		fee = feeWithInput
 
 		amountToConsume, err = math.Add(amountToConsume, additionalFee)
 		if err != nil {
