@@ -342,7 +342,7 @@ message PushQuery {
   uint64 deadline = 3;
   // Container being gossiped
   bytes container = 4;
-  // Requesting peer's last accepted height
+  // Requesting peer's next preferred height (one above its current preference)
   uint64 requested_height = 6;
 }
 
@@ -359,7 +359,7 @@ message PullQuery {
   uint64 deadline = 3;
   // Container id being gossiped
   bytes container_id = 4;
-  // Requesting peer's last accepted height
+  // Requesting peer's next preferred height (one above its current preference)
   uint64 requested_height = 6;
 }
 

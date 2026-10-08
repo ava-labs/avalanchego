@@ -64,6 +64,7 @@ go_test(
         "//snow/engine/enginetest",
         "//snow/engine/snowman/ancestor",
         "//snow/engine/snowman/block/blocktest",
+        "//snow/engine/snowman/enginetest",
         "//snow/engine/snowman/getter",
         "//snow/snowtest",
         "//snow/validators",
