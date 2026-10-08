@@ -1,0 +1,48 @@
+name: Bazel
+
+# Keep this workflow separate from bazel-merge-group.yml.
+# This lets bazel-required skip before the shared test workflows complete.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+# Cancel ongoing workflow runs if a new one is started
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Skip these jobs immediately.
+  # This lets a maintainer add the pull request to the merge queue.
+  linux-amd64-required:
+    name: linux-amd64 / bazel-required
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - run: true
+
+  darwin-arm64-required:
+    name: darwin-arm64 / bazel-required
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - run: true
+
+  unit-and-e2e:
+    name: linux-amd64
+    uses: ./.github/workflows/bazel.yml
+    with:
+      platform_name: linux-amd64
+      runner: ubuntu-24.04
+      run_race_shuffle_unit_tests: false
+    secrets: inherit
+
+  smoke:
+    name: darwin-arm64
+    uses: ./.github/workflows/bazel-smoke.yml
+    with:
+      platform_name: darwin-arm64
+      runner: macos-26
+    secrets: inherit

@@ -1,0 +1,27 @@
+name: Go
+
+# Keep this workflow separate from go-merge-group.yml.
+# This lets go-required skip before the shared test workflow completes.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+# Cancel ongoing workflow runs if a new one is started
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Skip this job immediately.
+  # This lets a maintainer add the pull request to the merge queue.
+  go-required:
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-24.04
+    steps:
+      - run: true
+
+  tests:
+    uses: ./.github/workflows/go.yml
+    secrets: inherit

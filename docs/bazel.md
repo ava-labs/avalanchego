@@ -918,11 +918,21 @@ Validate changes proportionally:
   metadata workflow and confirm the setup path still reaches repo tools and
   external repos without traversing unintended local workspace state
 
-The GitHub Actions Bazel workflow also defines a single aggregate job,
-`bazel-required`, that depends on the other jobs in the workflow via `needs`.
-Branch protection can require that one workflow-level job instead of tracking
-each underlying Bazel job separately. This reduces required-check maintenance
-to the workflow level.
+The merge-group Bazel entrypoint defines one aggregate job for each platform:
+
+- `linux-amd64 / bazel-required` depends on the full reusable-workflow call.
+- `darwin-arm64 / bazel-required` depends on the smoke reusable-workflow call.
+
+Branch protection can require these aggregate jobs instead of tracking each
+underlying Bazel job separately. Their `name` values preserve the check names
+that the nested reusable workflows previously emitted. Update branch protection
+before changing these names.
+
+The pull-request entrypoint defines the same checks without `needs` and skips
+them immediately. This lets a pull request join the merge queue before all CI
+finishes. See [Required checks and the merge queue](./ci.md#required-checks-and-the-merge-queue)
+for the admission policy and its trade-offs. See [Required-check validation in
+GitHub](./ci.md#required-check-validation-in-github) for checks that local lint cannot perform.
 
 If the `setup` job fails its metadata check in CI, rebase or merge the target
 branch, run `task bazel-generate-metadata`, commit the resulting changes, and

@@ -1,80 +1,12 @@
-name: Go
+name: Go Test Jobs
 
 on:
-  push:
-    tags:
-      - "*"
-    branches:
-      - master
-      - dev
-  pull_request:
-  merge_group:
-    types: [checks_requested]
+  workflow_call:
 
 permissions:
   contents: read
 
-# Cancel ongoing workflow runs if a new one is started
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  go-required:
-    if: ${{ always() }}
-    needs:
-      - build-antithesis-images-avalanchego
-      - build-antithesis-images-subnet-evm
-      - build-image-avalanchego
-      - build-image-subnet-evm
-      - check-contract-bindings
-      - check-generated-canoto
-      - check-generated-mocks
-      - check-generated-protobuf
-      - check-go-mod-tidy
-      - check-links
-      - check-tauseconds
-      - e2e
-      - e2e-bootstrap-monitor
-      - e2e-existing-network
-      - e2e-kube
-      - e2e-load-subnet-evm
-      - e2e-post-latest
-      - e2e-schedule-latest
-      - e2e-warp-subnet-evm
-      - fuzz
-      - lint-avalanchego
-      - lint-coreth
-      - lint-evm
-      - lint-subnet-evm
-      - load
-      # Re-enable once images are built by Bazel and can be cached; otherwise, this job is too expensive for what it evaluates.
-      # - load_kube_kind
-      - robustness
-      - smoke
-      - unit
-      - upgrade
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Fail unless all needed jobs succeeded
-        shell: bash
-        env:
-          NEEDS_JSON: ${{ toJSON(needs) }}
-        run: |
-          failed_jobs="$(
-            jq -r '
-              to_entries[]
-              | select(.value.result != "success")
-              | .key
-            ' <<<"$NEEDS_JSON"
-          )"
-
-          if [[ -n "$failed_jobs" ]]; then
-            echo "Required jobs failed:"
-            printf '%s\n' "$failed_jobs"
-            exit 1
-          fi
-
   setup-cache-darwin-arm64:
     runs-on: macos-26
     steps:
