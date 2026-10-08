@@ -848,14 +848,20 @@ from walking machine-specific workspace state.
 
 ### Enforcement
 
-All Bazel CI tasks that consume this cache state use
+Bazel CI build and test commands with target patterns use
 `./scripts/run_bazel_ci_command.sh`. The Go test helper gives its source target
 patterns to this wrapper. The wrapper checks that the patterns are present in
-`bazel_ci_dependency_list.sh` when CI enables enforcement.
+`bazel_ci_target_patterns` when CI enables enforcement.
 
 That keeps the target-pattern list aligned with the Bazel CI jobs that run.
 It makes it harder for a new or changed Bazel CI job to use an undeclared build
-dependency. Add command-only dependencies to the additional-dependency list.
+dependency.
+
+Commands without target patterns, such as `bazel mod tidy` and `bazel mod deps`,
+do not use this wrapper. The wrapper does not check
+`bazel_ci_additional_dependency_targets`. Add command-only dependencies to that
+list manually. Validate those commands with repository downloads disabled after
+cache preparation.
 
 ### Changing this safely
 
@@ -891,11 +897,14 @@ Validate changes proportionally:
   when these tasks are relevant
 - run the relevant `task bazel-test-unit-*` and `task bazel-test-e2e-*` targets
 - confirm that the dependency list and cache preparation agree
-- when changing cache setup or action ordering, test an exact restore, a
-  non-exact restore, and a cache miss on a fresh runner. Confirm that Bazel
-  preparation can populate its separate Go module cache before `GOPROXY` is
-  disabled, then confirm that the workload succeeds with repository downloads
-  disabled. An exact hit alone does not test this ordering constraint
+- when you change cache setup or action order, test these cases on a fresh runner:
+  - an exact restore
+  - a non-exact restore
+  - a cache miss
+- confirm that Bazel preparation populates its separate Go module cache before
+  Go setup disables `GOPROXY`
+- confirm that the workload succeeds with repository downloads disabled.
+  An exact hit alone does not test this ordering constraint
 - if you change a Bazel CI command or target pattern, update
   `scripts/bazel_ci_dependency_list.sh` in the same change rather than letting
   CI discover a missing dependency later

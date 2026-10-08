@@ -429,7 +429,7 @@ See [Bazel CI external dependency caching](./bazel.md#checked-in-bazel-dependenc
 The cache contains external Bazel dependency input and the Bazelisk-downloaded
 Bazel binary. It does not contain Bazel build outputs. It is separate from the
 Bazel remote action and test-result cache. See [Bazel CI external dependency
-caching](./bazel.md#checked-in-bazel-dependency-list) for its key and dependency
+caching](./bazel.md#bazel-ci-external-dependency-caching) for its key and dependency
 list rules.
 
 #### Nix store cache
@@ -493,7 +493,15 @@ commands.
 The action uses a GitHub Actions cache, not an artifact. A cache lets unrelated
 jobs and workflow runs reuse one binary. An artifact belongs to one workflow
 run. The cache key includes the Task version, operating system, and
-architecture. Each job restores the matching cache. Platform cache setup jobs
+architecture.
+
+Before restoring the cache, `setup-task` checks for an executable at
+`$RUNNER_TEMP/task/<version>/$RUNNER_OS-$RUNNER_ARCH/task`. If one exists, the
+action skips cache restore, download, and save. This lets repeated invocations
+reuse Task within a job. For example, both `setup-bazel` and
+`setup-go-for-project` invoke `setup-task` when a job needs Bazel and host Go.
+
+Otherwise, the action restores the matching cache. Platform cache setup jobs
 in the Go workflows can save a cache entry on `master`. All other jobs are
 restore-only consumers. Pull request and merge-queue jobs download Task on a
 cache miss. They do not save the binary. This policy reserves cache storage for
