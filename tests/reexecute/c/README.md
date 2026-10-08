@@ -245,7 +245,7 @@ BLOCK_DIR_SRC=cchain-mainnet-blocks-10k-ldb CURRENT_STATE_DIR_SRC=cchain-current
 
 To support testing the VM in multiple configurations, the benchmark supports a set of pre-defined configs passed via the `CONFIG` environment variable.
 
-The currently supported options are: "default", "archive", "pathdb", "firewood", and "firewood-archive".
+The currently supported options are: "default", "archive", "pathdb", "firewood", "firewood-archive", and "firewood-warmup" (the "firewood" config with `speculative-warmup-enabled`, which warms state caches by speculatively executing each block's transactions in parallel with the sequential execution).
 
 To execute a benchmark with any of these options, you must use a compatible `CURRENT_STATE_DIR` or `CURRENT_STATE_DIR_SRC` or the VM will refuse to start with an incompatible existing database and newly provided config.
 

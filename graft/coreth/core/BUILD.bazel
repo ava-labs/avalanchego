@@ -28,6 +28,7 @@ go_library(
         "headerchain.go",
         "predicate_check.go",
         "sender_cacher.go",
+        "speculative_warmup.go",
         "state_manager.go",
         "state_processor.go",
         "state_processor_ext.go",
