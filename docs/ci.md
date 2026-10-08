@@ -100,14 +100,14 @@ Go and Bazel use the same workflow roles and file-name pattern:
 
 | Role | Bazel | Go |
 | --- | --- | --- |
-| Pre-merge entrypoint | [`bazel-ci-pre-merge.yml`](../.github/workflows/bazel-ci-pre-merge.yml) | [`go-ci-pre-merge.yml`](../.github/workflows/go-ci-pre-merge.yml) |
-| Scheduled entrypoint | [`bazel-ci-scheduled.yml`](../.github/workflows/bazel-ci-scheduled.yml) | [`go-ci-scheduled.yml`](../.github/workflows/go-ci-scheduled.yml) |
-| Primary reusable workflow | [`bazel-ci.yml`](../.github/workflows/bazel-ci.yml) | [`go-ci.yml`](../.github/workflows/go-ci.yml) |
-| Reusable smoke workflow | [`bazel-ci-smoke.yml`](../.github/workflows/bazel-ci-smoke.yml) | [`go-ci-smoke.yml`](../.github/workflows/go-ci-smoke.yml) |
+| Pre-merge entrypoint | [`bazel-merge-group.yml`](../.github/workflows/bazel-merge-group.yml) | [`go.yml`](../.github/workflows/go.yml) |
+| Scheduled entrypoint | [`bazel-scheduled.yml`](../.github/workflows/bazel-scheduled.yml) | [`go-scheduled.yml`](../.github/workflows/go-scheduled.yml) |
+| Primary reusable workflow | [`bazel.yml`](../.github/workflows/bazel.yml) | [`go-unit.yml`](../.github/workflows/go-unit.yml) |
+| Reusable smoke workflow | [`bazel-smoke.yml`](../.github/workflows/bazel-smoke.yml) | [`go-smoke.yml`](../.github/workflows/go-smoke.yml) |
 
 Entrypoints select the reusable workflow that provides the required test policy,
 or define jobs that are specific to that event. The pre-merge and scheduled Go
-entrypoints both use `go-ci.yml`; pre-merge macOS uses `go-ci-smoke.yml`.
+entrypoints both use `go-unit.yml`; pre-merge macOS uses `go-smoke.yml`.
 
 Smoke workflows run a minimal macOS test. This test verifies that unit tests
 can run on macOS. The Linux pre-merge job and scheduled jobs run the full unit
@@ -129,14 +129,14 @@ jobs. Therefore, a platform's Bazel jobs wait only for that platform's setup job
 
 ### Go unit test platforms
 
-The `unit` job in `go-ci-pre-merge.yml` calls the reusable
-[`go-ci.yml`](../.github/workflows/go-ci.yml) workflow on Linux AMD64. It runs
+The `unit` job in `go.yml` calls the reusable
+[`go-unit.yml`](../.github/workflows/go-unit.yml) workflow on Linux AMD64. It runs
 the unified unit test suite ([`scripts/tests.unit.sh`](../scripts/tests.unit.sh))
 through the `test-unit` task. That task disables race detection and test
 shuffling so the Go build and test cache can serve repeated runs.
 
 On macOS, the `smoke` job calls
-[`go-ci-smoke.yml`](../.github/workflows/go-ci-smoke.yml). macOS runners are
+[`go-smoke.yml`](../.github/workflows/go-smoke.yml). macOS runners are
 slower. They also fail more often because of external runner problems.
 Pre-merge CI therefore runs only a Go unit-test smoke test on macOS. This
 mirrors the macOS smoke job in Bazel CI. See [Test platforms and cache
@@ -144,8 +144,8 @@ policy](./bazel.md#test-platforms-and-cache-policy).
 
 The `Scheduled Go` workflow runs the full unit suite on each platform. The
 workflow is defined in
-[`go-ci-scheduled.yml`](../.github/workflows/go-ci-scheduled.yml). It calls
-[`go-ci.yml`](../.github/workflows/go-ci.yml) for each platform. Only the Ubuntu
+[`go-scheduled.yml`](../.github/workflows/go-scheduled.yml). It calls
+[`go-unit.yml`](../.github/workflows/go-unit.yml) for each platform. Only the Ubuntu
 24.04 AMD64 job runs `test-unit-race-shuffle`. This task enables race detection
 and shuffled test order. The other scheduled jobs run `test-unit` to check
 platform compatibility without race detection or shuffled test order.
@@ -169,7 +169,7 @@ its `action.yml` from the workspace before it can run the action. A local action
 cannot check out the repository for its own first use.
 
 For example, end-to-end jobs in
-[`.github/workflows/go-ci-pre-merge.yml`](../.github/workflows/go-ci-pre-merge.yml) use
+[`.github/workflows/go.yml`](../.github/workflows/go.yml) use
 `run-monitored-tmpnet-cmd` to monitor a named task and collect its artifacts:
 
 ```yaml

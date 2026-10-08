@@ -41,7 +41,7 @@ jobs:
   full-darwin-arm64:
     name: macos-26-arm64
     needs: setup-cache-darwin-arm64
-    uses: ./.github/workflows/go-ci.yml
+    uses: ./.github/workflows/go-unit.yml
     with:
       platform_name: macos-26-arm64
       runner: macos-26
@@ -62,7 +62,7 @@ jobs:
           - platform_name: ubuntu-24.04-amd64
             runner: ubuntu-24.04
             run_race_shuffle_unit_tests: true
-    uses: ./.github/workflows/go-ci.yml
+    uses: ./.github/workflows/go-unit.yml
     with:
       platform_name: ${{ matrix.platform_name }}
       runner: ${{ matrix.runner }}
@@ -82,7 +82,7 @@ jobs:
             runner: ubuntu-22.04-arm
           - platform_name: ubuntu-24.04-arm64
             runner: ubuntu-24.04-arm
-    uses: ./.github/workflows/go-ci.yml
+    uses: ./.github/workflows/go-unit.yml
     with:
       platform_name: ${{ matrix.platform_name }}
       runner: ${{ matrix.runner }}

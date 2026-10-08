@@ -695,9 +695,9 @@ command can make multiple RPCs. Retry delays and other build work also add time.
 Use command and job timeouts to set a limit for the complete CI operation.
 
 CI job timeouts bound the complete operation. The timeout values are configured
-in `.github/workflows/bazel-ci.yml` and
-`.github/workflows/bazel-ci-smoke.yml`. Scheduled jobs configure their longer
-limits in `.github/workflows/bazel-ci-scheduled.yml`. They run broader tests
+in `.github/workflows/bazel.yml` and
+`.github/workflows/bazel-smoke.yml`. Scheduled jobs configure their longer
+limits in `.github/workflows/bazel-scheduled.yml`. They run broader tests
 without the remote cache. Bazel's test timeouts still limit each test process.
 The job-level limits also cover loading, analysis, builds, downloads, retries,
 and test setup.
