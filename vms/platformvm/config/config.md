@@ -2,7 +2,7 @@ This document provides details about the configuration options available for the
 
 ## Standard Configurations
 
-In order to specify a configuration for the PlatformVM, you need to define a `Config` struct and its parameters. The default values for these parameters are:
+To configure the PlatformVM, create a JSON file at `{chain-config-dir}/P/config.json`. The default values are:
 
 | Option                               | Type            | Default            |
 | ------------------------------------ | --------------- | ------------------ |
@@ -27,7 +27,7 @@ Default values are overridden only if explicitly specified in the config.
 
 ## Network Configuration
 
-The Network configuration defines parameters that control the network's gossip and validator behavior.
+The Network configuration defines parameters that control the network's gossip and validator behavior. Set these fields in the `network` object of the JSON file.
 
 ### Parameters
 
@@ -43,10 +43,9 @@ The Network configuration defines parameters that control the network's gossip a
 | `push-gossip-discarded-cache-size` | `int` | `16384` | Size of the cache storing recently dropped transaction IDs from mempool to avoid re-pushing |
 | `push-gossip-max-regossip-frequency` | `time.Duration` | `30 * time.Second` | Maximum frequency limit for re-gossiping a transaction |
 | `push-gossip-frequency` | `time.Duration` | `500 * time.Millisecond` | Frequency of push gossip rounds |
-| `pull-gossip-poll-size` | `int` | `1` | Number of validators to sample during pull gossip rounds |
 | `pull-gossip-frequency` | `time.Duration` | `1500 * time.Millisecond` | Frequency of pull gossip rounds |
-| `pull-gossip-throttling-period` | `time.Duration` | `10 * time.Second` | Time window for throttling pull requests |
-| `pull-gossip-throttling-limit` | `int` | `2` | Maximum number of pull queries allowed per validator within the throttling window |
+| `pull-gossip-throttling-period` | `time.Duration` | `1 * time.Hour` | Time window for throttling pull requests |
+| `pull-gossip-requests-per-validator` | `float64` | `2400` | Has no effect |
 | `expected-bloom-filter-elements` | `int` | `8 * 1024` | Expected number of elements when creating a new bloom filter. Larger values increase filter size |
 | `expected-bloom-filter-false-positive-probability` | `float64` | `0.01` | Target probability of false positives after inserting the expected number of elements. Lower values increase filter size |
 | `max-bloom-filter-false-positive-probability` | `float64` | `0.05` | Threshold for bloom filter regeneration. Filter is refreshed when false positive probability exceeds this value |
