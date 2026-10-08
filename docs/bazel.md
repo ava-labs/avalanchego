@@ -833,9 +833,15 @@ The checked-in list has two parts:
 
 - `bazel_ci_target_patterns` lists target patterns for the Bazel CI workflows.
   `run_bazel_ci_command.sh` checks these patterns before it runs a CI command.
-- `bazel_ci_additional_dependency_targets` lists dependencies for CI commands
-  without target patterns. `bazel mod tidy` needs the generated Buildozer target
-  in this list.
+- `bazel_ci_additional_dependency_targets` lists external tools for metadata
+  checks and commands without target patterns. The metadata formatter needs
+  `@buildifier_prebuilt//:buildifier`. `bazel mod tidy` needs the generated
+  Buildozer target in this list.
+
+`//...` covers workspace targets, not targets in external repositories. Fetch
+Buildifier explicitly so the metadata check can run with repository downloads
+disabled. `bazel mod deps` prepares the module graph but does not download the
+Buildifier binary.
 
 Do not add every Bazel target to the list. Add each CI target pattern and each
 command-only dependency that CI needs. This keeps unrelated repositories and
@@ -858,9 +864,9 @@ It makes it harder for a new or changed Bazel CI job to use an undeclared build
 dependency.
 
 Commands without target patterns, such as `bazel mod tidy` and `bazel mod deps`,
-do not use this wrapper. The wrapper does not check
-`bazel_ci_additional_dependency_targets`. Add command-only dependencies to that
-list manually. Validate those commands with repository downloads disabled after
+do not use this wrapper. The metadata formatter also runs Buildifier directly.
+The wrapper does not check `bazel_ci_additional_dependency_targets`. Add
+command-only dependencies to that list manually. Validate those commands with repository downloads disabled after
 cache preparation.
 
 ### Changing this safely

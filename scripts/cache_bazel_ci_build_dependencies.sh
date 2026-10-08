@@ -7,9 +7,9 @@ set -euo pipefail
 # ./scripts/nix_run.sh ./scripts/cache_bazel_ci_build_dependencies.sh
 #
 # Used by `task bazel-cache-ci-build-dependencies` in the Bazel CI setup job,
-# after the metadata check. This fetches only the dependencies needed by the
-# checked-in Bazel CI target patterns instead of trying to cache every possible
-# Bazel dependency.
+# before downloads are disabled and metadata is checked. This fetches dependencies
+# for the checked-in CI target patterns and additional tools, instead of every
+# possible Bazel dependency.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${REPO_ROOT}/scripts/bazel_ci_dependency_list.sh"
