@@ -231,6 +231,9 @@ func gasPrice(cost nAVAX, gas gas.Gas) uint256.Int {
 
 // Fee returns the minimum amount of nAVAX that a transaction consuming gas MUST
 // burn for its gas price to be at least price, in aAVAX/gas.
+//
+// Fee returns an error if gas*price overflows a uint64, so it can't compute
+// fees above ~18.4 AVAX.
 func Fee(gas gas.Gas, price gas.Price) (nAVAX, error) {
 	cost, err := gas.Cost(price)
 	if err != nil {
