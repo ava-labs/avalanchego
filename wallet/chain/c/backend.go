@@ -75,9 +75,8 @@ func (b *backend) AcceptTx(ctx context.Context, t *tx.Tx) error {
 				continue
 			}
 
-			scaled := tx.ScaleAVAX(output.Amount)
-			balance := scaled.ToBig()
-			account.Balance.Add(account.Balance, balance)
+			amount := tx.ScaleAVAX(output.Amount)
+			account.Balance.Add(account.Balance, amount.ToBig())
 		}
 	case *tx.Export:
 		txID := t.ID()
