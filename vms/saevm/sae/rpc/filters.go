@@ -33,26 +33,29 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 	}
 
 	start, foundStart := api.resolve(crit.FromBlock)
-	end, foundEnd := api.resolve(crit.ToBlock)
-	switch {
-	case !foundStart && !foundEnd:
-		// With neither end found, one can assume there are no intermediate
-		// known blocks either. Empty slice matches libevm behavior.
+	if !foundStart {
+		// The first block read will fail. Might as well return now.
 		return []*types.Log{}, nil
-	case !foundStart:
-		// There MAY be intermediate blocks available (e.g. statesync).
-		// crit.FromBlock MUST be non-negative, otherwise it would have been found.
-		start = crit.FromBlock.Uint64()
-	case !foundEnd:
+	}
+
+	end, foundEnd := api.resolve(crit.ToBlock)
+	if !foundEnd {
+		// All special numbers resolve, so this must be a future block.
 		// MUST be >= start, but we won't find unexecuted logs
 		end = api.b.LastAccepted().Height()
 	}
 
-	// In all cases, crit MUST be adjusted to reflect actual block numbers.
-	crit.FromBlock = new(big.Int).SetUint64(start)
-	crit.ToBlock = new(big.Int).SetUint64(end)
 	if end < start {
-		return api.FilterAPI.GetLogs(ctx, crit) // allow libevm to handle error
+		// Invalid input will be handled by libevm. A short proof that this doesn't
+		// escape the max blocks per request limit is below.
+		// - End wasn't found
+		//   - If start was a special value, it was assumed to be within
+		//     [Config.MaxBlocksPerRequest]. It will read until the first unexecuted block.
+		//   - If start was not a special value, then it was a future block (> last accepted),
+		//     in which case it couldn't have been found. Contradiction.
+		// - End was found. Then it resolved to a value less than the provided start.
+		//   In all cases, this is user error, and libevm will handle accordingly.
+		return api.FilterAPI.GetLogs(ctx, crit)
 	}
 
 	if maxBlocks := api.b.config.MaxBlocksPerRequest; maxBlocks > 0 && end-start >= maxBlocks {
@@ -64,6 +67,8 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 		)
 	}
 
+	crit.FromBlock = new(big.Int).SetUint64(start)
+	crit.ToBlock = new(big.Int).SetUint64(end)
 	return api.FilterAPI.GetLogs(ctx, crit)
 }
 

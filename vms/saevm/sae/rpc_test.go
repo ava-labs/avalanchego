@@ -873,98 +873,141 @@ func TestGetLogs(t *testing.T) {
 	}
 }
 
-func TestGetLogsBlockLimit(t *testing.T) {
+// TestGetLogsRange checks how the requested block range is resolved and
+// bounded by [saerpc.Config.MaxBlocksPerRequest], including while the
+// last-accepted block is still executing.
+func TestGetLogsRange(t *testing.T) {
 	const maxBlocksPerRequest = 2
 
-	ctx, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
+	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
+	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
+	ctx, sut := newSUT(t, 1, precompileOpt, options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.RPCConfig.MaxBlocksPerRequest = maxBlocksPerRequest
 	}))
+	defer unblock()
+
 	genesis := sut.lastAcceptedBlock(t)
 	first := sut.runConsensusLoop(t)
-	second := sut.runConsensusLoop(t)
-	require.NoErrorf(t, second.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", second)
+	executed := sut.runConsensusLoop(t)
+	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
+
+	unexecuted := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		To:       &blockingPrecompile,
+		Gas:      params.TxGas,
+		GasPrice: big.NewInt(1),
+	}))
+	future := hexutil.Uint64(unexecuted.Height() + 1)
+
+	num := func(b *blocks.Block) hexutil.Uint64 {
+		return hexutil.Uint64(b.Height())
+	}
 
 	tests := []struct {
 		name    string
-		query   ethereum.FilterQuery
+		query   map[string]any
 		wantErr testerr.Want
 	}{
 		{
-			name: "single_block",
-			query: ethereum.FilterQuery{
-				FromBlock: genesis.Number(),
-				ToBlock:   genesis.Number(),
-			},
+			name:  "single_block",
+			query: map[string]any{"fromBlock": num(genesis), "toBlock": num(genesis)},
 		},
 		{
-			name: "at_limit",
-			query: ethereum.FilterQuery{
-				FromBlock: genesis.Number(),
-				ToBlock:   first.Number(),
-			},
+			name:  "at_limit",
+			query: map[string]any{"fromBlock": num(genesis), "toBlock": num(first)},
 		},
 		{
-			name: "over_limit",
-			query: ethereum.FilterQuery{
-				FromBlock: genesis.Number(),
-				ToBlock:   second.Number(),
-			},
+			name:    "over_limit",
+			query:   map[string]any{"fromBlock": num(genesis), "toBlock": num(executed)},
 			wantErr: testerr.Contains("requested too many blocks from 0 to 2, maximum is set to 2"),
 		},
 		{
-			name: "over_limit_to_latest",
-			query: ethereum.FilterQuery{
-				FromBlock: genesis.Number(),
-			},
+			name:    "over_limit_to_latest",
+			query:   map[string]any{"fromBlock": num(genesis)},
 			wantErr: testerr.Contains("requested too many blocks from 0 to 2, maximum is set to 2"),
 		},
 		{
-			name: "under_limit_future_block",
-			query: ethereum.FilterQuery{
-				FromBlock: big.NewInt(99),
-				ToBlock:   big.NewInt(100),
-			},
+			name:    "over_limit_to_future_block",
+			query:   map[string]any{"fromBlock": num(genesis), "toBlock": future + 100},
+			wantErr: testerr.Contains("requested too many blocks from 0 to 3, maximum is set to 2"),
 		},
 		{
-			name: "over_limit_to_future_block_resolves",
-			query: ethereum.FilterQuery{
-				FromBlock: big.NewInt(1),
-				ToBlock:   big.NewInt(100),
-			},
+			name:    "to_future_block",
+			query:   map[string]any{"fromBlock": num(executed), "toBlock": future + 100},
+			wantErr: testerr.Contains("failed to get logs for block #3"), // from libevm
 		},
 		{
-			name: "over_limit_to_future_block",
-			query: ethereum.FilterQuery{
-				FromBlock: big.NewInt(0),
-				ToBlock:   big.NewInt(100),
-			},
-			wantErr: testerr.Contains("requested too many blocks from 0 to 2, maximum is set to 2"),
+			name:    "to_unexecuted_block",
+			query:   map[string]any{"fromBlock": num(executed), "toBlock": num(unexecuted)},
+			wantErr: testerr.Contains("failed to get logs for block #3"), // from libevm
 		},
 		{
-			name: "with_hash_ignores_args",
-			query: ethereum.FilterQuery{
-				BlockHash: new(first.Hash()),
-				FromBlock: genesis.Number(),
-			},
-			// If the numbers were resolved, it would have gotten the "over limit" error
+			name:  "from_unexecuted_block",
+			query: map[string]any{"fromBlock": num(unexecuted)},
+		},
+		{
+			name:  "from_future_block",
+			query: map[string]any{"fromBlock": future},
+		},
+		{
+			name:  "future_range",
+			query: map[string]any{"fromBlock": future, "toBlock": future + 9},
+		},
+		{
+			name:    "from_greater_than_to",
+			query:   map[string]any{"fromBlock": num(executed), "toBlock": num(first)},
+			wantErr: testerr.Contains("invalid block range params"), // from libevm
+		},
+		{
+			name:    "with_hash_ignores_range",
+			query:   map[string]any{"blockHash": first.Hash(), "fromBlock": num(genesis)},
 			wantErr: testerr.Contains("cannot specify both BlockHash and FromBlock/ToBlock"),
 		},
 		{
-			name: "from_greater_than_to",
-			query: ethereum.FilterQuery{
-				FromBlock: second.Number(),
-				ToBlock:   first.Number(),
-			},
+			name:    "unexecuted_block_hash",
+			query:   map[string]any{"blockHash": unexecuted.Hash()},
+			wantErr: testerr.Contains("failed to get logs for block #3"), // from libevm
+		},
+		{
+			name:    "unknown_block_hash",
+			query:   map[string]any{"blockHash": common.Hash{'u', 'n', 'k'}},
+			wantErr: testerr.Contains("unknown block"),
+		},
+		{
+			name:    "from_earliest",
+			query:   map[string]any{"fromBlock": "earliest"},
+			wantErr: testerr.Contains("requested too many blocks from 0 to 2, maximum is set to 2"),
+		},
+		{
+			name:    "from_finalized",
+			query:   map[string]any{"fromBlock": "finalized"},
+			wantErr: testerr.Contains("requested too many blocks from 0 to 2, maximum is set to 2"),
+		},
+		{
+			name:    "from_pending",
+			query:   map[string]any{"fromBlock": "pending"},
 			wantErr: testerr.Contains("invalid block range params"), // from libevm
+		},
+		{
+			// libevm ALWAYS resolves pending to last executed, but the config is NOT set.
+			name:    "pending_resolves_to_last_accepted",
+			query:   map[string]any{"fromBlock": "pending", "toBlock": "pending"},
+			wantErr: testerr.Contains("failed to get logs for block #3"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := sut.FilterLogs(ctx, tt.query)
+			var got json.RawMessage
+			err := sut.CallContext(ctx, &got, "eth_getLogs", tt.query)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
-				t.Errorf("eth_getLogs(...) %s", diff)
+				t.Fatalf("eth_getLogs(%v) %s", tt.query, diff)
 			}
+			if err != nil {
+				return
+			}
+
+			// MUST be an empty array, not null, to match libevm.
+			assert.JSONEqf(t, "[]", string(got), "eth_getLogs(%v)", tt.query)
 		})
 	}
 }
