@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/ethclient"
-	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/stretchr/testify/require"
 
@@ -20,7 +19,7 @@ import (
 type ethService struct{}
 
 func (ethService) BaseFee() hexutil.Uint64 {
-	return 25 * params.GWei
+	return hexutil.Uint64(baseFee)
 }
 
 // TestBaseFee checks the node's base fee is used only when no option sets one.
@@ -40,7 +39,7 @@ func TestBaseFee(t *testing.T) {
 	}{
 		{
 			name: "from_node",
-			want: 25 * params.GWei,
+			want: baseFee,
 		},
 		{
 			name:    "from_option",

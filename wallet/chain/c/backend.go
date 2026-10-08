@@ -108,11 +108,11 @@ func (b *backend) AcceptTx(ctx context.Context, t *tx.Tx) error {
 			}
 
 			scaled := tx.ScaleAVAX(input.Amount)
-			balance := scaled.ToBig()
-			if account.Balance.Cmp(balance) == -1 {
+			amount := scaled.ToBig()
+			if account.Balance.Cmp(amount) == -1 {
 				return errInsufficientFunds
 			}
-			account.Balance.Sub(account.Balance, balance)
+			account.Balance.Sub(account.Balance, amount)
 
 			newNonce, err := math.Add(input.Nonce, 1)
 			if err != nil {
