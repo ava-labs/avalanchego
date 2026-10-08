@@ -340,20 +340,8 @@ func (e *Engine) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uin
 	return e.executeDeferredWork(ctx)
 }
 
-func (e *Engine) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID, requestedHeight uint64) error {
+func (e *Engine) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, _ ids.ID, requestedHeight uint64) error {
 	e.sendChits(ctx, nodeID, requestID, requestedHeight)
-
-	issuedMetric := e.metrics.issued.WithLabelValues(pushGossipSource)
-
-	// Only issue the block if the node that sent us this query is a validator.
-	if e.Validators.GetWeight(e.Ctx.SubnetID, nodeID) > 0 {
-		// Try to issue [blkID] to consensus.
-		// If we're missing an ancestor, request it from [vdr]
-		if err := e.issueFromByID(ctx, nodeID, blkID, issuedMetric); err != nil {
-			return err
-		}
-	}
-
 	return e.executeDeferredWork(ctx)
 }
 
@@ -384,7 +372,13 @@ func (e *Engine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uin
 		return nil
 	}
 
-	if e.isBlockTooFarAhead(blk, nodeID, requestID) {
+	if e.isBlockTooFarAhead(blk, nodeID, requestID) || e.isDecided(blk) {
+		return e.executeDeferredWork(ctx)
+	}
+
+	// We check if we have [blk]'s parent.
+	// If not, we don't issue [blk] into consensus.
+	if _, err := e.getBlock(ctx, blk.Parent()); err != nil {
 		return e.executeDeferredWork(ctx)
 	}
 
