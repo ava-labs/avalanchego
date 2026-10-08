@@ -233,11 +233,10 @@ func (b *builder) NewImportTx(
 		BlockchainID:   b.context.BlockchainID,
 		SourceChain:    chainID,
 		ImportedInputs: importedInputs,
-		// The amount is set once the fee is known. It doesn't impact the gas
-		// used, as outputs are fixed-size.
 		Outs: []tx.Output{{
 			Address: to,
 			AssetID: avaxAssetID,
+			// Amount set below.
 		}},
 	}
 
@@ -304,6 +303,14 @@ func (b *builder) NewExportTx(
 		return nil, err
 	}
 
+	// Inputs are fixed-size, so every input adds the same amount of gas.
+	utx.Ins = []tx.Input{{}}
+	gasUsedWithInput, err := tx.GasUsed(utx)
+	if err != nil {
+		return nil, err
+	}
+	inputGas := gasUsedWithInput - gasUsed
+
 	var (
 		ops   = common.NewOptions(options)
 		ctx   = ops.Context()
@@ -315,19 +322,16 @@ func (b *builder) NewExportTx(
 			break
 		}
 
-		// Inputs are fixed-size, so a placeholder prices the next input.
-		utx.Ins = append(utx.Ins, tx.Input{})
-		gasUsedWithInput, err := tx.GasUsed(utx)
-		utx.Ins = utx.Ins[:len(utx.Ins)-1]
+		newGasUsed, err := math.Add(gasUsed, inputGas)
 		if err != nil {
 			return nil, err
 		}
-		feeWithInput, err := tx.Fee(gasUsedWithInput, baseFee)
+		newFee, err := tx.Fee(newGasUsed, baseFee)
 		if err != nil {
 			return nil, err
 		}
 
-		additionalFee := feeWithInput - fee
+		additionalFee := newFee - fee
 
 		balance, err := b.backend.Balance(ctx, addr)
 		if err != nil {
@@ -346,8 +350,9 @@ func (b *builder) NewExportTx(
 			continue
 		}
 
-		// Update the fee for the next iteration
-		fee = feeWithInput
+		// Update the gas used and fee for the next iteration
+		gasUsed = newGasUsed
+		fee = newFee
 
 		amountToConsume, err = math.Add(amountToConsume, additionalFee)
 		if err != nil {

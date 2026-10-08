@@ -39,8 +39,7 @@ type Export struct {
 	ExportedOutputs  []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
-// SortExportedOutputs sorts outs into the canonical order required of
-// [Export.ExportedOutputs].
+// SortExportedOutputs calls [avax.SortTransferableOutputs] with the local codec.
 func SortExportedOutputs(outs []*avax.TransferableOutput) {
 	avax.SortTransferableOutputs(outs, c)
 }
