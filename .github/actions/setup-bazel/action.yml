@@ -69,8 +69,8 @@ runs:
       shell: bash
       run: |
         {
-          echo "disable-downloads-on-cache-hit=${{ steps.cache.outputs.cache-hit == 'true' && (inputs.is-setup-job != 'true' || steps.cache-policy.outputs.cache-save-allowed == 'true') }}"
           echo "prepare-dependencies=${{ steps.cache.outputs.cache-hit != 'true' && (inputs.is-setup-job != 'true' || steps.cache-policy.outputs.cache-save-allowed == 'true') }}"
+          echo "disable-dependency-downloads=${{ inputs.is-setup-job != 'true' || steps.cache-policy.outputs.cache-save-allowed == 'true' }}"
           echo "save-cache=${{ steps.cache.outputs.cache-hit != 'true' && steps.cache-policy.outputs.cache-save-allowed == 'true' }}"
         } >> "$GITHUB_OUTPUT"
 
@@ -81,28 +81,27 @@ runs:
         GO_MOD_CACHE_DIR: ${{ steps.cache-paths.outputs.go_mod_cache }}
       run: ${{ github.action_path }}/configure-bazelrc.sh
 
-    # This must precede the metadata check: an exact cache hit must satisfy both
-    # metadata validation and the later workload without downloading inputs.
-    - name: Disable dependency downloads on direct cache hit
-      if: ${{ steps.cache-operations.outputs.disable-downloads-on-cache-hit == 'true' }}
+    # A setup job prepares data for a cache save. Consumers prepare only their local
+    # cache on a miss, then run offline.
+    - name: Cache Bazel CI build dependencies
+      if: ${{ steps.cache-operations.outputs.prepare-dependencies == 'true' }}
+      shell: bash
+      run: ./scripts/run_task.sh bazel-cache-ci-build-dependencies
+
+    # On a direct hit preparation is skipped; on a miss it must finish before
+    # later commands run offline.
+    - name: Disable dependency downloads
+      if: ${{ steps.cache-operations.outputs.disable-dependency-downloads == 'true' }}
       shell: bash
       run: |
         echo 'common --repository_disable_download' >> "$HOME/.bazelrc"
         echo 'common --repo_env=GOPROXY=off' >> "$HOME/.bazelrc"
 
-    # Bazel metadata must be consistent before any other bazel operations are
-    # performed including build dependency caching.
+    # Metadata validation must not add undeclared inputs to a cache entry.
     - name: Check Bazel metadata
       if: ${{ inputs.is-setup-job == 'true' }}
       shell: bash
       run: ./scripts/run_task.sh bazel-check-metadata
-
-    - name: Cache Bazel CI build dependencies
-      # A setup job prepares data for a cache save. Consumers prepare only their local
-      # cache on a miss, then run offline.
-      if: ${{ steps.cache-operations.outputs.prepare-dependencies == 'true' }}
-      shell: bash
-      run: ./scripts/run_task.sh bazel-cache-ci-build-dependencies
 
     - name: Prune old Bazelisk downloads
       if: ${{ steps.cache-operations.outputs.save-cache == 'true' }}
@@ -120,15 +119,6 @@ runs:
           ${{ steps.cache-paths.outputs.go_mod_cache }}
           ~/.cache/bazelisk
         key: ${{ steps.cache-key.outputs.cache-key }}
-
-    # This cannot share the exact-hit step above: a miss must allow metadata
-    # validation and dependency prefetch to download inputs before going offline.
-    - name: Disable dependency downloads after cache preparation
-      if: ${{ steps.cache-operations.outputs.prepare-dependencies == 'true' }}
-      shell: bash
-      run: |
-        echo 'common --repository_disable_download' >> "$HOME/.bazelrc"
-        echo 'common --repo_env=GOPROXY=off' >> "$HOME/.bazelrc"
 
     - name: Log Bazel disk diagnostics
       if: ${{ failure() }}

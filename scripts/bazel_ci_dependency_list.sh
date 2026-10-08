@@ -20,3 +20,17 @@ bazel_ci_target_patterns() {
 //ids:ids_test
 EOF
 }
+
+# Additional dependencies required by Bazel commands in Go CI that do not take
+# target patterns. `bazel mod tidy` uses this generated repository to update
+# use_repo() calls in MODULE.bazel.
+bazel_ci_additional_dependency_targets() {
+  cat <<'EOF'
+@@buildozer++buildozer_binary+buildozer_binary//:buildozer.exe
+EOF
+}
+
+bazel_ci_dependency_targets() {
+  bazel_ci_target_patterns
+  bazel_ci_additional_dependency_targets
+}
