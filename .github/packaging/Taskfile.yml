@@ -12,9 +12,11 @@ vars:
   # packaging Taskfile works both as an include and standalone.
   REPO_ROOT:
     sh: cd "{{.TASKFILE_DIR}}/../.." && pwd
-  # Go version from the project's go.mod.
+  # Read the declared version without invoking Go. Task evaluates this variable
+  # for non-packaging tasks too; `go list` can download Go or fail in Bazel jobs
+  # that do not provide host Go.
   PACKAGING_GO_VERSION:
-    sh: go list -m -f '{{ "{{.GoVersion}}" }}' | head -1
+    sh: awk '$1 == "go" { print $2; exit }' "$(git rev-parse --show-toplevel)/go.mod"
   # Map uname -m to RPM arch names (arm64 -> aarch64).
   PACKAGING_RPM_HOST_ARCH:
     sh: |
