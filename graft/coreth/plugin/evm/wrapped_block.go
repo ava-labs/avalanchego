@@ -27,11 +27,11 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 
 	ethcore "github.com/ava-labs/libevm/core"
 )
@@ -445,9 +445,9 @@ func (b *wrappedBlock) syntacticVerify() error {
 	if uncleHash != ethHeader.UncleHash {
 		return fmt.Errorf("invalid uncle hash %v does not match calculated uncle hash %v", ethHeader.UncleHash, uncleHash)
 	}
-	// Coinbase must match the BlackholeAddr on C-Chain
-	if ethHeader.Coinbase != constants.BlackholeAddr {
-		return fmt.Errorf("invalid coinbase %v does not match required blackhole address %v", ethHeader.Coinbase, constants.BlackholeAddr)
+	// Coinbase must match the blackhole address on C-Chain
+	if ethHeader.Coinbase != blackhole.Address {
+		return fmt.Errorf("invalid coinbase %v does not match required blackhole address %v", ethHeader.Coinbase, blackhole.Address)
 	}
 	// Block must not have any uncles
 	if len(b.ethBlock.Uncles()) > 0 {
