@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/math/intmath"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -21,21 +22,10 @@ import (
 	ethcommon "github.com/ava-labs/libevm/common"
 )
 
-const avaxConversionRateInt = 1_000_000_000
-
 var (
 	_ Builder = (*builder)(nil)
 
 	errInsufficientFunds = errors.New("insufficient funds")
-
-	// avaxConversionRate is the conversion rate between the smallest
-	// denomination on the X-Chain and P-chain, 1 nAVAX, and the smallest
-	// denomination on the C-Chain 1 wei. Where 1 nAVAX = 1 gWei.
-	//
-	// This is only required for AVAX because the denomination of 1 AVAX is 9
-	// decimal places on the X and P chains, but is 18 decimal places within the
-	// EVM.
-	avaxConversionRate = big.NewInt(avaxConversionRateInt)
 )
 
 // Builder provides a convenient interface for building unsigned C-chain
@@ -244,7 +234,7 @@ func (b *builder) NewImportTx(
 	if err != nil {
 		return nil, err
 	}
-	txFee, err := tx.Fee(gasUsed, baseFee)
+	txFee, err := calculateFee(gasUsed, baseFee)
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +283,7 @@ func (b *builder) NewExportTx(
 	if err != nil {
 		return nil, err
 	}
-	fee, err := tx.Fee(gasUsed, baseFee)
+	fee, err := calculateFee(gasUsed, baseFee)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +316,7 @@ func (b *builder) NewExportTx(
 		if err != nil {
 			return nil, err
 		}
-		newFee, err := tx.Fee(newGasUsed, baseFee)
+		newFee, err := calculateFee(newGasUsed, baseFee)
 		if err != nil {
 			return nil, err
 		}
@@ -338,10 +328,9 @@ func (b *builder) NewExportTx(
 			return nil, err
 		}
 
-		// Since the asset is AVAX, we divide by the avaxConversionRate to
-		// convert back to the correct denomination of AVAX that can be
-		// exported.
-		avaxBalance := new(big.Int).Div(balance, avaxConversionRate).Uint64()
+		// Since the asset is AVAX, we divide by [tx.X2CRate] to convert back to
+		// the correct denomination of AVAX that can be exported.
+		avaxBalance := new(big.Int).Div(balance, big.NewInt(tx.X2CRate)).Uint64()
 
 		// If the balance for [addr] is insufficient to cover the additional
 		// cost of adding an input to the transaction, skip adding the input
@@ -409,4 +398,19 @@ func getSpendableAmount(
 
 	inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
 	return out.Amt, inputSigIndices, ok
+}
+
+// calculateFee returns the minimum amount of nAVAX that a transaction consuming
+// gasUsed MUST burn for its gas price to be at least price, in aAVAX/gas.
+//
+// calculateFee returns an error if gasUsed*price overflows a uint64, so it
+// can't compute fees above ~18.4 AVAX.
+func calculateFee(gasUsed gas.Gas, price gas.Price) (uint64, error) {
+	cost, err := gasUsed.Cost(price)
+	if err != nil {
+		return 0, err
+	}
+	// The C-Chain computes the gas price by rounding down, so the fee must be
+	// rounded up.
+	return intmath.CeilDiv(cost, tx.X2CRate), nil
 }

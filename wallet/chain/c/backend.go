@@ -75,8 +75,8 @@ func (b *backend) AcceptAtomicTx(ctx context.Context, t *tx.Tx) error {
 				continue
 			}
 
-			balance := new(big.Int).SetUint64(output.Amount)
-			balance.Mul(balance, avaxConversionRate)
+			scaled := tx.ScaleAVAX(output.Amount)
+			balance := scaled.ToBig()
 			account.Balance.Add(account.Balance, balance)
 		}
 	case *tx.Export:
@@ -108,8 +108,8 @@ func (b *backend) AcceptAtomicTx(ctx context.Context, t *tx.Tx) error {
 				continue
 			}
 
-			balance := new(big.Int).SetUint64(input.Amount)
-			balance.Mul(balance, avaxConversionRate)
+			scaled := tx.ScaleAVAX(input.Amount)
+			balance := scaled.ToBig()
 			if account.Balance.Cmp(balance) == -1 {
 				return errInsufficientFunds
 			}
