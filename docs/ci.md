@@ -227,12 +227,22 @@ reserved for jobs with dependencies that another setup action does not provide.
 `install-nix` makes the Nix dev-shell Task available. See [Task](#task) for the
 cache and version rules.
 
-`setup-go-for-project`, `setup-bazel`, and `install-nix` are alternative Go
-provisioning mechanisms. A job that uses `setup-bazel` can also use `install-nix`
-for dependencies that Bazel does not provide. `install-nix` can restore Go
-module input, but it does not save that cache. The Go workflow setup jobs own
-Go module, Task, and Nix store cache writes. Other workflows consume these
-caches without writing them.
+Choose the setup action that provides the job's dependencies. Bazel provides
+Go for its targets, but a job that also runs host Go commands needs
+`setup-go-for-project` or the Nix dev shell. For example, `check-go-mod-tidy`
+uses both `setup-bazel` and `setup-go-for-project`, while `lint-avalanchego`
+uses `setup-bazel` and `install-nix` for flake-provided tools.
+
+When combining these actions, run `setup-bazel` before either Go setup action
+disables `GOPROXY`. Bazel preparation can download Go modules into its separate
+module cache on a miss or non-exact restore. Preparing the host Go module cache
+does not populate that cache. An exact Bazel cache hit can hide an incorrect
+setup order, so validate both exact hits and cold-cache preparation; see
+[Bazel cache validation](./bazel.md#changing-this-safely).
+
+`install-nix` can restore Go module input, but it does not save that cache. The
+Go workflow setup jobs own Go module, Task, and Nix store cache writes. Other
+workflows consume these caches without writing them.
 
 ## CI cache policy
 

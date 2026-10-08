@@ -864,6 +864,9 @@ When modifying `setup-bazel`, `run_task.sh`, `run_bazel_ci_command.sh`,
 preserve these invariants:
 
 - CI can launch `task` without assuming a preinstalled repo-specific wrapper
+- jobs that also prepare host Go dependencies run `setup-bazel` before
+  `setup-go-for-project` or `install-nix` disables `GOPROXY`; see
+  [CI dependency provisioning](./ci.md#provision-ci-job-dependencies)
 - on `master`, every `setup` job requests a cache save after it checks metadata;
   see [CI cache policy](./ci.md#ci-cache-policy) for cache preparation and
   concurrent-save behavior
@@ -888,6 +891,11 @@ Validate changes proportionally:
   when these tasks are relevant
 - run the relevant `task bazel-test-unit-*` and `task bazel-test-e2e-*` targets
 - confirm that the dependency list and cache preparation agree
+- when changing cache setup or action ordering, test an exact restore, a
+  non-exact restore, and a cache miss on a fresh runner. Confirm that Bazel
+  preparation can populate its separate Go module cache before `GOPROXY` is
+  disabled, then confirm that the workload succeeds with repository downloads
+  disabled. An exact hit alone does not test this ordering constraint
 - if you change which Bazel CI commands or target patterns the workflow runs,
   update `scripts/bazel_ci_dependency_list.sh` in the same change rather than
   letting CI discover the mismatch later

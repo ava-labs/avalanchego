@@ -178,6 +178,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      # Prepare Bazel's separate Go module cache before Go setup disables GOPROXY.
+      - uses: ./.github/actions/setup-bazel
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: ./scripts/run_task.sh check-go-mod-tidy
@@ -405,6 +407,9 @@ jobs:
       # involve downloading Go modules, it needs to happen before install-nix disables
       # GOPROXY.
       - uses: ./.github/actions/setup-bazel
+        env:
+          # This job does not build Bazel targets.
+          BAZEL_REMOTE_CACHE_ENABLED: 'false'
       - uses: ./.github/actions/install-nix
       - name: Runs all lint checks
         run: ./scripts/run_task.sh lint-all-ci
