@@ -23,9 +23,13 @@ var (
 	queueDurationBuckets = prometheus.ExponentialBuckets(time.Millisecond.Seconds(), 2, 15)
 	// executeBlockBuckets span 500µs (small block) to ~16s (large/slow block).
 	executeBlockBuckets = prometheus.ExponentialBuckets(500*time.Microsecond.Seconds(), 2, 16)
-	// gasRateHeadroomBuckets span 0.125x (execution far behind) to ~16x (ample
-	// spare capacity), with √2 spacing for resolution either side of 1x.
-	gasRateHeadroomBuckets = prometheus.ExponentialBuckets(0.125, math.Sqrt2, 15)
+	// gasRateHeadroomBuckets define the [rollingGasThroughput.headroom] histogram.
+	gasRateHeadroomBuckets = []float64{
+		0.8,                            // Terrain, terrain!
+		1,                              // lagging across [saeparams.Tau]: worth alerting
+		1.05, 1.1, 1.15, 1.2, 1.3, 1.4, // finer resolution when close
+		1.6, 2, 2.5, 4, 10, 30, 100, // coarser resolution when far
+	}
 )
 
 type metrics struct {
@@ -79,9 +83,9 @@ type rollingGasThroughput struct {
 		wallTime, gasTime time.Duration
 	}
 
-	// headroom is the factor by which the gas rate could be multiplied for gas
-	// time to advance exactly as fast as wall time spent executing; values
-	// below 1 mean that execution is falling behind.
+	// headroom is the factor by which the gas rate could have been multiplied
+	// for gas- and wall-clock time to have advanced by the same duration;
+	// values below 1 mean that execution is falling behind.
 	headroom       prometheus.Histogram
 	latestHeadroom prometheus.Gauge
 	// gasPerSecond is the raw, rolling-average throughput.
