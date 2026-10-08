@@ -983,11 +983,12 @@ func TestEngineBlockingChitRequest(t *testing.T) {
 		te.metrics.issued.WithLabelValues(unknownSource),
 	))
 
-	sender.CantSendChits = false
+	// The validator votes for [blockingBlk]. The engine holds it, but its
+	// parent [parentBlk] is only pending, so [blockingBlk] is queued behind it
+	// and the vote is queued behind [blockingBlk].
+	require.NoError(te.Chits(t.Context(), vdr, 0, blockingBlk.ID(), snowmantest.GenesisID, 0))
 
-	require.NoError(te.PushQuery(t.Context(), vdr, 0, blockingBlk.Bytes(), 0))
-
-	require.Equal(2, te.blocked.NumDependencies())
+	require.Equal(3, te.blocked.NumDependencies())
 
 	sender.CantSendPullQuery = false
 
@@ -1276,15 +1277,25 @@ func TestEngineInvalidBlockIgnoredFromUnexpectedPeer(t *testing.T) {
 		}
 	}
 
+	// The validator votes for [pendingBlk], which the engine doesn't have, so
+	// the engine requests it.
+	pendingReqID := new(uint32)
+	sender.SendGetF = func(_ context.Context, reqVdr ids.NodeID, requestID uint32, blkID ids.ID) {
+		*pendingReqID = requestID
+		require.Equal(vdr, reqVdr)
+		require.Equal(pendingBlk.ID(), blkID)
+	}
+	require.NoError(te.Chits(t.Context(), vdr, 0, pendingBlk.ID(), snowmantest.GenesisID, 0))
+
+	// [pendingBlk] arrives, but its parent [missingBlk] is unknown, so the
+	// engine buffers [pendingBlk] and requests [missingBlk].
 	reqID := new(uint32)
 	sender.SendGetF = func(_ context.Context, reqVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
 		require.Equal(vdr, reqVdr)
 		require.Equal(missingBlk.ID(), blkID)
 	}
-	sender.CantSendChits = false
-
-	require.NoError(te.PushQuery(t.Context(), vdr, 0, pendingBlk.Bytes(), 0))
+	require.NoError(te.Put(t.Context(), vdr, *pendingReqID, pendingBlk.Bytes()))
 
 	require.NoError(te.Put(t.Context(), secondVdr, *reqID, []byte{3}))
 
@@ -1350,18 +1361,29 @@ func TestEnginePushQueryRequestIDConflict(t *testing.T) {
 		}
 	}
 
+	// The validator votes for [pendingBlk], which the engine doesn't have, so
+	// the engine requests it.
+	pendingReqID := new(uint32)
+	sender.SendGetF = func(_ context.Context, reqVdr ids.NodeID, requestID uint32, blkID ids.ID) {
+		*pendingReqID = requestID
+		require.Equal(vdr, reqVdr)
+		require.Equal(pendingBlk.ID(), blkID)
+	}
+	require.NoError(te.Chits(t.Context(), vdr, 0, pendingBlk.ID(), snowmantest.GenesisID, 0))
+
+	// [pendingBlk] arrives, but its parent [missingBlk] is unknown, so the
+	// engine buffers [pendingBlk] and requests [missingBlk].
 	reqID := new(uint32)
 	sender.SendGetF = func(_ context.Context, reqVdr ids.NodeID, requestID uint32, blkID ids.ID) {
 		*reqID = requestID
 		require.Equal(vdr, reqVdr)
 		require.Equal(missingBlk.ID(), blkID)
 	}
-	sender.CantSendChits = false
-
-	require.NoError(te.PushQuery(t.Context(), vdr, 0, pendingBlk.Bytes(), 0))
+	require.NoError(te.Put(t.Context(), vdr, *pendingReqID, pendingBlk.Bytes()))
 
 	sender.SendGetF = nil
 	sender.CantSendGet = false
+	sender.CantSendChits = false
 
 	require.NoError(te.PushQuery(t.Context(), vdr, *reqID, []byte{3}, 0))
 
@@ -1802,6 +1824,16 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 		}
 	}
 
+	// The validator votes for [blk2], which this engine doesn't have, so the
+	// engine requests it.
+	blk2ReqID := new(uint32)
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
+		*blk2ReqID = requestID
+		require.Equal(blk2.ID(), blkID)
+		require.Equal(vdr, inVdr)
+	}
+	require.NoError(te.Chits(t.Context(), vdr, 0, blk2.ID(), snowmantest.GenesisID, 0))
+
 	asked := new(bool)
 	reqID := new(uint32)
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
@@ -1813,10 +1845,10 @@ func TestEngineBubbleVotesThroughInvalidBlock(t *testing.T) {
 	}
 	sender.CantSendChits = false
 
-	// This engine receives a Gossip message for [blk2] which was "unknown" in this engine.
-	// The engine thus learns about its ancestor [blk1] and should send a Get request for it.
+	// [blk2] arrives. Its parent [blk1] is unknown to this engine, so the
+	// engine buffers [blk2] and sends a Get request for [blk1].
 	// (see above for expected "Get" request)
-	require.NoError(te.PushQuery(t.Context(), vdr, 0, blk2.Bytes(), 0))
+	require.NoError(te.Put(t.Context(), vdr, *blk2ReqID, blk2.Bytes()))
 	require.True(*asked)
 
 	// Prepare to PullQuery [blk1] after our Get request is fulfilled. We should not PullQuery
@@ -1962,6 +1994,16 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		}
 	}
 
+	// The validator votes for [blk3], which this engine doesn't have, so the
+	// engine requests it.
+	blk3ReqID := new(uint32)
+	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
+		*blk3ReqID = requestID
+		require.Equal(blk3.ID(), blkID)
+		require.Equal(vdr, inVdr)
+	}
+	require.NoError(te.Chits(t.Context(), vdr, 0, blk3.ID(), snowmantest.GenesisID, 0))
+
 	asked := new(bool)
 	reqID := new(uint32)
 	sender.SendGetF = func(_ context.Context, inVdr ids.NodeID, requestID uint32, blkID ids.ID) {
@@ -1971,11 +2013,10 @@ func TestEngineBubbleVotesThroughInvalidChain(t *testing.T) {
 		require.Equal(vdr, inVdr)
 		*asked = true
 	}
-	sender.CantSendChits = false
 
-	// Receive Gossip message for [blk3] first and expect the sender to issue a
-	// Get request for its ancestor: [blk2].
-	require.NoError(te.PushQuery(t.Context(), vdr, 0, blk3.Bytes(), 0))
+	// [blk3] arrives. Its parent [blk2] is unknown to this engine, so the
+	// engine buffers [blk3] and sends a Get request for [blk2].
+	require.NoError(te.Put(t.Context(), vdr, *blk3ReqID, blk3.Bytes()))
 	require.True(*asked)
 
 	// Prepare to PullQuery [blk1] after our request for [blk2] is fulfilled.
@@ -2507,19 +2548,19 @@ func TestEngineVoteStallRegression(t *testing.T) {
 	))
 	require.NotNil(getBlock3Request)
 
-	// Attempt to issue block 4. This will register a dependency on block 3 for
-	// the issuance of block 4.
-	require.NoError(engine.PushQuery(
-		t.Context(),
-		nodeID0,
-		0,
-		rejectedChain[1].Bytes(),
-		0,
-	))
-	require.Len(pollRequestIDs, 3)
-
 	// Apply votes in poll 1 that will cause blocks 3 and 4 to be rejected once
-	// poll 0 finishes.
+	// poll 0 finishes. The vote for block 4 sends a Get request for block 4
+	// and registers the chits as a dependency on block 4.
+	var getBlock4Request *common.Request
+	sender.SendGetF = func(_ context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) {
+		require.Nil(getBlock4Request)
+		require.Equal(nodeID2, nodeID)
+		getBlock4Request = &common.Request{
+			NodeID:    nodeID,
+			RequestID: requestID,
+		}
+		require.Equal(rejectedChain[1].ID(), blkID)
+	}
 	require.NoError(engine.Chits(
 		t.Context(),
 		nodeID0,
@@ -2544,6 +2585,18 @@ func TestEngineVoteStallRegression(t *testing.T) {
 		rejectedChain[1].ID(),
 		rejectedChain[1].Height(),
 	))
+	require.NotNil(getBlock4Request)
+
+	// Provide block 4. Its parent, block 3, is still being fetched, so block 4
+	// is buffered with a dependency on block 3. No new Get is sent for block 3
+	// because one is already outstanding.
+	require.NoError(engine.Put(
+		t.Context(),
+		getBlock4Request.NodeID,
+		getBlock4Request.RequestID,
+		rejectedChain[1].Bytes(),
+	))
+	require.Len(pollRequestIDs, 3)
 
 	// Provide block 3.
 	// This will cause poll 0 to terminate and accept blocks 0 and 1.
@@ -2853,12 +2906,12 @@ func TestEngineForkNearAcceptFrontierAdvancesAcceptFrontier(t *testing.T) {
 			require.NoError(peerEngine.Start(t.Context(), 0))
 			require.NoError(nodeEngine.Start(t.Context(), 0))
 
-			// Phase 1 - fetch forkA over the wire. The node learns of forkA through a
-			// regular PullQuery for its tip (which carries just the block ID). Since the
-			// node holds no forkA blocks, it fetches the whole chain from the peer via
-			// Get/Put. Its own queries abort (peer not connected yet), so it
+			// Phase 1 - fetch forkA over the wire. The node learns of forkA through the
+			// peer voting for its tip in a Chits (which carries just the block ID).
+			// Since the node holds no forkA blocks, it fetches the whole chain from the
+			// peer via Get/Put. Its own queries abort (peer not connected yet), so it
 			// builds forkA without any forkB convergence interfering.
-			require.NoError(nodeEngine.PullQuery(t.Context(), peerID, 0, forkATip.ID(), 0))
+			require.NoError(nodeEngine.Chits(t.Context(), peerID, 0, forkATip.ID(), snowmantest.GenesisID, 0))
 			require.NoError(network.DeliverMessages())
 			require.False(network.HasQueuedMessagesToDispatch())
 
@@ -3919,10 +3972,15 @@ func TestEngineDropsChildWhenFetchedParentContradictsIt(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	peerID := ids.GenerateTestNodeID()
 
+	// The peer records every block the node asks it for, and how many blocks
+	// the node had buffered at that moment.
+	var node *Engine
 	requested := set.Set[ids.ID]{}
+	peakPending := 0
 	peerVM := snowmanenginetest.NewVM(t, chain)
 	peerVM.Has = func(blk *snowmantest.Block) bool {
 		requested.Add(blk.ID())
+		peakPending = max(peakPending, node.pending.Len())
 		return true
 	}
 
@@ -3932,20 +3990,29 @@ func TestEngineDropsChildWhenFetchedParentContradictsIt(t *testing.T) {
 	}
 
 	newFakeEngine(t, network, peerID, peerVM, nodeID)
-	node := newFakeEngine(t, network, nodeID, nodeVM, peerID)
+	node = newFakeEngine(t, network, nodeID, nodeVM, peerID)
 
-	// The peer gossips the tip. So the node buffers it and asks the peer for the parent.
-	require.NoError(node.PushQuery(t.Context(), peerID, 1, tip.Bytes(), 0))
+	// The peer votes for the tip. The node fetches it, buffers it, and asks the
+	// peer for the parent.
+	require.NoError(node.Chits(t.Context(), peerID, 1, tip.ID(), snowmantest.GenesisID, 0))
 	require.NoError(network.DeliverMessages())
 	require.False(network.HasQueuedMessagesToDispatch())
 
 	// Once we fetch the chain, we see that the tip's height does not follow from it, so the tip is dropped.
 	require.NotContains(node.pending.blockByID, tip.ID())
 
-	// The walk kept descending, so it never stalled; what it must not do is
-	// accumulate.
+	// The walk kept descending, so it never stalled: the peer was asked for the
+	// tip and for every link below it.
 	require.Contains(requested, tipParent.ID())
-	require.Len(requested, len(chain)-1)
+	require.Len(requested, len(chain))
+
+	// What it must not do is accumulate. Each arriving link contradicts the one
+	// waiting on it, and that one is dropped when the next link arrives, so at
+	// any point the node holds at most the arriving link and the one before
+	// it. Without that, the whole chain would be buffered until its bottom
+	// link failed to fetch.
+	require.GreaterOrEqual(peakPending, 1)
+	require.LessOrEqual(peakPending, 2)
 
 	// Each arriving ancestor drops the link pointing to it, so the peer
 	// was asked for one block per link but none of the chain reached consensus.
@@ -3953,354 +4020,6 @@ func TestEngineDropsChildWhenFetchedParentContradictsIt(t *testing.T) {
 
 	_, lastAcceptedHeight := node.Consensus.LastAccepted()
 	require.Zero(lastAcceptedHeight)
-}
-
-// TestEngineDropsChildWhenPushedParentContradictsIt tests that when ingesting blocks
-// though PushQuery, the engine drops a block if it links to a parent but does not follow from it in height.
-func TestEngineDropsChildWhenPushedParentContradictsIt(t *testing.T) {
-	require := require.New(t)
-
-	chain := newChain(8)
-	for _, blk := range chain {
-		blk.HeightV = maxAllowedBlockPreferenceHeightDistanceIngestion
-	}
-	tip := chain[len(chain)-1]
-	tipParent := chain[len(chain)-2]
-
-	network := snowmanenginetest.NewNetwork(t)
-	nodeID := ids.GenerateTestNodeID()
-	peerID := ids.GenerateTestNodeID()
-
-	requested := set.Set[ids.ID]{}
-	peerVM := snowmanenginetest.NewVM(t, chain)
-	peerVM.Has = func(blk *snowmantest.Block) bool {
-		requested.Add(blk.ID())
-		return false
-	}
-
-	nodeVM := snowmanenginetest.NewVM(t, chain)
-	nodeVM.Has = func(*snowmantest.Block) bool {
-		return false
-	}
-
-	newFakeEngine(t, network, peerID, peerVM, nodeID)
-	node := newFakeEngine(t, network, nodeID, nodeVM, peerID)
-
-	// The peer gossips the tip, which the node buffers while it waits for the parent.
-	require.NoError(node.PushQuery(t.Context(), peerID, 1, tip.Bytes(), 0))
-	require.Contains(node.pending.blockByID, tip.ID())
-
-	// Rather than answering the Get, the peer gossips the parent.
-	require.NoError(node.PushQuery(t.Context(), peerID, 2, tipParent.Bytes(), 0))
-	require.Contains(node.pending.blockByID, tipParent.ID())
-	require.Equal(2, node.pending.Len())
-
-	// Once we push another ancestor, the engine sees that the tip's height does not follow from it, so the tip is dropped.
-	require.NoError(node.PushQuery(t.Context(), peerID, 3, chain[len(chain)-3].Bytes(), 0))
-	require.NotContains(node.pending.blockByID, tip.ID())
-
-	// Steady state is two links, not a growing chain: each arrival releases the
-	// one two behind it.
-	require.Equal(2, node.pending.Len())
-	require.Zero(node.Consensus.NumProcessing())
-
-	require.NoError(network.DeliverMessages())
-	require.Zero(node.pending.Len())
-	require.Zero(node.Consensus.NumProcessing())
-}
-
-// TestEngineDropsBufferedChildWhenDelivering tests that a buffered
-// child whose height does not follow from its parent is dropped when the parent
-// is issued to consensus.
-func TestEngineDropsBufferedChildWhenDelivering(t *testing.T) {
-	require := require.New(t)
-
-	// Genesis <- parent (height 1) <- child (claims height 5)
-	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 2)
-	parent, child := chain[0], chain[1]
-	child.HeightV = parent.Height() + 4
-
-	network := snowmanenginetest.NewNetwork(t)
-	nodeID := ids.GenerateTestNodeID()
-	peerID := ids.GenerateTestNodeID()
-
-	peerVM := snowmanenginetest.NewVM(t, chain)
-
-	var node *Engine
-	nodeVM := snowmanenginetest.NewVM(t, chain)
-	nodeVM.Has = func(blk *snowmantest.Block) bool {
-		return node.Consensus.Processing(blk.ID())
-	}
-
-	newFakeEngine(t, network, peerID, peerVM, nodeID)
-	node = newFakeEngine(t, network, nodeID, nodeVM, peerID)
-
-	// The node does not know the parent yet, so it buffers the child.
-	require.NoError(node.PushQuery(t.Context(), peerID, 1, child.Bytes(), 0))
-	require.Contains(node.pending.blockByID, child.ID())
-	require.Zero(node.Consensus.NumProcessing())
-
-	// We then introduce the parent to the node, which is issued to consensus,
-	// and the child is dropped because its height does not follow from the parent.
-	require.NoError(node.PushQuery(t.Context(), peerID, 2, parent.Bytes(), 0))
-	require.True(node.Consensus.Processing(parent.ID()))
-	require.False(node.Consensus.Processing(child.ID()))
-	require.Equal(1, node.Consensus.NumProcessing())
-	require.NotContains(node.pending.blockByID, child.ID())
-	require.Zero(node.pending.Len())
-	require.Zero(node.blocked.NumDependencies())
-
-	// Draining the network must not resurrect the child somehow.
-	require.NoError(network.DeliverMessages())
-	require.False(network.HasQueuedMessagesToDispatch())
-	require.False(node.Consensus.Processing(child.ID()))
-	require.Zero(node.pending.Len())
-	require.Zero(node.blocked.NumDependencies())
-}
-
-// TestEnginePushedChainDoesNotAccumulate tests that when feeding the engine a long chain through PushQuery alone,
-// the chain of blocked jobs stays bounded however many blocks the peer pushes.
-func TestEnginePushedChainDoesNotAccumulate(t *testing.T) {
-	const pushedLen = maxAllowedBlockAcceptedHeightDistanceIngestion * 2
-
-	tests := []struct {
-		name     string
-		newChain func() []*snowmantest.Block
-		// The bounds below are on the peak values reached while the peer is
-		// pushing blocks to the node.
-		// Blocks are held as pending awaiting issuance, and the dependencies is the overall number of ancestors those
-		// blocks are waiting on.
-		//
-		// minPendingBlocks keeps a case from passing vacuously: an engine that
-		// refused everything would satisfy the two max bounds, but not the min bound.
-		minPendingBlocks       int
-		maxPendingBlocks       int
-		maxBlockedDependencies int
-	}{
-		{
-			// Every block claims the same height, so at most one block is ever queued.
-			// <- [x] <- [x] <- ... <- [x]; x = maxAllowedBlockPreferenceHeightDistanceIngestion
-			name: "same height everywhere",
-			newChain: func() []*snowmantest.Block {
-				chain := newChain(pushedLen)
-				for _, blk := range chain {
-					blk.HeightV = maxAllowedBlockPreferenceHeightDistanceIngestion
-				}
-				return chain
-			},
-			// Each arrival releases the link two behind it, so the queue holds
-			// at most the arrival and the one before it.
-			minPendingBlocks:       1,
-			maxPendingBlocks:       2,
-			maxBlockedDependencies: 2,
-		},
-		{
-			// Contiguous, but far above the maximum height the engine will accept,
-			// so the engine refuses every block and never queues any of them.
-			// Even the lowest block is above the cutoff, so there is nothing in the
-			// chain the engine is willing to chase.
-			// <- [x+1] <- [x+2] <- ... <- [3x]; x = maxAllowedBlockAcceptedHeightDistanceIngestion
-			name: "contiguous but far above the window",
-			newChain: func() []*snowmantest.Block {
-				chain := newChain(pushedLen)
-				for _, blk := range chain {
-					blk.HeightV += maxAllowedBlockAcceptedHeightDistanceIngestion
-				}
-				return chain
-			},
-			minPendingBlocks:       0,
-			maxPendingBlocks:       0,
-			maxBlockedDependencies: 0,
-		},
-		{
-			// Contiguous and inside the window, so the engine walks the whole chain
-			// and queues it as it goes. The walk ends at height 1, whose parent
-			// nobody holds, and the queue then collapses.
-			// <- [1] <- [2] <- ... <- [x]; x = maxAllowedBlockPreferenceHeightDistanceIngestion
-			name: "contiguous inside the window",
-			newChain: func() []*snowmantest.Block {
-				return newChain(maxAllowedBlockPreferenceHeightDistanceIngestion)
-			},
-			minPendingBlocks:       1,
-			maxPendingBlocks:       maxAllowedBlockPreferenceHeightDistanceIngestion,
-			maxBlockedDependencies: maxAllowedBlockPreferenceHeightDistanceIngestion,
-		},
-	}
-
-	for _, testCase := range tests {
-		t.Run(testCase.name, func(t *testing.T) {
-			require := require.New(t)
-
-			chain := testCase.newChain()
-
-			network := snowmanenginetest.NewNetwork(t)
-			nodeID := ids.GenerateTestNodeID()
-			peerID := ids.GenerateTestNodeID()
-
-			peerVM := snowmanenginetest.NewVM(t, chain)
-			peerVM.Has = func(*snowmantest.Block) bool {
-				return false
-			}
-
-			nodeVM := snowmanenginetest.NewVM(t, chain)
-			nodeVM.Has = func(*snowmantest.Block) bool {
-				return false
-			}
-
-			newFakeEngine(t, network, peerID, peerVM, nodeID)
-			node := newFakeEngine(t, network, nodeID, nodeVM, peerID)
-
-			// The peer gossips from the tip down, which is the order that builds
-			// a chain of blocked jobs: each block names the next one as the
-			// parent it is waiting for.
-			var peakPendingBlocks, peakBlockedDependencies int
-			for i := len(chain) - 1; i >= 0; i-- {
-				requestID := uint32(len(chain) - i)
-				require.NoError(node.PushQuery(t.Context(), peerID, requestID, chain[i].Bytes(), 0))
-				peakPendingBlocks = max(peakPendingBlocks, node.pending.Len())
-				peakBlockedDependencies = max(peakBlockedDependencies, node.blocked.NumDependencies())
-			}
-
-			require.GreaterOrEqual(peakPendingBlocks, testCase.minPendingBlocks)
-			require.LessOrEqual(peakPendingBlocks, testCase.maxPendingBlocks)
-			require.LessOrEqual(peakBlockedDependencies, testCase.maxBlockedDependencies)
-
-			require.NoError(network.DeliverMessages())
-			require.False(network.HasQueuedMessagesToDispatch())
-
-			require.Zero(node.pending.Len())
-			require.Zero(node.blocked.NumDependencies())
-			require.Zero(node.Consensus.NumProcessing())
-		})
-	}
-}
-
-// TestEnginePushedSameHeightChainBottomUpStaysFlat tests that when
-// a peer pushes a chain of blocks bottom up with the same height, blocks are rejected.
-func TestEnginePushedSameHeightChainBottomUpStaysFlat(t *testing.T) {
-	require := require.New(t)
-
-	chain := newChain(2 * maxAllowedBlockAcceptedHeightDistanceIngestion)
-	for _, blk := range chain {
-		blk.HeightV = maxAllowedBlockPreferenceHeightDistanceIngestion
-	}
-
-	network := snowmanenginetest.NewNetwork(t)
-	node, peerID := newNodeAndEmptyPeer(t, network, chain)
-
-	for i, blk := range chain {
-		require.NoError(node.PushQuery(t.Context(), peerID, uint32(i+1), blk.Bytes(), 0))
-
-		for _, pendingBlock := range node.pending.blockByID {
-			parentOfPending := pendingBlock.Parent()
-			// For each pending block, its parent should not be pending.
-			// This proves that the pending queue is flat: no pending block waits on another pending block.
-			_, waitsOnParent := node.pending.Get(parentOfPending)
-			require.False(waitsOnParent)
-		}
-	}
-	// The bound isn't vacuous: a block whose parent was dropped is queued while
-	// the node fetches that parent.
-	require.NotZero(node.pending.Len())
-
-	require.NoError(network.DeliverMessages())
-	require.False(network.HasQueuedMessagesToDispatch())
-	require.Zero(node.pending.Len())
-	require.Zero(node.blocked.NumDependencies())
-	require.Zero(node.blkReqs.Len())
-	require.Zero(node.Consensus.NumProcessing())
-}
-
-// newNodeAndEmptyPeer registers a node and a peer on [network]. Neither holds
-// any block of [chain], so the only way the node learns about a block is from
-// the message that carries it.
-func newNodeAndEmptyPeer(
-	t *testing.T,
-	network *snowmanenginetest.Network,
-	chain []*snowmantest.Block,
-) (*Engine, ids.NodeID) {
-	nodeID := ids.GenerateTestNodeID()
-	peerID := ids.GenerateTestNodeID()
-
-	peerVM := snowmanenginetest.NewVM(t, chain)
-	peerVM.Has = func(*snowmantest.Block) bool {
-		return false
-	}
-	newFakeEngine(t, network, peerID, peerVM, nodeID)
-
-	nodeVM := snowmanenginetest.NewVM(t, chain)
-	nodeVM.Has = func(*snowmantest.Block) bool {
-		return false
-	}
-	return newFakeEngine(t, network, nodeID, nodeVM, peerID), peerID
-}
-
-// TestEngineStopsBufferingBlocksTooFarAhead tests that the engine queues only
-// blocks within [maxAllowedBlockAcceptedHeightDistanceIngestion] of its last
-// accepted block, however many blocks a peer pushes.
-// The blocks are pushed bottom up, so each one finds its parent already queued.
-func TestEngineStopsBufferingBlocksTooFarAhead(t *testing.T) {
-	const heightLimit = maxAllowedBlockAcceptedHeightDistanceIngestion
-
-	tests := []struct {
-		name      string
-		numBlocks int
-	}{
-		{name: "fewer blocks than the limit", numBlocks: heightLimit / 2},
-		{name: "exactly the limit", numBlocks: heightLimit},
-		{name: "many times the limit", numBlocks: 3 * heightLimit},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
-			chain := newChain(test.numBlocks)
-			network := snowmanenginetest.NewNetwork(t)
-			node, peerID := newNodeAndEmptyPeer(t, network, chain)
-
-			_, lastAcceptedHeight := node.Consensus.LastAccepted()
-			highestAllowed := lastAcceptedHeight + heightLimit
-
-			var peakPending, peakBlockedDependencies int
-			for i, blk := range chain {
-				require.NoError(node.PushQuery(t.Context(), peerID, uint32(i+1), blk.Bytes(), 0))
-				peakPending = max(peakPending, node.pending.Len())
-				peakBlockedDependencies = max(peakBlockedDependencies, node.blocked.NumDependencies())
-
-				for _, queued := range node.pending.blockByID {
-					require.LessOrEqual(queued.Height(), highestAllowed)
-				}
-			}
-
-			require.LessOrEqual(peakPending, heightLimit)
-			require.LessOrEqual(peakBlockedDependencies, heightLimit)
-
-			// Ensure the bounds above aren't vacuous. The most that can ever
-			// be queued is one short of the limit: a block at the last
-			// accepted height plus one either extends the accepted block and
-			// is issued straight away, or points to another parent and is
-			// dropped as a rejected fork.
-			atLeast := min(test.numBlocks, heightLimit) - 1
-			require.GreaterOrEqual(peakPending, atLeast)
-			require.GreaterOrEqual(peakBlockedDependencies, atLeast)
-
-			// The block at the limit was queued and the one above it wasn't.
-			if test.numBlocks > heightLimit {
-				var highestQueued uint64
-				for _, queued := range node.pending.blockByID {
-					highestQueued = max(highestQueued, queued.Height())
-				}
-				require.Equal(highestAllowed, highestQueued)
-			}
-
-			require.NoError(network.DeliverMessages())
-			require.False(network.HasQueuedMessagesToDispatch())
-			require.Zero(node.pending.Len())
-			require.Zero(node.blocked.NumDependencies())
-			require.Zero(node.Consensus.NumProcessing())
-		})
-	}
 }
 
 // TestEngineRecoversFromIngestionCap tests that a node with
@@ -4393,18 +4112,24 @@ func TestEngineIgnoresBlocksFromNonValidators(t *testing.T) {
 	tests := []struct {
 		name  string
 		query func(ctx context.Context, e *Engine, from ids.NodeID, blk *snowmantest.Block) error
+		// fetches is whether acting on the query makes the node ask the sender
+		// for the block: a pull query carries only the block's ID, a push
+		// query carries the block.
+		fetches bool
 	}{
 		{
 			name: "pull query",
 			query: func(ctx context.Context, e *Engine, from ids.NodeID, blk *snowmantest.Block) error {
 				return e.PullQuery(ctx, from, 0, blk.ID(), 0)
 			},
+			fetches: true,
 		},
 		{
 			name: "push query",
 			query: func(ctx context.Context, e *Engine, from ids.NodeID, blk *snowmantest.Block) error {
 				return e.PushQuery(ctx, from, 0, blk.Bytes(), 0)
 			},
+			fetches: false,
 		},
 	}
 
@@ -4420,31 +4145,35 @@ func TestEngineIgnoresBlocksFromNonValidators(t *testing.T) {
 			validatorID := ids.GenerateTestNodeID()
 			nonValidatorID := ids.GenerateTestNodeID()
 
+			// The node holds the blocks it has issued: the ones it is processing
+			// and the ones it has accepted.
+			var node *Engine
 			nodeVM := snowmanenginetest.NewVM(t, chain)
-			nodeVM.Has = func(*snowmantest.Block) bool {
-				return false
-			}
-
-			// Both the validator and non validator have [blk].
-			requestedFrom := set.Set[ids.NodeID]{}
-			newPeerVM := func(peerID ids.NodeID) *snowmanenginetest.VM {
-				vm := snowmanenginetest.NewVM(t, chain)
-				vm.Has = func(b *snowmantest.Block) bool {
-					if b.ID() == blk.ID() {
-						// Record that the node asked this peer for [blk],
-						// so we can check that the node never asks a non-validator for it.
-						requestedFrom.Add(peerID)
-					}
-					return true
-				}
-				return vm
+			nodeVM.Has = func(blk *snowmantest.Block) bool {
+				return blk.Status == snowtest.Accepted || node.Consensus.Processing(blk.ID())
 			}
 
 			// Only [validatorID] and [nodeVM] are validators, not [nonValidatorID].
 			validators := []ids.NodeID{validatorID, nodeID}
-			node := newFakeEngine(t, network, nodeID, nodeVM, validators...)
-			newFakeEngine(t, network, validatorID, newPeerVM(validatorID), validators...)
-			newFakeEngine(t, network, nonValidatorID, newPeerVM(nonValidatorID), validators...)
+			node = newFakeEngine(t, network, nodeID, nodeVM, validators...)
+
+			// Both the validator and non validator hold [blk], and record if the
+			// node ever asks them for it.
+			requestedFrom := set.Set[ids.NodeID]{}
+			newPeer := func(peerID ids.NodeID) {
+				newObservedFakeEngine(t, network, peerID, snowmanenginetest.NewVM(t, chain), func(e *Engine) common.Handler {
+					return &getObserver{
+						Handler: e,
+						onGet: func(blkID ids.ID) {
+							if blkID == blk.ID() {
+								requestedFrom.Add(peerID)
+							}
+						},
+					}
+				}, validators...)
+			}
+			newPeer(validatorID)
+			newPeer(nonValidatorID)
 
 			// A non-validator tells the node about [blk]. The node ignores the block.
 			require.NoError(test.query(t.Context(), node, nonValidatorID, blk))
@@ -4466,9 +4195,387 @@ func TestEngineIgnoresBlocksFromNonValidators(t *testing.T) {
 			require.Equal(snowtest.Accepted, blk.Status)
 			acceptedID, _ := node.Consensus.LastAccepted()
 			require.Equal(blk.ID(), acceptedID)
-			require.Contains(requestedFrom, validatorID) // The node asked the validator for [blk].
+			require.Equal(test.fetches, requestedFrom.Contains(validatorID))
 		})
 	}
+}
+
+// getObserver forwards a node's messages to the wrapped handler and reports
+// the block ID of every Get it receives to [onGet] first.
+type getObserver struct {
+	common.Handler
+	onGet func(blkID ids.ID)
+}
+
+func (o *getObserver) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
+	o.onGet(blkID)
+	return o.Handler.Get(ctx, nodeID, requestID, blkID)
+}
+
+// TestEnginePullQueryRequiresHeldParent checks that a block fetched because a
+// PullQuery named it is only issued if its parent is already held. A pull
+// query can therefore make the engine fetch the block it names and nothing
+// more: never the block's ancestry.
+func TestEnginePullQueryRequiresHeldParent(t *testing.T) {
+	require := require.New(t)
+
+	// Genesis <- parent <- child
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 2)
+	parent, child := chain[0], chain[1]
+
+	network := snowmanenginetest.NewNetwork(t)
+	nodeID := ids.GenerateTestNodeID()
+	peerID := ids.GenerateTestNodeID()
+
+	// The node holds the blocks it is processing, and genesis.
+	var node *Engine
+	nodeVM := snowmanenginetest.NewVM(t, chain)
+	nodeVM.Has = func(blk *snowmantest.Block) bool {
+		return blk.Status == snowtest.Accepted || node.Consensus.Processing(blk.ID())
+	}
+
+	// The peer holds the whole chain and records every block the node asks it
+	// for.
+	var requested []ids.ID
+	validators := []ids.NodeID{peerID, nodeID}
+	newObservedFakeEngine(t, network, peerID, snowmanenginetest.NewVM(t, chain), func(e *Engine) common.Handler {
+		return &getObserver{
+			Handler: e,
+			onGet: func(blkID ids.ID) {
+				requested = append(requested, blkID)
+			},
+		}
+	}, validators...)
+	node = newFakeEngine(t, network, nodeID, nodeVM, validators...)
+
+	// The peer polls the node about [child] while the node doesn't hold
+	// [parent]. The node fetches [child] but drops it on arrival rather than
+	// fetching [parent].
+	require.NoError(node.PullQuery(t.Context(), peerID, 1, child.ID(), 0))
+	require.NoError(network.DeliverMessages())
+	require.False(network.HasQueuedMessagesToDispatch())
+
+	require.Equal([]ids.ID{child.ID()}, requested)
+	require.Zero(node.pending.Len())
+	require.Zero(node.blkReqs.Len())
+	require.Zero(node.pullQueryBlkReqs.Len())
+	require.Zero(node.Consensus.NumProcessing())
+	require.Equal(snowtest.Undecided, child.Status)
+
+	// The peer polls the node about [parent], whose parent is genesis. The
+	// node fetches, issues and accepts it.
+	requested = nil
+	require.NoError(node.PullQuery(t.Context(), peerID, 2, parent.ID(), 0))
+	require.NoError(network.DeliverMessages())
+	require.False(network.HasQueuedMessagesToDispatch())
+
+	require.Equal([]ids.ID{parent.ID()}, requested)
+	require.Equal(snowtest.Accepted, parent.Status)
+
+	// Now that the node holds [parent], the same poll about [child] gets it
+	// fetched, issued and accepted.
+	requested = nil
+	require.NoError(node.PullQuery(t.Context(), peerID, 3, child.ID(), 0))
+	require.NoError(network.DeliverMessages())
+	require.False(network.HasQueuedMessagesToDispatch())
+
+	require.Equal([]ids.ID{child.ID()}, requested)
+	require.Equal(snowtest.Accepted, child.Status)
+	require.Zero(node.pullQueryBlkReqs.Len())
+}
+
+// TestEngineChitsMayFetchAncestry checks the boundary of the rule above: a
+// block fetched because chits named it has no such constraint, and the engine
+// fetches its missing ancestry as before.
+func TestEngineChitsMayFetchAncestry(t *testing.T) {
+	require := require.New(t)
+
+	// Genesis <- parent <- child
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 2)
+	parent, child := chain[0], chain[1]
+
+	network := snowmanenginetest.NewNetwork(t)
+	nodeID := ids.GenerateTestNodeID()
+	peerID := ids.GenerateTestNodeID()
+
+	var node *Engine
+	nodeVM := snowmanenginetest.NewVM(t, chain)
+	nodeVM.Has = func(blk *snowmantest.Block) bool {
+		return blk.Status == snowtest.Accepted || node.Consensus.Processing(blk.ID())
+	}
+
+	var requested []ids.ID
+	validators := []ids.NodeID{peerID, nodeID}
+	newObservedFakeEngine(t, network, peerID, snowmanenginetest.NewVM(t, chain), func(e *Engine) common.Handler {
+		return &getObserver{
+			Handler: e,
+			onGet: func(blkID ids.ID) {
+				requested = append(requested, blkID)
+			},
+		}
+	}, validators...)
+	node = newFakeEngine(t, network, nodeID, nodeVM, validators...)
+
+	// The peer votes for [child] while the node doesn't hold [parent]. The
+	// node fetches [child], then [parent], and issues and accepts both.
+	require.NoError(node.Chits(t.Context(), peerID, 1, child.ID(), snowmantest.GenesisID, 0))
+	require.NoError(network.DeliverMessages())
+	require.False(network.HasQueuedMessagesToDispatch())
+
+	require.Equal([]ids.ID{child.ID(), parent.ID()}, requested)
+	require.Equal(snowtest.Accepted, parent.Status)
+	require.Equal(snowtest.Accepted, child.Status)
+	require.Zero(node.pullQueryBlkReqs.Len())
+}
+
+// TestEngineChitsReuseOutstandingPullQueryRequest tests that we do not expect
+// a block that is fetched because of a PullQuery to be dropped if chits also want
+// it. Only if the block is fetched because of a PullQuery and chits do not want it,
+// will it be dropped if its parent is unknown.
+func TestEngineChitsReuseOutstandingPullQueryRequest(t *testing.T) {
+	tests := []struct {
+		name string
+		// pollTheNode makes the peer poll the node about [blkB] and/or [blkC].
+		pollTheNode func(require *require.Assertions, node *Engine, peerID ids.NodeID, blkB, blkC *snowmantest.Block)
+		// shouldRequest is the sequence of blocks the node should the peer for.
+		shouldRequest func(blkA, blkB, blkC *snowmantest.Block) []ids.ID
+		// shouldAccept are the blocks the node should accept in the end.
+		shouldAccept func(blkA, blkB, blkC *snowmantest.Block) []*snowmantest.Block
+	}{
+		{
+			name: "chits need the requested block",
+			pollTheNode: func(require *require.Assertions, node *Engine, peerID ids.NodeID, blkB, _ *snowmantest.Block) {
+				require.NoError(node.PullQuery(t.Context(), peerID, 1, blkB.ID(), 0))
+				require.NoError(node.Chits(t.Context(), peerID, 2, blkB.ID(), snowmantest.GenesisID, 0))
+			},
+			shouldRequest: func(blkA, blkB, _ *snowmantest.Block) []ids.ID {
+				return []ids.ID{blkB.ID(), blkA.ID()}
+			},
+			shouldAccept: func(blkA, blkB, _ *snowmantest.Block) []*snowmantest.Block {
+				return []*snowmantest.Block{blkA, blkB}
+			},
+		},
+		{
+			name: "chits need a child of the requested block",
+			pollTheNode: func(require *require.Assertions, node *Engine, peerID ids.NodeID, blkB, blkC *snowmantest.Block) {
+				require.NoError(node.Chits(t.Context(), peerID, 1, blkC.ID(), snowmantest.GenesisID, 0))
+				require.NoError(node.PullQuery(t.Context(), peerID, 2, blkB.ID(), 0))
+			},
+			shouldRequest: func(blkA, blkB, blkC *snowmantest.Block) []ids.ID {
+				return []ids.ID{blkC.ID(), blkB.ID(), blkA.ID()}
+			},
+			shouldAccept: func(blkA, blkB, blkC *snowmantest.Block) []*snowmantest.Block {
+				return []*snowmantest.Block{blkA, blkB, blkC}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			// Genesis <- blkA <- blkB <- blkC
+			chain := snowmantest.BuildDescendants(snowmantest.Genesis, 3)
+			blkA, blkB, blkC := chain[0], chain[1], chain[2]
+
+			network := snowmanenginetest.NewNetwork(t)
+			nodeID := ids.GenerateTestNodeID()
+			peerID := ids.GenerateTestNodeID()
+
+			var node *Engine
+			nodeVM := snowmanenginetest.NewVM(t, chain)
+			nodeVM.Has = func(blk *snowmantest.Block) bool {
+				return blk.Status == snowtest.Accepted || node.Consensus.Processing(blk.ID())
+			}
+
+			var requested []ids.ID
+			validators := []ids.NodeID{peerID, nodeID}
+			newObservedFakeEngine(t, network, peerID, snowmanenginetest.NewVM(t, chain), func(e *Engine) common.Handler {
+				return &getObserver{
+					Handler: e,
+					onGet: func(blkID ids.ID) {
+						requested = append(requested, blkID)
+					},
+				}
+			}, validators...)
+			node = newFakeEngine(t, network, nodeID, nodeVM, validators...)
+
+			// Since the node is missing [blkA] and it is polled about [blkB],
+			// it should reject [blkB] when it's received.
+			// The reason it doesn't is because it is sent a Chit on [blkB] or [blkC]
+			// before it receives [blkB].
+			test.pollTheNode(require, node, peerID, blkB, blkC)
+
+			require.NoError(network.DeliverMessages())
+			require.False(network.HasQueuedMessagesToDispatch())
+
+			require.Equal(test.shouldRequest(blkA, blkB, blkC), requested)
+			for _, blk := range test.shouldAccept(blkA, blkB, blkC) {
+				require.Equal(snowtest.Accepted, blk.Status, "block %s at height %d", blk.ID(), blk.Height())
+			}
+			require.Zero(node.Consensus.NumProcessing())
+		})
+	}
+}
+
+// TestEngineDropsBufferedChildContradictedByParent checks that a buffered
+// block is dropped once its parent arrives with a height the block's own
+// height does not follow from, while the parent itself is issued.
+func TestEngineDropsBufferedChildContradictedByParent(t *testing.T) {
+	require := require.New(t)
+
+	// Genesis <- parent (height 1) <- child (claims height 5)
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 2)
+	parent, child := chain[0], chain[1]
+	child.HeightV = parent.Height() + 4
+
+	network := snowmanenginetest.NewNetwork(t)
+	nodeID := ids.GenerateTestNodeID()
+	peerID := ids.GenerateTestNodeID()
+
+	peerVM := snowmanenginetest.NewVM(t, chain)
+
+	// The node holds the blocks it is processing, and its accepted blocks.
+	var node *Engine
+	nodeVM := snowmanenginetest.NewVM(t, chain)
+	nodeVM.Has = func(blk *snowmantest.Block) bool {
+		return blk.Status == snowtest.Accepted || node.Consensus.Processing(blk.ID())
+	}
+
+	validators := []ids.NodeID{peerID, nodeID}
+	newFakeEngine(t, network, peerID, peerVM, validators...)
+	node = newFakeEngine(t, network, nodeID, nodeVM, validators...)
+
+	// The peer votes for [child]. The node fetches it, doesn't know [parent],
+	// so buffers [child] and fetches [parent]. When [parent] arrives, its
+	// height shows that [child] can't be its child, so [child] is dropped
+	// while [parent] is issued.
+	require.NoError(node.Chits(t.Context(), peerID, 1, child.ID(), snowmantest.GenesisID, 0))
+	require.NoError(network.DeliverMessages())
+	require.False(network.HasQueuedMessagesToDispatch())
+
+	require.Equal(snowtest.Accepted, parent.Status)
+	require.False(node.Consensus.Processing(child.ID()))
+	require.Equal(snowtest.Undecided, child.Status)
+	require.Zero(node.pending.Len())
+	require.Zero(node.blocked.NumDependencies())
+}
+
+// TestEnginePushQueryRequiresHeldParent checks that a pushed block is only
+// issued if its parent is already held. A push query therefore never makes the
+// engine buffer a block or fetch its ancestry.
+func TestEnginePushQueryRequiresHeldParent(t *testing.T) {
+	require := require.New(t)
+
+	// Genesis <- parent <- child
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 2)
+	parent, child := chain[0], chain[1]
+
+	network := snowmanenginetest.NewNetwork(t)
+	nodeID := ids.GenerateTestNodeID()
+	peerID := ids.GenerateTestNodeID()
+
+	// The node holds the blocks it is processing, and its accepted blocks.
+	var node *Engine
+	nodeVM := snowmanenginetest.NewVM(t, chain)
+	nodeVM.Has = func(blk *snowmantest.Block) bool {
+		return blk.Status == snowtest.Accepted || node.Consensus.Processing(blk.ID())
+	}
+
+	// The peer holds the whole chain and records every block the node asks it
+	// for.
+	var requested []ids.ID
+	validators := []ids.NodeID{peerID, nodeID}
+	newObservedFakeEngine(t, network, peerID, snowmanenginetest.NewVM(t, chain), func(e *Engine) common.Handler {
+		return &getObserver{
+			Handler: e,
+			onGet: func(blkID ids.ID) {
+				requested = append(requested, blkID)
+			},
+		}
+	}, validators...)
+	node = newFakeEngine(t, network, nodeID, nodeVM, validators...)
+
+	// The peer pushes [child] while the node doesn't hold [parent]. The node
+	// drops [child] rather than buffering it and fetching [parent].
+	require.NoError(node.PushQuery(t.Context(), peerID, 1, child.Bytes(), 0))
+	require.NoError(network.DeliverMessages())
+	require.False(network.HasQueuedMessagesToDispatch())
+
+	require.Empty(requested)
+	require.Zero(node.pending.Len())
+	require.Zero(node.blkReqs.Len())
+	require.Zero(node.Consensus.NumProcessing())
+	require.Equal(snowtest.Undecided, child.Status)
+
+	// The peer pushes [parent], whose parent is genesis. The node issues and
+	// accepts it.
+	require.NoError(node.PushQuery(t.Context(), peerID, 2, parent.Bytes(), 0))
+	require.NoError(network.DeliverMessages())
+	require.False(network.HasQueuedMessagesToDispatch())
+	require.Equal(snowtest.Accepted, parent.Status)
+
+	// Now that the node holds [parent], the same push of [child] is issued and
+	// accepted.
+	require.NoError(node.PushQuery(t.Context(), peerID, 3, child.Bytes(), 0))
+	require.NoError(network.DeliverMessages())
+	require.False(network.HasQueuedMessagesToDispatch())
+	require.Equal(snowtest.Accepted, child.Status)
+
+	// A push never made the node ask the peer for anything.
+	require.Empty(requested)
+}
+
+// TestEnginePushQueryDropsChildOfPendingParent checks that a pushed block is
+// dropped when its parent is held but not yet issued, i.e. is only pending
+// while its own ancestry is fetched. A pushed block must be issuable right
+// away; it is never stacked on top of a block that is still waiting.
+func TestEnginePushQueryDropsChildOfPendingParent(t *testing.T) {
+	require := require.New(t)
+
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
+
+	// Genesis <- blkA <- blkB <- blkC
+	blkA := snowmantest.BuildChild(snowmantest.Genesis)
+	blkB := snowmantest.BuildChild(blkA)
+	blkC := snowmantest.BuildChild(blkB)
+
+	vm.ParseBlockF = MakeParseBlockF(
+		[]*snowmantest.Block{snowmantest.Genesis},
+		[]*snowmantest.Block{blkA, blkB, blkC},
+	)
+	// The engine holds only genesis.
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		if blkID == snowmantest.GenesisID {
+			return snowmantest.Genesis, nil
+		}
+		return nil, errUnknownBlock
+	}
+
+	requests := make(map[ids.ID]uint32)
+	sender.SendGetF = func(_ context.Context, _ ids.NodeID, requestID uint32, blkID ids.ID) {
+		requests[blkID] = requestID
+	}
+	sender.CantSendChits = false
+
+	// The validator votes for [blkB], so the engine requests it.
+	require.NoError(te.Chits(t.Context(), vdr, 0, blkB.ID(), snowmantest.GenesisID, 0))
+	require.Contains(requests, blkB.ID())
+
+	// [blkB] arrives, but its parent [blkA] is unknown, so [blkB] is buffered
+	// while [blkA] is requested.
+	require.NoError(te.Put(t.Context(), vdr, requests[blkB.ID()], blkB.Bytes()))
+	require.Contains(requests, blkA.ID())
+	_, blkBPending := te.pending.Get(blkB.ID())
+	require.True(blkBPending)
+
+	// The validator pushes [blkC], whose parent [blkB] is only pending. [blkC]
+	// is dropped rather than buffered on top of [blkB].
+	require.NoError(te.PushQuery(t.Context(), vdr, 1, blkC.Bytes(), 0))
+	_, blkCPending := te.pending.Get(blkC.ID())
+	require.False(blkCPending)
+	require.Equal(1, te.pending.Len())
+	require.Len(requests, 2)
 }
 
 // queryObserver forwards a node's messages to the wrapped handler and reports

@@ -77,6 +77,10 @@ type Engine struct {
 	// blocks that have we have sent get requests for but haven't yet received
 	blkReqs            *bimap.BiMap[common.Request, ids.ID]
 	blkReqSourceMetric map[common.Request]prometheus.Counter
+	// pullQueryBlkReqs holds the outstanding Get requests that were sent
+	// because a PullQuery tried to issue from ID a block ID we didn't have.
+	// Everywhere we delete from [blkReqs] we also remove from here.
+	pullQueryBlkReqs set.Set[common.Request]
 
 	// blocks that are queued to be issued to consensus once missing dependencies are fetched
 	pending *pendingBlocks
@@ -160,6 +164,7 @@ func New(config Config) (*Engine, error) {
 		polls:                       polls,
 		blkReqs:                     bimap.New[common.Request, ids.ID](),
 		blkReqSourceMetric:          make(map[common.Request]prometheus.Counter),
+		pullQueryBlkReqs:            set.NewSet[common.Request](0),
 	}, nil
 }
 
@@ -265,6 +270,22 @@ func (e *Engine) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, b
 		}
 
 		issuedMetric = e.blkReqSourceMetric[req]
+
+		// A block fetched because of a PullQuery is only issued if its
+		// parent is already held.
+		if e.pullQueryBlkReqs.Contains(req) {
+			e.pullQueryBlkReqs.Remove(req)
+			if parentID := blk.Parent(); !e.canIssueChildOn(parentID) {
+				e.Ctx.Log.Debug("dropping block",
+					zap.String("reason", "block from a pull query has an unknown parent"),
+					zap.Stringer("nodeID", nodeID),
+					zap.Uint32("requestID", requestID),
+					zap.Stringer("blkID", actualBlkID),
+					zap.Stringer("parentID", parentID),
+				)
+				return e.GetFailed(ctx, nodeID, requestID)
+			}
+		}
 	default:
 		// This can happen if this block was provided to this engine while a Get
 		// request was outstanding. For example, the block may have been locally
@@ -331,6 +352,7 @@ func (e *Engine) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uin
 		return nil
 	}
 	delete(e.blkReqSourceMetric, req)
+	e.pullQueryBlkReqs.Remove(req)
 
 	// Because the get request was dropped, we no longer expect blkID to be
 	// issued.
@@ -343,17 +365,37 @@ func (e *Engine) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uin
 func (e *Engine) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID, requestedHeight uint64) error {
 	e.sendChits(ctx, nodeID, requestID, requestedHeight)
 
-	issuedMetric := e.metrics.issued.WithLabelValues(pushGossipSource)
-
 	// Only issue the block if the node that sent us this query is a validator.
-	if e.Validators.GetWeight(e.Ctx.SubnetID, nodeID) > 0 {
-		// Try to issue [blkID] to consensus.
-		// If we're missing an ancestor, request it from [vdr]
-		if err := e.issueFromByID(ctx, nodeID, blkID, issuedMetric); err != nil {
-			return err
-		}
+	if e.Validators.GetWeight(e.Ctx.SubnetID, nodeID) == 0 {
+		return e.executeDeferredWork(ctx)
 	}
 
+	// The block is already on its way, nothing else to do here.
+	if e.blkReqs.HasValue(blkID) {
+		return e.executeDeferredWork(ctx)
+	}
+
+	issuedMetric := e.metrics.issued.WithLabelValues(pushGossipSource)
+	blk, err := e.getBlock(ctx, blkID)
+	if err != nil {
+		// We don't hold the block, so request it.
+		// IssueFrom below will do the same, so just return early here.
+		if req, sent := e.sendRequest(ctx, nodeID, blkID, issuedMetric); sent {
+			e.pullQueryBlkReqs.Add(req)
+		}
+		return e.executeDeferredWork(ctx)
+	}
+
+	// Only issue the block into consensus if we know its parent,
+	// otherwise abort early.
+	if !e.canIssueChildOn(blk.Parent()) {
+		return e.executeDeferredWork(ctx)
+	}
+
+	// Try to issue [blk] to consensus.
+	if err := e.issueFrom(ctx, nodeID, blk, issuedMetric); err != nil {
+		return err
+	}
 	return e.executeDeferredWork(ctx)
 }
 
@@ -385,6 +427,11 @@ func (e *Engine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uin
 	}
 
 	if e.isBlockTooFarAhead(blk, nodeID, requestID) {
+		return e.executeDeferredWork(ctx)
+	}
+
+	// Only issue the block into consensus if we know its parent, otherwise abort early.
+	if !e.canIssueChildOn(blk.Parent()) {
 		return e.executeDeferredWork(ctx)
 	}
 
@@ -741,6 +788,12 @@ func (e *Engine) issueFromByID(
 ) error {
 	blk, err := e.getBlock(ctx, blkID)
 	if err != nil {
+		// Have we already sent a request for this block because of a pull query?
+		if req, ok := e.blkReqs.GetKey(blkID); ok && e.pullQueryBlkReqs.Contains(req) {
+			// Since we need to issue this block for a Chit, we should not abandon the Put if we don't have its parent
+			// as the pull query dictates to Put. We therefore undo the book-keeping we added in the PullQuery.
+			e.pullQueryBlkReqs.Remove(req)
+		}
 		// If the block is not locally available, request it from the peer.
 		e.sendRequest(ctx, nodeID, blkID, issuedMetric)
 		return nil //nolint:nilerr
@@ -787,6 +840,13 @@ func (e *Engine) issueFrom(
 			if err := e.issue(ctx, nodeID, blk, false, issuedMetric); err != nil {
 				return err
 			}
+
+			// Have we already sent a request for this parent block because of a pull query?
+			if req, ok := e.blkReqs.GetKey(parentID); ok && e.pullQueryBlkReqs.Contains(req) {
+				// Since we need to issue the parent block for a Chit, we should not abandon the Put if we don't have its parent
+				// as the pull query dictates to Put. We therefore undo the book-keeping we added in the PullQuery.
+				e.pullQueryBlkReqs.Remove(req)
+			}
 			e.sendRequest(ctx, nodeID, parentID, issuedMetric)
 			for childID := range observedIllegitimateChildren {
 				if err := e.blocked.Abandon(ctx, childID); err != nil {
@@ -832,6 +892,7 @@ func (e *Engine) issueFrom(
 	// Remove any outstanding requests for this block
 	if req, ok := e.blkReqs.DeleteValue(blkID); ok {
 		delete(e.blkReqSourceMetric, req)
+		e.pullQueryBlkReqs.Remove(req)
 	}
 
 	// If this block isn't pending, make sure nothing is blocked on it.
@@ -914,6 +975,7 @@ func (e *Engine) issue(
 	// Remove any outstanding requests for this block
 	if req, ok := e.blkReqs.DeleteValue(blkID); ok {
 		delete(e.blkReqSourceMetric, req)
+		e.pullQueryBlkReqs.Remove(req)
 	}
 
 	// Will add [blk] to consensus once its ancestors have been
@@ -945,10 +1007,10 @@ func (e *Engine) sendRequest(
 	nodeID ids.NodeID,
 	blkID ids.ID,
 	issuedMetric prometheus.Counter,
-) {
+) (common.Request, bool) {
 	// There is already an outstanding request for this block
 	if e.blkReqs.HasValue(blkID) {
-		return
+		return common.Request{}, false
 	}
 
 	e.requestID++
@@ -965,6 +1027,7 @@ func (e *Engine) sendRequest(
 		zap.Stringer("blkID", blkID),
 	)
 	e.Sender.SendGet(ctx, nodeID, e.requestID, blkID)
+	return req, true
 }
 
 // Send a query for this block. If push is set to true, blkBytes will be used to
@@ -1151,6 +1214,7 @@ func (e *Engine) deliver(
 		}
 		if req, ok := e.blkReqs.DeleteValue(blkID); ok {
 			delete(e.blkReqSourceMetric, req)
+			e.pullQueryBlkReqs.Remove(req)
 		}
 	}
 	for _, blk := range dropped {
@@ -1161,6 +1225,7 @@ func (e *Engine) deliver(
 		}
 		if req, ok := e.blkReqs.DeleteValue(blkID); ok {
 			delete(e.blkReqSourceMetric, req)
+			e.pullQueryBlkReqs.Remove(req)
 		}
 	}
 
