@@ -210,6 +210,11 @@ After Helicon activates, the C-Chain ignores the following options. The node log
   - `proposerWindowMilliseconds` in subnet configs
   - `proposerMillisecondTimestamps` in subnet configs
 
+### Config
+
+- Added:
+  - `--p-chain-follow-only`
+
 ### Fixes
 
 - Updated the minimum Go version from `1.25.8` to `1.25.10`.
