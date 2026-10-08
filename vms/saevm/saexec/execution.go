@@ -93,7 +93,7 @@ func (e *Executor) processQueue() (ret *Unhealthy) {
 			zap.Int("tx_count", len(block.Transactions())),
 		)
 
-		err := e.execute(block, log)
+		_, err := e.execute(block, log)
 		switch {
 		case errors.Is(err, errFatal):
 			log.Fatal( //nolint:gocritic // False positive, will not terminate the process
@@ -130,21 +130,21 @@ const (
 	triePrefetcherParallelism = 16
 )
 
-func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
+func (e *Executor) execute(b *blocks.Block, log logging.Logger) (res *ExecutionResults, _ error) {
 	// If the VM were to encounter an error after enqueuing the block, we would
 	// receive the same block twice for execution should consensus retry
 	// acceptance.
 	if last := e.lastExecuted.Load().Hash(); last != b.ParentHash() {
-		return fmt.Errorf("executing block built on parent %#x when last executed %#x", b.ParentHash(), last)
+		return nil, fmt.Errorf("executing block built on parent %#x when last executed %#x", b.ParentHash(), last)
 	}
 
 	start := time.Now()
 	defer func() {
-		e.metrics.observeExecuteDuration(time.Since(start))
+		e.metrics.observeExecuteDuration(start, time.Now(), b, res)
 	}()
 	stateDB, err := e.StateDB(b.ParentBlock().PostExecutionStateRoot())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// The prefetcher loads trie nodes during execution which removes the loads
@@ -167,9 +167,12 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 		WithReceiptStore(e.receipts),
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return e.afterExecution(b, stateDB, result)
+	if err := e.afterExecution(b, stateDB, result); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 type (
