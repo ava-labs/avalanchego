@@ -208,6 +208,7 @@ After Helicon activates, the C-Chain ignores the following options. The node log
 
 - Added:
   - `proposerWindowMilliseconds` in subnet configs
+  - `proposerMillisecondTimestamps` in subnet configs
 
 ### Fixes
 
