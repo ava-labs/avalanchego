@@ -247,8 +247,9 @@ these input caches:
 - **Verify Go and Bazel dependency inputs before using them.** On an exact cache
   hit, use the restored entry. On a non-exact hit or miss, prepare the inputs
   locally (and save them if permitted). Then disable downloads for the workload:
-  `GOPROXY=off` for Go modules and `--repository_disable_download` for Bazel.
-  If a dependency is missing, the workload fails instead of fetching it silently.
+  `GOPROXY=off` for Go modules and for Gazelle repository rules, and
+  `--repository_disable_download` for Bazel repository downloads. If a
+  dependency is missing, the workload fails instead of fetching it silently.
 
 The second rule checks whether cache preparation covers what CI actually uses;
 restricting writes alone cannot do that. It catches missing preparation inputs
@@ -407,8 +408,9 @@ cache, then checks metadata. A non-exact consumer restore runs the checked-in
 dependency list through `bazelisk fetch`. On `master`, a non-exact setup restore
 also prepares and saves the cache. Setup jobs can duplicate this cold-cache
 work. After an exact restore or local preparation, the action enables
-`--repository_disable_download`; see [Bazel CI external dependency
-caching](./bazel.md#bazel-ci-external-dependency-caching).
+`--repository_disable_download` and sets `GOPROXY=off` for repository rules.
+The latter prevents Gazelle's Go subprocess from fetching a missing module; see
+[Bazel CI external dependency caching](./bazel.md#bazel-ci-external-dependency-caching).
 
 The cache contains only external Bazel dependency input. It is separate from
 the Bazel remote action and test-result cache. See

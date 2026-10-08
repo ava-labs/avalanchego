@@ -758,16 +758,23 @@ write to the remote cache.
 
 ### Cache key
 
-The GitHub Actions cache key is:
-`bazel-repo-${runner.os}-${runner.arch}-${hashFiles('.bazelversion', 'MODULE.bazel.lock', 'scripts/bazel_ci_dependency_list.sh')}`
-with a same-platform restore prefix of
-`bazel-repo-${runner.os}-${runner.arch}-`.
+[`setup-bazel`](../.github/actions/setup-bazel/action.yml) constructs the
+GitHub Actions cache key with a platform-specific `bazel-repo-` prefix. It also
+uses that prefix for same-platform warm restores.
+
+An exact cache hit must contain all external dependencies for the CI target
+patterns. The key must include every input that Gazelle reads through `go_deps`.
+`MODULE.bazel.lock` does not replace the Go workspace inputs.
 
 That split is intentional:
 - `runner.os` and `runner.arch` separate caches by platform
 - `.bazelversion` invalidates the cache when the Bazel version changes
-- `MODULE.bazel.lock` invalidates the cache when the pinned external
-  dependency set changes
+- `MODULE.bazel` and `MODULE.bazel.lock` invalidate the cache when Bazel module
+  resolution or module-extension configuration changes
+- `go.work`, `go.work.sum`, and the `go.mod` and `go.sum` files for each
+  workspace module invalidate the cache when Gazelle's `go_deps` input graph
+  changes. `tools/external/go.mod` is not a workspace module and is not an
+  input to `go_deps`.
 - `scripts/bazel_ci_dependency_list.sh` invalidates the cache when the
   checked-in Bazel CI target patterns used by setup change
 - the broader same-platform restore key still gives a useful warm start
@@ -805,9 +812,11 @@ in `./scripts/bazel_ci_dependency_list.sh`. It then saves the exact key.
 An ordinary pull request or other non-`master` setup job restores the cache and
 checks metadata, but does not prefetch or save. Each later Bazel-consuming job
 restores the cache and, on a non-exact hit, runs the same dependency-list fetch
-locally. The action then enables `--repository_disable_download`. If a later
-repository rule needs a download absent from the restored or prepared cache,
-Bazel fails rather than fetching it. This lets a pull request test a new
+locally. The action then enables `--repository_disable_download` and sets
+`GOPROXY=off` for repository rules. `--repository_disable_download` blocks
+Bazel's downloader; `GOPROXY=off` blocks Gazelle's `go_repository` subprocess.
+If a later repository rule needs a download absent from the restored or prepared
+cache, Bazel fails rather than fetching it. This lets a pull request test a new
 dependency input without writing a shared cache, and shows that the dependency
 list or preparation process did not supply an input required by CI.
 
@@ -930,6 +939,10 @@ When adding a new Go module under `graft/`:
    ```
    go work use ./graft/newmodule
    ```
+   Add the module's `go.mod` and `go.sum` to the Bazel dependency-cache key in
+   [`.github/actions/setup-bazel/action.yml`](../.github/actions/setup-bazel/action.yml).
+   The key intentionally excludes non-workspace modules such as
+   `tools/external` that are not inputs to Gazelle's `go_deps` extension.
 
 2. **Create the module's root BUILD.bazel** with the gazelle prefix:
    ```python
