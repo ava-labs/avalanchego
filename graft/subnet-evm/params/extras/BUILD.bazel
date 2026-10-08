@@ -18,6 +18,7 @@ go_library(
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras",
     deps = [
+        "//graft/evm/params",
         "//graft/evm/utils",
         "//graft/subnet-evm/commontype",
         "//graft/subnet-evm/precompile/modules",

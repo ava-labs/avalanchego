@@ -34,7 +34,7 @@ func GasLimit(
 ) (uint64, error) {
 	timestamp := timeMS / 1000
 	switch {
-	case config.IsSubnetEVM(timestamp):
+	case config.IsApricotPhase1(timestamp):
 		return feeConfig.GasLimit.Uint64(), nil
 	default:
 		// since all chains have activated Subnet-EVM,
@@ -77,7 +77,7 @@ func VerifyGasLimit(
 	header *types.Header,
 ) error {
 	switch {
-	case config.IsSubnetEVM(header.Time):
+	case config.IsApricotPhase1(header.Time):
 		expectedGasLimit := feeConfig.GasLimit.Uint64()
 		if header.GasLimit != expectedGasLimit {
 			return fmt.Errorf("%w: expected to be %d in Subnet-EVM, but found %d",

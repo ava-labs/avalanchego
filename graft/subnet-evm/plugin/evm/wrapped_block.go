@@ -362,7 +362,7 @@ func (b *wrappedBlock) syntacticVerify() error {
 		return err
 	}
 
-	if rulesExtra.IsSubnetEVM {
+	if rulesExtra.IsApricotPhase3 {
 		if ethHeader.BaseFee == nil {
 			return errNilBaseFeeSubnetEVM
 		}
@@ -392,7 +392,7 @@ func (b *wrappedBlock) syntacticVerify() error {
 		return errUnclesUnsupported
 	}
 
-	if rulesExtra.IsSubnetEVM {
+	if rulesExtra.IsApricotPhase4 {
 		blockGasCost := customtypes.GetHeaderExtra(ethHeader).BlockGasCost
 		switch {
 		// Make sure BlockGasCost is not nil

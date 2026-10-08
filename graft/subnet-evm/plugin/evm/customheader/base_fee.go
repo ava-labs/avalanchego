@@ -25,7 +25,7 @@ func BaseFee(
 ) (*big.Int, error) {
 	timestamp := timeMS / 1000
 	switch {
-	case config.IsSubnetEVM(timestamp):
+	case config.IsApricotPhase3(timestamp):
 		return baseFeeFromWindow(config, feeConfig, parent, timestamp)
 	default:
 		// Prior to SubnetEVM the expected base fee is nil.

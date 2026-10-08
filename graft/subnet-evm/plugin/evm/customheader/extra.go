@@ -31,7 +31,7 @@ func ExtraPrefix(
 	header *types.Header,
 ) ([]byte, error) {
 	switch {
-	case config.IsSubnetEVM(header.Time):
+	case config.IsApricotPhase3(header.Time):
 		window, err := feeWindow(config, parent, header.Time)
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate fee window: %w", err)
@@ -50,7 +50,7 @@ func VerifyExtraPrefix(
 	parent *types.Header,
 	header *types.Header,
 ) error {
-	if !config.IsSubnetEVM(header.Time) {
+	if !config.IsApricotPhase3(header.Time) {
 		return nil
 	}
 
@@ -85,7 +85,7 @@ func VerifyExtra(rules extras.AvalancheRules, extra []byte) error {
 				extraLen,
 			)
 		}
-	case rules.IsSubnetEVM:
+	case rules.IsApricotPhase3:
 		if extraLen != subnetevm.WindowSize {
 			return fmt.Errorf(
 				"%w: expected %d but got %d",

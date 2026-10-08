@@ -19,6 +19,7 @@ go_library(
     deps = [
         "//graft/coreth/precompile/modules",
         "//graft/coreth/precompile/precompileconfig",
+        "//graft/evm/params",
         "//graft/evm/utils",
         "//snow",
         "//upgrade",

@@ -34,7 +34,7 @@ func BlockGasCost(
 	parent *types.Header,
 	timestamp uint64,
 ) *big.Int {
-	if !config.IsSubnetEVM(timestamp) {
+	if !config.IsApricotPhase4(timestamp) {
 		return nil
 	}
 

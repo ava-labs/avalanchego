@@ -63,7 +63,7 @@ func (RulesExtra) CanExecuteTransaction(common.Address, *common.Address, libevm.
 }
 
 func (r RulesExtra) ShouldRefundGas() bool {
-	return !r.IsSubnetEVM
+	return !r.IsApricotPhase1
 }
 
 // MinimumGasConsumption is a no-op.

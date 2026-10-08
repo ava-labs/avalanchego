@@ -388,7 +388,7 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 		headerExtra.TimeMilliseconds = utils.PointerTo(timeMS)
 	}
 
-	if params.GetExtra(config).IsSubnetEVM(header.Time) {
+	if params.GetExtra(config).IsApricotPhase4(header.Time) {
 		headerExtra := customtypes.GetHeaderExtra(header)
 		headerExtra.BlockGasCost = big.NewInt(0)
 	}
