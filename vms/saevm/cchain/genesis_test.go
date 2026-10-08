@@ -354,14 +354,30 @@ func TestParseGenesis(t *testing.T) {
 			opts := cmp.Options{
 				cmputils.BigInts(),
 				cmp.Comparer(func(a, b *corethparams.ChainConfig) bool {
-					return reflect.DeepEqual(a, b)
+					return reflect.DeepEqual(withoutPrecompiles(a), withoutPrecompiles(b))
 				}),
 			}
 			if diff := cmp.Diff(test.want, (*core.Genesis)(g), opts); diff != "" {
 				t.Errorf("parseGenesis(%s) (-want +got)\n%s", test.genesis, diff)
 			}
+			if test.wantErr == nil {
+				require.NotNil(t, corethparams.GetExtra(g.Config).Precompiles, "parsed config carries the precompile set")
+			}
 		})
 	}
+}
+
+// withoutPrecompiles returns a copy of c with the precompile set cleared.
+// The set holds function values, which reflect.DeepEqual never considers
+// equal; TestParseGenesisSetsPrecompiles covers the set itself.
+func withoutPrecompiles(c *corethparams.ChainConfig) *corethparams.ChainConfig {
+	if c == nil {
+		return nil
+	}
+	eth := *c
+	extra := *corethparams.GetExtra(c)
+	extra.Precompiles = nil
+	return corethparams.WithExtra(&eth, &extra)
 }
 
 // This test is intentionally a change detector: the genesis hash is part of

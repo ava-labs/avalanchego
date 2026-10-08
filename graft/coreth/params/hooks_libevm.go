@@ -118,7 +118,11 @@ var PrecompiledContractsGranite = map[common.Address]vm.PrecompiledContract{
 
 func (r RulesExtra) ActivePrecompiles(existing []common.Address) []common.Address {
 	var addresses []common.Address
-	addresses = slices.AppendSeq(addresses, maps.Keys(r.currentPrecompiles()))
+	if set := r.PrecompileSet; set != nil {
+		addresses = append(addresses, set.Active...)
+	} else {
+		addresses = slices.AppendSeq(addresses, maps.Keys(r.currentPrecompiles()))
+	}
 	addresses = append(addresses, existing...)
 	return addresses
 }
@@ -186,6 +190,10 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 }
 
 func (r RulesExtra) PrecompileOverride(addr common.Address) (libevm.PrecompiledContract, bool) {
+	if set := r.PrecompileSet; set != nil {
+		return set.Contract(addr)
+	}
+
 	if p, ok := r.precompileOverrideBuiltin(addr); ok {
 		return p, true
 	}

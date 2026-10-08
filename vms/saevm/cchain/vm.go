@@ -65,6 +65,12 @@ type VM struct {
 	metrics     *metrics
 	pending     *txpool.Pending
 
+	// overrideChainConfig, if non-nil, is applied to the parsed chain config
+	// before anything reads it. It exists only so tests can swap the
+	// precompile implementations for coreth's and compare behaviour. It is
+	// nil in production.
+	overrideChainConfig func(*ethparams.ChainConfig)
+
 	// TODO(alarso16): Remove from VM - only referenced in tests.
 	gossipSet *gossip.BloomSet[*gossipTx]
 
@@ -122,6 +128,9 @@ func (vm *VM) Initialize(
 	genesis, err := parseGenesis(snowCtx, genesisBytes)
 	if err != nil {
 		return fmt.Errorf("parsing genesis: %w", err)
+	}
+	if vm.overrideChainConfig != nil {
+		vm.overrideChainConfig(genesis.Config)
 	}
 	vm.chainConfig = genesis.Config
 

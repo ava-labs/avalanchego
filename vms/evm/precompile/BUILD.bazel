@@ -1,0 +1,29 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "precompile",
+    srcs = ["precompile.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/precompile",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/precompileconfig",
+        "//utils/set",
+        "//vms/evm/predicate",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//libevm",
+    ],
+)
+
+go_test(
+    name = "precompile_test",
+    srcs = ["precompile_test.go"],
+    embed = [":precompile"],
+    deps = [
+        "//graft/evm/precompileconfig",
+        "//vms/evm/predicate",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_stretchr_testify//require",
+    ],
+)

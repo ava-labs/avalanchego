@@ -22,6 +22,7 @@ go_library(
         "//graft/evm/utils",
         "//snow",
         "//upgrade",
+        "//vms/evm/precompile",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//params",
     ],

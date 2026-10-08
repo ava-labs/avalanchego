@@ -14,14 +14,13 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/evm/precompile"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 
-	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -30,11 +29,11 @@ func FromReceipts(rs types.Receipts) ([]*avalanchewarp.UnsignedMessage, error) {
 	var messages []*avalanchewarp.UnsignedMessage
 	for _, r := range rs {
 		for _, log := range r.Logs {
-			if log.Address != corethwarp.ContractAddress {
+			if log.Address != ContractAddress {
 				continue
 			}
 
-			m, err := corethwarp.UnpackSendWarpEventDataToMessage(log.Data)
+			m, err := UnpackSendWarpEventDataToMessage(log.Data)
 			if err != nil {
 				return nil, fmt.Errorf("parsing log data into warp message (TxHash: %s, LogIndex: %d): %w", log.TxHash, log.Index, err)
 			}
@@ -50,21 +49,21 @@ var errNoBlockContext = errors.New("no block context")
 func VerifyBlock(
 	snowContext *snow.Context,
 	blockContext *block.Context, // MAY be nil
-	rules *extras.Rules,
+	set *precompile.Set,
 	txs []*types.Transaction,
 ) (predicate.BlockResults, error) {
 	type result = lazyEntry[common.Hash, predicate.PrecompileResults]
 	var (
 		results = make([]result, 0, len(txs))
 		eg      = &errgroup.Group{}
-		pc      = &precompileconfig.PredicateContext{
+		pc      = &evmprecompileconfig.PredicateContext{
 			SnowCtx:            snowContext,
 			ProposerVMBlockCtx: blockContext,
 		}
 	)
 	eg.SetLimit(runtime.GOMAXPROCS(0))
 	for _, tx := range txs {
-		predicates := predicate.FromAccessList(rules, tx.AccessList())
+		predicates := predicate.FromAccessList(set, tx.AccessList())
 		if len(predicates) == 0 {
 			continue
 		}
@@ -79,7 +78,7 @@ func VerifyBlock(
 		}
 		results = append(results, result{
 			key:   tx.Hash(),
-			value: verifyTx(pc, rules.Predicaters, predicates, eg),
+			value: verifyTx(pc, set.Predicaters, predicates, eg),
 		})
 	}
 	if err := eg.Wait(); err != nil {
@@ -115,8 +114,8 @@ func collect[K comparable, V any](entries []lazyEntry[K, V]) map[K]V {
 //
 // The predicate results MUST be collected after eg.Wait has returned.
 func verifyTx(
-	pc *precompileconfig.PredicateContext,
-	contracts map[common.Address]precompileconfig.Predicater,
+	pc *evmprecompileconfig.PredicateContext,
+	contracts map[common.Address]evmprecompileconfig.Predicater,
 	predicatesByAddress map[common.Address][]predicate.Predicate,
 	eg *errgroup.Group,
 ) lazy[predicate.PrecompileResults] {
@@ -143,8 +142,8 @@ func verifyTx(
 //
 // The results MUST be collected after eg.Wait has returned.
 func verifyContract(
-	pc *precompileconfig.PredicateContext,
-	contract precompileconfig.Predicater,
+	pc *evmprecompileconfig.PredicateContext,
+	contract evmprecompileconfig.Predicater,
 	predicates []predicate.Predicate,
 	eg *errgroup.Group,
 ) lazy[set.Bits] {

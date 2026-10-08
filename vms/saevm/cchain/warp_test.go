@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
-	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -132,10 +131,10 @@ func TestSendWarpMessage(t *testing.T) {
 	ctx, sut := newSUT(t, withMaxAllocFor(sender))
 
 	payload := utils.RandomBytes(100)
-	callData, err := corethwarp.PackSendWarpMessage(payload)
-	require.NoError(t, err, "corethwarp.PackSendWarpMessage(...)")
+	callData, err := warp.PackSendWarpMessage(payload)
+	require.NoError(t, err, "warp.PackSendWarpMessage(...)")
 	tx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
-		To:        &corethwarp.ContractAddress,
+		To:        &warp.ContractAddress,
 		Gas:       1_000_000,
 		GasFeeCap: big.NewInt(1),
 		Data:      callData,
@@ -158,19 +157,35 @@ func TestSendWarpMessage(t *testing.T) {
 	sut.signAndVerifyWarpMessage(ctx, t, hashMsg)
 }
 
-// forwardAndLogCode returns runtime bytecode that forwards its calldata to
-// callee and emits the returned data as a log.
+// forwardAndLogCode returns bytecode that forwards its calldata to callee
+// with CALL and logs the return data.
 func forwardAndLogCode(tb testing.TB, callee common.Address) []byte {
 	tb.Helper()
+	return callAndLogCode(tb, vm.CALL, callee)
+}
+
+// callAndLogCode returns bytecode that forwards its calldata to callee using
+// op (CALL, CALLCODE, DELEGATECALL or STATICCALL), discards the success flag,
+// and logs the return data with LOG0.
+func callAndLogCode(tb testing.TB, op vm.OpCode, callee common.Address) []byte {
+	tb.Helper()
+	var value []byte
+	switch op {
+	case vm.CALL, vm.CALLCODE:
+		value = saetest.Ops(vm.PUSH0) // value
+	case vm.DELEGATECALL, vm.STATICCALL:
+		// no value operand
+	default:
+		tb.Fatalf("callAndLogCode(%s): not a call opcode", op)
+	}
 	return slices.Concat(
 		// mem[0:cds) = calldata
 		saetest.Ops(vm.CALLDATASIZE, vm.PUSH0, vm.PUSH0, vm.CALLDATACOPY),
-		// call callee with mem[0:cds) as input
 		saetest.Ops(vm.PUSH0, vm.PUSH0),        // return size + offset; read via RETURNDATACOPY instead
 		saetest.Ops(vm.CALLDATASIZE, vm.PUSH0), // input size + offset
-		saetest.Ops(vm.PUSH0),                  // value
+		value,
 		saetest.Push(tb, callee[:]),
-		saetest.Ops(vm.GAS, vm.CALL),
+		saetest.Ops(vm.GAS, op),
 		saetest.Ops(vm.POP), // discard the success flag
 		// mem[0:rds) = return data
 		saetest.Ops(vm.RETURNDATASIZE, vm.PUSH0, vm.PUSH0, vm.RETURNDATACOPY),
@@ -186,7 +201,7 @@ func warpAccessList(msgs ...*avalanchewarp.Message) types.AccessList {
 	al := make(types.AccessList, len(msgs))
 	for i, msg := range msgs {
 		al[i] = types.AccessTuple{
-			Address:     corethwarp.ContractAddress,
+			Address:     warp.ContractAddress,
 			StorageKeys: predicate.New(msg.Bytes()),
 		}
 	}
@@ -204,14 +219,14 @@ func TestReceiveWarpMessage(t *testing.T) {
 	)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(wallet.Addresses()...),
-		withAccount(warpLogger, types.Account{Code: forwardAndLogCode(t, corethwarp.ContractAddress)}),
+		withAccount(warpLogger, types.Account{Code: forwardAndLogCode(t, warp.ContractAddress)}),
 		withValidators(vdrs),
 	)
 
-	getMessage, err := corethwarp.PackGetVerifiedWarpMessage(0)
-	require.NoError(t, err, "corethwarp.PackGetVerifiedWarpMessage(...)")
-	getHash, err := corethwarp.PackGetVerifiedWarpBlockHash(0)
-	require.NoError(t, err, "corethwarp.PackGetVerifiedWarpBlockHash(...)")
+	getMessage, err := warp.PackGetVerifiedWarpMessage(0)
+	require.NoError(t, err, "warp.PackGetVerifiedWarpMessage(...)")
+	getHash, err := warp.PackGetVerifiedWarpBlockHash(0)
+	require.NoError(t, err, "warp.PackGetVerifiedWarpBlockHash(...)")
 
 	var (
 		sourceAddress    = common.Address{1, 2, 3}
@@ -281,8 +296,8 @@ func TestReceiveWarpMessage(t *testing.T) {
 			callData:   getMessage,
 			gas:        e2eGas,
 			wantStatus: types.ReceiptStatusSuccessful,
-			wantLogData: must(corethwarp.PackGetVerifiedWarpMessageOutput(corethwarp.GetVerifiedWarpMessageOutput{
-				Message: corethwarp.WarpMessage{
+			wantLogData: must(warp.PackGetVerifiedWarpMessageOutput(warp.GetVerifiedWarpMessageOutput{
+				Message: warp.WarpMessage{
 					SourceChainID:       common.Hash(sut.ctx.ChainID),
 					OriginSenderAddress: sourceAddress,
 					Payload:             payload,
@@ -296,7 +311,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 			callData:   getMessage,
 			gas:        e2eGas,
 			wantStatus: types.ReceiptStatusSuccessful,
-			wantLogData: must(corethwarp.PackGetVerifiedWarpMessageOutput(corethwarp.GetVerifiedWarpMessageOutput{
+			wantLogData: must(warp.PackGetVerifiedWarpMessageOutput(warp.GetVerifiedWarpMessageOutput{
 				Valid: false,
 			})),
 		},
@@ -306,8 +321,8 @@ func TestReceiveWarpMessage(t *testing.T) {
 			callData:   getHash,
 			gas:        e2eGas,
 			wantStatus: types.ReceiptStatusSuccessful,
-			wantLogData: must(corethwarp.PackGetVerifiedWarpBlockHashOutput(corethwarp.GetVerifiedWarpBlockHashOutput{
-				WarpBlockHash: corethwarp.WarpBlockHash{
+			wantLogData: must(warp.PackGetVerifiedWarpBlockHashOutput(warp.GetVerifiedWarpBlockHashOutput{
+				WarpBlockHash: warp.WarpBlockHash{
 					SourceChainID: common.Hash(sut.ctx.ChainID),
 					BlockHash:     common.Hash(blkID),
 				},
@@ -320,7 +335,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 			callData:   getHash,
 			gas:        e2eGas,
 			wantStatus: types.ReceiptStatusSuccessful,
-			wantLogData: must(corethwarp.PackGetVerifiedWarpBlockHashOutput(corethwarp.GetVerifiedWarpBlockHashOutput{
+			wantLogData: must(warp.PackGetVerifiedWarpBlockHashOutput(warp.GetVerifiedWarpBlockHashOutput{
 				Valid: false,
 			})),
 		},

@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/vms/evm/precompile"
 )
 
 type Rules struct {
@@ -24,6 +25,13 @@ type Rules struct {
 	// AccepterPrecompiles map addresses to stateful precompile accepter functions
 	// that are enabled for this rule set.
 	AccepterPrecompiles map[common.Address]precompileconfig.Accepter
+
+	// PrecompileSet is the chain's [extras.ChainConfig.Precompiles], copied
+	// here under Helicon rules and later so the libevm rules hooks can answer
+	// from it. nil means the module registry and built-in tables apply, as
+	// they always do for earlier rules so historical blocks replay as they
+	// were executed.
+	PrecompileSet *precompile.Set
 }
 
 func (r *Rules) PredicatersExist() bool {

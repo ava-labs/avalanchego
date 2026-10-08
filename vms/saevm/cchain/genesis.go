@@ -22,13 +22,14 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -121,17 +122,24 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 			AvalancheContext: extras.AvalancheContext{
 				SnowCtx: ctx,
 			},
+			// The warp upgrade exists only so debug RPCs replay pre-Helicon
+			// blocks as coreth executed them. Helicon and later are served
+			// from Precompiles.
 			UpgradeConfig: extras.UpgradeConfig{
 				PrecompileUpgrades: []extras.PrecompileUpgrade{
 					{
-						Config: warp.NewDefaultConfig(
+						Config: corethwarp.NewDefaultConfig(
 							utils.TimeToNewUint64(u.DurangoTime),
 						),
 					},
 				},
 			},
+			Precompiles: newPrecompiles(ctx),
 		},
 	)
+	if err := corethparams.GetExtra(g.Config).Precompiles.Verify(); err != nil {
+		return nil, fmt.Errorf("verifying precompiles: %w", err)
+	}
 	return (*genesis)(&g), nil
 }
 

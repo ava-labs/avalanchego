@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/vms/evm/precompile"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -116,6 +117,14 @@ type ChainConfig struct {
 	AvalancheContext `json:"-"` // Avalanche specific context set during VM initialization. Not serialized.
 
 	UpgradeConfig `json:"-"` // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
+
+	// Precompiles, when non-nil, replaces the precompile module registry and
+	// the built-in precompile tables as the source of stateful precompiles
+	// for this chain under Helicon rules and later. Earlier rules still use
+	// the module registry and built-in tables, so historical blocks replay as
+	// they were executed. It is set during VM initialization and never
+	// serialized.
+	Precompiles *precompile.Set `json:"-"`
 }
 
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed

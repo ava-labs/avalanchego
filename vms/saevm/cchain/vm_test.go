@@ -125,6 +125,8 @@ type (
 		state        snow.State
 		upgrades     upgrade.Config
 
+		overrideChainConfig func(*ethparams.ChainConfig)
+
 		skipRPCTransport bool
 	}
 	sutOption = options.Option[sutConfig]
@@ -328,6 +330,15 @@ func synchronousFixture(tb testing.TB) (*synchronoustest.Fixture, []sutOption, *
 	}, clock
 }
 
+// withCorethPrecompiles replaces the SAE precompile set's contracts and
+// predicater with coreth's implementations, keeping SAE's plumbing. It is the
+// control arm of the differential test.
+func withCorethPrecompiles() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.overrideChainConfig = useCorethPrecompiles
+	})
+}
+
 // newSUT initializes a cchain [VM], transitions it to the configured
 // [snow.State] (default [snow.NormalOp]), and
 // mounts its HTTP handlers behind a local [httptest.Server] at the paths
@@ -376,6 +387,8 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 			pullGossipPeriod: 100 * time.Millisecond,
 			pushGossipPeriod: 100 * time.Millisecond,
 			now:              cfg.clock.Now,
+
+			overrideChainConfig: cfg.overrideChainConfig,
 		}
 		db = cfg.db
 	)

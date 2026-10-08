@@ -67,6 +67,17 @@ func constructRulesExtra(c *ethparams.ChainConfig, r *ethparams.Rules, cEx *extr
 	}
 	rules.AvalancheRules = cEx.GetAvalancheRules(timestamp)
 
+	if set := cEx.Precompiles; set != nil && rules.IsHelicon {
+		// The chain supplies its own precompiles for Helicon and later; the
+		// module registry and built-in tables are bypassed entirely. Earlier
+		// rules fall through so historical blocks replay as executed.
+		rules.PrecompileSet = set
+		rules.Precompiles = map[common.Address]precompileconfig.Config{}
+		rules.Predicaters = set.Predicaters
+		rules.AccepterPrecompiles = map[common.Address]precompileconfig.Accepter{}
+		return rules
+	}
+
 	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
 	rules.Precompiles = make(map[common.Address]precompileconfig.Config)
 	rules.Predicaters = make(map[common.Address]precompileconfig.Predicater)

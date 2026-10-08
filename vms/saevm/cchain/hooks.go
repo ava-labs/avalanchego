@@ -25,7 +25,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -44,7 +43,6 @@ import (
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
-	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -254,7 +252,7 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
 	config := corethparams.GetExtra(h.chainConfig)
 	if isFirstDurangoBlock := corethparams.GetRulesExtra(rules).IsDurango && !config.IsDurango(parent.Time); isFirstDurangoBlock {
-		activatePrecompile(statedb, corethwarp.ContractAddress)
+		activatePrecompile(statedb, warp.ContractAddress)
 	}
 	return nil
 }
@@ -542,9 +540,8 @@ func (b *builder) BuildBlock(
 		return nil, fmt.Errorf("marshalling txs: %w", err)
 	}
 
-	rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)
-	rulesExtra := corethparams.GetRulesExtra(rules)
-	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, rulesExtra, ethTxs)
+	set := corethparams.GetExtra(b.chainConfig).Precompiles
+	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, set, ethTxs)
 	if err != nil {
 		return nil, fmt.Errorf("verifying warp messages: %w", err)
 	}
@@ -559,14 +556,9 @@ func (b *builder) BuildBlock(
 	if err != nil {
 		return nil, fmt.Errorf("serializing warp validity: %w", err)
 	}
-	// TODO(StephenButtolph): Delete [customheader.SetPredicateBytesInExtra]
-	// entirely during the coreth removal. warpValidityBytes could just be set
-	// directly.
-	header.Extra = customheader.SetPredicateBytesInExtra(
-		rulesExtra.AvalancheRules,
-		header.Extra,
-		warpValidityBytes,
-	)
+	// Under Helicon rules the header's extra data is exactly the encoded
+	// predicate results; there is no fee-window prefix.
+	header.Extra = warpValidityBytes
 
 	// Encode the settled block marker into the header so [hooks.SettledBy] can recover it.
 	he := customtypes.GetHeaderExtra(header)
