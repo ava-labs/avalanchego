@@ -1,0 +1,45 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+package(default_visibility = [
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
+])
+
+go_library(
+    name = "extstate",
+    srcs = ["statedb.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/extstate",
+    deps = [
+        "//graft/coreth/params",
+        "//vms/evm/predicate",
+        "//vms/saevm/cchain/libevm/customtypes",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//libevm/stateconf",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)
+
+go_test(
+    name = "extstate_test",
+    srcs = [
+        "state_object_test.go",
+        "statedb_multicoin_test.go",
+    ],
+    embed = [":extstate"],
+    deps = [
+        "//graft/evm/core/state/snapshot",
+        "//vms/saevm/cchain/libevm/customtypes",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//libevm/stateconf",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//require",
+    ],
+)

@@ -8,8 +8,8 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/extstate"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes"
 )
 
