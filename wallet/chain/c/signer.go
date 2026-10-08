@@ -31,7 +31,7 @@ var (
 )
 
 type Signer interface {
-	// SignAtomic adds as many missing signatures as possible to the provided
+	// Sign adds as many missing signatures as possible to the provided
 	// transaction.
 	//
 	// If there are already some signatures on the transaction, those signatures
@@ -39,7 +39,7 @@ type Signer interface {
 	//
 	// If the signer doesn't have the ability to provide a required signature,
 	// the signature slot will be skipped without reporting an error.
-	SignAtomic(ctx context.Context, tx *tx.Tx) error
+	Sign(ctx context.Context, tx *tx.Tx) error
 }
 
 type EthKeychain interface {
@@ -68,7 +68,7 @@ func NewSigner(avaxKC keychain.Keychain, ethKC EthKeychain, backend SignerBacken
 	}
 }
 
-func (s *txSigner) SignAtomic(ctx context.Context, t *tx.Tx) error {
+func (s *txSigner) Sign(ctx context.Context, t *tx.Tx) error {
 	switch utx := t.Unsigned.(type) {
 	case *tx.Import:
 		signers, err := s.getImportSigners(ctx, utx.SourceChain, utx.ImportedInputs)
@@ -146,9 +146,9 @@ func (s *txSigner) getExportSigners(ins []tx.Input) [][]keychain.Signer {
 	return txSigners
 }
 
-func SignUnsignedAtomic(ctx context.Context, signer Signer, utx tx.Unsigned) (*tx.Tx, error) {
+func SignUnsigned(ctx context.Context, signer Signer, utx tx.Unsigned) (*tx.Tx, error) {
 	t := &tx.Tx{Unsigned: utx}
-	return t, signer.SignAtomic(ctx, t)
+	return t, signer.Sign(ctx, t)
 }
 
 func sign(t *tx.Tx, txSigners [][]keychain.Signer) error {

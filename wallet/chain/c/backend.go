@@ -31,7 +31,7 @@ type Backend interface {
 	BuilderBackend
 	SignerBackend
 
-	AcceptAtomicTx(ctx context.Context, tx *tx.Tx) error
+	AcceptTx(ctx context.Context, tx *tx.Tx) error
 }
 
 type backend struct {
@@ -56,7 +56,7 @@ func NewBackend(
 	}
 }
 
-func (b *backend) AcceptAtomicTx(ctx context.Context, t *tx.Tx) error {
+func (b *backend) AcceptTx(ctx context.Context, t *tx.Tx) error {
 	switch utx := t.Unsigned.(type) {
 	case *tx.Import:
 		for _, input := range utx.ImportedInputs {

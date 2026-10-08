@@ -50,14 +50,14 @@ type Wallet interface {
 		options ...common.Option,
 	) (*tx.Tx, error)
 
-	// IssueUnsignedAtomicTx signs and issues the unsigned tx.
-	IssueUnsignedAtomicTx(
+	// IssueUnsignedTx signs and issues the unsigned tx.
+	IssueUnsignedTx(
 		utx tx.Unsigned,
 		options ...common.Option,
 	) (*tx.Tx, error)
 
-	// IssueAtomicTx issues the signed tx.
-	IssueAtomicTx(
+	// IssueTx issues the signed tx.
+	IssueTx(
 		t *tx.Tx,
 		options ...common.Option,
 	) error
@@ -109,7 +109,7 @@ func (w *wallet) IssueImportTx(
 	if err != nil {
 		return nil, err
 	}
-	return w.IssueUnsignedAtomicTx(utx, options...)
+	return w.IssueUnsignedTx(utx, options...)
 }
 
 func (w *wallet) IssueExportTx(
@@ -126,24 +126,24 @@ func (w *wallet) IssueExportTx(
 	if err != nil {
 		return nil, err
 	}
-	return w.IssueUnsignedAtomicTx(utx, options...)
+	return w.IssueUnsignedTx(utx, options...)
 }
 
-func (w *wallet) IssueUnsignedAtomicTx(
+func (w *wallet) IssueUnsignedTx(
 	utx tx.Unsigned,
 	options ...common.Option,
 ) (*tx.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	t, err := SignUnsignedAtomic(ctx, w.signer, utx)
+	t, err := SignUnsigned(ctx, w.signer, utx)
 	if err != nil {
 		return nil, err
 	}
 
-	return t, w.IssueAtomicTx(t, options...)
+	return t, w.IssueTx(t, options...)
 }
 
-func (w *wallet) IssueAtomicTx(
+func (w *wallet) IssueTx(
 	t *tx.Tx,
 	options ...common.Option,
 ) error {
@@ -166,7 +166,7 @@ func (w *wallet) IssueAtomicTx(
 	}
 
 	if ops.AssumeDecided() {
-		return w.Backend.AcceptAtomicTx(ctx, t)
+		return w.Backend.AcceptTx(ctx, t)
 	}
 
 	if err := w.avaxClient.AwaitTxAccepted(ctx, txID, ops.PollFrequency()); err != nil {
@@ -185,7 +185,7 @@ func (w *wallet) IssueAtomicTx(
 		})
 	}
 
-	return w.Backend.AcceptAtomicTx(ctx, t)
+	return w.Backend.AcceptTx(ctx, t)
 }
 
 func (w *wallet) baseFee(options []common.Option) (gas.Price, error) {

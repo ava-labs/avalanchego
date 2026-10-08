@@ -60,21 +60,21 @@ func (w *walletWithOptions) IssueExportTx(
 	)
 }
 
-func (w *walletWithOptions) IssueUnsignedAtomicTx(
+func (w *walletWithOptions) IssueUnsignedTx(
 	utx tx.Unsigned,
 	options ...common.Option,
 ) (*tx.Tx, error) {
-	return w.Wallet.IssueUnsignedAtomicTx(
+	return w.Wallet.IssueUnsignedTx(
 		utx,
 		common.UnionOptions(w.options, options)...,
 	)
 }
 
-func (w *walletWithOptions) IssueAtomicTx(
+func (w *walletWithOptions) IssueTx(
 	t *tx.Tx,
 	options ...common.Option,
 ) error {
-	return w.Wallet.IssueAtomicTx(
+	return w.Wallet.IssueTx(
 		t,
 		common.UnionOptions(w.options, options)...,
 	)
