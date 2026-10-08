@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
@@ -154,46 +153,12 @@ func newExtras(ctx *snow.Context, cfg *params.ChainConfig, upgradeConfig extras.
 }
 
 func networkUpgrades(existing extras.NetworkUpgrades, ctx *snow.Context, upgradeConfig extras.UpgradeConfig) extras.NetworkUpgrades {
-	u := &ctx.NetworkUpgrades
-	upgrades := extras.NetworkUpgrades{
-		SubnetEVMTimestamp: new(uint64),
-		DurangoTimestamp:   utils.TimeToNewUint64(u.DurangoTime),
-		EtnaTimestamp:      utils.TimeToNewUint64(u.EtnaTime),
-		FortunaTimestamp:   nil,
-		GraniteTimestamp:   utils.TimeToNewUint64(u.GraniteTime),
-		HeliconTimestamp:   utils.TimeToNewUint64(u.HeliconTime),
-		IglooTimestamp:     utils.TimeToNewUint64(u.IglooTime),
-	}
-	override(&upgrades, existing)
+	upgrades := existing
+	upgrades.SetDefaults(ctx.NetworkUpgrades)
 	if upgradeConfig.NetworkUpgradeOverrides != nil {
-		override(&upgrades, *upgradeConfig.NetworkUpgradeOverrides)
+		upgrades.Override(upgradeConfig.NetworkUpgradeOverrides)
 	}
 	return upgrades
-}
-
-// override sets upgrades to any non-nil value from overrides.
-func override(upgrades *extras.NetworkUpgrades, overrides extras.NetworkUpgrades) {
-	if overrides.SubnetEVMTimestamp != nil {
-		upgrades.SubnetEVMTimestamp = overrides.SubnetEVMTimestamp
-	}
-	if overrides.DurangoTimestamp != nil {
-		upgrades.DurangoTimestamp = overrides.DurangoTimestamp
-	}
-	if overrides.EtnaTimestamp != nil {
-		upgrades.EtnaTimestamp = overrides.EtnaTimestamp
-	}
-	if overrides.FortunaTimestamp != nil {
-		upgrades.FortunaTimestamp = overrides.FortunaTimestamp
-	}
-	if overrides.GraniteTimestamp != nil {
-		upgrades.GraniteTimestamp = overrides.GraniteTimestamp
-	}
-	if overrides.HeliconTimestamp != nil {
-		upgrades.HeliconTimestamp = overrides.HeliconTimestamp
-	}
-	if overrides.IglooTimestamp != nil {
-		upgrades.IglooTimestamp = overrides.IglooTimestamp
-	}
 }
 
 var errNoHeadHeader = errors.New("no head header")

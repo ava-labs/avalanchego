@@ -151,10 +151,15 @@ func newContext(t *testing.T, fork upgradetest.Fork) *snow.Context {
 
 func TestParseGenesis(t *testing.T) {
 	var (
-		latest    = newContext(t, upgradetest.Latest)
-		durango   = newContext(t, upgradetest.Durango)
-		delayedTS = new(testGenesisTime + 100)
+		latest             = newContext(t, upgradetest.Latest)
+		durango            = newContext(t, upgradetest.Durango)
+		mainnet            = newContext(t, upgradetest.Latest)
+		delayedTS          = new(testGenesisTime + 100)
+		zeroGraniteGenesis = testGenesisJSON(options.Func[legacy.Genesis](func(g *legacy.Genesis) {
+			l1params.GetExtra(g.Config).GraniteTimestamp = new(uint64)
+		}))
 	)
+	mainnet.NetworkUpgrades = upgrade.Mainnet // neeed non-zero network upgrades
 	tests := []struct {
 		name         string
 		ctx          *snow.Context
@@ -166,6 +171,22 @@ func TestParseGenesis(t *testing.T) {
 			name:    "defaults",
 			ctx:     latest,
 			genesis: testGenesisJSON(),
+		},
+		{
+			name:    "zero_genesis_upgrade_uses_network_default",
+			ctx:     mainnet,
+			genesis: zeroGraniteGenesis,
+		},
+		{
+			name:    "zero_upgrade_override_is_rejected",
+			ctx:     mainnet,
+			genesis: zeroGraniteGenesis,
+			upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
+				NetworkUpgradeOverrides: &extras.NetworkUpgrades{
+					GraniteTimestamp: new(uint64),
+				},
+			})),
+			wantErr: testerr.Contains("granite fork block timestamp is invalid"),
 		},
 		{
 			name:    "fee_config_defaulted",
