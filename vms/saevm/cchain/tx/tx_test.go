@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -422,6 +423,64 @@ func TestAccountInputID(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			got := AccountInputID(test.address, test.nonce)
 			assert.Equalf(t, test.want, got, "AccountInputID(%s, %d)", test.address, test.nonce)
+		})
+	}
+}
+
+func TestFee(t *testing.T) {
+	tests := []struct {
+		name    string
+		gas     gas.Gas
+		price   gas.Price
+		want    uint64
+		wantErr error
+	}{
+		{
+			name:  "exact",
+			gas:   10_000,
+			price: 25 * X2CRate,
+			want:  250_000,
+		},
+		{
+			name:  "rounds_up_below_one_nAVAX",
+			gas:   3,
+			price: 1,
+			want:  1,
+		},
+		{
+			name:  "rounds_up_remainder",
+			gas:   11_230,
+			price: 25*X2CRate + 1,
+			want:  280_751, // 11_230 * (25e9 + 1) / 1e9 = 280_750.00001123, rounded up
+		},
+		{
+			name:  "max_cost",
+			gas:   1,
+			price: math.MaxUint64,
+			want:  18_446_744_074, // MaxUint64 / 1e9, rounded up
+		},
+		{
+			name:    "cost_overflow",
+			gas:     2,
+			price:   math.MaxUint64,
+			wantErr: safemath.ErrOverflow,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := Fee(test.gas, test.price)
+			require.ErrorIsf(t, err, test.wantErr, "Fee(%d, %d)", test.gas, test.price)
+			if test.wantErr != nil {
+				return
+			}
+			require.Equalf(t, test.want, got, "Fee(%d, %d)", test.gas, test.price)
+
+			// The fee MUST be the minimum that SAE prices at or above price.
+			price := uint256.NewInt(uint64(test.price))
+			gotPrice := GasPrice(got, test.gas)
+			assert.Falsef(t, gotPrice.Lt(price), "GasPrice(%d, %d) = %s; want >= %s", got, test.gas, &gotPrice, price)
+			lowerPrice := GasPrice(got-1, test.gas)
+			assert.Truef(t, lowerPrice.Lt(price), "GasPrice(%d, %d) = %s; want < %s", got-1, test.gas, &lowerPrice, price)
 		})
 	}
 }

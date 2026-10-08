@@ -4,8 +4,8 @@
 package c
 
 import (
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
@@ -40,7 +40,7 @@ func (w *walletWithOptions) IssueImportTx(
 	chainID ids.ID,
 	to ethcommon.Address,
 	options ...common.Option,
-) (*atomic.Tx, error) {
+) (*tx.Tx, error) {
 	return w.Wallet.IssueImportTx(
 		chainID,
 		to,
@@ -52,7 +52,7 @@ func (w *walletWithOptions) IssueExportTx(
 	chainID ids.ID,
 	outputs []*secp256k1fx.TransferOutput,
 	options ...common.Option,
-) (*atomic.Tx, error) {
+) (*tx.Tx, error) {
 	return w.Wallet.IssueExportTx(
 		chainID,
 		outputs,
@@ -61,9 +61,9 @@ func (w *walletWithOptions) IssueExportTx(
 }
 
 func (w *walletWithOptions) IssueUnsignedAtomicTx(
-	utx atomic.UnsignedAtomicTx,
+	utx tx.Unsigned,
 	options ...common.Option,
-) (*atomic.Tx, error) {
+) (*tx.Tx, error) {
 	return w.Wallet.IssueUnsignedAtomicTx(
 		utx,
 		common.UnionOptions(w.options, options)...,
@@ -71,11 +71,11 @@ func (w *walletWithOptions) IssueUnsignedAtomicTx(
 }
 
 func (w *walletWithOptions) IssueAtomicTx(
-	tx *atomic.Tx,
+	t *tx.Tx,
 	options ...common.Option,
 ) error {
 	return w.Wallet.IssueAtomicTx(
-		tx,
+		t,
 		common.UnionOptions(w.options, options)...,
 	)
 }

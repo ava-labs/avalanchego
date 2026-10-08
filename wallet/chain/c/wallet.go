@@ -4,15 +4,13 @@
 package c
 
 import (
-	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/ethclient"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -39,7 +37,7 @@ type Wallet interface {
 		chainID ids.ID,
 		to ethcommon.Address,
 		options ...common.Option,
-	) (*atomic.Tx, error)
+	) (*tx.Tx, error)
 
 	// IssueExportTx creates, signs, and issues an export transaction that
 	// attempts to send all the provided [outputs] to the requested [chainID].
@@ -50,17 +48,17 @@ type Wallet interface {
 		chainID ids.ID,
 		outputs []*secp256k1fx.TransferOutput,
 		options ...common.Option,
-	) (*atomic.Tx, error)
+	) (*tx.Tx, error)
 
 	// IssueUnsignedAtomicTx signs and issues the unsigned tx.
 	IssueUnsignedAtomicTx(
-		utx atomic.UnsignedAtomicTx,
+		utx tx.Unsigned,
 		options ...common.Option,
-	) (*atomic.Tx, error)
+	) (*tx.Tx, error)
 
 	// IssueAtomicTx issues the signed tx.
 	IssueAtomicTx(
-		tx *atomic.Tx,
+		t *tx.Tx,
 		options ...common.Option,
 	) error
 }
@@ -101,7 +99,7 @@ func (w *wallet) IssueImportTx(
 	chainID ids.ID,
 	to ethcommon.Address,
 	options ...common.Option,
-) (*atomic.Tx, error) {
+) (*tx.Tx, error) {
 	baseFee, err := w.baseFee(options)
 	if err != nil {
 		return nil, err
@@ -118,7 +116,7 @@ func (w *wallet) IssueExportTx(
 	chainID ids.ID,
 	outputs []*secp256k1fx.TransferOutput,
 	options ...common.Option,
-) (*atomic.Tx, error) {
+) (*tx.Tx, error) {
 	baseFee, err := w.baseFee(options)
 	if err != nil {
 		return nil, err
@@ -132,31 +130,27 @@ func (w *wallet) IssueExportTx(
 }
 
 func (w *wallet) IssueUnsignedAtomicTx(
-	utx atomic.UnsignedAtomicTx,
+	utx tx.Unsigned,
 	options ...common.Option,
-) (*atomic.Tx, error) {
+) (*tx.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	tx, err := SignUnsignedAtomic(ctx, w.signer, utx)
+	t, err := SignUnsignedAtomic(ctx, w.signer, utx)
 	if err != nil {
 		return nil, err
 	}
 
-	return tx, w.IssueAtomicTx(tx, options...)
+	return t, w.IssueAtomicTx(t, options...)
 }
 
 func (w *wallet) IssueAtomicTx(
-	atx *atomic.Tx,
+	t *tx.Tx,
 	options ...common.Option,
 ) error {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
 	startTime := time.Now()
 
-	t, err := tx.Parse(atx.SignedBytes())
-	if err != nil {
-		return fmt.Errorf("parsing atomic tx: %w", err)
-	}
 	if err := w.avaxClient.IssueTx(ctx, t); err != nil {
 		return err
 	}
@@ -172,7 +166,7 @@ func (w *wallet) IssueAtomicTx(
 	}
 
 	if ops.AssumeDecided() {
-		return w.Backend.AcceptAtomicTx(ctx, atx)
+		return w.Backend.AcceptAtomicTx(ctx, t)
 	}
 
 	if err := w.avaxClient.AwaitTxAccepted(ctx, txID, ops.PollFrequency()); err != nil {
@@ -191,22 +185,21 @@ func (w *wallet) IssueAtomicTx(
 		})
 	}
 
-	return w.Backend.AcceptAtomicTx(ctx, atx)
+	return w.Backend.AcceptAtomicTx(ctx, t)
 }
 
-func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
+func (w *wallet) baseFee(options []common.Option) (gas.Price, error) {
 	ops := common.NewOptions(options)
-	baseFee := ops.BaseFee(nil)
-	if baseFee != nil {
+	if baseFee, ok := ops.BaseFee(); ok {
 		return baseFee, nil
 	}
 
 	ctx := ops.Context()
 	// TODO(owenwahlgren): Expose an SAE client that includes the
 	// Avalanche-custom eth RPCs, such as eth_baseFee, and use it here.
-	var fee hexutil.Big
+	var fee hexutil.Uint64
 	if err := w.ethClient.Client().CallContext(ctx, &fee, "eth_baseFee"); err != nil {
-		return nil, err
+		return 0, err
 	}
-	return (*big.Int)(&fee), nil
+	return gas.Price(fee), nil
 }

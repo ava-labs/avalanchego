@@ -5,11 +5,11 @@ package common
 
 import (
 	"context"
-	"math/big"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	ethcommon "github.com/ava-labs/libevm/common"
@@ -52,7 +52,8 @@ type Options struct {
 	customEthAddressesSet bool
 	customEthAddresses    set.Set[ethcommon.Address]
 
-	baseFee *big.Int
+	baseFeeSet bool
+	baseFee    gas.Price
 
 	minIssuanceTimeSet bool
 	minIssuanceTime    uint64
@@ -113,11 +114,8 @@ func (o *Options) EthAddresses(defaultAddresses set.Set[ethcommon.Address]) set.
 	return defaultAddresses
 }
 
-func (o *Options) BaseFee(defaultBaseFee *big.Int) *big.Int {
-	if o.baseFee != nil {
-		return o.baseFee
-	}
-	return defaultBaseFee
+func (o *Options) BaseFee() (gas.Price, bool) {
+	return o.baseFee, o.baseFeeSet
 }
 
 func (o *Options) MinIssuanceTime() uint64 {
@@ -181,8 +179,9 @@ func WithCustomEthAddresses(addrs set.Set[ethcommon.Address]) Option {
 	}
 }
 
-func WithBaseFee(baseFee *big.Int) Option {
+func WithBaseFee(baseFee gas.Price) Option {
 	return func(o *Options) {
+		o.baseFeeSet = true
 		o.baseFee = baseFee
 	}
 }

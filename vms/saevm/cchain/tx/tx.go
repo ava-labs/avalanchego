@@ -134,7 +134,7 @@ func (t *Tx) InputIDs() set.Set[ids.ID] {
 // The operation only includes state changes that impact Ethereum-native state.
 // It does not include non-AVAX balance changes or shared memory modifications.
 func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
-	gas, err := gasUsed(t.Unsigned)
+	gas, err := GasUsed(t.Unsigned)
 	if err != nil {
 		return hook.Op{}, fmt.Errorf("calculating gas used: %w", err)
 	}
@@ -169,7 +169,8 @@ const (
 	gasPerSig = gas.Gas(secp256k1fx.CostPerSignature)
 )
 
-func gasUsed(t Unsigned) (gas.Gas, error) {
+// GasUsed returns the amount of gas charged for t.
+func GasUsed(t Unsigned) (gas.Gas, error) {
 	// We MUST provide a pointer to t so that the returned size includes the
 	// type ID.
 	numBytes, err := c.Size(codecVersion, &t)
@@ -226,6 +227,21 @@ func gasPrice(cost nAVAX, gas gas.Gas) uint256.Int {
 	p := ScaleAVAX(cost)
 	p.Div(&p, &u)
 	return p
+}
+
+// Fee returns the minimum amount of nAVAX that a transaction consuming gas MUST
+// burn for its gas price to be at least price, in aAVAX/gas.
+func Fee(gas gas.Gas, price gas.Price) (nAVAX, error) {
+	cost, err := gas.Cost(price)
+	if err != nil {
+		return 0, err
+	}
+	// [gasPrice] rounds down, so the fee must be rounded up.
+	fee := cost / _x2cRate
+	if cost%_x2cRate != 0 {
+		fee++
+	}
+	return fee, nil
 }
 
 // SanityCheck verifies that the transaction's structural invariants hold

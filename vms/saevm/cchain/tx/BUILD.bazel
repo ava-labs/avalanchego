@@ -71,6 +71,7 @@ go_test(
         "//utils/set",
         "//utils/wrappers",
         "//vms/components/avax",
+        "//vms/components/gas",
         "//vms/saevm/cchain/tx/txtest",
         "//vms/saevm/cmputils",
         "//vms/saevm/hook",
