@@ -415,19 +415,22 @@ post-job save cannot be limited to `master` runs by `cache-policy`.
 [`setup-bazel`](../.github/actions/setup-bazel/action.yml) runs each Bazel
 setup job and the `lint-avalanchego` job. It restores the Bazel repository cache,
 the Bazel-specific Go module cache, and Bazelisk's downloaded Bazel binary. It
-checks metadata only in setup jobs. A non-exact consumer restore runs the
-checked-in dependency list through `bazelisk fetch`. On `master`, a non-exact
-setup restore also prepares and saves the cache. Setup jobs can duplicate this
-cold-cache work. After an exact restore or local preparation, the action enables
-`--repository_disable_download` and sets `GOPROXY=off` for repository rules.
-The latter prevents Gazelle's Go subprocess from fetching a missing module; see
-[Bazel CI external dependency caching](./bazel.md#bazel-ci-external-dependency-caching).
+checks metadata only in setup jobs.
+
+A non-exact consumer restore prepares the checked-in Bazel dependency list. On
+`master`, a non-exact setup restore also prepares that list. The setup job then
+disables downloads, checks metadata, and saves the cache. This order prevents a
+metadata check from adding undeclared inputs to a saved cache. Setup jobs can
+duplicate this cold-cache work. After an exact restore or local preparation, the
+action enables `--repository_disable_download` and sets `GOPROXY=off` for
+repository rules. `GOPROXY=off` prevents Gazelle from fetching a missing module.
+See [Bazel CI external dependency caching](./bazel.md#checked-in-bazel-dependency-list).
 
 The cache contains external Bazel dependency input and the Bazelisk-downloaded
 Bazel binary. It does not contain Bazel build outputs. It is separate from the
 Bazel remote action and test-result cache. See [Bazel CI external dependency
-caching](./bazel.md#bazel-ci-external-dependency-caching) for its key and
-dependency-list rules.
+caching](./bazel.md#checked-in-bazel-dependency-list) for its key and dependency
+list rules.
 
 #### Nix store cache
 
@@ -467,9 +470,8 @@ When changing an input cache:
   can prepare the dependency list before their Bazel consumers run;
 - prepare every non-exact restore before disabling its network path so a missing
   prepared input fails rather than being silently downloaded later;
-- add each new Go tool or pinned module to the module manifest, and each new
-  Bazel CI target pattern to the dependency list, so preparation covers every
-  input that CI commands require;
+- add each new Go tool or pinned module to the module manifest; add each Bazel
+  CI target pattern and command-only dependency to the Bazel dependency list;
 - do not use a shared cache to transfer build output or test results between
   jobs because those results depend on job-specific configuration and require a
   dedicated transfer protocol.
