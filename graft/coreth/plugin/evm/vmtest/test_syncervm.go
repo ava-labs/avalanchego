@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
@@ -42,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -657,7 +657,7 @@ func generateAndAcceptBlocks(t *testing.T, vm extension.InnerVM, numBlocks int, 
 		10,
 		func(i int, g *core.BlockGen) {
 			g.SetOnBlockGenerated(acceptExternalBlock)
-			g.SetCoinbase(constants.BlackholeAddr) // necessary for syntactic validation of the block
+			g.SetCoinbase(blackhole.Address) // necessary for syntactic validation of the block
 			gen(i, vm, g)
 		},
 		core.WithoutDiskCommit(),
