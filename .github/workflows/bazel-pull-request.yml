@@ -21,14 +21,16 @@ jobs:
     if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-24.04
     steps:
-      - run: true
+      # This job must only skip. Fail if it runs so unexpected execution cannot pass the required check.
+      - run: exit 1
 
   darwin-arm64-required:
     name: darwin-arm64 / bazel-required
     if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-24.04
     steps:
-      - run: true
+      # This job must only skip. Fail if it runs so unexpected execution cannot pass the required check.
+      - run: exit 1
 
   unit-and-e2e:
     name: linux-amd64
