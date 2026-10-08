@@ -34,6 +34,10 @@ runs:
           echo "go_mod_cache=$go_mod_cache_dir"
         } >> "$GITHUB_OUTPUT"
 
+    # List workspace modules explicitly instead of globbing to exclude unrelated
+    # modules such as tools/external. Add or remove a workspace module's go.mod
+    # and go.sum here. The go.work input still invalidates the cache if removal
+    # cleanup is missed.
     - id: cache-key
       name: Determine Bazel dependency cache key
       shell: bash
@@ -41,7 +45,7 @@ runs:
         cache_key_prefix="bazel-repo-${{ runner.os }}-${{ runner.arch }}-"
         {
           echo "cache-key-prefix=$cache_key_prefix"
-          echo "cache-key=${cache_key_prefix}${{ hashFiles('.bazelversion', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.work', 'go.work.sum', 'go.mod', 'go.sum', 'graft/coreth/go.mod', 'graft/coreth/go.sum', 'graft/evm/go.mod', 'graft/evm/go.sum', 'graft/subnet-evm/go.mod', 'graft/subnet-evm/go.sum', 'scripts/bazel_ci_dependency_list.sh') }}"
+          echo "cache-key=${cache_key_prefix}${{ hashFiles('.bazelversion', 'MODULE.bazel', 'MODULE.bazel.lock', 'go.work', 'go.work.sum', 'go.mod', 'go.sum', 'graft/coreth/go.mod', 'graft/coreth/go.sum', 'graft/evm/go.mod', 'graft/evm/go.sum', 'graft/subnet-evm/go.mod', 'graft/subnet-evm/go.sum', 'scripts/bazel_ci_dependency_list.sh', 'scripts/cache_bazel_ci_build_dependencies.sh', '.github/actions/setup-bazel/configure-bazelrc.sh') }}"
         } >> "$GITHUB_OUTPUT"
 
     - name: Restore Bazel dependency cache

@@ -939,6 +939,10 @@ When adding a new Go module under `graft/`:
    ```
    go work use ./graft/newmodule
    ```
+   Add the module's `go.mod` and `go.sum` to the Bazel dependency-cache key in
+   [`.github/actions/setup-bazel/action.yml`](../.github/actions/setup-bazel/action.yml).
+   The key intentionally excludes non-workspace modules such as
+   `tools/external` that are not inputs to Gazelle's `go_deps` extension.
 
 2. **Create the module's root BUILD.bazel** with the gazelle prefix:
    ```python
