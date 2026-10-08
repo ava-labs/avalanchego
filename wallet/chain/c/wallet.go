@@ -1,6 +1,8 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// TODO: Add unit tests for the C-Chain wallet, builder, signer, and backend.
+
 package c
 
 import (

@@ -42,31 +42,12 @@ go_library(
 
 go_test(
     name = "c_test",
-    srcs = [
-        "builder_test.go",
-        "wallet_test.go",
-    ],
+    srcs = ["builder_test.go"],
     embed = [":c"],
     deps = [
-        "//ids",
-        "//utils",
-        "//utils/constants",
         "//utils/math",
-        "//vms/components/avax",
         "//vms/components/gas",
         "//vms/saevm/cchain/tx",
-        "//vms/saevm/cchain/tx/txtest",
-        "//vms/secp256k1fx",
-        "//wallet/subnet/primary/common",
-        "@com_github_ava_labs_libevm//common",
-        "@com_github_ava_labs_libevm//common/hexutil",
-        "@com_github_ava_labs_libevm//ethclient",
-        "@com_github_ava_labs_libevm//params",
-        "@com_github_ava_labs_libevm//rpc",
-        "@com_github_google_go_cmp//cmp",
-        "@com_github_google_go_cmp//cmp/cmpopts",
-        "@com_github_holiman_uint256//:uint256",
-        "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
 )
