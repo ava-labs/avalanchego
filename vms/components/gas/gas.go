@@ -18,7 +18,7 @@ type (
 	Price uint64
 )
 
-// Cost returns g*price in the denomination used by price.
+// Cost returns g*price.
 //
 // If overflow would occur, an error is returned.
 func (g Gas) Cost(price Price) (uint64, error) {
