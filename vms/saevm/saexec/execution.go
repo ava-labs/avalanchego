@@ -491,6 +491,8 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 	}
 	e.sendPostExecutionEvents(b, r) // (3)
 	if b.Synchronous() {            // (4)
+		// We MUST avoid moving the finalized block pointer backwards and
+		// recovery may reexecute previously executed blocks.
 		if b.ParentHash() == rawdb.ReadFinalizedBlockHash(e.db) {
 			rawdb.WriteFinalizedBlockHash(e.db, b.Hash())
 		}
