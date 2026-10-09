@@ -603,6 +603,8 @@ platform.getCurrentValidators({
         },
         nextPeriod: string,
         autoCompoundRewardShares: string,
+        restakedValidationRewards: string,
+        restakedDelegateeRewards: string,
         delegatorCount: string,
         delegatorWeight: string,
         delegators: []{
@@ -669,6 +671,12 @@ platform.getCurrentValidators({
       `nextPeriod`, and `weight` grows by whatever share of the rewards was auto-compounded, capped
       at `MaxValidatorStake`. `txID` stays the same across renewals, so a changed `endTime` must not
       be treated as a new validator.
+  - `restakedValidationRewards` and `restakedDelegateeRewards` are returned only for auto-renewed
+    validators. They are the rewards, in nAVAX, restaked into `weight` over all completed cycles.
+    `weight` is the stake in the `AddAutoRenewedValidatorTx` plus both values. A node on v1.15.1 or
+    earlier omits them, so a missing value does not mean that no rewards were restaked.
+    - `restakedValidationRewards` is the restaked part of the rewards earned from staking.
+    - `restakedDelegateeRewards` is the restaked part of the rewards earned from delegations.
   - `delegatorCount` is the number of delegators on this validator.
     Omitted if `subnetID` is not the Primary Network.
   - `delegatorWeight` is total weight of delegators on this validator.
@@ -783,6 +791,8 @@ curl -X POST --data '{
         },
         "nextPeriod": "172800",
         "autoCompoundRewardShares": "500000",
+        "restakedValidationRewards": "0",
+        "restakedDelegateeRewards": "0",
         "delegatorCount": "0",
         "delegatorWeight": "0",
         "delegators": []
@@ -796,7 +806,8 @@ curl -X POST --data '{
 Here `nextPeriod` is `172800` seconds (48 hours) and `autoCompoundRewardShares` is `500000`,
 meaning half of each cycle's rewards are restaked into `weight` and half are paid out to
 `validationRewardOwner`. `startTime` is Helicon activation on Mainnet and `endTime` is one 48-hour
-cycle later, so this validator is in its first cycle.
+cycle later, so this validator is in its first cycle. No cycle has ended, so
+`restakedValidationRewards` and `restakedDelegateeRewards` are both `0`.
 
 **Example Response (L1):**
 
