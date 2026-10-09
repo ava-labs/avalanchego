@@ -33,15 +33,15 @@ type (
 	}
 )
 
-// Client unites [ethclient.Client], [gethclient.Client] and [rpc.Client].
+// Client unifies [ethclient.Client], [gethclient.Client] and [rpc.Client].
 type Client struct {
 	Eth
 	Geth
 	RPC
 }
 
-// DialContext connects a client to the given URL with context.
-func DialContext(ctx context.Context, rawurl string) (*Client, error) {
+// Dial connects a client to the given URL with context.
+func Dial(ctx context.Context, rawurl string) (*Client, error) {
 	c, err := rpc.DialContext(ctx, rawurl)
 	if err != nil {
 		return nil, err
@@ -74,9 +74,9 @@ func (c *Client) CallContract(ctx context.Context, msg ethereum.CallMsg, blockNu
 // used in the next block or that the next base fee will be higher or lower than
 // the returned value.
 func (c *Client) EstimateBaseFee(ctx context.Context) (gas.Price, error) {
-	var hex hexutil.Uint64
-	if err := c.CallContext(ctx, &hex, "eth_baseFee"); err != nil {
+	var bf hexutil.Uint64
+	if err := c.CallContext(ctx, &bf, "eth_baseFee"); err != nil {
 		return 0, err
 	}
-	return (gas.Price)(hex), nil
+	return gas.Price(bf), nil
 }

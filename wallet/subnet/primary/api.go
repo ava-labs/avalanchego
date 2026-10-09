@@ -200,7 +200,7 @@ func FetchEthState(
 		uri,
 		constants.ChainAliasPrefix,
 	)
-	client, err := ethclient.DialContext(ctx, path)
+	client, err := ethclient.Dial(ctx, path)
 	if err != nil {
 		return nil, err
 	}

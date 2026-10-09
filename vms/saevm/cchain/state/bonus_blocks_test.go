@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
-	"github.com/ava-labs/avalanchego/vms/saevm/client"
+	ethclient "github.com/ava-labs/avalanchego/vms/saevm/client"
 )
 
 var (
@@ -67,7 +67,7 @@ func TestBonusBlocks(t *testing.T) {
 
 	require.False(t, bonusBlockConsumers.Overlaps(bonusBlocks), "consumers overlap the bonus blocks")
 
-	client, err := client.DialContext(t.Context(), url)
+	client, err := ethclient.Dial(t.Context(), url)
 	require.NoErrorf(t, err, "client.DialContext(ctx, %q)", url)
 	defer client.Close()
 
@@ -89,7 +89,7 @@ func TestBonusBlocks(t *testing.T) {
 
 // atomicTxs returns the cross-chain transaction in each of the blocks at
 // heights.
-func atomicTxs(tb testing.TB, client *client.Client, heights set.Set[uint64]) map[uint64]*tx.Tx {
+func atomicTxs(tb testing.TB, client *ethclient.Client, heights set.Set[uint64]) map[uint64]*tx.Tx {
 	tb.Helper()
 
 	var (

@@ -6,7 +6,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 ### Features
 
-- New RPC client for all EVM uses was added to `vms/saevm/client`.
+- Added `vms/saevm/client`, which combines standard Ethereum, Geth-specific, raw RPC, and Avalanche-specific EVM methods.
 
 ### APIs
 

@@ -76,7 +76,6 @@ import (
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethereum "github.com/ava-labs/libevm"
 	ethparams "github.com/ava-labs/libevm/params"
-	ethrpc "github.com/ava-labs/libevm/rpc"
 )
 
 func TestMain(m *testing.M) {
@@ -427,15 +426,12 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 		}
 		server := httptest.NewServer(mux)
 		tb.Cleanup(server.Close)
+		sut.Client = NewClient(server.URL)
 
 		const wsHTTPPath = cchainHTTPPrefix + "/ws"
 		wsURI := "ws://" + server.Listener.Addr().String() + wsHTTPPath
-		ethRPCClient, err := ethrpc.Dial(wsURI)
-		require.NoErrorf(tb, err, "rpc.Dial(%s)", wsURI)
-		tb.Cleanup(ethRPCClient.Close)
-
-		sut.Client = NewClient(server.URL)
-		sut.ethclient = client.New(ethRPCClient)
+		sut.ethclient, err = client.Dial(ctx, wsURI)
+		require.NoErrorf(tb, err, "client.Dial(%s)", wsURI)
 	})
 
 	if cfg.state == snow.NormalOp {
