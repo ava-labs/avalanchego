@@ -45,7 +45,9 @@ jobs:
     name: darwin-arm64 / bazel-required
     if: ${{ always() }}
     needs: smoke
-    runs-on: macos-26
+    # This job checks results, not macOS behavior.
+    # Linux runners start faster and fail less often than macOS runners.
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Fail unless all needed jobs succeeded
