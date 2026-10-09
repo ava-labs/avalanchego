@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"maps"
@@ -407,25 +408,23 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan reexecu
 				)
 			}
 		}
-		if err := e.execute(ctx, blkResult.BlockBytes); err != nil {
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				// Interrupted; return nil so the deferred shutdown runs.
-				e.config.Log.Info("exiting early due to interrupt",
-					zap.Uint64("height", blkResult.Height),
-					zap.Error(ctxErr),
-				)
-				return nil
-			}
+		if err := e.execute(ctx, blkResult.BlockBytes); err != nil && ctx.Err() == nil {
 			return err
 		}
 
-		if err := ctx.Err(); err != nil {
+		switch err := ctx.Err(); {
+		case err == nil:
+		case errors.Is(err, context.DeadlineExceeded):
 			e.config.Log.Info("exiting early due to context timeout",
 				zap.Duration("elapsed", time.Since(start)),
 				zap.Duration("execution-timeout", e.config.ExecutionTimeout),
-				zap.Error(ctx.Err()),
+				zap.Error(err),
 			)
 			return nil
+		default:
+			// SIGINT/SIGTERM. Failing the run exits non-zero once the deferred
+			// VM shutdown has completed.
+			return fmt.Errorf("interrupted at height %d: %w", blkResult.Height, err)
 		}
 	}
 	e.config.Log.Info("finished executing sequence")
