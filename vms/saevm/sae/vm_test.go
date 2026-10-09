@@ -275,7 +275,7 @@ func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM, scheme, pat
 	tb.Cleanup(server.Close)
 	url := scheme + "://" + server.Listener.Addr().String()
 	client, err := rpc.DialContext(ctx, url)
-	require.NoErrorf(tb, err, "rpc.Dial(%q)", url)
+	require.NoErrorf(tb, err, "rpc.DialContext(ctx, %q)", url)
 	tb.Cleanup(client.Close)
 	return client
 }

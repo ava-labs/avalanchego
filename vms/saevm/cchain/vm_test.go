@@ -431,7 +431,8 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 		const wsHTTPPath = cchainHTTPPrefix + "/ws"
 		wsURI := "ws://" + server.Listener.Addr().String() + wsHTTPPath
 		sut.ethclient, err = client.Dial(ctx, wsURI)
-		require.NoErrorf(tb, err, "client.Dial(%s)", wsURI)
+		require.NoErrorf(tb, err, "client.Dial(ctx, %s)", wsURI)
+		tb.Cleanup(sut.ethclient.Close)
 	})
 
 	if cfg.state == snow.NormalOp {

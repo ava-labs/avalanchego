@@ -69,7 +69,7 @@ func TestBonusBlocks(t *testing.T) {
 	require.False(t, bonusBlockConsumers.Overlaps(bonusBlocks), "consumers overlap the bonus blocks")
 
 	client, err := evmclient.Dial(t.Context(), url)
-	require.NoErrorf(t, err, "client.DialContext(ctx, %q)", url)
+	require.NoErrorf(t, err, "evmclient.Dial(ctx, %q)", url)
 	defer client.Close()
 
 	bonusTxs := atomicTxs(t, client, bonusBlocks)

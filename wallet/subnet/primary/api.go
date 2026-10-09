@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 
-	evmclient "github.com/ava-labs/avalanchego/vms/evm/client"
+	ethclient "github.com/ava-labs/avalanchego/vms/evm/client"
 	pbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -186,7 +186,7 @@ func FetchPState(
 }
 
 type EthState struct {
-	Client   *evmclient.Client
+	Client   *ethclient.Client
 	Accounts map[ethcommon.Address]*c.Account
 }
 
@@ -200,7 +200,7 @@ func FetchEthState(
 		uri,
 		constants.ChainAliasPrefix,
 	)
-	client, err := evmclient.Dial(ctx, path)
+	client, err := ethclient.Dial(ctx, path)
 	if err != nil {
 		return nil, err
 	}
