@@ -54,6 +54,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
@@ -71,7 +72,6 @@ import (
 
 	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethereum "github.com/ava-labs/libevm"
@@ -1300,7 +1300,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 
 	contract := common.Address{'c', 'o', 'd', 'e'}
 	code := saetest.LogTopOfStackAfter(
-		saetest.Push(t, evmconstants.BlackholeAddr[:]),
+		saetest.Push(t, blackhole.Address[:]),
 		saetest.Ops(vm.BALANCE),
 	)
 	ctx, sut := newSUT(t,
@@ -1321,7 +1321,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 	}
 	sut.waitForPendingEthTxs(ctx, t, txs...)
 
-	preBurn := sut.balance(t, evmconstants.BlackholeAddr)
+	preBurn := sut.balance(t, blackhole.Address)
 	blk := sut.runConsensusLoop(ctx, t)
 	require.Zerof(t, big.NewInt(1).Cmp(blk.EthBlock().BaseFee()), "%T base fee", blk)
 	receipts := blk.Receipts()
@@ -1334,7 +1334,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 		require.Equalf(t, common.Hash(want.Bytes32()), got, "BALANCE(blackhole) observed by transaction %d", i)
 		want.AddUint64(&want, feePerGas*r.GasUsed)
 	}
-	assert.Equal(t, want, sut.balance(t, evmconstants.BlackholeAddr), "blackhole balance after the block")
+	assert.Equal(t, want, sut.balance(t, blackhole.Address), "blackhole balance after the block")
 }
 
 // TestParseBlock verifies that ParseBlock accepts well-formed blocks and

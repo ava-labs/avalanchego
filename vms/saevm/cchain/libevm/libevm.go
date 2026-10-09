@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package libevm registers the C-Chain's hooks and payloads with libevm.
+// Package libevm registers the C-Chain's libevm hooks and payloads.
 package libevm
 
 import (
@@ -13,10 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/extstate"
 )
 
-// RegisterExtras registers the C-Chain hooks and payloads with libevm: EVM
-// hooks, header and block-body extras, state-key normalization, and
-// chain-config extras. Together these are necessary and sufficient for libevm
-// to exhibit C-Chain behaviour.
+// RegisterExtras registers all the C-Chain's libevm hooks and payloads.
 //
 // It MUST NOT be called more than once and is therefore only allowed in tests
 // and `package main`, to avoid polluting other packages that transitively

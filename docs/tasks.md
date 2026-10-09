@@ -161,7 +161,7 @@ uploads, or secrets. That is normal CI setup, not task definition.
 
 ### Good: CI runs a named task
 
-In [`.github/workflows/go-ci-pre-merge.yml`](../.github/workflows/go-ci-pre-merge.yml), the process-based
+In [`.github/workflows/go.yml`](../.github/workflows/go.yml), the process-based
 load test runs:
 
 ```bash

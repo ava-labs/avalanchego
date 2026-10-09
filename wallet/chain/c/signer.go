@@ -11,31 +11,27 @@ import (
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
-
-const version = 0
 
 var (
 	_ Signer = (*txSigner)(nil)
 
-	errUnknownInputType      = errors.New("unknown input type")
-	errUnknownCredentialType = errors.New("unknown credential type")
-	errUnknownOutputType     = errors.New("unknown output type")
-	errInvalidUTXOSigIndex   = errors.New("invalid UTXO signature index")
+	errUnknownInputType    = errors.New("unknown input type")
+	errUnknownOutputType   = errors.New("unknown output type")
+	errInvalidUTXOSigIndex = errors.New("invalid UTXO signature index")
 
 	emptySig [secp256k1.SignatureLen]byte
 )
 
 type Signer interface {
-	// SignAtomic adds as many missing signatures as possible to the provided
+	// Sign adds as many missing signatures as possible to the provided
 	// transaction.
 	//
 	// If there are already some signatures on the transaction, those signatures
@@ -43,7 +39,7 @@ type Signer interface {
 	//
 	// If the signer doesn't have the ability to provide a required signature,
 	// the signature slot will be skipped without reporting an error.
-	SignAtomic(ctx context.Context, tx *atomic.Tx) error
+	Sign(ctx context.Context, tx *tx.Tx) error
 }
 
 type EthKeychain interface {
@@ -72,19 +68,19 @@ func NewSigner(avaxKC keychain.Keychain, ethKC EthKeychain, backend SignerBacken
 	}
 }
 
-func (s *txSigner) SignAtomic(ctx context.Context, tx *atomic.Tx) error {
-	switch utx := tx.UnsignedAtomicTx.(type) {
-	case *atomic.UnsignedImportTx:
+func (s *txSigner) Sign(ctx context.Context, t *tx.Tx) error {
+	switch utx := t.Unsigned.(type) {
+	case *tx.Import:
 		signers, err := s.getImportSigners(ctx, utx.SourceChain, utx.ImportedInputs)
 		if err != nil {
 			return err
 		}
-		return sign(tx, signers)
-	case *atomic.UnsignedExportTx:
+		return sign(t, signers)
+	case *tx.Export:
 		signers := s.getExportSigners(utx.Ins)
-		return sign(tx, signers)
+		return sign(t, signers)
 	default:
-		return fmt.Errorf("%w: %T", errUnknownTxType, tx)
+		return fmt.Errorf("%w: %T", errUnknownTxType, utx)
 	}
 }
 
@@ -133,7 +129,7 @@ func (s *txSigner) getImportSigners(ctx context.Context, sourceChainID ids.ID, i
 	return txSigners, nil
 }
 
-func (s *txSigner) getExportSigners(ins []atomic.EVMInput) [][]keychain.Signer {
+func (s *txSigner) getExportSigners(ins []tx.Input) [][]keychain.Signer {
 	txSigners := make([][]keychain.Signer, len(ins))
 	for credIndex, input := range ins {
 		inputSigners := make([]keychain.Signer, 1)
@@ -150,33 +146,28 @@ func (s *txSigner) getExportSigners(ins []atomic.EVMInput) [][]keychain.Signer {
 	return txSigners
 }
 
-func SignUnsignedAtomic(ctx context.Context, signer Signer, utx atomic.UnsignedAtomicTx) (*atomic.Tx, error) {
-	tx := &atomic.Tx{UnsignedAtomicTx: utx}
-	return tx, signer.SignAtomic(ctx, tx)
+func SignUnsigned(ctx context.Context, signer Signer, utx tx.Unsigned) (*tx.Tx, error) {
+	t := &tx.Tx{Unsigned: utx}
+	return t, signer.Sign(ctx, t)
 }
 
-func sign(tx *atomic.Tx, txSigners [][]keychain.Signer) error {
-	unsignedBytes, err := atomic.Codec.Marshal(version, &tx.UnsignedAtomicTx)
+func sign(t *tx.Tx, txSigners [][]keychain.Signer) error {
+	unsignedBytes, err := tx.UnsignedBytes(t.Unsigned)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)
 	}
 
-	if expectedLen := len(txSigners); expectedLen != len(tx.Creds) {
-		tx.Creds = make([]verify.Verifiable, expectedLen)
+	if expectedLen := len(txSigners); expectedLen != len(t.Creds) {
+		t.Creds = make([]tx.Credential, expectedLen)
 	}
 
 	sigCache := make(map[ids.ShortID][secp256k1.SignatureLen]byte)
 	for credIndex, inputSigners := range txSigners {
-		credIntf := tx.Creds[credIndex]
-		if credIntf == nil {
-			credIntf = &secp256k1fx.Credential{}
-			tx.Creds[credIndex] = credIntf
+		if t.Creds[credIndex] == nil {
+			t.Creds[credIndex] = &secp256k1fx.Credential{}
 		}
 
-		cred, ok := credIntf.(*secp256k1fx.Credential)
-		if !ok {
-			return errUnknownCredentialType
-		}
+		cred := t.Creds[credIndex].Self()
 		if expectedLen := len(inputSigners); expectedLen != len(cred.Sigs) {
 			cred.Sigs = make([][secp256k1.SignatureLen]byte, expectedLen)
 		}
@@ -210,11 +201,5 @@ func sign(tx *atomic.Tx, txSigners [][]keychain.Signer) error {
 			sigCache[addr] = cred.Sigs[sigIndex]
 		}
 	}
-
-	signedBytes, err := atomic.Codec.Marshal(version, tx)
-	if err != nil {
-		return fmt.Errorf("couldn't marshal tx: %w", err)
-	}
-	tx.Initialize(unsignedBytes, signedBytes)
 	return nil
 }
