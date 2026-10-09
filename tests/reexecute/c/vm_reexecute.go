@@ -68,19 +68,15 @@ var (
 			"pruning-enabled": false
 		}`,
 		"pathdb": `{
-			"state-scheme": "path",
-			"state-sync-enabled": false
+			"state-scheme": "path"
 		}`,
 		"firewood": `{
 			"state-scheme": "firewood",
-			"pruning-enabled": true,
-			"commit-interval": 4096
+			"pruning-enabled": true
 		}`,
 		"firewood-archive": `{
 			"state-scheme": "firewood",
-			"snapshot-cache": 0,
-			"pruning-enabled": false,
-			"state-sync-enabled": false
+			"pruning-enabled": false
 		}`,
 	}
 
