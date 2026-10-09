@@ -14,7 +14,6 @@ go_library(
         "//graft/coreth/params",
         "//ids",
         "//snow",
-        "//utils/heap",
         "//utils/lock",
         "//utils/set",
         "//utils/setmap",
@@ -26,6 +25,7 @@ go_library(
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//event",
         "@com_github_ava_labs_libevm//libevm",
+        "@com_github_google_btree//:btree",
         "@org_uber_go_zap//:zap",
     ],
 )
