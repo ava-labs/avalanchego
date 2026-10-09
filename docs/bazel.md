@@ -480,6 +480,9 @@ task bazel-stage-e2e-runtime
 
 # Run E2E tests from the staged binaries without invoking Bazel
 task bazel-test-e2e-staged
+
+# Run E2E tests serially from the staged binaries
+task bazel-test-e2e-staged-serial
 ```
 
 #### E2E runner
@@ -491,9 +494,36 @@ binary with Go during test execution.
 
 `task bazel-stage-avalanchego` and `task bazel-stage-e2e-runtime` build and
 stage these binaries under `build/bazel-e2e`. CI uploads the two directories as
-separate artifacts. `task bazel-test-e2e-staged` runs the restored binaries from
-that location without invoking Bazel. The runner restores executable permissions
-because GitHub Actions artifacts do not preserve them.
+separate artifacts. AvalancheGo has its own artifact because other CI jobs can
+reuse it. The E2E runtime artifact contains Ginkgo, XSVM, and `e2e.test`. This
+split avoids rebuilding unchanged binaries in each E2E consumer job.
+
+`task bazel-test-e2e-staged` runs the restored binaries from that location
+without invoking Bazel. `task bazel-test-e2e-staged-serial` runs the restored
+binaries with `E2E_SERIAL=1`. The runner restores executable permissions because
+GitHub Actions artifacts do not preserve them.
+
+##### Runner selection
+
+The reusable Bazel workflow uses `runner` for setup, unit tests, and E2E
+artifact builds. Its optional `e2e_runner` input overrides the runner for the
+E2E consumer only. Non-scheduled Linux CI sets `e2e_runner` to
+`ubuntu-24.04-amd64-4-core`. This runner has enough CPU capacity for parallel
+Ginkgo processes.
+
+Pre-merge CI uses the four-core runner to return E2E results sooner. Scheduled
+CI uses each platform's standard runner to validate all supported platforms. It
+sets `run_e2e_serially` to select `bazel-test-e2e-staged-serial`. Standard
+runners do not have enough CPU capacity for parallel Ginkgo processes. The
+longer scheduled run does not delay pull-request or merge-queue feedback.
+
+Use a larger scheduled runner only when serial E2E exceeds the scheduled timeout
+or stops providing useful coverage. Do not replace scheduled platforms with the
+AMD64 four-core runner only to reduce run time.
+
+Keep the E2E artifact builders and consumer on compatible operating systems and
+CPU architectures. The consumer runs the executables from the uploaded
+artifacts.
 
 The runner uses `bazel run`, not `bazel test`. Tmpnet creates network data under
 `$HOME/.tmpnet`. This path lets developers inspect a failed network. Tmpnet
@@ -661,8 +691,8 @@ reasons outside the repository. A smaller job set reduces that risk.
 
 Non-scheduled Bazel CI runs these jobs:
 
-- The Ubuntu 24.04 AMD64 four-core runner runs one full cacheable unit-test job
-  and all E2E tests.
+- The Ubuntu 24.04 AMD64 runner runs one full cacheable unit-test job and the
+  E2E artifact-builder jobs. The four-core runner runs the E2E consumer.
 - macOS 26 ARM64 CI runs one cacheable unit-test smoke target and one focused
   E2E smoke test.
 
@@ -691,10 +721,11 @@ cache. Setup jobs can duplicate this work when they share a key. On other refs, 
 Bazel-consuming job prepares its own non-exact restore before it runs offline.
 
 The daily scheduled workflow runs one full unit-test job and all E2E tests on
-Ubuntu 22.04 and 24.04, on AMD64 and ARM64, and on macOS 26 ARM64. Only the
-Ubuntu 24.04 AMD64 unit-test job uses race detection and shuffled test order.
-It uses `--nocache_test_results`. Thus, Bazel runs it again and does not use a
-cached random test result.
+Ubuntu 22.04 and 24.04, on AMD64 and ARM64, and on macOS 26 ARM64. Its E2E jobs
+run serially on each platform's standard runner. Only the Ubuntu 24.04 AMD64
+unit-test job uses race detection and shuffled test order. It uses
+`--nocache_test_results`. Thus, Bazel runs it again and does not use a cached
+random test result.
 
 The scheduled workflow also disables the remote cache. This provides daily
 validation that does not depend on remote action or test results.

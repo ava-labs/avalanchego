@@ -122,6 +122,12 @@ tasks:
     desc: Run E2E tests from staged Bazel binaries
     cmd: '{{.NIX_RUN}} ./tests/e2e/e2e_runner.sh --use-staged-binaries {{.CLI_ARGS}}'
 
+  bazel-test-e2e-staged-serial:
+    desc: Run E2E tests serially from staged Bazel binaries
+    env:
+      E2E_SERIAL: 1
+    cmd: '{{.NIX_RUN}} ./tests/e2e/e2e_runner.sh --use-staged-binaries {{.CLI_ARGS}}'
+
   bazel-test-unit:
     desc: Run cacheable Go unit tests with Bazel
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh all'
