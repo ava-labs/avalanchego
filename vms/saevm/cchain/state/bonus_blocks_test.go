@@ -13,10 +13,10 @@ import (
 
 	_ "embed"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 
 	evmclient "github.com/ava-labs/avalanchego/vms/evm/client"
@@ -35,7 +35,7 @@ func TestMain(m *testing.M) {
 	if err := json.Unmarshal(bonusBlockConsumersJSON, &bonusBlockConsumers); err != nil {
 		panic(err)
 	}
-	evm.RegisterAllLibEVMExtras()
+	libevm.RegisterExtras()
 	os.Exit(m.Run())
 }
 
