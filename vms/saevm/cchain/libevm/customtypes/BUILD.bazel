@@ -1,9 +1,9 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
-load("//.bazel:defs.bzl", "graft_go_test")
+load("//.bazel:defs.bzl", "go_test")
 
 package(default_visibility = [
-    "//graft/coreth:__subpackages__",
-    "//graft/coreth:external_consumers",
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
 ])
 
 go_library(
@@ -17,7 +17,8 @@ go_library(
         "libevm.go",
         "state_account_ext.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes",
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes",
+    visibility = ["//visibility:public"],
     deps = [
         "//vms/evm/acp226",
         "//vms/saevm/cchain/dynamic",
@@ -30,7 +31,7 @@ go_library(
     ],
 )
 
-graft_go_test(
+go_test(
     name = "customtypes_test",
     srcs = [
         "block_ext_test.go",
@@ -41,8 +42,6 @@ graft_go_test(
     ],
     embed = [":customtypes"],
     deps = [
-        "//graft/coreth/internal/blocktest",
-        "//graft/coreth/params",
         "//graft/evm/utils",
         "//vms/evm/acp226",
         "//vms/saevm/cchain/dynamic",
@@ -50,7 +49,9 @@ graft_go_test(
         "@com_github_ava_labs_libevm//common/math",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//params",
         "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//trie",
         "@com_github_google_go_cmp//cmp",
         "@com_github_google_go_cmp//cmp/cmpopts",
         "@com_github_holiman_uint256//:uint256",

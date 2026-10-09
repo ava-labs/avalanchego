@@ -143,9 +143,9 @@ func benchRLP(b *testing.B, encode bool) {
 		if encode {
 			b.Run(tc.name, func(b *testing.B) {
 				b.ReportAllocs()
-				var null = &devnull{}
+				null := &devnull{}
 				for i := 0; i < b.N; i++ {
-					rlp.Encode(null, tc.obj)
+					_ = rlp.Encode(null, tc.obj)
 				}
 				b.SetBytes(int64(null.len / b.N))
 			})

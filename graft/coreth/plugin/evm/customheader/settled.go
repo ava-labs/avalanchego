@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/libevm/core/types"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes"
 )
 
 // errSettledMarkerSet is returned when a coreth block carries a settled block

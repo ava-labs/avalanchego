@@ -136,9 +136,9 @@ func CalcExtDataHash(extdata []byte) common.Hash {
 
 func BlockTime(eth *ethtypes.Header) time.Time {
 	if t := GetHeaderExtra(eth).TimeMilliseconds; t != nil {
-		return time.UnixMilli(int64(*t))
+		return time.UnixMilli(int64(*t)) //#nosec G115 -- Won't overflow for a few millennia
 	}
-	return time.Unix(int64(eth.Time), 0)
+	return time.Unix(int64(eth.Time), 0) //#nosec G115 -- Won't overflow for a few millennia
 }
 
 // TODO(JonathanOppenheimer): take options instead of the positional

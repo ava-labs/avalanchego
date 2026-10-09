@@ -147,7 +147,7 @@ func allFieldsSet[T interface {
 				if fieldValue.Kind() == reflect.Pointer {
 					require.Falsef(t, fieldValue.IsNil(), "field %q is nil", field.Name)
 				}
-				fieldValue = reflect.NewAt(fieldValue.Type(), unsafe.Pointer(fieldValue.UnsafeAddr())).Elem()
+				fieldValue = reflect.NewAt(fieldValue.Type(), unsafe.Pointer(fieldValue.UnsafeAddr())).Elem() //#nosec G103 -- reads unexported fields in a test
 			}
 
 			switch f := fieldValue.Interface().(type) {

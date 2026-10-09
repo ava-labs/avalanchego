@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/libevm/core/types"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes"
 )
 
 var errRemoteTargetExponentSet = errors.New("remote target exponent should be nil")

@@ -13,7 +13,7 @@ go_library(
         "//graft/coreth/core",
         "//graft/coreth/core/extstate",
         "//graft/coreth/params",
-        "//graft/coreth/plugin/evm/customtypes",
+        "//vms/saevm/cchain/libevm/customtypes",
         "@com_github_ava_labs_libevm//libevm",
     ],
 )

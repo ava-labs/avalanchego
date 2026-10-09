@@ -100,7 +100,7 @@ func exportedFieldsPointToDifferentMemory[T interface {
 			case *[]uint8:
 				assertDifferentPointers(t, f, fieldCp)
 			case []uint8:
-				assertDifferentPointers(t, unsafe.SliceData(f), unsafe.SliceData(fieldCp.([]uint8)))
+				assertDifferentPointers(t, unsafe.SliceData(f), unsafe.SliceData(fieldCp.([]uint8))) //#nosec G103 -- pointer identity check only
 			default:
 				t.Fatalf("field %q type %T needs to be added to switch cases of exportedFieldsDeepCopied", field.Name, f)
 			}
