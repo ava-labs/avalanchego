@@ -55,9 +55,9 @@ func (tx *BaseTx) Outputs() []*avax.TransferableOutput {
 	return tx.Outs
 }
 
-// InitCtx sets the FxID fields in the inputs and outputs of this [BaseTx]. Also
-// sets the [ctx] to the given [vm.ctx] so that the addresses can be json
-// marshalled into human readable format
+// InitCtx sets the FxID fields in the inputs and outputs of this [BaseTx] and
+// initializes the outputs with ctx so that their addresses can be JSON
+// marshalled into a human-readable format.
 func (tx *BaseTx) InitCtx(ctx *snow.Context) {
 	for _, in := range tx.BaseTx.Ins {
 		in.FxID = secp256k1fx.ID

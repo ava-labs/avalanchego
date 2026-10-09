@@ -37,11 +37,13 @@ type Config struct {
 	ConnectionTimeout time.Duration `json:"connectionTimeout"`
 }
 
-// NewDialer returns a new Dialer that calls net.Dial with the provided network.
-// [network] is the network passed into Dial. Should probably be "TCP".
-// [dialerConfig.connectionTimeout] gives the timeout when dialing an IP.
-// [dialerConfig.throttleRps] gives the max number of outgoing connection attempts/second.
-// If [dialerConfig.throttleRps] == 0, outgoing connections aren't rate-limited.
+// NewDialer returns a new [Dialer] that calls [net.Dialer.DialContext] with the
+// provided network.
+// network is the network passed into Dial. Should probably be "TCP".
+// [Config.ConnectionTimeout] gives the timeout when dialing an IP.
+// [Config.ThrottleRps] gives the max number of outgoing connection
+// attempts/second.
+// If [Config.ThrottleRps] == 0, outgoing connections aren't rate-limited.
 func NewDialer(network string, dialerConfig Config, log logging.Logger) Dialer {
 	var throttler throttling.DialThrottler
 	if dialerConfig.ThrottleRps <= 0 {

@@ -24,7 +24,7 @@ var _ json.Marshaler = (*Set[int])(nil)
 // Set is a set of elements.
 type Set[T comparable] map[T]struct{}
 
-// Of returns a Set initialized with [elts]
+// Of returns a [Set] initialized with elts.
 func Of[T comparable](elts ...T) Set[T] {
 	s := NewSet[T](len(elts))
 	s.Add(elts...)
@@ -40,8 +40,8 @@ func UnionOf[T comparable](sets ...Set[T]) Set[T] {
 	return s
 }
 
-// Return a new set with initial capacity [size].
-// More or less than [size] elements can be added to this set.
+// NewSet returns a new [Set] with initial capacity size.
+// More or less than size elements can be added to this set.
 // Using NewSet() rather than Set[T]{} is just an optimization that can
 // be used if you know how many elements will be put in this set.
 func NewSet[T comparable](size int) Set[T] {
@@ -77,7 +77,7 @@ func (s *Set[T]) Union(set Set[T]) {
 	}
 }
 
-// Difference removes all the elements in [set] from [s].
+// Difference removes all the elements of the provided set from s.
 func (s *Set[T]) Difference(set Set[T]) {
 	for elt := range set {
 		delete(*s, elt)

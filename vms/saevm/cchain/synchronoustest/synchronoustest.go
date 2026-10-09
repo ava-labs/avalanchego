@@ -155,8 +155,8 @@ type RPCCall struct {
 	Error string `json:"error,omitempty"`
 }
 
-// Args returns [RPCCall.Params] as a slice of [any] values. It can easily be
-// used with an ethclient.
+// Args returns [RPCCall.Params] as a []any, which can easily be used with an
+// ethclient.
 func (r *RPCCall) Args() []any {
 	args := make([]any, len(r.Params))
 	for i, p := range r.Params {

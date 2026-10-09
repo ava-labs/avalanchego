@@ -100,9 +100,9 @@ type Manager struct {
 // height which is likely (but not guaranteed) to also be older than the
 // window's configured TTL.
 //
-// If [UseCurrentHeight] is true, we override the block selection policy
-// described above and we will always return the last accepted block height
-// as the minimum.
+// If [config.Internal.UseCurrentHeight] is true, we override the block
+// selection policy described above and we will always return the last accepted
+// block height as the minimum.
 func (m *Manager) GetMinimumHeight(ctx context.Context) (uint64, error) {
 	if m.cfg.UseCurrentHeight {
 		return m.getCurrentHeight(ctx)

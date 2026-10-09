@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-// Create a file at [filename] that has [perm] permissions.
+// Create a file at filename that has perm permissions.
 func Create(filename string, perm os.FileMode) (*os.File, error) {
 	if info, err := os.Stat(filename); err == nil {
 		if info.Mode() != perm {

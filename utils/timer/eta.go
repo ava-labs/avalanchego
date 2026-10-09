@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// ProgressFromHash returns the progress out of MaxUint64 assuming [b] is a key
+// ProgressFromHash returns the progress out of [math.MaxUint64] assuming b is a key
 // in a uniformly distributed sequence that is being iterated lexicographically.
 func ProgressFromHash(b []byte) uint64 {
 	// binary.BigEndian.Uint64 will panic if the input length is less than 8, so

@@ -5,15 +5,15 @@ package avax
 
 import "github.com/ava-labs/avalanchego/ids"
 
-// Removes the UTXOs consumed by [ins] from the UTXO set
+// Consume removes the UTXOs consumed by ins from the UTXO set.
 func Consume(utxoDB UTXODeleter, ins []*TransferableInput) {
 	for _, input := range ins {
 		utxoDB.DeleteUTXO(input.InputID())
 	}
 }
 
-// Adds the UTXOs created by [outs] to the UTXO set.
-// [txID] is the ID of the tx that created [outs].
+// Produce adds the UTXOs created by outs to the UTXO set. txID is the ID of the
+// tx that created outs.
 func Produce(
 	utxoDB UTXOAdder,
 	txID ids.ID,

@@ -22,7 +22,7 @@ func (b *UniqueBag[T]) init() {
 	}
 }
 
-// Adds [n] to the bitset associated with each key in [keys].
+// Add adds n to the bitset associated with each key in keys.
 func (b *UniqueBag[T]) Add(n uint, keys ...T) {
 	var bs set.Bits64
 	bs.Add(n)
@@ -32,7 +32,7 @@ func (b *UniqueBag[T]) Add(n uint, keys ...T) {
 	}
 }
 
-// Unions [set] with the bitset associated with [key].
+// UnionSet unions the provided bitset with the bitset associated with key.
 func (b *UniqueBag[T]) UnionSet(key T, set set.Bits64) {
 	b.init()
 
@@ -41,7 +41,8 @@ func (b *UniqueBag[T]) UnionSet(key T, set set.Bits64) {
 	(*b)[key] = previousSet
 }
 
-// Removes each element of [set] from the bitset associated with [key].
+// DifferenceSet removes each element of the provided bitset from the bitset
+// associated with key.
 func (b *UniqueBag[T]) DifferenceSet(key T, set set.Bits64) {
 	b.init()
 
@@ -50,11 +51,11 @@ func (b *UniqueBag[T]) DifferenceSet(key T, set set.Bits64) {
 	(*b)[key] = previousSet
 }
 
-// For each key/bitset pair in [diff], removes each element of the bitset
-// from the bitset associated with the key in [b].
-// Keys in [diff] that are not in [b] are ignored.
-// Bitset elements in [diff] that are not in the bitset associated with
-// the key in [b] are ignored.
+// Difference removes, for each key/bitset pair in diff, each element of the
+// bitset from the bitset associated with the key in b.
+// Keys in diff that are not in b are ignored.
+// Bitset elements in diff that are not in the bitset associated with
+// the key in b are ignored.
 func (b *UniqueBag[T]) Difference(diff *UniqueBag[T]) {
 	b.init()
 
@@ -66,23 +67,23 @@ func (b *UniqueBag[T]) Difference(diff *UniqueBag[T]) {
 	}
 }
 
-// Returns the bitset associated with [key].
+// GetSet returns the bitset associated with key.
 func (b *UniqueBag[T]) GetSet(key T) set.Bits64 {
 	return (*b)[key]
 }
 
-// Removes the bitset associated with [key].
+// RemoveSet removes the bitset associated with key.
 func (b *UniqueBag[T]) RemoveSet(key T) {
 	delete(*b, key)
 }
 
-// Returns the keys.
+// List returns the keys.
 func (b *UniqueBag[T]) List() []T {
 	return maps.Keys(*b)
 }
 
-// Returns a bag with the given [threshold] where each key is
-// in the bag once for each element in the key's bitset.
+// Bag returns a [Bag] with the given threshold where each key is in the bag
+// once for each element in the key's bitset.
 func (b *UniqueBag[T]) Bag(threshold int) Bag[T] {
 	bag := Bag[T]{
 		counts: make(map[T]int, len(*b)),
@@ -109,7 +110,7 @@ func (b *UniqueBag[_]) String() string {
 	return b.PrefixedString("")
 }
 
-// Removes all key --> bitset pairs.
+// Clear removes all key --> bitset pairs.
 func (b *UniqueBag[_]) Clear() {
 	clear(*b)
 }

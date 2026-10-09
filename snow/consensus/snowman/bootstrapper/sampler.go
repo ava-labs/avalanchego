@@ -13,8 +13,8 @@ import (
 
 var errUnexpectedSamplerFailure = errors.New("unexpected sampler failure")
 
-// Sample keys from [elements] uniformly by weight without replacement. The
-// returned set will have size less than or equal to [maxSize]. This function
+// Sample keys from elements uniformly by weight without replacement. The
+// returned set will have size less than or equal to maxSize. This function
 // will error if the sum of all weights overflows.
 func Sample[T comparable](elements map[T]uint64, maxSize int) (set.Set[T], error) {
 	var (

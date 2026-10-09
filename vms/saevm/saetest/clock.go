@@ -12,7 +12,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/params"
+
+	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 )
 
 // Clock is a mutable, test-controlled clock used to drive the block-building and
@@ -73,7 +74,7 @@ func (c *Clock) Advance(d time.Duration) {
 func (c *Clock) AdvanceToSettle(ctx context.Context, tb testing.TB, b SettlingBlock) {
 	tb.Helper()
 	require.NoErrorf(tb, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
-	to := b.ExecutedByGasTime().AsTime().Add(params.Tau + c.settleResolution - time.Nanosecond).Truncate(c.settleResolution)
+	to := b.ExecutedByGasTime().AsTime().Add(saeparams.Tau + c.settleResolution - time.Nanosecond).Truncate(c.settleResolution)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()

@@ -129,7 +129,7 @@ func (b *Bootstrapper) Clear(context.Context) error {
 }
 
 // Ancestors handles the receipt of multiple containers. Should be received in
-// response to a GetAncestors message to [nodeID] with request ID [requestID].
+// response to a GetAncestors message to nodeID with request ID requestID.
 // Expects vtxs[0] to be the vertex requested in the corresponding GetAncestors.
 func (b *Bootstrapper) Ancestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, vtxs [][]byte) error {
 	request := common.Request{

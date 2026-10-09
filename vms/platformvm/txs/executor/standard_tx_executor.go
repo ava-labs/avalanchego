@@ -64,10 +64,10 @@ var (
 	errStateCorruption                  = errors.New("state corruption")
 )
 
-// StandardTx executes the standard transaction [tx].
+// StandardTx executes the standard transaction tx.
 //
-// [state] is modified to represent the state of the chain after the execution
-// of [tx].
+// state is modified to represent the state of the chain after the execution
+// of tx.
 //
 // Returns:
 //   - The IDs of any import UTXOs consumed.
