@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"math/rand/v2"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1410,4 +1411,25 @@ func TestExecuteReturnsStateDBError(t *testing.T) {
 			require.ErrorIs(t, err, errAccountRead, "Execute()")
 		})
 	}
+}
+
+func TestSettlementBeforeExecuteReturns(t *testing.T) {
+	ctx, sut := newSUT(t)
+
+	heads := make(chan core.ChainHeadEvent)
+	defer sut.SubscribeChainHeadEvent(heads).Unsubscribe()
+	chainEvents := make(chan core.ChainEvent)
+	defer sut.SubscribeChainEvent(chainEvents).Unsubscribe()
+
+	b := sut.chain.NewBlock(t, nil)
+	require.NoError(t, sut.Enqueue(ctx, b), "Enqueue()")
+	<-heads
+
+	// The executor is blocked sending the chain event, after marking b as
+	// executed, so consensus can settle b before [Executor.execute] returns.
+	var lastSettled atomic.Pointer[blocks.Block]
+	require.NoErrorf(t, b.MarkSettled(&lastSettled), "%T.MarkSettled()", b)
+	<-chainEvents
+
+	require.NoErrorf(t, sut.Close(), "%T.Close()", sut)
 }
