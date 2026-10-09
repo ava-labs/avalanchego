@@ -1579,7 +1579,7 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 				engine.AncestorsF = func(context.Context, ids.NodeID, uint32, [][]byte) error { close(unwantedCall); return nil }
 				engine.PutF = func(context.Context, ids.NodeID, uint32, []byte) error { close(unwantedCall); return nil }
 				engine.AppResponseF = func(context.Context, ids.NodeID, uint32, []byte) error { close(unwantedCall); return nil }
-				engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID, uint64) error {
+				engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, uint64) error {
 					close(unwantedCall)
 					return nil
 				}
