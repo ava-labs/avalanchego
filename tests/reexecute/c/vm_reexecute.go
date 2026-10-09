@@ -74,7 +74,6 @@ var (
 		"firewood": `{
 			"state-scheme": "firewood",
 			"pruning-enabled": true,
-			"state-sync-enabled": false,
 			"commit-interval": 4096
 		}`,
 		"firewood-archive": `{
