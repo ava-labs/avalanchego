@@ -1,5 +1,7 @@
 name: Bazel
 
+# Keep this workflow separate from bazel-pull-request.yml.
+# This makes bazel-required wait for the shared test workflows.
 # Top-level Bazel CI entrypoint for pre-merge checks. Full Ubuntu tests and
 # macOS smoke tests use separate reusable workflows so this workflow has no
 # irrelevant skipped jobs.
@@ -10,7 +12,6 @@ on:
     branches:
       - master
       - dev
-  pull_request:
   merge_group:
     types: [checks_requested]
 
@@ -39,3 +40,57 @@ jobs:
       platform_name: darwin-arm64
       runner: macos-26
     secrets: inherit
+
+  darwin-arm64-required:
+    name: darwin-arm64 / bazel-required
+    if: ${{ always() }}
+    needs: smoke
+    # This job checks results, not macOS behavior.
+    # Linux runners start faster and fail less often than macOS runners.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Fail unless all needed jobs succeeded
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          failed_jobs="$(
+            jq -r '
+              to_entries[]
+              | select(.value.result != "success")
+              | .key
+            ' <<<"$NEEDS_JSON"
+          )"
+
+          if [[ -n "$failed_jobs" ]]; then
+            echo "Required jobs failed:"
+            printf '%s\n' "$failed_jobs"
+            exit 1
+          fi
+
+  linux-amd64-required:
+    name: linux-amd64 / bazel-required
+    if: ${{ always() }}
+    needs: unit-and-e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Fail unless all needed jobs succeeded
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          failed_jobs="$(
+            jq -r '
+              to_entries[]
+              | select(.value.result != "success")
+              | .key
+            ' <<<"$NEEDS_JSON"
+          )"
+
+          if [[ -n "$failed_jobs" ]]; then
+            echo "Required jobs failed:"
+            printf '%s\n' "$failed_jobs"
+            exit 1
+          fi

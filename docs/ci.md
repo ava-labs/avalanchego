@@ -10,6 +10,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 - [How CI is organized](#how-ci-is-organized)
   - [Workflows coordinate repository operations](#workflows-coordinate-repository-operations)
   - [Keep Go CI unified](#keep-go-ci-unified)
+  - [Required checks and the merge queue](#required-checks-and-the-merge-queue)
   - [Go and Bazel CI workflow layout](#go-and-bazel-ci-workflow-layout)
   - [Platform-specific setup dependencies](#platform-specific-setup-dependencies)
   - [Go unit test platforms](#go-unit-test-platforms)
@@ -34,6 +35,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
   - [Pin third-party actions](#pin-third-party-actions)
   - [Pinning does not eliminate supply-chain risk](#pinning-does-not-eliminate-supply-chain-risk)
 - [Validation](#validation)
+  - [Required-check validation in GitHub](#required-check-validation-in-github)
 
 ## Principles
 
@@ -90,9 +92,54 @@ the component for a repository-wide check. The aggregate job is an exception.
 Include the workflow name in `go-required`. This name keeps the required check
 distinct in GitHub output.
 
-Put `go-required` first in the pre-merge workflow. Sort the other job
-definitions and its `needs` list alphabetically. The `go-required` job fails if
-an enabled job fails.
+### Required checks and the merge queue
+
+Go and Bazel separate queue admission from permission to merge. GitHub accepts
+skipped required jobs for queue admission. Maintainers can therefore enqueue a
+pull request before its tests finish, even if those tests fail. This avoids
+waiting for pull-request CI when a maintainer expects merge-group CI to pass.
+A failing pull request can waste queue work. Merge-group checks must still pass
+before GitHub merges the pull request.
+
+Branch protection or a ruleset must require the merge queue for each target
+branch. Required status checks alone do not enforce this policy because GitHub
+accepts skipped checks. Without mandatory queue use, a pull request can merge
+directly without passing merge-group tests. Do not allow direct merges that
+bypass the queue.
+
+The merge-group Go entrypoint defines `go-required` first. It depends on the
+reusable test-workflow call and fails if that call fails. Each merge-group Bazel
+aggregate depends on its platform's reusable test-workflow call.
+
+A job with `needs` waits for its dependencies before GitHub skips it.
+Pull-request entrypoints therefore define the same aggregate checks without
+`needs` and skip them immediately. The test workflows still run. Keep the
+entrypoints separate so queue admission does not wait for their tests.
+
+Required status checks use the check name, optionally restricted to a source
+app, rather than the workflow display name. Preserve these exact names in both
+entrypoints:
+
+- `go-required`
+- `linux-amd64 / bazel-required`
+- `darwin-arm64 / bazel-required`
+
+Update branch protection before changing a required check name. A different
+workflow display name does not isolate duplicate check names. See GitHub's
+[required status check guidance](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches#require-status-checks-before-merging).
+
+Keep the `Go` and `Bazel` workflow display names consistent between their
+entrypoints. These names also form part of the concurrency groups; they do not
+identify required checks.
+
+Keep the entrypoint triggers disjoint:
+
+- Pull-request entrypoints run on `pull_request`.
+- Merge-group entrypoints run on `merge_group`, pushes to `master` and `dev`,
+  and tag pushes.
+
+Do not let both entrypoints emit the same check for one commit. Duplicate check
+names can make the required result ambiguous.
 
 ### Go and Bazel CI workflow layout
 
@@ -100,14 +147,16 @@ Go and Bazel use the same workflow roles and file-name pattern:
 
 | Role | Bazel | Go |
 | --- | --- | --- |
-| Pre-merge entrypoint | [`bazel-merge-group.yml`](../.github/workflows/bazel-merge-group.yml) | [`go.yml`](../.github/workflows/go.yml) |
+| Pull-request entrypoint | [`bazel-pull-request.yml`](../.github/workflows/bazel-pull-request.yml) | [`go-pull-request.yml`](../.github/workflows/go-pull-request.yml) |
+| Merge-group entrypoint | [`bazel-merge-group.yml`](../.github/workflows/bazel-merge-group.yml) | [`go-merge-group.yml`](../.github/workflows/go-merge-group.yml) |
 | Scheduled entrypoint | [`bazel-scheduled.yml`](../.github/workflows/bazel-scheduled.yml) | [`go-scheduled.yml`](../.github/workflows/go-scheduled.yml) |
 | Primary reusable workflow | [`bazel.yml`](../.github/workflows/bazel.yml) | [`go-unit.yml`](../.github/workflows/go-unit.yml) |
+| Pull-request and merge-group reusable workflow | n/a | [`go.yml`](../.github/workflows/go.yml) |
 | Reusable smoke workflow | [`bazel-smoke.yml`](../.github/workflows/bazel-smoke.yml) | [`go-smoke.yml`](../.github/workflows/go-smoke.yml) |
 
 Entrypoints select the reusable workflow that provides the required test policy,
-or define jobs that are specific to that event. The pre-merge and scheduled Go
-entrypoints both use `go-unit.yml`; pre-merge macOS uses `go-smoke.yml`.
+or define jobs that are specific to that event. The pull-request and
+merge-group Go entrypoints use `go.yml`; scheduled Go uses `go-unit.yml`.
 
 Smoke workflows run a minimal macOS test. This test verifies that unit tests
 can run on macOS. The Linux pre-merge job and scheduled jobs run the full unit
@@ -129,8 +178,9 @@ jobs. Therefore, a platform's Bazel jobs wait only for that platform's setup job
 
 ### Go unit test platforms
 
-The `unit` job in `go.yml` calls the reusable
-[`go-unit.yml`](../.github/workflows/go-unit.yml) workflow on Linux AMD64. It runs
+The `unit` job in [`go.yml`](../.github/workflows/go.yml) calls the reusable
+[`go-unit.yml`](../.github/workflows/go-unit.yml) workflow on Linux AMD64. It
+runs
 the unified unit test suite ([`scripts/tests.unit.sh`](../scripts/tests.unit.sh))
 through the `test-unit` task. That task disables race detection and test
 shuffling so the Go build and test cache can serve repeated runs.
@@ -653,3 +703,30 @@ duplicate because `nix develop` and `nix develop --impure` behave differently.
 These checks catch common violations, but they do not prove that a workflow is
 correct. Always review the workflow's permissions, inputs, secrets, failure handling,
 and exceptions to these conventions.
+
+### Required-check validation in GitHub
+
+Local lint cannot prove queue admission, check-name preservation, or merge
+blocking. After changing required-check workflows, check these properties in
+GitHub:
+
+1. Check that branch protection or a ruleset requires the merge queue for each
+   target branch. Check that maintainers cannot merge directly while PR checks
+   are skipped. Check that branch protection or the ruleset requires the exact
+   names listed in
+   [Required checks and the merge queue](#required-checks-and-the-merge-queue).
+   Check the source app too, if branch protection or the ruleset restricts it.
+2. Check that pull-request aggregate jobs skip before their test workflows
+   finish. Check that a maintainer can enqueue the pull request while tests run.
+3. Check that merge-group aggregates wait for their reusable test workflows.
+   Check that successful test workflows produce successful aggregate checks.
+4. Check a test failure in each reusable workflow that supplies a required
+   check. Check that its merge-group aggregate fails and GitHub blocks merging.
+5. Check a cancelled merge-group test workflow. Check that its required
+   aggregate does not report success and GitHub blocks merging.
+6. Check that only one entrypoint emits each required check for the commit
+   under test.
+
+Use a disposable pull request for failure and cancellation checks. Do not merge
+its test changes. Record any checks that remain unverified; a lint pass is not
+evidence for these GitHub behaviors.
