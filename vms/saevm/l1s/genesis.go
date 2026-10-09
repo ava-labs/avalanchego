@@ -1,7 +1,8 @@
-// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// SPDX-License-Identifier: BUSL-1.1
+// Copyright (C) 2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package cchain
+package l1s
 
 import (
 	"encoding/json"
@@ -15,21 +16,20 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
-	ethparams "github.com/ava-labs/libevm/params"
+	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
+	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
 const genesisNumber = 0
@@ -42,17 +42,24 @@ var (
 	errNonZeroGenesisParentHash   = errors.New("non-zero genesis parentHash")
 	errNonNilGenesisExcessBlobGas = errors.New("non-nil genesis excessBlobGas")
 	errNonNilGenesisBlobGasUsed   = errors.New("non-nil genesis blobGasUsed")
+	errGasLimitMismatch           = errors.New("gas limit mismatch")
+	errAirdropHash                = errors.New("airdrops are not supported")
 )
 
-// genesis is defined as a new type to prevent similar looking, but incorrect,
-// libevm genesis functions from being used inadvertently.
 type genesis core.Genesis
 
 // parseGenesis decodes the genesis bytes and populates the upgrade schedule.
-func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
-	var g core.Genesis
-	if err := json.Unmarshal(b, &g); err != nil {
+func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesis, error) {
+	var g legacy.Genesis
+	if err := json.Unmarshal(genesisBytes, &g); err != nil {
 		return nil, fmt.Errorf("unmarshalling genesis: %w", err)
+	}
+
+	var upgradeConfig extras.UpgradeConfig
+	if len(upgradeBytes) > 0 {
+		if err := json.Unmarshal(upgradeBytes, &upgradeConfig); err != nil {
+			return nil, fmt.Errorf("unmarshalling upgrade: %w", err)
+		}
 	}
 
 	// Almost all of the fields in [core.Genesis] that are marked as testing
@@ -74,14 +81,21 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 		return nil, fmt.Errorf("%w: %d", errNonNilGenesisExcessBlobGas, *g.ExcessBlobGas)
 	case g.BlobGasUsed != nil:
 		return nil, fmt.Errorf("%w: %d", errNonNilGenesisBlobGasUsed, *g.BlobGasUsed)
+	case g.AirdropHash != (common.Hash{}):
+		return nil, fmt.Errorf("%w: %s", errAirdropHash, g.AirdropHash)
 	}
 
-	// The JSON only specifies the chain-specific configuration; the upgrade
-	// schedule is configured by ctx.
+	extras, err := newExtras(ctx, g.Config, upgradeConfig)
+	if err != nil {
+		return nil, err
+	}
+	if gasLimit := extras.FeeConfig.GasLimit.Uint64(); gasLimit != g.GasLimit {
+		return nil, fmt.Errorf("%w: fee config %d vs genesis %d", errGasLimitMismatch, gasLimit, g.GasLimit)
+	}
+
 	chainID := g.Config.ChainID
-	u := &ctx.NetworkUpgrades
-	g.Config = corethparams.WithExtra(
-		&ethparams.ChainConfig{
+	cfg := l1params.WithExtra(
+		&params.ChainConfig{
 			ChainID:             chainID,
 			HomesteadBlock:      big.NewInt(0),
 			DAOForkBlock:        big.NewInt(0),
@@ -94,82 +108,60 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 			PetersburgBlock:     big.NewInt(0),
 			IstanbulBlock:       big.NewInt(0),
 			MuirGlacierBlock:    big.NewInt(0),
-			BerlinBlock:         big.NewInt(berlinBlock(chainID)),
-			LondonBlock:         big.NewInt(londonBlock(chainID)),
-			ShanghaiTime:        utils.TimeToNewUint64(u.DurangoTime),
-			CancunTime:          utils.TimeToNewUint64(u.EtnaTime),
+			BerlinBlock:         big.NewInt(0),
+			LondonBlock:         big.NewInt(0),
+			ShanghaiTime:        extras.DurangoTimestamp,
+			CancunTime:          extras.EtnaTimestamp,
 		},
-		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase1Time),
-				ApricotPhase2BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase2Time),
-				ApricotPhase3BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase3Time),
-				ApricotPhase4BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase4Time),
-				ApricotPhase5BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase5Time),
-				ApricotPhasePre6BlockTimestamp:  utils.TimeToNewUint64(u.ApricotPhasePre6Time),
-				ApricotPhase6BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase6Time),
-				ApricotPhasePost6BlockTimestamp: utils.TimeToNewUint64(u.ApricotPhasePost6Time),
-				BanffBlockTimestamp:             utils.TimeToNewUint64(u.BanffTime),
-				CortinaBlockTimestamp:           utils.TimeToNewUint64(u.CortinaTime),
-				DurangoBlockTimestamp:           utils.TimeToNewUint64(u.DurangoTime),
-				EtnaTimestamp:                   utils.TimeToNewUint64(u.EtnaTime),
-				FortunaTimestamp:                utils.TimeToNewUint64(u.FortunaTime),
-				GraniteTimestamp:                utils.TimeToNewUint64(u.GraniteTime),
-				HeliconTimestamp:                utils.TimeToNewUint64(u.HeliconTime),
-				IglooTimestamp:                  utils.TimeToNewUint64(u.IglooTime),
-			},
-			AvalancheContext: extras.AvalancheContext{
-				SnowCtx: ctx,
-			},
-			UpgradeConfig: extras.UpgradeConfig{
-				PrecompileUpgrades: []extras.PrecompileUpgrade{
-					{
-						Config: warp.NewDefaultConfig(
-							utils.TimeToNewUint64(u.DurangoTime),
-						),
-					},
-				},
-			},
-		},
+		extras,
 	)
-	return (*genesis)(&g), nil
-}
-
-var (
-	mainnetChainID = big.NewInt(43114)
-	fujiChainID    = big.NewInt(43113)
-)
-
-func berlinBlock(chainID *big.Int) int64 {
-	switch {
-	case utils.BigEqual(chainID, mainnetChainID):
-		return 1_640_340 // https://snowtrace.io/block/1640340?chainid=43114, AP2 activation block
-	case utils.BigEqual(chainID, fujiChainID):
-		return 184_985 // https://testnet.snowtrace.io/block/184985?chainid=43113, AP2 activation block
-	case utils.BigEqual(chainID, corethparams.TestFixtureChainID):
-		return corethparams.TestFixtureBerlinBlock
-	default:
-		return 0
+	if err := cfg.CheckConfigForkOrder(); err != nil {
+		return nil, err
 	}
+	return &genesis{
+		Config:     cfg,
+		Nonce:      g.Nonce,
+		Timestamp:  g.Timestamp,
+		ExtraData:  g.ExtraData,
+		Difficulty: g.Difficulty,
+		Mixhash:    g.Mixhash,
+		Coinbase:   g.Coinbase,
+		Alloc:      g.Alloc,
+		BaseFee:    g.BaseFee,
+		GasLimit:   g.GasLimit,
+	}, nil
 }
 
-func londonBlock(chainID *big.Int) int64 {
-	switch {
-	case utils.BigEqual(chainID, mainnetChainID):
-		return 3_308_552 // https://snowtrace.io/block/3308552?chainid=43114, AP3 activation block
-	case utils.BigEqual(chainID, fujiChainID):
-		return 805_078 // https://testnet.snowtrace.io/block/805078?chainid=43113, AP3 activation block
-	case utils.BigEqual(chainID, corethparams.TestFixtureChainID):
-		return corethparams.TestFixtureLondonBlock
-	default:
-		return 0
+func newExtras(ctx *snow.Context, cfg *params.ChainConfig, upgradeConfig extras.UpgradeConfig) (*extras.ChainConfig, error) {
+	provided := l1params.GetExtra(cfg)
+	cpy := *provided
+	if cpy.FeeConfig == commontype.EmptyFeeConfig {
+		cpy.FeeConfig = l1params.DefaultFeeConfig
 	}
+
+	cpy.NetworkUpgrades = networkUpgrades(provided.NetworkUpgrades, ctx, upgradeConfig)
+	cpy.UpgradeConfig = upgradeConfig
+	cpy.AvalancheContext = extras.AvalancheContext{
+		SnowCtx: ctx,
+	}
+
+	if err := cpy.Verify(); err != nil {
+		return nil, err
+	}
+
+	return &cpy, nil
 }
 
-var (
-	errNoStoredChainConfig = errors.New("no stored chainConfig")
-	errNoHeadHeader        = errors.New("no head header")
-)
+func networkUpgrades(existing extras.NetworkUpgrades, ctx *snow.Context, upgradeConfig extras.UpgradeConfig) extras.NetworkUpgrades {
+	upgrades := existing
+	upgrades.SetDefaults(ctx.NetworkUpgrades)
+	if upgradeConfig.NetworkUpgradeOverrides != nil {
+		upgrades.Override(upgradeConfig.NetworkUpgradeOverrides)
+	}
+	return upgrades
+}
+
+var errNoHeadHeader = errors.New("no head header")
 
 // verifyAndWriteBlock verifies that the genesis is compatible with any
 // previously stored genesis state by checking the genesis block hash along with
@@ -195,32 +187,39 @@ func (g *genesis) verifyAndWriteBlock(db ethdb.Database) error {
 	}
 
 	// If the rules change for the head block, it may have been executed
-	// incorrectly.
-	prev := rawdb.ReadChainConfig(db, hash)
-	if prev == nil {
-		return errNoStoredChainConfig
+	// incorrectly.  The upgrade config is stored separately from the chain
+	// config.
+	var prevUpgrades extras.UpgradeConfig
+	prev, err := customrawdb.ReadChainConfig(db, hash, &prevUpgrades)
+	if err != nil {
+		return fmt.Errorf("reading stored chain config: %w", err)
 	}
+	l1params.GetExtra(prev).UpgradeConfig = prevUpgrades
+
 	head := rawdb.ReadHeadHeader(db)
 	if head == nil {
 		return errNoHeadHeader
 	}
 	height, timestamp := head.Number.Uint64(), head.Time
-	// TODO(JonathanOppenheimer): coreth exposes a `skip-upgrade-check` config
-	// that bypasses this compatibility check; we need to make such a check
-	// unnecessary for the c-chain.
+	// TODO(JonathanOppenheimer): subnet-evm exposes a `skip-upgrade-check`
+	// config that bypasses this compatibility check; decide whether L1s need it.
 	if err := prev.CheckCompatible(g.Config, height, timestamp); err != nil {
 		return fmt.Errorf("incompatible chain config: %w", err)
 	}
+
 	// We will be executing new blocks based on the new chain config, so we
 	// need to keep it up-to-date in the database for the next restart.
-	rawdb.WriteChainConfig(db, hash, g.Config)
-
-	return nil
+	b := db.NewBatch()
+	if err := customrawdb.WriteChainConfig(b, hash, g.Config, l1params.GetExtra(g.Config).UpgradeConfig); err != nil {
+		return fmt.Errorf("writing chain config: %w", err)
+	}
+	return b.Write()
 }
 
-func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.ChainConfig) error {
+func writeGenesisBlock(db ethdb.Database, block *types.Block, config *params.ChainConfig) error {
 	b := db.NewBatch()
 	hash := block.Hash()
+	upgradeCfg := l1params.GetExtra(config).UpgradeConfig
 
 	rawdb.WriteBlock(b, block)
 	rawdb.WriteReceipts(b, hash, genesisNumber, nil)
@@ -229,10 +228,15 @@ func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.
 	rawdb.WriteHeadBlockHash(b, hash)
 	rawdb.WriteHeadHeaderHash(b, hash)
 	rawdb.WriteHeadFastBlockHash(b, hash)
-	rawdb.WriteChainConfig(b, hash, config)
+	if err := customrawdb.WriteChainConfig(b, hash, config, upgradeCfg); err != nil {
+		return fmt.Errorf("writing chain config: %w", err)
+	}
 	return b.Write()
 }
 
+// block constructs the genesis block. The header MUST be identical to the one
+// produced by subnet-evm for the same genesis so that existing L1s retain
+// their genesis hash.
 func (g *genesis) block() (*types.Block, error) {
 	root, err := g.root()
 	if err != nil {
@@ -260,15 +264,12 @@ func (g *genesis) block() (*types.Block, error) {
 		// WithdrawalsHash is not serialized by the libevm hooks, so it is
 		// always nil.
 	}
-	if h.GasLimit == 0 {
-		h.GasLimit = ethparams.GenesisGasLimit
-	}
 
-	c := corethparams.GetExtra(g.Config)
-	if c.IsApricotPhase3(g.Timestamp) { // Also called London
+	c := l1params.GetExtra(g.Config)
+	if c.IsSubnetEVM(g.Timestamp) { // Includes London
 		h.BaseFee = g.BaseFee
 		if h.BaseFee == nil {
-			h.BaseFee = big.NewInt(ap3.InitialBaseFee)
+			h.BaseFee = new(big.Int).Set(c.FeeConfig.MinBaseFee)
 		}
 	}
 
@@ -278,28 +279,20 @@ func (g *genesis) block() (*types.Block, error) {
 		h.ExcessBlobGas = new(uint64)
 		h.ParentBeaconRoot = new(common.Hash)
 
-		headerExtra.ExtDataGasUsed = new(big.Int)
 		headerExtra.BlockGasCost = new(big.Int)
 	}
 
 	if c.IsGranite(g.Timestamp) {
 		headerExtra.TimeMilliseconds = new(g.Timestamp * 1000)
-		headerExtra.MinDelayExcess = new(acp226.InitialDelayExcess)
+
+		minDelayExcess := acp226.InitialDelayExcess
+		if c.InitialMinDelayMS != 0 {
+			minDelayExcess = acp226.DesiredDelayExcess(c.InitialMinDelayMS)
+		}
+		headerExtra.MinDelayExcess = new(minDelayExcess)
 	}
 
-	if c.IsHelicon(g.Timestamp) {
-		headerExtra.TargetExponent = new(dynamic.InitialTargetExponent)
-		headerExtra.MinPriceExponent = new(dynamic.InitialPriceExponent)
-
-		// The genesis block is synchronous, so the markers must be zero to
-		// conform with [hook.Synchronous]. Most synchronous blocks omit these
-		// fields entirely. Genesis needs to include them with values that mark
-		// it as synchronous to allow future upgrade fields to be included.
-		headerExtra.SettledHeight = new(uint64)
-		headerExtra.SettledGasUnix = new(uint64)
-		headerExtra.SettledGasNumerator = new(uint64)
-		headerExtra.SettledExcess = new(uint64)
-	}
+	// TODO: Add SAE required fields if active at genesis.
 
 	return types.NewBlock(
 		h,
@@ -317,15 +310,6 @@ func (g *genesis) root() (_ common.Hash, retErr error) {
 		retErr = errors.Join(retErr, tdb.Close())
 	}()
 	return g.writeState(db, tdb)
-}
-
-// activatePrecompile marks the precompile's account as non-empty by setting
-// the nonce and code so it is not pruned as an empty account during state
-// finalization (EIP-161) and so it appears as a contract to EVM code
-// introspection (e.g. EXTCODESIZE/EXTCODEHASH).
-func activatePrecompile(statedb *state.StateDB, addr common.Address) {
-	statedb.SetNonce(addr, 1)
-	statedb.SetCode(addr, []byte{0x01})
 }
 
 // setupTrieDB commits the genesis allocation to the state database if
@@ -361,6 +345,8 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 		return common.Hash{}, err
 	}
 
+	// TODO: Register precompiles. See [legacy.ApplyPrecompileActivations].
+
 	for addr, account := range g.Alloc {
 		statedb.SetBalance(addr, uint256.MustFromBig(account.Balance))
 		statedb.SetCode(addr, account.Code)
@@ -369,15 +355,8 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 			statedb.SetState(addr, key, value)
 		}
 	}
-	// Precompile upgrades happen at the activation of the network upgrade. If
-	// the genesis timestamp is already after the Warp activation, then the
-	// state needs to reflect that or the precompile would never be marked as
-	// active.
-	if c := corethparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
-		activatePrecompile(statedb, warp.ContractAddress)
-	}
 
-	const deleteEmptyObjects = true
+	const deleteEmptyObjects = false
 	root, err := statedb.Commit(genesisNumber, deleteEmptyObjects)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("committing statedb: %w", err)
