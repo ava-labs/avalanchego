@@ -95,13 +95,36 @@ immediately without executing any tests:
 ./bin/gingko -v ./tests/e2e -- --stop-network
 ```
 
-## Skipping bootstrap checks
+## Bootstrap checks
 
-By default many tests will attempt to bootstrap a new node with the
-post-test network state. While this is a valuable activity to perform
-in CI, it can add considerable latency to test development. To disable
-these bootstrap checks during development, set the
-`E2E_SKIP_BOOTSTRAP_CHECKS` env var to a non-empty value:
+The suite starts a shared network for most tests. Some tests start a private
+network to avoid being affected by changes made by other tests.
+
+In a serial run, many tests start a new node near the end of the test. The node must
+bootstrap successfully from the network state resulting from the test's operations. No
+other test will change the shared network during the check.
+
+The first failed shared-network check is the most useful for finding a culprit.  A
+passing check shows that the shared network could bootstrap at that point.  The first
+failure narrows the investigation to changes since the last passing successful check
+against the shared network. This interval can include tests that did not run a check.
+Failures subsequent to an initial failure are unlikely to be attributable to any one
+test.
+
+In a parallel run, another test can change the shared network state during a per-test
+bootstrap check. A failure cannot reliably identify which test changed the
+network. Concurrent checks can also compete for resources on CI runners.
+
+For these reasons, parallel runs skip per-test checks for the shared network.
+If no test fails, the suite runs one check against the shared network after the
+tests finish. Tests with private networks still run their per-test checks.
+
+If the final check fails, a serial run can help identify the cause. Test order
+and accumulated network changes can affect whether the failure occurs again.
+
+To disable all bootstrap checks, set the `E2E_SKIP_BOOTSTRAP_CHECKS` environment
+variable to a non-empty value. The variable also disables the final bootstrap check in
+a parallel run:
 
 ```bash
 E2E_SKIP_BOOTSTRAP_CHECKS=1 ./bin/ginkgo -v ./tests/e2e ...
