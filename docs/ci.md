@@ -228,6 +228,10 @@ For example, end-to-end jobs in
     run: ./scripts/run_task.sh test-e2e-ci
 ```
 
+The action prepares the host Go module cache by default. A consumer that runs
+only restored executable artifacts can set `skip_host_go_module_cache: 'true'`.
+That input also keeps the workload offline by setting `GOPROXY=off`.
+
 Do not use a composite action as the only entrypoint for an operation that
 must run outside CI. Keep that operation in a task or script.
 
