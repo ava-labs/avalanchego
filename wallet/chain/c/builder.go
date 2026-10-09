@@ -8,33 +8,24 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/math/intmath"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	ethcommon "github.com/ava-labs/libevm/common"
 )
 
-const avaxConversionRateInt = 1_000_000_000
-
 var (
 	_ Builder = (*builder)(nil)
 
 	errInsufficientFunds = errors.New("insufficient funds")
-
-	// avaxConversionRate is the conversion rate between the smallest
-	// denomination on the X-Chain and P-chain, 1 nAVAX, and the smallest
-	// denomination on the C-Chain 1 wei. Where 1 nAVAX = 1 gWei.
-	//
-	// This is only required for AVAX because the denomination of 1 AVAX is 9
-	// decimal places on the X and P chains, but is 18 decimal places within the
-	// EVM.
-	avaxConversionRate = big.NewInt(avaxConversionRateInt)
 )
 
 // Builder provides a convenient interface for building unsigned C-chain
@@ -64,26 +55,28 @@ type Builder interface {
 	//
 	// - [chainID] specifies the chain to be importing funds from.
 	// - [to] specifies where to send the imported funds to.
-	// - [baseFee] specifies the fee price willing to be paid by this tx.
+	// - [baseFee] specifies the fee price, in aAVAX/gas, willing to be paid by
+	//   this tx.
 	NewImportTx(
 		chainID ids.ID,
 		to ethcommon.Address,
-		baseFee *big.Int,
+		baseFee gas.Price,
 		options ...common.Option,
-	) (*atomic.UnsignedImportTx, error)
+	) (*tx.Import, error)
 
 	// NewExportTx creates an export transaction that attempts to send all the
 	// provided [outputs] to the requested [chainID].
 	//
 	// - [chainID] specifies the chain to be exporting the funds to.
 	// - [outputs] specifies the outputs to send to the [chainID].
-	// - [baseFee] specifies the fee price willing to be paid by this tx.
+	// - [baseFee] specifies the fee price, in aAVAX/gas, willing to be paid by
+	//   this tx.
 	NewExportTx(
 		chainID ids.ID,
 		outputs []*secp256k1fx.TransferOutput,
-		baseFee *big.Int,
+		baseFee gas.Price,
 		options ...common.Option,
-	) (*atomic.UnsignedExportTx, error)
+	) (*tx.Export, error)
 }
 
 // BuilderBackend specifies the required information needed to build unsigned
@@ -182,9 +175,9 @@ func (b *builder) GetImportableBalance(
 func (b *builder) NewImportTx(
 	chainID ids.ID,
 	to ethcommon.Address,
-	baseFee *big.Int,
+	baseFee gas.Price,
 	options ...common.Option,
-) (*atomic.UnsignedImportTx, error) {
+) (*tx.Import, error) {
 	ops := common.NewOptions(options)
 	utxos, err := b.backend.UTXOs(ops.Context(), chainID)
 	if err != nil {
@@ -225,26 +218,23 @@ func (b *builder) NewImportTx(
 	}
 
 	utils.Sort(importedInputs)
-	tx := &atomic.UnsignedImportTx{
+	utx := &tx.Import{
 		NetworkID:      b.context.NetworkID,
 		BlockchainID:   b.context.BlockchainID,
 		SourceChain:    chainID,
 		ImportedInputs: importedInputs,
+		Outs: []tx.Output{{
+			Address: to,
+			AssetID: avaxAssetID,
+			// Amount set below.
+		}},
 	}
 
-	// We must initialize the bytes of the tx to calculate the initial cost
-	wrappedTx := &atomic.Tx{UnsignedAtomicTx: tx}
-	if err := wrappedTx.Sign(atomic.Codec, nil); err != nil {
-		return nil, err
-	}
-
-	gasUsedWithoutOutput, err := tx.GasUsed(true /*=IsApricotPhase5*/)
+	gasUsed, err := tx.GasUsed(utx)
 	if err != nil {
 		return nil, err
 	}
-	gasUsedWithOutput := gasUsedWithoutOutput + atomic.EVMOutputGas
-
-	txFee, err := atomic.CalculateDynamicFee(gasUsedWithOutput, baseFee)
+	txFee, err := calculateFee(gasUsed, baseFee)
 	if err != nil {
 		return nil, err
 	}
@@ -252,21 +242,16 @@ func (b *builder) NewImportTx(
 	if importedAmount <= txFee {
 		return nil, errInsufficientFunds
 	}
-
-	tx.Outs = []atomic.EVMOutput{{
-		Address: to,
-		Amount:  importedAmount - txFee,
-		AssetID: avaxAssetID,
-	}}
-	return tx, nil
+	utx.Outs[0].Amount = importedAmount - txFee
+	return utx, nil
 }
 
 func (b *builder) NewExportTx(
 	chainID ids.ID,
 	outputs []*secp256k1fx.TransferOutput,
-	baseFee *big.Int,
+	baseFee gas.Price,
 	options ...common.Option,
-) (*atomic.UnsignedExportTx, error) {
+) (*tx.Export, error) {
 	var (
 		avaxAssetID     = b.context.AVAXAssetID
 		exportedOutputs = make([]*avax.TransferableOutput, len(outputs))
@@ -286,68 +271,66 @@ func (b *builder) NewExportTx(
 		exportedAmount = newExportedAmount
 	}
 
-	avax.SortTransferableOutputs(exportedOutputs, atomic.Codec)
-	tx := &atomic.UnsignedExportTx{
+	tx.SortExportedOutputs(exportedOutputs)
+	utx := &tx.Export{
 		NetworkID:        b.context.NetworkID,
 		BlockchainID:     b.context.BlockchainID,
 		DestinationChain: chainID,
 		ExportedOutputs:  exportedOutputs,
 	}
 
-	// We must initialize the bytes of the tx to calculate the initial cost
-	wrappedTx := &atomic.Tx{UnsignedAtomicTx: tx}
-	if err := wrappedTx.Sign(atomic.Codec, nil); err != nil {
+	gasUsed, err := tx.GasUsed(utx)
+	if err != nil {
 		return nil, err
 	}
-
-	cost, err := tx.GasUsed(true /*=IsApricotPhase5*/)
+	fee, err := calculateFee(gasUsed, baseFee)
 	if err != nil {
 		return nil, err
 	}
 
-	initialFee, err := atomic.CalculateDynamicFee(cost, baseFee)
+	amountToConsume, err := math.Add(exportedAmount, fee)
 	if err != nil {
 		return nil, err
 	}
 
-	amountToConsume, err := math.Add(exportedAmount, initialFee)
+	// Inputs are fixed-size, so every input adds the same amount of gas.
+	utx.Ins = make([]tx.Input, 1)
+	gasUsedWithInput, err := tx.GasUsed(utx)
 	if err != nil {
 		return nil, err
 	}
+	inputGas := gasUsedWithInput - gasUsed
 
 	var (
-		ops    = common.NewOptions(options)
-		ctx    = ops.Context()
-		addrs  = ops.EthAddresses(b.ethAddrs)
-		inputs = make([]atomic.EVMInput, 0, addrs.Len())
+		ops   = common.NewOptions(options)
+		ctx   = ops.Context()
+		addrs = ops.EthAddresses(b.ethAddrs)
 	)
+	utx.Ins = make([]tx.Input, 0, addrs.Len())
 	for addr := range addrs {
 		if amountToConsume == 0 {
 			break
 		}
 
-		prevFee, err := atomic.CalculateDynamicFee(cost, baseFee)
+		newGasUsed, err := math.Add(gasUsed, inputGas)
+		if err != nil {
+			return nil, err
+		}
+		newFee, err := calculateFee(newGasUsed, baseFee)
 		if err != nil {
 			return nil, err
 		}
 
-		newCost := cost + atomic.EVMInputGas
-		newFee, err := atomic.CalculateDynamicFee(newCost, baseFee)
-		if err != nil {
-			return nil, err
-		}
-
-		additionalFee := newFee - prevFee
+		additionalFee := newFee - fee
 
 		balance, err := b.backend.Balance(ctx, addr)
 		if err != nil {
 			return nil, err
 		}
 
-		// Since the asset is AVAX, we divide by the avaxConversionRate to
-		// convert back to the correct denomination of AVAX that can be
-		// exported.
-		avaxBalance := new(big.Int).Div(balance, avaxConversionRate).Uint64()
+		// Since the asset is AVAX, we divide by [tx.X2CRate] to convert back to
+		// the correct denomination of AVAX that can be exported.
+		avaxBalance := new(big.Int).Div(balance, big.NewInt(tx.X2CRate)).Uint64()
 
 		// If the balance for [addr] is insufficient to cover the additional
 		// cost of adding an input to the transaction, skip adding the input
@@ -356,8 +339,9 @@ func (b *builder) NewExportTx(
 			continue
 		}
 
-		// Update the cost for the next iteration
-		cost = newCost
+		// Update the gas used and fee for the next iteration
+		gasUsed = newGasUsed
+		fee = newFee
 
 		amountToConsume, err = math.Add(amountToConsume, additionalFee)
 		if err != nil {
@@ -370,7 +354,7 @@ func (b *builder) NewExportTx(
 		}
 
 		inputAmount := min(amountToConsume, avaxBalance)
-		inputs = append(inputs, atomic.EVMInput{
+		utx.Ins = append(utx.Ins, tx.Input{
 			Address: addr,
 			Amount:  inputAmount,
 			AssetID: avaxAssetID,
@@ -383,17 +367,16 @@ func (b *builder) NewExportTx(
 		return nil, errInsufficientFunds
 	}
 
-	utils.Sort(inputs)
-	tx.Ins = inputs
+	utils.Sort(utx.Ins)
 
 	snowCtx, err := newSnowContext(b.context)
 	if err != nil {
 		return nil, err
 	}
-	for _, out := range tx.ExportedOutputs {
+	for _, out := range utx.ExportedOutputs {
 		out.InitCtx(snowCtx)
 	}
-	return tx, nil
+	return utx, nil
 }
 
 func getSpendableAmount(
@@ -415,4 +398,19 @@ func getSpendableAmount(
 
 	inputSigIndices, ok := common.MatchOwners(&out.OutputOwners, addrs, minIssuanceTime)
 	return out.Amt, inputSigIndices, ok
+}
+
+// calculateFee returns the minimum amount of nAVAX that a transaction consuming
+// gasUsed MUST burn for its gas price to be at least price, in aAVAX/gas.
+//
+// calculateFee returns an error if gasUsed*price overflows a uint64, so it
+// can't compute fees above ~18.4 AVAX.
+func calculateFee(gasUsed gas.Gas, price gas.Price) (uint64, error) {
+	cost, err := gasUsed.Cost(price)
+	if err != nil {
+		return 0, err
+	}
+	// The C-Chain computes the gas price by rounding down, so the fee must be
+	// rounded up.
+	return intmath.CeilDiv(cost, tx.X2CRate), nil
 }

@@ -25,7 +25,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
@@ -41,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -572,7 +572,7 @@ func generateAndAcceptBlocks(t *testing.T, vm *VM, numBlocks int, gen func(int, 
 		10,
 		func(i int, g *core.BlockGen) {
 			g.SetOnBlockGenerated(acceptExternalBlock)
-			g.SetCoinbase(constants.BlackholeAddr) // necessary for syntactic validation of the block
+			g.SetCoinbase(blackhole.Address) // necessary for syntactic validation of the block
 			gen(i, g)
 		},
 		core.WithoutDiskCommit(),
