@@ -136,7 +136,7 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics
 				Help: "Latest value observed by execution_gas_rate_headroom.",
 			}),
 			gasPerSecond: prometheus.NewGauge(prometheus.GaugeOpts{
-				Name: "executed_gas_per_second",
+				Name: "tau_second_avg_executed_gas_per_second",
 				Help: "Gas consumed per second of wall time spent executing, over a rolling tau window of execution, as of the latest executed block.",
 			}),
 		},
