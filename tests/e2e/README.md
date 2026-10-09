@@ -98,7 +98,7 @@ immediately without executing any tests:
 ## Bootstrap checks
 
 The suite starts a shared network for most tests. Some tests start a private
-network to avoid being affected changes made by other tests.
+network to avoid being affected by changes made by other tests.
 
 In a serial run, many tests start a new node near the end of the test. The node must
 bootstrap successfully from the network state resulting from the test's operations. No
