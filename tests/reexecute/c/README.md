@@ -251,24 +251,6 @@ To execute a benchmark with any of these options, you must use a compatible `CUR
 
 The `CONFIG` parameter currently only supports pre-defined configs and not passing a full JSON blob in, so that we can define corresponding names for each config option. The config name is attached as a label to the exported metrics and included in the name of the sub-benchmark (used by GitHub Action Benchmark to separate historical results with different configs).
 
-## Synchronous-era parity
-
-The benchmark runs the SAE C-Chain VM, which executes coreth-era (synchronous)
-blocks itself and fails fatally on the first block whose state root or receipt
-root disagrees with its header, so a completed run is a parity proof for that
-range. The reported mgas/s is not comparable with historical coreth results:
-saevm's `executed_gas_charged_total` includes end-of-block operation gas, while
-coreth's `block_gas_used_processed` did not.
-
-### Full-history parity gate
-
-The merge gate for synchronous-era execution is a full re-execution of mainnet
-and Fuji from the genesis state with `--config=default`, zero mismatches. This needs a block export covering every height (see
-`tests/reexecute/blockexport`); the range datasets listed above are not
-sufficient. Expect weeks of wall-clock; run it on a dedicated machine and
-resume after interruptions by restarting with the same `--current-state-dir`,
-which recovery handles.
-
 ## Testing with Custom Dependency Versions
 
 The benchmarks support testing with custom versions of `libevm` and `firewood` dependencies. This is useful for:
