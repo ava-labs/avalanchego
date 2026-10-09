@@ -13,10 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 )
 
-// RegisterExtras registers the C-Chain hooks and payloads with libevm: EVM
-// hooks, header and block-body extras, state-key normalization, and
-// chain-config extras. Together these are necessary and sufficient for libevm
-// to exhibit C-Chain behaviour.
+// RegisterExtras registers all the C-Chain's libevm hooks and payloads.
 //
 // It MUST NOT be called more than once and is therefore only allowed in tests
 // and `package main`, to avoid polluting other packages that transitively
