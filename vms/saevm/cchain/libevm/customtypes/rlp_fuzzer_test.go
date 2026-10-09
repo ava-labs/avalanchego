@@ -1,6 +1,6 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
-//
+
 // This file is a derived work, based on the go-ethereum library whose original
 // notices appear below.
 //
@@ -39,9 +39,8 @@ import (
 )
 
 func decodeEncode(input []byte, val interface{}) error {
-	if err := rlp.DecodeBytes(input, val); err != nil {
-		// not valid rlp, nothing to do
-		return nil
+	if rlp.DecodeBytes(input, val) != nil {
+		return nil //nolint:nilerr // not valid rlp, nothing to do
 	}
 	// If it _were_ valid rlp, we can encode it again
 	output, err := rlp.EncodeToBytes(val)
@@ -62,11 +61,11 @@ func fuzzRlp(t *testing.T, input []byte) {
 	if len(input) == 0 || len(input) > 500*1024 {
 		return
 	}
-	rlp.Split(input)
+	_, _, _, _ = rlp.Split(input)
 	if elems, _, err := rlp.SplitList(input); err == nil {
-		rlp.CountValues(elems)
+		_, _ = rlp.CountValues(elems)
 	}
-	rlp.NewStream(bytes.NewReader(input), 0).Decode(new(interface{}))
+	_ = rlp.NewStream(bytes.NewReader(input), 0).Decode(new(interface{}))
 	if err := decodeEncode(input, new(interface{})); err != nil {
 		t.Fatal(err)
 	}

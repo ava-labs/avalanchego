@@ -16,9 +16,9 @@ go_library(
     deps = [
         "//graft/coreth/accounts/abi/bind",
         "//graft/coreth/interfaces",
-        "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/registry",
         "//graft/evm/rpc",
+        "//vms/saevm/cchain/libevm/customtypes",
         "@com_github_ava_labs_libevm//:libevm",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",

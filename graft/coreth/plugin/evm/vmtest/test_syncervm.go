@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/coretest"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
@@ -45,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"

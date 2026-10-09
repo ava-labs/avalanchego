@@ -1,6 +1,6 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
-//
+
 // This file is a derived work, based on the go-ethereum library whose original
 // notices appear below.
 //
@@ -143,9 +143,9 @@ func benchRLP(b *testing.B, encode bool) {
 		if encode {
 			b.Run(tc.name, func(b *testing.B) {
 				b.ReportAllocs()
-				var null = &devnull{}
+				null := &devnull{}
 				for i := 0; i < b.N; i++ {
-					rlp.Encode(null, tc.obj)
+					_ = rlp.Encode(null, tc.obj)
 				}
 				b.SetBytes(int64(null.len / b.N))
 			})

@@ -18,8 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )

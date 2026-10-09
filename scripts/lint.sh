@@ -78,6 +78,7 @@ function _check_license_header {
       ! -name '*.connect.go' \
       ! -name 'mock_*.go' \
       ! -name 'mocks_*.go' \
+      ! -name 'gen_*.go' \
       ! -path './**/*mock/*.go' \
       ! -name '*.canoto.go' \
       ! -name '*.bindings.go' \

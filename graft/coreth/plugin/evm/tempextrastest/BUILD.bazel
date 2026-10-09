@@ -11,7 +11,7 @@ graft_go_test(
     deps = [
         "//graft/coreth/params",
         "//graft/coreth/plugin/evm",
-        "//graft/coreth/plugin/evm/customtypes",
+        "//vms/saevm/cchain/libevm/customtypes",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//core/vm",

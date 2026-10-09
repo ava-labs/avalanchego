@@ -50,7 +50,7 @@ graft_go_test(
         "//graft/coreth/nativeasset",
         "//graft/coreth/node",
         "//graft/coreth/params",
-        "//graft/coreth/plugin/evm/customtypes",
+        "//vms/saevm/cchain/libevm/customtypes",
         "@com_github_ava_labs_libevm//:libevm",
         "@com_github_ava_labs_libevm//accounts/abi",
         "@com_github_ava_labs_libevm//common",

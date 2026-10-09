@@ -1,6 +1,6 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
-//
+
 // This file is a derived work, based on the go-ethereum library whose original
 // notices appear below.
 //
@@ -33,19 +33,20 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/internal/blocktest"
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/trie"
 
-	// This test file has to be in package types_test to avoid a circular
-	// dependency when importing `params`. We dot-import the package to mimic
-	// regular same-package behaviour.
-	. "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+
+	ethparams "github.com/ava-labs/libevm/params"
+
+	// Dot-imported to mimic same-package behaviour from the external test
+	// package.
+	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes"
 )
 
 // This test has been modified from https://github.com/ethereum/go-ethereum/blob/v1.9.21/core/types/block_test.go#L35 to fit
@@ -320,7 +321,7 @@ func makeBenchBlock() *types.Block {
 		key, _   = crypto.GenerateKey()
 		txs      = make([]*types.Transaction, 70)
 		receipts = make([]*types.Receipt, len(txs))
-		signer   = types.LatestSigner(params.TestChainConfig)
+		signer   = types.LatestSigner(ethparams.TestChainConfig)
 		uncles   = make([]*types.Header, 3)
 	)
 	header := &types.Header{
@@ -353,7 +354,7 @@ func makeBenchBlock() *types.Block {
 			Extra:      []byte("benchmark uncle"),
 		}
 	}
-	return types.NewBlock(header, txs, uncles, receipts, blocktest.NewHasher())
+	return types.NewBlock(header, txs, uncles, receipts, trie.NewStackTrie(nil))
 }
 
 func TestAP4BlockEncoding(t *testing.T) {
