@@ -764,7 +764,7 @@ func TestStatefulRPCs(t *testing.T) {
 	storageKey := escrow.StorageKeyForBalance(recipient)
 	storageKeyHex := storageKey.Hex()
 
-	gc := gethclient.New(sut.rpcClient)
+	gc := gethclient.New(sut.wsClient)
 
 	wantStorageValue := big.NewInt(escrowDepositVal)
 	wantStorageBytes := uint256.NewInt(escrowDepositVal).PaddedBytes(32)
@@ -947,7 +947,7 @@ func TestStatefulRPCsEveryHeight(t *testing.T) {
 // the latest block: eth_estimateGas and eth_createAccessList.
 func TestStatefulRPCsLatestOnly(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
-	gc := gethclient.New(sut.rpcClient)
+	gc := gethclient.New(sut.wsClient)
 
 	escrowAddr := sut.deployEscrow(t)
 
@@ -992,7 +992,7 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 // mempool's size-based minimum, even when execution uses less gas.
 func TestSizeMinimumGas(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
-	gc := gethclient.New(sut.rpcClient)
+	gc := gethclient.New(sut.wsClient)
 
 	// Execution uses ~54k gas but the mempool requires ~420k because of the
 	// tx size.

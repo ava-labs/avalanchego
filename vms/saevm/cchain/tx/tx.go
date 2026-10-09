@@ -134,7 +134,7 @@ func (t *Tx) InputIDs() set.Set[ids.ID] {
 // The operation only includes state changes that impact Ethereum-native state.
 // It does not include non-AVAX balance changes or shared memory modifications.
 func (t *Tx) AsOp(avaxAssetID ids.ID) (hook.Op, error) {
-	gas, err := gasUsed(t.Unsigned)
+	gas, err := GasUsed(t.Unsigned)
 	if err != nil {
 		return hook.Op{}, fmt.Errorf("calculating gas used: %w", err)
 	}
@@ -169,7 +169,8 @@ const (
 	gasPerSig = gas.Gas(secp256k1fx.CostPerSignature)
 )
 
-func gasUsed(t Unsigned) (gas.Gas, error) {
+// GasUsed returns the amount of gas charged for t.
+func GasUsed(t Unsigned) (gas.Gas, error) {
 	// We MUST provide a pointer to t so that the returned size includes the
 	// type ID.
 	numBytes, err := c.Size(codecVersion, &t)
@@ -195,11 +196,11 @@ func gasUsed(t Unsigned) (gas.Gas, error) {
 	return math.Add(intrinsicGas, dynamicGas)
 }
 
-const _x2cRate = 1_000_000_000
-
-// x2cRate is the conversion rate between the smallest denomination on the
+// X2CRate is the conversion rate between the smallest denomination on the
 // X-Chain, 1 nAVAX, and the smallest denomination on the C-Chain, 1 aAVAX.
-var x2cRate = uint256.NewInt(_x2cRate)
+const X2CRate = 1_000_000_000
+
+var x2cRate = uint256.NewInt(X2CRate)
 
 type (
 	nAVAX = uint64

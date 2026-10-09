@@ -67,9 +67,6 @@ var (
 		"archive": `{
 			"pruning-enabled": false
 		}`,
-		"pathdb": `{
-			"state-scheme": "path"
-		}`,
 		"firewood": `{
 			"state-scheme": "firewood",
 			"pruning-enabled": true

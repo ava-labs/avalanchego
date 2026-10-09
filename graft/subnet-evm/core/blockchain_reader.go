@@ -30,13 +30,13 @@ package core
 import (
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
@@ -406,14 +406,14 @@ func (bc *BlockChain) GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig
 func (bc *BlockChain) GetCoinbaseAt(parent *types.Header) (common.Address, bool, error) {
 	configExtra := params.GetExtra(bc.Config())
 	if !configExtra.IsSubnetEVM(parent.Time) {
-		return constants.BlackholeAddr, false, nil
+		return blackhole.Address, false, nil
 	}
 
 	if !configExtra.IsPrecompileEnabled(rewardmanager.ContractAddress, parent.Time) {
 		if configExtra.AllowFeeRecipients {
 			return common.Address{}, true, nil
 		} else {
-			return constants.BlackholeAddr, false, nil
+			return blackhole.Address, false, nil
 		}
 	}
 
