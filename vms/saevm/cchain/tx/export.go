@@ -39,6 +39,11 @@ type Export struct {
 	ExportedOutputs  []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
+// SortExportedOutputs calls [avax.SortTransferableOutputs] with the local codec.
+func SortExportedOutputs(outs []*avax.TransferableOutput) {
+	avax.SortTransferableOutputs(outs, c)
+}
+
 // Input identifies an account + nonce pair on the C-Chain that authorizes the
 // asset and quantity to deduct.
 //

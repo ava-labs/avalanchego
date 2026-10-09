@@ -38,7 +38,7 @@ import (
 var noopRelease tracers.StateReleaseFunc = func() {}
 
 func (b *backend) RPCEVMTimeout() time.Duration {
-	return b.config.EVMTimeout
+	return b.config.CallTimeout
 }
 
 func (b *backend) RPCGasCap() uint64 {

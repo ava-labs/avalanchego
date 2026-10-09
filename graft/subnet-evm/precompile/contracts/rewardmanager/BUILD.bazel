@@ -17,11 +17,11 @@ go_library(
     embedsrcs = ["IRewardManager.abi"],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager",
     deps = [
-        "//graft/evm/constants",
         "//graft/subnet-evm/precompile/allowlist",
         "//graft/subnet-evm/precompile/contract",
         "//graft/subnet-evm/precompile/modules",
         "//graft/subnet-evm/precompile/precompileconfig",
+        "//vms/evm/blackhole",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//core/vm",
@@ -37,7 +37,6 @@ graft_go_test(
     ],
     deps = [
         ":rewardmanager",
-        "//graft/evm/constants",
         "//graft/evm/utils",
         "//graft/subnet-evm/accounts/abi/bind",
         "//graft/subnet-evm/commontype",
@@ -54,6 +53,7 @@ graft_go_test(
         "//graft/subnet-evm/precompile/contracts/utilstest",
         "//graft/subnet-evm/precompile/precompileconfig",
         "//graft/subnet-evm/precompile/precompiletest",
+        "//vms/evm/blackhole",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//core/vm",
