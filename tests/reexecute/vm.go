@@ -14,11 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/factory"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
 )
 
 var (
@@ -43,12 +44,18 @@ func NewMainnetCChainVM(
 	vmMultiGatherer metrics.MultiGatherer,
 	meterVMRegistry prometheus.Registerer,
 ) (block.ChainVM, error) {
-	factory := factory.Factory{}
+	factory := cchain.Factory{}
 	vmIntf, err := factory.New(logging.NoLog{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create VM from factory: %w", err)
 	}
 	vm := vmIntf.(block.ChainVM)
+
+	// The VM's AVAX API resolves the chain's primary alias at initialization.
+	aliaser := ids.NewAliaser()
+	if err := aliaser.Alias(mainnetCChainID, "C"); err != nil {
+		return nil, err
+	}
 
 	blsKey, err := localsigner.New()
 	if err != nil {
@@ -85,9 +92,10 @@ func NewMainnetCChainVM(
 			CChainID:    mainnetCChainID,
 			AVAXAssetID: mainnetAvaxAssetID,
 
-			Log:          tests.NewDefaultLogger("mainnet-vm-reexecution"),
+			// Info keeps the VM's per-block DEBUG/TRACE lines out of CI logs.
+			Log:          tests.NewLogger("mainnet-vm-reexecution", logging.Info),
 			SharedMemory: atomicMemory.NewSharedMemory(mainnetCChainID),
-			BCLookup:     ids.NewAliaser(),
+			BCLookup:     aliaser,
 			Metrics:      vmMultiGatherer,
 
 			WarpSigner: warpSigner,
@@ -99,6 +107,15 @@ func NewMainnetCChainVM(
 						return subnetID, nil
 					}
 					return ids.Empty, fmt.Errorf("unknown chainID: %s", chainID)
+				},
+				// The VM's p2p layer polls the validator set every second;
+				// there are no peers, so report an empty set rather than
+				// the test state's "unexpectedly called" errors.
+				GetCurrentHeightF: func(context.Context) (uint64, error) {
+					return 0, nil
+				},
+				GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+					return nil, nil
 				},
 			},
 			ChainDataDir: chainDataDir,
@@ -113,5 +130,9 @@ func NewMainnetCChainVM(
 		return nil, fmt.Errorf("failed to initialize VM: %w", err)
 	}
 
+	// Setting SAE to Bootstrapping allows execution to happen synchronously.
+	if err := vm.SetState(ctx, snow.Bootstrapping); err != nil {
+		return nil, fmt.Errorf("failed to set VM state to bootstrapping: %w", err)
+	}
 	return vm, nil
 }

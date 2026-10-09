@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"maps"
@@ -59,8 +60,9 @@ var (
 		"network_uuid":      networkUUID,
 	}
 
-	configKey         = "config"
-	defaultConfigKey  = "default"
+	configKey        = "config"
+	defaultConfigKey = "default"
+
 	predefinedConfigs = map[string]string{
 		defaultConfigKey: `{}`,
 		"archive": `{
@@ -68,17 +70,11 @@ var (
 		}`,
 		"firewood": `{
 			"state-scheme": "firewood",
-			"snapshot-cache": 0,
-			"pruning-enabled": true,
-			"state-sync-enabled": false,
-			"commit-interval": 4096,
-			"state-history": 8192
+			"pruning-enabled": true
 		}`,
 		"firewood-archive": `{
 			"state-scheme": "firewood",
-			"snapshot-cache": 0,
-			"pruning-enabled": false,
-			"state-sync-enabled": false
+			"pruning-enabled": false
 		}`,
 	}
 
@@ -140,7 +136,9 @@ func init() {
 
 func main() {
 	tc := tests.NewTestContext(tests.NewDefaultLogger("c-chain-reexecution"))
-	tc.SetDefaultContextParent(context.Background())
+	// SIGINT and SIGTERM cancel the context so the VM shuts down cleanly;
+	// otherwise saevm rebuilds its snapshot from scratch on the next start.
+	tc.SetDefaultContextParent(tests.DefaultNotifyContext(0, tc.DeferCleanup))
 	defer tc.RecoverAndExit()
 
 	benchmarkName := fmt.Sprintf(
@@ -275,7 +273,8 @@ func benchmarkReexecuteRange(
 	r.NoError(err)
 	defer func() {
 		log.Info("shutting down VM")
-		r.NoError(vm.Shutdown(ctx))
+		// Shutdown must complete even after an interrupt so the run can resume.
+		r.NoError(vm.Shutdown(context.WithoutCancel(ctx)))
 	}()
 
 	config := vmExecutorConfig{
@@ -288,12 +287,14 @@ func benchmarkReexecuteRange(
 	executor, err := newVMExecutor(vm, config)
 	r.NoError(err)
 
+	startGas, err := getMetricValue(prefixGatherer, gasMetric)
+	r.NoError(err)
 	start := time.Now()
 	r.NoError(executor.executeSequence(ctx, blockChan))
 	elapsed := time.Since(start)
 
 	benchmarkTool := newBenchmarkTool(benchmarkName)
-	getTopLevelMetrics(tc, benchmarkTool, prefixGatherer, elapsed) // Report the desired top-level metrics
+	getTopLevelMetrics(tc, benchmarkTool, prefixGatherer, elapsed, startGas) // Report the desired top-level metrics
 
 	benchmarkTool.logResults(log)
 	if len(benchmarkOutputFile) != 0 {
@@ -371,6 +372,10 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan reexecu
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", blk.Height()),
 	)
+	// The VM only accepts the child of its last accepted block.
+	if want := blk.Height() + 1; e.config.StartBlock != want {
+		return fmt.Errorf("start block %d does not follow last accepted height %d; pass --start-block=%d", e.config.StartBlock, blk.Height(), want)
+	}
 
 	// Initialize ETA tracking with a baseline sample at 0 progress
 	totalWork := e.config.EndBlock - e.config.StartBlock
@@ -403,17 +408,23 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan reexecu
 				)
 			}
 		}
-		if err := e.execute(ctx, blkResult.BlockBytes); err != nil {
+		if err := e.execute(ctx, blkResult.BlockBytes); err != nil && ctx.Err() == nil {
 			return err
 		}
 
-		if err := ctx.Err(); err != nil {
+		switch err := ctx.Err(); {
+		case err == nil:
+		case errors.Is(err, context.DeadlineExceeded):
 			e.config.Log.Info("exiting early due to context timeout",
 				zap.Duration("elapsed", time.Since(start)),
 				zap.Duration("execution-timeout", e.config.ExecutionTimeout),
-				zap.Error(ctx.Err()),
+				zap.Error(err),
 			)
 			return nil
+		default:
+			// SIGINT/SIGTERM. Failing the run exits non-zero once the deferred
+			// VM shutdown has completed.
+			return fmt.Errorf("interrupted at height %d: %w", blkResult.Height, err)
 		}
 	}
 	e.config.Log.Info("finished executing sequence")
