@@ -26,6 +26,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 - Updated the minimum Go version from `1.25.10` to `1.26.8`.
+- Optimized per-message metrics in the networking layer: peer, handler and message queue metrics now resolve their per-op series once at startup instead of building and hashing a label set for every message sent, received, queued and handled. Every defined op's series is now exported from startup rather than after its first use.
 - Helicon is now active from genesis on local networks. A local network started on a previous version is not compatible with this version.
 
 ### APIs

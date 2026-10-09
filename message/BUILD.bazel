@@ -35,6 +35,7 @@ go_test(
         "messages_benchmark_test.go",
         "messages_test.go",
         "mocks_generate_test.go",
+        "ops_test.go",
         "outbound_msg_builder_test.go",
     ],
     embed = [":message"],

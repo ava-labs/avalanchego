@@ -471,11 +471,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		)
 		h.resourceTracker.StopProcessing(nodeID, endTime)
 		h.metrics.lockingTime.Add(float64(lockingTime))
-		labels := prometheus.Labels{
-			opLabel: op,
-		}
-		h.metrics.messages.With(labels).Inc()
-		h.metrics.messageHandlingTime.With(labels).Add(float64(handlingTime))
+		h.metrics.observeHandled(msg.Op, handlingTime)
 
 		msg.OnFinishedHandling()
 		h.ctx.Log.Verbo("finished handling sync message",
@@ -808,11 +804,7 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 			handlingTime = endTime.Sub(startTime)
 		)
 		h.resourceTracker.StopProcessing(nodeID, endTime)
-		labels := prometheus.Labels{
-			opLabel: op,
-		}
-		h.metrics.messages.With(labels).Inc()
-		h.metrics.messageHandlingTime.With(labels).Add(float64(handlingTime))
+		h.metrics.observeHandled(msg.Op, handlingTime)
 
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling async message",
@@ -899,11 +891,7 @@ func (h *handler) handleChanMsg(msg *message.InboundMessage) error {
 			handlingTime = endTime.Sub(lockAcquiredTime)
 		)
 		h.metrics.lockingTime.Add(float64(lockingTime))
-		labels := prometheus.Labels{
-			opLabel: op,
-		}
-		h.metrics.messages.With(labels).Inc()
-		h.metrics.messageHandlingTime.With(labels).Add(float64(handlingTime))
+		h.metrics.observeHandled(msg.Op, handlingTime)
 
 		msg.OnFinishedHandling()
 		h.ctx.Log.Debug("finished handling chan message",
@@ -966,9 +954,7 @@ func (h *handler) popUnexpiredMsg(queue MessageQueue) (context.Context, Message,
 			span.AddEvent("dropping message", trace.WithAttributes(
 				attribute.String("reason", "timeout"),
 			))
-			h.metrics.expired.With(prometheus.Labels{
-				opLabel: op,
-			}).Inc()
+			h.metrics.observeExpired(msg.Op)
 			msg.OnFinishedHandling()
 			continue
 		}
