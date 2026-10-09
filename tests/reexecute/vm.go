@@ -119,8 +119,7 @@ func NewMainnetCChainVM(
 		return nil, fmt.Errorf("failed to initialize VM: %w", err)
 	}
 
-	// Bootstrapping finishes the VM's initialization: blocks are verified by
-	// hash and Accept waits for execution.
+	// Setting SAE to Bootstrapping allows execution to happen synchronously.
 	if err := vm.SetState(ctx, snow.Bootstrapping); err != nil {
 		return nil, fmt.Errorf("failed to set VM state to bootstrapping: %w", err)
 	}
