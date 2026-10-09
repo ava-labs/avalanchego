@@ -15,6 +15,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 ### Metrics
 
 - Added `avalanche_evm_transition_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
+- Added `execution_gas_rate_headroom` (histogram), `execution_gas_rate_headroom_latest` (gauge) and `tau_second_avg_executed_gas_per_second` to monitor gas-vs-wall clock skew during execution, for tuning gas target.
 
 ### Fixes
 
