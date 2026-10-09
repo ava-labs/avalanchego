@@ -15,7 +15,6 @@ graft_go_test(
     deps = [
         "//chains/atomic",
         "//database",
-        "//graft/coreth/core/extstate",
         "//graft/coreth/nativeasset",
         "//graft/coreth/params",
         "//graft/coreth/params/extras",
@@ -43,6 +42,7 @@ graft_go_test(
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
+        "//vms/saevm/cchain/libevm/extstate",
         "//vms/saevm/cchain/synchronoustest",
         "//vms/saevm/cchain/warp/warptest",
         "//vms/saevm/saetest",

@@ -7,13 +7,19 @@ package(default_visibility = [
 
 go_library(
     name = "libevm",
-    srcs = ["libevm.go"],
+    srcs = [
+        "hooks.go",
+        "libevm.go",
+    ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm",
     deps = [
-        "//graft/coreth/core",
-        "//graft/coreth/core/extstate",
         "//graft/coreth/params",
         "//vms/saevm/cchain/libevm/customtypes",
+        "//vms/saevm/cchain/libevm/extstate",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//libevm/stateconf",
     ],
 )

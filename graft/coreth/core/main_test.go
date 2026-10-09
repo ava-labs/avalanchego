@@ -10,19 +10,13 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"go.uber.org/goleak"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes"
+	cchainlibevm "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 )
 
 // TestMain uses goleak to verify tests in this package do not leak unexpected
 // goroutines.
 func TestMain(m *testing.M) {
-	RegisterExtras()
-
-	customtypes.Register()
-	extstate.RegisterExtras()
-	params.RegisterExtras()
+	cchainlibevm.RegisterExtras()
 
 	// May of these tests are likely to fail due to `log.Crit` in goroutines.
 	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelError, true)))

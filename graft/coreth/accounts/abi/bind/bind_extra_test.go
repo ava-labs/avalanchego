@@ -17,18 +17,16 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind/backends"
-	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth/ethconfig"
 	"github.com/ava-labs/avalanchego/graft/coreth/ethclient/simulated"
 	"github.com/ava-labs/avalanchego/graft/coreth/node"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes"
+
+	cchainlibevm "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 )
 
 func TestMain(m *testing.M) {
-	core.RegisterExtras()
-	customtypes.Register()
-	params.RegisterExtras()
+	cchainlibevm.RegisterExtras()
 	os.Exit(m.Run())
 }
 
