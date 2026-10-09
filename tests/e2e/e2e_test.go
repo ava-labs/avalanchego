@@ -4,6 +4,9 @@
 package e2e_test
 
 import (
+	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
@@ -29,7 +32,13 @@ func TestE2E(t *testing.T) {
 	ginkgo.RunSpecs(t, "e2e test suites")
 }
 
-var flagVars *e2e.FlagVars
+const suiteFailureMarkerFileName = ".e2e-spec-failure"
+
+var (
+	flagVars               *e2e.FlagVars
+	runSuiteBootstrapCheck bool
+	suiteFailureMarkerPath string
+)
 
 func init() {
 	flagVars = e2e.RegisterFlags(e2e.WithDefaultOwner("avalanchego-e2e"))
@@ -54,7 +63,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	require.NoError(tc, err)
 	defaultFlags.SetDefaults(tmpnet.DefaultE2EFlags())
 
-	return e2e.NewTestEnvironment(
+	env := e2e.NewTestEnvironment(
 		tc,
 		flagVars,
 		&tmpnet.Network{
@@ -63,10 +72,57 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 			Nodes:        nodes,
 			Subnets:      subnets,
 		},
-	).Marshal()
+	)
+	env.SuiteStateDir, err = os.MkdirTemp("", "avalanchego-e2e-")
+	require.NoError(tc, err)
+	tc.DeferCleanup(func() {
+		require.NoError(tc, os.RemoveAll(env.SuiteStateDir))
+	})
+	return env.Marshal()
 }, func(envBytes []byte) {
 	// Run in every ginkgo process
 
 	// Initialize the local test environment from the global state
-	e2e.InitSharedTestEnvironment(e2e.NewTestContext(), envBytes)
+	tc := e2e.NewTestContext()
+	e2e.InitSharedTestEnvironment(tc, envBytes)
+
+	suiteConfig, _ := ginkgo.GinkgoConfiguration()
+	if suiteConfig.ParallelTotal <= 1 || os.Getenv(e2e.SkipBootstrapChecksEnvName) != "" {
+		return
+	}
+
+	// Parallel tests can change the shared network at the same time. The suite
+	// checks the shared network after all tests pass.
+	runSuiteBootstrapCheck = true
+	suiteFailureMarkerPath = filepath.Join(e2e.GetEnv(tc).SuiteStateDir, suiteFailureMarkerFileName)
+})
+
+var _ = ginkgo.ReportAfterEach(func(report ginkgo.SpecReport) {
+	if !report.Failed() || !runSuiteBootstrapCheck {
+		return
+	}
+
+	// The primary process uses this marker to avoid running a bootstrap check when
+	// the suite has any failed specs since a failed spec may result in inconsistent
+	// network state.
+	tc := e2e.NewEventHandlerTestContext()
+	require.NoError(tc, os.WriteFile(suiteFailureMarkerPath, nil, 0o600))
+})
+
+var _ = ginkgo.SynchronizedAfterSuite(func() {}, func() {
+	if !runSuiteBootstrapCheck {
+		return
+	}
+
+	tc := e2e.NewEventHandlerTestContext()
+	_, err := os.Stat(suiteFailureMarkerPath)
+	if err == nil {
+		tc.Log().Info("skipping suite bootstrap check because one or more specs failed")
+		return
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		require.NoError(tc, err)
+	}
+
+	e2e.CheckBootstrapIsPossibleAfterParallelRun(tc, e2e.GetEnv(tc).GetNetwork())
 })
