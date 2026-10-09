@@ -19,6 +19,7 @@ go_library(
         "//snow",
         "//snow/engine/enginetest",
         "//snow/engine/snowman/block",
+        "//snow/validators",
         "//snow/validators/validatorstest",
         "//tests",
         "//upgrade",

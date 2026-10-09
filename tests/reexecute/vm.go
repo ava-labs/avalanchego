@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -106,6 +107,15 @@ func NewMainnetCChainVM(
 						return subnetID, nil
 					}
 					return ids.Empty, fmt.Errorf("unknown chainID: %s", chainID)
+				},
+				// The VM's p2p layer polls the validator set every second;
+				// there are no peers, so report an empty set rather than
+				// the test state's "unexpectedly called" errors.
+				GetCurrentHeightF: func(context.Context) (uint64, error) {
+					return 0, nil
+				},
+				GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+					return nil, nil
 				},
 			},
 			ChainDataDir: chainDataDir,
