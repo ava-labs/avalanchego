@@ -19,15 +19,13 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes"
 
+	cchainlibevm "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestMain(m *testing.M) {
-	core.RegisterExtras()
-	customtypes.Register()
-	params.RegisterExtras()
+	cchainlibevm.RegisterExtras()
 	os.Exit(m.Run())
 }
 

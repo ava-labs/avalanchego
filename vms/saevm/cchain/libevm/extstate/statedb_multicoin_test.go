@@ -65,7 +65,7 @@ func TestMultiCoinSnapshot(t *testing.T) {
 		t.Helper()
 
 		balance := wrappedStateDB.GetBalance(addr)
-		require.Equal(t, uint256.NewInt(uint64(regular)), balance, "incorrect non-multicoin balance")
+		require.Equal(t, uint256.NewInt(uint64(regular)), balance, "incorrect non-multicoin balance") //#nosec G115 -- test balances are small positives
 		balanceBig := wrappedStateDB.GetBalanceMultiCoin(addr, assetID1)
 		require.Equal(t, big.NewInt(multicoin1).String(), balanceBig.String(), "incorrect multicoin1 balance")
 		balanceBig = wrappedStateDB.GetBalanceMultiCoin(addr, assetID2)

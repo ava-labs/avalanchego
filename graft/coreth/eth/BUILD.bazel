@@ -22,7 +22,6 @@ go_library(
     deps = [
         "//graft/coreth/consensus",
         "//graft/coreth/core",
-        "//graft/coreth/core/extstate",
         "//graft/coreth/core/txpool",
         "//graft/coreth/core/txpool/legacypool",
         "//graft/coreth/eth/ethconfig",
@@ -40,6 +39,7 @@ go_library(
         "//utils/timer/mockable",
         "//version",
         "//vms/evm/sync/customrawdb",
+        "//vms/saevm/cchain/libevm/extstate",
         "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//accounts",
         "@com_github_ava_labs_libevm//common",
@@ -69,7 +69,7 @@ graft_go_test(
     ],
     embed = [":eth"],
     deps = [
-        "//graft/coreth/core/extstate",
+        "//vms/saevm/cchain/libevm/extstate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",

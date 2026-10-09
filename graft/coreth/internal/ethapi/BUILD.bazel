@@ -76,7 +76,7 @@ graft_go_test(
         "//graft/evm/rpc",
         "//graft/evm/utils",
         "//vms/evm/acp176",
-        "//vms/saevm/cchain/libevm/customtypes",
+        "//vms/saevm/cchain/libevm",
         "@com_github_ava_labs_libevm//accounts",
         "@com_github_ava_labs_libevm//accounts/keystore",
         "@com_github_ava_labs_libevm//common",
