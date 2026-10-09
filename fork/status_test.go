@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/fork"
 	"github.com/ava-labs/avalanchego/fork/forktest"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 func TestArm(t *testing.T) {
@@ -72,25 +72,27 @@ func TestArm(t *testing.T) {
 func TestStatusPhase(t *testing.T) {
 	cfg := forktest.NewConfig(t, testForkTime, ids.GenerateTestNodeID())
 	now := testForkTime.Add(-time.Second)
-	s := fork.NewStatus(cfg, func() time.Time { return now })
+	switched := false
+	s := fork.NewStatus(cfg, func() time.Time { return now }, func() bool { return switched })
 
 	require.Equal(t, fork.Observing, s.Phase(), "Phase() before T")
 	now = testForkTime
 	require.Equal(t, fork.Grace, s.Phase(), "Phase() at T")
-	s.MarkSwitched()
-	require.Equal(t, fork.Switched, s.Phase(), "Phase() after MarkSwitched()")
+	switched = true
+	require.Equal(t, fork.Switched, s.Phase(), "Phase() after switch")
 	require.Equal(t, "switched", s.Phase().String(), "Phase().String()")
 }
 
 func TestStatusHealthCheck(t *testing.T) {
 	cfg := forktest.NewConfig(t, testForkTime, ids.GenerateTestNodeID())
 	now := cfg.SwitchTime().Add(11 * time.Minute)
-	s := fork.NewStatus(cfg, func() time.Time { return now })
+	switched := false
+	s := fork.NewStatus(cfg, func() time.Time { return now }, func() bool { return switched })
 
 	_, err := s.HealthCheck(t.Context())
 	require.NoError(t, err, "HealthCheck() before switch")
 
-	s.MarkSwitched()
+	switched = true
 	_, err = s.HealthCheck(t.Context())
 	require.ErrorIs(t, err, fork.ErrForkHeightUnknown, "HealthCheck() switched without H_fork")
 
@@ -98,7 +100,7 @@ func TestStatusHealthCheck(t *testing.T) {
 	_, err = s.HealthCheck(t.Context())
 	require.NoError(t, err, "HealthCheck() switched recently without H_fork")
 
-	s.SetForkHeight(42)
+	s.SetForkPoint(constants.PlatformChainID, fork.ForkPoint{BlockID: ids.GenerateTestID(), Height: 41})
 	chainID := ids.GenerateTestID()
 	point := fork.ForkPoint{BlockID: ids.GenerateTestID(), Height: 7}
 	s.SetForkPoint(chainID, point)
@@ -110,28 +112,15 @@ func TestStatusHealthCheck(t *testing.T) {
 	require.Equal(t, "switched", report.Phase, "Report.Phase")
 	require.NotNil(t, report.ForkHeight, "Report.ForkHeight")
 	require.Equal(t, uint64(42), *report.ForkHeight, "Report.ForkHeight")
-	require.Equal(t, map[string]fork.ForkPoint{chainID.String(): point}, report.ForkPoints, "Report.ForkPoints")
+	require.Len(t, report.ForkPoints, 2, "Report.ForkPoints")
+	require.Equal(t, point, report.ForkPoints[chainID.String()], "Report.ForkPoints[chain]")
 }
 
 func TestForkPointBytesRoundTrip(t *testing.T) {
 	want := fork.ForkPoint{BlockID: ids.GenerateTestID(), Height: 1234}
-	got, err := fork.ParseForkPoint(want.Bytes())
+	b, err := want.Bytes()
+	require.NoError(t, err, "Bytes()")
+	got, err := fork.ParseForkPoint(b)
 	require.NoError(t, err, "ParseForkPoint()")
 	require.Equal(t, want, got, "ParseForkPoint()")
-
-	_, err = fork.ParseForkPoint([]byte{1, 2, 3})
-	require.ErrorIs(t, err, fork.ErrInvalidForkPoint, "ParseForkPoint(short)")
-}
-
-func TestStatusRegisterMetrics(t *testing.T) {
-	cfg := forktest.NewConfig(t, testForkTime, ids.GenerateTestNodeID())
-	s := fork.NewStatus(cfg, func() time.Time { return testForkTime.Add(-time.Second) })
-	reg := prometheus.NewRegistry()
-	require.NoError(t, s.RegisterMetrics(reg), "RegisterMetrics()")
-
-	families, err := reg.Gather()
-	require.NoError(t, err, "Gather()")
-	require.Len(t, families, 1, "Gather()")
-	require.Equal(t, "phase", families[0].GetName(), "metric name")
-	require.Zero(t, families[0].GetMetric()[0].GetGauge().GetValue(), "phase gauge while observing")
 }

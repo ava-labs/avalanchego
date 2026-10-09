@@ -587,7 +587,7 @@ func (vm *VM) getPostDurangoSlotTime(
 		return vm.slotTimeFor(ctx, vm.Windower, blkHeight, pChainHeight, slot, parentTimestamp)
 	}
 
-	forkTime := vm.Fork.Time
+	forkTime := vm.Fork.Config().Time
 	forkSlot := proposer.TimeToSlot(parentTimestamp, forkTime)
 	if parentTimestamp.Before(forkTime) && slot < forkSlot {
 		// Slots that start before T are scheduled by the source windower.

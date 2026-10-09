@@ -5,8 +5,6 @@ package fork
 
 import (
 	"fmt"
-	"maps"
-	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -23,46 +21,49 @@ var (
 )
 
 // Manager is the node's current validator view in fork mode. Before the
-// switch it mirrors [private], which the P-chain populates. Switch replaces
-// that view with the fork validator set and tells every listener: first it
-// removes everything they were told, then it adds the fork validators.
+// switch it reads from [mirror], a copy of [private] (which the P-chain
+// populates) that the forwarder keeps in sync. After the switch it reads from
+// [static], which holds the fork validators.
+//
+// Listeners are registered on both views. Switch empties the mirror, which
+// tells them the source validators are gone, and then fills the static view,
+// which tells them the fork validators are here.
 type Manager struct {
+	config  *Config
 	private validators.Manager
+	mirror  validators.Manager
 	static  validators.Manager
 
 	switched atomic.Bool
-
-	// lock serializes event delivery, listener registration, and Switch.
-	lock         sync.Mutex
-	mirror       map[ids.ID]map[ids.NodeID]*mirrored
-	listeners    []validators.ManagerCallbackListener
-	setListeners map[ids.ID][]validators.SetCallbackListener
-	onSwitch     []func()
-}
-
-type mirrored struct {
-	pk     *bls.PublicKey
-	txID   ids.ID
-	weight uint64
+	// lock serializes the forwarder, listener registration, and Switch.
+	lock sync.Mutex
 }
 
 // NewManager returns a Manager over [private], which must be empty.
 func NewManager(private validators.Manager, c *Config, startSwitched bool) (*Manager, error) {
-	static := validators.NewManager()
-	for _, v := range c.Validators {
-		if err := static.AddStaker(constants.PrimaryNetworkID, v.NodeID, v.Signer.Key(), ids.Empty, v.Weight); err != nil {
-			return nil, fmt.Errorf("adding fork validator %s: %w", v.NodeID, err)
-		}
-	}
 	m := &Manager{
-		private:      private,
-		static:       static,
-		mirror:       make(map[ids.ID]map[ids.NodeID]*mirrored),
-		setListeners: make(map[ids.ID][]validators.SetCallbackListener),
+		config:  c,
+		private: private,
+		mirror:  validators.NewManager(),
+		static:  validators.NewManager(),
 	}
-	m.switched.Store(startSwitched)
+	if startSwitched {
+		if err := m.addForkValidators(); err != nil {
+			return nil, err
+		}
+		m.switched.Store(true)
+	}
 	private.RegisterCallbackListener(forwarder{m: m})
 	return m, nil
+}
+
+func (m *Manager) addForkValidators() error {
+	for _, v := range m.config.Validators {
+		if err := m.static.AddStaker(constants.PrimaryNetworkID, v.NodeID, v.Signer.Key(), ids.Empty, v.Weight); err != nil {
+			return fmt.Errorf("adding fork validator %s: %w", v.NodeID, err)
+		}
+	}
+	return nil
 }
 
 // Switched reports whether the fork validator set is in effect.
@@ -70,57 +71,32 @@ func (m *Manager) Switched() bool {
 	return m.switched.Load()
 }
 
-// OnSwitch registers [f] to run once the switch has happened. If it already
-// has, [f] runs immediately. [f] never runs while the Manager's lock is held.
-func (m *Manager) OnSwitch(f func()) {
-	m.lock.Lock()
-	if !m.switched.Load() {
-		m.onSwitch = append(m.onSwitch, f)
-		m.lock.Unlock()
-		return
-	}
-	m.lock.Unlock()
-	f()
-}
-
 // Switch replaces the source validator view with the fork validator set. It is
 // idempotent.
 func (m *Manager) Switch() {
 	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	if m.switched.Load() {
-		m.lock.Unlock()
 		return
 	}
 	m.switched.Store(true)
 
-	for _, subnetID := range sortedKeys(m.mirror) {
-		vdrs := m.mirror[subnetID]
-		for _, nodeID := range sortedKeys(vdrs) {
-			m.notifyRemoved(subnetID, nodeID, vdrs[nodeID].weight)
+	for subnetID, vdrs := range m.mirror.GetAllMaps() {
+		for nodeID, v := range vdrs {
+			// Cannot fail: the weight is the validator's current weight.
+			_ = m.mirror.RemoveWeight(subnetID, nodeID, v.Weight)
 		}
 	}
-	m.mirror = nil
-
-	forkSet := m.static.GetMap(constants.PrimaryNetworkID)
-	for _, nodeID := range sortedKeys(forkSet) {
-		v := forkSet[nodeID]
-		m.notifyAdded(constants.PrimaryNetworkID, nodeID, v.PublicKey, ids.Empty, v.Weight)
-	}
-
-	hooks := m.onSwitch
-	m.onSwitch = nil
-	m.lock.Unlock()
-
-	for _, f := range hooks {
-		f()
-	}
+	// Cannot fail: the config is validated and the static view is empty.
+	_ = m.addForkValidators()
 }
 
 func (m *Manager) view() validators.Manager {
 	if m.switched.Load() {
 		return m.static
 	}
-	return m.private
+	return m.mirror
 }
 
 func (m *Manager) String() string {
@@ -186,78 +162,21 @@ func (m *Manager) RegisterCallbackListener(listener validators.ManagerCallbackLi
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.listeners = append(m.listeners, listener)
-	if m.switched.Load() {
-		forkSet := m.static.GetMap(constants.PrimaryNetworkID)
-		for _, nodeID := range sortedKeys(forkSet) {
-			v := forkSet[nodeID]
-			listener.OnValidatorAdded(constants.PrimaryNetworkID, nodeID, v.PublicKey, ids.Empty, v.Weight)
-		}
-		return
-	}
-	for _, subnetID := range sortedKeys(m.mirror) {
-		vdrs := m.mirror[subnetID]
-		for _, nodeID := range sortedKeys(vdrs) {
-			v := vdrs[nodeID]
-			listener.OnValidatorAdded(subnetID, nodeID, v.pk, v.txID, v.weight)
-		}
-	}
+	m.mirror.RegisterCallbackListener(listener)
+	m.static.RegisterCallbackListener(listener)
 }
 
 func (m *Manager) RegisterSetCallbackListener(subnetID ids.ID, listener validators.SetCallbackListener) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	m.setListeners[subnetID] = append(m.setListeners[subnetID], listener)
-	if m.switched.Load() {
-		if subnetID != constants.PrimaryNetworkID {
-			return
-		}
-		forkSet := m.static.GetMap(constants.PrimaryNetworkID)
-		for _, nodeID := range sortedKeys(forkSet) {
-			v := forkSet[nodeID]
-			listener.OnValidatorAdded(nodeID, v.PublicKey, ids.Empty, v.Weight)
-		}
-		return
-	}
-	vdrs := m.mirror[subnetID]
-	for _, nodeID := range sortedKeys(vdrs) {
-		v := vdrs[nodeID]
-		listener.OnValidatorAdded(nodeID, v.pk, v.txID, v.weight)
-	}
+	m.mirror.RegisterSetCallbackListener(subnetID, listener)
+	m.static.RegisterSetCallbackListener(subnetID, listener)
 }
 
-// notify* must be called with [m.lock] held.
-
-func (m *Manager) notifyAdded(subnetID ids.ID, nodeID ids.NodeID, pk *bls.PublicKey, txID ids.ID, weight uint64) {
-	for _, l := range m.listeners {
-		l.OnValidatorAdded(subnetID, nodeID, pk, txID, weight)
-	}
-	for _, l := range m.setListeners[subnetID] {
-		l.OnValidatorAdded(nodeID, pk, txID, weight)
-	}
-}
-
-func (m *Manager) notifyRemoved(subnetID ids.ID, nodeID ids.NodeID, weight uint64) {
-	for _, l := range m.listeners {
-		l.OnValidatorRemoved(subnetID, nodeID, weight)
-	}
-	for _, l := range m.setListeners[subnetID] {
-		l.OnValidatorRemoved(nodeID, weight)
-	}
-}
-
-func (m *Manager) notifyWeightChanged(subnetID ids.ID, nodeID ids.NodeID, oldWeight, newWeight uint64) {
-	for _, l := range m.listeners {
-		l.OnValidatorWeightChanged(subnetID, nodeID, oldWeight, newWeight)
-	}
-	for _, l := range m.setListeners[subnetID] {
-		l.OnValidatorWeightChanged(nodeID, oldWeight, newWeight)
-	}
-}
-
-// forwarder relays the private manager's events to the Manager's listeners
-// until the switch.
+// forwarder copies the private manager's events into the mirror until the
+// switch. The private manager emits a consistent sequence, so the mirror
+// writes cannot fail.
 type forwarder struct {
 	m *Manager
 }
@@ -267,16 +186,9 @@ func (f forwarder) OnValidatorAdded(subnetID ids.ID, nodeID ids.NodeID, pk *bls.
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if m.switched.Load() {
-		return
+	if !m.switched.Load() {
+		_ = m.mirror.AddStaker(subnetID, nodeID, pk, txID, weight)
 	}
-	vdrs, ok := m.mirror[subnetID]
-	if !ok {
-		vdrs = make(map[ids.NodeID]*mirrored)
-		m.mirror[subnetID] = vdrs
-	}
-	vdrs[nodeID] = &mirrored{pk: pk, txID: txID, weight: weight}
-	m.notifyAdded(subnetID, nodeID, pk, txID, weight)
 }
 
 func (f forwarder) OnValidatorRemoved(subnetID ids.ID, nodeID ids.NodeID, weight uint64) {
@@ -284,15 +196,9 @@ func (f forwarder) OnValidatorRemoved(subnetID ids.ID, nodeID ids.NodeID, weight
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if m.switched.Load() {
-		return
+	if !m.switched.Load() {
+		_ = m.mirror.RemoveWeight(subnetID, nodeID, weight)
 	}
-	vdrs := m.mirror[subnetID]
-	delete(vdrs, nodeID)
-	if len(vdrs) == 0 {
-		delete(m.mirror, subnetID)
-	}
-	m.notifyRemoved(subnetID, nodeID, weight)
 }
 
 func (f forwarder) OnValidatorWeightChanged(subnetID ids.ID, nodeID ids.NodeID, oldWeight, newWeight uint64) {
@@ -303,20 +209,9 @@ func (f forwarder) OnValidatorWeightChanged(subnetID ids.ID, nodeID ids.NodeID, 
 	if m.switched.Load() {
 		return
 	}
-	if v, ok := m.mirror[subnetID][nodeID]; ok {
-		v.weight = newWeight
+	if newWeight > oldWeight {
+		_ = m.mirror.AddWeight(subnetID, nodeID, newWeight-oldWeight)
+	} else {
+		_ = m.mirror.RemoveWeight(subnetID, nodeID, oldWeight-newWeight)
 	}
-	m.notifyWeightChanged(subnetID, nodeID, oldWeight, newWeight)
-}
-
-// orderedKey is satisfied by ids.ID and ids.NodeID.
-type orderedKey[T any] interface {
-	comparable
-	Compare(T) int
-}
-
-func sortedKeys[K orderedKey[K], V any](m map[K]V) []K {
-	keys := slices.Collect(maps.Keys(m))
-	slices.SortFunc(keys, func(a, b K) int { return a.Compare(b) })
-	return keys
 }

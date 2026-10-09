@@ -31,12 +31,14 @@ var testForkTime = snowmantest.GenesisTimestamp.Add(time.Hour)
 
 // enableTestFork turns on fork mode for an already-initialized proVM.
 func enableTestFork(t *testing.T, proVM *VM, nodeIDs ...ids.NodeID) *fork.Status {
-	cfg := forktest.NewConfig(t, testForkTime, nodeIDs...)
-	status := fork.NewStatus(cfg, time.Now)
-	proVM.Fork = cfg
-	proVM.ForkStatus = status
+	status := newTestStatus(forktest.NewConfig(t, testForkTime, nodeIDs...))
+	proVM.Fork = status
 	require.NoError(t, proVM.initFork(), "initFork()")
 	return status
+}
+
+func newTestStatus(cfg *fork.Config) *fork.Status {
+	return fork.NewStatus(cfg, time.Now, func() bool { return false })
 }
 
 // buildAcceptedParent builds and accepts the first post-fork block at [ts].
@@ -178,8 +180,8 @@ func TestForkBuildAndRecordForkPoint(t *testing.T) {
 	require.Equal(t, map[string]fork.ForkPoint{proVM.ctx.ChainID.String(): want}, status.Report().ForkPoints, "fork points after accept")
 
 	// A restart reloads the fork point from the database.
-	restarted := fork.NewStatus(proVM.Fork, time.Now)
-	proVM.ForkStatus = restarted
+	restarted := newTestStatus(proVM.Fork.Config())
+	proVM.Fork = restarted
 	proVM.forkPointKnown = false
 	require.NoError(t, proVM.initFork(), "initFork() after restart")
 	require.Equal(t, map[string]fork.ForkPoint{proVM.ctx.ChainID.String(): want}, restarted.Report().ForkPoints, "fork points after restart")
@@ -249,7 +251,7 @@ func TestPostDurangoSlotTimeAcrossFork(t *testing.T) {
 
 			cfg := forktest.NewConfig(t, testForkTime, tt.forkSet...)
 			vm := &VM{
-				Config:   Config{Fork: cfg},
+				Config:   Config{Fork: newTestStatus(cfg)},
 				ctx:      &snow.Context{NodeID: self, Log: logging.NoLog{}},
 				Windower: windower,
 			}

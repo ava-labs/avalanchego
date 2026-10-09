@@ -29,7 +29,7 @@ func (vm *VM) initFork() error {
 	if vm.Fork == nil {
 		return nil
 	}
-	vm.forkWindower = proposer.New(fork.NewStaticState(vm.Fork), vm.ctx.SubnetID, vm.ctx.ChainID, vm.ctx.Log)
+	vm.forkWindower = proposer.New(fork.NewStaticState(vm.Fork.Config()), vm.ctx.SubnetID, vm.ctx.ChainID, vm.ctx.Log)
 
 	b, err := vm.db.Get(forkPointKey)
 	switch {
@@ -43,14 +43,14 @@ func (vm *VM) initFork() error {
 		return err
 	}
 	vm.forkPointKnown = true
-	vm.reportForkPoint(point)
+	vm.Fork.SetForkPoint(vm.ctx.ChainID, point)
 	return nil
 }
 
 // isForkBlock reports whether a block timestamped [ts] is subject to the fork
 // proposer rule.
 func (vm *VM) isForkBlock(ts time.Time) bool {
-	return vm.Fork != nil && vm.Fork.IsForked(ts)
+	return vm.Fork != nil && vm.Fork.Config().IsForked(ts)
 }
 
 // windowerFor returns the windower that schedules proposers for a block
@@ -92,14 +92,18 @@ func (p *postForkCommonComponents) verifyForkProposer(
 // before the accept commit so that the fork point is written atomically with
 // [blk].
 func (vm *VM) recordForkPoint(blk PostForkBlock) error {
-	if vm.Fork == nil || vm.forkPointKnown || !vm.Fork.IsForked(blk.Timestamp()) {
+	if vm.Fork == nil || vm.forkPointKnown || !vm.Fork.Config().IsForked(blk.Timestamp()) {
 		return nil
 	}
 	point := fork.ForkPoint{
 		BlockID: blk.Parent(),
 		Height:  blk.Height() - 1,
 	}
-	if err := vm.db.Put(forkPointKey, point.Bytes()); err != nil {
+	b, err := point.Bytes()
+	if err != nil {
+		return fmt.Errorf("encoding fork point: %w", err)
+	}
+	if err := vm.db.Put(forkPointKey, b); err != nil {
 		return fmt.Errorf("writing fork point: %w", err)
 	}
 	vm.forkPointKnown = true
@@ -109,12 +113,6 @@ func (vm *VM) recordForkPoint(blk PostForkBlock) error {
 		zap.Stringer("firstForkBlkID", blk.ID()),
 		zap.Time("firstForkBlkTimestamp", blk.Timestamp()),
 	)
-	vm.reportForkPoint(point)
+	vm.Fork.SetForkPoint(vm.ctx.ChainID, point)
 	return nil
-}
-
-func (vm *VM) reportForkPoint(point fork.ForkPoint) {
-	if vm.ForkStatus != nil {
-		vm.ForkStatus.SetForkPoint(vm.ctx.ChainID, point)
-	}
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 )
 
 var (
@@ -61,26 +60,13 @@ func (*staticState) GetCurrentValidatorSet(context.Context, ids.ID) (map[ids.ID]
 
 // NewState wraps [inner] so that primary network validator lookups at P-chain
 // heights at or above H_fork return the fork set. [forkHeight] reports H_fork
-// once it is known.
+// once it is known. GetCurrentValidatorSet is not overridden: nothing on the
+// primary network calls it.
 func NewState(inner validators.State, c *Config, forkHeight func() (uint64, bool)) validators.State {
-	current := make(map[ids.ID]*validators.GetCurrentValidatorOutput, len(c.Validators))
-	for _, v := range c.Validators {
-		// Fork validators have no staking transaction; derive a stable,
-		// unique validation ID from the node ID.
-		validationID := ids.ID(hashing.ComputeHash256Array(v.NodeID.Bytes()))
-		current[validationID] = &validators.GetCurrentValidatorOutput{
-			ValidationID: validationID,
-			NodeID:       v.NodeID,
-			PublicKey:    v.Signer.Key(),
-			Weight:       v.Weight,
-			IsActive:     true,
-		}
-	}
 	return &state{
 		State:      inner,
 		config:     c,
 		forkHeight: forkHeight,
-		current:    current,
 	}
 }
 
@@ -89,7 +75,6 @@ type state struct {
 
 	config     *Config
 	forkHeight func() (uint64, bool)
-	current    map[ids.ID]*validators.GetCurrentValidatorOutput
 }
 
 func (s *state) isForked(height uint64) bool {
@@ -115,12 +100,4 @@ func (s *state) GetWarpValidatorSets(ctx context.Context, height uint64) (map[id
 	}
 	forked[constants.PrimaryNetworkID] = s.config.WarpSet()
 	return forked, nil
-}
-
-func (s *state) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
-	vdrs, height, err := s.State.GetCurrentValidatorSet(ctx, subnetID)
-	if err != nil || subnetID != constants.PrimaryNetworkID || !s.isForked(height) {
-		return vdrs, height, err
-	}
-	return s.current, height, nil
 }

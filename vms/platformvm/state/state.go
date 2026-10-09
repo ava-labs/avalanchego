@@ -100,7 +100,6 @@ var (
 	AccruedFeesKey       = []byte("accrued fees")
 	CurrentSupplyKey     = []byte("current supply")
 	LastAcceptedKey      = []byte("last accepted")
-	ForkHeightKey        = []byte("fork height")
 	HeightsIndexedKey    = []byte("heights indexed")
 	InitializedKey       = []byte("initialized")
 	BlocksReindexedKey   = []byte("blocks reindexed.3")
@@ -359,10 +358,6 @@ type State struct {
 	currentSupply, persistedCurrentSupply         uint64
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
-	// forkHeight is H_fork in fork mode: the height of the first accepted
-	// block timestamped at or after the fork time.
-	forkHeight                            uint64
-	hasForkHeight, persistedHasForkHeight bool
 	// TODO: Remove indexedHeights once v1.11.3 has been released.
 	indexedHeights *heightRange
 	singletonDB    database.Database
@@ -1906,16 +1901,6 @@ func (s *State) loadMetadata() error {
 	s.persistedLastAccepted = lastAccepted
 	s.lastAccepted = lastAccepted
 
-	forkHeight, err := database.GetUInt64(s.singletonDB, ForkHeightKey)
-	switch {
-	case err == nil:
-		s.forkHeight = forkHeight
-		s.hasForkHeight = true
-		s.persistedHasForkHeight = true
-	case !errors.Is(err, database.ErrNotFound):
-		return err
-	}
-
 	// Lookup the most recently indexed range on disk. If we haven't started
 	// indexing the weights, then we keep the indexed heights as nil.
 	indexedHeightsBytes, err := s.singletonDB.Get(HeightsIndexedKey)
@@ -2510,17 +2495,6 @@ func (s *State) AddStatelessBlock(block platform.Block) {
 	blkID := block.ID()
 	s.addedBlockIDs[block.Height()] = blkID
 	s.addedBlocks[blkID] = block
-}
-
-// GetForkHeight returns H_fork, if fork mode has recorded it.
-func (s *State) GetForkHeight() (uint64, bool) {
-	return s.forkHeight, s.hasForkHeight
-}
-
-// SetForkHeight records H_fork. It is persisted with the next commit.
-func (s *State) SetForkHeight(height uint64) {
-	s.forkHeight = height
-	s.hasForkHeight = true
 }
 
 func (s *State) SetHeight(height uint64) {
@@ -3394,12 +3368,6 @@ func (s *State) writeMetadata() error {
 			return fmt.Errorf("failed to write last accepted: %w", err)
 		}
 		s.persistedLastAccepted = s.lastAccepted
-	}
-	if s.hasForkHeight && !s.persistedHasForkHeight {
-		if err := database.PutUInt64(s.singletonDB, ForkHeightKey, s.forkHeight); err != nil {
-			return fmt.Errorf("failed to write fork height: %w", err)
-		}
-		s.persistedHasForkHeight = true
 	}
 	if s.indexedHeights != nil {
 		indexedHeightsBytes, err := platform.GenesisCodec.Marshal(platform.CodecVersion, s.indexedHeights)

@@ -33,10 +33,8 @@ type Config struct {
 	// Registerer for prometheus metrics
 	Registerer prometheus.Registerer
 
-	// Fork, if non-nil, enables fork mode: blocks timestamped at or after
-	// Fork.Time must be signed by the fork validator scheduled for their slot.
-	Fork *fork.Config
-
-	// ForkStatus, if non-nil, receives this chain's fork point.
-	ForkStatus *fork.Status
+	// Fork, if non-nil, enables fork mode: blocks timestamped at or after the
+	// fork time must be signed by the fork validator scheduled for their slot.
+	// It receives this chain's fork point.
+	Fork *fork.Status
 }

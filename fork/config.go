@@ -39,12 +39,12 @@ var (
 
 // Validator is a member of the fork's validator set.
 type Validator struct {
-	NodeID ids.NodeID
-	Weight uint64
-	Signer *signer.ProofOfPossession
+	NodeID ids.NodeID                `json:"nodeID"`
+	Weight uint64                    `json:"weight"`
+	Signer *signer.ProofOfPossession `json:"signer"`
 	// IP is used to connect to the validator before the switch and as a
 	// beacon after it.
-	IP netip.AddrPort
+	IP netip.AddrPort `json:"ip"`
 }
 
 // Config is a validated fork configuration.
@@ -62,17 +62,11 @@ type Config struct {
 	hash         [sha256.Size]byte
 }
 
-type jsonValidator struct {
-	NodeID ids.NodeID                `json:"nodeID"`
-	Weight uint64                    `json:"weight"`
-	Signer *signer.ProofOfPossession `json:"signer"`
-	IP     netip.AddrPort            `json:"ip"`
-}
-
 type jsonConfig struct {
-	ForkTime    time.Time       `json:"forkTime"`
-	GracePeriod *string         `json:"gracePeriod,omitempty"`
-	Validators  []jsonValidator `json:"validators"`
+	ForkTime time.Time `json:"forkTime"`
+	// GracePeriod is a duration string; empty means DefaultGracePeriod.
+	GracePeriod string      `json:"gracePeriod,omitempty"`
+	Validators  []Validator `json:"validators"`
 }
 
 // New validates the provided values and returns a Config.
@@ -119,34 +113,24 @@ func Parse(b []byte) (*Config, error) {
 	}
 
 	gracePeriod := DefaultGracePeriod
-	if raw.GracePeriod != nil {
-		d, err := time.ParseDuration(*raw.GracePeriod)
+	if raw.GracePeriod != "" {
+		d, err := time.ParseDuration(raw.GracePeriod)
 		if err != nil {
 			return nil, fmt.Errorf("parsing grace period: %w", err)
 		}
 		gracePeriod = d
 	}
-
-	vdrs := make([]Validator, len(raw.Validators))
-	for i, v := range raw.Validators {
-		vdrs[i] = Validator(v)
-	}
-	return New(raw.ForkTime, gracePeriod, vdrs)
+	return New(raw.ForkTime, gracePeriod, raw.Validators)
 }
 
 // MarshalJSON returns the canonical encoding of the config. It is also the
 // input to Hash.
 func (c *Config) MarshalJSON() ([]byte, error) {
-	gracePeriod := c.GracePeriod.String()
-	raw := jsonConfig{
+	return json.Marshal(jsonConfig{
 		ForkTime:    c.Time.UTC(),
-		GracePeriod: &gracePeriod,
-		Validators:  make([]jsonValidator, len(c.Validators)),
-	}
-	for i, v := range c.Validators {
-		raw.Validators[i] = jsonValidator(v)
-	}
-	return json.Marshal(raw)
+		GracePeriod: c.GracePeriod.String(),
+		Validators:  c.Validators,
+	})
 }
 
 func (c *Config) verify() error {

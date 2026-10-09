@@ -32,10 +32,7 @@ func TestStaticState(t *testing.T) {
 }
 
 func TestState(t *testing.T) {
-	const (
-		forkHeight    = 100
-		currentHeight = 150
-	)
+	const forkHeight = 100
 	var (
 		cfg      = forktest.NewConfig(t, testForkTime, ids.GenerateTestNodeID())
 		subnetID = ids.GenerateTestID()
@@ -43,7 +40,6 @@ func TestState(t *testing.T) {
 		srcSet   = map[ids.NodeID]*validators.GetValidatorOutput{srcNode: {NodeID: srcNode, Weight: 7}}
 		srcWarp  = validators.WarpSet{TotalWeight: 7}
 		subWarp  = validators.WarpSet{TotalWeight: 3}
-		srcCur   = map[ids.ID]*validators.GetCurrentValidatorOutput{ids.GenerateTestID(): {NodeID: srcNode, Weight: 7}}
 	)
 	innerWarp := map[ids.ID]validators.WarpSet{constants.PrimaryNetworkID: srcWarp, subnetID: subWarp}
 	inner := &validatorstest.State{
@@ -53,9 +49,6 @@ func TestState(t *testing.T) {
 		},
 		GetWarpValidatorSetsF: func(context.Context, uint64) (map[ids.ID]validators.WarpSet, error) {
 			return innerWarp, nil
-		},
-		GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
-			return srcCur, currentHeight, nil
 		},
 	}
 
@@ -97,24 +90,4 @@ func TestState(t *testing.T) {
 			}
 		})
 	}
-
-	t.Run("current set before H_fork", func(t *testing.T) {
-		s := fork.NewState(inner, cfg, func() (uint64, bool) { return forkHeight, false })
-		got, height, err := s.GetCurrentValidatorSet(t.Context(), constants.PrimaryNetworkID)
-		require.NoError(t, err, "GetCurrentValidatorSet()")
-		require.Equal(t, srcCur, got, "GetCurrentValidatorSet() delegates when not forked")
-		require.Equal(t, uint64(currentHeight), height, "GetCurrentValidatorSet() height")
-	})
-
-	t.Run("current set after H_fork", func(t *testing.T) {
-		s := fork.NewState(inner, cfg, func() (uint64, bool) { return forkHeight, true })
-		got, height, err := s.GetCurrentValidatorSet(t.Context(), constants.PrimaryNetworkID)
-		require.NoError(t, err, "GetCurrentValidatorSet()")
-		require.Equal(t, uint64(currentHeight), height, "GetCurrentValidatorSet() height")
-		require.Len(t, got, 1, "GetCurrentValidatorSet()")
-		for _, v := range got {
-			require.Equal(t, cfg.Validators[0].NodeID, v.NodeID, "GetCurrentValidatorSet() nodeID")
-			require.True(t, v.IsActive, "GetCurrentValidatorSet() IsActive")
-		}
-	})
 }

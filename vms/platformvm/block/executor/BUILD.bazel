@@ -50,7 +50,6 @@ go_library(
 go_test(
     name = "executor_test",
     srcs = [
-        "acceptor_fork_test.go",
         "acceptor_test.go",
         "backend_test.go",
         "block_test.go",

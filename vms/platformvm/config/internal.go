@@ -90,14 +90,6 @@ type Internal struct {
 	// on recently created subnets (without this, users need to wait for
 	// [recentlyAcceptedWindowTTL] to pass for activation to occur).
 	UseCurrentHeight bool
-
-	// ForkTime, if non-zero, enables fork mode: the height of the first
-	// accepted block timestamped at or after ForkTime is recorded as H_fork.
-	ForkTime time.Time
-
-	// OnForkHeight, if non-nil, is called with H_fork when it is recorded and
-	// on startup if it was recorded previously.
-	OnForkHeight func(height uint64)
 }
 
 // Create the blockchain described in [tx], but only if this node is a member of

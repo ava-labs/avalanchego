@@ -162,9 +162,6 @@ func TestManagerSwitch(t *testing.T) {
 	primary := newRecorder()
 	m.RegisterSetCallbackListener(constants.PrimaryNetworkID, setRecorder{primary, constants.PrimaryNetworkID})
 
-	hookCalls := 0
-	m.OnSwitch(func() { hookCalls++ })
-
 	m.Switch()
 	m.Switch() // idempotent
 
@@ -172,7 +169,6 @@ func TestManagerSwitch(t *testing.T) {
 	require.Equal(t, forkView(cfg), primary.view, "primary set listener view after Switch()")
 	all.requireConsistent(t)
 	primary.requireConsistent(t)
-	require.Equal(t, 1, hookCalls, "OnSwitch hook calls")
 	require.True(t, m.Switched(), "Switched()")
 
 	require.Zero(t, m.GetWeight(constants.PrimaryNetworkID, srcNode), "GetWeight(source) after switch")
@@ -185,10 +181,6 @@ func TestManagerSwitch(t *testing.T) {
 	require.NoError(t, m.AddStaker(constants.PrimaryNetworkID, ids.GenerateTestNodeID(), nil, ids.GenerateTestID(), 9), "AddStaker() after switch")
 	require.Len(t, all.events, eventsBefore, "events after post-switch AddStaker()")
 	require.Equal(t, 1, m.NumValidators(constants.PrimaryNetworkID), "NumValidators(primary) after post-switch AddStaker()")
-
-	late := 0
-	m.OnSwitch(func() { late++ })
-	require.Equal(t, 1, late, "OnSwitch registered after switch runs immediately")
 }
 
 func TestManagerRegisterAfterSwitchReplaysForkSet(t *testing.T) {

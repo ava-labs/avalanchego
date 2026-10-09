@@ -248,9 +248,7 @@ type ManagerConfig struct {
 	Subnets *Subnets
 
 	// Fork, if non-nil, enables fork mode on the primary network's chains.
-	// ForkStatus must be non-nil whenever Fork is.
-	Fork       *fork.Config
-	ForkStatus *fork.Status
+	Fork *fork.Status
 }
 
 type manager struct {
@@ -794,8 +792,7 @@ func (m *manager) createAvalancheChain(
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
 			Registerer:          proposervmReg,
-			Fork:                m.forkConfigFor(ctx.SubnetID),
-			ForkStatus:          m.ForkStatus,
+			Fork:                m.forkFor(ctx.SubnetID),
 		},
 	)
 
@@ -1070,9 +1067,9 @@ func (m *manager) createAvalancheChain(
 	}, nil
 }
 
-// forkConfigFor returns the fork config if fork mode applies to chains of
+// forkFor returns the fork status if fork mode applies to chains of
 // [subnetID].
-func (m *manager) forkConfigFor(subnetID ids.ID) *fork.Config {
+func (m *manager) forkFor(subnetID ids.ID) *fork.Status {
 	if subnetID != constants.PrimaryNetworkID {
 		return nil
 	}
@@ -1175,8 +1172,8 @@ func (m *manager) createSnowmanChain(
 		}
 
 		if m.Fork != nil {
-			valState = fork.NewState(valState, m.Fork, m.ForkStatus.ForkHeight)
-			ctx.ValidatorState = fork.NewState(ctx.ValidatorState, m.Fork, m.ForkStatus.ForkHeight)
+			valState = fork.NewState(valState, m.Fork.Config(), m.Fork.ForkHeight)
+			ctx.ValidatorState = fork.NewState(ctx.ValidatorState, m.Fork.Config(), m.Fork.ForkHeight)
 		}
 		m.validatorState = valState
 
@@ -1232,8 +1229,7 @@ func (m *manager) createSnowmanChain(
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
 			Registerer:          proposervmReg,
-			Fork:                m.forkConfigFor(ctx.SubnetID),
-			ForkStatus:          m.ForkStatus,
+			Fork:                m.forkFor(ctx.SubnetID),
 		},
 	)
 

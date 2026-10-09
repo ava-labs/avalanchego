@@ -19,11 +19,9 @@ go_library(
         "//upgrade",
         "//utils/constants",
         "//utils/crypto/bls",
-        "//utils/hashing",
         "//utils/math",
         "//utils/set",
         "//vms/platformvm/signer",
-        "@com_github_prometheus_client_golang//prometheus",
     ],
 )
 
@@ -48,7 +46,6 @@ go_test(
         "//utils/crypto/bls",
         "//utils/math",
         "//vms/platformvm/signer",
-        "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",
     ],
 )

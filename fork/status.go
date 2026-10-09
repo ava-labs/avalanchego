@@ -6,17 +6,16 @@ package fork
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 // unhealthyAfterSwitch is how long after T+Δ the node tolerates not knowing
@@ -26,7 +25,6 @@ const unhealthyAfterSwitch = 10 * time.Minute
 var (
 	ErrLateJoiner        = errors.New("fork time has passed and this node was not armed before it; late joiners are not supported")
 	ErrConfigChanged     = errors.New("fork config differs from the config this node was armed with")
-	ErrInvalidForkPoint  = errors.New("invalid fork point encoding")
 	ErrForkHeightUnknown = errors.New("the P-chain has not accepted a block at or after the fork time; issue a P-chain transaction")
 
 	markerKey = []byte("fork marker")
@@ -94,23 +92,16 @@ type ForkPoint struct {
 	Height  uint64 `json:"height"`
 }
 
-// Bytes encodes the fork point as blockID || bigEndian(height).
-func (p ForkPoint) Bytes() []byte {
-	b := make([]byte, ids.IDLen+8)
-	copy(b, p.BlockID[:])
-	binary.BigEndian.PutUint64(b[ids.IDLen:], p.Height)
-	return b
+// Bytes encodes the fork point for storage.
+func (p ForkPoint) Bytes() ([]byte, error) {
+	return json.Marshal(p)
 }
 
 // ParseForkPoint decodes the output of ForkPoint.Bytes.
 func ParseForkPoint(b []byte) (ForkPoint, error) {
-	if len(b) != ids.IDLen+8 {
-		return ForkPoint{}, fmt.Errorf("%w: length %d", ErrInvalidForkPoint, len(b))
-	}
 	var p ForkPoint
-	copy(p.BlockID[:], b[:ids.IDLen])
-	p.Height = binary.BigEndian.Uint64(b[ids.IDLen:])
-	return p, nil
+	err := json.Unmarshal(b, &p)
+	return p, err
 }
 
 // Report is the fork health check's details.
@@ -122,10 +113,10 @@ type Report struct {
 
 // Status tracks the node's fork progress. It is safe for concurrent use.
 type Status struct {
-	config *Config
-	now    func() time.Time
+	config   *Config
+	now      func() time.Time
+	switched func() bool
 
-	switched      atomic.Bool
 	hasForkHeight atomic.Bool
 	forkHeight    atomic.Uint64
 
@@ -133,21 +124,24 @@ type Status struct {
 	forkPoints map[ids.ID]ForkPoint
 }
 
-func NewStatus(c *Config, now func() time.Time) *Status {
+// NewStatus returns a Status for [c]. [switched] reports whether the fork
+// validator set is in effect.
+func NewStatus(c *Config, now func() time.Time, switched func() bool) *Status {
 	return &Status{
 		config:     c,
 		now:        now,
+		switched:   switched,
 		forkPoints: make(map[ids.ID]ForkPoint),
 	}
 }
 
-func (s *Status) MarkSwitched() {
-	s.switched.Store(true)
+func (s *Status) Config() *Config {
+	return s.config
 }
 
 func (s *Status) Phase() Phase {
 	switch {
-	case s.switched.Load():
+	case s.switched():
 		return Switched
 	case !s.config.IsForked(s.now()):
 		return Observing
@@ -156,13 +150,9 @@ func (s *Status) Phase() Phase {
 	}
 }
 
-// SetForkHeight records H_fork, the height of the first accepted P-chain
-// block timestamped at or after the fork time.
-func (s *Status) SetForkHeight(height uint64) {
-	s.forkHeight.Store(height)
-	s.hasForkHeight.Store(true)
-}
-
+// ForkHeight returns H_fork, the height of the first accepted P-chain block
+// timestamped at or after the fork time, once the P-chain's fork point is
+// known.
 func (s *Status) ForkHeight() (uint64, bool) {
 	if !s.hasForkHeight.Load() {
 		return 0, false
@@ -170,11 +160,17 @@ func (s *Status) ForkHeight() (uint64, bool) {
 	return s.forkHeight.Load(), true
 }
 
+// SetForkPoint records a chain's fork point. The P-chain's fork point also
+// determines H_fork: the height of the block after it.
 func (s *Status) SetForkPoint(chainID ids.ID, p ForkPoint) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
 	s.forkPoints[chainID] = p
+	if chainID == constants.PlatformChainID {
+		s.forkHeight.Store(p.Height + 1)
+		s.hasForkHeight.Store(true)
+	}
 }
 
 func (s *Status) Report() Report {
@@ -205,15 +201,4 @@ func (s *Status) HealthCheck(context.Context) (interface{}, error) {
 		return r, ErrForkHeightUnknown
 	}
 	return r, nil
-}
-
-// RegisterMetrics registers a "phase" gauge: 0 observing, 1 grace, 2 switched.
-func (s *Status) RegisterMetrics(reg prometheus.Registerer) error {
-	return reg.Register(prometheus.NewGaugeFunc(
-		prometheus.GaugeOpts{
-			Name: "phase",
-			Help: "fork phase: 0 observing, 1 grace, 2 switched",
-		},
-		func() float64 { return float64(s.Phase()) },
-	))
 }
