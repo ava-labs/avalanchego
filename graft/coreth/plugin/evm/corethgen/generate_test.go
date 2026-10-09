@@ -19,6 +19,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
@@ -26,6 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -36,6 +40,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	commoneng "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 //go:generate go test -run TestFixtureUpToDate -update .
@@ -139,22 +145,12 @@ func generate(t *testing.T) *synchronoustest.Fixture {
 	}
 
 	g.setClock(upgrade.InitiallyActiveTime)
-	suite := vmtest.SetupTestVM(t, g.vm, vmtest.TestVMConfig{
-		Upgrades:    &upgrades,
-		GenesisJSON: string(genesisJSON),
-		ConfigJSON: `{
-			"pruning-enabled": false, 
-			"snapshot-cache": 0, 
-			"eth-apis": [
-				"internal-blockchain", 
-				"internal-transaction", 
-				"eth-filter", 
-				"debug-tracer"
-			]
-		}`,
-	})
-	g.ctx = suite.Ctx
-	g.memory = suite.AtomicMemory
+	// Shared memory commits the VM's batches atomically by unwrapping them to
+	// the base database, so both MUST share one.
+	baseDB := memdb.New()
+	sharedMemoryDB := prefixdb.New([]byte{0}, baseDB)
+	db := prefixdb.New([]byte{1}, baseDB)
+	g.initialize(t, db, sharedMemoryDB, genesisJSON, upgrades)
 	g.configureValidatorState(t)
 
 	g.recordGenesisBlock(t)
@@ -164,8 +160,43 @@ func generate(t *testing.T) *synchronoustest.Fixture {
 	// The dump MUST follow a clean shutdown, matching a real handed-over
 	// database and removing geth's unclean-shutdown marker.
 	require.NoError(t, g.vm.Shutdown(t.Context()), "vm.Shutdown()")
-	g.setDatabase(t, suite.DB)
+	g.fixture.Database = dump(t, db)
+	g.fixture.SharedMemory = dump(t, sharedMemoryDB)
 	return g.fixture
+}
+
+// initialize initializes the VM as [vmtest.SetupTestVM] does, but with shared
+// memory backed by sharedMemoryDB so that the fixture can record it.
+func (g *generator) initialize(t *testing.T, db, sharedMemoryDB database.Database, genesisJSON []byte, upgrades upgrade.Config) {
+	t.Helper()
+
+	g.ctx = snowtest.Context(t, snowtest.CChainID)
+	g.ctx.NetworkUpgrades = upgrades
+	g.memory = atomic.NewMemory(sharedMemoryDB)
+	g.ctx.SharedMemory = g.memory.NewSharedMemory(g.ctx.ChainID)
+	// Matching [vmtest.SetupGenesis], the lock is intentionally left locked.
+	g.ctx.Lock.Lock()
+
+	appSender := &enginetest.Sender{
+		T:                 t,
+		CantSendAppGossip: true,
+		SendAppGossipF:    func(context.Context, commoneng.SendConfig, []byte) error { return nil },
+	}
+	const config = `{
+		"pruning-enabled": false,
+		"snapshot-cache": 0,
+		"eth-apis": [
+			"internal-blockchain",
+			"internal-transaction",
+			"eth-filter",
+			"debug-tracer"
+		]
+	}`
+
+	ctx := t.Context()
+	require.NoError(t, g.vm.Initialize(ctx, g.ctx, db, genesisJSON, nil, []byte(config), nil, appSender), "vm.Initialize()")
+	require.NoError(t, g.vm.SetState(ctx, snow.Bootstrapping), "vm.SetState(Bootstrapping)")
+	require.NoError(t, g.vm.SetState(ctx, snow.NormalOp), "vm.SetState(NormalOp)")
 }
 
 func (g *generator) configureValidatorState(t *testing.T) {
@@ -187,16 +218,18 @@ func (g *generator) configureValidatorState(t *testing.T) {
 	}
 }
 
-func (g *generator) setDatabase(t *testing.T, db database.Iteratee) {
+// dump returns every key-value pair of db.
+func dump(t *testing.T, db database.Iteratee) map[string]hexutil.Bytes {
 	t.Helper()
 
-	g.fixture.Database = make(map[string]hexutil.Bytes)
+	entries := make(map[string]hexutil.Bytes)
 	it := db.NewIterator()
 	defer it.Release()
 	for it.Next() {
-		g.fixture.Database[hexutil.Encode(it.Key())] = bytes.Clone(it.Value())
+		entries[hexutil.Encode(it.Key())] = bytes.Clone(it.Value())
 	}
-	require.NoError(t, it.Error(), "iterating VM database")
+	require.NoError(t, it.Error(), "iterating database")
+	return entries
 }
 
 // setClock sets the VM's clock, which drives block timestamps and fork-rule

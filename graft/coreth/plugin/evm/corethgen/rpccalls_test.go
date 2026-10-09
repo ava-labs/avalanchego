@@ -26,7 +26,12 @@ func (g *generator) recordRPCCalls(t *testing.T) {
 
 	handler := g.rpcHandler(t)
 	for _, req := range g.rpcRequests(t) {
-		g.fixture.RPCCalls = append(g.fixture.RPCCalls, req.serve(t, handler))
+		call := req.serve(t, handler)
+		if call.Method == "eth_getProof" {
+			g.fixture.ProofCalls = append(g.fixture.ProofCalls, call)
+		} else {
+			g.fixture.RPCCalls = append(g.fixture.RPCCalls, call)
+		}
 	}
 }
 

@@ -88,6 +88,10 @@ func (e *executionResults) setBaseFee(bf *big.Int) error {
 //
 // This method MUST NOT be called more than once. The wall-clock [time.Time] is
 // for metrics only.
+//
+// A synchronous block's header commits to its state and receipts roots, so
+// nothing is written to xdb. If either root differs from the header, an error
+// is returned before anything is written.
 func (b *Block) MarkExecuted(
 	db ethdb.Database,
 	xdb saetypes.ExecutionResults,
@@ -109,9 +113,21 @@ func (b *Block) MarkExecuted(
 		)
 	}
 
+	receiptRoot := types.DeriveSha(receipts, trie.NewStackTrie(nil))
+	// The roots aren't sanity checked during verification for synchronous
+	// blocks, so we do it here.
+	if b.Synchronous() {
+		if want := b.SettledStateRoot(); stateRootPost != want {
+			return fmt.Errorf("synchronous block %d executed to state root %#x, header commits to %#x", b.NumberU64(), stateRootPost, want)
+		}
+		if want := b.SettledReceiptsRoot(); receiptRoot != want {
+			return fmt.Errorf("synchronous block %d executed to receipts root %#x, header commits to %#x", b.NumberU64(), receiptRoot, want)
+		}
+	}
+
 	e := &executionResults{
 		byGas:         *byGas.Clone(),
-		receiptRoot:   types.DeriveSha(receipts, trie.NewStackTrie(nil)),
+		receiptRoot:   receiptRoot,
 		stateRootPost: stateRootPost,
 		ephemeralExecutionResults: ephemeralExecutionResults{
 			byWall:   byWall,
@@ -131,16 +147,18 @@ func (b *Block) MarkExecuted(
 	return b.markExecutedAfterDiskArtefacts(e, lastExecuted)
 }
 
-// markExecutedOnDisk updates the [saetypes.ExecutionResults] and the head block
-// in the database. The batch is `Write()`n (yeah, it's a word now) after all
-// disk artefacts are persisted.
+// markExecutedOnDisk updates the head block in the database, and the
+// [saetypes.ExecutionResults] if the block is asynchronous. The batch is
+// `Write()`n (yeah, it's a word now) after all disk artefacts are persisted.
 func (b *Block) markExecutedOnDisk(batch ethdb.Batch, xdb saetypes.ExecutionResults, e *executionResults) error {
-	n := b.NumberU64()
-	if err := xdb.Put(n, e.MarshalCanoto()); err != nil {
-		return err
-	}
-	if err := xdb.Sync(n, n); err != nil {
-		return err
+	if !b.Synchronous() {
+		n := b.NumberU64()
+		if err := xdb.Put(n, e.MarshalCanoto()); err != nil {
+			return err
+		}
+		if err := xdb.Sync(n, n); err != nil {
+			return err
+		}
 	}
 	b.SetAsHeadBlock(batch)
 	return batch.Write()
@@ -301,17 +319,16 @@ func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.Execut
 // database, thus they are extracted from the header.
 func (b *Block) synchronousExecutionResults() (*executionResults, error) {
 	// Target, excess, and config _after_ are a requirement of
-	// [Block.MarkExecuted], as provided by [Block.synchronousGasTime].
-	execTime, err := b.synchronousGasTime()
+	// [Block.MarkExecuted], as provided by [Block.SynchronousGasTime].
+	execTime, err := b.SynchronousGasTime()
 	if err != nil {
 		return nil, err
 	}
 
-	ethB := b.EthBlock()
 	e := &executionResults{
 		byGas:         *execTime.Clone(),
-		receiptRoot:   ethB.ReceiptHash(),
-		stateRootPost: ethB.Root(),
+		receiptRoot:   b.SettledReceiptsRoot(),
+		stateRootPost: b.SettledStateRoot(),
 		// receipts are populated in [Block.RestoreExecutionArtefacts], which
 		// calls this method, because this logic is shared.
 	}
@@ -319,10 +336,9 @@ func (b *Block) synchronousExecutionResults() (*executionResults, error) {
 	return e, nil
 }
 
-// synchronousGasTime derives the gas time of a synchronous block, which has no
-// predecessor clock to advance. Inverting the base fee only approximates the
-// excess.
-func (b *Block) synchronousGasTime() (*gastime.Time, error) {
+// SynchronousGasTime derives the gas time of b from its header. b MUST be
+// synchronous. Inverting the base fee only approximates the excess.
+func (b *Block) SynchronousGasTime() (*gastime.Time, error) {
 	target, cfg := b.hooks.GasConfigAfter(b.Header())
 	return gastime.New(
 		b.PreciseTime(),

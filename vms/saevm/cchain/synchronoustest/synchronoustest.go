@@ -8,6 +8,7 @@ package synchronoustest
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -19,7 +20,9 @@ import (
 
 	_ "embed"
 
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade"
 )
 
@@ -35,9 +38,26 @@ type Fixture struct {
 	// RPCCalls holds JSON-RPC calls and the responses the synchronous VM
 	// returned.
 	RPCCalls []RPCCall `json:"rpcCalls"`
+	// ProofCalls holds eth_getProof calls and the responses the synchronous VM
+	// returned. They are kept apart from RPCCalls because eth_getProof is not
+	// supported on Firewood nodes.
+	ProofCalls []RPCCall `json:"proofCalls"`
 	// Database holds every key-value pair of the VM's database after all
 	// Blocks were accepted.
 	Database map[string]hexutil.Bytes `json:"database"`
+	// UTXOs holds the elements the X-Chain put into shared memory for the
+	// C-Chain to import, in order.
+	UTXOs []Element `json:"utxos"`
+	// SharedMemory holds every key-value pair of the shared memory database
+	// after all Blocks were accepted.
+	SharedMemory map[string]hexutil.Bytes `json:"sharedMemory"`
+}
+
+// An Element is a JSON-marshalable [atomic.Element].
+type Element struct {
+	Key    hexutil.Bytes   `json:"key"`
+	Value  hexutil.Bytes   `json:"value"`
+	Traits []hexutil.Bytes `json:"traits"`
 }
 
 //go:embed fixture.json
@@ -106,7 +126,8 @@ var fixtureJSON []byte
 //   - eth_getTransactionCount: each account at each height.
 //   - eth_getCode: each account at each height.
 //   - eth_getStorageAt: slot 0 of each account at each height.
-//   - eth_getProof: each account at each height, proving slot 0.
+//   - eth_getProof: each account at each height, proving slot 0. Recorded in
+//     [Fixture.ProofCalls] rather than [Fixture.RPCCalls].
 //   - eth_call: the counter contract at each height, with call data that makes
 //     it return the slot rather than increment it.
 //   - eth_callDetailed: that same call at each height.
@@ -165,6 +186,11 @@ func (r *RPCCall) Args() []any {
 	return args
 }
 
+// AllRPCCalls returns [Fixture.RPCCalls] followed by [Fixture.ProofCalls].
+func (f *Fixture) AllRPCCalls() []RPCCall {
+	return slices.Concat(f.RPCCalls, f.ProofCalls)
+}
+
 // CoreGenesis decodes [Fixture.Genesis].
 func (f *Fixture) CoreGenesis(tb testing.TB) core.Genesis {
 	tb.Helper()
@@ -178,11 +204,44 @@ func (f *Fixture) CoreGenesis(tb testing.TB) core.Genesis {
 // recreating the database a synchronous node would hand to its successor VM.
 func (f *Fixture) WriteDatabase(tb testing.TB, db database.KeyValueWriter) {
 	tb.Helper()
+	write(tb, f.Database, db)
+}
 
-	for keyHex, value := range f.Database {
+// WriteSharedMemory writes every [Fixture.SharedMemory] key-value pair to db.
+func (f *Fixture) WriteSharedMemory(tb testing.TB, db database.KeyValueWriter) {
+	tb.Helper()
+	write(tb, f.SharedMemory, db)
+}
+
+func write(tb testing.TB, entries map[string]hexutil.Bytes, db database.KeyValueWriter) {
+	tb.Helper()
+
+	for keyHex, value := range entries {
 		key, err := hexutil.Decode(keyHex)
 		require.NoError(tb, err, "decoding key %s", keyHex)
 		require.NoError(tb, db.Put(key, value), "writing entry %s", keyHex)
+	}
+}
+
+// PutUTXOs puts every [Fixture.UTXOs] element into shared memory, from the
+// X-Chain for the C-Chain to import.
+func (f *Fixture) PutUTXOs(tb testing.TB, memory *atomic.Memory, xChainID, cChainID ids.ID) {
+	tb.Helper()
+
+	sm := memory.NewSharedMemory(xChainID)
+	for _, e := range f.UTXOs {
+		traits := make([][]byte, len(e.Traits))
+		for i, t := range e.Traits {
+			traits[i] = t
+		}
+		requests := map[ids.ID]*atomic.Requests{
+			cChainID: {PutRequests: []*atomic.Element{{
+				Key:    e.Key,
+				Value:  e.Value,
+				Traits: traits,
+			}}},
+		}
+		require.NoErrorf(tb, sm.Apply(requests), "%T.Apply(UTXO %s)", sm, e.Key)
 	}
 }
 

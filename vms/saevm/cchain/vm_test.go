@@ -12,6 +12,8 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"testing/synctest"
@@ -40,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -60,6 +63,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
@@ -273,6 +277,13 @@ func withFirewood() sutOption {
 	})
 }
 
+// withSnapshotDisabled disables the snapshot.
+func withSnapshotDisabled() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.SnapshotCache = 0
+	})
+}
+
 // withStateSyncDisabled clears [config.StateSyncEnabled], which defaults to
 // true.
 func withStateSyncDisabled() sutOption {
@@ -300,9 +311,22 @@ func withMinDelayTarget(ms uint64) sutOption {
 	})
 }
 
-// chainDBPrefix locates the VM's database within the SUT's base database,
-// mirroring the prefix avalanchego's chain manager applies.
-var chainDBPrefix = []byte("chain")
+// synchronousFixture returns the fixture and options to bootstrap it from
+// genesis, with Helicon after its last block.
+func synchronousFixture(tb testing.TB) (*synchronoustest.Fixture, []sutOption, *saetest.Clock) {
+	tb.Helper()
+
+	fixture := synchronoustest.Load(tb)
+	upgrades := fixture.Upgrades
+	upgrades.HeliconTime = upgrades.GraniteTime.Add(24 * time.Hour)
+	timeOpt, clock := withVMTime(upgrades.HeliconTime)
+	return fixture, []sutOption{
+		withGenesis(fixture.CoreGenesis(tb)),
+		withUpgrades(upgrades),
+		timeOpt,
+		withState(snow.Bootstrapping),
+	}, clock
+}
 
 // newSUT initializes a cchain [VM], transitions it to the configured
 // [snow.State] (default [snow.NormalOp]), and
@@ -315,6 +339,14 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	require.NoError(tb, err, "tryNewSUT()")
 	return sut.logger.CancelOnError(tb.Context()), sut
 }
+
+var (
+	// chainDBPrefix locates the VM's database within the SUT's base database,
+	// mirroring the prefix avalanchego's chain manager applies.
+	chainDBPrefix = []byte("chain")
+	// sharedMemoryPrefix locates shared memory within the SUT's base database.
+	sharedMemoryPrefix = []byte("sharedmemory")
+)
 
 // tryNewSUT is [newSUT], returning any startup error. Tests SHOULD use
 // [newSUT] unless asserting on such errors.
@@ -350,7 +382,7 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 
 	// The VM and shared memory MUST share an underlying database so that
 	// [atomic.SharedMemory.Apply] writes to the VM DB.
-	sharedMemoryDB := prefixdb.New([]byte("sharedmemory"), db)
+	sharedMemoryDB := prefixdb.New(sharedMemoryPrefix, db)
 	memory := atomic.NewMemory(sharedMemoryDB)
 
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
@@ -775,6 +807,23 @@ func (s *SUT) parseVerifyAccept(ctx context.Context, tb testing.TB, blk *blocks.
 	require.NoErrorf(tb, s.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", s.VM, blk.Height())
 	require.NoErrorf(tb, s.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", s.VM, blk.Height())
 	return parsed
+}
+
+// acceptSynchronousBlocks drives blks, in order, through parse, verify, and
+// accept, asserting that each re-executes to the state and receipts roots its
+// header commits to.
+func (s *SUT) acceptSynchronousBlocks(ctx context.Context, tb testing.TB, blks []synchronoustest.Block) {
+	tb.Helper()
+
+	for _, blk := range blks {
+		parsed, err := s.ParseBlock(ctx, blk.RLP)
+		require.NoErrorf(tb, err, "%T.ParseBlock(height %d)", s.VM, blk.Number)
+		require.NoErrorf(tb, s.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", s.VM, blk.Number)
+		require.NoErrorf(tb, s.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", s.VM, blk.Number)
+
+		assert.Equalf(tb, parsed.SettledStateRoot(), parsed.PostExecutionStateRoot(), "post-execution state root of height %d", blk.Number)
+		assert.Equalf(tb, parsed.SettledReceiptsRoot(), types.DeriveSha(parsed.Receipts(), saetest.TrieHasher()), "receipts root of height %d", blk.Number)
+	}
 }
 
 // verifyTampered re-seals valid with a mutated header and returns the
@@ -1616,6 +1665,78 @@ func TestRestartWithSettledAsynchronousBlock(t *testing.T) {
 	require.Equal(t, settler.ID(), restarted.lastAccepted(restartedCtx, t), "restarted last-accepted")
 }
 
+// A node bootstrapping from genesis must recover from a crash after any number
+// of database writes and be able to extend the chain asynchronously.
+//
+// TODO(StephenButtolph): Also crash with Firewood.
+func TestBootstrapSynchronousBlocks(t *testing.T) {
+	fixture, opts, _ := synchronousFixture(t)
+	heights := make(map[ids.ID]int, len(fixture.Blocks))
+	for i, blk := range fixture.Blocks {
+		heights[ids.ID(blk.Hash)] = i
+	}
+	tip := fixture.Blocks[len(fixture.Blocks)-1]
+
+	// Write the X-chain's UTXOs so that we can use the fixture's shared memory
+	// as the expected shared memory.
+	funded := memdb.New()
+	fixture.PutUTXOs(
+		t,
+		atomic.NewMemory(prefixdb.New(sharedMemoryPrefix, funded)),
+		snowtest.XChainID,
+		snowtest.CChainID,
+	)
+
+	counterDB := saetest.NewCaptureDB(saetest.CopyDB(t, funded), math.MaxInt)
+	ctx, counterSUT := newSUT(t, append(opts, withDB(counterDB))...)
+	counterSUT.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
+
+	for crashAfter := range counterDB.Ops() + 1 {
+		t.Run(fmt.Sprintf("crash_after_op_%d", crashAfter), func(t *testing.T) {
+			t.Parallel()
+
+			_, opts, clock := synchronousFixture(t)
+			db := saetest.NewCaptureDB(saetest.CopyDB(t, funded), crashAfter)
+
+			dataDir := t.TempDir()
+			ctx, node := newSUT(t, append(opts, withDB(db), withChainDataDir(dataDir))...)
+			node.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
+			require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+
+			ctx, sut := newSUT(t, append(opts, withDB(db.Captured(t)), withChainDataDir(dataDir))...)
+			last := sut.lastAccepted(ctx, t)
+			height, ok := heights[last]
+			require.Truef(t, ok, "last accepted %s after restart is not a fixture block", last)
+
+			sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[height+1:])
+			require.Equal(t, ids.ID(tip.Hash), sut.lastAccepted(ctx, t), "last accepted after bootstrapping")
+
+			t.Run("shared_memory", func(t *testing.T) {
+				want := memdb.New()
+				fixture.WriteSharedMemory(t, want)
+				saetest.AssertEqualDBs(t, want, sut.sharedMemoryDB, "shared memory")
+			})
+
+			require.NoErrorf(t, sut.SetPreference(ctx, sut.lastAccepted(ctx, t), nil), "%T.SetPreference()", sut.VM)
+			require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", sut.VM)
+
+			t.Run("extend_async", func(t *testing.T) {
+				// The fixture funds three accounts and only the first two ever
+				// transact, so the third still has its genesis balance and a
+				// zero nonce.
+				w := newWallet(secp256k1.TestKeys()[2], sut.ctx, sut.Client)
+				first := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+				require.Equal(t, tip.Number+1, first.Height(), "first asynchronous block height")
+				require.Equal(t, ids.ID(tip.Hash), first.LastSettled().ID(), "first asynchronous block settles the synchronous tip")
+
+				clock.AdvanceToSettle(ctx, t, first)
+				second := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+				require.Equal(t, first.ID(), second.LastSettled().ID(), "second asynchronous block settles the first")
+			})
+		})
+	}
+}
+
 // Verifies a built block splits its timestamp: seconds in Header.Time, the full
 // millisecond instant in TimeMilliseconds.
 func TestBuildBlockPreservesMillisecondTimestamp(t *testing.T) {
@@ -2160,4 +2281,36 @@ func TestWaitForEventInitializing(t *testing.T) {
 	cancel()
 	_, err := sut.WaitForEvent(ctx)
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+// Re-executing synchronous blocks after a Firewood crash MUST NOT regress the
+// finalized block. Startup only searches for state at and below it, and
+// Firewood only serves its most recently persisted root.
+func TestRecoverFirewoodAcrossSynchronousTransition(t *testing.T) {
+	fixture, opts, clock := synchronousFixture(t)
+	dataDir := t.TempDir()
+	opts = append(opts, withFirewood(), withDB(memdb.New()), withChainDataDir(dataDir))
+
+	ctx, sut := newSUT(t, opts...)
+	sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
+	require.NoErrorf(t, sut.SetPreference(ctx, sut.lastAccepted(ctx, t), nil), "%T.SetPreference()", sut.VM)
+	require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", sut.VM)
+
+	w := newWallet(secp256k1.TestKeys()[2], sut.ctx, sut.Client) // the fixture's only unused account
+	for range 2 {
+		blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+		clock.AdvanceToSettle(ctx, t, blk)
+	}
+	require.NoErrorf(t, sut.Shutdown(ctx), "%T.Shutdown()", sut.VM)
+
+	// Simulates a crash rolling Firewood back before it persisted anything.
+	firewoodDir := filepath.Join(dataDir, firewood.Directory)
+	require.NoError(t, os.RemoveAll(firewoodDir), "removing Firewood directory")
+
+	// Shutdown persists the settled asynchronous root, which will then be the
+	// only root Firewood serves.
+	ctx, sut = newSUT(t, opts...)
+	require.NoErrorf(t, sut.Shutdown(ctx), "%T.Shutdown()", sut.VM)
+
+	newSUT(t, opts...)
 }
