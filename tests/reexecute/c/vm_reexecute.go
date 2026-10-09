@@ -286,12 +286,14 @@ func benchmarkReexecuteRange(
 	executor, err := newVMExecutor(vm, config)
 	r.NoError(err)
 
+	startGas, err := getMetricValue(prefixGatherer, gasMetric)
+	r.NoError(err)
 	start := time.Now()
 	r.NoError(executor.executeSequence(ctx, blockChan))
 	elapsed := time.Since(start)
 
 	benchmarkTool := newBenchmarkTool(benchmarkName)
-	getTopLevelMetrics(tc, benchmarkTool, prefixGatherer, elapsed) // Report the desired top-level metrics
+	getTopLevelMetrics(tc, benchmarkTool, prefixGatherer, elapsed, startGas) // Report the desired top-level metrics
 
 	benchmarkTool.logResults(log)
 	if len(benchmarkOutputFile) != 0 {

@@ -76,11 +76,14 @@ func getMetricValue(registry prometheus.Gatherer, metric topLevelMetric) (float6
 	return 0, fmt.Errorf("metric %s not found", query)
 }
 
-func getTopLevelMetrics(tc tests.TestContext, tool *benchmarkTool, registry prometheus.Gatherer, elapsed time.Duration) {
+// getTopLevelMetrics reports throughput over the gas executed since startGas,
+// excluding any blocks re-executed while the VM recovered its state.
+func getTopLevelMetrics(tc tests.TestContext, tool *benchmarkTool, registry prometheus.Gatherer, elapsed time.Duration, startGas float64) {
 	r := require.New(tc)
 
-	totalGas, err := getMetricValue(registry, gasMetric)
+	endGas, err := getMetricValue(registry, gasMetric)
 	r.NoError(err)
+	totalGas := endGas - startGas
 	r.NotZero(totalGas, "denominator metric %q has value 0", gasMetric.name)
 
 	var (
