@@ -34,6 +34,7 @@ avalanchego monorepo.
   - [Building](#building)
   - [Testing](#testing)
     - [Go Test Selection](#go-test-selection)
+    - [E2E runner](#e2e-runner)
     - [Test Options](#test-options)
     - [Test Timeouts](#test-timeouts)
     - [Non-Unit Tests and the `manual` Tag](#non-unit-tests-and-the-manual-tag)
@@ -467,9 +468,74 @@ bazel test //utils:set_test --test_filter=TestSet_Add
 # Collect coverage
 bazel coverage //...
 
-# Run E2E tests (requires built binary)
+# Run all E2E tests with Bazel-built runtime dependencies
 task bazel-test-e2e
+
+# Run the focused E2E smoke test with Bazel-built runtime dependencies
+task bazel-test-e2e-smoke
+
+# Build and stage the binaries used by E2E artifact consumers
+task bazel-stage-avalanchego
+task bazel-stage-e2e-runtime
+
+# Run E2E tests from the staged binaries without invoking Bazel
+task bazel-test-e2e-staged
+
+# Run E2E tests serially from the staged binaries
+task bazel-test-e2e-staged-serial
 ```
+
+#### E2E runner
+
+`task bazel-test-e2e` runs `bazel run //tests/e2e:e2e_runner`. Bazel builds
+avalanchego, Ginkgo, the E2E test binary, and XSVM before it starts the runner.
+The runner then runs the prebuilt E2E binary through Ginkgo. It does not build a
+binary with Go during test execution.
+
+`task bazel-stage-avalanchego` and `task bazel-stage-e2e-runtime` build and
+stage these binaries under `build/bazel-e2e`. CI uploads the two directories as
+separate artifacts. AvalancheGo has its own artifact because other CI jobs can
+reuse it. The E2E runtime artifact contains Ginkgo, XSVM, and `e2e.test`. This
+split avoids rebuilding unchanged binaries in each E2E consumer job.
+
+`task bazel-test-e2e-staged` runs the restored binaries from that location
+without invoking Bazel. `task bazel-test-e2e-staged-serial` runs the restored
+binaries with `E2E_SERIAL=1`. The runner restores executable permissions because
+GitHub Actions artifacts do not preserve them.
+
+##### Runner selection
+
+The reusable Bazel workflow uses `runner` for setup, unit tests, and E2E
+artifact builds. Its optional `e2e_runner` input overrides the runner for the
+E2E consumer only. Non-scheduled Linux CI sets `e2e_runner` to
+`ubuntu-24.04-amd64-4-core`. This runner has enough CPU capacity for parallel
+Ginkgo processes.
+
+Pre-merge CI uses the four-core runner to return E2E results sooner. Scheduled
+CI uses each platform's standard runner to validate all supported platforms. It
+sets `run_e2e_serially` to select `bazel-test-e2e-staged-serial`. Standard
+runners do not have enough CPU capacity for parallel Ginkgo processes. The
+longer scheduled run does not delay pull-request or merge-queue feedback.
+
+Use a larger scheduled runner only when serial E2E exceeds the scheduled timeout
+or stops providing useful coverage. Do not replace scheduled platforms with the
+AMD64 four-core runner only to reduce run time.
+
+Keep the E2E artifact builders and consumer on compatible operating systems and
+CPU architectures. The consumer runs the executables from the uploaded
+artifacts.
+
+The runner uses `bazel run`, not `bazel test`. Tmpnet creates network data under
+`$HOME/.tmpnet`. This path lets developers inspect a failed network. Tmpnet
+already gives each network a separate directory. Do not move this runtime into
+a Bazel sandbox unless tmpnet can preserve this inspection path.
+
+The runner creates `$HOME/.tmpnet/plugins/bazel-e2e` and links the Bazel-built
+XSVM binary there. It sets `AVAGO_PLUGIN_DIR` to this directory. The runner does
+not change `build/xsvm` or `$HOME/.avalanchego/plugins`.
+
+Use `task bazel-test-e2e-smoke` to run only the C-Chain ProposerVM API test.
+This task uses the same Bazel runner and inputs as the full E2E task.
 
 #### Go Test Selection
 
@@ -625,10 +691,20 @@ reasons outside the repository. A smaller job set reduces that risk.
 
 Non-scheduled Bazel CI runs these jobs:
 
-- Ubuntu 24.04 AMD64 CI runs one full cacheable unit-test job and a focused E2E
-  smoke test.
+- The Ubuntu 24.04 AMD64 runner runs one full cacheable unit-test job and the
+  E2E artifact-builder jobs. The four-core runner runs the E2E consumer.
 - macOS 26 ARM64 CI runs one cacheable unit-test smoke target and one focused
   E2E smoke test.
+
+The Linux E2E jobs build avalanchego and the other E2E runtime binaries with
+Bazel, upload them as separate artifacts, and run the restored binaries on the
+host. This lets tmpnet write network data to `$HOME/.tmpnet`. The macOS smoke
+job uses `//tests/e2e:e2e_runner` directly and changes only the Ginkgo focus
+filter.
+
+The Linux runner label is `ubuntu-24.04-amd64-4-core`. The four cores let
+Ginkgo run E2E tests in parallel. Add a new custom runner label to
+`.github/actionlint.yml` before a workflow uses it.
 
 Previously, Bazel CI divided the full unit-test suite among three
 component-specific jobs. These jobs ran in parallel to keep the pre-merge
@@ -637,20 +713,19 @@ detection. These changes remove the need for separate jobs. Reconsider separate
 jobs if these conditions change or one job makes the pre-merge runtime
 unacceptable.
 
-The E2E smoke task selects the C-Chain ProposerVM API test. Ubuntu and macOS use
-the same task. It does not provide full E2E coverage. A future change will
-replace the Ubuntu smoke test with a non-smoke E2E test. Each setup job checks
+The E2E smoke task selects the C-Chain ProposerVM API test. Only macOS pre-merge CI
+uses this task. The Linux pre-merge job runs the full E2E task.  Each setup job checks
 Bazel metadata. On `master`, a cache miss makes each setup job prepare the CI
 dependency list. The job then disables downloads, checks metadata, and saves the
-cache. Setup jobs can duplicate this work when they share a key. On other refs,
-each Bazel-consuming job prepares its own non-exact restore before it runs
-offline. Those jobs do not save the cache.
+cache. Setup jobs can duplicate this work when they share a key. On other refs, each
+Bazel-consuming job prepares its own non-exact restore before it runs offline.
 
-The daily scheduled workflow runs one full unit-test job on Ubuntu 22.04 and
-24.04, on AMD64 and ARM64, and on macOS 26 ARM64. It also runs the same focused
-E2E smoke test on each platform. Only the Ubuntu 24.04 AMD64 unit-test job uses
-race detection and shuffled test order. It uses `--nocache_test_results`. Thus,
-Bazel runs it again and does not use a cached random test result.
+The daily scheduled workflow runs one full unit-test job and all E2E tests on
+Ubuntu 22.04 and 24.04, on AMD64 and ARM64, and on macOS 26 ARM64. Its E2E jobs
+run serially on each platform's standard runner. Only the Ubuntu 24.04 AMD64
+unit-test job uses race detection and shuffled test order. It uses
+`--nocache_test_results`. Thus, Bazel runs it again and does not use a cached
+random test result.
 
 The scheduled workflow also disables the remote cache. This provides daily
 validation that does not depend on remote action or test results.

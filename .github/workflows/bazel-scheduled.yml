@@ -39,6 +39,7 @@ jobs:
     with:
       platform_name: ${{ matrix.platform_name }}
       runner: ${{ matrix.runner }}
+      run_e2e_serially: true
       run_race_shuffle_unit_tests: ${{ matrix.run_race_shuffle_unit_tests }}
       # Scheduled jobs run broader tests without the remote action cache.
       setup_timeout_minutes: 20

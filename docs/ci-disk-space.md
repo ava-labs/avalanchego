@@ -38,7 +38,7 @@ The current shared implementation centers on:
 - `scripts/log_ci_disk_state.sh` for bounded diagnostics
 - `./.github/actions/ensure-disk-space` for shared check/cleanup/re-check orchestration
 - thin wrapper actions that combine preflight, command execution, and failure diagnostics for specific job classes
-- `./.github/actions/run-monitored-tmpnet-cmd` for monitored tmpnet jobs whose disk behavior is derived from `setup_bazel` and `runtime`
+- `./.github/actions/run-monitored-tmpnet-cmd` for monitored tmpnet jobs whose disk behavior is derived from `setup_bazel` and `runtime`; artifact-backed consumers can also skip host Go module-cache setup
 
 ## Usage
 

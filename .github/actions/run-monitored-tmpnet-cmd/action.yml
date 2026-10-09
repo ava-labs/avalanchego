@@ -14,6 +14,9 @@ inputs:
   setup_bazel:
     description: 'Whether to run Bazel setup before executing the command'
     default: 'false'
+  skip_host_go_module_cache:
+    description: 'Skip host Go module-cache setup when the command does not use host Go'
+    default: 'false'
   filter_by_owner:
     default: ''
   artifact_prefix:
@@ -67,8 +70,15 @@ runs:
     # Install nix and ensure promtail and prometheus are available
     - uses: ./.github/actions/install-nix
       with:
-        # Bazel uses its own Go module cache.
-        setup_go_module_cache: ${{ inputs.setup_bazel != 'true' }}
+        # Bazel uses its own Go module cache. Artifact-backed consumers can
+        # also skip the host cache when their command does not invoke Go.
+        setup_go_module_cache: ${{ inputs.setup_bazel != 'true' && inputs.skip_host_go_module_cache != 'true' }}
+    - name: Disable the Go module proxy without module-cache setup
+      # setup-go-module-cache normally sets GOPROXY=off. Keep the same offline
+      # workload policy when an artifact-backed consumer skips that action.
+      if: ${{ inputs.skip_host_go_module_cache == 'true' }}
+      shell: bash
+      run: echo 'GOPROXY=off' >> "$GITHUB_ENV"
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash
