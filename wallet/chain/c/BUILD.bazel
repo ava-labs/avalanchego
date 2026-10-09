@@ -30,13 +30,12 @@ go_library(
         "//vms/avm",
         "//vms/components/avax",
         "//vms/components/gas",
+        "//vms/evm/client",
         "//vms/saevm/cchain",
         "//vms/saevm/cchain/tx",
         "//vms/secp256k1fx",
         "//wallet/subnet/primary/common",
         "@com_github_ava_labs_libevm//common",
-        "@com_github_ava_labs_libevm//common/hexutil",
-        "@com_github_ava_labs_libevm//ethclient",
     ],
 )
 

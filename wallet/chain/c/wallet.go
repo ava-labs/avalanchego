@@ -8,11 +8,9 @@ package c
 import (
 	"time"
 
-	"github.com/ava-labs/libevm/common/hexutil"
-	"github.com/ava-labs/libevm/ethclient"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/client"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -69,7 +67,7 @@ func NewWallet(
 	builder Builder,
 	signer Signer,
 	avaxClient *cchain.Client,
-	ethClient *ethclient.Client,
+	ethClient *client.Client,
 	backend Backend,
 ) Wallet {
 	return &wallet{
@@ -86,7 +84,7 @@ type wallet struct {
 	builder    Builder
 	signer     Signer
 	avaxClient *cchain.Client
-	ethClient  *ethclient.Client
+	ethClient  *client.Client
 }
 
 func (w *wallet) Builder() Builder {
@@ -196,12 +194,5 @@ func (w *wallet) baseFee(options []common.Option) (gas.Price, error) {
 		return baseFee, nil
 	}
 
-	ctx := ops.Context()
-	// TODO(owenwahlgren): Expose an SAE client that includes the
-	// Avalanche-custom eth RPCs, such as eth_baseFee, and use it here.
-	var fee hexutil.Uint64
-	if err := w.ethClient.Client().CallContext(ctx, &fee, "eth_baseFee"); err != nil {
-		return 0, err
-	}
-	return gas.Price(fee), nil
+	return w.ethClient.EstimateBaseFee(ops.Context())
 }

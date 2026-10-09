@@ -117,7 +117,7 @@ func (s *SUT) testRPC(ctx context.Context, t *testing.T, tcs ...rpcTest) {
 			if tc.parallel {
 				t.Parallel()
 			}
-			t.Logf("%T.CallContext(ctx, %T, %q, %v...)", s.wsClient, &tc.want, tc.method, tc.args)
+			t.Logf("%T.CallContext(ctx, %T, %q, %v...)", s.Client.RPC.Client, &tc.want, tc.method, tc.args)
 			if tc.eventually {
 				require.EventuallyWithT(t, func(c *assert.CollectT) {
 					test(c)
@@ -176,7 +176,7 @@ func TestSubscriptions(t *testing.T) {
 		newLogs  = make(chan types.Log, 1)
 	)
 	{
-		sub, err := sut.wsClient.EthSubscribe(ctx, newTxs, "newPendingTransactions")
+		sub, err := sut.EthSubscribe(ctx, newTxs, "newPendingTransactions")
 		require.NoError(t, err, "EthSubscribe(newPendingTransactions)")
 		t.Cleanup(sub.Unsubscribe)
 	}

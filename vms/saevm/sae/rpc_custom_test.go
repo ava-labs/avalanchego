@@ -85,13 +85,13 @@ func TestNewAcceptedTransactions(t *testing.T) {
 
 	hashes := make(chan common.Hash, 1)
 	{
-		sub, err := sut.wsClient.EthSubscribe(ctx, hashes, "newAcceptedTransactions")
+		sub, err := sut.EthSubscribe(ctx, hashes, "newAcceptedTransactions")
 		require.NoErrorf(t, err, "EthSubscribe(newAcceptedTransactions)")
 		t.Cleanup(sub.Unsubscribe)
 	}
 	txs := make(chan *ethapi.RPCTransaction, 1)
 	{
-		sub, err := sut.wsClient.EthSubscribe(ctx, txs, "newAcceptedTransactions", true)
+		sub, err := sut.EthSubscribe(ctx, txs, "newAcceptedTransactions", true)
 		require.NoErrorf(t, err, "EthSubscribe(newAcceptedTransactions, true)")
 		t.Cleanup(sub.Unsubscribe)
 	}

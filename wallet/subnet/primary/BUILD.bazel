@@ -19,6 +19,7 @@ go_library(
         "//utils/set",
         "//vms/avm",
         "//vms/components/avax",
+        "//vms/evm/client",
         "//vms/platformvm",
         "//vms/platformvm/platform",
         "//vms/saevm/cchain",
@@ -32,7 +33,6 @@ go_library(
         "//wallet/chain/x/signer",
         "//wallet/subnet/primary/common",
         "@com_github_ava_labs_libevm//common",
-        "@com_github_ava_labs_libevm//ethclient",
     ],
 )
 

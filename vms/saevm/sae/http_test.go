@@ -21,6 +21,11 @@ func TestCallTimeout(t *testing.T) {
 	ctx, sut := newSUT(t, 0, precompileOpt, options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.RPCConfig.CallTimeout = 100 * time.Millisecond
 	}))
+
+	httpClient := dialRPC(ctx, t, sut, "http", rpcHTTPExtensionPath)
+	t.Cleanup(httpClient.Close)
+
+	// MUST occur before any RPC clients are closed, or they will block.
 	defer unblock()
 
 	tests := []struct {
@@ -29,11 +34,11 @@ func TestCallTimeout(t *testing.T) {
 	}{
 		{
 			name:   "http",
-			client: sut.httpClient,
+			client: httpClient,
 		},
 		{
 			name:   "ws",
-			client: sut.wsClient,
+			client: sut.Client.RPC.Client,
 		},
 	}
 

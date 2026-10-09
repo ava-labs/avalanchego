@@ -7,8 +7,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ava-labs/libevm/ethclient"
-
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -24,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
 
+	ethclient "github.com/ava-labs/avalanchego/vms/evm/client"
 	pbuilder "github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 	xbuilder "github.com/ava-labs/avalanchego/wallet/chain/x/builder"
 	walletcommon "github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -201,7 +200,7 @@ func FetchEthState(
 		uri,
 		constants.ChainAliasPrefix,
 	)
-	client, err := ethclient.Dial(path)
+	client, err := ethclient.Dial(ctx, path)
 	if err != nil {
 		return nil, err
 	}
