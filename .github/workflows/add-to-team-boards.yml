@@ -19,6 +19,7 @@ jobs:
           app-id: ${{ vars.TEAM_BOARDS_APP_ID }}
           private-key: ${{ secrets.TEAM_BOARDS_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
 
       - name: Determine author team membership
         id: membership
