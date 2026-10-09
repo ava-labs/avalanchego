@@ -298,14 +298,14 @@ func (r *rollingGasThroughput) observe(s executionSpan) {
 }
 
 func (s *executionSpan) gasTime() time.Duration {
-	// Overflow is impossible due to the block gas limit being O(seconds) worth
-	// of gas.
+	// See gosec disabling rationale for why we ignore the (impossible) overflow
+	// error.
 	ns, _, _ := intmath.MulDiv(
 		s.consumed,                           // gas
 		gas.Gas(time.Second/time.Nanosecond), // no unit
 		s.rate,                               // gas/time
 	)
-	return time.Duration(ns)
+	return time.Duration(ns) //nolint:gosec // Known to be O(seconds) so won't overflow int64
 }
 
 func (s *executionSpan) wallTime() time.Duration {
