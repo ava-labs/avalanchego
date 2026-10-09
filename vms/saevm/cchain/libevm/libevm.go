@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package libevm registers the C-Chain's hooks and payloads with libevm.
+// Package libevm registers the C-Chain's libevm hooks and payloads.
 package libevm
 
 import (
