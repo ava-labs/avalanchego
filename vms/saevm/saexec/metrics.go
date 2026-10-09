@@ -262,10 +262,7 @@ func (m *metrics) observeExecuteDuration(start, end time.Time, b *blocks.Block, 
 		start:    start,
 		end:      end,
 		consumed: res.GasConsumed,
-		// The gas target (and hence rate) is changed at the end of a block, so
-		// the rate at which this block was executed is inherited from the
-		// parent.
-		rate: b.ParentBlock().ExecutedByGasTime().Rate(),
+		rate:     res.rate,
 	})
 }
 

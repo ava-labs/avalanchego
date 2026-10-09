@@ -199,6 +199,10 @@ type (
 			Gas  *gastime.Time
 			Wall time.Time
 		}
+		// The final [gastime.Time] is from after the change in
+		// [gastime.Time.Rate] so may differ from the rate at which the block
+		// was actually executed.
+		rate gas.Gas
 	}
 )
 
@@ -335,6 +339,7 @@ func Execute(
 		Signer:   signer,
 		BlockCtx: core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
 		Receipts: make(types.Receipts, len(txs)),
+		rate:     gasClock.Rate(),
 	}
 
 	for ti, tx := range txs {
