@@ -39,7 +39,7 @@ func (b *Block) SwapInterimExecutionTime(t *proxytime.Time[gas.Gas]) *proxytime.
 	return b.interimExecutionTime.Swap(t.Clone())
 }
 
-//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+//go:generate go run github.com/StephenButtolph/canoto/canoto --proto $GOFILE
 
 //nolint:revive // struct-tag: canoto allows unexported fields
 type executionResults struct {
