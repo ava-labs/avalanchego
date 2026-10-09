@@ -66,10 +66,6 @@ var (
 		"archive": `{
 			"pruning-enabled": false
 		}`,
-		"pathdb": `{
-			"state-scheme": "path",
-			"state-sync-enabled": false
-		}`,
 		"firewood": `{
 			"state-scheme": "firewood",
 			"snapshot-cache": 0,

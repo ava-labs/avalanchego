@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
@@ -45,7 +46,6 @@ import (
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
@@ -404,7 +404,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
-			Coinbase:         evmconstants.BlackholeAddr,
+			Coinbase:         blackhole.Address,
 			Difficulty:       big.NewInt(1),
 			Number:           new(big.Int).Add(parent.Number, common.Big1),
 			Time:             nowMS / 1000,

@@ -11,9 +11,9 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	ethcommon "github.com/ava-labs/libevm/common"
@@ -31,7 +31,7 @@ type Backend interface {
 	BuilderBackend
 	SignerBackend
 
-	AcceptAtomicTx(ctx context.Context, tx *atomic.Tx) error
+	AcceptTx(ctx context.Context, tx *tx.Tx) error
 }
 
 type backend struct {
@@ -56,12 +56,12 @@ func NewBackend(
 	}
 }
 
-func (b *backend) AcceptAtomicTx(ctx context.Context, tx *atomic.Tx) error {
-	switch tx := tx.UnsignedAtomicTx.(type) {
-	case *atomic.UnsignedImportTx:
-		for _, input := range tx.ImportedInputs {
+func (b *backend) AcceptTx(ctx context.Context, t *tx.Tx) error {
+	switch utx := t.Unsigned.(type) {
+	case *tx.Import:
+		for _, input := range utx.ImportedInputs {
 			utxoID := input.InputID()
-			if err := b.RemoveUTXO(ctx, tx.SourceChain, utxoID); err != nil {
+			if err := b.RemoveUTXO(ctx, utx.SourceChain, utxoID); err != nil {
 				return err
 			}
 		}
@@ -69,22 +69,21 @@ func (b *backend) AcceptAtomicTx(ctx context.Context, tx *atomic.Tx) error {
 		b.accountsLock.Lock()
 		defer b.accountsLock.Unlock()
 
-		for _, output := range tx.Outs {
+		for _, output := range utx.Outs {
 			account, ok := b.accounts[output.Address]
 			if !ok {
 				continue
 			}
 
-			balance := new(big.Int).SetUint64(output.Amount)
-			balance.Mul(balance, avaxConversionRate)
-			account.Balance.Add(account.Balance, balance)
+			amount := tx.ScaleAVAX(output.Amount)
+			account.Balance.Add(account.Balance, amount.ToBig())
 		}
-	case *atomic.UnsignedExportTx:
-		txID := tx.ID()
-		for i, out := range tx.ExportedOutputs {
+	case *tx.Export:
+		txID := t.ID()
+		for i, out := range utx.ExportedOutputs {
 			err := b.AddUTXO(
 				ctx,
-				tx.DestinationChain,
+				utx.DestinationChain,
 				&avax.UTXO{
 					UTXOID: avax.UTXOID{
 						TxID:        txID,
@@ -102,18 +101,18 @@ func (b *backend) AcceptAtomicTx(ctx context.Context, tx *atomic.Tx) error {
 		b.accountsLock.Lock()
 		defer b.accountsLock.Unlock()
 
-		for _, input := range tx.Ins {
+		for _, input := range utx.Ins {
 			account, ok := b.accounts[input.Address]
 			if !ok {
 				continue
 			}
 
-			balance := new(big.Int).SetUint64(input.Amount)
-			balance.Mul(balance, avaxConversionRate)
-			if account.Balance.Cmp(balance) == -1 {
+			scaled := tx.ScaleAVAX(input.Amount)
+			amount := scaled.ToBig()
+			if account.Balance.Cmp(amount) == -1 {
 				return errInsufficientFunds
 			}
-			account.Balance.Sub(account.Balance, balance)
+			account.Balance.Sub(account.Balance, amount)
 
 			newNonce, err := math.Add(input.Nonce, 1)
 			if err != nil {
@@ -122,7 +121,7 @@ func (b *backend) AcceptAtomicTx(ctx context.Context, tx *atomic.Tx) error {
 			account.Nonce = newNonce
 		}
 	default:
-		return fmt.Errorf("%w: %T", errUnknownTxType, tx)
+		return fmt.Errorf("%w: %T", errUnknownTxType, utx)
 	}
 	return nil
 }

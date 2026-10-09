@@ -97,7 +97,7 @@ If this release activates a new network upgrade on Mainnet:
    DEFAULT_VERSION="1.15.1"
    ```
 
-1. In [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml), comment out the `Run e2e tests` step of the `upgrade` job, leaving `actions/checkout` so the job still has a step:
+1. In [`.github/workflows/go.yml`](.github/workflows/go.yml), comment out the `Run e2e tests` step of the `upgrade` job, leaving `actions/checkout` so the job still has a step:
 
    ```yaml
    upgrade:
@@ -315,7 +315,7 @@ export NEXT_VERSION=v1.15.2
    git diff "$VERSION" origin/master -- RELEASES.md
    ```
 
-1. If you disabled the `upgrade` job in [step 2](#activating-a-network-upgrade-on-mainnet), enable it again in [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml). Uncomment the `Run e2e tests` step and delete the `TODO` comment.
+1. If you disabled the `upgrade` job in [step 2](#activating-a-network-upgrade-on-mainnet), enable it again in [`.github/workflows/go.yml`](.github/workflows/go.yml). Uncomment the `Run e2e tests` step and delete the `TODO` comment.
 
 1. Create PR and merge:
 

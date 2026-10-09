@@ -13,8 +13,8 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 )
 
 var mintSignature = contract.CalculateFunctionSelector("mintNativeCoin(address,uint256)") // address, amount
@@ -29,7 +29,7 @@ func FuzzPackMintNativeCoinTest(f *testing.F) {
 	f.Add(testAddrBytes, abi.MaxUint256.Bytes())
 	f.Add(testAddrBytes, new(big.Int).Sub(abi.MaxUint256, common.Big1).Bytes())
 	f.Add(testAddrBytes, new(big.Int).Add(abi.MaxUint256, common.Big1).Bytes())
-	f.Add(constants.BlackholeAddr.Bytes(), common.Big2.Bytes())
+	f.Add(blackhole.Address.Bytes(), common.Big2.Bytes())
 	f.Fuzz(func(t *testing.T, b []byte, bigIntBytes []byte) {
 		bigIntVal := new(big.Int).SetBytes(bigIntBytes)
 		// we can only check if outputs are correct if the value is less than MaxUint256
@@ -59,7 +59,7 @@ func testPackMintNativeCoin(t *testing.T, addr common.Address, amount *big.Int, 
 }
 
 func TestUnpackMintNativeCoinInput(t *testing.T) {
-	testInputBytes, err := PackMintNativeCoin(constants.BlackholeAddr, common.Big2)
+	testInputBytes, err := PackMintNativeCoin(blackhole.Address, common.Big2)
 	require.NoError(t, err)
 	// exclude 4 bytes for function selector
 	testInputBytes = testInputBytes[4:]
@@ -94,7 +94,7 @@ func TestUnpackMintNativeCoinInput(t *testing.T) {
 			input:          append(testInputBytes, make([]byte, 32)...),
 			strictMode:     false,
 			expectedErr:    nil,
-			expectedAddr:   constants.BlackholeAddr,
+			expectedAddr:   blackhole.Address,
 			expectedAmount: common.Big2,
 		},
 		{
@@ -108,7 +108,7 @@ func TestUnpackMintNativeCoinInput(t *testing.T) {
 			input:          append(testInputBytes, make([]byte, 33)...),
 			strictMode:     false,
 			expectedErr:    nil,
-			expectedAddr:   constants.BlackholeAddr,
+			expectedAddr:   blackhole.Address,
 			expectedAmount: common.Big2,
 		},
 	}

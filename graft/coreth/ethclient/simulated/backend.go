@@ -40,9 +40,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/interfaces"
 	"github.com/ava-labs/avalanchego/graft/coreth/node"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -106,7 +106,7 @@ func NewBackend(alloc types.GenesisAlloc, options ...func(nodeConf *node.Config,
 		Alloc:  alloc,
 	}
 	ethConf.AllowUnfinalizedQueries = true
-	ethConf.Miner.Etherbase = constants.BlackholeAddr
+	ethConf.Miner.Etherbase = blackhole.Address
 	ethConf.Miner.TestOnlyAllowDuplicateBlocks = true
 	ethConf.TxPool.NoLocals = true
 

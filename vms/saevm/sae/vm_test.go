@@ -233,10 +233,10 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 	// don't need to treat our node as a special case.
 	require.NoErrorf(tb, snow.Connected(ctx, snowCtx.NodeID, version.Current), "Connected(%s)", snowCtx.NodeID)
 
-	ethClient := dialRPC(ctx, tb, snow)
+	rpcClient := dialRPC(ctx, tb, snow, "ws", wsHTTPExtensionPath)
 	sut := &SUT{
 		ChainVM: snow,
-		Client:  ethClient,
+		Client:  client.New(rpcClient),
 
 		wallet: saetest.NewWalletWithKeyChain(
 			keys,
@@ -263,18 +263,20 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 	return sut.context(tb), sut
 }
 
-func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM) *client.Client {
+// dialRPC serves the handler that snow creates for the HTTP extension `path`
+// and returns a client connected to it via `scheme`, typically "ws" for
+// [wsHTTPExtensionPath] or "http" for [rpcHTTPExtensionPath].
+func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM, scheme, path string) *rpc.Client {
 	tb.Helper()
 
 	handlers, err := snow.CreateHandlers(ctx)
 	require.NoErrorf(tb, err, "%T.CreateHandlers()", snow)
-	server := httptest.NewServer(handlers[wsHTTPExtensionPath])
+	server := httptest.NewServer(handlers[path])
 	tb.Cleanup(server.Close)
-	rpcClient, err := rpc.Dial("ws://" + server.Listener.Addr().String())
-	require.NoErrorf(tb, err, "rpc.Dial(http.NewServer(%T.CreateHandlers()))", snow)
-	client := client.New(rpcClient)
+	url := scheme + "://" + server.Listener.Addr().String()
+	client, err := rpc.DialContext(ctx, url)
+	require.NoErrorf(tb, err, "rpc.Dial(%q)", url)
 	tb.Cleanup(client.Close)
-
 	return client
 }
 

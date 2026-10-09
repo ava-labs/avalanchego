@@ -100,14 +100,14 @@ Go and Bazel use the same workflow roles and file-name pattern:
 
 | Role | Bazel | Go |
 | --- | --- | --- |
-| Pre-merge entrypoint | [`bazel-ci-pre-merge.yml`](../.github/workflows/bazel-ci-pre-merge.yml) | [`go-ci-pre-merge.yml`](../.github/workflows/go-ci-pre-merge.yml) |
-| Scheduled entrypoint | [`bazel-ci-scheduled.yml`](../.github/workflows/bazel-ci-scheduled.yml) | [`go-ci-scheduled.yml`](../.github/workflows/go-ci-scheduled.yml) |
-| Primary reusable workflow | [`bazel-ci.yml`](../.github/workflows/bazel-ci.yml) | [`go-ci.yml`](../.github/workflows/go-ci.yml) |
-| Reusable smoke workflow | [`bazel-ci-smoke.yml`](../.github/workflows/bazel-ci-smoke.yml) | [`go-ci-smoke.yml`](../.github/workflows/go-ci-smoke.yml) |
+| Pre-merge entrypoint | [`bazel-merge-group.yml`](../.github/workflows/bazel-merge-group.yml) | [`go.yml`](../.github/workflows/go.yml) |
+| Scheduled entrypoint | [`bazel-scheduled.yml`](../.github/workflows/bazel-scheduled.yml) | [`go-scheduled.yml`](../.github/workflows/go-scheduled.yml) |
+| Primary reusable workflow | [`bazel.yml`](../.github/workflows/bazel.yml) | [`go-unit.yml`](../.github/workflows/go-unit.yml) |
+| Reusable smoke workflow | [`bazel-smoke.yml`](../.github/workflows/bazel-smoke.yml) | [`go-smoke.yml`](../.github/workflows/go-smoke.yml) |
 
 Entrypoints select the reusable workflow that provides the required test policy,
 or define jobs that are specific to that event. The pre-merge and scheduled Go
-entrypoints both use `go-ci.yml`; pre-merge macOS uses `go-ci-smoke.yml`.
+entrypoints both use `go-unit.yml`; pre-merge macOS uses `go-smoke.yml`.
 
 Smoke workflows run a minimal macOS test. This test verifies that unit tests
 can run on macOS. The Linux pre-merge job and scheduled jobs run the full unit
@@ -129,14 +129,14 @@ jobs. Therefore, a platform's Bazel jobs wait only for that platform's setup job
 
 ### Go unit test platforms
 
-The `unit` job in `go-ci-pre-merge.yml` calls the reusable
-[`go-ci.yml`](../.github/workflows/go-ci.yml) workflow on Linux AMD64. It runs
+The `unit` job in `go.yml` calls the reusable
+[`go-unit.yml`](../.github/workflows/go-unit.yml) workflow on Linux AMD64. It runs
 the unified unit test suite ([`scripts/tests.unit.sh`](../scripts/tests.unit.sh))
 through the `test-unit` task. That task disables race detection and test
 shuffling so the Go build and test cache can serve repeated runs.
 
 On macOS, the `smoke` job calls
-[`go-ci-smoke.yml`](../.github/workflows/go-ci-smoke.yml). macOS runners are
+[`go-smoke.yml`](../.github/workflows/go-smoke.yml). macOS runners are
 slower. They also fail more often because of external runner problems.
 Pre-merge CI therefore runs only a Go unit-test smoke test on macOS. This
 mirrors the macOS smoke job in Bazel CI. See [Test platforms and cache
@@ -144,8 +144,8 @@ policy](./bazel.md#test-platforms-and-cache-policy).
 
 The `Scheduled Go` workflow runs the full unit suite on each platform. The
 workflow is defined in
-[`go-ci-scheduled.yml`](../.github/workflows/go-ci-scheduled.yml). It calls
-[`go-ci.yml`](../.github/workflows/go-ci.yml) for each platform. Only the Ubuntu
+[`go-scheduled.yml`](../.github/workflows/go-scheduled.yml). It calls
+[`go-unit.yml`](../.github/workflows/go-unit.yml) for each platform. Only the Ubuntu
 24.04 AMD64 job runs `test-unit-race-shuffle`. This task enables race detection
 and shuffled test order. The other scheduled jobs run `test-unit` to check
 platform compatibility without race detection or shuffled test order.
@@ -169,7 +169,7 @@ its `action.yml` from the workspace before it can run the action. A local action
 cannot check out the repository for its own first use.
 
 For example, end-to-end jobs in
-[`.github/workflows/go-ci-pre-merge.yml`](../.github/workflows/go-ci-pre-merge.yml) use
+[`.github/workflows/go.yml`](../.github/workflows/go.yml) use
 `run-monitored-tmpnet-cmd` to monitor a named task and collect its artifacts:
 
 ```yaml
@@ -227,12 +227,22 @@ reserved for jobs with dependencies that another setup action does not provide.
 `install-nix` makes the Nix dev-shell Task available. See [Task](#task) for the
 cache and version rules.
 
-`setup-go-for-project`, `setup-bazel`, and `install-nix` are alternative Go
-provisioning mechanisms. A job that uses `setup-bazel` can also use `install-nix`
-for dependencies that Bazel does not provide. `install-nix` can restore Go
-module input, but it does not save that cache. The Go workflow setup jobs own
-Go module, Task, and Nix store cache writes. Other workflows consume these
-caches without writing them.
+Choose the setup action that provides the job's dependencies. Bazel provides
+Go for its targets, but a job that also runs host Go commands needs
+`setup-go-for-project` or the Nix dev shell. For example, `check-go-mod-tidy`
+uses both `setup-bazel` and `setup-go-for-project`, while `lint-avalanchego`
+uses `setup-bazel` and `install-nix` for flake-provided tools.
+
+When combining these actions, run `setup-bazel` before either Go setup action
+disables `GOPROXY`. Bazel preparation can download Go modules into its separate
+module cache on a miss or non-exact restore. Preparing the host Go module cache
+does not populate that cache. An exact Bazel cache hit can hide an incorrect
+setup order, so validate both exact hits and cold-cache preparation; see
+[Bazel cache validation](./bazel.md#changing-this-safely).
+
+`install-nix` can restore Go module input, but it does not save that cache. The
+Go workflow setup jobs own Go module, Task, and Nix store cache writes. Other
+workflows consume these caches without writing them.
 
 ## CI cache policy
 
@@ -247,8 +257,9 @@ these input caches:
 - **Verify Go and Bazel dependency inputs before using them.** On an exact cache
   hit, use the restored entry. On a non-exact hit or miss, prepare the inputs
   locally (and save them if permitted). Then disable downloads for the workload:
-  `GOPROXY=off` for Go modules and `--repository_disable_download` for Bazel.
-  If a dependency is missing, the workload fails instead of fetching it silently.
+  `GOPROXY=off` for Go modules and for Gazelle repository rules, and
+  `--repository_disable_download` for Bazel repository downloads. If a
+  dependency is missing, the workload fails instead of fetching it silently.
 
 The second rule checks whether cache preparation covers what CI actually uses;
 restricting writes alone cannot do that. It catches missing preparation inputs
@@ -402,18 +413,24 @@ post-job save cannot be limited to `master` runs by `cache-policy`.
 #### Bazel dependency cache
 
 [`setup-bazel`](../.github/actions/setup-bazel/action.yml) runs each Bazel
-setup job. It restores the Bazel repository cache and Bazel-specific Go module
-cache, then checks metadata. A non-exact consumer restore runs the checked-in
-dependency list through `bazelisk fetch`. On `master`, a non-exact setup restore
-also prepares and saves the cache. Setup jobs can duplicate this cold-cache
-work. After an exact restore or local preparation, the action enables
-`--repository_disable_download`; see [Bazel CI external dependency
-caching](./bazel.md#bazel-ci-external-dependency-caching).
+setup job and the `lint-avalanchego` job. It restores the Bazel repository cache,
+the Bazel-specific Go module cache, and Bazelisk's downloaded Bazel binary. It
+checks metadata only in setup jobs.
 
-The cache contains only external Bazel dependency input. It is separate from
-the Bazel remote action and test-result cache. See
-[Bazel CI external dependency caching](./bazel.md#bazel-ci-external-dependency-caching)
-for its key and dependency-list rules.
+Each non-exact restore prepares the checked-in Bazel dependency list. The action
+then disables downloads. The setup job checks metadata after downloads are
+disabled. On `master`, that job saves the cache after the check succeeds. This
+order prevents a metadata check from adding undeclared inputs to a saved cache.
+Setup jobs can duplicate this cold-cache work. The action enables
+`--repository_disable_download` and sets `GOPROXY=off` for repository rules.
+`GOPROXY=off` prevents Gazelle from fetching a missing module.
+See [Bazel CI external dependency caching](./bazel.md#checked-in-bazel-dependency-list).
+
+The cache contains external Bazel dependency input and the Bazelisk-downloaded
+Bazel binary. It does not contain Bazel build outputs. It is separate from the
+Bazel remote action and test-result cache. See [Bazel CI external dependency
+caching](./bazel.md#bazel-ci-external-dependency-caching) for its key and dependency
+list rules.
 
 #### Nix store cache
 
@@ -453,9 +470,8 @@ When changing an input cache:
   can prepare the dependency list before their Bazel consumers run;
 - prepare every non-exact restore before disabling its network path so a missing
   prepared input fails rather than being silently downloaded later;
-- add each new Go tool or pinned module to the module manifest, and each new
-  Bazel CI target pattern to the dependency list, so preparation covers every
-  input that CI commands require;
+- add each new Go tool or pinned module to the module manifest; add each Bazel
+  CI target pattern and command-only dependency to the Bazel dependency list;
 - do not use a shared cache to transfer build output or test results between
   jobs because those results depend on job-specific configuration and require a
   dedicated transfer protocol.
@@ -477,7 +493,15 @@ commands.
 The action uses a GitHub Actions cache, not an artifact. A cache lets unrelated
 jobs and workflow runs reuse one binary. An artifact belongs to one workflow
 run. The cache key includes the Task version, operating system, and
-architecture. Each job restores the matching cache. Platform cache setup jobs
+architecture.
+
+Before restoring the cache, `setup-task` checks for an executable at
+`$RUNNER_TEMP/task/<version>/$RUNNER_OS-$RUNNER_ARCH/task`. If one exists, the
+action skips cache restore, download, and save. This lets repeated invocations
+reuse Task within a job. For example, both `setup-bazel` and
+`setup-go-for-project` invoke `setup-task` when a job needs Bazel and host Go.
+
+Otherwise, the action restores the matching cache. Platform cache setup jobs
 in the Go workflows can save a cache entry on `master`. All other jobs are
 restore-only consumers. Pull request and merge-queue jobs download Task on a
 cache miss. They do not save the binary. This policy reserves cache storage for

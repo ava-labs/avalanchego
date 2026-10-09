@@ -946,6 +946,7 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
 
 	escrowAddr := sut.deployEscrow(t)
+
 	recipient := common.Address{'r', 'e', 'c', 'v'}
 	callMsg := ethereum.CallMsg{
 		From: sut.wallet.Addresses()[0],
@@ -1058,8 +1059,7 @@ func TestContractBindingsWhenPendingResolvesToLastExecuted(t *testing.T) {
 	require.NoError(t, err, "bind.NewKeyedTransactorWithChainID(...)")
 
 	addr := sut.deployEscrow(t)
-	ec := sut.Client.Eth
-	contract := bind.NewBoundContract(addr, escrow.ABI(t), ec, ec, ec)
+	contract := bind.NewBoundContract(addr, escrow.ABI(t), sut.Client, sut.Client, sut.Client)
 
 	deposit := uint256.NewInt(42)
 	recipient := sut.wallet.Addresses()[1]

@@ -25,7 +25,7 @@ concurrency:
 jobs:
   unit-and-e2e:
     name: linux-amd64
-    uses: ./.github/workflows/bazel-ci.yml
+    uses: ./.github/workflows/bazel.yml
     with:
       platform_name: linux-amd64
       runner: ubuntu-24.04
@@ -34,7 +34,7 @@ jobs:
 
   smoke:
     name: darwin-arm64
-    uses: ./.github/workflows/bazel-ci-smoke.yml
+    uses: ./.github/workflows/bazel-smoke.yml
     with:
       platform_name: darwin-arm64
       runner: macos-26

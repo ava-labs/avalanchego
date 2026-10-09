@@ -178,6 +178,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      # Prepare Bazel's separate Go module cache before Go setup disables GOPROXY.
+      - uses: ./.github/actions/setup-bazel
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: ./scripts/run_task.sh check-go-mod-tidy
@@ -400,6 +402,14 @@ jobs:
         shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
+      # Bazel is required by lint-all-ci since it runs check-go-mod-tidy, which
+      # invokes `bazelisk mod tidy`. Since preparation of Bazel dependencies may
+      # involve downloading Go modules, it needs to happen before install-nix disables
+      # GOPROXY.
+      - uses: ./.github/actions/setup-bazel
+        env:
+          # This job does not build Bazel targets.
+          BAZEL_REMOTE_CACHE_ENABLED: 'false'
       - uses: ./.github/actions/install-nix
       - name: Runs all lint checks
         run: ./scripts/run_task.sh lint-all-ci
@@ -516,7 +526,7 @@ jobs:
   smoke:
     name: darwin-arm64
     needs: setup-cache-darwin-arm64
-    uses: ./.github/workflows/go-ci-smoke.yml
+    uses: ./.github/workflows/go-smoke.yml
     with:
       platform_name: darwin-arm64
       runner: macos-26
@@ -525,7 +535,7 @@ jobs:
   unit:
     name: linux-amd64
     needs: setup-cache-linux-amd64
-    uses: ./.github/workflows/go-ci.yml
+    uses: ./.github/workflows/go-unit.yml
     with:
       platform_name: linux-amd64
       runner: ubuntu-24.04

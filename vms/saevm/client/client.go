@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/libevm/ethclient/gethclient"
 	"github.com/ava-labs/libevm/rpc"
 
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+
 	ethereum "github.com/ava-labs/libevm"
 )
 
@@ -71,10 +73,10 @@ func (c *Client) CallContract(ctx context.Context, msg ethereum.CallMsg, blockNu
 // created immediately. There is no guarantee that this will be the base fee
 // used in the next block or that the next base fee will be higher or lower than
 // the returned value.
-func (c *Client) EstimateBaseFee(ctx context.Context) (*big.Int, error) {
-	var hex hexutil.Big
+func (c *Client) EstimateBaseFee(ctx context.Context) (gas.Price, error) {
+	var hex hexutil.Uint64
 	if err := c.CallContext(ctx, &hex, "eth_baseFee"); err != nil {
-		return nil, err
+		return 0, err
 	}
-	return (*big.Int)(&hex), nil
+	return (gas.Price)(hex), nil
 }

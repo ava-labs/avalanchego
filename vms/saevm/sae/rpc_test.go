@@ -117,7 +117,7 @@ func (s *SUT) testRPC(ctx context.Context, t *testing.T, tcs ...rpcTest) {
 			if tc.parallel {
 				t.Parallel()
 			}
-			t.Logf("%T.CallContext(ctx, %T, %q, %v...)", s.Client, &tc.want, tc.method, tc.args)
+			t.Logf("%T.CallContext(ctx, %T, %q, %v...)", s.Client.RPC.Client, &tc.want, tc.method, tc.args)
 			if tc.eventually {
 				require.EventuallyWithT(t, func(c *assert.CollectT) {
 					test(c)

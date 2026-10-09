@@ -1,4 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "c",
@@ -16,7 +17,6 @@ go_library(
     deps = [
         "//api/info",
         "//database",
-        "//graft/coreth/plugin/evm/atomic",
         "//ids",
         "//snow",
         "//utils",
@@ -25,16 +25,28 @@ go_library(
         "//utils/crypto/secp256k1",
         "//utils/logging",
         "//utils/math",
+        "//utils/math/intmath",
         "//utils/set",
         "//vms/avm",
         "//vms/components/avax",
-        "//vms/components/verify",
+        "//vms/components/gas",
         "//vms/saevm/cchain",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/client",
         "//vms/secp256k1fx",
         "//wallet/subnet/primary/common",
         "@com_github_ava_labs_libevm//common",
-        "@com_github_ava_labs_libevm//common/hexutil",
+    ],
+)
+
+go_test(
+    name = "c_test",
+    srcs = ["builder_test.go"],
+    embed = [":c"],
+    deps = [
+        "//utils/math",
+        "//vms/components/gas",
+        "//vms/saevm/cchain/tx",
+        "@com_github_stretchr_testify//require",
     ],
 )
