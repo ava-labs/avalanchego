@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791483573769,
+  "lastUpdate": 1791542044653,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -62086,6 +62086,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_accept_ms/ggas",
             "value": 50.4688703302042,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonathan Oppenheimer",
+            "username": "JonathanOppenheimer",
+            "email": "jonathan.oppenheimer@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "1618ad2e36ac0307379e8b88a0dbca4ab744b939",
+          "message": "refactor(wallet/chain/c): use cchain/tx instead of coreth atomic types (#6119)\n\nSigned-off-by: Jonathan Oppenheimer <147infiniti@gmail.com>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>",
+          "timestamp": "2026-10-08T23:38:06Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/1618ad2e36ac0307379e8b88a0dbca4ab744b939"
+        },
+        "date": 1791542042526,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - mgas/s",
+            "value": 84.31597004811383,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - ms/ggas",
+            "value": 11860.149381301822,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - block_parse_ms/ggas",
+            "value": 70.21596112512957,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - block_verify_ms/ggas",
+            "value": 11151.825224964878,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-4xlarge-local-ssd - block_accept_ms/ggas",
+            "value": 636.0298506887003,
             "unit": "block_accept_ms/ggas"
           }
         ]
