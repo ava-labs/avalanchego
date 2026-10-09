@@ -526,7 +526,7 @@ jobs:
   smoke:
     name: darwin-arm64
     needs: setup-cache-darwin-arm64
-    uses: ./.github/workflows/go-ci-smoke.yml
+    uses: ./.github/workflows/go-smoke.yml
     with:
       platform_name: darwin-arm64
       runner: macos-26
@@ -535,7 +535,7 @@ jobs:
   unit:
     name: linux-amd64
     needs: setup-cache-linux-amd64
-    uses: ./.github/workflows/go-ci.yml
+    uses: ./.github/workflows/go-unit.yml
     with:
       platform_name: linux-amd64
       runner: ubuntu-24.04
