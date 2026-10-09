@@ -31,11 +31,7 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-const (
-	genesisNumber = 0
-
-	ap3BaseFee = 225 * ethparams.GWei
-)
+const genesisNumber = 0
 
 var (
 	errNoGenesisChainConfig       = errors.New("no genesis chainConfig")
@@ -236,6 +232,8 @@ func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.
 	rawdb.WriteChainConfig(b, hash, config)
 	return b.Write()
 }
+
+const ap3BaseFee = 225 * ethparams.GWei
 
 func (g *genesis) block() (*types.Block, error) {
 	root, err := g.root()
