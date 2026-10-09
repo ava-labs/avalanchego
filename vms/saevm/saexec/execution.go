@@ -130,7 +130,7 @@ const (
 	triePrefetcherParallelism = 16
 )
 
-func (e *Executor) execute(b *blocks.Block, log logging.Logger) (res *ExecutionResults, _ error) {
+func (e *Executor) execute(b *blocks.Block, log logging.Logger) (res *ExecutionResults, _ error) { //nolint:unparam // False positive; used by deferred function
 	// If the VM were to encounter an error after enqueuing the block, we would
 	// receive the same block twice for execution should consensus retry
 	// acceptance.
