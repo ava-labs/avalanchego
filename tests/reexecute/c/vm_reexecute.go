@@ -63,8 +63,10 @@ var (
 	defaultConfigKey = "default"
 
 	predefinedConfigs = map[string]string{
-		defaultConfigKey: `{"state-sync-enabled": false}`,
-		"archive":        `{"pruning-enabled": false, "state-sync-enabled": false}`,
+		defaultConfigKey: `{}`,
+		"archive": `{
+			"pruning-enabled": false
+		}`,
 		"pathdb": `{
 			"state-scheme": "path",
 			"state-sync-enabled": false
