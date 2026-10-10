@@ -316,7 +316,7 @@ func TestParseConfig(t *testing.T) {
 				t.Errorf("parseConfig(...) error (-want +got)\n%s", diff)
 			}
 			require.Equal(t, test.want, got, "parseConfig(...)")
-			require.Equal(t, test.wantWarnings, log.Records, "parseConfig(...) logs")
+			require.Equal(t, test.wantWarnings, log.Records(), "parseConfig(...) logs")
 		})
 	}
 }

@@ -258,11 +258,12 @@ func (t *Tx) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) erro
 	return t.Unsigned.transferNonAVAX(avaxAssetID, statedb)
 }
 
-// Parse deserializes a [Tx] from its canonical binary format.
+// Parse deserializes a [Tx] from its canonical binary format, returning an
+// error wrapping [ErrDecode] if the bytes are not in that format.
 func Parse(b []byte) (*Tx, error) {
 	var tx Tx
 	if _, err := c.Unmarshal(b, &tx); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ErrDecode, err)
 	}
 	return &tx, nil
 }

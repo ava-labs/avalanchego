@@ -30,8 +30,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
+// ErrExecutorClosed is returned by [Executor.Enqueue] and
+// [Executor.WaitUntilExecuted] once the Executor has stopped.
+var ErrExecutorClosed = errors.New("saexec.Executor closed")
+
 var (
-	errExecutorClosed                = errors.New("saexec.Executor closed")
 	errTransactionCountOutOfRange    = errors.New("transaction count out of range")
 	errPartialEndOfBlockExecution    = errors.New("end-of-block operations require all transactions to have been executed")
 	errCanonicalWithoutEndOfBlockOps = errors.New("canonical execution requires end-of-block operations")
@@ -67,16 +70,65 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 		// processing error when enqueueing (nor is it strictly necessary as its
 		// exposed by [Executor.HealthCheck]), but this is the latest possible
 		// time.
-		if err := e.HealthCheck(); err != nil {
-			return err
+		if e.HealthCheck() != nil {
+			return e.stoppedErr()
 		}
 		return nil
 
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-e.done:
-		return errors.Join(errExecutorClosed, e.HealthCheck())
+		return e.stoppedErr()
 	}
+}
+
+// WaitUntilExecuted blocks until the block has been executed, the context is
+// cancelled, or the Executor stops, in which case it reports [ErrExecutorClosed]
+// and the cause. [blocks.Block.WaitUntilExecuted] alone would wait forever on a
+// stopped Executor.
+func (e *Executor) WaitUntilExecuted(ctx context.Context, b *blocks.Block) error {
+	return e.waitUnlessStopped(ctx, b.Executed, b.WaitUntilExecuted)
+}
+
+// WaitUntilSettled is [Executor.WaitUntilExecuted] for settlement, which the
+// Executor performs itself after executing a synchronous block.
+func (e *Executor) WaitUntilSettled(ctx context.Context, b *blocks.Block) error {
+	return e.waitUnlessStopped(ctx, b.Settled, b.WaitUntilSettled)
+}
+
+// waitUnlessStopped runs `wait` until `done` reports true, the context is
+// cancelled, or the Executor stops.
+func (e *Executor) waitUnlessStopped(ctx context.Context, done func() bool, wait func(context.Context) error) error {
+	if done() {
+		return nil
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		select {
+		case <-e.done:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+
+	err := wait(ctx)
+	if done() {
+		return nil
+	}
+	select {
+	case <-e.done:
+		return e.stoppedErr()
+	default:
+		return err
+	}
+}
+
+// stoppedErr reports why the Executor stopped. It MUST only be called once
+// `e.done` is closed.
+func (e *Executor) stoppedErr() error {
+	return errors.Join(ErrExecutorClosed, e.HealthCheck())
 }
 
 func (e *Executor) processQueue() (ret *Unhealthy) {

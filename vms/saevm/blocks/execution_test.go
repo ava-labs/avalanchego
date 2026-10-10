@@ -327,3 +327,27 @@ func mustNewGasTime(tb testing.TB, at time.Time, target gas.Gas, price gas.Price
 	require.NoError(tb, err, "gastime.New()")
 	return tm
 }
+
+func TestMarkExecutedSynchronousSkipsExecutionResultsDB(t *testing.T) {
+	db := rawdb.NewMemoryDatabase()
+	xdb := saetest.NewExecutionResultsDB()
+	tm := mustNewGasTime(t, time.Unix(0, 0), 1e6, 0, gastime.DefaultGasPriceConfig())
+
+	parent := newBlock(t, newSynchronousEthBlock(t, 1, 0, nil), nil, nil)
+	parent.markExecutedForTests(t, db, xdb, tm)
+
+	child := newBlock(t, newSynchronousEthBlock(t, 2, 1, parent.EthBlock()), parent, nil)
+	require.True(t, child.Synchronous(), "Synchronous()")
+
+	gasTime, err := child.SynchronousGasTime()
+	require.NoError(t, err, "SynchronousGasTime()")
+
+	root := child.EthBlock().Root()
+	require.NoError(t, child.MarkExecuted(db, xdb, gasTime, time.Unix(1, 0), nil, nil, root, nil), "MarkExecuted()")
+
+	_, err = xdb.Get(child.NumberU64())
+	require.ErrorIs(t, err, database.ErrNotFound, "xdb.Get() MUST NOT find results for a synchronous block")
+	require.Equal(t, child.Hash(), rawdb.ReadHeadBlockHash(db), "rawdb.ReadHeadBlockHash()")
+	require.Equal(t, root, child.PostExecutionStateRoot(), "PostExecutionStateRoot()")
+	require.Equal(t, gasTime.String(), child.ExecutedByGasTime().String(), "ExecutedByGasTime()")
+}

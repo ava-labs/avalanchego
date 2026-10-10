@@ -143,10 +143,10 @@ func TestParseSlice(t *testing.T) {
 	txs, bytes := goldensSlice()
 
 	tests := []struct {
-		name    string
-		bytes   []byte
-		want    []*Tx
-		wantErr error
+		name     string
+		bytes    []byte
+		want     []*Tx
+		wantErrs []error
 	}{
 		{
 			name:  "mainnet",
@@ -164,13 +164,19 @@ func TestParseSlice(t *testing.T) {
 				// len(txs):
 				0x00, 0x00, 0x00, 0x00,
 			},
-			wantErr: ErrInefficientSlicePacking,
+			// Wrong-era bytes can unmarshal into an empty slice; both apply.
+			wantErrs: []error{ErrInefficientSlicePacking, ErrDecode},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			got, err := ParseSlice(test.bytes)
-			require.ErrorIs(t, err, test.wantErr, "ParseSlice()")
+			if len(test.wantErrs) == 0 {
+				require.NoError(t, err, "ParseSlice()")
+			}
+			for _, wantErr := range test.wantErrs {
+				require.ErrorIs(t, err, wantErr, "ParseSlice()")
+			}
 			if diff := cmp.Diff(test.want, got, txtest.CmpOpt()); diff != "" {
 				t.Errorf("ParseSlice() diff (-want +got):\n%s", diff)
 			}
@@ -221,6 +227,12 @@ func TestFromBlock(t *testing.T) {
 			time:    preAP5Time,
 			extData: importTx.bytes,
 			want:    []*Tx{importTx.tx},
+		},
+		{
+			name:    "pre_ap5_slice",
+			time:    preAP5Time,
+			extData: sliceBytes,
+			wantErr: ErrDecode,
 		},
 		{
 			name: "ap5_empty",

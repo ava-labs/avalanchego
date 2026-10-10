@@ -46,6 +46,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -73,7 +74,7 @@ type SUT struct {
 	saedbConfig  saedb.Config
 	chain        *blockstest.ChainBuilder
 	wallet       *saetest.Wallet
-	logger       *loggingtest.Logger
+	logger       logging.Logger
 	db           ethdb.Database
 	chainDataDir string
 
@@ -89,24 +90,33 @@ type (
 		commitInterval uint64
 		dbScheme       string
 		extraAlloc     types.GenesisAlloc
+		logger         logging.Logger
+		// wantCloseErr is expected from [Executor.Close] at cleanup.
+		wantCloseErr testerr.Want
 	}
 	sutOption = options.Option[sutConfig]
 )
 
-// newSUT returns a new SUT. Any >= [logging.Error] on the logger will also
-// cancel the returned context, which is useful when waiting for blocks that
-// can never finish execution because of an error.
+// newSUT returns a new SUT. Unless overridden with [withLogger], any >=
+// [logging.Error] on the logger will also cancel the returned context, which is
+// useful when waiting for blocks that can never finish execution because of an
+// error.
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
-
-	logger := loggingtest.New(tb, logging.Warn)
-	ctx := logger.CancelOnError(tb.Context())
-	chainDataDir := tb.TempDir()
 
 	sutCfg := options.ApplyTo(&sutConfig{
 		hooks:          defaultHooks(),
 		commitInterval: saedb.DefaultCommitInterval,
 	}, opts...)
+
+	logger := sutCfg.logger
+	ctx := tb.Context()
+	if logger == nil {
+		l := loggingtest.New(tb, logging.Warn)
+		logger, ctx = l, l.CancelOnError(ctx)
+	}
+	chainDataDir := tb.TempDir()
+
 	config := saetest.ChainConfig()
 	saedbConfig := saedb.Config{
 		Archival:         sutCfg.archival,
@@ -150,7 +160,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		)
 	})
 	tb.Cleanup(func() {
-		require.NoErrorf(tb, closeOnce(), "%T.Close() then %T.Close()", e, tr)
+		if diff := testerr.Diff(closeOnce(), sutCfg.wantCloseErr); diff != "" {
+			tb.Errorf("%T.Close() then %T.Close() %s", e, tr, diff)
+		}
 	})
 	return ctx, &SUT{
 		Executor:     e,
@@ -181,6 +193,22 @@ func withHooks(h *saehookstest.Stub) sutOption {
 func withExtraAlloc(a types.GenesisAlloc) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.extraAlloc = a
+	})
+}
+
+// withLogger overrides the SUT's logger. Unlike the default, the override
+// neither fails the test on Error logs nor cancels the context, so tests that
+// deliberately log a failure MUST use it.
+func withLogger(l logging.Logger) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.logger = l
+	})
+}
+
+// withStoppedExecutor expects [Executor.Close] to report an [Unhealthy] error.
+func withStoppedExecutor() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.wantCloseErr = testerr.As[*Unhealthy](nil)
 	})
 }
 
@@ -829,8 +857,8 @@ func FuzzOpCodes(f *testing.F) {
 
 		// Ensure that the SUT [logging.Logger] remains of this type so >=WARN
 		// logs become failures.
-		//nolint:staticcheck
-		var logger *loggingtest.Logger = sut.logger
+		logger, ok := sut.logger.(*loggingtest.Logger)
+		require.Truef(t, ok, "%T.logger is a %T", sut, sut.logger)
 		// Errors in execution (i.e. reverts) are fine, but we don't want them
 		// bubbling up any further.
 		require.NoErrorf(t, sut.execute(b, logger), "%T.execute()", sut.Executor)
@@ -1410,4 +1438,43 @@ func TestExecuteReturnsStateDBError(t *testing.T) {
 			require.ErrorIs(t, err, errAccountRead, "Execute()")
 		})
 	}
+}
+
+func TestWaitUntilExecutedReportsStoppedExecutor(t *testing.T) {
+	rec := loggingtest.NewRecorder(logging.Warn)
+	ctx, sut := newSUT(t, withLogger(rec), withStoppedExecutor())
+	e := sut.Executor
+
+	// A synchronous block whose header commits to the wrong root fails in
+	// [blocks.Block.MarkExecuted], which stops the executor.
+	bad := blockstest.NewEthBlock(t, e.LastExecuted().EthBlock(), nil,
+		blockstest.WithSettled(hook.Settled{}),
+		blockstest.ModifyHeader(func(h *types.Header) {
+			h.Root = common.Hash{0xba, 0xd}
+			h.ReceiptHash = types.EmptyReceiptsHash
+		}),
+	)
+	b := blockstest.NewBlock(t, bad, e.LastExecuted(), nil,
+		blockstest.WithHooks(sut.hooks),
+		blockstest.WithLogger(rec),
+	)
+	require.NoError(t, e.Enqueue(ctx, b), "Enqueue(bad block)")
+
+	// Bounds a regression that would otherwise hang.
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
+	require.ErrorIsf(t, e.WaitUntilExecuted(ctx, b), ErrExecutorClosed, "%T.WaitUntilExecuted(bad block)", e)
+	require.ErrorIsf(t, e.WaitUntilSettled(ctx, b), ErrExecutorClosed, "%T.WaitUntilSettled(bad block)", e)
+	require.Falsef(t, b.Executed(), "%T.Executed() after a failed execution", b)
+
+	// Enqueue reports the same cause once the buffered queue is full and the
+	// closed `done` channel is its only ready case.
+	var enqueueErr error
+	for range cap(e.queue) + 1 {
+		if enqueueErr = e.Enqueue(ctx, b); enqueueErr != nil {
+			break
+		}
+	}
+	require.ErrorIsf(t, enqueueErr, ErrExecutorClosed, "%T.Enqueue() after a failed execution", e)
 }

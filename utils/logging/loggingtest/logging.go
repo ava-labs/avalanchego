@@ -11,6 +11,7 @@ import (
 	"context"
 	"runtime"
 	"slices"
+	"sync"
 	"testing"
 
 	"go.uber.org/zap"
@@ -68,10 +69,14 @@ func NewRecorder(level logging.Level) *Recorder {
 }
 
 // A Recorder is a [logging.Logger] that stores all logs as [Record]
-// entries for inspection.
+// entries for inspection. It is safe for concurrent use; access the entries
+// through [Recorder.Records], [Recorder.Filter], [Recorder.At] or
+// [Recorder.AtLeast].
 type Recorder struct {
 	*logger
-	Records []*Record
+
+	mu      sync.Mutex
+	records []*Record
 }
 
 // A Record is a single entry in a [Recorder].
@@ -82,17 +87,30 @@ type Record struct {
 }
 
 func (l *Recorder) log(lvl logging.Level, msg string, fields ...zap.Field) {
-	l.Records = append(l.Records, &Record{
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	l.records = append(l.records, &Record{
 		Level:  lvl,
 		Msg:    msg,
 		Fields: fields,
 	})
 }
 
-// Filter returns the recorded logs for which `fn` returns true.
+// Records returns all recorded logs, in the order they were logged.
+func (l *Recorder) Records() []*Record {
+	return l.Filter(func(*Record) bool { return true })
+}
+
+// Filter returns the recorded logs for which `fn` returns true. `fn` runs
+// outside the lock, so it may log to the same [Recorder].
 func (l *Recorder) Filter(fn func(*Record) bool) []*Record {
+	l.mu.Lock()
+	records := slices.Clone(l.records)
+	l.mu.Unlock()
+
 	var out []*Record
-	for _, r := range l.Records {
+	for _, r := range records {
 		if fn(r) {
 			out = append(out, r)
 		}

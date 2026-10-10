@@ -5,6 +5,7 @@ package tx
 
 import (
 	"errors"
+	"fmt"
 	"math"
 
 	"github.com/ava-labs/libevm/core/types"
@@ -67,7 +68,13 @@ func MarshalSlice(txs []*Tx) ([]byte, error) {
 	return c.Marshal(codecVersion, txs)
 }
 
-var errInefficientSlicePacking = errors.New("inefficient slice packing: empty slices should be packed as nil")
+var (
+	errInefficientSlicePacking = errors.New("inefficient slice packing: empty slices should be packed as nil")
+
+	// ErrDecode wraps every decoding failure from [Parse], [ParseSlice] and
+	// [FromBlock], including bytes encoded under another era's extData rules.
+	ErrDecode = errors.New("decoding transaction bytes")
+)
 
 // ParseSlice deserializes a slice of [Tx] from its canonical binary format.
 func ParseSlice(b []byte) ([]*Tx, error) {
@@ -77,10 +84,10 @@ func ParseSlice(b []byte) ([]*Tx, error) {
 
 	var txs []*Tx
 	if _, err := c.Unmarshal(b, &txs); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ErrDecode, err)
 	}
 	if len(txs) == 0 {
-		return nil, errInefficientSlicePacking
+		return nil, fmt.Errorf("%w: %w", ErrDecode, errInefficientSlicePacking)
 	}
 	return txs, nil
 }
