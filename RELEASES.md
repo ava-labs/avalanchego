@@ -33,6 +33,10 @@ This release updates the plugin version to `47`. All plugins must update to rema
 - Added:
   - `restakedValidationRewards` and `restakedDelegateeRewards` fields to `platform.getCurrentValidators` results for auto-renewed validators
 
+### Fixes
+
+- Fixed nodes with `proposerNumHistoricalBlocks` set failing to start after state syncing on top of previously accepted blocks.
+
 ### Metrics
 
 - Added `avalanche_platformvm_local_delegated_staked` (gauge): amount (in nAVAX) of AVAX delegated to this node on the Primary Network.
