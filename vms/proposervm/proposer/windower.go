@@ -23,16 +23,18 @@ import (
 
 // Proposer list constants
 const (
-	WindowDuration = 5 * time.Second
+	// DefaultWindowDuration is the proposer slot length for chains that do not
+	// configure one; see subnets.Config.ProposerWindowMilliseconds.
+	DefaultWindowDuration = 5 * time.Second
 
 	MaxVerifyWindows = 6
-	MaxVerifyDelay   = MaxVerifyWindows * WindowDuration // 30 seconds
+	MaxVerifyDelay   = MaxVerifyWindows * DefaultWindowDuration // 30 seconds
 
 	MaxBuildWindows = 60
-	MaxBuildDelay   = MaxBuildWindows * WindowDuration // 5 minutes
+	MaxBuildDelay   = MaxBuildWindows * DefaultWindowDuration // 5 minutes
 
 	MaxLookAheadSlots  = 720
-	MaxLookAheadWindow = MaxLookAheadSlots * WindowDuration // 1 hour
+	MaxLookAheadWindow = MaxLookAheadSlots * DefaultWindowDuration // 1 hour
 )
 
 var (
@@ -46,7 +48,7 @@ type Windower interface {
 	// Proposers returns the proposer list for building a block at [blockHeight]
 	// when the validator set is defined at [pChainHeight]. The list is returned
 	// in order. The minimum delay of a validator is the index they appear times
-	// [WindowDuration].
+	// the chain's window duration.
 	Proposers(
 		ctx context.Context,
 		blockHeight,
@@ -100,19 +102,21 @@ type Windower interface {
 // windower interfaces with P-Chain and it is responsible for calculating the
 // delay for the block submission window of a given validator
 type windower struct {
-	state       validators.State
-	subnetID    ids.ID
-	chainSource uint64
-	logger      logging.Logger
+	state          validators.State
+	subnetID       ids.ID
+	chainSource    uint64
+	windowDuration time.Duration
+	logger         logging.Logger
 }
 
-func New(state validators.State, subnetID, chainID ids.ID, logger logging.Logger) Windower {
+func New(state validators.State, subnetID, chainID ids.ID, windowDuration time.Duration, logger logging.Logger) Windower {
 	w := wrappers.Packer{Bytes: chainID[:]}
 	return &windower{
-		logger:      logger,
-		state:       state,
-		subnetID:    subnetID,
-		chainSource: w.UnpackLong(),
+		logger:         logger,
+		state:          state,
+		subnetID:       subnetID,
+		chainSource:    w.UnpackLong(),
+		windowDuration: windowDuration,
 	}
 }
 
@@ -150,7 +154,7 @@ func (w *windower) Proposers(ctx context.Context, blockHeight, pChainHeight uint
 
 func (w *windower) Delay(ctx context.Context, blockHeight, pChainHeight uint64, validatorID ids.NodeID, maxWindows int) (time.Duration, error) {
 	if validatorID == ids.EmptyNodeID {
-		return time.Duration(maxWindows) * WindowDuration, nil
+		return time.Duration(maxWindows) * w.windowDuration, nil
 	}
 
 	proposers, err := w.Proposers(ctx, blockHeight, pChainHeight, maxWindows)
@@ -163,7 +167,7 @@ func (w *windower) Delay(ctx context.Context, blockHeight, pChainHeight uint64, 
 		if nodeID == validatorID {
 			return delay, nil
 		}
-		delay += WindowDuration
+		delay += w.windowDuration
 	}
 	return delay, nil
 }
@@ -226,12 +230,12 @@ func (w *windower) MinDelayForProposer(
 		}
 
 		if expectedNodeID == nodeID {
-			return time.Duration(slot) * WindowDuration, nil
+			return time.Duration(slot) * w.windowDuration, nil
 		}
 	}
 
 	// no slots scheduled for the max window we inspect. Return max delay
-	return time.Duration(maxSlot) * WindowDuration, nil
+	return time.Duration(maxSlot) * w.windowDuration, nil
 }
 
 func (w *windower) makeSampler(
@@ -288,9 +292,9 @@ func (w *windower) expectedProposer(
 	return validators[indices[0]].id, nil
 }
 
-func TimeToSlot(start, now time.Time) uint64 {
+func TimeToSlot(start, now time.Time, windowDuration time.Duration) uint64 {
 	if now.Before(start) {
 		return 0
 	}
-	return uint64(now.Sub(start) / WindowDuration)
+	return uint64(now.Sub(start) / windowDuration)
 }
