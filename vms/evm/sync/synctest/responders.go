@@ -20,19 +20,20 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 )
 
-// ServeResponder registers r at handlerID on a single-node loopback network.
+// ServeResponder registers r at handlerID on a single-node loopback network and
+// returns a client bound to it.
 func ServeResponder[V any, Req handlers.ProtoMessage[V], Resp proto.Message](
 	t *testing.T,
 	ctx context.Context,
 	log logging.Logger,
 	handlerID uint64,
 	r handlers.Responder[Req, Resp],
-) (*p2p.Network, *p2p.PeerTracker) {
+) *p2p.TrackingClient {
 	t.Helper()
 
 	net, tracker := NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
 	require.NoError(t, net.AddHandler(handlerID, handlers.NewHandler(log, r)))
-	return net, tracker
+	return net.NewTrackingClient(handlerID, tracker)
 }
 
 // RecordingResponder records every request reaching inner.

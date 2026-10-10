@@ -42,10 +42,8 @@ func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Ha
 	return &Syncer{
 		fetcher: hashdb.NewClient(
 			state.snowCtx.Log,
-			n,
-			p2p.EVMAtomicLeafRequestHandlerID,
+			n.NewTrackingClient(p2p.EVMAtomicLeafRequestHandlerID, pt),
 			keyLength,
-			pt,
 		),
 		targetRoot:   root,
 		targetHeight: height,

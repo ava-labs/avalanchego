@@ -39,21 +39,14 @@ type Client struct {
 	minKey []byte // read-only stand-in for an absent start key
 }
 
-// NewClient returns a [Client] reading handlerID's trie from n's peers.
+// NewClient returns a [Client] reading the trie served at client's handler ID.
 func NewClient(
 	log logging.Logger,
-	n *p2p.Network,
-	handlerID uint64,
+	client *p2p.TrackingClient,
 	trieKeyLength int,
-	peers *p2p.PeerTracker,
 ) *Client {
 	return &Client{
-		sender: network.NewDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, leafResult](
-			log,
-			n,
-			handlerID,
-			peers,
-		),
+		sender: network.NewDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, leafResult](log, client),
 		minKey: make([]byte, trieKeyLength),
 	}
 }

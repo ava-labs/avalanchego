@@ -146,7 +146,7 @@ type Syncer[R any, C any] struct {
 type Config[R any, C any] struct {
 	RangeProofMarshaler   Marshaler[R]
 	ChangeProofMarshaler  Marshaler[C]
-	ProofClient           *p2p.Client
+	ProofClient           *p2p.TrackingClient
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
@@ -418,18 +418,20 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, err error) {
+	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, err error) error {
 		defer s.finishWorkItem()
 
 		if err := s.handleChangeProofResponse(ctx, targetRootID, work, changeReq, responseBytes, err); err != nil {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
-			return
+			return err
 		}
+
+		return nil
 	}
 
-	if err := s.sendRequest(ctx, s.config.ProofClient, requestBytes, onResponse); err != nil {
+	if err := s.sendRequest(ctx, requestBytes, onResponse); err != nil {
 		s.finishWorkItem()
 		s.setError(err)
 		return
@@ -473,18 +475,20 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) {
+	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) error {
 		defer s.finishWorkItem()
 
 		if err := s.handleRangeProofResponse(ctx, targetRootID, work, rangeReq, responseBytes, appErr); err != nil {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
-			return
+			return err
 		}
+
+		return nil
 	}
 
-	if err := s.sendRequest(ctx, s.config.ProofClient, requestBytes, onResponse); err != nil {
+	if err := s.sendRequest(ctx, requestBytes, onResponse); err != nil {
 		s.finishWorkItem()
 		s.setError(err)
 		return
@@ -495,10 +499,10 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 
 func (s *Syncer[_, _]) sendRequest(
 	ctx context.Context,
-	client *p2p.Client,
 	requestBytes []byte,
-	onResponse p2p.AppResponseCallback,
+	onResponse p2p.AppResponseVerifier,
 ) error {
+	client := s.config.ProofClient
 	if len(s.config.StateSyncNodes) == 0 {
 		return client.AppRequestAny(ctx, requestBytes, onResponse)
 	}
@@ -573,11 +577,6 @@ func (s *Syncer[R, _]) handleRangeProofResponse(
 		return err
 	}
 
-	root, err := ids.ToID(request.RootHash)
-	if err != nil {
-		return err
-	}
-
 	s.metrics.proofReceived(proofTypeRange, len(responseBytes))
 
 	if err := s.verifyAndCommitRangeProof(
@@ -587,7 +586,7 @@ func (s *Syncer[R, _]) handleRangeProofResponse(
 		rangeProof,
 		protoutils.ProtoToMaybe(request.StartKey),
 		protoutils.ProtoToMaybe(request.EndKey),
-		root,
+		targetRootID,
 		int(request.KeyLimit),
 	); err != nil {
 		return fmt.Errorf("%w: %w", errInvalidRangeProof, err)
@@ -614,11 +613,6 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 
 	startKey := protoutils.ProtoToMaybe(request.StartKey)
 	endKey := protoutils.ProtoToMaybe(request.EndKey)
-	endRoot, err := ids.ToID(request.EndRootHash)
-	if err != nil {
-		return err
-	}
-
 	switch response := response.Response.(type) {
 	case *pb.ProofResponse_ChangeProof:
 		// The server had enough history to send us a change proof
@@ -635,7 +629,7 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 			changeProof,
 			startKey,
 			endKey,
-			endRoot,
+			targetRootID,
 			int(request.KeyLimit),
 		)
 		s.metrics.observeVerification(proofTypeChange, time.Since(verificationStart), err)
@@ -670,7 +664,7 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 			rangeProof,
 			startKey,
 			endKey,
-			endRoot,
+			targetRootID,
 			int(request.KeyLimit),
 		)
 	default:
