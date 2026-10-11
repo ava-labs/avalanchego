@@ -95,10 +95,11 @@ type SUT struct {
 	logger logging.Logger
 	sender *saetest.Sender
 
-	rpcClient *rpc.Client
-	rawVM     *VM
-	genesis   *blocks.Block
-	close     func()
+	wsClient   *rpc.Client
+	httpClient *rpc.Client
+	rawVM      *VM
+	genesis    *blocks.Block
+	close      func()
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.rawVM.snowCtx.NodeID }
@@ -234,10 +235,10 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 	// don't need to treat our node as a special case.
 	require.NoErrorf(tb, snow.Connected(ctx, snowCtx.NodeID, version.Current), "Connected(%s)", snowCtx.NodeID)
 
-	rpcClient, ethClient := dialRPC(ctx, tb, snow)
+	wsClient, httpClient := dialRPC(ctx, tb, snow)
 	sut := &SUT{
 		ChainVM: snow,
-		Client:  ethClient,
+		Client:  ethclient.NewClient(wsClient),
 
 		wallet: saetest.NewWalletWithKeyChain(
 			keys,
@@ -248,10 +249,11 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 		logger: conf.logger,
 		sender: sender,
 
-		rpcClient: rpcClient,
-		rawVM:     vm.VM,
-		genesis:   vm.last.settled.Load(),
-		close:     closeOnce,
+		wsClient:   wsClient,
+		httpClient: httpClient,
+		rawVM:      vm.VM,
+		genesis:    vm.last.settled.Load(),
+		close:      closeOnce,
 	}
 	sender.Start(tb, sut)
 	return sut, nil
@@ -265,19 +267,23 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 	return sut.context(tb), sut
 }
 
-func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM) (*rpc.Client, *ethclient.Client) {
+// dialRPC returns clients connected to the WebSocket and HTTP handlers of
+// snow.
+func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM) (wsClient, httpClient *rpc.Client) {
 	tb.Helper()
 
 	handlers, err := snow.CreateHandlers(ctx)
 	require.NoErrorf(tb, err, "%T.CreateHandlers()", snow)
-	server := httptest.NewServer(handlers[wsHTTPExtensionPath])
-	tb.Cleanup(server.Close)
-	rpcClient, err := rpc.Dial("ws://" + server.Listener.Addr().String())
-	require.NoErrorf(tb, err, "rpc.Dial(http.NewServer(%T.CreateHandlers()))", snow)
-	client := ethclient.NewClient(rpcClient)
-	tb.Cleanup(client.Close)
-
-	return rpcClient, client
+	dial := func(scheme, path string) *rpc.Client {
+		server := httptest.NewServer(handlers[path])
+		tb.Cleanup(server.Close)
+		url := scheme + "://" + server.Listener.Addr().String()
+		client, err := rpc.Dial(url)
+		require.NoErrorf(tb, err, "rpc.Dial(%q)", url)
+		tb.Cleanup(client.Close)
+		return client
+	}
+	return dial("ws", wsHTTPExtensionPath), dial("http", rpcHTTPExtensionPath)
 }
 
 func marshalJSON(tb testing.TB, v any) []byte {
@@ -287,11 +293,11 @@ func marshalJSON(tb testing.TB, v any) []byte {
 	return buf
 }
 
-// CallContext propagates its arguments to and from [SUT.rpcClient.CallContext].
+// CallContext propagates its arguments to and from [SUT.wsClient.CallContext].
 // Embedding both the [ethclient.Client] and the underlying [rpc.Client] isn't
 // possible due to a name conflict, so this method is manually exposed.
 func (s *SUT) CallContext(ctx context.Context, result any, method string, args ...any) error {
-	return s.rpcClient.CallContext(ctx, result, method, args...)
+	return s.wsClient.CallContext(ctx, result, method, args...)
 }
 
 // withVMTime returns an option to configure a new SUT's "now" function along

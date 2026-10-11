@@ -32,11 +32,10 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 )
 
 //go:generate go test -run TestFixtureUpToDate -update .
@@ -214,6 +213,6 @@ func (g *generator) watchedAddresses() []common.Address {
 		vmtest.TestEthAddrs[1],
 		transferRecipient,
 		g.counter,
-		evmconstants.BlackholeAddr,
+		blackhole.Address,
 	}
 }

@@ -55,7 +55,6 @@ go_library(
         "//vms/proposervm/summary",
         "@com_connectrpc_connect//:connect",
         "@com_connectrpc_grpcreflect//:grpcreflect",
-        "@com_github_gorilla_rpc//v2:rpc",
         "@com_github_prometheus_client_golang//prometheus",
         "@org_uber_go_zap//:zap",
     ],

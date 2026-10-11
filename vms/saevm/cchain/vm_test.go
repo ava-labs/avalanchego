@@ -39,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -55,10 +54,12 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
@@ -71,7 +72,6 @@ import (
 
 	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethereum "github.com/ava-labs/libevm"
@@ -80,7 +80,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	evm.RegisterAllLibEVMExtras()
+	libevm.RegisterExtras()
 	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
 
@@ -899,10 +899,12 @@ func (w *wallet) newImportTx(
 ) *tx.Tx {
 	tb.Helper()
 
+	utxos, err := w.client.GetAllUTXOs(ctx, []ids.ShortID{w.sk.Address()}, sourceChain)
+	require.NoErrorf(tb, err, "%T.GetAllUTXOs()", w.client)
+
 	var (
 		avaxAssetID  = w.snowCtx.AVAXAssetID
 		importedAVAX uint64
-		utxos        = w.client.getAllUTXOs(ctx, tb, sourceChain, maxGetUTXOsLimit, w.sk.Address())
 		inputs       = make([]*avax.TransferableInput, 0, len(utxos))
 	)
 	for _, utxo := range utxos {
@@ -1298,7 +1300,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 
 	contract := common.Address{'c', 'o', 'd', 'e'}
 	code := saetest.LogTopOfStackAfter(
-		saetest.Push(t, evmconstants.BlackholeAddr[:]),
+		saetest.Push(t, blackhole.Address[:]),
 		saetest.Ops(vm.BALANCE),
 	)
 	ctx, sut := newSUT(t,
@@ -1319,7 +1321,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 	}
 	sut.waitForPendingEthTxs(ctx, t, txs...)
 
-	preBurn := sut.balance(t, evmconstants.BlackholeAddr)
+	preBurn := sut.balance(t, blackhole.Address)
 	blk := sut.runConsensusLoop(ctx, t)
 	require.Zerof(t, big.NewInt(1).Cmp(blk.EthBlock().BaseFee()), "%T base fee", blk)
 	receipts := blk.Receipts()
@@ -1332,7 +1334,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 		require.Equalf(t, common.Hash(want.Bytes32()), got, "BALANCE(blackhole) observed by transaction %d", i)
 		want.AddUint64(&want, feePerGas*r.GasUsed)
 	}
-	assert.Equal(t, want, sut.balance(t, evmconstants.BlackholeAddr), "blackhole balance after the block")
+	assert.Equal(t, want, sut.balance(t, blackhole.Address), "blackhole balance after the block")
 }
 
 // TestParseBlock verifies that ParseBlock accepts well-formed blocks and

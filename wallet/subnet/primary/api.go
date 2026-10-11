@@ -7,11 +7,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ava-labs/libevm/ethclient"
+
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/client"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -20,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
 	"github.com/ava-labs/avalanchego/wallet/chain/c"
 	"github.com/ava-labs/avalanchego/wallet/chain/p"
 	"github.com/ava-labs/avalanchego/wallet/chain/x"
@@ -41,7 +41,6 @@ const (
 var (
 	_ UTXOClient = (*platformvm.Client)(nil)
 	_ UTXOClient = (*avm.Client)(nil)
-	_ UTXOClient = (*client.Client)(nil)
 )
 
 type UTXOClient interface {
@@ -61,7 +60,7 @@ type AVAXState struct {
 	PCTX    *pbuilder.Context
 	XClient *avm.Client
 	XCTX    *xbuilder.Context
-	CClient *client.Client
+	CClient *cchain.Client
 	CCTX    *c.Context
 	UTXOs   walletcommon.UTXOs
 }
@@ -77,7 +76,7 @@ func FetchState(
 	infoClient := info.NewClient(uri)
 	pClient := platformvm.NewClient(uri)
 	xClient := avm.NewClient(uri, "X")
-	cClient := client.NewCChainClient(uri)
+	cClient := cchain.NewClient(uri)
 
 	pCTX, err := p.NewContextFromClients(ctx, infoClient, pClient)
 	if err != nil {
@@ -111,24 +110,35 @@ func FetchState(
 			client: xClient,
 			codec:  xbuilder.Parser.Codec(),
 		},
-		{
-			id:     cCTX.BlockchainID,
-			client: cClient,
-			codec:  atomic.Codec,
-		},
+	}
+	sourceChainIDs := []ids.ID{
+		constants.PlatformChainID,
+		xCTX.BlockchainID,
+		cCTX.BlockchainID,
 	}
 	for _, destinationChain := range chains {
-		for _, sourceChain := range chains {
+		for _, sourceChainID := range sourceChainIDs {
 			err = AddAllUTXOs(
 				ctx,
 				utxos,
 				destinationChain.client,
 				destinationChain.codec,
-				sourceChain.id,
+				sourceChainID,
 				destinationChain.id,
 				addrList,
 			)
 			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	for _, sourceChainID := range sourceChainIDs {
+		cUTXOs, err := cClient.GetAllUTXOs(ctx, addrList, sourceChainID)
+		if err != nil {
+			return nil, err
+		}
+		for _, utxo := range cUTXOs {
+			if err := utxos.AddUTXO(ctx, sourceChainID, cCTX.BlockchainID, utxo); err != nil {
 				return nil, err
 			}
 		}

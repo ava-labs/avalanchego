@@ -14,12 +14,11 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
 
 var (
@@ -35,7 +34,7 @@ func TestMain(m *testing.M) {
 	if err := json.Unmarshal(bonusBlockConsumersJSON, &bonusBlockConsumers); err != nil {
 		panic(err)
 	}
-	evm.RegisterAllLibEVMExtras()
+	libevm.RegisterExtras()
 	os.Exit(m.Run())
 }
 
@@ -58,7 +57,7 @@ func TestMain(m *testing.M) {
 // forward.
 func TestBonusBlocks(t *testing.T) {
 	const (
-		url = primary.MainnetAPIURI + "/ext/bc/C/rpc"
+		url = "https://api.avax.network/ext/bc/C/rpc"
 		// envVar must be set to run the test.
 		envVar = "SAEVM_TEST_MAINNET_API"
 	)
