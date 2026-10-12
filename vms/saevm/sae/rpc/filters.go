@@ -40,15 +40,16 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 
 	end, foundEnd := api.resolve(crit.ToBlock)
 	if !foundEnd {
-		// All special numbers resolve, so this must be a future block.
-		// MUST be >= start, but we won't find unexecuted logs
+		/// All special numbers resolve, so this must be a future block. Cap at
+		// the last-accepted block, where libevm would stop anyway and if that
+		// block hasn't executed yet, libevm errors when reading its logs.
 		end = api.b.LastAccepted().Height()
 	}
 
 	if end < start {
 		// Invalid input will be handled by libevm. A short proof that this doesn't
 		// escape the max blocks per request limit is below.
-		// - End wasn't found
+		// - End wasn't found (i.e. `!foundEnd`):
 		//   - If start was a special value, it was assumed to be within
 		//     [Config.MaxBlocksPerRequest]. It will read until the first unexecuted block.
 		//   - If start was not a special value, then it was a future block (> last accepted),

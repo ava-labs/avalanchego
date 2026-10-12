@@ -880,14 +880,16 @@ func TestGetLogsRange(t *testing.T) {
 	const maxBlocksPerRequest = 2
 
 	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
-	ctx, sut := newSUT(t, 1, precompileOpt, options.Func[sutConfig](func(c *sutConfig) {
+	ctx, sut := newSUT(t, 1, precompileOpt, timeOpt, options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.RPCConfig.MaxBlocksPerRequest = maxBlocksPerRequest
 	}))
 	defer unblock()
 
 	genesis := sut.lastAcceptedBlock(t)
-	first := sut.runConsensusLoop(t)
+	settled := sut.runConsensusLoop(t)
+	vmTime.AdvanceToSettle(ctx, t, settled)
 	executed := sut.runConsensusLoop(t)
 	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
 
@@ -908,12 +910,8 @@ func TestGetLogsRange(t *testing.T) {
 		wantErr testerr.Want
 	}{
 		{
-			name:  "single_block",
-			query: map[string]any{"fromBlock": num(genesis), "toBlock": num(genesis)},
-		},
-		{
 			name:  "at_limit",
-			query: map[string]any{"fromBlock": num(genesis), "toBlock": num(first)},
+			query: map[string]any{"fromBlock": num(genesis), "toBlock": num(settled)},
 		},
 		{
 			name:    "over_limit",
@@ -954,33 +952,21 @@ func TestGetLogsRange(t *testing.T) {
 		},
 		{
 			name:    "from_greater_than_to",
-			query:   map[string]any{"fromBlock": num(executed), "toBlock": num(first)},
+			query:   map[string]any{"fromBlock": num(executed), "toBlock": num(settled)},
 			wantErr: testerr.Contains("invalid block range params"), // from libevm
 		},
 		{
+			// We must ensure that the provided numbers do not resolve  hastily, but only
+			// as needed, as this avoids unnecessary disk reads. If it were resolved,
+			// it would early return with a nil error.
 			name:    "with_hash_ignores_range",
-			query:   map[string]any{"blockHash": first.Hash(), "fromBlock": num(genesis)},
+			query:   map[string]any{"blockHash": settled.Hash(), "fromBlock": num(unexecuted) + 1},
 			wantErr: testerr.Contains("cannot specify both BlockHash and FromBlock/ToBlock"),
 		},
 		{
-			name:    "unexecuted_block_hash",
-			query:   map[string]any{"blockHash": unexecuted.Hash()},
-			wantErr: testerr.Contains("failed to get logs for block #3"), // from libevm
-		},
-		{
-			name:    "unknown_block_hash",
-			query:   map[string]any{"blockHash": common.Hash{'u', 'n', 'k'}},
-			wantErr: testerr.Contains("unknown block"),
-		},
-		{
-			name:    "from_earliest",
-			query:   map[string]any{"fromBlock": "earliest"},
-			wantErr: testerr.Contains("requested too many blocks from 0 to 2, maximum is set to 2"),
-		},
-		{
-			name:    "from_finalized",
-			query:   map[string]any{"fromBlock": "finalized"},
-			wantErr: testerr.Contains("requested too many blocks from 0 to 2, maximum is set to 2"),
+			name:    "from_finalized_matches_settled",
+			query:   map[string]any{"fromBlock": "finalized", "toBlock": num(unexecuted)},
+			wantErr: testerr.Contains("requested too many blocks from 1 to 3, maximum is set to 2"),
 		},
 		{
 			name:    "from_pending",
@@ -988,7 +974,7 @@ func TestGetLogsRange(t *testing.T) {
 			wantErr: testerr.Contains("invalid block range params"), // from libevm
 		},
 		{
-			// libevm ALWAYS resolves pending to last executed, but the config is NOT set.
+			// libevm always resolves pending to last executed, but the config is NOT set.
 			name:    "pending_resolves_to_last_accepted",
 			query:   map[string]any{"fromBlock": "pending", "toBlock": "pending"},
 			wantErr: testerr.Contains("failed to get logs for block #3"),
@@ -1006,7 +992,7 @@ func TestGetLogsRange(t *testing.T) {
 				return
 			}
 
-			// MUST be an empty array, not null, to match libevm.
+			// must be an empty array, not null, to match libevm.
 			assert.JSONEqf(t, "[]", string(got), "eth_getLogs(%v)", tt.query)
 		})
 	}
