@@ -16,14 +16,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -1508,6 +1511,273 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 				onAbortState,
 				tt.want(cfg, staker.PotentialReward),
 			)
+		})
+	}
+}
+
+// increaseAutoRenewedValidatorStake issues an IncreaseAutoRenewedValidatorStakeTx
+// for stakerTxID, executes it via StandardTx and commits the result to
+// env.state.
+func increaseAutoRenewedValidatorStake(
+	t testing.TB,
+	env *environment,
+	wallet wallet.Wallet,
+	stakerTxID ids.ID,
+	amount uint64,
+) *platform.Tx {
+	t.Helper()
+
+	tx, err := wallet.IssueIncreaseAutoRenewedValidatorStakeTx(stakerTxID, amount)
+	require.NoError(t, err)
+
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+
+	_, _, _, err = StandardTx(
+		&env.backend,
+		state.PickFeeCalculator(env.config, env.state),
+		tx,
+		diff,
+	)
+	require.NoError(t, err)
+	diff.AddTx(tx, status.Committed)
+
+	require.NoError(t, diff.Apply(env.state))
+	require.NoError(t, env.state.Commit())
+	return tx
+}
+
+// rewardAutoRenewedValidator executes the RewardAutoRenewedValidatorTx that ends
+// the current cycle of the validator created by stakerTx and returns the
+// resulting commit and abort states.
+func rewardAutoRenewedValidator(
+	t testing.TB,
+	env *environment,
+	stakerTx *platform.Tx,
+) (*state.Diff, *state.Diff) {
+	t.Helper()
+
+	uStakerTx := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
+	staker, err := env.state.GetCurrentValidator(uStakerTx.SubnetID(), uStakerTx.NodeID())
+	require.NoError(t, err)
+
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+	diff.SetTimestamp(staker.EndTime)
+
+	rewardTx := newRewardAutoRenewedValidatorTx(t, stakerTx.ID(), diff.GetTimestamp())
+
+	onCommitState, err := state.NewDiffOn(diff, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+	onAbortState, err := state.NewDiffOn(diff, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+
+	require.NoError(t, ProposalTx(
+		&env.backend,
+		state.PickFeeCalculator(env.config, env.state),
+		rewardTx,
+		onCommitState,
+		onAbortState,
+	))
+	return onCommitState, onAbortState
+}
+
+// assertStakeIncreaseReturned asserts that each of the stake outputs locked by
+// the stake increase tx is returned as a UTXO with the original amount.
+func assertStakeIncreaseReturned(t testing.TB, chain state.Chain, tx *platform.Tx) {
+	t.Helper()
+
+	uTx := tx.Unsigned.(*platform.IncreaseAutoRenewedValidatorStakeTx)
+	for i, stakeOut := range uTx.StakeOuts {
+		utxoID := avax.UTXOID{
+			TxID:        tx.ID(),
+			OutputIndex: uint32(len(uTx.Outputs()) + i),
+		}
+		utxo, err := chain.GetUTXO(utxoID.InputID())
+		require.NoError(t, err)
+
+		out, ok := utxo.Out.(*secp256k1fx.TransferOutput)
+		require.True(t, ok)
+		require.Equal(t, stakeOut.Out.Amount(), out.Amt)
+	}
+}
+
+// assertStakeIncreaseLocked asserts that none of the stake outputs locked by
+// the stake increase tx have been returned.
+func assertStakeIncreaseLocked(t testing.TB, chain state.Chain, tx *platform.Tx) {
+	t.Helper()
+
+	uTx := tx.Unsigned.(*platform.IncreaseAutoRenewedValidatorStakeTx)
+	for i := range uTx.StakeOuts {
+		assertNoUTXO(t, chain, tx.ID(), len(uTx.Outputs())+i)
+	}
+}
+
+// TestRewardAutoRenewedValidatorTxStakeIncrease tests that stake increases are
+// applied to an auto-renewed validator's weight at the start of its next cycle,
+// and that the locked stake is returned when the validator stops.
+func TestRewardAutoRenewedValidatorTxStakeIncrease(t *testing.T) {
+	const appliedStakeIncrease = 2 * units.MilliAvax
+
+	tests := []struct {
+		name string
+		// pendingStakeIncrease returns the stake locked during the second cycle,
+		// given the validator's weight at the start of that cycle.
+		pendingStakeIncrease func(env *environment, weight uint64) uint64
+		// restake reports whether the validator continues after the second
+		// cycle.
+		restake bool
+	}{
+		{
+			name: "restake",
+			pendingStakeIncrease: func(*environment, uint64) uint64 {
+				return 3 * units.MilliAvax
+			},
+			restake: true,
+		},
+		{
+			// The pending stake increase fills the remaining capacity, so no
+			// rewards can be restaked and they are all withdrawn.
+			name: "restake_capped_at_max",
+			pendingStakeIncrease: func(env *environment, weight uint64) uint64 {
+				return env.config.MaxValidatorStake - weight
+			},
+			restake: true,
+		},
+		{
+			// The validator was configured to stop after the stake was locked.
+			// The stake is never applied and is returned on both branches.
+			name: "graceful_stop",
+			pendingStakeIncrease: func(*environment, uint64) uint64 {
+				return 3 * units.MilliAvax
+			},
+			restake: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			env := newEnvironment(t, upgradetest.Latest)
+			wallet := newWallet(t, env, walletConfig{})
+
+			// Restake all rewards, so the expected weights are exact.
+			cfg := autoRenewedValidatorConfig{
+				weight:                   defaultMinValidatorStake,
+				delegationRewardShares:   reward.PercentDenominator / 10,
+				autoCompoundRewardShares: reward.PercentDenominator,
+				restake:                  true,
+			}
+			stakerTx, err := wallet.IssueAddAutoRenewedValidatorTx(
+				ids.GenerateTestNodeID(),
+				cfg.weight,
+				newProofOfPossession(t),
+				&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+				&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+				&secp256k1fx.OutputOwners{},
+				cfg.delegationRewardShares,
+				cfg.autoCompoundRewardShares,
+				env.config.MinStakeDuration,
+			)
+			require.NoError(err)
+			addAutoRenewedValidator(t, env, stakerTx, cfg)
+
+			uStakerTx := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
+			subnetID, nodeID := uStakerTx.SubnetID(), uStakerTx.NodeID()
+
+			// First cycle: the stake increase is locked, and applied to the weight
+			// when the cycle ends.
+			appliedTx := increaseAutoRenewedValidatorStake(t, env, wallet, stakerTx.ID(), appliedStakeIncrease)
+
+			firstCycleValidator, err := env.state.GetCurrentValidator(subnetID, nodeID)
+			require.NoError(err)
+			require.Equal(cfg.weight, firstCycleValidator.Weight)
+
+			onCommitState, _ := rewardAutoRenewedValidator(t, env, stakerTx)
+			require.NoError(onCommitState.Apply(env.state))
+			require.NoError(env.state.Commit())
+
+			secondCycleValidator, err := env.state.GetCurrentValidator(subnetID, nodeID)
+			require.NoError(err)
+			require.Equal(
+				cfg.weight+appliedStakeIncrease+firstCycleValidator.PotentialReward,
+				secondCycleValidator.Weight,
+			)
+
+			stakingInfo, err := env.state.GetStakingInfo(subnetID, nodeID)
+			require.NoError(err)
+			require.Zero(stakingInfo.PendingStakeIncrease)
+			require.Equal(appliedStakeIncrease, stakingInfo.AccruedStakeIncrease)
+			require.Empty(stakingInfo.PendingStakeIncreaseTxIDs)
+			require.Equal([]ids.ID{appliedTx.ID()}, stakingInfo.AccruedStakeIncreaseTxIDs)
+			assertStakeIncreaseLocked(t, env.state, appliedTx)
+
+			// Second cycle: another stake increase is locked, but is still pending
+			// when the cycle ends.
+			pendingStakeIncrease := tt.pendingStakeIncrease(env, secondCycleValidator.Weight)
+			pendingTx := increaseAutoRenewedValidatorStake(t, env, wallet, stakerTx.ID(), pendingStakeIncrease)
+
+			if !tt.restake {
+				stakingInfo, err := env.state.GetStakingInfo(subnetID, nodeID)
+				require.NoError(err)
+				stakingInfo.NextPeriod = 0
+				require.NoError(env.state.SetStakingInfo(subnetID, nodeID, stakingInfo))
+			}
+
+			onCommitState, onAbortState := rewardAutoRenewedValidator(t, env, stakerTx)
+
+			// On abort the validator is removed and all of its stake is returned.
+			_, err = onAbortState.GetCurrentValidator(subnetID, nodeID)
+			require.ErrorIs(err, database.ErrNotFound)
+			assertStakeReturned(t, onAbortState, stakerTx.ID(), uStakerTx)
+			assertStakeIncreaseReturned(t, onAbortState, appliedTx)
+			assertStakeIncreaseReturned(t, onAbortState, pendingTx)
+
+			if !tt.restake {
+				// On a graceful stop the validator is removed and all of its stake
+				// is returned.
+				_, err = onCommitState.GetCurrentValidator(subnetID, nodeID)
+				require.ErrorIs(err, database.ErrNotFound)
+				assertStakeReturned(t, onCommitState, stakerTx.ID(), uStakerTx)
+				assertStakeIncreaseReturned(t, onCommitState, appliedTx)
+				assertStakeIncreaseReturned(t, onCommitState, pendingTx)
+				return
+			}
+
+			// On commit the pending stake increase is applied before restaking the
+			// rewards, which are capped at MaxValidatorStake.
+			wantWeight := min(
+				secondCycleValidator.Weight+pendingStakeIncrease+secondCycleValidator.PotentialReward,
+				env.config.MaxValidatorStake,
+			)
+
+			validator, err := onCommitState.GetCurrentValidator(subnetID, nodeID)
+			require.NoError(err)
+			require.Equal(wantWeight, validator.Weight)
+
+			stakingInfo, err = onCommitState.GetStakingInfo(subnetID, nodeID)
+			require.NoError(err)
+			require.Zero(stakingInfo.PendingStakeIncrease)
+			require.Equal(appliedStakeIncrease+pendingStakeIncrease, stakingInfo.AccruedStakeIncrease)
+			require.Empty(stakingInfo.PendingStakeIncreaseTxIDs)
+			require.Equal([]ids.ID{appliedTx.ID(), pendingTx.ID()}, stakingInfo.AccruedStakeIncreaseTxIDs)
+
+			assertStakeIncreaseLocked(t, onCommitState, appliedTx)
+			assertStakeIncreaseLocked(t, onCommitState, pendingTx)
+
+			// The weight must be reconstructed from the persisted staking info.
+			require.NoError(onCommitState.Apply(env.state))
+			require.NoError(env.state.Commit())
+
+			reloadedState := statetest.New(t, statetest.Config{
+				DB:       env.baseDB,
+				Upgrades: env.config.UpgradeConfig,
+				Context:  env.ctx,
+			})
+			reloadedValidator, err := reloadedState.GetCurrentValidator(subnetID, nodeID)
+			require.NoError(err)
+			require.Equal(wantWeight, reloadedValidator.Weight)
 		})
 	}
 }
