@@ -50,6 +50,8 @@ jobs:
         uses: ./.github/actions/run-docker-with-disk-space
         with:
           setup-qemu: 'true'
+          docker-username: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_USERNAME || '' }}
+          docker-password: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_PASS || '' }}
           run: ./scripts/run_task.sh test-build-image
 
   build-image-subnet-evm:
@@ -61,6 +63,8 @@ jobs:
         uses: ./.github/actions/run-docker-with-disk-space
         with:
           setup-qemu: 'true'
+          docker-username: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_USERNAME || '' }}
+          docker-password: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_PASS || '' }}
           run: ./scripts/run_task.sh test-build-image
           working_directory: ./graft/subnet-evm
 
