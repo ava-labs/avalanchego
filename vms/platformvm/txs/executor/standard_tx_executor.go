@@ -1481,27 +1481,17 @@ func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRene
 }
 
 func (e *standardTxExecutor) CancelAutoRenewedValidatorStakeIncreaseTx(tx *platform.CancelAutoRenewedValidatorStakeIncreaseTx) error {
-	validator, err := verifyCancelAutoRenewedValidatorStakeIncreaseTx(e.backend, e.feeCalculator, e.state, e.tx, tx)
+	validator, stakingInfo, err := verifyCancelAutoRenewedValidatorStakeIncreaseTx(e.backend, e.feeCalculator, e.state, e.tx, tx)
 	if err != nil {
 		return err
 	}
 
-	stakeIncreaseTx, _, err := e.state.GetTx(tx.StakeIncreaseTxID)
+	stakeIncreaseTx, err := getStakeIncreaseTx(e.state, tx.StakeIncreaseTxID)
 	if err != nil {
-		return fmt.Errorf("getting stake increase tx: %w", err)
+		return err
 	}
 
-	uStakeIncreaseTx, ok := stakeIncreaseTx.Unsigned.(*platform.IncreaseAutoRenewedValidatorStakeTx)
-	if !ok {
-		return fmt.Errorf("%w: %T", errUnexpectedStakeIncreaseTxType, stakeIncreaseTx.Unsigned)
-	}
-
-	stakingInfo, err := e.state.GetStakingInfo(validator.SubnetID, validator.NodeID)
-	if err != nil {
-		return fmt.Errorf("getting staking info: %w", err)
-	}
-
-	stakingInfo.PendingStakeIncrease, err = math.Sub(stakingInfo.PendingStakeIncrease, uStakeIncreaseTx.Weight())
+	stakingInfo.PendingStakeIncrease, err = math.Sub(stakingInfo.PendingStakeIncrease, stakeIncreaseTx.Weight())
 	if err != nil {
 		return fmt.Errorf("removing pending stake increase: %w", err)
 	}
@@ -1517,7 +1507,7 @@ func (e *standardTxExecutor) CancelAutoRenewedValidatorStakeIncreaseTx(tx *platf
 	// Return the locked stake to the owners of its stake outputs. The stake
 	// increase tx is no longer tracked by the validator, so its stake isn't
 	// returned again when the validator stops.
-	unstakeUTXOs(uStakeIncreaseTx, tx.StakeIncreaseTxID, e.state)
+	unstakeUTXOs(stakeIncreaseTx, tx.StakeIncreaseTxID, e.state)
 
 	avax.Consume(e.state, tx.Ins)
 	avax.Produce(e.state, e.tx.ID(), tx.Outs)
@@ -1526,14 +1516,9 @@ func (e *standardTxExecutor) CancelAutoRenewedValidatorStakeIncreaseTx(tx *platf
 }
 
 func (e *standardTxExecutor) IncreaseAutoRenewedValidatorStakeTx(tx *platform.IncreaseAutoRenewedValidatorStakeTx) error {
-	validator, err := verifyIncreaseAutoRenewedValidatorStakeTx(e.backend, e.feeCalculator, e.state, e.tx, tx)
+	validator, stakingInfo, err := verifyIncreaseAutoRenewedValidatorStakeTx(e.backend, e.feeCalculator, e.state, e.tx, tx)
 	if err != nil {
 		return err
-	}
-
-	stakingInfo, err := e.state.GetStakingInfo(validator.SubnetID, validator.NodeID)
-	if err != nil {
-		return fmt.Errorf("getting staking info: %w", err)
 	}
 
 	// The stake is locked now, but it is only added to the validator's weight
@@ -1546,7 +1531,8 @@ func (e *standardTxExecutor) IncreaseAutoRenewedValidatorStakeTx(tx *platform.In
 	// The tx ID is recorded so that the locked stake outputs can be returned
 	// when the validator stops. The slice is copied because it may be shared
 	// with the parent state.
-	stakingInfo.PendingStakeIncreaseTxIDs = append(slices.Clone(stakingInfo.PendingStakeIncreaseTxIDs), e.tx.ID())
+	txID := e.tx.ID()
+	stakingInfo.PendingStakeIncreaseTxIDs = append(slices.Clone(stakingInfo.PendingStakeIncreaseTxIDs), txID)
 
 	if err := e.state.SetStakingInfo(validator.SubnetID, validator.NodeID, stakingInfo); err != nil {
 		return fmt.Errorf("setting staking info: %w", err)
@@ -1555,7 +1541,7 @@ func (e *standardTxExecutor) IncreaseAutoRenewedValidatorStakeTx(tx *platform.In
 	// The stake outputs are not produced here. They are produced when the
 	// validator stops, which unlocks the stake.
 	avax.Consume(e.state, tx.Ins)
-	avax.Produce(e.state, e.tx.ID(), tx.Outs)
+	avax.Produce(e.state, txID, tx.Outs)
 
 	return nil
 }

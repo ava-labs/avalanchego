@@ -1046,20 +1046,27 @@ func stakeIncreaseTxIDs(stakingInfo state.StakingInfo) []ids.ID {
 	return slices.Concat(stakingInfo.AccruedStakeIncreaseTxIDs, stakingInfo.PendingStakeIncreaseTxIDs)
 }
 
+func getStakeIncreaseTx(chainState state.Chain, txID ids.ID) (*platform.IncreaseAutoRenewedValidatorStakeTx, error) {
+	tx, _, err := chainState.GetTx(txID)
+	if err != nil {
+		return nil, fmt.Errorf("getting stake increase tx %s: %w", txID, err)
+	}
+
+	stakeIncreaseTx, ok := tx.Unsigned.(*platform.IncreaseAutoRenewedValidatorStakeTx)
+	if !ok {
+		return nil, fmt.Errorf("%w: %T", errUnexpectedStakeIncreaseTxType, tx.Unsigned)
+	}
+	return stakeIncreaseTx, nil
+}
+
 // unstakeStakeIncreaseUTXOs returns the stake locked by the
 // IncreaseAutoRenewedValidatorStakeTxs with the provided IDs.
 func unstakeStakeIncreaseUTXOs(stakeIncreaseTxIDs []ids.ID, chainState *state.Diff) error {
 	for _, txID := range stakeIncreaseTxIDs {
-		tx, _, err := chainState.GetTx(txID)
+		stakeIncreaseTx, err := getStakeIncreaseTx(chainState, txID)
 		if err != nil {
-			return fmt.Errorf("getting stake increase tx %s: %w", txID, err)
+			return err
 		}
-
-		stakeIncreaseTx, ok := tx.Unsigned.(*platform.IncreaseAutoRenewedValidatorStakeTx)
-		if !ok {
-			return fmt.Errorf("%w: %T", errUnexpectedStakeIncreaseTxType, tx.Unsigned)
-		}
-
 		unstakeUTXOs(stakeIncreaseTx, txID, chainState)
 	}
 	return nil
