@@ -188,6 +188,10 @@ func (*backendVisitor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedV
 	return ErrUnsupportedTxType
 }
 
+func (b *backendVisitor) IncreaseAutoRenewedValidatorStakeTx(tx *platform.IncreaseAutoRenewedValidatorStakeTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
 func (b *backendVisitor) baseTx(tx *platform.BaseTx) error {
 	return b.b.removeUTXOs(
 		b.ctx,

@@ -529,6 +529,13 @@ func (*inputOutputGetter) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenew
 	return fmt.Errorf("%w: RewardAutoRenewedValidatorTx", ErrUnsupportedTxType)
 }
 
+func (i *inputOutputGetter) IncreaseAutoRenewedValidatorStakeTx(tx *platform.IncreaseAutoRenewedValidatorStakeTx) error {
+	i.getUTXOs(tx.BaseTx)
+	i.OutputUTXOs = append(i.OutputUTXOs, tx.StakeOuts...)
+
+	return nil
+}
+
 func (i *inputOutputGetter) getUTXOs(tx platform.BaseTx) {
 	i.InputUTXOs = append(i.InputUTXOs, tx.Ins...)
 	i.OutputUTXOs = append(i.OutputUTXOs, tx.Outs...)

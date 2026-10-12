@@ -214,8 +214,13 @@ func (tx *AddAutoRenewedValidatorTx) nodeID() (ids.NodeID, error) {
 }
 
 func (tx *AddAutoRenewedValidatorTx) stakeWeight() (uint64, error) {
+	return sumStakeOuts(tx.StakeOuts)
+}
+
+// sumStakeOuts returns the total amount staked by stakeOuts.
+func sumStakeOuts(stakeOuts []*avax.TransferableOutput) (uint64, error) {
 	weight := uint64(0)
-	for _, out := range tx.StakeOuts {
+	for _, out := range stakeOuts {
 		switch {
 		case out == nil:
 			return 0, avax.ErrNilTransferableOutput

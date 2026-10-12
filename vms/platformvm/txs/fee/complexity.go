@@ -246,6 +246,15 @@ var (
 		gas.DBRead:  1, // read tx
 		gas.DBWrite: 1, // update staker
 	}
+	IntrinsicIncreaseAutoRenewedValidatorStakeTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.IDLen + // txID
+			wrappers.IntLen + // auth typeID
+			wrappers.IntLen + // authCredential typeID
+			wrappers.IntLen, // num stake outs
+		gas.DBRead:  1, // read tx
+		gas.DBWrite: 1, // update staker
+	}
 	errUnsupportedOutput = errors.New("unsupported output type")
 	errUnsupportedInput  = errors.New("unsupported input type")
 	errUnsupportedOwner  = errors.New("unsupported owner type")
@@ -872,6 +881,27 @@ func (c *complexityVisitor) SetAutoRenewedValidatorConfigTx(tx *platform.SetAuto
 
 func (*complexityVisitor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedValidatorTx) error {
 	return ErrUnsupportedTx
+}
+
+func (c *complexityVisitor) IncreaseAutoRenewedValidatorStakeTx(tx *platform.IncreaseAutoRenewedValidatorStakeTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	authComplexity, err := AuthComplexity(tx.Auth)
+	if err != nil {
+		return err
+	}
+	outputsComplexity, err := OutputComplexity(tx.Stake()...)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicIncreaseAutoRenewedValidatorStakeTxComplexities.Add(
+		&baseTxComplexity,
+		&authComplexity,
+		&outputsComplexity,
+	)
+	return err
 }
 
 func baseTxComplexity(tx *platform.BaseTx) (gas.Dimensions, error) {

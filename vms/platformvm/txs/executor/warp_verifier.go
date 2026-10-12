@@ -134,6 +134,10 @@ func (*warpVerifier) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedVal
 	return nil
 }
 
+func (*warpVerifier) IncreaseAutoRenewedValidatorStakeTx(*platform.IncreaseAutoRenewedValidatorStakeTx) error {
+	return nil
+}
+
 func (w *warpVerifier) verify(message []byte) error {
 	msg, err := warp.ParseMessage(message)
 	if err != nil {

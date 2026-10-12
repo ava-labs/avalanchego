@@ -259,6 +259,19 @@ func (*visitor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedValidato
 	return ErrUnsupportedTxType
 }
 
+func (s *visitor) IncreaseAutoRenewedValidatorStakeTx(tx *platform.IncreaseAutoRenewedValidatorStakeTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	authSigners, err := s.getAuthSigners(tx.TxID, tx.Auth)
+	if err != nil {
+		return err
+	}
+	txSigners = append(txSigners, authSigners)
+	return sign(s.tx, txSigners)
+}
+
 func (s *visitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput) ([][]keychain.Signer, error) {
 	txSigners := make([][]keychain.Signer, len(ins))
 	for credIndex, transferInput := range ins {

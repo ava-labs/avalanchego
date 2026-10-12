@@ -284,5 +284,17 @@ var (
 			expectedComplexityErr: ErrUnsupportedTx,
 			expectedDynamicFeeErr: ErrUnsupportedTx,
 		},
+		{
+			name:                 "IncreaseAutoRenewedValidatorStakeTx",
+			tx:                   "00000000002b00003039000000000000000000000000000000000000000000000000000000000000000000000001dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db0000000700238520c676e000000000000000000000000001000000013cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c00000001043c91e9d508169329034e2a68110427a311f945efc53ed3f3493d335b393fd100000000dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000005002386f26fc100000000000100000000000000003d0ad12b8ee8928edf248ca91ca55600fb383f07c32bff1d6dec472b25cf59a70000000a000000010000000000000001dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000007000001d16daf5600000000000000000000000001000000013cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c000000020000000900000001d9dc5fde088e2eb8e1f1ecc9a95fc0268d90dd101d6438b7f7a2ea8edb3476bf4a894cc2a968ce76509c5ba7c41124794664041272906169c84315f835cbfead010000000900000001d9dc5fde088e2eb8e1f1ecc9a95fc0268d90dd101d6438b7f7a2ea8edb3476bf4a894cc2a968ce76509c5ba7c41124794664041272906169c84315f835cbfead01",
+			expectedStaticFeeErr: ErrUnsupportedTx,
+			expectedComplexity: gas.Dimensions{
+				gas.Bandwidth: 500, // The length of the tx in bytes
+				gas.DBRead:    IntrinsicIncreaseAutoRenewedValidatorStakeTxComplexities[gas.DBRead] + intrinsicInputDBRead,
+				gas.DBWrite:   IntrinsicIncreaseAutoRenewedValidatorStakeTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + 2*intrinsicOutputDBWrite,
+				gas.Compute:   2 * intrinsicSECP256k1FxSignatureCompute,
+			},
+			expectedDynamicFee: 88_500 * units.NanoAvax,
+		},
 	}
 )

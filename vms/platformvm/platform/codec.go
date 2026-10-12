@@ -42,6 +42,7 @@ func init() {
 			registerDurangoTxTypes(c),
 			registerEtnaTxTypes(c),
 			registerHeliconTxTypes(c),
+			registerIglooTxTypes(c),
 		)
 	}
 
@@ -156,4 +157,10 @@ func registerHeliconTxTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&SetAutoRenewedValidatorConfigTx{}),
 		targetCodec.RegisterType(&RewardAutoRenewedValidatorTx{}),
 	)
+}
+
+// registerIglooTxTypes registers the transaction types that were valid during
+// the Igloo series of upgrades.
+func registerIglooTxTypes(targetCodec linearcodec.Codec) error {
+	return targetCodec.RegisterType(&IncreaseAutoRenewedValidatorStakeTx{})
 }

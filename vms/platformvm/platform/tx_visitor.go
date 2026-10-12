@@ -37,4 +37,7 @@ type TxVisitor interface {
 	AddAutoRenewedValidatorTx(*AddAutoRenewedValidatorTx) error
 	SetAutoRenewedValidatorConfigTx(*SetAutoRenewedValidatorConfigTx) error
 	RewardAutoRenewedValidatorTx(*RewardAutoRenewedValidatorTx) error
+
+	// Igloo Transactions:
+	IncreaseAutoRenewedValidatorStakeTx(*IncreaseAutoRenewedValidatorStakeTx) error
 }

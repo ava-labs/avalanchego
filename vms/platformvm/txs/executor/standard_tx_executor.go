@@ -1478,6 +1478,10 @@ func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRene
 	return ErrWrongTxType
 }
 
+func (*standardTxExecutor) IncreaseAutoRenewedValidatorStakeTx(*platform.IncreaseAutoRenewedValidatorStakeTx) error {
+	return ErrWrongTxType
+}
+
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
 func (e *standardTxExecutor) putStaker(stakerTx platform.BoundedStaker) error {
 	var (

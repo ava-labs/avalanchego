@@ -86,6 +86,20 @@ func TestGetInputOutputs(t *testing.T) {
 			tx:      &platform.RewardAutoRenewedValidatorTx{},
 			wantErr: ErrUnsupportedTxType,
 		},
+		{
+			name: "increase_auto-renewed_validator_stake",
+			tx: &platform.IncreaseAutoRenewedValidatorStakeTx{
+				BaseTx: platform.BaseTx{
+					BaseTx: avax.BaseTx{
+						Ins:  []*avax.TransferableInput{baseIn},
+						Outs: []*avax.TransferableOutput{baseOut},
+					},
+				},
+				StakeOuts: []*avax.TransferableOutput{stakeOut},
+			},
+			wantInputs:  []*avax.TransferableInput{baseIn},
+			wantOutputs: []*avax.TransferableOutput{baseOut, stakeOut},
+		},
 	}
 
 	for _, test := range tests {
