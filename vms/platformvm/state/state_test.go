@@ -4936,8 +4936,6 @@ func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
 // that applied stake increases are included in the validator's weight after
 // reloading the state.
 func TestAutoRenewedValidatorStakeIncreaseStateReload(t *testing.T) {
-	require := require.New(t)
-
 	db := memdb.New()
 	state := newTestState(t, db)
 
@@ -4970,7 +4968,7 @@ func TestAutoRenewedValidatorStakeIncreaseStateReload(t *testing.T) {
 
 	autoRenewedUnsigned := createAutoRenewedValidatorTx(t, nodeID, weight, period, autoCompoundRewardShares)
 	autoRenewedTx := &platform.Tx{Unsigned: autoRenewedUnsigned}
-	require.NoError(autoRenewedTx.Initialize(platform.Codec))
+	require.NoError(t, autoRenewedTx.Initialize(platform.Codec))
 
 	wantWeight := weight + accruedRewards + accruedDelRewards + accruedStakeIncrease
 	staker, err := NewCurrentStaker(
@@ -4981,7 +4979,7 @@ func TestAutoRenewedValidatorStakeIncreaseStateReload(t *testing.T) {
 		wantWeight,
 		potentialReward,
 	)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	wantStakingInfo := StakingInfo{
 		AccruedValidationRewards:  accruedRewards,
@@ -4995,24 +4993,24 @@ func TestAutoRenewedValidatorStakeIncreaseStateReload(t *testing.T) {
 	}
 
 	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
-	require.NoError(err)
+	require.NoError(t, err)
 	d.AddTx(autoRenewedTx, status.Committed)
-	require.NoError(d.PutCurrentValidator(staker))
-	require.NoError(d.SetStakingInfo(subnetID, nodeID, wantStakingInfo))
-	require.NoError(d.Apply(state))
-	require.NoError(state.Commit())
+	require.NoError(t, d.PutCurrentValidator(staker))
+	require.NoError(t, d.SetStakingInfo(subnetID, nodeID, wantStakingInfo))
+	require.NoError(t, d.Apply(state))
+	require.NoError(t, state.Commit())
 
 	reloadedState := newTestState(t, db)
 
 	gotValidator, err := reloadedState.GetCurrentValidator(subnetID, nodeID)
-	require.NoError(err)
+	require.NoError(t, err)
 	// The pending stake increase must not be included in the weight until it
 	// is applied at the start of the next cycle.
-	require.Equal(wantWeight, gotValidator.Weight)
+	require.Equal(t, wantWeight, gotValidator.Weight)
 
 	gotStakingInfo, err := reloadedState.GetStakingInfo(subnetID, nodeID)
-	require.NoError(err)
-	require.Equal(wantStakingInfo, gotStakingInfo)
+	require.NoError(t, err)
+	require.Equal(t, wantStakingInfo, gotStakingInfo)
 }
 
 func TestStateAndDiffIntegration_L1Validators(t *testing.T) {

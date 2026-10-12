@@ -1657,8 +1657,6 @@ func TestRewardAutoRenewedValidatorTxStakeIncrease(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
 			env := newEnvironment(t, upgradetest.Latest)
 			wallet := newWallet(t, env, walletConfig{})
 
@@ -1680,7 +1678,7 @@ func TestRewardAutoRenewedValidatorTxStakeIncrease(t *testing.T) {
 				cfg.autoCompoundRewardShares,
 				env.config.MinStakeDuration,
 			)
-			require.NoError(err)
+			require.NoError(t, err)
 			addAutoRenewedValidator(t, env, stakerTx, cfg)
 
 			uStakerTx := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
@@ -1691,26 +1689,26 @@ func TestRewardAutoRenewedValidatorTxStakeIncrease(t *testing.T) {
 			appliedTx := increaseAutoRenewedValidatorStake(t, env, wallet, stakerTx.ID(), appliedStakeIncrease)
 
 			firstCycleValidator, err := env.state.GetCurrentValidator(subnetID, nodeID)
-			require.NoError(err)
-			require.Equal(cfg.weight, firstCycleValidator.Weight)
+			require.NoError(t, err)
+			require.Equal(t, cfg.weight, firstCycleValidator.Weight)
 
 			onCommitState, _ := rewardAutoRenewedValidator(t, env, stakerTx)
-			require.NoError(onCommitState.Apply(env.state))
-			require.NoError(env.state.Commit())
+			require.NoError(t, onCommitState.Apply(env.state))
+			require.NoError(t, env.state.Commit())
 
 			secondCycleValidator, err := env.state.GetCurrentValidator(subnetID, nodeID)
-			require.NoError(err)
-			require.Equal(
+			require.NoError(t, err)
+			require.Equal(t,
 				cfg.weight+appliedStakeIncrease+firstCycleValidator.PotentialReward,
 				secondCycleValidator.Weight,
 			)
 
 			stakingInfo, err := env.state.GetStakingInfo(subnetID, nodeID)
-			require.NoError(err)
-			require.Zero(stakingInfo.PendingStakeIncrease)
-			require.Equal(appliedStakeIncrease, stakingInfo.AccruedStakeIncrease)
-			require.Empty(stakingInfo.PendingStakeIncreaseTxIDs)
-			require.Equal([]ids.ID{appliedTx.ID()}, stakingInfo.AccruedStakeIncreaseTxIDs)
+			require.NoError(t, err)
+			require.Zero(t, stakingInfo.PendingStakeIncrease)
+			require.Equal(t, appliedStakeIncrease, stakingInfo.AccruedStakeIncrease)
+			require.Empty(t, stakingInfo.PendingStakeIncreaseTxIDs)
+			require.Equal(t, []ids.ID{appliedTx.ID()}, stakingInfo.AccruedStakeIncreaseTxIDs)
 			assertStakeIncreaseLocked(t, env.state, appliedTx)
 
 			// Second cycle: another stake increase is locked, but is still pending
@@ -1720,16 +1718,16 @@ func TestRewardAutoRenewedValidatorTxStakeIncrease(t *testing.T) {
 
 			if !tt.restake {
 				stakingInfo, err := env.state.GetStakingInfo(subnetID, nodeID)
-				require.NoError(err)
+				require.NoError(t, err)
 				stakingInfo.NextPeriod = 0
-				require.NoError(env.state.SetStakingInfo(subnetID, nodeID, stakingInfo))
+				require.NoError(t, env.state.SetStakingInfo(subnetID, nodeID, stakingInfo))
 			}
 
 			onCommitState, onAbortState := rewardAutoRenewedValidator(t, env, stakerTx)
 
 			// On abort the validator is removed and all of its stake is returned.
 			_, err = onAbortState.GetCurrentValidator(subnetID, nodeID)
-			require.ErrorIs(err, database.ErrNotFound)
+			require.ErrorIs(t, err, database.ErrNotFound)
 			assertStakeReturned(t, onAbortState, stakerTx.ID(), uStakerTx)
 			assertStakeIncreaseReturned(t, onAbortState, appliedTx)
 			assertStakeIncreaseReturned(t, onAbortState, pendingTx)
@@ -1738,7 +1736,7 @@ func TestRewardAutoRenewedValidatorTxStakeIncrease(t *testing.T) {
 				// On a graceful stop the validator is removed and all of its stake
 				// is returned.
 				_, err = onCommitState.GetCurrentValidator(subnetID, nodeID)
-				require.ErrorIs(err, database.ErrNotFound)
+				require.ErrorIs(t, err, database.ErrNotFound)
 				assertStakeReturned(t, onCommitState, stakerTx.ID(), uStakerTx)
 				assertStakeIncreaseReturned(t, onCommitState, appliedTx)
 				assertStakeIncreaseReturned(t, onCommitState, pendingTx)
@@ -1753,22 +1751,22 @@ func TestRewardAutoRenewedValidatorTxStakeIncrease(t *testing.T) {
 			)
 
 			validator, err := onCommitState.GetCurrentValidator(subnetID, nodeID)
-			require.NoError(err)
-			require.Equal(wantWeight, validator.Weight)
+			require.NoError(t, err)
+			require.Equal(t, wantWeight, validator.Weight)
 
 			stakingInfo, err = onCommitState.GetStakingInfo(subnetID, nodeID)
-			require.NoError(err)
-			require.Zero(stakingInfo.PendingStakeIncrease)
-			require.Equal(appliedStakeIncrease+pendingStakeIncrease, stakingInfo.AccruedStakeIncrease)
-			require.Empty(stakingInfo.PendingStakeIncreaseTxIDs)
-			require.Equal([]ids.ID{appliedTx.ID(), pendingTx.ID()}, stakingInfo.AccruedStakeIncreaseTxIDs)
+			require.NoError(t, err)
+			require.Zero(t, stakingInfo.PendingStakeIncrease)
+			require.Equal(t, appliedStakeIncrease+pendingStakeIncrease, stakingInfo.AccruedStakeIncrease)
+			require.Empty(t, stakingInfo.PendingStakeIncreaseTxIDs)
+			require.Equal(t, []ids.ID{appliedTx.ID(), pendingTx.ID()}, stakingInfo.AccruedStakeIncreaseTxIDs)
 
 			assertStakeIncreaseLocked(t, onCommitState, appliedTx)
 			assertStakeIncreaseLocked(t, onCommitState, pendingTx)
 
 			// The weight must be reconstructed from the persisted staking info.
-			require.NoError(onCommitState.Apply(env.state))
-			require.NoError(env.state.Commit())
+			require.NoError(t, onCommitState.Apply(env.state))
+			require.NoError(t, env.state.Commit())
 
 			reloadedState := statetest.New(t, statetest.Config{
 				DB:       env.baseDB,
@@ -1776,8 +1774,8 @@ func TestRewardAutoRenewedValidatorTxStakeIncrease(t *testing.T) {
 				Context:  env.ctx,
 			})
 			reloadedValidator, err := reloadedState.GetCurrentValidator(subnetID, nodeID)
-			require.NoError(err)
-			require.Equal(wantWeight, reloadedValidator.Weight)
+			require.NoError(t, err)
+			require.Equal(t, wantWeight, reloadedValidator.Weight)
 		})
 	}
 }

@@ -185,10 +185,8 @@ func TestIncreaseAutoRenewedValidatorStakeTxWeight(t *testing.T) {
 }
 
 func TestIncreaseAutoRenewedValidatorStakeTxSerialization(t *testing.T) {
-	require := require.New(t)
-
 	avaxAssetID, err := ids.FromString("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z")
-	require.NoError(err)
+	require.NoError(t, err)
 
 	txID := ids.ID{
 		0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
@@ -249,7 +247,7 @@ func TestIncreaseAutoRenewedValidatorStakeTxSerialization(t *testing.T) {
 	}
 	avax.SortTransferableOutputs(tx.Outs, Codec)
 	utils.Sort(tx.Ins)
-	require.NoError(tx.SyntacticVerify(&snow.Context{
+	require.NoError(t, tx.SyntacticVerify(&snow.Context{
 		NetworkID:   1,
 		ChainID:     constants.PlatformChainID,
 		AVAXAssetID: avaxAssetID,
@@ -331,6 +329,6 @@ func TestIncreaseAutoRenewedValidatorStakeTxSerialization(t *testing.T) {
 
 	var unsignedTx UnsignedTx = tx
 	gotBytes, err := Codec.Marshal(CodecVersion, &unsignedTx)
-	require.NoError(err)
-	require.Equal(wantBytes, gotBytes)
+	require.NoError(t, err)
+	require.Equal(t, wantBytes, gotBytes)
 }

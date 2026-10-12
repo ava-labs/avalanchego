@@ -4989,9 +4989,10 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 	}
 }
 
+// TestStandardExecutorIncreaseAutoRenewedValidatorStakeTx verifies that the
+// stake is locked as pending without changing the validator, and that competing
+// txs executed on sibling diffs don't overwrite each other's pending tx IDs.
 func TestStandardExecutorIncreaseAutoRenewedValidatorStakeTx(t *testing.T) {
-	require := require.New(t)
-
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge a non-zero fee so the tx is funded with a real input and change
 	// output, letting us assert UTXO consumption/production below.
@@ -5003,10 +5004,10 @@ func TestStandardExecutorIncreaseAutoRenewedValidatorStakeTx(t *testing.T) {
 	)
 
 	sk, err := localsigner.New()
-	require.NoError(err)
+	require.NoError(t, err)
 
 	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	nodeID := ids.GenerateTestNodeID()
 
@@ -5021,14 +5022,14 @@ func TestStandardExecutorIncreaseAutoRenewedValidatorStakeTx(t *testing.T) {
 		300_000,
 		2*env.config.MinStakeDuration,
 	)
-	require.NoError(err)
+	require.NoError(t, err)
 	validatorTx := addAutoRenewedValidatorTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
 
 	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	_, _, _, err = StandardTx(&env.backend, feeCalculator, addAutoRenewedValidatorTx, diff)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Record the tx so the stake increase tx can look it up by ID during
 	// verification.
@@ -5047,11 +5048,11 @@ func TestStandardExecutorIncreaseAutoRenewedValidatorStakeTx(t *testing.T) {
 		PendingStakeIncreaseTxIDs: pendingStakeIncreaseTxIDs,
 		AccruedStakeIncreaseTxIDs: []ids.ID{ids.GenerateTestID()},
 	}
-	require.NoError(diff.SetStakingInfo(constants.PrimaryNetworkID, nodeID, initialStakingInfo))
-	require.NoError(diff.Apply(env.state))
+	require.NoError(t, diff.SetStakingInfo(constants.PrimaryNetworkID, nodeID, initialStakingInfo))
+	require.NoError(t, diff.Apply(env.state))
 
 	initialValidator, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	const (
 		amount        = 3 * units.MilliAvax
@@ -5064,38 +5065,38 @@ func TestStandardExecutorIncreaseAutoRenewedValidatorStakeTx(t *testing.T) {
 		addAutoRenewedValidatorTx.ID(),
 		amount,
 	)
-	require.NoError(err)
-	require.Equal(amount, uIncreaseStakeTx.Weight())
+	require.NoError(t, err)
+	require.Equal(t, amount, uIncreaseStakeTx.Weight())
 
 	increaseStakeTx, err := walletsigner.SignUnsigned(t.Context(), wallet.Signer(), uIncreaseStakeTx)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	uSiblingIncreaseStakeTx, err := wallet.Builder().NewIncreaseAutoRenewedValidatorStakeTx(
 		addAutoRenewedValidatorTx.ID(),
 		siblingAmount,
 	)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	siblingIncreaseStakeTx, err := walletsigner.SignUnsigned(t.Context(), wallet.Signer(), uSiblingIncreaseStakeTx)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Before execution: the input UTXOs exist and the output UTXOs don't.
 	inputIDs := increaseStakeTx.InputIDs()
-	require.NotEmpty(inputIDs)
+	require.NotEmpty(t, inputIDs)
 	for inputID := range inputIDs {
 		_, err := env.state.GetUTXO(inputID)
-		require.NoError(err)
+		require.NoError(t, err)
 	}
 
 	outputUTXOs := increaseStakeTx.UTXOs()
-	require.NotEmpty(outputUTXOs)
+	require.NotEmpty(t, outputUTXOs)
 	for _, outputUTXO := range outputUTXOs {
 		_, err := env.state.GetUTXO(outputUTXO.InputID())
-		require.ErrorIs(err, database.ErrNotFound)
+		require.ErrorIs(t, err, database.ErrNotFound)
 	}
 
 	diff, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	_, _, _, err = StandardTx(
 		&env.backend,
@@ -5103,13 +5104,13 @@ func TestStandardExecutorIncreaseAutoRenewedValidatorStakeTx(t *testing.T) {
 		increaseStakeTx,
 		diff,
 	)
-	require.NoError(err)
-	require.True(uIncreaseStakeTx.SyntacticallyVerified)
+	require.NoError(t, err)
+	require.True(t, uIncreaseStakeTx.SyntacticallyVerified)
 
 	// The competing tx is executed on a sibling diff, as would happen when
 	// verifying competing blocks.
 	siblingDiff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	_, _, _, err = StandardTx(
 		&env.backend,
@@ -5117,7 +5118,7 @@ func TestStandardExecutorIncreaseAutoRenewedValidatorStakeTx(t *testing.T) {
 		siblingIncreaseStakeTx,
 		siblingDiff,
 	)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	wantStakingInfo := initialStakingInfo
 	wantStakingInfo.PendingStakeIncrease = initialStakingInfo.PendingStakeIncrease + amount
@@ -5134,42 +5135,42 @@ func TestStandardExecutorIncreaseAutoRenewedValidatorStakeTx(t *testing.T) {
 	}
 
 	siblingStakingInfo, err := siblingDiff.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
-	require.NoError(err)
-	require.Equal(wantSiblingStakingInfo, siblingStakingInfo)
+	require.NoError(t, err)
+	require.Equal(t, wantSiblingStakingInfo, siblingStakingInfo)
 
 	// Executing the sibling tx must not modify the staking info of the diff
 	// nor of the parent state.
 	stakingInfo, err := diff.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
-	require.NoError(err)
-	require.Equal(wantStakingInfo, stakingInfo)
+	require.NoError(t, err)
+	require.Equal(t, wantStakingInfo, stakingInfo)
 
 	stakingInfo, err = env.state.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
-	require.NoError(err)
-	require.Equal(initialStakingInfo, stakingInfo)
+	require.NoError(t, err)
+	require.Equal(t, initialStakingInfo, stakingInfo)
 
-	require.NoError(diff.Apply(env.state))
+	require.NoError(t, diff.Apply(env.state))
 
 	stakingInfo, err = env.state.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
-	require.NoError(err)
-	require.Equal(wantStakingInfo, stakingInfo)
+	require.NoError(t, err)
+	require.Equal(t, wantStakingInfo, stakingInfo)
 
 	// The stake is only applied at the start of the next cycle, so the
 	// validator must not be modified.
 	validator, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
-	require.NoError(err)
-	require.Equal(initialValidator, validator)
+	require.NoError(t, err)
+	require.Equal(t, initialValidator, validator)
 
 	// After execution: the input UTXOs are consumed and the change outputs are
 	// created.
 	for inputID := range inputIDs {
 		_, err := env.state.GetUTXO(inputID)
-		require.ErrorIs(err, database.ErrNotFound)
+		require.ErrorIs(t, err, database.ErrNotFound)
 	}
 
 	for _, wantUTXO := range outputUTXOs {
 		gotUTXO, err := env.state.GetUTXO(wantUTXO.InputID())
-		require.NoError(err)
-		require.Equal(wantUTXO, gotUTXO)
+		require.NoError(t, err)
+		require.Equal(t, wantUTXO, gotUTXO)
 	}
 
 	// The stake outputs are locked, so they must not be created.
@@ -5179,7 +5180,7 @@ func TestStandardExecutorIncreaseAutoRenewedValidatorStakeTx(t *testing.T) {
 			OutputIndex: uint32(len(outputUTXOs) + i),
 		}
 		_, err := env.state.GetUTXO(utxoID.InputID())
-		require.ErrorIs(err, database.ErrNotFound)
+		require.ErrorIs(t, err, database.ErrNotFound)
 	}
 }
 
@@ -5380,6 +5381,9 @@ func TestStandardExecutorIncreaseAutoRenewedValidatorStakeTxErrors(t *testing.T)
 	}
 }
 
+// TestStandardExecutorCancelAutoRenewedValidatorStakeIncreaseTx verifies that a
+// cancelled stake increase returns its stake outputs, leaves the other pending
+// stake increases locked, and doesn't modify the parent state.
 func TestStandardExecutorCancelAutoRenewedValidatorStakeIncreaseTx(t *testing.T) {
 	const (
 		cancelledAmount = 2 * units.MilliAvax
@@ -5404,8 +5408,6 @@ func TestStandardExecutorCancelAutoRenewedValidatorStakeIncreaseTx(t *testing.T)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
 			env := newEnvironment(t, upgradetest.Latest)
 			// Charge a non-zero fee so the tx is funded with a real input and
 			// change output, letting us assert UTXO consumption/production below.
@@ -5433,7 +5435,7 @@ func TestStandardExecutorCancelAutoRenewedValidatorStakeIncreaseTx(t *testing.T)
 				cfg.autoCompoundRewardShares,
 				env.config.MinStakeDuration,
 			)
-			require.NoError(err)
+			require.NoError(t, err)
 			addAutoRenewedValidator(t, env, stakerTx, cfg)
 
 			uStakerTx := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
@@ -5444,44 +5446,44 @@ func TestStandardExecutorCancelAutoRenewedValidatorStakeIncreaseTx(t *testing.T)
 
 			if !tt.restake {
 				stakingInfo, err := env.state.GetStakingInfo(subnetID, nodeID)
-				require.NoError(err)
+				require.NoError(t, err)
 				stakingInfo.NextPeriod = 0
-				require.NoError(env.state.SetStakingInfo(subnetID, nodeID, stakingInfo))
+				require.NoError(t, env.state.SetStakingInfo(subnetID, nodeID, stakingInfo))
 			}
 
 			initialValidator, err := env.state.GetCurrentValidator(subnetID, nodeID)
-			require.NoError(err)
+			require.NoError(t, err)
 			initialStakingInfo, err := env.state.GetStakingInfo(subnetID, nodeID)
-			require.NoError(err)
-			require.Equal(cancelledAmount+remainingAmount, initialStakingInfo.PendingStakeIncrease)
-			require.Equal([]ids.ID{cancelledTx.ID(), remainingTx.ID()}, initialStakingInfo.PendingStakeIncreaseTxIDs)
+			require.NoError(t, err)
+			require.Equal(t, cancelledAmount+remainingAmount, initialStakingInfo.PendingStakeIncrease)
+			require.Equal(t, []ids.ID{cancelledTx.ID(), remainingTx.ID()}, initialStakingInfo.PendingStakeIncreaseTxIDs)
 
 			cancelTx, err := wallet.IssueCancelAutoRenewedValidatorStakeIncreaseTx(
 				stakerTx.ID(),
 				cancelledTx.ID(),
 			)
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Before execution: the input UTXOs exist, the output UTXOs don't, and
 			// the stake is locked.
 			inputIDs := cancelTx.InputIDs()
-			require.NotEmpty(inputIDs)
+			require.NotEmpty(t, inputIDs)
 			for inputID := range inputIDs {
 				_, err := env.state.GetUTXO(inputID)
-				require.NoError(err)
+				require.NoError(t, err)
 			}
 
 			outputUTXOs := cancelTx.UTXOs()
-			require.NotEmpty(outputUTXOs)
+			require.NotEmpty(t, outputUTXOs)
 			for _, outputUTXO := range outputUTXOs {
 				_, err := env.state.GetUTXO(outputUTXO.InputID())
-				require.ErrorIs(err, database.ErrNotFound)
+				require.ErrorIs(t, err, database.ErrNotFound)
 			}
 
 			assertStakeIncreaseLocked(t, env.state, cancelledTx)
 
 			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-			require.NoError(err)
+			require.NoError(t, err)
 
 			_, _, _, err = StandardTx(
 				&env.backend,
@@ -5489,32 +5491,32 @@ func TestStandardExecutorCancelAutoRenewedValidatorStakeIncreaseTx(t *testing.T)
 				cancelTx,
 				diff,
 			)
-			require.NoError(err)
-			require.True(cancelTx.Unsigned.(*platform.CancelAutoRenewedValidatorStakeIncreaseTx).SyntacticallyVerified)
+			require.NoError(t, err)
+			require.True(t, cancelTx.Unsigned.(*platform.CancelAutoRenewedValidatorStakeIncreaseTx).SyntacticallyVerified)
 
 			// Executing the tx must not modify the parent state. The tx IDs are
 			// compared against a new slice, as initialStakingInfo shares its
 			// slice with the parent state.
 			stakingInfo, err := env.state.GetStakingInfo(subnetID, nodeID)
-			require.NoError(err)
-			require.Equal(cancelledAmount+remainingAmount, stakingInfo.PendingStakeIncrease)
-			require.Equal([]ids.ID{cancelledTx.ID(), remainingTx.ID()}, stakingInfo.PendingStakeIncreaseTxIDs)
+			require.NoError(t, err)
+			require.Equal(t, cancelledAmount+remainingAmount, stakingInfo.PendingStakeIncrease)
+			require.Equal(t, []ids.ID{cancelledTx.ID(), remainingTx.ID()}, stakingInfo.PendingStakeIncreaseTxIDs)
 
-			require.NoError(diff.Apply(env.state))
+			require.NoError(t, diff.Apply(env.state))
 
 			stakingInfo, err = env.state.GetStakingInfo(subnetID, nodeID)
-			require.NoError(err)
+			require.NoError(t, err)
 
 			wantStakingInfo := initialStakingInfo
 			wantStakingInfo.PendingStakeIncrease = remainingAmount
 			wantStakingInfo.PendingStakeIncreaseTxIDs = []ids.ID{remainingTx.ID()}
-			require.Equal(wantStakingInfo, stakingInfo)
+			require.Equal(t, wantStakingInfo, stakingInfo)
 
 			// The stake increase was never applied, so the validator must not be
 			// modified.
 			validator, err := env.state.GetCurrentValidator(subnetID, nodeID)
-			require.NoError(err)
-			require.Equal(initialValidator, validator)
+			require.NoError(t, err)
+			require.Equal(t, initialValidator, validator)
 
 			// The cancelled stake is returned, and the remaining stake is still
 			// locked.
@@ -5525,13 +5527,13 @@ func TestStandardExecutorCancelAutoRenewedValidatorStakeIncreaseTx(t *testing.T)
 			// are created.
 			for inputID := range inputIDs {
 				_, err := env.state.GetUTXO(inputID)
-				require.ErrorIs(err, database.ErrNotFound)
+				require.ErrorIs(t, err, database.ErrNotFound)
 			}
 
 			for _, wantUTXO := range outputUTXOs {
 				gotUTXO, err := env.state.GetUTXO(wantUTXO.InputID())
-				require.NoError(err)
-				require.Equal(wantUTXO, gotUTXO)
+				require.NoError(t, err)
+				require.Equal(t, wantUTXO, gotUTXO)
 			}
 		})
 	}
