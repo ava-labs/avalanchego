@@ -255,6 +255,17 @@ var (
 		gas.DBRead:  1, // read tx
 		gas.DBWrite: 1, // update staker
 	}
+	// The writes of the returned stake outputs are not included, as they were
+	// paid for by the IncreaseAutoRenewedValidatorStakeTx that locked them.
+	IntrinsicCancelAutoRenewedValidatorStakeIncreaseTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.IDLen + // txID
+			ids.IDLen + // stakeIncreaseTxID
+			wrappers.IntLen + // auth typeID
+			wrappers.IntLen, // authCredential typeID
+		gas.DBRead:  2, // read tx + read stake increase tx
+		gas.DBWrite: 1, // update staker
+	}
 	errUnsupportedOutput = errors.New("unsupported output type")
 	errUnsupportedInput  = errors.New("unsupported input type")
 	errUnsupportedOwner  = errors.New("unsupported owner type")
@@ -900,6 +911,22 @@ func (c *complexityVisitor) IncreaseAutoRenewedValidatorStakeTx(tx *platform.Inc
 		&baseTxComplexity,
 		&authComplexity,
 		&outputsComplexity,
+	)
+	return err
+}
+
+func (c *complexityVisitor) CancelAutoRenewedValidatorStakeIncreaseTx(tx *platform.CancelAutoRenewedValidatorStakeIncreaseTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	authComplexity, err := AuthComplexity(tx.Auth)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicCancelAutoRenewedValidatorStakeIncreaseTxComplexities.Add(
+		&baseTxComplexity,
+		&authComplexity,
 	)
 	return err
 }

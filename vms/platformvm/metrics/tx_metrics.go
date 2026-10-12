@@ -201,3 +201,10 @@ func (m *txMetrics) IncreaseAutoRenewedValidatorStakeTx(*platform.IncreaseAutoRe
 	}).Inc()
 	return nil
 }
+
+func (m *txMetrics) CancelAutoRenewedValidatorStakeIncreaseTx(*platform.CancelAutoRenewedValidatorStakeIncreaseTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "cancel_auto_renewed_validator_stake_increase",
+	}).Inc()
+	return nil
+}

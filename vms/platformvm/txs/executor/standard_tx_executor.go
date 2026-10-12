@@ -1480,6 +1480,10 @@ func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRene
 	return ErrWrongTxType
 }
 
+func (*standardTxExecutor) CancelAutoRenewedValidatorStakeIncreaseTx(*platform.CancelAutoRenewedValidatorStakeIncreaseTx) error {
+	return ErrWrongTxType
+}
+
 func (e *standardTxExecutor) IncreaseAutoRenewedValidatorStakeTx(tx *platform.IncreaseAutoRenewedValidatorStakeTx) error {
 	validator, err := verifyIncreaseAutoRenewedValidatorStakeTx(e.backend, e.feeCalculator, e.state, e.tx, tx)
 	if err != nil {

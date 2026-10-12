@@ -144,6 +144,10 @@ func (*atomicTxExecutor) IncreaseAutoRenewedValidatorStakeTx(*platform.IncreaseA
 	return ErrWrongTxType
 }
 
+func (*atomicTxExecutor) CancelAutoRenewedValidatorStakeIncreaseTx(*platform.CancelAutoRenewedValidatorStakeIncreaseTx) error {
+	return ErrWrongTxType
+}
+
 func (e *atomicTxExecutor) ImportTx(*platform.ImportTx) error {
 	return e.atomicTx()
 }

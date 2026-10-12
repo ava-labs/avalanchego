@@ -296,5 +296,17 @@ var (
 			},
 			expectedDynamicFee: 88_500 * units.NanoAvax,
 		},
+		{
+			name:                 "CancelAutoRenewedValidatorStakeIncreaseTx",
+			tx:                   "00000000002c00003039000000000000000000000000000000000000000000000000000000000000000000000001dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db0000000700238520c676e000000000000000000000000001000000013cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c00000001043c91e9d508169329034e2a68110427a311f945efc53ed3f3493d335b393fd100000000dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000005002386f26fc100000000000100000000000000003d0ad12b8ee8928edf248ca91ca55600fb383f07c32bff1d6dec472b25cf59a7fd91c5c421468b13b09dda413bdbe1316c7c9417f2468b893071d4cb608a01da0000000a00000001000000000000000200000009000000013cd0a1ba0a4ba7ad3ef4fcc21884257a092b0c4172129d968d342dcab781c15330f551a7c953c4e6c0f8f3bbc94c110991f7e2d00e3de788b41157d1553ab8310000000009000000013cd0a1ba0a4ba7ad3ef4fcc21884257a092b0c4172129d968d342dcab781c15330f551a7c953c4e6c0f8f3bbc94c110991f7e2d00e3de788b41157d1553ab83100",
+			expectedStaticFeeErr: ErrUnsupportedTx,
+			expectedComplexity: gas.Dimensions{
+				gas.Bandwidth: 448, // The length of the tx in bytes
+				gas.DBRead:    IntrinsicCancelAutoRenewedValidatorStakeIncreaseTxComplexities[gas.DBRead] + intrinsicInputDBRead,
+				gas.DBWrite:   IntrinsicCancelAutoRenewedValidatorStakeIncreaseTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
+				gas.Compute:   2 * intrinsicSECP256k1FxSignatureCompute,
+			},
+			expectedDynamicFee: 70_448 * units.NanoAvax,
+		},
 	}
 )

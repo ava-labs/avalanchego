@@ -162,5 +162,8 @@ func registerHeliconTxTypes(targetCodec linearcodec.Codec) error {
 // registerIglooTxTypes registers the transaction types that were valid during
 // the Igloo series of upgrades.
 func registerIglooTxTypes(targetCodec linearcodec.Codec) error {
-	return targetCodec.RegisterType(&IncreaseAutoRenewedValidatorStakeTx{})
+	return errors.Join(
+		targetCodec.RegisterType(&IncreaseAutoRenewedValidatorStakeTx{}),
+		targetCodec.RegisterType(&CancelAutoRenewedValidatorStakeIncreaseTx{}),
+	)
 }

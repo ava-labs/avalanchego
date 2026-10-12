@@ -100,6 +100,19 @@ func TestGetInputOutputs(t *testing.T) {
 			wantInputs:  []*avax.TransferableInput{baseIn},
 			wantOutputs: []*avax.TransferableOutput{baseOut, stakeOut},
 		},
+		{
+			name: "cancel_auto-renewed_validator_stake_increase",
+			tx: &platform.CancelAutoRenewedValidatorStakeIncreaseTx{
+				BaseTx: platform.BaseTx{
+					BaseTx: avax.BaseTx{
+						Ins:  []*avax.TransferableInput{baseIn},
+						Outs: []*avax.TransferableOutput{baseOut},
+					},
+				},
+			},
+			wantInputs:  []*avax.TransferableInput{baseIn},
+			wantOutputs: []*avax.TransferableOutput{baseOut},
+		},
 	}
 
 	for _, test := range tests {
