@@ -674,7 +674,8 @@ platform.getCurrentValidators({
       `IncreaseAutoRenewedValidatorStakeTx` during the current cycle. It is added to `weight` at the
       start of the next cycle. Requires Igloo.
     - `pendingStakeIncreases` lists each `IncreaseAutoRenewedValidatorStakeTx` that locked
-      `pendingStakeIncrease`, with its `txID` and `amount` in nAVAX. Requires Igloo.
+      `pendingStakeIncrease`, with its `txID` and `amount` in nAVAX. These stake increases can be
+      cancelled with a `CancelAutoRenewedValidatorStakeIncreaseTx`. Requires Igloo.
     - `appliedStakeIncrease` is the total stake, in nAVAX, added to `weight` by stake increases in
       previous cycles. Requires Igloo.
     - `endTime` for an auto-renewed validator is the end of the current cycle, not the end of the

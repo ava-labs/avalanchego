@@ -1480,8 +1480,49 @@ func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRene
 	return ErrWrongTxType
 }
 
-func (*standardTxExecutor) CancelAutoRenewedValidatorStakeIncreaseTx(*platform.CancelAutoRenewedValidatorStakeIncreaseTx) error {
-	return ErrWrongTxType
+func (e *standardTxExecutor) CancelAutoRenewedValidatorStakeIncreaseTx(tx *platform.CancelAutoRenewedValidatorStakeIncreaseTx) error {
+	validator, err := verifyCancelAutoRenewedValidatorStakeIncreaseTx(e.backend, e.feeCalculator, e.state, e.tx, tx)
+	if err != nil {
+		return err
+	}
+
+	stakeIncreaseTx, _, err := e.state.GetTx(tx.StakeIncreaseTxID)
+	if err != nil {
+		return fmt.Errorf("getting stake increase tx: %w", err)
+	}
+
+	uStakeIncreaseTx, ok := stakeIncreaseTx.Unsigned.(*platform.IncreaseAutoRenewedValidatorStakeTx)
+	if !ok {
+		return fmt.Errorf("%w: %T", errUnexpectedStakeIncreaseTxType, stakeIncreaseTx.Unsigned)
+	}
+
+	stakingInfo, err := e.state.GetStakingInfo(validator.SubnetID, validator.NodeID)
+	if err != nil {
+		return fmt.Errorf("getting staking info: %w", err)
+	}
+
+	stakingInfo.PendingStakeIncrease, err = math.Sub(stakingInfo.PendingStakeIncrease, uStakeIncreaseTx.Weight())
+	if err != nil {
+		return fmt.Errorf("removing pending stake increase: %w", err)
+	}
+
+	// The slice is copied because it may be shared with the parent state.
+	i := slices.Index(stakingInfo.PendingStakeIncreaseTxIDs, tx.StakeIncreaseTxID)
+	stakingInfo.PendingStakeIncreaseTxIDs = slices.Delete(slices.Clone(stakingInfo.PendingStakeIncreaseTxIDs), i, i+1)
+
+	if err := e.state.SetStakingInfo(validator.SubnetID, validator.NodeID, stakingInfo); err != nil {
+		return fmt.Errorf("setting staking info: %w", err)
+	}
+
+	// Return the locked stake to the owners of its stake outputs. The stake
+	// increase tx is no longer tracked by the validator, so its stake isn't
+	// returned again when the validator stops.
+	unstakeUTXOs(uStakeIncreaseTx, tx.StakeIncreaseTxID, e.state)
+
+	avax.Consume(e.state, tx.Ins)
+	avax.Produce(e.state, e.tx.ID(), tx.Outs)
+
+	return nil
 }
 
 func (e *standardTxExecutor) IncreaseAutoRenewedValidatorStakeTx(tx *platform.IncreaseAutoRenewedValidatorStakeTx) error {

@@ -7,6 +7,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 ### Features
 
 - Added the `IncreaseAutoRenewedValidatorStakeTx` P-Chain transaction, activated with Igloo. It locks additional stake for an auto-renewed validator, which is added to the validator's weight at the start of its next cycle without affecting the current cycle.
+- Added the `CancelAutoRenewedValidatorStakeIncreaseTx` P-Chain transaction, activated with Igloo. It cancels a stake increase that has not been applied yet and returns its stake.
 
 ### APIs
 
