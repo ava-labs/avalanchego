@@ -120,6 +120,7 @@ go_test(
         "//vms/secp256k1fx",
         "//vms/types",
         "//wallet/chain/p/builder",
+        "//wallet/chain/p/signer",
         "//wallet/chain/p/wallet",
         "//wallet/subnet/primary/common",
         "@com_github_stretchr_testify//require",

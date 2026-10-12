@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"go.uber.org/zap"
@@ -50,6 +51,7 @@ var (
 	errMissingStartTimePreDurango       = errors.New("staker transactions must have a StartTime pre-Durango")
 	errEtnaUpgradeNotActive             = errors.New("attempting to use an Etna-upgrade feature prior to activation")
 	errHeliconUpgradeNotActive          = errors.New("attempting to use a Helicon-upgrade feature prior to activation")
+	errIglooUpgradeNotActive            = errors.New("attempting to use an Igloo-upgrade feature prior to activation")
 	errTransformSubnetTxPostEtna        = errors.New("TransformSubnetTx is not permitted post-Etna")
 	errMaxNumActiveValidators           = errors.New("already at the max number of active validators")
 	errCouldNotLoadSubnetToL1Conversion = errors.New("could not load subnet conversion")
@@ -1478,8 +1480,39 @@ func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRene
 	return ErrWrongTxType
 }
 
-func (*standardTxExecutor) IncreaseAutoRenewedValidatorStakeTx(*platform.IncreaseAutoRenewedValidatorStakeTx) error {
-	return ErrWrongTxType
+func (e *standardTxExecutor) IncreaseAutoRenewedValidatorStakeTx(tx *platform.IncreaseAutoRenewedValidatorStakeTx) error {
+	validator, err := verifyIncreaseAutoRenewedValidatorStakeTx(e.backend, e.feeCalculator, e.state, e.tx, tx)
+	if err != nil {
+		return err
+	}
+
+	stakingInfo, err := e.state.GetStakingInfo(validator.SubnetID, validator.NodeID)
+	if err != nil {
+		return fmt.Errorf("getting staking info: %w", err)
+	}
+
+	// The stake is locked now, but it is only added to the validator's weight
+	// at the start of the next cycle.
+	stakingInfo.PendingStakeIncrease, err = math.Add(stakingInfo.PendingStakeIncrease, tx.Weight())
+	if err != nil {
+		return fmt.Errorf("adding pending stake increase: %w", err)
+	}
+
+	// The tx ID is recorded so that the locked stake outputs can be returned
+	// when the validator stops. The slice is copied because it may be shared
+	// with the parent state.
+	stakingInfo.PendingStakeIncreaseTxIDs = append(slices.Clone(stakingInfo.PendingStakeIncreaseTxIDs), e.tx.ID())
+
+	if err := e.state.SetStakingInfo(validator.SubnetID, validator.NodeID, stakingInfo); err != nil {
+		return fmt.Errorf("setting staking info: %w", err)
+	}
+
+	// The stake outputs are not produced here. They are produced when the
+	// validator stops, which unlocks the stake.
+	avax.Consume(e.state, tx.Ins)
+	avax.Produce(e.state, e.tx.ID(), tx.Outs)
+
+	return nil
 }
 
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].

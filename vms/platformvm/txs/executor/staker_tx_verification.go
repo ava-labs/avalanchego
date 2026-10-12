@@ -45,7 +45,14 @@ var (
 	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
 	errInvalidStakerTxType             = errors.New("invalid staker tx type")
 	errInvalidStakerTx                 = errors.New("invalid staker tx")
+	errAutoRenewedValidatorStopping    = errors.New("auto-renewed validator is stopping at the end of its current cycle")
+	errTooManyStakeIncreases           = errors.New("too many stake increases")
 )
+
+// maxStakeIncreaseTxs is the maximum number of IncreaseAutoRenewedValidatorStakeTx
+// that can be accepted for a single auto-renewed validator. The IDs of these
+// txs are stored in the validator's metadata, so the number must be bounded.
+const maxStakeIncreaseTxs = 64
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
 // network requirements for [subnetValidator]. An error is returned if they
@@ -1012,6 +1019,106 @@ func verifySetAutoRenewedValidatorConfigTx(
 		return nil, ErrStakeTooShort
 	case tx.Period > uint64(validatorRules.maxStakeDuration/time.Second):
 		return nil, ErrStakeTooLong
+	}
+
+	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, autoRenewedStakerTx.ValidatorAuthority, tx.Auth)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := verifySpend(
+		backend,
+		feeCalculator,
+		chainState,
+		tx,
+		baseTxCreds,
+	); err != nil {
+		return nil, err
+	}
+
+	return validator, nil
+}
+
+// verifyIncreaseAutoRenewedValidatorStakeTx carries out the validation for an
+// IncreaseAutoRenewedValidatorStakeTx.
+func verifyIncreaseAutoRenewedValidatorStakeTx(
+	backend *Backend,
+	feeCalculator fee.Calculator,
+	chainState state.Chain,
+	sTx *platform.Tx,
+	tx *platform.IncreaseAutoRenewedValidatorStakeTx,
+) (*state.Staker, error) {
+	if !backend.Config.UpgradeConfig.IsIglooActivated(chainState.GetTimestamp()) {
+		return nil, errIglooUpgradeNotActive
+	}
+
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return nil, err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return nil, err
+	}
+
+	stakerTx, _, err := chainState.GetTx(tx.TxID)
+	if err != nil {
+		return nil, fmt.Errorf("getting staker tx: %w", err)
+	}
+
+	autoRenewedStakerTx, ok := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
+	if !ok {
+		return nil, fmt.Errorf("%w: %T", errInvalidStakerTxType, stakerTx.Unsigned)
+	}
+
+	validator, err := chainState.GetCurrentValidator(constants.PrimaryNetworkID, autoRenewedStakerTx.NodeID())
+	if err != nil {
+		return nil, fmt.Errorf("getting validator %s from state: %w", autoRenewedStakerTx.NodeID(), err)
+	}
+
+	if tx.TxID != validator.TxID {
+		// This can happen if a validator restaked with the same node id.
+		// In this case, TxID should be the latest transaction of the auto-renewed validator.
+		return nil, fmt.Errorf("%w: wrong tx id", errInvalidStakerTx)
+	}
+
+	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return validator, nil
+	}
+
+	stakingInfo, err := chainState.GetStakingInfo(validator.SubnetID, validator.NodeID)
+	if err != nil {
+		return nil, fmt.Errorf("getting staking info: %w", err)
+	}
+
+	switch {
+	case stakingInfo.NextPeriod == 0:
+		// The stake would never be applied, as the validator stops at the end
+		// of its current cycle.
+		return nil, errAutoRenewedValidatorStopping
+
+	case len(stakingInfo.PendingStakeIncreaseTxIDs)+len(stakingInfo.AccruedStakeIncreaseTxIDs) >= maxStakeIncreaseTxs:
+		return nil, errTooManyStakeIncreases
+	}
+
+	validatorRules, err := getValidatorRules(backend, chainState, autoRenewedStakerTx.SubnetID())
+	if err != nil {
+		return nil, fmt.Errorf("getting validator rules: %w", err)
+	}
+
+	// The stake increase is reserved against the max validator stake now, so
+	// that it is guaranteed to fit when it is applied at the start of the next
+	// cycle.
+	newWeight, err := safemath.Add(validator.Weight, stakingInfo.PendingStakeIncrease)
+	if err != nil {
+		return nil, err
+	}
+	newWeight, err = safemath.Add(newWeight, tx.Weight())
+	if err != nil {
+		return nil, err
+	}
+	if newWeight > validatorRules.maxValidatorStake {
+		return nil, ErrWeightTooLarge
 	}
 
 	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, autoRenewedStakerTx.ValidatorAuthority, tx.Auth)
