@@ -55,8 +55,10 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 		// - End wasn't found (i.e. `!foundEnd`):
 		//   - If FromBlock is a special value, it is assumed to be within
 		//     [Config.MaxBlocksPerRequest]. It will read until the first unexecuted block.
-		//   - If FromBlock is not a special value, then ToBlock is a future block (> last accepted),
-		//     in which case it couldn't have been found. Contradiction.
+		//   - If FromBlock is not a special value, then ToBlock is a future block
+		//	   (> last accepted), since FromBlock couldn't have resolved if it wasn't yet
+		//     known. However, since `end` is clampled at last accepted, `start` must be a
+		//     future block, in which case it couldn't have been found. Contradiction.
 		// - End was found. Then it resolved to a value less than the provided start.
 		//   In all cases, this is user error, and libevm will handle accordingly.
 		return api.FilterAPI.GetLogs(ctx, crit)
