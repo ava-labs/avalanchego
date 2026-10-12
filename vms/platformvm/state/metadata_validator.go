@@ -134,14 +134,14 @@ type StakingInfo struct {
 	// PendingStakeIncrease. Their stake outputs are returned when the
 	// validator stops or when the stake increase is cancelled.
 	//
-	// The slice may be shared with other [StakingInfo] values, so it must be
+	// The slice may be shared with other [StakingInfo] values, so it MUST be
 	// copied before being modified.
 	PendingStakeIncreaseTxIDs []ids.ID
 	// AccruedStakeIncreaseTxIDs are the IDs of the txs that locked
 	// AccruedStakeIncrease. Their stake outputs are returned when the
 	// validator stops.
 	//
-	// The slice may be shared with other [StakingInfo] values, so it must be
+	// The slice may be shared with other [StakingInfo] values, so it MUST be
 	// copied before being modified.
 	AccruedStakeIncreaseTxIDs []ids.ID
 }
