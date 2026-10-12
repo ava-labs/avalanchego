@@ -69,7 +69,7 @@ type Config struct {
 
 	// Resource limits
 	BlocksPerBloomSection uint64
-	EVMTimeout            time.Duration
+	CallTimeout           time.Duration // per call or batch; 0 = no limit
 	GasCap                uint64
 	BatchRequestLimit     uint64 // 0 = no limit
 	MaxBlocksPerRequest   uint64 // maximum number of blocks per eth_getLogs request; 0 = no limit

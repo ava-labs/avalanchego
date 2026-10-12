@@ -24,11 +24,7 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	s := vm.rpcProvider.Server()
 	return map[string]http.Handler{
 		rpcHTTPExtensionPath: s,
-		// TODO(StephenButtolph) coreth and subnet-evm have modified the ws
-		// handler to introduce CPU limiting and maximum request durations. We
-		// should either include those modifications into libevm, or determine
-		// that those restrictions were not required.
-		wsHTTPExtensionPath: s.WebsocketHandler([]string{"*"}),
+		wsHTTPExtensionPath:  s.WebsocketHandler([]string{"*"}),
 	}, nil
 }
 

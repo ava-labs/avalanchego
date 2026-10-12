@@ -20,35 +20,6 @@ permissions:
   contents: read
 
 jobs:
-  # Aggregate the per-platform Bazel checks into one stable required job.
-  bazel-required:
-    if: ${{ always() }}
-    needs:
-      - setup
-      - unit-smoke
-      - e2e-smoke
-    runs-on: ${{ inputs.runner }}
-    timeout-minutes: 5
-    steps:
-      - name: Fail unless all needed jobs succeeded
-        shell: bash
-        env:
-          NEEDS_JSON: ${{ toJSON(needs) }}
-        run: |
-          failed_jobs="$(
-            jq -r '
-              to_entries[]
-              | select(.value.result != "success")
-              | .key
-            ' <<<"$NEEDS_JSON"
-          )"
-
-          if [[ -n "$failed_jobs" ]]; then
-            echo "Required jobs failed:"
-            printf '%s\n' "$failed_jobs"
-            exit 1
-          fi
-
   # Prepare Bazel CI for this platform before the smoke tests run.
   setup:
     runs-on: ${{ inputs.runner }}

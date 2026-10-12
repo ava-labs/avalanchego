@@ -44,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
@@ -59,6 +58,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -1363,7 +1363,7 @@ func TestNoBlobsAllowed(t *testing.T) {
 	// Make one block with a single blob tx
 	signer := types.NewCancunSigner(gspec.Config.ChainID)
 	blockGen := func(_ int, b *core.BlockGen) {
-		b.SetCoinbase(constants.BlackholeAddr)
+		b.SetCoinbase(blackhole.Address)
 		fee := big.NewInt(500)
 		fee.Add(fee, b.BaseFee())
 		tx, err := types.SignTx(types.NewTx(&types.BlobTx{

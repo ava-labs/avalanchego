@@ -96,8 +96,8 @@ type config struct {
 	// BatchRequestLimit is the maximum number of requests per JSON-RPC batch;
 	// 0 = no limit. An unset config uses the default (1000).
 	BatchRequestLimit uint64 `json:"batch-request-limit"`
-	// APIMaxDuration limits how long an eth_call (or eth_callDetailed) runs.
-	// Non-positive values result in no limit. Defaults to no limit.
+	// APIMaxDuration limits how long each call to the /rpc and /ws endpoints
+	// runs. Non-positive values result in no limit. Defaults to no limit.
 	APIMaxDuration duration `json:"api-max-duration"`
 	// MaxBlocksPerRequest is the maximum block range (inclusive) that can be
 	// used in an eth_getLogs request.
@@ -230,7 +230,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			APIs:                c.APIs,
 			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
 			BatchRequestLimit:   c.BatchRequestLimit,
-			EVMTimeout:          c.APIMaxDuration.Duration,
+			CallTimeout:         c.APIMaxDuration.Duration,
 			MaxBlocksPerRequest: c.MaxBlocksPerRequest,
 			// GasCap and TxFeeCap are set to reasonable values for mainnet
 			// C-Chain. They are left unconfigurable to minimize the size of the

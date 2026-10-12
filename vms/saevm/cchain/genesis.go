@@ -21,7 +21,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
@@ -234,6 +233,8 @@ func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.
 	return b.Write()
 }
 
+const ap3BaseFee = 225 * ethparams.GWei
+
 func (g *genesis) block() (*types.Block, error) {
 	root, err := g.root()
 	if err != nil {
@@ -269,7 +270,7 @@ func (g *genesis) block() (*types.Block, error) {
 	if c.IsApricotPhase3(g.Timestamp) { // Also called London
 		h.BaseFee = g.BaseFee
 		if h.BaseFee == nil {
-			h.BaseFee = big.NewInt(ap3.InitialBaseFee)
+			h.BaseFee = big.NewInt(ap3BaseFee)
 		}
 	}
 
