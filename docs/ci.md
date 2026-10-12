@@ -10,6 +10,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 - [How CI is organized](#how-ci-is-organized)
   - [Workflows coordinate repository operations](#workflows-coordinate-repository-operations)
   - [Keep Go CI unified](#keep-go-ci-unified)
+  - [Required checks and the merge queue](#required-checks-and-the-merge-queue)
   - [Go and Bazel CI workflow layout](#go-and-bazel-ci-workflow-layout)
   - [Platform-specific setup dependencies](#platform-specific-setup-dependencies)
   - [Go unit test platforms](#go-unit-test-platforms)
@@ -34,6 +35,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
   - [Pin third-party actions](#pin-third-party-actions)
   - [Pinning does not eliminate supply-chain risk](#pinning-does-not-eliminate-supply-chain-risk)
 - [Validation](#validation)
+  - [Required-check validation in GitHub](#required-check-validation-in-github)
 
 ## Principles
 
@@ -90,9 +92,54 @@ the component for a repository-wide check. The aggregate job is an exception.
 Include the workflow name in `go-required`. This name keeps the required check
 distinct in GitHub output.
 
-Put `go-required` first in the pre-merge workflow. Sort the other job
-definitions and its `needs` list alphabetically. The `go-required` job fails if
-an enabled job fails.
+### Required checks and the merge queue
+
+Go and Bazel separate queue admission from permission to merge. GitHub accepts
+skipped required jobs for queue admission. Maintainers can therefore enqueue a
+pull request before its tests finish, even if those tests fail. This avoids
+waiting for pull-request CI when a maintainer expects merge-group CI to pass.
+A failing pull request can waste queue work. Merge-group checks must still pass
+before GitHub merges the pull request.
+
+Branch protection or a ruleset must require the merge queue for each target
+branch. Required status checks alone do not enforce this policy because GitHub
+accepts skipped checks. Without mandatory queue use, a pull request can merge
+directly without passing merge-group tests. Do not allow direct merges that
+bypass the queue.
+
+The merge-group Go entrypoint defines `go-required` first. It depends on the
+reusable test-workflow call and fails if that call fails. Each merge-group Bazel
+aggregate depends on its platform's reusable test-workflow call.
+
+A job with `needs` waits for its dependencies before GitHub skips it.
+Pull-request entrypoints therefore define the same aggregate checks without
+`needs` and skip them immediately. The test workflows still run. Keep the
+entrypoints separate so queue admission does not wait for their tests.
+
+Required status checks use the check name, optionally restricted to a source
+app, rather than the workflow display name. Preserve these exact names in both
+entrypoints:
+
+- `go-required`
+- `linux-amd64 / bazel-required`
+- `darwin-arm64 / bazel-required`
+
+Update branch protection before changing a required check name. A different
+workflow display name does not isolate duplicate check names. See GitHub's
+[required status check guidance](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches#require-status-checks-before-merging).
+
+Keep the `Go` and `Bazel` workflow display names consistent between their
+entrypoints. These names also form part of the concurrency groups; they do not
+identify required checks.
+
+Keep the entrypoint triggers disjoint:
+
+- Pull-request entrypoints run on `pull_request`.
+- Merge-group entrypoints run on `merge_group`, pushes to `master` and `dev`,
+  and tag pushes.
+
+Do not let both entrypoints emit the same check for one commit. Duplicate check
+names can make the required result ambiguous.
 
 ### Go and Bazel CI workflow layout
 
@@ -100,14 +147,16 @@ Go and Bazel use the same workflow roles and file-name pattern:
 
 | Role | Bazel | Go |
 | --- | --- | --- |
-| Pre-merge entrypoint | [`bazel-ci-pre-merge.yml`](../.github/workflows/bazel-ci-pre-merge.yml) | [`go-ci-pre-merge.yml`](../.github/workflows/go-ci-pre-merge.yml) |
-| Scheduled entrypoint | [`bazel-ci-scheduled.yml`](../.github/workflows/bazel-ci-scheduled.yml) | [`go-ci-scheduled.yml`](../.github/workflows/go-ci-scheduled.yml) |
-| Primary reusable workflow | [`bazel-ci.yml`](../.github/workflows/bazel-ci.yml) | [`go-ci.yml`](../.github/workflows/go-ci.yml) |
-| Reusable smoke workflow | [`bazel-ci-smoke.yml`](../.github/workflows/bazel-ci-smoke.yml) | [`go-ci-smoke.yml`](../.github/workflows/go-ci-smoke.yml) |
+| Pull-request entrypoint | [`bazel-pull-request.yml`](../.github/workflows/bazel-pull-request.yml) | [`go-pull-request.yml`](../.github/workflows/go-pull-request.yml) |
+| Merge-group entrypoint | [`bazel-merge-group.yml`](../.github/workflows/bazel-merge-group.yml) | [`go-merge-group.yml`](../.github/workflows/go-merge-group.yml) |
+| Scheduled entrypoint | [`bazel-scheduled.yml`](../.github/workflows/bazel-scheduled.yml) | [`go-scheduled.yml`](../.github/workflows/go-scheduled.yml) |
+| Primary reusable workflow | [`bazel.yml`](../.github/workflows/bazel.yml) | [`go-unit.yml`](../.github/workflows/go-unit.yml) |
+| Pull-request and merge-group reusable workflow | n/a | [`go.yml`](../.github/workflows/go.yml) |
+| Reusable smoke workflow | [`bazel-smoke.yml`](../.github/workflows/bazel-smoke.yml) | [`go-smoke.yml`](../.github/workflows/go-smoke.yml) |
 
 Entrypoints select the reusable workflow that provides the required test policy,
-or define jobs that are specific to that event. The pre-merge and scheduled Go
-entrypoints both use `go-ci.yml`; pre-merge macOS uses `go-ci-smoke.yml`.
+or define jobs that are specific to that event. The pull-request and
+merge-group Go entrypoints use `go.yml`; scheduled Go uses `go-unit.yml`.
 
 Smoke workflows run a minimal macOS test. This test verifies that unit tests
 can run on macOS. The Linux pre-merge job and scheduled jobs run the full unit
@@ -129,14 +178,15 @@ jobs. Therefore, a platform's Bazel jobs wait only for that platform's setup job
 
 ### Go unit test platforms
 
-The `unit` job in `go-ci-pre-merge.yml` calls the reusable
-[`go-ci.yml`](../.github/workflows/go-ci.yml) workflow on Linux AMD64. It runs
+The `unit` job in [`go.yml`](../.github/workflows/go.yml) calls the reusable
+[`go-unit.yml`](../.github/workflows/go-unit.yml) workflow on Linux AMD64. It
+runs
 the unified unit test suite ([`scripts/tests.unit.sh`](../scripts/tests.unit.sh))
 through the `test-unit` task. That task disables race detection and test
 shuffling so the Go build and test cache can serve repeated runs.
 
 On macOS, the `smoke` job calls
-[`go-ci-smoke.yml`](../.github/workflows/go-ci-smoke.yml). macOS runners are
+[`go-smoke.yml`](../.github/workflows/go-smoke.yml). macOS runners are
 slower. They also fail more often because of external runner problems.
 Pre-merge CI therefore runs only a Go unit-test smoke test on macOS. This
 mirrors the macOS smoke job in Bazel CI. See [Test platforms and cache
@@ -144,8 +194,8 @@ policy](./bazel.md#test-platforms-and-cache-policy).
 
 The `Scheduled Go` workflow runs the full unit suite on each platform. The
 workflow is defined in
-[`go-ci-scheduled.yml`](../.github/workflows/go-ci-scheduled.yml). It calls
-[`go-ci.yml`](../.github/workflows/go-ci.yml) for each platform. Only the Ubuntu
+[`go-scheduled.yml`](../.github/workflows/go-scheduled.yml). It calls
+[`go-unit.yml`](../.github/workflows/go-unit.yml) for each platform. Only the Ubuntu
 24.04 AMD64 job runs `test-unit-race-shuffle`. This task enables race detection
 and shuffled test order. The other scheduled jobs run `test-unit` to check
 platform compatibility without race detection or shuffled test order.
@@ -169,7 +219,7 @@ its `action.yml` from the workspace before it can run the action. A local action
 cannot check out the repository for its own first use.
 
 For example, end-to-end jobs in
-[`.github/workflows/go-ci-pre-merge.yml`](../.github/workflows/go-ci-pre-merge.yml) use
+[`.github/workflows/go.yml`](../.github/workflows/go.yml) use
 `run-monitored-tmpnet-cmd` to monitor a named task and collect its artifacts:
 
 ```yaml
@@ -227,12 +277,22 @@ reserved for jobs with dependencies that another setup action does not provide.
 `install-nix` makes the Nix dev-shell Task available. See [Task](#task) for the
 cache and version rules.
 
-`setup-go-for-project`, `setup-bazel`, and `install-nix` are alternative Go
-provisioning mechanisms. A job that uses `setup-bazel` can also use `install-nix`
-for dependencies that Bazel does not provide. `install-nix` can restore Go
-module input, but it does not save that cache. The Go workflow setup jobs own
-Go module, Task, and Nix store cache writes. Other workflows consume these
-caches without writing them.
+Choose the setup action that provides the job's dependencies. Bazel provides
+Go for its targets, but a job that also runs host Go commands needs
+`setup-go-for-project` or the Nix dev shell. For example, `check-go-mod-tidy`
+uses both `setup-bazel` and `setup-go-for-project`, while `lint-avalanchego`
+uses `setup-bazel` and `install-nix` for flake-provided tools.
+
+When combining these actions, run `setup-bazel` before either Go setup action
+disables `GOPROXY`. Bazel preparation can download Go modules into its separate
+module cache on a miss or non-exact restore. Preparing the host Go module cache
+does not populate that cache. An exact Bazel cache hit can hide an incorrect
+setup order, so validate both exact hits and cold-cache preparation; see
+[Bazel cache validation](./bazel.md#changing-this-safely).
+
+`install-nix` can restore Go module input, but it does not save that cache. The
+Go workflow setup jobs own Go module, Task, and Nix store cache writes. Other
+workflows consume these caches without writing them.
 
 ## CI cache policy
 
@@ -403,19 +463,24 @@ post-job save cannot be limited to `master` runs by `cache-policy`.
 #### Bazel dependency cache
 
 [`setup-bazel`](../.github/actions/setup-bazel/action.yml) runs each Bazel
-setup job. It restores the Bazel repository cache and Bazel-specific Go module
-cache, then checks metadata. A non-exact consumer restore runs the checked-in
-dependency list through `bazelisk fetch`. On `master`, a non-exact setup restore
-also prepares and saves the cache. Setup jobs can duplicate this cold-cache
-work. After an exact restore or local preparation, the action enables
-`--repository_disable_download` and sets `GOPROXY=off` for repository rules.
-The latter prevents Gazelle's Go subprocess from fetching a missing module; see
-[Bazel CI external dependency caching](./bazel.md#bazel-ci-external-dependency-caching).
+setup job and the `lint-avalanchego` job. It restores the Bazel repository cache,
+the Bazel-specific Go module cache, and Bazelisk's downloaded Bazel binary. It
+checks metadata only in setup jobs.
 
-The cache contains only external Bazel dependency input. It is separate from
-the Bazel remote action and test-result cache. See
-[Bazel CI external dependency caching](./bazel.md#bazel-ci-external-dependency-caching)
-for its key and dependency-list rules.
+Each non-exact restore prepares the checked-in Bazel dependency list. The action
+then disables downloads. The setup job checks metadata after downloads are
+disabled. On `master`, that job saves the cache after the check succeeds. This
+order prevents a metadata check from adding undeclared inputs to a saved cache.
+Setup jobs can duplicate this cold-cache work. The action enables
+`--repository_disable_download` and sets `GOPROXY=off` for repository rules.
+`GOPROXY=off` prevents Gazelle from fetching a missing module.
+See [Bazel CI external dependency caching](./bazel.md#checked-in-bazel-dependency-list).
+
+The cache contains external Bazel dependency input and the Bazelisk-downloaded
+Bazel binary. It does not contain Bazel build outputs. It is separate from the
+Bazel remote action and test-result cache. See [Bazel CI external dependency
+caching](./bazel.md#bazel-ci-external-dependency-caching) for its key and dependency
+list rules.
 
 #### Nix store cache
 
@@ -455,9 +520,8 @@ When changing an input cache:
   can prepare the dependency list before their Bazel consumers run;
 - prepare every non-exact restore before disabling its network path so a missing
   prepared input fails rather than being silently downloaded later;
-- add each new Go tool or pinned module to the module manifest, and each new
-  Bazel CI target pattern to the dependency list, so preparation covers every
-  input that CI commands require;
+- add each new Go tool or pinned module to the module manifest; add each Bazel
+  CI target pattern and command-only dependency to the Bazel dependency list;
 - do not use a shared cache to transfer build output or test results between
   jobs because those results depend on job-specific configuration and require a
   dedicated transfer protocol.
@@ -479,7 +543,15 @@ commands.
 The action uses a GitHub Actions cache, not an artifact. A cache lets unrelated
 jobs and workflow runs reuse one binary. An artifact belongs to one workflow
 run. The cache key includes the Task version, operating system, and
-architecture. Each job restores the matching cache. Platform cache setup jobs
+architecture.
+
+Before restoring the cache, `setup-task` checks for an executable at
+`$RUNNER_TEMP/task/<version>/$RUNNER_OS-$RUNNER_ARCH/task`. If one exists, the
+action skips cache restore, download, and save. This lets repeated invocations
+reuse Task within a job. For example, both `setup-bazel` and
+`setup-go-for-project` invoke `setup-task` when a job needs Bazel and host Go.
+
+Otherwise, the action restores the matching cache. Platform cache setup jobs
 in the Go workflows can save a cache entry on `master`. All other jobs are
 restore-only consumers. Pull request and merge-queue jobs download Task on a
 cache miss. They do not save the binary. This policy reserves cache storage for
@@ -631,3 +703,30 @@ duplicate because `nix develop` and `nix develop --impure` behave differently.
 These checks catch common violations, but they do not prove that a workflow is
 correct. Always review the workflow's permissions, inputs, secrets, failure handling,
 and exceptions to these conventions.
+
+### Required-check validation in GitHub
+
+Local lint cannot prove queue admission, check-name preservation, or merge
+blocking. After changing required-check workflows, check these properties in
+GitHub:
+
+1. Check that branch protection or a ruleset requires the merge queue for each
+   target branch. Check that maintainers cannot merge directly while PR checks
+   are skipped. Check that branch protection or the ruleset requires the exact
+   names listed in
+   [Required checks and the merge queue](#required-checks-and-the-merge-queue).
+   Check the source app too, if branch protection or the ruleset restricts it.
+2. Check that pull-request aggregate jobs skip before their test workflows
+   finish. Check that a maintainer can enqueue the pull request while tests run.
+3. Check that merge-group aggregates wait for their reusable test workflows.
+   Check that successful test workflows produce successful aggregate checks.
+4. Check a test failure in each reusable workflow that supplies a required
+   check. Check that its merge-group aggregate fails and GitHub blocks merging.
+5. Check a cancelled merge-group test workflow. Check that its required
+   aggregate does not report success and GitHub blocks merging.
+6. Check that only one entrypoint emits each required check for the commit
+   under test.
+
+Use a disposable pull request for failure and cancellation checks. Do not merge
+its test changes. Record any checks that remain unverified; a lint pass is not
+evidence for these GitHub behaviors.
