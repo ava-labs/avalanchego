@@ -45,7 +45,10 @@ go_library(
 
 go_test(
     name = "saexec_test",
-    srcs = ["saexec_test.go"],
+    srcs = [
+        "metrics_test.go",
+        "saexec_test.go",
+    ],
     data = glob(["testdata/**"]),
     embed = [":saexec"],
     deps = [
@@ -58,6 +61,7 @@ go_test(
         "//vms/saevm/cmputils",
         "//vms/saevm/gastime",
         "//vms/saevm/hook/hookstest",
+        "//vms/saevm/params",
         "//vms/saevm/proxytime",
         "//vms/saevm/saedb",
         "//vms/saevm/saetest",
@@ -80,6 +84,8 @@ go_test(
         "@com_github_google_go_cmp//cmp/cmpopts",
         "@com_github_holiman_uint256//:uint256",
         "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_golang//prometheus/testutil",
+        "@com_github_prometheus_client_model//go",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_goleak//:goleak",

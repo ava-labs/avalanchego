@@ -282,7 +282,7 @@ func (r *rollingGasThroughput) observe(s executionSpan) {
 	// whole, for simplicity.
 	for cutoff := s.end.Add(-saeparams.Tau); ; {
 		old, _ := r.history.PeekLeft()
-		if !old.end.Before(cutoff) {
+		if old.end.After(cutoff) {
 			break
 		}
 		r.history.PopLeft()
