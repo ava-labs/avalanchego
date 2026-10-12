@@ -32,6 +32,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
+// TODO: Ensure that the maximum number of expiries to track is limited to a reasonable number by this window.
+const (
+	second                            = 1
+	minute                            = 60 * second
+	hour                              = 60 * minute
+	day                               = 24 * hour
+	RegisterL1ValidatorTxExpiryWindow = day
+)
+
 var (
 	_ platform.TxVisitor = (*standardTxExecutor)(nil)
 
@@ -745,10 +754,8 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1Valida
 		return fmt.Errorf("%w at %d and it is currently %d", errWarpMessageExpired, msg.Expiry, currentTimestampUnix)
 	}
 
-	// TODO: Ensure that the maximum number of expiries to track is limited to a reasonable number by this window.
-	const registerL1ValidatorTxExpiryWindowSeconds = uint64(24 * time.Hour / time.Second)
-	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > registerL1ValidatorTxExpiryWindowSeconds {
-		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, registerL1ValidatorTxExpiryWindowSeconds)
+	if secondsUntilExpiry := msg.Expiry - currentTimestampUnix; secondsUntilExpiry > RegisterL1ValidatorTxExpiryWindow {
+		return fmt.Errorf("%w because time is %d seconds in the future but the limit is %d", errWarpMessageNotYetAllowed, secondsUntilExpiry, RegisterL1ValidatorTxExpiryWindow)
 	}
 
 	// Verify that this warp message isn't being replayed.
@@ -1279,8 +1286,11 @@ func (e *standardTxExecutor) applySpend(creds []verify.Verifiable) error {
 // before calling applySpend. Transaction-specific verification may continue
 // afterward. Callers must discard the state diff if transaction execution fails.
 //
-// Must not be used for [platform.ImportTx]. The inputs from [utxo.GetInputOutputs]
-// include the imported inputs.
+// Must not be used for:
+//   - [platform.ImportTx]: the inputs from [utxo.GetInputOutputs] include the
+//     imported inputs, which are not in chainState.
+//   - [platform.TransformSubnetTx]: it must also burn the subnet asset, while
+//     [verifySpend] only requires AVAX to be burned.
 func applySpend(
 	backend *Backend,
 	feeCalculator fee.Calculator,

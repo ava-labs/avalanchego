@@ -4480,16 +4480,8 @@ func TestStandardExecutorAddPermissionlessValidatorTxFlowCheckFails(t *testing.T
 	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
-	// Remove the UTXOs funding the tx so that its inputs no longer cover its
-	// outputs plus the fee.
-	utxoIDs, err := env.state.UTXOIDs(
-		genesistest.DefaultFundedKeys[0].Address().Bytes(),
-		ids.Empty,
-		math.MaxInt32,
-	)
-	require.NoError(err)
-
-	for _, utxoID := range utxoIDs {
+	// Remove the UTXOs the tx consumes so the flow check fails.
+	for utxoID := range tx.InputIDs() {
 		diff.DeleteUTXO(utxoID)
 	}
 
