@@ -9,7 +9,6 @@ This release updates the plugin version to `47`. All plugins must update to rema
 - Added `vms/evm/evmclient`, which combines standard Ethereum, Geth-specific, raw RPC, and Avalanche-specific EVM methods.
 - `eth_getLogs` now respects the node's C-Chain config option for `api-resolve-pending-to-last-executed`.
 
->>>>>>> conflict 1 of 1 ends
 ### APIs
 
 - The `avax.getAtomicTxStatus` C-Chain RPC, deprecated in v1.15.0, is removed. Use `avax.getAtomicTx`, which fails for a tx that has not been accepted.

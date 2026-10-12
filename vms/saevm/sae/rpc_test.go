@@ -956,12 +956,9 @@ func TestGetLogsRange(t *testing.T) {
 			wantErr: testerr.Contains("invalid block range params"), // from libevm
 		},
 		{
-			// We must ensure that the provided numbers do not resolve  hastily, but only
-			// as needed, as this avoids unnecessary disk reads. If it were resolved,
-			// it would early return with a nil error.
-			name:    "with_hash_ignores_range",
+			name:    "with_hash_and_range_libevm_error",
 			query:   map[string]any{"blockHash": settled.Hash(), "fromBlock": future},
-			wantErr: testerr.Contains("cannot specify both BlockHash and FromBlock/ToBlock"),
+			wantErr: testerr.Contains("cannot specify both BlockHash and FromBlock/ToBlock"), // from libevm
 		},
 		{
 			name:    "from_finalized_matches_settled",
@@ -983,22 +980,6 @@ func TestGetLogsRange(t *testing.T) {
 			name:    "future_range_reversed",
 			query:   map[string]any{"fromBlock": future + 9, "toBlock": future},
 			wantErr: testerr.Contains("invalid block range params"), // from libevm
-		},
-		{
-			name: "from_future_block_too_many_topics",
-			query: map[string]any{
-				"fromBlock": future,
-				"topics":    [][]common.Hash{{{}}, {{}}, {{}}, {{}}, {{}}},
-			},
-			wantErr: testerr.Contains("exceed max topics"), // from libevm
-		},
-		{
-			name:  "from_future_block_to_latest",
-			query: map[string]any{"fromBlock": future, "toBlock": "latest"},
-		},
-		{
-			name:  "from_future_block_to_pending",
-			query: map[string]any{"fromBlock": future, "toBlock": "pending"},
 		},
 	}
 

@@ -37,7 +37,7 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 		// All special numbers resolve, so this must be a future block.
 		// This could at most fetch logs from this block (if it has been
 		// executed after the above call) until a missing block is hit.
-		// This is assumed to be within the [Config.MaxBlocksPerRequest]
+		// This is assumed to be within [Config.MaxBlocksPerRequest].
 		return api.FilterAPI.GetLogs(ctx, crit)
 	}
 
@@ -53,9 +53,9 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 		// Invalid input will be handled by libevm. A short proof that this doesn't
 		// escape the max blocks per request limit is below.
 		// - End wasn't found (i.e. `!foundEnd`):
-		//   - If start was a special value, it was assumed to be within
+		//   - If FromBlock is a special value, it is assumed to be within
 		//     [Config.MaxBlocksPerRequest]. It will read until the first unexecuted block.
-		//   - If start was not a special value, then it was a future block (> last accepted),
+		//   - If FromBlock is not a special value, then ToBlock is a future block (> last accepted),
 		//     in which case it couldn't have been found. Contradiction.
 		// - End was found. Then it resolved to a value less than the provided start.
 		//   In all cases, this is user error, and libevm will handle accordingly.
