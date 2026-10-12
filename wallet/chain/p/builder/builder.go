@@ -378,6 +378,19 @@ type Builder interface {
 		amount uint64,
 		options ...common.Option,
 	) (*platform.IncreaseAutoRenewedValidatorStakeTx, error)
+
+	// NewCancelAutoRenewedValidatorStakeIncreaseTx creates a transaction to
+	// cancel a pending stake increase of an existing auto-renewed validator.
+	// The locked stake is returned to the owners of its stake outputs.
+	//
+	// - txID is the transaction ID of the auto-renewed validator.
+	// - stakeIncreaseTxID is the transaction ID of the stake increase to
+	//   cancel.
+	NewCancelAutoRenewedValidatorStakeIncreaseTx(
+		txID ids.ID,
+		stakeIncreaseTxID ids.ID,
+		options ...common.Option,
+	) (*platform.CancelAutoRenewedValidatorStakeIncreaseTx, error)
 }
 
 type Backend interface {
@@ -1763,6 +1776,67 @@ func (b *builder) NewIncreaseAutoRenewedValidatorStakeTx(
 		TxID:      txID,
 		Auth:      auth,
 		StakeOuts: stakeOutputs,
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewCancelAutoRenewedValidatorStakeIncreaseTx(
+	txID ids.ID,
+	stakeIncreaseTxID ids.ID,
+	options ...common.Option,
+) (*platform.CancelAutoRenewedValidatorStakeIncreaseTx, error) {
+	toBurn := map[ids.ID]uint64{}
+	toStake := map[ids.ID]uint64{}
+	ops := common.NewOptions(options)
+
+	auth, err := b.authorize(txID, ops)
+	if err != nil {
+		return nil, fmt.Errorf("authorizing CancelAutoRenewedValidatorStakeIncreaseTx: %w", err)
+	}
+
+	authComplexity, err := fee.AuthComplexity(auth)
+	if err != nil {
+		return nil, fmt.Errorf("computing auth complexity: %w", err)
+	}
+
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+
+	complexity, err := fee.IntrinsicCancelAutoRenewedValidatorStakeIncreaseTxComplexities.Add(
+		&memoComplexity,
+		&authComplexity,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("computing CancelAutoRenewedValidatorStakeIncreaseTx complexity: %w", err)
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("spending for CancelAutoRenewedValidatorStakeIncreaseTx: %w", err)
+	}
+
+	tx := &platform.CancelAutoRenewedValidatorStakeIncreaseTx{
+		BaseTx: platform.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    b.context.NetworkID,
+				BlockchainID: constants.PlatformChainID,
+				Ins:          inputs,
+				Outs:         outputs,
+				Memo:         memo,
+			},
+		},
+		TxID:              txID,
+		StakeIncreaseTxID: stakeIncreaseTxID,
+		Auth:              auth,
 	}
 	return tx, b.initCtx(tx)
 }

@@ -362,3 +362,15 @@ func (w *withOptions) NewIncreaseAutoRenewedValidatorStakeTx(
 		common.UnionOptions(w.options, options)...,
 	)
 }
+
+func (w *withOptions) NewCancelAutoRenewedValidatorStakeIncreaseTx(
+	txID ids.ID,
+	stakeIncreaseTxID ids.ID,
+	options ...common.Option,
+) (*platform.CancelAutoRenewedValidatorStakeIncreaseTx, error) {
+	return w.builder.NewCancelAutoRenewedValidatorStakeIncreaseTx(
+		txID,
+		stakeIncreaseTxID,
+		common.UnionOptions(w.options, options)...,
+	)
+}

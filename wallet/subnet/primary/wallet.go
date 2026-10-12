@@ -66,8 +66,9 @@ type WalletConfig struct {
 	// transactions.
 	ValidationIDs []ids.ID // optional
 	// Auto-renewed validator tx IDs that the wallet should know about to
-	// be able to generate SetAutoRenewedValidatorConfigTx and
-	// IncreaseAutoRenewedValidatorStakeTx transactions.
+	// be able to generate SetAutoRenewedValidatorConfigTx,
+	// IncreaseAutoRenewedValidatorStakeTx and
+	// CancelAutoRenewedValidatorStakeIncreaseTx transactions.
 	AutoRenewedValidatorTxIDs []ids.ID // optional
 }
 
