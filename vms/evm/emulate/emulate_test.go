@@ -11,8 +11,8 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
-	cchain "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	subnet "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	cchain "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes"
 )
 
 // setAndGetMillis is an arbitrary function that can be run if and only if
@@ -51,7 +51,7 @@ func TestEmulation(t *testing.T) {
 		t, &active,
 		cchain.WithHeaderExtra,
 		&cchain.HeaderExtra{TimeMilliseconds: newUint64(milli)},
-		cchain.BlockTimeMilliseconds,
+		func(b *types.Block) *uint64 { return cchain.GetHeaderExtra(b.Header()).TimeMilliseconds },
 		sentinel,
 	)
 	onSubnetEVM := setAndGetMillis(

@@ -16,8 +16,8 @@ import (
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes"
 )
 
 // RegisterExtras registers the libevm hook that normalizes state keys, so that

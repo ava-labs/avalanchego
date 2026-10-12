@@ -18,13 +18,11 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -36,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/extstate"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
@@ -567,15 +566,7 @@ func (b *builder) BuildBlock(
 	he.SettledGasNumerator = (*uint64)(&settled.GasNumerator)
 	he.SettledExcess = (*uint64)(&settled.Excess)
 
-	return customtypes.NewBlockWithExtData(
-		header,
-		ethTxs,
-		nil, // uncles
-		receipts,
-		trie.NewStackTrie(nil),
-		extData,
-		true, // update [customtypes.HeaderExtra.ExtDataHash]
-	), nil
+	return customtypes.NewBlockWithExtData(header, ethTxs, receipts, extData), nil
 }
 
 var _ hook.Transaction = (*hookTx)(nil)
