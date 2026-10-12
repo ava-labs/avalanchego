@@ -5,6 +5,7 @@ package customtypes
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"math/big"
 	"reflect"
 	"testing"
@@ -450,3 +451,40 @@ type stubHasher struct{}
 func (stubHasher) Reset()                   {}
 func (stubHasher) Update(_, _ []byte) error { return nil }
 func (stubHasher) Hash() common.Hash        { return common.Hash{} }
+
+func TestBlockBodyExtraRPCJSONRoundTrip(t *testing.T) {
+	tests := []struct {
+		name    string
+		extData *[]byte
+		want    *[]byte
+	}{
+		{
+			// Nil ext data is marshalled as "0x", so it round-trips as empty.
+			name: "nil",
+			want: &[]byte{},
+		},
+		{
+			name:    "empty",
+			extData: &[]byte{},
+			want:    &[]byte{},
+		},
+		{
+			name:    "set",
+			extData: &[]byte{1, 2, 3},
+			want:    &[]byte{1, 2, 3},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			in := &BlockBodyExtra{ExtData: tt.extData}
+			marshalled := map[string]any{}
+			in.PostRPCMarshal(nil, marshalled)
+			raw, err := json.Marshal(marshalled)
+			require.NoError(t, err, "json.Marshal(PostRPCMarshal())")
+
+			var got BlockBodyExtra
+			require.NoError(t, got.PostRPCUnmarshal(nil, raw), "PostRPCUnmarshal(%s)", raw)
+			require.Equal(t, tt.want, got.ExtData, "PostRPCUnmarshal(%s).ExtData", raw)
+		})
+	}
+}
