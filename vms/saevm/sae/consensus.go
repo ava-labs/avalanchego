@@ -10,8 +10,6 @@ import (
 
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/libevm"
 	"go.uber.org/zap"
@@ -69,24 +67,25 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 	if !ok {
 		return errUnverifiedBlock
 	}
-	if b.Synchronous() {
-		return vm.acceptSynchronous(ctx, b)
-	}
 
 	settles := b.Settles()
 	{
 		batch := vm.db.NewBatch()
 
 		// D(Σ ⊂ S); yes, I know it's in a batch
-		if len(settles) > 0 {
+		if !b.Synchronous() && len(settles) > 0 {
 			// Note that while we treat SAFE and FINALIZED identically, there is
 			// no notion of the former in [rawdb]. Furthermore, the LAST label
 			// is reserved for the last executed so it too isn't persisted here.
 			rawdb.WriteFinalizedBlockHash(batch, b.LastSettled().Hash())
 		}
 
+		rawdb.WriteBlock(batch, b.EthBlock())
+		rawdb.WriteTxLookupEntriesByBlock(batch, b.EthBlock())
 		// D(b ∈ A)
-		writeAccepted(batch, b.EthBlock())
+		hash := b.Hash()
+		rawdb.WriteCanonicalHash(batch, hash, b.NumberU64())
+		rawdb.WriteHeadFastBlockHash(batch, hash)
 
 		if err := batch.Write(); err != nil {
 			return err
@@ -102,6 +101,13 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 	//
 	// [blocks.Block.MarkSettled] guarantees M before I (i.e. `vm.last.settled`)
 	for _, s := range settles {
+		if s == b {
+			// A synchronous block settles itself, which is only possible once
+			// it has executed, so the [saexec.Executor] settles it after
+			// execution. Unlike other blocks, its acceptance therefore precedes
+			// the settlement it causes.
+			break
+		}
 		if err := s.MarkSettled(vm.last.settled); err != nil {
 			return err
 		}
@@ -116,12 +122,20 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		return err
 	}
 
-	// When the chain is bootstrapping, avalanchego expects to be able to call
-	// `Verify` and `Accept` in a loop over blocks. Reporting an error during
-	// either `Verify` or `Accept` is considered FATAL during this process.
-	// Therefore, we must ensure that avalanchego does not get too far ahead of
-	// the execution thread and FATAL during block verification.
-	if vm.consensusState.Get() == snow.Bootstrapping {
+	switch {
+	case b.Synchronous():
+		// See rationale above, in `range settles` loop.
+		if err := b.WaitUntilSettled(ctx); err != nil {
+			return fmt.Errorf("waiting for synchronous block %d to settle: %w", b.Height(), err)
+		}
+		vm.metrics.markSettled(b)
+
+	case vm.consensusState.Get() == snow.Bootstrapping:
+		// When the chain is bootstrapping, avalanchego expects to be able to call
+		// `Verify` and `Accept` in a loop over blocks. Reporting an error during
+		// either `Verify` or `Accept` is considered FATAL during this process.
+		// Therefore, we must ensure that avalanchego does not get too far ahead of
+		// the execution thread and FATAL during block verification.
 		if err := b.WaitUntilExecuted(ctx); err != nil {
 			return fmt.Errorf("waiting for block %d to execute: %v", b.Height(), err)
 		}
@@ -135,10 +149,15 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 
 	// Same rationale as the invariant described in [blocks.Block]. Praised be
 	// the GC!
+	//
 	// The executor's [saedb.Tracker] handles removing state roots once the reference
 	// count is 0. Since on execution, each root has a reference added,
 	// this count is decremented once the block's state is no longer needed by
 	// consensus.
+	//
+	//
+	// Note that for synchronous blocks this amounts to removing the parent
+	// block from the consensus-critical map.
 	keep := b.LastSettled().Hash()
 	for _, s := range settles {
 		if s.Hash() == keep {
@@ -150,50 +169,6 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		vm.consensusCritical.Delete(h)
 	}
 	return nil
-}
-
-// acceptSynchronous accepts a synchronous block. Such a block settles itself,
-// which is only possible once it has executed, so the [saexec.Executor]
-// settles it after execution. Unlike other blocks, its acceptance therefore
-// precedes the settlement it causes.
-func (vm *VM) acceptSynchronous(ctx context.Context, b *blocks.Block) error {
-	// D(b ∈ A)
-	batch := vm.db.NewBatch()
-	writeAccepted(batch, b.EthBlock())
-	if err := batch.Write(); err != nil {
-		return err
-	}
-
-	// I(b ∈ A) before X(b ∈ A)
-	vm.last.accepted.Store(b)
-	vm.metrics.markAccepted(b)
-	vm.acceptedBlocks.Send(b)
-	if err := vm.exec.Enqueue(ctx, b); err != nil {
-		return err
-	}
-	if err := b.WaitUntilSettled(ctx); err != nil {
-		return fmt.Errorf("waiting for synchronous block %d to settle: %w", b.Height(), err)
-	}
-	vm.metrics.markSettled(b)
-
-	vm.log().Debug(
-		"Accepted block",
-		zap.Uint64("height", b.Height()),
-		zap.Stringer("hash", b.Hash()),
-	)
-
-	// This block replaced the parent as the last-settled block.
-	vm.consensusCritical.Delete(b.ParentHash())
-	return nil
-}
-
-// writeAccepted writes b and the indices that record it as accepted to w.
-func writeAccepted(w ethdb.KeyValueWriter, b *types.Block) {
-	rawdb.WriteBlock(w, b)
-	rawdb.WriteTxLookupEntriesByBlock(w, b)
-	hash := b.Hash()
-	rawdb.WriteCanonicalHash(w, hash, b.NumberU64())
-	rawdb.WriteHeadFastBlockHash(w, hash)
 }
 
 // LastAccepted returns the ID of the last block received by [VM.AcceptBlock].
