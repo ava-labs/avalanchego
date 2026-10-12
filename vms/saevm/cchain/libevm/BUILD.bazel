@@ -1,4 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
 
 package(default_visibility = [
     "//vms/saevm/cchain:__subpackages__",
@@ -7,13 +8,35 @@ package(default_visibility = [
 
 go_library(
     name = "libevm",
-    srcs = ["libevm.go"],
+    srcs = [
+        "hooks.go",
+        "libevm.go",
+    ],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm",
     deps = [
-        "//graft/coreth/core",
         "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
         "//vms/saevm/cchain/extstate",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//libevm/stateconf",
+    ],
+)
+
+go_test(
+    name = "libevm_test",
+    srcs = ["hooks_test.go"],
+    embed = [":libevm"],
+    deps = [
+        "//graft/coreth/params",
+        "//vms/saevm/cchain/extstate",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_stretchr_testify//require",
     ],
 )
