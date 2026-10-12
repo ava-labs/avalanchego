@@ -1,9 +1,9 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package client provides a unified client for interacting with [ethclient],
+// Package evmclient provides a unified client for interacting with [ethclient],
 // [gethclient], and any custom methods for Avalanche EVMs.
-package client
+package evmclient
 
 import (
 	"context"
@@ -22,22 +22,16 @@ import (
 // Disambiguation of the different client types to allow for embedding all in
 // the same struct.
 type (
-	Eth struct {
-		*ethclient.Client
-	}
-	Geth struct {
-		*gethclient.Client
-	}
-	RPC struct {
-		*rpc.Client
-	}
+	Eth  = ethclient.Client
+	Geth = gethclient.Client
+	RPC  = rpc.Client
 )
 
 // Client unifies [ethclient.Client], [gethclient.Client] and [rpc.Client].
 type Client struct {
-	Eth
-	Geth
-	RPC
+	*Eth
+	*Geth
+	*RPC
 }
 
 // Dial connects a client to the given URL with context.
@@ -52,9 +46,9 @@ func Dial(ctx context.Context, rawurl string) (*Client, error) {
 // New creates a [Client] that uses the given RPC client.
 func New(c *rpc.Client) *Client {
 	return &Client{
-		Eth:  Eth{ethclient.NewClient(c)},
-		Geth: Geth{gethclient.New(c)},
-		RPC:  RPC{c},
+		Eth:  ethclient.NewClient(c),
+		Geth: gethclient.New(c),
+		RPC:  c,
 	}
 }
 

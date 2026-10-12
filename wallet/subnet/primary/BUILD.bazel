@@ -19,7 +19,7 @@ go_library(
         "//utils/set",
         "//vms/avm",
         "//vms/components/avax",
-        "//vms/evm/client",
+        "//vms/evm/evmclient",
         "//vms/platformvm",
         "//vms/platformvm/platform",
         "//vms/saevm/cchain",

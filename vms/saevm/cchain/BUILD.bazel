@@ -164,7 +164,7 @@ go_test(
         "//vms/evm/acp176",
         "//vms/evm/acp226",
         "//vms/evm/blackhole",
-        "//vms/evm/client",
+        "//vms/evm/evmclient",
         "//vms/evm/predicate",
         "//vms/evm/sync/customrawdb",
         "//vms/platformvm/warp",

@@ -30,7 +30,7 @@ go_library(
         "//vms/avm",
         "//vms/components/avax",
         "//vms/components/gas",
-        "//vms/evm/client",
+        "//vms/evm/evmclient",
         "//vms/saevm/cchain",
         "//vms/saevm/cchain/tx",
         "//vms/secp256k1fx",

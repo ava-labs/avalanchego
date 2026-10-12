@@ -54,7 +54,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
-	"github.com/ava-labs/avalanchego/vms/evm/client"
+	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
@@ -90,7 +90,7 @@ var _ saetest.Peer = (*SUT)(nil)
 type SUT struct {
 	*VM
 	*Client
-	ethclient  *client.Client
+	ethclient  *evmclient.Client
 	clientOnce func()
 
 	ctx            *snow.Context
@@ -430,7 +430,7 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 
 		const wsHTTPPath = cchainHTTPPrefix + "/ws"
 		wsURI := "ws://" + server.Listener.Addr().String() + wsHTTPPath
-		sut.ethclient, err = client.Dial(ctx, wsURI)
+		sut.ethclient, err = evmclient.Dial(ctx, wsURI)
 		require.NoErrorf(tb, err, "client.Dial(ctx, %s)", wsURI)
 		tb.Cleanup(sut.ethclient.Close)
 	})

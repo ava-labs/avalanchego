@@ -65,7 +65,7 @@ go_test(
         "//utils/logging/loggingtest",
         "//utils/set",
         "//vms/components/avax",
-        "//vms/evm/client",
+        "//vms/evm/evmclient",
         "//vms/evm/sync/synctest",
         "//vms/saevm/cchain/libevm",
         "//vms/saevm/cchain/tx",

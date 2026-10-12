@@ -52,7 +52,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/evm/client"
+	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -87,7 +87,7 @@ var _ saetest.Peer = (*SUT)(nil)
 // avoid over-reliance on internal implementation details.
 type SUT struct {
 	block.ChainVM
-	*client.Client
+	*evmclient.Client
 
 	wallet *saetest.Wallet
 	db     ethdb.Database
@@ -236,7 +236,7 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 	rpcClient := dialRPC(ctx, tb, snow, "ws", wsHTTPExtensionPath)
 	sut := &SUT{
 		ChainVM: snow,
-		Client:  client.New(rpcClient),
+		Client:  evmclient.New(rpcClient),
 
 		wallet: saetest.NewWalletWithKeyChain(
 			keys,

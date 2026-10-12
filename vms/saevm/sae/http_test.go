@@ -38,7 +38,7 @@ func TestCallTimeout(t *testing.T) {
 		},
 		{
 			name:   "ws",
-			client: sut.Client.RPC.Client,
+			client: sut.Client.RPC,
 		},
 	}
 

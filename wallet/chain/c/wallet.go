@@ -10,7 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/client"
+	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -67,7 +67,7 @@ func NewWallet(
 	builder Builder,
 	signer Signer,
 	avaxClient *cchain.Client,
-	ethClient *client.Client,
+	ethClient *evmclient.Client,
 	backend Backend,
 ) Wallet {
 	return &wallet{
@@ -84,7 +84,7 @@ type wallet struct {
 	builder    Builder
 	signer     Signer
 	avaxClient *cchain.Client
-	ethClient  *client.Client
+	ethClient  *evmclient.Client
 }
 
 func (w *wallet) Builder() Builder {
