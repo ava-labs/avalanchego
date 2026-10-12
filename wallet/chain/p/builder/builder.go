@@ -366,6 +366,18 @@ type Builder interface {
 		period time.Duration,
 		options ...common.Option,
 	) (*platform.SetAutoRenewedValidatorConfigTx, error)
+
+	// NewIncreaseAutoRenewedValidatorStakeTx creates a transaction to lock
+	// additional stake for an existing auto-renewed validator. The stake is
+	// added to the validator's weight at the start of its next cycle.
+	//
+	// - txID is the transaction ID of the auto-renewed validator.
+	// - amount is the amount of AVAX to stake.
+	NewIncreaseAutoRenewedValidatorStakeTx(
+		txID ids.ID,
+		amount uint64,
+		options ...common.Option,
+	) (*platform.IncreaseAutoRenewedValidatorStakeTx, error)
 }
 
 type Backend interface {
@@ -1688,6 +1700,69 @@ func (b *builder) NewSetAutoRenewedValidatorConfigTx(
 		Auth:                     auth,
 		AutoCompoundRewardShares: autoCompoundRewardShares,
 		Period:                   uint64(period / time.Second),
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewIncreaseAutoRenewedValidatorStakeTx(
+	txID ids.ID,
+	amount uint64,
+	options ...common.Option,
+) (*platform.IncreaseAutoRenewedValidatorStakeTx, error) {
+	toBurn := map[ids.ID]uint64{}
+	toStake := map[ids.ID]uint64{
+		b.context.AVAXAssetID: amount,
+	}
+	ops := common.NewOptions(options)
+
+	auth, err := b.authorize(txID, ops)
+	if err != nil {
+		return nil, fmt.Errorf("authorizing IncreaseAutoRenewedValidatorStakeTx: %w", err)
+	}
+
+	authComplexity, err := fee.AuthComplexity(auth)
+	if err != nil {
+		return nil, fmt.Errorf("computing auth complexity: %w", err)
+	}
+
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+
+	complexity, err := fee.IntrinsicIncreaseAutoRenewedValidatorStakeTxComplexities.Add(
+		&memoComplexity,
+		&authComplexity,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("computing IncreaseAutoRenewedValidatorStakeTx complexity: %w", err)
+	}
+
+	inputs, baseOutputs, stakeOutputs, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("spending for IncreaseAutoRenewedValidatorStakeTx: %w", err)
+	}
+
+	tx := &platform.IncreaseAutoRenewedValidatorStakeTx{
+		BaseTx: platform.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    b.context.NetworkID,
+				BlockchainID: constants.PlatformChainID,
+				Ins:          inputs,
+				Outs:         baseOutputs,
+				Memo:         memo,
+			},
+		},
+		TxID:      txID,
+		Auth:      auth,
+		StakeOuts: stakeOutputs,
 	}
 	return tx, b.initCtx(tx)
 }
