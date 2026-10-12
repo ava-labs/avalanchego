@@ -661,6 +661,29 @@ type GetCurrentValidatorsReply struct {
 	Validators []any `json:"validators"`
 }
 
+// loadStakeIncreases returns the stake increases locked by the
+// IncreaseAutoRenewedValidatorStakeTxs with the provided IDs.
+func (s *Service) loadStakeIncreases(txIDs []ids.ID) ([]platformapi.StakeIncrease, error) {
+	stakeIncreases := make([]platformapi.StakeIncrease, len(txIDs))
+	for i, txID := range txIDs {
+		tx, _, err := s.vm.state.GetTx(txID)
+		if err != nil {
+			return nil, fmt.Errorf("getting stake increase tx %s: %w", txID, err)
+		}
+
+		stakeIncreaseTx, ok := tx.Unsigned.(*platform.IncreaseAutoRenewedValidatorStakeTx)
+		if !ok {
+			return nil, fmt.Errorf("expected *platform.IncreaseAutoRenewedValidatorStakeTx but got %T", tx.Unsigned)
+		}
+
+		stakeIncreases[i] = platformapi.StakeIncrease{
+			TxID:   txID,
+			Amount: avajson.Uint64(stakeIncreaseTx.Weight()),
+		}
+	}
+	return stakeIncreases, nil
+}
+
 func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error) {
 	// Lookup tx from the cache first.
 	attr, found := s.stakerAttributesCache.Get(txID)
@@ -922,12 +945,19 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 				if err != nil {
 					return nil, err
 				}
+				pendingStakeIncreases, err := s.loadStakeIncreases(stakingInfo.PendingStakeIncreaseTxIDs)
+				if err != nil {
+					return nil, err
+				}
 				vdr.AutoRenewedConfig = &platformapi.AutoRenewedConfig{
 					ValidatorAuthority:        apiAuthority,
 					NextPeriod:                avajson.Uint64(stakingInfo.NextPeriod),
 					AutoCompoundRewardShares:  avajson.Uint32(stakingInfo.AutoCompoundRewardShares),
 					RestakedValidationRewards: new(avajson.Uint64(stakingInfo.AccruedValidationRewards)),
 					RestakedDelegateeRewards:  new(avajson.Uint64(stakingInfo.AccruedDelegateeRewards)),
+					PendingStakeIncrease:      new(avajson.Uint64(stakingInfo.PendingStakeIncrease)),
+					PendingStakeIncreases:     &pendingStakeIncreases,
+					AppliedStakeIncrease:      new(avajson.Uint64(stakingInfo.AccruedStakeIncrease)),
 				}
 			}
 

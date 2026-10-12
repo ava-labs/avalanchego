@@ -75,6 +75,15 @@ type ClientAutoRenewedConfig struct {
 	// Nil if the node does not report them. See api.AutoRenewedConfig.
 	RestakedValidationRewards *uint64
 	RestakedDelegateeRewards  *uint64
+	PendingStakeIncrease      *uint64
+	PendingStakeIncreases     []ClientStakeIncrease
+	AppliedStakeIncrease      *uint64
+}
+
+// ClientStakeIncrease is a stake increase of an auto-renewed validator.
+type ClientStakeIncrease struct {
+	TxID   ids.ID
+	Amount uint64
 }
 
 // ClientDelegator is the repr. of a delegator sent over client
@@ -220,11 +229,25 @@ func apiAutoRenewedConfigToClient(cfg *api.AutoRenewedConfig) (*ClientAutoRenewe
 		return nil, err
 	}
 
+	var pendingStakeIncreases []ClientStakeIncrease
+	if cfg.PendingStakeIncreases != nil {
+		pendingStakeIncreases = make([]ClientStakeIncrease, len(*cfg.PendingStakeIncreases))
+		for i, stakeIncrease := range *cfg.PendingStakeIncreases {
+			pendingStakeIncreases[i] = ClientStakeIncrease{
+				TxID:   stakeIncrease.TxID,
+				Amount: uint64(stakeIncrease.Amount),
+			}
+		}
+	}
+
 	return &ClientAutoRenewedConfig{
 		ValidatorAuthority:        validatorAuthority,
 		NextPeriod:                uint64(cfg.NextPeriod),
 		AutoCompoundRewardShares:  uint32(cfg.AutoCompoundRewardShares),
 		RestakedValidationRewards: (*uint64)(cfg.RestakedValidationRewards),
 		RestakedDelegateeRewards:  (*uint64)(cfg.RestakedDelegateeRewards),
+		PendingStakeIncrease:      (*uint64)(cfg.PendingStakeIncrease),
+		PendingStakeIncreases:     pendingStakeIncreases,
+		AppliedStakeIncrease:      (*uint64)(cfg.AppliedStakeIncrease),
 	}, nil
 }

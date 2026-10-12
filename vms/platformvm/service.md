@@ -603,6 +603,12 @@ platform.getCurrentValidators({
         },
         nextPeriod: string,
         autoCompoundRewardShares: string,
+        pendingStakeIncrease: string,
+        pendingStakeIncreases: []{
+            txID: string,
+            amount: string
+        },
+        appliedStakeIncrease: string,
         delegatorCount: string,
         delegatorWeight: string,
         delegators: []{
@@ -664,10 +670,17 @@ platform.getCurrentValidators({
     - `autoCompoundRewardShares` is the percentage of rewards restaked at the end of each cycle,
       expressed in millionths in the range `[0, 1000000]`. `500000` means half the rewards are
       restaked and half are paid out.
+    - `pendingStakeIncrease` is the stake, in nAVAX, locked with an
+      `IncreaseAutoRenewedValidatorStakeTx` during the current cycle. It is added to `weight` at the
+      start of the next cycle. Requires Igloo.
+    - `pendingStakeIncreases` lists each `IncreaseAutoRenewedValidatorStakeTx` that locked
+      `pendingStakeIncrease`, with its `txID` and `amount` in nAVAX. Requires Igloo.
+    - `appliedStakeIncrease` is the total stake, in nAVAX, added to `weight` by stake increases in
+      previous cycles. Requires Igloo.
     - `endTime` for an auto-renewed validator is the end of the current cycle, not the end of the
       validation. On renewal `startTime` becomes the old `endTime`, `endTime` moves forward by
-      `nextPeriod`, and `weight` grows by whatever share of the rewards was auto-compounded, capped
-      at `MaxValidatorStake`. `txID` stays the same across renewals, so a changed `endTime` must not
+      `nextPeriod`, and `weight` grows by `pendingStakeIncrease` plus whatever share of the rewards
+      was auto-compounded, capped at `MaxValidatorStake`. `txID` stays the same across renewals, so a changed `endTime` must not
       be treated as a new validator.
   - `delegatorCount` is the number of delegators on this validator.
     Omitted if `subnetID` is not the Primary Network.

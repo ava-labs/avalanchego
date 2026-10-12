@@ -95,6 +95,13 @@ type PermissionlessValidator struct {
 	Delegators      *[]PrimaryDelegator `json:"delegators,omitempty"`
 }
 
+// StakeIncrease is the repr. of an IncreaseAutoRenewedValidatorStakeTx sent
+// over APIs.
+type StakeIncrease struct {
+	TxID   ids.ID      `json:"txID"`
+	Amount json.Uint64 `json:"amount"`
+}
+
 // AutoRenewedConfig holds the config fields specific to auto-renewed validators.
 type AutoRenewedConfig struct {
 	// The owner authorized to modify this validator's config.
@@ -106,11 +113,21 @@ type AutoRenewedConfig struct {
 	// Cumulative rewards auto-compounded into the validator's weight over
 	// completed cycles, split by source:
 	//
-	//	weight = tx.Weight + RestakedValidationRewards + RestakedDelegateeRewards
+	//	weight = tx.Weight + RestakedValidationRewards + RestakedDelegateeRewards + AppliedStakeIncrease
 	//
 	// Distinct from AccruedDelegateeReward, which holds only the commission
 	// pending in the current cycle. Nil if the node does not report them, which
 	// is not the same as nothing having been restaked yet.
 	RestakedValidationRewards *json.Uint64 `json:"restakedValidationRewards,omitempty"`
 	RestakedDelegateeRewards  *json.Uint64 `json:"restakedDelegateeRewards,omitempty"`
+	// Stake locked during the current cycle that will be added to the
+	// validator's weight at the start of the next cycle. Nil if the node does
+	// not report it.
+	PendingStakeIncrease *json.Uint64 `json:"pendingStakeIncrease,omitempty"`
+	// The txs that locked PendingStakeIncrease. These stake increases can
+	// still be cancelled. Nil if the node does not report them.
+	PendingStakeIncreases *[]StakeIncrease `json:"pendingStakeIncreases,omitempty"`
+	// Cumulative stake increases added to the validator's weight over
+	// completed cycles. Nil if the node does not report it.
+	AppliedStakeIncrease *json.Uint64 `json:"appliedStakeIncrease,omitempty"`
 }

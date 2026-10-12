@@ -8,6 +8,10 @@ The implementation adds three Helicon-gated transaction types:
 - `SetAutoRenewedValidatorConfigTx` updates the validator's auto-renew configuration for the next cycle.
 - `RewardAutoRenewedValidatorTx` is issued by block builders at each cycle boundary to settle rewards and either start the next cycle or remove the validator.
 
+The Igloo upgrade adds one more transaction type:
+
+- `IncreaseAutoRenewedValidatorStakeTx` locks additional stake for the validator, which is added to the validator's weight at the start of its next cycle.
+
 A cycle is one active validation interval for an auto-renewed validator. The
 first cycle duration comes from `AddAutoRenewedValidatorTx.Period`; later cycle
 durations come from `StakingInfo.NextPeriod`. A `NextPeriod` of 0 means the
@@ -22,10 +26,14 @@ Mutable auto-renewed validator state is stored separately from the core `Staker`
 - `AccruedDelegateeRewards` - delegatee rewards restaked by previous auto-renewal commits.
 - `AutoCompoundRewardShares` - percentage of current cycle rewards to restake at cycle end, expressed in millionths.
 - `NextPeriod` - next validation cycle duration in seconds. A value of 0 means the validator stops at the end of the current cycle.
+- `PendingStakeIncrease` - stake locked by `IncreaseAutoRenewedValidatorStakeTx` during the current cycle, which is added to the validator's weight at the start of the next cycle.
+- `AccruedStakeIncrease` - stake increases added to the validator's weight by previous auto-renewal commits.
+- `PendingStakeIncreaseTxIDs` - IDs of the `IncreaseAutoRenewedValidatorStakeTx`s that locked `PendingStakeIncrease`.
+- `AccruedStakeIncreaseTxIDs` - IDs of the `IncreaseAutoRenewedValidatorStakeTx`s that locked `AccruedStakeIncrease`.
 
-The validator's effective weight is the original stake plus `AccruedValidationRewards` and `AccruedDelegateeRewards`; the implementation persists this weight on the renewed `Staker`. The current cycle's `StartTime`, `EndTime`, `PotentialReward`, and weight remain on the `Staker` record itself.
+The validator's effective weight is the original stake plus `AccruedValidationRewards`, `AccruedDelegateeRewards`, and `AccruedStakeIncrease`; the implementation persists this weight on the renewed `Staker`. The current cycle's `StartTime`, `EndTime`, `PotentialReward`, and weight remain on the `Staker` record itself.
 
-`StakingInfo` is initialized from `AddAutoRenewedValidatorTx`, updated by `SetAutoRenewedValidatorConfigTx`, and updated again at cycle end when rewards are restaked or withdrawn.
+`StakingInfo` is initialized from `AddAutoRenewedValidatorTx`, updated by `SetAutoRenewedValidatorConfigTx` and `IncreaseAutoRenewedValidatorStakeTx`, and updated again at cycle end when rewards are restaked or withdrawn.
 
 ## Transaction Types
 
@@ -70,6 +78,28 @@ On execution:
 - `StakingInfo.AutoCompoundRewardShares` is updated, and `Period` is stored as the new `StakingInfo.NextPeriod`.
 - BaseTx inputs are consumed and BaseTx outputs are produced.
 
+### IncreaseAutoRenewedValidatorStakeTx
+
+Locks additional stake for an auto-renewed validator without changing its current cycle. The stake is locked when the transaction is accepted, but it only increases the validator's weight at the start of the next cycle, so the current cycle's weight, `PotentialReward`, and delegation capacity are unaffected.
+
+Verification rules:
+
+- Igloo must be active.
+- Referenced TxID must be an `AddAutoRenewedValidatorTx`.
+- Validator must be currently active.
+- TxID must match the active validator's latest transaction ID.
+- `StakingInfo.NextPeriod` must be non-zero. Otherwise the validator stops at the end of the current cycle and the stake would never be applied.
+- The validator must have fewer than 64 `PendingStakeIncreaseTxIDs` and `AccruedStakeIncreaseTxIDs` combined, which bounds the size of its metadata.
+- The validator's weight plus `PendingStakeIncrease` plus the new stake must not exceed `maxValidatorStake`. The stake increase is reserved against `maxValidatorStake` when it is locked, so it is guaranteed to fit when it is applied.
+- The staked asset must be AVAX.
+- Must be authorized by the validator's `ValidatorAuthority`.
+- The BaseTx spend, including the stake outputs, must be valid.
+
+On execution:
+
+- The stake is added to `StakingInfo.PendingStakeIncrease`, and the transaction ID is appended to `StakingInfo.PendingStakeIncreaseTxIDs`.
+- BaseTx inputs are consumed and BaseTx outputs are produced. The stake outputs are not produced: like the stake of `AddAutoRenewedValidatorTx`, they are locked until the validator stops.
+
 ### RewardAutoRenewedValidatorTx
 
 Settles an auto-renewed validator at the end of a cycle.
@@ -90,21 +120,24 @@ Taken when the validator has sufficient uptime and is eligible for rewards.
 
 1. The current cycle's `PotentialReward` and `DelegateeReward` are each split according to `AutoCompoundRewardShares`. Accrued values (`AccruedValidationRewards`, `AccruedDelegateeRewards`) are already part of the validator's weight and are not split again.
 
-2. The restaked portions increase validator weight. If the new weight would exceed `MaxValidatorStake`, only the remaining capacity is restaked and the excess is withdrawn.
+2. `PendingStakeIncrease` is added to the validator's weight and moved to `AccruedStakeIncrease`, and `PendingStakeIncreaseTxIDs` are moved to `AccruedStakeIncreaseTxIDs`. It is applied before the restaked rewards, because it was already reserved against `MaxValidatorStake`.
 
-3. Withdrawn rewards are paid as reward UTXOs on the commit path. Withdrawn validation rewards and withdrawn delegatee rewards are each paid as a separate reward UTXO when non-zero. Each amount includes both the configured withdrawal from `AutoCompoundRewardShares` and any additional overflow from the `MaxValidatorStake` cap.
+3. The restaked portions increase validator weight. If the new weight would exceed `MaxValidatorStake`, only the remaining capacity is restaked and the excess is withdrawn.
 
-4. A new cycle begins immediately with `StartTime` set to the previous `EndTime`, `EndTime = StartTime + NextPeriod`, a new `PotentialReward` calculated from the new weight and current supply, and `DelegateeReward` reset. Current supply is increased by the new `PotentialReward`.
+4. Withdrawn rewards are paid as reward UTXOs on the commit path. Withdrawn validation rewards and withdrawn delegatee rewards are each paid as a separate reward UTXO when non-zero. Each amount includes both the configured withdrawal from `AutoCompoundRewardShares` and any additional overflow from the `MaxValidatorStake` cap.
+
+5. A new cycle begins immediately with `StartTime` set to the previous `EndTime`, `EndTime = StartTime + NextPeriod`, a new `PotentialReward` calculated from the new weight and current supply, and `DelegateeReward` reset. Current supply is increased by the new `PotentialReward`.
 
 **If `NextPeriod == 0` (graceful exit):**
 
-On commit, all rewards (`PotentialReward` + `AccruedValidationRewards` + `DelegateeReward` + `AccruedDelegateeRewards`) are withdrawn as reward UTXOs. Principal is returned as stake UTXOs that reference the original `AddAutoRenewedValidatorTx`. Validator is removed.
+On commit, all rewards (`PotentialReward` + `AccruedValidationRewards` + `DelegateeReward` + `AccruedDelegateeRewards`) are withdrawn as reward UTXOs. Principal is returned as stake UTXOs that reference the original `AddAutoRenewedValidatorTx`. The stake of each transaction in `AccruedStakeIncreaseTxIDs` and `PendingStakeIncreaseTxIDs` is returned as stake UTXOs that reference that `IncreaseAutoRenewedValidatorStakeTx`. Validator is removed.
 
 ### Abort Path
 
 Taken when the validator did not meet uptime requirements, regardless of `NextPeriod`. Auto-renewal is conditioned on reward eligibility; failing uptime forces exit.
 
 - Principal is returned as stake UTXOs that reference the original `AddAutoRenewedValidatorTx`.
+- The stake of each transaction in `AccruedStakeIncreaseTxIDs` and `PendingStakeIncreaseTxIDs` is returned as stake UTXOs that reference that `IncreaseAutoRenewedValidatorStakeTx`.
 - `AccruedValidationRewards`, `AccruedDelegateeRewards`, and `DelegateeReward` are returned as reward UTXOs.
 - Current cycle's `PotentialReward` is forfeited.
 - Current supply is decreased by the forfeited `PotentialReward`, which was added when the cycle started.
@@ -116,6 +149,6 @@ conditioned on meeting uptime requirements and is forfeited on abort.
 
 ## API
 
-The `GetCurrentValidators` endpoint embeds an `AutoRenewedConfig` only for auto-renewed validators. The config contains `validatorAuthority`, `nextPeriod`, and `autoCompoundRewardShares`.
+The `GetCurrentValidators` endpoint embeds an `AutoRenewedConfig` only for auto-renewed validators. The config contains `validatorAuthority`, `nextPeriod`, `autoCompoundRewardShares`, `restakedValidationRewards`, `restakedDelegateeRewards`, `pendingStakeIncrease`, `pendingStakeIncreases`, and `appliedStakeIncrease`. `pendingStakeIncreases` lists the transaction ID and amount of each pending stake increase.
 
 RPC consumers need this metadata to distinguish auto-renewed validators from fixed-term validators and to show the validator's pending next-cycle behavior. Wallets, staking dashboards, and operators can use it to display whether the validator will renew or exit at the next cycle boundary, what percentage of rewards will be restaked in the next cycle, and which authority can update the configuration.

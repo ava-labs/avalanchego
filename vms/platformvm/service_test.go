@@ -879,10 +879,12 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 	periodSeconds := uint64(period / time.Second)
 
 	tests := []struct {
-		name               string
-		restakedValidation uint64
-		restakedDelegatee  uint64
-		delegateeReward    uint64
+		name                  string
+		restakedValidation    uint64
+		restakedDelegatee     uint64
+		delegateeReward       uint64
+		pendingStakeIncreases []uint64
+		appliedStakeIncrease  uint64
 	}{
 		{
 			name: "nothing restaked",
@@ -901,6 +903,13 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 			restakedDelegatee:  3_000,
 			delegateeReward:    111,
 		},
+		{
+			name:                  "pending stake increase reported apart from applied stake increase",
+			restakedValidation:    7_000,
+			restakedDelegatee:     3_000,
+			pendingStakeIncreases: []uint64{2_000, 1_000},
+			appliedStakeIncrease:  5_000,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -910,8 +919,9 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 			nodeID := ids.GenerateTestNodeID()
 			startTime := service.vm.clock.Time()
 			endTime := startTime.Add(period)
-			// Restaked rewards are added to the weight on every renewal.
-			weight := service.vm.MinValidatorStake + test.restakedValidation + test.restakedDelegatee
+			// Restaked rewards and pending stake increases are added to the
+			// weight on every renewal, after which they are reported as applied.
+			weight := service.vm.MinValidatorStake + test.restakedValidation + test.restakedDelegatee + test.appliedStakeIncrease
 
 			rewardOwner := &secp256k1fx.OutputOwners{
 				Threshold: 1,
@@ -957,12 +967,46 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 			require.NoError(err)
 			diff.AddTx(tx, status.Committed)
 			require.NoError(diff.PutCurrentValidator(staker))
+
+			var (
+				pendingStakeIncrease      uint64
+				pendingStakeIncreaseTxIDs []ids.ID
+				wantPendingStakeIncreases = []pchainapi.StakeIncrease{}
+			)
+			for _, amount := range test.pendingStakeIncreases {
+				stakeIncreaseTx := &platform.Tx{Unsigned: &platform.IncreaseAutoRenewedValidatorStakeTx{
+					TxID: tx.ID(),
+					Auth: &secp256k1fx.Input{},
+					StakeOuts: []*avax.TransferableOutput{
+						{
+							Asset: avax.Asset{ID: service.vm.ctx.AVAXAssetID},
+							Out: &secp256k1fx.TransferOutput{
+								Amt:          amount,
+								OutputOwners: *rewardOwner,
+							},
+						},
+					},
+				}}
+				require.NoError(stakeIncreaseTx.Initialize(platform.Codec))
+				diff.AddTx(stakeIncreaseTx, status.Committed)
+
+				pendingStakeIncrease += amount
+				pendingStakeIncreaseTxIDs = append(pendingStakeIncreaseTxIDs, stakeIncreaseTx.ID())
+				wantPendingStakeIncreases = append(wantPendingStakeIncreases, pchainapi.StakeIncrease{
+					TxID:   stakeIncreaseTx.ID(),
+					Amount: avajson.Uint64(amount),
+				})
+			}
+
 			require.NoError(diff.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
-				DelegateeReward:          test.delegateeReward,
-				AccruedValidationRewards: test.restakedValidation,
-				AccruedDelegateeRewards:  test.restakedDelegatee,
-				AutoCompoundRewardShares: autoCompoundRewardShares,
-				NextPeriod:               periodSeconds,
+				DelegateeReward:           test.delegateeReward,
+				AccruedValidationRewards:  test.restakedValidation,
+				AccruedDelegateeRewards:   test.restakedDelegatee,
+				AutoCompoundRewardShares:  autoCompoundRewardShares,
+				NextPeriod:                periodSeconds,
+				PendingStakeIncrease:      pendingStakeIncrease,
+				AccruedStakeIncrease:      test.appliedStakeIncrease,
+				PendingStakeIncreaseTxIDs: pendingStakeIncreaseTxIDs,
 			}))
 			require.NoError(diff.Apply(service.vm.state))
 			require.NoError(service.vm.state.Commit())
@@ -1014,6 +1058,9 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 					AutoCompoundRewardShares:  avajson.Uint32(autoCompoundRewardShares),
 					RestakedValidationRewards: new(avajson.Uint64(test.restakedValidation)),
 					RestakedDelegateeRewards:  new(avajson.Uint64(test.restakedDelegatee)),
+					PendingStakeIncrease:      new(avajson.Uint64(pendingStakeIncrease)),
+					PendingStakeIncreases:     &wantPendingStakeIncreases,
+					AppliedStakeIncrease:      new(avajson.Uint64(test.appliedStakeIncrease)),
 				},
 				DelegatorCount:  new(avajson.Uint64),
 				DelegatorWeight: new(avajson.Uint64),
