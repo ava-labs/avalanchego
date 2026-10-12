@@ -2766,6 +2766,7 @@ func TestResolveValidatorMetadataCodec(t *testing.T) {
 	var (
 		durangoTime = time.Unix(1000, 0)
 		heliconTime = time.Unix(2000, 0)
+		iglooTime   = time.Unix(3000, 0)
 	)
 
 	tests := []struct {
@@ -2794,9 +2795,19 @@ func TestResolveValidatorMetadataCodec(t *testing.T) {
 			want:      codecVersion2,
 		},
 		{
-			name:      "post-Helicon",
-			timestamp: heliconTime.Add(time.Second),
+			name:      "between_Helicon_and_Igloo",
+			timestamp: iglooTime.Add(-time.Second),
 			want:      codecVersion2,
+		},
+		{
+			name:      "Igloo_activated",
+			timestamp: iglooTime,
+			want:      codecVersion3,
+		},
+		{
+			name:      "post-Igloo",
+			timestamp: iglooTime.Add(time.Second),
+			want:      codecVersion3,
 		},
 	}
 
@@ -2806,6 +2817,7 @@ func TestResolveValidatorMetadataCodec(t *testing.T) {
 			s.upgrades = upgrade.Config{
 				DurangoTime: durangoTime,
 				HeliconTime: heliconTime,
+				IglooTime:   iglooTime,
 			}
 
 			s.SetTimestamp(tt.timestamp)
@@ -4917,6 +4929,90 @@ func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
 	require.Equal(accruedDelRewards, gotStakingInfo.AccruedDelegateeRewards)
 	require.Equal(autoCompoundRewardShares, gotStakingInfo.AutoCompoundRewardShares)
 	require.Equal(period, gotStakingInfo.NextPeriod)
+}
+
+// TestAutoRenewedValidatorStakeIncreaseStateReload verifies that the stake
+// increase fields of an auto-renewed validator's staking info are persisted and
+// that applied stake increases are included in the validator's weight after
+// reloading the state.
+func TestAutoRenewedValidatorStakeIncreaseStateReload(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	state := newTestState(t, db)
+
+	const (
+		weight                          = uint64(3000)
+		potentialReward                 = uint64(500)
+		period                          = uint64(time.Hour / time.Second)
+		autoCompoundRewardShares uint32 = .1 * reward.PercentDenominator
+
+		accruedRewards       = uint64(100)
+		accruedDelRewards    = uint64(50)
+		accruedStakeIncrease = uint64(1000)
+		pendingStakeIncrease = uint64(2000)
+	)
+	var (
+		nodeID   = ids.GenerateTestNodeID()
+		subnetID = constants.PrimaryNetworkID
+
+		startTime = genesistest.DefaultValidatorStartTime
+		endTime   = startTime.Add(24 * time.Hour)
+
+		pendingStakeIncreaseTxIDs = []ids.ID{
+			ids.GenerateTestID(),
+		}
+		accruedStakeIncreaseTxIDs = []ids.ID{
+			ids.GenerateTestID(),
+			ids.GenerateTestID(),
+		}
+	)
+
+	autoRenewedUnsigned := createAutoRenewedValidatorTx(t, nodeID, weight, period, autoCompoundRewardShares)
+	autoRenewedTx := &platform.Tx{Unsigned: autoRenewedUnsigned}
+	require.NoError(autoRenewedTx.Initialize(platform.Codec))
+
+	wantWeight := weight + accruedRewards + accruedDelRewards + accruedStakeIncrease
+	staker, err := NewCurrentStaker(
+		autoRenewedTx.ID(),
+		autoRenewedUnsigned,
+		startTime,
+		endTime,
+		wantWeight,
+		potentialReward,
+	)
+	require.NoError(err)
+
+	wantStakingInfo := StakingInfo{
+		AccruedValidationRewards:  accruedRewards,
+		AccruedDelegateeRewards:   accruedDelRewards,
+		AutoCompoundRewardShares:  autoCompoundRewardShares,
+		NextPeriod:                period,
+		PendingStakeIncrease:      pendingStakeIncrease,
+		AccruedStakeIncrease:      accruedStakeIncrease,
+		PendingStakeIncreaseTxIDs: pendingStakeIncreaseTxIDs,
+		AccruedStakeIncreaseTxIDs: accruedStakeIncreaseTxIDs,
+	}
+
+	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	require.NoError(err)
+	d.AddTx(autoRenewedTx, status.Committed)
+	require.NoError(d.PutCurrentValidator(staker))
+	require.NoError(d.SetStakingInfo(subnetID, nodeID, wantStakingInfo))
+	require.NoError(d.Apply(state))
+	require.NoError(state.Commit())
+
+	reloadedState := newTestState(t, db)
+
+	gotValidator, err := reloadedState.GetCurrentValidator(subnetID, nodeID)
+	require.NoError(err)
+	// The pending stake increase must not be included in the weight until it
+	// is applied at the start of the next cycle.
+	require.Equal(wantWeight, gotValidator.Weight)
+
+	gotStakingInfo, err := reloadedState.GetStakingInfo(subnetID, nodeID)
+	require.NoError(err)
+	require.Equal(wantStakingInfo, gotStakingInfo)
 }
 
 func TestStateAndDiffIntegration_L1Validators(t *testing.T) {

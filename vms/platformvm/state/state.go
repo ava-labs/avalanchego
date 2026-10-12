@@ -2016,6 +2016,10 @@ func (s *State) loadCurrentValidators() error {
 			if err != nil {
 				return fmt.Errorf("adding accrued delegatee rewards: %w", err)
 			}
+			weight, err = safemath.Add(weight, metadata.AccruedStakeIncrease)
+			if err != nil {
+				return fmt.Errorf("adding accrued stake increase: %w", err)
+			}
 
 			staker, err = NewCurrentStaker(
 				txID,
@@ -2393,6 +2397,8 @@ func (s *State) write(updateValidators bool, height uint64) error {
 
 func (s *State) resolveValidatorMetadataCodec() uint16 {
 	switch ts := s.GetTimestamp(); {
+	case s.upgrades.IsIglooActivated(ts):
+		return codecVersion3
 	case s.upgrades.IsHeliconActivated(ts):
 		return codecVersion2
 	case s.upgrades.IsDurangoActivated(ts):

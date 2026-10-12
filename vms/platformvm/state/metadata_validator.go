@@ -34,7 +34,8 @@ type validatorMetadata struct {
 	StakerStartTime          uint64        `          v1:"true"`
 
 	// Auto-renewed validators.
-	// Weight is computed as: tx.Weight + AccruedValidationRewards + AccruedDelegateeRewards
+	// Weight is computed as:
+	//   tx.Weight + AccruedValidationRewards + AccruedDelegateeRewards + AccruedStakeIncrease
 	// AccruedValidationRewards is the sum of validation rewards restaked from previous cycles.
 	AccruedValidationRewards uint64 `v2:"true"`
 	// AccruedDelegateeRewards is the sum of delegatee rewards restaked from previous cycles.
@@ -45,6 +46,18 @@ type validatorMetadata struct {
 	NextPeriod uint64 `v2:"true"`
 	// StakerEndTime is the Unix timestamp, in seconds, when the current cycle ends.
 	StakerEndTime uint64 `v2:"true"`
+	// PendingStakeIncrease is the stake locked during the current cycle that
+	// will be added to the validator's weight at the start of the next cycle.
+	PendingStakeIncrease uint64 `v3:"true"`
+	// AccruedStakeIncrease is the sum of stake increases applied to the
+	// validator's weight in previous cycles.
+	AccruedStakeIncrease uint64 `v3:"true"`
+	// PendingStakeIncreaseTxIDs are the IDs of the txs that locked
+	// PendingStakeIncrease.
+	PendingStakeIncreaseTxIDs []ids.ID `v3:"true"`
+	// AccruedStakeIncreaseTxIDs are the IDs of the txs that locked
+	// AccruedStakeIncrease.
+	AccruedStakeIncreaseTxIDs []ids.ID `v3:"true"`
 
 	txID        ids.ID
 	lastUpdated time.Time
@@ -83,6 +96,15 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 		if _, err := MetadataCodec.Unmarshal(bytes, metadata); err != nil {
 			return err
 		}
+
+		// The codec unmarshals empty slices as non-nil. Normalize them so that
+		// metadata round-trips through the database unchanged.
+		if len(metadata.PendingStakeIncreaseTxIDs) == 0 {
+			metadata.PendingStakeIncreaseTxIDs = nil
+		}
+		if len(metadata.AccruedStakeIncreaseTxIDs) == 0 {
+			metadata.AccruedStakeIncreaseTxIDs = nil
+		}
 	}
 	metadata.lastUpdated = time.Unix(int64(metadata.LastUpdated), 0)
 	return nil
@@ -102,15 +124,39 @@ type StakingInfo struct {
 	AutoCompoundRewardShares uint32
 	// NextPeriod is the next validation cycle duration, in seconds.
 	NextPeriod uint64
+	// PendingStakeIncrease is the stake locked during the current cycle that
+	// will be added to the validator's weight at the start of the next cycle.
+	PendingStakeIncrease uint64
+	// AccruedStakeIncrease is the sum of stake increases applied to the
+	// validator's weight in previous cycles.
+	AccruedStakeIncrease uint64
+	// PendingStakeIncreaseTxIDs are the IDs of the txs that locked
+	// PendingStakeIncrease. Their stake outputs are returned when the
+	// validator stops or when the stake increase is cancelled.
+	//
+	// The slice may be shared with other [StakingInfo] values, so it must be
+	// copied before being modified.
+	PendingStakeIncreaseTxIDs []ids.ID
+	// AccruedStakeIncreaseTxIDs are the IDs of the txs that locked
+	// AccruedStakeIncrease. Their stake outputs are returned when the
+	// validator stops.
+	//
+	// The slice may be shared with other [StakingInfo] values, so it must be
+	// copied before being modified.
+	AccruedStakeIncreaseTxIDs []ids.ID
 }
 
 func stakingInfoFromMetadata(vdrMetadata *validatorMetadata) StakingInfo {
 	return StakingInfo{
-		DelegateeReward:          vdrMetadata.PotentialDelegateeReward,
-		AccruedValidationRewards: vdrMetadata.AccruedValidationRewards,
-		AccruedDelegateeRewards:  vdrMetadata.AccruedDelegateeRewards,
-		AutoCompoundRewardShares: vdrMetadata.AutoCompoundRewardShares,
-		NextPeriod:               vdrMetadata.NextPeriod,
+		DelegateeReward:           vdrMetadata.PotentialDelegateeReward,
+		AccruedValidationRewards:  vdrMetadata.AccruedValidationRewards,
+		AccruedDelegateeRewards:   vdrMetadata.AccruedDelegateeRewards,
+		AutoCompoundRewardShares:  vdrMetadata.AutoCompoundRewardShares,
+		NextPeriod:                vdrMetadata.NextPeriod,
+		PendingStakeIncrease:      vdrMetadata.PendingStakeIncrease,
+		AccruedStakeIncrease:      vdrMetadata.AccruedStakeIncrease,
+		PendingStakeIncreaseTxIDs: vdrMetadata.PendingStakeIncreaseTxIDs,
+		AccruedStakeIncreaseTxIDs: vdrMetadata.AccruedStakeIncreaseTxIDs,
 	}
 }
 
@@ -221,6 +267,10 @@ func (vs *validatorState) SetStakingInfo(
 	metadata.AccruedDelegateeRewards = stakingInfo.AccruedDelegateeRewards
 	metadata.AutoCompoundRewardShares = stakingInfo.AutoCompoundRewardShares
 	metadata.NextPeriod = stakingInfo.NextPeriod
+	metadata.PendingStakeIncrease = stakingInfo.PendingStakeIncrease
+	metadata.AccruedStakeIncrease = stakingInfo.AccruedStakeIncrease
+	metadata.PendingStakeIncreaseTxIDs = stakingInfo.PendingStakeIncreaseTxIDs
+	metadata.AccruedStakeIncreaseTxIDs = stakingInfo.AccruedStakeIncreaseTxIDs
 
 	vs.addUpdatedTxID(vdrID, subnetID, metadata.txID)
 	return nil
