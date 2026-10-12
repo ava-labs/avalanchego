@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethclient"
-	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
@@ -231,33 +230,14 @@ func WithSuggestedGasPrice(tc tests.TestContext, ethClient *ethclient.Client) co
 }
 
 // CheckBootstrapIsPossible verifies that a new node can bootstrap into the
-// network. It skips shared-network checks during parallel runs. If the check
-// runs, it returns the new node.
+// network. If the check runs, it returns the new node.
 func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tmpnet.Node {
-	return checkBootstrapIsPossible(tc, network, false)
-}
-
-// CheckBootstrapIsPossibleAfterParallelRun verifies that a new node can
-// bootstrap from the shared network after parallel tests complete.
-func CheckBootstrapIsPossibleAfterParallelRun(tc tests.TestContext, network *tmpnet.Network) *tmpnet.Node {
-	return checkBootstrapIsPossible(tc, network, true)
-}
-
-func checkBootstrapIsPossible(
-	tc tests.TestContext,
-	network *tmpnet.Network,
-	checkSharedNetworkDuringParallelRun bool,
-) *tmpnet.Node {
 	require := require.New(tc)
 
 	if len(os.Getenv(SkipBootstrapChecksEnvName)) > 0 {
 		tc.Log().Info("skipping bootstrap check due to env var being set",
 			zap.String("envVar", SkipBootstrapChecksEnvName),
 		)
-		return nil
-	}
-	if !checkSharedNetworkDuringParallelRun && isSharedNetworkCheckDuringParallelRun(tc, network) {
-		tc.Log().Info("skipping shared-network bootstrap check during parallel run")
 		return nil
 	}
 	tc.By("checking if bootstrap is possible with the current network state")
@@ -297,17 +277,6 @@ func checkBootstrapIsPossible(
 	}
 
 	return node
-}
-
-func isSharedNetworkCheckDuringParallelRun(tc tests.TestContext, network *tmpnet.Network) bool {
-	env := GetEnv(tc)
-	// A private network will have a different network dir than the shared network
-	if env == nil || network.Dir != env.NetworkDir {
-		return false
-	}
-
-	suiteConfig, _ := ginkgo.GinkgoConfiguration()
-	return suiteConfig.ParallelTotal > 1
 }
 
 // Start a temporary network with the provided avalanchego binary.
