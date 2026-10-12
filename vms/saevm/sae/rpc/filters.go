@@ -34,13 +34,16 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 
 	start, foundStart := api.resolve(crit.FromBlock)
 	if !foundStart {
-		// The first block read will fail. Might as well return now.
-		return []*types.Log{}, nil
+		// All special numbers resolve, so this must be a future block.
+		// This could at most fetch logs from this block (if it has been
+		// executed after the above call) until a missing block is hit.
+		// This is assumed to be within the [Config.MaxBlocksPerRequest]
+		return api.FilterAPI.GetLogs(ctx, crit)
 	}
 
 	end, foundEnd := api.resolve(crit.ToBlock)
 	if !foundEnd {
-		/// All special numbers resolve, so this must be a future block. Cap at
+		// All special numbers resolve, so this must be a future block. Cap at
 		// the last-accepted block, where libevm would stop anyway and if that
 		// block hasn't executed yet, libevm errors when reading its logs.
 		end = api.b.LastAccepted().Height()
