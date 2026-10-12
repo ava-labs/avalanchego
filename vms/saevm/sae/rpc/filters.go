@@ -50,17 +50,18 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 	}
 
 	if end < start {
-		// Invalid input will be handled by libevm. A short proof that this doesn't
-		// escape the max blocks per request limit is below.
-		// - End wasn't found (i.e. `!foundEnd`):
-		//   - If FromBlock is a special value, it is assumed to be within
-		//     [Config.MaxBlocksPerRequest]. It will read until the first unexecuted block.
-		//   - If FromBlock is not a special value, then ToBlock is a future block
-		//	   (> last accepted), since FromBlock couldn't have resolved if it wasn't yet
-		//     known. However, since `end` is clampled at last accepted, `start` must be a
-		//     future block, in which case it couldn't have been found. Contradiction.
-		// - End was found. Then it resolved to a value less than the provided start.
-		//   In all cases, this is user error, and libevm will handle accordingly.
+		// A short proof that this doesn't escape [Config.MaxBlocksPerRequest]:
+		//
+		// Assume ToBlock wasn't found (i.e. `!foundEnd`). `start` was found, otherwise we would
+		// have returned earlier. Since `end` is capped at the last accepted block, and it
+		// was determined after `start` (the last accepted block could have updated), we know
+		// `start <= end`. Thus, this `if` statement could not be hit (contradiction).
+		//
+		// Assume ToBlock was found. If ToBlock was a special number, then `start` must be
+		// at minimum the last finalized block, which we assume is within
+		// [Config.MaxBlocksPerRequest] from the last accepted block, which libevm will bound to.
+		// If ToBlock wasn't a special number, then this is user error, and will be handled
+		// by libevm.
 		return api.FilterAPI.GetLogs(ctx, crit)
 	}
 
