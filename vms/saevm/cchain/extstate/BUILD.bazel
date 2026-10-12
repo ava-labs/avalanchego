@@ -12,8 +12,8 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/extstate",
     deps = [
         "//graft/coreth/params",
-        "//vms/evm/predicate",
         "//graft/coreth/plugin/evm/customtypes",
+        "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",
@@ -25,14 +25,13 @@ go_library(
 
 go_test(
     name = "extstate_test",
-    srcs = [
-        "state_object_test.go",
-        "statedb_multicoin_test.go",
-    ],
+    srcs = ["statedb_test.go"],
     embed = [":extstate"],
     deps = [
-        "//graft/evm/core/state/snapshot",
+        "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
+        "//graft/evm/core/state/snapshot",
+        "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",
@@ -40,6 +39,7 @@ go_test(
         "@com_github_ava_labs_libevm//crypto",
         "@com_github_ava_labs_libevm//libevm/stateconf",
         "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
 )
