@@ -196,6 +196,10 @@ func (b *backendVisitor) CancelAutoRenewedValidatorStakeIncreaseTx(tx *platform.
 	return b.baseTx(&tx.BaseTx)
 }
 
+func (b *backendVisitor) DecreaseAutoRenewedValidatorStakeTx(tx *platform.DecreaseAutoRenewedValidatorStakeTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
 func (b *backendVisitor) baseTx(tx *platform.BaseTx) error {
 	return b.b.removeUTXOs(
 		b.ctx,

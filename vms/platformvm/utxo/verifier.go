@@ -542,6 +542,12 @@ func (i *inputOutputGetter) CancelAutoRenewedValidatorStakeIncreaseTx(tx *platfo
 	return nil
 }
 
+func (i *inputOutputGetter) DecreaseAutoRenewedValidatorStakeTx(tx *platform.DecreaseAutoRenewedValidatorStakeTx) error {
+	i.getUTXOs(tx.BaseTx)
+
+	return nil
+}
+
 func (i *inputOutputGetter) getUTXOs(tx platform.BaseTx) {
 	i.InputUTXOs = append(i.InputUTXOs, tx.Ins...)
 	i.OutputUTXOs = append(i.OutputUTXOs, tx.Outs...)

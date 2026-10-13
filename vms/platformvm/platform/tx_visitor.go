@@ -41,4 +41,5 @@ type TxVisitor interface {
 	// Igloo Transactions:
 	IncreaseAutoRenewedValidatorStakeTx(*IncreaseAutoRenewedValidatorStakeTx) error
 	CancelAutoRenewedValidatorStakeIncreaseTx(*CancelAutoRenewedValidatorStakeIncreaseTx) error
+	DecreaseAutoRenewedValidatorStakeTx(*DecreaseAutoRenewedValidatorStakeTx) error
 }

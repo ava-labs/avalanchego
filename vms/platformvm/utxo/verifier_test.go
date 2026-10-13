@@ -101,6 +101,19 @@ func TestGetInputOutputs(t *testing.T) {
 			wantOutputs: []*avax.TransferableOutput{baseOut, stakeOut},
 		},
 		{
+			name: "decrease_auto-renewed_validator_stake",
+			tx: &platform.DecreaseAutoRenewedValidatorStakeTx{
+				BaseTx: platform.BaseTx{
+					BaseTx: avax.BaseTx{
+						Ins:  []*avax.TransferableInput{baseIn},
+						Outs: []*avax.TransferableOutput{baseOut},
+					},
+				},
+			},
+			wantInputs:  []*avax.TransferableInput{baseIn},
+			wantOutputs: []*avax.TransferableOutput{baseOut},
+		},
+		{
 			name: "cancel_auto-renewed_validator_stake_increase",
 			tx: &platform.CancelAutoRenewedValidatorStakeIncreaseTx{
 				BaseTx: platform.BaseTx{

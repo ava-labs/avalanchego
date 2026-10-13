@@ -165,5 +165,6 @@ func registerIglooTxTypes(targetCodec linearcodec.Codec) error {
 	return errors.Join(
 		targetCodec.RegisterType(&IncreaseAutoRenewedValidatorStakeTx{}),
 		targetCodec.RegisterType(&CancelAutoRenewedValidatorStakeIncreaseTx{}),
+		targetCodec.RegisterType(&DecreaseAutoRenewedValidatorStakeTx{}),
 	)
 }

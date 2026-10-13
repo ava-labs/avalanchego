@@ -308,5 +308,17 @@ var (
 			},
 			expectedDynamicFee: 70_448 * units.NanoAvax,
 		},
+		{
+			name:                 "DecreaseAutoRenewedValidatorStakeTx",
+			tx:                   "00000000002d00003039000000000000000000000000000000000000000000000000000000000000000000000001dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db0000000700238520c676e000000000000000000000000001000000013cb7d3842e8cee6a0ebd09f1fe884f6861e1b29c00000001043c91e9d508169329034e2a68110427a311f945efc53ed3f3493d335b393fd100000000dbcf890f77f49b96857648b72b77f9f82937f28a68704af05da0dc12ba53f2db00000005002386f26fc100000000000100000000000000003d0ad12b8ee8928edf248ca91ca55600fb383f07c32bff1d6dec472b25cf59a70000000a0000000100000000000000746a528800000000020000000900000001ac644447134a0254ca5af7a4c2bac4cb03537e9f106ccb1ae6db5f1b3c8db11c766cbc369fb3b5a5715c34cab1d64ecf7a6ba94b9507bb9eb608967ebef62c24010000000900000001ac644447134a0254ca5af7a4c2bac4cb03537e9f106ccb1ae6db5f1b3c8db11c766cbc369fb3b5a5715c34cab1d64ecf7a6ba94b9507bb9eb608967ebef62c2401",
+			expectedStaticFeeErr: ErrUnsupportedTx,
+			expectedComplexity: gas.Dimensions{
+				gas.Bandwidth: 424, // The length of the tx in bytes
+				gas.DBRead:    IntrinsicDecreaseAutoRenewedValidatorStakeTxComplexities[gas.DBRead] + intrinsicInputDBRead,
+				gas.DBWrite:   IntrinsicDecreaseAutoRenewedValidatorStakeTxComplexities[gas.DBWrite] + intrinsicInputDBWrite + intrinsicOutputDBWrite,
+				gas.Compute:   2 * intrinsicSECP256k1FxSignatureCompute,
+			},
+			expectedDynamicFee: 88_424 * units.NanoAvax,
+		},
 	}
 )
