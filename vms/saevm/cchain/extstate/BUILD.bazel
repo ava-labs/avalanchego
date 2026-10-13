@@ -25,21 +25,21 @@ go_library(
 
 go_test(
     name = "extstate_test",
-    srcs = [
-        "state_object_test.go",
-        "statedb_multicoin_test.go",
-    ],
-    embed = [":extstate"],
+    srcs = ["statedb_test.go"],
     deps = [
+        ":extstate",
+        "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/evm/core/state/snapshot",
+        "//vms/evm/predicate",
+        "//vms/saevm/cchain/libevm",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//crypto",
         "@com_github_ava_labs_libevm//libevm/stateconf",
-        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
 )
