@@ -46,6 +46,7 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 | `snapshot-cache` | int | Size of the snapshot disk layer clean cache in MB. | `256` |
 | `allow-missing-tries` | bool | Suppress warnings about an incomplete trie index. | `false` |
 | `state-scheme` | string | EXPERIMENTAL: specifies the database scheme used to store state data; either `hash` or `firewood`. | `hash` |
+| `state-history` | uint64 | Number of recently executed states to guarantee available in memory. The minimum possible value is the default. | `128` |
 
 ## Transaction Pool
 

@@ -82,7 +82,8 @@ type config struct {
 	AllowMissingTries bool   `json:"allow-missing-tries"` // If enabled, checks preventing an incomplete trie index are skipped.
 	// PopulateMissingTries *uint64 `json:"populate-missing-tries,omitempty"`
 	// OfflinePruning       bool    `json:"offline-pruning-enabled"`
-	StateScheme string `json:"state-scheme"`
+	StateScheme  string `json:"state-scheme"`
+	StateHistory uint64 `json:"state-history"` // Number of recent states to guarantee. Defaults to core.TriesInMemory.
 
 	// Transaction pool
 	LocalTxsEnabled    bool   `json:"local-txs-enabled"`
@@ -225,6 +226,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			CommitInterval:    c.CommitInterval,
 			SnapshotCacheMiB:  c.SnapshotCache,
 			AllowMissingTries: c.AllowMissingTries,
+			StateHistory:      c.StateHistory,
 		},
 		RPCConfig: rpc.Config{
 			APIs:                c.APIs,

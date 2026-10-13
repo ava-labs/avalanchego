@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -36,13 +37,16 @@ var (
 
 // Config holds the configuration for creating a [TrieDB].
 type Config struct {
-	Path              string
-	Log               logging.Logger
-	CacheSizeBytes    uint
-	RevisionsInMemory uint // must be >= 2
-	Archive           bool
-	// DeferredCommitInterval must be < RevisionsInMemory as otherwise, it's
-	// possible to reap the latest persisted revision.
+	Path           string
+	Log            logging.Logger
+	CacheSizeBytes uint
+	Archive        bool
+	// StateHistory is the minimum number of recently committed states
+	// guaranteed to be available. // If not set/too low, this value will be set
+	// to [Config.DeferredCommitInterval] + 1.
+	StateHistory uint64
+	// DeferredCommitInterval is the maximum bumber of revisions that may become
+	// inaccessible on restart. This MUST be set to a non-zero value.
 	DeferredCommitInterval uint64
 	// TODO(alarso16): Should metrics match the old implementation? Do we need libevm's registration?
 }
@@ -53,7 +57,7 @@ func DefaultConfig(path string, log logging.Logger) Config {
 		Path:                   path,
 		Log:                    log,
 		CacheSizeBytes:         1024 * 1024,
-		RevisionsInMemory:      128,
+		StateHistory:           128,
 		DeferredCommitInterval: 64,
 	}
 }
@@ -77,8 +81,8 @@ func (c Config) BackendConstructor(ethdb.Database) triedb.DBOverride {
 var (
 	errNoLogger             = errors.New("Log must be provided")  //nolint:staticcheck // false positive
 	errPathNotProvided      = errors.New("Path must be provided") //nolint:staticcheck // false positive
-	errTooFewRevisions      = errors.New("RevisionsInMemory must be >= 2")
-	errCommitIntervalTooBig = errors.New("DeferredCommitInterval must be < RevisionsInMemory")
+	errStateHistoryTooBig   = fmt.Errorf("StateHistory must not exceed %d", uint64(math.MaxUint))
+	errCommitIntervalTooBig = fmt.Errorf("DeferredCommitInterval must not exceed %d", uint64(math.MaxUint-1))
 )
 
 func (c Config) validate() error {
@@ -87,10 +91,10 @@ func (c Config) validate() error {
 		return errNoLogger
 	case c.Path == "":
 		return errPathNotProvided
-	case c.RevisionsInMemory < 2:
-		return fmt.Errorf("%w: got %d", errTooFewRevisions, c.RevisionsInMemory)
-	case c.DeferredCommitInterval >= uint64(c.RevisionsInMemory):
-		return fmt.Errorf("%w: %d >= %d", errCommitIntervalTooBig, c.DeferredCommitInterval, c.RevisionsInMemory)
+	case c.StateHistory > math.MaxUint:
+		return fmt.Errorf("%w: got %d", errStateHistoryTooBig, c.StateHistory)
+	case c.DeferredCommitInterval >= math.MaxUint:
+		return fmt.Errorf("%w: got %d", errCommitIntervalTooBig, c.DeferredCommitInterval)
 	default:
 		return nil
 	}
@@ -126,10 +130,21 @@ func New(config Config) (*TrieDB, error) {
 		return nil, err
 	}
 
+	// Firewood requires > DeferredPersistenceCommitCount
+	revInMemory := config.StateHistory
+	if revInMemory <= config.DeferredCommitInterval {
+		revInMemory = config.DeferredCommitInterval + 1
+		config.Log.Info("updating provided RevisionsInMemory to be greater than DeferredCommitInterval",
+			zap.Uint64("provided", config.StateHistory),
+			zap.Uint64("deferred_commit_interval", config.DeferredCommitInterval),
+			zap.Uint64("updated", revInMemory),
+		)
+	}
+
 	options := []ffi.Option{
 		ffi.WithReadCacheStrategy(ffi.CacheAllReads), // Based on benchmarking, highest cache hit rate
 		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
-		ffi.WithRevisions(config.RevisionsInMemory),
+		ffi.WithRevisions(uint(revInMemory)), // #nosec G115 -- checked in [Config.validate]
 		ffi.WithDeferredPersistenceCommitCount(config.DeferredCommitInterval),
 		ffi.WithExpensiveMetrics(),
 	}
