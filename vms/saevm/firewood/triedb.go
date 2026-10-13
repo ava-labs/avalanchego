@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -36,13 +37,11 @@ var (
 
 // Config holds the configuration for creating a [TrieDB].
 type Config struct {
-	Path              string
-	Log               logging.Logger
-	CacheSizeBytes    uint
-	RevisionsInMemory uint // must be >= 2
-	Archive           bool
-	// DeferredCommitInterval must be < RevisionsInMemory as otherwise, it's
-	// possible to reap the latest persisted revision.
+	Path                   string
+	Log                    logging.Logger
+	CacheSizeBytes         uint
+	RevisionsInMemory      uint64 // Defaults to [Config.DeferredCommitInterval] + 1
+	Archive                bool
 	DeferredCommitInterval uint64
 	// TODO(alarso16): Should metrics match the old implementation? Do we need libevm's registration?
 }
@@ -75,10 +74,10 @@ func (c Config) BackendConstructor(ethdb.Database) triedb.DBOverride {
 }
 
 var (
-	errNoLogger             = errors.New("Log must be provided")  //nolint:staticcheck // false positive
-	errPathNotProvided      = errors.New("Path must be provided") //nolint:staticcheck // false positive
-	errTooFewRevisions      = errors.New("RevisionsInMemory must be >= 2")
-	errCommitIntervalTooBig = errors.New("DeferredCommitInterval must be < RevisionsInMemory")
+	errNoLogger                 = errors.New("Log must be provided")  //nolint:staticcheck // false positive
+	errPathNotProvided          = errors.New("Path must be provided") //nolint:staticcheck // false positive
+	errInvalidRevisionsInMemory = errors.New("RevisionsInMemory must be a uint >= 2")
+	errCommitIntervalTooBig     = errors.New("DeferredCommitInterval plus one overflows uint")
 )
 
 func (c Config) validate() error {
@@ -87,10 +86,10 @@ func (c Config) validate() error {
 		return errNoLogger
 	case c.Path == "":
 		return errPathNotProvided
-	case c.RevisionsInMemory < 2:
-		return fmt.Errorf("%w: got %d", errTooFewRevisions, c.RevisionsInMemory)
-	case c.DeferredCommitInterval >= uint64(c.RevisionsInMemory):
-		return fmt.Errorf("%w: %d >= %d", errCommitIntervalTooBig, c.DeferredCommitInterval, c.RevisionsInMemory)
+	case c.RevisionsInMemory > math.MaxUint:
+		return fmt.Errorf("%w: got %d", errInvalidRevisionsInMemory, c.RevisionsInMemory)
+	case c.DeferredCommitInterval >= math.MaxUint:
+		return fmt.Errorf("%w: got %d", errCommitIntervalTooBig, c.DeferredCommitInterval)
 	default:
 		return nil
 	}
@@ -126,10 +125,12 @@ func New(config Config) (*TrieDB, error) {
 		return nil, err
 	}
 
+	// MUST be > DeferredPersistenceCommitCount
+	revInMemory := max(config.RevisionsInMemory, config.DeferredCommitInterval+1)
 	options := []ffi.Option{
 		ffi.WithReadCacheStrategy(ffi.CacheAllReads), // Based on benchmarking, highest cache hit rate
 		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
-		ffi.WithRevisions(config.RevisionsInMemory),
+		ffi.WithRevisions(uint(revInMemory)), // #nosec G115 -- checked in [Config.validate]
 		ffi.WithDeferredPersistenceCommitCount(config.DeferredCommitInterval),
 		ffi.WithExpensiveMetrics(),
 	}

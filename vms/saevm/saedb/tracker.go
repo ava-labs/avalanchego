@@ -65,6 +65,7 @@ type Config struct {
 	Archival          bool   // if true, state will be persisted regularly for RPC support
 	CommitInterval    uint64 // MUST be set to a non-zero value
 	AllowMissingTries bool   // allow switching from archival to pruning on a DB that ran archival
+	StateHistory      uint64 // Number of recent states to guarantee. Minimum of [core.TriesInMemory].
 
 	// only configurable for tests
 	maxCapBytes       common.StorageSize
@@ -111,7 +112,7 @@ func (c Config) TrieDBConfig(dataDir string, log logging.Logger) *triedb.Config 
 			DBOverride: firewood.Config{
 				Path:                   filepath.Join(dataDir, graftfw.Directory),
 				CacheSizeBytes:         uint(c.TrieCacheMiB) * mibToBytes,
-				RevisionsInMemory:      uint(2 * c.CommitInterval),
+				RevisionsInMemory:      c.stateHistory(),
 				DeferredCommitInterval: c.CommitInterval,
 				Archive:                c.Archival,
 				Log:                    log,
@@ -130,6 +131,10 @@ func (c Config) TrieDBConfig(dataDir string, log logging.Logger) *triedb.Config 
 		)
 		return nil
 	}
+}
+
+func (c Config) stateHistory() uint64 {
+	return max(core.TriesInMemory, c.StateHistory)
 }
 
 func (c Config) snapConfig() *snapshot.Config {
@@ -174,8 +179,8 @@ type Tracker struct {
 
 	// recent is a ring of the post-execution roots of the most recently
 	// executed blocks, each holding a reference that keeps its trie in memory
-	// for the snapshot generator. Unused when the snapshot is disabled.
-	recent     [core.TriesInMemory]common.Hash
+	// for the snapshot generator. Of length returned by [Config.stateHistory].
+	recent     []common.Hash
 	recentNext int
 
 	config Config
@@ -207,6 +212,7 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir s
 		cache:  cache,
 		config: c,
 		log:    log,
+		recent: make([]common.Hash, c.stateHistory()),
 	}, nil
 }
 
@@ -291,11 +297,8 @@ func (t *Tracker) BlockExecuted(settledRoot, executionRoot common.Hash, height u
 // retain holds a reference to `root` until [core.TriesInMemory] later roots
 // have been retained. This is necessary because snapshot generation resumes at
 // the root of its disk layer, which is never more than [core.TriesInMemory]
-// blocks behind. If [Tracker.snaps] is nil then retain is a no-op.
+// blocks behind.
 func (t *Tracker) retain(root common.Hash) {
-	if t.snaps == nil {
-		return
-	}
 	t.Track(root)
 	if toEvict := t.recent[t.recentNext]; toEvict != (common.Hash{}) {
 		t.Untrack(toEvict)
