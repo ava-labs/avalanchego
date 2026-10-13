@@ -673,8 +673,7 @@ platform.getCurrentValidators({
       be treated as a new validator.
   - `restakedValidationRewards` and `restakedDelegateeRewards` are returned only for auto-renewed
     validators. They are the rewards, in nAVAX, restaked into `weight` over all completed cycles.
-    `weight` is the stake in the `AddAutoRenewedValidatorTx` plus both values. A node on v1.15.1 or
-    earlier omits them, so a missing value does not mean that no rewards were restaked.
+    `weight` is the stake in the `AddAutoRenewedValidatorTx` plus both values.
     - `restakedValidationRewards` is the restaked part of the rewards earned from staking.
     - `restakedDelegateeRewards` is the restaked part of the rewards earned from delegations.
   - `delegatorCount` is the number of delegators on this validator.
