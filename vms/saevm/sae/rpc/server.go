@@ -277,6 +277,7 @@ func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 
 	s := rpc.NewServer()
 	s.SetBatchLimits(int(b.config.BatchRequestLimit), batchResponseMaxSize) // #nosec G115 -- [Config.Verify], bounds-checks against math.MaxInt
+	s.SetCallTimeout(b.config.CallTimeout)
 	for _, svc := range apiServices {
 		if !b.config.APIs.Contains(svc.name) {
 			continue

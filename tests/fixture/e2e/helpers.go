@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
@@ -224,7 +225,8 @@ func SuggestGasPrice(tc tests.TestContext, ethClient *ethclient.Client) *big.Int
 // Helper simplifying use via an option of a gas price appropriate for testing.
 func WithSuggestedGasPrice(tc tests.TestContext, ethClient *ethclient.Client) common.Option {
 	baseFee := SuggestGasPrice(tc, ethClient)
-	return common.WithBaseFee(baseFee)
+	require.Truef(tc, baseFee.IsUint64(), "suggested gas price %s overflows uint64", baseFee)
+	return common.WithBaseFee(gas.Price(baseFee.Uint64()))
 }
 
 // Verify that a new node can bootstrap into the network. If the check wasn't skipped,

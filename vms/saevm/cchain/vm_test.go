@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
-	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/google/go-cmp/cmp"
@@ -39,7 +38,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -55,10 +53,13 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
@@ -71,16 +72,14 @@ import (
 
 	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethereum "github.com/ava-labs/libevm"
 	ethparams "github.com/ava-labs/libevm/params"
-	ethrpc "github.com/ava-labs/libevm/rpc"
 )
 
 func TestMain(m *testing.M) {
-	evm.RegisterAllLibEVMExtras()
+	libevm.RegisterExtras()
 	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
 
@@ -91,7 +90,7 @@ var _ saetest.Peer = (*SUT)(nil)
 type SUT struct {
 	*VM
 	*Client
-	ethclient  *ethclient.Client
+	ethclient  *evmclient.Client
 	clientOnce func()
 
 	ctx            *snow.Context
@@ -427,15 +426,13 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 		}
 		server := httptest.NewServer(mux)
 		tb.Cleanup(server.Close)
+		sut.Client = NewClient(server.URL)
 
 		const wsHTTPPath = cchainHTTPPrefix + "/ws"
 		wsURI := "ws://" + server.Listener.Addr().String() + wsHTTPPath
-		ethRPCClient, err := ethrpc.Dial(wsURI)
-		require.NoErrorf(tb, err, "rpc.Dial(%s)", wsURI)
-		tb.Cleanup(ethRPCClient.Close)
-
-		sut.Client = NewClient(server.URL)
-		sut.ethclient = ethclient.NewClient(ethRPCClient)
+		sut.ethclient, err = evmclient.Dial(ctx, wsURI)
+		require.NoErrorf(tb, err, "client.Dial(ctx, %s)", wsURI)
+		tb.Cleanup(sut.ethclient.Close)
 	})
 
 	if cfg.state == snow.NormalOp {
@@ -1300,7 +1297,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 
 	contract := common.Address{'c', 'o', 'd', 'e'}
 	code := saetest.LogTopOfStackAfter(
-		saetest.Push(t, evmconstants.BlackholeAddr[:]),
+		saetest.Push(t, blackhole.Address[:]),
 		saetest.Ops(vm.BALANCE),
 	)
 	ctx, sut := newSUT(t,
@@ -1321,7 +1318,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 	}
 	sut.waitForPendingEthTxs(ctx, t, txs...)
 
-	preBurn := sut.balance(t, evmconstants.BlackholeAddr)
+	preBurn := sut.balance(t, blackhole.Address)
 	blk := sut.runConsensusLoop(ctx, t)
 	require.Zerof(t, big.NewInt(1).Cmp(blk.EthBlock().BaseFee()), "%T base fee", blk)
 	receipts := blk.Receipts()
@@ -1334,7 +1331,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 		require.Equalf(t, common.Hash(want.Bytes32()), got, "BALANCE(blackhole) observed by transaction %d", i)
 		want.AddUint64(&want, feePerGas*r.GasUsed)
 	}
-	assert.Equal(t, want, sut.balance(t, evmconstants.BlackholeAddr), "blackhole balance after the block")
+	assert.Equal(t, want, sut.balance(t, blackhole.Address), "blackhole balance after the block")
 }
 
 // TestParseBlock verifies that ParseBlock accepts well-formed blocks and

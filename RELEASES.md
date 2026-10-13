@@ -4,6 +4,10 @@
 
 This release updates the plugin version to `47`. All plugins must update to remain compatible.
 
+### Features
+
+- Added `vms/evm/evmclient`, which combines standard Ethereum, Geth-specific, raw RPC, and Avalanche-specific EVM methods.
+
 ### APIs
 
 - The `avax.getAtomicTxStatus` C-Chain RPC, deprecated in v1.15.0, is removed. Use `avax.getAtomicTx`, which fails for a tx that has not been accepted.
@@ -15,6 +19,10 @@ This release updates the plugin version to `47`. All plugins must update to rema
 ### Metrics
 
 - Added `avalanche_evm_transition_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
+
+### Fixes
+
+- Fixed C-Chain `api-max-duration` only limiting `eth_call` since Helicon. It again limits every call to the `/rpc` and `/ws` endpoints, and a WebSocket call that times out doesn't close its connection.
 
 ## [v1.15.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.1)
 
