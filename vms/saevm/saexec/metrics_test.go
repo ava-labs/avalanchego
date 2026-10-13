@@ -95,6 +95,7 @@ func TestRollingGasThroughput(t *testing.T) {
 		n   uint64
 		sum float64
 	)
+	const tolerance = 1e-9
 	for _, s := range steps {
 		t.Run(s.name, func(t *testing.T) {
 			sut.observe(s.span)
@@ -106,11 +107,11 @@ func TestRollingGasThroughput(t *testing.T) {
 
 				n, sum = n+1, sum+s.wantHeadroom
 				assert.Equal(t, n, got.GetSampleCount(), "sample count")
-				assert.InDelta(t, sum, got.GetSampleSum(), 1e-9, "sample sum")
+				assert.InDelta(t, sum, got.GetSampleSum(), tolerance, "sample sum")
 			})
 
-			assert.InDelta(t, s.wantHeadroom, testutil.ToFloat64(sut.latestHeadroom), 1e-9, "latest headroom")
-			assert.InDelta(t, s.wantGasPerSecond, testutil.ToFloat64(sut.gasPerSecond), 1e-3, "gas per second")
+			assert.InDelta(t, s.wantHeadroom, testutil.ToFloat64(sut.latestHeadroom), tolerance, "latest headroom")
+			assert.InDelta(t, s.wantGasPerSecond, testutil.ToFloat64(sut.gasPerSecond), tolerance, "gas per second")
 		})
 		if t.Failed() {
 			t.Skip("steps are not independent")
