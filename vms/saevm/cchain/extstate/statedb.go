@@ -33,7 +33,7 @@ func RegisterExtras() {
 // equivalent to a call to [RegisterExtras], but limited to the life of `fn`.
 //
 // This function is not intended for direct use. Use
-// `evm.WithTempRegisteredLibEVMExtras()` instead as it calls this along with
+// `libevm.WithTempRegisteredExtras()` instead as it calls this along with
 // all other temporary-registration functions.
 func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
 	return state.WithTempRegisteredExtras(lock, normalizeStateKeysHook{}, fn)
@@ -47,6 +47,9 @@ func (normalizeStateKeysHook) TransformStateKey(_ common.Address, key common.Has
 	return key
 }
 
+// TODO(JonathanOppenheimer): [StateDB], [New], [StateDB.Prepare], and
+// [StateDB.GetPredicate] are identical to Subnet-EVM's `core/extstate`.
+// Eventually we should share them.
 type StateDB struct {
 	*state.StateDB
 
