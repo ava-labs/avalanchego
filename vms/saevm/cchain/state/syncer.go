@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/tracking"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 )
 
@@ -42,7 +43,7 @@ func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Ha
 	return &Syncer{
 		fetcher: hashdb.NewClient(
 			state.snowCtx.Log,
-			n.NewTrackingClient(p2p.EVMAtomicLeafRequestHandlerID, pt),
+			tracking.NewClient(n, p2p.EVMAtomicLeafRequestHandlerID, pt),
 			keyLength,
 		),
 		targetRoot:   root,

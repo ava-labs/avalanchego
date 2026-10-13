@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/tracking"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
@@ -28,12 +28,12 @@ func ServeResponder[V any, Req handlers.ProtoMessage[V], Resp proto.Message](
 	log logging.Logger,
 	handlerID uint64,
 	r handlers.Responder[Req, Resp],
-) *p2p.TrackingClient {
+) *tracking.Client {
 	t.Helper()
 
 	net, tracker := NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
 	require.NoError(t, net.AddHandler(handlerID, handlers.NewHandler(log, r)))
-	return net.NewTrackingClient(handlerID, tracker)
+	return tracking.NewClient(net, handlerID, tracker)
 }
 
 // RecordingResponder records every request reaching inner.

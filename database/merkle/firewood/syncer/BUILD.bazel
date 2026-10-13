@@ -14,7 +14,7 @@ go_library(
     deps = [
         "//database/merkle/sync",
         "//ids",
-        "//network/p2p",
+        "//network/p2p/tracking",
         "//utils/logging",
         "//utils/maybe",
         "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",

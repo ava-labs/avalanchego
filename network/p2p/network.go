@@ -129,18 +129,6 @@ func (n *Network) NewClient(handlerID uint64, nodeSampler NodeSampler) *Client {
 	return n.newClient(handlerID, nodeSampler)
 }
 
-// NewTrackingClient returns a client that selects peers with pt and scores
-// every request it issues against pt.
-func (n *Network) NewTrackingClient(handlerID uint64, pt *PeerTracker) *TrackingClient {
-	// No nodeSampler, since TrackingClient selects with pt and never routes
-	// through Client.AppRequestAny.
-	return &TrackingClient{
-		handlerID: handlerID,
-		client:    n.newClient(handlerID, nil),
-		peers:     pt,
-	}
-}
-
 func (n *Network) newClient(handlerID uint64, nodeSampler NodeSampler) *Client {
 	return &Client{
 		handlerIDStr:  strconv.FormatUint(handlerID, 10),

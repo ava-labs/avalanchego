@@ -1,67 +1,86 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package p2p
+package tracking
 
 import (
 	"context"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // Added to a response's elapsed time to avoid dividing by zero.
 const bandwidthEpsilon = 1e-6
 
-// AppResponseVerifier is called upon receiving an AppResponse for an AppRequest
-// issued by [TrackingClient]. Callers should check [err] to see whether the
+// ResponseVerifier is called upon receiving an AppResponse for an AppRequest
+// issued by [Client]. Callers should check [err] to see whether the
 // AppRequest failed or not.
 //
 // The return scores the peer and nothing else, so report false only when the
 // peer is at fault. A failure of our own still counts as served.
-type AppResponseVerifier func(
+type ResponseVerifier func(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	responseBytes []byte,
 	err error,
 ) bool
 
-// TrackingClient issues requests through a [Client] and scores each one
-// against its [PeerTracker].
-type TrackingClient struct {
+// PeerScorer selects peers to request from and records how well they served.
+type PeerScorer interface {
+	SelectPeer() (ids.NodeID, bool)
+	RegisterRequest(nodeID ids.NodeID)
+	RegisterResponse(nodeID ids.NodeID, bandwidth float64)
+	RegisterFailure(nodeID ids.NodeID)
+}
+
+func NewClient(n *p2p.Network, handlerID uint64, scorer PeerScorer) *Client {
+	// No NodeSampler, since Client selects with scorer and never routes through
+	// [p2p.Client.AppRequestAny].
+	return &Client{
+		handlerID: handlerID,
+		client:    n.NewClient(handlerID, nil),
+		scorer:    scorer,
+	}
+}
+
+// Client issues requests through a [p2p.Client] and scores each one against
+// its [PeerScorer].
+type Client struct {
 	handlerID uint64
-	client    *Client
-	peers     *PeerTracker
+	client    *p2p.Client
+	scorer    PeerScorer
 }
 
 // HandlerID returns the ID of the protocol this client sends requests to.
-func (c *TrackingClient) HandlerID() uint64 {
+func (c *Client) HandlerID() uint64 {
 	return c.handlerID
 }
 
-// AppRequestAny issues an AppRequest to the peer the [PeerTracker] selects.
-// See [Client.AppRequestAny] for more docs.
-func (c *TrackingClient) AppRequestAny(
+// AppRequestAny issues an AppRequest to the peer the [PeerScorer] selects.
+// See [p2p.Client.AppRequestAny] for more docs.
+func (c *Client) AppRequestAny(
 	ctx context.Context,
 	appRequestBytes []byte,
-	onResponse AppResponseVerifier,
+	onResponse ResponseVerifier,
 ) error {
-	nodeID, ok := c.peers.SelectPeer()
+	nodeID, ok := c.scorer.SelectPeer()
 	if !ok {
-		return ErrNoPeers
+		return p2p.ErrNoPeers
 	}
 
 	return c.AppRequest(ctx, set.Of(nodeID), appRequestBytes, onResponse)
 }
 
 // AppRequest issues a request to each node in nodeIDs, scoring every one.
-// See [Client.AppRequest] for more docs.
-func (c *TrackingClient) AppRequest(
+// See [p2p.Client.AppRequest] for more docs.
+func (c *Client) AppRequest(
 	ctx context.Context,
 	nodeIDs set.Set[ids.NodeID],
 	appRequestBytes []byte,
-	onResponse AppResponseVerifier,
+	onResponse ResponseVerifier,
 ) error {
 	for nodeID := range nodeIDs {
 		if err := c.request(ctx, nodeID, appRequestBytes, onResponse); err != nil {
@@ -74,13 +93,13 @@ func (c *TrackingClient) AppRequest(
 
 // request registers a request to nodeID, sends it, and scores the outcome. The
 // engine answers every request it sends, with a timeout failure if nothing else.
-func (c *TrackingClient) request(
+func (c *Client) request(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	appRequestBytes []byte,
-	onResponse AppResponseVerifier,
+	onResponse ResponseVerifier,
 ) error {
-	c.peers.RegisterRequest(nodeID)
+	c.scorer.RegisterRequest(nodeID)
 	start := time.Now()
 
 	// Scoring always uses nodeID, the node we asked. The chain router keys a
@@ -99,17 +118,17 @@ func (c *TrackingClient) request(
 		// short-circuit that skips it hangs them.
 		ok := onResponse(respCtx, respNodeID, responseBytes, appErr)
 		if appErr != nil || !ok {
-			c.peers.RegisterFailure(nodeID)
+			c.scorer.RegisterFailure(nodeID)
 			return
 		}
 
 		bandwidth := float64(len(responseBytes)) / (elapsed.Seconds() + bandwidthEpsilon)
-		c.peers.RegisterResponse(nodeID, bandwidth)
+		c.scorer.RegisterResponse(nodeID, bandwidth)
 	}
 
 	if err := c.client.AppRequest(ctx, set.Of(nodeID), appRequestBytes, score); err != nil {
 		// The request never left the node, so balance the registration above.
-		c.peers.RegisterFailure(nodeID)
+		c.scorer.RegisterFailure(nodeID)
 		return err
 	}
 

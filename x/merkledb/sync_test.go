@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -18,8 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/database/merkle/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/network/p2p/tracking"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
@@ -28,6 +29,58 @@ var (
 	rangeProofMarshaler  = RangeProofMarshaler{}
 	changeProofMarshaler = ChangeProofMarshaler{}
 )
+
+type (
+	// sut is the syncer under test, always over the merkledb proof types.
+	sut = sync.Syncer[*RangeProof, *ChangeProof]
+
+	sutConfig struct {
+		targetRoot ids.ID
+	}
+	sutOption = options.Option[sutConfig]
+)
+
+// withTarget syncs to root rather than the zero root.
+func withTarget(root ids.ID) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.targetRoot = root
+	})
+}
+
+// selfClient returns a client that serves db's own proofs back to the caller.
+func selfClient(t *testing.T, ctx context.Context, db MerkleDB) *tracking.Client {
+	t.Helper()
+
+	return p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, db))
+}
+
+// newSUT returns a syncer that fills db through client.
+func newSUT(
+	t *testing.T,
+	db sync.DB[*RangeProof, *ChangeProof],
+	client *tracking.Client,
+	opts ...sutOption,
+) *sut {
+	t.Helper()
+
+	cfg := options.ApplyTo(&sutConfig{}, opts...)
+
+	syncer, err := sync.NewSyncer(
+		db,
+		sync.Config[*RangeProof, *ChangeProof]{
+			RangeProofMarshaler:   rangeProofMarshaler,
+			ChangeProofMarshaler:  changeProofMarshaler,
+			ProofClient:           client,
+			TargetRoot:            cfg.targetRoot,
+			SimultaneousWorkLimit: 5,
+			Log:                   logging.NoLog{},
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, syncer)
+	return syncer
+}
 
 func Test_Creation(t *testing.T) {
 	require := require.New(t)
@@ -40,19 +93,7 @@ func Test_Creation(t *testing.T) {
 	require.NoError(err)
 
 	ctx := t.Context()
-	syncer, err := sync.NewSyncer(
-		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, db)),
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
-	require.NotNil(syncer)
+	syncer := newSUT(t, db, selfClient(t, ctx, db))
 	require.NoError(syncer.Sync(t.Context()))
 }
 
@@ -68,11 +109,11 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 	tests := []struct {
 		name        string
 		db          MerkleDB
-		proofClient func(db MerkleDB) *p2p.TrackingClient
+		proofClient func(db MerkleDB) *tracking.Client
 	}{
 		{
 			name: "range proof bad response - too many leaves in response",
-			proofClient: func(db MerkleDB) *p2p.TrackingClient {
+			proofClient: func(db MerkleDB) *tracking.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.KeyChanges = append(response.KeyChanges, KeyChange{})
 				})
@@ -82,7 +123,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "range proof bad response - removed first key in response",
-			proofClient: func(db MerkleDB) *p2p.TrackingClient {
+			proofClient: func(db MerkleDB) *tracking.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
@@ -92,7 +133,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "range proof bad response - removed first key in response and replaced proof",
-			proofClient: func(db MerkleDB) *p2p.TrackingClient {
+			proofClient: func(db MerkleDB) *tracking.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 					response.KeyChanges = []KeyChange{
@@ -118,7 +159,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "range proof bad response - removed key from middle of response",
-			proofClient: func(db MerkleDB) *p2p.TrackingClient {
+			proofClient: func(db MerkleDB) *tracking.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					i := rand.Intn(max(1, len(response.KeyChanges)-1))
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
@@ -129,7 +170,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "range proof bad response - start and end proof nodes removed",
-			proofClient: func(db MerkleDB) *p2p.TrackingClient {
+			proofClient: func(db MerkleDB) *tracking.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
@@ -140,7 +181,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "range proof bad response - end proof removed",
-			proofClient: func(db MerkleDB) *p2p.TrackingClient {
+			proofClient: func(db MerkleDB) *tracking.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.EndProof = nil
 				})
@@ -150,7 +191,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "range proof bad response - empty proof",
-			proofClient: func(db MerkleDB) *p2p.TrackingClient {
+			proofClient: func(db MerkleDB) *tracking.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
@@ -162,7 +203,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "range proof server flake",
-			proofClient: func(db MerkleDB) *p2p.TrackingClient {
+			proofClient: func(db MerkleDB) *tracking.Client {
 				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
 					Handler: newTestProofHandler(t, db),
 					c:       &counter{m: 2},
@@ -171,7 +212,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "change proof bad response - too many keys in response",
-			proofClient: func(db MerkleDB) *p2p.TrackingClient {
+			proofClient: func(db MerkleDB) *tracking.Client {
 				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
 					response.KeyChanges = append(response.KeyChanges, make([]KeyChange, sync.DefaultRequestKeyLimit)...)
 				})
@@ -181,7 +222,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "change proof bad response - removed first key in response",
-			proofClient: func(db MerkleDB) *p2p.TrackingClient {
+			proofClient: func(db MerkleDB) *tracking.Client {
 				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
@@ -191,7 +232,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "change proof bad response - removed key from middle of response",
-			proofClient: func(db MerkleDB) *p2p.TrackingClient {
+			proofClient: func(db MerkleDB) *tracking.Client {
 				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
 					i := rand.Intn(max(1, len(response.KeyChanges)-1))
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
@@ -202,7 +243,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "change proof bad response - all proof keys removed from response",
-			proofClient: func(db MerkleDB) *p2p.TrackingClient {
+			proofClient: func(db MerkleDB) *tracking.Client {
 				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
@@ -213,7 +254,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "change proof flaky server",
-			proofClient: func(db MerkleDB) *p2p.TrackingClient {
+			proofClient: func(db MerkleDB) *tracking.Client {
 				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
 					Handler: newTestProofHandler(t, db),
 					c:       &counter{m: 2},
@@ -245,21 +286,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 				proofClient = tt.proofClient(dbToSync)
 			}
 
-			syncer, err := sync.NewSyncer(
-				db,
-				sync.Config[*RangeProof, *ChangeProof]{
-					RangeProofMarshaler:   rangeProofMarshaler,
-					ChangeProofMarshaler:  changeProofMarshaler,
-					ProofClient:           proofClient,
-					TargetRoot:            syncRoot,
-					SimultaneousWorkLimit: 5,
-					Log:                   logging.NoLog{},
-				},
-				prometheus.NewRegistry(),
-			)
-
-			require.NoError(err)
-			require.NotNil(syncer)
+			syncer := newSUT(t, db, proofClient, withTarget(syncRoot))
 
 			// Start syncing from the server
 			var eg errgroup.Group
@@ -324,20 +351,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	syncer, err := sync.NewSyncer(
-		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, dbToSync)),
-			TargetRoot:            syncRoot,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
-	require.NotNil(syncer)
+	syncer := newSUT(t, db, selfClient(t, ctx, dbToSync), withTarget(syncRoot))
 
 	// Start syncing from the server, will be cancelled by the range proof handler
 	var eg errgroup.Group
@@ -353,20 +367,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.ErrorIsf(eg.Wait(), context.Canceled, "%T.Sync()", syncer)
 
 	ctx = t.Context()
-	newSyncer, err := sync.NewSyncer(
-		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, dbToSync)),
-			TargetRoot:            syncRoot,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
-	require.NotNil(newSyncer)
+	newSyncer := newSUT(t, db, selfClient(t, ctx, dbToSync), withTarget(syncRoot))
 
 	require.NoError(newSyncer.Sync(ctx))
 
@@ -435,20 +436,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		}
 	}, 1)
 
-	syncer, err = sync.NewSyncer(
-		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, actionHandler),
-			TargetRoot:            firstSyncRoot,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
-	require.NotNil(syncer)
+	syncer = newSUT(t, db, p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, actionHandler), withTarget(firstSyncRoot))
 
 	require.NoError(syncer.Sync(ctx))
 
@@ -491,19 +479,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 			cancel(err)
 		}
 	}, 0)
-	syncer, err = sync.NewSyncer(
-		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, actionHandler),
-			TargetRoot:            root1,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
+	syncer = newSUT(t, db, p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, actionHandler), withTarget(root1))
 
 	require.NoError(syncer.Sync(ctx))
 }

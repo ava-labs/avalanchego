@@ -11,6 +11,7 @@ import (
 	"testing/synctest"
 	"time"
 
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/network/p2p/tracking"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
@@ -134,6 +136,59 @@ func marshalNilProofResponse(t *testing.T, _ *proofDouble) []byte {
 	return b
 }
 
+type (
+	// sut is the syncer under test, always over the proof doubles.
+	sut = Syncer[*proofDouble, *proofDouble]
+
+	sutConfig struct {
+		db *db
+	}
+	sutOption = options.Option[sutConfig]
+)
+
+// withDB syncs into d rather than an empty database.
+func withDB(d *db) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.db = d
+	})
+}
+
+// selfClient returns a client that routes back to handler.
+func selfClient(t *testing.T, ctx context.Context, handler p2p.Handler) *tracking.Client {
+	t.Helper()
+
+	return p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, handler)
+}
+
+// newSUT returns a syncer targeting targetRoot that fetches through client.
+func newSUT(
+	t *testing.T,
+	targetRoot ids.ID,
+	client *tracking.Client,
+	opts ...sutOption,
+) *sut {
+	t.Helper()
+
+	cfg := options.ApplyTo(&sutConfig{db: &db{id: ids.Empty}}, opts...)
+
+	syncer, err := NewSyncer(
+		cfg.db,
+		Config[*proofDouble, *proofDouble]{
+			TargetRoot:           targetRoot,
+			RangeProofMarshaler:  marshaler{},
+			ChangeProofMarshaler: marshaler{},
+			ProofClient:          client,
+			// Several cases end the sync by cancellation, which the syncer
+			// logs at Error.
+			Log:                   logging.NoLog{},
+			SimultaneousWorkLimit: 1,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+	return syncer
+}
+
 func Test_Sync_RangeProofRequest(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -182,19 +237,7 @@ func Test_Sync_RangeProofRequest(t *testing.T) {
 				},
 			}
 
-			syncer, err := NewSyncer(
-				clientDB,
-				Config[*proofDouble, *proofDouble]{
-					TargetRoot:            targetRoot,
-					RangeProofMarshaler:   marshaler{},
-					ChangeProofMarshaler:  marshaler{},
-					ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, handler),
-					Log:                   logging.NoLog{},
-					SimultaneousWorkLimit: 1,
-				},
-				prometheus.NewRegistry(),
-			)
-			require.NoError(t, err)
+			syncer := newSUT(t, targetRoot, selfClient(t, ctx, handler), withDB(clientDB))
 			require.NoErrorf(t, syncer.Sync(ctx), "%T.Sync()", syncer)
 			require.Equal(t, tt.expectRetried, retried, "retry behavior mismatch")
 		})
@@ -261,20 +304,7 @@ func Test_Sync_ChangeProofRequest(t *testing.T) {
 				},
 			}
 
-			var err error
-			syncer, err = NewSyncer(
-				clientDB,
-				Config[*proofDouble, *proofDouble]{
-					TargetRoot:            originalTarget,
-					RangeProofMarshaler:   marshaler{},
-					ChangeProofMarshaler:  marshaler{},
-					ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, handler),
-					Log:                   logging.NoLog{},
-					SimultaneousWorkLimit: 1,
-				},
-				prometheus.NewRegistry(),
-			)
-			require.NoError(t, err)
+			syncer = newSUT(t, originalTarget, selfClient(t, ctx, handler), withDB(clientDB))
 
 			require.NoErrorf(t, syncer.Sync(ctx), "%T.Sync()", syncer)
 			require.Equal(t, tt.expectRetried, retried, "unexpected retry of failed change proof request")
@@ -301,21 +331,10 @@ func Test_Sync_BusyContextCancellation(t *testing.T) {
 		},
 	}
 
-	syncer, err := NewSyncer(
-		clientDB,
-		Config[*proofDouble, *proofDouble]{
-			TargetRoot:            ids.GenerateTestID(), // must be different from clientDB's root and [ids.Empty]
-			RangeProofMarshaler:   marshaler{},
-			ChangeProofMarshaler:  marshaler{},
-			ProofClient:           p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, blockingHandler),
-			Log:                   logging.NoLog{},
-			SimultaneousWorkLimit: 1, // ensures synchronous event handling
-		},
-		prometheus.NewRegistry(),
-	)
-	require.NoError(t, err)
+	// The target must differ from clientDB's root and from [ids.Empty].
+	syncer := newSUT(t, ids.GenerateTestID(), selfClient(t, ctx, blockingHandler), withDB(clientDB))
 
-	err = syncer.Sync(ctx)
+	err := syncer.Sync(ctx)
 	require.ErrorIs(t, err, context.Canceled)
 }
 
@@ -438,20 +457,7 @@ func TestSyncerShutdownDoesNotDescorePeer(t *testing.T) {
 				tracker := p2ptest.NewTracker(t)
 				client := p2ptest.NewSelfTrackingClientWithTracker(t, ctx, nodeID, handler, tracker)
 
-				var err error
-				syncer, err = NewSyncer(
-					&db{id: ids.Empty},
-					Config[*proofDouble, *proofDouble]{
-						TargetRoot:            targetRoot,
-						RangeProofMarshaler:   marshaler{},
-						ChangeProofMarshaler:  marshaler{},
-						ProofClient:           client,
-						Log:                   logging.NoLog{},
-						SimultaneousWorkLimit: 1,
-					},
-					prometheus.NewRegistry(),
-				)
-				require.NoError(t, err)
+				syncer = newSUT(t, targetRoot, client)
 
 				syncErr := make(chan error, 1)
 				go func() { syncErr <- syncer.Sync(ctx) }()
@@ -492,53 +498,45 @@ func TestSyncerScoresProofSource(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(t.Context())
-			defer cancel()
+			synctest.Test(t, func(t *testing.T) {
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
 
-			targetRoot := ids.GenerateTestID()
-			nodeID := ids.GenerateTestNodeID()
-			response := marshalRangeProofResponse(t, &proofDouble{newRoot: targetRoot})
+				targetRoot := ids.GenerateTestID()
+				nodeID := ids.GenerateTestNodeID()
+				response := marshalRangeProofResponse(t, &proofDouble{newRoot: targetRoot})
 
-			// An unusable proof is retried forever, so stop the syncer from
-			// inside the second request rather than racing it from outside.
-			served := 0
-			handler := p2p.TestHandler{
-				AppRequestF: func(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *common.AppError) {
-					served++
-					if tt.validProof {
-						return response, nil
-					}
-					if served > 1 {
-						cancel()
-						return nil, &common.AppError{Code: 1, Message: "stop"}
-					}
-					return []byte{0xff, 0xff, 0xff}, nil
-				},
-			}
+				// An unusable proof is retried forever, so stop the syncer from
+				// inside the second request rather than racing it from outside.
+				tracker := p2ptest.NewTracker(t)
+				served := 0
+				handler := p2p.TestHandler{
+					AppRequestF: func(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *common.AppError) {
+						served++
+						if tt.validProof {
+							return response, nil
+						}
+						if served > 1 {
+							// A retry means the first proof was scored, and
+							// cancelling below scores the second as a shutdown.
+							synctest.Wait()
+							assert.Falsef(t, responsive(tracker, nodeID),
+								"%T.ResponsivePeers() after an unusable proof", tracker)
+							cancel()
+							return nil, &common.AppError{Code: 1, Message: "stop"}
+						}
+						return []byte{0xff, 0xff, 0xff}, nil
+					},
+				}
 
-			tracker := p2ptest.NewTracker(t)
+				syncer := newSUT(t, targetRoot, p2ptest.NewSelfTrackingClientWithTracker(t, ctx, nodeID, handler, tracker))
 
-			syncer, err := NewSyncer(
-				&db{id: ids.Empty},
-				Config[*proofDouble, *proofDouble]{
-					TargetRoot:           targetRoot,
-					RangeProofMarshaler:  marshaler{},
-					ChangeProofMarshaler: marshaler{},
-					ProofClient:          p2ptest.NewSelfTrackingClientWithTracker(t, ctx, nodeID, handler, tracker),
-					// The unusable-proof case ends the sync by cancellation,
-					// which the syncer logs at Error.
-					Log:                   logging.NoLog{},
-					SimultaneousWorkLimit: 1,
-				},
-				prometheus.NewRegistry(),
-			)
-			require.NoError(t, err)
+				require.ErrorIsf(t, syncer.Sync(ctx), tt.wantErr, "%T.Sync()", syncer)
 
-			require.ErrorIsf(t, syncer.Sync(ctx), tt.wantErr, "%T.Sync()", syncer)
-
-			tracked := tracker.TrackedPeers()
-			assert.Truef(t, tracked.Contains(nodeID), "%T.TrackedPeers()", tracker)
-			assert.Equalf(t, tt.validProof, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
+				tracked := tracker.TrackedPeers()
+				assert.Truef(t, tracked.Contains(nodeID), "%T.TrackedPeers()", tracker)
+				assert.Equalf(t, tt.validProof, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
+			})
 		})
 	}
 }

@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//ids",
         "//network/p2p",
+        "//network/p2p/tracking",
         "//utils/logging",
         "@com_github_ava_labs_libevm//libevm/options",
         "@org_golang_google_protobuf//proto",

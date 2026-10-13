@@ -13,7 +13,6 @@ go_library(
         "router.go",
         "throttler.go",
         "throttler_handler.go",
-        "tracking_client.go",
         "validators.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/network/p2p",
