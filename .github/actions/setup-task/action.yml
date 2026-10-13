@@ -20,15 +20,29 @@ runs:
       shell: bash
       run: echo "version=$(./scripts/setup_task.sh version)" >> "$GITHUB_OUTPUT"
 
+    - id: task-present
+      name: Check existing Task binary
+      shell: bash
+      env:
+        TASK_VERSION: ${{ steps.version.outputs.version }}
+      run: |
+        task_path="$RUNNER_TEMP/task/$TASK_VERSION/$RUNNER_OS-$RUNNER_ARCH/task"
+        if [[ -x "$task_path" ]]; then
+          echo 'available=true' >> "$GITHUB_OUTPUT"
+        else
+          echo 'available=false' >> "$GITHUB_OUTPUT"
+        fi
+
     - id: cache
       name: Restore Task
+      if: ${{ steps.task-present.outputs.available != 'true' }}
       uses: actions/cache/restore@v5
       with:
         path: ${{ runner.temp }}/task/${{ steps.version.outputs.version }}/${{ runner.os }}-${{ runner.arch }}
         key: task-${{ runner.os }}-${{ runner.arch }}-${{ steps.version.outputs.version }}
 
     - name: Download Task
-      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      if: ${{ steps.task-present.outputs.available != 'true' && steps.cache.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         TASK_VERSION: ${{ steps.version.outputs.version }}
@@ -36,7 +50,7 @@ runs:
 
     - name: Save Task
       # Master creates shared entries; manual validation writes only to its ref.
-      if: ${{ steps.cache.outputs.cache-hit != 'true' && steps.cache-policy.outputs.cache-save-allowed == 'true' }}
+      if: ${{ steps.task-present.outputs.available != 'true' && steps.cache.outputs.cache-hit != 'true' && steps.cache-policy.outputs.cache-save-allowed == 'true' }}
       uses: actions/cache/save@v5
       with:
         path: ${{ runner.temp }}/task/${{ steps.version.outputs.version }}/${{ runner.os }}-${{ runner.arch }}

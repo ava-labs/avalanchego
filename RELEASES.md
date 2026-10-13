@@ -6,6 +6,10 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 **Nodes that last ran before Helicon activated must first run v1.15.0 or v1.15.1 until the C-Chain has bootstrapped past Helicon, or resync from an empty database.**
 
+### Features
+
+- Added `vms/evm/evmclient`, which combines standard Ethereum, Geth-specific, raw RPC, and Avalanche-specific EVM methods.
+
 ### APIs
 
 - The `avax.getAtomicTxStatus` C-Chain RPC, deprecated in v1.15.0, is removed. Use `avax.getAtomicTx`, which fails for a tx that has not been accepted.

@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
-	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/google/go-cmp/cmp"
@@ -41,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/ids"
@@ -59,10 +57,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
@@ -80,11 +80,10 @@ import (
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethereum "github.com/ava-labs/libevm"
 	ethparams "github.com/ava-labs/libevm/params"
-	ethrpc "github.com/ava-labs/libevm/rpc"
 )
 
 func TestMain(m *testing.M) {
-	evm.RegisterAllLibEVMExtras()
+	libevm.RegisterExtras()
 	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
 
@@ -95,7 +94,7 @@ var _ saetest.Peer = (*SUT)(nil)
 type SUT struct {
 	*VM
 	*Client
-	ethclient  *ethclient.Client
+	ethclient  *evmclient.Client
 	clientOnce func()
 
 	ctx            *snow.Context
@@ -459,15 +458,13 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 		}
 		server := httptest.NewServer(mux)
 		tb.Cleanup(server.Close)
+		sut.Client = NewClient(server.URL)
 
 		const wsHTTPPath = cchainHTTPPrefix + "/ws"
 		wsURI := "ws://" + server.Listener.Addr().String() + wsHTTPPath
-		ethRPCClient, err := ethrpc.Dial(wsURI)
-		require.NoErrorf(tb, err, "rpc.Dial(%s)", wsURI)
-		tb.Cleanup(ethRPCClient.Close)
-
-		sut.Client = NewClient(server.URL)
-		sut.ethclient = ethclient.NewClient(ethRPCClient)
+		sut.ethclient, err = evmclient.Dial(ctx, wsURI)
+		require.NoErrorf(tb, err, "client.Dial(ctx, %s)", wsURI)
+		tb.Cleanup(sut.ethclient.Close)
 	})
 
 	if cfg.state == snow.NormalOp {

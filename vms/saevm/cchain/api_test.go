@@ -237,9 +237,8 @@ func TestRPCExtras(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.method, func(t *testing.T) {
-			client := sut.ethclient.Client()
 			var got map[string]any
-			err := client.CallContext(ctx, &got, tt.method, tt.args...)
+			err := sut.ethclient.CallContext(ctx, &got, tt.method, tt.args...)
 			require.NoErrorf(t, err, "%s(%v)", tt.method, tt.args)
 			for k, want := range tt.want {
 				assert.Equalf(t, want, got[k], "field %q", k)
@@ -329,7 +328,7 @@ func (s *SUT) requireSynchronousRPCs(
 			t.Parallel()
 
 			var got json.RawMessage
-			err := s.ethclient.Client().CallContext(ctx, &got, call.Method, call.Args()...)
+			err := s.ethclient.CallContext(ctx, &got, call.Method, call.Args()...)
 			if call.Error != "" {
 				require.EqualErrorf(t, err, call.Error, "%s(%s)", call.Method, call.Params)
 				return

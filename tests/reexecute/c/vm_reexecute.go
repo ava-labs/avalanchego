@@ -6,7 +6,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"maps"
@@ -25,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/meterdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
@@ -36,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 )
 
 var (
@@ -44,7 +43,6 @@ var (
 	startBlockArg      uint64
 	endBlockArg        uint64
 	chanSizeArg        int
-	executionTimeout   time.Duration
 	labelsArg          string
 
 	pprofDirArg                string
@@ -86,14 +84,13 @@ var (
 )
 
 func init() {
-	evm.RegisterAllLibEVMExtras()
+	libevm.RegisterExtras()
 
 	flag.StringVar(&blockDirArg, "block-dir", blockDirArg, "Block DB directory to read from during re-execution.")
 	flag.StringVar(&currentStateDirArg, "current-state-dir", currentStateDirArg, "Current state directory including VM DB and Chain Data Directory for re-execution.")
 	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (exclusive).")
 	flag.Uint64Var(&endBlockArg, "end-block", 200, "End block to end execution (inclusive).")
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
-	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
 	flag.StringVar(&pprofDirArg, "pprof-dir", "", "Directory to write cpu, mem, and lock profiles. Empty to disable.")
 	flag.BoolVar(&metricsServerEnabledArg, "metrics-server-enabled", false, "Whether to enable the metrics server.")
@@ -278,11 +275,10 @@ func benchmarkReexecuteRange(
 	}()
 
 	config := vmExecutorConfig{
-		Log:              tests.NewDefaultLogger("vm-executor"),
-		Registry:         consensusRegistry,
-		ExecutionTimeout: executionTimeout,
-		StartBlock:       startBlock,
-		EndBlock:         endBlock,
+		Log:        tests.NewDefaultLogger("vm-executor"),
+		Registry:   consensusRegistry,
+		StartBlock: startBlock,
+		EndBlock:   endBlock,
 	}
 	executor, err := newVMExecutor(vm, config)
 	r.NoError(err)
@@ -306,12 +302,6 @@ type vmExecutorConfig struct {
 	Log logging.Logger
 	// Registry is the registry to register the metrics with.
 	Registry prometheus.Registerer
-	// ExecutionTimeout is the maximum timeout to continue executing blocks.
-	// If 0, no timeout is applied. If non-zero, the executor will exit early
-	// WITHOUT error after hitting the timeout.
-	// This is useful to provide consistent duration benchmarks.
-	ExecutionTimeout time.Duration
-
 	// [StartBlock, EndBlock] defines the range (inclusive) of blocks to execute.
 	StartBlock, EndBlock uint64
 }
@@ -381,12 +371,6 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan reexecu
 	totalWork := e.config.EndBlock - e.config.StartBlock
 	e.etaTracker.AddSample(0, totalWork, start)
 
-	if e.config.ExecutionTimeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, e.config.ExecutionTimeout)
-		defer cancel()
-	}
-
 	for blkResult := range blkChan {
 		if blkResult.Err != nil {
 			return blkResult.Err
@@ -412,23 +396,13 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan reexecu
 			return err
 		}
 
-		switch err := ctx.Err(); {
-		case err == nil:
-		case errors.Is(err, context.DeadlineExceeded):
-			e.config.Log.Info("exiting early due to context timeout",
-				zap.Duration("elapsed", time.Since(start)),
-				zap.Duration("execution-timeout", e.config.ExecutionTimeout),
-				zap.Error(err),
-			)
-			return nil
-		default:
+		if err := ctx.Err(); err != nil {
 			// SIGINT/SIGTERM. Failing the run exits non-zero once the deferred
 			// VM shutdown has completed.
 			return fmt.Errorf("interrupted at height %d: %w", blkResult.Height, err)
 		}
 	}
 	e.config.Log.Info("finished executing sequence")
-
 	return nil
 }
 

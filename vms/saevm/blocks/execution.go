@@ -148,8 +148,8 @@ func (b *Block) MarkExecuted(
 }
 
 // markExecutedOnDisk updates the head block in the database, and the
-// [saetypes.ExecutionResults] of an asynchronous block. The batch is `Write()`n
-// (yeah, it's a word now) after all disk artefacts are persisted.
+// [saetypes.ExecutionResults] if the block is asynchronous. The batch is
+// `Write()`n (yeah, it's a word now) after all disk artefacts are persisted.
 func (b *Block) markExecutedOnDisk(batch ethdb.Batch, xdb saetypes.ExecutionResults, e *executionResults) error {
 	if !b.Synchronous() {
 		n := b.NumberU64()
