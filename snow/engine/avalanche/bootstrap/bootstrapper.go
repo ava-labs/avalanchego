@@ -604,6 +604,17 @@ func (b *Bootstrapper) checkFinish(ctx context.Context) error {
 		return nil
 	}
 
+	if b.linearized {
+		// Even after we have finished bootstrapping, we may still receive GetAncestors messages from bootstrapping nodes
+		// that have still not finished linearizing themselves.
+		// So we still need to dispatch messages to the avalanche VM engine.
+		// We can get a late Ancestors() message for vertices that were already processed,
+		// despite bootstrapping already being finished.
+		// We therefore avoid linearizing the DAG again, which would re-initialize the VM stack and cause errors.
+		b.Ctx.Log.Debug("skipping linearization because the DAG has already been linearized")
+		return nil
+	}
+
 	b.Ctx.Log.Info("executing transactions")
 	_, err := b.TxBlocked.ExecuteAll(
 		ctx,
@@ -632,16 +643,9 @@ func (b *Bootstrapper) checkFinish(ctx context.Context) error {
 	edge := b.Manager.Edge(ctx)
 	stopVertexID := edge[0]
 
-	if b.linearized {
-		// Bootstrapping already finished. Avoid linearizing the DAG again, which would re-initialize the VM stack and cause errors.
-		b.Ctx.Log.Debug("skipping linearization because the DAG has already been linearized")
-		return nil
-	}
-
 	if err := b.VM.Linearize(ctx, stopVertexID); err != nil {
 		return err
 	}
-	// Mark that the DAG has been fully executed and the VM has been linearized.
 	b.linearized = true
 
 	b.processedCache.Flush()
