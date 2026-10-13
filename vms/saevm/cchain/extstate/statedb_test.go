@@ -93,9 +93,8 @@ func TestStateKeyPartition(t *testing.T) {
 	}
 }
 
-// FuzzStateKeyPartition covers the hook installed by
-// [extstate.RegisterExtras]. Without it, a storage write to a key equal to a
-// coin ID would overwrite that coin's balance.
+// FuzzStateKeyPartition covers [extstate.StateDBHooks]. Without them, a storage
+// write to a key equal to a coin ID would overwrite that coin's balance.
 func FuzzStateKeyPartition(f *testing.F) {
 	f.Add([]byte{0x01}) // Already a normalized coin ID.
 	f.Fuzz(func(t *testing.T, keyBytes []byte) {
