@@ -34,9 +34,9 @@ func RegisterExtras() {
 // WithTempRegisteredExtras runs fn with the state-key normalization hook
 // temporarily registered. The previous hook is restored after fn returns.
 //
-// It MUST NOT be used on a live chain. Callers SHOULD NOT call it directly, and
-// SHOULD instead use `vms/saevm/cchain/libevm.WithTempRegisteredExtras()`,
-// which registers all C-Chain extras together.
+// Callers SHOULD NOT call it directly, and SHOULD instead use
+// `vms/saevm/cchain/libevm.WithTempRegisteredExtras()`, which registers all
+// C-Chain extras together.
 func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
 	return state.WithTempRegisteredExtras(lock, normalizeStateKeysHook{}, fn)
 }
@@ -61,8 +61,8 @@ func normalizeCoinID(coinID *common.Hash) {
 	coinID[0] |= 0x01
 }
 
-// TODO(JonathanOppenheimer): Share the predicate handling with Subnet-EVM's
-// `core/extstate`.
+// TODO(JonathanOppenheimer): Use the predicates in SAE and share them with
+// Subnet-EVM. See https://github.com/ava-labs/avalanchego/issues/6113.
 
 // StateDB wraps a [state.StateDB] with multicoin balances and the predicates of
 // the current transaction's access list.

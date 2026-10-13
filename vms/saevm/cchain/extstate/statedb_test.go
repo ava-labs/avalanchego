@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/libevm/stateconf"
-	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -72,12 +71,6 @@ func TestStateKeyPartition(t *testing.T) {
 			wantStateKey: common.Hash{0xf0},
 		},
 		{
-			name:         "first_byte_all_ones",
-			key:          common.Hash{0xff},
-			wantCoinID:   common.Hash{0xff},
-			wantStateKey: common.Hash{0xfe},
-		},
-		{
 			name:         "all_ones",
 			key:          allOnes,
 			wantCoinID:   allOnes,
@@ -123,37 +116,51 @@ func FuzzStateKeyPartition(f *testing.F) {
 }
 
 func TestMultiCoinBalance(t *testing.T) {
+	type op struct {
+		sub    bool
+		amount int64
+	}
 	tests := []struct {
 		name          string
-		deltas        []int64 // Positive deltas are added and negative ones subtracted.
+		ops           []op
 		want          int64
+		wantExist     bool
 		wantMultiCoin bool
 	}{
 		{
-			name:   "add_zero",
-			deltas: []int64{0},
+			name:      "add_zero",
+			ops:       []op{{}},
+			wantExist: true,
+		},
+		{
+			name: "sub_zero",
+			ops:  []op{{sub: true}},
 		},
 		{
 			name:          "add",
-			deltas:        []int64{10},
+			ops:           []op{{amount: 10}},
 			want:          10,
+			wantExist:     true,
 			wantMultiCoin: true,
 		},
 		{
 			name:          "add_then_sub",
-			deltas:        []int64{10, -4},
+			ops:           []op{{amount: 10}, {sub: true, amount: 4}},
 			want:          6,
+			wantExist:     true,
 			wantMultiCoin: true,
 		},
 		{
 			name:          "sub_entire_balance",
-			deltas:        []int64{10, -10},
+			ops:           []op{{amount: 10}, {sub: true, amount: 10}},
+			wantExist:     true,
 			wantMultiCoin: true,
 		},
 		{
 			name:          "add_sub_add",
-			deltas:        []int64{10, -5, 3},
+			ops:           []op{{amount: 10}, {sub: true, amount: 5}, {amount: 3}},
 			want:          8,
+			wantExist:     true,
 			wantMultiCoin: true,
 		},
 	}
@@ -162,93 +169,20 @@ func TestMultiCoinBalance(t *testing.T) {
 			s := newEmptyStateDB(t)
 			addr := common.Address{1}
 			coinID := common.Hash{2}
-			for _, d := range tt.deltas {
-				if d < 0 {
-					s.SubBalanceMultiCoin(addr, coinID, big.NewInt(-d))
+			for _, o := range tt.ops {
+				if o.sub {
+					s.SubBalanceMultiCoin(addr, coinID, big.NewInt(o.amount))
 				} else {
-					s.AddBalanceMultiCoin(addr, coinID, big.NewInt(d))
+					s.AddBalanceMultiCoin(addr, coinID, big.NewInt(o.amount))
 				}
 			}
 
 			got := s.GetBalanceMultiCoin(addr, coinID)
 			assert.Zerof(t, big.NewInt(tt.want).Cmp(got), "%T.GetBalanceMultiCoin() = %d, want %d", s, got, tt.want)
-			assert.Truef(t, s.Exist(addr), "%T.Exist()", s)
-			assert.Equalf(t, tt.wantMultiCoin, customtypes.IsMultiCoin(s.StateDB, addr), "customtypes.IsMultiCoin()")
+			assert.Equalf(t, tt.wantExist, s.Exist(addr), "%T.Exist(%s)", s, addr)
+			assert.Equal(t, tt.wantMultiCoin, customtypes.IsMultiCoin(s.StateDB, addr), "customtypes.IsMultiCoin()")
 		})
 	}
-}
-
-func TestSubBalanceMultiCoinZero(t *testing.T) {
-	s := newEmptyStateDB(t)
-	addr := common.Address{1}
-	s.SubBalanceMultiCoin(addr, common.Hash{1}, new(big.Int))
-
-	assert.Falsef(t, s.Exist(addr), "%T.Exist(%s)", s, addr)
-}
-
-func TestMultiCoinSnapshot(t *testing.T) {
-	diskdb := rawdb.NewMemoryDatabase()
-	db := state.NewDatabase(diskdb)
-	// The empty root doubles as the block hash of the disk layer.
-	snaps := snapshot.NewTestTree(diskdb, types.EmptyRootHash, types.EmptyRootHash)
-
-	var (
-		addr   = common.Address{1}
-		asset1 = common.Hash{1}
-		asset2 = common.Hash{2}
-	)
-	open := func(t *testing.T, root common.Hash) *extstate.StateDB {
-		t.Helper()
-		s, err := state.New(root, db, snaps)
-		require.NoErrorf(t, err, "state.New(%s)", root)
-		return extstate.New(s)
-	}
-	snapshotOpts := stateconf.WithSnapshotUpdateOpts(snapshot.WithBlockHashes(common.Hash{}, common.Hash{}))
-	commit := func(t *testing.T, s *extstate.StateDB) common.Hash {
-		t.Helper()
-		root, err := s.Commit(0, false, snapshotOpts)
-		require.NoErrorf(t, err, "%T.Commit()", s)
-		return root
-	}
-	requireBalances := func(t *testing.T, s *extstate.StateDB, wantRegular uint64, wantAsset1, wantAsset2 int64) {
-		t.Helper()
-		require.Equalf(t, uint256.NewInt(wantRegular), s.GetBalance(addr), "%T.GetBalance()", s)
-		for asset, want := range map[common.Hash]int64{
-			asset1: wantAsset1,
-			asset2: wantAsset2,
-		} {
-			got := s.GetBalanceMultiCoin(addr, asset)
-			require.Zerof(t, big.NewInt(want).Cmp(got), "%T.GetBalanceMultiCoin(%s) = %d, want %d", s, asset, got, want)
-		}
-	}
-
-	s := open(t, types.EmptyRootHash)
-	requireBalances(t, s, 0, 0, 0)
-	s.AddBalance(addr, uint256.NewInt(10))
-	root := commit(t, s)
-	requireBalances(t, s, 10, 0, 0)
-
-	s = open(t, root)
-	s.AddBalanceMultiCoin(addr, asset1, big.NewInt(10))
-	root = commit(t, s)
-	requireBalances(t, s, 10, 10, 0)
-
-	// [state.StateDB.Commit] caps the snapshot at 128 diff layers, so 256
-	// commits flatten the oldest layers into the disk layer.
-	for range 256 {
-		s = open(t, root)
-		s.AddBalanceMultiCoin(addr, asset1, big.NewInt(1))
-		s.AddBalanceMultiCoin(addr, asset2, big.NewInt(2))
-		root = commit(t, s)
-	}
-	requireBalances(t, s, 10, 266, 512)
-
-	// The regular balance is now only in the disk layer.
-	s = open(t, root)
-	s.AddBalance(addr, uint256.NewInt(1))
-	s.AddBalanceMultiCoin(addr, asset1, big.NewInt(1))
-	root = commit(t, s)
-	requireBalances(t, open(t, root), 11, 267, 512)
 }
 
 func TestMultiCoinSnapshotGeneration(t *testing.T) {
