@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
@@ -87,7 +86,7 @@ func forkHeaders() []forkHeader {
 	})
 	add("Granite time milliseconds and min delay excess", func(_ *types.Header, e *HeaderExtra) []any {
 		e.TimeMilliseconds = utils.PointerTo[uint64](1_600_000_000_500)
-		e.MinDelayExcess = utils.PointerTo(acp226.DelayExcess(25))
+		e.MinDelayExcess = utils.PointerTo(dynamic.DelayExponent(25))
 		return []any{*e.TimeMilliseconds, uint64(*e.MinDelayExcess)}
 	})
 	add("Helicon target and min price exponents", func(_ *types.Header, e *HeaderExtra) []any {
