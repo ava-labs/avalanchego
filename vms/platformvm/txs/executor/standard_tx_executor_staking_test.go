@@ -775,9 +775,11 @@ func TestStandardExecutorAddSubnetValidatorTxStakeDurationErrors(t *testing.T) {
 	}
 }
 
-// TestStandardExecutorAddSubnetValidatorTx verifies the successful execution
-// of an [platform.AddSubnetValidatorTx].
-func TestStandardExecutorAddSubnetValidatorTx(t *testing.T) {
+// TestStandardExecutorAddSubnetValidatorTxPreDurango verifies that, before
+// Durango, an [platform.AddSubnetValidatorTx] adds the validator to the subnet's
+// pending validator set. Pre-Etna txs pay no fee, so the tx has no inputs and
+// its spend is covered by [TestStandardExecutorAddSubnetValidatorTx].
+func TestStandardExecutorAddSubnetValidatorTxPreDurango(t *testing.T) {
 	env := newEnvironment(t, upgradetest.ApricotPhase5)
 
 	var (
@@ -857,16 +859,13 @@ func TestStandardExecutorAddSubnetValidatorTx(t *testing.T) {
 				tt.updateState(diff)
 			}
 
-			feeCalculator := state.PickFeeCalculator(env.config, diff)
 			_, _, _, err = StandardTx(
 				&env.backend,
-				feeCalculator,
+				state.PickFeeCalculator(env.config, diff),
 				stx,
 				diff,
 			)
 			require.NoError(err)
-
-			requireBaseTxApplied(t, env, diff, feeCalculator, stx)
 
 			// assert the validator was added to the subnet's pending validator
 			// set
@@ -878,6 +877,55 @@ func TestStandardExecutorAddSubnetValidatorTx(t *testing.T) {
 			require.Equal(tt.validator.End, uint64(gotStaker.EndTime.Unix()))
 		})
 	}
+}
+
+// TestStandardExecutorAddSubnetValidatorTx verifies the successful execution
+// of an [platform.AddSubnetValidatorTx].
+func TestStandardExecutorAddSubnetValidatorTx(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		env       = newEnvironment(t, upgradetest.Latest)
+		wallet    = newWallet(t, env, walletConfig{})
+		subnetID  = testSubnet1.ID()
+		chainTime = env.state.GetTimestamp()
+		validator = platform.Validator{
+			NodeID: genesistest.DefaultNodeIDs[0],
+			End:    uint64(chainTime.Add(env.config.MinStakeDuration).Unix()),
+			Wght:   genesistest.DefaultValidatorWeight,
+		}
+	)
+
+	stx, err := wallet.IssueAddSubnetValidatorTx(
+		&platform.SubnetValidator{
+			Validator: validator,
+			Subnet:    subnetID,
+		},
+	)
+	require.NoError(err)
+
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+
+	feeCalculator := state.PickFeeCalculator(env.config, diff)
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		stx,
+		diff,
+	)
+	require.NoError(err)
+
+	requireBaseTxApplied(t, env, diff, feeCalculator, stx)
+
+	// assert the validator was added to the subnet's current validator set,
+	// starting at the current chain time
+	gotStaker, err := diff.GetCurrentValidator(subnetID, validator.NodeID)
+	require.NoError(err)
+	require.Equal(stx.ID(), gotStaker.TxID)
+	require.Equal(validator.Wght, gotStaker.Weight)
+	require.Equal(chainTime.Unix(), gotStaker.StartTime.Unix())
+	require.Equal(validator.End, uint64(gotStaker.EndTime.Unix()))
 }
 
 // TestStandardExecutorAddPermissionlessValidatorTxErrors verifies the failure
@@ -1204,8 +1252,7 @@ func TestStandardExecutorAddPermissionlessDelegatorTx(t *testing.T) {
 // of [platform.RemoveSubnetValidatorTx] execution.
 func TestStandardExecutorRemoveSubnetValidatorTxErrors(t *testing.T) {
 	var (
-		env    = newEnvironment(t, upgradetest.Durango)
-		wallet = newWallet(t, env, walletConfig{})
+		env    = newEnvironment(t, upgradetest.Latest)
 		nodeID = genesistest.DefaultNodeIDs[0]
 	)
 
@@ -1282,6 +1329,9 @@ func TestStandardExecutorRemoveSubnetValidatorTxErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// A fresh wallet per subtest, so that it never spends an output of a
+			// tx from a previous subtest, which was never applied.
+			wallet := newWallet(t, env, walletConfig{})
 			tx, err := wallet.IssueRemoveSubnetValidatorTx(
 				nodeID,
 				testSubnet1.ID(),
