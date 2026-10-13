@@ -26,12 +26,13 @@ go_library(
 go_test(
     name = "extstate_test",
     srcs = ["statedb_test.go"],
-    embed = [":extstate"],
     deps = [
+        ":extstate",
         "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/evm/core/state/snapshot",
         "//vms/evm/predicate",
+        "//vms/saevm/cchain/libevm",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",

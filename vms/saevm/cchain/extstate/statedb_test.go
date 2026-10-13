@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package extstate
+package extstate_test
 
 import (
 	"math/big"
@@ -22,20 +22,20 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/extstate"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 )
 
 func TestMain(m *testing.M) {
-	customtypes.Register()
-	params.RegisterExtras()
-	RegisterExtras()
+	libevm.RegisterExtras()
 	os.Exit(m.Run())
 }
 
-func newEmptyStateDB(tb testing.TB) *StateDB {
+func newEmptyStateDB(tb testing.TB) *extstate.StateDB {
 	tb.Helper()
 	s, err := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	require.NoError(tb, err, "state.New()")
-	return New(s)
+	return extstate.New(s)
 }
 
 func TestStateKeyPartition(t *testing.T) {
@@ -86,48 +86,40 @@ func TestStateKeyPartition(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			coinID := tt.key
-			normalizeCoinID(&coinID)
-			assert.Equalf(t, tt.wantCoinID, coinID, "normalizeCoinID(%s)", tt.key)
+			s := newEmptyStateDB(t)
+			addr := common.Address{1}
+			balance := big.NewInt(1)
+			s.AddBalanceMultiCoin(addr, tt.key, balance)
+			stored := common.Hash{0xff}
+			s.SetState(addr, tt.key, stored)
 
-			stateKey := tt.key
-			normalizeStateKey(&stateKey)
-			assert.Equalf(t, tt.wantStateKey, stateKey, "normalizeStateKey(%s)", tt.key)
+			raw := stateconf.SkipStateKeyTransformation()
+			assert.Equalf(t, common.BigToHash(balance), s.GetState(addr, tt.wantCoinID, raw), "%T.GetState(%s, %s) after %[1]T.AddBalanceMultiCoin(%[2]s, %s)", s, addr, tt.wantCoinID, tt.key)
+			assert.Equalf(t, stored, s.GetState(addr, tt.wantStateKey, raw), "%T.GetState(%s, %s) after %[1]T.SetState(%[2]s, %s)", s, addr, tt.wantStateKey, tt.key)
 		})
 	}
 }
 
+// FuzzStateKeyPartition covers the hook installed by
+// [extstate.RegisterExtras]. Without it, a storage write to a key equal to a
+// coin ID would overwrite that coin's balance.
 func FuzzStateKeyPartition(f *testing.F) {
+	f.Add([]byte{0x01}) // Already a normalized coin ID.
 	f.Fuzz(func(t *testing.T, keyBytes []byte) {
 		var key common.Hash
 		copy(key[:], keyBytes)
 
-		coinID, stateKey := key, key
-		normalizeCoinID(&coinID)
-		normalizeStateKey(&stateKey)
-		require.NotEqualf(t, coinID, stateKey, "normalizeCoinID(%s) == normalizeStateKey(%s)", key, key)
-		// Only the first byte is used to partition the key space.
-		require.Equalf(t, key[1:], coinID[1:], "normalizeCoinID(%s)[1:]", key)
-		require.Equalf(t, key[1:], stateKey[1:], "normalizeStateKey(%s)[1:]", key)
+		s := newEmptyStateDB(t)
+		addr := common.Address{1}
+		want := big.NewInt(10)
+		s.AddBalanceMultiCoin(addr, key, want)
+		stored := common.Hash{0xff}
+		s.SetState(addr, key, stored)
+
+		got := s.GetBalanceMultiCoin(addr, key)
+		require.Zerof(t, want.Cmp(got), "%T.GetBalanceMultiCoin(%s, %s) = %d, want %d", s, addr, key, got, want)
+		require.Equalf(t, stored, s.GetState(addr, key), "%T.GetState(%s, %s)", s, addr, key)
 	})
-}
-
-// TestStorageDoesNotOverwriteMultiCoinBalance covers the hook installed by
-// [RegisterExtras]. Without it, a storage write to a key equal to a coin ID
-// would overwrite that coin's balance.
-func TestStorageDoesNotOverwriteMultiCoinBalance(t *testing.T) {
-	s := newEmptyStateDB(t)
-	addr := common.Address{1}
-	coinID := common.Hash{0x01} // Already normalized.
-
-	want := big.NewInt(10)
-	s.AddBalanceMultiCoin(addr, coinID, want)
-	stored := common.Hash{0xff}
-	s.SetState(addr, coinID, stored)
-
-	got := s.GetBalanceMultiCoin(addr, coinID)
-	assert.Zerof(t, want.Cmp(got), "%T.GetBalanceMultiCoin() = %d, want %d", s, got, want)
-	assert.Equalf(t, stored, s.GetState(addr, coinID), "%T.GetState()", s)
 }
 
 func TestMultiCoinBalance(t *testing.T) {
@@ -205,20 +197,20 @@ func TestMultiCoinSnapshot(t *testing.T) {
 		asset1 = common.Hash{1}
 		asset2 = common.Hash{2}
 	)
-	open := func(t *testing.T, root common.Hash) *StateDB {
+	open := func(t *testing.T, root common.Hash) *extstate.StateDB {
 		t.Helper()
 		s, err := state.New(root, db, snaps)
 		require.NoErrorf(t, err, "state.New(%s)", root)
-		return New(s)
+		return extstate.New(s)
 	}
 	snapshotOpts := stateconf.WithSnapshotUpdateOpts(snapshot.WithBlockHashes(common.Hash{}, common.Hash{}))
-	commit := func(t *testing.T, s *StateDB) common.Hash {
+	commit := func(t *testing.T, s *extstate.StateDB) common.Hash {
 		t.Helper()
 		root, err := s.Commit(0, false, snapshotOpts)
 		require.NoErrorf(t, err, "%T.Commit()", s)
 		return root
 	}
-	requireBalances := func(t *testing.T, s *StateDB, wantRegular uint64, wantAsset1, wantAsset2 int64) {
+	requireBalances := func(t *testing.T, s *extstate.StateDB, wantRegular uint64, wantAsset1, wantAsset2 int64) {
 		t.Helper()
 		require.Equalf(t, uint256.NewInt(wantRegular), s.GetBalance(addr), "%T.GetBalance()", s)
 		for asset, want := range map[common.Hash]int64{
@@ -264,12 +256,12 @@ func TestMultiCoinSnapshotGeneration(t *testing.T) {
 	db := state.NewDatabase(diskdb)
 
 	addr := common.BytesToAddress([]byte("addr1"))
-	coinID := common.BytesToHash([]byte("coin1"))
+	coinID := common.Hash{0x02}
 	want := big.NewInt(10)
 
 	statedb, err := state.New(types.EmptyRootHash, db, nil)
 	require.NoError(t, err, "state.New()")
-	s := New(statedb)
+	s := extstate.New(statedb)
 	s.AddBalanceMultiCoin(addr, coinID, want)
 	root, err := s.Commit(0, false)
 	require.NoErrorf(t, err, "%T.Commit()", s)
@@ -294,8 +286,8 @@ func TestMultiCoinSnapshotGeneration(t *testing.T) {
 	require.NoErrorf(t, err, "%T.Account()", snap)
 	require.True(t, customtypes.IsAccountMultiCoin(account), "customtypes.IsAccountMultiCoin()")
 
-	normalizeCoinID(&coinID)
-	storage, err := snap.Storage(addrHash, crypto.Keccak256Hash(coinID[:]))
+	slot := common.Hash{0x03} // coinID with bit 0 set.
+	storage, err := snap.Storage(addrHash, crypto.Keccak256Hash(slot[:]))
 	require.NoErrorf(t, err, "%T.Storage()", snap)
 	got := new(big.Int).SetBytes(storage)
 	require.Zerof(t, want.Cmp(got), "%T.Storage() = %d, want %d", snap, got, want)

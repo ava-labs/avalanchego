@@ -49,6 +49,18 @@ func (normalizeStateKeysHook) TransformStateKey(_ common.Address, key common.Has
 	return key
 }
 
+// normalizeStateKey sets the 0th bit of the first byte in `key` to 0.
+// This partitions normal state storage from multicoin storage.
+func normalizeStateKey(key *common.Hash) {
+	key[0] &^= 0x01
+}
+
+// normalizeCoinID sets the 0th bit of the first byte in `coinID` to 1.
+// This partitions multicoin storage from normal state storage.
+func normalizeCoinID(coinID *common.Hash) {
+	coinID[0] |= 0x01
+}
+
 // TODO(JonathanOppenheimer): Share the predicate handling with Subnet-EVM's
 // `core/extstate`.
 
@@ -130,16 +142,4 @@ func (s *StateDB) SubBalanceMultiCoin(addr common.Address, coinID common.Hash, a
 func (s *StateDB) setBalanceMultiCoin(addr common.Address, coinID common.Hash, amount *big.Int) {
 	normalizeCoinID(&coinID)
 	s.SetState(addr, coinID, common.BigToHash(amount), stateconf.SkipStateKeyTransformation())
-}
-
-// normalizeStateKey sets the 0th bit of the first byte in `key` to 0.
-// This partitions normal state storage from multicoin storage.
-func normalizeStateKey(key *common.Hash) {
-	key[0] &^= 0x01
-}
-
-// normalizeCoinID sets the 0th bit of the first byte in `coinID` to 1.
-// This partitions multicoin storage from normal state storage.
-func normalizeCoinID(coinID *common.Hash) {
-	coinID[0] |= 0x01
 }
