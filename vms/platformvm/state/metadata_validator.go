@@ -35,7 +35,7 @@ type validatorMetadata struct {
 
 	// Auto-renewed validators.
 	// Weight is computed as:
-	//   tx.Weight + AccruedValidationRewards + AccruedDelegateeRewards + AccruedStakeIncrease
+	//   tx.Weight + AccruedValidationRewards + AccruedDelegateeRewards + AccruedStakeIncrease - WithdrawnStake
 	// AccruedValidationRewards is the sum of validation rewards restaked from previous cycles.
 	AccruedValidationRewards uint64 `v2:"true"`
 	// AccruedDelegateeRewards is the sum of delegatee rewards restaked from previous cycles.
@@ -58,6 +58,12 @@ type validatorMetadata struct {
 	// AccruedStakeIncreaseTxIDs are the IDs of the txs that locked
 	// AccruedStakeIncrease.
 	AccruedStakeIncreaseTxIDs []ids.ID `v3:"true"`
+	// PendingStakeDecrease is the stake to withdraw at the start of the next
+	// cycle.
+	PendingStakeDecrease uint64 `v3:"true"`
+	// WithdrawnStake is the sum of stake withdrawn from the validator's stake
+	// outputs in previous cycles.
+	WithdrawnStake uint64 `v3:"true"`
 
 	txID        ids.ID
 	lastUpdated time.Time
@@ -144,6 +150,14 @@ type StakingInfo struct {
 	// The slice may be shared with other [StakingInfo] values, so it MUST be
 	// copied before being modified.
 	AccruedStakeIncreaseTxIDs []ids.ID
+	// PendingStakeDecrease is the stake to withdraw at the start of the next
+	// cycle.
+	PendingStakeDecrease uint64
+	// WithdrawnStake is the sum of stake withdrawn from the validator's stake
+	// outputs in previous cycles. Withdrawals draw from the outputs of the tx
+	// that created the validator, then from the outputs of its applied stake
+	// increases in the order they were applied.
+	WithdrawnStake uint64
 }
 
 func stakingInfoFromMetadata(vdrMetadata *validatorMetadata) StakingInfo {
@@ -157,6 +171,8 @@ func stakingInfoFromMetadata(vdrMetadata *validatorMetadata) StakingInfo {
 		AccruedStakeIncrease:      vdrMetadata.AccruedStakeIncrease,
 		PendingStakeIncreaseTxIDs: vdrMetadata.PendingStakeIncreaseTxIDs,
 		AccruedStakeIncreaseTxIDs: vdrMetadata.AccruedStakeIncreaseTxIDs,
+		PendingStakeDecrease:      vdrMetadata.PendingStakeDecrease,
+		WithdrawnStake:            vdrMetadata.WithdrawnStake,
 	}
 }
 
@@ -271,6 +287,8 @@ func (vs *validatorState) SetStakingInfo(
 	metadata.AccruedStakeIncrease = stakingInfo.AccruedStakeIncrease
 	metadata.PendingStakeIncreaseTxIDs = stakingInfo.PendingStakeIncreaseTxIDs
 	metadata.AccruedStakeIncreaseTxIDs = stakingInfo.AccruedStakeIncreaseTxIDs
+	metadata.PendingStakeDecrease = stakingInfo.PendingStakeDecrease
+	metadata.WithdrawnStake = stakingInfo.WithdrawnStake
 
 	vs.addUpdatedTxID(vdrID, subnetID, metadata.txID)
 	return nil

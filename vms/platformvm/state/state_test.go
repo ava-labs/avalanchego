@@ -4932,9 +4932,9 @@ func TestAutoRenewedValidatorRestakeStateReload(t *testing.T) {
 }
 
 // TestAutoRenewedValidatorStakeIncreaseStateReload verifies that the stake
-// increase fields of an auto-renewed validator's staking info are persisted and
-// that applied stake increases are included in the validator's weight after
-// reloading the state.
+// increase and decrease fields of an auto-renewed validator's staking info are
+// persisted, and that the validator's weight after reloading the state includes
+// applied stake increases and excludes withdrawn stake.
 func TestAutoRenewedValidatorStakeIncreaseStateReload(t *testing.T) {
 	db := memdb.New()
 	state := newTestState(t, db)
@@ -4949,6 +4949,8 @@ func TestAutoRenewedValidatorStakeIncreaseStateReload(t *testing.T) {
 		accruedDelRewards    = uint64(50)
 		accruedStakeIncrease = uint64(1000)
 		pendingStakeIncrease = uint64(2000)
+		withdrawnStake       = uint64(400)
+		pendingStakeDecrease = uint64(300)
 	)
 	var (
 		nodeID   = ids.GenerateTestNodeID()
@@ -4970,7 +4972,7 @@ func TestAutoRenewedValidatorStakeIncreaseStateReload(t *testing.T) {
 	autoRenewedTx := &platform.Tx{Unsigned: autoRenewedUnsigned}
 	require.NoError(t, autoRenewedTx.Initialize(platform.Codec))
 
-	wantWeight := weight + accruedRewards + accruedDelRewards + accruedStakeIncrease
+	wantWeight := weight + accruedRewards + accruedDelRewards + accruedStakeIncrease - withdrawnStake
 	staker, err := NewCurrentStaker(
 		autoRenewedTx.ID(),
 		autoRenewedUnsigned,
@@ -4990,6 +4992,8 @@ func TestAutoRenewedValidatorStakeIncreaseStateReload(t *testing.T) {
 		AccruedStakeIncrease:      accruedStakeIncrease,
 		PendingStakeIncreaseTxIDs: pendingStakeIncreaseTxIDs,
 		AccruedStakeIncreaseTxIDs: accruedStakeIncreaseTxIDs,
+		PendingStakeDecrease:      pendingStakeDecrease,
+		WithdrawnStake:            withdrawnStake,
 	}
 
 	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)

@@ -2020,6 +2020,10 @@ func (s *State) loadCurrentValidators() error {
 			if err != nil {
 				return fmt.Errorf("adding accrued stake increase: %w", err)
 			}
+			weight, err = safemath.Sub(weight, metadata.WithdrawnStake)
+			if err != nil {
+				return fmt.Errorf("subtracting withdrawn stake: %w", err)
+			}
 
 			staker, err = NewCurrentStaker(
 				txID,
