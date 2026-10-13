@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes"
@@ -35,7 +34,7 @@ func TestDelayExponent(t *testing.T) {
 			name: "header_carries_excess",
 			header: customtypes.WithHeaderExtra(
 				&types.Header{},
-				&customtypes.HeaderExtra{MinDelayExcess: new(acp226.DelayExcess(42))},
+				&customtypes.HeaderExtra{MinDelayExcess: new(dynamic.DelayExponent(42))},
 			),
 			want: dynamic.DelayExponent(42),
 		},

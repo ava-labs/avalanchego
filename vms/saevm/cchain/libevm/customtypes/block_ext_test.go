@@ -19,7 +19,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
@@ -90,7 +89,7 @@ func exportedFieldsPointToDifferentMemory[T interface {
 				assertDifferentPointers(t, f, fieldCp)
 			case *common.Hash:
 				assertDifferentPointers(t, f, fieldCp)
-			case *acp226.DelayExcess:
+			case *dynamic.DelayExponent:
 				assertDifferentPointers(t, f, fieldCp)
 			case *dynamic.TargetExponent:
 				assertDifferentPointers(t, f, fieldCp)

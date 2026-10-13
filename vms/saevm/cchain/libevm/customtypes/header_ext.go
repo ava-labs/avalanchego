@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/rlp"
 
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
@@ -38,7 +37,7 @@ type HeaderExtra struct {
 	ExtDataGasUsed   *big.Int
 	BlockGasCost     *big.Int
 	TimeMilliseconds *uint64
-	MinDelayExcess   *acp226.DelayExcess
+	MinDelayExcess   *dynamic.DelayExponent
 	TargetExponent   *dynamic.TargetExponent
 	MinPriceExponent *dynamic.PriceExponent
 
@@ -163,7 +162,7 @@ func (h *HeaderExtra) DecodeJSON(eth *ethtypes.Header, b []byte) error {
 		ExtDataGasUsed:      (*big.Int)(x.ExtDataGasUsed),
 		BlockGasCost:        (*big.Int)(x.BlockGasCost),
 		TimeMilliseconds:    (*uint64)(x.TimeMilliseconds),
-		MinDelayExcess:      (*acp226.DelayExcess)(x.MinDelayExcess),
+		MinDelayExcess:      (*dynamic.DelayExponent)(x.MinDelayExcess),
 		TargetExponent:      (*dynamic.TargetExponent)(x.TargetExponent),
 		MinPriceExponent:    (*dynamic.PriceExponent)(x.MinPriceExponent),
 		SettledHeight:       (*uint64)(x.SettledHeight),
