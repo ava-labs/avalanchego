@@ -1,15 +1,15 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
-load("//.bazel:defs.bzl", "graft_go_test")
+load("//.bazel:defs.bzl", "go_test")
 
 package(default_visibility = [
-    "//graft/coreth:__subpackages__",
-    "//graft/coreth:external_consumers",
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
 ])
 
 go_library(
     name = "extstate",
     srcs = ["statedb.go"],
-    importpath = "github.com/ava-labs/avalanchego/graft/coreth/core/extstate",
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/extstate",
     deps = [
         "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
@@ -23,7 +23,7 @@ go_library(
     ],
 )
 
-graft_go_test(
+go_test(
     name = "extstate_test",
     srcs = [
         "state_object_test.go",
