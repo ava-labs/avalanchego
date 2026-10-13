@@ -106,7 +106,6 @@ type Bootstrapper struct {
 
 	// linearized is set once the DAG has been fully executed and the VM has
 	// been linearized in this process.
-	// Linearize initializes the snowman VM stack, which is not idempotent.
 	linearized bool
 
 	// Called when bootstrapping is done on a specific chain
@@ -605,12 +604,9 @@ func (b *Bootstrapper) checkFinish(ctx context.Context) error {
 	}
 
 	if b.linearized {
-		// Even after we have finished bootstrapping, we may still receive GetAncestors messages from bootstrapping nodes
-		// that have still not finished linearizing themselves.
-		// So we still need to dispatch messages to the avalanche VM engine.
-		// We can get a late Ancestors() message for vertices that were already processed,
-		// despite bootstrapping already being finished.
-		// We therefore avoid linearizing the DAG again, which would re-initialize the VM stack and cause errors.
+		// After linearization, the snowman engine bootstraps the chain while
+		// [snow.State] is still [snow.Bootstrapping]. This bootstrapper may
+		// still be called during that time and it must not linearize again.
 		b.Ctx.Log.Debug("skipping linearization because the DAG has already been linearized")
 		return nil
 	}
