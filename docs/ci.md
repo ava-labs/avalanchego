@@ -512,6 +512,14 @@ This action replaces `docker/setup-qemu-action` because its `cache-image` input
 controls cache reads and writes together. It cannot restore a cache on a pull
 request while it saves only from `master`.
 
+CI historically used the default AMD64 runners. The image-build jobs continue
+that pattern and cross-compile images for AMD64 and ARM64. AMD64 is not a
+design requirement.
+
+QEMU enables cross-platform smoke tests on these runners. Use native runners
+for broader image tests because emulation is too slow. Revisit the runner
+choice, binfmt image pin, and cache platform key when adding native tests.
+
 The `binfmt-image` action input defines the image reference. It uses the Linux
 AMD64 image digest, not a mutable tag such as `latest`. A mutable tag can
 select new QEMU code without a repository change. The cache key includes the
@@ -537,7 +545,7 @@ On a cache miss, the action requests permission to save. The
 [`cache-policy`](../.github/actions/cache-policy/action.yml) action permits
 saves only on `master`. The publish job and both Go image-check jobs can save
 the image tar file. GitHub cache entries are immutable. Concurrent `master`
-jobs can pull the same 31 MB image. The first job to save the key creates the
+jobs can pull the same image. The first job to save the key creates the
 shared entry.
 
 [`setup-qemu.sh`](../.github/actions/run-docker-with-disk-space/setup-qemu.sh)

@@ -14,8 +14,11 @@ inputs:
     required: false
     default: 'false'
   binfmt-image:
-    description: 'Pinned Linux AMD64 binfmt image used for QEMU setup'
+    description: 'Digest-pinned binfmt image for a Linux AMD64 Docker host'
     required: false
+    # CI continues to use AMD64 build runners, so pin the AMD64 binfmt image.
+    # Multi-platform builds do not require the host to use AMD64.
+    # This digest selects one platform, not a multi-platform index.
     default: docker.io/tonistiigi/binfmt@sha256:465d3fdd28d0f2b871ba4b4ec98bd183292e96167f00d9fd40bd249f8632d705
   docker-username:
     description: 'Docker Hub username for a binfmt cache miss'
