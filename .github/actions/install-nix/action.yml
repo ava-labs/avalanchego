@@ -7,11 +7,11 @@ inputs:
     default: ${{ github.token }}
     required: false
   disable_go_proxy:
-    description: 'Disable GOPROXY after Go module-cache preparation'
+    description: 'Disable Go module downloads after preparation for Go tasks outside Bazel'
     default: 'true'
     required: false
   setup_go_module_cache:
-    description: 'Restore and prepare the shared Go module cache'
+    description: 'Restore and prepare dependencies for Go tasks outside Bazel, not Gazelle repositories'
     default: 'true'
     required: false
   request_nix_cache_save:

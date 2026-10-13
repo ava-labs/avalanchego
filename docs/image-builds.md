@@ -19,11 +19,11 @@ Antithesis test setups. Repository tasks provide the standard interface for
 these builds. Product-specific scripts configure Buildx and supply the inputs
 that each image needs.
 
-Image builds compile Go code without downloading dependencies from the network.
-The build scripts provide the repository's host module cache as an offline
-proxy. This design separates dependency preparation from image construction and
-keeps module downloads out of Dockerfile instructions. It prevents image
-construction from depending on network downloads.
+Go build instructions compile code without network access. The build scripts
+provide a local file proxy from the module cache for Go tasks outside Bazel.
+This separates dependency preparation from compilation in Dockerfiles. Other
+image-build operations, such as base-image pulls and package installation, can
+still require the network.
 
 ## Supported tasks
 
@@ -58,6 +58,10 @@ workflows restore and prepare shared caches before they run an image-build task.
 The build scripts consume those caches in CI instead of preparing them again.
 
 ## Go module dependencies
+
+These builds use the module cache for Go tasks outside Bazel, not CI's separate
+Gazelle cache. See [Go toolchains and dependency caches](./go-toolchains-and-caches.md)
+for the distinction between dependency inputs and compilation results.
 
 The build scripts pass only Go's module-download cache (`cache/download`) to
 BuildKit. They do not pass the extracted module trees, which are often larger
@@ -135,8 +139,8 @@ layers, run:
 The uncached build succeeds only if the host proxy cache contains every required
 module.
 
-Next, verify the offline restriction. Run the following command with an empty
-proxy cache. This command bypasses host-cache preparation.
+Next, verify that the Go build cannot download missing modules. Run the following
+command with an empty proxy cache. This command bypasses host-cache preparation.
 
 ```sh
 (

@@ -67,7 +67,9 @@ runs:
     # Install nix and ensure promtail and prometheus are available
     - uses: ./.github/actions/install-nix
       with:
-        # Bazel uses its own Go module cache.
+        # This switch skips cache preparation for Go tasks outside Bazel.
+        # It does not prepare their dependencies through Gazelle's cache.
+        # See docs/go-toolchains-and-caches.md#dependency-preparation.
         setup_go_module_cache: ${{ inputs.setup_bazel != 'true' }}
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
