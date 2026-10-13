@@ -91,8 +91,11 @@ func TestRollingGasThroughput(t *testing.T) {
 		},
 	}
 
-	var sum float64
-	for i, s := range steps {
+	var (
+		n   uint64
+		sum float64
+	)
+	for _, s := range steps {
 		t.Run(s.name, func(t *testing.T) {
 			sut.observe(s.span)
 
@@ -101,8 +104,8 @@ func TestRollingGasThroughput(t *testing.T) {
 				require.NoErrorf(t, sut.headroom.Write(&m), "%T.headroom.Write(%T)", sut, &m)
 				got := m.GetHistogram()
 
-				assert.Equal(t, uint64(i+1), got.GetSampleCount(), "sample count")
-				sum += s.wantHeadroom
+				n, sum = n+1, sum+s.wantHeadroom
+				assert.Equal(t, n, got.GetSampleCount(), "sample count")
 				assert.InDelta(t, sum, got.GetSampleSum(), 1e-9, "sample sum")
 			})
 
