@@ -134,7 +134,8 @@ func TestStandardExecutorTransformSubnetTxErrors(t *testing.T) {
 }
 
 // TestStandardExecutorTransformSubnetTx verifies the successful execution of
-// a [platform.TransformSubnetTx].
+// a [platform.TransformSubnetTx]. The tx is rejected post-Etna, and pre-Etna
+// txs pay no fee, so it has no inputs or outputs to assert on.
 func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 	require := require.New(t)
 
@@ -182,8 +183,6 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 	supply, err := diff.GetCurrentSupply(tx.Subnet)
 	require.NoError(err)
 	require.Equal(tx.InitialSupply, supply)
-
-	requireBaseTxApplied(t, env, diff, feeCalculator, stx)
 }
 
 // TestStandardExecutorCreateChainTxErrors verifies the failure cases of
@@ -351,10 +350,7 @@ func TestStandardExecutorCreateChainTx(t *testing.T) {
 // TestStandardExecutorCreateSubnetTxErrors verifies the failure cases of
 // [platform.CreateSubnetTx] execution.
 func TestStandardExecutorCreateSubnetTxErrors(t *testing.T) {
-	var (
-		env    = newEnvironment(t, upgradetest.Latest)
-		wallet = newWallet(t, env, walletConfig{})
-	)
+	env := newEnvironment(t, upgradetest.Latest)
 
 	tests := []struct {
 		name     string
@@ -386,6 +382,9 @@ func TestStandardExecutorCreateSubnetTxErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// A fresh wallet per subtest, so that it never spends an output of a
+			// tx from a previous subtest, which was never applied.
+			wallet := newWallet(t, env, walletConfig{})
 			tx, err := wallet.IssueCreateSubnetTx(
 				newOwner(),
 			)
