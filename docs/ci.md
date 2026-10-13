@@ -34,6 +34,8 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
   - [Start the Nix dev shell in composite actions](#start-the-nix-dev-shell-in-composite-actions)
 - [Runners and external actions](#runners-and-external-actions)
   - [Use versioned GitHub-hosted runners](#use-versioned-github-hosted-runners)
+  - [Use beefier runners for faster E2E jobs](#use-beefier-runners-for-faster-e2e-jobs)
+  - [Cache separation between runner providers](#cache-separation-between-runner-providers)
   - [Pin third-party actions](#pin-third-party-actions)
   - [Pinning does not eliminate supply-chain risk](#pinning-does-not-eliminate-supply-chain-risk)
 - [Validation](#validation)
@@ -708,6 +710,27 @@ version without a reviewed repository change.
 Versioned labels do not make runner images immutable. GitHub can update the image for
 a versioned label without a repository change, and those updates can break CI. A
 versioned label prevents an unreviewed move to a new OS version.
+
+### Use beefier runners for faster E2E jobs
+
+E2E testing can only run in serial on the standard resource-constrained GitHub
+runners. Parallel execution on standard runners results in unreliable execution due to
+contention. Running E2E testing on more capable (e.g. 4+ vCPUs) runners supports
+parallel execution so that jobs finish faster. Worth it on PRs for faster iteration.
+For scheduled jobs, serial execution on standard runners is generally preferable.
+
+### Cache separation between runner providers
+
+[Blacksmith redirects cache actions to its own cache
+backend](https://docs.blacksmith.sh/blacksmith-caching/dependencies-actions).
+Populating the GitHub Actions cache does not populate the Blacksmith cache, or vice
+versa. This separation applies to exact keys and fallback keys alike.
+
+Using both providers requires populating the caches twice. Each population requires
+network downloads, which increases exposure to download failures. Maintaining both
+caches also requires additional work. For now, this repository prefers GitHub-hosted
+runners to reduce that work and failure risk. We can reconsider that preference if we
+decide we require the higher capacity and reliability advertised by Blacksmith.
 
 ### Pin third-party actions
 
