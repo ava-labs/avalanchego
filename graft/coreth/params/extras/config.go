@@ -10,8 +10,8 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -79,7 +79,11 @@ var (
 		c.NetworkUpgrades.HeliconTimestamp = utils.PointerTo[uint64](0)
 	})
 
-	TestChainConfig = copyConfig(TestHeliconChainConfig)
+	TestIglooChainConfig = copyAndSet(TestHeliconChainConfig, func(c *ChainConfig) {
+		c.NetworkUpgrades.IglooTimestamp = utils.PointerTo[uint64](0)
+	})
+
+	TestChainConfig = copyConfig(TestGraniteChainConfig)
 )
 
 func copyConfig(c *ChainConfig) *ChainConfig {

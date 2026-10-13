@@ -15,7 +15,7 @@ import (
 	ids "github.com/ava-labs/avalanchego/ids"
 	avax "github.com/ava-labs/avalanchego/vms/components/avax"
 	verify "github.com/ava-labs/avalanchego/vms/components/verify"
-	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	platform "github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -44,7 +44,7 @@ func (m *Verifier) EXPECT() *VerifierMockRecorder {
 }
 
 // VerifySpend mocks base method.
-func (m *Verifier) VerifySpend(tx txs.UnsignedTx, utxoDB avax.UTXOGetter, ins []*avax.TransferableInput, outs []*avax.TransferableOutput, creds []verify.Verifiable, unlockedProduced map[ids.ID]uint64) error {
+func (m *Verifier) VerifySpend(tx platform.UnsignedTx, utxoDB avax.UTXOGetter, ins []*avax.TransferableInput, outs []*avax.TransferableOutput, creds []verify.Verifiable, unlockedProduced map[ids.ID]uint64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VerifySpend", tx, utxoDB, ins, outs, creds, unlockedProduced)
 	ret0, _ := ret[0].(error)
@@ -58,7 +58,7 @@ func (mr *VerifierMockRecorder) VerifySpend(tx, utxoDB, ins, outs, creds, unlock
 }
 
 // VerifySpendUTXOs mocks base method.
-func (m *Verifier) VerifySpendUTXOs(tx txs.UnsignedTx, utxos []*avax.UTXO, ins []*avax.TransferableInput, outs []*avax.TransferableOutput, creds []verify.Verifiable, unlockedProduced map[ids.ID]uint64) error {
+func (m *Verifier) VerifySpendUTXOs(tx platform.UnsignedTx, utxos []*avax.UTXO, ins []*avax.TransferableInput, outs []*avax.TransferableOutput, creds []verify.Verifiable, unlockedProduced map[ids.ID]uint64) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "VerifySpendUTXOs", tx, utxos, ins, outs, creds, unlockedProduced)
 	ret0, _ := ret[0].(error)

@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/graft/evm/utils/rpc"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -40,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -352,6 +352,14 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	log.Info("AVAX API enabled")
 	apis[avaxEndpoint] = avaxAPI
 	return apis, nil
+}
+
+// SetPreferenceWithContext implements [block.SetPreferenceWithContextChainVM].
+//
+// The context is never actually used by this implementation, so the preference
+// is just delegated to the normal SetPreference method.
+func (vm *VM) SetPreferenceWithContext(ctx context.Context, blkID ids.ID, _ *block.Context) error {
+	return vm.SetPreference(ctx, blkID)
 }
 
 // verifyTxAtTip verifies that [tx] is valid to be issued on top of the currently preferred block

@@ -44,4 +44,9 @@ for tag in "${TAGS[@]}"; do
 done
 
 echo "Pushing tags for $VERSION to $REMOTE:"
-git push "$REMOTE" "${TAGS[@]}"
+# GitHub does not create tag push/create events when more than three tags are
+# pushed at once, which prevents release workflows from running. Push the tags
+# individually so each push stays under that limit.
+for tag in "${TAGS[@]}"; do
+    git push "$REMOTE" "$tag"
+done

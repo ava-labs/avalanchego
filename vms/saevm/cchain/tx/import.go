@@ -11,9 +11,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 
-	// Imported for [atomic.UnsignedImportTx.Burned] comment resolution.
-	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -68,9 +65,8 @@ func (i *Import) inputIDs() set.Set[ids.ID] {
 	return s
 }
 
-// Like [atomic.UnsignedImportTx.Burned], burned will error if the sum of the
-// inputs exceeds MaxUint64, even if the total amount burned could be
-// represented as a uint64.
+// burned will error if the sum of the inputs exceeds MaxUint64, even if the
+// total amount burned could be represented as a uint64.
 //
 // Because the total supply of AVAX fits in a uint64, this doesn't matter in
 // practice and allows for easier fuzzing.

@@ -25,8 +25,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
@@ -35,15 +33,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	cchainlibevm "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 )
 
 func TestMain(m *testing.M) {
-	evm.RegisterAllLibEVMExtras()
+	cchainlibevm.RegisterExtras()
 	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
 }
 
@@ -140,7 +141,7 @@ func newSUT(tb testing.TB, state libevm.StateReader) (context.Context, *SUT) {
 	snowCtx.Log = log
 	pool, err := New(
 		snowCtx,
-		saetest.ChainConfig(),
+		cchaintest.ChainConfig(),
 		NewPending(),
 		backend,
 		maxSize,
@@ -168,49 +169,7 @@ func (s *SUT) markAsExecuted(tb testing.TB, block *types.Block, state libevm.Sta
 	// Sending a second event guarantees that this function returns after the
 	// pool's goroutine has processed the first event. We pass an empty block to
 	// avoid removing more conflicts after this function returns.
-	s.backend.markAsExecuted(newBlock(tb), state)
-}
-
-// A blockOption configures the default block properties created by [newBlock].
-type blockOption = options.Option[blockProperties]
-
-type blockProperties struct {
-	ethTxs  []*types.Transaction
-	avaxTxs []*tx.Tx
-}
-
-func withEthTxs(txs ...*types.Transaction) blockOption {
-	return options.Func[blockProperties](func(p *blockProperties) {
-		p.ethTxs = txs
-	})
-}
-
-func withAvaxTxs(txs ...*tx.Tx) blockOption {
-	return options.Func[blockProperties](func(p *blockProperties) {
-		p.avaxTxs = txs
-	})
-}
-
-// blockHeight is the block number used by [newBlock].
-var blockHeight = big.NewInt(1)
-
-func newBlock(tb testing.TB, opts ...blockOption) *types.Block {
-	tb.Helper()
-
-	props := options.ApplyTo(&blockProperties{}, opts...)
-	b, err := tx.MarshalSlice(props.avaxTxs)
-	require.NoErrorf(tb, err, "tx.MarshalSlice(%d)", len(props.avaxTxs))
-	return customtypes.NewBlockWithExtData(
-		&types.Header{
-			Number: blockHeight,
-		},
-		props.ethTxs,
-		nil, // uncles
-		nil, // receipts
-		saetest.TrieHasher(),
-		b,
-		true,
-	)
+	s.backend.markAsExecuted(cchaintest.NewTestBlock(tb), state)
 }
 
 // An exportOption configures the default export properties created by
@@ -316,7 +275,7 @@ func newKey(tb testing.TB) *secp256k1.PrivateKey {
 func newEth(tb testing.TB, key *secp256k1.PrivateKey) *types.Transaction {
 	tb.Helper()
 
-	signer := types.MakeSigner(saetest.ChainConfig(), blockHeight, 0)
+	signer := types.MakeSigner(saetest.ChainConfig(), big.NewInt(1), 0)
 	tx, err := types.SignNewTx(key.ToECDSA(), signer, &types.LegacyTx{
 		Gas: params.TxGas,
 		To:  &common.Address{},
@@ -368,12 +327,20 @@ func TestAdd(t *testing.T) {
 		missingCreds = newExport(t, []*secp256k1.PrivateKey{alice}, withCredentials(nil))
 	)
 
+	// Each single-sig input costs 1000 gas of signature verification alone, so
+	// 1000 of them exceed the 1M minimum gas target.
+	manySigKeys := make([]*secp256k1.PrivateKey, 1_000)
+	for i := range manySigKeys {
+		manySigKeys[i] = newKey(t)
+	}
+	manySigs := newExport(t, manySigKeys)
+
 	allKeys := []*secp256k1.PrivateKey{alice, bob, charles}
 	maxSizeTxs := make([]*tx.Tx, maxSize)
 	for i := range maxSizeTxs {
 		sk := newKey(t)
 		allKeys = append(allKeys, sk)
-		amount := lowFee + uint64(i) //#nosec G115 -- Won't overflow
+		amount := lowFee + uint64(i)
 		maxSizeTxs[i] = newExport(t, []*secp256k1.PrivateKey{sk}, withAmount(amount))
 	}
 	slices.Reverse(maxSizeTxs) // Sorted by descending fee.
@@ -395,6 +362,11 @@ func TestAdd(t *testing.T) {
 			name:    "as_op_failure",
 			toAdd:   unmarshalable,
 			wantErr: errAsOp,
+		},
+		{
+			name:    "gas_over_minimum_target",
+			toAdd:   manySigs,
+			wantErr: errExcessGas,
 		},
 		{
 			name:    "verify_credentials_failure",
@@ -505,20 +477,20 @@ func TestUpdateEvictsConflicts(t *testing.T) {
 	}{
 		{
 			name: "no_conflicts_leave_pool_unchanged",
-			block: newBlock(
+			block: cchaintest.NewTestBlock(
 				t,
-				withEthTxs(newEth(t, newKey(t))),
-				withAvaxTxs(newExport(t, []*secp256k1.PrivateKey{newKey(t)})),
+				cchaintest.WithEthTxs(newEth(t, newKey(t))),
+				cchaintest.WithCrossChainTxs(newExport(t, []*secp256k1.PrivateKey{newKey(t)})),
 			),
 			wantPool: []*tx.Tx{initTx},
 		},
 		{
 			name:  "eth_tx_conflict_evicts_tx",
-			block: newBlock(t, withEthTxs(newEth(t, sk))),
+			block: cchaintest.NewTestBlock(t, cchaintest.WithEthTxs(newEth(t, sk))),
 		},
 		{
 			name:  "avax_tx_conflict_evicts_tx",
-			block: newBlock(t, withAvaxTxs(newExport(t, []*secp256k1.PrivateKey{sk}))),
+			block: cchaintest.NewTestBlock(t, cchaintest.WithCrossChainTxs(newExport(t, []*secp256k1.PrivateKey{sk}))),
 		},
 	}
 	for _, tt := range tests {
@@ -545,7 +517,7 @@ func TestStateUpdate(t *testing.T) {
 	sut.assertEquals(ctx, t)
 
 	hasBalance := newState(t, sk)
-	sut.markAsExecuted(t, newBlock(t), hasBalance)
+	sut.markAsExecuted(t, cchaintest.NewTestBlock(t), hasBalance)
 	require.NoErrorf(t, sut.Add(tx), "%T.Add()", sut)
 	sut.assertEquals(ctx, t, tx)
 }

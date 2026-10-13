@@ -27,11 +27,11 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 
 	ethcore "github.com/ava-labs/libevm/core"
 )
@@ -57,6 +57,7 @@ var (
 	errParentBeaconRootNonEmpty            = errors.New("invalid non-empty parentBeaconRoot")
 	errBlobGasUsedNilInCancun              = errors.New("blob gas used must not be nil in Cancun")
 	errBlobsNotEnabled                     = errors.New("blobs not enabled on avalanche networks")
+	errIsHeliconBlock                      = errors.New("helicon blocks are not valid pre-SAE")
 )
 
 var (
@@ -339,13 +340,33 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	}
 
 	header := b.ethBlock.Header()
+
 	// Ensure MinDelayExcess is consistent with rules and minimum block delay is enforced.
 	if err := customheader.VerifyMinDelayExcess(extraConfig, parent, header); err != nil {
+		return err
+	}
+	// Ensure TargetExponent is unset. The ACP-176 field belongs to SAE and
+	// must never appear on a coreth block.
+	if err := customheader.VerifyTargetExponent(header); err != nil {
+		return err
+	}
+	// Ensure MinPriceExponent is unset. The ACP-283 field belongs to SAE and
+	// must never appear on a coreth block.
+	if err := customheader.VerifyMinPriceExponent(header); err != nil {
 		return err
 	}
 	// Ensure Time and TimeMilliseconds are consistent with rules.
 	if err := customheader.VerifyTime(extraConfig, parent, header, b.vm.clock.Time()); err != nil {
 		return err
+	}
+	// Ensure settled block marker fields are unset. The fields belong to SAE
+	// and must never appear on a coreth block.
+	if err := customheader.VerifySettled(header); err != nil {
+		return err
+	}
+
+	if extraConfig.IsHelicon(header.Time) {
+		return errIsHeliconBlock
 	}
 
 	// If the VM is not marked as bootstrapped the other chains may also be
@@ -424,9 +445,9 @@ func (b *wrappedBlock) syntacticVerify() error {
 	if uncleHash != ethHeader.UncleHash {
 		return fmt.Errorf("invalid uncle hash %v does not match calculated uncle hash %v", ethHeader.UncleHash, uncleHash)
 	}
-	// Coinbase must match the BlackholeAddr on C-Chain
-	if ethHeader.Coinbase != constants.BlackholeAddr {
-		return fmt.Errorf("invalid coinbase %v does not match required blackhole address %v", ethHeader.Coinbase, constants.BlackholeAddr)
+	// Coinbase must match the blackhole address on C-Chain
+	if ethHeader.Coinbase != blackhole.Address {
+		return fmt.Errorf("invalid coinbase %v does not match required blackhole address %v", ethHeader.Coinbase, blackhole.Address)
 	}
 	// Block must not have any uncles
 	if len(b.ethBlock.Uncles()) > 0 {

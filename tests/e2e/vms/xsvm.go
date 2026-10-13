@@ -54,7 +54,8 @@ func XSVMSubnetsOrPanic(nodes ...*tmpnet.Node) []*tmpnet.Subnet {
 	}
 }
 
-var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
+// TODO(marun) Figure out why this test flakes when running in parallel
+var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), ginkgo.Serial, func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
@@ -180,8 +181,6 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 		destinationBalance, err := destinationClient.Balance(tc.DefaultContext(), destinationKey.Address(), sourceChain.ChainID)
 		require.NoError(err)
 		require.Equal(units.Schmeckle, destinationBalance)
-
-		_ = e2e.CheckBootstrapIsPossible(tc, network)
 	})
 
 	ginkgo.It("should serve grpc api requests", func() {

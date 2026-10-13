@@ -6,8 +6,8 @@ go_library(
     srcs = [
         "locked_calculator.go",
         "manager.go",
-        "no_op_calculator.go",
         "state.go",
+        "test_calculator.go",
         "test_state.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/snow/uptime",

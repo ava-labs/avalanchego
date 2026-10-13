@@ -134,8 +134,21 @@ func (be *blockExtension) SyntacticVerify(rules extras.Rules) error {
 		return ErrEmptyBlock
 	}
 
+	return nil
+}
+
+// SemanticVerify checks the semantic validity of the block. This is called by the wrapper
+// block manager's SemanticVerify method.
+func (be *blockExtension) SemanticVerify() error {
+	vm := be.blockExtender.vm
+	ethBlock := be.block.GetEthBlock()
+	rules := vm.rules(ethBlock.Number(), ethBlock.Time())
+
 	// If we are in ApricotPhase4, ensure that ExtDataGasUsed is populated correctly.
 	if rules.IsApricotPhase4 {
+		headerExtra := customtypes.GetHeaderExtra(ethBlock.Header())
+		atomicTxs := be.atomicTxs
+
 		// After the F upgrade, the extDataGasUsed field is validated by
 		// [header.VerifyGasUsed].
 		if !rules.IsFortuna && rules.IsApricotPhase5 {
@@ -163,13 +176,6 @@ func (be *blockExtension) SyntacticVerify(rules extras.Rules) error {
 		}
 	}
 
-	return nil
-}
-
-// SemanticVerify checks the semantic validity of the block. This is called by the wrapper
-// block manager's SemanticVerify method.
-func (be *blockExtension) SemanticVerify() error {
-	vm := be.blockExtender.vm
 	if vm.bootstrapped.Get() {
 		// Verify that the UTXOs named in import txs are present in shared
 		// memory.

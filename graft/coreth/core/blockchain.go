@@ -51,6 +51,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/evm/prefetch"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/lru"
@@ -393,8 +394,6 @@ func NewBlockChain(
 	if cacheConfig == nil {
 		return nil, errCacheConfigNotSpecified
 	}
-	// Open trie database with provided config
-	triedb := triedb.NewDatabase(db, cacheConfig.triedbConfig())
 
 	// Setup the genesis block, commit the provided genesis specification
 	// to database if the genesis block is not present yet, or load the
@@ -402,10 +401,19 @@ func NewBlockChain(
 	// Note: In go-ethereum, the code rewinds the chain on an incompatible config upgrade.
 	// We don't do this and expect the node operator to always update their node's configuration
 	// before network upgrades take effect.
-	chainConfig, _, err := SetupGenesisBlock(db, triedb, genesis, lastAcceptedHash, skipChainConfigCheckCompatible)
-	if err != nil {
-		return nil, err
+	//
+	// This MUST be closed and re-opened to guarantee Firewood persists the genesis root.
+	var chainConfig *params.ChainConfig
+	{
+		tdb := triedb.NewDatabase(db, cacheConfig.triedbConfig())
+		var err error
+		chainConfig, _, err = SetupGenesisBlock(db, tdb, genesis, lastAcceptedHash, skipChainConfigCheckCompatible)
+		err = errors.Join(err, tdb.Close())
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	log.Info("")
 	log.Info(strings.Repeat("-", 153))
 	for _, line := range strings.Split(chainConfig.Description(), "\n") {
@@ -419,7 +427,7 @@ func NewBlockChain(
 		chainConfig:       chainConfig,
 		cacheConfig:       cacheConfig,
 		db:                db,
-		triedb:            triedb,
+		triedb:            triedb.NewDatabase(db, cacheConfig.triedbConfig()),
 		bodyCache:         lru.NewCache[common.Hash, *types.Body](bodyCacheLimit),
 		receiptsCache:     lru.NewCache[common.Hash, []*types.Receipt](receiptsCacheLimit),
 		blockCache:        lru.NewCache[common.Hash, *types.Block](blockCacheLimit),
@@ -436,6 +444,7 @@ func NewBlockChain(
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.processor = NewStateProcessor(chainConfig, bc, engine)
 
+	var err error
 	bc.hc, err = NewHeaderChain(db, chainConfig, cacheConfig, engine)
 	if err != nil {
 		return nil, err
@@ -530,6 +539,7 @@ func (bc *BlockChain) batchBlockAcceptedIndices(batch ethdb.Batch, b *types.Bloc
 	if err := customrawdb.WriteAcceptorTip(batch, b.Hash()); err != nil {
 		return fmt.Errorf("%w: failed to write acceptor tip key", err)
 	}
+	rawdb.WriteFinalizedBlockHash(batch, b.Hash())
 	return nil
 }
 
@@ -760,6 +770,21 @@ func (bc *BlockChain) loadLastState(lastAcceptedHash common.Hash) error {
 		return fmt.Errorf("could not load last accepted block")
 	}
 
+	// SAE requires these values to be set to the last accepted hash on
+	// transition. Nodes that do not accept any blocks after upgrading before
+	// transition wouldn't otherwise correctly set these values.
+	{
+		lastAcceptedHash := bc.lastAccepted.Hash()
+		if finalized := rawdb.ReadFinalizedBlockHash(bc.db); finalized != lastAcceptedHash {
+			log.Info("Repairing finalized block hash", "from", finalized, "to", lastAcceptedHash)
+			rawdb.WriteFinalizedBlockHash(bc.db, lastAcceptedHash)
+		}
+		if headFast := rawdb.ReadHeadFastBlockHash(bc.db); headFast != lastAcceptedHash {
+			log.Info("Repairing head fast block hash", "from", headFast, "to", lastAcceptedHash)
+			rawdb.WriteHeadFastBlockHash(bc.db, lastAcceptedHash)
+		}
+	}
+
 	// This ensures that the head block is updated to the last accepted block on startup
 	if err := bc.setPreference(bc.lastAccepted); err != nil {
 		return fmt.Errorf("failed to set preference to last accepted block while loading last state: %w", err)
@@ -785,6 +810,10 @@ func (bc *BlockChain) loadGenesisState() error {
 	bc.currentBlock.Store(bc.genesisBlock.Header())
 	bc.hc.SetGenesis(bc.genesisBlock.Header())
 	bc.hc.SetCurrentHeader(bc.genesisBlock.Header())
+
+	if tdb, ok := bc.triedb.Backend().(*firewood.TrieDB); ok {
+		tdb.SetHashAndHeight(bc.genesisBlock.Hash(), 0)
+	}
 	return nil
 }
 
@@ -842,7 +871,7 @@ func (bc *BlockChain) writeHeadBlock(block *types.Block) {
 	// Add the block to the canonical chain number scheme and mark as the head
 	batch := bc.db.NewBatch()
 	rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
-
+	rawdb.WriteHeadFastBlockHash(batch, block.Hash())
 	rawdb.WriteHeadBlockHash(batch, block.Hash())
 	rawdb.WriteHeadHeaderHash(batch, block.Hash())
 
@@ -1386,7 +1415,7 @@ func (bc *BlockChain) insertBlock(block *types.Block, writes bool) error {
 	blockStateInitTimer.Inc(time.Since(substart).Milliseconds())
 
 	// Enable prefetching to pull in trie node paths while processing transactions
-	statedb.StartPrefetcher("chain", extstate.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
+	statedb.StartPrefetcher("chain", prefetch.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
 	defer statedb.StopPrefetcher()
 
 	// Process block using the parent state as reference point
@@ -1749,7 +1778,7 @@ func (bc *BlockChain) reprocessBlock(parent *types.Block, current *types.Block) 
 	}
 
 	// Enable prefetching to pull in trie node paths while processing transactions
-	statedb.StartPrefetcher("chain", extstate.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
+	statedb.StartPrefetcher("chain", prefetch.WithConcurrentWorkers(bc.cacheConfig.TriePrefetcherParallelism))
 	defer statedb.StopPrefetcher()
 
 	// Process previously stored block
@@ -2191,6 +2220,7 @@ func (bc *BlockChain) ResetToStateSyncedBlock(block *types.Block) error {
 	}
 	rawdb.WriteHeadBlockHash(batch, block.Hash())
 	rawdb.WriteHeadHeaderHash(batch, block.Hash())
+	rawdb.WriteHeadFastBlockHash(batch, block.Hash())
 	customrawdb.WriteSnapshotBlockHash(batch, block.Hash())
 	rawdb.WriteSnapshotRoot(batch, block.Root())
 	if err := customrawdb.WriteSyncPerformed(batch, block.NumberU64()); err != nil {

@@ -1,0 +1,86 @@
+name: build-linux-package
+description: Build and validate an avalanchego Linux package (RPM or DEB)
+
+# This composite action lives under .github/packaging/ so that the overlay
+# checkout (which workflows do for older tags that predate the packaging
+# implementation) makes it available alongside the rest of the packaging
+# tree. Calling workflows invoke it as `./.github/packaging/actions/build-package`
+# *after* the overlay step.
+
+inputs:
+  format:
+    description: 'Package format (rpm or deb)'
+    required: true
+  package-arch:
+    description: 'Package architecture (x86_64/aarch64 for RPM, amd64/arm64 for DEB)'
+    required: true
+  tag-input:
+    description: 'Explicit tag from workflow_dispatch (empty for tag-push or PR)'
+    required: false
+    default: ''
+  gpg-private-key:
+    description: 'GPG private key content (empty for ephemeral PR/local signing)'
+    required: false
+    default: ''
+  gpg-passphrase:
+    description: 'GPG key passphrase'
+    required: false
+    default: ''
+  release:
+    description: 'Set to "true" for release builds; missing GPG key is then fatal'
+    required: false
+    default: 'false'
+
+outputs:
+  # The tag is derived purely from the dispatch input / git ref (see
+  # workflow-setup-packaging.sh); it is independent of `format` and
+  # `package-arch`. Callers that fan this action out across a matrix can
+  # therefore rely on every leg emitting the same tag value.
+  tag:
+    description: 'Resolved package tag (e.g. v1.14.1 or v0.0.0-pr.<sha>)'
+    value: ${{ steps.setup.outputs.tag }}
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/setup-go-for-project
+
+    - name: Set up packaging environment
+      id: setup
+      shell: bash
+      run: ./.github/packaging/scripts/workflow-setup-packaging.sh
+      env:
+        TAG_INPUT: ${{ inputs.tag-input }}
+        GPG_PRIVATE_KEY: ${{ inputs.gpg-private-key }}
+        RELEASE: ${{ inputs.release == 'true' && 'true' || '' }}
+
+    - name: Build and validate ${{ inputs.format }} packages
+      shell: bash
+      run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-${{ inputs.format }}s
+      env:
+        PACKAGING_TAG: ${{ steps.setup.outputs.tag }}
+        PACKAGE_ARCH: ${{ inputs.package-arch }}
+        GPG_KEY_FILE: ${{ steps.setup.outputs.gpg-key-file }}
+        GPG_KEY_PASSPHRASE: ${{ inputs.gpg-passphrase }}
+
+    - name: Upload packages as artifacts
+      if: inputs.release == 'true'
+      uses: actions/upload-artifact@v6
+      with:
+        name: ${{ inputs.format }}s-${{ inputs.package-arch }}
+        path: |
+          build/${{ inputs.format }}/avalanchego-${{ steps.setup.outputs.tag }}-${{ inputs.package-arch }}.${{ inputs.format }}
+          build/${{ inputs.format }}/subnet-evm-${{ steps.setup.outputs.tag }}-${{ inputs.package-arch }}.${{ inputs.format }}
+          build/${{ inputs.format }}/GPG-KEY-avalanchego
+
+    - name: Cleanup
+      if: always()
+      shell: bash
+      env:
+        FORMAT: ${{ inputs.format }}
+        GPG_KEY_FILE: ${{ steps.setup.outputs.gpg-key-file }}
+      run: |
+        if [[ -n "${GPG_KEY_FILE}" ]]; then
+          rm -f "${GPG_KEY_FILE}"
+        fi
+        sudo rm -rf "build/${FORMAT}" build/gpg

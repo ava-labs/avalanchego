@@ -42,6 +42,7 @@ graft_go_test(
     ],
     embed = [":warp"],
     deps = [
+        "//graft/evm/utils",
         "//graft/evm/utils/utilstest",
         "//graft/subnet-evm/core/extstate",
         "//graft/subnet-evm/params/extras",

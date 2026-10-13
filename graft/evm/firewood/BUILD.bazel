@@ -9,6 +9,7 @@ go_library(
         "metrics.go",
         "reconstructed_state.go",
         "reconstructed_trie.go",
+        "reconstructed_triedb.go",
         "state.go",
         "storage_trie.go",
         "triedb.go",

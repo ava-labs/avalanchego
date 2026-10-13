@@ -7,8 +7,3 @@ package utils
 func Zero[T any]() (_ T) {
 	return
 }
-
-// PointerTo returns a pointer to the provided value.
-func PointerTo[T any](v T) *T {
-	return &v
-}

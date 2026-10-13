@@ -47,6 +47,7 @@ graft_go_test(
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/precompileconfig",
         "//graft/coreth/precompile/precompiletest",
+        "//graft/evm/utils",
         "//ids",
         "//snow",
         "//snow/engine/snowman/block",

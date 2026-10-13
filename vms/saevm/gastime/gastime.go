@@ -11,8 +11,8 @@ import (
 
 	"github.com/holiman/uint256"
 
+	"github.com/ava-labs/avalanchego/utils/math/intmath"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/intmath"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
 
@@ -43,15 +43,17 @@ type Time struct {
 // New returns a new [Time], derived from a [time.Time]. The consumption of
 // `target` * [TargetToRate] units of [gas.Gas] is equivalent to a tick of 1
 // second.
-//
-// TODO(StephenButtolph): startingExcess is pretty difficult for a caller to
-// meaningfully provide. We should instead take in startingPrice.
-func New(at time.Time, target, startingExcess gas.Gas, c GasPriceConfig) (*Time, error) {
-	tm := proxytime.Of[gas.Gas](at)
+func New(at time.Time, target gas.Gas, startingPrice gas.Price, c GasPriceConfig) (*Time, error) {
 	target = clampTarget(target)
-	tm.SetRate(rateOf(target))
+	excess := excessForPrice(startingPrice, c.TargetToExcessScaling, target)
+	return newFromExcess(at, target, excess, c)
+}
 
-	return FromProxyTime(tm, startingExcess, c)
+func newFromExcess(at time.Time, target gas.Gas, excess gas.Gas, c GasPriceConfig) (*Time, error) {
+	pt := proxytime.Of[gas.Gas](at)
+	target = clampTarget(target)
+	pt.SetRate(rateOf(target))
+	return FromProxyTime(pt, excess, c)
 }
 
 var errZeroTarget = errors.New("zero target not allowed")

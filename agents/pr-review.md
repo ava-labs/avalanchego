@@ -1,5 +1,3 @@
-Review this pull request. The PR branch is checked out in the current working directory.
-
 Skim the PR description for intent. Comment on a gap between what it claims and what the diff does only when that gap is **obvious** (not slight wording drift) and it affects correctness, safety, or maintainability.
 
 ## Areas to look at
@@ -14,7 +12,6 @@ Skim the PR description for intent. Comment on a gap between what it claims and 
 
 ## How to leave feedback
 
-- Prefer **inline comments** on the relevant lines when supported; each note should suggest an outcome or next step.
 - For cross-cutting concerns, one comment that ties threads together can be clearer than repeating the same idea on every file.
 - Avoid repeating what formatters, linters, or CI already cover unless something is objectively wrong.
 - **Fewer, higher-signal** comments are better than commenting on every file—silence is acceptable when the change looks sound.

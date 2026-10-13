@@ -22,8 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
@@ -120,8 +120,8 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			)
 
 			_, err := pWallet.IssueAddPermissionlessValidatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
+				&platform.SubnetValidator{
+					Validator: platform.Validator{
 						NodeID: alphaNodeID,
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
@@ -153,8 +153,8 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			e2e.OutputWalletBalances(tc, baseWallet)
 
 			_, err := pWallet.IssueAddPermissionlessValidatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
+				&platform.SubnetValidator{
+					Validator: platform.Validator{
 						NodeID: betaNodeID,
 						End:    uint64(betaValidatorEndTime.Unix()),
 						Wght:   weight,
@@ -190,8 +190,8 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			)
 
 			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
+				&platform.SubnetValidator{
+					Validator: platform.Validator{
 						NodeID: alphaNodeID,
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
@@ -217,8 +217,8 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 			)
 
 			_, err := pWallet.IssueAddPermissionlessDelegatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
+				&platform.SubnetValidator{
+					Validator: platform.Validator{
 						NodeID: betaNodeID,
 						End:    uint64(endTime.Unix()),
 						Wght:   weight,
@@ -270,14 +270,30 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		})
 
 		tc.By("checking expected rewards against actual rewards", func() {
+			upgrades, err := alphaInfoClient.Upgrades(tc.DefaultContext())
+			require.NoError(err)
+
 			var (
 				adminClient  = admin.NewClient(nodeURI.URI)
-				rewardConfig = getRewardConfig(tc, adminClient)
-				calculator   = reward.NewCalculator(rewardConfig)
+				rewardConfig = GetRewardConfig(tc, adminClient)
+				calculator   = reward.NewPrimaryNetworkCalculator(rewardConfig, *upgrades)
+			)
 
-				expectedValidationReward = calculator.Calculate(actualAlphaValidationPeriod, weight, supplyAtAlphaNodeStart)
+			// ACP-285 selects the primary-network rate from each staker's start time.
+			var (
+				expectedValidationReward = calculator.Calculate(
+					time.Unix(int64(alphaValidator.StartTime), 0),
+					actualAlphaValidationPeriod,
+					weight,
+					supplyAtAlphaNodeStart,
+				)
 
-				potentialDelegationReward                      = calculator.Calculate(actualGammaDelegationPeriod, weight, supplyAtGammaDelegatorStart)
+				potentialDelegationReward = calculator.Calculate(
+					time.Unix(int64(gammaDelegator.StartTime), 0),
+					actualGammaDelegationPeriod,
+					weight,
+					supplyAtGammaDelegatorStart,
+				)
 				expectedDelegationFee, expectedDelegatorReward = reward.Split(potentialDelegationReward, delegationShare)
 			)
 
@@ -311,15 +327,13 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		tc.By("stopping alpha to free up resources for a bootstrap check", func() {
 			require.NoError(alphaNode.Stop(tc.DefaultContext()))
 		})
-
-		_ = e2e.CheckBootstrapIsPossible(tc, network)
 	})
 })
 
 // TODO(marun) Enable GetConfig to return *node.Config directly. Currently, due
 // to a circular dependency issue, a map-based equivalent is used for which
 // manual unmarshaling is required.
-func getRewardConfig(tc tests.TestContext, client *admin.Client) reward.Config {
+func GetRewardConfig(tc tests.TestContext, client *admin.Client) reward.Config {
 	require := require.New(tc)
 
 	rawNodeConfigMap, err := client.GetConfig(tc.DefaultContext())

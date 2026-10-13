@@ -31,15 +31,15 @@ While it also has a notion of a "safe" block (with reduced probability of re-org
 
 #### Mapping
 
-| SAE      | `rawdb`   |
-| -------- | --------- |
-| Accepted | Canonical |
-| Executed | Head      |
-| Settled  | Finalized |
+| SAE      | `rawdb`             |
+| -------- | ------------------- |
+| Accepted | Canonical, HeadFast |
+| Executed | Head                |
+| Settled  | Finalized           |
 
 #### Rationale
 
-* Accepted and canonical are effectively identical concepts, save for nuanced differences between the consensus mechanisms.
+* Accepted and canonical are effectively identical concepts, save for nuanced differences between the consensus mechanisms. `libevm`'s `HeadFast` denotes a recorded block whose state has not yet been executed; this aligns with SAE's definition of Accepted and is convenient for indexing the last-accepted block.
 
 * From an API perspective, we treat "latest" (i.e. the chain head) as the last-executed block.
 Mirroring this on disk allows for simple integration with the upstream API implementations.
@@ -111,6 +111,11 @@ An example is a chain-head subscription, be it in the same binary or over a webs
 > [!NOTE]
 > Although by definition $b_n \in A$ i.f.f. $\Sigma_n \subset S$, in practice it may not be possible to realise side effects atomically.
 > The chosen ordering of settlement then acceptance is for practical reasons as code with access to $b_n$ can typically access $\Sigma_n$ but not vice versa, so inverting the order would provide zero benefit.
+
+> [!NOTE]
+> A synchronous block settles itself, so $\Sigma_n = \\{b_n\\}$.
+> It must be accepted before it can be executed, and executed before it can be settled. This ordering conflicts with (2), so synchronous blocks are exempt from that rule.
+> Their acceptance is realised before their settlement, just as for asynchronous blocks awaiting settlement.
 
 #### Polling vs Broadcast
 

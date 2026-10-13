@@ -62,9 +62,19 @@ func (RulesExtra) CanExecuteTransaction(common.Address, *common.Address, libevm.
 	return nil
 }
 
+func (r RulesExtra) ShouldRefundGas() bool {
+	return !r.IsSubnetEVM
+}
+
 // MinimumGasConsumption is a no-op.
 func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
+}
+
+// ShouldCreditBaseFeeToCoinbase is unused, as subnet-evm never calls libevm's
+// implementation of core for message or transaction execution.
+func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
+	return (ethparams.NOOPHooks{}).ShouldCreditBaseFeeToCoinbase()
 }
 
 // AccessListGas computes the intrinsic gas for an access list.

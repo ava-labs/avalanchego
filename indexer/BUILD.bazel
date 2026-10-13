@@ -33,7 +33,6 @@ go_library(
         "//utils/rpc",
         "//utils/timer/mockable",
         "//utils/wrappers",
-        "@com_github_gorilla_rpc//v2:rpc",
         "@org_uber_go_zap//:zap",
     ],
 )

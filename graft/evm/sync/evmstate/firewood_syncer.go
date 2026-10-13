@@ -5,7 +5,6 @@ package evmstate
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
@@ -30,7 +29,7 @@ type FirewoodSyncer struct {
 	cancel    context.CancelFunc
 	codeQueue *code.Queue
 	// finalizeOnce is initialized in the constructor to make Finalize idempotent.
-	finalizeOnce func() error
+	finalizeOnce func()
 }
 
 func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Hash, codeQueue *code.Queue, client *p2p.Client) (*FirewoodSyncer, error) {
@@ -49,7 +48,7 @@ func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Has
 		cancel:    func() {}, // overwritten in Sync
 		codeQueue: codeQueue,
 	}
-	f.finalizeOnce = sync.OnceValue(f.finish)
+	f.finalizeOnce = sync.OnceFunc(f.finish)
 	return f, nil
 }
 
@@ -63,18 +62,16 @@ func (f *FirewoodSyncer) Sync(ctx context.Context) error {
 }
 
 func (f *FirewoodSyncer) Finalize() error {
-	return f.finalizeOnce()
+	f.finalizeOnce()
+	return nil
 }
 
 // finish performs the finalization logic for the FirewoodSyncer inside a [sync.Once].
 // This is linked to the [sync.Once] in the constructor, and should not be called directly.
-func (f *FirewoodSyncer) finish() error {
+func (f *FirewoodSyncer) finish() {
 	// Ensure the syncer stops work and the code queue closes on exit.
 	f.cancel()
-	if err := f.codeQueue.Finalize(); err != nil {
-		return fmt.Errorf("finalizing code queue: %w", err)
-	}
-	return nil
+	f.codeQueue.DoneAdding()
 }
 
 func (*FirewoodSyncer) ID() string {

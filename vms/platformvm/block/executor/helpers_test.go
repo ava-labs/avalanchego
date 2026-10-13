@@ -34,11 +34,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
@@ -59,7 +59,7 @@ const (
 	defaultTxFee = 100 * units.NanoAvax
 )
 
-var testSubnet1 *txs.Tx
+var testSubnet1 *platform.Tx
 
 type stakerStatus uint
 
@@ -111,14 +111,13 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 
 	res.fx = defaultFx(res.clk, res.ctx.Log, res.isBootstrapped.Get())
 
-	rewardsCalc := reward.NewCalculator(res.config.RewardConfig)
-
 	res.state = statetest.New(t, statetest.Config{
-		DB:         res.baseDB,
-		Genesis:    genesistest.NewBytes(t, genesistest.Config{}),
-		Validators: res.config.Validators,
-		Context:    res.ctx,
-		Rewards:    rewardsCalc,
+		DB:           res.baseDB,
+		Genesis:      genesistest.NewBytes(t, genesistest.Config{}),
+		Validators:   res.config.Validators,
+		Upgrades:     res.config.UpgradeConfig,
+		Context:      res.ctx,
+		RewardConfig: res.config.RewardConfig,
 	})
 
 	res.uptimes = uptime.NewManager(res.state, res.clk)
@@ -132,7 +131,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 		Fx:           res.fx,
 		FlowChecker:  res.utxosVerifier,
 		Uptimes:      res.uptimes,
-		Rewards:      rewardsCalc,
 	}
 
 	registerer := prometheus.NewRegistry()
@@ -322,7 +320,7 @@ func addPendingValidator(
 	nodeID ids.NodeID,
 	rewardAddress ids.ShortID,
 	keys []*secp256k1.PrivateKey,
-) *txs.Tx {
+) *platform.Tx {
 	require := require.New(t)
 
 	wallet := newWallet(t, env, walletConfig{
@@ -330,7 +328,7 @@ func addPendingValidator(
 	})
 
 	addValidatorTx, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
 			End:    uint64(endTime.Unix()),
@@ -346,7 +344,7 @@ func addPendingValidator(
 
 	staker, err := state.NewPendingStaker(
 		addValidatorTx.ID(),
-		addValidatorTx.Unsigned.(*txs.AddValidatorTx),
+		addValidatorTx.Unsigned.(*platform.AddValidatorTx),
 	)
 	require.NoError(err)
 

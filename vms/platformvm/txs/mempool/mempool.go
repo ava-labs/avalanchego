@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/setmap"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 
@@ -34,7 +34,7 @@ var (
 )
 
 type meteredTx struct {
-	*txs.Tx
+	*platform.Tx
 	// gasPrice is the amount of AVAX burned per unit of gas used by this tx
 	gasPrice float64
 	gasUsed  gas.Gas
@@ -105,7 +105,7 @@ func New(
 }
 
 // Add adds `tx` to the mempool and clears its dropped status.
-func (m *Mempool) Add(tx *txs.Tx) error {
+func (m *Mempool) Add(tx *platform.Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -173,7 +173,7 @@ func (m *Mempool) allocateSpace(txToAdd meteredTx) bool {
 	return true
 }
 
-func (m *Mempool) meter(tx *txs.Tx) (meteredTx, error) {
+func (m *Mempool) meter(tx *platform.Tx) (meteredTx, error) {
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx.Unsigned)
 	if err != nil {
 		return meteredTx{}, fmt.Errorf("getting utxos %w", err)
@@ -236,7 +236,7 @@ func (m *Mempool) updateMetrics() {
 }
 
 // Get returns the tx corresponding to `txID` and if it was present
-func (m *Mempool) Get(txID ids.ID) (*txs.Tx, bool) {
+func (m *Mempool) Get(txID ids.ID) (*platform.Tx, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -278,7 +278,7 @@ func (m *Mempool) RemoveConflicts(utxos set.Set[ids.ID]) {
 }
 
 // Peek returns a tx in the mempool and if it was present
-func (m *Mempool) Peek() (*txs.Tx, bool) {
+func (m *Mempool) Peek() (*platform.Tx, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -287,7 +287,7 @@ func (m *Mempool) Peek() (*txs.Tx, bool) {
 }
 
 // Iterate calls `f` over each tx in the mempool
-func (m *Mempool) Iterate(f func(tx *txs.Tx) bool) {
+func (m *Mempool) Iterate(f func(tx *platform.Tx) bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 

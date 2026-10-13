@@ -9,7 +9,10 @@ go_library(
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/platformvm/reward",
     visibility = ["//visibility:public"],
-    deps = ["//utils/math"],
+    deps = [
+        "//upgrade",
+        "//utils/math",
+    ],
 )
 
 go_test(
@@ -20,6 +23,7 @@ go_test(
     ],
     embed = [":reward"],
     deps = [
+        "//upgrade/upgradetest",
         "//utils/units",
         "@com_github_stretchr_testify//require",
     ],

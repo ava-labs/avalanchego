@@ -24,5 +24,6 @@ go_test(
         "string_test.go",
     ],
     embed = [":version"],
+    embedsrcs = ["current.txt"],
     deps = ["@com_github_stretchr_testify//require"],
 )

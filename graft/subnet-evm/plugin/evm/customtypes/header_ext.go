@@ -120,6 +120,18 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 	SetHeaderExtra(dst, cp)
 }
 
+func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
+	if h.BlockGasCost != nil {
+		m["blockGasCost"] = (*hexutil.Big)(h.BlockGasCost)
+	}
+	if h.TimeMilliseconds != nil {
+		m["timestampMilliseconds"] = hexutil.Uint64(*h.TimeMilliseconds)
+	}
+	if h.MinDelayExcess != nil {
+		m["minDelayExcess"] = hexutil.Uint64(*h.MinDelayExcess)
+	}
+}
+
 func (h *HeaderSerializable) updateFromEth(eth *ethtypes.Header) {
 	h.ParentHash = eth.ParentHash
 	h.UncleHash = eth.UncleHash

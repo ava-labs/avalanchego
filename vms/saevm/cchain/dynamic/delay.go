@@ -3,13 +3,28 @@
 
 package dynamic
 
-import "github.com/ava-labs/avalanchego/vms/components/gas"
+import (
+	"time"
+
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+)
 
 // DelayExponent encodes the minimum block delay.
 //
 // Implements ACP-226, specified here:
 // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/226-dynamic-minimum-block-times/README.md
 type DelayExponent uint64
+
+// InitialDelayExponent is the ACP-226 initial delay exponent. It is the
+// smallest exponent whose [DelayExponent.Delay] decodes to the 2000ms initial
+// minimum block delay, obtained by inverting the
+// Delay = minimum·e^(exponent/conversionRate) formula (minimum = 1ms,
+// conversionRate = 2²⁰) for a 2000ms target and rounding up so the floored
+// decode reaches 2000ms exactly:
+//
+//	InitialDelayExponent = ⌊conversionRate·ln(2000/minimum)⌋ + 1
+//	                     = ⌊2²⁰·ln(2000)⌋ + 1
+const InitialDelayExponent DelayExponent = 7_970_124
 
 // Delay returns the minimum block delay in milliseconds.
 //
@@ -24,6 +39,12 @@ func (d DelayExponent) Delay() uint64 {
 		gas.Gas(d),
 		conversionRate,
 	))
+}
+
+// DelayDuration returns the minimum block delay ([DelayExponent.Delay], which
+// is denominated in milliseconds) as a [time.Duration].
+func (d DelayExponent) DelayDuration() time.Duration {
+	return time.Duration(d.Delay()) * time.Millisecond //#nosec G115 -- Delay() returns ms values that fit in int64 for centuries
 }
 
 // Toward returns a new value where d is moved to be as close as possible to

@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/holiman/uint256"
@@ -63,8 +65,8 @@ func TestReconstructedRevisions(t *testing.T) {
 		r.NoError(recon.Drop())
 	})
 
-	reconDB, err := NewReconstructedStateAccessor(db, recon, true /* computeRootOnHash */)
-	r.NoError(err)
+	reconTrieDB := NewReconstructedTrieDB(tdb, recon, true /* computeRootOnHash */)
+	reconDB := NewStateAccessor(state.NewDatabaseWithNodeDB(rawdb.NewMemoryDatabase(), reconTrieDB))
 
 	var (
 		newBalances = []*uint256.Int{
@@ -148,8 +150,8 @@ func TestReconstructedCopyTrie(t *testing.T) {
 		require.NoError(t, recon.Drop())
 	})
 
-	reconDB, err := NewReconstructedStateAccessor(db, recon, true /* computeRootOnHash */)
-	require.NoError(t, err)
+	reconTrieDB := NewReconstructedTrieDB(tdb, recon, true /* computeRootOnHash */)
+	reconDB := NewStateAccessor(state.NewDatabaseWithNodeDB(rawdb.NewMemoryDatabase(), reconTrieDB))
 
 	// Create the reconstructed trie to compare against.
 	reconTrie, err := reconDB.OpenTrie(initialRoot)
@@ -215,8 +217,8 @@ func TestReconstructedRevisionHashing(t *testing.T) {
 
 	// First, use the reconstructed view with computeRootOnHash=false so that Hash
 	// flushes pending writes but returns the cached root.
-	replayAccessor, err := NewReconstructedStateAccessor(db, recon, false /* computeRootOnHash */)
-	require.NoError(t, err)
+	replayTrieDB := NewReconstructedTrieDB(tdb, recon, false /* computeRootOnHash */)
+	replayAccessor := NewStateAccessor(state.NewDatabaseWithNodeDB(rawdb.NewMemoryDatabase(), replayTrieDB))
 	replayTrie, err := replayAccessor.OpenTrie(initialRoot)
 	require.NoError(t, err)
 	require.NoError(t, replayTrie.UpdateAccount(addr, &types.StateAccount{Balance: uint256.NewInt(200)}))

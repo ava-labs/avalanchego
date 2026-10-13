@@ -9,7 +9,25 @@ if ! command -v solc &> /dev/null; then
   exit 1
 fi
 
-CONTRACTS_DIR="$(dirname "$0")"
+CONTRACTS_DIR="$(cd "$(dirname "$0")" && pwd)"
+readonly abigen_version='v1.13.14-0.2.0.release'
+
+# Use the versioned package path when module-proxy access is available so
+# generation works from a clean checkout. If the caller disables module-proxy
+# access, a compatible module cache must be prepared before invoking this script.
+run_abigen() {
+  if [[ "${GOPROXY:-}" == "off" ]]; then
+    local abigen_dir
+    abigen_dir="$(go env GOMODCACHE)/github.com/ava-labs/libevm@${abigen_version}"
+    (
+      cd "${abigen_dir}"
+      go run ./cmd/abigen "$@"
+    )
+    return
+  fi
+
+  go run "github.com/ava-labs/libevm/cmd/abigen@${abigen_version}" "$@"
+}
 TEMPDIR=$(mktemp -d)
 
 cleanup() {
@@ -42,7 +60,7 @@ for FILE in "${CONTRACTS_DIR}"/*.sol; do
   echo "Generating Go bindings from Solidity contract $FILE..."
   CONTRACT_NAME=$(basename "$FILE" .sol)
   solc --evm-version="cancun" --abi --bin --overwrite -o "$TEMPDIR" "${CONTRACTS_DIR}/${CONTRACT_NAME}.sol"
-  go run github.com/ava-labs/libevm/cmd/abigen@v1.13.14-0.2.0.release \
+  run_abigen \
     --bin="${TEMPDIR}/${CONTRACT_NAME}.bin" \
     --abi="${TEMPDIR}/${CONTRACT_NAME}.abi" \
     --type "$CONTRACT_NAME" \

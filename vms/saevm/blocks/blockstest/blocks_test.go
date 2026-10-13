@@ -64,7 +64,7 @@ func TestIntegration(t *testing.T) {
 	dest := common.Address{'d', 'e', 's', 't'}
 	for i := range numBlocks {
 		// Genesis is block 0
-		blockNum := uint64(i + 1) //#nosec G115 -- Known to not overflow
+		blockNum := uint64(i + 1)
 
 		var txs types.Transactions
 		for range txsPerAccountPerBlock {
@@ -123,8 +123,7 @@ func TestNewGenesis(t *testing.T) {
 	alloc := saetest.MaxAllocFor(wallet.Addresses()...)
 
 	db := rawdb.NewMemoryDatabase()
-	xdb := saetest.NewExecutionResultsDB()
-	gen := NewGenesis(t, db, xdb, config, alloc)
+	gen := NewGenesis(t, db, config, alloc)
 
 	assert.True(t, gen.Executed(), "genesis.Executed()")
 	require.NoError(t, gen.WaitUntilSettled(t.Context()), "genesis.WaitUntilSettled()")

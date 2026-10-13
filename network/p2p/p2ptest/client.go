@@ -131,7 +131,7 @@ func NewClientWithPeers(
 
 	peerSampler := p2p.PeerSampler{Peers: &p2p.Peers{}}
 	for nodeID := range peers {
-		peerSampler.Peers.Connected(nodeID)
+		peerSampler.Peers.Connected(nodeID, nil)
 	}
 
 	return peerNetworks[clientNodeID].NewClient(0, peerSampler)

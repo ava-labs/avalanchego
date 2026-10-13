@@ -12,6 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
+// ACP267UptimeRequirement is the 90% Primary Network uptime requirement
+// introduced by ACP-267.
+const ACP267UptimeRequirement = .9
+
 type StakingConfig struct {
 	// Staking uptime requirements
 	UptimeRequirement float64 `json:"uptimeRequirement"`
@@ -31,6 +35,9 @@ type StakingConfig struct {
 	// MaxStakeDuration is the maximum amount of time a validator can validate
 	// for in a single period.
 	MaxStakeDuration time.Duration `json:"maxStakeDuration"`
+	// HeliconMinStakeDuration is the minimum staking duration for the primary
+	// network after the Helicon upgrade (ACP-273).
+	HeliconMinStakeDuration time.Duration `json:"heliconMinStakeDuration"`
 	// RewardConfig is the config for the reward function.
 	RewardConfig reward.Config `json:"rewardConfig"`
 }

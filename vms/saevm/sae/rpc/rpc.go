@@ -11,6 +11,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
+	"runtime"
 	"time"
 
 	"github.com/ava-labs/libevm/accounts"
@@ -24,6 +26,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/gasprice"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -58,16 +61,44 @@ type Chain interface {
 	SubscribeLogsEvent(chan<- []*types.Log) event.Subscription
 }
 
-// Config controls which JSON-RPC namespaces are enabled and their resource
-// limits.
+// Config controls which JSON-RPC APIs are enabled and their resource limits.
 type Config struct {
+	// APIs are the [API]s to register. Methods of an absent API are not served,
+	// returning a "method not found" error instead. See [DefaultAPIs].
+	APIs set.Set[API]
+
+	// Resource limits
 	BlocksPerBloomSection uint64
-	EnableDBInspecting    bool
-	EnableProfiling       bool
-	DisableTracing        bool
-	EVMTimeout            time.Duration
+	CallTimeout           time.Duration // per call or batch; 0 = no limit
 	GasCap                uint64
-	TxFeeCap              float64 // 0 = no cap
+	BatchRequestLimit     uint64 // 0 = no limit
+
+	// Transaction submission
+	TxFeeCap            float64 // 0 = no cap
+	AllowUnprotectedTxs bool
+
+	ResolvePendingToLastExecuted bool
+}
+
+var (
+	// ErrBatchRequestLimitTooLarge means [Config.BatchRequestLimit] overflows an int.
+	ErrBatchRequestLimitTooLarge = errors.New("batch request limit exceeds max")
+	// ErrUnknownAPI means [Config.APIs] contains an API that doesn't exist.
+	ErrUnknownAPI = errors.New("unknown API")
+)
+
+// Verify checks that all values in c are within usable bounds.
+func (c Config) Verify() error {
+	if c.BatchRequestLimit > math.MaxInt {
+		return fmt.Errorf("%w: %d > %d", ErrBatchRequestLimitTooLarge, c.BatchRequestLimit, math.MaxInt)
+	}
+	known := AllAPIs()
+	for a := range c.APIs {
+		if !known.Contains(a) {
+			return fmt.Errorf("%w: %q", ErrUnknownAPI, a)
+		}
+	}
+	return nil
 }
 
 // A Provider provides an [rpc.Server] along with the raw geth backends that
@@ -80,11 +111,16 @@ type Provider struct {
 
 // New constructs a new [Provider].
 func New(chain Chain, config Config) (*Provider, error) {
+	if err := config.Verify(); err != nil {
+		return nil, err
+	}
+
 	price, err := gasprice.NewEstimator(&estimatorBackend{chain}, chain.Logger(), gasprice.DefaultConfig())
 	if err != nil {
 		return nil, fmt.Errorf("gasprice.NewEstimator(...): %v", err)
 	}
 
+	replaySlots := max(1, runtime.GOMAXPROCS(0)-1)
 	chainIdx := chainIndexer{chain}
 	override := bloomOverrider{chain}
 
@@ -99,6 +135,7 @@ func New(chain Chain, config Config) (*Provider, error) {
 		chain.Mempool(),
 		chainIdx,
 		override,
+		make(chan struct{}, replaySlots),
 		newBloomIndexer(
 			// TODO(alarso16): if we are state syncing, we need to provide the
 			// first block available to the indexer via

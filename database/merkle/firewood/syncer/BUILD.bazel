@@ -34,6 +34,7 @@ go_test(
         "//ids",
         "//network/p2p/p2ptest",
         "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
+        "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_goleak//:goleak",

@@ -22,8 +22,8 @@ func (b *backend) RPCTxFeeCap() float64 {
 	return b.config.TxFeeCap
 }
 
-func (*backend) UnprotectedAllowed() bool {
-	return false
+func (b *backend) UnprotectedAllowed() bool {
+	return b.config.AllowUnprotectedTxs
 }
 
 // ExtRPCEnabled reports that external RPC access is enabled. This adds an

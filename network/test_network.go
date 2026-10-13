@@ -166,6 +166,7 @@ func NewTestNetworkConfig(
 			1,
 		)),
 		NetworkID:                    networkID,
+		UpgradeConfig:                upgrade.GetConfig(networkID),
 		MaxClockDifference:           constants.DefaultNetworkMaxClockDifference,
 		PingFrequency:                constants.DefaultPingFrequency,
 		AllowPrivateIPs:              !constants.ProductionNetworkIDs.Contains(networkID),
@@ -175,7 +176,7 @@ func NewTestNetworkConfig(
 		TrackedSubnets:               trackedSubnets,
 		Beacons:                      validators.NewManager(),
 		Validators:                   currentValidators,
-		UptimeCalculator:             uptime.NoOpCalculator,
+		UptimeCalculator:             uptime.TestCalculator{},
 		UptimeMetricFreq:             constants.DefaultUptimeMetricFreq,
 		RequireValidatorToConnect:    constants.DefaultNetworkRequireValidatorToConnect,
 		MaximumInboundMessageTimeout: constants.DefaultNetworkMaximumInboundTimeout,
@@ -220,9 +221,10 @@ func NewTestNetwork(
 		return nil, err
 	}
 
+	upgrades := upgrade.GetConfig(cfg.NetworkID)
 	return NewNetwork(
 		cfg,
-		upgrade.GetConfig(cfg.NetworkID).GraniteTime, // Must be updated for each network upgrade
+		upgrades.LatestTime(),
 		msgCreator,
 		metrics,
 		log,

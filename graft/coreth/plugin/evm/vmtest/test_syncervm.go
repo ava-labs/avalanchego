@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
@@ -42,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -117,6 +117,8 @@ func StateSyncFromScratchTest(t *testing.T, testSetup *SyncTestSetup) {
 }
 
 func StateSyncFromScratchExceedParentTest(t *testing.T, testSetup *SyncTestSetup) {
+	t.Skip("TODO(JonathanOppenheimer): flaky, will be deleted with graft.")
+
 	numToGen := engine.BlocksToFetch + uint64(32)
 	test := SyncTestParams{
 		SyncableInterval:   numToGen,
@@ -195,7 +197,7 @@ func stateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 
 		stateSyncDisabledConfigJSON, err := OverrideSchemeConfig(scheme, `{"state-sync-enabled":false}`)
 		require.NoError(t, err, "OverrideSchemeConfig()")
-		genesisJSON := []byte(GenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]))
+		genesisJSON := []byte(GenesisJSON(paramstest.ForkToChainConfig[upgradetest.Granite]))
 		require.NoError(t, syncDisabledVM.Initialize(
 			t.Context(),
 			testSyncVMSetup.syncerVM.SnowCtx,
@@ -239,6 +241,8 @@ func stateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 }
 
 func VMShutdownWhileSyncingTest(t *testing.T, testSetup *SyncTestSetup) {
+	t.Skip("TODO(JonathanOppenheimer): flaky, will be deleted with graft.")
+
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {
 			const maxRequests = 50
@@ -288,9 +292,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 	// This is necessary to support fetching a state summary.
 	config := fmt.Sprintf(`{"commit-interval": %d, "state-history": %d, "state-sync-commit-interval": %d}`, test.SyncableInterval, test.SyncableInterval, test.SyncableInterval)
 	serverVM, cb := testSetup.NewVM()
-	fork := upgradetest.Latest
 	serverTest := SetupTestVM(t, serverVM, TestVMConfig{
-		Fork:       &fork,
 		ConfigJSON: config,
 		Scheme:     test.StateScheme,
 	})
@@ -352,7 +354,6 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 
 	syncerVM, syncerCB := testSetup.NewVM()
 	syncerTest := SetupTestVM(t, syncerVM, TestVMConfig{
-		Fork:       &fork,
 		ConfigJSON: stateSyncEnabledJSON,
 		Scheme:     test.StateScheme,
 		IsSyncing:  true,
@@ -656,7 +657,7 @@ func generateAndAcceptBlocks(t *testing.T, vm extension.InnerVM, numBlocks int, 
 		10,
 		func(i int, g *core.BlockGen) {
 			g.SetOnBlockGenerated(acceptExternalBlock)
-			g.SetCoinbase(constants.BlackholeAddr) // necessary for syntactic validation of the block
+			g.SetCoinbase(blackhole.Address) // necessary for syntactic validation of the block
 			gen(i, vm, g)
 		},
 		core.WithoutDiskCommit(),

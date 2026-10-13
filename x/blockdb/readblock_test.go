@@ -292,3 +292,18 @@ func TestHasBlock(t *testing.T) {
 		})
 	}
 }
+
+func TestGetRejectsIndexedHeightMismatch(t *testing.T) {
+	db := newDatabase(t, DefaultConfig())
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	require.NoError(t, db.Put(0, []byte("first block")))
+	require.NoError(t, db.Put(1, []byte("second block")))
+	entry, err := db.readIndexEntry(1)
+	require.NoError(t, err)
+	offset, err := db.indexEntryOffset(0)
+	require.NoError(t, err)
+	require.NoError(t, db.writeIndexEntryAt(offset, entry.Offset, entry.Size))
+
+	_, err = db.Get(0)
+	require.ErrorIs(t, err, ErrCorrupted)
+}

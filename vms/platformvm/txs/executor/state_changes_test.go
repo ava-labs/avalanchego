@@ -22,10 +22,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
@@ -373,7 +373,7 @@ func TestAdvanceTimeTo_UpdateL1Validators(t *testing.T) {
 
 // Regression test for a case where a pending delegator and validator are promoted to current stakers. Only Apricot can
 // trip this regression, because after Apricot pending validators always sort before pending delegators according to
-// txs.Priority.
+// platform.Priority.
 func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 	s := statetest.New(t, statetest.Config{})
 
@@ -392,7 +392,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 		StartTime: startTime,
 		EndTime:   endTime,
 		NextTime:  startTime,
-		Priority:  txs.PrimaryNetworkValidatorPendingPriority,
+		Priority:  platform.PrimaryNetworkValidatorPendingPriority,
 	}))
 
 	s.PutPendingDelegator(&state.Staker{
@@ -404,7 +404,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 		StartTime: startTime,
 		EndTime:   endTime,
 		NextTime:  startTime,
-		Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
+		Priority:  platform.PrimaryNetworkDelegatorApricotPendingPriority,
 	})
 
 	updated, err := AdvanceTimeTo(
@@ -412,14 +412,14 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 			Config: &config.Internal{
 				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
-				UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+				RewardConfig: reward.Config{
+					MaxConsumptionRate: .12 * reward.PercentDenominator,
+					MinConsumptionRate: .1 * reward.PercentDenominator,
+					MintingPeriod:      365 * 24 * time.Hour,
+					SupplyCap:          720 * units.MegaAvax,
+				},
+				UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
 			},
-			Rewards: reward.NewCalculator(reward.Config{
-				MaxConsumptionRate: .12 * reward.PercentDenominator,
-				MinConsumptionRate: .1 * reward.PercentDenominator,
-				MintingPeriod:      365 * 24 * time.Hour,
-				SupplyCap:          720 * units.MegaAvax,
-			}),
 		},
 		s,
 		startTime,
@@ -430,14 +430,14 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator(t *testing.T) {
 	// Check that the stakers got promoted to current
 	gotValidator, err := s.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
-	require.Equal(t, txs.PrimaryNetworkValidatorCurrentPriority, gotValidator.Priority)
+	require.Equal(t, platform.PrimaryNetworkValidatorCurrentPriority, gotValidator.Priority)
 
 	currentDelegatorItr, err := s.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
 	defer currentDelegatorItr.Release()
 
 	require.True(t, currentDelegatorItr.Next())
-	require.Equal(t, txs.PrimaryNetworkDelegatorCurrentPriority, currentDelegatorItr.Value().Priority)
+	require.Equal(t, platform.PrimaryNetworkDelegatorCurrentPriority, currentDelegatorItr.Value().Priority)
 
 	// Check that they are no longer pending
 	_, err = s.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
@@ -471,7 +471,7 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 		StartTime: startTime,
 		EndTime:   endTime,
 		NextTime:  startTime,
-		Priority:  txs.PrimaryNetworkValidatorPendingPriority,
+		Priority:  platform.PrimaryNetworkValidatorPendingPriority,
 	}))
 
 	s.PutPendingDelegator(&state.Staker{
@@ -482,31 +482,32 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 		StartTime: startTime,
 		EndTime:   endTime,
 		NextTime:  startTime,
-		Priority:  txs.PrimaryNetworkDelegatorApricotPendingPriority,
+		Priority:  platform.PrimaryNetworkDelegatorApricotPendingPriority,
 	})
 
-	rewards := reward.NewCalculator(reward.Config{
+	rewardConfig := reward.Config{
 		MaxConsumptionRate: .12 * reward.PercentDenominator,
 		MinConsumptionRate: .1 * reward.PercentDenominator,
 		MintingPeriod:      365 * 24 * time.Hour,
 		SupplyCap:          720 * units.MegaAvax,
-	})
+	}
+	rewards := reward.NewCalculator(rewardConfig)
 
 	initialSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(t, err)
 
 	duration := endTime.Sub(startTime)
-	wantDelegatorReward := rewards.Calculate(duration, delegatorWeight, initialSupply)
-	wantValidatorReward := rewards.Calculate(duration, validatorWeight, initialSupply+wantDelegatorReward)
+	wantDelegatorReward := rewards.Calculate(startTime, duration, delegatorWeight, initialSupply)
+	wantValidatorReward := rewards.Calculate(startTime, duration, validatorWeight, initialSupply+wantDelegatorReward)
 
 	_, err = AdvanceTimeTo(
 		&Backend{
 			Config: &config.Internal{
 				DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 				ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
+				RewardConfig:       rewardConfig,
 				UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
 			},
-			Rewards: rewards,
 		},
 		s,
 		startTime,
@@ -526,4 +527,54 @@ func TestAdvanceTimeTo_PromotePendingDelegatorAndValidator_PreservesRewardOrder(
 	gotSupply, err := s.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(t, err)
 	require.Equal(t, initialSupply+wantDelegatorReward+wantValidatorReward, gotSupply)
+}
+
+func TestGetRewardsCalculatorTransformedSubnetConfig(t *testing.T) {
+	const heliconRampDuration = 90 * 24 * time.Hour
+	heliconTime := time.Unix(1_000_000, 0)
+	postRampStartTime := heliconTime.Add(heliconRampDuration + time.Second)
+	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(upgradetest.Helicon, heliconTime)
+
+	primaryConfig := genesis.MainnetParams.StakingConfig.RewardConfig
+	transformConfig := primaryConfig
+	// Set MinConsumptionRate above the ACP-285 target so primary network
+	// reward upgrades would alter the reward if applied.
+	transformConfig.MinConsumptionRate = 90_000
+
+	transformedSubnet := ids.GenerateTestID()
+	transformedState := statetest.New(t, statetest.Config{})
+	transformedState.AddSubnetTransformation(&platform.Tx{Unsigned: &platform.TransformSubnetTx{
+		Subnet:             transformedSubnet,
+		MaxConsumptionRate: transformConfig.MaxConsumptionRate,
+		MinConsumptionRate: transformConfig.MinConsumptionRate,
+		MaximumSupply:      transformConfig.SupplyCap,
+	}})
+
+	rewards, err := GetRewardsCalculator(
+		primaryConfig,
+		upgradeConfig,
+		transformedState,
+		transformedSubnet,
+	)
+	require.NoError(t, err)
+
+	const (
+		stakeDuration = 14 * 24 * time.Hour
+		stakedAmount  = units.MegaAvax
+		currentSupply = 5 * units.MegaAvax
+	)
+	want := reward.NewCalculator(transformConfig).Calculate(
+		postRampStartTime,
+		stakeDuration,
+		stakedAmount,
+		currentSupply,
+	)
+
+	got := rewards.Calculate(
+		postRampStartTime,
+		stakeDuration,
+		stakedAmount,
+		currentSupply,
+	)
+	require.Equal(t, want, got)
 }

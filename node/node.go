@@ -84,9 +84,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
-	coreth "github.com/ava-labs/avalanchego/graft/coreth/plugin/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
+	saevm "github.com/ava-labs/avalanchego/vms/saevm/cchain"
 )
 
 const (
@@ -615,6 +615,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	n.Config.NetworkConfig.MyNodeID = n.ID
 	n.Config.NetworkConfig.MyIPPort = atomicIP
 	n.Config.NetworkConfig.NetworkID = n.Config.NetworkID
+	n.Config.NetworkConfig.UpgradeConfig = n.Config.UpgradeConfig
 	n.Config.NetworkConfig.Validators = n.vdrs
 	n.Config.NetworkConfig.Beacons = n.bootstrappers
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
@@ -629,7 +630,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
-		n.Config.UpgradeConfig.GraniteTime,
+		n.Config.UpgradeConfig.LatestTime(),
 		n.msgCreator,
 		reg,
 		n.Log,
@@ -1212,6 +1213,7 @@ func (n *Node) initVMs() error {
 				MinDelegationFee:          n.Config.MinDelegationFee,
 				MinStakeDuration:          n.Config.MinStakeDuration,
 				MaxStakeDuration:          n.Config.MaxStakeDuration,
+				HeliconMinStakeDuration:   n.Config.HeliconMinStakeDuration,
 				RewardConfig:              n.Config.RewardConfig,
 				UpgradeConfig:             n.Config.UpgradeConfig,
 				UseCurrentHeight:          n.Config.UseCurrentHeight,
@@ -1224,7 +1226,7 @@ func (n *Node) initVMs() error {
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 			},
 		}),
-		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &coreth.Factory{}),
+		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &saevm.Factory{}),
 	)
 	if err != nil {
 		return err
@@ -1525,7 +1527,7 @@ func (n *Node) initHealthAPI() error {
 	// are expensive calls. This could be rewritten as an event based monitor to
 	// avoid expensive iteration.
 	var (
-		localUpgradeTime     = n.Config.UpgradeConfig.GraniteTime
+		localUpgradeTime     = n.Config.UpgradeConfig.LatestTime()
 		localUpgradeTimeUnix = uint64(localUpgradeTime.Unix())
 		lastLogTime          time.Time
 	)

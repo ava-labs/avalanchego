@@ -15,6 +15,10 @@ import (
 // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/283-dynamic-minimum-gas-price/README.md
 type PriceExponent uint64
 
+// InitialPriceExponent is the initial price exponent. Its price is the 1 wei
+// minimum.
+const InitialPriceExponent PriceExponent = 0
+
 // Price returns the minimum gas price in wei (aAVAX).
 //
 // Price = minimum * e^(p / conversionRate)

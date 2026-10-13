@@ -42,6 +42,7 @@ const (
 	MinDelegatorStakeKey                     = "min-delegator-stake"
 	MinDelegatorFeeKey                       = "min-delegation-fee"
 	MinStakeDurationKey                      = "min-stake-duration"
+	HeliconMinStakeDurationKey               = "helicon-min-stake-duration"
 	MaxStakeDurationKey                      = "max-stake-duration"
 	StakeMaxConsumptionRateKey               = "stake-max-consumption-rate"
 	StakeMinConsumptionRateKey               = "stake-min-consumption-rate"

@@ -15,8 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 var (
@@ -44,7 +44,7 @@ type Verifier interface {
 	//
 	// Note: [unlockedProduced] is modified by this method.
 	VerifySpend(
-		tx txs.UnsignedTx,
+		tx platform.UnsignedTx,
 		utxoDB avax.UTXOGetter,
 		ins []*avax.TransferableInput,
 		outs []*avax.TransferableOutput,
@@ -64,7 +64,7 @@ type Verifier interface {
 	//
 	// Note: [unlockedProduced] is modified by this method.
 	VerifySpendUTXOs(
-		tx txs.UnsignedTx,
+		tx platform.UnsignedTx,
 		utxos []*avax.UTXO,
 		ins []*avax.TransferableInput,
 		outs []*avax.TransferableOutput,
@@ -92,7 +92,7 @@ type verifier struct {
 }
 
 func (h *verifier) VerifySpend(
-	tx txs.UnsignedTx,
+	tx platform.UnsignedTx,
 	utxoDB avax.UTXOGetter,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
@@ -116,7 +116,7 @@ func (h *verifier) VerifySpend(
 }
 
 func (h *verifier) VerifySpendUTXOs(
-	tx txs.UnsignedTx,
+	tx platform.UnsignedTx,
 	utxos []*avax.UTXO,
 	ins []*avax.TransferableInput,
 	outs []*avax.TransferableOutput,
@@ -219,7 +219,7 @@ func (h *verifier) VerifySpendUTXOs(
 			return fmt.Errorf("expected fx.Owned but got %T", out)
 		}
 		owner := owned.Owners()
-		ownerBytes, err := txs.Codec.Marshal(txs.CodecVersion, owner)
+		ownerBytes, err := platform.Codec.Marshal(platform.CodecVersion, owner)
 		if err != nil {
 			return fmt.Errorf("couldn't marshal owner: %w", err)
 		}
@@ -268,7 +268,7 @@ func (h *verifier) VerifySpendUTXOs(
 			return fmt.Errorf("expected fx.Owned but got %T", out)
 		}
 		owner := owned.Owners()
-		ownerBytes, err := txs.Codec.Marshal(txs.CodecVersion, owner)
+		ownerBytes, err := platform.Codec.Marshal(platform.CodecVersion, owner)
 		if err != nil {
 			return fmt.Errorf("couldn't marshal owner: %w", err)
 		}
@@ -334,7 +334,7 @@ func (h *verifier) VerifySpendUTXOs(
 
 // GetInputOutputs returns the input/output utxos and any AVAX that is produced
 // as part of the execution of the tx
-func GetInputOutputs(tx txs.UnsignedTx) (
+func GetInputOutputs(tx platform.UnsignedTx) (
 	[]*avax.TransferableInput,
 	[]*avax.TransferableOutput,
 	uint64,
@@ -359,93 +359,93 @@ type inputOutputGetter struct {
 	ProducedAVAX uint64
 }
 
-func (i *inputOutputGetter) AddValidatorTx(tx *txs.AddValidatorTx) error {
+func (i *inputOutputGetter) AddValidatorTx(tx *platform.AddValidatorTx) error {
 	i.getUTXOs(tx.BaseTx)
 	i.OutputUTXOs = append(i.OutputUTXOs, tx.StakeOuts...)
 
 	return nil
 }
 
-func (i *inputOutputGetter) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+func (i *inputOutputGetter) AddSubnetValidatorTx(tx *platform.AddSubnetValidatorTx) error {
 	i.getUTXOs(tx.BaseTx)
 
 	return nil
 }
 
-func (i *inputOutputGetter) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+func (i *inputOutputGetter) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 	i.getUTXOs(tx.BaseTx)
 	i.OutputUTXOs = append(i.OutputUTXOs, tx.StakeOuts...)
 
 	return nil
 }
 
-func (i *inputOutputGetter) CreateChainTx(tx *txs.CreateChainTx) error {
+func (i *inputOutputGetter) CreateChainTx(tx *platform.CreateChainTx) error {
 	i.getUTXOs(tx.BaseTx)
 
 	return nil
 }
 
-func (i *inputOutputGetter) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+func (i *inputOutputGetter) CreateSubnetTx(tx *platform.CreateSubnetTx) error {
 	i.getUTXOs(tx.BaseTx)
 
 	return nil
 }
 
-func (i *inputOutputGetter) ImportTx(tx *txs.ImportTx) error {
+func (i *inputOutputGetter) ImportTx(tx *platform.ImportTx) error {
 	i.getUTXOs(tx.BaseTx)
 	i.InputUTXOs = append(i.InputUTXOs, tx.ImportedInputs...)
 
 	return nil
 }
 
-func (i *inputOutputGetter) ExportTx(tx *txs.ExportTx) error {
+func (i *inputOutputGetter) ExportTx(tx *platform.ExportTx) error {
 	i.getUTXOs(tx.BaseTx)
 	i.OutputUTXOs = append(i.OutputUTXOs, tx.ExportedOutputs...)
 
 	return nil
 }
 
-func (*inputOutputGetter) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+func (*inputOutputGetter) AdvanceTimeTx(*platform.AdvanceTimeTx) error {
 	return fmt.Errorf("%w: AdvanceTimeTx", ErrUnsupportedTxType)
 }
 
-func (*inputOutputGetter) RewardValidatorTx(*txs.RewardValidatorTx) error {
+func (*inputOutputGetter) RewardValidatorTx(*platform.RewardValidatorTx) error {
 	return fmt.Errorf("%w: RewardValidatorTx", ErrUnsupportedTxType)
 }
 
-func (i *inputOutputGetter) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+func (i *inputOutputGetter) RemoveSubnetValidatorTx(tx *platform.RemoveSubnetValidatorTx) error {
 	i.getUTXOs(tx.BaseTx)
 
 	return nil
 }
 
-func (i *inputOutputGetter) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+func (i *inputOutputGetter) TransformSubnetTx(tx *platform.TransformSubnetTx) error {
 	i.getUTXOs(tx.BaseTx)
 
 	return nil
 }
 
-func (i *inputOutputGetter) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
-	i.getUTXOs(tx.BaseTx)
-	i.OutputUTXOs = append(i.OutputUTXOs, tx.StakeOuts...)
-
-	return nil
-}
-
-func (i *inputOutputGetter) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+func (i *inputOutputGetter) AddPermissionlessValidatorTx(tx *platform.AddPermissionlessValidatorTx) error {
 	i.getUTXOs(tx.BaseTx)
 	i.OutputUTXOs = append(i.OutputUTXOs, tx.StakeOuts...)
 
 	return nil
 }
 
-func (i *inputOutputGetter) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+func (i *inputOutputGetter) AddPermissionlessDelegatorTx(tx *platform.AddPermissionlessDelegatorTx) error {
+	i.getUTXOs(tx.BaseTx)
+	i.OutputUTXOs = append(i.OutputUTXOs, tx.StakeOuts...)
+
+	return nil
+}
+
+func (i *inputOutputGetter) TransferSubnetOwnershipTx(tx *platform.TransferSubnetOwnershipTx) error {
 	i.getUTXOs(tx.BaseTx)
 
 	return nil
 }
 
-func (i *inputOutputGetter) BaseTx(tx *txs.BaseTx) error {
+func (i *inputOutputGetter) BaseTx(tx *platform.BaseTx) error {
 	i.getUTXOs(*tx)
 
 	return nil
@@ -454,7 +454,7 @@ func (i *inputOutputGetter) BaseTx(tx *txs.BaseTx) error {
 // ConvertSubnetToL1Tx treats validator balances like produced AVAX because
 // the fee payer must have enough input AVAX to cover the initial state of the
 // L1 validators
-func (i *inputOutputGetter) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
+func (i *inputOutputGetter) ConvertSubnetToL1Tx(tx *platform.ConvertSubnetToL1Tx) error {
 	i.getUTXOs(tx.BaseTx)
 
 	for _, v := range tx.Validators {
@@ -472,7 +472,7 @@ func (i *inputOutputGetter) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) err
 // RegisterL1ValidatorTx treats the validator balance like produced AVAX because
 // the fee payer must have enough input AVAX to cover the initial state of the
 // validator
-func (i *inputOutputGetter) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
+func (i *inputOutputGetter) RegisterL1ValidatorTx(tx *platform.RegisterL1ValidatorTx) error {
 	i.getUTXOs(tx.BaseTx)
 
 	producedAVAX, err := math.Add(i.ProducedAVAX, tx.Balance)
@@ -485,7 +485,7 @@ func (i *inputOutputGetter) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx)
 	return nil
 }
 
-func (i *inputOutputGetter) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) error {
+func (i *inputOutputGetter) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorWeightTx) error {
 	i.getUTXOs(tx.BaseTx)
 
 	return nil
@@ -493,7 +493,7 @@ func (i *inputOutputGetter) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightT
 
 // RegisterL1ValidatorTx treats the validator balance like produced AVAX because
 // the fee payer must have enough input AVAX to cover the increase in balance
-func (i *inputOutputGetter) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1ValidatorBalanceTx) error {
+func (i *inputOutputGetter) IncreaseL1ValidatorBalanceTx(tx *platform.IncreaseL1ValidatorBalanceTx) error {
 	i.getUTXOs(tx.BaseTx)
 
 	producedAVAX, err := math.Add(i.ProducedAVAX, tx.Balance)
@@ -506,30 +506,30 @@ func (i *inputOutputGetter) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1Valid
 	return nil
 }
 
-func (i *inputOutputGetter) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) error {
+func (i *inputOutputGetter) DisableL1ValidatorTx(tx *platform.DisableL1ValidatorTx) error {
 	i.getUTXOs(tx.BaseTx)
 
 	return nil
 }
 
-func (i *inputOutputGetter) AddAutoRenewedValidatorTx(tx *txs.AddAutoRenewedValidatorTx) error {
+func (i *inputOutputGetter) AddAutoRenewedValidatorTx(tx *platform.AddAutoRenewedValidatorTx) error {
 	i.getUTXOs(tx.BaseTx)
 	i.OutputUTXOs = append(i.OutputUTXOs, tx.StakeOuts...)
 
 	return nil
 }
 
-func (i *inputOutputGetter) SetAutoRenewedValidatorConfigTx(tx *txs.SetAutoRenewedValidatorConfigTx) error {
+func (i *inputOutputGetter) SetAutoRenewedValidatorConfigTx(tx *platform.SetAutoRenewedValidatorConfigTx) error {
 	i.getUTXOs(tx.BaseTx)
 
 	return nil
 }
 
-func (*inputOutputGetter) RewardAutoRenewedValidatorTx(*txs.RewardAutoRenewedValidatorTx) error {
+func (*inputOutputGetter) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedValidatorTx) error {
 	return fmt.Errorf("%w: RewardAutoRenewedValidatorTx", ErrUnsupportedTxType)
 }
 
-func (i *inputOutputGetter) getUTXOs(tx txs.BaseTx) {
+func (i *inputOutputGetter) getUTXOs(tx platform.BaseTx) {
 	i.InputUTXOs = append(i.InputUTXOs, tx.Ins...)
 	i.OutputUTXOs = append(i.OutputUTXOs, tx.Outs...)
 }

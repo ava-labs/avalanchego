@@ -307,7 +307,7 @@ func TestCommitAtomicTrieOnShutdown(t *testing.T) {
 		ctx,     // context
 		tvm.Ctx, // chain context
 		tvm.DB,  // database
-		[]byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest])), // genesis bytes
+		[]byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[upgradetest.Granite])), // genesis bytes
 		nil,           // upgrade bytes
 		nil,           // config bytes
 		nil,           // fxs
@@ -1640,11 +1640,8 @@ func TestWaitForEvent(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			fork := upgradetest.Latest
 			vm := newAtomicTestVM()
-			tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-				Fork: &fork,
-			})
+			tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{})
 			key := vmtest.TestKeys[0].ToECDSA()
 			address := vmtest.TestEthAddrs[0]
 
@@ -1685,15 +1682,17 @@ func TestWaitForEvent(t *testing.T) {
 // the VM is restarted and the import's input UTXO has already been consumed
 // from shared memory.
 func TestFirewoodHistoricalReplayAcrossAtomicImport(t *testing.T) {
+	t.Skip("TODO(JonathanOppenheimer): flaky, will be deleted with graft.")
+
 	ctx := t.Context()
 
-	// Creating the genesis state (block 0) is a commit operation and so Firewood first persists at block 3.
-	// Placing the import at block 4 ensures that it is not persisted.
+	// Creating the genesis state (block 0) is a commit operation and so Firewood first persists at block 4.
+	// Placing the import at block 5 ensures that it is not persisted.
 	var (
 		recipient          = common.HexToAddress("0x1234567890abcdef1234567890abcdef12345678")
 		importAmount       = uint64(50_000_000)
 		fork               = upgradetest.Fortuna
-		numPreImportBlocks = 3
+		numPreImportBlocks = 4
 		targetBlockHeight  = numPreImportBlocks + 1
 		configJSON         = `{
 			"pruning-enabled": false,

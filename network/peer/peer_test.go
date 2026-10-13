@@ -91,7 +91,7 @@ func newConfig(t *testing.T) *Config {
 		PongTimeout:          constants.DefaultPingPongTimeout,
 		MaxClockDifference:   time.Minute,
 		ResourceTracker:      resourceTracker,
-		UptimeCalculator:     uptime.NoOpCalculator,
+		UptimeCalculator:     uptime.TestCalculator{},
 		IPSigner:             nil,
 	}
 }

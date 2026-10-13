@@ -186,7 +186,7 @@ func newTokenContract(
 		return nil, err
 	}
 
-	if _, err := bind.WaitDeployed(ctx, client, tx); err != nil {
+	if err := load.WaitDeployed(ctx, client, tx); err != nil {
 		return nil, err
 	}
 

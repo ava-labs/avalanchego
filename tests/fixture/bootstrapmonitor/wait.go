@@ -144,7 +144,7 @@ func WaitForCompletion(
 	}
 
 	// Avoid exiting immediately to avoid container restart before the pod is recreated with the new image
-	time.Sleep(5 * time.Minute)
+	time.Sleep(reapTimeout)
 	return nil
 }
 

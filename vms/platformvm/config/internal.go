@@ -14,8 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 )
 
@@ -72,6 +72,10 @@ type Internal struct {
 	// Maximum amount of time to allow a staker to stake
 	MaxStakeDuration time.Duration
 
+	// HeliconMinStakeDuration is the minimum staking duration for the primary
+	// network after the Helicon upgrade (ACP-273).
+	HeliconMinStakeDuration time.Duration
+
 	// Config for the minting function
 	RewardConfig reward.Config
 
@@ -90,7 +94,7 @@ type Internal struct {
 
 // Create the blockchain described in [tx], but only if this node is a member of
 // the subnet that validates the chain
-func (c *Internal) CreateChain(chainID ids.ID, tx *txs.CreateChainTx) {
+func (c *Internal) CreateChain(chainID ids.ID, tx *platform.CreateChainTx) {
 	if c.SybilProtectionEnabled && // Sybil protection is enabled, so nodes might not validate all chains
 		constants.PrimaryNetworkID != tx.SubnetID && // All nodes must validate the primary network
 		!c.TrackedSubnets.Contains(tx.SubnetID) { // This node doesn't validate this blockchain

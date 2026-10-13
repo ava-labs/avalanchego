@@ -22,6 +22,9 @@ import (
 // BLS12-381 Curve Operations added to the set of precompiled contracts
 
 var (
+	// GenesisContractAddr is the address of the deprecated native-asset
+	// genesis contract. It is the same account as the blackhole address that
+	// receives burned fees.
 	GenesisContractAddr    = common.HexToAddress("0x0100000000000000000000000000000000000000")
 	NativeAssetBalanceAddr = common.HexToAddress("0x0100000000000000000000000000000000000001")
 	NativeAssetCallAddr    = common.HexToAddress("0x0100000000000000000000000000000000000002")
@@ -151,7 +154,11 @@ func (c *NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.Sta
 	stateDB.SubBalanceMultiCoin(caller, assetID, assetAmount)
 	stateDB.AddBalanceMultiCoin(to, assetID, assetAmount)
 
-	ret, err = env.Call(to, callData, env.Gas(), new(uint256.Int), vm.WithUNSAFECallerAddressProxying())
+	legacy := []vm.CallOption{
+		vm.WithUNSAFECallerAddressProxying(),
+		vm.WithLegacyOutboundCallGas(),
+	}
+	ret, err = env.Call(to, callData, env.Gas(), new(uint256.Int), legacy...)
 	// When an error was returned by the EVM or when setting the creation code
 	// above we revert to the snapshot and consume any gas remaining. Additionally
 	// when we're in homestead this also counts for code storage gas errors.
