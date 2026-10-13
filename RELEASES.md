@@ -11,6 +11,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 ### Configs
 
 - The `eth-apis` C-Chain option, deprecated in v1.15.0, is removed. The node now ignores it and logs a warning like any other unrecognized option. Set `apis` instead.
+- Removed `pull-gossip-requests-per-validator` from the P-Chain config. It has had no effect since v1.14.2. The node ignores the key if a config still sets it.
 
 ### Metrics
 
