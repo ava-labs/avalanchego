@@ -62,9 +62,6 @@ func (g Gas) SubOverTime(gasRate Gas, duration uint64) Gas {
 //
 //	minPrice * e^(excess / excessConversionConstant)
 //
-// The result is capped at [math.MaxUint64]. excessConversionConstant MUST be
-// non-zero.
-//
 // This implements the EIP-4844 fake exponential formula:
 //
 //	def fake_exponential(factor: int, numerator: int, denominator: int) -> int:
@@ -83,51 +80,29 @@ func CalculatePrice(
 	excess Gas,
 	excessConversionConstant Gas,
 ) Price {
-	var denominator uint256.Int
-	denominator.SetUint64(uint64(excessConversionConstant)) // range is [0, MaxUint64]
-	return calculatePrice(minPrice, excess, &denominator)
+	return CalculatePriceWithExcessConversion(minPrice, excess, excessConversionConstant, 1)
 }
 
 // CalculatePriceWithExcessConversion is equivalent to [CalculatePrice], except
 // that the excess conversion constant is supplied as the two factors whose
-// product forms it: targetToExcessScaling * target. Splitting it this way lets
-// the constant exceed [math.MaxUint64] while remaining bounded by MaxUint64^2 by
-// construction. The product MUST be non-zero.
+// product forms it. This allows the constant to exceed [math.MaxUint64].
+//
+// This implementation is optimized with the knowledge that any value greater
+// than MaxUint64 gets returned as MaxUint64. This means that every intermediate
+// value is guaranteed to be at most MaxUint256. So, we can safely use
+// uint256.Int.
+//
+// This function does not perform any memory allocations.
 func CalculatePriceWithExcessConversion(
 	minPrice Price,
 	excess Gas,
-	targetToExcessScaling Gas,
-	target Gas,
-) Price {
-	var scaling, denominator uint256.Int
-	scaling.SetUint64(uint64(targetToExcessScaling)) // range is [0, MaxUint64]
-	denominator.SetUint64(uint64(target))            // range is [0, MaxUint64]
-	denominator.Mul(&denominator, &scaling)          // range is [0, MaxUint64^2]
-	return calculatePrice(minPrice, excess, &denominator)
-}
-
-// calculatePrice is the shared implementation of [CalculatePrice] and
-// [CalculatePriceWithExcessConversion].
-//
-// This implementation is optimized with the knowledge that any value greater
-// than MaxUint64 gets returned as MaxUint64. Both callers guarantee by
-// construction that denominator is in [1, MaxUint128], so every intermediate
-// value fits in a uint256.Int:
-//   - maxOutput (= denominator * MaxUint64) is below 2^192;
-//   - each term selected for multiplication is below maxOutput, so multiplying it
-//     by numerator (< 2^64) stays below 2^256;
-//   - after division by denominator, the next term is below MaxUint64^2; and
-//   - output is kept below maxOutput, so adding the next term stays below
-//     2^192 + 2^128.
-//
-// This function does not perform any memory allocations.
-func calculatePrice(
-	minPrice Price,
-	excess Gas,
-	denominator *uint256.Int,
+	excessConversionFactor1 Gas,
+	excessConversionFactor2 Gas,
 ) Price {
 	var (
-		numerator uint256.Int
+		numerator   uint256.Int
+		denominator uint256.Int
+		factor      uint256.Int
 
 		i              uint256.Int
 		output         uint256.Int
@@ -135,24 +110,27 @@ func calculatePrice(
 
 		maxOutput uint256.Int
 	)
-	numerator.SetUint64(uint64(excess)) // range is [0, MaxUint64]
+	numerator.SetUint64(uint64(excess))                    // range is [0, MaxUint64]
+	denominator.SetUint64(uint64(excessConversionFactor1)) // range is [0, MaxUint64]
+	factor.SetUint64(uint64(excessConversionFactor2))      // range is [0, MaxUint64]
+	denominator.Mul(&denominator, &factor)                 // range is [0, MaxUint128]
 
 	i.SetOne()
-	numeratorAccum.SetUint64(uint64(minPrice))       // range is [0, MaxUint64]
-	numeratorAccum.Mul(&numeratorAccum, denominator) // range is [0, MaxUint192]
+	numeratorAccum.SetUint64(uint64(minPrice))        // range is [0, MaxUint64]
+	numeratorAccum.Mul(&numeratorAccum, &denominator) // range is [0, MaxUint192]
 
-	maxOutput.Mul(denominator, maxUint64) // range is [0, MaxUint192]
+	maxOutput.Mul(&denominator, maxUint64) // range is [0, MaxUint192]
 	for numeratorAccum.Sign() > 0 {
-		output.Add(&output, &numeratorAccum) // range is [0, 2*MaxUint192)
+		output.Add(&output, &numeratorAccum) // range is [0, 2*MaxUint192]
 		if output.Cmp(&maxOutput) >= 0 {
 			return math.MaxUint64
 		}
-		// numeratorAccum < maxOutput <= MaxUint192.
-		numeratorAccum.Mul(&numeratorAccum, &numerator) // range is [0, MaxUint256)
-		numeratorAccum.Div(&numeratorAccum, denominator)
+		// maxOutput < MaxUint192 so numeratorAccum < MaxUint192.
+		numeratorAccum.Mul(&numeratorAccum, &numerator) // range is [0, MaxUint256]
+		numeratorAccum.Div(&numeratorAccum, &denominator)
 		numeratorAccum.Div(&numeratorAccum, &i)
 
 		i.AddUint64(&i, 1)
 	}
-	return Price(output.Div(&output, denominator).Uint64())
+	return Price(output.Div(&output, &denominator).Uint64())
 }

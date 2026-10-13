@@ -127,11 +127,7 @@ func (tm *Time) Excess() gas.Gas {
 }
 
 // Price returns the price of a unit of gas, i.e. the "base fee", determined by
-// [calculatePrice].
-//
-// The K variable of ACP-103/176, [GasPriceConfig.TargetToExcessScaling] * T,
-// can exceed [math.MaxUint64]. It is passed as its two factors so the
-// exponential calculation can use full precision.
+// [gas.CalculatePriceWithExcessConversion].
 func (tm *Time) Price() gas.Price {
 	p := calculatePrice(tm.excess, tm.config.TargetToExcessScaling, tm.target)
 	// When minPrice can't be represented by e^(x/k), p may be too low.

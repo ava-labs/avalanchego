@@ -107,19 +107,18 @@ func (tm *Time) enforceMinExcess() {
 	tm.excess = max(tm.excess, minExcess)
 }
 
-// excessForPrice searches the [gas.Gas] range for a price closest to p.
+// excessForPrice returns an integer approximation of ln(p) * k.
 //
-// If [calculatePrice] can produce p, [excessForPrice] returns the minimum excess
-// that does so. Otherwise, it returns the greatest excess that still produces a
-// lower price, which can happen because of integer approximation or because the
-// required excess is above [math.MaxUint64].
+// If [calculatePrice] can produce p, excessForPrice returns the minimum excess to
+// produce p. Otherwise, it returns the maximum excess to produce a number < p,
+// which may happen due to overflow or integer approximation.
 func excessForPrice(p gas.Price, scaling, target gas.Gas) gas.Gas {
 	if p <= 1 {
 		return 0
 	}
-	// Binary search for the minimum x where calculatePrice(x, ...) >= p.
+	// Binary search for the minimum x where calculatePrice(x, k) >= p.
 	//
-	// calculatePrice(0, ...) == 1 and p > 1, so lo > 0.
+	// calculatePrice(0, k) == 1 and p > 1, so lo > 0.
 	lo, hi := gas.Gas(1), gas.Gas(math.MaxUint64)
 	for lo < hi {
 		mid := lo + (hi-lo)/2
@@ -129,16 +128,16 @@ func excessForPrice(p gas.Price, scaling, target gas.Gas) gas.Gas {
 			lo = mid + 1
 		}
 	}
-	// If [calculatePrice] can't generate p exactly, honor the lower price
-	// expectation.
+	// If [calculatePrice] can't generate p due to integer approximation, honor
+	// the lower price expectation.
 	if calculatePrice(lo, scaling, target) > p {
 		return lo - 1
 	}
 	return lo
 }
 
-// calculatePrice returns an integer approximation of e^(x/(scaling*target)),
-// capped at [math.MaxUint64].
+// calculatePrice returns an integer approximation of e^(x/k), where
+// k = scaling * target may exceed [math.MaxUint64].
 func calculatePrice(x, scaling, target gas.Gas) gas.Price {
 	return gas.CalculatePriceWithExcessConversion(1, x, scaling, target)
 }

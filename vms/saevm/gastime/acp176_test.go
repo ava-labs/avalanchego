@@ -866,8 +866,8 @@ func FuzzPriceExcess(f *testing.F) {
 	// K = scaling * target, which may exceed MaxUint64.
 	seeds := []struct {
 		p       gas.Price
-		scaling uint64
-		target  uint64
+		scaling gas.Gas
+		target  gas.Gas
 	}{
 		{1, 1, 1},
 		{2, 1, 1},
@@ -880,7 +880,7 @@ func FuzzPriceExcess(f *testing.F) {
 		{math.MaxUint64, math.MaxUint64, math.MaxUint64},
 	}
 	for _, s := range seeds {
-		f.Add(uint64(s.p), s.scaling, s.target)
+		f.Add(uint64(s.p), uint64(s.scaling), uint64(s.target))
 	}
 	f.Fuzz(func(t *testing.T, pInt, scalingInt, targetInt uint64) {
 		p := gas.Price(pInt)
