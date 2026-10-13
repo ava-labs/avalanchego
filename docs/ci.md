@@ -25,6 +25,8 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
     - [Go module cache](#go-module-cache)
     - [Bazel dependency cache](#bazel-dependency-cache)
     - [Nix store cache](#nix-store-cache)
+    - [Binfmt image cache](#binfmt-image-cache)
+      - [Validate binfmt cache changes](#validate-binfmt-cache-changes)
     - [Changing input caches safely](#changing-input-caches-safely)
   - [Task](#task)
 - [Using Nix in GitHub Actions](#using-nix-in-github-actions)
@@ -301,9 +303,10 @@ workflows consume these caches without writing them.
 CI caches tools and dependencies, not build or test output. Two rules govern
 these input caches:
 
-- **Save shared entries only from designated setup jobs on `master`.** Pull
-  requests and other refs may restore entries and prepare missing inputs locally,
-  but cannot save them. This reserves limited cache storage for merged code.
+- **Save shared entries only from designated setup or image-build jobs on
+  `master`.** Pull requests and other refs can restore entries and prepare
+  missing inputs locally, but cannot save them. This reserves cache storage for
+  merged code.
 - **Verify Go and Bazel dependency inputs before using them.** On an exact cache
   hit, use the restored entry. On a non-exact hit or miss, prepare the inputs
   locally (and save them if permitted). Then disable downloads for the workload:
@@ -340,10 +343,11 @@ Only `github.ref == 'refs/heads/master'` can save an input cache. Pull request,
 merge-queue, tag, and non-`master` branch runs can restore entries and prepare a
 local miss, but cannot save it. The local
 [`cache-policy`](../.github/actions/cache-policy/action.yml) action is where this
-policy is defined. Shared cache setup actions serve both cache-writing setup
-jobs and restore-only consumers. Only a designated cache-writing setup job uses
-`request-cache-save` to request permission to save. All other uses restore and
-prepare inputs without saving. The policy action returns `cache-save-allowed`
+policy is defined. Shared cache setup actions serve both cache-writing jobs and
+restore-only consumers. Only a designated cache-writing setup or image-build
+job uses `request-cache-save` to request permission to save. All other uses
+restore and prepare inputs without saving. The policy action returns
+`cache-save-allowed`
 only when that request is permitted.
 
 GitHub isolates pull-request cache entries from `master`, and cache entries are
@@ -496,6 +500,75 @@ that loading. Go jobs that use Nix-provided Go restore the shared Go module
 cache through `install-nix` so they reuse the same dependencies as jobs that use
 `setup-go-for-project`.  Bazel jobs disable this behavior because they use the
 Bazel-specific cache.
+
+#### Binfmt image cache
+
+[`run-docker-with-disk-space`](../.github/actions/run-docker-with-disk-space/action.yml)
+optionally configures QEMU for cross-platform Docker builds. Setup requires the
+`tonistiigi/binfmt` image. The action attempts to restore a cached image but
+will fall back to pulling from Docker Hub.
+
+This action replaces `docker/setup-qemu-action` because its `cache-image` input
+controls cache reads and writes together. It cannot restore a cache on a pull
+request while it saves only from `master`.
+
+CI historically used the default AMD64 runners. The image-build jobs continue
+that pattern and cross-compile images for AMD64 and ARM64. AMD64 is not a
+design requirement.
+
+QEMU enables cross-platform smoke tests on these runners. Use native runners
+for broader image tests because emulation is too slow. Revisit the runner
+choice, binfmt image pin, and cache platform key when adding native tests.
+
+The `binfmt-image` action input defines the image reference. It uses the Linux
+AMD64 image digest, not a mutable tag such as `latest`. A mutable tag can
+select new QEMU code without a repository change. The cache key includes the
+image digest. Changing the digest changes the cache key. The cache key also
+contains a format version and the platform.
+
+Change the action input to update the image. Do not copy the digest into a
+cache key or script.
+
+On a cache miss, the action pulls by digest. It gives the image a local tag
+based on that digest. Docker does not retain digest references when it saves
+and loads images. The action saves the tagged image so a cache hit can run it
+without a pull.
+
+The Docker image publish job passes Docker Hub credentials to the action. The
+Go image-check jobs pass credentials only on `master`. Their reusable workflow
+inherits secrets from the calling workflow, so their `master` cache-miss pulls
+are authenticated. Pull-request jobs do not receive credentials. They pull
+the public image without credentials on a cache miss. A cache miss can encounter
+rate limits until a `master` job saves the image.
+
+On a cache miss, the action requests permission to save. The
+[`cache-policy`](../.github/actions/cache-policy/action.yml) action permits
+saves only on `master`. The publish job and both Go image-check jobs can save
+the image tar file. GitHub cache entries are immutable. Concurrent `master`
+jobs can pull the same image. The first job to save the key creates the
+shared entry.
+
+[`setup-qemu.sh`](../.github/actions/run-docker-with-disk-space/setup-qemu.sh)
+implements the QEMU installation from the replaced upstream action. The script
+links to that action source. Keep the required QEMU setup behavior aligned.
+
+##### Validate binfmt cache changes
+
+Run `task lint-action`. Run `task lint-shell`. Then validate on the pull request
+that changes the cache:
+
+1. Add a `DONOTMERGE` commit that temporarily permits binfmt cache writes on
+   this pull request.
+2. Run the image-check jobs. Check that a cache-miss job pulls the pinned image
+   and saves the cache.
+3. Check that a job restores the cached image without a pull. Run the jobs again
+   if the first run has no cache hit.
+4. Check that the cross-platform builds succeed.
+5. Remove the `DONOTMERGE` commit before merging. Check that the final
+   configuration permits cache writes only on `master`.
+
+Keep the temporary exception limited to the binfmt cache. This check does not
+verify authenticated pulls on `master`.
 
 #### Changing input caches safely
 
