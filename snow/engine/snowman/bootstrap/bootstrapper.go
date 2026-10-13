@@ -387,7 +387,10 @@ func (b *Bootstrapper) GetAcceptedFailed(ctx context.Context, nodeID ids.NodeID,
 }
 
 func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedBlockIDs []ids.ID) error {
-	knownBlockIDs := genesis.GetCheckpoints(b.Ctx.NetworkID, b.Ctx.ChainID)
+	var knownBlockIDs set.Set[ids.ID]
+	if b.SkipCheckpoints == nil || !b.SkipCheckpoints() {
+		knownBlockIDs = genesis.GetCheckpoints(b.Ctx.NetworkID, b.Ctx.ChainID)
+	}
 	b.missingBlockIDs.Union(knownBlockIDs)
 	b.missingBlockIDs.Add(acceptedBlockIDs...)
 	numMissingBlockIDs := b.missingBlockIDs.Len()

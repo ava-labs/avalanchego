@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -28,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 
@@ -239,6 +241,47 @@ func TestBootstrapperSingleFrontier(t *testing.T) {
 
 	require.NoError(bs.startSyncing(t.Context(), blocksToIDs(blks[0:1])))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+}
+
+// Checkpoints are fetched from peers unless SkipCheckpoints reports true.
+func TestBootstrapperSkipCheckpoints(t *testing.T) {
+	fujiCChainID, err := ids.FromString("yH8D7ThNJkxmtkuv2jgBa4P1Rn3Qpr4pPr7QYNfcdoS6k6HWp")
+	require.NoError(t, err, "ids.FromString()")
+	numCheckpoints := genesis.GetCheckpoints(constants.FujiID, fujiCChainID).Len()
+	require.Positive(t, numCheckpoints, "fuji C-chain checkpoints")
+
+	tests := []struct {
+		name            string
+		skipCheckpoints func() bool
+		wantRequests    int
+	}{
+		{name: "checkpoints fetched", skipCheckpoints: nil, wantRequests: numCheckpoints},
+		{name: "checkpoints kept while not skipping", skipCheckpoints: func() bool { return false }, wantRequests: numCheckpoints},
+		{name: "checkpoints skipped", skipCheckpoints: func() bool { return true }, wantRequests: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config, _, sender, vm, _ := newConfig(t)
+			config.Ctx.NetworkID = constants.FujiID
+			config.Ctx.ChainID = fujiCChainID
+			config.SkipCheckpoints = tt.skipCheckpoints
+
+			blks := snowmantest.BuildChain(1)
+			initializeVMWithBlockchain(vm, blks)
+
+			requests := 0
+			sender.SendGetAncestorsF = func(context.Context, ids.NodeID, uint32, ids.ID) {
+				requests++
+			}
+
+			bs, err := New(config, func(context.Context, uint32) error { return nil })
+			require.NoError(t, err, "New()")
+			bs.TimeoutRegistrar = &enginetest.Timer{}
+			require.NoError(t, bs.Start(t.Context(), 0), "Start()")
+			require.NoError(t, bs.startSyncing(t.Context(), blocksToIDs(blks[0:1])), "startSyncing()")
+			require.Equal(t, tt.wantRequests, requests, "GetAncestors requests for checkpoints")
+		})
+	}
 }
 
 // Requests the unknown block and gets back a Ancestors with unexpected block.

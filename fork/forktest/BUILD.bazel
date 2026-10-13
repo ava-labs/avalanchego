@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "forktest",
+    srcs = ["forktest.go"],
+    importpath = "github.com/ava-labs/avalanchego/fork/forktest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//fork",
+        "//ids",
+        "//utils/crypto/bls/signer/localsigner",
+        "//vms/platformvm/signer",
+        "@com_github_stretchr_testify//require",
+    ],
+)

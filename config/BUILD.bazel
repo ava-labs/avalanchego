@@ -18,6 +18,7 @@ go_library(
         "//database/leveldb",
         "//database/memdb",
         "//database/pebbledb",
+        "//fork",
         "//genesis",
         "//ids",
         "//network",
@@ -57,16 +58,22 @@ go_library(
 
 go_test(
     name = "config_test",
-    srcs = ["config_test.go"],
+    srcs = [
+        "config_fork_test.go",
+        "config_test.go",
+    ],
     embed = [":config"],
     deps = [
         "//chains",
         "//config/node",
+        "//fork",
+        "//fork/forktest",
         "//genesis",
         "//ids",
         "//snow/consensus/simplex",
         "//snow/consensus/snowball",
         "//subnets",
+        "//upgrade",
         "//utils/constants",
         "@com_github_spf13_pflag//:pflag",
         "@com_github_spf13_viper//:viper",

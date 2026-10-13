@@ -20,6 +20,7 @@ go_library(
         "//database",
         "//database/meterdb",
         "//database/prefixdb",
+        "//fork",
         "//ids",
         "//message",
         "//network",

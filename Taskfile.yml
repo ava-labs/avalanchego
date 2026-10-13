@@ -650,6 +650,12 @@ tasks:
       - task: build
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}'
 
+  test-fork:
+    desc: Runs the fork-mode e2e test against a local source network
+    cmds:
+      - task: build
+      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.fork.sh {{.CLI_ARGS}}'
+
   update-go-version:
     desc: "Updates go version directives across all modules. Usage: task update-go-version -- <version> (e.g. 1.25.7)"
     cmds:

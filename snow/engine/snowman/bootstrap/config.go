@@ -40,6 +40,12 @@ type Config struct {
 	// NonVerifyingParse parses blocks without verifying them.
 	NonVerifyingParse block.ParseFunc
 
+	// SkipCheckpoints, if non-nil and true when syncing starts, skips the
+	// network's hard-coded checkpoints. Checkpoints defend against malicious
+	// peers; a fork that has switched to its own validators trusts every peer,
+	// and state-synced peers cannot serve ancient checkpoint blocks.
+	SkipCheckpoints func() bool
+
 	Bootstrapped func()
 
 	common.Haltable

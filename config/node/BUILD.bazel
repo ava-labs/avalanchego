@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//api/server",
         "//chains",
+        "//fork",
         "//genesis",
         "//ids",
         "//network",

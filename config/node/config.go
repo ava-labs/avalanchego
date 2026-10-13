@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
+	"github.com/ava-labs/avalanchego/fork"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network"
@@ -137,6 +138,9 @@ type Config struct {
 	DatabaseConfig      `json:"databaseConfig"`
 
 	UpgradeConfig upgrade.Config `json:"upgradeConfig"`
+
+	// ForkConfig is non-nil iff fork mode is enabled.
+	ForkConfig *fork.Config `json:"forkConfig,omitempty"`
 
 	// Genesis information
 	GenesisBytes []byte `json:"-"`

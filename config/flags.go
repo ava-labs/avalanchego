@@ -101,6 +101,10 @@ func addNodeFlags(fs *pflag.FlagSet) {
 		UpgradeFileContentKey))
 	fs.String(UpgradeFileContentKey, "", "Specifies base64 encoded upgrade content")
 
+	// Fork
+	fs.String(ForkConfigFileKey, "", "Specifies a fork config file. Enables fork mode: from the fork time on, only the listed validators may propose blocks, and after the grace period only they are polled and peered with")
+	fs.String(ForkConfigFileContentKey, "", "Specifies base64 encoded fork config content")
+
 	// Network ID
 	fs.String(NetworkNameKey, constants.MainnetName, "Network ID this node will connect to")
 

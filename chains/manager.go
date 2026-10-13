@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/fork"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
@@ -245,6 +246,9 @@ type ManagerConfig struct {
 	ChainDataDir string
 
 	Subnets *Subnets
+
+	// Fork, if non-nil, enables fork mode on the primary network's chains.
+	Fork *fork.Status
 }
 
 type manager struct {
@@ -788,6 +792,7 @@ func (m *manager) createAvalancheChain(
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
 			Registerer:          proposervmReg,
+			Fork:                m.forkFor(ctx.SubnetID),
 		},
 	)
 
@@ -972,6 +977,7 @@ func (m *manager) createAvalancheChain(
 		AncestorsMaxContainersReceived: m.BootstrapAncestorsMaxContainersReceived,
 		DB:                             blockBootstrappingDB,
 		VM:                             vmWrappingProposerVM,
+		SkipCheckpoints:                m.skipCheckpoints(ctx.SubnetID),
 	}
 	var snowmanBootstrapper common.BootstrapableEngine
 	snowmanBootstrapper, err = smbootstrap.New(
@@ -1060,6 +1066,27 @@ func (m *manager) createAvalancheChain(
 		VM:      dagVM,
 		Handler: h,
 	}, nil
+}
+
+// skipCheckpoints returns a function reporting whether chains of [subnetID]
+// may bootstrap without the network's hard-coded checkpoints: once the fork
+// has switched, every peer is a trusted fork validator, and state-synced
+// C-chain peers cannot serve the ancient checkpoint blocks to each other.
+func (m *manager) skipCheckpoints(subnetID ids.ID) func() bool {
+	f := m.forkFor(subnetID)
+	if f == nil {
+		return nil
+	}
+	return func() bool { return f.Phase() == fork.Switched }
+}
+
+// forkFor returns the fork status if fork mode applies to chains of
+// [subnetID].
+func (m *manager) forkFor(subnetID ids.ID) *fork.Status {
+	if subnetID != constants.PrimaryNetworkID {
+		return nil
+	}
+	return m.Fork
 }
 
 // Create a linear chain using the Snowman consensus engine
@@ -1156,6 +1183,11 @@ func (m *manager) createSnowmanChain(
 			valState = validators.NewNoValidatorsState(valState)
 			ctx.ValidatorState = validators.NewNoValidatorsState(ctx.ValidatorState)
 		}
+
+		if m.Fork != nil {
+			valState = fork.NewState(valState, m.Fork.Config(), m.Fork.ForkHeight)
+			ctx.ValidatorState = fork.NewState(ctx.ValidatorState, m.Fork.Config(), m.Fork.ForkHeight)
+		}
 		m.validatorState = valState
 
 		// Set this func only for platform
@@ -1210,6 +1242,7 @@ func (m *manager) createSnowmanChain(
 			StakingLeafSigner:   m.StakingTLSSigner,
 			StakingCertLeaf:     m.StakingTLSCert,
 			Registerer:          proposervmReg,
+			Fork:                m.forkFor(ctx.SubnetID),
 		},
 	)
 
@@ -1400,6 +1433,7 @@ func (m *manager) createSnowmanChain(
 		DB:                             bootstrappingDB,
 		VM:                             vm,
 		Bootstrapped:                   bootstrapFunc,
+		SkipCheckpoints:                m.skipCheckpoints(ctx.SubnetID),
 	}
 	var bootstrapper common.BootstrapableEngine
 	bootstrapper, err = smbootstrap.New(
