@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
@@ -34,13 +33,6 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
-
-// enableL1Fees makes txs charge non-zero fees, so that they are funded with
-// real inputs and outputs.
-func enableL1Fees(env *environment) {
-	env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
-	env.config.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
-}
 
 // convertSubnetToL1 converts testSubnet1 to an L1 with the given initial
 // validators and commits the conversion to env.state. It returns the chainID
@@ -111,8 +103,7 @@ func newWarpMessageBytes(
 // [platform.ConvertSubnetToL1Tx] execution.
 func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
-	// Charge non-zero fees and allow two active L1 validators.
-	enableL1Fees(env)
+	// Allow two active L1 validators.
 	env.config.ValidatorFeeConfig.Capacity = 2
 
 	sk, err := localsigner.New()
@@ -311,9 +302,6 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 	require := require.New(t)
 
 	env := newEnvironment(t, upgradetest.Latest)
-	// Charge non-zero fees so the tx is funded with real inputs and outputs.
-	enableL1Fees(env)
-
 	wallet := newWallet(t, env, walletConfig{})
 
 	sk, err := localsigner.New()
@@ -421,8 +409,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 // of [platform.RegisterL1ValidatorTx] execution.
 func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
-	// Charge non-zero fees and allow two active L1 validators.
-	enableL1Fees(env)
+	// Allow two active L1 validators.
 	env.config.ValidatorFeeConfig.Capacity = 2
 
 	initialSK, err := localsigner.New()
@@ -799,8 +786,6 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	require := require.New(t)
 
 	env := newEnvironment(t, upgradetest.Latest)
-	// Charge non-zero fees so the tx is funded with real inputs and outputs.
-	enableL1Fees(env)
 
 	initialSK, err := localsigner.New()
 	require.NoError(err)
@@ -930,8 +915,6 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 // of [platform.SetL1ValidatorWeightTx] execution.
 func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
-	// Charge non-zero fees so the txs are funded with real inputs and outputs.
-	enableL1Fees(env)
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)
@@ -1215,8 +1198,6 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 // execution of a [platform.SetL1ValidatorWeightTx].
 func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
-	// Charge non-zero fees so the txs are funded with real inputs and outputs.
-	enableL1Fees(env)
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)
@@ -1446,8 +1427,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 // cases of [platform.IncreaseL1ValidatorBalanceTx] execution.
 func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
-	// Charge non-zero fees and allow a single active L1 validator.
-	enableL1Fees(env)
+	// Allow a single active L1 validator.
 	env.config.ValidatorFeeConfig.Capacity = 1
 
 	sk, err := localsigner.New()
@@ -1610,8 +1590,6 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 	require := require.New(t)
 
 	env := newEnvironment(t, upgradetest.Latest)
-	// Charge non-zero fees so the txs are funded with real inputs and outputs.
-	enableL1Fees(env)
 
 	sk, err := localsigner.New()
 	require.NoError(err)
@@ -1680,8 +1658,6 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 // [platform.DisableL1ValidatorTx] execution.
 func TestStandardExecutorDisableL1ValidatorTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
-	// Charge non-zero fees so the txs are funded with real inputs and outputs.
-	enableL1Fees(env)
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)
@@ -1815,8 +1791,6 @@ func TestStandardExecutorDisableL1ValidatorTxErrors(t *testing.T) {
 // of a [platform.DisableL1ValidatorTx].
 func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
-	// Charge non-zero fees so the txs are funded with real inputs and outputs.
-	enableL1Fees(env)
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)

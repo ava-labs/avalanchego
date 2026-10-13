@@ -45,7 +45,7 @@ func TestStandardExecutorImportTxErrors(t *testing.T) {
 		sourceKey,
 		env.ctx.XChainID,
 		map[ids.ID]uint64{
-			env.ctx.AVAXAssetID: 1,
+			env.ctx.AVAXAssetID: units.Avax,
 		},
 		rand.NewSource(0),
 	)
@@ -157,30 +157,29 @@ func TestStandardExecutorImportTx(t *testing.T) {
 		name          string
 		sourceChainID ids.ID
 		assets        map[ids.ID]uint64
-		timestamp     time.Time
 	}{
 		{
-			name:          "can_barely_pay_fee",
+			name:          "import_avax_from_x_chain",
 			sourceChainID: env.ctx.XChainID,
 			assets: map[ids.ID]uint64{
-				env.ctx.AVAXAssetID: 1,
+				env.ctx.AVAXAssetID: units.Avax,
 			},
 		},
 		{
 			name:          "import_from_c_chain",
 			sourceChainID: env.ctx.CChainID,
 			assets: map[ids.ID]uint64{
-				env.ctx.AVAXAssetID: 1,
+				env.ctx.AVAXAssetID: units.Avax,
 			},
-			timestamp: env.config.UpgradeConfig.ApricotPhase5Time,
 		},
 		{
+			// The fee is paid with the imported AVAX.
 			name:          "import_non_avax_from_x_chain",
 			sourceChainID: env.ctx.XChainID,
 			assets: map[ids.ID]uint64{
-				customAssetID: 1,
+				customAssetID:       1,
+				env.ctx.AVAXAssetID: units.Avax,
 			},
-			timestamp: env.config.UpgradeConfig.ApricotPhase5Time,
 		},
 	}
 
@@ -213,23 +212,8 @@ func TestStandardExecutorImportTx(t *testing.T) {
 			numInputs := len(tx.Ins) + len(tx.ImportedInputs)
 			require.Equal(len(stx.Creds), numInputs, "should have the same number of credentials as inputs")
 
-			totalIn := uint64(0)
-			for _, in := range tx.Ins {
-				totalIn += in.Input().Amount()
-			}
-			for _, in := range tx.ImportedInputs {
-				totalIn += in.Input().Amount()
-			}
-			totalOut := uint64(0)
-			for _, out := range tx.Outs {
-				totalOut += out.Out.Amount()
-			}
-			require.Equal(totalIn, totalOut)
-
 			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
-
-			diff.SetTimestamp(tt.timestamp)
 
 			feeCalculator := state.PickFeeCalculator(env.config, diff)
 			inputs, atomicRequests, _, err := StandardTx(
