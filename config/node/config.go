@@ -164,6 +164,9 @@ type Config struct {
 	// File Descriptor Limit
 	FdLimit uint64 `json:"fdLimit"`
 
+	// Go runtime memory limit as a fraction of available memory
+	MemoryLimitRatio float64 `json:"memoryLimitRatio"`
+
 	// Metrics
 	MeterVMEnabled bool `json:"meterVMEnabled"`
 

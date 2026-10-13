@@ -1,0 +1,24 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "memlimit",
+    srcs = ["memlimit.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/memlimit",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/logging",
+        "@com_github_kimmachinegun_automemlimit//memlimit",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "memlimit_test",
+    srcs = ["memlimit_test.go"],
+    embed = [":memlimit"],
+    deps = [
+        "//utils/logging",
+        "@com_github_stretchr_testify//require",
+    ],
+)
