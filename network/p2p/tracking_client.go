@@ -15,17 +15,17 @@ import (
 const bandwidthEpsilon = 1e-6
 
 // AppResponseVerifier is called upon receiving an AppResponse for an AppRequest
-// issued by [TrackingClient], and reports whether the peer served it usefully.
-// Callers should check [err] to see whether the AppRequest failed or not.
+// issued by [TrackingClient]. Callers should check [err] to see whether the
+// AppRequest failed or not.
 //
-// A non-nil return registers a failure against nodeID, so return nil for a
-// failure that is not the peer's fault.
+// The return scores the peer and nothing else, so report false only when the
+// peer is at fault. A failure of our own still counts as served.
 type AppResponseVerifier func(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	responseBytes []byte,
 	err error,
-) error
+) bool
 
 // TrackingClient issues requests through a [Client] and scores each one
 // against its [PeerTracker].
@@ -95,8 +95,10 @@ func (c *TrackingClient) request(
 		// of validating its own response.
 		elapsed := time.Since(start)
 
-		err := onResponse(respCtx, respNodeID, responseBytes, appErr)
-		if appErr != nil || err != nil {
+		// Callers deliver their result from inside onResponse, so a
+		// short-circuit that skips it hangs them.
+		ok := onResponse(respCtx, respNodeID, responseBytes, appErr)
+		if appErr != nil || !ok {
 			c.peers.RegisterFailure(nodeID)
 			return
 		}

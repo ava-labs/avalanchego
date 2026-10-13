@@ -418,21 +418,18 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, err error) error {
+	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, err error) bool {
 		defer s.finishWorkItem()
 
 		if err := s.handleChangeProofResponse(ctx, targetRootID, work, changeReq, responseBytes, err); err != nil {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
-			if errors.Is(err, ErrAlreadyClosed) {
-				// Our own shutdown, so the peer is not at fault.
-				return nil
-			}
-			return err
+			// Our own shutdown is not the peer's fault.
+			return errors.Is(err, ErrAlreadyClosed)
 		}
 
-		return nil
+		return true
 	}
 
 	if err := s.sendRequest(ctx, requestBytes, onResponse); err != nil {
@@ -479,21 +476,18 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) error {
+	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) bool {
 		defer s.finishWorkItem()
 
 		if err := s.handleRangeProofResponse(ctx, targetRootID, work, rangeReq, responseBytes, appErr); err != nil {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
-			if errors.Is(err, ErrAlreadyClosed) {
-				// Our own shutdown, so the peer is not at fault.
-				return nil
-			}
-			return err
+			// Our own shutdown is not the peer's fault.
+			return errors.Is(err, ErrAlreadyClosed)
 		}
 
-		return nil
+		return true
 	}
 
 	if err := s.sendRequest(ctx, requestBytes, onResponse); err != nil {

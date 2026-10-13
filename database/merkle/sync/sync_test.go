@@ -386,60 +386,91 @@ func Test_Midpoint(t *testing.T) {
 
 // Shutting down must not de-score a peer that answered correctly.
 func TestSyncerShutdownDoesNotDescorePeer(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		ctx := t.Context()
+	tests := []struct {
+		name        string
+		changeProof bool
+	}{
+		{
+			name: "range_proof",
+		},
+		{
+			name:        "change_proof",
+			changeProof: true,
+		},
+	}
 
-		targetRoot := ids.GenerateTestID()
-		nodeID := ids.GenerateTestNodeID()
-		response := marshalRangeProofResponse(t, &proofDouble{newRoot: targetRoot})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				ctx := t.Context()
 
-		// The handler parks mid-request so the syncer can be closed underneath
-		// it, then serves a valid proof that arrives after the close.
-		served := make(chan struct{})
-		release := make(chan struct{})
-		handler := p2p.TestHandler{
-			AppRequestF: func(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *common.AppError) {
-				close(served)
-				<-release
-				return response, nil
-			},
-		}
+				targetRoot := ids.GenerateTestID()
+				newTarget := ids.GenerateTestID()
+				nodeID := ids.GenerateTestNodeID()
 
-		tracker := p2ptest.NewTracker(t)
-		client := p2ptest.NewSelfTrackingClientWithTracker(t, ctx, nodeID, handler, tracker)
+				rangeReply := marshalRangeProofResponse(t, &proofDouble{newRoot: targetRoot})
+				parked := rangeReply
+				if tt.changeProof {
+					parked = marshalChangeProofResponse(t, &proofDouble{newRoot: newTarget})
+				}
 
-		syncer, err := NewSyncer(
-			&db{id: ids.Empty},
-			Config[*proofDouble, *proofDouble]{
-				TargetRoot:            targetRoot,
-				RangeProofMarshaler:   marshaler{},
-				ChangeProofMarshaler:  marshaler{},
-				ProofClient:           client,
-				Log:                   logging.NoLog{},
-				SimultaneousWorkLimit: 1,
-			},
-			prometheus.NewRegistry(),
-		)
-		require.NoError(t, err)
+				// Parks mid-request so the syncer can be closed underneath it,
+				// then serves a valid proof that arrives after the close.
+				var syncer *Syncer[*proofDouble, *proofDouble]
+				calls := 0
+				served := make(chan struct{})
+				release := make(chan struct{})
+				handler := p2p.TestHandler{
+					AppRequestF: func(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *common.AppError) {
+						calls++
+						if tt.changeProof && calls == 1 {
+							// Retarget so the completed range is stale and
+							// the next request asks for changes.
+							assert.NoErrorf(t, syncer.UpdateSyncTarget(newTarget), "%T.UpdateSyncTarget()", syncer)
+							return rangeReply, nil
+						}
+						close(served)
+						<-release
+						return parked, nil
+					},
+				}
 
-		syncErr := make(chan error, 1)
-		go func() {
-			syncErr <- syncer.Sync(ctx)
-		}()
+				tracker := p2ptest.NewTracker(t)
+				client := p2ptest.NewSelfTrackingClientWithTracker(t, ctx, nodeID, handler, tracker)
 
-		// Close while the handler is parked, so its reply lands after the close.
-		<-served
-		closeMidSync(syncer)
-		close(release)
+				var err error
+				syncer, err = NewSyncer(
+					&db{id: ids.Empty},
+					Config[*proofDouble, *proofDouble]{
+						TargetRoot:            targetRoot,
+						RangeProofMarshaler:   marshaler{},
+						ChangeProofMarshaler:  marshaler{},
+						ProofClient:           client,
+						Log:                   logging.NoLog{},
+						SimultaneousWorkLimit: 1,
+					},
+					prometheus.NewRegistry(),
+				)
+				require.NoError(t, err)
 
-		require.ErrorIsf(t, <-syncErr, context.Canceled, "%T.Sync()", syncer)
-		// Sync returns as soon as close cancels its context, so wait for the
-		// reply still in flight to reach the scoring callback.
-		synctest.Wait()
+				syncErr := make(chan error, 1)
+				go func() { syncErr <- syncer.Sync(ctx) }()
 
-		assert.Truef(t, responsive(tracker, nodeID),
-			"%T.ResponsivePeers() after shutdown, the peer served a valid proof", tracker)
-	})
+				// Close while the handler is parked, so its reply lands after the close.
+				<-served
+				closeMidSync(syncer)
+				close(release)
+
+				require.ErrorIsf(t, <-syncErr, context.Canceled, "%T.Sync()", syncer)
+				// Sync returns when close cancels its context, so wait for the
+				// in-flight reply to reach the scoring callback.
+				synctest.Wait()
+
+				assert.Truef(t, responsive(tracker, nodeID),
+					"%T.ResponsivePeers() after shutdown, the peer served a valid proof", tracker)
+			})
+		})
+	}
 }
 
 func TestSyncerScoresProofSource(t *testing.T) {

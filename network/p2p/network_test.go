@@ -34,8 +34,7 @@ var (
 		Code:    123,
 		Message: "foo",
 	}
-	errSendFailed  = errors.New("send failed")
-	errBadResponse = errors.New("bad response")
+	errSendFailed = errors.New("send failed")
 )
 
 func TestMessageRouting(t *testing.T) {
@@ -1065,12 +1064,12 @@ func peerBandwidth(pt *PeerTracker, nodeID ids.NodeID) float64 {
 
 func TestTrackingClientScoresRequests(t *testing.T) {
 	tests := []struct {
-		name        string
-		sendErr     error
-		appErr      *common.AppError
-		response    []byte
-		callbackErr error
-		preCancel   bool
+		name            string
+		sendErr         error
+		appErr          *common.AppError
+		response        []byte
+		callbackRejects bool
+		preCancel       bool
 
 		wantTracked    bool
 		wantResponsive bool
@@ -1084,11 +1083,11 @@ func TestTrackingClientScoresRequests(t *testing.T) {
 			wantInHeap:     true,
 		},
 		{
-			name:        "response_rejected_by_caller",
-			response:    []byte("response"),
-			callbackErr: errBadResponse,
-			wantTracked: true,
-			wantInHeap:  true,
+			name:            "response_rejected_by_caller",
+			response:        []byte("response"),
+			callbackRejects: true,
+			wantTracked:     true,
+			wantInHeap:      true,
 		},
 		{
 			name:        "request_failed",
@@ -1131,8 +1130,8 @@ func TestTrackingClientScoresRequests(t *testing.T) {
 				requestCtx,
 				set.Of(conn.nodeID),
 				[]byte("request"),
-				func(context.Context, ids.NodeID, []byte, error) error {
-					return test.callbackErr
+				func(context.Context, ids.NodeID, []byte, error) bool {
+					return !test.callbackRejects
 				},
 			)
 
@@ -1173,9 +1172,9 @@ func TestTrackingClientScoresBandwidthBeforeVerification(t *testing.T) {
 			ctx,
 			set.Of(conn.nodeID),
 			[]byte("request"),
-			func(context.Context, ids.NodeID, []byte, error) error {
+			func(context.Context, ids.NodeID, []byte, error) bool {
 				time.Sleep(verification)
-				return nil
+				return true
 			},
 		))
 		require.NoError(t, conn.network.AppResponse(ctx, conn.nodeID, 1, response))
@@ -1216,11 +1215,8 @@ func TestTrackingClientScoresEachPeer(t *testing.T) {
 		ctx,
 		set.Of(accepted, rejected),
 		[]byte("request"),
-		func(_ context.Context, nodeID ids.NodeID, _ []byte, _ error) error {
-			if nodeID == rejected {
-				return errBadResponse
-			}
-			return nil
+		func(_ context.Context, nodeID ids.NodeID, _ []byte, _ error) bool {
+			return nodeID != rejected
 		},
 	))
 	require.Len(t, routedTo, 2)

@@ -85,10 +85,12 @@ func (d *Dispatcher[Req, In, Resp, Out]) sendBytes(
 	}
 	// Buffered so a reply landing after ctx ends never blocks the handler.
 	resultCh := make(chan result, 1)
-	onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, appErr error) error {
+	onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, appErr error) bool {
 		out, err := decode[In, Resp](responseBytes, appErr, parse)
 		resultCh <- result{out: out, err: err}
-		return err
+		// Everything decode rejects is the peer's doing: a handler error, a
+		// malformed reply, or a proof the caller would not accept.
+		return err == nil
 	}
 
 	if err := d.client.AppRequestAny(ctx, requestBytes, onResponse); err != nil {
