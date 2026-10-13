@@ -391,6 +391,19 @@ type Builder interface {
 		stakeIncreaseTxID ids.ID,
 		options ...common.Option,
 	) (*platform.CancelAutoRenewedValidatorStakeIncreaseTx, error)
+
+	// NewDecreaseAutoRenewedValidatorStakeTx creates a transaction to withdraw
+	// stake from an existing auto-renewed validator at the start of its next
+	// cycle. The stake is returned to the owners of the stake it is drawn
+	// from.
+	//
+	// - txID is the transaction ID of the auto-renewed validator.
+	// - amount is the amount of AVAX to withdraw.
+	NewDecreaseAutoRenewedValidatorStakeTx(
+		txID ids.ID,
+		amount uint64,
+		options ...common.Option,
+	) (*platform.DecreaseAutoRenewedValidatorStakeTx, error)
 }
 
 type Backend interface {
@@ -1837,6 +1850,67 @@ func (b *builder) NewCancelAutoRenewedValidatorStakeIncreaseTx(
 		TxID:              txID,
 		StakeIncreaseTxID: stakeIncreaseTxID,
 		Auth:              auth,
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewDecreaseAutoRenewedValidatorStakeTx(
+	txID ids.ID,
+	amount uint64,
+	options ...common.Option,
+) (*platform.DecreaseAutoRenewedValidatorStakeTx, error) {
+	toBurn := map[ids.ID]uint64{}
+	toStake := map[ids.ID]uint64{}
+	ops := common.NewOptions(options)
+
+	auth, err := b.authorize(txID, ops)
+	if err != nil {
+		return nil, fmt.Errorf("authorizing DecreaseAutoRenewedValidatorStakeTx: %w", err)
+	}
+
+	authComplexity, err := fee.AuthComplexity(auth)
+	if err != nil {
+		return nil, fmt.Errorf("computing auth complexity: %w", err)
+	}
+
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+
+	complexity, err := fee.IntrinsicDecreaseAutoRenewedValidatorStakeTxComplexities.Add(
+		&memoComplexity,
+		&authComplexity,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("computing DecreaseAutoRenewedValidatorStakeTx complexity: %w", err)
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("spending for DecreaseAutoRenewedValidatorStakeTx: %w", err)
+	}
+
+	tx := &platform.DecreaseAutoRenewedValidatorStakeTx{
+		BaseTx: platform.BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    b.context.NetworkID,
+				BlockchainID: constants.PlatformChainID,
+				Ins:          inputs,
+				Outs:         outputs,
+				Memo:         memo,
+			},
+		},
+		TxID:   txID,
+		Auth:   auth,
+		Amount: amount,
 	}
 	return tx, b.initCtx(tx)
 }

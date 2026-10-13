@@ -364,6 +364,18 @@ func (w *withOptions) IssueCancelAutoRenewedValidatorStakeIncreaseTx(
 	)
 }
 
+func (w *withOptions) IssueDecreaseAutoRenewedValidatorStakeTx(
+	txID ids.ID,
+	amount uint64,
+	options ...common.Option,
+) (*platform.Tx, error) {
+	return w.wallet.IssueDecreaseAutoRenewedValidatorStakeTx(
+		txID,
+		amount,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
 func (w *withOptions) IssueUnsignedTx(
 	utx platform.UnsignedTx,
 	options ...common.Option,

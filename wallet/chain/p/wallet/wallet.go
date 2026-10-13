@@ -386,6 +386,20 @@ type Wallet interface {
 		options ...common.Option,
 	) (*platform.Tx, error)
 
+	// IssueDecreaseAutoRenewedValidatorStakeTx creates, signs, and issues a
+	// transaction to withdraw stake from an existing auto-renewed validator
+	// at the start of its next cycle. The stake is returned to the owners of
+	// the stake it is drawn from.
+	//
+	// - txID is the transaction ID of the AddAutoRenewedValidatorTx that
+	//   created the validator.
+	// - amount is the amount of AVAX to withdraw.
+	IssueDecreaseAutoRenewedValidatorStakeTx(
+		txID ids.ID,
+		amount uint64,
+		options ...common.Option,
+	) (*platform.Tx, error)
+
 	// IssueUnsignedTx signs and issues the unsigned tx.
 	IssueUnsignedTx(
 		utx platform.UnsignedTx,
@@ -755,6 +769,22 @@ func (w *wallet) IssueCancelAutoRenewedValidatorStakeIncreaseTx(
 	utx, err := w.builder.NewCancelAutoRenewedValidatorStakeIncreaseTx(
 		txID,
 		stakeIncreaseTxID,
+		options...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueDecreaseAutoRenewedValidatorStakeTx(
+	txID ids.ID,
+	amount uint64,
+	options ...common.Option,
+) (*platform.Tx, error) {
+	utx, err := w.builder.NewDecreaseAutoRenewedValidatorStakeTx(
+		txID,
+		amount,
 		options...,
 	)
 	if err != nil {
