@@ -13,8 +13,6 @@ func NewDefaultLogger(prefix string) logging.Logger {
 	return NewLogger(prefix, logging.Debug)
 }
 
-// NewLogger returns a logger for the auto-detected format that drops entries
-// below level.
 func NewLogger(prefix string, level logging.Level) logging.Logger {
 	log, err := newLogger(prefix, logging.AutoString, level)
 	if err != nil {

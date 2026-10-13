@@ -92,7 +92,6 @@ func NewMainnetCChainVM(
 			CChainID:    mainnetCChainID,
 			AVAXAssetID: mainnetAvaxAssetID,
 
-			// Info keeps the VM's per-block DEBUG/TRACE lines out of CI logs.
 			Log:          tests.NewLogger("mainnet-vm-reexecution", logging.Info),
 			SharedMemory: atomicMemory.NewSharedMemory(mainnetCChainID),
 			BCLookup:     aliaser,

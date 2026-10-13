@@ -61,6 +61,8 @@ var (
 	configKey        = "config"
 	defaultConfigKey = "default"
 
+	// Every config uses the VM's default commit-interval of 4096. The firewood
+	// configs keep 2 * commit-interval = 8192 revisions in memory.
 	predefinedConfigs = map[string]string{
 		defaultConfigKey: `{}`,
 		"archive": `{
