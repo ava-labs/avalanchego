@@ -31,6 +31,7 @@ go_test(
         "//ids",
         "//network/p2p",
         "//network/p2p/p2ptest",
+        "//network/p2p/tracking/trackingtest",
         "//proto/pb/sync",
         "//snow/engine/common",
         "//utils/logging",

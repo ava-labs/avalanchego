@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/network/p2p/tracking/trackingtest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
@@ -249,7 +250,7 @@ func newTestDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any
 	t.Helper()
 	return &Dispatcher[Req, In, Resp, Out]{
 		log:    loggingtest.New(t, logging.Debug),
-		client: p2ptest.NewSelfTrackingClientWithTracker(t, ctx, nodeID, h, peers),
+		client: trackingtest.NewSelfClientWithTracker(t, ctx, nodeID, h, peers),
 	}
 }
 

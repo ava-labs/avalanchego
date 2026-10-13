@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/database/merkle/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/network/p2p/tracking/trackingtest"
 )
 
 func TestMain(m *testing.M) {
@@ -90,7 +90,7 @@ func testSync(t *testing.T, clientKeys int, serverKeys int) {
 		Config{},
 		clientDB,
 		root,
-		p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, newTestGetProofHandler(t, serverDB)),
+		trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, newTestGetProofHandler(t, serverDB)),
 	)
 	require.NoError(t, err)
 
@@ -166,7 +166,7 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 		Config{},
 		clientDB,
 		firstRoot,
-		p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, proofHandler),
+		trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, proofHandler),
 	)
 	require.NoError(t, err)
 

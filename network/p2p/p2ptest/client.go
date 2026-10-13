@@ -14,7 +14,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/network/p2p/tracking"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -25,29 +24,17 @@ func NewSelfClient(t *testing.T, ctx context.Context, nodeID ids.NodeID, handler
 	return NewClient(t, ctx, nodeID, handler, nodeID, handler)
 }
 
-// NewSelfTrackingClient returns a [tracking.Client] that routes to nodeID's
-// handler, scoring against a tracker the test does not observe.
-func NewSelfTrackingClient(
+// NewSelfNetwork returns a network for nodeID whose only peer is itself, with
+// connHandlers receiving its connection events.
+func NewSelfNetwork(
 	t *testing.T,
 	ctx context.Context,
 	nodeID ids.NodeID,
 	handler p2p.Handler,
-) *tracking.Client {
-	return NewSelfTrackingClientWithTracker(t, ctx, nodeID, handler, NewTracker(t))
-}
-
-// NewSelfTrackingClientWithTracker returns a [tracking.Client] routing to
-// nodeID's handler, scoring against tracker, with nodeID already connected to it.
-func NewSelfTrackingClientWithTracker(
-	t *testing.T,
-	ctx context.Context,
-	nodeID ids.NodeID,
-	handler p2p.Handler,
-	tracker *p2p.PeerTracker,
-) *tracking.Client {
+	connHandlers ...p2p.ConnectionHandler,
+) *p2p.Network {
 	peers := map[ids.NodeID]p2p.Handler{nodeID: handler}
-	network := newClientNetwork(t, ctx, nodeID, handler, peers, tracker)
-	return tracking.NewClient(network, 0, tracker)
+	return newClientNetwork(t, ctx, nodeID, handler, peers, connHandlers...)
 }
 
 // NewClient generates a client-server pair and returns the client used to

@@ -19,8 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/database/merkle/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/network/p2p/tracking"
+	"github.com/ava-labs/avalanchego/network/p2p/tracking/trackingtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
@@ -51,7 +51,7 @@ func withTarget(root ids.ID) sutOption {
 func selfClient(t *testing.T, ctx context.Context, db MerkleDB) *tracking.Client {
 	t.Helper()
 
-	return p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, db))
+	return trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, db))
 }
 
 // newSUT returns a syncer that fills db through client.
@@ -118,7 +118,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = append(response.KeyChanges, KeyChange{})
 				})
 
-				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -128,7 +128,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
 
-				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -154,7 +154,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					}
 				})
 
-				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -165,7 +165,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
 
-				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -176,7 +176,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.EndProof = nil
 				})
 
-				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -186,7 +186,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.EndProof = nil
 				})
 
-				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -198,13 +198,13 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = nil
 				})
 
-				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof server flake",
 			proofClient: func(db MerkleDB) *tracking.Client {
-				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
+				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
 					Handler: newTestProofHandler(t, db),
 					c:       &counter{m: 2},
 				})
@@ -217,7 +217,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = append(response.KeyChanges, make([]KeyChange, sync.DefaultRequestKeyLimit)...)
 				})
 
-				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -227,7 +227,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
 
-				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -238,7 +238,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
 
-				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -249,13 +249,13 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.EndProof = nil
 				})
 
-				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "change proof flaky server",
 			proofClient: func(db MerkleDB) *tracking.Client {
-				return p2ptest.NewSelfTrackingClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
+				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
 					Handler: newTestProofHandler(t, db),
 					c:       &counter{m: 2},
 				})
@@ -281,7 +281,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			)
 			require.NoError(err)
 
-			proofClient := p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, dbToSync))
+			proofClient := trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, dbToSync))
 			if tt.proofClient != nil {
 				proofClient = tt.proofClient(dbToSync)
 			}
@@ -436,7 +436,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		}
 	}, 1)
 
-	syncer = newSUT(t, db, p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, actionHandler), withTarget(firstSyncRoot))
+	syncer = newSUT(t, db, trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler), withTarget(firstSyncRoot))
 
 	require.NoError(syncer.Sync(ctx))
 
@@ -479,7 +479,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 			cancel(err)
 		}
 	}, 0)
-	syncer = newSUT(t, db, p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, actionHandler), withTarget(root1))
+	syncer = newSUT(t, db, trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler), withTarget(root1))
 
 	require.NoError(syncer.Sync(ctx))
 }

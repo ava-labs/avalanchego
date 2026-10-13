@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/network/p2p/tracking"
+	"github.com/ava-labs/avalanchego/network/p2p/tracking/trackingtest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
@@ -157,7 +158,7 @@ func withDB(d *db) sutOption {
 func selfClient(t *testing.T, ctx context.Context, handler p2p.Handler) *tracking.Client {
 	t.Helper()
 
-	return p2ptest.NewSelfTrackingClient(t, ctx, ids.EmptyNodeID, handler)
+	return trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, handler)
 }
 
 // newSUT returns a syncer targeting targetRoot that fetches through client.
@@ -455,7 +456,7 @@ func TestSyncerShutdownDoesNotDescorePeer(t *testing.T) {
 				}
 
 				tracker := p2ptest.NewTracker(t)
-				client := p2ptest.NewSelfTrackingClientWithTracker(t, ctx, nodeID, handler, tracker)
+				client := trackingtest.NewSelfClientWithTracker(t, ctx, nodeID, handler, tracker)
 
 				syncer = newSUT(t, targetRoot, client)
 
@@ -529,7 +530,7 @@ func TestSyncerScoresProofSource(t *testing.T) {
 					},
 				}
 
-				syncer := newSUT(t, targetRoot, p2ptest.NewSelfTrackingClientWithTracker(t, ctx, nodeID, handler, tracker))
+				syncer := newSUT(t, targetRoot, trackingtest.NewSelfClientWithTracker(t, ctx, nodeID, handler, tracker))
 
 				require.ErrorIsf(t, syncer.Sync(ctx), tt.wantErr, "%T.Sync()", syncer)
 
