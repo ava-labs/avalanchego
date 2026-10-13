@@ -425,6 +425,10 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
+			if errors.Is(err, ErrAlreadyClosed) {
+				// Our own shutdown, so the peer is not at fault.
+				return nil
+			}
 			return err
 		}
 
@@ -482,6 +486,10 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
+			if errors.Is(err, ErrAlreadyClosed) {
+				// Our own shutdown, so the peer is not at fault.
+				return nil
+			}
 			return err
 		}
 

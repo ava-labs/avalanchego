@@ -8,6 +8,7 @@ import (
 	"context"
 	"math/rand"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -383,8 +384,64 @@ func Test_Midpoint(t *testing.T) {
 	}
 }
 
-// The proof client scores the peer it fetched from. Only the wiring is pinned,
-// since an unusable proof also ends the sync by cancellation, which de-scores.
+// Shutting down must not de-score a peer that answered correctly.
+func TestSyncerShutdownDoesNotDescorePeer(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx := t.Context()
+
+		targetRoot := ids.GenerateTestID()
+		nodeID := ids.GenerateTestNodeID()
+		response := marshalRangeProofResponse(t, &proofDouble{newRoot: targetRoot})
+
+		// The handler parks mid-request so the syncer can be closed underneath
+		// it, then serves a valid proof that arrives after the close.
+		served := make(chan struct{})
+		release := make(chan struct{})
+		handler := p2p.TestHandler{
+			AppRequestF: func(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *common.AppError) {
+				close(served)
+				<-release
+				return response, nil
+			},
+		}
+
+		tracker := p2ptest.NewTracker(t)
+		client := p2ptest.NewSelfTrackingClientWithTracker(t, ctx, nodeID, handler, tracker)
+
+		syncer, err := NewSyncer(
+			&db{id: ids.Empty},
+			Config[*proofDouble, *proofDouble]{
+				TargetRoot:            targetRoot,
+				RangeProofMarshaler:   marshaler{},
+				ChangeProofMarshaler:  marshaler{},
+				ProofClient:           client,
+				Log:                   logging.NoLog{},
+				SimultaneousWorkLimit: 1,
+			},
+			prometheus.NewRegistry(),
+		)
+		require.NoError(t, err)
+
+		syncErr := make(chan error, 1)
+		go func() {
+			syncErr <- syncer.Sync(ctx)
+		}()
+
+		// Close while the handler is parked, so its reply lands after the close.
+		<-served
+		closeMidSync(syncer)
+		close(release)
+
+		require.ErrorIsf(t, <-syncErr, context.Canceled, "%T.Sync()", syncer)
+		// Sync returns as soon as close cancels its context, so wait for the
+		// reply still in flight to reach the scoring callback.
+		synctest.Wait()
+
+		assert.Truef(t, responsive(tracker, nodeID),
+			"%T.ResponsivePeers() after shutdown, the peer served a valid proof", tracker)
+	})
+}
+
 func TestSyncerScoresProofSource(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -448,9 +505,22 @@ func TestSyncerScoresProofSource(t *testing.T) {
 
 			require.ErrorIsf(t, syncer.Sync(ctx), tt.wantErr, "%T.Sync()", syncer)
 
-			tracked, responsive := tracker.TrackedPeers(), tracker.ResponsivePeers()
+			tracked := tracker.TrackedPeers()
 			assert.Truef(t, tracked.Contains(nodeID), "%T.TrackedPeers()", tracker)
-			assert.Equalf(t, tt.validProof, responsive.Contains(nodeID), "%T.ResponsivePeers()", tracker)
+			assert.Equalf(t, tt.validProof, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
 		})
 	}
+}
+
+func responsive(tracker *p2p.PeerTracker, nodeID ids.NodeID) bool {
+	peers := tracker.ResponsivePeers()
+	return peers.Contains(nodeID)
+}
+
+// closeMidSync orders the close before any in-flight reply.
+func closeMidSync[R, C any](s *Syncer[R, C]) {
+	s.workLock.Lock()
+	defer s.workLock.Unlock()
+
+	s.close()
 }
