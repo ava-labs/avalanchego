@@ -1,0 +1,31 @@
+name: Cache policy
+description: Decide whether this run may save a requested input cache
+
+# This action centralizes shared-cache write policy so every caching action
+# applies the same restrictions. See docs/ci.md#ci-cache-policy for the policy
+# and its rationale.
+
+inputs:
+  request-cache-save:
+    description: 'Request permission for this run to save a cache entry'
+    required: false
+    default: 'false'
+
+outputs:
+  cache-save-allowed:
+    description: Whether this run may save the requested cache
+    value: ${{ steps.policy.outputs.cache-save-allowed }}
+
+runs:
+  using: composite
+  steps:
+    - id: policy
+      shell: bash
+      env:
+        REQUEST_CACHE_SAVE: ${{ inputs.request-cache-save }}
+      run: |
+        cache_save_allowed=false
+        if [[ "$REQUEST_CACHE_SAVE" == 'true' ]] && [[ "$GITHUB_REF" == 'refs/heads/master' ]]; then
+          cache_save_allowed=true
+        fi
+        echo "cache-save-allowed=$cache_save_allowed" >> "$GITHUB_OUTPUT"

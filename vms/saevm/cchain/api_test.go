@@ -13,21 +13,20 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
-	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -35,61 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
-	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
-
-	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
-
-// getTxStatus exposes the deprecated [service.GetAtomicTxStatus] endpoint.
-func (c *Client) getTxStatus(ctx context.Context, txID ids.ID) (TxStatus, error) {
-	var resp TxStatus
-	err := c.r.SendRequest(
-		ctx,
-		"avax.getAtomicTxStatus",
-		&api.JSONTxID{
-			TxID: txID,
-		},
-		&resp,
-	)
-	return resp, err
-}
-
-// getAllUTXOs drains [Client.GetUTXOs] for addrs by walking pages of size limit
-// until a short page signals the end of the result set.
-func (c *Client) getAllUTXOs(
-	ctx context.Context,
-	tb testing.TB,
-	sourceChain ids.ID,
-	limit uint32,
-	addrs ...ids.ShortID,
-) []*avax.UTXO {
-	tb.Helper()
-
-	var (
-		startAddr   ids.ShortID
-		startUTXOID ids.ID
-		utxos       []*avax.UTXO
-	)
-	for {
-		page, endAddr, endUTXOID, err := c.GetUTXOs(
-			ctx,
-			addrs,
-			sourceChain,
-			limit,
-			startAddr,
-			startUTXOID,
-		)
-		require.NoErrorf(tb, err, "%T.GetUTXOs()", c)
-		utxos = append(utxos, page...)
-		// This termination condition matches the original synchronous C-Chain
-		// API behavior. Changing the expected termination condition could
-		// accidentally break legacy users.
-		if uint64(len(page)) < uint64(limit) {
-			return utxos
-		}
-		startAddr, startUTXOID = endAddr, endUTXOID
-	}
-}
 
 // TestIssueTxRejectsInvalidTransaction asserts that [Client.IssueTx] surfaces
 // an error from the transaction pool's verification pipeline.
@@ -165,43 +110,38 @@ func TestGetTxNotFound(t *testing.T) {
 	require.ErrorContainsf(t, err, errFetchingTx.Error(), "%T.GetTx()", sut.Client)
 }
 
-// TestGetAtomicTxStatus exercises the deprecated avax.getAtomicTxStatus
-// endpoint on both the unknown and accepted branches.
-func TestGetAtomicTxStatus(t *testing.T) {
+// TestAwaitTxAccepted asserts that [Client.AwaitTxAccepted] keeps polling while
+// the tx is unknown and returns once the tx is accepted.
+func TestAwaitTxAccepted(t *testing.T) {
 	sk := txtest.NewKey(t)
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(sk.EthAddress())
-	}))
+	ctx, sut := newSUT(t, withMaxAllocFor(sk.EthAddress()))
 
 	stx := newWallet(sk, sut.ctx, sut.Client).newMinimalTx(t)
-	t.Run("before_execution", func(t *testing.T) {
-		got, err := sut.getTxStatus(ctx, stx.ID())
-		require.NoErrorf(t, err, "%T.getTxStatus()", sut.Client)
-		want := TxStatus{
-			Status: choices.Unknown,
-		}
-		require.Equalf(t, want, got, "%T.getTxStatus()", sut.Client)
+	t.Run("before_accept", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+		defer cancel()
+		err := sut.AwaitTxAccepted(ctx, stx.ID(), time.Millisecond)
+		require.ErrorIsf(t, err, context.DeadlineExceeded, "%T.AwaitTxAccepted()", sut.Client)
 	})
 
-	blk := sut.issueAndExecute(ctx, t, stx)
-	t.Run("after_execution", func(t *testing.T) {
-		got, err := sut.getTxStatus(ctx, stx.ID())
-		require.NoErrorf(t, err, "%T.getTxStatus()", sut.Client)
-		want := TxStatus{
-			Status: choices.Accepted,
-			Height: new(avajson.Uint64(blk.NumberU64())),
-		}
-		require.Equalf(t, want, got, "%T.getTxStatus()", sut.Client)
+	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
+	blk := sut.buildVerifyAccept(ctx, t)
+	t.Run("after_accept", func(t *testing.T) {
+		err := sut.AwaitTxAccepted(ctx, stx.ID(), time.Millisecond)
+		require.NoErrorf(t, err, "%T.AwaitTxAccepted()", sut.Client)
+		sut.assertTxAccepted(ctx, t, stx, blk.NumberU64())
 	})
 }
 
-// TestGetUTXOsPagination asserts that walking [Client.GetUTXOs] yields each
-// seeded UTXO exactly once.
-func TestGetUTXOsPagination(t *testing.T) {
+// TestGetAllUTXOs asserts that [Client.GetAllUTXOs] yields each seeded UTXO
+// exactly once.
+func TestGetAllUTXOs(t *testing.T) {
 	ctx, sut := newSUT(t)
 
 	sourceChain := sut.ctx.XChainID
-	const numUTXOs uint64 = 5
+	// Two full pages cross one page boundary. Because the last page is full,
+	// one more request is needed, and it returns no UTXOs.
+	const numUTXOs uint64 = 2 * maxGetUTXOsLimit
 	want := make([]*avax.UTXO, numUTXOs)
 	addr := txtest.NewKey(t).Address()
 	for i := range numUTXOs {
@@ -209,11 +149,13 @@ func TestGetUTXOsPagination(t *testing.T) {
 	}
 	sut.addUTXOs(t, sut.ctx.ChainID, sourceChain, want...)
 
-	// pageSize=1 stresses the boundary behavior so any off-by-one in the cursor
-	// logic will surface here.
-	const pageSize = 1
-	got := sut.Client.getAllUTXOs(ctx, t, sourceChain, pageSize, addr)
-	if diff := cmp.Diff(want, got, txtest.UTXOCmpOpt()); diff != "" {
+	got, err := sut.Client.GetAllUTXOs(ctx, []ids.ShortID{addr}, sourceChain)
+	require.NoErrorf(t, err, "%T.GetAllUTXOs()", sut.Client)
+	// Comparing this many UTXOs field by field takes seconds under -race.
+	byEncoding := cmp.Comparer(func(a, b *avax.UTXO) bool {
+		return bytes.Equal(txtest.MarshalUTXO(t, a), txtest.MarshalUTXO(t, b))
+	})
+	if diff := cmp.Diff(want, got, txtest.UTXOCmpOpt(), byEncoding); diff != "" {
 		t.Errorf("paginated UTXOs (-want +got):\n%s", diff)
 	}
 }
@@ -295,9 +237,8 @@ func TestRPCExtras(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.method, func(t *testing.T) {
-			client := sut.ethclient.Client()
 			var got map[string]any
-			err := client.CallContext(ctx, &got, tt.method, tt.args...)
+			err := sut.ethclient.CallContext(ctx, &got, tt.method, tt.args...)
 			require.NoErrorf(t, err, "%s(%v)", tt.method, tt.args)
 			for k, want := range tt.want {
 				assert.Equalf(t, want, got[k], "field %q", k)
@@ -306,11 +247,8 @@ func TestRPCExtras(t *testing.T) {
 	}
 }
 
-// TestSynchronousRPCs replays JSON-RPC calls recorded from the synchronous VM
-// and requires an identical response, covering state, receipt, log, and tracing
-// RPCs at every height for every pre-SAE network upgrade.
-//
-// TODO(StephenButtolph): Test RPCs re-executing synchronous blocks.
+// TestSynchronousRPCs serves the database written by the synchronous VM and
+// requires every recorded JSON-RPC call to be answered identically.
 func TestSynchronousRPCs(t *testing.T) {
 	// The fixture's keys are relative to the VM's own database rather than to
 	// the base database that contains it.
@@ -326,13 +264,71 @@ func TestSynchronousRPCs(t *testing.T) {
 		// to refuse later pruning runs.
 		withArchival(),
 	)
+	sut.requireSynchronousRPCs(ctx, t, fixture.AllRPCCalls(), fixture.Blocks)
+}
 
-	for _, call := range fixture.RPCCalls {
+// TestBootstrappedSynchronousRPCs executes the synchronous history during
+// bootstrapping and verifies that JSON-RPC responses are correct.
+func TestBootstrappedSynchronousRPCs(t *testing.T) {
+	fixture, opts, _ := synchronousFixture(t)
+	tests := []struct {
+		name  string
+		opts  []sutOption
+		calls []synchronoustest.RPCCall
+	}{
+		{
+			name: "hashdb_archival",
+			opts: []sutOption{withArchival()},
+			// Archival hashdb nodes are the only nodes that are guaranteed to
+			// support eth_getProof.
+			calls: fixture.AllRPCCalls(),
+		},
+		{
+			name:  "hashdb_pruning",
+			calls: fixture.RPCCalls,
+		},
+		{
+			name:  "hashdb_pruning_no_snapshot",
+			opts:  []sutOption{withSnapshotDisabled()},
+			calls: fixture.RPCCalls,
+		},
+		{
+			name:  "firewood",
+			opts:  []sutOption{withFirewood()},
+			calls: fixture.RPCCalls,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ctx, sut := newSUT(t, append(opts, tt.opts...)...)
+			sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
+
+			require.NoErrorf(t, sut.SetPreference(ctx, sut.lastAccepted(ctx, t), nil), "%T.SetPreference()", sut.VM)
+			require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", sut.VM)
+			sut.requireSynchronousRPCs(ctx, t, tt.calls, fixture.Blocks)
+		})
+	}
+}
+
+// requireSynchronousRPCs replays calls, recorded from the synchronous VM, and
+// requires an identical response. It also requires every block to be served
+// identically by number and by hash.
+func (s *SUT) requireSynchronousRPCs(
+	ctx context.Context,
+	t *testing.T,
+	calls []synchronoustest.RPCCall,
+	blocks []synchronoustest.Block,
+) {
+	t.Helper()
+
+	for _, call := range calls {
 		t.Run(call.Name, func(t *testing.T) {
 			t.Parallel()
 
 			var got json.RawMessage
-			err := sut.ethclient.Client().CallContext(ctx, &got, call.Method, call.Args()...)
+			err := s.ethclient.CallContext(ctx, &got, call.Method, call.Args()...)
 			if call.Error != "" {
 				require.EqualErrorf(t, err, call.Error, "%s(%s)", call.Method, call.Params)
 				return
@@ -356,20 +352,20 @@ func TestSynchronousRPCs(t *testing.T) {
 		cmputils.Headers(),
 		cmpopts.EquateEmpty(),
 	}
-	for _, block := range fixture.Blocks {
+	for _, block := range blocks {
 		t.Run(fmt.Sprintf("block_%02d_%s", block.Number, block.Fork), func(t *testing.T) {
 			t.Parallel()
 
 			t.Logf("%s", block.Description)
 			want := block.EthBlock(t)
 
-			byNumber, err := sut.ethclient.BlockByNumber(ctx, new(big.Int).SetUint64(block.Number))
+			byNumber, err := s.ethclient.BlockByNumber(ctx, new(big.Int).SetUint64(block.Number))
 			require.NoErrorf(t, err, "BlockByNumber(%d)", block.Number)
 			if diff := cmp.Diff(want, byNumber, opts); diff != "" {
 				t.Errorf("BlockByNumber(%d) diff (-want +got):\n%s", block.Number, diff)
 			}
 
-			byHash, err := sut.ethclient.BlockByHash(ctx, block.Hash)
+			byHash, err := s.ethclient.BlockByHash(ctx, block.Hash)
 			require.NoErrorf(t, err, "BlockByHash(%s)", block.Hash)
 			if diff := cmp.Diff(want, byHash, opts); diff != "" {
 				t.Errorf("BlockByHash(%s) diff (-want +got):\n%s", block.Hash, diff)

@@ -11,7 +11,7 @@ require (
 	github.com/ava-labs/avalanchego v1.15.2
 	github.com/ava-labs/avalanchego/graft/evm v1.15.2
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0
-	github.com/ava-labs/libevm v1.13.15-0.20261005133427-37f8eb6a71f0
+	github.com/ava-labs/libevm v1.13.15-0.20261009144421-d51262991849
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/go-bexpr v0.1.10
@@ -88,7 +88,7 @@ require (
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
-	github.com/klauspost/compress v1.20.0 // indirect
+	github.com/klauspost/compress v1.20.2 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect

@@ -27,7 +27,7 @@ require (
 	github.com/ava-labs/avalanchego/graft/evm v1.15.2
 	github.com/ava-labs/avalanchego/graft/subnet-evm v1.15.2
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0
-	github.com/ava-labs/libevm v1.13.15-0.20261005133427-37f8eb6a71f0
+	github.com/ava-labs/libevm v1.13.15-0.20261009144421-d51262991849
 	github.com/ava-labs/simplex v0.0.0-20260429081342-03ce910391ad
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
@@ -149,7 +149,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.20.0
+	github.com/klauspost/compress v1.20.2
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect

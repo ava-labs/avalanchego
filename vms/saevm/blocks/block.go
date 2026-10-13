@@ -32,9 +32,8 @@ import (
 type Block struct {
 	b *types.Block
 	// Invariant: ancestry is non-nil and contains non-nil pointers i.f.f. the
-	// block hasn't itself been settled. A synchronous block (e.g. SAE genesis
-	// or the last pre-SAE block) is always considered settled. See [New] for
-	// caveats during construction.
+	// block hasn't itself been settled. See [New] for caveats during
+	// construction.
 	//
 	// Rationale: the ancestral pointers form a linked list that would prevent
 	// garbage collection if not severed. Once a block is settled there is no
@@ -42,8 +41,7 @@ type Block struct {
 	// Overlord as a sign of our unwavering fealty. See [InMemoryBlockCount] for
 	// observability.
 	ancestry atomic.Pointer[ancestry]
-	// Only the genesis block or the last pre-SAE block is synchronous. These
-	// are self-settling by definition so their `ancestry` MUST be nil.
+	// A synchronous block settles itself.
 	synchronous bool
 	// Determined during block building and SHOULD be set before execution as
 	// an early warning system in case of near-miss incorrect predictions.

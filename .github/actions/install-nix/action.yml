@@ -6,10 +6,27 @@ inputs:
     description: "github token to authenticate with to avoid being rate-limited"
     default: ${{ github.token }}
     required: false
+  disable_go_proxy:
+    description: 'Disable GOPROXY after Go module-cache preparation'
+    default: 'true'
+    required: false
+  setup_go_module_cache:
+    description: 'Restore and prepare the shared Go module cache'
+    default: 'true'
+    required: false
+  request_nix_cache_save:
+    description: 'Request a Nix store cache save when cache policy permits it'
+    default: 'false'
+    required: false
 
 runs:
   using: composite
   steps:
+    - id: cache-policy
+      uses: ./.github/actions/cache-policy
+      with:
+        request-cache-save: ${{ inputs.request_nix_cache_save }}
+
     - uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
       with:
         github_access_token: ${{ inputs.github_token }}
@@ -24,28 +41,17 @@ runs:
         primary-key: nix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('flake.lock') }}
         restore-prefixes-first-match: |
           nix-${{ runner.os }}-${{ runner.arch }}-
+        save: ${{ steps.cache-policy.outputs.cache-save-allowed == 'true' }}
         gc-max-store-size-linux: 5G
         gc-max-store-size-macos: 5G
     - name: Load flake dependencies
       run: nix develop --command echo "dependencies installed"
       shell: bash
-    # Restore Go modules (architecture-independent). setup-go-for-project owns cache writes.
-    - uses: actions/cache/restore@v5
-      id: go-mod-cache
+    # This action is a restore-only consumer. The dedicated Go workflow setup
+    # jobs own Go module-cache writes.
+    - uses: ./.github/actions/setup-go-module-cache
+      if: ${{ inputs.setup_go_module_cache == 'true' }}
       with:
-        path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.work.sum', 'tools/external/go.sum') }}
-        restore-keys: ${{ runner.os }}-go-mod-
-    # Restore the Go build cache (architecture-specific). setup-go-for-project owns cache writes.
-    - uses: actions/cache/restore@v5
-      with:
-        path: ~/.cache/go-build
-        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.work.sum', 'tools/external/go.sum') }}
-        restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
-    # Download modules only on cache miss
-    - run: nix develop --command go mod download
-      if: steps.go-mod-cache.outputs.cache-hit != 'true'
-      shell: bash
-    - run: GOWORK=off nix develop --command go mod download -modfile=tools/external/go.mod
-      if: steps.go-mod-cache.outputs.cache-hit != 'true'
-      shell: bash
+        use-nix: 'true'
+        request-cache-save: 'false'
+        disable-go-proxy: ${{ inputs.disable_go_proxy }}

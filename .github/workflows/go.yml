@@ -1,81 +1,26 @@
-name: Go
+name: Go Test Jobs
 
 on:
-  push:
-    tags:
-      - "*"
-    branches:
-      - master
-      - dev
-  pull_request:
-  merge_group:
-    types: [checks_requested]
+  workflow_call:
 
 permissions:
   contents: read
 
-# Cancel ongoing workflow runs if a new one is started
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  go-required:
-    if: ${{ always() }}
-    needs:
-      - build-antithesis-images-avalanchego
-      - build-antithesis-images-subnet-evm
-      - build-image-avalanchego
-      - build-image-subnet-evm
-      - check-contract-bindings
-      - check-generated-canoto
-      - check-generated-mocks
-      - check-generated-protobuf
-      - check-go-mod-tidy
-      - check-links
-      - check-tauseconds
-      - e2e
-      - e2e-bootstrap-monitor
-      - e2e-existing-network
-      - e2e-kube
-      - e2e-load-subnet-evm
-      - e2e-post-latest
-      - e2e-schedule-latest
-      - e2e-warp-subnet-evm
-      - fuzz
-      - lint-avalanchego
-      - lint-coreth
-      - lint-evm
-      - lint-subnet-evm
-      - load
-      # Re-enable once images are built by Bazel and can be cached; otherwise, this job is too expensive for what it evaluates.
-      # - load_kube_kind
-      - robustness
-      - smoke
-      - unit
-      - upgrade
+  setup-cache-darwin-arm64:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-workflow-cache-producer
+
+  setup-cache-linux-amd64:
     runs-on: ubuntu-24.04
     steps:
-      - name: Fail unless all needed jobs succeeded
-        shell: bash
-        env:
-          NEEDS_JSON: ${{ toJSON(needs) }}
-        run: |
-          failed_jobs="$(
-            jq -r '
-              to_entries[]
-              | select(.value.result != "success")
-              | .key
-            ' <<<"$NEEDS_JSON"
-          )"
-
-          if [[ -n "$failed_jobs" ]]; then
-            echo "Required jobs failed:"
-            printf '%s\n' "$failed_jobs"
-            exit 1
-          fi
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-workflow-cache-producer
 
   build-antithesis-images-avalanchego:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -85,6 +30,7 @@ jobs:
           run: ./scripts/run_task.sh test-build-antithesis-images-avalanchego
 
   build-antithesis-images-subnet-evm:
+    needs: setup-cache-linux-amd64
     # Use a faster runner pending migration to bazel. The default free runners result
     # in 20+ minute runtime, slowing down every PR and merge queue CI run.
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -96,6 +42,7 @@ jobs:
           run: ./scripts/run_task.sh test-build-antithesis-images-subnet-evm
 
   build-image-avalanchego:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -103,9 +50,12 @@ jobs:
         uses: ./.github/actions/run-docker-with-disk-space
         with:
           setup-qemu: 'true'
+          docker-username: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_USERNAME || '' }}
+          docker-password: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_PASS || '' }}
           run: ./scripts/run_task.sh test-build-image
 
   build-image-subnet-evm:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -113,10 +63,13 @@ jobs:
         uses: ./.github/actions/run-docker-with-disk-space
         with:
           setup-qemu: 'true'
+          docker-username: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_USERNAME || '' }}
+          docker-password: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_PASS || '' }}
           run: ./scripts/run_task.sh test-build-image
           working_directory: ./graft/subnet-evm
 
   check-contract-bindings:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -127,6 +80,7 @@ jobs:
       - run: ./scripts/run_task.sh check-generate-load-contract-bindings
 
   check-generated-canoto:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -135,6 +89,7 @@ jobs:
         run: ./scripts/run_task.sh check-generate-canoto
 
   check-generated-mocks:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -143,6 +98,7 @@ jobs:
         run: ./scripts/run_task.sh check-generate-mocks
 
   check-generated-protobuf:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -154,9 +110,12 @@ jobs:
       - run: ./scripts/run_task.sh check-generate-protobuf
 
   check-go-mod-tidy:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      # Prepare Bazel's separate Go module cache before Go setup disables GOPROXY.
+      - uses: ./.github/actions/setup-bazel
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: ./scripts/run_task.sh check-go-mod-tidy
@@ -182,6 +141,7 @@ jobs:
           fi
 
   e2e:
+    needs: setup-cache-linux-amd64
     name: e2e (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
@@ -208,6 +168,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-bootstrap-monitor:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -231,6 +192,7 @@ jobs:
           artifact_name: bootstrap-monitor-kind-diagnostics
 
   e2e-existing-network:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -249,6 +211,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-kube:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -268,6 +231,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-load-subnet-evm:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - name: Git checkout
@@ -290,6 +254,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-post-latest:
+    needs: setup-cache-linux-amd64
     # The default free runners lack the resources for parallel execution, so a beefier
     # runner is required.
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -311,6 +276,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-schedule-latest:
+    needs: setup-cache-linux-amd64
     # The default free runners lack the resources for parallel execution, so a beefier
     # runner is required.
     runs-on: blacksmith-4vcpu-ubuntu-2404
@@ -332,6 +298,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-warp-subnet-evm:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - name: Git checkout
@@ -354,6 +321,7 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   fuzz:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -363,17 +331,27 @@ jobs:
         run: ./scripts/run_task.sh test-fuzz
 
   lint-avalanchego:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
         shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
+      # Bazel is required by lint-all-ci since it runs check-go-mod-tidy, which
+      # invokes `bazelisk mod tidy`. Since preparation of Bazel dependencies may
+      # involve downloading Go modules, it needs to happen before install-nix disables
+      # GOPROXY.
+      - uses: ./.github/actions/setup-bazel
+        env:
+          # This job does not build Bazel targets.
+          BAZEL_REMOTE_CACHE_ENABLED: 'false'
       - uses: ./.github/actions/install-nix
       - name: Runs all lint checks
         run: ./scripts/run_task.sh lint-all-ci
 
   lint-coreth:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -388,6 +366,7 @@ jobs:
         run: ./scripts/run_task.sh check-go-mod-tidy
 
   lint-evm:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -401,6 +380,7 @@ jobs:
         run: ../../scripts/run_task.sh check-go-mod-tidy
 
   lint-subnet-evm:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -415,6 +395,7 @@ jobs:
         run: ./scripts/run_task.sh check-go-mod-tidy
 
   load:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
@@ -451,6 +432,7 @@ jobs:
   #         loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   robustness:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -479,7 +461,8 @@ jobs:
   # runs the full suite on macOS.
   smoke:
     name: darwin-arm64
-    uses: ./.github/workflows/go-ci-smoke.yml
+    needs: setup-cache-darwin-arm64
+    uses: ./.github/workflows/go-smoke.yml
     with:
       platform_name: darwin-arm64
       runner: macos-26
@@ -487,13 +470,15 @@ jobs:
 
   unit:
     name: linux-amd64
-    uses: ./.github/workflows/go-ci.yml
+    needs: setup-cache-linux-amd64
+    uses: ./.github/workflows/go-unit.yml
     with:
       platform_name: linux-amd64
       runner: ubuntu-24.04
     secrets: inherit
 
   upgrade:
+    needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5

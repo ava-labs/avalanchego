@@ -66,6 +66,9 @@ runs:
       if: ${{ inputs.setup_bazel == 'true' }}
     # Install nix and ensure promtail and prometheus are available
     - uses: ./.github/actions/install-nix
+      with:
+        # Bazel uses its own Go module cache.
+        setup_go_module_cache: ${{ inputs.setup_bazel != 'true' }}
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash
