@@ -12,6 +12,10 @@ const (
 	// but nonetheless uses the C-Chain. Intended to support
 	// execution of all C-Chain tests by the coreth repo in an e2e job.
 	UsesCChainLabel = "uses-c"
+
+	// SkipSharedNetworkBootstrapCheckLabel excludes a test from bootstrap checks
+	// against the shared network. A suite check still runs if another test is eligible.
+	SkipSharedNetworkBootstrapCheckLabel = "skip-shared-network-bootstrap-check"
 )
 
 // DescribeXChain annotates the tests for X-Chain.
