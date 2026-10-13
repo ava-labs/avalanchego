@@ -229,8 +229,8 @@ func WithSuggestedGasPrice(tc tests.TestContext, ethClient *ethclient.Client) co
 	return common.WithBaseFee(gas.Price(baseFee.Uint64()))
 }
 
-// Verify that a new node can bootstrap into the network. If the check wasn't skipped,
-// the node will be returned to the caller.
+// CheckBootstrapIsPossible verifies that a new node can bootstrap into the
+// network. If the check runs, it returns the new node.
 func CheckBootstrapIsPossible(tc tests.TestContext, network *tmpnet.Network) *tmpnet.Node {
 	require := require.New(tc)
 
