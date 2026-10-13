@@ -494,7 +494,7 @@ func (e *proposalTxExecutor) applySpendOnCommit(creds []verify.Verifiable) error
 func (e *proposalTxExecutor) applySpendOnAbort(tx platform.UnsignedTx) error {
 	ins, outs, _, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("getting utxos: %w", err)
+		return err
 	}
 
 	avax.Consume(e.onAbortState, ins)
