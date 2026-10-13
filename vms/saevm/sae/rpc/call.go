@@ -13,11 +13,13 @@ import (
 )
 
 // Call overrides [ethapi.BlockChainAPI.Call] to record the gas used for
-// [GasUsedHeader].
+// [GasUsedHeader]. The interceptor needs the request's context, so it is set
+// on a [ethapi.BlockChainAPI] built for each call.
 func (b *blockChainAPI) Call(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash *rpc.BlockNumberOrHash, overrides *ethapi.StateOverride, blockOverrides *ethapi.BlockOverrides) (hexutil.Bytes, error) {
 	recordGas := func(r *core.ExecutionResult) error {
 		addGas(ctx, r.UsedGas)
 		return nil
 	}
-	return b.BlockChainAPI.Call(ctx, args, blockNrOrHash, overrides, blockOverrides, ethapi.WithCallResultInterceptor(recordGas))
+	api := ethapi.NewBlockChainAPI(b.b, ethapi.WithDefaultCallOptions(ethapi.WithCallResultInterceptor(recordGas)))
+	return api.Call(ctx, args, blockNrOrHash, overrides, blockOverrides)
 }

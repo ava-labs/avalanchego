@@ -39,7 +39,6 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/core",
     deps = [
         "//database",
-        "//graft/evm/constants",
         "//graft/evm/core/state/snapshot",
         "//graft/evm/firewood",
         "//graft/evm/triedb/hashdb",
@@ -63,6 +62,7 @@ go_library(
         "//graft/subnet-evm/stateupgrade",
         "//utils/set",
         "//vms/evm/acp226",
+        "//vms/evm/blackhole",
         "//vms/evm/predicate",
         "//vms/evm/prefetch",
         "//vms/evm/sync/customrawdb",

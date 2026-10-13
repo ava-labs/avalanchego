@@ -1,0 +1,31 @@
+name: Setup Go workflow cache producer
+description: Prepare and save Go workflow input caches when cache policy permits it
+
+inputs:
+  produce-go-module-cache:
+    description: Produce the shared Go module cache as well as the Task and Nix caches
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - id: cache-policy
+      uses: ./.github/actions/cache-policy
+      with:
+        request-cache-save: 'true'
+    # setup-go-for-project includes setup-task. Run setup-task directly only
+    # when this platform does not own the shared Go module cache.
+    - if: ${{ steps.cache-policy.outputs.cache-save-allowed == 'true' && inputs.produce-go-module-cache == 'true' }}
+      uses: ./.github/actions/setup-go-for-project
+      with:
+        request-cache-save: 'true'
+    - if: ${{ steps.cache-policy.outputs.cache-save-allowed == 'true' && inputs.produce-go-module-cache != 'true' }}
+      uses: ./.github/actions/setup-task
+      with:
+        request-cache-save: 'true'
+    - if: ${{ steps.cache-policy.outputs.cache-save-allowed == 'true' }}
+      uses: ./.github/actions/install-nix
+      with:
+        setup_go_module_cache: 'false'
+        request_nix_cache_save: 'true'
