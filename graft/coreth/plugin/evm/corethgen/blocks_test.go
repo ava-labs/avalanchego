@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
@@ -441,6 +442,11 @@ func (g *generator) seedUTXO(t *testing.T, assetID ids.ID, amount uint64) *avax.
 			Traits: [][]byte{vmtest.TestShortIDAddrs[0].Bytes()},
 		}}},
 	}), "sharedMemory.Apply(UTXO)")
+	g.fixture.UTXOs = append(g.fixture.UTXOs, synchronoustest.Element{
+		Key:    inputID[:],
+		Value:  utxoBytes,
+		Traits: []hexutil.Bytes{vmtest.TestShortIDAddrs[0].Bytes()},
+	})
 	return utxo
 }
 
