@@ -273,6 +273,19 @@ func (n *Node) EnsureBLSSigningKey() error {
 	return nil
 }
 
+func (n *Node) GetBLSSigningKey() (*localsigner.LocalSigner, error) {
+	signingKey := n.Flags[config.StakingSignerKeyContentKey]
+	signingKeyBytes, err := base64.StdEncoding.DecodeString(signingKey)
+	if err != nil {
+		return nil, stacktrace.Wrap(err)
+	}
+	signer, err := localsigner.FromBytes(signingKeyBytes)
+	if err != nil {
+		return nil, stacktrace.Wrap(err)
+	}
+	return signer, nil
+}
+
 // Ensures a staking keypair is generated if not already present.
 func (n *Node) EnsureStakingKeypair() error {
 	keyKey := config.StakingTLSKeyContentKey
