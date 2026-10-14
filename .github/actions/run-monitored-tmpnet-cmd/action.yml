@@ -73,10 +73,13 @@ runs:
         # See docs/go-toolchains-and-caches.md#dependency-preparation.
         setup_go_module_cache: ${{ inputs.setup_bazel != 'true' }}
     - name: Notify of metrics availability
+      id: notify-metrics
       if: (inputs.prometheus_username != '')
       shell: bash
       run: |
-        metrics_url=$($GITHUB_ACTION_PATH/output-metrics-url.sh)
+        start_timestamp="$(date '+%s')"
+        echo "start-timestamp=${start_timestamp}" >> "$GITHUB_OUTPUT"
+        metrics_url=$(METRICS_START_TIMESTAMP="${start_timestamp}" "${GITHUB_ACTION_PATH}/output-metrics-url.sh")
         echo "Grafana: ${metrics_url}"
         echo "🔗 [View Grafana Dashboard](${metrics_url})" >> "$GITHUB_STEP_SUMMARY"
       env:
@@ -115,6 +118,20 @@ runs:
         GH_RUN_NUMBER: ${{ inputs.run_number }}
         GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
+    - name: Notify of metrics for the full run
+      # The link emitted before the command ran displays metrics up to the time
+      # it is viewed. Emit a link bounded by the actual start and end of the run.
+      if: always() && steps.notify-metrics.outputs.start-timestamp != ''
+      shell: bash
+      run: |
+        metrics_url=$(METRICS_END_TIMESTAMP="$(date '+%s')" "${GITHUB_ACTION_PATH}/output-metrics-url.sh")
+        echo "Grafana (full run): ${metrics_url}"
+        echo "🔗 [View Grafana Dashboard (full run)](${metrics_url})" >> "$GITHUB_STEP_SUMMARY"
+      env:
+        GRAFANA_URL: https://avalabs.grafana.net/d/${{ inputs.grafana_dashboard_id }}?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
+        GH_JOB_ID: ${{ inputs.job }}
+        FILTER_BY_OWNER: ${{ inputs.filter_by_owner }}
+        METRICS_START_TIMESTAMP: ${{ steps.notify-metrics.outputs.start-timestamp }}
     - name: Log Bazel disk diagnostics
       if: ${{ steps.run-command.outcome == 'failure' && inputs.setup_bazel == 'true' }}
       shell: bash
