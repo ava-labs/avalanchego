@@ -27,11 +27,11 @@ func Register() {
 }
 
 // WithTempRegisteredExtras runs `fn` with temporary registration otherwise
-// equivalent to a call to [RegisterExtras], but limited to the life of `fn`.
+// equivalent to a call to [Register], but limited to the life of `fn`.
 //
-// This function is not intended for direct use. Use
-// `evm.WithTempRegisteredLibEVMExtras()` instead as it calls this along with
-// all other temporary-registration functions.
+// This function is not intended for direct use. Use the parent package's
+// `libevm.WithTempRegisteredExtras()` instead as it calls this along with all
+// other temporary-registration functions.
 func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
 	old := extras
 	defer func() { extras = old }()

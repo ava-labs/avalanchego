@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
 	_ "embed"
@@ -563,15 +562,7 @@ func (b *builder) BuildBlock(
 	he.SettledGasNumerator = (*uint64)(&settled.GasNumerator)
 	he.SettledExcess = (*uint64)(&settled.Excess)
 
-	return customtypes.NewBlockWithExtData(
-		header,
-		ethTxs,
-		nil, // uncles
-		receipts,
-		trie.NewStackTrie(nil),
-		extData,
-		true, // update [customtypes.HeaderExtra.ExtDataHash]
-	), nil
+	return customtypes.NewBlockWithExtData(header, ethTxs, receipts, extData), nil
 }
 
 var _ hook.Transaction = (*hookTx)(nil)
