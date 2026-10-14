@@ -435,6 +435,10 @@ tasks:
     desc: Formats YAML files with yamlfmt
     cmd: '{{.NIX_RUN}} yamlfmt .'
 
+  normalize-testdata-mtimes:
+    desc: Normalizes testdata modification times for Go test-result caching
+    cmd: '{{.NIX_RUN}} ./scripts/normalize_testdata_mtimes.sh'
+
   run-polyrepo:
     desc: "Run polyrepo for orchestrating local dependencies. Example: LIBEVM_REF=v1.2.3 FIREWOOD_REF=abc123 task run-polyrepo"
     cmd: '{{.NIX_RUN}} ./scripts/run_polyrepo.sh {{.CLI_ARGS}}'
@@ -631,10 +635,6 @@ tasks:
     cmds:
       - cmd: '{{.NIX_RUN}} ./bin/tmpnetctl start-kind-cluster --install-chaos-mesh'
 
-  normalize-testdata-mtimes:
-    desc: Normalizes testdata modification times for Go test-result caching
-    cmd: '{{.NIX_RUN}} ./scripts/normalize_testdata_mtimes.sh'
-
   test-run-task-launcher:
     desc: Tests the run_task launcher behavior
     cmd: '{{.NIX_RUN}} ./scripts/test_run_task_launcher.sh'
@@ -662,6 +662,17 @@ tasks:
     desc: Tests unified unit-test script behavior
     cmd: '{{.NIX_RUN}} ./scripts/test_tests_unit.sh'
 
+  test-unit-smoke:
+    desc: Runs one unit test package to check that Go unit tests run on a platform
+    # Mirrors the Bazel unit-test smoke target (//ids:ids_test --test_filter=TestID).
+    cmd: '{{.NIX_RUN}} go test -run TestID ./ids'
+
+  test-upgrade:
+    desc: Runs upgrade tests
+    cmds:
+      - task: build
+      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}'
+
   test-workflow-hash-go-unit-inputs:
     desc: Tests hashing of Go unit-test cache inputs
     cmd: '{{.NIX_RUN}} ./scripts/test_workflow_hash_go_unit_inputs.sh'
@@ -673,17 +684,6 @@ tasks:
   test-workflow-validate-go-unit-cache:
     desc: Tests Go unit-test cache validation
     cmd: '{{.NIX_RUN}} ./scripts/test_workflow_validate_go_unit_cache.sh'
-
-  test-unit-smoke:
-    desc: Runs one unit test package to check that Go unit tests run on a platform
-    # Mirrors the Bazel unit-test smoke target (//ids:ids_test --test_filter=TestID).
-    cmd: '{{.NIX_RUN}} go test -run TestID ./ids'
-
-  test-upgrade:
-    desc: Runs upgrade tests
-    cmds:
-      - task: build
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}'
 
   update-go-version:
     desc: "Updates go version directives across all modules. Usage: task update-go-version -- <version> (e.g. 1.25.7)"
