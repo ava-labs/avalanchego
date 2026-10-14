@@ -1266,3 +1266,77 @@ func verifyCancelAutoRenewedValidatorStakeIncreaseTx(
 
 	return validator, stakingInfo, nil
 }
+
+// verifyDecreaseAutoRenewedValidatorStakeTx carries out the validation for a
+// DecreaseAutoRenewedValidatorStakeTx.
+func verifyDecreaseAutoRenewedValidatorStakeTx(
+	backend *Backend,
+	feeCalculator fee.Calculator,
+	chainState state.Chain,
+	sTx *platform.Tx,
+	tx *platform.DecreaseAutoRenewedValidatorStakeTx,
+) (*state.Staker, state.StakingInfo, error) {
+	if !backend.Config.UpgradeConfig.IsIglooActivated(chainState.GetTimestamp()) {
+		return nil, state.StakingInfo{}, errIglooUpgradeNotActive
+	}
+
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return nil, state.StakingInfo{}, err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return nil, state.StakingInfo{}, err
+	}
+
+	autoRenewedStakerTx, validator, stakingInfo, err := getAutoRenewedValidator(chainState, tx.TxID)
+	if err != nil {
+		return nil, state.StakingInfo{}, err
+	}
+
+	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return validator, stakingInfo, nil
+	}
+
+	if stakingInfo.NextPeriod == 0 {
+		// The stake would never be withdrawn, as the validator stops at the
+		// end of its current cycle and all of its stake is returned.
+		return nil, state.StakingInfo{}, errAutoRenewedValidatorStopping
+	}
+
+	validatorRules, err := getValidatorRules(backend, chainState, autoRenewedStakerTx.SubnetID())
+	if err != nil {
+		return nil, state.StakingInfo{}, fmt.Errorf("getting validator rules: %w", err)
+	}
+
+	// Pending stake increases are not counted, as they can still be
+	// cancelled.
+	maxDecrease, err := safemath.Sub(validator.Weight, validatorRules.minValidatorStake)
+	if err != nil {
+		return nil, state.StakingInfo{}, err
+	}
+	totalDecrease, err := safemath.Add(stakingInfo.PendingStakeDecrease, tx.Amount)
+	if err != nil {
+		return nil, state.StakingInfo{}, err
+	}
+	if totalDecrease > maxDecrease {
+		return nil, state.StakingInfo{}, fmt.Errorf("%w: decreasing by %d would leave less than the minimum stake of %d", ErrWeightTooSmall, totalDecrease, validatorRules.minValidatorStake)
+	}
+
+	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, autoRenewedStakerTx.ValidatorAuthority, tx.Auth)
+	if err != nil {
+		return nil, state.StakingInfo{}, err
+	}
+
+	if err := verifySpend(
+		backend,
+		feeCalculator,
+		chainState,
+		tx,
+		baseTxCreds,
+	); err != nil {
+		return nil, state.StakingInfo{}, err
+	}
+
+	return validator, stakingInfo, nil
+}

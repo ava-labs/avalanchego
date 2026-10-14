@@ -1480,8 +1480,26 @@ func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRene
 	return ErrWrongTxType
 }
 
-func (*standardTxExecutor) DecreaseAutoRenewedValidatorStakeTx(*platform.DecreaseAutoRenewedValidatorStakeTx) error {
-	return ErrWrongTxType
+func (e *standardTxExecutor) DecreaseAutoRenewedValidatorStakeTx(tx *platform.DecreaseAutoRenewedValidatorStakeTx) error {
+	validator, stakingInfo, err := verifyDecreaseAutoRenewedValidatorStakeTx(e.backend, e.feeCalculator, e.state, e.tx, tx)
+	if err != nil {
+		return err
+	}
+
+	// The stake is only withdrawn at the start of the next cycle.
+	stakingInfo.PendingStakeDecrease, err = math.Add(stakingInfo.PendingStakeDecrease, tx.Amount)
+	if err != nil {
+		return fmt.Errorf("adding pending stake decrease: %w", err)
+	}
+
+	if err := e.state.SetStakingInfo(validator.SubnetID, validator.NodeID, stakingInfo); err != nil {
+		return fmt.Errorf("setting staking info: %w", err)
+	}
+
+	avax.Consume(e.state, tx.Ins)
+	avax.Produce(e.state, e.tx.ID(), tx.Outs)
+
+	return nil
 }
 
 func (e *standardTxExecutor) CancelAutoRenewedValidatorStakeIncreaseTx(tx *platform.CancelAutoRenewedValidatorStakeIncreaseTx) error {
