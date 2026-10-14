@@ -47,7 +47,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Assign PR to author
-        if: github.event_name == 'pull_request_target' && (steps.membership.outputs.avalanchego == 'true' || steps.membership.outputs.evm == 'true')
+        if: github.event_name == 'pull_request_target'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NUMBER: ${{ github.event.pull_request.number }}
