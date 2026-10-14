@@ -5,6 +5,7 @@ package customtypes
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"math/big"
 	"reflect"
 	"testing"
@@ -13,11 +14,11 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
@@ -100,7 +101,7 @@ func exportedFieldsPointToDifferentMemory[T interface {
 			case *[]uint8:
 				assertDifferentPointers(t, f, fieldCp)
 			case []uint8:
-				assertDifferentPointers(t, unsafe.SliceData(f), unsafe.SliceData(fieldCp.([]uint8)))
+				assertDifferentPointers(t, unsafe.SliceData(f), unsafe.SliceData(fieldCp.([]uint8))) //#nosec G103 -- pointer identity check only
 			default:
 				t.Fatalf("field %q type %T needs to be added to switch cases of exportedFieldsDeepCopied", field.Name, f)
 			}
@@ -308,41 +309,23 @@ func TestBlockGetters(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name                 string
-		headerExtra          *HeaderExtra
-		blockExtra           *BlockBodyExtra
-		wantExtDataGasUsed   *big.Int
-		wantBlockGasCost     *big.Int
-		wantVersion          uint32
-		wantExtData          []byte
-		wantTimeMilliseconds *uint64
-		wantMinDelayExcess   *acp226.DelayExcess
+		name        string
+		blockExtra  *BlockBodyExtra
+		wantVersion uint32
+		wantExtData []byte
 	}{
 		{
-			name:                 "empty",
-			headerExtra:          &HeaderExtra{},
-			blockExtra:           &BlockBodyExtra{},
-			wantTimeMilliseconds: nil,
-			wantMinDelayExcess:   nil,
+			name:       "empty",
+			blockExtra: &BlockBodyExtra{},
 		},
 		{
 			name: "fields_set",
-			headerExtra: &HeaderExtra{
-				ExtDataGasUsed:   big.NewInt(1),
-				BlockGasCost:     big.NewInt(2),
-				TimeMilliseconds: utils.PointerTo[uint64](3),
-				MinDelayExcess:   utils.PointerTo(acp226.DelayExcess(4)),
-			},
 			blockExtra: &BlockBodyExtra{
 				Version: 3,
 				ExtData: &[]byte{4},
 			},
-			wantExtDataGasUsed:   big.NewInt(1),
-			wantBlockGasCost:     big.NewInt(2),
-			wantVersion:          3,
-			wantExtData:          []byte{4},
-			wantTimeMilliseconds: utils.PointerTo[uint64](3),
-			wantMinDelayExcess:   utils.PointerTo(acp226.DelayExcess(4)),
+			wantVersion: 3,
+			wantExtData: []byte{4},
 		},
 	}
 
@@ -350,30 +333,25 @@ func TestBlockGetters(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			header := WithHeaderExtra(&types.Header{}, test.headerExtra)
-
-			block := types.NewBlock(header, nil, nil, nil, stubHasher{})
+			block := types.NewBlock(WithHeaderExtra(&types.Header{}, &HeaderExtra{}), nil, nil, nil, stubHasher{})
 			extras.Block.Set(block, test.blockExtra)
 
-			extData := BlockExtData(block)
-			require.Equal(t, test.wantExtData, extData, "BlockExtData()")
-
-			version := BlockVersion(block)
-			require.Equal(t, test.wantVersion, version, "BlockVersion()")
-
-			extDataGasUsed := BlockExtDataGasUsed(block)
-			require.Equal(t, test.wantExtDataGasUsed, extDataGasUsed, "BlockExtDataGasUsed()")
-
-			blockGasCost := BlockGasCost(block)
-			require.Equal(t, test.wantBlockGasCost, blockGasCost, "BlockGasCost()")
-
-			timeMilliseconds := BlockTimeMilliseconds(block)
-			require.Equal(t, test.wantTimeMilliseconds, timeMilliseconds, "BlockTimeMilliseconds()")
-
-			minDelayExcess := BlockMinDelayExcess(block)
-			require.Equal(t, test.wantMinDelayExcess, minDelayExcess, "BlockMinDelayExcess()")
+			require.Equal(t, test.wantExtData, BlockExtData(block), "BlockExtData()")
+			require.Equal(t, test.wantVersion, BlockVersion(block), "BlockVersion()")
 		})
 	}
+}
+
+func TestCalcExtDataHash(t *testing.T) {
+	t.Parallel()
+
+	// Golden: the hash every C-Chain block without atomic transactions commits
+	// to. nil and empty ext data MUST hash identically.
+	want := common.HexToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+	require.Equal(t, want, EmptyExtDataHash, "EmptyExtDataHash")
+	require.Equal(t, want, CalcExtDataHash(nil), "CalcExtDataHash(nil)")
+	require.Equal(t, want, CalcExtDataHash([]byte{}), "CalcExtDataHash(empty)")
+	require.Equal(t, types.RLPHash([]byte{1}), CalcExtDataHash([]byte{1}), "CalcExtDataHash(non-empty)")
 }
 
 func TestNewBlockWithExtData(t *testing.T) {
@@ -387,20 +365,17 @@ func TestNewBlockWithExtData(t *testing.T) {
 		name      string
 		header    *types.Header
 		txs       []*types.Transaction
-		uncles    []*types.Header
 		receipts  []*types.Receipt
 		extdata   []byte
-		recalc    bool
 		wantBlock func() *types.Block
 	}{
 		{
 			name:   "empty",
 			header: WithHeaderExtra(&types.Header{}, &HeaderExtra{}),
 			wantBlock: func() *types.Block {
-				header := WithHeaderExtra(&types.Header{}, &HeaderExtra{})
-				block := types.NewBlock(header, nil, nil, nil, stubHasher{})
-				blockExtra := &BlockBodyExtra{ExtData: &[]byte{}}
-				extras.Block.Set(block, blockExtra)
+				header := WithHeaderExtra(&types.Header{}, &HeaderExtra{ExtDataHash: EmptyExtDataHash})
+				block := types.NewBlock(header, nil, nil, nil, trie.NewStackTrie(nil))
+				extras.Block.Set(block, &BlockBodyExtra{ExtData: &[]byte{}})
 				return block
 			},
 		},
@@ -408,70 +383,54 @@ func TestNewBlockWithExtData(t *testing.T) {
 			name:   "header_nil_extra",
 			header: &types.Header{},
 			wantBlock: func() *types.Block {
-				header := WithHeaderExtra(&types.Header{}, &HeaderExtra{})
-				block := types.NewBlock(header, nil, nil, nil, stubHasher{})
-				blockExtra := &BlockBodyExtra{ExtData: &[]byte{}}
-				extras.Block.Set(block, blockExtra)
+				header := WithHeaderExtra(&types.Header{}, &HeaderExtra{ExtDataHash: EmptyExtDataHash})
+				block := types.NewBlock(header, nil, nil, nil, trie.NewStackTrie(nil))
+				extras.Block.Set(block, &BlockBodyExtra{ExtData: &[]byte{}})
 				return block
 			},
 		},
 		{
-			name: "with_recalc",
+			name: "ext_data_hash_recalculated",
 			header: WithHeaderExtra(
 				&types.Header{},
 				&HeaderExtra{
-					ExtDataHash: common.Hash{1}, // should be overwritten
+					ExtDataHash: common.Hash{1}, // must be overwritten
 				},
 			),
 			extdata: []byte{2},
-			recalc:  true,
 			wantBlock: func() *types.Block {
 				header := WithHeaderExtra(
 					&types.Header{},
 					&HeaderExtra{ExtDataHash: CalcExtDataHash([]byte{2})},
 				)
-				block := types.NewBlock(header, nil, nil, nil, stubHasher{})
-				blockExtra := &BlockBodyExtra{ExtData: &[]byte{2}}
-				extras.Block.Set(block, blockExtra)
+				block := types.NewBlock(header, nil, nil, nil, trie.NewStackTrie(nil))
+				extras.Block.Set(block, &BlockBodyExtra{ExtData: &[]byte{2}})
 				return block
 			},
 		},
 		{
-			name: "filled_no_recalc",
+			name: "filled",
 			header: WithHeaderExtra(
 				&types.Header{GasLimit: 1},
 				&HeaderExtra{
-					ExtDataHash:    common.Hash{2},
 					ExtDataGasUsed: big.NewInt(3),
 					BlockGasCost:   big.NewInt(4),
 				},
 			),
-			txs: []*types.Transaction{testTx},
-			uncles: []*types.Header{
-				WithHeaderExtra(
-					&types.Header{GasLimit: 5},
-					&HeaderExtra{BlockGasCost: big.NewInt(6)},
-				),
-			},
+			txs:      []*types.Transaction{testTx},
 			receipts: []*types.Receipt{{PostState: []byte{7}}},
 			extdata:  []byte{8},
 			wantBlock: func() *types.Block {
 				header := WithHeaderExtra(
 					&types.Header{GasLimit: 1},
 					&HeaderExtra{
-						ExtDataHash:    common.Hash{2},
+						ExtDataHash:    CalcExtDataHash([]byte{8}),
 						ExtDataGasUsed: big.NewInt(3),
 						BlockGasCost:   big.NewInt(4),
 					},
 				)
-				uncle := WithHeaderExtra(
-					&types.Header{GasLimit: 5},
-					&HeaderExtra{BlockGasCost: big.NewInt(6)},
-				)
-				uncles := []*types.Header{uncle}
-				block := types.NewBlock(header, []*types.Transaction{testTx}, uncles, []*types.Receipt{{PostState: []byte{7}}}, stubHasher{})
-				blockExtra := &BlockBodyExtra{ExtData: &[]byte{8}}
-				extras.Block.Set(block, blockExtra)
+				block := types.NewBlock(header, []*types.Transaction{testTx}, nil, []*types.Receipt{{PostState: []byte{7}}}, trie.NewStackTrie(nil))
+				extras.Block.Set(block, &BlockBodyExtra{ExtData: &[]byte{8}})
 				return block
 			},
 		},
@@ -481,16 +440,7 @@ func TestNewBlockWithExtData(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			block := NewBlockWithExtData(
-				test.header,
-				test.txs,
-				test.uncles,
-				test.receipts,
-				stubHasher{},
-				test.extdata,
-				test.recalc,
-			)
-
+			block := NewBlockWithExtData(test.header, test.txs, test.receipts, test.extdata)
 			require.Equal(t, test.wantBlock(), block)
 		})
 	}
@@ -501,3 +451,40 @@ type stubHasher struct{}
 func (stubHasher) Reset()                   {}
 func (stubHasher) Update(_, _ []byte) error { return nil }
 func (stubHasher) Hash() common.Hash        { return common.Hash{} }
+
+func TestBlockBodyExtraRPCJSONRoundTrip(t *testing.T) {
+	tests := []struct {
+		name    string
+		extData *[]byte
+		want    *[]byte
+	}{
+		{
+			// Nil ext data is marshalled as "0x", so it round-trips as empty.
+			name: "nil",
+			want: &[]byte{},
+		},
+		{
+			name:    "empty",
+			extData: &[]byte{},
+			want:    &[]byte{},
+		},
+		{
+			name:    "set",
+			extData: &[]byte{1, 2, 3},
+			want:    &[]byte{1, 2, 3},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			in := &BlockBodyExtra{ExtData: tt.extData}
+			marshalled := map[string]any{}
+			in.PostRPCMarshal(nil, marshalled)
+			raw, err := json.Marshal(marshalled)
+			require.NoError(t, err, "json.Marshal(PostRPCMarshal())")
+
+			var got BlockBodyExtra
+			require.NoError(t, got.PostRPCUnmarshal(nil, raw), "PostRPCUnmarshal(%s)", raw)
+			require.Equal(t, tt.want, got.ExtData, "PostRPCUnmarshal(%s).ExtData", raw)
+		})
+	}
+}

@@ -4,6 +4,8 @@
 package customtypes
 
 import (
+	"encoding/json"
+	"errors"
 	"io"
 	"math/big"
 
@@ -17,27 +19,20 @@ import (
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
-// GetHeaderExtra returns the [HeaderExtra] from the given [Header].
+// GetHeaderExtra returns the [HeaderExtra] carried by the header.
 func GetHeaderExtra(h *ethtypes.Header) *HeaderExtra {
 	return extras.Header.Get(h)
 }
 
-// SetHeaderExtra sets the given [HeaderExtra] on the [Header].
-func SetHeaderExtra(h *ethtypes.Header, extra *HeaderExtra) {
-	extras.Header.Set(h, extra)
-}
-
-// WithHeaderExtra sets the given [HeaderExtra] on the [Header]
-// and returns the [Header] for chaining.
+// WithHeaderExtra sets the [HeaderExtra] on the header and returns it.
 func WithHeaderExtra(h *ethtypes.Header, extra *HeaderExtra) *ethtypes.Header {
-	SetHeaderExtra(h, extra)
+	extras.Header.Set(h, extra)
 	return h
 }
 
-// HeaderExtra is a struct that contains extra fields used by Avalanche
-// in the block header.
-// This type uses [HeaderSerializable] to encode and decode the extra fields
-// along with the upstream type for compatibility with existing network blocks.
+// HeaderExtra holds the Avalanche-specific header fields. Its RLP and JSON
+// encodings are merged into those of the upstream [ethtypes.Header] so that
+// every historical C-Chain block hash still verifies.
 type HeaderExtra struct {
 	ExtDataHash      common.Hash
 	ExtDataGasUsed   *big.Int
@@ -53,112 +48,163 @@ type HeaderExtra struct {
 	SettledExcess       *uint64
 }
 
-// HeaderTimeMilliseconds returns the header timestamp in milliseconds.
-// If the header has the Granite field TimeMilliseconds set in extras, it is used.
-// Otherwise, it falls back to seconds-based Time multiplied by 1000.
+// HeaderTimeMilliseconds returns the header timestamp in milliseconds: the
+// Granite TimeMilliseconds field when set, otherwise the seconds-based Time.
 func HeaderTimeMilliseconds(h *ethtypes.Header) uint64 {
-	extra := GetHeaderExtra(h)
-	if extra != nil && extra.TimeMilliseconds != nil {
-		return *extra.TimeMilliseconds
+	if t := GetHeaderExtra(h).TimeMilliseconds; t != nil {
+		return *t
 	}
 	return h.Time * 1000
 }
 
-// EncodeRLP RLP encodes the given [ethtypes.Header] and [HeaderExtra] together
-// to the `writer`. It does merge both structs into a single [HeaderSerializable].
-func (h *HeaderExtra) EncodeRLP(eth *ethtypes.Header, writer io.Writer) error {
-	temp := new(HeaderSerializable)
-
-	temp.updateFromEth(eth)
-	temp.updateFromExtras(h)
-
-	return rlp.Encode(writer, temp)
+// rlpFields is the C-Chain header wire format: the upstream fields in their
+// go-ethereum order with ExtDataHash appended, then the fields added by each
+// upgrade as optional trailing elements. A nil optional field is omitted when
+// every later one is nil too, and encoded as an empty string otherwise.
+//
+// `ptr` selects pointers to the fields (for decoding) over their values.
+func (h *HeaderExtra) rlpFields(eth *ethtypes.Header, ptr bool) *rlp.Fields {
+	if ptr {
+		return &rlp.Fields{
+			Required: []any{
+				&eth.ParentHash, &eth.UncleHash, &eth.Coinbase, &eth.Root, &eth.TxHash, &eth.ReceiptHash,
+				&eth.Bloom, &eth.Difficulty, &eth.Number, &eth.GasLimit, &eth.GasUsed, &eth.Time, &eth.Extra,
+				&eth.MixDigest, &eth.Nonce, &h.ExtDataHash,
+			},
+			Optional: []any{
+				&eth.BaseFee, &h.ExtDataGasUsed, &h.BlockGasCost,
+				&eth.BlobGasUsed, &eth.ExcessBlobGas, &eth.ParentBeaconRoot,
+				&h.TimeMilliseconds, &h.MinDelayExcess, &h.TargetExponent, &h.MinPriceExponent,
+				&h.SettledHeight, &h.SettledGasUnix, &h.SettledGasNumerator, &h.SettledExcess,
+			},
+		}
+	}
+	return &rlp.Fields{
+		Required: []any{
+			eth.ParentHash, eth.UncleHash, eth.Coinbase, eth.Root, eth.TxHash, eth.ReceiptHash,
+			eth.Bloom, eth.Difficulty, eth.Number, eth.GasLimit, eth.GasUsed, eth.Time, eth.Extra,
+			eth.MixDigest, eth.Nonce, h.ExtDataHash,
+		},
+		Optional: []any{
+			eth.BaseFee, h.ExtDataGasUsed, h.BlockGasCost,
+			eth.BlobGasUsed, eth.ExcessBlobGas, eth.ParentBeaconRoot,
+			h.TimeMilliseconds, h.MinDelayExcess, h.TargetExponent, h.MinPriceExponent,
+			h.SettledHeight, h.SettledGasUnix, h.SettledGasNumerator, h.SettledExcess,
+		},
+	}
 }
 
-// DecodeRLP RLP decodes from the [*rlp.Stream] and writes the output to both the
-// [ethtypes.Header] passed as argument and to the receiver [HeaderExtra].
-func (h *HeaderExtra) DecodeRLP(eth *ethtypes.Header, stream *rlp.Stream) error {
-	temp := new(HeaderSerializable)
-	if err := stream.Decode(temp); err != nil {
+// EncodeRLP implements [ethtypes.HeaderHooks].
+func (h *HeaderExtra) EncodeRLP(eth *ethtypes.Header, w io.Writer) error {
+	return h.rlpFields(eth, false).EncodeRLP(w)
+}
+
+var errTooFewHeaderFields = errors.New("rlp: too few elements for header")
+
+// DecodeRLP implements [ethtypes.HeaderHooks].
+func (h *HeaderExtra) DecodeRLP(eth *ethtypes.Header, s *rlp.Stream) error {
+	// An EOL here is the enclosing list (e.g. uncles) running out of headers
+	// and MUST propagate unchanged so the slice decoder stops.
+	if _, _, err := s.Kind(); err != nil {
 		return err
 	}
-
-	temp.updateToEth(eth)
-	temp.updateToExtras(h)
-
-	return nil
+	err := h.rlpFields(eth, true).DecodeRLP(s)
+	if errors.Is(err, rlp.EOL) {
+		// An EOL from inside the header's own list means too few fields. It
+		// MUST NOT escape as EOL, or a slice decoder reading this header as an
+		// element would take it for the end of its own list.
+		return errTooFewHeaderFields
+	}
+	return err
 }
 
-// EncodeJSON JSON encodes the given [ethtypes.Header] and [HeaderExtra] together
-// to the `writer`. It does merge both structs into a single [HeaderSerializable].
+// headerExtraJSON is the JSON form of [HeaderExtra]. Its keys match
+// [HeaderExtra.PostRPCMarshal], which produces the encoding.
+type headerExtraJSON struct {
+	ExtDataHash         common.Hash     `json:"extDataHash"`
+	ExtDataGasUsed      *hexutil.Big    `json:"extDataGasUsed"`
+	BlockGasCost        *hexutil.Big    `json:"blockGasCost"`
+	TimeMilliseconds    *hexutil.Uint64 `json:"timestampMilliseconds"`
+	MinDelayExcess      *hexutil.Uint64 `json:"minDelayExcess"`
+	TargetExponent      *hexutil.Uint64 `json:"targetExponent"`
+	MinPriceExponent    *hexutil.Uint64 `json:"minPriceExponent"`
+	SettledHeight       *hexutil.Uint64 `json:"settledHeight"`
+	SettledGasUnix      *hexutil.Uint64 `json:"settledGasUnix"`
+	SettledGasNumerator *hexutil.Uint64 `json:"settledGasNumerator"`
+	SettledExcess       *hexutil.Uint64 `json:"settledExcess"`
+}
+
+// EncodeJSON implements [ethtypes.HeaderHooks]: the upstream header JSON,
+// including its "hash", with the extra fields added alongside.
 func (h *HeaderExtra) EncodeJSON(eth *ethtypes.Header) ([]byte, error) {
-	temp := new(HeaderSerializable)
-
-	temp.updateFromEth(eth)
-	temp.updateFromExtras(h)
-
-	return temp.MarshalJSON()
+	upstream, err := new(ethtypes.NOOPHeaderHooks).EncodeJSON(eth)
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]any
+	if err := json.Unmarshal(upstream, &m); err != nil {
+		return nil, err
+	}
+	h.PostRPCMarshal(eth, m)
+	return json.Marshal(m)
 }
 
-// DecodeJSON JSON decodes from the `input` bytes and writes the output to both the
-// [ethtypes.Header] passed as argument and to the receiver [HeaderExtra].
-func (h *HeaderExtra) DecodeJSON(eth *ethtypes.Header, input []byte) error {
-	temp := new(HeaderSerializable)
-	if err := temp.UnmarshalJSON(input); err != nil {
+// DecodeJSON implements [ethtypes.HeaderHooks].
+func (h *HeaderExtra) DecodeJSON(eth *ethtypes.Header, b []byte) error {
+	if err := new(ethtypes.NOOPHeaderHooks).DecodeJSON(eth, b); err != nil {
 		return err
 	}
-
-	temp.updateToEth(eth)
-	temp.updateToExtras(h)
-
+	var x headerExtraJSON
+	if err := json.Unmarshal(b, &x); err != nil {
+		return err
+	}
+	*h = HeaderExtra{
+		ExtDataHash:         x.ExtDataHash,
+		ExtDataGasUsed:      (*big.Int)(x.ExtDataGasUsed),
+		BlockGasCost:        (*big.Int)(x.BlockGasCost),
+		TimeMilliseconds:    (*uint64)(x.TimeMilliseconds),
+		MinDelayExcess:      (*acp226.DelayExcess)(x.MinDelayExcess),
+		TargetExponent:      (*dynamic.TargetExponent)(x.TargetExponent),
+		MinPriceExponent:    (*dynamic.PriceExponent)(x.MinPriceExponent),
+		SettledHeight:       (*uint64)(x.SettledHeight),
+		SettledGasUnix:      (*uint64)(x.SettledGasUnix),
+		SettledGasNumerator: (*uint64)(x.SettledGasNumerator),
+		SettledExcess:       (*uint64)(x.SettledExcess),
+	}
 	return nil
 }
 
+// PostCopy implements [ethtypes.HeaderHooks]: it deep-copies the extra into
+// the copied header.
 func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
-	cp := &HeaderExtra{
-		ExtDataHash: h.ExtDataHash,
+	cp := *h
+	if h.ExtDataGasUsed != nil {
+		cp.ExtDataGasUsed = new(big.Int).Set(h.ExtDataGasUsed)
 	}
 	if h.BlockGasCost != nil {
 		cp.BlockGasCost = new(big.Int).Set(h.BlockGasCost)
 	}
-	if h.ExtDataGasUsed != nil {
-		cp.ExtDataGasUsed = new(big.Int).Set(h.ExtDataGasUsed)
-	}
-	if h.TimeMilliseconds != nil {
-		m := *h.TimeMilliseconds
-		cp.TimeMilliseconds = &m
-	}
-	if h.MinDelayExcess != nil {
-		e := *h.MinDelayExcess
-		cp.MinDelayExcess = &e
-	}
-	if h.TargetExponent != nil {
-		e := *h.TargetExponent
-		cp.TargetExponent = &e
-	}
-	if h.MinPriceExponent != nil {
-		e := *h.MinPriceExponent
-		cp.MinPriceExponent = &e
-	}
-	if h.SettledHeight != nil {
-		v := *h.SettledHeight
-		cp.SettledHeight = &v
-	}
-	if h.SettledGasUnix != nil {
-		v := *h.SettledGasUnix
-		cp.SettledGasUnix = &v
-	}
-	if h.SettledGasNumerator != nil {
-		v := *h.SettledGasNumerator
-		cp.SettledGasNumerator = &v
-	}
-	if h.SettledExcess != nil {
-		v := *h.SettledExcess
-		cp.SettledExcess = &v
-	}
-	SetHeaderExtra(dst, cp)
+	cp.TimeMilliseconds = copyPtr(h.TimeMilliseconds)
+	cp.MinDelayExcess = copyPtr(h.MinDelayExcess)
+	cp.TargetExponent = copyPtr(h.TargetExponent)
+	cp.MinPriceExponent = copyPtr(h.MinPriceExponent)
+	cp.SettledHeight = copyPtr(h.SettledHeight)
+	cp.SettledGasUnix = copyPtr(h.SettledGasUnix)
+	cp.SettledGasNumerator = copyPtr(h.SettledGasNumerator)
+	cp.SettledExcess = copyPtr(h.SettledExcess)
+	WithHeaderExtra(dst, &cp)
 }
 
+func copyPtr[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
+}
+
+// PostRPCMarshal implements [ethtypes.HeaderHooks]: it adds the extra fields
+// that are set to the RPC representation of the header.
 func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	m["extDataHash"] = h.ExtDataHash
 	if h.ExtDataGasUsed != nil {
@@ -167,205 +213,18 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	if h.BlockGasCost != nil {
 		m["blockGasCost"] = (*hexutil.Big)(h.BlockGasCost)
 	}
-	if h.TimeMilliseconds != nil {
-		m["timestampMilliseconds"] = hexutil.Uint64(*h.TimeMilliseconds)
+	for key, v := range map[string]*uint64{
+		"timestampMilliseconds": h.TimeMilliseconds,
+		"minDelayExcess":        (*uint64)(h.MinDelayExcess),
+		"targetExponent":        (*uint64)(h.TargetExponent),
+		"minPriceExponent":      (*uint64)(h.MinPriceExponent),
+		"settledHeight":         h.SettledHeight,
+		"settledGasUnix":        h.SettledGasUnix,
+		"settledGasNumerator":   h.SettledGasNumerator,
+		"settledExcess":         h.SettledExcess,
+	} {
+		if v != nil {
+			m[key] = hexutil.Uint64(*v)
+		}
 	}
-	if h.MinDelayExcess != nil {
-		m["minDelayExcess"] = hexutil.Uint64(*h.MinDelayExcess)
-	}
-	if h.TargetExponent != nil {
-		m["targetExponent"] = hexutil.Uint64(*h.TargetExponent)
-	}
-	if h.MinPriceExponent != nil {
-		m["minPriceExponent"] = hexutil.Uint64(*h.MinPriceExponent)
-	}
-	if h.SettledHeight != nil {
-		m["settledHeight"] = hexutil.Uint64(*h.SettledHeight)
-	}
-	if h.SettledGasUnix != nil {
-		m["settledGasUnix"] = hexutil.Uint64(*h.SettledGasUnix)
-	}
-	if h.SettledGasNumerator != nil {
-		m["settledGasNumerator"] = hexutil.Uint64(*h.SettledGasNumerator)
-	}
-	if h.SettledExcess != nil {
-		m["settledExcess"] = hexutil.Uint64(*h.SettledExcess)
-	}
-}
-
-func (h *HeaderSerializable) updateFromEth(eth *ethtypes.Header) {
-	h.ParentHash = eth.ParentHash
-	h.UncleHash = eth.UncleHash
-	h.Coinbase = eth.Coinbase
-	h.Root = eth.Root
-	h.TxHash = eth.TxHash
-	h.ReceiptHash = eth.ReceiptHash
-	h.Bloom = eth.Bloom
-	h.Difficulty = eth.Difficulty
-	h.Number = eth.Number
-	h.GasLimit = eth.GasLimit
-	h.GasUsed = eth.GasUsed
-	h.Time = eth.Time
-	h.Extra = eth.Extra
-	h.MixDigest = eth.MixDigest
-	h.Nonce = eth.Nonce
-	h.BaseFee = eth.BaseFee
-	h.BlobGasUsed = eth.BlobGasUsed
-	h.ExcessBlobGas = eth.ExcessBlobGas
-	h.ParentBeaconRoot = eth.ParentBeaconRoot
-}
-
-func (h *HeaderSerializable) updateToEth(eth *ethtypes.Header) {
-	eth.ParentHash = h.ParentHash
-	eth.UncleHash = h.UncleHash
-	eth.Coinbase = h.Coinbase
-	eth.Root = h.Root
-	eth.TxHash = h.TxHash
-	eth.ReceiptHash = h.ReceiptHash
-	eth.Bloom = h.Bloom
-	eth.Difficulty = h.Difficulty
-	eth.Number = h.Number
-	eth.GasLimit = h.GasLimit
-	eth.GasUsed = h.GasUsed
-	eth.Time = h.Time
-	eth.Extra = h.Extra
-	eth.MixDigest = h.MixDigest
-	eth.Nonce = h.Nonce
-	eth.BaseFee = h.BaseFee
-	eth.BlobGasUsed = h.BlobGasUsed
-	eth.ExcessBlobGas = h.ExcessBlobGas
-	eth.ParentBeaconRoot = h.ParentBeaconRoot
-}
-
-func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
-	h.ExtDataHash = extras.ExtDataHash
-	h.ExtDataGasUsed = extras.ExtDataGasUsed
-	h.BlockGasCost = extras.BlockGasCost
-	h.TimeMilliseconds = extras.TimeMilliseconds
-	h.MinDelayExcess = (*uint64)(extras.MinDelayExcess)
-	h.TargetExponent = (*uint64)(extras.TargetExponent)
-	h.MinPriceExponent = (*uint64)(extras.MinPriceExponent)
-	h.SettledHeight = extras.SettledHeight
-	h.SettledGasUnix = extras.SettledGasUnix
-	h.SettledGasNumerator = extras.SettledGasNumerator
-	h.SettledExcess = extras.SettledExcess
-}
-
-func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
-	extras.ExtDataHash = h.ExtDataHash
-	extras.ExtDataGasUsed = h.ExtDataGasUsed
-	extras.BlockGasCost = h.BlockGasCost
-	extras.TimeMilliseconds = h.TimeMilliseconds
-	extras.MinDelayExcess = (*acp226.DelayExcess)(h.MinDelayExcess)
-	extras.TargetExponent = (*dynamic.TargetExponent)(h.TargetExponent)
-	extras.MinPriceExponent = (*dynamic.PriceExponent)(h.MinPriceExponent)
-	extras.SettledHeight = h.SettledHeight
-	extras.SettledGasUnix = h.SettledGasUnix
-	extras.SettledGasNumerator = h.SettledGasNumerator
-	extras.SettledExcess = h.SettledExcess
-}
-
-// NOTE: both generators currently do not support type aliases.
-// We are using custom versions of these programs for now to support type aliases,
-// see https://github.com/ava-labs/coreth/pull/746#discussion_r1969673252
-//go:generate go tool gencodec -type HeaderSerializable -field-override headerMarshaling -out gen_header_serializable_json.go
-//go:generate go tool rlpgen -type HeaderSerializable -out gen_header_serializable_rlp.go
-
-// HeaderSerializable defines the header of a block in the Ethereum blockchain,
-// as it is to be serialized into RLP and JSON. Note it must be exported so that
-// rlpgen can generate the serialization code from it.
-//
-//nolint:tagalign
-type HeaderSerializable struct {
-	ParentHash  common.Hash         `json:"parentHash"       gencodec:"required"`
-	UncleHash   common.Hash         `json:"sha3Uncles"       gencodec:"required"`
-	Coinbase    common.Address      `json:"miner"            gencodec:"required"`
-	Root        common.Hash         `json:"stateRoot"        gencodec:"required"`
-	TxHash      common.Hash         `json:"transactionsRoot" gencodec:"required"`
-	ReceiptHash common.Hash         `json:"receiptsRoot"     gencodec:"required"`
-	Bloom       ethtypes.Bloom      `json:"logsBloom"        gencodec:"required"`
-	Difficulty  *big.Int            `json:"difficulty"       gencodec:"required"`
-	Number      *big.Int            `json:"number"           gencodec:"required"`
-	GasLimit    uint64              `json:"gasLimit"         gencodec:"required"`
-	GasUsed     uint64              `json:"gasUsed"          gencodec:"required"`
-	Time        uint64              `json:"timestamp"        gencodec:"required"`
-	Extra       []byte              `json:"extraData"        gencodec:"required"`
-	MixDigest   common.Hash         `json:"mixHash"`
-	Nonce       ethtypes.BlockNonce `json:"nonce"`
-	ExtDataHash common.Hash         `json:"extDataHash"      gencodec:"required"`
-
-	// BaseFee was added by EIP-1559 and is ignored in legacy headers.
-	BaseFee *big.Int `json:"baseFeePerGas" rlp:"optional"`
-
-	// ExtDataGasUsed was added by Apricot Phase 4 and is ignored in legacy
-	// headers.
-	//
-	// It is not a uint64 like GasLimit or GasUsed because it is not possible to
-	// correctly encode this field optionally with uint64.
-	ExtDataGasUsed *big.Int `json:"extDataGasUsed" rlp:"optional"`
-
-	// BlockGasCost was added by Apricot Phase 4 and is ignored in legacy
-	// headers.
-	BlockGasCost *big.Int `json:"blockGasCost" rlp:"optional"`
-
-	// BlobGasUsed was added by EIP-4844 and is ignored in legacy headers.
-	BlobGasUsed *uint64 `json:"blobGasUsed" rlp:"optional"`
-
-	// ExcessBlobGas was added by EIP-4844 and is ignored in legacy headers.
-	ExcessBlobGas *uint64 `json:"excessBlobGas" rlp:"optional"`
-
-	// ParentBeaconRoot was added by EIP-4788 and is ignored in legacy headers.
-	ParentBeaconRoot *common.Hash `json:"parentBeaconBlockRoot" rlp:"optional"`
-
-	// TimeMilliseconds was added by Granite and is ignored in legacy headers.
-	TimeMilliseconds *uint64 `json:"timestampMilliseconds" rlp:"optional"`
-
-	// MinDelayExcess was added by Granite and is ignored in legacy headers.
-	// We use *uint64 type here to avoid rlpgen generating incorrect code
-	MinDelayExcess *uint64 `json:"minDelayExcess" rlp:"optional"`
-
-	// TargetExponent was added by Helicon and is ignored in legacy headers.
-	// We use *uint64 type here to avoid rlpgen generating incorrect code
-	TargetExponent *uint64 `json:"targetExponent" rlp:"optional"`
-
-	// MinPriceExponent was added by Helicon (ACP-283) and is ignored in legacy headers.
-	// We use *uint64 type here to avoid rlpgen generating incorrect code
-	MinPriceExponent *uint64 `json:"minPriceExponent" rlp:"optional"`
-
-	SettledHeight       *uint64 `json:"settledHeight"       rlp:"optional"`
-	SettledGasUnix      *uint64 `json:"settledGasUnix"      rlp:"optional"`
-	SettledGasNumerator *uint64 `json:"settledGasNumerator" rlp:"optional"`
-	SettledExcess       *uint64 `json:"settledExcess"       rlp:"optional"`
-}
-
-// field type overrides for gencodec
-type headerMarshaling struct {
-	Difficulty          *hexutil.Big
-	Number              *hexutil.Big
-	GasLimit            hexutil.Uint64
-	GasUsed             hexutil.Uint64
-	Time                hexutil.Uint64
-	Extra               hexutil.Bytes
-	BaseFee             *hexutil.Big
-	ExtDataGasUsed      *hexutil.Big
-	BlockGasCost        *hexutil.Big
-	Hash                common.Hash `json:"hash"` // adds call to Hash() in MarshalJSON
-	BlobGasUsed         *hexutil.Uint64
-	ExcessBlobGas       *hexutil.Uint64
-	TimeMilliseconds    *hexutil.Uint64
-	MinDelayExcess      *hexutil.Uint64
-	TargetExponent      *hexutil.Uint64
-	MinPriceExponent    *hexutil.Uint64
-	SettledHeight       *hexutil.Uint64
-	SettledGasUnix      *hexutil.Uint64
-	SettledGasNumerator *hexutil.Uint64
-	SettledExcess       *hexutil.Uint64
-}
-
-// Hash returns the block hash of the header, which is simply the keccak256 hash of its
-// RLP encoding.
-// This function MUST be exported and is used in [HeaderSerializable.EncodeJSON] which is
-// generated to the file gen_header_json.go.
-func (h *HeaderSerializable) Hash() common.Hash {
-	return ethtypes.RLPHash(h)
 }

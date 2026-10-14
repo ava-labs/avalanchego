@@ -26,7 +26,7 @@ import (
 func TestHeaderRLP(t *testing.T) {
 	t.Parallel()
 
-	got := testHeaderEncodeDecode(t, rlp.EncodeToBytes, rlp.DecodeBytes)
+	got := testHeaderEncodeDecode(t, rlp.EncodeToBytes, rlp.DecodeBytes, false)
 
 	// Golden data from original coreth implementation, before integration of
 	// libevm. WARNING: changing these values can break backwards compatibility
@@ -45,13 +45,14 @@ func TestHeaderJSON(t *testing.T) {
 
 	// Note we ignore the returned encoded bytes because we don't
 	// need to compare them to a JSON gold standard.
-	_ = testHeaderEncodeDecode(t, json.Marshal, json.Unmarshal)
+	_ = testHeaderEncodeDecode(t, json.Marshal, json.Unmarshal, true)
 }
 
 func testHeaderEncodeDecode(
 	t *testing.T,
 	encode func(any) ([]byte, error),
 	decode func([]byte, any) error,
+	withdrawalsHashEncoded bool, // RLP never carries it; JSON does
 ) (encoded []byte) {
 	t.Helper()
 
@@ -65,7 +66,9 @@ func testHeaderEncodeDecode(
 	gotExtra := GetHeaderExtra(gotHeader)
 
 	wantHeader, wantExtra := headerWithNonZeroFields()
-	wantHeader.WithdrawalsHash = nil
+	if !withdrawalsHashEncoded {
+		wantHeader.WithdrawalsHash = nil
+	}
 	require.Equal(t, wantHeader, gotHeader)
 	require.Equal(t, wantExtra, gotExtra)
 
@@ -147,7 +150,7 @@ func allFieldsSet[T interface {
 				if fieldValue.Kind() == reflect.Pointer {
 					require.Falsef(t, fieldValue.IsNil(), "field %q is nil", field.Name)
 				}
-				fieldValue = reflect.NewAt(fieldValue.Type(), unsafe.Pointer(fieldValue.UnsafeAddr())).Elem()
+				fieldValue = reflect.NewAt(fieldValue.Type(), unsafe.Pointer(fieldValue.UnsafeAddr())).Elem() //#nosec G103 -- reads unexported fields in a test
 			}
 
 			switch f := fieldValue.Interface().(type) {

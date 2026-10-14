@@ -51,7 +51,7 @@ func TestEmulation(t *testing.T) {
 		t, &active,
 		cchain.WithHeaderExtra,
 		&cchain.HeaderExtra{TimeMilliseconds: newUint64(milli)},
-		cchain.BlockTimeMilliseconds,
+		func(b *types.Block) *uint64 { return cchain.GetHeaderExtra(b.Header()).TimeMilliseconds },
 		sentinel,
 	)
 	onSubnetEVM := setAndGetMillis(
