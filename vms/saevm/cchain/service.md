@@ -37,24 +37,14 @@ wss://api.avax.network/ext/bc/C/ws
 
 ### Standard Ethereum APIs
 
-The C-Chain serves the [Ethereum JSON-RPC API](https://ethereum.org/en/developers/docs/apis/json-rpc/)
+The C-Chain serves methods from the [Ethereum JSON-RPC API](https://ethereum.org/en/developers/docs/apis/json-rpc/)
 and [Geth's JSON-RPC API](https://geth.ethereum.org/docs/interacting-with-geth/rpc) over HTTP and WebSocket.
 It doesn't serve IPC or GraphQL.
 
+[Available APIs](https://build.avax.network/docs/nodes/chain-configs/primary-network/c-chain#available-apis)
+lists every method that the C-Chain serves, grouped by API, and the APIs that are enabled by default.
 The [`apis`](https://build.avax.network/docs/nodes/chain-configs/primary-network/c-chain#apis) option
-selects the APIs that a node serves. [Available APIs](https://build.avax.network/docs/nodes/chain-configs/primary-network/c-chain#available-apis)
-lists the methods of each API and the APIs that are enabled by default.
-
-The C-Chain doesn't serve these methods:
-
-- The `admin`, `clique`, `engine`, `les`, `miner`, and `personal` namespaces.
-- `eth_accounts`, `eth_coinbase`, `eth_etherbase`, `eth_hashrate`, `eth_mining`, and `eth_protocolVersion`.
-- The `syncing` subscription.
-- `debug_accountRange`, `debug_backtraceAt`, `debug_dumpBlock`, `debug_freezeClient`, `debug_getAccessibleState`,
-  `debug_getBadBlocks`, `debug_getBlockRlp`, `debug_getHeaderRlp`, `debug_getModifiedAccountsByHash`,
-  `debug_getModifiedAccountsByNumber`, `debug_getTrieFlushInterval`, `debug_preimage`, `debug_seedHash`,
-  `debug_setTrieFlushInterval`, and `debug_storageRangeAt`.
-- Methods that Geth added after v1.13.14, such as `eth_blobBaseFee`, `eth_config`, and `eth_simulateV1`.
+selects the APIs that a node serves.
 
 The node has no accounts, so `eth_resend`, `eth_sendTransaction`, `eth_sign`, and `eth_signTransaction` always fail,
 and `eth_pendingTransactions` always returns an empty list.
@@ -63,11 +53,13 @@ and `eth_pendingTransactions` always returns an empty list.
 
 The C-Chain executes blocks after consensus accepts them, as described in [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution). This changes the following:
 
-- `latest` is the last executed block.
-- `pending` is the last executed block. If `api-resolve-pending-to-last-executed` is `false`, it is the last accepted block instead, and methods that read state reject `pending`.
+- `latest` and `pending` are the last executed block. If `api-resolve-pending-to-last-executed` is `false`, `pending` is the last accepted block, and state reads such as `eth_getBalance` and `eth_call` reject it. `eth_getTransactionCount` with `pending` always returns the transaction pool nonce.
 - `safe` and `finalized` are the last settled block, the most recent block whose execution results are included in an accepted block.
-- Methods that read state or receipts at an accepted block that hasn't executed yet wait for it to execute.
-- A block header's `baseFeePerGas` is an upper bound on the base fee charged when the block executes, and its `stateRoot` is the post-execution state root of the last settled block when it was built.
+- State and receipt reads wait for an accepted block to execute. `eth_getLogs` and log filters don't wait: for a block that hasn't executed, they return no logs, or an error if the query has no address or topic filter.
+- From Helicon, block headers change:
+  - `stateRoot` is the post-execution state root of the last block that the block settles, or its parent's `stateRoot` if it settles no blocks.
+  - `receiptsRoot` and `logsBloom` cover the receipts of the blocks that it settles.
+  - `gasUsed` is the sum of its transactions' gas limits, and `baseFeePerGas` is an upper bound on the base fee charged when it executes. Receipts report `gasUsed` and `effectiveGasPrice` from execution.
 
 ### Avalanche - Ethereum APIs
 
