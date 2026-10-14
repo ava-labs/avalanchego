@@ -90,7 +90,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 	}{
 		"zero limit dropped": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     largeTrieRoot,
 					Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 					End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -105,7 +105,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"empty root dropped": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 					End:      bytes.Repeat([]byte{0xff}, common.HashLength),
 					Limit:    maxLeavesLimit,
@@ -120,7 +120,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"bad start len dropped": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Start:    bytes.Repeat([]byte{0x00}, common.HashLength+2),
 					End:      bytes.Repeat([]byte{0xff}, common.HashLength),
 					Limit:    maxLeavesLimit,
@@ -135,7 +135,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"bad end len dropped": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 					End:      bytes.Repeat([]byte{0xff}, common.HashLength-1),
 					Limit:    maxLeavesLimit,
@@ -150,7 +150,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"empty storage root dropped": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     types.EmptyRootHash,
 					Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 					End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -166,7 +166,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"missing root dropped": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     common.BytesToHash([]byte("something is missing here...")),
 					Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 					End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -182,7 +182,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"corrupted trie drops request": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     corruptedTrieRoot,
 					Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 					End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -201,7 +201,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				ctx, cancel := context.WithCancel(t.Context())
 				cancel()
 
-				return ctx, message.SubnetEVMLeafsRequest{
+				return ctx, message.LeafsRequest{
 					Root:     largeTrieRoot,
 					Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 					End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -216,7 +216,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"nil start and end range returns entire trie": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     smallTrieRoot,
 					Limit:    maxLeavesLimit,
 					NodeType: message.StateTrieNode,
@@ -234,7 +234,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"nil end range treated like greatest possible value": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     smallTrieRoot,
 					Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 					Limit:    maxLeavesLimit,
@@ -252,7 +252,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"end greater than start dropped": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     largeTrieRoot,
 					Start:    bytes.Repeat([]byte{0xbb}, common.HashLength),
 					End:      bytes.Repeat([]byte{0xaa}, common.HashLength),
@@ -268,7 +268,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"invalid node type dropped": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     largeTrieRoot,
 					Start:    bytes.Repeat([]byte{0xbb}, common.HashLength),
 					End:      bytes.Repeat([]byte{0xaa}, common.HashLength),
@@ -283,7 +283,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"max leaves overridden": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     largeTrieRoot,
 					Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 					End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -304,7 +304,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"full range with nil start": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     largeTrieRoot,
 					End:      bytes.Repeat([]byte{0xff}, common.HashLength),
 					Limit:    maxLeavesLimit,
@@ -325,7 +325,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"full range with 0x00 start": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     largeTrieRoot,
 					Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 					End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -351,7 +351,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				startKey[31]++                 // exclude start key from response
 				endKey := largeTrieKeys[1_040] // include end key in response
 
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     largeTrieRoot,
 					Start:    startKey,
 					End:      endKey,
@@ -373,7 +373,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"partial end range": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     largeTrieRoot,
 					Start:    largeTrieKeys[9_400],
 					End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -395,7 +395,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"final end range": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     largeTrieRoot,
 					Start:    bytes.Repeat([]byte{0xff}, common.HashLength),
 					End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -417,7 +417,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		},
 		"small trie root": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     smallTrieRoot,
 					End:      bytes.Repeat([]byte{0xff}, common.HashLength),
 					Limit:    maxLeavesLimit,
@@ -446,7 +446,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				require.NoError(t, err)
 				snapshotProvider.Snapshot = snap
 
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     accountTrieRoot,
 					Limit:    maxLeavesLimit,
 					NodeType: message.StateTrieNode,
@@ -490,7 +490,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					i++
 				}
 
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     accountTrieRoot,
 					Limit:    maxLeavesLimit,
 					NodeType: message.StateTrieNode,
@@ -521,7 +521,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				require.NoError(t, err)
 				snapshotProvider.Snapshot = snap
 
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     largeTrieRoot,
 					Account:  largeStorageAccount,
 					Limit:    maxLeavesLimit,
@@ -565,7 +565,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 					i++
 				}
 
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     largeTrieRoot,
 					Account:  largeStorageAccount,
 					Limit:    maxLeavesLimit,
@@ -604,7 +604,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				}
 				rawdb.DeleteStorageSnapshot(memdb, smallStorageAccount, lastKey)
 
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     smallTrieRoot,
 					Account:  smallStorageAccount,
 					Limit:    maxLeavesLimit,
@@ -638,7 +638,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 				}
 				rawdb.DeleteStorageSnapshot(memdb, smallStorageAccount, lastKey)
 
-				return t.Context(), message.SubnetEVMLeafsRequest{
+				return t.Context(), message.LeafsRequest{
 					Root:     smallTrieRoot,
 					Account:  smallStorageAccount,
 					Start:    lastKey[:],
@@ -683,10 +683,10 @@ func requireRangeProofIsValid(t *testing.T, request message.LeafsRequest, respon
 	t.Helper()
 
 	var start []byte
-	if len(request.StartKey()) == 0 {
+	if len(request.Start) == 0 {
 		start = bytes.Repeat([]byte{0x00}, common.HashLength)
 	} else {
-		start = request.StartKey()
+		start = request.Start
 	}
 
 	var proof ethdb.Database
@@ -699,7 +699,7 @@ func requireRangeProofIsValid(t *testing.T, request message.LeafsRequest, respon
 		}
 	}
 
-	more, err := trie.VerifyRangeProof(request.RootHash(), start, response.Keys, response.Vals, proof)
+	more, err := trie.VerifyRangeProof(request.Root, start, response.Keys, response.Vals, proof)
 	require.NoError(t, err)
 	require.Equal(t, expectMore, more)
 }

@@ -3,11 +3,18 @@
 
 package message
 
-import "github.com/ava-labs/libevm/common"
+import (
+	"context"
+	"fmt"
+
+	"github.com/ava-labs/libevm/common"
+
+	"github.com/ava-labs/avalanchego/ids"
+)
 
 const MaxCodeHashesPerRequest = 5
 
-var _ LeafsRequest = SubnetEVMLeafsRequest{}
+var _ Request = LeafsRequest{}
 
 // NodeType outlines the trie that a leaf node belongs to
 // handlers.LeafsRequestHandler uses this information to determine
@@ -19,15 +26,28 @@ const (
 	StateTrieKeyLength = common.HashLength
 )
 
-// LeafsRequest defines the interface for leaf sync requests.
-type LeafsRequest interface {
-	Request
-	RootHash() common.Hash
-	AccountHash() common.Hash
-	StartKey() []byte
-	EndKey() []byte
-	KeyLimit() uint16
-	LeafType() NodeType
+// LeafsRequest is a request for a range of leaves from the trie at Root.
+// Account selects a storage trie, or the account trie when empty.
+//
+// NodeType is not serialized, to stay wire-compatible with existing nodes.
+type LeafsRequest struct {
+	Root     common.Hash `serialize:"true"`
+	Account  common.Hash `serialize:"true"`
+	Start    []byte      `serialize:"true"`
+	End      []byte      `serialize:"true"`
+	Limit    uint16      `serialize:"true"`
+	NodeType NodeType
+}
+
+func (l LeafsRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler RequestHandler) ([]byte, error) {
+	return handler.HandleLeafsRequest(ctx, nodeID, requestID, l)
+}
+
+func (l LeafsRequest) String() string {
+	return fmt.Sprintf(
+		"LeafsRequest(Root=%s, Account=%s, Start=%s, End=%s, Limit=%d, NodeType=%d)",
+		l.Root, l.Account, common.Bytes2Hex(l.Start), common.Bytes2Hex(l.End), l.Limit, l.NodeType,
+	)
 }
 
 // LeafsResponse is a response to a LeafsRequest

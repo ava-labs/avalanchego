@@ -30,7 +30,7 @@ func newCodec() codec.Manager {
 	errs.Add(
 		c.RegisterType(BlockRequest{}),
 		c.RegisterType(BlockResponse{}),
-		c.RegisterType(SubnetEVMLeafsRequest{}),
+		c.RegisterType(LeafsRequest{}),
 		c.RegisterType(LeafsResponse{}),
 		c.RegisterType(CodeRequest{}),
 		c.RegisterType(CodeResponse{}),

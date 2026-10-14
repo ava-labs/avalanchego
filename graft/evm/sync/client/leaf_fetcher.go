@@ -34,7 +34,7 @@ func (f *LeafFetcher) FetchLeaves(ctx context.Context, req hashdb.LeafRange) (ha
 	}
 
 	// End is always nil, [hashdb.LeafRange] carries no end key.
-	resp, err := f.client.GetLeafs(ctx, message.SubnetEVMLeafsRequest{
+	resp, err := f.client.GetLeafs(ctx, message.LeafsRequest{
 		Root:     req.Root,
 		Account:  account,
 		Start:    req.Start,

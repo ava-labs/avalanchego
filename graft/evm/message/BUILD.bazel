@@ -12,7 +12,6 @@ go_library(
         "handler.go",
         "leafs_request.go",
         "request.go",
-        "subnet_evm_leafs_request.go",
         "syncable.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/evm/message",

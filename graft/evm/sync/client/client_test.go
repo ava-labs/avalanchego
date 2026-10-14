@@ -371,7 +371,7 @@ func TestGetLeafs(t *testing.T) {
 		expectedErr     error
 	}{
 		"full response for small (single request) trie": {
-			request: message.SubnetEVMLeafsRequest{
+			request: message.LeafsRequest{
 				Root:     smallTrieRoot,
 				Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 				End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -392,7 +392,7 @@ func TestGetLeafs(t *testing.T) {
 			},
 		},
 		"too many leaves in response": {
-			request: message.SubnetEVMLeafsRequest{
+			request: message.LeafsRequest{
 				Root:     smallTrieRoot,
 				Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 				End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -400,13 +400,13 @@ func TestGetLeafs(t *testing.T) {
 				NodeType: message.StateTrieNode,
 			},
 			response: func(t *testing.T, handler handlers.LeafRequestHandler, request message.LeafsRequest) []byte {
-				modifiedRequest := message.SubnetEVMLeafsRequest{
-					Root:     request.RootHash(),
-					Account:  request.AccountHash(),
-					Start:    request.StartKey(),
-					End:      request.EndKey(),
+				modifiedRequest := message.LeafsRequest{
+					Root:     request.Root,
+					Account:  request.Account,
+					Start:    request.Start,
+					End:      request.End,
 					Limit:    leafsLimit,
-					NodeType: request.LeafType(),
+					NodeType: request.NodeType,
 				}
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, modifiedRequest)
 				require.NoError(t, err)
@@ -417,7 +417,7 @@ func TestGetLeafs(t *testing.T) {
 			expectedErr: errTooManyLeaves,
 		},
 		"partial response to request for entire trie (full leaf limit)": {
-			request: message.SubnetEVMLeafsRequest{
+			request: message.LeafsRequest{
 				Root:     largeTrieRoot,
 				Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 				End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -438,7 +438,7 @@ func TestGetLeafs(t *testing.T) {
 			},
 		},
 		"partial response to request for middle range of trie (full leaf limit)": {
-			request: message.SubnetEVMLeafsRequest{
+			request: message.LeafsRequest{
 				Root:     largeTrieRoot,
 				Start:    largeTrieKeys[1000],
 				End:      largeTrieKeys[99000],
@@ -459,7 +459,7 @@ func TestGetLeafs(t *testing.T) {
 			},
 		},
 		"full response from near end of trie to end of trie (less than leaf limit)": {
-			request: message.SubnetEVMLeafsRequest{
+			request: message.LeafsRequest{
 				Root:     largeTrieRoot,
 				Start:    largeTrieKeys[len(largeTrieKeys)-30], // Set start 30 keys from the end of the large trie
 				End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -480,7 +480,7 @@ func TestGetLeafs(t *testing.T) {
 			},
 		},
 		"full response for intermediate range of trie (less than leaf limit)": {
-			request: message.SubnetEVMLeafsRequest{
+			request: message.LeafsRequest{
 				Root:     largeTrieRoot,
 				Start:    largeTrieKeys[1000], // Set the range for 1000 leafs in an intermediate range of the trie
 				End:      largeTrieKeys[1099], // (inclusive range)
@@ -501,7 +501,7 @@ func TestGetLeafs(t *testing.T) {
 			},
 		},
 		"removed first key in response": {
-			request: message.SubnetEVMLeafsRequest{
+			request: message.LeafsRequest{
 				Root:     largeTrieRoot,
 				Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 				End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -526,7 +526,7 @@ func TestGetLeafs(t *testing.T) {
 			expectedErr: errInvalidRangeProof,
 		},
 		"removed first key in response and replaced proof": {
-			request: message.SubnetEVMLeafsRequest{
+			request: message.LeafsRequest{
 				Root:     largeTrieRoot,
 				Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 				End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -540,13 +540,13 @@ func TestGetLeafs(t *testing.T) {
 				var leafResponse message.LeafsResponse
 				_, err = message.Codec.Unmarshal(response, &leafResponse)
 				require.NoError(t, err)
-				modifiedRequest := message.SubnetEVMLeafsRequest{
-					Root:     request.RootHash(),
-					Account:  request.AccountHash(),
+				modifiedRequest := message.LeafsRequest{
+					Root:     request.Root,
+					Account:  request.Account,
 					Start:    leafResponse.Keys[1],
-					End:      request.EndKey(),
-					Limit:    request.KeyLimit(),
-					NodeType: request.LeafType(),
+					End:      request.End,
+					Limit:    request.Limit,
+					NodeType: request.NodeType,
 				}
 				modifiedResponse, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 2, modifiedRequest)
 				require.NoError(t, err)
@@ -555,7 +555,7 @@ func TestGetLeafs(t *testing.T) {
 			expectedErr: errInvalidRangeProof,
 		},
 		"removed last key in response": {
-			request: message.SubnetEVMLeafsRequest{
+			request: message.LeafsRequest{
 				Root:     largeTrieRoot,
 				Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 				End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -579,7 +579,7 @@ func TestGetLeafs(t *testing.T) {
 			expectedErr: errInvalidRangeProof,
 		},
 		"removed key from middle of response": {
-			request: message.SubnetEVMLeafsRequest{
+			request: message.LeafsRequest{
 				Root:     largeTrieRoot,
 				Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 				End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -604,7 +604,7 @@ func TestGetLeafs(t *testing.T) {
 			expectedErr: errInvalidRangeProof,
 		},
 		"corrupted value in middle of response": {
-			request: message.SubnetEVMLeafsRequest{
+			request: message.LeafsRequest{
 				Root:     largeTrieRoot,
 				Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 				End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -628,7 +628,7 @@ func TestGetLeafs(t *testing.T) {
 			expectedErr: errInvalidRangeProof,
 		},
 		"all proof keys removed from response": {
-			request: message.SubnetEVMLeafsRequest{
+			request: message.LeafsRequest{
 				Root:     largeTrieRoot,
 				Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 				End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -709,7 +709,7 @@ func TestGetLeafsRetries(t *testing.T) {
 		BlockParser:      newTestBlockParser(),
 	})
 
-	request := message.SubnetEVMLeafsRequest{
+	request := message.LeafsRequest{
 		Root:     root,
 		Start:    bytes.Repeat([]byte{0x00}, common.HashLength),
 		End:      bytes.Repeat([]byte{0xff}, common.HashLength),
@@ -777,7 +777,7 @@ func TestStateSyncNodes(t *testing.T) {
 	}, responses...)
 
 	// send some request, doesn't matter what it is because we're testing the interaction with state sync nodes here
-	emptyRequest := message.SubnetEVMLeafsRequest{NodeType: message.StateTrieNode}
+	emptyRequest := message.LeafsRequest{NodeType: message.StateTrieNode}
 	response, err := client.GetLeafs(ctx, emptyRequest)
 	require.ErrorIs(t, err, context.Canceled)
 	require.Empty(t, response)

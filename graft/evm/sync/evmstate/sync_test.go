@@ -239,7 +239,7 @@ type interruptLeafsIntercept struct {
 // response for the first [numRequest] requests for leafs from [root].
 // After that, all requests for leafs from [root] return [errInterrupted].
 func (i *interruptLeafsIntercept) getLeafsIntercept(request message.LeafsRequest, response message.LeafsResponse) (message.LeafsResponse, error) {
-	if request.RootHash() == i.root {
+	if request.Root == i.root {
 		if numRequests := i.numRequests.Add(1); numRequests > i.interruptAfter {
 			return message.LeafsResponse{}, errInterrupted
 		}
