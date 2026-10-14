@@ -24,10 +24,9 @@ graft_go_test(
     srcs = ["contract_test.go"],
     deps = [
         ":nativeasset",
-        "//graft/coreth/core",
         "//graft/coreth/params",
-        "//graft/coreth/plugin/evm/customtypes",
         "//vms/saevm/cchain/extstate",
+        "//vms/saevm/cchain/libevm",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",
