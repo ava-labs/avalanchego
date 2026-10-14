@@ -38,19 +38,11 @@ type Amounter interface {
 	Amount() uint64
 }
 
-// Coster is a data structure that has a cost associated with it
-type Coster interface {
-	// Cost returns how much this element costs to be included in its
-	// transaction.
-	Cost() (uint64, error)
-}
-
 // TransferableIn is the interface a feature extension must provide to transfer
 // value between features extensions.
 type TransferableIn interface {
 	verify.Verifiable
 	Amounter
-	Coster
 }
 
 // TransferableOut is the interface a feature extension must provide to transfer

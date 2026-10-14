@@ -54,21 +54,6 @@ func (mr *TransferableInMockRecorder) Amount() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Amount", reflect.TypeOf((*TransferableIn)(nil).Amount))
 }
 
-// Cost mocks base method.
-func (m *TransferableIn) Cost() (uint64, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Cost")
-	ret0, _ := ret[0].(uint64)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Cost indicates an expected call of Cost.
-func (mr *TransferableInMockRecorder) Cost() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Cost", reflect.TypeOf((*TransferableIn)(nil).Cost))
-}
-
 // InitCtx mocks base method.
 func (m *TransferableIn) InitCtx(ctx *snow.Context) {
 	m.ctrl.T.Helper()
