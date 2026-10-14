@@ -503,98 +503,87 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
-		tx   *BaseTx
-		want error
+		name     string
+		updateTx func(*BaseTx)
+		want     error
 	}{
 		{
-			name: "nil_tx",
-			tx:   nil,
-			want: ErrNilTx,
-		},
-		{
 			name: "already_verified",
-			tx: &BaseTx{
+			updateTx: func(tx *BaseTx) {
 				// Would fail verification if it were re-verified
-				BaseTx: avax.BaseTx{
-					NetworkID: networkID + 1,
-				},
-				SyntacticallyVerified: true,
+				tx.NetworkID++
+				tx.SyntacticallyVerified = true
 			},
 			want: nil,
 		},
 		{
 			name: "wrong_network_id",
-			tx: func() *BaseTx {
-				tx := newBaseTx()
+			updateTx: func(tx *BaseTx) {
 				tx.NetworkID++
-				return tx
-			}(),
+			},
 			want: avax.ErrWrongNetworkID,
 		},
 		{
 			name: "wrong_chain_id",
-			tx: func() *BaseTx {
-				tx := newBaseTx()
+			updateTx: func(tx *BaseTx) {
 				tx.BlockchainID = ids.GenerateTestID()
-				return tx
-			}(),
+			},
 			want: avax.ErrWrongChainID,
 		},
 		{
 			name: "invalid_output",
-			tx: func() *BaseTx {
-				tx := newBaseTx()
+			updateTx: func(tx *BaseTx) {
 				tx.Outs = []*avax.TransferableOutput{newOutput(0)}
-				return tx
-			}(),
+			},
 			want: secp256k1fx.ErrNoValueOutput,
 		},
 		{
 			name: "invalid_input",
-			tx: func() *BaseTx {
-				tx := newBaseTx()
+			updateTx: func(tx *BaseTx) {
 				tx.Ins = []*avax.TransferableInput{newInput(0)}
-				return tx
-			}(),
+			},
 			want: secp256k1fx.ErrNoValueInput,
 		},
 		{
 			name: "outputs_not_sorted",
-			tx: func() *BaseTx {
-				tx := newBaseTx()
-
+			updateTx: func(tx *BaseTx) {
 				unsortedOutputs := []*avax.TransferableOutput{newOutput(1), newOutput(2)}
 				avax.SortTransferableOutputs(unsortedOutputs, Codec)
 				unsortedOutputs[0], unsortedOutputs[1] = unsortedOutputs[1], unsortedOutputs[0]
 
 				tx.Outs = unsortedOutputs
-				return tx
-			}(),
+			},
 			want: errOutputsNotSorted,
 		},
 		{
 			name: "inputs_not_sorted_and_unique",
-			tx: func() *BaseTx {
-				tx := newBaseTx()
-
+			updateTx: func(tx *BaseTx) {
 				input := newInput(1)
 				tx.Ins = []*avax.TransferableInput{input, input}
-				return tx
-			}(),
+			},
 			want: errInputsNotSortedUnique,
 		},
 		{
 			name: "valid",
-			tx:   newBaseTx(),
 			want: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.tx.SyntacticVerify(ctx)
+			tx := newBaseTx()
+			if tt.updateTx != nil {
+				tt.updateTx(tx)
+			}
+
+			got := tx.SyntacticVerify(ctx)
 			require.ErrorIs(t, got, tt.want)
 		})
 	}
+
+	t.Run("nil_tx", func(t *testing.T) {
+		var tx *BaseTx
+		got := tx.SyntacticVerify(ctx)
+		require.ErrorIs(t, got, ErrNilTx)
+	})
 }
