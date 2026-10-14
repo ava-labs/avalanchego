@@ -205,9 +205,9 @@ func (g *genesis) verifyAndWriteBlock(db ethdb.Database) error {
 		return errNoHeadHeader
 	}
 	height, timestamp := head.Number.Uint64(), head.Time
-	// TODO(JonathanOppenheimer): coreth exposes a `skip-upgrade-check` config
-	// that bypasses this compatibility check; we need to make such a check
-	// unnecessary for the c-chain.
+	// TODO(JonathanOppenheimer): make this compatibility check unnecessary for
+	// the c-chain, rather than exposing a `skip-upgrade-check` config that
+	// bypasses it.
 	if err := prev.CheckCompatible(g.Config, height, timestamp); err != nil {
 		return fmt.Errorf("incompatible chain config: %w", err)
 	}

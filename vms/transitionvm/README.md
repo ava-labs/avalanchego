@@ -7,8 +7,8 @@ stay connected and APIs keep working across the swap.
 
 It is a [`block.ChainVM`](../../snow/engine/snowman/block/vm.go) wrapping a
 *pre-transition* and a *post-transition* [`Chain`](vm.go), forwarding every call
-to whichever is active. Its first use is the C-Chain's Coreth-to-SAEVM migration
-at Helicon.
+to whichever is active. It will migrate Subnet-EVM L1s to SAEVM at the Igloo
+upgrade.
 
 The two VMs are not independent. They share one database and block history, so
 they must agree on layout and block format, and each must handle the other's
@@ -25,10 +25,10 @@ Construct one from a [`Factory`](factory.go) with the two factories and the swit
 time:
 
 ```go
-n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &transitionvm.Factory{
-    PreFactory:      &coreth.Factory{},
-    PostFactory:     &saevm.Factory{},
-    TransitionTime:  n.Config.UpgradeConfig.HeliconTime.Add(-10 * time.Second),
+n.VMManager.RegisterFactory(context.TODO(), constants.SubnetEVMID, &transitionvm.Factory{
+    PreFactory:      preFactory,  // the VM before the switch
+    PostFactory:     postFactory, // the VM after the switch
+    TransitionTime:  n.Config.UpgradeConfig.IglooTime.Add(-10 * time.Second),
     Now:             time.Now,
     APIDrainTimeout: 15 * time.Second,
 })
@@ -143,7 +143,7 @@ flowchart TB
 
     subgraph VM["TransitionVM"]
         active{{"active VM"}}
-        pre["pre-transition VM<br/>(Coreth)"]
+        pre["pre-transition VM<br/>(Subnet-EVM)"]
         post["post-transition VM<br/>(SAEVM)"]
         pre ==>|"hands over consensus state, preference,<br/>peer connections, HTTP routes"| post
     end

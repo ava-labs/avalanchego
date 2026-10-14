@@ -78,7 +78,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		key := privateNetwork.PreFundedKeys[0]
 		ethAddress := key.EthAddress()
 
-		tc.By("initializing a coreth client")
+		tc.By("initializing an eth client")
 		node := privateNetwork.Nodes[0]
 		nodeURI := tmpnet.NodeURI{
 			NodeID: node.NodeID,
