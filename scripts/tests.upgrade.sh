@@ -65,6 +65,6 @@ source ./scripts/constants.sh
 #################################
 # By default, it runs all upgrade test cases!
 echo "running upgrade tests against the local cluster with ${AVALANCHEGO_PATH}"
-./bin/ginkgo -v ./tests/upgrade -- \
+"${GINKGO_PATH:-./bin/ginkgo}" -v "${E2E_TARGET:-./tests/upgrade}" -- \
   --avalanchego-path="/tmp/avalanchego-v${VERSION}/avalanchego" \
   --avalanchego-path-to-upgrade-to="${AVALANCHEGO_PATH}"

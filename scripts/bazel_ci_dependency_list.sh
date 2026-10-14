@@ -17,6 +17,10 @@ set -euo pipefail
 bazel_ci_target_patterns() {
   cat <<'EOF'
 //tests/e2e:e2e_runner
+//tests/load/main:runner
+//tests/upgrade:runner
+//graft/subnet-evm/tests/load:runner
+//graft/subnet-evm/tests/warp:runner
 //...
 //ids:ids_test
 EOF
