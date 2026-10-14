@@ -274,7 +274,7 @@ reserved for jobs with dependencies that another setup action does not provide.
 | Dependency | Provisioning mechanism | Use when |
 | --- | --- | --- |
 | Go | [`setup-go-for-project`](../.github/actions/setup-go-for-project/) | The job needs Go and Task and does not use Nix or Bazel to provide them. |
-| Bazel | [`setup-bazel`](../.github/actions/setup-bazel/) | The job needs Bazel and Task. Bazel also provides Go. |
+| Bazel | [`setup-bazel`](../.github/actions/setup-bazel/) | The job needs Bazel and Task. Bazel manages Go for its targets, not for commands outside Bazel. |
 | Flake-provided tools | [`install-nix`](../.github/actions/install-nix/) | A job runs a command that requires a dependency from the Nix dev shell. The shell provides Go and Task. |
 
 `setup-go-for-project` and `setup-bazel` install the pinned Task release.
@@ -282,16 +282,15 @@ reserved for jobs with dependencies that another setup action does not provide.
 cache and version rules.
 
 Choose the setup action that provides the job's dependencies. Bazel provides
-Go for its targets, but a job that also runs host Go commands needs
+Go for its targets, but a job that also runs Go commands outside Bazel needs
 `setup-go-for-project` or the Nix dev shell. For example, `check-go-mod-tidy`
 uses both `setup-bazel` and `setup-go-for-project`, while `lint-avalanchego`
 uses `setup-bazel` and `install-nix` for flake-provided tools.
 
 When combining these actions, run `setup-bazel` before either Go setup action
-disables `GOPROXY`. Bazel preparation can download Go modules into its separate
-module cache on a miss or non-exact restore. Preparing the host Go module cache
-does not populate that cache. An exact Bazel cache hit can hide an incorrect
-setup order, so validate both exact hits and cold-cache preparation; see
+disables `GOPROXY`. They prepare separate module caches. See
+[Go toolchains and dependency caches](./go-toolchains-and-caches.md)
+for the boundaries. Validate both exact hits and cold-cache preparation; see
 [Bazel cache validation](./bazel.md#changing-this-safely).
 
 `install-nix` can restore Go module input, but it does not save that cache. The
@@ -302,8 +301,8 @@ workflows consume these caches without writing them.
 
 ### Cache policy overview
 
-CI caches tools and dependencies, not build or test output. Two rules govern
-these input caches:
+GitHub Actions caches tools and dependencies, not build or test output. Two rules
+govern these input caches:
 
 - **Save shared entries only from designated setup or image-build jobs on
   `master`.** Pull requests and other refs can restore entries and prepare
@@ -322,15 +321,17 @@ when a pull request adds a dependency, as well as on `master`. Disabling
 downloads detects gaps in cache preparation as CI changes; it is not a
 prerequisite for preparing the cache, which can use the network. The Task cache
 can download a release on a miss, and the Nix store cache can fetch missing
-flake store paths. Those caches do not use the offline completeness check.
+flake store paths. Those caches do not use the dependency-download completeness
+check. These restrictions do not isolate the workload from the network; see
+[download restrictions](./go-toolchains-and-caches.md#download-restrictions).
 
 ### Input-cache lifecycle
 
 GitHub-hosted runners are temporary. GitHub Actions caching is currently used
 for build inputs - tools and dependencies - not outputs (build and testing). A
-cache miss must still let the job obtain its required input before the job runs
-offline. GitHub Actions caches are immutable: the first successful save for a
-key wins and later saves of that key do not replace it.
+cache miss must still let the job obtain its required input before the job
+disables dependency downloads. GitHub Actions caches are immutable: the first
+successful save for a key wins. Later saves of that key do not replace it.
 
 Bazel is configured to cache outputs via its separate remote cache, but still
 depends on GitHub Actions caching for its repository inputs.
@@ -420,7 +421,10 @@ URL and authorization header. The scheduled Bazel workflow disables it. See
 #### Go module cache
 
 [`setup-go-module-cache`](../.github/actions/setup-go-module-cache/action.yml)
-restores `GOMODCACHE`. On a non-exact hit it runs
+restores the module cache for Go tasks outside Bazel, at `go env GOMODCACHE`.
+This does not prepare CI's separate Gazelle cache; see
+[cache boundaries](./go-toolchains-and-caches.md#separate-caches).
+On a non-exact hit or miss it runs
 [`download_go_modules.sh`](../scripts/download_go_modules.sh), which resolves
 all repository modules and the checked-in
 [`go_module_cache_manifest.tsv`](../scripts/go_module_cache_manifest.tsv).
@@ -462,8 +466,11 @@ The cache-writing setup jobs use
 It requests saves from `setup-go-for-project`, `setup-task`, and `install-nix`
 only when `cache-policy` permits cache writing. Other uses of these actions are
 restore-only. `install-nix` can use the same module-cache action as a
-restore-only consumer. Bazel jobs disable this use because Bazel has a separate
-`GOMODCACHE`. The implicit `actions/setup-go` cache is disabled because its
+restore-only consumer. Disabling `setup_go_module_cache` skips preparation for
+Go tasks outside Bazel. It does not prepare those dependencies through Gazelle's
+cache or set `GOPROXY=off` for those tasks. A job that disables their module
+downloads must prepare their dependencies separately.
+The implicit `actions/setup-go` cache is disabled because its
 post-job save cannot be limited to `master` runs by `cache-policy`.
 
 #### Bazel dependency cache
@@ -624,7 +631,8 @@ Before restoring the cache, `setup-task` checks for an executable at
 `$RUNNER_TEMP/task/<version>/$RUNNER_OS-$RUNNER_ARCH/task`. If one exists, the
 action skips cache restore, download, and save. This lets repeated invocations
 reuse Task within a job. For example, both `setup-bazel` and
-`setup-go-for-project` invoke `setup-task` when a job needs Bazel and host Go.
+`setup-go-for-project` invoke `setup-task` when a job needs Bazel and Go commands
+outside Bazel.
 
 Otherwise, the action restores the matching cache. Platform cache setup jobs
 in the Go workflows can save a cache entry on `master`. All other jobs are
@@ -640,10 +648,12 @@ Task.
 
 On a cache miss, the action downloads the platform release from the Task GitHub
 release and checks its SHA-256 value against the checked-in value in
-`setup_task.sh`. This avoids a host Go dependency in Bazel jobs. A source build would
-require host Go before Task can run. The checked-in checksum detects a damaged or
-changed archive in transit and makes release-archive changes visible in repository
-review.
+`setup_task.sh`. Running this prebuilt Task binary requires no Go compilation.
+Building Task from source would require Go outside Bazel before Task can run.
+This does not remove compilation from a subsequent Bazel build; see
+[Go toolchains and dependency caches](./go-toolchains-and-caches.md#toolchains-builds-and-prebuilt-binaries).
+The checked-in checksum detects a damaged or changed archive in transit. It also
+makes release-archive changes visible in repository review.
 
 When changing this setup, keep these rules:
 
