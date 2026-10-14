@@ -46,7 +46,7 @@ while IFS= read -r package; do
       ;;
     "${coreth_prefix}"|"${coreth_prefix}/"*|"${subnet_evm_prefix}"|"${subnet_evm_prefix}/"*)
       ;;
-    */mocks*|*proto*|*/tests/e2e*|*/tests/load/c*|*/tests/upgrade*|*/tests/fixture/bootstrapmonitor/e2e*|*/tests/reexecute*)
+    */mocks*|*proto*|*/tests/e2e*|*/tests/upgrade*|*/tests/fixture/bootstrapmonitor/e2e*|*/tests/reexecute*)
       continue
       ;;
   esac
