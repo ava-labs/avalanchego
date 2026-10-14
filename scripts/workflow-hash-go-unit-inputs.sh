@@ -23,7 +23,7 @@ trap 'rm -f "${PACKAGE_JSON}" "${INPUT_PATHS}" "${EMBED_LIST}"' EXIT
 # Hash contents rather than the commit so unrelated changes do not invalidate
 # an exact test cache hit.
 git -C "${REPO_ROOT}" ls-files -z -- \
-  '*.go' '**/*.go' go.mod go.sum go.work.sum '**/go.mod' '**/go.sum' \
+  '*.go' '**/*.go' go.mod go.sum go.work go.work.sum '**/go.mod' '**/go.sum' \
   'testdata/**' '**/testdata/**' > "${INPUT_PATHS}"
 
 # go list reports production and test-only embedded files, regardless of
