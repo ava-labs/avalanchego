@@ -3,7 +3,7 @@ title: C-Chain API
 description: "This page is an overview of the C-Chain API associated with AvalancheGo."
 ---
 
-> **Note:** Ethereum has its own notion of `networkID` and `chainID`. These have no relationship to Avalanche's view of networkID and chainID and are purely internal to the [C-Chain](https://build.avax.network/docs/quick-start/primary-network#c-chain). On Mainnet, the C-Chain uses `1` and `43114` for these values. On the Fuji Testnet, it uses `1` and `43113` for these values. `networkID` and `chainID` can also be obtained using the `net_version` and `eth_chainId` methods.
+> **Note:** Ethereum's chain ID has no relationship to Avalanche's view of networkID and chainID and is purely internal to the [C-Chain](https://build.avax.network/docs/quick-start/primary-network#c-chain). On Mainnet, the C-Chain uses `43114`. On the Fuji Testnet, it uses `43113`. Both `eth_chainId` and `net_version` return this value.
 
 ## Ethereum APIs
 
@@ -16,14 +16,6 @@ To interact with C-Chain via the JSON-RPC endpoint:
 ```sh
 /ext/bc/C/rpc
 ```
-
-To interact with other instances of the EVM via the JSON-RPC endpoint:
-
-```sh
-/ext/bc/blockchainID/rpc
-```
-
-where `blockchainID` is the ID of the blockchain running the EVM.
 
 #### WebSocket Endpoints
 
@@ -43,25 +35,11 @@ ws://127.0.0.1:9650/ext/bc/C/ws
 
 > **Tip:** On localhost, use `ws://`. When using the [Public API](https://build.avax.network/integrations#RPC%20Providers) or another host that supports encryption, use `wss://`.
 
-To interact with other instances of the EVM via the websocket endpoint:
-
-```sh
-/ext/bc/blockchainID/ws
-```
-
-where `blockchainID` is the ID of the blockchain running the EVM.
-
 ### Standard Ethereum APIs
 
-Avalanche offers an API interface identical to Geth's API except that it only supports the following
-services:
-
-- `web3_`
-- `net_`
-- `eth_`
-- `personal_`
-- `txpool_`
-- `debug_` (note: this is turned off on the public API node.)
+Avalanche offers an API interface identical to Geth's API except that it only supports the methods
+listed in [Available APIs](https://build.avax.network/docs/nodes/chain-configs/primary-network/c-chain#available-apis),
+which also lists the methods a node serves by default. The `debug_` methods are turned off on the public API node.
 
 You can interact with these services the same exact way you'd interact with Geth (see exceptions below). See the
 [Ethereum Wiki's JSON-RPC Documentation](https://ethereum.org/en/developers/docs/apis/json-rpc/)
@@ -72,17 +50,19 @@ for a full description of this API.
 
 #### Exceptions
 
-Starting with release [`v0.12.2`](https://github.com/ava-labs/avalanchego/releases/tag/v1.12.2), `eth_getProof` has a different behavior compared to geth:
+The C-Chain executes blocks after consensus accepts them, as described in [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution). A block is final as soon as it is accepted, but its receipts and post-execution state exist only once it has executed. This changes the following:
 
-- On archival nodes (nodes with`pruning-enabled` set to `false`), queries for state proofs older than 24 hours preceding the last accepted block will be rejected by default. This can be adjusted with `historical-proof-query-window`, which defines the number of blocks before the last accepted block that can be queried for state proofs. Set this option to `0` to accept a state query for any block number.
-- On pruning nodes (nodes with `pruning-enabled` set to `true`), queries for state proofs outside the 32 block window after the last accepted block are always rejected.
+- `latest` is the last executed block.
+- `pending` is the last executed block. If `api-resolve-pending-to-last-executed` is `false`, it is the last accepted block instead, and methods that read state reject `pending`.
+- `safe` and `finalized` are the last settled block, the most recent block whose execution results are included in an accepted block.
+- Methods that read state at an accepted block that hasn't executed yet wait for it to execute. Receipts for such a block are `null`.
+- A block header's `baseFeePerGas` is an upper bound on the base fee charged when the block executes, and its `stateRoot` is the post-execution state root of the last settled block when it was built.
 
 ### Avalanche - Ethereum APIs
 
 In addition to the standard Ethereum APIs, Avalanche offers `eth_baseFee`,
-`eth_getChainConfig`, `eth_callDetailed`,
-`eth_getBadBlocks`, `eth_suggestPriceOptions`,
-and the `eth_newAcceptedTransactions` subscription.
+`eth_getChainConfig`, `eth_callDetailed`, `eth_suggestPriceOptions`,
+and the `newAcceptedTransactions` subscription.
 
 They use the same endpoint as standard Ethereum APIs:
 
@@ -92,7 +72,7 @@ They use the same endpoint as standard Ethereum APIs:
 
 #### `eth_baseFee`
 
-Get the base fee for the next block.
+Get an upper bound on the base fee for the next block.
 
 **Signature:**
 
@@ -100,7 +80,7 @@ Get the base fee for the next block.
 eth_baseFee() -> {}
 ```
 
-`result` is the hex value of the base fee for the next block.
+`result` is the hex value of the upper bound on the base fee for the next block.
 
 **Example Call:**
 
@@ -205,12 +185,14 @@ eth_callDetailed({
     value: quantity (optional),
     data: data (optional)
 }, blockNumberOrHash, stateOverrides (optional)) -> {
-    gas: quantity,
+    gas: number,
     errCode: number,
     err: string,
     returnData: data
 }
 ```
+
+`errCode` is `3` if the call reverted, and `0` otherwise.
 
 **Example Call:**
 
@@ -239,32 +221,6 @@ curl -X POST --data '{
     "returnData": "0x"
   }
 }
-```
-
-#### `eth_getBadBlocks`
-
-Returns a list of the last bad blocks that the client has seen on the network.
-
-**Signature:**
-
-```sh
-eth_getBadBlocks() -> []{
-    hash: hash,
-    block: object,
-    rlp: string,
-    reason: object
-}
-```
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"eth_getBadBlocks",
-    "params" :[]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
 ```
 
 #### `eth_suggestPriceOptions`
@@ -310,24 +266,24 @@ curl -X POST --data '{
   "id": 1,
   "result": {
     "slow": {
-      "maxPriorityFeePerGas": "0x5d21dba00",
-      "maxFeePerGas": "0x6fc23ac00"
+      "maxPriorityFeePerGas": "0x389fd980",
+      "maxFeePerGas": "0xafd56d80"
     },
     "normal": {
-      "maxPriorityFeePerGas": "0x2540be400",
-      "maxFeePerGas": "0x4a817c800"
+      "maxPriorityFeePerGas": "0x3b9aca00",
+      "maxFeePerGas": "0xb2d05e00"
     },
     "fast": {
-      "maxPriorityFeePerGas": "0x12a05f200",
-      "maxFeePerGas": "0x37e11d600"
+      "maxPriorityFeePerGas": "0x3e95ba80",
+      "maxFeePerGas": "0xb5cb4e80"
     }
   }
 }
 ```
 
-#### `eth_newAcceptedTransactions` (Subscription)
+#### `newAcceptedTransactions` (Subscription)
 
-Creates a subscription that fires each time a transaction is accepted (finalized) on the chain.
+Creates a subscription that fires each time a transaction is accepted (finalized) on the chain, before it is executed.
 This is an Avalanche-specific subscription not available in standard Ethereum. If `fullTx` is
 `true`, the full transaction object is sent; otherwise only the transaction hash is sent.
 
@@ -336,7 +292,7 @@ Available only via WebSocket.
 **Signature:**
 
 ```sh
-{"jsonrpc":"2.0", "id":1, "method":"eth_subscribe", "params":["newAcceptedTransactions", {"fullTx": false}]}
+{"jsonrpc":"2.0", "id":1, "method":"eth_subscribe", "params":["newAcceptedTransactions", false]}
 ```
 
 **Example Call:**
@@ -356,343 +312,6 @@ wscat -c ws://127.0.0.1:9650/ext/bc/C/ws -x '{"jsonrpc":"2.0", "id":1, "method":
     "result": "0xtransactionhash..."
   }
 }
-```
-
-## Warp APIs
-
-The Warp API enables interaction with Avalanche Warp Messaging (AWM), allowing cross-chain
-communication between Avalanche blockchains. It provides methods for retrieving warp messages
-and their BLS signatures, as well as aggregating signatures from validators.
-
-The Warp API is enabled when the `warp-api-enabled` flag is set to `true` in the node configuration.
-
-### Warp API Endpoint
-
-```sh
-/ext/bc/C/rpc
-```
-
-### Warp API Methods
-
-#### `warp_getMessage`
-
-Returns the raw bytes of a warp message by its ID.
-
-**Signature:**
-
-```sh
-warp_getMessage({messageID: string}) -> data
-```
-
-- `messageID` is the ID of the warp message.
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"warp_getMessage",
-    "params" :["2PsAgvhGczsTNxCMgVJG39gKV4W9ETXWL1mMJk3xoSRHMBcyY"]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": "0x..."
-}
-```
-
-#### `warp_getMessageSignature`
-
-Returns BLS signature for the specified warp message.
-
-**Signature:**
-
-```sh
-warp_getMessageSignature({messageID: string}) -> data
-```
-
-- `messageID` is the ID of the warp message.
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"warp_getMessageSignature",
-    "params" :["2PsAgvhGczsTNxCMgVJG39gKV4W9ETXWL1mMJk3xoSRHMBcyY"]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": "0x..."
-}
-```
-
-#### `warp_getBlockSignature`
-
-Returns the BLS signature associated with a blockID.
-
-**Signature:**
-
-```sh
-warp_getBlockSignature({blockID: string}) -> data
-```
-
-- `blockID` is the ID of the block in warp message.
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"warp_getBlockSignature",
-    "params" :["2PsAgvhGczsTNxCMgVJG39gKV4W9ETXWL1mMJk3xoSRHMBcyY"]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": "0x..."
-}
-```
-
-#### `warp_getMessageAggregateSignature`
-
-Fetches BLS signatures from validators for the specified warp message and aggregates them into a
-single signed warp message. The caller specifies the quorum numerator (the denominator is 100).
-
-**Signature:**
-
-```sh
-warp_getMessageAggregateSignature({messageID: string, quorumNum: number, subnetID: string (optional)}) -> data
-```
-
-- `messageID` is the ID of the warp message.
-- `quorumNum` is the quorum numerator (e.g., `67` for 67% quorum). The denominator is 100.
-- `subnetID` (optional) is the subnet to aggregate signatures from. Defaults to the current subnet.
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"warp_getMessageAggregateSignature",
-    "params" :["2PsAgvhGczsTNxCMgVJG39gKV4W9ETXWL1mMJk3xoSRHMBcyY", 67, ""]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": "0x..."
-}
-```
-
-The returned bytes are the serialized signed warp message.
-
-#### `warp_getBlockAggregateSignature`
-
-Fetches BLS signatures from validators for the specified block and aggregates them into a single
-signed warp message. The caller specifies the quorum numerator (the denominator is 100).
-
-**Signature:**
-
-```sh
-warp_getBlockAggregateSignature({blockID: string, quorumNum: number, subnetID: string (optional)}) -> data
-```
-
-- `blockID` is the ID of the block.
-- `quorumNum` is the quorum numerator (e.g., `67` for 67% quorum). The denominator is 100.
-- `subnetID` (optional) is the subnet to aggregate signatures from. Defaults to the current subnet.
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"warp_getBlockAggregateSignature",
-    "params" :["2PsAgvhGczsTNxCMgVJG39gKV4W9ETXWL1mMJk3xoSRHMBcyY", 67, ""]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": "0x..."
-}
-```
-
-The returned bytes are the serialized signed warp message.
-
-## Admin APIs
-
-The Admin API provides administrative functionality for the EVM.
-
-### Admin API Endpoint
-
-```sh
-/ext/bc/C/admin
-```
-
-### Admin API Methods
-
-#### `admin_startCPUProfiler`
-
-Starts a CPU profile that writes to the specified file.
-
-**Signature:**
-
-```sh
-admin_startCPUProfiler() -> {}
-```
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"admin_startCPUProfiler",
-    "params" :[]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/admin
-```
-
-#### `admin_stopCPUProfiler`
-
-Stops the CPU profile.
-
-**Signature:**
-
-```sh
-admin_stopCPUProfiler() -> {}
-```
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"admin_stopCPUProfiler",
-    "params" :[]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/admin
-```
-
-#### `admin_memoryProfile`
-
-Runs a memory profile writing to the specified file.
-
-**Signature:**
-
-```sh
-admin_memoryProfile() -> {}
-```
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"admin_memoryProfile",
-    "params" :[]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/admin
-```
-
-#### `admin_lockProfile`
-
-Runs a mutex profile writing to the specified file.
-
-**Signature:**
-
-```sh
-admin_lockProfile() -> {}
-```
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"admin_lockProfile",
-    "params" :[]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/admin
-```
-
-#### `admin_setLogLevel`
-
-Sets the log level for the EVM.
-
-**Signature:**
-
-```sh
-admin_setLogLevel({
-    level: string
-}) -> {}
-```
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"admin_setLogLevel",
-    "params" :[{
-        "level": "debug"
-    }]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/admin
-```
-
-#### `admin_getVMConfig`
-
-Returns the current VM configuration.
-
-**Signature:**
-
-```sh
-admin_getVMConfig() -> {
-    config: {
-        // VM configuration fields
-    }
-}
-```
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"admin_getVMConfig",
-    "params" :[]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/admin
 ```
 
 ## Avalanche-Specific APIs
@@ -740,7 +359,7 @@ curl -X POST --data '{
     "id"     :1,
     "method" :"avax.getUTXOs",
     "params" :[{
-        "addresses": ["X-avax1..."],
+        "addresses": ["C-avax1..."],
         "sourceChain": "X",
         "limit": 100,
         "encoding": "hex"
@@ -777,37 +396,9 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/avax
 ```
 
-#### `avax.getAtomicTxStatus`
-
-Returns the status of the specified atomic transaction.
-
-**Signature:**
-
-```sh
-avax.getAtomicTxStatus({
-    txID: string
-}) -> {
-    status: string,
-    blockHeight: number (optional)
-}
-```
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"avax.getAtomicTxStatus",
-    "params" :[{
-        "txID": "2QouvNW..."
-    }]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/avax
-```
-
 #### `avax.getAtomicTx`
 
-Returns the specified atomic transaction.
+Returns the specified atomic transaction. It returns an error until the transaction is accepted.
 
 **Signature:**
 
@@ -818,7 +409,7 @@ avax.getAtomicTx({
 }) -> {
     tx: string,
     encoding: string,
-    blockHeight: number (optional)
+    blockHeight: string
 }
 ```
 
