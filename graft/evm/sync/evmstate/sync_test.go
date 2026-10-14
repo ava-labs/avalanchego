@@ -63,7 +63,7 @@ func testSync(t *testing.T, test syncTest) {
 	clientEthDB, ok := clientDB.DiskDB().(ethdb.Database)
 	require.Truef(t, ok, "%T is not an ethdb.Database", clientDB.DiskDB())
 
-	leafsRequestHandler := handlers.NewLeafsRequestHandler(serverDB.TrieDB(), message.StateTrieKeyLength, nil, message.Codec, handlerstats.NewNoopHandlerStats())
+	leafsRequestHandler := handlers.NewLeafsRequestHandler(serverDB.TrieDB(), nil, message.Codec, handlerstats.NewNoopHandlerStats())
 	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB.DiskDB(), message.Codec, handlerstats.NewNoopHandlerStats())
 	mockClient := client.NewTestClient(message.Codec, leafsRequestHandler, codeRequestHandler, nil)
 	// Set intercept functions for the mock client
@@ -279,7 +279,7 @@ func TestResumeSyncLargeStorageTrieInterrupted(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
-	largeStorageRoot, _, _ := synctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000, common.HashLength)
+	largeStorageRoot, _, _ := synctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000)
 	root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, 2000, func(_ *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
 		// Set the root for a single account
 		if index == 10 {
@@ -312,8 +312,8 @@ func TestResumeSyncToNewRootAfterLargeStorageTrieInterrupted(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
-	largeStorageRoot1, _, _ := synctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000, common.HashLength)
-	largeStorageRoot2, _, _ := synctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000, common.HashLength)
+	largeStorageRoot1, _, _ := synctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000)
+	largeStorageRoot2, _, _ := synctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000)
 	root1, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, 2000, func(_ *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
 		// Set the root for a single account
 		if index == 10 {
@@ -354,7 +354,7 @@ func TestResumeSyncLargeStorageTrieWithConsecutiveDuplicatesInterrupted(t *testi
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
-	largeStorageRoot, _, _ := synctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000, common.HashLength)
+	largeStorageRoot, _, _ := synctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000)
 	root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, 100, func(_ *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
 		// Set the root for 2 successive accounts
 		if index == 10 || index == 11 {
@@ -387,7 +387,7 @@ func TestResumeSyncLargeStorageTrieWithSpreadOutDuplicatesInterrupted(t *testing
 	r := rand.New(rand.NewSource(1))
 	serverDB := state.NewDatabase(rawdb.NewMemoryDatabase())
 
-	largeStorageRoot, _, _ := synctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000, common.HashLength)
+	largeStorageRoot, _, _ := synctest.GenerateIndependentTrie(t, r, serverDB.TrieDB(), 2000)
 	root, _ := synctest.FillAccounts(t, r, serverDB, common.Hash{}, 100, func(_ *testing.T, index int, _ common.Address, account types.StateAccount, _ state.Trie) types.StateAccount {
 		if index == 10 || index == 90 {
 			account.Root = largeStorageRoot

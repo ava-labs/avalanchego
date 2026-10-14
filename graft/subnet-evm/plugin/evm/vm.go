@@ -663,7 +663,6 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 			LeafType:   message.StateTrieNode,
 			MetricName: "sync_state_trie_leaves",
 			Handler: handlers.NewLeafsRequestHandler(evmTrieDB,
-				message.StateTrieKeyLength,
 				vm.blockChain, vm.networkCodec,
 				syncStats,
 			),

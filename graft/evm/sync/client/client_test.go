@@ -361,8 +361,8 @@ func TestGetLeafs(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	largeTrieRoot, largeTrieKeys, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 100_000, common.HashLength)
-	smallTrieRoot, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, leafsLimit, common.HashLength)
+	largeTrieRoot, largeTrieKeys, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 100_000)
+	smallTrieRoot, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, leafsLimit)
 
 	tests := map[string]struct {
 		request         message.LeafsRequest
@@ -656,7 +656,6 @@ func TestGetLeafs(t *testing.T) {
 	for name, test := range tests {
 		handler := handlers.NewLeafsRequestHandler(
 			trieDB,
-			message.StateTrieKeyLength,
 			nil,
 			message.Codec,
 			handlerstats.NewNoopHandlerStats(),
@@ -689,11 +688,10 @@ func TestGetLeafs(t *testing.T) {
 func TestGetLeafsRetries(t *testing.T) {
 	r := rand.New(rand.NewSource(1))
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	root, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 100_000, common.HashLength)
+	root, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 100_000)
 
 	handler := handlers.NewLeafsRequestHandler(
 		trieDB,
-		message.StateTrieKeyLength,
 		nil,
 		message.Codec,
 		handlerstats.NewNoopHandlerStats(),

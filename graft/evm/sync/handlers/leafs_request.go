@@ -58,16 +58,14 @@ type leafsRequestHandler struct {
 	snapshotProvider SnapshotProvider
 	codec            codec.Manager
 	stats            stats.LeafsRequestHandlerStats
-	trieKeyLength    int
 }
 
-func NewLeafsRequestHandler(trieDB *triedb.Database, trieKeyLength int, snapshotProvider SnapshotProvider, codec codec.Manager, syncerStats stats.LeafsRequestHandlerStats) *leafsRequestHandler {
+func NewLeafsRequestHandler(trieDB *triedb.Database, snapshotProvider SnapshotProvider, codec codec.Manager, syncerStats stats.LeafsRequestHandlerStats) *leafsRequestHandler {
 	return &leafsRequestHandler{
 		trieDB:           trieDB,
 		snapshotProvider: snapshotProvider,
 		codec:            codec,
 		stats:            syncerStats,
-		trieKeyLength:    trieKeyLength,
 	}
 }
 
@@ -97,9 +95,9 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 		lrh.stats.IncInvalidLeafsRequest()
 		return nil, nil
 	}
-	if (len(startKey) != 0 && len(startKey) != lrh.trieKeyLength) ||
-		(len(endKey) != 0 && len(endKey) != lrh.trieKeyLength) {
-		log.Debug("invalid length for leafs request range, dropping request", "startLen", len(startKey), "endLen", len(endKey), "expected", lrh.trieKeyLength)
+	if (len(startKey) != 0 && len(startKey) != message.StateTrieKeyLength) ||
+		(len(endKey) != 0 && len(endKey) != message.StateTrieKeyLength) {
+		log.Debug("invalid length for leafs request range, dropping request", "startLen", len(startKey), "endLen", len(endKey), "expected", message.StateTrieKeyLength)
 		lrh.stats.IncInvalidLeafsRequest()
 		return nil, nil
 	}
@@ -125,12 +123,11 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 	leafsResponse.Vals = make([][]byte, 0, limit)
 
 	responseBuilder := &responseBuilder{
-		request:   leafsRequest,
-		response:  &leafsResponse,
-		t:         t,
-		keyLength: lrh.trieKeyLength,
-		limit:     limit,
-		stats:     lrh.stats,
+		request:  leafsRequest,
+		response: &leafsResponse,
+		t:        t,
+		limit:    limit,
+		stats:    lrh.stats,
 	}
 	// pass snapshot to responseBuilder if non-nil snapshot getter provided
 	if lrh.snapshotProvider != nil {
@@ -166,12 +163,11 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 }
 
 type responseBuilder struct {
-	request   message.LeafsRequest
-	response  *message.LeafsResponse
-	t         *trie.Trie
-	snap      *snapshot.Tree
-	keyLength int
-	limit     uint16
+	request  message.LeafsRequest
+	response *message.LeafsResponse
+	t        *trie.Trie
+	snap     *snapshot.Tree
+	limit    uint16
 
 	// stats
 	trieReadTime time.Duration
@@ -333,7 +329,7 @@ func (rb *responseBuilder) generateRangeProof(start []byte, keys [][]byte) (*mem
 
 	// If [start] is empty, populate it with the appropriate length key starting at 0.
 	if len(start) == 0 {
-		start = bytes.Repeat([]byte{0x00}, rb.keyLength)
+		start = bytes.Repeat([]byte{0x00}, message.StateTrieKeyLength)
 	}
 
 	if err := rb.t.Prove(start, proof); err != nil {
@@ -359,7 +355,7 @@ func (rb *responseBuilder) verifyRangeProof(keys, vals [][]byte, start []byte, p
 
 	// If [start] is empty, populate it with the appropriate length key starting at 0.
 	if len(start) == 0 {
-		start = bytes.Repeat([]byte{0x00}, rb.keyLength)
+		start = bytes.Repeat([]byte{0x00}, message.StateTrieKeyLength)
 	}
 	return trie.VerifyRangeProof(rb.request.Root, start, keys, vals, proof)
 }
@@ -425,7 +421,7 @@ func (rb *responseBuilder) fillFromTrie(ctx context.Context, end []byte) (bool, 
 	more := false
 	start := rb.nextKey()
 	if len(start) == 0 {
-		start = make([]byte, rb.keyLength)
+		start = make([]byte, message.StateTrieKeyLength)
 	}
 	for pair, err := range hashdb.LeafIterator(rb.t, start) {
 		if err != nil {

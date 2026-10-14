@@ -41,8 +41,7 @@ var (
 	proposeOnProposeCount  = metrics.GetOrRegisterCounter("firewood/triedb/propose/proposal/count", nil)
 	explicitlyDroppedCount = metrics.GetOrRegisterCounter("firewood/triedb/drop/count", nil)
 
-	errNoRevisionFound = errors.New("no revision found")
-
+	errNoRevisionFound         = errors.New("no revision found")
 	errNoProposalFound         = errors.New("no proposal found")
 	errUnexpectedProposalFound = errors.New("unexpected proposal found")
 )

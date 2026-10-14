@@ -32,14 +32,14 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 	db := state.NewDatabase(memdb)
 	trieDB := db.TrieDB()
 
-	corruptedTrieRoot, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 100, common.HashLength)
+	corruptedTrieRoot, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 100)
 	tr, err := trie.New(trie.TrieID(corruptedTrieRoot), trieDB)
 	require.NoError(t, err)
 	// Corrupt [corruptedTrieRoot]
 	synctest.CorruptTrie(t, memdb, tr, 5)
 
-	largeTrieRoot, largeTrieKeys, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 10_000, common.HashLength)
-	smallTrieRoot, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 500, common.HashLength)
+	largeTrieRoot, largeTrieKeys, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 10_000)
+	smallTrieRoot, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 500)
 	accountTrieRoot, accounts := synctest.FillAccounts(
 		t,
 		r,
@@ -663,7 +663,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		leafsHandler := NewLeafsRequestHandler(trieDB, message.StateTrieKeyLength, snapshotProvider, message.Codec, testHandlerStats)
+		leafsHandler := NewLeafsRequestHandler(trieDB, snapshotProvider, message.Codec, testHandlerStats)
 
 		t.Run(name, func(t *testing.T) {
 			ctx, request := test.prepareTestFn()
