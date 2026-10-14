@@ -12,13 +12,16 @@ if ! [[ "$0" =~ scripts/shellcheck.sh ]]; then
   exit 255
 fi
 
-# `find *` is the simplest way to ensure find does not include a
-# leading `.` in filenames it emits. A leading `.` will prevent the
-# use of `git apply` to fix reported shellcheck issues. This is
-# compatible with both macos and linux (unlike the use of -printf).
-# We exclude the graft/coreth and graft/subnet-evm directories to 
-# avoid linting files that should be run from a different location 
-# within the repo, as there are false positives.
+# Bare paths avoid the leading `./` that prevents `git apply` from applying
+# fixes from shellcheck. Include .github when it exists to check local action
+# helpers. Graft directories can also call this script without a .github
+# directory. This works on both macOS and Linux without find's -printf.
+# Exclude graft/coreth and graft/subnet-evm because linting them from the
+# repository root produces false positives.
 #
 # shellcheck disable=SC2035
-find * \( -path 'graft/coreth' -o -path 'graft/subnet-evm' \) -prune -o -name '*.sh' -type f -print0 | xargs -0 shellcheck "${@}"
+paths=(*)
+if [[ -d .github ]]; then
+  paths+=(.github)
+fi
+find "${paths[@]}" \( -path 'graft/coreth' -o -path 'graft/subnet-evm' \) -prune -o -name '*.sh' -type f -print0 | xargs -0 shellcheck "${@}"

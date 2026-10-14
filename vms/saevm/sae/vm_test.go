@@ -9,6 +9,7 @@ import (
 	"errors"
 	"math/big"
 	"math/rand/v2"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"slices"
@@ -271,8 +272,23 @@ func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM, scheme, pat
 
 	handlers, err := snow.CreateHandlers(ctx)
 	require.NoErrorf(tb, err, "%T.CreateHandlers()", snow)
-	server := httptest.NewServer(handlers[path])
+
+	// [http.StateHijacked] immediately removes the connection from the
+	// [httptest.Server]'s internal waitgroup, so it doesn't wait on
+	// [httptest.Server.Close] for the websocket connection to close. However,
+	// the [http.Handler] still doesn't return until the websocket is closed AND
+	// all inflight calls have completed. See additional documentation of this
+	// behavior at [http.Server.RegisterOnShutdown].
+	var inflight sync.WaitGroup
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		inflight.Add(1)
+		defer inflight.Done()
+		handlers[path].ServeHTTP(w, r)
+	})
+	tb.Cleanup(inflight.Wait)
+	server := httptest.NewServer(h)
 	tb.Cleanup(server.Close)
+
 	url := scheme + "://" + server.Listener.Addr().String()
 	client, err := rpc.DialContext(ctx, url)
 	require.NoErrorf(tb, err, "rpc.DialContext(ctx, %q)", url)

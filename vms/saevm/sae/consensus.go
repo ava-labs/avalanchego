@@ -46,6 +46,9 @@ var errUnverifiedBlock = errors.New("block not verified")
 //     method called; and
 //   - The block being propagated to [saexec.Executor.Enqueue].
 //
+// A synchronous block settles itself, so the [saexec.Executor] settles it after
+// execution and AcceptBlock returns once it is settled.
+//
 // [accepted]: https://github.com/ava-labs/avalanchego/tree/master/vms#block-statuses
 func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 	// Recall the terminology and ordering from the invariants document:
@@ -70,7 +73,7 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		batch := vm.db.NewBatch()
 
 		// D(Σ ⊂ S); yes, I know it's in a batch
-		if len(settles) > 0 {
+		if !b.Synchronous() && len(settles) > 0 {
 			// Note that while we treat SAFE and FINALIZED identically, there is
 			// no notion of the former in [rawdb]. Furthermore, the LAST label
 			// is reserved for the last executed so it too isn't persisted here.
@@ -80,8 +83,9 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		rawdb.WriteBlock(batch, b.EthBlock())
 		rawdb.WriteTxLookupEntriesByBlock(batch, b.EthBlock())
 		// D(b ∈ A)
-		rawdb.WriteCanonicalHash(batch, b.Hash(), b.NumberU64())
-		rawdb.WriteHeadFastBlockHash(batch, b.Hash())
+		hash := b.Hash()
+		rawdb.WriteCanonicalHash(batch, hash, b.NumberU64())
+		rawdb.WriteHeadFastBlockHash(batch, hash)
 
 		if err := batch.Write(); err != nil {
 			return err
@@ -97,7 +101,14 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 	//
 	// [blocks.Block.MarkSettled] guarantees M before I (i.e. `vm.last.settled`)
 	for _, s := range settles {
-		if err := s.MarkSettled(&vm.last.settled); err != nil {
+		if s == b {
+			// A synchronous block settles itself, which is only possible once
+			// it has executed, so the [saexec.Executor] settles it after
+			// execution. Unlike other blocks, its acceptance therefore precedes
+			// the settlement it causes.
+			break
+		}
+		if err := s.MarkSettled(vm.last.settled); err != nil {
 			return err
 		}
 		vm.metrics.markSettled(s)
@@ -111,12 +122,20 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		return err
 	}
 
-	// When the chain is bootstrapping, avalanchego expects to be able to call
-	// `Verify` and `Accept` in a loop over blocks. Reporting an error during
-	// either `Verify` or `Accept` is considered FATAL during this process.
-	// Therefore, we must ensure that avalanchego does not get too far ahead of
-	// the execution thread and FATAL during block verification.
-	if vm.consensusState.Get() == snow.Bootstrapping {
+	switch {
+	case b.Synchronous():
+		// See rationale above, in `range settles` loop.
+		if err := b.WaitUntilSettled(ctx); err != nil {
+			return fmt.Errorf("waiting for synchronous block %d to settle: %w", b.Height(), err)
+		}
+		vm.metrics.markSettled(b)
+
+	case vm.consensusState.Get() == snow.Bootstrapping:
+		// When the chain is bootstrapping, avalanchego expects to be able to call
+		// `Verify` and `Accept` in a loop over blocks. Reporting an error during
+		// either `Verify` or `Accept` is considered FATAL during this process.
+		// Therefore, we must ensure that avalanchego does not get too far ahead of
+		// the execution thread and FATAL during block verification.
 		if err := b.WaitUntilExecuted(ctx); err != nil {
 			return fmt.Errorf("waiting for block %d to execute: %v", b.Height(), err)
 		}
@@ -130,10 +149,15 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 
 	// Same rationale as the invariant described in [blocks.Block]. Praised be
 	// the GC!
+	//
 	// The executor's [saedb.Tracker] handles removing state roots once the reference
 	// count is 0. Since on execution, each root has a reference added,
 	// this count is decremented once the block's state is no longer needed by
 	// consensus.
+	//
+	//
+	// Note that for synchronous blocks this amounts to removing the parent
+	// block from the consensus-critical map.
 	keep := b.LastSettled().Hash()
 	for _, s := range settles {
 		if s.Hash() == keep {
