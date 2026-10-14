@@ -500,6 +500,10 @@ for packages whose inputs have not changed.
 | `master` push | Yes | On an exact hit or a compatible fallback | Yes, including test results |
 | Scheduled | Yes | No | Yes, with test results expired |
 
+Scheduled jobs save build caches for platforms without a full unit job on PR or
+`master` pushes. Later scheduled runs can reuse compiled output while rerunning
+every test.
+
 `clear_unit_test_results` defaults to `true`, so a new caller retains build
 cache entries but runs its tests. The pre-merge workflow is the only caller that
 sets it to `false`. Scheduled jobs retain restored build-cache entries but clear
