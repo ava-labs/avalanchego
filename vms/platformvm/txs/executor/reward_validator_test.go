@@ -109,6 +109,8 @@ func newAddAutoRenewedValidatorTx(
 ) *platform.Tx {
 	t.Helper()
 
+	_, pop := newSignerWithPoP(t)
+
 	// Only spend the first funded key so that txs built on top of this one
 	// can use the other keys without conflicting on UTXOs.
 	wallet := newWallet(t, env, walletConfig{
@@ -117,7 +119,7 @@ func newAddAutoRenewedValidatorTx(
 	tx, err := wallet.IssueAddAutoRenewedValidatorTx(
 		ids.GenerateTestNodeID(),
 		weight,
-		newProofOfPossession(t),
+		pop,
 		newOwner(),
 		newOwner(),
 		newOwner(),
@@ -856,6 +858,7 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 				endTime       = genesistest.DefaultValidatorStartTime.Add(2 * env.config.MinStakeDuration)
 			)
 
+			_, pop := newSignerWithPoP(t)
 			tx, err := wallet.IssueAddPermissionlessValidatorTx(
 				&platform.SubnetValidator{
 					Validator: platform.Validator{
@@ -865,7 +868,7 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 					},
 					Subnet: constants.PrimaryNetworkID,
 				},
-				newProofOfPossession(t),
+				pop,
 				env.ctx.AVAXAssetID,
 				newOwner(),
 				newOwner(),

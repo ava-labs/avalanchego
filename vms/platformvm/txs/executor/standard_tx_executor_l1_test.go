@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -106,11 +105,7 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 	// Allow two active L1 validators.
 	env.config.ValidatorFeeConfig.Capacity = 2
 
-	sk, err := localsigner.New()
-	require.NoError(t, err)
-
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(t, err)
+	_, pop := newSignerWithPoP(t)
 
 	subnetID := testSubnet1.ID()
 	nodeID := ids.GenerateTestNodeID()
@@ -304,11 +299,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	wallet := newWallet(t, env, walletConfig{})
 
-	sk, err := localsigner.New()
-	require.NoError(err)
-
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(err)
+	sk, pop := newSignerWithPoP(t)
 
 	subnetID := testSubnet1.ID()
 	nodeID := ids.GenerateTestNodeID()
@@ -412,11 +403,7 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 	// Allow two active L1 validators.
 	env.config.ValidatorFeeConfig.Capacity = 2
 
-	initialSK, err := localsigner.New()
-	require.NoError(t, err)
-
-	initialPoP, err := signer.NewProofOfPossession(initialSK)
-	require.NoError(t, err)
+	initialSK, initialPoP := newSignerWithPoP(t)
 
 	subnetID := testSubnet1.ID()
 
@@ -440,11 +427,7 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 	const weight = 1
 
 	// Create the Warp message
-	sk, err := localsigner.New()
-	require.NoError(t, err)
-
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(t, err)
+	sk, pop := newSignerWithPoP(t)
 
 	var (
 		remainingBalanceOwner = message.PChainOwner{}
@@ -787,11 +770,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 
 	env := newEnvironment(t, upgradetest.Latest)
 
-	initialSK, err := localsigner.New()
-	require.NoError(err)
-
-	initialPoP, err := signer.NewProofOfPossession(initialSK)
-	require.NoError(err)
+	_, initialPoP := newSignerWithPoP(t)
 
 	subnetID := testSubnet1.ID()
 
@@ -815,11 +794,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	const weight = 1
 
 	// Create the Warp message
-	sk, err := localsigner.New()
-	require.NoError(err)
-
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(err)
+	sk, pop := newSignerWithPoP(t)
 
 	var (
 		remainingBalanceOwner = message.PChainOwner{}
@@ -916,11 +891,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 
-	sk, err := localsigner.New()
-	require.NoError(t, err)
-
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(t, err)
+	sk, pop := newSignerWithPoP(t)
 
 	const (
 		initialWeight = 1
@@ -1199,11 +1170,7 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 
-	sk, err := localsigner.New()
-	require.NoError(t, err)
-
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(t, err)
+	sk, pop := newSignerWithPoP(t)
 
 	const (
 		initialWeight = 1
@@ -1430,11 +1397,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 	// Allow a single active L1 validator.
 	env.config.ValidatorFeeConfig.Capacity = 1
 
-	sk, err := localsigner.New()
-	require.NoError(t, err)
-
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(t, err)
+	_, pop := newSignerWithPoP(t)
 
 	var (
 		subnetID     = testSubnet1.ID()
@@ -1591,11 +1554,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 
 	env := newEnvironment(t, upgradetest.Latest)
 
-	sk, err := localsigner.New()
-	require.NoError(err)
-
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(err)
+	_, pop := newSignerWithPoP(t)
 
 	var (
 		subnetID     = testSubnet1.ID()
@@ -1659,11 +1618,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 func TestStandardExecutorDisableL1ValidatorTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 
-	sk, err := localsigner.New()
-	require.NoError(t, err)
-
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(t, err)
+	_, pop := newSignerWithPoP(t)
 
 	var (
 		subnetID     = testSubnet1.ID()
@@ -1778,11 +1733,7 @@ func TestStandardExecutorDisableL1ValidatorTxErrors(t *testing.T) {
 func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 
-	sk, err := localsigner.New()
-	require.NoError(t, err)
-
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(t, err)
+	_, pop := newSignerWithPoP(t)
 
 	const initialBalance = units.Avax
 	var (
