@@ -179,16 +179,19 @@ type Tracker struct {
 
 	// recent is a ring of the post-execution roots of the most recently
 	// executed blocks, each holding a reference that keeps its trie in memory
-	// for the snapshot generator. Of length returned by [Config.stateHistory].
-	recent     []common.Hash
-	recentNext int
+	// for the snapshot generator and for settled state availability. Of length
+	// returned by [Config.stateHistory].
+	recent          []common.Hash
+	recentNext      int
+	toCommitOnClose common.Hash
 
 	config Config
 	log    logging.Logger
 }
 
-// NewTracker provides a new [Tracker] on the underlying database.
-func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir string, log logging.Logger) (*Tracker, error) {
+// NewTracker provides a new [Tracker] on the underlying database, starting
+// from an available settled state root.
+func NewTracker(db ethdb.Database, c Config, last common.Hash, dataDir string, log logging.Logger) (*Tracker, error) {
 	if err := c.Verify(); err != nil {
 		return nil, err
 	}
@@ -202,17 +205,18 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir s
 		var err error
 		// This may log a warning if the VM did not shutdown gracefully, and
 		// start background generation.
-		snaps, err = snapshot.New(*snapConf, db, cache.TrieDB(), lastExecuted)
+		snaps, err = snapshot.New(*snapConf, db, cache.TrieDB(), last)
 		if err != nil {
 			return nil, err
 		}
 	}
 	return &Tracker{
-		snaps:  snaps,
-		cache:  cache,
-		config: c,
-		log:    log,
-		recent: make([]common.Hash, c.stateHistory()),
+		snaps:           snaps,
+		cache:           cache,
+		config:          c,
+		log:             log,
+		recent:          make([]common.Hash, c.stateHistory()),
+		toCommitOnClose: last,
 	}, nil
 }
 
@@ -227,25 +231,6 @@ func (t *Tracker) Snapshot() *snapshot.Tree {
 	return t.snaps
 }
 
-// CommitInterval returns the number of blocks between guaranteed commits of the
-// settled state, as configured in [Config.CommitInterval].
-func (t *Tracker) CommitInterval() uint64 {
-	return t.config.CommitInterval
-}
-
-// Track tracks the root and may commit the trie associated with the root
-// to the database if [Config.ShouldCommitTrieDB] returns true, or the [Config]
-// specifies that the node is archival.
-//
-// This state will be available in memory until [Tracker.Untrack] has been
-// called for the root as many times as [Tracker.Track] has been called.
-func (t *Tracker) Track(root common.Hash) {
-	// Never returns an error because it is a [triedb.HashDB].
-	if err := t.cache.TrieDB().Reference(root, common.Hash{}); err != nil {
-		t.log.Error("*triedb.Database.Reference()", zap.Error(err))
-	}
-}
-
 // BlockExecuted informs the Tracker that the block at height executed to
 // executionRoot, settling the state at settledRoot. It MAY call
 // [triedb.Database.Commit], based on the following priorities:
@@ -256,10 +241,10 @@ func (t *Tracker) Track(root common.Hash) {
 // 4. If there is sufficient memory pressure in HashDB, flushes the oldest trie nodes to disk.
 // 5. Otherwise, nothing is committed.
 //
-// While the snapshot is enabled, the Tracker also holds its own reference to
-// the executed state, as if by [Tracker.Track], and releases it once
-// [core.TriesInMemory] later blocks have executed.
+// The Tracker also holds its own reference to the executed state and releases
+// it once the configured number of blocks have been executed.
 func (t *Tracker) BlockExecuted(settledRoot, executionRoot common.Hash, height uint64) error {
+	t.toCommitOnClose = settledRoot
 	t.retain(executionRoot)
 
 	var (
@@ -294,14 +279,12 @@ func (t *Tracker) BlockExecuted(settledRoot, executionRoot common.Hash, height u
 	return nil
 }
 
-// retain holds a reference to `root` until [core.TriesInMemory] later roots
-// have been retained. This is necessary because snapshot generation resumes at
-// the root of its disk layer, which is never more than [core.TriesInMemory]
-// blocks behind.
+// retain holds a reference to `root` until [Config.stateHistory] later roots
+// have been retained.
 func (t *Tracker) retain(root common.Hash) {
-	t.Track(root)
+	t.track(root)
 	if toEvict := t.recent[t.recentNext]; toEvict != (common.Hash{}) {
-		t.Untrack(toEvict)
+		t.untrack(toEvict)
 	}
 	t.recent[t.recentNext] = root
 	t.recentNext++
@@ -331,13 +314,14 @@ func (t *Tracker) maybeCap(height uint64) error {
 	return tdb.Cap(targetCap - ethdb.IdealBatchSize) // avoid small DB writes
 }
 
-// Untrack informs the [Tracker] that the state corresponding
-// with `root` can have its reference count reduced. If the reference
-// count is 0, the state will be removed from memory.
-//
-// This should be called on each block after its state is no longer
-// needed. If the state is already on disk, no operation is performed.
-func (t *Tracker) Untrack(root common.Hash) {
+func (t *Tracker) track(root common.Hash) {
+	// Never returns an error because it is a [triedb.HashDB].
+	if err := t.cache.TrieDB().Reference(root, common.Hash{}); err != nil {
+		t.log.Error("*triedb.Database.Reference()", zap.Error(err))
+	}
+}
+
+func (t *Tracker) untrack(root common.Hash) {
 	// Never returns an error because it is a [triedb.HashDB].
 	if err := t.cache.TrieDB().Dereference(root); err != nil {
 		t.log.Error("*triedb.Database.Dereference()", zap.Error(err))
@@ -354,18 +338,20 @@ func (t *Tracker) StateDB(root common.Hash) (*state.StateDB, error) {
 	return state.New(root, t.cache, t.snaps)
 }
 
-// Close commits the state at root to disk, flattens any snapshot onto it, and
-// releases all resources associated with the [triedb.Database]. root SHOULD be
-// the state that a subsequent [NewTracker] opens at, otherwise the snapshot is
-// regenerated instead of loaded.
+// Close commits the last settled state to disk, flattens any snapshot onto it,
+// and releases all resources associated with the [triedb.Database]. If no
+// blocks have been settled, no states are persisted.
 //
-// TODO(StephenButtolph): Close fails if the snapshot layer at root was already
-// flattened away, which happens when settlement lags execution by more than the
-// number of retained diff layers. In this case, shutdown will report the error
-// and the next start will regenerate the snapshot.
-func (t *Tracker) Close(root common.Hash) error {
+// TODO(StephenButtolph): Close fails if the snapshot layer at the settled root
+// was already flattened away, which happens when settlement lags execution by
+// more than the number of retained diff layers. This could also happen during
+// recovery, if the node was unable to finish re-executing accepted blocks. In
+// this case, shutdown will report the error and the next start will regenerate
+// the snapshot.
+func (t *Tracker) Close() error {
 	var errs []error
 
+	root := t.toCommitOnClose
 	tdb := t.cache.TrieDB()
 	if err := tdb.Commit(root, false /* log */); err != nil {
 		errs = append(errs, fmt.Errorf("%T.Commit(%#x): %v", tdb, root, err))

@@ -25,7 +25,6 @@ go_library(
         "@com_github_ava_labs_libevm//libevm/precompiles/parallel",
         "@com_github_ava_labs_libevm//params",
         "@com_github_prometheus_client_golang//prometheus",
-        "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
 )
