@@ -40,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -63,6 +62,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
@@ -1911,7 +1911,7 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 				blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
 				he := customtypes.GetHeaderExtra(blk.Header())
 				require.NotNilf(t, he.MinDelayExcess, "block %d %T.MinDelayExcess", blk.Height(), he)
-				got := dynamic.DelayExponent(*he.MinDelayExcess)
+				got := *he.MinDelayExcess
 				assert.Equalf(t, wantExponent, got, "block %d %T.MinDelayExcess", blk.Height(), he)
 				clock.Advance(got.DelayDuration())
 			}

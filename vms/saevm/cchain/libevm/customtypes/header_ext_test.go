@@ -19,14 +19,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
 func TestHeaderRLP(t *testing.T) {
 	t.Parallel()
 
-	got := testHeaderEncodeDecode(t, rlp.EncodeToBytes, rlp.DecodeBytes)
+	got := testHeaderEncodeDecode(t, rlp.EncodeToBytes, rlp.DecodeBytes, false)
 
 	// Golden data from original coreth implementation, before integration of
 	// libevm. WARNING: changing these values can break backwards compatibility
@@ -45,13 +44,14 @@ func TestHeaderJSON(t *testing.T) {
 
 	// Note we ignore the returned encoded bytes because we don't
 	// need to compare them to a JSON gold standard.
-	_ = testHeaderEncodeDecode(t, json.Marshal, json.Unmarshal)
+	_ = testHeaderEncodeDecode(t, json.Marshal, json.Unmarshal, true)
 }
 
 func testHeaderEncodeDecode(
 	t *testing.T,
 	encode func(any) ([]byte, error),
 	decode func([]byte, any) error,
+	withdrawalsHashEncoded bool, // RLP never carries it; JSON does
 ) (encoded []byte) {
 	t.Helper()
 
@@ -65,7 +65,9 @@ func testHeaderEncodeDecode(
 	gotExtra := GetHeaderExtra(gotHeader)
 
 	wantHeader, wantExtra := headerWithNonZeroFields()
-	wantHeader.WithdrawalsHash = nil
+	if !withdrawalsHashEncoded {
+		wantHeader.WithdrawalsHash = nil
+	}
 	require.Equal(t, wantHeader, gotHeader)
 	require.Equal(t, wantExtra, gotExtra)
 
@@ -115,7 +117,7 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		ExtDataGasUsed:      big.NewInt(22),
 		BlockGasCost:        big.NewInt(23),
 		TimeMilliseconds:    utils.PointerTo[uint64](24),
-		MinDelayExcess:      utils.PointerTo(acp226.DelayExcess(25)),
+		MinDelayExcess:      utils.PointerTo(dynamic.DelayExponent(25)),
 		TargetExponent:      utils.PointerTo(dynamic.TargetExponent(26)),
 		MinPriceExponent:    utils.PointerTo(dynamic.PriceExponent(27)),
 		SettledHeight:       utils.PointerTo[uint64](28),
@@ -147,7 +149,7 @@ func allFieldsSet[T interface {
 				if fieldValue.Kind() == reflect.Pointer {
 					require.Falsef(t, fieldValue.IsNil(), "field %q is nil", field.Name)
 				}
-				fieldValue = reflect.NewAt(fieldValue.Type(), unsafe.Pointer(fieldValue.UnsafeAddr())).Elem()
+				fieldValue = reflect.NewAt(fieldValue.Type(), unsafe.Pointer(fieldValue.UnsafeAddr())).Elem() //#nosec G103 -- reads unexported fields in a test
 			}
 
 			switch f := fieldValue.Interface().(type) {
@@ -173,7 +175,7 @@ func allFieldsSet[T interface {
 				assertNonZero(t, f)
 			case *types.Header:
 				assertNonZero(t, f)
-			case *acp226.DelayExcess:
+			case *dynamic.DelayExponent:
 				assertNonZero(t, f)
 			case *dynamic.TargetExponent:
 				assertNonZero(t, f)
@@ -191,7 +193,7 @@ func allFieldsSet[T interface {
 func assertNonZero[T interface {
 	common.Hash | common.Address | types.BlockNonce | uint32 | uint64 | types.Bloom |
 		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header |
-		*acp226.DelayExcess | *dynamic.TargetExponent | *dynamic.PriceExponent
+		*dynamic.DelayExponent | *dynamic.TargetExponent | *dynamic.PriceExponent
 }](t *testing.T, v T) {
 	t.Helper()
 	require.NotZero(t, v)
