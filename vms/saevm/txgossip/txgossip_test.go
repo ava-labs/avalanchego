@@ -437,7 +437,15 @@ func TestP2PIntegration(t *testing.T) {
 			var gossiper gossip.Gossiper
 			switch tt.dir {
 			case pull:
-				gossiper = gossip.NewPullGossiper(logger, Marshaller{}, recv.Set, client, metrics, 1)
+				gossiper = gossip.NewPullGossiper(
+					logger,
+					Marshaller{},
+					recv.Set,
+					&stubPeers{[]ids.NodeID{sendID}},
+					client,
+					metrics,
+					1,
+				)
 
 			case push:
 				branch := gossip.BranchingFactor{Peers: 1}

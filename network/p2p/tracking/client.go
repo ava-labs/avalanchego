@@ -37,11 +37,9 @@ type PeerScorer interface {
 }
 
 func NewClient(n *p2p.Network, handlerID uint64, scorer PeerScorer) *Client {
-	// No NodeSampler, since Client selects with scorer and never routes through
-	// [p2p.Client.AppRequestAny].
 	return &Client{
 		handlerID: handlerID,
-		client:    n.NewClient(handlerID, nil),
+		client:    n.NewClient(handlerID),
 		scorer:    scorer,
 	}
 }
@@ -60,7 +58,7 @@ func (c *Client) HandlerID() uint64 {
 }
 
 // AppRequestAny issues an AppRequest to the peer the [PeerScorer] selects.
-// See [p2p.Client.AppRequestAny] for more docs.
+// See [Client.AppRequest] for more docs.
 func (c *Client) AppRequestAny(
 	ctx context.Context,
 	appRequestBytes []byte,

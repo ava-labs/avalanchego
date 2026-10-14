@@ -67,13 +67,7 @@ func NewClientWithPeers(
 	peers map[ids.NodeID]p2p.Handler,
 ) *p2p.Client {
 	network := newClientNetwork(t, ctx, clientNodeID, clientHandler, peers)
-
-	peerSampler := p2p.PeerSampler{Peers: &p2p.Peers{}}
-	for nodeID := range peers {
-		peerSampler.Peers.Connected(nodeID, nil)
-	}
-
-	return network.NewClient(0, peerSampler)
+	return network.NewClient(0)
 }
 
 // newClientNetwork returns a network for clientNodeID with every peer reachable.
