@@ -32,8 +32,6 @@ import (
 
 const (
 	AvalancheGoPathEnvName = "AVALANCHEGO_PATH"
-
-	defaultNodeInitTimeout = 10 * time.Second
 )
 
 var (
@@ -41,6 +39,7 @@ var (
 
 	errNodeAlreadyRunning = errors.New("failed to start node: node is already running")
 	errNotRunning         = errors.New("node is not running")
+	errProcessExited      = errors.New("node process exited before writing its process context")
 )
 
 type ProcessRuntimeConfig struct {
@@ -129,6 +128,17 @@ func (p *ProcessRuntime) Start(ctx context.Context) error {
 		return stacktrace.Wrap(err)
 	}
 
+	// Reap the process in the background so that an exit before the process
+	// context is written can be detected without waiting for ctx to expire.
+	var (
+		processExited = make(chan struct{})
+		waitErr       error
+	)
+	go func() {
+		waitErr = cmd.Wait()
+		close(processExited)
+	}()
+
 	// Watch the node's main.log file in the background for FATAL log entries that indicate
 	// a configuration error preventing startup. Such a log entry will be provided to the
 	// cancelWithCause function so that waitForProcessContext can exit early with an error
@@ -138,11 +148,17 @@ func (p *ProcessRuntime) Start(ctx context.Context) error {
 	logPath := p.node.DataDir + "/logs/main.log"
 	go watchLogFileForFatal(ctx, cancelWithCause, log, logPath)
 
-	// A node writes a process context file on start. If the file is not
-	// found in a reasonable amount of time, the node is unlikely to have
-	// started successfully.
-	if err := p.waitForProcessContext(ctx); err != nil {
-		return stacktrace.Errorf("failed to start local node: %w", err)
+	// A node writes a process context file on start. Wait for the file until
+	// the process exits or ctx is done.
+	if err := p.waitForProcessContext(ctx, processExited); err != nil {
+		// Stop finds the process by reading the process context file, which
+		// may not have been written yet. Kill the process directly to ensure
+		// that a failed start does not leave it running.
+		if killErr := cmd.Process.Kill(); killErr != nil && !errors.Is(killErr, os.ErrProcessDone) {
+			err = errors.Join(err, stacktrace.Errorf("failed to kill node process: %w", killErr))
+		}
+		<-processExited
+		return stacktrace.Errorf("failed to start local node (process exit: %v): %w", waitErr, err)
 	}
 
 	log.Info("started local node",
@@ -280,12 +296,10 @@ func (p *ProcessRuntime) getProcessContextPath() string {
 	return filepath.Join(p.node.DataDir, config.DefaultProcessContextFilename)
 }
 
-func (p *ProcessRuntime) waitForProcessContext(ctx context.Context) error {
+func (p *ProcessRuntime) waitForProcessContext(ctx context.Context, processExited <-chan struct{}) error {
 	ticker := time.NewTicker(defaultNodeTickerInterval)
 	defer ticker.Stop()
 
-	ctx, cancel := context.WithTimeout(ctx, defaultNodeInitTimeout)
-	defer cancel()
 	for len(p.node.URI) == 0 {
 		err := p.readState(ctx)
 		if err != nil {
@@ -295,6 +309,8 @@ func (p *ProcessRuntime) waitForProcessContext(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return stacktrace.Errorf("failed to load process context for node %q: %w", p.node.NodeID, context.Cause(ctx))
+		case <-processExited:
+			return stacktrace.Errorf("failed to load process context for node %q: %w", p.node.NodeID, errProcessExited)
 		case <-ticker.C:
 		}
 	}
