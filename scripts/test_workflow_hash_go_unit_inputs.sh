@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-workdir="$(mktemp -d "${repo_root}/.embed-hash-test.XXXXXX")"
-trap 'rm -rf "${workdir}"' EXIT
+# Verify the cache key changes for Go source, testdata, and production/test
+# embedded files, but not for unrelated files.
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WORKDIR="$(mktemp -d "${REPO_ROOT}/.embed-hash-test.XXXXXX")"
+trap 'rm -rf "${WORKDIR}"' EXIT
 
 (
-  cd "${workdir}"
+  cd "${WORKDIR}"
   git init -q
   go mod init example.com/embed-hash-test >/dev/null
   printf 'package fixture\nimport _ "embed"\n//go:embed input.txt\nvar input string\n' > fixture.go
@@ -18,20 +20,20 @@ trap 'rm -rf "${workdir}"' EXIT
   git add go.mod fixture.go fixture_test.go input.txt test-input.txt testdata/input.txt
 )
 
-hash() { GOWORK=off "${repo_root}/scripts/workflow-hash-go-unit-inputs.sh" "${workdir}"; }
-initial="$(hash)"
-printf 'second' > "${workdir}/input.txt"
-[[ "$(hash)" != "${initial}" ]] || { echo 'production embed did not change hash' >&2; exit 1; }
-initial="$(hash)"
-printf 'test second' > "${workdir}/test-input.txt"
-[[ "$(hash)" != "${initial}" ]] || { echo 'test embed did not change hash' >&2; exit 1; }
-initial="$(hash)"
-printf 'fixture second' > "${workdir}/testdata/input.txt"
-[[ "$(hash)" != "${initial}" ]] || { echo 'testdata did not change hash' >&2; exit 1; }
-initial="$(hash)"
-printf '\nvar changed = true\n' >> "${workdir}/fixture.go"
-[[ "$(hash)" != "${initial}" ]] || { echo 'Go source did not change hash' >&2; exit 1; }
-initial="$(hash)"
-printf 'unrelated' > "${workdir}/unrelated.txt"
-[[ "$(hash)" == "${initial}" ]] || { echo 'unrelated file changed hash' >&2; exit 1; }
+hash() { GOWORK=off "${REPO_ROOT}/scripts/workflow-hash-go-unit-inputs.sh" "${WORKDIR}"; }
+INITIAL="$(hash)"
+printf 'second' > "${WORKDIR}/input.txt"
+[[ "$(hash)" != "${INITIAL}" ]] || { echo 'production embed did not change hash' >&2; exit 1; }
+INITIAL="$(hash)"
+printf 'test second' > "${WORKDIR}/test-input.txt"
+[[ "$(hash)" != "${INITIAL}" ]] || { echo 'test embed did not change hash' >&2; exit 1; }
+INITIAL="$(hash)"
+printf 'fixture second' > "${WORKDIR}/testdata/input.txt"
+[[ "$(hash)" != "${INITIAL}" ]] || { echo 'testdata did not change hash' >&2; exit 1; }
+INITIAL="$(hash)"
+printf '\nvar changed = true\n' >> "${WORKDIR}/fixture.go"
+[[ "$(hash)" != "${INITIAL}" ]] || { echo 'Go source did not change hash' >&2; exit 1; }
+INITIAL="$(hash)"
+printf 'unrelated' > "${WORKDIR}/unrelated.txt"
+[[ "$(hash)" == "${INITIAL}" ]] || { echo 'unrelated file changed hash' >&2; exit 1; }
 echo 'Go unit input hash tests passed'
