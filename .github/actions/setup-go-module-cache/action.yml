@@ -13,6 +13,7 @@ inputs:
   disable-go-proxy:
     # Keep the proxy enabled only when later setup can require modules that are
     # not represented by this repository's cache key, such as custom polyrepo refs.
+    # See docs/go-toolchains-and-caches.md#download-restrictions.
     description: 'Disable Go module downloads after preparation; this does not block all network access'
     required: false
     default: 'true'
