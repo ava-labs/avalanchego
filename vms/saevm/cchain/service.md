@@ -38,8 +38,8 @@ ws://127.0.0.1:9650/ext/bc/C/ws
 ### Standard Ethereum APIs
 
 Avalanche offers an API interface identical to Geth's API except that it only supports the methods
-listed in [Available APIs](https://build.avax.network/docs/nodes/chain-configs/primary-network/c-chain#available-apis),
-which also lists the methods a node serves by default. The `debug_` methods are turned off on the public API node.
+listed in [Available APIs](https://build.avax.network/docs/nodes/chain-configs/primary-network/c-chain#available-apis).
+The `debug_` methods are turned off on the public API node.
 
 You can interact with these services the same exact way you'd interact with Geth (see exceptions below). See the
 [Ethereum Wiki's JSON-RPC Documentation](https://ethereum.org/en/developers/docs/apis/json-rpc/)
@@ -50,7 +50,7 @@ for a full description of this API.
 
 #### Exceptions
 
-The C-Chain executes blocks after consensus accepts them, as described in [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution). A block is final as soon as it is accepted, but its receipts and post-execution state exist only once it has executed. This changes the following:
+The C-Chain executes blocks after consensus accepts them, as described in [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution). This changes the following:
 
 - `latest` is the last executed block.
 - `pending` is the last executed block. If `api-resolve-pending-to-last-executed` is `false`, it is the last accepted block instead, and methods that read state reject `pending`.
