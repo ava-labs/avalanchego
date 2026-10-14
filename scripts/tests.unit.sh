@@ -39,9 +39,6 @@ trap 'rm -f "${package_list_file}"' EXIT
 packages=()
 while IFS= read -r package; do
   case "${package}" in
-    "${coreth_prefix}/tests"|"${coreth_prefix}/tests/"*)
-      continue
-      ;;
     "${evm_prefix}"|"${evm_prefix}/"*)
       ;;
     "${subnet_evm_prefix}/tests"|"${subnet_evm_prefix}/tests/"*)
