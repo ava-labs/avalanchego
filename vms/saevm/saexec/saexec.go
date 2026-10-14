@@ -8,16 +8,20 @@
 package saexec
 
 import (
+	"errors"
 	"fmt"
 	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/libevm/eventual"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
@@ -33,10 +37,10 @@ var _ saedb.StateDBOpener = (*Executor)(nil)
 
 // An Executor accepts and executes a [blocks.Block] FIFO queue.
 type Executor struct {
-	*saedb.Tracker
-	done  chan struct{}
-	log   logging.Logger
-	hooks hook.Points
+	tracker *saedb.Tracker
+	done    chan struct{}
+	log     logging.Logger
+	hooks   hook.Points
 
 	queue        chan queuedBlock
 	queueErr     atomic.Pointer[Unhealthy]
@@ -55,9 +59,10 @@ type Executor struct {
 	metrics      *metrics
 }
 
-// New constructs and starts a new [Executor]. Call [Executor.Close] to stop it.
+// New constructs and starts a new [Executor], including its state tracker.
+// Call [Executor.Close] to stop execution and release the tracker.
 //
-// The post-execution state of the last-executed block MUST be available.
+// The post-execution state of the last-executed block MUST be available and settled.
 //
 // The Executor settles synchronous blocks after executing them and updates
 // lastSettled accordingly. lastSettled is not modified for asynchronous blocks.
@@ -68,7 +73,8 @@ func New(
 	chainConfig *params.ChainConfig,
 	db ethdb.Database,
 	xdb saetypes.ExecutionResults,
-	tracker *saedb.Tracker,
+	dbConfig saedb.Config,
+	dataDir string,
 	hooks hook.Points,
 	logger logging.Logger,
 	reg prometheus.Registerer,
@@ -77,9 +83,13 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("initializing saexec metrics: %w", err)
 	}
+	tracker, err := saedb.NewTracker(db, dbConfig, lastExecuted.PostExecutionStateRoot(), dataDir, logger)
+	if err != nil {
+		return nil, fmt.Errorf("initializing saexec state tracker: %w", err)
+	}
 
 	e := &Executor{
-		Tracker: tracker,
+		tracker: tracker,
 		done:    make(chan struct{}), // closed by [Executor.processQueue] once `queue` is closed and drained
 		log:     logger,
 		hooks:   hooks,
@@ -87,7 +97,7 @@ func New(
 		// committed, so the queue needs sufficient capacity to avoid
 		// [Executor.Enqueue] warning about it being too full.
 		// queue is closed by [Executor.Close].
-		queue: make(chan queuedBlock, 2*tracker.CommitInterval()),
+		queue: make(chan queuedBlock, 2*dbConfig.CommitInterval),
 		chainContext: &chainContext{
 			headerSrc,
 			lru.NewCache[uint64, *types.Header](256), // minimum history for BLOCKHASH op
@@ -140,11 +150,31 @@ func (e *Executor) HealthCheck() error {
 }
 
 // Close shuts down the [Executor] and waits for all queued blocks to finish
-// executing. It returns [Executor.HealthCheck].
+// executing, then persists a recent settled state and closes the state tracker.
+// It returns any execution or tracker shutdown errors.
 func (e *Executor) Close() error {
 	close(e.queue)
 	<-e.done
-	return e.HealthCheck()
+
+	return errors.Join(
+		e.HealthCheck(),
+		e.tracker.Close(),
+	)
+}
+
+// StateDB opens the state at root.
+func (e *Executor) StateDB(root common.Hash) (*state.StateDB, error) {
+	return e.tracker.StateDB(root)
+}
+
+// TrieDB returns the executor's trie database, which is closed by [Executor.Close].
+func (e *Executor) TrieDB() *triedb.Database {
+	return e.tracker.TrieDB()
+}
+
+// Snapshot returns the executor's snapshot, or nil if snapshots are disabled.
+func (e *Executor) Snapshot() *snapshot.Tree {
+	return e.tracker.Snapshot()
 }
 
 // ChainConfig returns the config originally passed to [New].
