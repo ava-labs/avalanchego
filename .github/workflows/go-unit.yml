@@ -22,7 +22,6 @@ on:
         default: true
 
 permissions:
-  actions: write
   contents: read
 
 jobs:
