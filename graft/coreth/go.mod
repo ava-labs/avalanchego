@@ -38,8 +38,6 @@ require (
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
-	github.com/fjl/gencodec v0.1.1 // indirect
-	github.com/garslo/gogen v0.0.0-20170306192744-1d203ffc1f61 // indirect
 	github.com/gballet/go-verkle v0.1.1-0.20231031103413-a67434b50f46 // indirect
 	github.com/getsentry/sentry-go v0.35.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
@@ -105,15 +103,9 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-// The following tools are managed here instead of in tools/external/go.mod
-// because they are already direct dependencies of the main module, or
-// because they need to parse types from this module (gencodec) and
-// workspace mode forbids -modfile.
-tool (
-	github.com/ava-labs/libevm/rlp/rlpgen
-	github.com/fjl/gencodec
-	go.uber.org/mock/mockgen
-)
+// mockgen is managed here instead of in tools/external/go.mod because it is
+// already a direct dependency of this module.
+tool go.uber.org/mock/mockgen
 
 replace (
 	github.com/ava-labs/avalanchego => ../../

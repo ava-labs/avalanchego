@@ -257,11 +257,8 @@ func TestFromBlock(t *testing.T) {
 					Time: test.time,
 				},
 				nil, // txs
-				nil, // uncles
 				nil, // receipts
-				nil, // hasher, unused without txs
 				test.extData,
-				true, // update [customtypes.HeaderExtra.ExtDataHash]
 			)
 			got, err := FromBlock(config, block)
 			require.ErrorIs(t, err, test.wantErr, "FromBlock()")
