@@ -3,11 +3,13 @@ title: C-Chain API
 description: "This page is an overview of the C-Chain API associated with AvalancheGo."
 ---
 
-> **Note:** Ethereum's chain ID has no relationship to Avalanche's view of networkID and chainID and is purely internal to the [C-Chain](https://build.avax.network/docs/quick-start/primary-network#c-chain). On Mainnet, the C-Chain uses `43114`. On the Fuji Testnet, it uses `43113`. Both `eth_chainId` and `net_version` return this value.
+> **Note:** Ethereum's chain ID has no relationship to Avalanche's view of networkID and chainID and is purely internal to the [C-Chain](https://build.avax.network/docs/quick-start/primary-network#c-chain-contract-chain). On Mainnet, the C-Chain uses `43114`. On the Fuji Testnet, it uses `43113`. Both `eth_chainId` and `net_version` return this value.
 
 ## Ethereum APIs
 
 ### Endpoints
+
+The examples on this page call the public API node at `api.avax.network`. To call your own node, replace `https://api.avax.network` with `http://127.0.0.1:9650`, and `wss://api.avax.network` with `ws://127.0.0.1:9650`.
 
 #### JSON-RPC Endpoints
 
@@ -19,34 +21,43 @@ To interact with C-Chain via the JSON-RPC endpoint:
 
 #### WebSocket Endpoints
 
-> **Info:** The [public API node](https://build.avax.network/integrations#RPC%20Providers) (api.avax.network) supports HTTP APIs for X-Chain, P-Chain, and C-Chain, but websocket connections are only available for C-Chain. Other EVM chains are not available via websocket on the public API node.
-
-To interact with C-Chain via the websocket endpoint:
+To interact with C-Chain via the WebSocket endpoint:
 
 ```sh
 /ext/bc/C/ws
 ```
 
-For example, to interact with the C-Chain's Ethereum APIs via websocket on localhost, you can use:
+For example, to interact with the C-Chain's Ethereum APIs via WebSocket on the public API node, you can use:
 
 ```sh
-ws://127.0.0.1:9650/ext/bc/C/ws
+wss://api.avax.network/ext/bc/C/ws
 ```
 
-> **Tip:** On localhost, use `ws://`. When using the [Public API](https://build.avax.network/integrations#RPC%20Providers) or another host that supports encryption, use `wss://`.
+> **Tip:** Use `ws://` for a node that serves HTTP. Use `wss://` for a node that serves HTTPS.
 
 ### Standard Ethereum APIs
 
-Avalanche offers an API interface identical to Geth's API except that it only supports the methods
-listed in [Available APIs](https://build.avax.network/docs/nodes/chain-configs/primary-network/c-chain#available-apis).
-The `debug_` methods are turned off on the public API node.
+The C-Chain serves the [Ethereum JSON-RPC API](https://ethereum.org/en/developers/docs/apis/json-rpc/)
+and [Geth's JSON-RPC API](https://geth.ethereum.org/docs/interacting-with-geth/rpc) over HTTP and WebSocket.
+It doesn't serve IPC or GraphQL.
 
-You can interact with these services the same exact way you'd interact with Geth (see exceptions below). See the
-[Ethereum Wiki's JSON-RPC Documentation](https://ethereum.org/en/developers/docs/apis/json-rpc/)
-and [Geth's JSON-RPC Documentation](https://geth.ethereum.org/docs/rpc/server)
-for a full description of this API.
+The [`apis`](https://build.avax.network/docs/nodes/chain-configs/primary-network/c-chain#apis) option
+selects the APIs that a node serves. [Available APIs](https://build.avax.network/docs/nodes/chain-configs/primary-network/c-chain#available-apis)
+lists the methods of each API and the APIs that are enabled by default.
 
-> **Info:** For batched requests on the [public API node](https://build.avax.network/integrations#RPC%20Providers) , the maximum number of items is 40.
+The C-Chain doesn't serve these methods:
+
+- The `admin`, `clique`, `engine`, `les`, `miner`, and `personal` namespaces.
+- `eth_accounts`, `eth_coinbase`, `eth_etherbase`, `eth_hashrate`, `eth_mining`, and `eth_protocolVersion`.
+- The `syncing` subscription.
+- `debug_accountRange`, `debug_backtraceAt`, `debug_dumpBlock`, `debug_freezeClient`, `debug_getAccessibleState`,
+  `debug_getBadBlocks`, `debug_getBlockRlp`, `debug_getHeaderRlp`, `debug_getModifiedAccountsByHash`,
+  `debug_getModifiedAccountsByNumber`, `debug_getTrieFlushInterval`, `debug_preimage`, `debug_seedHash`,
+  `debug_setTrieFlushInterval`, and `debug_storageRangeAt`.
+- Methods that Geth added after v1.13.14, such as `eth_blobBaseFee`, `eth_config`, and `eth_simulateV1`.
+
+The node has no accounts, so `eth_resend`, `eth_sendTransaction`, `eth_sign`, and `eth_signTransaction` always fail,
+and `eth_pendingTransactions` always returns an empty list.
 
 #### Exceptions
 
@@ -61,14 +72,10 @@ The C-Chain executes blocks after consensus accepts them, as described in [ACP-1
 ### Avalanche - Ethereum APIs
 
 In addition to the standard Ethereum APIs, Avalanche offers `eth_baseFee`,
-`eth_getChainConfig`, `eth_callDetailed`, `eth_suggestPriceOptions`,
+`eth_getChainConfig`, `eth_suggestPriceOptions`,
 and the `newAcceptedTransactions` subscription.
 
-They use the same endpoint as standard Ethereum APIs:
-
-```sh
-/ext/bc/C/rpc
-```
+They use the same endpoints as the standard Ethereum APIs.
 
 #### `eth_baseFee`
 
@@ -77,7 +84,7 @@ Get an upper bound on the base fee for the next block.
 **Signature:**
 
 ```sh
-eth_baseFee() -> {}
+eth_baseFee() -> quantity
 ```
 
 `result` is the hex value of the upper bound on the base fee for the next block.
@@ -88,9 +95,8 @@ eth_baseFee() -> {}
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
-    "method" :"eth_baseFee",
-    "params" :[]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
+    "method" :"eth_baseFee"
+}' -H 'content-type:application/json;' https://api.avax.network/ext/bc/C/rpc
 ```
 
 **Example Response:**
@@ -113,7 +119,7 @@ Returns the chain configuration.
 eth_getChainConfig() -> {}
 ```
 
-`result` is the chain configuration object.
+`result` is the chain configuration object. The public API node doesn't serve this method, so this example calls a local node.
 
 **Example Call:**
 
@@ -121,9 +127,8 @@ eth_getChainConfig() -> {}
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
-    "method" :"eth_getChainConfig",
-    "params" :[]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
+    "method" :"eth_getChainConfig"
+}' -H 'content-type:application/json;' http://127.0.0.1:9650/ext/bc/C/rpc
 ```
 
 **Example Response:**
@@ -169,62 +174,6 @@ curl -X POST --data '{
 }
 ```
 
-#### `eth_callDetailed`
-
-Performs the same operation as `eth_call`, but returns additional execution details including gas
-used, any EVM error code, and return data.
-
-**Signature:**
-
-```sh
-eth_callDetailed({
-    from: address (optional),
-    to: address,
-    gas: quantity (optional),
-    gasPrice: quantity (optional),
-    maxFeePerGas: quantity (optional),
-    maxPriorityFeePerGas: quantity (optional),
-    value: quantity (optional),
-    data: data (optional)
-}, blockNumberOrHash, stateOverrides (optional)) -> {
-    gas: number,
-    errCode: number,
-    err: string,
-    returnData: data
-}
-```
-
-`errCode` is `3` if the call reverted, and `0` otherwise.
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"eth_callDetailed",
-    "params" :[{
-        "to": "0x...",
-        "data": "0x..."
-    }, "latest"]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "gas": 21000,
-    "errCode": 0,
-    "err": "",
-    "returnData": "0x"
-  }
-}
-```
-
 #### `eth_suggestPriceOptions`
 
 Returns suggested gas price options (slow, normal, fast) for the current network conditions. Each
@@ -255,9 +204,8 @@ eth_suggestPriceOptions() -> {
 curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
-    "method" :"eth_suggestPriceOptions",
-    "params" :[]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/rpc
+    "method" :"eth_suggestPriceOptions"
+}' -H 'content-type:application/json;' https://api.avax.network/ext/bc/C/rpc
 ```
 
 **Example Response:**
@@ -285,7 +233,7 @@ curl -X POST --data '{
 
 #### `newAcceptedTransactions` (Subscription)
 
-Creates a subscription that fires each time a transaction is accepted (finalized) on the chain, before it is executed.
+Creates a subscription that fires each time a transaction is accepted on the chain, before it is executed.
 This is an Avalanche-specific subscription not available in standard Ethereum. If `fullTx` is
 `true`, the full transaction object is sent; otherwise only the transaction hash is sent.
 
@@ -294,13 +242,23 @@ Available only via WebSocket.
 **Signature:**
 
 ```sh
-{"jsonrpc":"2.0", "id":1, "method":"eth_subscribe", "params":["newAcceptedTransactions", false]}
+{
+    "jsonrpc":"2.0",
+    "id"     :1,
+    "method" :"eth_subscribe",
+    "params" :["newAcceptedTransactions", false]
+}
 ```
 
 **Example Call:**
 
 ```sh
-wscat -c ws://127.0.0.1:9650/ext/bc/C/ws -x '{"jsonrpc":"2.0", "id":1, "method":"eth_subscribe", "params":["newAcceptedTransactions"]}'
+wscat -w -1 -c wss://api.avax.network/ext/bc/C/ws -x '{
+    "jsonrpc":"2.0",
+    "id"     :1,
+    "method" :"eth_subscribe",
+    "params" :["newAcceptedTransactions"]
+}'
 ```
 
 **Example Notification:**
@@ -328,7 +286,7 @@ wscat -c ws://127.0.0.1:9650/ext/bc/C/ws -x '{"jsonrpc":"2.0", "id":1, "method":
 
 #### `avax.getUTXOs`
 
-Gets all UTXOs for the specified addresses.
+Gets the UTXOs that `sourceChain` exported to the C-Chain for the specified addresses and that no executed block has imported yet. To get the next page, set `startIndex` to the returned `endIndex`. Stop when `utxos` is empty.
 
 **Signature:**
 
@@ -339,9 +297,9 @@ avax.getUTXOs({
     startIndex: {
         address: string,
         utxo: string
-    },
-    limit: number,
-    encoding: string
+    } (optional),
+    limit: number (optional),
+    encoding: string (optional)
 }) -> {
     utxos: [string],
     endIndex: {
@@ -360,13 +318,13 @@ curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
     "method" :"avax.getUTXOs",
-    "params" :[{
-        "addresses": ["C-avax1..."],
+    "params" :{
+        "addresses": ["C-avax1m03jar35fw6q9rk63wqkl5j925xqwxhct8g5w6"],
         "sourceChain": "X",
         "limit": 100,
         "encoding": "hex"
-    }]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/avax
+    }
+}' -H 'content-type:application/json;' https://api.avax.network/ext/bc/C/avax
 ```
 
 #### `avax.issueTx`
@@ -378,7 +336,7 @@ Issues a transaction to the network.
 ```sh
 avax.issueTx({
     tx: string,
-    encoding: string
+    encoding: string (optional)
 }) -> {
     txID: string
 }
@@ -391,23 +349,23 @@ curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
     "method" :"avax.issueTx",
-    "params" :[{
+    "params" :{
         "tx": "0x...",
         "encoding": "hex"
-    }]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/avax
+    }
+}' -H 'content-type:application/json;' https://api.avax.network/ext/bc/C/avax
 ```
 
 #### `avax.getAtomicTx`
 
-Returns the specified atomic transaction. It returns an error until the transaction is accepted.
+Returns the specified atomic transaction. It returns an error until the block that contains the transaction is executed.
 
 **Signature:**
 
 ```sh
 avax.getAtomicTx({
     txID: string,
-    encoding: string
+    encoding: string (optional)
 }) -> {
     tx: string,
     encoding: string,
@@ -422,9 +380,9 @@ curl -X POST --data '{
     "jsonrpc":"2.0",
     "id"     :1,
     "method" :"avax.getAtomicTx",
-    "params" :[{
-        "txID": "2QouvNW...",
+    "params" :{
+        "txID": "2rgCo8mupzwgMfpVM7BDAgmteSDU6qrmQnJNtb37tscnN4fSwC",
         "encoding": "hex"
-    }]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/avax
+    }
+}' -H 'content-type:application/json;' https://api.avax.network/ext/bc/C/avax
 ```
