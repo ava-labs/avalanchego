@@ -15,13 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -204,15 +202,7 @@ func TestDurangoMemoField(t *testing.T) {
 		},
 		{
 			tx: func() (*platform.Tx, error) {
-				sk, err := localsigner.New()
-				if err != nil {
-					return nil, err
-				}
-				pop, err := signer.NewProofOfPossession(sk)
-				if err != nil {
-					return nil, err
-				}
-
+				_, pop := newSignerWithPoP(t)
 				return wallet.IssueAddPermissionlessValidatorTx(
 					&platform.SubnetValidator{
 						Validator: platform.Validator{
@@ -423,11 +413,7 @@ func TestStandardExecutorAddPermissionlessValidatorTxFlowCheckFails(t *testing.T
 	wallet := newWallet(t, env, walletConfig{keys: genesistest.DefaultFundedKeys[:1]})
 	feeCalculator := state.PickFeeCalculator(env.config, env.state)
 
-	sk, err := localsigner.New()
-	require.NoError(err)
-
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(err)
+	_, pop := newSignerWithPoP(t)
 
 	endTime := env.state.GetTimestamp().Add(defaultMinStakingDuration)
 	tx, err := wallet.IssueAddPermissionlessValidatorTx(
