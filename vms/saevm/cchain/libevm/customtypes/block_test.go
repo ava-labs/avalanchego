@@ -45,7 +45,7 @@ import (
 	// This test file has to be in package types_test to avoid a circular
 	// dependency when importing `params`. We dot-import the package to mimic
 	// regular same-package behaviour.
-	. "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes"
 )
 
 // This test has been modified from https://github.com/ethereum/go-ethereum/blob/v1.9.21/core/types/block_test.go#L35 to fit
