@@ -4,16 +4,10 @@
 package warp
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/libevm/common"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 )
-
-var _ contract.Configurator = (*configurator)(nil)
 
 // ConfigKey is the key used in json config files to specify this precompile config.
 // must be unique across all precompiles.
@@ -24,13 +18,10 @@ var ContractAddress = common.HexToAddress("0x02000000000000000000000000000000000
 
 // Module is the precompile module. It is used to register the precompile contract.
 var Module = modules.Module{
-	ConfigKey:    ConfigKey,
-	Address:      ContractAddress,
-	Contract:     WarpPrecompile,
-	Configurator: &configurator{},
+	ConfigKey: ConfigKey,
+	Address:   ContractAddress,
+	Contract:  WarpPrecompile,
 }
-
-type configurator struct{}
 
 func init() {
 	// Register the precompile module.
@@ -38,18 +29,4 @@ func init() {
 	if err := modules.RegisterModule(Module); err != nil {
 		panic(err)
 	}
-}
-
-// MakeConfig returns a new precompile config instance.
-// This is required to Marshal/Unmarshal the precompile config.
-func (*configurator) MakeConfig() precompileconfig.Config {
-	return new(Config)
-}
-
-// Configure is a no-op for warp since it does not need to store any information in the state
-func (*configurator) Configure(_ precompileconfig.ChainConfig, cfg precompileconfig.Config, _ contract.StateDB, _ contract.ConfigurationBlockContext) error {
-	if _, ok := cfg.(*Config); !ok {
-		return fmt.Errorf("expected config type %T, got %T: %v", &Config{}, cfg, cfg)
-	}
-	return nil
 }
