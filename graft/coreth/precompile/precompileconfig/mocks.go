@@ -95,20 +95,6 @@ func (m *MockConfig) EXPECT() *MockConfigMockRecorder {
 	return m.recorder
 }
 
-// Equal mocks base method.
-func (m *MockConfig) Equal(arg0 Config) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Equal", arg0)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// Equal indicates an expected call of Equal.
-func (mr *MockConfigMockRecorder) Equal(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Equal", reflect.TypeOf((*MockConfig)(nil).Equal), arg0)
-}
-
 // IsDisabled mocks base method.
 func (m *MockConfig) IsDisabled() bool {
 	m.ctrl.T.Helper()
@@ -149,20 +135,6 @@ func (m *MockConfig) Timestamp() *uint64 {
 func (mr *MockConfigMockRecorder) Timestamp() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Timestamp", reflect.TypeOf((*MockConfig)(nil).Timestamp))
-}
-
-// Verify mocks base method.
-func (m *MockConfig) Verify(arg0 ChainConfig) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Verify", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Verify indicates an expected call of Verify.
-func (mr *MockConfigMockRecorder) Verify(arg0 any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verify", reflect.TypeOf((*MockConfig)(nil).Verify), arg0)
 }
 
 // MockChainConfig is a mock of ChainConfig interface.
