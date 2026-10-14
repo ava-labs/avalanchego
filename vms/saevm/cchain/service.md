@@ -55,7 +55,7 @@ The C-Chain executes blocks after consensus accepts them, as described in [ACP-1
 - `latest` is the last executed block.
 - `pending` is the last executed block. If `api-resolve-pending-to-last-executed` is `false`, it is the last accepted block instead, and methods that read state reject `pending`.
 - `safe` and `finalized` are the last settled block, the most recent block whose execution results are included in an accepted block.
-- Methods that read state at an accepted block that hasn't executed yet wait for it to execute. Receipts for such a block are `null`.
+- Methods that read state or receipts at an accepted block that hasn't executed yet wait for it to execute.
 - A block header's `baseFeePerGas` is an upper bound on the base fee charged when the block executes, and its `stateRoot` is the post-execution state root of the last settled block when it was built.
 
 ### Avalanche - Ethereum APIs
@@ -156,8 +156,10 @@ curl -X POST --data '{
         "eip158Block": 0,
         "etnaTimestamp": 1607144400,
         "fortunaTimestamp": 1607144400,
-        "graniteTimestamp": 253399622400,
+        "graniteTimestamp": 1607144400,
+        "heliconTimestamp": 1607144400,
         "homesteadBlock": 0,
+        "iglooTimestamp": 253399622400,
         "istanbulBlock": 0,
         "londonBlock": 0,
         "muirGlacierBlock": 0,
