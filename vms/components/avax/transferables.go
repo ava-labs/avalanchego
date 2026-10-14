@@ -21,7 +21,7 @@ var (
 	ErrNilTransferableFxOutput = errors.New("nil transferable feature extension output is not valid")
 	ErrOutputsNotSorted        = errors.New("outputs not sorted")
 
-	ErrNilTransferableInput   = errors.New("nil transferable input is not valid")
+	errNilTransferableInput   = errors.New("nil transferable input is not valid")
 	ErrNilTransferableFxInput = errors.New("nil transferable feature extension input is not valid")
 	ErrInputsNotSortedUnique  = errors.New("inputs not sorted and unique")
 
@@ -145,7 +145,7 @@ func (in *TransferableInput) Input() TransferableIn {
 func (in *TransferableInput) Verify() error {
 	switch {
 	case in == nil:
-		return ErrNilTransferableInput
+		return errNilTransferableInput
 	case in.In == nil:
 		return ErrNilTransferableFxInput
 	default:
