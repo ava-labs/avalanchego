@@ -1,29 +1,5 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
-//
-// This file is a derived work, based on the go-ethereum library whose original
-// notices appear below.
-//
-// It is distributed under a license compatible with the licensing terms of the
-// original code from which it is derived.
-//
-// Much love to the original authors for their work.
-// **********
-// Copyright 2016 The go-ethereum Authors
-// This file is part of the go-ethereum library.
-//
-// The go-ethereum library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Lesser General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
-//
-// The go-ethereum library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Lesser General Public License for more details.
-//
-// You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 package vm
 
@@ -40,27 +16,28 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 )
 
-// RegisterExtras registers hooks with libevm to achieve Avalanche behaviour of
-// the EVM. It MUST NOT be called more than once and therefore is only allowed
-// to be used in tests and `package main`, to avoid polluting other packages
-// that transitively depend on this one but don't need registration.
+// RegisterExtras registers the libevm hooks that give the EVM the C-Chain's
+// behaviour: the StateDB is wrapped for multicoin state keys and, since
+// Shanghai, Difficulty is moved into Random.
+//
+// It MUST NOT be called more than once and is therefore only allowed in tests
+// and `package main`, to avoid polluting other packages that transitively
+// depend on this one but don't need registration.
 func RegisterExtras() {
-	// Although the registration function refers to just Hooks (not Extras) this
-	// will be changed in the future to standardise across libevm, hence the
-	// name of the function we're in.
 	vm.RegisterHooks(hooks{})
 }
 
-// WithTempRegisteredExtras runs `fn` with temporary registration otherwise
-// equivalent to a call to [RegisterExtras], but limited to the life of `fn`.
+// WithTempRegisteredExtras runs fn with the C-Chain's EVM hooks temporarily
+// registered. The previous hooks are restored after fn returns.
 //
-// This function is not intended for direct use. Use
-// `evm.WithTempRegisteredLibEVMExtras()` instead as it calls this along with
-// all other temporary-registration functions.
+// Callers SHOULD NOT call it directly, and SHOULD instead use
+// `vms/saevm/cchain/libevm.WithTempRegisteredExtras()`, which registers all
+// C-Chain extras together.
 func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
 	return vm.WithTempRegisteredHooks(lock, hooks{}, fn)
 }
 
+// hooks implements [vm.Hooks] to achieve the C-Chain's EVM behaviour.
 type hooks struct{}
 
 // PreprocessingGasCharge is not necessary.
@@ -100,10 +77,10 @@ func wrapStateDB(rules params.Rules, statedb vm.StateDB) vm.StateDB {
 	if params.GetRulesExtra(rules).IsApricotPhase1 {
 		return wrappedStateDB
 	}
-	return &StateDBAP0{wrappedStateDB}
+	return &stateDBAP0{wrappedStateDB}
 }
 
-// StateDBAP0 implements the GetCommittedState behavior that existed prior to
+// stateDBAP0 implements the GetCommittedState behavior that existed prior to
 // the AP1 upgrade.
 //
 // Since launch, state keys have been normalized to allow for multicoin
@@ -114,10 +91,10 @@ func wrapStateDB(rules params.Rules, statedb vm.StateDB) vm.StateDB {
 // and generate the same merkle root, this behavior must be maintained.
 //
 // See the [extstate] package for details around state key normalization.
-type StateDBAP0 struct {
+type stateDBAP0 struct {
 	*extstate.StateDB
 }
 
-func (s *StateDBAP0) GetCommittedState(addr common.Address, key common.Hash, _ ...stateconf.StateDBStateOption) common.Hash {
+func (s *stateDBAP0) GetCommittedState(addr common.Address, key common.Hash, _ ...stateconf.StateDBStateOption) common.Hash {
 	return s.StateDB.GetCommittedState(addr, key, stateconf.SkipStateKeyTransformation())
 }
