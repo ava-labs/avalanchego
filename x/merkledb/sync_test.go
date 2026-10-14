@@ -281,7 +281,12 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			)
 			require.NoError(err)
 
-			proofClient := trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, dbToSync))
+			proofClient := trackingtest.NewSelfClient(
+				t,
+				ctx,
+				ids.EmptyNodeID,
+				newTestProofHandler(t, dbToSync),
+			)
 			if tt.proofClient != nil {
 				proofClient = tt.proofClient(dbToSync)
 			}
@@ -436,7 +441,12 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		}
 	}, 1)
 
-	syncer = newSUT(t, db, trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler), withTarget(firstSyncRoot))
+	syncer = newSUT(
+		t,
+		db,
+		trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
+		withTarget(firstSyncRoot),
+	)
 
 	require.NoError(syncer.Sync(ctx))
 
@@ -479,7 +489,12 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 			cancel(err)
 		}
 	}, 0)
-	syncer = newSUT(t, db, trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler), withTarget(root1))
+	syncer = newSUT(
+		t,
+		db,
+		trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
+		withTarget(root1),
+	)
 
 	require.NoError(syncer.Sync(ctx))
 }

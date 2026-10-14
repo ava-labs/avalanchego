@@ -52,15 +52,21 @@ func newRecorder(selected ids.NodeID) *recorder {
 	}
 }
 
-func (r *recorder) SelectPeer() (ids.NodeID, bool) { return r.selected, true }
+func (r *recorder) SelectPeer() (ids.NodeID, bool) {
+	return r.selected, true
+}
 
-func (r *recorder) RegisterRequest(nodeID ids.NodeID) { r.requested[nodeID]++ }
+func (r *recorder) RegisterRequest(nodeID ids.NodeID) {
+	r.requested[nodeID]++
+}
 
 func (r *recorder) RegisterResponse(nodeID ids.NodeID, bw float64) {
 	r.bandwidth[nodeID] = append(r.bandwidth[nodeID], bw)
 }
 
-func (r *recorder) RegisterFailure(nodeID ids.NodeID) { r.failures[nodeID]++ }
+func (r *recorder) RegisterFailure(nodeID ids.NodeID) {
+	r.failures[nodeID]++
+}
 
 type (
 	sut struct {

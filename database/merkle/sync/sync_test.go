@@ -333,7 +333,12 @@ func Test_Sync_BusyContextCancellation(t *testing.T) {
 	}
 
 	// The target must differ from clientDB's root and from [ids.Empty].
-	syncer := newSUT(t, ids.GenerateTestID(), selfClient(t, ctx, blockingHandler), withDB(clientDB))
+	syncer := newSUT(
+		t,
+		ids.GenerateTestID(),
+		selfClient(t, ctx, blockingHandler),
+		withDB(clientDB),
+	)
 
 	err := syncer.Sync(ctx)
 	require.ErrorIs(t, err, context.Canceled)
@@ -461,7 +466,9 @@ func TestSyncerShutdownDoesNotDescorePeer(t *testing.T) {
 				syncer = newSUT(t, targetRoot, client)
 
 				syncErr := make(chan error, 1)
-				go func() { syncErr <- syncer.Sync(ctx) }()
+				go func() {
+					syncErr <- syncer.Sync(ctx)
+				}()
 
 				// Close while the handler is parked, so its reply lands after the close.
 				<-served
@@ -530,7 +537,11 @@ func TestSyncerScoresProofSource(t *testing.T) {
 					},
 				}
 
-				syncer := newSUT(t, targetRoot, trackingtest.NewSelfClientWithTracker(t, ctx, nodeID, handler, tracker))
+				syncer := newSUT(
+					t,
+					targetRoot,
+					trackingtest.NewSelfClientWithTracker(t, ctx, nodeID, handler, tracker),
+				)
 
 				require.ErrorIsf(t, syncer.Sync(ctx), tt.wantErr, "%T.Sync()", syncer)
 

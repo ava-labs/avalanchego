@@ -20,7 +20,13 @@ import (
 func NewTracker(t *testing.T) *p2p.PeerTracker {
 	t.Helper()
 
-	tracker, err := p2p.NewPeerTracker(loggingtest.New(t, logging.Debug), "", prometheus.NewRegistry(), nil, nil)
+	tracker, err := p2p.NewPeerTracker(
+		loggingtest.New(t, logging.Debug),
+		"",
+		prometheus.NewRegistry(),
+		nil,
+		nil,
+	)
 	require.NoError(t, err, "p2p.NewPeerTracker()")
 	return tracker
 }

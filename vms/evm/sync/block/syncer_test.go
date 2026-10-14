@@ -300,7 +300,13 @@ func TestSyncer_RetriesBadResponses(t *testing.T) {
 				},
 			)
 			recorder := synctest.NewRecordingResponder(tamperer)
-			p2pClient := synctest.ServeResponder(t, ctx, log, p2p.EVMBlockRequestHandlerID, recorder)
+			p2pClient := synctest.ServeResponder(
+				t,
+				ctx,
+				log,
+				p2p.EVMBlockRequestHandlerID,
+				recorder,
+			)
 
 			target := rawdb.NewMemoryDatabase()
 			syncer := NewSyncer(
