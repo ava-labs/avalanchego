@@ -728,7 +728,6 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		MetadataDB:          vm.metadataDB,
 		Acceptor:            vm,
 		SyncSummaryProvider: vm.extensionConfig.SyncSummaryProvider,
-		Extender:            nil,
 		LeafFetcher:         client.NewLeafFetcher(syncClient, message.SubnetEVMLeafsRequestType, message.StateTrieNode),
 	})
 

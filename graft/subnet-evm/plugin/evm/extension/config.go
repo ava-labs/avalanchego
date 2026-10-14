@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
-	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -133,9 +132,6 @@ type Config struct {
 	// SyncSummaryProvider provides and parses state sync summaries.
 	// It's required and should be non-nil.
 	SyncSummaryProvider message.SyncSummaryProvider
-	// SyncExtender can extend the syncer to handle custom sync logic.
-	// It's optional and can be nil
-	SyncExtender types.Extender
 	// BlockExtender allows the VM extension to create an extension to handle block processing events.
 	// It's optional and can be nil
 	BlockExtender BlockExtender
