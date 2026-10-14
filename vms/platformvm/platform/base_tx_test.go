@@ -450,3 +450,140 @@ func TestBaseTxSerialization(t *testing.T) {
 	"memo": "0xf09f98850a77656c6c2074686174277301234521"
 }`, string(unsignedComplexBaseTxJSONBytes))
 }
+
+func TestBaseTxSyntacticVerify(t *testing.T) {
+	var (
+		networkID = uint32(1337)
+		chainID   = ids.GenerateTestID()
+		assetID   = ids.GenerateTestID()
+		addr      = ids.GenerateTestShortID()
+	)
+
+	ctx := &snow.Context{
+		NetworkID: networkID,
+		ChainID:   chainID,
+	}
+
+	newOutput := func(amt uint64) *avax.TransferableOutput {
+		return &avax.TransferableOutput{
+			Asset: avax.Asset{ID: assetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt: amt,
+				OutputOwners: secp256k1fx.OutputOwners{
+					Threshold: 1,
+					Addrs:     []ids.ShortID{addr},
+				},
+			},
+		}
+	}
+	newInput := func(amt uint64) *avax.TransferableInput {
+		return &avax.TransferableInput{
+			UTXOID: avax.UTXOID{
+				TxID: ids.GenerateTestID(),
+			},
+			Asset: avax.Asset{ID: assetID},
+			In: &secp256k1fx.TransferInput{
+				Amt: amt,
+				Input: secp256k1fx.Input{
+					SigIndices: []uint32{0},
+				},
+			},
+		}
+	}
+	// newBaseTx returns a BaseTx that passes syntactic verification.
+	newBaseTx := func() *BaseTx {
+		return &BaseTx{
+			BaseTx: avax.BaseTx{
+				NetworkID:    networkID,
+				BlockchainID: chainID,
+				Ins:          []*avax.TransferableInput{newInput(1)},
+				Outs:         []*avax.TransferableOutput{newOutput(1)},
+			},
+		}
+	}
+
+	tests := []struct {
+		name     string
+		updateTx func(*BaseTx)
+		want     error
+	}{
+		{
+			name: "already_verified",
+			updateTx: func(tx *BaseTx) {
+				// Would fail verification if it were re-verified
+				tx.NetworkID++
+				tx.SyntacticallyVerified = true
+			},
+			want: nil,
+		},
+		{
+			name: "wrong_network_id",
+			updateTx: func(tx *BaseTx) {
+				tx.NetworkID++
+			},
+			want: avax.ErrWrongNetworkID,
+		},
+		{
+			name: "wrong_chain_id",
+			updateTx: func(tx *BaseTx) {
+				tx.BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid_output",
+			updateTx: func(tx *BaseTx) {
+				tx.Outs = []*avax.TransferableOutput{newOutput(0)}
+			},
+			want: secp256k1fx.ErrNoValueOutput,
+		},
+		{
+			name: "invalid_input",
+			updateTx: func(tx *BaseTx) {
+				tx.Ins = []*avax.TransferableInput{newInput(0)}
+			},
+			want: secp256k1fx.ErrNoValueInput,
+		},
+		{
+			name: "outputs_not_sorted",
+			updateTx: func(tx *BaseTx) {
+				unsortedOutputs := []*avax.TransferableOutput{newOutput(1), newOutput(2)}
+				avax.SortTransferableOutputs(unsortedOutputs, Codec)
+				unsortedOutputs[0], unsortedOutputs[1] = unsortedOutputs[1], unsortedOutputs[0]
+
+				tx.Outs = unsortedOutputs
+			},
+			want: errOutputsNotSorted,
+		},
+		{
+			name: "inputs_not_sorted_and_unique",
+			updateTx: func(tx *BaseTx) {
+				input := newInput(1)
+				tx.Ins = []*avax.TransferableInput{input, input}
+			},
+			want: errInputsNotSortedUnique,
+		},
+		{
+			name: "valid",
+			want: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx := newBaseTx()
+			if tt.updateTx != nil {
+				tt.updateTx(tx)
+			}
+
+			got := tx.SyntacticVerify(ctx)
+			require.ErrorIs(t, got, tt.want)
+		})
+	}
+
+	t.Run("nil_tx", func(t *testing.T) {
+		var tx *BaseTx
+		got := tx.SyntacticVerify(ctx)
+		require.ErrorIs(t, got, ErrNilTx)
+	})
+}
