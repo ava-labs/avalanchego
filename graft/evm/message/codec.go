@@ -15,43 +15,22 @@ const (
 	maxMessageSize = 2*units.MiB - 64*units.KiB // Subtract 64 KiB from p2p network cap to leave room for encoding overhead from AvalancheGo
 )
 
-// CodecType identifies the codec variant to use for message serialization.
-// Each variant has its own skip count and LeafsRequest wire format.
-type CodecType int
+// Codec serializes state sync messages.
+var Codec = newCodec()
 
-const (
-	// SubnetEVMCodecType is used for Subnet-EVM state sync messages.
-	SubnetEVMCodecType CodecType = iota
-)
-
-// SubnetEVMCodec is used for Subnet-EVM state sync messages
-var SubnetEVMCodec = newCodec(SubnetEVMCodecType)
-
-func newCodec(codecType CodecType) codec.Manager {
-	// Codec-specific configuration: skip count and LeafsRequest type.
-	var (
-		deprecatedSkipCount int
-		leafsRequestType    any
-	)
-	switch codecType {
-	case SubnetEVMCodecType:
-		deprecatedSkipCount = 2 // deprecated gossip types
-		leafsRequestType = SubnetEVMLeafsRequest{}
-	default:
-		panic("unknown codec type")
-	}
-
+func newCodec() codec.Manager {
 	mgr := codec.NewManager(maxMessageSize)
 	c := linearcodec.NewDefault()
 
-	// Skip registrations to maintain type ID compatibility after removing deprecated types.
-	c.SkipRegistrations(deprecatedSkipCount)
+	// Skip 2 registrations to maintain type ID compatibility after removing
+	// deprecated gossip types.
+	c.SkipRegistrations(2)
 
 	errs := wrappers.Errs{}
 	errs.Add(
 		c.RegisterType(BlockRequest{}),
 		c.RegisterType(BlockResponse{}),
-		c.RegisterType(leafsRequestType),
+		c.RegisterType(SubnetEVMLeafsRequest{}),
 		c.RegisterType(LeafsResponse{}),
 		c.RegisterType(CodeRequest{}),
 		c.RegisterType(CodeResponse{}),

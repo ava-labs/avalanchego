@@ -40,8 +40,6 @@ graft_go_test(
     ],
     deps = [
         ":message",
-        "//codec",
-        "//graft/evm/message/messagetest",
         "//snow/engine/snowman/block",
         "@com_github_ava_labs_libevm//common",
         "@com_github_stretchr_testify//require",

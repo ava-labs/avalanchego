@@ -36,7 +36,6 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		reqType  message.LeafsRequestType
 		nodeType message.NodeType
 		req      hashdb.LeafRange
 		resp     message.LeafsResponse
@@ -46,7 +45,6 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 	}{
 		{
 			name:     "account_trie_over_subnet_evm",
-			reqType:  message.SubnetEVMLeafsRequestType,
 			nodeType: message.StateTrieNode,
 			req: hashdb.LeafRange{
 				Root:  root,
@@ -68,7 +66,6 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 		},
 		{
 			name:     "storage_trie_over_coreth",
-			reqType:  message.SubnetEVMLeafsRequestType,
 			nodeType: message.NodeType(2),
 			req: hashdb.LeafRange{
 				Root:    root,
@@ -95,7 +92,6 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 		{
 			// The client verifies the proof, so it never reaches the caller.
 			name:     "proof_is_stripped_and_more_is_carried",
-			reqType:  message.SubnetEVMLeafsRequestType,
 			nodeType: message.StateTrieNode,
 			req: hashdb.LeafRange{
 				Root:  root,
@@ -119,7 +115,6 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 		},
 		{
 			name:     "client_error_propagates",
-			reqType:  message.SubnetEVMLeafsRequestType,
 			nodeType: message.StateTrieNode,
 			req: hashdb.LeafRange{
 				Root:  root,
@@ -142,7 +137,7 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 				err:  tt.err,
 			}
 
-			got, more, err := NewLeafFetcher(stub, tt.reqType, tt.nodeType).
+			got, more, err := NewLeafFetcher(stub, tt.nodeType).
 				FetchLeaves(t.Context(), tt.req)
 
 			require.ErrorIs(t, err, tt.err)

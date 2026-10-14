@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 )
 
 const (
@@ -40,12 +38,12 @@ func TestMarshalLeafsRequest(t *testing.T) {
 			NodeType: message.StateTrieNode,
 		}
 
-		leafsRequestBytes, err := message.SubnetEVMCodec.Marshal(message.Version, request)
+		leafsRequestBytes, err := message.Codec.Marshal(message.Version, request)
 		require.NoError(t, err)
 		require.Equal(t, subnetEVMLeafsRequestB64, base64.StdEncoding.EncodeToString(leafsRequestBytes))
 
 		var decoded message.SubnetEVMLeafsRequest
-		_, err = message.SubnetEVMCodec.Unmarshal(leafsRequestBytes, &decoded)
+		_, err = message.Codec.Unmarshal(leafsRequestBytes, &decoded)
 		require.NoError(t, err)
 		require.Equal(t, request.Root, decoded.Root)
 		require.Equal(t, request.Start, decoded.Start)
@@ -65,19 +63,17 @@ func TestMarshalLeafsResponse(t *testing.T) {
 
 	leafsResponse := newLeafsResponseFixture(t, r)
 
-	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-		leafsResponseBytes, err := c.Marshal(message.Version, leafsResponse)
-		require.NoError(t, err)
-		require.Equal(t, leafsResponseFixtureB64, base64.StdEncoding.EncodeToString(leafsResponseBytes))
+	leafsResponseBytes, err := message.Codec.Marshal(message.Version, leafsResponse)
+	require.NoError(t, err)
+	require.Equal(t, leafsResponseFixtureB64, base64.StdEncoding.EncodeToString(leafsResponseBytes))
 
-		var l message.LeafsResponse
-		_, err = c.Unmarshal(leafsResponseBytes, &l)
-		require.NoError(t, err)
-		require.Equal(t, leafsResponse.Keys, l.Keys)
-		require.Equal(t, leafsResponse.Vals, l.Vals)
-		require.False(t, l.More) // make sure it is not serialized
-		require.Equal(t, leafsResponse.ProofVals, l.ProofVals)
-	})
+	var l message.LeafsResponse
+	_, err = message.Codec.Unmarshal(leafsResponseBytes, &l)
+	require.NoError(t, err)
+	require.Equal(t, leafsResponse.Keys, l.Keys)
+	require.Equal(t, leafsResponse.Vals, l.Vals)
+	require.False(t, l.More) // make sure it is not serialized
+	require.Equal(t, leafsResponse.ProofVals, l.ProofVals)
 }
 
 // TestSubnetEVMLeafsRequestNodeTypeNotSerialized verifies that NodeType is not serialized
@@ -108,16 +104,16 @@ func TestSubnetEVMLeafsRequestNodeTypeNotSerialized(t *testing.T) {
 		NodeType: message.StateTrieNode,
 	}
 
-	bytesDefault, err := message.SubnetEVMCodec.Marshal(message.Version, leafsRequestDefault)
+	bytesDefault, err := message.Codec.Marshal(message.Version, leafsRequestDefault)
 	require.NoError(t, err)
 
-	bytesWithNodeType, err := message.SubnetEVMCodec.Marshal(message.Version, leafsRequestWithNodeType)
+	bytesWithNodeType, err := message.Codec.Marshal(message.Version, leafsRequestWithNodeType)
 	require.NoError(t, err)
 
 	require.Equal(t, bytesDefault, bytesWithNodeType, "NodeType should not affect serialization")
 
 	var unmarshaled message.SubnetEVMLeafsRequest
-	_, err = message.SubnetEVMCodec.Unmarshal(bytesWithNodeType, &unmarshaled)
+	_, err = message.Codec.Unmarshal(bytesWithNodeType, &unmarshaled)
 	require.NoError(t, err)
 
 	require.Equal(t, message.NodeType(0), unmarshaled.NodeType, "NodeType should not be serialized")

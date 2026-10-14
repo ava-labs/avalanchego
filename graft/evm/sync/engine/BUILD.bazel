@@ -48,9 +48,7 @@ graft_go_test(
     ],
     embed = [":engine"],
     deps = [
-        "//codec",
         "//graft/evm/message",
-        "//graft/evm/message/messagetest",
         "//graft/evm/sync/types",
         "//graft/evm/utils/utilstest",
         "@com_github_ava_labs_libevm//common",

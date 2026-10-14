@@ -146,8 +146,8 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 	// Create the mock P2P proofClient that serves range proofs and change proofs from the server DB.
 	// Use CorethCodec as the default - the firewood syncer uses p2p directly, not the message codec,
 	// so the codec choice only affects the code request handler which is auxiliary to these tests.
-	codeRequestHandler := handlers.NewCodeRequestHandler(serverState.DiskDB(), message.SubnetEVMCodec, handlerstats.NewNoopHandlerStats())
-	mockClient := client.NewTestClient(message.SubnetEVMCodec, nil, codeRequestHandler, nil)
+	codeRequestHandler := handlers.NewCodeRequestHandler(serverState.DiskDB(), message.Codec, handlerstats.NewNoopHandlerStats())
+	mockClient := client.NewTestClient(message.Codec, nil, codeRequestHandler, nil)
 
 	// Create the proof handler.
 	serverDB := dbFromState(t, serverState)

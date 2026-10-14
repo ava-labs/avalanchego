@@ -443,7 +443,7 @@ func (vm *VM) Initialize(
 		vm.ethConfig.Miner.Etherbase = blackhole.Address
 	}
 
-	vm.networkCodec = message.SubnetEVMCodec
+	vm.networkCodec = message.Codec
 	vm.Network, err = network.NewNetwork(vm.ctx, appSender, vm.networkCodec, vm.config.MaxOutboundActiveRequests, vm.sdkMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to create network: %w", err)
@@ -728,7 +728,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		MetadataDB:          vm.metadataDB,
 		Acceptor:            vm,
 		SyncSummaryProvider: vm.extensionConfig.SyncSummaryProvider,
-		LeafFetcher:         client.NewLeafFetcher(syncClient, message.SubnetEVMLeafsRequestType, message.StateTrieNode),
+		LeafFetcher:         client.NewLeafFetcher(syncClient, message.StateTrieNode),
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume
@@ -1283,7 +1283,7 @@ func (vm *VM) ReadLastAccepted() (common.Hash, uint64, error) {
 func defaultExtensions() *extension.Config {
 	return &extension.Config{
 		Clock:               &mockable.Clock{},
-		SyncSummaryProvider: message.NewBlockSyncSummaryProvider(message.SubnetEVMCodec),
+		SyncSummaryProvider: message.NewBlockSyncSummaryProvider(message.Codec),
 	}
 }
 

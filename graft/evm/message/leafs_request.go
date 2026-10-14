@@ -3,11 +3,7 @@
 
 package message
 
-import (
-	"fmt"
-
-	"github.com/ava-labs/libevm/common"
-)
+import "github.com/ava-labs/libevm/common"
 
 const MaxCodeHashesPerRequest = 5
 
@@ -32,30 +28,6 @@ type LeafsRequest interface {
 	EndKey() []byte
 	KeyLimit() uint16
 	LeafType() NodeType
-}
-
-// LeafsRequestType selects which wire format to use when building leafs requests.
-type LeafsRequestType int
-
-const (
-	SubnetEVMLeafsRequestType LeafsRequestType = iota
-)
-
-// NewLeafsRequest builds a leafs request using the requested wire format.
-func NewLeafsRequest(leafReqType LeafsRequestType, root, account common.Hash, start, end []byte, limit uint16, nodeType NodeType) (LeafsRequest, error) {
-	switch leafReqType {
-	case SubnetEVMLeafsRequestType:
-		return SubnetEVMLeafsRequest{
-			Root:     root,
-			Account:  account,
-			Start:    start,
-			End:      end,
-			Limit:    limit,
-			NodeType: nodeType,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported leafs request type: %d", leafReqType)
-	}
 }
 
 // LeafsResponse is a response to a LeafsRequest
