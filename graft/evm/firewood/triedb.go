@@ -41,7 +41,7 @@ var (
 	proposeOnProposeCount  = metrics.GetOrRegisterCounter("firewood/triedb/propose/proposal/count", nil)
 	explicitlyDroppedCount = metrics.GetOrRegisterCounter("firewood/triedb/drop/count", nil)
 
-	ErrNoRevisionFound = errors.New("no revision found")
+	errNoRevisionFound = errors.New("no revision found")
 
 	errNoProposalFound         = errors.New("no proposal found")
 	errUnexpectedProposalFound = errors.New("unexpected proposal found")
@@ -600,7 +600,7 @@ func (t *TrieDB) createProposals(parentRoot common.Hash, ops []ffi.BatchOp) (com
 func (t *TrieDB) Reader(root common.Hash) (database.Reader, error) {
 	revision, err := t.Firewood.Revision(ffi.Hash(root))
 	if err != nil {
-		return nil, fmt.Errorf("%w: expected root %s, got %w", ErrNoRevisionFound, root.Hex(), err)
+		return nil, fmt.Errorf("%w: expected root %s, got %w", errNoRevisionFound, root.Hex(), err)
 	}
 	return &reader{revision: revision}, nil
 }
