@@ -34,7 +34,7 @@ avalanchego monorepo.
 - [Common Tasks](#common-tasks)
   - [Building](#building)
   - [Testing](#testing)
-    - [E2E runner](#e2e-runner)
+    - [E2E and monitored test runners](#e2e-and-monitored-test-runners)
     - [Go Test Selection](#go-test-selection)
     - [Test Options](#test-options)
     - [Test Timeouts](#test-timeouts)
@@ -65,6 +65,7 @@ avalanchego monorepo.
 - [Future Improvements](#future-improvements)
   - [Remote Execution](#remote-execution)
   - [CI Integration](#ci-integration)
+  - [Solidity builds and binding generation](#solidity-builds-and-binding-generation)
   - [Patch Maintenance](#patch-maintenance)
   - [Test Configuration](#test-configuration)
 - [References](#references)
@@ -490,7 +491,7 @@ bazel test //utils:set_test --test_filter=TestSet_Add
 bazel coverage //...
 ```
 
-#### E2E runner
+#### E2E and monitored test runners
 
 ```bash
 # Run all E2E tests with Bazel-built runtime dependencies
@@ -507,6 +508,20 @@ task bazel-test-e2e-serial
 
 # Run only the C-Chain ProposerVM API test
 task bazel-test-e2e-smoke
+
+# Run the network-reuse E2E test
+task bazel-test-e2e-existing-network
+
+# Run E2E tests with different activation times for the latest protocol upgrade
+task bazel-test-e2e-post-latest
+task bazel-test-e2e-schedule-latest
+
+# Run the other monitored tests
+task bazel-test-load-subnet-evm
+task bazel-test-warp-subnet-evm
+task bazel-test-load
+task bazel-test-load-ci # Runs with the 30-second CI load duration
+task bazel-test-upgrade
 ```
 
 `task bazel-test-e2e` runs `bazel run //tests/e2e:e2e_runner`. The
@@ -517,14 +532,53 @@ The [Bazel runner](../scripts/tests.e2e.bazel.sh) uses the
 Bazel can cache the binary builds. E2E test execution does not use cached test
 results.
 
-Scheduled Bazel CI runs serial E2E tests on every scheduled platform. It enables
-race detection only on Ubuntu 24.04 AMD64. This matches the scheduled unit-test
-policy. It limits race detection to one platform.
+Both `bazel-test-load` and `bazel-test-load-ci` regenerate Solidity bindings
+before Bazel builds the load-test binary. This ensures that local contract edits
+reach the test. Generation uses `solc` and Go outside Bazel through the Nix
+shell. CI prepares the separate Go module cache for this job because Gazelle's
+cache does not supply the generator's dependencies.
 
-[CI builds and executes E2E tests in one job](../.github/workflows/bazel.yml)
-through the same tasks used locally.
-This follows the [CI entrypoint conventions](./ci.md#principles) and avoids a
-separate artifact lifecycle. Remote caching lets each job reuse compiled outputs.
+Bazel manages Go compilation for the load tests, but not Solidity compilation
+or binding generation. Task-level generation ensures that contract edits reach
+the tests without requiring Bazel support for `solc` and `abigen`. The trade-off
+is that generation runs on every task invocation, even when Bazel reuses all
+compiled outputs. Bazel cannot cache this generation step. Keep generation in
+both tasks until Bazel manages the
+[Solidity build and binding-generation pipeline](#solidity-builds-and-binding-generation).
+
+The Subnet-EVM load and warp tasks use `GINKGO_LABEL_FILTER` to select tests.  For
+example, `GINKGO_LABEL_FILTER='!load'` excludes the load simulation. An explicit
+`--ginkgo.label-filter` task argument overrides this environment variable.
+
+`task bazel-test-upgrade` tests an upgrade from a published AvalancheGo release
+to the Bazel-built binary. The [upgrade script](../scripts/tests.upgrade.sh)
+downloads that release on every run, even when Bazel reuses all compiled outputs.
+This task requires access to GitHub release downloads; Bazel's caches do not
+make it runnable offline. Without an argument, it uses the script's default
+compatible release. To select a different compatible release, pass its version
+without the `v` prefix:
+
+```bash
+task bazel-test-upgrade -- 1.15.1
+```
+
+Bazel pre-merge E2E jobs disable race detection to reduce PR-run costs.
+Scheduled Bazel CI runs the primary E2E suite serially on every scheduled
+platform. It enables race detection only on Ubuntu 24.04 AMD64. This matches
+the scheduled unit-test policy.
+
+CI runs network-reuse and protocol-upgrade activation variants on pull requests,
+merge groups, pushes to `master` and `dev`, and tag pushes. These jobs disable
+race detection. They check network reuse and upgrade activation, not concurrency.
+The scheduled primary E2E suite provides race coverage. It does not run these
+variants.
+
+[CI runs the primary E2E suite and monitored tests](../.github/workflows/bazel.yml)
+through the same tasks used locally. The Go workflow also runs the primary E2E
+suite with race detection to test artifacts built with `go build`. Both build paths
+require CGO. This follows the [CI entrypoint conventions](./ci.md#principles) and
+avoids a separate artifact lifecycle. Remote caching lets each Bazel job reuse
+compiled outputs.
 
 The Bazel entrypoint uses `bazel run`, not `bazel test`. It keeps network data
 available for inspection after a failure. Network data defaults to `$HOME/.tmpnet`.
@@ -693,7 +747,8 @@ reasons outside the repository. A smaller job set reduces that risk.
 
 Non-scheduled Bazel CI runs these jobs:
 
-- Linux pre-merge CI runs the full cacheable unit-test suite and full E2E suite.
+- Linux pre-merge CI runs the full cacheable unit-test suite, the full primary
+  E2E suite, and monitored tests.
 - macOS pre-merge CI runs one cacheable unit-test smoke target and one focused
   E2E smoke test.
 
@@ -701,7 +756,8 @@ Pull requests and merge groups use the same Linux unit-test task,
 `bazel-test-unit-race`. Both enable race detection and reuse test results from
 the remote cache.
 
-See [E2E runner](#e2e-runner) for build and execution details.
+See [E2E and monitored test runners](#e2e-and-monitored-test-runners) for build
+and execution details.
 See [E2E runner capacity](./ci.md#use-beefier-runners-for-faster-e2e-jobs) for the
 shared runner-sizing policy.
 
@@ -1188,10 +1244,28 @@ requires.
 
 ### CI Integration
 
-- **Migrate CI to Bazel** - Update GitHub Actions to use Bazel for
-  builds/tests where possible
-- **Retain non-Bazel coverage** - Keep traditional `go build` CI jobs
-  to support third-party consumers who don't use Bazel
+The intended long-term strategy is to run tests with Bazel-built artifacts,
+except for the non-Bazel unit and E2E jobs. Retain those jobs to support
+third-party consumers who do not use Bazel. Checks and lint are outside this
+migration.
+
+### Solidity builds and binding generation
+
+The intended end state is for Bazel to manage the complete load-contract build:
+
+```text
+Solidity sources → pinned solc → ABI and bytecode → pinned abigen → Go bindings → load-test binary
+```
+
+This would make Solidity sources and generator tools explicit build inputs.
+Contract edits would invalidate the affected actions, while unchanged generation
+could reuse cached outputs. Bazel support for this pipeline is a future goal;
+the load tasks still require generation outside Bazel.
+
+Remove task-level binding generation only after the Bazel dependency chain
+replaces it. Validate that a Solidity edit updates the bytecode embedded in the
+load-test binary. Also check that an unchanged build reuses generation outputs
+and that both load tasks work without a separate generation command.
 
 ### Patch Maintenance
 
@@ -1221,14 +1295,19 @@ tag) are maintained manually and are not generated by this script.
 
 ### Test Configuration
 
-Graft modules already have custom test timeouts via `gazelle:map_kind`
-(see "Custom Test Macros" section). Note that `gazelle:map_kind`
-applies to all `go_test` targets in the subtree, including non-unit
-tests. This is harmless today since Bazel only runs unit tests, but
-may need revisiting if non-unit tests move to Bazel. Consider further
-stratification:
-- Integration tests: medium timeout (300s)
-- E2E tests: explicit long timeout (currently use `manual` tag)
+Graft modules use `gazelle:map_kind` to apply custom test timeouts (see [Custom Test
+Macros](#custom-test-macros-via-gazellemap_kind)). These settings apply to all
+`go_test` targets in the subtree, including non-unit tests.
+
+The [E2E and monitored test runners](#e2e-and-monitored-test-runners) build their
+artifacts with Bazel and execute them through `bazel run`. They do not use
+Bazel's test-result cache or `--test_timeout` setting. CI job timeouts limit
+these runs. When changing a runner, check its execution limits separately from
+its `go_test` timeout attribute.
+
+If more non-unit suites move to `bazel test`, consider separate timeout settings
+for unit, integration, and E2E tests. Keep non-unit targets tagged `manual` so
+wildcard commands do not select them.
 
 ## References
 

@@ -42,3 +42,30 @@ graft_go_test(
         "@com_github_stretchr_testify//require",
     ],
 )
+
+genrule(
+    name = "warp_test_binary",
+    testonly = True,
+    srcs = [":warp_test"],
+    outs = ["warp.test"],
+    cmd = "cp $< $@",
+    tags = ["manual"],
+)
+
+sh_binary(
+    name = "runner",
+    testonly = True,
+    srcs = ["//graft/subnet-evm/scripts:tests.e2e.bazel.sh"],
+    args = [
+        "$(location //main:avalanchego)",
+        "$(location //graft/subnet-evm/plugin)",
+        "$(location :warp_test_binary)",
+    ],
+    data = [
+        ":warp_test_binary",
+        "//graft/subnet-evm/plugin",
+        "//main:avalanchego",
+    ],
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
