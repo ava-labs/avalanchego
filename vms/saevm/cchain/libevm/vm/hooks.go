@@ -25,18 +25,19 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-package core
+package vm
 
 import (
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/stateconf"
+
+	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 )
 
 // RegisterExtras registers hooks with libevm to achieve Avalanche behaviour of

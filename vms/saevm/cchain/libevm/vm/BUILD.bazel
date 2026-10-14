@@ -1,14 +1,14 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 package(default_visibility = [
-    "//graft/coreth:__subpackages__",
-    "//graft/coreth:external_consumers",
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
 ])
 
 go_library(
-    name = "core",
-    srcs = ["evm.go"],
-    importpath = "github.com/ava-labs/avalanchego/graft/coreth/core",
+    name = "vm",
+    srcs = ["hooks.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/vm",
     deps = [
         "//graft/coreth/params",
         "//vms/saevm/cchain/libevm/extstate",
