@@ -11,7 +11,6 @@ require (
 	github.com/ava-labs/avalanchego v1.15.2
 	github.com/ava-labs/avalanchego/graft/evm v1.15.2
 	github.com/ava-labs/libevm v1.13.15-0.20261009144421-d51262991849
-	github.com/google/go-cmp v0.7.0
 	github.com/holiman/uint256 v1.2.4
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.5.0
@@ -49,6 +48,7 @@ require (
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/renameio/v2 v2.0.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/rpc v1.2.0 // indirect

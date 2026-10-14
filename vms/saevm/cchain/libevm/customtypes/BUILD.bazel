@@ -2,8 +2,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "graft_go_test")
 
 package(default_visibility = [
-    "//graft/coreth:__subpackages__",
-    "//graft/coreth:external_consumers",
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
 ])
 
 go_library(
@@ -17,7 +17,7 @@ go_library(
         "libevm.go",
         "state_account_ext.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes",
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/customtypes",
     deps = [
         "//vms/evm/acp226",
         "//vms/saevm/cchain/dynamic",
