@@ -9,7 +9,6 @@ go_library(
         "block_sync_summary_provider.go",
         "code_request.go",
         "codec.go",
-        "coreth_leafs_request.go",
         "handler.go",
         "leafs_request.go",
         "request.go",

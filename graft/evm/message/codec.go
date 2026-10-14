@@ -20,23 +20,12 @@ const (
 type CodecType int
 
 const (
-	// CorethCodecType is used for C-Chain state sync messages.
-	CorethCodecType CodecType = iota
 	// SubnetEVMCodecType is used for Subnet-EVM state sync messages.
-	SubnetEVMCodecType
+	SubnetEVMCodecType CodecType = iota
 )
 
-var (
-	// CorethCodec is used for C-Chain state sync messages
-	CorethCodec codec.Manager
-	// SubnetEVMCodec is used for Subnet-EVM state sync messages
-	SubnetEVMCodec codec.Manager
-)
-
-func init() {
-	CorethCodec = newCodec(CorethCodecType)
-	SubnetEVMCodec = newCodec(SubnetEVMCodecType)
-}
+// SubnetEVMCodec is used for Subnet-EVM state sync messages
+var SubnetEVMCodec = newCodec(SubnetEVMCodecType)
 
 func newCodec(codecType CodecType) codec.Manager {
 	// Codec-specific configuration: skip count and LeafsRequest type.
@@ -45,9 +34,6 @@ func newCodec(codecType CodecType) codec.Manager {
 		leafsRequestType    any
 	)
 	switch codecType {
-	case CorethCodecType:
-		deprecatedSkipCount = 3 // deprecated gossip types and sync summary type
-		leafsRequestType = CorethLeafsRequest{}
 	case SubnetEVMCodecType:
 		deprecatedSkipCount = 2 // deprecated gossip types
 		leafsRequestType = SubnetEVMLeafsRequest{}

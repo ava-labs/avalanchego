@@ -11,10 +11,7 @@ import (
 
 const MaxCodeHashesPerRequest = 5
 
-var (
-	_ LeafsRequest = SubnetEVMLeafsRequest{}
-	_ LeafsRequest = CorethLeafsRequest{}
-)
+var _ LeafsRequest = SubnetEVMLeafsRequest{}
 
 // NodeType outlines the trie that a leaf node belongs to
 // handlers.LeafsRequestHandler uses this information to determine
@@ -41,8 +38,7 @@ type LeafsRequest interface {
 type LeafsRequestType int
 
 const (
-	CorethLeafsRequestType LeafsRequestType = iota
-	SubnetEVMLeafsRequestType
+	SubnetEVMLeafsRequestType LeafsRequestType = iota
 )
 
 // NewLeafsRequest builds a leafs request using the requested wire format.
@@ -50,15 +46,6 @@ func NewLeafsRequest(leafReqType LeafsRequestType, root, account common.Hash, st
 	switch leafReqType {
 	case SubnetEVMLeafsRequestType:
 		return SubnetEVMLeafsRequest{
-			Root:     root,
-			Account:  account,
-			Start:    start,
-			End:      end,
-			Limit:    limit,
-			NodeType: nodeType,
-		}, nil
-	case CorethLeafsRequestType:
-		return CorethLeafsRequest{
 			Root:     root,
 			Account:  account,
 			Start:    start,

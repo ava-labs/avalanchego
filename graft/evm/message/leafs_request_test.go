@@ -17,7 +17,6 @@ import (
 )
 
 const (
-	corethLeafsRequestB64    = "AAAAAAAAAAAAAAAAAAAAAABpbSBST09UaW5nIGZvciB5YQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIFL9/AchgmVPFj9fD5piHXKVZsdNEAN8TXu7BAfR4sZJAAAAIIGFWthoHQ2G0ekeABZ5OctmlNLEIqzSCKAHKTlIf2mZBAAB"
 	subnetEVMLeafsRequestB64 = "AAAAAAAAAAAAAAAAAAAAAABpbSBST09UaW5nIGZvciB5YQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIFL9/AchgmVPFj9fD5piHXKVZsdNEAN8TXu7BAfR4sZJAAAAIIGFWthoHQ2G0ekeABZ5OctmlNLEIqzSCKAHKTlIf2mZBAA="
 	leafsResponseFixtureB64  = "AAAAAAAQAAAAIE8WP18PmmIdcpVmx00QA3xNe7sEB9HixkmBhVrYaB0NAAAAIGagByk5SH9pmeudGKRHhARdh/PGfPInRumVr1olNnlRAAAAIK2zfFghtmgLTnyLdjobHUnUlVyEhiFjJSU/7HON16niAAAAIIYVu9oIMfUFmHWSHmaKW98sf8SERZLSVyvNBmjS1sUvAAAAIHHb2Wiw9xcu2FeUuzWLDDtSXaF4b5//CUJ52xlE69ehAAAAIPhMiSs77qX090OR9EXRWv1ClAQDdPaSS5jL+HE/jZYtAAAAIMr8yuOmvI+effHZKTM/+ZOTO+pvWzr23gN0NmxHGeQ6AAAAIBZZpE856x5YScYHfbtXIvVxeiiaJm+XZHmBmY6+qJwLAAAAIHOq53hmZ/fpNs1PJKv334ZrqlYDg2etYUXeHuj0qLCZAAAAIHiN5WOvpGfUnexqQOmh0AfwM8KCMGG90Oqln45NpkMBAAAAIKAQ13yW6oCnpmX2BvamO389/SVnwYl55NYPJmhtm/L7AAAAIAfuKbpk+Eq0PKDG5rkcH9O+iZBDQXnTr0SRo2kBLbktAAAAILsXyQKL6ZFOt2ScbJNHgAl50YMDVvKlTD3qsqS0R11jAAAAIOqxOTXzHYRIRRfpJK73iuFRwAdVklg2twdYhWUMMOwpAAAAIHnqPf5BNqv3UrO4Jx0D6USzyds2a3UEX479adIq5UEZAAAAIDLWEMqsbjP+qjJjo5lDcCS6nJsUZ4onTwGpEK4pX277AAAAEAAAAAmG0ekeABZ5OcsAAAAMuqL/bNRxxIPxX7kLAAAACov5IRGcFg8HAkQAAAAIUFTi0INr+EwAAAAOnQ97usvgJVqlt9RL7EAAAAAJfI0BkZLCQiTiAAAACxsGfYm8fwHx9XOYAAAADUs3OXARXoLtb0ElyPoAAAAKPr34iDoK2L6cOQAAAAoFIg0LKWiLc0uOAAAACCbJAf81TN4WAAAADBhPw50XNP9XFkKJUwAAAAuvvo+1aYfHf1gYUgAAAAqjcDk0v1CijaECAAAADkfLVT12lCZ670686kBrAAAADf5fWr9EzN4mO1YGYz4AAAAEAAAADlcyXwVWMEo+Pq4Uwo0MAAAADeo50qHks46vP0TGxu8AAAAOg2Ly9WQIVMFd/KyqiiwAAAAL7M5aOpS00zilFD4="
 )
@@ -29,31 +28,6 @@ func TestMarshalLeafsRequest(t *testing.T) {
 	r := newTestRand()
 	startBytes := randomBytes(t, r, common.HashLength)
 	endBytes := randomBytes(t, r, common.HashLength)
-
-	// Test coreth format - marshal concrete struct directly to verify wire format
-	t.Run("coreth", func(t *testing.T) {
-		request := message.CorethLeafsRequest{
-			Root:     common.BytesToHash([]byte("im ROOTing for ya")),
-			Account:  common.Hash{},
-			Start:    startBytes,
-			End:      endBytes,
-			Limit:    1024,
-			NodeType: message.StateTrieNode,
-		}
-
-		leafsRequestBytes, err := message.CorethCodec.Marshal(message.Version, request)
-		require.NoError(t, err)
-		require.Equal(t, corethLeafsRequestB64, base64.StdEncoding.EncodeToString(leafsRequestBytes))
-
-		var decoded message.CorethLeafsRequest
-		_, err = message.CorethCodec.Unmarshal(leafsRequestBytes, &decoded)
-		require.NoError(t, err)
-		require.Equal(t, request.Root, decoded.Root)
-		require.Equal(t, request.Start, decoded.Start)
-		require.Equal(t, request.End, decoded.End)
-		require.Equal(t, request.Limit, decoded.Limit)
-		require.Equal(t, request.NodeType, decoded.NodeType)
-	})
 
 	// Test subnet-evm format - marshal concrete struct directly to verify wire format
 	t.Run("subnet-evm", func(t *testing.T) {

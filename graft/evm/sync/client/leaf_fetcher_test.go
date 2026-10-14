@@ -68,7 +68,7 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 		},
 		{
 			name:     "storage_trie_over_coreth",
-			reqType:  message.CorethLeafsRequestType,
+			reqType:  message.SubnetEVMLeafsRequestType,
 			nodeType: message.NodeType(2),
 			req: hashdb.LeafRange{
 				Root:    root,
@@ -80,7 +80,7 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 				Keys: [][]byte{{0x03}},
 				Vals: [][]byte{{0x0c}},
 			},
-			wantReq: message.CorethLeafsRequest{
+			wantReq: message.SubnetEVMLeafsRequest{
 				Root:     root,
 				Account:  account,
 				Start:    []byte{0x01},

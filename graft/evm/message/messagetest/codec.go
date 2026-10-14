@@ -20,7 +20,6 @@ func ForEachCodec(t *testing.T, fn func(codec.Manager, message.LeafsRequestType)
 		leafReqType message.LeafsRequestType
 	}
 	codecs := map[string]codecEntry{
-		"coreth":     {message.CorethCodec, message.CorethLeafsRequestType},
 		"subnet-evm": {message.SubnetEVMCodec, message.SubnetEVMLeafsRequestType},
 	}
 	for name, entry := range codecs {
