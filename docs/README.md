@@ -17,6 +17,8 @@ that span multiple areas of the tree.
 - [CI disk space](./ci-disk-space.md) - shared CI runner disk-space policy and diagnostics
 - [Container image builds](./image-builds.md) - how repository tasks build
   container images and provide Go dependencies without module proxy access
+- [Go toolchains and dependency caches](./go-toolchains-and-caches.md) - compiler
+  requirements, dependency preparation, and cache boundaries across repository tasks
 - [Bazel](./bazel.md) - Bazel-related repository guidance
 - [External consumption](./external_consumption.md) - guidance for externally
   consumed repository outputs
