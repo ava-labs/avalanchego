@@ -338,14 +338,15 @@ func deleteUTXOsOwnedBy(t testing.TB, env *environment, diff *state.Diff, key *s
 	}
 }
 
-func newProofOfPossession(t testing.TB) *signer.ProofOfPossession {
+// newSignerWithPoP returns a new BLS signer and its proof of possession.
+func newSignerWithPoP(t testing.TB) (*localsigner.LocalSigner, *signer.ProofOfPossession) {
 	t.Helper()
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)
 	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(t, err)
-	return pop
+	return sk, pop
 }
 
 func newAdvanceTimeTx(t testing.TB, timestamp time.Time) *platform.Tx {
