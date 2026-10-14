@@ -29,7 +29,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 	type test struct {
 		name        string
 		backend     *Backend
-		diff        *state.Diff
+		updateState func(*testing.T, *state.Diff)
 		sTxF        func() *platform.Tx
 		txF         func() *platform.AddPermissionlessValidatorTx
 		expectedErr error
@@ -105,13 +105,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
 				},
 			},
-
-			diff: func() *state.Diff {
-				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(t, err)
-				diff.SetTimestamp(now)
-				return diff
-			}(),
 			sTxF: func() *platform.Tx {
 				return nil
 			},
@@ -129,12 +122,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: &utils.Atomic[bool]{},
 			},
-			diff: func() *state.Diff {
-				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(t, err)
-				diff.SetTimestamp(now)
-				return diff
-			}(),
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
@@ -152,12 +139,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			diff: func() *state.Diff {
-				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(t, err)
+			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.SetTimestamp(verifiedTx.StartTime())
-				return diff
-			}(),
+			},
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
@@ -175,13 +159,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			diff: func() *state.Diff {
-				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(t, err)
-				diff.SetTimestamp(now)
+			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.AddSubnetTransformation(&transformTx)
-				return diff
-			}(),
+			},
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
@@ -201,13 +181,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			diff: func() *state.Diff {
-				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(t, err)
-				diff.SetTimestamp(now)
+			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.AddSubnetTransformation(&transformTx)
-				return diff
-			}(),
+			},
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
@@ -227,13 +203,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			diff: func() *state.Diff {
-				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(t, err)
-				diff.SetTimestamp(now)
+			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.AddSubnetTransformation(&transformTx)
-				return diff
-			}(),
+			},
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
@@ -254,13 +226,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			diff: func() *state.Diff {
-				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(t, err)
-				diff.SetTimestamp(now)
+			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.AddSubnetTransformation(&transformTx)
-				return diff
-			}(),
+			},
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
@@ -284,13 +252,10 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			diff: func() *state.Diff {
-				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(t, err)
+			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.SetTimestamp(time.Unix(1, 0))
 				diff.AddSubnetTransformation(&transformTx)
-				return diff
-			}(),
+			},
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
@@ -314,13 +279,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			diff: func() *state.Diff {
-				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(t, err)
-				diff.SetTimestamp(now)
+			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.AddSubnetTransformation(&transformTx)
-				return diff
-			}(),
+			},
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
@@ -346,10 +307,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			diff: func() *state.Diff {
-				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(t, err)
-				diff.SetTimestamp(now)
+			updateState: func(t *testing.T, diff *state.Diff) {
 				diff.AddSubnetTransformation(&transformTx)
 				// State says validator exists
 				primaryNetworkVdr := &state.Staker{
@@ -364,8 +322,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					NodeID:   verifiedTx.NodeID(),
 				}
 				require.NoError(t, diff.PutCurrentValidator(staker))
-				return diff
-			}(),
+			},
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
@@ -383,10 +340,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			diff: func() *state.Diff {
-				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(t, err)
-				diff.SetTimestamp(now)
+			updateState: func(t *testing.T, diff *state.Diff) {
 				diff.AddSubnetTransformation(&transformTx)
 
 				// Validator time isn't subset of primary network validator time
@@ -396,8 +350,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					NodeID:   verifiedTx.NodeID(),
 				}
 				require.NoError(t, diff.PutCurrentValidator(primaryNetworkVdr))
-				return diff
-			}(),
+			},
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
@@ -415,10 +368,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				Ctx:          ctx,
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			diff: func() *state.Diff {
-				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(t, err)
-				diff.SetTimestamp(now)
+			updateState: func(t *testing.T, diff *state.Diff) {
 				diff.AddSubnetTransformation(&transformTx)
 				primaryNetworkVdr := &state.Staker{
 					EndTime:  mockable.MaxTime,
@@ -426,8 +376,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					NodeID:   verifiedTx.NodeID(),
 				}
 				require.NoError(t, diff.PutCurrentValidator(primaryNetworkVdr))
-				return diff
-			}(),
+			},
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
 			},
@@ -446,7 +395,14 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx      = tt.txF()
 			)
 
-			err := verifyAddPermissionlessValidatorTx(backend, tt.diff, sTx, tx)
+			diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(t, err)
+			diff.SetTimestamp(now)
+			if tt.updateState != nil {
+				tt.updateState(t, diff)
+			}
+
+			err = verifyAddPermissionlessValidatorTx(backend, diff, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
