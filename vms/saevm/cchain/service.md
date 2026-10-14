@@ -9,7 +9,7 @@ description: "This page is an overview of the C-Chain API associated with Avalan
 
 ### Endpoints
 
-The examples on this page call the public API node at `api.avax.network`. To call your own node, replace `https://api.avax.network` with `http://127.0.0.1:9650`, and `wss://api.avax.network` with `ws://127.0.0.1:9650`.
+The examples on this page call the public APIs at `api.avax.network`. To call your own node, replace `https://api.avax.network` with `http://127.0.0.1:9650`, and `wss://api.avax.network` with `ws://127.0.0.1:9650`.
 
 #### JSON-RPC Endpoints
 
@@ -27,7 +27,7 @@ To interact with C-Chain via the WebSocket endpoint:
 /ext/bc/C/ws
 ```
 
-For example, to interact with the C-Chain's Ethereum APIs via WebSocket on the public API node, you can use:
+For example, the public APIs serve the C-Chain's Ethereum WebSocket endpoint at:
 
 ```sh
 wss://api.avax.network/ext/bc/C/ws
@@ -111,7 +111,7 @@ Returns the chain configuration.
 eth_getChainConfig() -> {}
 ```
 
-`result` is the chain configuration object. The public API node doesn't serve this method, so this example calls a local node.
+`result` is the chain configuration object. The public APIs don't serve this method, so this example calls a local node.
 
 **Example Call:**
 
