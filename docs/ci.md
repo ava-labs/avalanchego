@@ -27,6 +27,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
     - [Nix store cache](#nix-store-cache)
     - [Binfmt image cache](#binfmt-image-cache)
       - [Validate binfmt cache changes](#validate-binfmt-cache-changes)
+    - [Kind image cache](#kind-image-cache)
     - [Changing input caches safely](#changing-input-caches-safely)
   - [Task](#task)
 - [Using Nix in GitHub Actions](#using-nix-in-github-actions)
@@ -578,6 +579,33 @@ that changes the cache:
 
 Keep the temporary exception limited to the binfmt cache. This check does not
 verify authenticated pulls on `master`.
+
+#### Kind image cache
+
+The `kind-images` setup job restores the exact shared cache. On an exact miss
+it creates it in a fresh Docker-in-Docker daemon with
+[`produce-kind-image-cache.sh`](../scripts/produce-kind-image-cache.sh). The
+job validates the cache, then uploads that exact directory as the `kind-images`
+workflow artifact. Kind consumers download the artifact rather than each
+restoring or producing a separate cache. Only `master` saves the immutable
+GitHub Actions cache entry.
+
+The cache contains host Docker images, Kind-node containerd images, and the
+Helm repository data needed to run the workload without network access. The
+producer records image-store inventories before and after the real robustness
+task and exports only their deltas. Its input digest changes with the Kind
+bootstrap, workload, cache scripts, Helm configuration, and selected tooling.
+
+The setup job runs
+`//tests/fixture/tmpnet:kind_chaos_image_cache_completeness_test`. The Bazel
+target declares the cache archives, manifest, and workload inputs. It starts a
+networkless nested Docker daemon, proves an unseeded pull fails, loads both
+image archives, imports the containerd archive after Kind creation, and runs
+the real `test-robustness` task. `AVALANCHEGO_KIND_OFFLINE=true` requires the
+containerd archive and disables Helm repository updates. The networkless daemon
+enforces that Docker, containerd, and kubelet can use only preloaded images.
+Do not add restore-key prefixes: an older cache must not validate a changed
+workload.
 
 #### Changing input caches safely
 
