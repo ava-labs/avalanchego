@@ -32,8 +32,8 @@ import (
 func (s *SUT) acceptBlockWith(ctx context.Context, tb testing.TB, stx *tx.Tx, ethTx *types.Transaction) *blocks.Block {
 	tb.Helper()
 
-	require.NoErrorf(tb, s.ethclient.SendTransaction(ctx, ethTx), "%T.SendTransaction()", s.ethclient)
-	s.waitForPendingEthTxs(ctx, tb, ethTx)
+	require.NoErrorf(tb, s.EthClient().SendTransaction(ctx, ethTx), "%T.SendTransaction()", s.EthClient())
+	s.WaitForPendingEthTxs(ctx, tb, ethTx)
 	blk := s.issueAndExecute(ctx, tb, stx)
 	assertBlockIncludes(tb, blk, types.Transactions{ethTx}, []*tx.Tx{stx})
 
@@ -109,11 +109,11 @@ func (s *SUT) bootstrapFrom(ctx context.Context, t *testing.T, src *SUT, fromHei
 
 	head := src.lastAcceptedHeight(ctx, t)
 	for height := fromHeight + 1; height <= head; height++ {
-		s.parseVerifyAccept(ctx, t, src.blockAtHeight(ctx, t, height))
+		s.ParseVerifyAccept(ctx, t, src.blockAtHeight(ctx, t, height))
 	}
 
 	require.NoErrorf(t, s.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", s.VM)
-	require.NoErrorf(t, s.SetPreference(ctx, s.lastAccepted(ctx, t), nil), "%T.SetPreference()", s.VM)
+	require.NoErrorf(t, s.SetPreference(ctx, s.LastAcceptedID(ctx, t), nil), "%T.SetPreference()", s.VM)
 }
 
 // assertChainsMatch asserts that s and other agree on the last-accepted block
@@ -121,7 +121,7 @@ func (s *SUT) bootstrapFrom(ctx context.Context, t *testing.T, src *SUT, fromHei
 func (s *SUT) assertChainsMatch(ctx context.Context, t *testing.T, other *SUT) {
 	t.Helper()
 
-	require.Equalf(t, other.lastAccepted(ctx, t), s.lastAccepted(ctx, t), "%T.LastAccepted()", s.VM)
+	require.Equalf(t, other.LastAcceptedID(ctx, t), s.LastAcceptedID(ctx, t), "%T.LastAccepted()", s.VM)
 
 	head := s.lastAcceptedHeight(ctx, t)
 	headBlk := s.blockAtHeight(ctx, t, head)
@@ -209,12 +209,12 @@ func TestStateSyncNewNode(t *testing.T) {
 
 	// dst keeps up with the network...
 	blk := src.produceBlocks(srcCtx, t, w, ethW, 1)
-	dst.parseVerifyAccept(ctx, t, blk)
+	dst.ParseVerifyAccept(ctx, t, blk)
 
 	// ...and produces a block of its own that src accepts.
 	dstW := newWallet(dstKey, dst.ctx, dst.Client)
 	dstBlk := dst.acceptBlockWith(ctx, t, dstW.newMinimalTx(t), newEthTx(t, ethW))
-	src.parseVerifyAccept(srcCtx, t, dstBlk)
+	src.ParseVerifyAccept(srcCtx, t, dstBlk)
 	dst.assertChainsMatch(ctx, t, src)
 }
 
