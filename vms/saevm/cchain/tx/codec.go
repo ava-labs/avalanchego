@@ -15,9 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 )
 
 const codecVersion uint16 = 0
@@ -89,7 +88,7 @@ func ParseSlice(b []byte) ([]*Tx, error) {
 // config specifies at b's timestamp.
 func FromBlock(config *params.ChainConfig, b *types.Block) ([]*Tx, error) {
 	extData := customtypes.BlockExtData(b)
-	if corethparams.GetExtra(config).IsApricotPhase5(b.Time()) {
+	if cparams.GetExtra(config).IsApricotPhase5(b.Time()) {
 		return ParseSlice(extData)
 	}
 	if len(extData) == 0 {
