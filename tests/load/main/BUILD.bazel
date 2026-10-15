@@ -26,3 +26,18 @@ go_binary(
     embed = [":main_lib"],
     visibility = ["//visibility:public"],
 )
+
+sh_binary(
+    name = "runner",
+    testonly = True,
+    srcs = ["//scripts:tests.load.bazel.sh"],
+    args = [
+        "$(location //main:avalanchego)",
+        "$(location :main)",
+    ],
+    data = [
+        ":main",
+        "//main:avalanchego",
+    ],
+    visibility = ["//visibility:public"],
+)

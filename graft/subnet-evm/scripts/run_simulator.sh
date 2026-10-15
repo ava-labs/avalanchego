@@ -20,14 +20,17 @@ source "$SUBNET_EVM_PATH"/scripts/constants.sh
 
 run_simulator() {
     #################################
-    echo "building simulator"
-    pushd ./cmd/simulator
-    go build -o ./simulator main/*.go
-    echo
+    if [[ -z "${SIMULATOR_PATH:-}" ]]; then
+        echo "building simulator"
+        pushd ./cmd/simulator
+        go build -o ./simulator main/*.go
+        echo
+        popd
+        SIMULATOR_PATH=./cmd/simulator/simulator
+    fi
 
-    popd
     echo "running simulator from $PWD"
-    ./cmd/simulator/simulator \
+    "${SIMULATOR_PATH}" \
         --endpoints="$RPC_ENDPOINTS" \
         --key-dir=./cmd/simulator/.simulator/keys \
         --timeout=300s \

@@ -487,7 +487,7 @@ bazel test //utils:set_test --test_filter=TestSet_Add
 bazel coverage //...
 ```
 
-#### E2E runner
+#### E2E and monitored test runners
 
 ```bash
 # Run all E2E tests with Bazel-built runtime dependencies
@@ -498,6 +498,20 @@ task bazel-test-e2e-serial
 
 # Run only the C-Chain ProposerVM API test
 task bazel-test-e2e-smoke
+
+# Run the network-reuse E2E test
+task bazel-test-e2e-existing-network
+
+# Run the latest-version activation variants
+task bazel-test-e2e-post-latest
+task bazel-test-e2e-schedule-latest
+
+# Run the other monitored tests
+task bazel-test-load-subnet-evm
+task bazel-test-warp-subnet-evm
+task bazel-test-load
+task bazel-test-load-ci # Runs with the 30-second CI load duration
+task bazel-test-upgrade
 ```
 
 `task bazel-test-e2e` runs `bazel run //tests/e2e:e2e_runner`. The
@@ -508,10 +522,10 @@ The [Bazel runner](../scripts/tests.e2e.bazel.sh) uses the
 Bazel can cache the binary builds. E2E test execution does not use cached test
 results.
 
-[CI builds and executes E2E tests in one job](../.github/workflows/bazel.yml)
-through the same tasks used locally.
-This follows the [CI entrypoint conventions](./ci.md#principles) and avoids a
-separate artifact lifecycle. Remote caching lets each job reuse compiled outputs.
+[CI runs the primary E2E suite and monitored tests](../.github/workflows/bazel.yml)
+through the same tasks used locally. The Go workflow also runs the primary E2E
+suite to test the pure-Go build. Remote caching lets each job reuse compiled
+outputs.
 
 The Bazel entrypoint uses `bazel run`, not `bazel test`. It keeps network data
 available for inspection after a failure. Network data defaults to `$HOME/.tmpnet`.
@@ -674,7 +688,8 @@ reasons outside the repository. A smaller job set reduces that risk.
 
 Non-scheduled Bazel CI runs these jobs:
 
-- Linux pre-merge CI runs the full cacheable unit-test suite and full E2E suite.
+- Linux pre-merge CI runs the full cacheable unit-test suite, full E2E suite,
+  and binary-consuming E2E, load, and upgrade jobs.
 - macOS pre-merge CI runs one cacheable unit-test smoke target and one focused
   E2E smoke test.
 

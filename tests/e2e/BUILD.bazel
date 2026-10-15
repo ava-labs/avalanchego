@@ -52,6 +52,7 @@ sh_binary(
     data = [
         ":e2e_test_binary",
         "//main:avalanchego",
+        "//scripts:tests.e2e.existing.sh",
         "//scripts:tests.e2e.sh",
         "//vms/example/xsvm/cmd/xsvm",
         "@com_github_onsi_ginkgo_v2//ginkgo",

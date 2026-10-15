@@ -1,0 +1,10 @@
+package(default_visibility = [
+    "//graft/subnet-evm:__subpackages__",
+    "//graft/subnet-evm:external_consumers",
+])
+
+exports_files([
+    "run.sh",
+    "run_simulator.sh",
+    "tests.e2e.bazel.sh",
+])
