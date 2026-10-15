@@ -12,15 +12,14 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
@@ -34,7 +33,7 @@ func TestBuildHeaderHeliconOverride(t *testing.T) {
 	snowCtx := newSnowCtx(t, networkUpgrades)
 	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgradetest.Helicon])
 	legacyparams.GetExtra(&chainCfg).Override(&extras.NetworkUpgrades{
-		HeliconTimestamp: utils.PointerTo(uint64(heliconTime.Unix())), //#nosec G115 -- known positive test timestamp
+		HeliconTimestamp: new(uint64(heliconTime.Unix())), //#nosec G115 -- known positive test timestamp
 	})
 	parent := &types.Header{
 		Number: new(big.Int),
@@ -105,7 +104,7 @@ func TestGasConfigAfterGenesisCanonicalTarget(t *testing.T) {
 			}
 			legacyparams.GetExtra(&chainCfg).GenesisPrecompiles = extras.Precompiles{
 				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-					utils.PointerTo[uint64](0),
+					new(uint64(0)),
 					nil,
 					nil,
 					nil,
@@ -142,8 +141,8 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 
 	parent := &types.Header{Number: big.NewInt(1), Time: parentTimeMS / 1000}
 	customtypes.SetHeaderExtra(parent, &customtypes.HeaderExtra{
-		TimeMilliseconds: utils.PointerTo(parentTimeMS),
-		MinDelayExponent: utils.PointerTo(dynamic.InitialDelayExponent),
+		TimeMilliseconds: new(parentTimeMS),
+		MinDelayExponent: new(dynamic.InitialDelayExponent),
 	})
 	tx := types.NewTx(&types.DynamicFeeTx{Gas: 21_000, Value: big.NewInt(0)})
 	settled := &types.Header{Number: big.NewInt(0), Time: parent.Time}
@@ -219,8 +218,8 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 
 	parent := &types.Header{Number: big.NewInt(1), Time: parentTimeMS / 1000}
 	customtypes.SetHeaderExtra(parent, &customtypes.HeaderExtra{
-		TimeMilliseconds: utils.PointerTo(parentTimeMS),
-		MinDelayExponent: utils.PointerTo(dynamic.InitialDelayExponent),
+		TimeMilliseconds: new(parentTimeMS),
+		MinDelayExponent: new(dynamic.InitialDelayExponent),
 	})
 	tx := types.NewTx(&types.DynamicFeeTx{Gas: 21_000, Value: big.NewInt(0)})
 	settled := &types.Header{Number: big.NewInt(0), Time: parent.Time}
@@ -237,8 +236,8 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 		Number:   new(big.Int).Add(parent.Number, common.Big1),
 	}
 	customtypes.SetHeaderExtra(forgedHdr, &customtypes.HeaderExtra{
-		TimeMilliseconds: utils.PointerTo(nowMS),
-		MinDelayExponent: utils.PointerTo(dynamic.InitialDelayExponent),
+		TimeMilliseconds: new(nowMS),
+		MinDelayExponent: new(dynamic.InitialDelayExponent),
 	})
 	forgedBlock := types.NewBlockWithHeader(forgedHdr)
 
@@ -253,7 +252,7 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	require.Equal(t, constants.BlackholeAddr, rebuilt.Header().Coinbase,
+	require.Equal(t, blackhole.Address, rebuilt.Header().Coinbase,
 		"deterministic branch MUST stamp BlackholeAddr regardless of received Coinbase")
 	require.NotEqual(t, forgedCoinbase, rebuilt.Header().Coinbase,
 		"rebuilder MUST NOT echo the forged Coinbase")
@@ -262,7 +261,7 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 }
 
 func TestVerifyBlockSyntaxGasConfigGroup(t *testing.T) {
-	one := utils.PointerTo[uint64](1)
+	one := new(uint64(1))
 	tests := []struct {
 		name    string
 		extra   customtypes.HeaderExtra

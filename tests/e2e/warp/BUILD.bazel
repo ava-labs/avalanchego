@@ -56,10 +56,10 @@ go_test(
     tags = ["manual"],
     deps = [
         "//config",
-        "//graft/coreth/plugin/evm",
         "//tests/fixture/e2e",
         "//tests/fixture/tmpnet",
         "//upgrade/upgradetest",
+        "//vms/saevm/cchain/libevm",
         "@com_github_onsi_ginkgo_v2//:ginkgo",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_zap//:zap",

@@ -17,11 +17,11 @@ import (
 	"github.com/spf13/cast"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
@@ -217,7 +217,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 	config.MempoolConfig.Lifetime = c.TxPoolLifetime.Duration
 	config.DBConfig.Archival = !c.PruningEnabled
 	config.DBConfig.CommitInterval = c.CommitInterval
-	config.RPCConfig.EVMTimeout = c.APIMaxDuration.Duration
+	config.RPCConfig.CallTimeout = c.APIMaxDuration.Duration
 	config.RPCConfig.GasCap = c.RPCGasCap
 	config.RPCConfig.BatchRequestLimit = c.BatchRequestLimit
 	config.RPCConfig.TxFeeCap = c.RPCTxFeeCap
@@ -243,7 +243,7 @@ func (c config) desired() desiredParams {
 // feeRecipient resolves the local node's preferred fee recipient for
 // inclusion in `header.Coinbase` when the chain allows custom fee
 // recipients. Empty / unset [config.FeeRecipient] defaults to
-// [constants.BlackholeAddr] (explicit burn). If the operator left it unset
+// [blackhole.Address] (explicit burn). If the operator left it unset
 // on a chain where fee routing CAN go to a custom address (genesis-flag
 // `AllowFeeRecipients=true` or rewardmanager precompile configured anywhere
 // in the chain config -- not necessarily activated), log a warning so they
@@ -257,7 +257,7 @@ func (c config) feeRecipient(chainConfig *legacyparams.ChainConfig, log logging.
 			zap.String("reason", reason),
 		)
 	}
-	return constants.BlackholeAddr
+	return blackhole.Address
 }
 
 // chainAllowsCustomFeeRecipient reports whether the chain config (genesis

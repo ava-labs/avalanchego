@@ -11,9 +11,9 @@ import (
 
 	"github.com/ava-labs/libevm/log"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 // ErrFeeManagerEnabledAfterHelicon is returned when a feeManager configuration

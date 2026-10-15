@@ -162,10 +162,6 @@ func NewWarpACP118SignatureAggregator(
 	}
 	sender.network = net
 
-	peerSet := &p2p.Peers{}
-	for id := range peers {
-		peerSet.Connected(id, nil)
-	}
-	client := net.NewClient(p2p.SignatureRequestHandlerID, p2p.PeerSampler{Peers: peerSet})
+	client := net.NewClient(p2p.SignatureRequestHandlerID)
 	return acp118.NewSignatureAggregator(log, client), nil
 }

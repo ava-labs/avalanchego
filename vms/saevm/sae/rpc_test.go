@@ -7,11 +7,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"math/big"
 	"os"
 	"reflect"
 	"runtime/debug"
+	"slices"
 	"testing"
 	"time"
 
@@ -39,7 +41,7 @@ import (
 	_ "github.com/ava-labs/libevm/core/txpool"
 	_ "github.com/ava-labs/libevm/eth/filters"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -47,6 +49,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	ethereum "github.com/ava-labs/libevm"
 )
 
@@ -114,7 +117,7 @@ func (s *SUT) testRPC(ctx context.Context, t *testing.T, tcs ...rpcTest) {
 			if tc.parallel {
 				t.Parallel()
 			}
-			t.Logf("%T.CallContext(ctx, %T, %q, %v...)", s.rpcClient, &tc.want, tc.method, tc.args)
+			t.Logf("%T.CallContext(ctx, %T, %q, %v...)", s.Client.RPC, &tc.want, tc.method, tc.args)
 			if tc.eventually {
 				require.EventuallyWithT(t, func(c *assert.CollectT) {
 					test(c)
@@ -173,7 +176,7 @@ func TestSubscriptions(t *testing.T) {
 		newLogs  = make(chan types.Log, 1)
 	)
 	{
-		sub, err := sut.rpcClient.EthSubscribe(ctx, newTxs, "newPendingTransactions")
+		sub, err := sut.EthSubscribe(ctx, newTxs, "newPendingTransactions")
 		require.NoError(t, err, "EthSubscribe(newPendingTransactions)")
 		t.Cleanup(sub.Unsubscribe)
 	}
@@ -565,7 +568,7 @@ func TestEthGetters(t *testing.T) {
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
 	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
-	ctx, sut := newSUT(t, 1, timeOpt, precompileOpt, withDebugAPI())
+	ctx, sut := newSUT(t, 1, timeOpt, precompileOpt, withAllAPIs())
 	t.Cleanup(unblock)
 
 	t.Run("unknown_hashes", func(t *testing.T) {
@@ -641,7 +644,7 @@ func TestEthGetters(t *testing.T) {
 }
 
 func TestMempoolTxGetters(t *testing.T) {
-	ctx, sut := newSUT(t, 1, withDebugAPI())
+	ctx, sut := newSUT(t, 1, withAllAPIs())
 
 	// These RPC methods use GetPoolTransaction, which returns any transaction
 	// accepted into the pool regardless of pending/queued status. A
@@ -876,7 +879,7 @@ func TestEthPendingTransactions(t *testing.T) {
 
 func TestGetReceipts(t *testing.T) {
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	ctx, sut := newSUT(t, 2, timeOpt, withDebugAPI())
+	ctx, sut := newSUT(t, 2, timeOpt, withAllAPIs())
 
 	var (
 		txs  []*types.Transaction
@@ -927,7 +930,7 @@ func TestGetReceipts(t *testing.T) {
 			r.CumulativeGasUsed = totalGas
 			r.BlockHash = b.Hash()
 			r.BlockNumber = b.Number()
-			r.TransactionIndex = uint(i) //#nosec G115 -- Known non-negative
+			r.TransactionIndex = uint(i)
 		}
 		return b, rs
 	}
@@ -1105,9 +1108,9 @@ func TestFillTransaction(t *testing.T) {
 	}
 
 	args := ethapi.TransactionArgs{
-		From:  utils.PointerTo(sut.wallet.Addresses()[0]),
+		From:  new(sut.wallet.Addresses()[0]),
 		To:    &to,
-		Gas:   utils.PointerTo(hexutil.Uint64(gas)),
+		Gas:   new(hexutil.Uint64(gas)),
 		Value: hexBig(value),
 	}
 
@@ -1152,10 +1155,10 @@ func TestResend(t *testing.T) {
 		method: "eth_resend",
 		args: []any{
 			ethapi.TransactionArgs{
-				From:                 utils.PointerTo(sut.wallet.Addresses()[0]),
-				Nonce:                utils.PointerTo(hexutil.Uint64(tx.Nonce())),
+				From:                 new(sut.wallet.Addresses()[0]),
+				Nonce:                new(hexutil.Uint64(tx.Nonce())),
 				To:                   tx.To(),
-				Gas:                  utils.PointerTo(hexutil.Uint64(tx.Gas())),
+				Gas:                  new(hexutil.Uint64(tx.Gas())),
 				MaxFeePerGas:         (*hexutil.Big)(tx.GasFeeCap()),
 				MaxPriorityFeePerGas: (*hexutil.Big)(tx.GasTipCap()),
 			},
@@ -1174,10 +1177,10 @@ func TestEthSigningAPIs(t *testing.T) {
 	txFields := ethapi.TransactionArgs{
 		From:     &zeroAddr,
 		To:       &zeroAddr,
-		Gas:      utils.PointerTo(hexutil.Uint64(params.TxGas)),
+		Gas:      new(hexutil.Uint64(params.TxGas)),
 		GasPrice: hexBig(1),
 		Value:    hexBig(100),
-		Nonce:    utils.PointerTo(hexutil.Uint64(0)),
+		Nonce:    new(hexutil.Uint64),
 	}
 	sut.testRPC(ctx, t, []rpcTest{
 		{
@@ -1283,7 +1286,7 @@ func TestUnprotectedTxs(t *testing.T) {
 }
 
 func TestDebugRPCs(t *testing.T) {
-	ctx, sut := newSUT(t, 0, withDebugAPI())
+	ctx, sut := newSUT(t, 0, withAllAPIs())
 
 	sut.testRPC(ctx, t, []rpcTest{
 		{
@@ -1397,7 +1400,7 @@ func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block
 	}...)
 
 	for i, wantTx := range want.Transactions() {
-		txIdx := hexutil.Uint(i) //#nosec G115 -- Won't overflow
+		txIdx := hexutil.Uint(i)
 		marshaled, err := wantTx.MarshalBinary()
 		require.NoErrorf(t, err, "%T.MarshalBinary()", wantTx)
 
@@ -1430,7 +1433,7 @@ func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block
 		}...)
 	}
 
-	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1) //#nosec G115 -- Known to not overflow
+	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1)
 	s.testRPC(ctx, t, []rpcTest{
 		{
 			method: "eth_getTransactionByBlockHashAndIndex",
@@ -1543,7 +1546,7 @@ func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Blo
 	}...)
 
 	for i, wantTx := range want.Transactions() {
-		txIdx := hexutil.Uint(i) //#nosec G115 -- Won't overflow
+		txIdx := hexutil.Uint(i)
 		marshaled, err := wantTx.MarshalBinary()
 		require.NoErrorf(t, err, "%T.MarshalBinary()", wantTx)
 
@@ -1561,7 +1564,7 @@ func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Blo
 		}...)
 	}
 
-	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1) //#nosec G115 -- Known to not overflow
+	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1)
 	s.testRPC(ctx, t, []rpcTest{
 		{
 			method: "eth_getTransactionByBlockNumberAndIndex",
@@ -1625,12 +1628,68 @@ func withTxFeeCap(feeCap float64) sutOption {
 	})
 }
 
-// withDebugAPI returns a sutOption that enables the debug API.
-func withDebugAPI() sutOption {
+// withAPIs returns a sutOption that serves only the APIs in apis.
+func withAPIs(apis set.Set[saerpc.API]) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.RPCConfig.EnableDBInspecting = true
-		c.vmConfig.RPCConfig.EnableProfiling = true
+		c.vmConfig.RPCConfig.APIs = apis
 	})
+}
+
+// withAllAPIs returns a sutOption that serves every API, including those
+// excluded from [saerpc.DefaultAPIs].
+func withAllAPIs() sutOption {
+	return withAPIs(saerpc.AllAPIs())
+}
+
+// errCodeMethodNotFound is the JSON-RPC 2.0 code returned for a method the
+// server doesn't serve. libevm's rpc package doesn't export it.
+const errCodeMethodNotFound = -32601
+
+// methodRegistered reports whether sut serves method.
+func methodRegistered(ctx context.Context, tb testing.TB, sut *SUT, method string) bool {
+	tb.Helper()
+
+	err := sut.CallContext(ctx, new(json.RawMessage), method)
+	if err == nil {
+		return true
+	}
+	var rpcErr rpc.Error
+	require.ErrorAsf(tb, err, &rpcErr, "%T.CallContext(%q)", sut, method)
+	return rpcErr.ErrorCode() != errCodeMethodNotFound
+}
+
+func TestAPIsServed(t *testing.T) {
+	// A method served by each API and no other.
+	methods := map[saerpc.API]string{
+		saerpc.APIWeb3:         "web3_clientVersion",
+		saerpc.APINet:          "net_version",
+		saerpc.APITxPool:       "txpool_status",
+		saerpc.APIPrice:        "eth_gasPrice",
+		saerpc.APIChain:        "eth_blockNumber",
+		saerpc.APITx:           "eth_getTransactionCount",
+		saerpc.APISubscription: "eth_getLogs",
+		saerpc.APIAvalanche:    "eth_callDetailed",
+		saerpc.APIDB:           "debug_dbGet",
+		saerpc.APIProfile:      "debug_gcStats",
+		saerpc.APITrace:        "debug_traceBlockByNumber",
+	}
+	require.Equal(t, saerpc.AllAPIs(), set.Of(slices.Collect(maps.Keys(methods))...), "every API has a method")
+
+	configs := map[string]set.Set[saerpc.API]{
+		"all":     saerpc.AllAPIs(),
+		"default": saerpc.DefaultAPIs(),
+	}
+	for api := range methods {
+		configs["only_"+string(api)] = set.Of(api)
+	}
+	for name, apis := range configs {
+		t.Run(name, func(t *testing.T) {
+			ctx, sut := newSUT(t, 0, withAPIs(apis))
+			for api, method := range methods {
+				assert.Equalf(t, apis.Contains(api), methodRegistered(ctx, t, sut, method), "%s served with %v enabled", method, apis)
+			}
+		})
+	}
 }
 
 func TestResolveBlockNumberOrHash(t *testing.T) {
@@ -1671,7 +1730,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "both_num_and_hash",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockNumber: utils.PointerTo(rpc.LatestBlockNumber),
+				BlockNumber: new(rpc.LatestBlockNumber),
 				BlockHash:   &common.Hash{},
 			},
 			wantErr: blocks.ErrBothNumberAndHash,
@@ -1685,7 +1744,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "canonical_hash_in_memory",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash: utils.PointerTo(accepted.Hash()),
+				BlockHash: new(accepted.Hash()),
 			},
 			wantNum:  accepted.NumberU64(),
 			wantHash: accepted.Hash(),
@@ -1693,7 +1752,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "canonical_hash_on_disk",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash: utils.PointerTo(settled.Hash()),
+				BlockHash: new(settled.Hash()),
 			},
 			wantNum:  settled.NumberU64(),
 			wantHash: settled.Hash(),
@@ -1701,7 +1760,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "non_canonical_when_canonical_not_required",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash: utils.PointerTo(nonCanonical.Hash()),
+				BlockHash: new(nonCanonical.Hash()),
 			},
 			wantNum:  nonCanonical.NumberU64(),
 			wantHash: nonCanonical.Hash(),
@@ -1709,7 +1768,7 @@ func TestResolveBlockNumberOrHash(t *testing.T) {
 		{
 			name: "non_canonical_when_canonical_required",
 			nOrH: rpc.BlockNumberOrHash{
-				BlockHash:        utils.PointerTo(nonCanonical.Hash()),
+				BlockHash:        new(nonCanonical.Hash()),
 				RequireCanonical: true,
 			},
 			wantErr: blocks.ErrNonCanonicalBlock,

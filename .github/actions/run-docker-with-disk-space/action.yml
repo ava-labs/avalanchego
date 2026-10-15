@@ -13,17 +13,77 @@ inputs:
     description: 'Whether to set up QEMU before running the command'
     required: false
     default: 'false'
+  binfmt-image:
+    description: 'Digest-pinned binfmt image for a Linux AMD64 Docker host'
+    required: false
+    # CI continues to use AMD64 build runners, so pin the AMD64 binfmt image.
+    # Multi-platform builds do not require the host to use AMD64.
+    # This digest selects one platform, not a multi-platform index.
+    default: docker.io/tonistiigi/binfmt@sha256:465d3fdd28d0f2b871ba4b4ec98bd183292e96167f00d9fd40bd249f8632d705
+  docker-username:
+    description: 'Docker Hub username for a binfmt cache miss'
+    required: false
+  docker-password:
+    description: 'Docker Hub password for a binfmt cache miss'
+    required: false
 
 runs:
   using: composite
   steps:
+    - name: Login to Docker Hub
+      if: ${{ inputs.docker-username != '' && inputs.docker-password != '' }}
+      uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
+      with:
+        username: ${{ inputs.docker-username }}
+        password: ${{ inputs.docker-password }}
+
     - uses: ./.github/actions/ensure-disk-space
       with:
         diagnostic-groups: docker
 
+    # Ensure golang is installed after tool cache removal by ensure-disk-space
+    - uses: ./.github/actions/setup-go-for-project
+
+    - id: binfmt-image
+      if: ${{ inputs.setup-qemu == 'true' }}
+      shell: bash
+      env:
+        BINFMT_IMAGE: ${{ inputs.binfmt-image }}
+      run: |
+        cache_key="binfmt-v1-${BINFMT_IMAGE#*@sha256:}-linux-amd64"
+        {
+          echo "image=$BINFMT_IMAGE"
+          echo "cache-key=$cache_key"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Restore binfmt image
+      id: restore-binfmt-image
+      if: ${{ inputs.setup-qemu == 'true' }}
+      uses: actions/cache/restore@v5
+      with:
+        path: ~/.cache/avalanchego/binfmt
+        key: ${{ steps.binfmt-image.outputs.cache-key }}
+
+    - id: cache-policy
+      uses: ./.github/actions/cache-policy
+      with:
+        request-cache-save: ${{ inputs.setup-qemu == 'true' && steps.restore-binfmt-image.outputs.cache-hit != 'true' }}
+
     - name: Set up QEMU (required for cross-platform builds)
       if: ${{ inputs.setup-qemu == 'true' }}
-      uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
+      shell: bash
+      env:
+        BINFMT_CACHE_HIT: ${{ steps.restore-binfmt-image.outputs.cache-hit }}
+        BINFMT_IMAGE: ${{ steps.binfmt-image.outputs.image }}
+        CACHE_BINFMT_IMAGE: ${{ steps.cache-policy.outputs.cache-save-allowed }}
+      run: bash "$GITHUB_ACTION_PATH/setup-qemu.sh"
+
+    - name: Cache binfmt image
+      if: ${{ steps.cache-policy.outputs.cache-save-allowed == 'true' }}
+      uses: actions/cache/save@v5
+      with:
+        path: ~/.cache/avalanchego/binfmt
+        key: ${{ steps.binfmt-image.outputs.cache-key }}
 
     - name: Run command with Docker failure diagnostics
       shell: bash

@@ -13,15 +13,20 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+
+	_ "github.com/ava-labs/avalanchego/vms/saevm/firewood" // registers metrics
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -31,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/unwind"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
@@ -41,17 +47,20 @@ import (
 
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	evmprometheus "github.com/ava-labs/avalanchego/vms/evm/metrics/prometheus"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	ethmetrics "github.com/ava-labs/libevm/metrics"
 )
 
 // directory that stores execution results database under the chain data directory
 const executionResultsDir = "sae_execution_results"
 
+func ExecutionResultsPath(chainDataDir string) string {
+	return filepath.Join(chainDataDir, executionResultsDir)
+}
+
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,
-// which needs to be provided by a harness. In all cases, the harness MUST
-// ensure that the last-synchronous block (which MAY be the genesis) is
-// canonical on disk with its post-execution state committed before [NewVM] is
-// called.
+// which needs to be provided by a harness.
 type VM struct {
 	network *network.Network
 	hooks   hook.Points
@@ -66,7 +75,8 @@ type VM struct {
 
 	preference atomic.Pointer[blocks.Block]
 	last       struct {
-		accepted, settled atomic.Pointer[blocks.Block]
+		accepted atomic.Pointer[blocks.Block]
+		settled  *atomic.Pointer[blocks.Block]
 	}
 	acceptedBlocks event.FeedOf[*blocks.Block]
 	// Consensus-critical blocks are those either (a) undergoing a consensus
@@ -110,6 +120,7 @@ func DefaultConfig() Config {
 			SnapshotCacheMiB: saedb.DefaultSnapshotCacheSizeMiB,
 		},
 		RPCConfig: rpc.Config{
+			APIs:                         rpc.DefaultAPIs(),
 			GasCap:                       50_000_000,
 			TxFeeCap:                     100,
 			BatchRequestLimit:            1000,
@@ -132,9 +143,10 @@ func (c Config) Verify() error {
 // NewVM returns a new [VM] that is ready for use immediately upon return.
 // [VM.Shutdown] MUST be called to release resources.
 //
-// The state root of the last synchronous block MUST be available when creating
-// a [triedb.Database] from the provided [ethdb.Database] and [triedb.Config]
-// (the latter provided via the [Config]).
+// The genesis block MUST be canonical in the provided [ethdb.Database]. The
+// post-execution state of the genesis, or of a later settled block, MUST be
+// available when creating a [triedb.Database] from the provided
+// [ethdb.Database] and [triedb.Config] (the latter provided via the [Config]).
 func NewVM[T hook.Transaction](
 	ctx context.Context,
 	hooks hook.PointsG[T],
@@ -167,10 +179,15 @@ func NewVM[T hook.Transaction](
 	if err != nil {
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
+	if err := snowCtx.Metrics.Register(customrawdb.FirewoodScheme, ffi.Gatherer{}); err != nil {
+		return nil, fmt.Errorf("registering firewood metrics: %w", err)
+	}
+	if err := snowCtx.Metrics.Register("eth", evmprometheus.NewGatherer(ethmetrics.DefaultRegistry)); err != nil {
+		return nil, fmt.Errorf("registering libevm metrics: %w", err)
+	}
 
 	// ==========  Execution Results DB  ==========
-	xdbDir := filepath.Join(snowCtx.ChainDataDir, executionResultsDir)
-
+	xdbDir := ExecutionResultsPath(snowCtx.ChainDataDir)
 	xdb, err := hooks.ExecutionResultsDB(xdbDir)
 	if err != nil {
 		return nil, fmt.Errorf("%T.ExecutionResultsDB(%q): %w", hooks, xdbDir, err)
@@ -178,11 +195,21 @@ func NewVM[T hook.Transaction](
 	closers.Push(&xdb)
 
 	// ==========  Block State  ==========
-	exec, consensusCritical, err := recoverExecutor(ctx, db, xdb, chainConfig, snowCtx, hooks, cfg, reg)
+	lastSettled := new(atomic.Pointer[blocks.Block])
+	exec, consensusCritical, err := recoverExecutor(ctx, db, xdb, lastSettled, chainConfig, snowCtx, hooks, cfg, reg)
 	if err != nil {
 		return nil, fmt.Errorf("creating new execution: %w", err)
 	}
-	closers.Push(exec)
+	closers.Push(
+		unwind.CloserFunc(func() error {
+			// We MUST NOT write a root that is more advanced than the last settled
+			// root to ensure that firewood is able to restart.
+			return exec.Tracker.Close(exec.LastExecuted().SettledStateRoot())
+		}),
+		// The executor MUST be closed before the tracker, and unwinding is
+		// performed in reverse order.
+		exec,
+	)
 
 	// ==========  Mempool & P2P Gossip  ==========
 	admitter := newAdmitter(exec, hooks, chainConfig)
@@ -215,6 +242,7 @@ func NewVM[T hook.Transaction](
 		newTxs:  newTxs,
 		closers: closers,
 	}
+	vm.last.settled = lastSettled
 
 	// ==========  Frontiers  ==========
 	{
@@ -224,7 +252,7 @@ func NewVM[T hook.Transaction](
 
 		s := e.LastSettled()
 		vm.last.settled.Store(s)
-		metrics.markSettled(s.Height())
+		metrics.setFrontiers(s, blocks.Range(s, e))
 	}
 
 	// ==========  RPC Provider  ==========
@@ -388,6 +416,11 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 func (vm *VM) numPendingTxs() int {
 	p, _ := vm.mempool.Pool.Stats()
 	return p
+}
+
+// EVMState returns direct access to the databases that control the EVM state.
+func (vm *VM) EVMState() (*triedb.Database, *snapshot.Tree) {
+	return vm.exec.TrieDB(), vm.exec.Snapshot()
 }
 
 // SetState notifies the VM of a transition in the state lifecycle.

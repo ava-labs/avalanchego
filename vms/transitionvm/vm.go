@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -44,6 +45,7 @@ type VM struct {
 	preTransitionChain  Chain
 	postTransitionChain Chain
 	transitionTime      time.Time
+	now                 func() time.Time
 	apiDrainTimeout     time.Duration
 
 	// chain parameters
@@ -142,7 +144,33 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("loading last accepted block %s: %w", lastAcceptedID, err)
 	}
 	if lastAccepted.Timestamp().Before(vm.transitionTime) {
-		return nil
+		if vm.now().Before(vm.transitionTime) {
+			return nil
+		}
+		// Transitioning is only safe once the network has sequenced at least
+		// one commit interval of blocks after the transition, so peers have a
+		// post-transition summary to serve. The production networks are known
+		// to satisfy this; a custom network may not, so it waits for the
+		// transition block instead.
+		if !constants.ProductionNetworkIDs.Contains(preChainCtx.NetworkID) {
+			log.Info("past transition time on a non-production network; waiting for the transition block")
+			return nil
+		}
+		// The network is past the transition time, so peers only serve the
+		// post-transition chain's state summaries.
+		if lastAccepted.Height() > 0 {
+			log.Info("past transition time with accepted pre-transition blocks; waiting for the transition block")
+			return nil
+		}
+		enabled, err := vm.StateSyncEnabled(ctx)
+		if err != nil {
+			return fmt.Errorf("checking whether the node will state sync: %w", err)
+		}
+		if !enabled {
+			log.Info("past transition time but not state syncing; waiting for the transition block")
+			return nil
+		}
+		log.Info("transitioning eagerly to state sync as the post-transition chain")
 	}
 	return vm.transition(ctx, lastAccepted)
 }

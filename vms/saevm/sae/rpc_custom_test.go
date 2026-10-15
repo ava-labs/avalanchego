@@ -22,7 +22,6 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
@@ -86,13 +85,13 @@ func TestNewAcceptedTransactions(t *testing.T) {
 
 	hashes := make(chan common.Hash, 1)
 	{
-		sub, err := sut.rpcClient.EthSubscribe(ctx, hashes, "newAcceptedTransactions")
+		sub, err := sut.EthSubscribe(ctx, hashes, "newAcceptedTransactions")
 		require.NoErrorf(t, err, "EthSubscribe(newAcceptedTransactions)")
 		t.Cleanup(sub.Unsubscribe)
 	}
 	txs := make(chan *ethapi.RPCTransaction, 1)
 	{
-		sub, err := sut.rpcClient.EthSubscribe(ctx, txs, "newAcceptedTransactions", true)
+		sub, err := sut.EthSubscribe(ctx, txs, "newAcceptedTransactions", true)
 		require.NoErrorf(t, err, "EthSubscribe(newAcceptedTransactions, true)")
 		t.Cleanup(sub.Unsubscribe)
 	}
@@ -160,7 +159,7 @@ func TestCallDetailed(t *testing.T) {
 			args: []any{
 				ethapi.TransactionArgs{
 					To:   &escrowAddr,
-					Data: utils.PointerTo(hexutil.Bytes(escrow.CallDataForBalance(recipient))),
+					Data: new(hexutil.Bytes(escrow.CallDataForBalance(recipient))),
 				},
 				latest,
 			},
@@ -175,7 +174,7 @@ func TestCallDetailed(t *testing.T) {
 				ethapi.TransactionArgs{
 					From: &noBalance,
 					To:   &escrowAddr,
-					Data: utils.PointerTo(hexutil.Bytes(escrow.CallDataToWithdraw())),
+					Data: new(hexutil.Bytes(escrow.CallDataToWithdraw())),
 				},
 				latest,
 			},
@@ -195,7 +194,7 @@ func TestCallDetailed(t *testing.T) {
 			args: []any{
 				ethapi.TransactionArgs{
 					To:   &echoReverter,
-					Data: utils.PointerTo(hexutil.Bytes{42}),
+					Data: new(hexutil.Bytes{42}),
 				},
 				latest,
 			},
@@ -211,7 +210,7 @@ func TestCallDetailed(t *testing.T) {
 			args: []any{
 				ethapi.TransactionArgs{
 					To:   &echoReverter,
-					Data: utils.PointerTo(hexutil.Bytes(revertAsPanic)),
+					Data: new(hexutil.Bytes(revertAsPanic)),
 				},
 				latest,
 			},

@@ -12,7 +12,6 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool",
     deps = [
         "//graft/coreth/params",
-        "//graft/coreth/plugin/evm/customtypes",
         "//ids",
         "//snow",
         "//utils/heap",
@@ -36,7 +35,6 @@ go_test(
     srcs = ["txpool_test.go"],
     embed = [":txpool"],
     deps = [
-        "//graft/coreth/plugin/evm",
         "//ids",
         "//snow/snowtest",
         "//utils",
@@ -46,6 +44,7 @@ go_test(
         "//utils/logging/loggingtest",
         "//vms/components/avax",
         "//vms/saevm/cchain/cchaintest",
+        "//vms/saevm/cchain/libevm",
         "//vms/saevm/cchain/tx",
         "//vms/saevm/cchain/tx/txtest",
         "//vms/saevm/hook",

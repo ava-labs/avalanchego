@@ -4,300 +4,179 @@
 package statesync
 
 import (
-	"context"
-	"encoding/json"
-	"math/big"
 	"testing"
 
-	"github.com/ava-labs/libevm/core"
-	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/libevm/options"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
-	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
-
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
-	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
 func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
 
-type (
-	sut struct {
-		*SummaryHandler
-		genesis *core.Genesis
-		blocks  []*blocks.Block
-	}
-	sutConfig struct {
-		enabled        bool
-		numBlocks      uint64
-		commitInterval uint64
-		initializeVM   bool
-	}
-	sutOption = options.Option[sutConfig]
-)
-
-// withNumBlocks returns a [sutOption] that sets the number of blocks to build
-// after initialization. If [withoutInitialization] is also used, this option
-// has no effect.
-func withNumBlocks(blocks uint64) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.numBlocks = blocks
-	})
-}
-
-// withoutInitialization returns a [sutOption] that prevents the VM from being
-// initialized. This is useful for testing the [SummaryHandler] in isolation.
-func withoutInitialization() sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.initializeVM = false
-	})
-}
-
-// withEnabled returns a [sutOption] that sets [Config.Enabled].
-func withEnabled(e bool) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.enabled = e
-	})
-}
-
-const defaultCommitInterval = 4
-
-// newSUT constructs a VM, builds and accepts the number of
-// blocks requested, each block settling the previous, and returns a fresh
-// [SummaryHandler] that uses the same underlying database.
-func newSUT(t *testing.T, opts ...sutOption) *sut {
-	t.Helper()
-
-	cfg := options.ApplyTo(&sutConfig{
-		enabled:        true,
-		commitInterval: defaultCommitInterval,
-		initializeVM:   true,
-	}, opts...)
-
-	logger := loggingtest.New(t, logging.Debug)
-
-	chainID := ids.GenerateTestID()
-	snowCtx := snowtest.Context(t, chainID)
-	snowCtx.Log = logger
-
-	hooks := hookstest.NewStub(100e6)
-	mempoolConf := legacypool.DefaultConfig
-	mempoolConf.Journal = "" // no on-disk journal in tests
-	saeCfg := sae.Config{
-		MempoolConfig: mempoolConf,
-	}
-	saeCfg.DBConfig.CommitInterval = cfg.commitInterval
-
-	genesis := core.Genesis{
-		Config:     saetest.ChainConfig(),
-		Alloc:      types.GenesisAlloc{},
-		Timestamp:  saeparams.TauSeconds,
-		BaseFee:    big.NewInt(1),
-		Difficulty: big.NewInt(0), // irrelevant but required
-	}
-
-	// The [SummaryHandler] requires the genesis block to be written to disk,
-	// but we don't want to actually commit the genesis state.
-	db := memdb.New()
-	ethDB := saetypes.NewEthDB(db)
-	dummyTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	_, err := genesis.Commit(ethDB, dummyTrieDB)
-	require.NoErrorf(t, err, "%T.Commit()", genesis)
-
-	reader, err := New(
-		Config{
-			DBConfig: saedb.Config{
-				CommitInterval: cfg.commitInterval,
-			},
-			Enabled: cfg.enabled,
-		},
-		ethDB,
-		logger,
-		hooks,
-	)
-	require.NoError(t, err, "New()")
-
-	if !cfg.initializeVM {
-		return &sut{
-			SummaryHandler: reader,
-			genesis:        &genesis,
-		}
-	}
-
-	vm := sae.NewSinceGenesis(hooks, saeCfg)
-	ctx := logger.CancelOnError(t.Context())
-
-	genesisBytes, err := json.Marshal(genesis)
-	require.NoError(t, err, "json.Marshal(genesis)")
-	require.NoError(t, vm.Initialize(
-		ctx,
-		snowCtx,
-		db,
-		genesisBytes,
-		nil, // upgradeBytes
-		nil, // configBytes
-		nil, // fxs
-		saetest.NewSender(t, set.Set[ids.NodeID]{}),
-	), "Initialize()")
-	t.Cleanup(func() {
-		require.NoError(t, vm.Shutdown(context.WithoutCancel(ctx)), "Shutdown()")
-	})
-
-	require.NoError(t, vm.SetState(ctx, snow.Bootstrapping), "SetState(Bootstrapping)")
-	require.NoError(t, vm.SetState(ctx, snow.NormalOp), "SetState(NormalOp)")
-
-	genesisID, err := vm.LastAccepted(ctx)
-	require.NoError(t, err, "LastAccepted() [genesis]")
-	genesisBlock, err := vm.GetBlock(ctx, genesisID)
-	require.NoError(t, err, "GetBlock(LastAccepted()) [genesis]")
-
-	accepted := make([]*blocks.Block, 0, cfg.numBlocks+1)
-	accepted = append(accepted, genesisBlock)
-	parent := genesisID
-	for range cfg.numBlocks {
-		require.NoError(t, vm.SetPreference(ctx, parent, nil), "SetPreference()")
-
-		b, err := vm.BuildBlock(ctx, nil)
-		require.NoErrorf(t, err, "%T.BuildBlock()", vm)
-
-		require.NoErrorf(t, vm.VerifyBlock(ctx, nil, b), "%T.VerifyBlock()", vm)
-		require.NoErrorf(t, vm.AcceptBlock(ctx, b), "%T.AcceptBlock()", vm)
-
-		accepted = append(accepted, b)
-		parent = b.ID()
-	}
-
-	return &sut{
-		SummaryHandler: reader,
-		genesis:        &genesis,
-		blocks:         accepted,
-	}
-}
-
-func TestLastAccepted(t *testing.T) {
-	tests := []struct {
-		name      string
-		numBlocks uint64
-	}{
-		{
-			name:      "genesis_only",
-			numBlocks: 0,
-		},
-		{
-			name:      "one_block",
-			numBlocks: 1,
-		},
-		{
-			name:      "past_commit_boundary",
-			numBlocks: defaultCommitInterval + 1,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			sut := newSUT(t, withNumBlocks(tt.numBlocks))
-			last := sut.blocks[len(sut.blocks)-1]
-
-			got, err := sut.LastAccepted(t.Context())
-			require.NoError(t, err, "LastAccepted()")
-			require.Equal(t, last.ID(), got)
-		})
-	}
-}
-
 func TestBlock(t *testing.T) {
 	t.Parallel()
 
-	const numBlocks = defaultCommitInterval + 1
-	sut := newSUT(t, withNumBlocks(numBlocks))
+	const numBlocks uint64 = defaultCommitInterval + 1
+	vm := newVM(t)
+	vm.acceptBlocks(t, numBlocks)
+	h := vm.Handler
 
 	t.Run("GetBlockIDAtHeight", func(t *testing.T) {
-		for _, b := range sut.blocks {
-			got, err := sut.GetBlockIDAtHeight(t.Context(), b.Height())
-			require.NoErrorf(t, err, "GetBlockIDAtHeight(%d)", b.Height())
-			require.Equalf(t, b.ID(), got, "GetBlockIDAtHeight(%d)", b.Height())
+		for height := range numBlocks + 1 {
+			want, err := vm.vm.GetBlockIDAtHeight(t.Context(), height)
+			require.NoErrorf(t, err, "VM.GetBlockIDAtHeight(%d)", height)
+			got, err := h.GetBlockIDAtHeight(t.Context(), height)
+			require.NoErrorf(t, err, "GetBlockIDAtHeight(%d)", height)
+			require.Equalf(t, want, got, "GetBlockIDAtHeight(%d)", height)
 		}
 
-		_, err := sut.GetBlockIDAtHeight(t.Context(), numBlocks+1)
+		_, err := h.GetBlockIDAtHeight(t.Context(), numBlocks+1)
 		require.Equalf(t, database.ErrNotFound, err, "GetBlockIDAtHeight(%d)", numBlocks+1)
 	})
 
 	t.Run("GetBlock", func(t *testing.T) {
-		for _, b := range sut.blocks {
-			got, err := sut.GetBlock(t.Context(), b.ID())
-			require.NoErrorf(t, err, "GetBlock(%s)", b.ID())
-			require.Equalf(t, b.Hash(), got.Hash(), "GetBlock(%s).Hash()", b.ID())
-			require.Equalf(t, b.Height(), got.Height(), "GetBlock(%s).Height()", b.ID())
+		for height := range numBlocks + 1 {
+			want := vm.blockAtHeight(t, height)
+			id := ids.ID(want.Hash())
+			got, err := h.GetBlock(t.Context(), id)
+			require.NoErrorf(t, err, "GetBlock(%s): %d", id, height)
+			require.Equalf(t, want.Hash(), got.Hash(), "GetBlock(%s).Hash(): %d", id, height)
+			require.Equalf(t, want.Height(), got.Height(), "GetBlock(%s).Height()", id)
 		}
 
-		_, err := sut.GetBlock(t.Context(), ids.GenerateTestID())
+		_, err := h.GetBlock(t.Context(), ids.GenerateTestID())
 		require.Equal(t, database.ErrNotFound, err, "GetBlock(unknown)")
 	})
 }
 
-func TestStateSummary(t *testing.T) {
+// TestGetStateSummary asserts that a summary is served only for an
+// asynchronous block at a committed height.
+func TestGetStateSummary(t *testing.T) {
 	t.Parallel()
 
-	const numBlocks = defaultCommitInterval + 1
-	sut := newSUT(t, withNumBlocks(numBlocks))
-	lastCommitted := sut.blocks[defaultCommitInterval].EthBlock() // last block at a commit boundary
+	const (
+		lastCommitted = defaultCommitInterval
+		numBlocks     = defaultCommitInterval + 1
+	)
 
-	t.Run("GetLastStateSummary", func(t *testing.T) {
-		summary, err := sut.GetLastStateSummary(t.Context())
-		require.NoError(t, err)
-		checkSummaryMatchesBlock(t, summary, lastCommitted)
-	})
+	tests := []struct {
+		name            string
+		numBlocks       uint64
+		lastSynchronous uint64
+		height          uint64
+		wantErr         error
+	}{
+		{
+			name:      "committed_height",
+			numBlocks: numBlocks,
+			height:    lastCommitted,
+		},
+		{
+			name:      "uncommitted_height",
+			numBlocks: numBlocks,
+			height:    numBlocks,
+			wantErr:   database.ErrNotFound,
+		},
+		{
+			name:      "unknown_committed_height",
+			numBlocks: numBlocks,
+			height:    2 * defaultCommitInterval,
+			wantErr:   database.ErrNotFound,
+		},
+		{
+			name:      "genesis",
+			numBlocks: numBlocks,
+			height:    0,
+			wantErr:   database.ErrNotFound,
+		},
+		{
+			name:            "synchronous_committed_height",
+			numBlocks:       numBlocks,
+			lastSynchronous: lastCommitted,
+			height:          lastCommitted,
+			wantErr:         database.ErrNotFound,
+		},
+	}
 
-	t.Run("GetStateSummary_at_committed_height", func(t *testing.T) {
-		summary, err := sut.GetStateSummary(t.Context(), lastCommitted.NumberU64())
-		require.NoError(t, err)
-		checkSummaryMatchesBlock(t, summary, lastCommitted)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	t.Run("GetStateSummary_at_uncommitted_height", func(t *testing.T) {
-		_, err := sut.GetStateSummary(t.Context(), numBlocks)
-		require.Equal(t, database.ErrNotFound, err)
-	})
+			vm := newVM(t, withLastSynchronous(tt.lastSynchronous))
+			vm.acceptBlocks(t, tt.numBlocks)
+
+			summary, err := vm.Handler.GetStateSummary(t.Context(), tt.height)
+			require.ErrorIs(t, err, tt.wantErr)
+			if tt.wantErr != nil {
+				return
+			}
+			checkSummaryMatchesBlock(t, summary, vm.blockAtHeight(t, tt.height).EthBlock())
+		})
+	}
 }
 
-func TestGenesisStateSummary(t *testing.T) {
+// TestGetLastStateSummary asserts that the last summary is served only if the
+// block at the last committed height is asynchronous.
+func TestGetLastStateSummary(t *testing.T) {
 	t.Parallel()
 
-	sut := newSUT(t, withoutInitialization())
-	genesis := sut.genesis.ToBlock()
+	const (
+		lastCommitted = defaultCommitInterval
+		numBlocks     = defaultCommitInterval + 1
+	)
 
-	t.Run("GetLastStateSummary", func(t *testing.T) {
-		summary, err := sut.GetLastStateSummary(t.Context())
-		require.NoError(t, err)
-		checkSummaryMatchesBlock(t, summary, genesis)
-	})
+	tests := []struct {
+		name            string
+		numBlocks       uint64
+		lastSynchronous uint64
+		wantHeight      uint64
+		wantErr         error
+	}{
+		{
+			name:       "last_committed",
+			numBlocks:  numBlocks,
+			wantHeight: lastCommitted,
+		},
+		{
+			name:    "only_genesis",
+			wantErr: database.ErrNotFound,
+		},
+		{
+			name:            "last_committed_synchronous",
+			numBlocks:       numBlocks,
+			lastSynchronous: lastCommitted,
+			wantErr:         database.ErrNotFound,
+		},
+		{
+			name:            "last_committed_above_synchronous_threshold",
+			numBlocks:       numBlocks,
+			lastSynchronous: lastCommitted - 1,
+			wantHeight:      lastCommitted,
+		},
+	}
 
-	t.Run("GetStateSummary", func(t *testing.T) {
-		summary, err := sut.GetStateSummary(t.Context(), genesis.NumberU64())
-		require.NoError(t, err)
-		checkSummaryMatchesBlock(t, summary, genesis)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			vm := newVM(t, withLastSynchronous(tt.lastSynchronous))
+			vm.acceptBlocks(t, tt.numBlocks)
+
+			summary, err := vm.Handler.GetLastStateSummary(t.Context())
+			require.ErrorIs(t, err, tt.wantErr)
+			if tt.wantErr != nil {
+				return
+			}
+			checkSummaryMatchesBlock(t, summary, vm.blockAtHeight(t, tt.wantHeight).EthBlock())
+		})
+	}
 }
 
 func checkSummaryMatchesBlock(t *testing.T, summary *Summary, block *types.Block) {

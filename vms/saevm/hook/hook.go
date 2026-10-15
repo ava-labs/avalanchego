@@ -296,16 +296,28 @@ func BlockTimeFrom(seconds uint64, milliseconds *uint64) time.Time {
 	return time.Unix(int64(seconds), subSecondNanos) //#nosec G115 -- Won't overflow for a few millennia
 }
 
+// Self reports whether Settled represents a self-settling synchronous block.
+func (s Settled) Self() bool {
+	return s == Settled{}
+}
+
 // Synchronous reports whether the header is that of a synchronously executed
 // (pre-SAE) block.
 func Synchronous(h Points, hdr *types.Header) bool {
-	return h.SettledBy(hdr) == (Settled{})
+	return h.SettledBy(hdr).Self()
+}
+
+// SettledHeight returns the height of the last block settled by the header. A
+// synchronous block settles itself.
+func SettledHeight(h Points, hdr *types.Header) uint64 {
+	if s := h.SettledBy(hdr); !s.Self() {
+		return s.Height
+	}
+	return hdr.Number.Uint64()
 }
 
 // SettledGasTime is a helper that given a header and its settler, returns the
 // [gastime.Time] associated with the post-execution state of the header.
-//
-// TODO(alarso16): This should be moved to the state sync logic once implemented.
 func SettledGasTime(h Points, settled, settler *types.Header) (*gastime.Time, error) {
 	target, cfg := h.GasConfigAfter(settled)
 	s := h.SettledBy(settler)

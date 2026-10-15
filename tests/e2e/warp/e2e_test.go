@@ -14,14 +14,14 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/config"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 )
 
 func TestE2E(t *testing.T) {
-	evm.RegisterAllLibEVMExtras()
+	libevm.RegisterExtras()
 	ginkgo.RunSpecs(t, "warp e2e test suites")
 }
 

@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/warp/warptest"
@@ -39,7 +38,7 @@ func TestParseGenesisNetworkUpgradeOverrides(t *testing.T) {
 	wantEtnaTimestamp := uint64(upgrade.InitiallyActiveTime.Unix() + 2) // #nosec G115 -- known positive test timestamp
 	upgradeBytes, err := json.Marshal(extras.UpgradeConfig{
 		NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-			EtnaTimestamp: utils.PointerTo(wantEtnaTimestamp),
+			EtnaTimestamp: new(wantEtnaTimestamp),
 		},
 	})
 	require.NoError(t, err, "json.Marshal(upgradeConfig)")
@@ -106,7 +105,7 @@ func TestRestartRejectsActivatedNetworkUpgradeChange(t *testing.T) {
 	upgradeBytes := func(timestamp uint64) []byte {
 		return mustMarshalJSON(t, extras.UpgradeConfig{
 			NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-				HeliconTimestamp: utils.PointerTo(timestamp),
+				HeliconTimestamp: new(timestamp),
 			},
 		})
 	}

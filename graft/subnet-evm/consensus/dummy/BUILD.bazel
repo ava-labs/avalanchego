@@ -31,9 +31,9 @@ graft_go_test(
     srcs = ["consensus_test.go"],
     embed = [":dummy"],
     deps = [
+        "//graft/evm/utils",
         "//graft/subnet-evm/plugin/evm/customheader",
         "//graft/subnet-evm/plugin/evm/customtypes",
-        "//utils",
         "//vms/components/gas",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_stretchr_testify//require",

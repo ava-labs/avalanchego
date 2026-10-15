@@ -52,9 +52,9 @@ go_library(
         "//utils/set",
         "//utils/units",
         "//vms/platformvm",
+        "//vms/platformvm/platform",
         "//vms/platformvm/reward",
         "//vms/platformvm/signer",
-        "//vms/platformvm/txs",
         "//vms/platformvm/txs/executor",
         "//vms/secp256k1fx",
         "//wallet/subnet/primary",
@@ -96,6 +96,7 @@ go_test(
     srcs = [
         "kube_runtime_test.go",
         "network_test.go",
+        "node_test.go",
     ],
     embed = [":tmpnet"],
     deps = [

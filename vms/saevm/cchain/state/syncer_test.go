@@ -18,8 +18,8 @@ import (
 )
 
 func sync(t *testing.T, srcSUT, dstSUT *SUT) error {
-	src := srcSUT.stateImpl.(*State)
-	dst := dstSUT.stateImpl.(*State)
+	src := srcSUT.State
+	dst := dstSUT.State
 
 	net, tracker := synctest.NewSelfNetwork(t, t.Context(), src.snowCtx.NodeID)
 	require.NoError(t, RegisterSyncHandler(net, src), "RegisterSyncHandler()")
@@ -32,12 +32,12 @@ func checkStatesMatch(t *testing.T, wantSUT, gotSUT *SUT, blocks ...block) {
 	t.Helper()
 
 	var (
-		want = wantSUT.stateImpl.(*State)
-		got  = gotSUT.stateImpl.(*State)
+		want = wantSUT.State
+		got  = gotSUT.State
 	)
 
 	require.Equal(t, want.CurrentHeight(), got.CurrentHeight(), "CurrentHeight()")
-	require.Equal(t, dbEntries(t, wantSUT.sharedMemoryDB), dbEntries(t, gotSUT.sharedMemoryDB), "shared memory")
+	saetest.AssertEqualDBs(t, wantSUT.sharedMemoryDB, gotSUT.sharedMemoryDB, "shared memory")
 	require.Equal(t, want.currentRoot, got.currentRoot, "current merkle root")
 
 	for _, b := range blocks {

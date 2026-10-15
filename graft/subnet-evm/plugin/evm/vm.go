@@ -41,7 +41,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
@@ -78,6 +77,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
@@ -441,7 +441,7 @@ func (vm *VM) Initialize(
 		vm.ethConfig.Miner.Etherbase = address
 	} else {
 		log.Info("Config has not specified any coinbase address. Defaulting to the blackhole address.")
-		vm.ethConfig.Miner.Etherbase = constants.BlackholeAddr
+		vm.ethConfig.Miner.Etherbase = blackhole.Address
 	}
 
 	vm.networkCodec = message.SubnetEVMCodec
@@ -1185,7 +1185,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	}
 
 	if vm.config.WarpAPIEnabled {
-		warpSDKClient := vm.P2PNetwork().NewClient(p2p.SignatureRequestHandlerID, vm.P2PValidators())
+		warpSDKClient := vm.P2PNetwork().NewClient(p2p.SignatureRequestHandlerID)
 		signatureAggregator := acp118.NewSignatureAggregator(vm.ctx.Log, warpSDKClient)
 
 		if err := handler.RegisterName("warp", warp.NewAPI(vm.ctx, vm.warpBackend, signatureAggregator)); err != nil {

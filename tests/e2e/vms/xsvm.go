@@ -180,8 +180,6 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), ginkgo.Serial, func() {
 		destinationBalance, err := destinationClient.Balance(tc.DefaultContext(), destinationKey.Address(), sourceChain.ChainID)
 		require.NoError(err)
 		require.Equal(units.Schmeckle, destinationBalance)
-
-		_ = e2e.CheckBootstrapIsPossible(tc, network)
 	})
 
 	ginkgo.It("should serve grpc api requests", func() {

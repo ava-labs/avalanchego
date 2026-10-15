@@ -17,11 +17,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/nftfx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/propertyfx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	xchaintxs "github.com/ava-labs/avalanchego/vms/avm/txs"
-	pchaintxs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 )
 
 const (
@@ -528,13 +528,13 @@ func splitAllocations(allocations []Allocation, numSplits int) [][]Allocation {
 	return append(allNodeAllocations, currentNodeAllocation)
 }
 
-func VMGenesis(genesisBytes []byte, vmID ids.ID) (*pchaintxs.Tx, error) {
+func VMGenesis(genesisBytes []byte, vmID ids.ID) (*platform.Tx, error) {
 	genesis, err := genesis.Parse(genesisBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse genesis: %w", err)
 	}
 	for _, chain := range genesis.Chains {
-		uChain := chain.Unsigned.(*pchaintxs.CreateChainTx)
+		uChain := chain.Unsigned.(*platform.CreateChainTx)
 		if uChain.VMID == vmID {
 			return chain, nil
 		}

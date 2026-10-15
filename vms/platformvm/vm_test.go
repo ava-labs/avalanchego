@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -48,14 +49,13 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -118,7 +118,7 @@ var (
 	}
 
 	// subnet that exists at genesis in defaultVM
-	testSubnet1 *txs.Tx
+	testSubnet1 *platform.Tx
 )
 
 type mutableSharedMemory struct {
@@ -327,8 +327,8 @@ func TestAddValidatorCommit(t *testing.T) {
 
 	// create valid tx
 	tx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				End:    uint64(endTime.Unix()),
 				Wght:   vm.MinValidatorStake,
@@ -373,7 +373,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 	// create invalid tx
 	tx, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
 			End:    uint64(endTime.Unix()),
@@ -392,11 +392,11 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 	require.NoError(err)
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := block.NewBanffStandardBlock(
+	statelessBlk, err := platform.NewBanffStandardBlock(
 		preferred.Timestamp(),
 		preferredID,
 		preferredHeight+1,
-		[]*txs.Tx{tx},
+		[]*platform.Tx{tx},
 	)
 	require.NoError(err)
 
@@ -431,7 +431,7 @@ func TestAddValidatorReject(t *testing.T) {
 
 	// create valid tx
 	tx, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(startTime.Unix()),
 			End:    uint64(endTime.Unix()),
@@ -450,11 +450,11 @@ func TestAddValidatorReject(t *testing.T) {
 	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
 	require.NoError(err)
 
-	statelessBlk, err := block.NewBanffStandardBlock(
+	statelessBlk, err := platform.NewBanffStandardBlock(
 		lastAccepted.Timestamp().Add(time.Second),
 		lastAccepted.ID(),
 		lastAccepted.Height()+1,
-		[]*txs.Tx{tx},
+		[]*platform.Tx{tx},
 	)
 	require.NoError(err)
 
@@ -498,8 +498,8 @@ func TestAddValidatorInvalidNotReissued(t *testing.T) {
 
 	// create valid tx
 	tx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: repeatNodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
@@ -544,8 +544,8 @@ func TestAddSubnetValidatorAccept(t *testing.T) {
 	// note that [startTime, endTime] is a subset of time that keys[0]
 	// validates primary network ([genesistest.DefaultValidatorStartTime, genesistest.DefaultValidatorEndTime])
 	tx, err := wallet.IssueAddSubnetValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
@@ -593,8 +593,8 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	// note that [startTime, endTime] is a subset of time that keys[0]
 	// validates primary network ([genesistest.DefaultValidatorStartTime, genesistest.DefaultValidatorEndTime])
 	tx, err := wallet.IssueAddSubnetValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
@@ -644,18 +644,18 @@ func TestRewardValidatorAccept(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
+	require.IsType(&platform.BanffCommitBlock{}, commit.Block)
 	abort := options[1].(*blockexecutor.Block)
-	require.IsType(&block.BanffAbortBlock{}, abort.Block)
+	require.IsType(&platform.BanffAbortBlock{}, abort.Block)
 
 	// Assert block tries to reward a genesis validator
-	rewardTx := blk.(block.Block).Txs()[0].Unsigned
-	require.IsType(&txs.RewardValidatorTx{}, rewardTx)
+	rewardTx := blk.(platform.Block).Txs()[0].Unsigned
+	require.IsType(&platform.RewardValidatorTx{}, rewardTx)
 
 	// Verify options and accept commit block
 	require.NoError(commit.Verify(t.Context()))
 	require.NoError(abort.Verify(t.Context()))
-	txID := blk.(block.Block).Txs()[0].ID()
+	txID := blk.(platform.Block).Txs()[0].ID()
 	{
 		onAbort, ok := vm.manager.GetState(abort.ID())
 		require.True(ok)
@@ -683,11 +683,11 @@ func TestRewardValidatorAccept(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Committed, txStatus)
 
-	tx, _, err := vm.state.GetTx(rewardTx.(*txs.RewardValidatorTx).TxID)
+	tx, _, err := vm.state.GetTx(rewardTx.(*platform.RewardValidatorTx).TxID)
 	require.NoError(err)
-	require.IsType(&txs.AddValidatorTx{}, tx.Unsigned)
+	require.IsType(&platform.AddValidatorTx{}, tx.Unsigned)
 
-	valTx, _ := tx.Unsigned.(*txs.AddValidatorTx)
+	valTx, _ := tx.Unsigned.(*platform.AddValidatorTx)
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, valTx.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
@@ -713,19 +713,19 @@ func TestRewardValidatorReject(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
+	require.IsType(&platform.BanffCommitBlock{}, commit.Block)
 
 	abort := options[1].(*blockexecutor.Block)
-	require.IsType(&block.BanffAbortBlock{}, abort.Block)
+	require.IsType(&platform.BanffAbortBlock{}, abort.Block)
 
 	// Assert block tries to reward a genesis validator
-	rewardTx := oracleBlk.(block.Block).Txs()[0].Unsigned
-	require.IsType(&txs.RewardValidatorTx{}, rewardTx)
+	rewardTx := oracleBlk.(platform.Block).Txs()[0].Unsigned
+	require.IsType(&platform.RewardValidatorTx{}, rewardTx)
 
 	// Verify options and accept abort block
 	require.NoError(commit.Verify(t.Context()))
 	require.NoError(abort.Verify(t.Context()))
-	txID := blk.(block.Block).Txs()[0].ID()
+	txID := blk.(platform.Block).Txs()[0].ID()
 	{
 		onAccept, ok := vm.manager.GetState(commit.ID())
 		require.True(ok)
@@ -753,11 +753,11 @@ func TestRewardValidatorReject(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Aborted, txStatus)
 
-	tx, _, err := vm.state.GetTx(rewardTx.(*txs.RewardValidatorTx).TxID)
+	tx, _, err := vm.state.GetTx(rewardTx.(*platform.RewardValidatorTx).TxID)
 	require.NoError(err)
-	require.IsType(&txs.AddValidatorTx{}, tx.Unsigned)
+	require.IsType(&platform.AddValidatorTx{}, tx.Unsigned)
 
-	valTx, _ := tx.Unsigned.(*txs.AddValidatorTx)
+	valTx, _ := tx.Unsigned.(*platform.AddValidatorTx)
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, valTx.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
@@ -858,8 +858,8 @@ func TestCreateSubnet(t *testing.T) {
 	endTime := startTime.Add(defaultMinStakingDuration)
 	// [startTime, endTime] is subset of time keys[0] validates default subnet so tx is valid
 	addValidatorTx, err := wallet.IssueAddSubnetValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
@@ -934,7 +934,7 @@ func TestAtomicImport(t *testing.T) {
 			OutputOwners: *importOwners,
 		},
 	}
-	utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
+	utxoBytes, err := platform.Codec.Marshal(platform.CodecVersion, utxo)
 	require.NoError(err)
 
 	inputID := utxo.InputID()
@@ -981,8 +981,8 @@ func TestOptimisticAtomicImport(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	tx := &txs.Tx{Unsigned: &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+	tx := &platform.Tx{Unsigned: &platform.ImportTx{
+		BaseTx: platform.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 		}},
@@ -998,14 +998,14 @@ func TestOptimisticAtomicImport(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx.Initialize(txs.Codec))
+	require.NoError(tx.Initialize(platform.Codec))
 
 	preferredID := vm.manager.Preferred()
 	preferred, err := vm.manager.GetBlock(preferredID)
 	require.NoError(err)
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := block.NewApricotAtomicBlock(
+	statelessBlk, err := platform.NewApricotAtomicBlock(
 		preferredID,
 		preferredHeight+1,
 		tx,
@@ -1075,8 +1075,8 @@ func TestRestartFullyAccepted(t *testing.T) {
 	require.NoError(err)
 
 	// include a tx to make the block be accepted
-	tx := &txs.Tx{Unsigned: &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+	tx := &platform.Tx{Unsigned: &platform.ImportTx{
+		BaseTx: platform.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    firstVM.ctx.NetworkID,
 			BlockchainID: firstVM.ctx.ChainID,
 		}},
@@ -1092,7 +1092,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx.Initialize(txs.Codec))
+	require.NoError(tx.Initialize(platform.Codec))
 
 	nextChainTime := initialClkTime.Add(time.Second)
 	firstVM.clock.Set(initialClkTime)
@@ -1102,11 +1102,11 @@ func TestRestartFullyAccepted(t *testing.T) {
 	require.NoError(err)
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := block.NewBanffStandardBlock(
+	statelessBlk, err := platform.NewBanffStandardBlock(
 		nextChainTime,
 		preferredID,
 		preferredHeight+1,
-		[]*txs.Tx{tx},
+		[]*platform.Tx{tx},
 	)
 	require.NoError(err)
 
@@ -1417,7 +1417,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.NoError(err)
 	currentStakerIterator.Release()
 
-	rewardValidatorBlk, err := block.NewBanffProposalBlock(
+	rewardValidatorBlk, err := platform.NewBanffProposalBlock(
 		stakerToRemove.EndTime,
 		lastAcceptedID,
 		lastAccepted.Height()+1,
@@ -1502,7 +1502,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	//
 	// We should prefer commit because our VM thinks we have been offline for
 	// the staking duration.
-	commitBlock, err := block.NewBanffCommitBlock(
+	commitBlock, err := platform.NewBanffCommitBlock(
 		rewardValidatorBlk.Timestamp(),
 		rewardValidatorBlk.ID(),
 		rewardValidatorBlk.Height()+1,
@@ -1548,8 +1548,8 @@ func TestUnverifiedParent(t *testing.T) {
 	))
 
 	// include a tx1 to make the block be accepted
-	tx1 := &txs.Tx{Unsigned: &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+	tx1 := &platform.Tx{Unsigned: &platform.ImportTx{
+		BaseTx: platform.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 		}},
@@ -1565,7 +1565,7 @@ func TestUnverifiedParent(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx1.Initialize(txs.Codec))
+	require.NoError(tx1.Initialize(platform.Codec))
 
 	nextChainTime := initialClkTime.Add(time.Second)
 
@@ -1574,19 +1574,19 @@ func TestUnverifiedParent(t *testing.T) {
 	require.NoError(err)
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := block.NewBanffStandardBlock(
+	statelessBlk, err := platform.NewBanffStandardBlock(
 		nextChainTime,
 		preferredID,
 		preferredHeight+1,
-		[]*txs.Tx{tx1},
+		[]*platform.Tx{tx1},
 	)
 	require.NoError(err)
 	firstAdvanceTimeBlk := vm.manager.NewBlock(statelessBlk)
 	require.NoError(firstAdvanceTimeBlk.Verify(t.Context()))
 
 	// include a tx2 to make the block be accepted
-	tx2 := &txs.Tx{Unsigned: &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+	tx2 := &platform.Tx{Unsigned: &platform.ImportTx{
+		BaseTx: platform.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 		}},
@@ -1602,14 +1602,14 @@ func TestUnverifiedParent(t *testing.T) {
 			},
 		}},
 	}}
-	require.NoError(tx2.Initialize(txs.Codec))
+	require.NoError(tx2.Initialize(platform.Codec))
 	nextChainTime = nextChainTime.Add(time.Second)
 	vm.clock.Set(nextChainTime)
-	statelessSecondAdvanceTimeBlk, err := block.NewBanffStandardBlock(
+	statelessSecondAdvanceTimeBlk, err := platform.NewBanffStandardBlock(
 		nextChainTime,
 		firstAdvanceTimeBlk.ID(),
 		firstAdvanceTimeBlk.Height()+1,
-		[]*txs.Tx{tx2},
+		[]*platform.Tx{tx2},
 	)
 	require.NoError(err)
 	secondAdvanceTimeBlk := vm.manager.NewBlock(statelessSecondAdvanceTimeBlk)
@@ -1768,15 +1768,15 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.NoError(err)
 
 	abort := options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffAbortBlock{}, abort.Block)
+	require.IsType(&platform.BanffAbortBlock{}, abort.Block)
 
 	commit := options[1].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
+	require.IsType(&platform.BanffCommitBlock{}, commit.Block)
 
 	// Assert block tries to reward a genesis validator
-	rewardTx := oracleBlk.(block.Block).Txs()[0].Unsigned
-	require.IsType(&txs.RewardValidatorTx{}, rewardTx)
-	txID := blk.(block.Block).Txs()[0].ID()
+	rewardTx := oracleBlk.(platform.Block).Txs()[0].Unsigned
+	require.IsType(&platform.RewardValidatorTx{}, rewardTx)
+	txID := blk.(platform.Block).Txs()[0].ID()
 
 	// Verify options and accept abort block
 	require.NoError(commit.Verify(t.Context()))
@@ -1796,11 +1796,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Aborted, txStatus)
 
-	tx, _, err := secondVM.state.GetTx(rewardTx.(*txs.RewardValidatorTx).TxID)
+	tx, _, err := secondVM.state.GetTx(rewardTx.(*platform.RewardValidatorTx).TxID)
 	require.NoError(err)
-	require.IsType(&txs.AddValidatorTx{}, tx.Unsigned)
+	require.IsType(&platform.AddValidatorTx{}, tx.Unsigned)
 
-	valTx, _ := tx.Unsigned.(*txs.AddValidatorTx)
+	valTx, _ := tx.Unsigned.(*platform.AddValidatorTx)
 	_, err = secondVM.state.GetCurrentValidator(constants.PrimaryNetworkID, valTx.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
@@ -1866,15 +1866,15 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require.NoError(err)
 
 	abort := options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffAbortBlock{}, abort.Block)
+	require.IsType(&platform.BanffAbortBlock{}, abort.Block)
 
 	commit := options[1].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
+	require.IsType(&platform.BanffCommitBlock{}, commit.Block)
 
 	// Assert block tries to reward a genesis validator
-	rewardTx := oracleBlk.(block.Block).Txs()[0].Unsigned
-	require.IsType(&txs.RewardValidatorTx{}, rewardTx)
-	txID := blk.(block.Block).Txs()[0].ID()
+	rewardTx := oracleBlk.(platform.Block).Txs()[0].Unsigned
+	require.IsType(&platform.RewardValidatorTx{}, rewardTx)
+	txID := blk.(platform.Block).Txs()[0].ID()
 
 	// Verify options and accept abort block
 	require.NoError(commit.Verify(t.Context()))
@@ -1894,11 +1894,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	require.NoError(err)
 	require.Equal(status.Aborted, txStatus)
 
-	tx, _, err := vm.state.GetTx(rewardTx.(*txs.RewardValidatorTx).TxID)
+	tx, _, err := vm.state.GetTx(rewardTx.(*platform.RewardValidatorTx).TxID)
 	require.NoError(err)
-	require.IsType(&txs.AddValidatorTx{}, tx.Unsigned)
+	require.IsType(&platform.AddValidatorTx{}, tx.Unsigned)
 
-	valTx, _ := tx.Unsigned.(*txs.AddValidatorTx)
+	valTx, _ := tx.Unsigned.(*platform.AddValidatorTx)
 	_, err = vm.state.GetCurrentValidator(constants.PrimaryNetworkID, valTx.NodeID())
 	require.ErrorIs(err, database.ErrNotFound)
 }
@@ -1927,8 +1927,8 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	}
 
 	addValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(validatorStartTime.Unix()),
 				End:    uint64(validatorEndTime.Unix()),
@@ -1964,8 +1964,8 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 
 	subnetID := createSubnetTx.ID()
 	addSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(validatorStartTime.Unix()),
 				End:    uint64(validatorEndTime.Unix()),
@@ -1985,11 +1985,11 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	lastAcceptedID := vm.state.GetLastAccepted()
 	lastAcceptedHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
-	statelessBlock, err := block.NewBanffStandardBlock(
+	statelessBlock, err := platform.NewBanffStandardBlock(
 		vm.state.GetTimestamp(),
 		lastAcceptedID,
 		lastAcceptedHeight+1,
-		[]*txs.Tx{
+		[]*platform.Tx{
 			addSubnetValidatorTx,
 			removeSubnetValidatorTx,
 		},
@@ -2145,8 +2145,8 @@ func TestPruneMempool(t *testing.T) {
 		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
 	}
 	addValidatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: ids.GenerateTestNodeID(),
 				Start:  uint64(startTime.Unix()),
 				End:    uint64(endTime.Unix()),
@@ -2266,4 +2266,59 @@ func TestThrottleBlockBuildingUntilNormalOperationsStart(t *testing.T) {
 	msg, err = vm.WaitForEvent(impatientContext)
 	require.NoError(err)
 	require.Equal(common.PendingTxs, msg)
+}
+
+func TestTxTooBig(t *testing.T) {
+	tests := []struct {
+		name      string
+		fork      upgradetest.Fork
+		verifyErr error
+	}{
+		{
+			name:      "PreHelicon",
+			fork:      upgradetest.Granite,
+			verifyErr: blockexecutor.ErrTxTooBigPreHelicon,
+		},
+		{
+			name: "PostHelicon",
+			fork: upgradetest.Helicon,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			vm, _, _ := defaultVM(t, tt.fork)
+			vm.ctx.Lock.Lock()
+			defer vm.ctx.Lock.Unlock()
+
+			// Increase capacity so that the large tx passes gas validation.
+			vm.DynamicFeeConfig.MaxCapacity = 1_000_000
+			vm.state.SetFeeState(gas.State{Capacity: 1_000_000})
+
+			subnetID := testSubnet1.ID()
+			wallet := newWallet(t, vm, walletConfig{
+				subnetIDs: []ids.ID{subnetID},
+			})
+
+			// Use the wallet builder to construct a CreateChainTx with a
+			// genesis payload that makes the tx exceed codec.DefaultMaxSize.
+			bigGenesis := make([]byte, codec.DefaultMaxSize+1)
+			createChainTx, err := wallet.Builder().NewCreateChainTx(
+				subnetID,
+				bigGenesis,
+				ids.ID{'t', 'e', 's', 't', 'v', 'm'},
+				nil,
+				"big",
+			)
+			require.NoError(err)
+
+			bigTx := &platform.Tx{Unsigned: createChainTx}
+			require.NoError(wallet.Signer().Sign(t.Context(), bigTx))
+
+			err = vm.manager.VerifyTx(bigTx)
+			require.ErrorIs(err, tt.verifyErr)
+		})
+	}
 }

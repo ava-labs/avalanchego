@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 
 	legacyparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -55,7 +54,7 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				txallowlist.ConfigKey: txallowlist.NewConfig(
-					utils.PointerTo[uint64](0),
+					new(uint64(0)),
 					[]common.Address{addresses[adminIdx]},
 					nil,
 					nil,
@@ -66,13 +65,13 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 			return mustMarshalJSON(t, &extras.UpgradeConfig{
 				PrecompileUpgrades: []extras.PrecompileUpgrade{
 					{
-						Config: txallowlist.NewDisableConfig(utils.PointerTo(uint64(disableTime.Unix()))), // #nosec G115 -- known positive test timestamp
+						Config: txallowlist.NewDisableConfig(new(uint64(disableTime.Unix()))), // #nosec G115 -- known positive test timestamp
 					},
 					{
 						// Re-enable promotes `nonAdminIdx` to manager so we
 						// can observe the new config land in state.
 						Config: txallowlist.NewConfig(
-							utils.PointerTo(uint64(reenableTime.Unix())), // #nosec G115 -- known positive test timestamp
+							new(uint64(reenableTime.Unix())), // #nosec G115 -- known positive test timestamp
 							[]common.Address{addresses[adminIdx]},
 							nil,
 							[]common.Address{addresses[nonAdminIdx]},

@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
@@ -99,7 +98,7 @@ func TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE(t *testing.T) {
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-					utils.PointerTo[uint64](0),
+					new(uint64(0)),
 					[]common.Address{addresses[adminIdx]},
 					nil,
 					nil,
@@ -169,7 +168,7 @@ func TestGasPriceManagerSetGasPriceConfigSettlementLagSAE(t *testing.T) {
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-					utils.PointerTo[uint64](0),
+					new(uint64(0)),
 					[]common.Address{addresses[adminIdx]},
 					nil,
 					nil,
@@ -260,7 +259,7 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 			withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 				legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 					gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-						utils.PointerTo[uint64](0),
+						new(uint64(0)),
 						[]common.Address{addresses[adminIdx]},
 						nil, nil, &cfg,
 					),
@@ -368,7 +367,7 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-					utils.PointerTo[uint64](0),
+					new(uint64(0)),
 					[]common.Address{addresses[adminIdx]},
 					nil, nil, &initialConfig,
 				),
@@ -470,7 +469,7 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 	pinnedGenesisPrecompiles := func(addresses []common.Address) extras.Precompiles {
 		return extras.Precompiles{
 			gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-				utils.PointerTo[uint64](0),
+				new(uint64(0)),
 				[]common.Address{addresses[adminIdx]},
 				nil, nil, &pinnedCfg,
 			),
@@ -479,7 +478,7 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 	enableUpgrades := func(addresses []common.Address, activationTime time.Time) []extras.PrecompileUpgrade {
 		return []extras.PrecompileUpgrade{{
 			Config: gaspricemanager.NewConfig(
-				utils.PointerTo(uint64(activationTime.Unix())), // #nosec G115 -- known positive test timestamp
+				new(uint64(activationTime.Unix())), // #nosec G115 -- known positive test timestamp
 				[]common.Address{addresses[adminIdx]},
 				nil, nil, &pinnedCfg,
 			),
@@ -487,7 +486,7 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 	}
 	disableUpgrades := func(_ []common.Address, activationTime time.Time) []extras.PrecompileUpgrade {
 		return []extras.PrecompileUpgrade{{
-			Config: gaspricemanager.NewDisableConfig(utils.PointerTo(uint64(activationTime.Unix()))), // #nosec G115 -- known positive test timestamp
+			Config: gaspricemanager.NewDisableConfig(new(uint64(activationTime.Unix()))), // #nosec G115 -- known positive test timestamp
 		}}
 	}
 
@@ -634,7 +633,7 @@ func TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE(t *testing.T) {
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				gaspricemanager.ConfigKey: gaspricemanager.NewConfig(
-					utils.PointerTo[uint64](0),
+					new(uint64(0)),
 					[]common.Address{addresses[adminIdx]},
 					nil,
 					nil,

@@ -6,6 +6,7 @@ package sae
 import (
 	"errors"
 	"math/big"
+	"sync/atomic"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -73,7 +74,7 @@ func newAdmitterFixture(t *testing.T, keys *saetest.KeyChain, opts ...admitterOp
 
 	tracker, err := saedb.NewTracker(db, saedb.Config{CommitInterval: saedb.DefaultCommitInterval}, genesis.EthBlock().Root(), t.TempDir(), logger)
 	require.NoError(t, err, "saedb.NewTracker()")
-	exec, err := saexec.New(genesis, src.AsHeaderSource(), config, db, xdb, tracker, hooks, logger, prometheus.NewRegistry())
+	exec, err := saexec.New(genesis, new(atomic.Pointer[blocks.Block]), src.AsHeaderSource(), config, db, xdb, tracker, hooks, logger, prometheus.NewRegistry())
 	require.NoError(t, err, "saexec.New()")
 	t.Cleanup(func() {
 		require.NoErrorf(t, exec.Close(), "%T.Close()", exec)

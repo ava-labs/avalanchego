@@ -6,18 +6,25 @@ package cchain
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
 )
@@ -67,7 +74,7 @@ type config struct {
 
 	// State & trie
 	Pruning           bool   `json:"pruning-enabled"` // If enabled, trie roots are only persisted every commit-interval blocks.
-	CommitInterval    uint64 `json:"commit-interval"` // Commit interval at which to persist the state trie.
+	CommitInterval    uint64 `json:"commit-interval"` // HashDB: blocks between trie persistence. Firewood: max unpersisted revisions.
 	TrieCleanCache    uint64 `json:"trie-clean-cache"`
 	SnapshotCache     uint64 `json:"snapshot-cache"`
 	AllowMissingTries bool   `json:"allow-missing-tries"` // If enabled, checks preventing an incomplete trie index are skipped.
@@ -82,12 +89,16 @@ type config struct {
 
 	// APIs
 	// MaxBlocksPerRequest int64  `json:"api-max-blocks-per-request"`
-	AllowUnprotectedTxs bool `json:"allow-unprotected-txs"` // required for deterministic-address deployments.
+
+	// APIs is the exhaustive set of JSON-RPC APIs this node serves. Methods of
+	// any other API return "method not found".
+	APIs                set.Set[rpc.API] `json:"apis"`
+	AllowUnprotectedTxs bool             `json:"allow-unprotected-txs"` // required for deterministic-address deployments.
 	// BatchRequestLimit is the maximum number of requests per JSON-RPC batch;
 	// 0 = no limit. An unset config uses the default (1000).
 	BatchRequestLimit uint64 `json:"batch-request-limit"`
-	// APIMaxDuration limits how long an eth_call (or eth_callDetailed) runs.
-	// Non-positive values result in no limit. Defaults to no limit.
+	// APIMaxDuration limits how long each call to the /rpc and /ws endpoints
+	// runs. Non-positive values result in no limit. Defaults to no limit.
 	APIMaxDuration               duration `json:"api-max-duration"`
 	ResolvePendingToLastExecuted bool     `json:"api-resolve-pending-to-last-executed"`
 
@@ -119,6 +130,7 @@ func defaultConfig() config {
 		SnapshotCache:                saedb.DefaultSnapshotCacheSizeMiB,
 		TxPoolAccountSlots:           legacypool.DefaultConfig.AccountSlots,
 		TxPoolGlobalSlots:            legacypool.DefaultConfig.GlobalSlots,
+		APIs:                         rpc.DefaultAPIs(),
 		BatchRequestLimit:            1000, // matches geth / libevm's node.DefaultConfig
 		ResolvePendingToLastExecuted: true, // support Foundry's cast and geth/libevm's bound contracts
 	}
@@ -127,25 +139,69 @@ func defaultConfig() config {
 var errProductionCommitInterval = fmt.Errorf("production networks must use the commit interval %d", saedb.DefaultCommitInterval)
 
 // parseConfig parses b as a JSON-encoded [config]. This should be preferred
-// over [json.Unmarshal] because it correctly populates default values.
-func parseConfig(b []byte, networkID uint32) (config, error) {
+// over [json.Unmarshal] because it correctly populates default values. Options
+// that need the operator's attention are logged as warnings.
+func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	c := defaultConfig()
 	if len(b) == 0 {
 		return c, nil
 	}
 
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(b, &keys); err != nil {
+		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", keys, err)
+	}
 	if err := json.Unmarshal(b, &c); err != nil {
 		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
 	}
+
+	var unrecognized []string
+	for key := range keys {
+		if !configKeys.Contains(key) {
+			unrecognized = append(unrecognized, key)
+		}
+	}
+	if len(unrecognized) > 0 {
+		slices.Sort(unrecognized)
+		snowCtx.Log.Warn("ignoring unrecognized config options",
+			zap.Strings("options", unrecognized),
+		)
+	}
+
 	saeCfg := c.saeConfig(nil)
 	if err := saeCfg.Verify(); err != nil {
 		return config{}, err
 	}
-	if ci := saeCfg.DBConfig.CommitInterval; ci != saedb.DefaultCommitInterval &&
-		constants.ProductionNetworkIDs.Contains(networkID) {
+	ci := saeCfg.DBConfig.CommitInterval
+	if constants.ProductionNetworkIDs.Contains(snowCtx.NetworkID) &&
+		c.StateScheme != customrawdb.FirewoodScheme &&
+		ci != saedb.DefaultCommitInterval {
 		return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
 	}
 	return c, nil
+}
+
+// configKeys are the JSON keys that unmarshal into a [config] field.
+// [parseConfig] warns about, and ignores, all other keys.
+var configKeys = jsonKeys[config]()
+
+// jsonKeys returns the key under which [encoding/json] decodes each field of
+// struct T, including fields promoted from embedded structs.
+func jsonKeys[T any]() set.Set[string] {
+	t := reflect.TypeFor[T]()
+	fields := reflect.VisibleFields(t)
+	keys := set.NewSet[string](len(fields))
+	for _, f := range fields {
+		if f.Anonymous {
+			continue
+		}
+		name, _, _ := strings.Cut(f.Tag.Get("json"), ",")
+		if name == "" {
+			name = f.Name // an untagged field unmarshals from its own name
+		}
+		keys.Add(name)
+	}
+	return keys
 }
 
 // saeConfig translates the operator-supplied [config] into the [sae.Config]
@@ -161,16 +217,23 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 	config.DBConfig.CommitInterval = c.CommitInterval
 	config.DBConfig.SnapshotCacheMiB = c.SnapshotCache
 	config.DBConfig.AllowMissingTries = c.AllowMissingTries
+	config.RPCConfig.APIs = c.APIs
 	config.RPCConfig.AllowUnprotectedTxs = c.AllowUnprotectedTxs
 	config.RPCConfig.BatchRequestLimit = c.BatchRequestLimit
-	config.RPCConfig.EVMTimeout = c.APIMaxDuration.Duration
+	config.RPCConfig.CallTimeout = c.APIMaxDuration.Duration
 	config.RPCConfig.ResolvePendingToLastExecuted = c.ResolvePendingToLastExecuted
 	config.Now = now
 	return config
 }
 
-func (c config) stateSyncConfig() statesync.Config {
+func (c config) stateSyncConfig(networkID uint32) statesync.Config {
 	saeCfg := c.saeConfig(nil)
+	// All nodes in production networks MUST agree which state summaries to
+	// serve to ensure the state sync engine can hit the required quorum to
+	// accept the summaries.
+	if constants.ProductionNetworkIDs.Contains(networkID) {
+		saeCfg.DBConfig.CommitInterval = saedb.DefaultCommitInterval
+	}
 	return statesync.Config{
 		DBConfig: saeCfg.DBConfig,
 		Enabled:  c.StateSyncEnabled,

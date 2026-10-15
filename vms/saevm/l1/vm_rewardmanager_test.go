@@ -14,11 +14,10 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 
@@ -112,14 +111,14 @@ func TestRewardManagerDefaultBurnSAE(t *testing.T) {
 		withNow(now),
 	)
 
-	preBurn := balanceOf(t, sut, constants.BlackholeAddr)
+	preBurn := balanceOf(t, sut, blackhole.Address)
 
 	tx := sendTippedTransferTxTo(t, sut, fromIdx, dustSink, common.Big1)
 	block := sut.buildAcceptExecuteBlock(t)
 	requireBlockContainsTxs(t, block, tx.Hash())
 	sut.requireTxSucceeded(t, tx)
 
-	postBurn := balanceOf(t, sut, constants.BlackholeAddr)
+	postBurn := balanceOf(t, sut, blackhole.Address)
 	delta := new(big.Int).Sub(postBurn, preBurn)
 	require.Zerof(t, delta.Cmp(expectedTipCredit),
 		"BlackholeAddr must receive exactly tip*gasUsed (want=%s got=%s)",
@@ -146,7 +145,7 @@ func TestRewardManagerGenesisAllowFeeRecipientsSAE(t *testing.T) {
 	)
 
 	preValidator := balanceOf(t, sut, validator)
-	preBurn := balanceOf(t, sut, constants.BlackholeAddr)
+	preBurn := balanceOf(t, sut, blackhole.Address)
 
 	tx := sendTippedTransferTxTo(t, sut, fromIdx, dustSink, common.Big1)
 	block := sut.buildAcceptExecuteBlock(t)
@@ -154,7 +153,7 @@ func TestRewardManagerGenesisAllowFeeRecipientsSAE(t *testing.T) {
 	sut.requireTxSucceeded(t, tx)
 
 	postValidator := balanceOf(t, sut, validator)
-	postBurn := balanceOf(t, sut, constants.BlackholeAddr)
+	postBurn := balanceOf(t, sut, blackhole.Address)
 
 	gain := new(big.Int).Sub(postValidator, preValidator)
 	require.Zerof(t, gain.Cmp(expectedTipCredit),
@@ -198,7 +197,7 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				rewardmanager.ConfigKey: rewardmanager.NewConfig(
-					utils.PointerTo[uint64](0),
+					new(uint64(0)),
 					[]common.Address{addresses[adminIdx]},
 					nil,
 					nil,
@@ -229,7 +228,7 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 		{
 			name:          "disableRewards_burns",
 			mutationFn:    rewardmanager.PackDisableRewards,
-			wantRecipient: constants.BlackholeAddr,
+			wantRecipient: blackhole.Address,
 		},
 		{
 			name:          "allowFeeRecipients_routes_to_validator",
@@ -238,7 +237,7 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 		},
 	}
 
-	recipients := []common.Address{rewardAddr, validator, constants.BlackholeAddr}
+	recipients := []common.Address{rewardAddr, validator, blackhole.Address}
 	for _, s := range steps {
 		t.Run(s.name, func(t *testing.T) {
 			sut.advanceTime(t, blockBuildAdvance)
@@ -322,7 +321,7 @@ func TestRewardManagerForgedCoinbaseFailsVerifyBlock(t *testing.T) {
 				withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 					legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 						rewardmanager.ConfigKey: rewardmanager.NewConfig(
-							utils.PointerTo[uint64](0),
+							new(uint64(0)),
 							[]common.Address{addresses[adminIdx]},
 							nil,
 							nil,
@@ -331,7 +330,7 @@ func TestRewardManagerForgedCoinbaseFailsVerifyBlock(t *testing.T) {
 					}
 				}),
 			},
-			forgedCoinbase: constants.BlackholeAddr,
+			forgedCoinbase: blackhole.Address,
 		},
 	}
 

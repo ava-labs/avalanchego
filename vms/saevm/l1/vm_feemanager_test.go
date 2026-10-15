@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 
 	legacyparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
@@ -49,7 +48,7 @@ func TestFeeManagerForceDisabledAtHeliconActivation(t *testing.T) {
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
 			legacyparams.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 				feemanager.ConfigKey: feemanager.NewConfig(
-					utils.PointerTo[uint64](0),
+					new(uint64(0)),
 					[]common.Address{addresses[adminIdx]},
 					nil, nil,
 					&initialFeeConfig,

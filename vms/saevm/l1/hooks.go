@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/trie"
 
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
@@ -27,9 +26,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -396,12 +395,12 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// which is not in scope here. [builder.FinalizeHeader]
 			// receives the settled state from SAE and overwrites this field
 			// before the block is sealed (see [builder.resolveCoinbase]).
-			Coinbase:         constants.BlackholeAddr,
+			Coinbase:         blackhole.Address,
 			Difficulty:       big.NewInt(1),
 			Number:           new(big.Int).Add(parent.Number, common.Big1),
 			Time:             uint64(now.Unix()), //#nosec G115 -- block times are known non-negative
-			BlobGasUsed:      utils.PointerTo[uint64](0),
-			ExcessBlobGas:    utils.PointerTo[uint64](0),
+			BlobGasUsed:      new(uint64(0)),
+			ExcessBlobGas:    new(uint64(0)),
 			ParentBeaconRoot: &common.Hash{},
 		},
 		&customtypes.HeaderExtra{
@@ -410,7 +409,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// decision-making in SAE (ACP-226 superseded its use). It is
 			// always stamped to zero by the SAE block builder.
 			BlockGasCost:     big.NewInt(0),
-			TimeMilliseconds: utils.PointerTo[uint64](nowMS),
+			TimeMilliseconds: new(uint64(nowMS)),
 			MinDelayExponent: &mde,
 			TargetExcess:     &te,
 		},
@@ -520,7 +519,7 @@ func (b *builder) resolveCoinbase(settled *types.Header, settledState libevm.Sta
 		if configExtra.AllowFeeRecipients {
 			return b.coinbase
 		}
-		return constants.BlackholeAddr
+		return blackhole.Address
 	}
 
 	addr, allowFeeRecipients := rewardmanager.GetStoredRewardAddress(settledState)

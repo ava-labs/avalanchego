@@ -103,4 +103,14 @@ type AutoRenewedConfig struct {
 	NextPeriod json.Uint64 `json:"nextPeriod"`
 	// Percentage of rewards to auto-compound.
 	AutoCompoundRewardShares json.Uint32 `json:"autoCompoundRewardShares"`
+	// Cumulative rewards auto-compounded into the validator's weight over
+	// completed cycles, split by source:
+	//
+	//	weight = tx.Weight + RestakedValidationRewards + RestakedDelegateeRewards
+	//
+	// Distinct from AccruedDelegateeReward, which holds only the commission
+	// pending in the current cycle. Nil if the node does not report them, which
+	// is not the same as nothing having been restaked yet.
+	RestakedValidationRewards *json.Uint64 `json:"restakedValidationRewards,omitempty"`
+	RestakedDelegateeRewards  *json.Uint64 `json:"restakedDelegateeRewards,omitempty"`
 }

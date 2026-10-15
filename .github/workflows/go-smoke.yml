@@ -1,0 +1,25 @@
+name: Go Smoke Test Jobs
+
+# Reusable workflow for running the Go unit-test smoke suite.
+on:
+  workflow_call:
+    inputs:
+      platform_name:
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  unit-smoke:
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Run unit-test smoke suite
+        shell: bash
+        run: ./scripts/run_task.sh test-unit-smoke

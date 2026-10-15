@@ -21,7 +21,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
@@ -29,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
-	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -117,6 +115,7 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 				FortunaTimestamp:                utils.TimeToNewUint64(u.FortunaTime),
 				GraniteTimestamp:                utils.TimeToNewUint64(u.GraniteTime),
 				HeliconTimestamp:                utils.TimeToNewUint64(u.HeliconTime),
+				IglooTimestamp:                  utils.TimeToNewUint64(u.IglooTime),
 			},
 			AvalancheContext: extras.AvalancheContext{
 				SnowCtx: ctx,
@@ -234,6 +233,8 @@ func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.
 	return b.Write()
 }
 
+const ap3BaseFee = 225 * ethparams.GWei
+
 func (g *genesis) block() (*types.Block, error) {
 	root, err := g.root()
 	if err != nil {
@@ -269,7 +270,7 @@ func (g *genesis) block() (*types.Block, error) {
 	if c.IsApricotPhase3(g.Timestamp) { // Also called London
 		h.BaseFee = g.BaseFee
 		if h.BaseFee == nil {
-			h.BaseFee = big.NewInt(ap3.InitialBaseFee)
+			h.BaseFee = big.NewInt(ap3BaseFee)
 		}
 	}
 
@@ -284,13 +285,13 @@ func (g *genesis) block() (*types.Block, error) {
 	}
 
 	if c.IsGranite(g.Timestamp) {
-		headerExtra.TimeMilliseconds = avalancheutils.PointerTo(g.Timestamp * 1000)
-		headerExtra.MinDelayExcess = avalancheutils.PointerTo(acp226.InitialDelayExcess)
+		headerExtra.TimeMilliseconds = new(g.Timestamp * 1000)
+		headerExtra.MinDelayExcess = new(acp226.InitialDelayExcess)
 	}
 
 	if c.IsHelicon(g.Timestamp) {
-		headerExtra.TargetExponent = avalancheutils.PointerTo(dynamic.InitialTargetExponent)
-		headerExtra.MinPriceExponent = avalancheutils.PointerTo(dynamic.InitialPriceExponent)
+		headerExtra.TargetExponent = new(dynamic.InitialTargetExponent)
+		headerExtra.MinPriceExponent = new(dynamic.InitialPriceExponent)
 
 		// The genesis block is synchronous, so the markers must be zero to
 		// conform with [hook.Synchronous]. Most synchronous blocks omit these

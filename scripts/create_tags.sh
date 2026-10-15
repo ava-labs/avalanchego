@@ -78,7 +78,7 @@ fi
 echo "Creating tags for $VERSION at $HEAD_SHORT:"
 for tag in "${TAGS[@]}"; do
     echo "  $tag"
-    git tag $SIGN_FLAG "$tag"
+    git tag $SIGN_FLAG -m "$VERSION" "$tag"
 done
 
 echo ""

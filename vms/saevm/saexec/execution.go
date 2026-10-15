@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
@@ -23,6 +24,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/prefetch"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -44,9 +46,9 @@ type queuedBlock struct {
 	enqueuedAt time.Time
 }
 
-// Enqueue pushes a new block to the FIFO queue. If [Executor.Close] is called
-// before [blocks.Block.Executed] returns true then there is no guarantee that
-// the block will be executed.
+// Enqueue pushes a new block to the FIFO queue. Every enqueued block is
+// executed before [Executor.Close] returns, unless an earlier block fails to
+// execute. Enqueue MUST NOT be called after [Executor.Close] or it will panic.
 func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 	e.createReceiptBuffers(block)
 
@@ -61,61 +63,73 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 				zap.Int("queue_capacity", n),
 			)
 		}
+		// As it's concurrent, there's no perfect place to check for a
+		// processing error when enqueueing (nor is it strictly necessary as its
+		// exposed by [Executor.HealthCheck]), but this is the latest possible
+		// time.
+		if err := e.HealthCheck(); err != nil {
+			return err
+		}
 		return nil
 
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-e.quit:
-		return errExecutorClosed
 	case <-e.done:
-		// `e.done` can also close due to [Executor.execute] errors.
-		return errExecutorClosed
+		return errors.Join(errExecutorClosed, e.HealthCheck())
 	}
 }
 
-const emergencyPlaybookLink = "https://github.com/ava-labs/avalanchego/issues/5276"
+func (e *Executor) processQueue() (ret *Unhealthy) {
+	defer func() {
+		e.queueErr.Store(ret)
+		close(e.done)
+	}()
 
-func (e *Executor) processQueue() {
-	defer close(e.done)
+	for qb := range e.queue {
+		block := qb.block
+		log := e.log.With(
+			zap.Uint64("block_height", block.Height()),
+			zap.Uint64("block_time", block.BuildTime()),
+			zap.Stringer("block_hash", block.Hash()),
+			zap.Int("tx_count", len(block.Transactions())),
+		)
 
-	for {
-		select {
-		case <-e.quit:
-			return
-
-		case qb := <-e.queue:
-			block := qb.block
-			log := e.log.With(
-				zap.Uint64("block_height", block.Height()),
-				zap.Uint64("block_time", block.BuildTime()),
-				zap.Stringer("block_hash", block.Hash()),
-				zap.Int("tx_count", len(block.Transactions())),
+		err := e.execute(block, log)
+		switch {
+		case errors.Is(err, errFatal):
+			log.Fatal( //nolint:gocritic // False positive, will not terminate the process
+				"Block execution failed",
+				zap.Error(err),
 			)
-
-			err := e.execute(block, log)
-			switch {
-			case errors.Is(err, errFatal):
-				log.Fatal( //nolint:gocritic // False positive, will not terminate the process
-					"Block execution failed",
-					zap.String("playbook", emergencyPlaybookLink),
-					zap.Error(err),
-				)
-			case err != nil:
-				log.Error(
-					"Error of unknown severity in block execution",
-					zap.String("if_escalation_required", emergencyPlaybookLink),
-					zap.Error(err),
-				)
-			}
-			if err != nil {
-				return
-			}
-			e.metrics.observeQueueDuration(time.Since(qb.enqueuedAt))
+		case err != nil:
+			log.Error(
+				"Error of unknown severity in block execution",
+				zap.Error(err),
+			)
 		}
+		if err != nil {
+			return &Unhealthy{
+				err:   err,
+				cause: block,
+			}
+		}
+		e.metrics.observeQueueDuration(time.Since(qb.enqueuedAt))
 	}
+	return nil
 }
 
 var errFatal = errors.New("fatal execution error")
+
+const (
+	// triePrefetcherNamespace names the prefetcher's metrics. libevm records
+	// them as `trie/prefetch/sae/*` on its global registry.
+	//
+	// TODO(JonathanOppenheimer): We need to register this namespace within
+	// SAE.
+	triePrefetcherNamespace = "sae"
+	// triePrefetcherParallelism limits the prefetcher to 16 goroutines.
+	triePrefetcherParallelism = 16
+)
 
 func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	// If the VM were to encounter an error after enqueuing the block, we would
@@ -133,6 +147,16 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
+
+	// The prefetcher loads trie nodes during execution which removes the loads
+	// at Commit time. On historical mainnet C-Chain it cut mean block insertion
+	// from 99.76ms to 44.84ms:
+	// https://github.com/ava-labs/avalanchego/issues/5665#issuecomment-5372800462
+	//
+	// TODO(JonathanOppenheimer): measure this again after SAE is live!
+	stateDB.StartPrefetcher(triePrefetcherNamespace, prefetch.WithConcurrentWorkers(triePrefetcherParallelism))
+	defer stateDB.StopPrefetcher()
+
 	result, err := Execute(
 		b,
 		stateDB,
@@ -250,7 +274,8 @@ func stateBeforeTransactions(hooks hook.Points, rules params.Rules, stateDB *sta
 // execution after a transaction prefix for intra-block inspection.
 //
 // The gas clock and base fee come from the parent's post-execution clock,
-// except pre-SAE blocks, which use their own header's fee.
+// except pre-SAE blocks, which use their own header's fee and finish at the gas
+// time derived from their header.
 //
 // Execute only runs the deterministic hooks, so it is also safe to use for
 // historical execution. Canonical-only side effects belong in
@@ -293,7 +318,8 @@ func Execute(
 	}
 
 	baseFee := gasClock.BaseFee()
-	if hook.Synchronous(hooks, header) {
+	synchronous := b.Synchronous()
+	if synchronous {
 		baseFee = b.WorstCaseBaseFee()
 	} else {
 		b.CheckBaseFeeBound(baseFee)
@@ -334,9 +360,12 @@ func Execute(
 		perTxClock.Tick(gas.Gas(receipt.GasUsed))
 		// Interim execution time reports live canonical progress. Historical
 		// execution can run only part of the same in-memory block and overwrite
-		// that progress with an earlier time. This violates monotonicity and can
-		// change the settlement decision made by LastToSettleAt.
-		if config.canonical {
+		// that progress with an earlier time. This violates monotonicity and
+		// can change the settlement decision made by LastToSettleAt.
+		//
+		// A synchronous block's final gas time is derived from its header, not
+		// from this clock, so it records no interim time.
+		if config.canonical && !synchronous {
 			b.SwapInterimExecutionTime(perTxClock)
 			// TODO(arr4n) investigate calling the same method on pending blocks in
 			// the queue. It's only worth it if [blocks.LastToSettleAt] regularly
@@ -367,6 +396,12 @@ func Execute(
 		// TODO(JonathanOppenheimer): skipping the FinishExecutingBlock hook
 		// leaks goroutines from an in-flight parallel.Processor, which requires
 		// a FinishBlock call.
+
+		// This captures MOST read errors. For the subset of DB errors through
+		// leveldb that have ignored errors in geth, we rely on the corruptabledb.
+		if err := stateDB.Error(); err != nil {
+			return nil, fmt.Errorf("during execution: %w", err)
+		}
 		return res, nil
 	}
 
@@ -379,7 +414,7 @@ func Execute(
 		b.CheckOpBurnerBalanceBounds(stateDB, numTxs+i, o)
 		res.GasConsumed += o.Gas
 		perTxClock.Tick(o.Gas)
-		if config.canonical {
+		if config.canonical && !synchronous {
 			b.SwapInterimExecutionTime(perTxClock)
 		}
 
@@ -392,10 +427,26 @@ func Execute(
 		return nil, fmt.Errorf("finish-executing-block hook: %v", err)
 	}
 
+	// This captures MOST read errors. For the subset of DB errors through
+	// leveldb that have ignored errors in geth, we rely on the corruptabledb.
+	if err := stateDB.Error(); err != nil {
+		return nil, fmt.Errorf("during execution: %w", err)
+	}
+
 	endTime := time.Now()
-	target, gasCfg := hooks.GasConfigAfter(b.Header())
-	if err := gasClock.AfterBlock(res.GasConsumed, target, gasCfg); err != nil {
-		return nil, fmt.Errorf("after-block gas time update: %w", err)
+	if synchronous {
+		// Recovery derives synchronous gas times from the header. Execution
+		// MUST match, because the first asynchronous block advances the last
+		// synchronous block's gas time.
+		gasClock, err = b.SynchronousGasTime()
+		if err != nil {
+			return nil, fmt.Errorf("%w: deriving synchronous gas time: %v", errFatal, err)
+		}
+	} else {
+		target, gasCfg := hooks.GasConfigAfter(b.Header())
+		if err := gasClock.AfterBlock(res.GasConsumed, target, gasCfg); err != nil {
+			return nil, fmt.Errorf("after-block gas time update: %w", err)
+		}
 	}
 
 	log.Trace(
@@ -421,25 +472,37 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 	if err != nil {
 		return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
 	}
-	if err := e.Tracker.MaybeCommit(b.SettledStateRoot(), root, b.NumberU64()); err != nil {
-		return err
-	}
 
 	// Responsibility for untracking lies with the VM once it deems this block's
 	// post-execution state to no longer be consensus-critical.
 	e.Tracker.Track(root)
 
-	// The strict ordering of the next 3 calls guarantees invariants that MUST
-	// NOT be broken:
+	// The strict ordering of the remaining calls guarantees invariants that
+	// MUST NOT be broken:
 	//
 	// 1. [blocks.Block.MarkExecuted] guarantees disk then in-memory changes.
 	// 2. Internal indicator of last executed MUST follow in-memory change.
 	// 3. External indicator of last executed MUST follow internal indicator.
+	// 4. A synchronous block settles itself, which MUST follow its execution.
+	// 5. Settlement MUST be persisted before [saedb.Tracker.BlockExecuted] MAY
+	//    commit the settled state, so the committed state never leads it.
 	if err := b.MarkExecuted(e.db, e.xdb, r.FinishBy.Gas.Clone(), r.FinishBy.Wall, r.BaseFee.ToBig(), r.Receipts, root, &e.lastExecuted /* (2) */); err != nil {
 		return err
 	}
 	e.sendPostExecutionEvents(b, r) // (3)
-	return nil
+	if b.Synchronous() {            // (4)
+		// We MUST avoid moving the finalized block pointer backwards when
+		// recovery reexecutes previously executed blocks.
+		if b.ParentHash() == rawdb.ReadFinalizedBlockHash(e.db) {
+			rawdb.WriteFinalizedBlockHash(e.db, b.Hash())
+		}
+		if err := b.MarkSettled(e.lastSettled); err != nil {
+			return err
+		}
+	}
+	// b's settled root stays tracked until settlement passes b, which requires a
+	// later block to execute, so the root is still available here.
+	return e.Tracker.BlockExecuted(b.SettledStateRoot(), root, b.NumberU64()) // (5)
 }
 
 // NullReceiptStore discards transaction receipts.

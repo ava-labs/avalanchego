@@ -12,9 +12,9 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/evm/utils",
         "//graft/subnet-evm/params/extras",
         "//graft/subnet-evm/precompile/contracts/feemanager",
-        "//utils",
         "@com_github_ava_labs_libevm//log",
     ],
 )
@@ -24,10 +24,10 @@ graft_go_test(
     srcs = ["retirement_test.go"],
     deps = [
         ":retirement",
+        "//graft/evm/utils",
         "//graft/subnet-evm/params/extras",
         "//graft/subnet-evm/precompile/contracts/feemanager",
         "//graft/subnet-evm/precompile/contracts/nativeminter",
-        "//utils",
         "@com_github_stretchr_testify//require",
     ],
 )

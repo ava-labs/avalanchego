@@ -3,7 +3,7 @@
 
 package fee
 
-import "github.com/ava-labs/avalanchego/vms/platformvm/txs"
+import "github.com/ava-labs/avalanchego/vms/platformvm/platform"
 
 var _ Calculator = (*SimpleCalculator)(nil)
 
@@ -17,6 +17,6 @@ func NewSimpleCalculator(fee uint64) *SimpleCalculator {
 	}
 }
 
-func (c *SimpleCalculator) CalculateFee(txs.UnsignedTx) (uint64, error) {
+func (c *SimpleCalculator) CalculateFee(platform.UnsignedTx) (uint64, error) {
 	return c.txFee, nil
 }

@@ -4,67 +4,64 @@
 package compression
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 
-	"github.com/DataDog/zstd"
+	"github.com/klauspost/compress/zstd"
 )
 
 var (
 	_ Compressor = (*zstdCompressor)(nil)
 
 	ErrInvalidMaxSizeCompressor = errors.New("invalid compressor max size")
-	ErrDecompressedMsgTooLarge  = errors.New("decompressed msg too large")
 	ErrMsgTooLarge              = errors.New("msg too large to be compressed")
 )
 
 func NewZstdCompressor(maxSize int64) (Compressor, error) {
-	return NewZstdCompressorWithLevel(maxSize, zstd.DefaultCompression)
+	return NewZstdCompressorWithLevel(maxSize, zstd.SpeedDefault)
 }
 
-func NewZstdCompressorWithLevel(maxSize int64, level int) (Compressor, error) {
-	if maxSize == math.MaxInt64 {
-		// "Decompress" creates "io.LimitReader" with max size + 1:
-		// if the max size + 1 overflows, "io.LimitReader" reads nothing
-		// returning 0 byte for the decompress call
-		// require max size < math.MaxInt64 to prevent int64 overflows
+func NewZstdCompressorWithLevel(maxSize int64, level zstd.EncoderLevel) (Compressor, error) {
+	if maxSize <= 0 || maxSize == math.MaxInt64 {
 		return nil, ErrInvalidMaxSizeCompressor
 	}
+
+	// We do not use streaming apis, so we do not have to call Close to release
+	// resources.
+	encoder, err := zstd.NewWriter(nil, zstd.WithEncoderLevel(level))
+	if err != nil {
+		return nil, err
+	}
+
+	decoder, err := zstd.NewReader(nil, zstd.WithDecoderMaxMemory(uint64(maxSize)))
+	if err != nil {
+		return nil, err
+	}
+
 	return &zstdCompressor{
 		maxSize: maxSize,
-		level:   level,
+		encoder: encoder,
+		decoder: decoder,
 	}, nil
 }
 
 type zstdCompressor struct {
 	maxSize int64
-	level   int
+
+	// We do not use streaming apis, so we do not have to call Close to release
+	// resources.
+	encoder *zstd.Encoder
+	decoder *zstd.Decoder
 }
 
 func (z *zstdCompressor) Compress(msg []byte) ([]byte, error) {
 	if int64(len(msg)) > z.maxSize {
 		return nil, fmt.Errorf("%w: (%d) > (%d)", ErrMsgTooLarge, len(msg), z.maxSize)
 	}
-	return zstd.CompressLevel(nil, msg, z.level)
+	return z.encoder.EncodeAll(msg, nil), nil
 }
 
 func (z *zstdCompressor) Decompress(msg []byte) ([]byte, error) {
-	reader := zstd.NewReader(bytes.NewReader(msg))
-	defer reader.Close()
-
-	// We allow [io.LimitReader] to read up to [z.maxSize + 1] bytes, so that if
-	// the decompressed payload is greater than the maximum size, this function
-	// will return the appropriate error instead of an incomplete byte slice.
-	limitReader := io.LimitReader(reader, z.maxSize+1)
-	decompressed, err := io.ReadAll(limitReader)
-	if err != nil {
-		return nil, err
-	}
-	if int64(len(decompressed)) > z.maxSize {
-		return nil, fmt.Errorf("%w: (%d) > (%d)", ErrDecompressedMsgTooLarge, len(decompressed), z.maxSize)
-	}
-	return decompressed, nil
+	return z.decoder.DecodeAll(msg, nil)
 }

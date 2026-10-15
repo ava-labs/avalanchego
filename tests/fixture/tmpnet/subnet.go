@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -182,8 +182,8 @@ func (s *Subnet) AddValidators(ctx context.Context, log logging.Logger, apiURI s
 		}
 
 		_, err := pWallet.IssueAddSubnetValidatorTx(
-			&txs.SubnetValidator{
-				Validator: txs.Validator{
+			&platform.SubnetValidator{
+				Validator: platform.Validator{
 					NodeID: node.NodeID,
 					Start:  uint64(startTime.Unix()),
 					End:    endTime,

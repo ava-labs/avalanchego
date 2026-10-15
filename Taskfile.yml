@@ -240,7 +240,7 @@ tasks:
     cmd: '{{.NIX_RUN}} ./scripts/check_go_version.sh'
 
   check-require-directives:
-    desc: Checks that internal module require directives reference the same version
+    desc: Checks that internal module require directives reference the same version and match version.Current
     cmd: '{{.NIX_RUN}} ./scripts/check_require_directives.sh'
 
   check-require-directives-round-trip:
@@ -248,6 +248,10 @@ tasks:
     cmds:
       - cmd: '{{.NIX_RUN}} ./scripts/check_require_directives_round_trip.sh'
       - task: check-clean-branch
+
+  check-task-version:
+    desc: Checks that the Go Task bootstrap matches the Nix Task version
+    cmd: '{{.NIX_RUN}} ./scripts/check_task_version.sh'
 
   check-yaml-fmt:
     desc: Checks that YAML files are formatted with yamlfmt (requires a clean git working tree)
@@ -366,8 +370,12 @@ tasks:
       - lint-action
       - lint-shell
       - test-ci-disk-space
+      - test-setup-task
+      - test-sync-task-version
+      - test-unit-script
       - check-go-version
       - check-require-directives
+      - check-task-version
 
   _lint-readonly-serial:
     internal: true
@@ -386,11 +394,15 @@ tasks:
       - task: lint-shell
       - task: test-ci-disk-space
       - task: test-run-task-launcher
+      - task: test-setup-task
+      - task: test-sync-task-version
+      - task: test-unit-script
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
       - task: check-go-version
       - task: check-require-directives
       - task: check-require-directives-round-trip
+      - task: check-task-version
 
   lint-fix:
     desc: Runs automated fixing for failing static analysis of golang code
@@ -422,6 +434,10 @@ tasks:
       - cmd: '{{.NIX_RUN}} go mod download'
       # GOWORK="" ensures workspace mode is enabled (overrides any GOWORK=off in environment)
       - cmd: '{{.NIX_RUN}} env GOWORK="" go work sync'
+
+  sync-task-version:
+    desc: Synchronizes the Go Task bootstrap dependency with the Nix Task version
+    cmd: '{{.NIX_RUN}} ./scripts/sync_task_version.sh'
 
   tags-create:
     desc: Creates tags for avalanchego and submodules
@@ -623,17 +639,33 @@ tasks:
     desc: Tests the run_task launcher behavior
     cmd: '{{.NIX_RUN}} ./scripts/test_run_task_launcher.sh'
 
-  test-unit:
-    desc: Runs unit tests
-    # Invoking with bash ensures compatibility with CI execution on Windows
-    cmd: '{{.NIX_RUN}} bash ./scripts/build_test.sh'
+  test-setup-task:
+    desc: Tests Task setup behavior
+    cmd: '{{.NIX_RUN}} ./scripts/test_setup_task.sh'
 
-  test-unit-fast:
-    desc: Runs unit tests
+  test-sync-task-version:
+    desc: Tests Task version synchronization
+    cmd: '{{.NIX_RUN}} ./scripts/test_sync_task_version.sh'
+
+  test-unit:
+    desc: Runs cacheable unified unit tests
     env:
       NO_SHUFFLE: TRUE # Allows caching
-      NO_RACE: TRUE    # Tests are much faster without race detection
-    cmd: '{{.NIX_RUN}} bash ./scripts/build_test.sh'
+      NO_RACE: TRUE    # Reduces execution time
+    cmd: '{{.NIX_RUN}} bash ./scripts/tests.unit.sh'
+
+  test-unit-race-shuffle:
+    desc: Runs unified unit tests with race detection and shuffle
+    cmd: '{{.NIX_RUN}} bash ./scripts/tests.unit.sh'
+
+  test-unit-script:
+    desc: Tests unified unit-test script behavior
+    cmd: '{{.NIX_RUN}} ./scripts/test_tests_unit.sh'
+
+  test-unit-smoke:
+    desc: Runs one unit test package to check that Go unit tests run on a platform
+    # Mirrors the Bazel unit-test smoke target (//ids:ids_test --test_filter=TestID).
+    cmd: '{{.NIX_RUN}} go test -run TestID ./ids'
 
   test-upgrade:
     desc: Runs upgrade tests

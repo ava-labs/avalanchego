@@ -5,9 +5,6 @@ on:
   schedule:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   firewood-load-test:
     runs-on: avalanche-avalanchego-runner

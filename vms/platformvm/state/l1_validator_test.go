@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 )
 
 func TestL1Validator_Compare(t *testing.T) {
@@ -197,7 +197,7 @@ func TestPutL1Validator(t *testing.T) {
 		db          = memdb.New()
 		cache       = lru.NewCache[ids.ID, maybe.Maybe[L1Validator]](10)
 	)
-	expectedL1ValidatorBytes, err := block.GenesisCodec.Marshal(block.CodecVersion, l1Validator)
+	expectedL1ValidatorBytes, err := platform.GenesisCodec.Marshal(platform.CodecVersion, l1Validator)
 	require.NoError(err)
 
 	require.NoError(putL1Validator(db, cache, l1Validator))

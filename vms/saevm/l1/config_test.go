@@ -207,7 +207,7 @@ func TestParseConfig_RPC(t *testing.T) {
 			require.NoError(t, err, "parseConfig(%q)", test.config)
 
 			rpcConfig := config.saeConfig(nil).RPCConfig
-			require.Equal(t, test.wantDuration, rpcConfig.EVMTimeout, "parseConfig(%q)", test.config)
+			require.Equal(t, test.wantDuration, rpcConfig.CallTimeout, "parseConfig(%q)", test.config)
 			require.Equal(t, test.wantBatchLimit, rpcConfig.BatchRequestLimit, "parseConfig(%q)", test.config)
 			require.Equal(t, test.wantResolveLast, rpcConfig.ResolvePendingToLastExecuted, "parseConfig(%q)", test.config)
 		})
