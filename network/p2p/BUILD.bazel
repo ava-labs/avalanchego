@@ -54,6 +54,7 @@ go_test(
         "//snow/validators/validatorsmock",
         "//snow/validators/validatorstest",
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//utils/set",
         "//version",
         "@com_github_prometheus_client_golang//prometheus",

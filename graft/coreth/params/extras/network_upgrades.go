@@ -5,7 +5,6 @@ package extras
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
@@ -63,10 +62,6 @@ type NetworkUpgrades struct {
 	HeliconTimestamp *uint64 `json:"heliconTimestamp,omitempty"`
 	// Igloo is our next upcoming upgrade.
 	IglooTimestamp *uint64 `json:"iglooTimestamp,omitempty"`
-}
-
-func (n *NetworkUpgrades) Equal(other *NetworkUpgrades) bool {
-	return reflect.DeepEqual(n, other)
 }
 
 func (n *NetworkUpgrades) checkNetworkUpgradesCompatible(newcfg *NetworkUpgrades, time uint64) *ethparams.ConfigCompatError {
@@ -161,12 +156,6 @@ func (n *NetworkUpgrades) IsApricotPhase3(time uint64) bool {
 	return isTimestampForked(n.ApricotPhase3BlockTimestamp, time)
 }
 
-// IsApricotPhase4 returns whether [time] represents a block
-// with a timestamp after the Apricot Phase 4 upgrade time.
-func (n NetworkUpgrades) IsApricotPhase4(time uint64) bool {
-	return isTimestampForked(n.ApricotPhase4BlockTimestamp, time)
-}
-
 // IsApricotPhase5 returns whether [time] represents a block
 // with a timestamp after the Apricot Phase 5 upgrade time.
 func (n NetworkUpgrades) IsApricotPhase5(time uint64) bool {
@@ -185,22 +174,10 @@ func (n NetworkUpgrades) IsApricotPhase6(time uint64) bool {
 	return isTimestampForked(n.ApricotPhase6BlockTimestamp, time)
 }
 
-// IsApricotPhasePost6 returns whether [time] represents a block
-// with a timestamp after the Apricot Phase 6 Post upgrade time.
-func (n NetworkUpgrades) IsApricotPhasePost6(time uint64) bool {
-	return isTimestampForked(n.ApricotPhasePost6BlockTimestamp, time)
-}
-
 // IsBanff returns whether [time] represents a block
 // with a timestamp after the Banff upgrade time.
 func (n NetworkUpgrades) IsBanff(time uint64) bool {
 	return isTimestampForked(n.BanffBlockTimestamp, time)
-}
-
-// IsCortina returns whether [time] represents a block
-// with a timestamp after the Cortina upgrade time.
-func (n NetworkUpgrades) IsCortina(time uint64) bool {
-	return isTimestampForked(n.CortinaBlockTimestamp, time)
 }
 
 // IsDurango returns whether [time] represents a block
@@ -282,16 +259,14 @@ func GetNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
 }
 
 type AvalancheRules struct {
-	IsApricotPhase1, IsApricotPhase2, IsApricotPhase3, IsApricotPhase4, IsApricotPhase5 bool
-	IsApricotPhasePre6, IsApricotPhase6, IsApricotPhasePost6                            bool
-	IsBanff                                                                             bool
-	IsCortina                                                                           bool
-	IsDurango                                                                           bool
-	IsEtna                                                                              bool
-	IsFortuna                                                                           bool
-	IsGranite                                                                           bool
-	IsHelicon                                                                           bool
-	IsIgloo                                                                             bool
+	IsApricotPhase1, IsApricotPhase2    bool
+	IsApricotPhasePre6, IsApricotPhase6 bool
+	IsBanff                             bool
+	IsDurango                           bool
+	IsFortuna                           bool
+	IsGranite                           bool
+	IsHelicon                           bool
+	IsIgloo                             bool
 }
 
 // IsGraniteActivated is used by the warp precompile to determine which gas costs to use.
@@ -307,22 +282,16 @@ func (a AvalancheRules) IsDurangoActivated() bool {
 
 func (n *NetworkUpgrades) GetAvalancheRules(timestamp uint64) AvalancheRules {
 	return AvalancheRules{
-		IsApricotPhase1:     n.IsApricotPhase1(timestamp),
-		IsApricotPhase2:     n.IsApricotPhase2(timestamp),
-		IsApricotPhase3:     n.IsApricotPhase3(timestamp),
-		IsApricotPhase4:     n.IsApricotPhase4(timestamp),
-		IsApricotPhase5:     n.IsApricotPhase5(timestamp),
-		IsApricotPhasePre6:  n.IsApricotPhasePre6(timestamp),
-		IsApricotPhase6:     n.IsApricotPhase6(timestamp),
-		IsApricotPhasePost6: n.IsApricotPhasePost6(timestamp),
-		IsBanff:             n.IsBanff(timestamp),
-		IsCortina:           n.IsCortina(timestamp),
-		IsDurango:           n.IsDurango(timestamp),
-		IsEtna:              n.IsEtna(timestamp),
-		IsFortuna:           n.IsFortuna(timestamp),
-		IsGranite:           n.IsGranite(timestamp),
-		IsHelicon:           n.IsHelicon(timestamp),
-		IsIgloo:             n.IsIgloo(timestamp),
+		IsApricotPhase1:    n.IsApricotPhase1(timestamp),
+		IsApricotPhase2:    n.IsApricotPhase2(timestamp),
+		IsApricotPhasePre6: n.IsApricotPhasePre6(timestamp),
+		IsApricotPhase6:    n.IsApricotPhase6(timestamp),
+		IsBanff:            n.IsBanff(timestamp),
+		IsDurango:          n.IsDurango(timestamp),
+		IsFortuna:          n.IsFortuna(timestamp),
+		IsGranite:          n.IsGranite(timestamp),
+		IsHelicon:          n.IsHelicon(timestamp),
+		IsIgloo:            n.IsIgloo(timestamp),
 	}
 }
 

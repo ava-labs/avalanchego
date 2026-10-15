@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
 
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/tracking"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/network"
 
@@ -39,21 +39,14 @@ type Client struct {
 	minKey []byte // read-only stand-in for an absent start key
 }
 
-// NewClient returns a [Client] reading handlerID's trie from n's peers.
+// NewClient returns a [Client] reading the trie served at client's handler ID.
 func NewClient(
 	log logging.Logger,
-	n *p2p.Network,
-	handlerID uint64,
+	client *tracking.Client,
 	trieKeyLength int,
-	peers *p2p.PeerTracker,
 ) *Client {
 	return &Client{
-		sender: network.NewDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, leafResult](
-			log,
-			n,
-			handlerID,
-			peers,
-		),
+		sender: network.NewDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, leafResult](log, client),
 		minKey: make([]byte, trieKeyLength),
 	}
 }

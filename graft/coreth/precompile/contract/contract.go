@@ -44,14 +44,6 @@ func NewStatefulPrecompileFunction(selector []byte, execute RunStatefulPrecompil
 	}
 }
 
-func NewStatefulPrecompileFunctionWithActivator(selector []byte, execute RunStatefulPrecompileFunc, activation ActivationFunc) *StatefulPrecompileFunction {
-	return &StatefulPrecompileFunction{
-		selector:   selector,
-		execute:    execute,
-		activation: activation,
-	}
-}
-
 // statefulPrecompileWithFunctionSelectors implements StatefulPrecompiledContract by using 4 byte function selectors to pass
 // off responsibilities to internal execution functions.
 // Note: because we only ever read from [functions] there no lock is required to make it thread-safe.

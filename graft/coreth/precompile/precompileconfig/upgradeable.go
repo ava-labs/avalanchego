@@ -3,8 +3,6 @@
 
 package precompileconfig
 
-import "github.com/ava-labs/avalanchego/graft/evm/utils"
-
 // Upgrade contains the timestamp for the upgrade along with
 // a boolean [Disable]. If [Disable] is set, the upgrade deactivates
 // the precompile and clears its storage.
@@ -21,13 +19,4 @@ func (u *Upgrade) Timestamp() *uint64 {
 // IsDisabled returns true if the network upgrade deactivates the precompile.
 func (u *Upgrade) IsDisabled() bool {
 	return u.Disable
-}
-
-// Equal returns true iff [other] has the same blockTimestamp and has the
-// same on value for the Disable flag.
-func (u *Upgrade) Equal(other *Upgrade) bool {
-	if other == nil {
-		return false
-	}
-	return u.Disable == other.Disable && utils.Uint64PtrEqual(u.BlockTimestamp, other.BlockTimestamp)
 }
