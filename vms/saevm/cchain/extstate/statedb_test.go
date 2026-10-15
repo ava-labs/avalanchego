@@ -93,8 +93,8 @@ func TestStateKeyPartition(t *testing.T) {
 	}
 }
 
-// FuzzStateKeyPartition covers [extstate.StateDBHooks]. Without them, a storage
-// write to a key equal to a coin ID would overwrite that coin's balance.
+// FuzzStateKeyPartition ensures that multicoin state updates don't
+// affect any existing state with the same key
 func FuzzStateKeyPartition(f *testing.F) {
 	f.Add([]byte{0x01}) // Already a normalized coin ID.
 	f.Fuzz(func(t *testing.T, keyBytes []byte) {
