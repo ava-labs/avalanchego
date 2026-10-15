@@ -137,9 +137,7 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 var (
 	mainnetChainID = big.NewInt(43114)
 	fujiChainID    = big.NewInt(43113)
-	// testFixtureChainID identifies the pre-SAE fixture chain used to test
-	// synchronous blocks. Like Fuji and Mainnet, it crosses AP2 and AP3
-	// mid-chain.
+	// for use with the synchronoustest fixture
 	testFixtureChainID = big.NewInt(43110)
 )
 
