@@ -45,11 +45,10 @@ func normalizeCoinID(coinID *common.Hash) {
 	coinID[0] |= 0x01
 }
 
-// TODO(JonathanOppenheimer): Use the predicates in SAE and share them with
-// Subnet-EVM. See https://github.com/ava-labs/avalanchego/issues/6113.
-
 // StateDB wraps a [state.StateDB] with multicoin balances and the predicates of
 // the current transaction's access list.
+//
+// TODO(#6113): Use the predicates in SAE and share them with Subnet-EVM. 
 type StateDB struct {
 	*state.StateDB
 
