@@ -32,8 +32,6 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/libevm/common"
 	cmath "github.com/ava-labs/libevm/common/math"
 	ethcore "github.com/ava-labs/libevm/core"
@@ -251,11 +249,10 @@ func (st *StateTransition) preCheck() error {
 		}
 
 		// Check that the sender is on the tx allow list if enabled
-		if params.GetExtra(st.evm.ChainConfig()).IsPrecompileEnabled(txallowlist.ContractAddress, st.evm.Context.Time) {
-			txAllowListRole := txallowlist.GetTxAllowListStatus(st.state, msg.From)
-			if !txAllowListRole.IsEnabled() {
-				return fmt.Errorf("%w: %s", vmerrors.ErrSenderAddressNotAllowListed, msg.From)
-			}
+		rules := st.evm.ChainConfig().Rules(st.evm.Context.BlockNumber, params.IsMergeTODO, st.evm.Context.Time)
+		rulesExtra := params.RulesExtra(*params.GetRulesExtra(rules))
+		if err := rulesExtra.EnforceTxAllowList(msg.From, st.state); err != nil {
+			return err
 		}
 	}
 	// Make sure that transaction gasFeeCap is greater than the baseFee (post london)

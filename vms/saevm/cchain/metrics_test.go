@@ -17,10 +17,10 @@ func TestMinBlockDelayMetric(t *testing.T) {
 	ctx, sut := newSUT(t, withMaxAllocFor(sk.EthAddress()))
 	w := newWallet(sk, sut.ctx, sut.Client)
 
-	require.Zerof(t, testutil.ToFloat64(sut.metrics.minBlockDelay), "min block delay before executing any block")
+	require.Zerof(t, testutil.ToFloat64(sut.metrics), "min block delay before executing any block")
 
 	blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
 
 	want := delayExponent(blk.Header()).DelayDuration().Seconds()
-	require.Equalf(t, want, testutil.ToFloat64(sut.metrics.minBlockDelay), "min block delay after executing block %d", blk.NumberU64())
+	require.Equalf(t, want, testutil.ToFloat64(sut.metrics), "min block delay after executing block %d", blk.NumberU64())
 }

@@ -43,6 +43,13 @@ func NewStorage(db database.Database, msgs ...*warp.UnsignedMessage) *Storage {
 	}
 }
 
+// AddMessage writes a single message to storage. Its signature matches
+// subnet-evm's `precompileconfig.WarpMessageWriter`, allowing a Storage to be
+// passed directly as the warp message sink of a precompile accept context.
+func (s *Storage) AddMessage(m *warp.UnsignedMessage) error {
+	return s.Add(m)
+}
+
 // Add writes the given messages to storage.
 func (s *Storage) Add(msgs ...*warp.UnsignedMessage) error {
 	batch := s.db.NewBatch()

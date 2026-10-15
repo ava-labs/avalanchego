@@ -50,8 +50,13 @@ const _ uint = constants.DefaultMaxMessageSize - saeparams.MaxBlockBytes - 1
 var (
 	errUnknownParent     = errors.New("unknown parent")
 	errBlockHeightTooLow = errors.New("block height too low")
-	errHashMismatch      = errors.New("hash mismatch")
 	errBlockTooLarge     = errors.New("block size exceeds maximum")
+
+	// ErrHashMismatch is returned by [VM.VerifyBlock] when the locally rebuilt
+	// block does not hash-match the received block. Exported so callers and
+	// tests can `errors.Is` against it (e.g. assertions that a forged header
+	// field trips the rebuild-and-compare check).
+	ErrHashMismatch = errors.New("hash mismatch")
 )
 
 // VerifyBlock validates the block and, if successful, populates its ancestry.
@@ -87,7 +92,7 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 			zap.Reflect("block", b.Header()),
 			zap.Reflect("rebuilt", rebuilt.Header()),
 		)
-		return fmt.Errorf("%w; rebuilt as %#x when verifying %#x", errHashMismatch, reH, verH)
+		return fmt.Errorf("%w; rebuilt as %#x when verifying %#x", ErrHashMismatch, reH, verH)
 	}
 	if err := b.CopyAncestorsFrom(rebuilt); err != nil {
 		return err
@@ -105,7 +110,7 @@ var (
 
 // verifyWhenBootstrapping skips verification in its entirety. It is expected
 // for blocks to be verified by hash in the bootstrapping engine. This supports
-// hooks, such as Coreth and Subnet-EVM, that are unable to fully verify blocks
+// hooks, such as Coreth and the L1 VM, that are unable to fully verify blocks
 // during bootstrapping.
 func (vm *VM) verifyWhenBootstrapping(b, parent *blocks.Block) error {
 	header := b.Header()

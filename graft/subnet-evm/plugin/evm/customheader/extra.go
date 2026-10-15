@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/subnetevm"
 )
 
@@ -19,9 +20,29 @@ const (
 )
 
 var (
-	errInvalidExtraPrefix = errors.New("invalid header.Extra prefix")
-	errInvalidExtraLength = errors.New("invalid header.Extra length")
+	errInvalidExtraPrefix         = errors.New("invalid header.Extra prefix")
+	errInvalidExtraLength         = errors.New("invalid header.Extra length")
+	ErrSAEHeaderFieldsUnsupported = errors.New("SAE header fields are unsupported by legacy Subnet-EVM")
 )
+
+// VerifyNoSAEHeaderFields rejects SAE-only fields on legacy Subnet-EVM.
+func VerifyNoSAEHeaderFields(header *types.Header) error {
+	extra := customtypes.GetHeaderExtra(header)
+	if extra == nil {
+		return nil
+	}
+	if extra.TargetExcess != nil ||
+		extra.SettledHeight != nil ||
+		extra.SettledGasUnix != nil ||
+		extra.SettledGasNumerator != nil ||
+		extra.SettledExcess != nil ||
+		extra.GasConfigTargetToExcessScaling != nil ||
+		extra.GasConfigMinGasPrice != nil ||
+		extra.GasConfigStaticPricing != nil {
+		return ErrSAEHeaderFieldsUnsupported
+	}
+	return nil
+}
 
 // ExtraPrefix takes the previous header and the timestamp of its child
 // block and calculates the expected extra prefix for the child block.

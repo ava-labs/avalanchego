@@ -1,0 +1,61 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "warp",
+    srcs = [
+        "handler.go",
+        "predicates.go",
+        "storage.go",
+        "verifier.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/warp",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache/lru",
+        "//database",
+        "//database/prefixdb",
+        "//ids",
+        "//network/p2p/acp118",
+        "//snow/engine/common",
+        "//utils/set",
+        "//vms/evm/predicate",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "//vms/saevm/network",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core/types",
+        "@org_golang_x_sync//errgroup",
+    ],
+)
+
+go_test(
+    name = "warp_test",
+    srcs = [
+        "handler_test.go",
+        "helpers_test.go",
+        "predicates_test.go",
+        "storage_test.go",
+        "verifier_test.go",
+    ],
+    embed = [":warp"],
+    deps = [
+        "//database",
+        "//database/memdb",
+        "//ids",
+        "//snow/engine/common",
+        "//snow/snowtest",
+        "//utils",
+        "//utils/constants",
+        "//utils/set",
+        "//vms/evm/predicate",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
+    ],
+)

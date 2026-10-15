@@ -5,11 +5,43 @@ package sae
 
 import (
 	"errors"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 )
+
+// MinBlockDelayMetric reports the ACP-226 minimum block delay.
+type MinBlockDelayMetric struct {
+	gauge prometheus.Gauge
+}
+
+// NewMinBlockDelayMetric registers a minimum block delay metric.
+func NewMinBlockDelayMetric(reg prometheus.Registerer) (*MinBlockDelayMetric, error) {
+	m := &MinBlockDelayMetric{
+		gauge: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "min_block_delay_seconds",
+			Help: "ACP-226 minimum block delay, in seconds.",
+		}),
+	}
+	return m, reg.Register(m.gauge)
+}
+
+// Set records the minimum block delay.
+func (m *MinBlockDelayMetric) Set(d time.Duration) {
+	m.gauge.Set(d.Seconds())
+}
+
+// Describe sends the metric descriptor to ch.
+func (m *MinBlockDelayMetric) Describe(ch chan<- *prometheus.Desc) {
+	m.gauge.Describe(ch)
+}
+
+// Collect sends the current metric value to ch.
+func (m *MinBlockDelayMetric) Collect(ch chan<- prometheus.Metric) {
+	m.gauge.Collect(ch)
+}
 
 type metrics struct {
 	lastSettledHeight prometheus.Gauge

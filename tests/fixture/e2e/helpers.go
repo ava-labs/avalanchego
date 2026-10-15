@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -18,8 +19,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
@@ -384,4 +388,40 @@ func GetRepoRootPath(suffix string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSuffix(cwd, suffix), nil
+}
+
+// DefaultWarpSignatureRequestTimeout is the P2P message creator timeout used for
+// warp signature AppRequests (ACP-118).
+const DefaultWarpSignatureRequestTimeout = 10 * time.Second
+
+// FindP2PMessage pops messages from the deque until one is successfully parsed.
+// Non-matching messages are pushed back to the front of the deque.
+func FindP2PMessage[T any](
+	q buffer.BlockingDeque[*message.InboundMessage],
+	parser func(*message.InboundMessage) (T, bool, error),
+) (T, bool, error) {
+	var messagesToReprocess []*message.InboundMessage
+	defer func() {
+		slices.Reverse(messagesToReprocess)
+		for _, msg := range messagesToReprocess {
+			q.PushLeft(msg)
+		}
+	}()
+
+	for {
+		msg, ok := q.PopLeft()
+		if !ok {
+			return utils.Zero[T](), false, nil
+		}
+
+		parsed, ok, err := parser(msg)
+		if err != nil {
+			return utils.Zero[T](), false, err
+		}
+		if ok {
+			return parsed, true, nil
+		}
+
+		messagesToReprocess = append(messagesToReprocess, msg)
+	}
 }

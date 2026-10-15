@@ -20,15 +20,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
@@ -355,55 +352,6 @@ func TestConfigStateSyncInterval(t *testing.T) {
 
 			got := c.stateSyncConfig(tt.networkID).DBConfig.CommitInterval
 			require.Equal(t, tt.want, got, "%T.stateSyncConfig(%d).DBConfig.CommitInterval", c, tt.networkID)
-		})
-	}
-}
-
-func TestConfig_WarpMessages(t *testing.T) {
-	payload, err := payload.NewAddressedCall(
-		utils.RandomBytes(20),
-		[]byte("test"),
-	)
-	require.NoError(t, err, "payload.NewAddressedCall(...)")
-
-	msg, err := warp.NewUnsignedMessage(constants.UnitTestID, ids.GenerateTestID(), payload.Bytes())
-	require.NoError(t, err, "warp.NewUnsignedMessage(...)")
-
-	tests := []struct {
-		name    string
-		bytes   []hexutil.Bytes
-		want    []*warp.UnsignedMessage
-		wantErr error
-	}{
-		{
-			name: "empty",
-			want: []*warp.UnsignedMessage{},
-		},
-		{
-			name:  "single_message",
-			bytes: []hexutil.Bytes{msg.Bytes()},
-			want:  []*warp.UnsignedMessage{msg},
-		},
-		{
-			name:  "multiple_messages",
-			bytes: []hexutil.Bytes{msg.Bytes(), msg.Bytes()},
-			want:  []*warp.UnsignedMessage{msg, msg},
-		},
-		{
-			name:    "invalid_message",
-			bytes:   []hexutil.Bytes{{0xff}},
-			wantErr: errParsingWarpMessage,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			c := config{
-				WarpOffChainMessages: test.bytes,
-			}
-
-			got, err := c.WarpMessages()
-			require.ErrorIsf(t, err, test.wantErr, "%T.WarpMessages()", c)
-			require.Equalf(t, test.want, got, "%T.WarpMessages()", c)
 		})
 	}
 }

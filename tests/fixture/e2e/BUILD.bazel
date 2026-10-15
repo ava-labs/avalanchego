@@ -16,9 +16,12 @@ go_library(
     deps = [
         "//config",
         "//ids",
+        "//message",
         "//tests",
         "//tests/fixture/tmpnet",
         "//tests/fixture/tmpnet/flags",
+        "//utils",
+        "//utils/buffer",
         "//utils/crypto/secp256k1",
         "//utils/logging",
         "//vms/components/gas",

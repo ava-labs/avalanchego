@@ -207,6 +207,16 @@ func (n *NetworkUpgrades) IsHelicon(time uint64) bool {
 	return isTimestampForked(n.HeliconTimestamp, time)
 }
 
+// ScheduledHeliconTimestamp returns the Helicon activation timestamp
+// when the chain has actually scheduled it (treats both nil and the
+// `unscheduledActivation` sentinel as "not scheduled").
+func (n *NetworkUpgrades) ScheduledHeliconTimestamp() (uint64, bool) {
+	if n.HeliconTimestamp == nil || *n.HeliconTimestamp >= unscheduledActivation {
+		return 0, false
+	}
+	return *n.HeliconTimestamp, true
+}
+
 // IsIgloo returns whether [time] represents a block
 // with a timestamp after the Igloo upgrade time.
 func (n *NetworkUpgrades) IsIgloo(time uint64) bool {

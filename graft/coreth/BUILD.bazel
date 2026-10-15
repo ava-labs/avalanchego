@@ -10,6 +10,7 @@ package(default_visibility = [
 package_group(
     name = "external_consumers",
     packages = [
+        "//tests/e2e/warp",
         "//vms/evm/emulate",
         "//vms/saevm/cchain/...",
     ],

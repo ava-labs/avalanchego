@@ -12,7 +12,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 )
+
+var maxTargetExcess = gas.Gas(dynamic.DesiredTargetExponent(math.MaxUint64))
 
 const nAVAX = 1_000_000_000
 

@@ -57,27 +57,28 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
+	"github.com/ava-labs/avalanchego/vms/saevm/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saewarp "github.com/ava-labs/avalanchego/vms/saevm/warp"
 	ethereum "github.com/ava-labs/libevm"
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -501,14 +502,14 @@ func (s *SUT) SetState(ctx context.Context, state snow.State) error {
 func (s *SUT) hooks(tb testing.TB) *hooks {
 	tb.Helper()
 
-	m, err := newMetrics(prometheus.NewRegistry())
-	require.NoErrorf(tb, err, "newMetrics()")
+	m, err := sae.NewMinBlockDelayMetric(prometheus.NewRegistry())
+	require.NoErrorf(tb, err, "sae.NewMinBlockDelayMetric()")
 	return newHooks(
 		s.ctx,
 		s.state,
 		s.chainConfig,
 		s.pending,
-		warp.NewStorage(s.db),
+		saewarp.NewStorage(s.db),
 		s.now,
 		desiredParams{},
 		m,
@@ -1865,7 +1866,7 @@ func TestDynamicTargetExponent(t *testing.T) {
 	}
 }
 
-// TestDynamicMinDelayExcess verifies each built block's MinDelayExcess steps
+// TestDynamicMinDelayExcess verifies each built block's MinDelayExponent steps
 // toward the node's ACP-226 vote by at most the per-block cap, and holds at the
 // initial value with no vote.
 func TestDynamicMinDelayExcess(t *testing.T) {
@@ -1912,7 +1913,7 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 				he := customtypes.GetHeaderExtra(blk.Header())
 				require.NotNilf(t, he.MinDelayExcess, "block %d %T.MinDelayExcess", blk.Height(), he)
 				got := dynamic.DelayExponent(*he.MinDelayExcess)
-				assert.Equalf(t, wantExponent, got, "block %d %T.MinDelayExcess", blk.Height(), he)
+				assert.Equalf(t, wantExponent, got, "block %d %T.MinDelayExponent", blk.Height(), he)
 				clock.Advance(got.DelayDuration())
 			}
 		})
