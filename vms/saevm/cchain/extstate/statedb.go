@@ -48,7 +48,7 @@ func normalizeCoinID(coinID *common.Hash) {
 // StateDB wraps a [state.StateDB] with multicoin balances and the predicates of
 // the current transaction's access list.
 //
-// TODO(#6113): Use the predicates in SAE and share them with Subnet-EVM. 
+// TODO(#6113): Use the predicates in SAE and share them with Subnet-EVM.
 type StateDB struct {
 	*state.StateDB
 
@@ -75,9 +75,10 @@ func (s *StateDB) Prepare(
 	s.StateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)
 }
 
-// GetPredicate returns the predicate of the index-th access tuple for address
-// in the list passed to [StateDB.Prepare]. It returns false if there is no such
-// predicate.
+// GetPredicate returns the predicate at index for address, from the access list
+// passed to [StateDB.Prepare]. If address is a precompile that uses predicates,
+// each of its entries in the list is one predicate, in list order. It returns
+// false if there is none.
 func (s *StateDB) GetPredicate(address common.Address, index int) (predicate.Predicate, bool) {
 	predicates := s.predicates[address]
 	if index < 0 || index >= len(predicates) {
@@ -115,6 +116,8 @@ func (s *StateDB) AddBalanceMultiCoin(addr common.Address, coinID common.Hash, a
 // amount MUST NOT be negative and MUST NOT exceed the balance.
 func (s *StateDB) SubBalanceMultiCoin(addr common.Address, coinID common.Hash, amount *big.Int) {
 	if amount.Sign() == 0 {
+		// Like [state.StateDB.SubBalance], subtracting zero doesn't touch the
+		// account.
 		return
 	}
 	// The balance is positive, so [StateDB.AddBalanceMultiCoin] has already
