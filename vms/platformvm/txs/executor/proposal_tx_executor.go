@@ -1019,14 +1019,14 @@ func (e *proposalTxExecutor) newUTXO(
 	}, nil
 }
 
-// unstakeUTXOs creates UTXOs to unstake a staker's staked UTXOs.
-// The UTXOs are added to all provided state diffs.
 // stakeLocker is a tx that locks stake outputs until its staker stops.
 type stakeLocker interface {
 	Outputs() []*avax.TransferableOutput
 	Stake() []*avax.TransferableOutput
 }
 
+// unstakeUTXOs creates UTXOs to unstake a staker's staked UTXOs.
+// The UTXOs are added to all provided state diffs.
 func unstakeUTXOs(stakerTx stakeLocker, txID ids.ID, state *state.Diff) {
 	outputIndexOffset := len(stakerTx.Outputs())
 
