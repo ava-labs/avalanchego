@@ -183,7 +183,6 @@ jobs:
         run: ./scripts/run_task.sh test-bootstrap-monitor-e2e
       - name: Log Docker disk diagnostics
         if: failure()
-        shell: bash
         run: ./scripts/run_task.sh log-ci-disk-state-docker
       - name: Collect kind diagnostics
         if: failure()
@@ -448,7 +447,6 @@ jobs:
         run: ./scripts/run_task.sh test-robustness
       - name: Log Docker disk diagnostics
         if: failure()
-        shell: bash
         run: ./scripts/run_task.sh log-ci-disk-state-docker
       - name: Collect kind diagnostics
         if: failure()

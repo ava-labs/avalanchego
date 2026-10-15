@@ -121,7 +121,8 @@ runs:
       run: ./scripts/run_task.sh log-ci-disk-state-bazel
     - name: Log Docker disk diagnostics
       if: ${{ steps.run-command.outcome == 'failure' && inputs.runtime == 'kube' }}
-      shell: bash
+      # Without setup-bazel, Task is only on the PATH inside the Nix dev shell.
+      shell: nix develop --command bash -x {0}
       run: ./scripts/run_task.sh log-ci-disk-state-docker
     - name: Upload tmpnet data
       if: always() && (inputs.runtime == 'process')
