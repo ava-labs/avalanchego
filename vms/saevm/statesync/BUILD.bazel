@@ -19,7 +19,7 @@ go_library(
         "//graft/evm/sync/evmstate",
         "//ids",
         "//network/p2p",
-        "//network/p2p/tracking",
+        "//network/p2p/peertracker",
         "//snow",
         "//snow/engine/snowman/block",
         "//utils/logging",

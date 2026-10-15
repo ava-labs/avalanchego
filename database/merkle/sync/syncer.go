@@ -19,7 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/merkle/sync/protoutils"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/tracking"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
@@ -146,7 +146,7 @@ type Syncer[R any, C any] struct {
 type Config[R any, C any] struct {
 	RangeProofMarshaler   Marshaler[R]
 	ChangeProofMarshaler  Marshaler[C]
-	ProofClient           *tracking.Client
+	ProofClient           *peertracker.Client
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
@@ -502,7 +502,7 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 func (s *Syncer[_, _]) sendRequest(
 	ctx context.Context,
 	requestBytes []byte,
-	onResponse tracking.ResponseVerifier,
+	onResponse peertracker.ResponseVerifier,
 ) error {
 	client := s.config.ProofClient
 	if len(s.config.StateSyncNodes) == 0 {
