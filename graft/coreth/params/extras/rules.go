@@ -21,9 +21,6 @@ type Rules struct {
 	// Predicaters maps addresses to stateful precompile Predicaters
 	// that are enabled for this rule set.
 	Predicaters map[common.Address]precompileconfig.Predicater
-	// AccepterPrecompiles map addresses to stateful precompile accepter functions
-	// that are enabled for this rule set.
-	AccepterPrecompiles map[common.Address]precompileconfig.Accepter
 }
 
 func (r *Rules) PredicatersExist() bool {
