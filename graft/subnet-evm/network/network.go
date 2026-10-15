@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -72,8 +73,8 @@ type Network interface {
 
 	SyncedNetworkClient
 
-	// PeerTracker returns the tracker to build a [tracking.Client] with.
-	PeerTracker() *p2p.PeerTracker
+	// PeerTracker returns the tracker to build a [peertracker.Client] with.
+	PeerTracker() *peertracker.PeerTracker
 
 	// SendAppRequestAny sends request to an arbitrary peer.
 	// Returns the ID of the chosen peer, and an error if no peer is available.
@@ -108,7 +109,7 @@ type network struct {
 	appSender                  common.AppSender                   // avalanchego AppSender for sending messages
 	codec                      codec.Manager                      // Codec used for parsing messages
 	appRequestHandler          message.RequestHandler             // maps request type => handler
-	peers                      *p2p.PeerTracker                   // tracking of peers & bandwidth
+	peers                      *peertracker.PeerTracker           // tracking of peers & bandwidth
 
 	// Set to true when Shutdown is called, after which all operations on this
 	// struct are no-ops.
@@ -148,7 +149,7 @@ func NewNetwork(
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize p2p network: %w", err)
 	}
-	peers, err := p2p.NewPeerTracker(
+	peers, err := peertracker.New(
 		ctx.Log,
 		"sync_peer_tracker",
 		registerer,
@@ -420,7 +421,7 @@ func (n *network) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion 
 		return nil
 	}
 
-	// [p2p.PeerTracker] filters out self via the ignoredNodes set passed at construction.
+	// [peertracker.PeerTracker] filters out self via the ignoredNodes set passed at construction.
 	n.peers.Connected(nodeID, nodeVersion)
 
 	return n.sdkNetwork.Connected(ctx, nodeID, nodeVersion)
@@ -470,7 +471,7 @@ func (n *network) Size() uint32 {
 	return uint32(n.peers.Size())
 }
 
-func (n *network) PeerTracker() *p2p.PeerTracker {
+func (n *network) PeerTracker() *peertracker.PeerTracker {
 	return n.peers
 }
 

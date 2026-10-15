@@ -19,6 +19,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker/peertrackertest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
@@ -84,7 +86,7 @@ func TestSend_RetriesThenSucceeds(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
 			handler, _ := scriptedHandler(tt.firstFail, scriptResponse{bytes: wantBytes})
-			tracker := newTestTracker(t, nodeID)
+			tracker := peertrackertest.New(t, nodeID)
 			c := newRetryDispatcher(t, ctx, nodeID, handler, tracker)
 
 			verifyCalls := 0
@@ -124,7 +126,7 @@ func TestSend_NoPeersBackoffEscalates(t *testing.T) {
 		ctx := t.Context()
 
 		handler, _ := scriptedHandler(scriptResponse{bytes: wantBytes})
-		tracker := newTestTracker(t)
+		tracker := peertrackertest.New(t)
 		c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](t, ctx, nodeID, handler, tracker)
 		// The constructor connects nodeID. Undo it so SelectPeer starts with no
 		// peers and the goroutine below is what makes one appear.
@@ -157,7 +159,7 @@ func TestSend_CtxCancelledBeforeStart(t *testing.T) {
 	cancel()
 
 	handler, calls := scriptedHandler(scriptResponse{bytes: []byte{}})
-	tracker := newTestTracker(t, nodeID)
+	tracker := peertrackertest.New(t, nodeID)
 	c := newRetryDispatcher(t, ctx, nodeID, handler, tracker)
 
 	got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, acceptLeaf)
@@ -319,7 +321,7 @@ func newRetryDispatcher(
 	ctx context.Context,
 	nodeID ids.NodeID,
 	h p2p.Handler,
-	tracker *p2p.PeerTracker,
+	tracker *peertracker.PeerTracker,
 ) *leafRetryDispatcher {
 	t.Helper()
 	c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](t, ctx, nodeID, h, tracker)

@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/tracking"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -35,14 +35,14 @@ type ProtoMessage[T any] interface {
 // Use one instance per RPC type.
 type Dispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any] struct {
 	log    logging.Logger
-	client *tracking.Client
+	client *peertracker.Client
 	policy retryPolicy
 }
 
 // NewDispatcher returns a [Dispatcher] that sends through client.
 func NewDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any](
 	log logging.Logger,
-	client *tracking.Client,
+	client *peertracker.Client,
 	opts ...RetryOption,
 ) *Dispatcher[Req, In, Resp, Out] {
 	return &Dispatcher[Req, In, Resp, Out]{

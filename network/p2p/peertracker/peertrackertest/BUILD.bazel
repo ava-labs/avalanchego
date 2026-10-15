@@ -1,0 +1,44 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "trackingtest",
+    testonly = True,
+    srcs = [
+        "client.go",
+        "peer_tracker.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/network/p2p/tracking/trackingtest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//network/p2p",
+        "//network/p2p/p2ptest",
+        "//network/p2p/tracking",
+        "//utils/logging",
+        "//utils/logging/loggingtest",
+        "//version",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_library(
+    name = "peertrackertest",
+    srcs = [
+        "client.go",
+        "peer_tracker.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/network/p2p/peertracker/peertrackertest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//network/p2p",
+        "//network/p2p/p2ptest",
+        "//network/p2p/peertracker",
+        "//utils/logging",
+        "//utils/logging/loggingtest",
+        "//version",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

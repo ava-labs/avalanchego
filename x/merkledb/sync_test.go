@@ -19,8 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/database/merkle/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/tracking"
-	"github.com/ava-labs/avalanchego/network/p2p/tracking/trackingtest"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker/peertrackertest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
@@ -48,17 +48,17 @@ func withTarget(root ids.ID) sutOption {
 }
 
 // selfClient returns a client that serves db's own proofs back to the caller.
-func selfClient(t *testing.T, ctx context.Context, db MerkleDB) *tracking.Client {
+func selfClient(t *testing.T, ctx context.Context, db MerkleDB) *peertracker.Client {
 	t.Helper()
 
-	return trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, db))
+	return peertrackertest.NewSelfClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, db))
 }
 
 // newSUT returns a syncer that fills db through client.
 func newSUT(
 	t *testing.T,
 	db sync.DB[*RangeProof, *ChangeProof],
-	client *tracking.Client,
+	client *peertracker.Client,
 	opts ...sutOption,
 ) *sut {
 	t.Helper()
@@ -109,31 +109,31 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 	tests := []struct {
 		name        string
 		db          MerkleDB
-		proofClient func(db MerkleDB) *tracking.Client
+		proofClient func(db MerkleDB) *peertracker.Client
 	}{
 		{
 			name: "range proof bad response - too many leaves in response",
-			proofClient: func(db MerkleDB) *tracking.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.KeyChanges = append(response.KeyChanges, KeyChange{})
 				})
 
-				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof bad response - removed first key in response",
-			proofClient: func(db MerkleDB) *tracking.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
 
-				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof bad response - removed first key in response and replaced proof",
-			proofClient: func(db MerkleDB) *tracking.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 					response.KeyChanges = []KeyChange{
@@ -154,57 +154,57 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					}
 				})
 
-				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof bad response - removed key from middle of response",
-			proofClient: func(db MerkleDB) *tracking.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					i := rand.Intn(max(1, len(response.KeyChanges)-1))
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
 
-				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof bad response - start and end proof nodes removed",
-			proofClient: func(db MerkleDB) *tracking.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
 				})
 
-				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof bad response - end proof removed",
-			proofClient: func(db MerkleDB) *tracking.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.EndProof = nil
 				})
 
-				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof bad response - empty proof",
-			proofClient: func(db MerkleDB) *tracking.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
 					response.KeyChanges = nil
 				})
 
-				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof server flake",
-			proofClient: func(db MerkleDB) *tracking.Client {
-				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
+			proofClient: func(db MerkleDB) *peertracker.Client {
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
 					Handler: newTestProofHandler(t, db),
 					c:       &counter{m: 2},
 				})
@@ -212,50 +212,50 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "change proof bad response - too many keys in response",
-			proofClient: func(db MerkleDB) *tracking.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
 					response.KeyChanges = append(response.KeyChanges, make([]KeyChange, sync.DefaultRequestKeyLimit)...)
 				})
 
-				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "change proof bad response - removed first key in response",
-			proofClient: func(db MerkleDB) *tracking.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
 
-				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "change proof bad response - removed key from middle of response",
-			proofClient: func(db MerkleDB) *tracking.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
 					i := rand.Intn(max(1, len(response.KeyChanges)-1))
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
 
-				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "change proof bad response - all proof keys removed from response",
-			proofClient: func(db MerkleDB) *tracking.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
 				})
 
-				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "change proof flaky server",
-			proofClient: func(db MerkleDB) *tracking.Client {
-				return trackingtest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
+			proofClient: func(db MerkleDB) *peertracker.Client {
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
 					Handler: newTestProofHandler(t, db),
 					c:       &counter{m: 2},
 				})
@@ -281,7 +281,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			)
 			require.NoError(err)
 
-			proofClient := trackingtest.NewSelfClient(
+			proofClient := peertrackertest.NewSelfClient(
 				t,
 				ctx,
 				ids.EmptyNodeID,
@@ -444,7 +444,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	syncer = newSUT(
 		t,
 		db,
-		trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
+		peertrackertest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
 		withTarget(firstSyncRoot),
 	)
 
@@ -492,7 +492,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	syncer = newSUT(
 		t,
 		db,
-		trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
+		peertrackertest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
 		withTarget(root1),
 	)
 
