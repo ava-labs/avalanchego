@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       issues: write # Required for GITHUB_TOKEN to add the evm label to issues
-      pull-requests: write # Required for GITHUB_TOKEN to add the evm label to PRs
+      pull-requests: write # Required for GITHUB_TOKEN to add the evm label to PRs and assign their authors
     steps:
       - name: Mint installation token
         id: token
@@ -45,6 +45,15 @@ jobs:
             echo "avalanchego=$avalanchego"
             echo "evm=$evm"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Assign PR to author
+        if: github.event_name == 'pull_request_target' && (steps.membership.outputs.avalanchego == 'true' || steps.membership.outputs.evm == 'true')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          gh api --silent "repos/$GITHUB_REPOSITORY/issues/$NUMBER/assignees" -f "assignees[]=$AUTHOR"
 
       - name: Add to avalanchego board
         if: steps.membership.outputs.avalanchego == 'true'
