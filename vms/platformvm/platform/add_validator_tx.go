@@ -42,8 +42,8 @@ type AddValidatorTx struct {
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
-// [AddValidatorTx]. Also sets the [ctx] to the given [vm.ctx] so that
-// the addresses can be json marshalled into human readable format
+// [AddValidatorTx] and initializes the outputs and owner with ctx so that
+// their addresses can be JSON marshalled into a human-readable format.
 func (tx *AddValidatorTx) InitCtx(ctx *snow.Context) {
 	tx.BaseTx.InitCtx(ctx)
 	for _, out := range tx.StakeOuts {
@@ -89,7 +89,7 @@ func (tx *AddValidatorTx) Shares() uint32 {
 	return tx.DelegationShares
 }
 
-// SyntacticVerify returns nil iff [tx] is valid
+// SyntacticVerify returns nil iff tx is valid
 func (tx *AddValidatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
 	case tx == nil:

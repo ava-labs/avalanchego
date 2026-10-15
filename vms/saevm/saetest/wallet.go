@@ -120,8 +120,9 @@ func (w *Wallet) DecrementNonce(tb testing.TB, account int) {
 	w.nonces[account]--
 }
 
-// MaxAllocFor returns a genesis allocation with [MaxUint256] as the balance for
-// all addresses provided.
+// MaxAllocFor returns a genesis allocation with
+// [github.com/ava-labs/libevm/common/math.MaxBig256] as the balance for all
+// addresses provided.
 func MaxAllocFor(addrs ...common.Address) types.GenesisAlloc {
 	alloc := make(types.GenesisAlloc)
 	for _, a := range addrs {

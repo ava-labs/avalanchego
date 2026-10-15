@@ -11,17 +11,18 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
+
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 // FakeResponder records the last request in GotReq.
 type FakeResponder[Req, Resp proto.Message] struct {
 	Resp   Resp
-	Err    *common.AppError
+	Err    *snowcommon.AppError
 	GotReq Req
 }
 
-func (f *FakeResponder[Req, Resp]) Respond(_ context.Context, _ ids.NodeID, req Req) (Resp, *common.AppError) {
+func (f *FakeResponder[Req, Resp]) Respond(_ context.Context, _ ids.NodeID, req Req) (Resp, *snowcommon.AppError) {
 	f.GotReq = req
 	return f.Resp, f.Err
 }

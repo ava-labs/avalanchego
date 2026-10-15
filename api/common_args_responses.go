@@ -70,7 +70,7 @@ type GetTxArgs struct {
 	Encoding formatting.Encoding `json:"encoding"`
 }
 
-// GetTxReply defines an object containing a single [Tx] object along with Encoding
+// GetTxReply defines an object containing a single tx along with its encoding.
 type GetTxReply struct {
 	// If [GetTxArgs.Encoding] is [Hex], [Tx] is the string representation of
 	// the tx under hex encoding.
@@ -94,23 +94,26 @@ type Index struct {
 }
 
 // GetUTXOsArgs are arguments for passing into GetUTXOs.
-// Gets the UTXOs that reference at least one address in [Addresses].
-// Returns at most [limit] addresses.
-// If specified, [SourceChain] is the chain where the atomic UTXOs were exported from. If empty,
-// or the Chain ID of this VM is specified, then GetUTXOs fetches the native UTXOs.
-// If [limit] == 0 or > [maxUTXOsToFetch], fetches up to [maxUTXOsToFetch].
-// [StartIndex] defines where to start fetching UTXOs (for pagination.)
-// UTXOs fetched are from addresses equal to or greater than [StartIndex.Address]
-// For address [StartIndex.Address], only UTXOs with IDs greater than [StartIndex.UTXO] will be returned.
-// If [StartIndex] is omitted, gets all UTXOs.
-// If GetUTXOs is called multiple times, with our without [StartIndex], it is not guaranteed
-// that returned UTXOs are unique. That is, the same UTXO may appear in the response of multiple calls.
+// If GetUTXOs is called multiple times, with or without StartIndex, it is not
+// guaranteed that returned UTXOs are unique. That is, the same UTXO may appear
+// in the response of multiple calls.
 type GetUTXOsArgs struct {
-	Addresses   []string            `json:"addresses"`
-	SourceChain string              `json:"sourceChain"`
-	Limit       avajson.Uint32      `json:"limit"`
-	StartIndex  Index               `json:"startIndex"`
-	Encoding    formatting.Encoding `json:"encoding"`
+	// Addresses to fetch UTXOs for. Only UTXOs that reference at least one of
+	// these addresses are returned.
+	Addresses []string `json:"addresses"`
+	// SourceChain, if specified, is the chain where the atomic UTXOs were
+	// exported from. If empty, or the Chain ID of this VM is specified, then
+	// GetUTXOs fetches the native UTXOs.
+	SourceChain string `json:"sourceChain"`
+	// Limit is the maximum number of UTXOs to return. If 0 or greater than the
+	// VM's maximum, fetches up to that maximum.
+	Limit avajson.Uint32 `json:"limit"`
+	// StartIndex defines where to start fetching UTXOs (for pagination).
+	// UTXOs fetched are from addresses equal to or greater than
+	// StartIndex.Address. For address StartIndex.Address, only UTXOs with IDs
+	// greater than StartIndex.UTXO are returned. If omitted, gets all UTXOs.
+	StartIndex Index               `json:"startIndex"`
+	Encoding   formatting.Encoding `json:"encoding"`
 }
 
 // GetUTXOsReply defines the GetUTXOs replies returned from the API

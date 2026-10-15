@@ -37,7 +37,7 @@ func Encode(bytes []byte) (string, error) {
 	return base58.Encode(checked), nil
 }
 
-// Decode [str] to bytes from cb58.
+// Decode str to bytes from cb58.
 func Decode(str string) ([]byte, error) {
 	decodedBytes, err := base58.Decode(str)
 	if err != nil {

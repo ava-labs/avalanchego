@@ -17,9 +17,9 @@ var (
 	ErrMismatchedSubnetIDs = errors.New("mismatched subnetIDs")
 )
 
-// SameSubnet verifies that the provided [ctx] was provided to a chain in the
-// same subnet as [peerChainID], but not the same chain. If this verification
-// fails, a non-nil error will be returned.
+// SameSubnet verifies that chainCtx was provided to a chain in the same subnet
+// as peerChainID, but not the same chain. If this verification fails, a non-nil
+// error will be returned.
 func SameSubnet(ctx context.Context, chainCtx *snow.Context, peerChainID ids.ID) error {
 	if peerChainID == chainCtx.ChainID {
 		return ErrSameChainID

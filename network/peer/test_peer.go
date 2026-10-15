@@ -40,12 +40,12 @@ const maxMessageToSend = 1024
 //
 // The returned peer will not throttle inbound or outbound messages.
 //
-//   - [ctx] provides a way of canceling the connection request.
-//   - [ip] is the remote that will be dialed to create the connection.
-//   - [networkID] will be sent to the peer during the handshake. If the peer is
-//     expecting a different [networkID], the handshake will fail and an error
+//   - ctx provides a way of canceling the connection request.
+//   - ip is the remote that will be dialed to create the connection.
+//   - networkID will be sent to the peer during the handshake. If the peer is
+//     expecting a different networkID, the handshake will fail and an error
 //     will be returned.
-//   - [router] will be called with all non-handshake messages received by the
+//   - router will be called with all non-handshake messages received by the
 //     peer.
 func StartTestPeer(
 	ctx context.Context,

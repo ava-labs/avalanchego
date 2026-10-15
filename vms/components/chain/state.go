@@ -149,11 +149,11 @@ func NewMeteredState(
 
 var errSetAcceptedWithProcessing = errors.New("cannot set last accepted block with blocks processing")
 
-// SetLastAcceptedBlock sets the last accepted block to [lastAcceptedBlock].
+// SetLastAcceptedBlock sets the last accepted block to lastAcceptedBlock.
 // This should be called with an internal block - not a wrapped block returned
 // from state.
 //
-// This also flushes [lastAcceptedBlock] from missingBlocks and unverifiedBlocks
+// This also flushes lastAcceptedBlock from missingBlocks and unverifiedBlocks
 // to ensure that their contents stay valid.
 func (s *State) SetLastAcceptedBlock(lastAcceptedBlock snowman.Block) error {
 	if len(s.verifiedBlocks) != 0 {
@@ -185,7 +185,8 @@ func (s *State) Flush() {
 	s.bytesToIDCache.Flush()
 }
 
-// GetBlock returns the BlockWrapper as snowman.Block corresponding to [blkID]
+// GetBlock returns the [BlockWrapper], as a [snowman.Block], corresponding to
+// blkID.
 func (s *State) GetBlock(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
 	if blk, ok := s.getCachedBlock(blkID); ok {
 		return blk, nil
@@ -228,7 +229,7 @@ func (s *State) getCachedBlock(blkID ids.ID) (snowman.Block, bool) {
 	return nil, false
 }
 
-// GetBlockInternal returns the internal representation of [blkID]
+// GetBlockInternal returns the internal representation of blkID.
 func (s *State) GetBlockInternal(ctx context.Context, blkID ids.ID) (snowman.Block, error) {
 	wrappedBlk, err := s.GetBlock(ctx, blkID)
 	if err != nil {
@@ -238,7 +239,7 @@ func (s *State) GetBlockInternal(ctx context.Context, blkID ids.ID) (snowman.Blo
 	return wrappedBlk.(*BlockWrapper).Block, nil
 }
 
-// ParseBlock attempts to parse [b] into an internal Block and adds it to the
+// ParseBlock attempts to parse b into an internal Block and adds it to the
 // appropriate caching layer if successful.
 func (s *State) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
 	// See if we've cached this block's ID by its byte repr.
@@ -278,8 +279,8 @@ func (s *State) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error)
 
 // BatchedParseBlock implements part of the block.BatchedChainVM interface. In
 // addition to performing all the caching as the ParseBlock function, it
-// performs at most one call to the underlying VM if [batchedUnmarshalBlock] was
-// provided.
+// performs at most one call to the underlying VM if
+// [Config.BatchedUnmarshalBlock] was provided.
 func (s *State) BatchedParseBlock(ctx context.Context, blksBytes [][]byte) ([]snowman.Block, error) {
 	blks := make([]snowman.Block, len(blksBytes))
 	idWasCached := make([]bool, len(blksBytes))
@@ -355,7 +356,8 @@ func (s *State) BatchedParseBlock(ctx context.Context, blksBytes [][]byte) ([]sn
 
 // BuildBlockWithContext attempts to build a new internal Block, wraps it, and
 // adds it to the appropriate caching layer if successful.
-// If [s.buildBlockWithContext] is nil, returns [BuildBlock].
+// If [Config.BuildBlockWithContext] wasn't provided, falls back to
+// [State.BuildBlock].
 func (s *State) BuildBlockWithContext(ctx context.Context, blockCtx *block.Context) (snowman.Block, error) {
 	if s.buildBlockWithContext == nil {
 		return s.BuildBlock(ctx)
@@ -430,7 +432,7 @@ func (s *State) LastAcceptedBlockInternal() snowman.Block {
 	return s.LastAcceptedBlock().Block
 }
 
-// IsProcessing returns whether [blkID] is processing in consensus
+// IsProcessing returns whether blkID is processing in consensus.
 func (s *State) IsProcessing(blkID ids.ID) bool {
 	_, ok := s.verifiedBlocks[blkID]
 	return ok

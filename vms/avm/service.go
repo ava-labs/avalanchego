@@ -446,7 +446,7 @@ type GetBalanceReply struct {
 }
 
 // GetBalance returns the balance of an asset held by an address.
-// If ![args.IncludePartial], returns only the balance held solely
+// If !args.IncludePartial, returns only the balance held solely
 // (1 out of 1 multisig) by the address and with a locktime in the past.
 // Otherwise, returned balance includes assets held only partially by the
 // address, and includes balances with locktime in the future.
@@ -521,10 +521,10 @@ type GetAllBalancesReply struct {
 
 // GetAllBalances returns a map where:
 //
-// Key: ID of an asset such that [args.Address] has a non-zero balance of the asset
+// Key: ID of an asset such that args.Address has a non-zero balance of the asset
 // Value: The balance of the asset held by the address
 //
-// If ![args.IncludePartial], returns only unlocked balance/UTXOs with a 1-out-of-1 multisig.
+// If !args.IncludePartial, returns only unlocked balance/UTXOs with a 1-out-of-1 multisig.
 // Otherwise, returned balance/UTXOs includes assets held only partially by the
 // address, and includes balances with locktime in the future.
 func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, reply *GetAllBalancesReply) error {

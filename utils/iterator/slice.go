@@ -5,8 +5,8 @@ package iterator
 
 var _ Iterator[any] = (*slice[any])(nil)
 
-// ToSlice returns a slice that contains all of the elements from [it] in order.
-// [it] will be released before returning.
+// ToSlice returns a slice that contains all of the elements of the provided
+// iterator in order. The iterator is released before returning.
 func ToSlice[T any](it Iterator[T]) []T {
 	defer it.Release()
 
@@ -22,7 +22,7 @@ type slice[T any] struct {
 	elements []T
 }
 
-// FromSlice returns an iterator that contains [elements] in order. Doesn't sort
+// FromSlice returns an iterator that contains elements in order. Doesn't sort
 // by anything.
 func FromSlice[T any](elements ...T) Iterator[T] {
 	return &slice[T]{

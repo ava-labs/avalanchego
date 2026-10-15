@@ -30,8 +30,8 @@ type SendConfig struct {
 // messages do not include requestIDs, because no response is expected from the
 // peer. However, both requests and responses include requestIDs.
 //
-// It is expected that each [nodeID + requestID + expected response type] that
-// is outstanding at any given time is unique.
+// It is expected that each (nodeID, requestID, expected response type) tuple
+// that is outstanding at any given time is unique.
 //
 // As an example, it is valid to send `Get(nodeA, request0)` and
 // `PullQuery(nodeA, request0)` because they have different expected response

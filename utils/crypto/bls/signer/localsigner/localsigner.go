@@ -123,12 +123,12 @@ func (s *LocalSigner) PublicKey() *bls.PublicKey {
 	return s.pk
 }
 
-// Sign [msg] to authorize this message
+// Sign signs msg to authorize it.
 func (s *LocalSigner) Sign(msg []byte) (*bls.Signature, error) {
 	return new(bls.Signature).Sign(s.sk, msg, bls.CiphersuiteSignature.Bytes()), nil
 }
 
-// Sign [msg] to prove the ownership
+// SignProofOfPossession signs msg to prove ownership of the secret key.
 func (s *LocalSigner) SignProofOfPossession(msg []byte) (*bls.Signature, error) {
 	return new(bls.Signature).Sign(s.sk, msg, bls.CiphersuiteProofOfPossession.Bytes()), nil
 }

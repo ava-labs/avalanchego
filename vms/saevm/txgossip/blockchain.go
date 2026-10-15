@@ -31,10 +31,11 @@ type BlockChain interface {
 //
 // The wrappers's `CurrentBlock()` method returns the last executed, while the
 // `StateAt()` method ignores its argument and always opens the latest
-// post-execution state root. The [core.ChainHeadEvent] subscription therefore
-// acts only to inform the mempool of some new state, but not which specific
-// root as the event contains a [types.Header] carrying the (ignored)
-// last-settled state root.
+// post-execution state root. The
+// [github.com/ava-labs/libevm/core.ChainHeadEvent] subscription therefore acts
+// only to inform the mempool of some new state, but not which specific root as
+// the event contains a [types.Header] carrying the (ignored) last-settled state
+// root.
 func NewBlockChain(exec *saexec.Executor, blocks saetypes.BlockSource) BlockChain {
 	return &blockchain{
 		Executor: exec,

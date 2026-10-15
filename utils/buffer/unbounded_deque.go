@@ -39,8 +39,9 @@ type Deque[T any] interface {
 	List() []T
 }
 
-// Returns a new unbounded deque with the given initial slice size.
-// Note that the returned deque is always empty -- [initSize] is just
+// NewUnboundedDeque returns a new unbounded [Deque] with the given initial
+// slice size.
+// Note that the returned deque is always empty -- initSize is just
 // a hint to prevent unnecessary resizing.
 func NewUnboundedDeque[T any](initSize int) Deque[T] {
 	if initSize < 2 {

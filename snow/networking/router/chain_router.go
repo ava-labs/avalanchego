@@ -95,7 +95,7 @@ type ChainRouter struct {
 // Initialize the router.
 //
 // When this router receives an incoming message, it cancels the timeout in
-// [timeouts] associated with the request that caused the incoming message, if
+// timeoutManager associated with the request that caused the incoming message, if
 // applicable.
 func (cr *ChainRouter) Initialize(
 	nodeID ids.NodeID,
@@ -139,11 +139,8 @@ func (cr *ChainRouter) Initialize(
 	return nil
 }
 
-// RegisterRequest marks that we should expect to receive a reply for a request
-// from the given node's [chainID] and
-// the reply should have the given requestID.
-//
-// The type of message we expect is [op].
+// RegisterRequest marks that we should expect to receive a reply of type op
+// from nodeID for chainID with the given requestID.
 //
 // Every registered request must be cleared either by receiving a valid reply
 // and passing it to the appropriate chain or by a timeout.

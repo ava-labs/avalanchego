@@ -137,8 +137,8 @@ func GetBool(db KeyValueReader, key []byte) (bool, error) {
 	return b[0] == BoolTrue, nil
 }
 
-// WithDefault returns the value at [key] in [db]. If the key doesn't exist, it
-// returns [def].
+// WithDefault returns the value at key in db. If the key doesn't exist, it
+// returns the provided default value.
 func WithDefault[V any](
 	get func(KeyValueReader, []byte) (V, error),
 	db KeyValueReader,
@@ -178,7 +178,7 @@ func AtomicClear(readerDB Iteratee, deleterDB KeyValueDeleter) error {
 	return AtomicClearPrefix(readerDB, deleterDB, nil)
 }
 
-// AtomicClearPrefix deletes from [deleterDB] all keys in [readerDB] that have the given [prefix].
+// AtomicClearPrefix deletes from deleterDB all keys in readerDB that have the given prefix.
 func AtomicClearPrefix(readerDB Iteratee, deleterDB KeyValueDeleter, prefix []byte) error {
 	iterator := readerDB.NewIteratorWithPrefix(prefix)
 	defer iterator.Release()
@@ -192,14 +192,14 @@ func AtomicClearPrefix(readerDB Iteratee, deleterDB KeyValueDeleter, prefix []by
 	return iterator.Error()
 }
 
-// Remove all key-value pairs from [db].
-// Writes each batch when it reaches [writeSize].
+// Clear removes all key-value pairs from db.
+// Writes each batch when it reaches writeSize.
 func Clear(db Database, writeSize int) error {
 	return ClearPrefix(db, nil, writeSize)
 }
 
-// Removes all keys with the given [prefix] from [db].
-// Writes each batch when it reaches [writeSize].
+// ClearPrefix removes all keys with the given prefix from db.
+// Writes each batch when it reaches writeSize.
 func ClearPrefix(db Database, prefix []byte, writeSize int) error {
 	b := db.NewBatch()
 	it := db.NewIteratorWithPrefix(prefix)

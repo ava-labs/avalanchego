@@ -19,8 +19,8 @@ type CreateSubnetTx struct {
 }
 
 // InitCtx sets the FxID fields in the inputs and outputs of this
-// [CreateSubnetTx]. Also sets the [ctx] to the given [vm.ctx] so that
-// the addresses can be json marshalled into human readable format
+// [CreateSubnetTx] and initializes the outputs and owner with ctx so that
+// their addresses can be JSON marshalled into a human-readable format.
 func (tx *CreateSubnetTx) InitCtx(ctx *snow.Context) {
 	tx.BaseTx.InitCtx(ctx)
 	tx.Owner.InitCtx(ctx)

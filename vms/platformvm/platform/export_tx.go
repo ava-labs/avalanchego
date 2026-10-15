@@ -32,9 +32,9 @@ type ExportTx struct {
 	ExportedOutputs []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
 }
 
-// InitCtx sets the FxID fields in the inputs and outputs of this
-// [UnsignedExportTx]. Also sets the [ctx] to the given [vm.ctx] so that
-// the addresses can be json marshalled into human readable format
+// InitCtx sets the FxID fields in the inputs and outputs of this [ExportTx] and
+// initializes the outputs with ctx so that their addresses can be JSON
+// marshalled into a human-readable format.
 func (tx *ExportTx) InitCtx(ctx *snow.Context) {
 	tx.BaseTx.InitCtx(ctx)
 	for _, out := range tx.ExportedOutputs {

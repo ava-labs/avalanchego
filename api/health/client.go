@@ -41,20 +41,20 @@ func (c *Client) Liveness(ctx context.Context, tags []string, options ...rpc.Opt
 	return res, err
 }
 
-// AwaitReady polls the node every [freq] until the node reports ready.
-// Only returns an error if [ctx] returns an error.
+// AwaitReady polls the node every freq until the node reports ready.
+// Only returns an error if ctx returns an error.
 func AwaitReady(ctx context.Context, c *Client, freq time.Duration, tags []string, options ...rpc.Option) (bool, error) {
 	return await(ctx, freq, c.Readiness, tags, options...)
 }
 
-// AwaitHealthy polls the node every [freq] until the node reports healthy.
-// Only returns an error if [ctx] returns an error.
+// AwaitHealthy polls the node every freq until the node reports healthy.
+// Only returns an error if ctx returns an error.
 func AwaitHealthy(ctx context.Context, c *Client, freq time.Duration, tags []string, options ...rpc.Option) (bool, error) {
 	return await(ctx, freq, c.Health, tags, options...)
 }
 
-// AwaitAlive polls the node every [freq] until the node reports liveness.
-// Only returns an error if [ctx] returns an error.
+// AwaitAlive polls the node every freq until the node reports liveness.
+// Only returns an error if ctx returns an error.
 func AwaitAlive(ctx context.Context, c *Client, freq time.Duration, tags []string, options ...rpc.Option) (bool, error) {
 	return await(ctx, freq, c.Liveness, tags, options...)
 }

@@ -30,8 +30,7 @@ const (
 // and compatibility reasons with existing APIs :(.
 type API string
 
-// Every available [API]. The methods each one carries are listed alongside its
-// registration in [apiServices].
+// Every available [API].
 const (
 	APIWeb3         API = "web3"
 	APINet          API = "net"
@@ -56,7 +55,7 @@ func AllAPIs() set.Set[API] {
 }
 
 // DefaultAPIs returns the [API]s served when an operator doesn't configure
-// [Config.APIs] (those with [apiService.defaultOn])).
+// [Config.APIs].
 func DefaultAPIs() set.Set[API] {
 	d := set.NewSet[API](len(apiServices))
 	for _, s := range apiServices {

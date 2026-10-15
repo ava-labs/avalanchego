@@ -77,7 +77,8 @@ func (fx *Fx) Bootstrapped() error {
 	return nil
 }
 
-// VerifyPermission returns nil iff [credIntf] proves that [controlGroup] assents to [txIntf]
+// VerifyPermission returns nil iff credIntf proves that ownerIntf assents to
+// txIntf.
 func (fx *Fx) VerifyPermission(txIntf, inIntf, credIntf, ownerIntf interface{}) error {
 	tx, ok := txIntf.(UnsignedTx)
 	if !ok {

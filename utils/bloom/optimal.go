@@ -7,9 +7,9 @@ import "math"
 
 const ln2Squared = math.Ln2 * math.Ln2
 
-// OptimalParameters calculates the optimal [numHashes] and [numEntries] that
-// should be allocated for a bloom filter which will contain [count] and target
-// [falsePositiveProbability].
+// OptimalParameters calculates the optimal numHashes and numEntries that
+// should be allocated for a bloom filter which will contain count additions and
+// target a false positive probability of falsePositiveProbability.
 func OptimalParameters(count int, falsePositiveProbability float64) (int, int) {
 	numEntries := OptimalEntries(count, falsePositiveProbability)
 	numHashes := OptimalHashes(numEntries, count)
@@ -17,7 +17,7 @@ func OptimalParameters(count int, falsePositiveProbability float64) (int, int) {
 }
 
 // OptimalHashes calculates the number of hashes which will minimize the false
-// positive probability of a bloom filter with [numEntries] after [count]
+// positive probability of a bloom filter with numEntries after count
 // additions.
 //
 // It is guaranteed to return a value in the range [minHashes, maxHashes].
@@ -44,9 +44,9 @@ func OptimalHashes(numEntries, count int) int {
 }
 
 // OptimalEntries calculates the optimal number of entries to use when creating
-// a new Bloom filter when targenting a size of [count] with
-// [falsePositiveProbability] assuming that the optimal number of hashes is
-// used.
+// a new Bloom filter targeting count additions with a false positive
+// probability of falsePositiveProbability, assuming that the optimal number of
+// hashes is used.
 //
 // It is guaranteed to return a value in the range [minEntries, MaxInt].
 //
@@ -75,7 +75,7 @@ func OptimalEntries(count int, falsePositiveProbability float64) int {
 }
 
 // EstimateCount estimates the number of additions a bloom filter with
-// [numHashes] and [numEntries] must have to reach [falsePositiveProbability].
+// numHashes and numEntries must have to reach falsePositiveProbability.
 // This is derived by inversing a lower-bound on the probability of false
 // positives. For values where numBits >> numHashes, the predicted probability
 // is fairly accurate.

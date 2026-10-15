@@ -4,9 +4,8 @@
 // Package sync syncs a merkle trie over the p2p network: a [Syncer] (client)
 // requests range and change proofs that a [ProofHandler] (server) generates.
 //
-// Metrics are split by component: [syncerMetrics] is updated only by [Syncer]
-// and [handlerMetrics] only by [ProofHandler], so each component registers
-// only the collectors it updates.
+// Metrics are split by component: [Syncer] and [ProofHandler] each register
+// only the collectors they update.
 package sync
 
 import (

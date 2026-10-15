@@ -235,9 +235,9 @@ func (s *service) IssueTx(_ *http.Request, args *api.FormattedTx, resp *api.JSON
 	return nil
 }
 
-// GetTxReply is the response returned by [service.GetAtomicTx].
+// GetTxReply is the response to the avax.getAtomicTx API method.
 //
-// It MUST be exported for gorilla RPC to publicly expose [service.GetAtomicTx].
+// It MUST be exported for gorilla RPC to publicly expose the method.
 type GetTxReply struct {
 	api.FormattedTx
 	Height json.Uint64 `json:"blockHeight"`

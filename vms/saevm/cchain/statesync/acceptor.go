@@ -8,10 +8,11 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/statesync"
+
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 // StateSyncEnabled checks whether the node should query for state summaries.
@@ -20,10 +21,10 @@ func (h *Handler) StateSyncEnabled(context.Context) (bool, error) {
 }
 
 // WaitForEvent blocks until the entire state sync is complete.
-func (h *Handler) WaitForEvent(ctx context.Context) (common.Message, error) {
+func (h *Handler) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	select {
 	case <-h.done:
-		return common.StateSyncDone, nil
+		return snowcommon.StateSyncDone, nil
 	case <-ctx.Done():
 		return 0, context.Cause(ctx)
 	}
@@ -36,7 +37,7 @@ func (h *Handler) SyncError() error {
 
 // AcceptSummary ensures the summary should be accepted. If it shouldn't, it
 // returns [block.StateSyncSkipped]. Otherwise, it asynchronouosly begins the
-// state sync. [Handler.WaitForEvent] will return [common.StateSyncDone] once
+// state sync. [Handler.WaitForEvent] will return [snowcommon.StateSyncDone] once
 // the sync is complete. Any error from during the state sync can be read via
 // [Handler.SyncError].
 //

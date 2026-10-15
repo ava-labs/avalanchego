@@ -12,9 +12,9 @@ import (
 
 var _ net.Listener = (*throttledListener)(nil)
 
-// Wraps [listener] and returns a net.Listener that will accept at most
-// [maxConnsPerSec] connections per second.
-// [maxConnsPerSec] must be non-negative.
+// NewThrottledListener wraps listener and returns a [net.Listener] that will
+// accept at most maxConnsPerSec connections per second.
+// maxConnsPerSec must be non-negative.
 func NewThrottledListener(listener net.Listener, maxConnsPerSec float64) net.Listener {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &throttledListener{

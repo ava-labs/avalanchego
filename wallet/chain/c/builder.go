@@ -96,11 +96,11 @@ type builder struct {
 
 // NewBuilder returns a new transaction builder.
 //
-//   - [avaxAddrs] is the set of addresses in the AVAX format that the builder
+//   - avaxAddrs is the set of addresses in the AVAX format that the builder
 //     assumes can be used when signing the transactions in the future.
-//   - [ethAddrs] is the set of addresses in the Eth format that the builder
+//   - ethAddrs is the set of addresses in the Eth format that the builder
 //     assumes can be used when signing the transactions in the future.
-//   - [backend] provides the required access to the chain's context and state
+//   - backend provides the required access to the chain's context and state
 //     to build out the transactions.
 func NewBuilder(
 	avaxAddrs set.Set[ids.ShortID],

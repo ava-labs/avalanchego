@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-// ChmodR sets the permissions of all directories and optionally files to [perm]
+// ChmodR sets the permissions of all directories and optionally files to perm
 // permissions.
 func ChmodR(dir string, dirOnly bool, perm os.FileMode) error {
 	if _, err := os.Stat(dir); errors.Is(err, os.ErrNotExist) {
