@@ -169,4 +169,4 @@ The VM must also implement `CreateHandlers()` which can return a map of extensio
 
 ## VM implementations
 
-- [TransitionVM](./transitionvm/README.md) — a wrapper VM that swaps the underlying VM at a configured time. Subnet-EVM L1s will use it to migrate to SAEVM at the Igloo upgrade.
+- [TransitionVM](./transitionvm/README.md) — a wrapper VM that swaps the underlying VM at a configured time.

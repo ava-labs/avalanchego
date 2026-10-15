@@ -30,7 +30,6 @@ const (
 	EVMLeafRequestHandlerID
 	EVMCodeRequestHandlerID
 	EVMBlockRequestHandlerID
-	// EVMAtomicLeafRequestHandlerID serves the C-Chain atomic trie.
 	EVMAtomicLeafRequestHandlerID
 )
 
