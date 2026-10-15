@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1792072438910,
+  "lastUpdate": 1792075020388,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -63637,6 +63637,53 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_accept_ms/ggas",
             "value": 18309.940981484942,
+            "unit": "block_accept_ms/ggas"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonathan Oppenheimer",
+            "username": "JonathanOppenheimer",
+            "email": "jonathan.oppenheimer@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "84d5648e74d6f82c9e1ebf7049a9ca385822c778",
+          "message": "the greatest day: delete (almost all of) graft/coreth (#6149)\n\nCo-authored-by: Austin Larson <78000745+alarso16@users.noreply.github.com>\nCo-authored-by: Arran Schlosberg <519948+ARR4N@users.noreply.github.com>\nCo-authored-by: Tsvetan Dimitrov <4035842+powerslider@users.noreply.github.com>\nCo-authored-by: Rahul Muttineni <288633009+rahulmutt-ava@users.noreply.github.com>\nCo-authored-by: Stephen Buttolph <22109487+StephenButtolph@users.noreply.github.com>\nCo-authored-by: Arran Schlosberg <me@arranschlosberg.com>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>",
+          "timestamp": "2026-10-15T13:32:41Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/84d5648e74d6f82c9e1ebf7049a9ca385822c778"
+        },
+        "date": 1792075018413,
+        "tool": "customBiggerIsBetter",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-16xlarge-local-ssd - mgas/s",
+            "value": 35.05870841394945,
+            "unit": "mgas/s"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-16xlarge-local-ssd - ms/ggas",
+            "value": 28523.583589922317,
+            "unit": "ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-16xlarge-local-ssd - block_parse_ms/ggas",
+            "value": 62.07056363847,
+            "unit": "block_parse_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-16xlarge-local-ssd - block_verify_ms/ggas",
+            "value": 1.7643432568037531,
+            "unit": "block_verify_ms/ggas"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[69000001,69100000]-Config-archive-Runner-avago-runner-i4i-16xlarge-local-ssd - block_accept_ms/ggas",
+            "value": 28458.527350630287,
             "unit": "block_accept_ms/ggas"
           }
         ]
