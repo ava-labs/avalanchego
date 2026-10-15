@@ -126,6 +126,10 @@ func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 // NewClient returns a Client that can be used to send messages for the
 // corresponding protocol.
 func (n *Network) NewClient(handlerID uint64, nodeSampler NodeSampler) *Client {
+	return n.newClient(handlerID, nodeSampler)
+}
+
+func (n *Network) newClient(handlerID uint64, nodeSampler NodeSampler) *Client {
 	return &Client{
 		handlerIDStr:  strconv.FormatUint(handlerID, 10),
 		handlerPrefix: ProtocolPrefix(handlerID),
