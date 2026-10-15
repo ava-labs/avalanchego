@@ -4,6 +4,8 @@
 
 This release updates the plugin version to `47`. All plugins must update to remain compatible.
 
+**Nodes that last ran before Helicon activated must first run v1.15.0 or v1.15.1 until the C-Chain has bootstrapped past Helicon, or resync from an empty database.**
+
 ### Features
 
 - Added `vms/evm/evmclient`, which combines standard Ethereum, Geth-specific, raw RPC, and Avalanche-specific EVM methods.
@@ -11,6 +13,8 @@ This release updates the plugin version to `47`. All plugins must update to rema
 ### APIs
 
 - The `avax.getAtomicTxStatus` C-Chain RPC, deprecated in v1.15.0, is removed. Use `avax.getAtomicTx`, which fails for a tx that has not been accepted.
+- Added:
+  - `restakedValidationRewards` and `restakedDelegateeRewards` fields to `platform.getCurrentValidators` results for auto-renewed validators
 
 ### Configs
 
@@ -18,8 +22,9 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 ### Metrics
 
-- Added `avalanche_evm_transition_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
-- Added `avalanche_evm_transition_sae_execution_gas_rate_headroom` (histogram), `avalanche_evm_transition_sae_execution_gas_rate_headroom_latest` (gauge), and `avalanche_evm_transition_sae_tau_second_avg_executed_gas_per_second` (gauge) to monitor gas-vs-wall clock skew during execution, for tuning the gas target.
+- C-Chain metrics no longer include the `transition` prefix. For example, `avalanche_evm_transition_sae_last_executed_height` is now `avalanche_evm_sae_last_executed_height`.
+- Added `avalanche_evm_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
+- Added `avalanche_evm_sae_execution_gas_rate_headroom` (histogram), `avalanche_evm_sae_execution_gas_rate_headroom_latest` (gauge), and `avalanche_evm_sae_tau_second_avg_executed_gas_per_second` (gauge) to monitor gas-vs-wall clock skew during execution, for tuning the gas target.
 
 ### Fixes
 
@@ -32,11 +37,6 @@ This release updates the plugin version to `47`. All plugins must update to rema
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 - Updated the minimum Go version from `1.25.10` to `1.26.8`.
 - Helicon is now active from genesis on local networks. A local network started on a previous version is not compatible with this version.
-
-### APIs
-
-- Added:
-  - `restakedValidationRewards` and `restakedDelegateeRewards` fields to `platform.getCurrentValidators` results for auto-renewed validators
 
 ### Metrics
 

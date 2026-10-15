@@ -23,7 +23,6 @@ func TestCallTimeout(t *testing.T) {
 	}))
 
 	httpClient := dialRPC(ctx, t, sut, "http", rpcHTTPExtensionPath)
-	t.Cleanup(httpClient.Close)
 
 	// MUST occur before any RPC clients are closed, or they will block.
 	defer unblock()

@@ -25,10 +25,6 @@ type Config interface {
 	Timestamp() *uint64
 	// IsDisabled returns true if this network upgrade should disable the precompile.
 	IsDisabled() bool
-	// Equal returns true if the provided argument configures the same precompile with the same parameters.
-	Equal(Config) bool
-	// Verify is called on startup and an error is treated as fatal. Configure can assume the Config has passed verification.
-	Verify(ChainConfig) error
 }
 
 // PredicateContext is the context passed in to the Predicater interface to verify

@@ -60,10 +60,7 @@ func ExecutionResultsPath(chainDataDir string) string {
 }
 
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,
-// which needs to be provided by a harness. In all cases, the harness MUST
-// ensure that the last-synchronous block (which MAY be the genesis) is
-// canonical on disk with its post-execution state committed before [NewVM] is
-// called.
+// which needs to be provided by a harness.
 type VM struct {
 	network *network.Network
 	hooks   hook.Points
@@ -78,7 +75,8 @@ type VM struct {
 
 	preference atomic.Pointer[blocks.Block]
 	last       struct {
-		accepted, settled atomic.Pointer[blocks.Block]
+		accepted atomic.Pointer[blocks.Block]
+		settled  *atomic.Pointer[blocks.Block]
 	}
 	acceptedBlocks event.FeedOf[*blocks.Block]
 	// Consensus-critical blocks are those either (a) undergoing a consensus
@@ -116,9 +114,10 @@ type Config struct {
 // NewVM returns a new [VM] that is ready for use immediately upon return.
 // [VM.Shutdown] MUST be called to release resources.
 //
-// The state root of the last synchronous block MUST be available when creating
-// a [triedb.Database] from the provided [ethdb.Database] and [triedb.Config]
-// (the latter provided via the [Config]).
+// The genesis block MUST be canonical in the provided [ethdb.Database]. The
+// post-execution state of the genesis, or of a later settled block, MUST be
+// available when creating a [triedb.Database] from the provided
+// [ethdb.Database] and [triedb.Config] (the latter provided via the [Config]).
 func NewVM[T hook.Transaction](
 	ctx context.Context,
 	hooks hook.PointsG[T],
@@ -163,7 +162,8 @@ func NewVM[T hook.Transaction](
 	closers.Push(&xdb)
 
 	// ==========  Block State  ==========
-	exec, consensusCritical, err := recoverExecutor(ctx, db, xdb, chainConfig, snowCtx, hooks, cfg, reg)
+	lastSettled := new(atomic.Pointer[blocks.Block])
+	exec, consensusCritical, err := recoverExecutor(ctx, db, xdb, lastSettled, chainConfig, snowCtx, hooks, cfg, reg)
 	if err != nil {
 		return nil, fmt.Errorf("creating new execution: %w", err)
 	}
@@ -208,6 +208,7 @@ func NewVM[T hook.Transaction](
 		newTxs:  newTxs,
 		closers: closers,
 	}
+	vm.last.settled = lastSettled
 
 	// ==========  Frontiers  ==========
 	{

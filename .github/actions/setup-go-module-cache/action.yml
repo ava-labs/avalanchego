@@ -1,5 +1,5 @@
 name: 'Setup Go module cache'
-description: 'Restore, prepare, and optionally save the project Go module cache'
+description: 'Restore, prepare, and optionally save module dependencies for Go tasks outside Bazel'
 
 inputs:
   use-nix:
@@ -13,7 +13,8 @@ inputs:
   disable-go-proxy:
     # Keep the proxy enabled only when later setup can require modules that are
     # not represented by this repository's cache key, such as custom polyrepo refs.
-    description: 'Disable GOPROXY after module preparation'
+    # See docs/go-toolchains-and-caches.md#download-restrictions.
+    description: 'Disable Go module downloads after preparation; this does not block all network access'
     required: false
     default: 'true'
 

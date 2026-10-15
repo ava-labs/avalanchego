@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/libevm/common"
-
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
 
@@ -274,22 +272,6 @@ func checkForks(forks []fork) error {
 		}
 	}
 	return nil
-}
-
-// Verify verifies chain config.
-func (c *ChainConfig) Verify() error {
-	// Verify the precompile upgrades are internally consistent given the existing chainConfig.
-	if err := c.verifyPrecompileUpgrades(); err != nil {
-		return fmt.Errorf("invalid precompile upgrades: %w", err)
-	}
-
-	return nil
-}
-
-// IsPrecompileEnabled returns whether precompile with `address` is enabled at `timestamp`.
-func (c *ChainConfig) IsPrecompileEnabled(address common.Address, timestamp uint64) bool {
-	config := c.GetActivePrecompileConfig(address, timestamp)
-	return config != nil && !config.IsDisabled()
 }
 
 // IsForkTransition returns true if `fork` activates during the transition from

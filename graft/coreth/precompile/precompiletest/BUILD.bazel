@@ -8,7 +8,6 @@ package(default_visibility = [
 go_library(
     name = "precompiletest",
     srcs = [
-        "test_config.go",
         "test_precompile.go",
         "test_predicate.go",
     ],

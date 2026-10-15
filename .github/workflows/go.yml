@@ -33,7 +33,7 @@ jobs:
     needs: setup-cache-linux-amd64
     # Use a faster runner pending migration to bazel. The default free runners result
     # in 20+ minute runtime, slowing down every PR and merge queue CI run.
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04-amd64-4-core
     steps:
       - uses: actions/checkout@v5
       - name: Check image build for subnet-evm test setup
@@ -50,6 +50,8 @@ jobs:
         uses: ./.github/actions/run-docker-with-disk-space
         with:
           setup-qemu: 'true'
+          docker-username: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_USERNAME || '' }}
+          docker-password: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_PASS || '' }}
           run: ./scripts/run_task.sh test-build-image
 
   build-image-subnet-evm:
@@ -61,6 +63,8 @@ jobs:
         uses: ./.github/actions/run-docker-with-disk-space
         with:
           setup-qemu: 'true'
+          docker-username: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_USERNAME || '' }}
+          docker-password: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_PASS || '' }}
           run: ./scripts/run_task.sh test-build-image
           working_directory: ./graft/subnet-evm
 
@@ -145,7 +149,7 @@ jobs:
       matrix:
         # The default free runners lack the resources for parallel execution, so
         # a beefier runner is required.
-        os: [blacksmith-4vcpu-ubuntu-2404]
+        os: [ubuntu-24.04-amd64-4-core]
     steps:
       - uses: actions/checkout@v5
       - name: Run e2e tests
@@ -253,7 +257,7 @@ jobs:
     needs: setup-cache-linux-amd64
     # The default free runners lack the resources for parallel execution, so a beefier
     # runner is required.
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04-amd64-4-core
     steps:
       - uses: actions/checkout@v5
       - name: Run e2e tests
@@ -275,7 +279,7 @@ jobs:
     needs: setup-cache-linux-amd64
     # The default free runners lack the resources for parallel execution, so a beefier
     # runner is required.
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04-amd64-4-core
     steps:
       - uses: actions/checkout@v5
       - name: Run e2e tests
