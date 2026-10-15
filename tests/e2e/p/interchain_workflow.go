@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-var _ = e2e.DescribePChain("[Interchain Workflow]", func() {
+var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainLabel), func() {
 	var (
 		tc      = e2e.NewTestContext()
 		require = require.New(tc)
