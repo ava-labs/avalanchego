@@ -610,7 +610,7 @@ tasks:
   test-robustness:
     desc: Deploys kind with chaos mesh. Intended to eventually run a robustness (fault-injection) test suite.
     cmds:
-      - cmd: '{{.NIX_RUN}} ./bin/tmpnetctl start-kind-cluster --install-chaos-mesh'
+      - cmd: '{{.NIX_RUN}} ./scripts/start_kind_cluster.sh --install-chaos-mesh'
 
   test-run-task-launcher:
     desc: Tests the run_task launcher behavior

@@ -10,6 +10,8 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -350,12 +352,21 @@ func deployIngressController(ctx context.Context, log logging.Logger, configPath
 
 	log.Info("deploying traefik ingress controller using Helm")
 
-	// Add the Traefik Helm repository.
-	if err := runHelmCommand(ctx, "repo", "add", "traefik", ingressChartRepo); err != nil {
-		return stacktrace.Errorf("failed to add helm repo: %w", err)
+	// Offline mode supplies a repository and chart cache produced by the online
+	// cache producer. Do not let Helm hide a missing image by reaching the network.
+	if os.Getenv("AVALANCHEGO_KIND_OFFLINE") != "true" {
+		// Add the Traefik Helm repository.
+		if err := runHelmCommand(ctx, "repo", "add", "traefik", ingressChartRepo); err != nil {
+			return stacktrace.Errorf("failed to add helm repo: %w", err)
+		}
+		if err := runHelmCommand(ctx, "repo", "update"); err != nil {
+			return stacktrace.Errorf("failed to update helm repos: %w", err)
+		}
 	}
-	if err := runHelmCommand(ctx, "repo", "update"); err != nil {
-		return stacktrace.Errorf("failed to update helm repos: %w", err)
+
+	chart, err := helmChart(ingressChartName, ingressChartVersion)
+	if err != nil {
+		return stacktrace.Errorf("failed to find traefik chart: %w", err)
 	}
 
 	// Install Traefik with Helm values.
@@ -363,7 +374,7 @@ func deployIngressController(ctx context.Context, log logging.Logger, configPath
 	args := []string{
 		"install",
 		ingressReleaseName,
-		ingressChartName,
+		chart,
 		"--version", ingressChartVersion,
 		"--namespace", ingressNamespace,
 		"--create-namespace",
@@ -403,6 +414,25 @@ func isIngressControllerRunning(ctx context.Context, log logging.Logger, configP
 	_, err = clientset.AppsV1().Deployments(ingressNamespace).Get(ctx, ingressControllerName, metav1.GetOptions{})
 	isRunning := !apierrors.IsNotFound(err) || err == nil
 	return isRunning, nil
+}
+
+// helmChart returns a repository chart reference normally, or the cached chart
+// archive when offline mode is enabled. Helm uses its repository cache only to
+// resolve metadata; installing a repository reference still downloads the chart.
+func helmChart(chartName, chartVersion string) (string, error) {
+	if os.Getenv("AVALANCHEGO_KIND_OFFLINE") != "true" {
+		return chartName, nil
+	}
+
+	chartPath := filepath.Join(
+		os.Getenv("HELM_CACHE_HOME"),
+		"repository",
+		fmt.Sprintf("%s-%s.tgz", path.Base(chartName), chartVersion),
+	)
+	if _, err := os.Stat(chartPath); err != nil {
+		return "", err
+	}
+	return chartPath, nil
 }
 
 // runHelmCommand runs a Helm command with the given arguments.
@@ -473,19 +503,26 @@ func deployChaosMesh(ctx context.Context, log logging.Logger, configPath string,
 
 	log.Info("deploying chaos mesh using Helm")
 
-	// Add the helm repo for chaos-mesh
-	if err := runHelmCommand(ctx, "repo", "add", "chaos-mesh", chaosMeshChartRepo); err != nil {
-		return stacktrace.Errorf("failed to add chaos mesh helm repo: %w", err)
+	if os.Getenv("AVALANCHEGO_KIND_OFFLINE") != "true" {
+		// Add the Helm repo for Chaos Mesh.
+		if err := runHelmCommand(ctx, "repo", "add", "chaos-mesh", chaosMeshChartRepo); err != nil {
+			return stacktrace.Errorf("failed to add chaos mesh helm repo: %w", err)
+		}
+		if err := runHelmCommand(ctx, "repo", "update"); err != nil {
+			return stacktrace.Errorf("failed to update helm repos: %w", err)
+		}
 	}
-	if err := runHelmCommand(ctx, "repo", "update"); err != nil {
-		return stacktrace.Errorf("failed to update helm repos: %w", err)
+
+	chart, err := helmChart(chaosMeshChartName, chaosMeshChartVersion)
+	if err != nil {
+		return stacktrace.Errorf("failed to find chaos mesh chart: %w", err)
 	}
 
 	// Install Chaos Mesh with all required settings including ingress
 	args := []string{
 		"install",
 		chaosMeshReleaseName,
-		chaosMeshChartName,
+		chart,
 		"--namespace", chaosMeshNamespace,
 		"--create-namespace",
 		"--version", chaosMeshChartVersion,

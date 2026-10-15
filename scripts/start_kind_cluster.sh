@@ -8,10 +8,15 @@ set -euo pipefail
 # Enable reuse of the arguments to ginkgo relevant to starting a cluster
 START_CLUSTER_ARGS=()
 for arg in "$@"; do
-  if [[ "${arg}" =~ "--kubeconfig=" || "${arg}" =~ "--kubeconfig-context=" || "${arg}" =~ "--start-metrics-collector" || "${arg}" =~ "--start-logs-collector" ]]; then
+  if [[ "${arg}" =~ "--kubeconfig=" || "${arg}" =~ "--kubeconfig-context=" || "${arg}" =~ "--start-metrics-collector" || "${arg}" =~ "--start-logs-collector" || "${arg}" == "--install-chaos-mesh" ]]; then
     START_CLUSTER_ARGS+=("${arg}")
   fi
 done
 echo "Starting kind cluster with args: ${START_CLUSTER_ARGS[*]}"
 echo "To cleanup the cluster, run ./scripts/run_task.sh delete-kind-cluster"
-./bin/tmpnetctl start-kind-cluster "${START_CLUSTER_ARGS[@]}"
+tmpnetctl="${AVALANCHEGO_TMPNETCTL:-./bin/tmpnetctl}"
+if [[ ! -x "$tmpnetctl" ]]; then
+  echo "tmpnetctl is not executable: $tmpnetctl" >&2
+  exit 1
+fi
+"$tmpnetctl" start-kind-cluster "${START_CLUSTER_ARGS[@]}"

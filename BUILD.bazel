@@ -1,6 +1,11 @@
 load("@bazel_gazelle//:def.bzl", "DEFAULT_LANGUAGES", "gazelle", "gazelle_binary", "gazelle_test")
 
-exports_files(["BUILD.bazel"])
+exports_files([
+    "BUILD.bazel",
+    "Taskfile.yml",
+    "flake.lock",
+    "flake.nix",
+])
 
 # gazelle:prefix github.com/ava-labs/avalanchego
 # gazelle:exclude tools

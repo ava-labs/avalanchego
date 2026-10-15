@@ -91,12 +91,44 @@ go_library(
     ],
 )
 
+sh_test(
+    name = "kind_chaos_image_cache_completeness_test",
+    timeout = "long",
+    srcs = ["kind_image_cache_completeness_test.sh"],
+    data = glob([
+        "kind_image_cache_inputs/**",
+        "yaml/**",
+    ]) + [
+        "start_kind_cluster.go",
+        "//:Taskfile.yml",
+        "//:flake.lock",
+        "//:flake.nix",
+        "//.github/actions/restore-kind-image-cache:action.yml",
+        "//.github/actions/setup-kind-image-cache:action.yml",
+        "//scripts:build_tmpnetctl.sh",
+        "//scripts:kind-image-cache.sh",
+        "//scripts:kind-with-registry.sh",
+        "//scripts:produce-kind-image-cache.sh",
+        "//scripts:run_task.sh",
+        "//scripts:start_kind_cluster.sh",
+        "//tests/fixture/tmpnet/tmpnetctl:main.go",
+    ],
+    # This test starts a privileged Docker daemon. It must not run in Bazel's
+    # sandbox or ordinary unit-test suites.
+    tags = [
+        "local",
+        "no-remote",
+        "requires-docker",
+    ],
+)
+
 go_test(
     name = "tmpnet_test",
     srcs = [
         "kube_runtime_test.go",
         "network_test.go",
         "node_test.go",
+        "start_kind_cluster_test.go",
     ],
     embed = [":tmpnet"],
     deps = [

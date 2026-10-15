@@ -1,0 +1,48 @@
+name: Set up Kind image cache
+description: Restore or produce the exact image and Helm cache used by Kind workloads
+
+outputs:
+  cache-key:
+    description: Exact cache key for the materialized profile
+    value: ${{ steps.key.outputs.cache-key }}
+
+runs:
+  using: composite
+  steps:
+    - id: key
+      shell: bash
+      run: |
+        digest="$(./scripts/kind-image-cache.sh input-digest)"
+        echo "cache-key=kind-images-v1-${digest}" >> "$GITHUB_OUTPUT"
+
+    - id: restore
+      uses: actions/cache/restore@v5
+      with:
+        path: tests/fixture/tmpnet/kind_image_cache_inputs
+        key: ${{ steps.key.outputs.cache-key }}
+
+    - name: Produce exact Kind image cache
+      if: ${{ steps.restore.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        rm -rf tests/fixture/tmpnet/kind_image_cache_inputs
+        nix develop --command ./scripts/produce-kind-image-cache.sh tests/fixture/tmpnet/kind_image_cache_inputs
+
+    # The offline Bazel test must not compile Go modules after networking is
+    # disabled. Build this once in the normal runner environment and pass it
+    # to the test explicitly.
+    - name: Build tmpnetctl for offline verification
+      shell: bash
+      run: nix develop --command ./scripts/build_tmpnetctl.sh
+
+    - id: cache-policy
+      uses: ./.github/actions/cache-policy
+      with:
+        request-cache-save: ${{ steps.restore.outputs.cache-hit != 'true' }}
+
+    - name: Save Kind image cache
+      if: ${{ steps.cache-policy.outputs.cache-save-allowed == 'true' }}
+      uses: actions/cache/save@v5
+      with:
+        path: tests/fixture/tmpnet/kind_image_cache_inputs
+        key: ${{ steps.key.outputs.cache-key }}

@@ -167,7 +167,7 @@ jobs:
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
-  e2e-bootstrap-monitor:
+  kind-images:
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
@@ -179,6 +179,33 @@ jobs:
         with:
           diagnostic-groups: docker
       - uses: ./.github/actions/install-nix
+      - uses: ./.github/actions/setup-kind-image-cache
+      - name: Verify Kind image cache offline
+        run: >-
+          bazelisk test
+          --test_env=AVALANCHEGO_TMPNETCTL="$PWD/build/tmpnetctl"
+          --test_env=AVALANCHEGO_WORKSPACE_ROOT="$PWD"
+          //tests/fixture/tmpnet:kind_chaos_image_cache_completeness_test
+      - uses: actions/upload-artifact@v6
+        with:
+          name: kind-images
+          path: tests/fixture/tmpnet/kind_image_cache_inputs
+          if-no-files-found: error
+          compression-level: 0
+
+  e2e-bootstrap-monitor:
+    needs: [setup-cache-linux-amd64, kind-images]
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        shell: nix develop --command bash -x {0}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/ensure-disk-space
+        with:
+          diagnostic-groups: docker
+      - uses: ./.github/actions/install-nix
+      - uses: ./.github/actions/restore-kind-image-cache
       - name: Run e2e tests
         run: ./scripts/run_task.sh test-bootstrap-monitor-e2e
       - name: Log Docker disk diagnostics
@@ -211,10 +238,14 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-kube:
-    needs: setup-cache-linux-amd64
+    needs: [setup-cache-linux-amd64, kind-images]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/ensure-disk-space
+        with:
+          diagnostic-groups: docker
+      - uses: ./.github/actions/restore-kind-image-cache
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh test-e2e-kube-ci
@@ -432,7 +463,7 @@ jobs:
   #         loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   robustness:
-    needs: setup-cache-linux-amd64
+    needs: [setup-cache-linux-amd64, kind-images]
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -443,8 +474,8 @@ jobs:
         with:
           diagnostic-groups: docker
       - uses: ./.github/actions/install-nix
-      # TODO(marun) Extend testing of robustness beyond deploying a suitable test environment
-      - name: Deploy kind with chaos mesh
+      - uses: ./.github/actions/restore-kind-image-cache
+      - name: Deploy kind with chaos mesh from the image cache
         run: ./scripts/run_task.sh test-robustness
       - name: Log Docker disk diagnostics
         if: failure()
