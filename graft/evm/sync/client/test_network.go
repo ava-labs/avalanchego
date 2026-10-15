@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 )
 
 var _ Network = (*testNetwork)(nil)
@@ -85,7 +86,7 @@ func (t *testNetwork) testResponses(callback func(), responses ...[]byte) {
 	t.numCalls = 0
 }
 
-func (*testNetwork) PeerTracker() *p2p.PeerTracker {
+func (*testNetwork) PeerTracker() *peertracker.PeerTracker {
 	panic("PeerTracker unimplemented")
 }
 

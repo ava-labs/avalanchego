@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/network/peertest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker/peertrackertest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -716,7 +716,7 @@ func TestSendAppRequestErrorBalancesTracker(t *testing.T) {
 
 	// Seed the peer responsive, so a missing failure registration is visible as
 	// the peer staying responsive.
-	p2ptest.SeedResponsive(t, net.PeerTracker(), nodeID)
+	peertrackertest.SeedResponsive(t, net.PeerTracker(), nodeID)
 	require.True(t, responsive(net, nodeID), "seeded")
 
 	_, err = net.SendSyncedAppRequest(t.Context(), nodeID, []byte("request"))

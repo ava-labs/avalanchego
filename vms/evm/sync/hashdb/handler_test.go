@@ -18,7 +18,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/network/p2p/tracking"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
@@ -214,7 +214,7 @@ func TestResponder(t *testing.T) {
 			))
 			client := NewClient(
 				log,
-				tracking.NewClient(net, p2p.EVMLeafRequestHandlerID, tracker),
+				peertracker.NewClient(net, p2p.EVMLeafRequestHandlerID, tracker),
 				common.HashLength,
 			)
 

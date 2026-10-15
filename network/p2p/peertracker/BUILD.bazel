@@ -2,28 +2,42 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "go_test")
 
 go_library(
-    name = "tracking",
-    srcs = ["client.go"],
-    importpath = "github.com/ava-labs/avalanchego/network/p2p/tracking",
+    name = "peertracker",
+    srcs = [
+        "client.go",
+        "peer_tracker.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/network/p2p/peertracker",
     visibility = ["//visibility:public"],
     deps = [
         "//ids",
         "//network/p2p",
+        "//utils/heap",
+        "//utils/logging",
+        "//utils/math",
         "//utils/set",
+        "//version",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_uber_go_zap//:zap",
     ],
 )
 
 go_test(
-    name = "tracking_test",
-    srcs = ["client_test.go"],
-    embed = [":tracking"],
+    name = "peertracker_test",
+    srcs = [
+        "client_test.go",
+        "peer_tracker_test.go",
+    ],
+    embed = [":peertracker"],
     deps = [
         "//ids",
         "//network/p2p",
         "//snow/engine/common",
         "//snow/engine/enginetest",
         "//utils/logging",
+        "//utils/logging/loggingtest",
         "//utils/set",
+        "//version",
         "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",

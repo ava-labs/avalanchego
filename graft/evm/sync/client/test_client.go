@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/tracking"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 )
 
 var (
@@ -57,7 +57,7 @@ func NewTestClient(
 	}
 }
 
-func (*TestClient) AddClient(uint64) *tracking.Client {
+func (*TestClient) AddClient(uint64) *peertracker.Client {
 	panic("AddClient is not supported in TestClient")
 }
 
