@@ -17,8 +17,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -47,6 +49,8 @@ var (
 	errInvalidTimestamp              = errors.New("invalid timestamp")
 	errUnexpectedStakerTxType        = errors.New("unexpected staker transaction type")
 	errUnexpectedStakeIncreaseTxType = errors.New("unexpected stake increase transaction type")
+	errUnexpectedStakeOutputType     = errors.New("unexpected stake output type")
+	errStakeDecreaseTooLarge         = errors.New("stake decrease exceeds the withdrawable stake")
 )
 
 // ProposalTx executes the proposal transaction [tx].
@@ -414,19 +418,22 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *platform.RewardValidatorTx) e
 //
 // The abort branch is the same regardless of configuration: the validator is
 // removed, its principal and the stake locked by its stake increase txs are
-// returned, the optimistically-minted potential reward is removed from the
-// supply, and only its accrued validation rewards and delegatee rewards are paid
-// out (the current cycle's potential reward is forfeited).
+// returned (except stake that was already withdrawn), the optimistically-minted
+// potential reward is removed from the supply, and only its accrued validation
+// rewards and delegatee rewards are paid out (the current cycle's potential
+// reward is forfeited).
 //
 // The commit branch depends on the configured next period:
-//   - NextPeriod > 0: the validator continues. Its pending stake increase is
-//     added to its weight, its rewards are restaked per
+//   - NextPeriod > 0: the validator continues. Its pending stake decrease is
+//     withdrawn and its pending stake increase is added to its weight, its
+//     rewards are restaked per
 //     AutoCompoundRewardShares (growing its weight up to MaxValidatorStake and
 //     withdrawing any excess) and the next cycle begins immediately.
 //   - NextPeriod == 0: the validator gracefully exits. It is removed, its
-//     principal and the stake locked by its stake increase txs are returned,
-//     and it receives all rewards for the cycle (current potential reward +
-//     accrued validation rewards + all delegatee rewards).
+//     principal and the stake locked by its stake increase txs are returned
+//     (except stake that was already withdrawn), and it receives all rewards
+//     for the cycle (current potential reward + accrued validation rewards +
+//     all delegatee rewards).
 func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAutoRenewedValidatorTx) error {
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
@@ -465,9 +472,17 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 		return fmt.Errorf("deleting current validator from abort state: %w", err)
 	}
 
-	unstakeUTXOs(uStakerTx, staker.TxID, e.onAbortState)
-	if err := unstakeStakeIncreaseUTXOs(stakeIncreaseTxIDs(stakingInfo), e.onAbortState); err != nil {
-		return fmt.Errorf("unstaking stake increases on abort: %w", err)
+	stakes, err := withdrawableStakes(e.onCommitState, staker.TxID, uStakerTx, stakingInfo.AccruedStakeIncreaseTxIDs)
+	if err != nil {
+		return err
+	}
+
+	txID := e.tx.ID()
+	if err := unstakeRemainingUTXOs(e.onAbortState, stakes, stakingInfo.WithdrawnStake, txID); err != nil {
+		return fmt.Errorf("unstaking stake on abort: %w", err)
+	}
+	if err := unstakeStakeIncreaseUTXOs(stakingInfo.PendingStakeIncreaseTxIDs, e.onAbortState); err != nil {
+		return fmt.Errorf("unstaking pending stake increases on abort: %w", err)
 	}
 
 	if err := e.undoSupplyMintOnAbort(staker); err != nil {
@@ -486,7 +501,7 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 		// Commit: restake rewards per AutoCompoundRewardShares and start the
 		// next cycle. The validator stays in the set, so its stake is not
 		// returned here.
-		return e.restakeAutoRenewedValidatorOnCommit(uStakerTx, staker, stakingInfo)
+		return e.restakeAutoRenewedValidatorOnCommit(uStakerTx, staker, stakingInfo, stakes)
 	}
 
 	// Graceful exit (NextPeriod == 0): the validator stops after this cycle and
@@ -497,9 +512,11 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 
 	// Commit: return the principal and the stake locked by the stake increase
 	// txs. (The abort branch already returned them above.)
-	unstakeUTXOs(uStakerTx, staker.TxID, e.onCommitState)
-	if err := unstakeStakeIncreaseUTXOs(stakeIncreaseTxIDs(stakingInfo), e.onCommitState); err != nil {
-		return fmt.Errorf("unstaking stake increases on commit: %w", err)
+	if err := unstakeRemainingUTXOs(e.onCommitState, stakes, stakingInfo.WithdrawnStake, txID); err != nil {
+		return fmt.Errorf("unstaking stake on commit: %w", err)
+	}
+	if err := unstakeStakeIncreaseUTXOs(stakingInfo.PendingStakeIncreaseTxIDs, e.onCommitState); err != nil {
+		return fmt.Errorf("unstaking pending stake increases on commit: %w", err)
 	}
 
 	// Commit: pay all rewards for the cycle — the current potential reward plus
@@ -800,19 +817,60 @@ func (e *proposalTxExecutor) mintRewards(
 // auto-renewed validator based on their AutoCompoundRewardShares configuration.
 //
 // The function:
-//  1. Splits rewards (validation + delegatee) into restaking and withdrawing portions
-//  2. Caps the restaking portion so the validator's weight, including its
+//  1. Withdraws the pending stake decrease, first from the validator's stake
+//     outputs and then from its restaked rewards
+//  2. Splits rewards (validation + delegatee) into restaking and withdrawing portions
+//  3. Caps the restaking portion so the validator's weight, including its
 //     pending stake increase, stays within MaxValidatorStake, withdrawing
 //     anything that doesn't fit
-//  3. Creates UTXOs for the withdrawn portion
-//  4. Increases validator weight by the pending stake increase and the
+//  4. Creates UTXOs for the withdrawn portion
+//  5. Increases validator weight by the pending stake increase and the
 //     restaking portion, and the accrued rewards by the restaking portion
-//  5. Updates the validator state
+//  6. Updates the validator state
 func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 	addAutoRenewedValidatorTx *platform.AddAutoRenewedValidatorTx,
 	validator *state.Staker,
 	stakingInfo state.StakingInfo,
+	stakes []withdrawableStake,
 ) error {
+	// The pending stake decrease draws from the stake outputs first, so that
+	// the stake is returned to the owners who locked it. Only the part that
+	// the stake outputs can't cover is drawn from the restaked rewards, which
+	// are paid to the reward owners below.
+	stakeWeight, err := safemath.Add(addAutoRenewedValidatorTx.Weight(), stakingInfo.AccruedStakeIncrease)
+	if err != nil {
+		return err
+	}
+	withdrawableStakeWeight, err := safemath.Sub(stakeWeight, stakingInfo.WithdrawnStake)
+	if err != nil {
+		return err
+	}
+	stakeDecrease := min(stakingInfo.PendingStakeDecrease, withdrawableStakeWeight)
+	rewardsDecrease := stakingInfo.PendingStakeDecrease - stakeDecrease
+	validationRewardsDecrease := min(rewardsDecrease, stakingInfo.AccruedValidationRewards)
+	delegateeRewardsDecrease := rewardsDecrease - validationRewardsDecrease
+
+	if err := withdrawStake(e.onCommitState, stakes, stakingInfo.WithdrawnStake, stakeDecrease, e.tx.ID()); err != nil {
+		return fmt.Errorf("withdrawing stake: %w", err)
+	}
+
+	newWithdrawnStake, err := safemath.Add(stakingInfo.WithdrawnStake, stakeDecrease)
+	if err != nil {
+		return err
+	}
+	remainingValidationRewards, err := safemath.Sub(stakingInfo.AccruedValidationRewards, validationRewardsDecrease)
+	if err != nil {
+		return err
+	}
+	remainingDelegateeRewards, err := safemath.Sub(stakingInfo.AccruedDelegateeRewards, delegateeRewardsDecrease)
+	if err != nil {
+		return err
+	}
+	remainingWeight, err := safemath.Sub(validator.Weight, stakingInfo.PendingStakeDecrease)
+	if err != nil {
+		return err
+	}
+
 	// Ignore the withdrawn portions from [reward.Split] because the restaked
 	// amounts may be capped below. Withdrawn rewards are computed later from the
 	// difference between total rewards and the amounts actually restaked.
@@ -821,7 +879,7 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 
 	// The pending stake increase is applied before restaking rewards. It was
 	// reserved against MaxValidatorStake when it was locked, so it always fits.
-	weightWithStakeIncrease, err := safemath.Add(validator.Weight, stakingInfo.PendingStakeIncrease)
+	weightWithStakeIncrease, err := safemath.Add(remainingWeight, stakingInfo.PendingStakeIncrease)
 	if err != nil {
 		return err
 	}
@@ -888,6 +946,16 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 		return err
 	}
 
+	withdrawingRewards, err = safemath.Add(withdrawingRewards, validationRewardsDecrease)
+	if err != nil {
+		return err
+	}
+
+	withdrawingDelegateeRewards, err = safemath.Add(withdrawingDelegateeRewards, delegateeRewardsDecrease)
+	if err != nil {
+		return err
+	}
+
 	if err := e.mintRewards(
 		addAutoRenewedValidatorTx,
 		withdrawingRewards,
@@ -909,12 +977,12 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 		return err
 	}
 
-	newAccruedRewards, err := safemath.Add(stakingInfo.AccruedValidationRewards, restakingValidationRewards)
+	newAccruedRewards, err := safemath.Add(remainingValidationRewards, restakingValidationRewards)
 	if err != nil {
 		return err
 	}
 
-	newAccruedDelegateeRewards, err := safemath.Add(stakingInfo.AccruedDelegateeRewards, restakingDelegateeRewards)
+	newAccruedDelegateeRewards, err := safemath.Add(remainingDelegateeRewards, restakingDelegateeRewards)
 	if err != nil {
 		return err
 	}
@@ -982,6 +1050,8 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 	stakingInfo.AccruedStakeIncrease = newAccruedStakeIncrease
 	stakingInfo.AccruedStakeIncreaseTxIDs = slices.Concat(stakingInfo.AccruedStakeIncreaseTxIDs, stakingInfo.PendingStakeIncreaseTxIDs)
 	stakingInfo.PendingStakeIncreaseTxIDs = nil
+	stakingInfo.PendingStakeDecrease = 0
+	stakingInfo.WithdrawnStake = newWithdrawnStake
 
 	if err := e.onCommitState.SetStakingInfo(validator.SubnetID, validator.NodeID, stakingInfo); err != nil {
 		return fmt.Errorf("setting staking info for validator: %w", err)
@@ -1044,12 +1114,6 @@ func unstakeUTXOs(stakerTx stakeLocker, txID ids.ID, state *state.Diff) {
 	}
 }
 
-// stakeIncreaseTxIDs returns the IDs of all the txs that locked stake for an
-// auto-renewed validator, whether or not the stake was applied to its weight.
-func stakeIncreaseTxIDs(stakingInfo state.StakingInfo) []ids.ID {
-	return slices.Concat(stakingInfo.AccruedStakeIncreaseTxIDs, stakingInfo.PendingStakeIncreaseTxIDs)
-}
-
 func getStakeIncreaseTx(chainState state.Chain, txID ids.ID) (*platform.IncreaseAutoRenewedValidatorStakeTx, error) {
 	tx, _, err := chainState.GetTx(txID)
 	if err != nil {
@@ -1072,6 +1136,167 @@ func unstakeStakeIncreaseUTXOs(stakeIncreaseTxIDs []ids.ID, chainState *state.Di
 			return err
 		}
 		unstakeUTXOs(stakeIncreaseTx, txID, chainState)
+	}
+	return nil
+}
+
+// stakeReturnOutputIndex is the output index of the first stake UTXO that a
+// RewardAutoRenewedValidatorTx creates. Its validation and delegatee reward
+// UTXOs use the indices before it.
+const stakeReturnOutputIndex = 2
+
+// withdrawableStake is a stake output that a stake decrease can draw from.
+type withdrawableStake struct {
+	txID        ids.ID
+	outputIndex uint32
+	out         *avax.TransferableOutput
+}
+
+// withdrawableStakes returns the stake outputs of an auto-renewed validator in
+// the order that stake decreases draw from them: the outputs of the tx that
+// created the validator, then the outputs of its applied stake increases in
+// the order they were applied. Applied stake increases are only ever
+// appended, so the outputs that a WithdrawnStake covers never change.
+func withdrawableStakes(
+	chainState state.Chain,
+	stakerTxID ids.ID,
+	stakerTx *platform.AddAutoRenewedValidatorTx,
+	stakeIncreaseTxIDs []ids.ID,
+) ([]withdrawableStake, error) {
+	var stakes []withdrawableStake
+	add := func(txID ids.ID, tx stakeLocker) {
+		outputIndexOffset := len(tx.Outputs())
+		for i, out := range tx.Stake() {
+			stakes = append(stakes, withdrawableStake{
+				txID:        txID,
+				outputIndex: uint32(outputIndexOffset + i),
+				out:         out,
+			})
+		}
+	}
+
+	add(stakerTxID, stakerTx)
+	for _, txID := range stakeIncreaseTxIDs {
+		stakeIncreaseTx, err := getStakeIncreaseTx(chainState, txID)
+		if err != nil {
+			return nil, err
+		}
+		add(txID, stakeIncreaseTx)
+	}
+	return stakes, nil
+}
+
+// stakeUTXO returns a UTXO that holds amount of the stake in out, with the
+// owners and lock time of out.
+func stakeUTXO(out *avax.TransferableOutput, amount uint64, utxoID avax.UTXOID) (*avax.UTXO, error) {
+	var stakeOut verify.State
+	switch out := out.Out.(type) {
+	case *secp256k1fx.TransferOutput:
+		stakeOut = &secp256k1fx.TransferOutput{
+			Amt:          amount,
+			OutputOwners: out.OutputOwners,
+		}
+	case *stakeable.LockOut:
+		transferOut, ok := out.TransferableOut.(*secp256k1fx.TransferOutput)
+		if !ok {
+			return nil, fmt.Errorf("%w: %T", errUnexpectedStakeOutputType, out.TransferableOut)
+		}
+		stakeOut = &stakeable.LockOut{
+			Locktime: out.Locktime,
+			TransferableOut: &secp256k1fx.TransferOutput{
+				Amt:          amount,
+				OutputOwners: transferOut.OutputOwners,
+			},
+		}
+	default:
+		return nil, fmt.Errorf("%w: %T", errUnexpectedStakeOutputType, out)
+	}
+
+	return &avax.UTXO{
+		UTXOID: utxoID,
+		Asset:  out.Asset,
+		Out:    stakeOut,
+	}, nil
+}
+
+// withdrawStake returns amount of stake to the owners of the stake outputs
+// that it is drawn from. The first withdrawn units of stakes were already
+// returned, so they are skipped. The UTXOs are created by txID.
+func withdrawStake(
+	chainState *state.Diff,
+	stakes []withdrawableStake,
+	withdrawn uint64,
+	amount uint64,
+	txID ids.ID,
+) error {
+	outputIndex := uint32(stakeReturnOutputIndex)
+	for _, stake := range stakes {
+		if amount == 0 {
+			return nil
+		}
+
+		stakeAmount := stake.out.Output().Amount()
+		if withdrawn >= stakeAmount {
+			withdrawn -= stakeAmount
+			continue
+		}
+
+		drawn := min(stakeAmount-withdrawn, amount)
+		utxo, err := stakeUTXO(stake.out, drawn, avax.UTXOID{
+			TxID:        txID,
+			OutputIndex: outputIndex,
+		})
+		if err != nil {
+			return err
+		}
+		chainState.AddUTXO(utxo)
+
+		withdrawn = 0
+		amount -= drawn
+		outputIndex++
+	}
+	if amount != 0 {
+		return fmt.Errorf("%w: %d remaining", errStakeDecreaseTooLarge, amount)
+	}
+	return nil
+}
+
+// unstakeRemainingUTXOs returns the stake that was not withdrawn. An output
+// that was not drawn from is returned as it was locked. The rest of an output
+// that was partly drawn from is returned by txID.
+func unstakeRemainingUTXOs(
+	chainState *state.Diff,
+	stakes []withdrawableStake,
+	withdrawn uint64,
+	txID ids.ID,
+) error {
+	for _, stake := range stakes {
+		stakeAmount := stake.out.Output().Amount()
+		switch {
+		case withdrawn >= stakeAmount:
+			withdrawn -= stakeAmount
+		case withdrawn > 0:
+			// Withdrawals draw from the stake outputs in order, so at most one
+			// output was partly drawn from.
+			utxo, err := stakeUTXO(stake.out, stakeAmount-withdrawn, avax.UTXOID{
+				TxID:        txID,
+				OutputIndex: stakeReturnOutputIndex,
+			})
+			if err != nil {
+				return err
+			}
+			chainState.AddUTXO(utxo)
+			withdrawn = 0
+		default:
+			chainState.AddUTXO(&avax.UTXO{
+				UTXOID: avax.UTXOID{
+					TxID:        stake.txID,
+					OutputIndex: stake.outputIndex,
+				},
+				Asset: stake.out.Asset,
+				Out:   stake.out.Output(),
+			})
+		}
 	}
 	return nil
 }

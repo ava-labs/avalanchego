@@ -1780,6 +1780,204 @@ func TestRewardAutoRenewedValidatorTxStakeIncrease(t *testing.T) {
 	}
 }
 
+// TestRewardAutoRenewedValidatorTxStakeDecrease tests that a pending stake
+// decrease is withdrawn at the start of the next cycle, first from the stake
+// outputs in order and then from the restaked rewards, and that only the stake
+// that was not withdrawn is returned when the validator stops.
+func TestRewardAutoRenewedValidatorTxStakeDecrease(t *testing.T) {
+	const (
+		principal                = 3 * defaultMinValidatorStake
+		addition                 = 2 * defaultMinValidatorStake
+		accruedValidationRewards = 4 * units.MilliAvax
+		accruedDelegateeRewards  = 8 * units.MilliAvax
+		weight                   = principal + addition + accruedValidationRewards + accruedDelegateeRewards
+	)
+
+	tests := []struct {
+		name     string
+		decrease uint64
+		// The stake withdrawn from each source at the start of the next cycle.
+		wantFromPrincipal         uint64
+		wantFromAddition          uint64
+		wantFromValidationRewards uint64
+		wantFromDelegateeRewards  uint64
+	}{
+		{
+			name:              "within_principal",
+			decrease:          4 * units.MilliAvax,
+			wantFromPrincipal: 4 * units.MilliAvax,
+		},
+		{
+			name:              "across_principal_and_addition",
+			decrease:          principal + 3*units.MilliAvax,
+			wantFromPrincipal: principal,
+			wantFromAddition:  3 * units.MilliAvax,
+		},
+		{
+			// Once the stake outputs are used up, the decrease draws from the
+			// restaked validation rewards and then the restaked delegatee
+			// rewards.
+			name:                      "into_restaked_rewards",
+			decrease:                  principal + addition + accruedValidationRewards + 2*units.MilliAvax,
+			wantFromPrincipal:         principal,
+			wantFromAddition:          addition,
+			wantFromValidationRewards: accruedValidationRewards,
+			wantFromDelegateeRewards:  2 * units.MilliAvax,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			env := newEnvironment(t, upgradetest.Latest)
+			wallet := newWallet(t, env, walletConfig{})
+
+			// Withdraw all rewards each cycle, so the weight changes only through
+			// the stake increase and decrease.
+			cfg := autoRenewedValidatorConfig{
+				weight:                 principal,
+				delegationRewardShares: reward.PercentDenominator / 10,
+				restake:                true,
+			}
+			stakerTx, err := wallet.IssueAddAutoRenewedValidatorTx(
+				ids.GenerateTestNodeID(),
+				cfg.weight,
+				newProofOfPossession(t),
+				&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+				&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+				&secp256k1fx.OutputOwners{},
+				cfg.delegationRewardShares,
+				cfg.autoCompoundRewardShares,
+				env.config.MinStakeDuration,
+			)
+			require.NoError(t, err)
+			addAutoRenewedValidator(t, env, stakerTx, cfg)
+
+			uStakerTx := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
+			subnetID, nodeID := uStakerTx.SubnetID(), uStakerTx.NodeID()
+			require.Len(t, uStakerTx.StakeOuts, 1)
+			principalOwner := &uStakerTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).OutputOwners
+			principalIndex := len(uStakerTx.Outputs())
+
+			// The first cycle applies the stake increase.
+			additionTx := increaseAutoRenewedValidatorStake(t, env, wallet, stakerTx.ID(), addition)
+			uAdditionTx := additionTx.Unsigned.(*platform.IncreaseAutoRenewedValidatorStakeTx)
+			require.Len(t, uAdditionTx.StakeOuts, 1)
+			additionOwner := &uAdditionTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).OutputOwners
+			additionIndex := len(uAdditionTx.Outputs())
+
+			onCommitState, _ := rewardAutoRenewedValidator(t, env, stakerTx)
+			require.NoError(t, onCommitState.Apply(env.state))
+			require.NoError(t, env.state.Commit())
+
+			// Add restaked rewards to the weight, and request the stake decrease.
+			validator, err := env.state.GetCurrentValidator(subnetID, nodeID)
+			require.NoError(t, err)
+			stakingInfo, err := env.state.GetStakingInfo(subnetID, nodeID)
+			require.NoError(t, err)
+
+			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+			require.NoError(t, err)
+			require.NoError(t, diff.DeleteCurrentValidator(validator))
+			withRewards := *validator
+			withRewards.Weight = weight
+			require.NoError(t, diff.PutCurrentValidator(&withRewards))
+			stakingInfo.AccruedValidationRewards = accruedValidationRewards
+			stakingInfo.AccruedDelegateeRewards = accruedDelegateeRewards
+			stakingInfo.PendingStakeDecrease = tt.decrease
+			require.NoError(t, diff.SetStakingInfo(subnetID, nodeID, stakingInfo))
+			require.NoError(t, diff.Apply(env.state))
+			require.NoError(t, env.state.Commit())
+
+			// The second cycle withdraws the stake decrease.
+			rewardTxID := newRewardAutoRenewedValidatorTx(t, stakerTx.ID(), withRewards.EndTime).ID()
+			onCommitState, onAbortState := rewardAutoRenewedValidator(t, env, stakerTx)
+
+			// On abort nothing was withdrawn yet, so all of the stake is returned
+			// as it was locked.
+			assertStakeReturned(t, onAbortState, stakerTx.ID(), uStakerTx)
+			assertStakeIncreaseReturned(t, onAbortState, additionTx)
+
+			renewedValidator, err := onCommitState.GetCurrentValidator(subnetID, nodeID)
+			require.NoError(t, err)
+			require.Equal(t, weight-tt.decrease, renewedValidator.Weight)
+
+			stakingInfo, err = onCommitState.GetStakingInfo(subnetID, nodeID)
+			require.NoError(t, err)
+			require.Zero(t, stakingInfo.PendingStakeDecrease)
+			require.Equal(t, tt.wantFromPrincipal+tt.wantFromAddition, stakingInfo.WithdrawnStake)
+			require.Equal(t, accruedValidationRewards-tt.wantFromValidationRewards, stakingInfo.AccruedValidationRewards)
+			require.Equal(t, accruedDelegateeRewards-tt.wantFromDelegateeRewards, stakingInfo.AccruedDelegateeRewards)
+
+			// Withdrawn stake is returned to the owners of the stake outputs it
+			// is drawn from, and withdrawn rewards to the reward owners.
+			outputIndex := stakeReturnOutputIndex
+			if tt.wantFromPrincipal > 0 {
+				assertUTXO(t, onCommitState, rewardTxID, outputIndex, tt.wantFromPrincipal, principalOwner)
+				outputIndex++
+			}
+			if tt.wantFromAddition > 0 {
+				assertUTXO(t, onCommitState, rewardTxID, outputIndex, tt.wantFromAddition, additionOwner)
+				outputIndex++
+			}
+			assertNoUTXO(t, onCommitState, rewardTxID, outputIndex)
+
+			validationOwner := uStakerTx.ValidatorRewardsOwner.(*secp256k1fx.OutputOwners)
+			delegationOwner := uStakerTx.DelegatorRewardsOwner.(*secp256k1fx.OutputOwners)
+			assertUTXO(t, onCommitState, rewardTxID, 0, withRewards.PotentialReward+tt.wantFromValidationRewards, validationOwner)
+			if tt.wantFromDelegateeRewards > 0 {
+				assertUTXO(t, onCommitState, rewardTxID, 1, tt.wantFromDelegateeRewards, delegationOwner)
+			} else {
+				assertNoUTXO(t, onCommitState, rewardTxID, 1)
+			}
+
+			require.NoError(t, onCommitState.Apply(env.state))
+			require.NoError(t, env.state.Commit())
+
+			// The third cycle stops the validator. Only the stake that was not
+			// withdrawn is returned.
+			stakingInfo, err = env.state.GetStakingInfo(subnetID, nodeID)
+			require.NoError(t, err)
+			stakingInfo.NextPeriod = 0
+			require.NoError(t, env.state.SetStakingInfo(subnetID, nodeID, stakingInfo))
+
+			exitTxID := newRewardAutoRenewedValidatorTx(t, stakerTx.ID(), renewedValidator.EndTime).ID()
+			onCommitState, onAbortState = rewardAutoRenewedValidator(t, env, stakerTx)
+
+			for _, chain := range []state.Chain{onCommitState, onAbortState} {
+				_, err := chain.GetCurrentValidator(subnetID, nodeID)
+				require.ErrorIs(t, err, database.ErrNotFound)
+
+				// Outputs that were drawn from are never returned as they were
+				// locked. The rest of a partly drawn output is returned by the
+				// reward tx.
+				switch {
+				case tt.wantFromPrincipal == 0:
+					assertStakeReturned(t, chain, stakerTx.ID(), uStakerTx)
+				case tt.wantFromPrincipal < principal:
+					assertNoUTXO(t, chain, stakerTx.ID(), principalIndex)
+					assertUTXO(t, chain, exitTxID, stakeReturnOutputIndex, principal-tt.wantFromPrincipal, principalOwner)
+				default:
+					assertNoUTXO(t, chain, stakerTx.ID(), principalIndex)
+				}
+
+				switch {
+				case tt.wantFromAddition == 0:
+					assertStakeIncreaseReturned(t, chain, additionTx)
+				case tt.wantFromAddition < addition:
+					assertNoUTXO(t, chain, additionTx.ID(), additionIndex)
+					assertUTXO(t, chain, exitTxID, stakeReturnOutputIndex, addition-tt.wantFromAddition, additionOwner)
+				default:
+					assertNoUTXO(t, chain, additionTx.ID(), additionIndex)
+				}
+
+				if tt.wantFromPrincipal == principal && tt.wantFromAddition == addition {
+					assertNoUTXO(t, chain, exitTxID, stakeReturnOutputIndex)
+				}
+			}
+		})
+	}
+}
+
 // TestRewardDelegatorToAutoRenewedValidator tests the full delegator reward
 // flow for a delegator to an auto-renewed validator: delegator gets their
 // share, delegatee share is deferred to StakingInfo.DelegateeReward.

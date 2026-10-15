@@ -39,6 +39,7 @@ go_library(
         "//vms/platformvm/platform",
         "//vms/platformvm/reward",
         "//vms/platformvm/signer",
+        "//vms/platformvm/stakeable",
         "//vms/platformvm/state",
         "//vms/platformvm/txs/fee",
         "//vms/platformvm/utxo",
