@@ -137,6 +137,8 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 var (
 	mainnetChainID = big.NewInt(43114)
 	fujiChainID    = big.NewInt(43113)
+	// for use with the synchronoustest fixture
+	testFixtureChainID = big.NewInt(43110)
 )
 
 func berlinBlock(chainID *big.Int) int64 {
@@ -145,8 +147,8 @@ func berlinBlock(chainID *big.Int) int64 {
 		return 1_640_340 // https://snowtrace.io/block/1640340?chainid=43114, AP2 activation block
 	case utils.BigEqual(chainID, fujiChainID):
 		return 184_985 // https://testnet.snowtrace.io/block/184985?chainid=43113, AP2 activation block
-	case utils.BigEqual(chainID, corethparams.TestFixtureChainID):
-		return corethparams.TestFixtureBerlinBlock
+	case utils.BigEqual(chainID, testFixtureChainID):
+		return 3 // AP2 activation block of the synchronoustest fixture
 	default:
 		return 0
 	}
@@ -158,8 +160,8 @@ func londonBlock(chainID *big.Int) int64 {
 		return 3_308_552 // https://snowtrace.io/block/3308552?chainid=43114, AP3 activation block
 	case utils.BigEqual(chainID, fujiChainID):
 		return 805_078 // https://testnet.snowtrace.io/block/805078?chainid=43113, AP3 activation block
-	case utils.BigEqual(chainID, corethparams.TestFixtureChainID):
-		return corethparams.TestFixtureLondonBlock
+	case utils.BigEqual(chainID, testFixtureChainID):
+		return 5 // AP3 activation block of the synchronoustest fixture
 	default:
 		return 0
 	}
