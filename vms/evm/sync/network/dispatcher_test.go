@@ -70,7 +70,7 @@ func TestDispatcher_SendBytes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			tracker := peertrackertest.New(t, nodeID)
+			tracker := peertrackertest.New(t)
 			c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 				t, ctx, nodeID, tt.handler, tracker,
 			)
@@ -109,11 +109,11 @@ func TestDispatcher_CancelInFlight(t *testing.T) {
 		},
 	}
 
-	tracker := peertrackertest.New(t, nodeID)
-	peertrackertest.SeedResponsive(t, tracker, nodeID)
+	tracker := peertrackertest.New(t)
 	c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 		t, t.Context(), nodeID, handler, tracker,
 	)
+	peertrackertest.SeedResponsive(t, tracker, nodeID)
 
 	reqBytes, err := proto.Marshal(&syncpb.GetLeafRequest{})
 	require.NoError(t, err, "proto.Marshal(req)")
@@ -164,13 +164,13 @@ func TestDispatcher_PeerScoring(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
 			nodeID := ids.GenerateTestNodeID()
-			tracker := peertrackertest.New(t, nodeID)
-			if tt.seed {
-				peertrackertest.SeedResponsive(t, tracker, nodeID)
-			}
+			tracker := peertrackertest.New(t)
 			c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 				t, ctx, nodeID, tt.handler, tracker,
 			)
+			if tt.seed {
+				peertrackertest.SeedResponsive(t, tracker, nodeID)
+			}
 
 			verify := acceptLeaf
 			if tt.rejectResp {

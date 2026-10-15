@@ -86,7 +86,7 @@ func TestSend_RetriesThenSucceeds(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
 			handler, _ := scriptedHandler(tt.firstFail, scriptResponse{bytes: wantBytes})
-			tracker := peertrackertest.New(t, nodeID)
+			tracker := peertrackertest.New(t)
 			c := newRetryDispatcher(t, ctx, nodeID, handler, tracker)
 
 			verifyCalls := 0
@@ -159,7 +159,7 @@ func TestSend_CtxCancelledBeforeStart(t *testing.T) {
 	cancel()
 
 	handler, calls := scriptedHandler(scriptResponse{bytes: []byte{}})
-	tracker := peertrackertest.New(t, nodeID)
+	tracker := peertrackertest.New(t)
 	c := newRetryDispatcher(t, ctx, nodeID, handler, tracker)
 
 	got, err := c.Send(ctx, &syncpb.GetLeafRequest{}, acceptLeaf)
