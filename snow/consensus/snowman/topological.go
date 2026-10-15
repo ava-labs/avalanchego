@@ -323,12 +323,18 @@ func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
 		errs = append(errs, err)
 	}
 
-	maxTimeProcessing := ts.metrics.MeasureAndGetOldestDuration()
+	oldestID, maxTimeProcessing := ts.metrics.MeasureAndGetOldest()
 	if maxTimeProcessing > ts.params.MaxItemProcessingTime {
-		err := fmt.Errorf("%w: %s > %s",
+		var height uint64
+		if blk, ok := ts.blocks[oldestID]; ok {
+			height = blk.blk.Height()
+		}
+		err := fmt.Errorf("%w: %s > %s (blkID %s, height %d)",
 			errBlockProcessingTooLong,
 			maxTimeProcessing,
 			ts.params.MaxItemProcessingTime,
+			oldestID,
+			height,
 		)
 		errs = append(errs, err)
 	}
