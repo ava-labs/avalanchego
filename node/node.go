@@ -87,6 +87,7 @@ import (
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 	saevm "github.com/ava-labs/avalanchego/vms/saevm/cchain"
+	goruntime "runtime"
 )
 
 const (
@@ -1344,6 +1345,10 @@ func (n *Node) initAdminAPI() error {
 
 // initProfiler initializes the continuous profiling
 func (n *Node) initProfiler() {
+	// Applied regardless of continuous profiling, since admin.lockProfile also
+	// reads the mutex profile.
+	goruntime.SetMutexProfileFraction(n.Config.ProfilerConfig.MutexProfileFraction)
+
 	if !n.Config.ProfilerConfig.Enabled {
 		n.Log.Info("skipping profiler initialization because it has been disabled")
 		return

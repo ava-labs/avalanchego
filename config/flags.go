@@ -350,6 +350,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Bool(ProfileContinuousEnabledKey, false, "Whether the app should continuously produce performance profiles")
 	fs.Duration(ProfileContinuousFreqKey, 15*time.Minute, "How frequently to rotate performance profiles")
 	fs.Int(ProfileContinuousMaxFilesKey, 5, "Maximum number of historical profiles to keep")
+	fs.Int(ProfileMutexFractionKey, 0, "Fraction of mutex contention events reported in the lock profile: on average 1/n events are recorded. 0 disables mutex profiling")
 
 	// Aliasing
 	fs.String(VMAliasesFileKey, defaultVMAliasFilePath, fmt.Sprintf("Specifies a JSON file that maps vmIDs with custom aliases. Ignored if %s is specified", VMAliasesContentKey))

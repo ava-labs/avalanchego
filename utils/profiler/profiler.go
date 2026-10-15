@@ -83,7 +83,6 @@ func (p *profiler) StartCPUProfiler() error {
 		_ = file.Close() // Return the original error
 		return err
 	}
-	runtime.SetMutexProfileFraction(1)
 
 	p.cpuProfileFile = file
 	return nil

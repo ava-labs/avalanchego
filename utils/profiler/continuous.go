@@ -18,6 +18,10 @@ type Config struct {
 	Enabled     bool          `json:"enabled"`
 	Freq        time.Duration `json:"freq"`
 	MaxNumFiles int           `json:"maxNumFiles"`
+	// MutexProfileFraction is passed to runtime.SetMutexProfileFraction: on
+	// average 1/n mutex contention events are reported in the lock profile.
+	// 0 disables mutex profiling.
+	MutexProfileFraction int `json:"mutexProfileFraction"`
 }
 
 // ContinuousProfiler periodically captures CPU, memory, and lock profiles

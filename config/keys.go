@@ -179,6 +179,7 @@ const (
 	ProfileContinuousEnabledKey                          = "profile-continuous-enabled"
 	ProfileContinuousFreqKey                             = "profile-continuous-freq"
 	ProfileContinuousMaxFilesKey                         = "profile-continuous-max-files"
+	ProfileMutexFractionKey                              = "profile-mutex-fraction"
 	InboundThrottlerAtLargeAllocSizeKey                  = "throttler-inbound-at-large-alloc-size"
 	InboundThrottlerVdrAllocSizeKey                      = "throttler-inbound-validator-alloc-size"
 	InboundThrottlerNodeMaxAtLargeBytesKey               = "throttler-inbound-node-max-at-large-bytes"
