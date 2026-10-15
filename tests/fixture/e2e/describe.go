@@ -9,8 +9,7 @@ const (
 	// For label usage in ginkgo invocation, see: https://onsi.github.io/ginkgo/#spec-labels
 
 	// UsesCChainLabel marks a test that is not primarily a C-Chain test but
-	// nonetheless uses the C-Chain. Combined with the "c" label, it selects
-	// every test that exercises the C-Chain.
+	// nonetheless uses the C-Chain.
 	UsesCChainLabel = "uses-c"
 
 	// SkipSharedNetworkBootstrapCheckLabel excludes a test from bootstrap checks
