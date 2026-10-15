@@ -22,12 +22,6 @@ A block that cannot be gossiped halts the chain. Every block MUST fit in a p2p
 message for the chain to remain live, so block size has to be bounded in bytes
 and not only in gas.
 
-Earlier EVM block builders kept blocks gossipable with a cumulative byte
-target, stopping once a block's serialized transactions reached a fixed size.
-Because bytes and gas were tracked independently, that bound the block but left
-the gas target gameable. SAE can do better: it knows each transaction's gas
-limit up front, so it gates on the gas-to-byte ratio directly.
-
 ### The rule
 
 A transaction is eligible only if its byte share of a block does not exceed
