@@ -52,7 +52,7 @@ func init() {
 		&loadTimeoutArg,
 		"load-timeout",
 		0,
-		"the duration that the load test should run for",
+		"the duration that the load test should run for (in-flight tests are allowed to finish, so the run may overrun by up to the per-test timeout)",
 	)
 	flag.BoolVar(
 		&firewoodEnabledArg,

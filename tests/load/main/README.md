@@ -114,7 +114,7 @@ updated by the generator/wallets. The server is configured to be targeted by
 
 ### Load Test Flags
 
-- `--load-timeout`: Maximum duration to run the load test (default: unlimited)
+- `--load-timeout`: Duration to generate load for (default: unlimited). In-flight tests are allowed to finish, so the run may overrun this by up to the per-test timeout.
 - `--firewood`: Whether to use Firewood in Coreth (default: false)
 - `--num-workers`: The number of workers to use for the load test (default: 5)
 
