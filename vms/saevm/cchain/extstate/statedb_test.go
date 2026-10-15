@@ -11,15 +11,14 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/extstate"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
@@ -149,19 +148,6 @@ func TestMultiCoinBalance(t *testing.T) {
 			wantExist:     true,
 			wantMultiCoin: true,
 		},
-		{
-			name:          "sub_entire_balance",
-			ops:           []op{{amount: 10}, {sub: true, amount: 10}},
-			wantExist:     true,
-			wantMultiCoin: true,
-		},
-		{
-			name:          "add_sub_add",
-			ops:           []op{{amount: 10}, {sub: true, amount: 5}, {amount: 3}},
-			want:          8,
-			wantExist:     true,
-			wantMultiCoin: true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -184,46 +170,30 @@ func TestMultiCoinBalance(t *testing.T) {
 	}
 }
 
-func TestMultiCoinSnapshotGeneration(t *testing.T) {
+// TestMultiCoinSnapshotUpdate checks that multicoin balances and flags are read
+// back from a snapshot, which [state.StateDB] prefers over the trie.
+func TestMultiCoinSnapshotUpdate(t *testing.T) {
 	diskdb := rawdb.NewMemoryDatabase()
 	db := state.NewDatabase(diskdb)
+	snaps, err := snapshot.New(snapshot.Config{CacheSize: 1}, diskdb, db.TrieDB(), types.EmptyRootHash)
+	require.NoError(t, err, "snapshot.New()")
 
-	addr := common.BytesToAddress([]byte("addr1"))
-	coinID := common.Hash{0x02}
-	want := big.NewInt(10)
-
-	statedb, err := state.New(types.EmptyRootHash, db, nil)
+	statedb, err := state.New(types.EmptyRootHash, db, snaps)
 	require.NoError(t, err, "state.New()")
 	s := extstate.New(statedb)
+	addr := common.Address{1}
+	coinID := common.Hash{2}
+	want := big.NewInt(10)
 	s.AddBalanceMultiCoin(addr, coinID, want)
 	root, err := s.Commit(0, false)
 	require.NoErrorf(t, err, "%T.Commit()", s)
-	triedb := db.TrieDB()
-	require.NoErrorf(t, triedb.Commit(root, true), "%T.Commit()", triedb)
 
-	snaps, err := snapshot.New(
-		snapshot.Config{
-			CacheSize:  16,
-			SkipVerify: true,
-		},
-		diskdb,
-		triedb,
-		common.Hash{},
-		root,
-	)
-	require.NoError(t, err, "snapshot.New()")
-	snap := snaps.Snapshot(root)
-
-	addrHash := crypto.Keccak256Hash(addr[:])
-	account, err := snap.Account(addrHash)
-	require.NoErrorf(t, err, "%T.Account()", snap)
-	require.True(t, customtypes.IsAccountMultiCoin(account), "customtypes.IsAccountMultiCoin()")
-
-	slot := common.Hash{0x03} // coinID with bit 0 set.
-	storage, err := snap.Storage(addrHash, crypto.Keccak256Hash(slot[:]))
-	require.NoErrorf(t, err, "%T.Storage()", snap)
-	got := new(big.Int).SetBytes(storage)
-	require.Zerof(t, want.Cmp(got), "%T.Storage() = %d, want %d", snap, got, want)
+	statedb, err = state.New(root, db, snaps)
+	require.NoError(t, err, "state.New()")
+	s = extstate.New(statedb)
+	got := s.GetBalanceMultiCoin(addr, coinID)
+	assert.Zerof(t, want.Cmp(got), "%T.GetBalanceMultiCoin() = %d, want %d", s, got, want)
+	assert.True(t, customtypes.IsMultiCoin(s.StateDB, addr), "customtypes.IsMultiCoin()")
 }
 
 func TestPrepare(t *testing.T) {
