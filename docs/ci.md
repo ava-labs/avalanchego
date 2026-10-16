@@ -32,6 +32,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 - [Using Nix in GitHub Actions](#using-nix-in-github-actions)
   - [Run `install-nix` jobs in the Nix dev shell](#run-install-nix-jobs-in-the-nix-dev-shell)
   - [Start the Nix dev shell in composite actions](#start-the-nix-dev-shell-in-composite-actions)
+  - [Guard failure handlers](#guard-failure-handlers)
 - [Runners and external actions](#runners-and-external-actions)
   - [Use versioned GitHub-hosted runners](#use-versioned-github-hosted-runners)
   - [Use beefier runners for faster E2E jobs](#use-beefier-runners-for-faster-e2e-jobs)
@@ -708,6 +709,34 @@ example, a step that reads GitHub Actions environment variables can use `nix dev
 A composite action cannot set `defaults.run.shell`. A calling job's default shell does
 not apply to the action. Set `shell:` on each `run:` step that needs the Nix dev
 shell.
+
+### Guard failure handlers
+
+A `failure()` condition runs after any earlier step fails. An `always()` condition
+runs even when setup fails.
+
+A failure handler must check that its required setup completed. Do not run a handler
+that needs Nix, Task, or generated test data when the setup step failed. Give the
+setup step an `id`. Check its outcome in the handler condition.
+
+```yaml
+- id: install-nix
+  uses: ./.github/actions/install-nix
+
+- name: Log Docker disk diagnostics
+  if: ${{ failure() && steps.install-nix.outcome == 'success' }}
+  run: ./scripts/run_task.sh log-ci-disk-state-docker
+```
+
+Use `always()` when a handler must run after a workload failure. Also check the setup
+outcome.
+
+```yaml
+if: ${{ always() && steps.install-nix.outcome == 'success' }}
+```
+
+This keeps the first setup failure visible. It also prevents secondary failures from
+unavailable tools or missing workload output.
 
 ## Runners and external actions
 
