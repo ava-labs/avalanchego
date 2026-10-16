@@ -32,15 +32,87 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
+
+// enableL1Fees makes txs charge non-zero fees, so that they are funded with
+// real inputs and outputs.
+func enableL1Fees(env *environment) {
+	env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
+	env.config.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
+}
+
+// convertSubnetToL1 converts testSubnet1 to an L1 with the given initial
+// validators and commits the conversion to env.state. It returns the chainID
+// and address of the L1's manager.
+func convertSubnetToL1(
+	t testing.TB,
+	env *environment,
+	validators ...*platform.ConvertSubnetToL1Validator,
+) (chainID ids.ID, address []byte) {
+	t.Helper()
+	require := require.New(t)
+
+	chainID = ids.GenerateTestID()
+	address = utils.RandomBytes(32)
+
+	wallet := newWallet(t, env, walletConfig{})
+	tx, err := wallet.IssueConvertSubnetToL1Tx(
+		testSubnet1.ID(),
+		chainID,
+		address,
+		validators,
+	)
+	require.NoError(err)
+
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(err)
+
+	_, _, _, err = StandardTx(
+		&env.backend,
+		state.PickFeeCalculator(env.config, env.state),
+		tx,
+		diff,
+	)
+	require.NoError(err)
+	require.NoError(diff.Apply(env.state))
+	require.NoError(env.state.Commit())
+	return chainID, address
+}
+
+// newWarpMessageBytes wraps payloadBytes in an addressed call from the L1
+// manager at (chainID, address) and returns the bytes of the warp message with
+// the given signature. The executor doesn't verify warp signatures, so the
+// same signature can be reused for every payload.
+func newWarpMessageBytes(
+	t testing.TB,
+	env *environment,
+	chainID ids.ID,
+	address []byte,
+	signature warp.Signature,
+	payloadBytes []byte,
+) []byte {
+	t.Helper()
+
+	return must[*warp.Message](t)(warp.NewMessage(
+		must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
+			env.ctx.NetworkID,
+			chainID,
+			must[*payload.AddressedCall](t)(payload.NewAddressedCall(
+				address,
+				payloadBytes,
+			)).Bytes(),
+		)),
+		signature,
+	)).Bytes()
+}
 
 // TestStandardExecutorConvertSubnetToL1TxErrors verifies the failure cases of
 // [platform.ConvertSubnetToL1Tx] execution.
 func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees and allow two active L1 validators.
-	env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
-	env.config.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
+	enableL1Fees(env)
 	env.config.ValidatorFeeConfig.Capacity = 2
 
 	sk, err := localsigner.New()
@@ -57,10 +129,11 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		want        error
-		updateTx    func(*testing.T, *platform.Tx)
-		updateState func(*testing.T, *state.Diff)
+		name          string
+		feeCalculator txfee.Calculator
+		want          error
+		updateTx      func(*testing.T, *platform.Tx)
+		updateState   func(*testing.T, *state.Diff)
 	}{
 		{
 			name: "invalid_prior_to_etna",
@@ -86,10 +159,7 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 		{
 			name: "fail_subnet_authorization",
 			updateState: func(_ *testing.T, diff *state.Diff) {
-				diff.SetSubnetOwner(subnetID, &secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-				})
+				diff.SetSubnetOwner(subnetID, newOwner())
 			},
 			want: errUnauthorizedModification,
 		},
@@ -141,6 +211,16 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 				}))
 			},
 			want: state.ErrDuplicateL1Validator,
+		},
+		{
+			name: "insufficient_fee",
+			// The wallet funds the tx at the current price. A higher execution
+			// price leaves its outputs and balances covered but underpays the fee.
+			feeCalculator: txfee.NewDynamicCalculator(
+				env.config.DynamicFeeConfig.Weights,
+				100*env.config.DynamicFeeConfig.MinPrice,
+			),
+			want: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
 			name: "flow_checker_failed",
@@ -209,6 +289,10 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 			}
 
 			feeCalculator := state.PickFeeCalculator(env.config, env.state)
+			if tt.feeCalculator != nil {
+				feeCalculator = tt.feeCalculator
+			}
+
 			_, _, _, got = StandardTx(
 				&env.backend,
 				feeCalculator,
@@ -228,8 +312,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees so the tx is funded with real inputs and outputs.
-	env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
-	env.config.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
+	enableL1Fees(env)
 
 	wallet := newWallet(t, env, walletConfig{})
 
@@ -339,8 +422,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees and allow two active L1 validators.
-	env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
-	env.config.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
+	enableL1Fees(env)
 	env.config.ValidatorFeeConfig.Capacity = 2
 
 	initialSK, err := localsigner.New()
@@ -350,38 +432,16 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 	require.NoError(t, err)
 
 	subnetID := testSubnet1.ID()
-	chainID := ids.GenerateTestID()
-	address := utils.RandomBytes(32)
 
 	// Convert the subnet to an L1 with one active validator
-	convertWallet := newWallet(t, env, walletConfig{})
-	convertSubnetToL1Tx, err := convertWallet.IssueConvertSubnetToL1Tx(
-		subnetID,
-		chainID,
-		address,
-		[]*platform.ConvertSubnetToL1Validator{{
-			NodeID:                ids.GenerateTestNodeID().Bytes(),
-			Weight:                1,
-			Balance:               units.Avax,
-			Signer:                *initialPoP,
-			RemainingBalanceOwner: message.PChainOwner{},
-			DeactivationOwner:     message.PChainOwner{},
-		}},
-	)
-	require.NoError(t, err)
-
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(t, err)
-
-	_, _, _, err = StandardTx(
-		&env.backend,
-		state.PickFeeCalculator(env.config, env.state),
-		convertSubnetToL1Tx,
-		diff,
-	)
-	require.NoError(t, err)
-	require.NoError(t, diff.Apply(env.state))
-	require.NoError(t, env.state.Commit())
+	chainID, address := convertSubnetToL1(t, env, &platform.ConvertSubnetToL1Validator{
+		NodeID:                ids.GenerateTestNodeID().Bytes(),
+		Weight:                1,
+		Balance:               units.Avax,
+		Signer:                *initialPoP,
+		RemainingBalanceOwner: message.PChainOwner{},
+		DeactivationOwner:     message.PChainOwner{},
+	})
 
 	var (
 		nodeID           = ids.GenerateTestNodeID()
@@ -433,30 +493,14 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 		warpSignature,
 	))
 
-	// newWarpMessageBytes wraps an addressed-call payload into warp message
-	// bytes. The executor doesn't verify the warp signature, so reusing
-	// warpSignature for every payload is fine.
-	newWarpMessageBytes := func(t *testing.T, payloadBytes []byte) []byte {
-		return must[*warp.Message](t)(warp.NewMessage(
-			must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
-				env.ctx.NetworkID,
-				chainID,
-				must[*payload.AddressedCall](t)(payload.NewAddressedCall(
-					address,
-					payloadBytes,
-				)).Bytes(),
-			)),
-			warpSignature,
-		)).Bytes()
-	}
-
 	validationID := addressedCallPayload.ValidationID()
 	tests := []struct {
-		name        string
-		balance     uint64
-		want        error
-		updateTx    func(*testing.T, *platform.Tx)
-		updateState func(*testing.T, *state.Diff)
+		name          string
+		feeCalculator txfee.Calculator
+		balance       uint64
+		want          error
+		updateTx      func(*testing.T, *platform.Tx)
+		updateState   func(*testing.T, *state.Diff)
 	}{
 		{
 			name: "invalid_prior_to_etna",
@@ -485,6 +529,16 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Balance = math.MaxUint64
 			},
 			want: safemath.ErrOverflow,
+		},
+		{
+			name: "insufficient_fee",
+			// The wallet funds the tx at the current price. A higher execution
+			// price leaves its outputs and balances covered but underpays the fee.
+			feeCalculator: txfee.NewDynamicCalculator(
+				env.config.DynamicFeeConfig.Weights,
+				100*env.config.DynamicFeeConfig.MinPrice,
+			),
+			want: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
 			name: "flow_checker_failed",
@@ -526,6 +580,10 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 			updateTx: func(t *testing.T, tx *platform.Tx) {
 				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Message = newWarpMessageBytes(
 					t,
+					env,
+					chainID,
+					address,
+					warpSignature,
 					must[*message.SubnetToL1Conversion](t)(message.NewSubnetToL1Conversion(ids.Empty)).Bytes(),
 				)
 			},
@@ -536,6 +594,10 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 			updateTx: func(t *testing.T, tx *platform.Tx) {
 				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Message = newWarpMessageBytes(
 					t,
+					env,
+					chainID,
+					address,
+					warpSignature,
 					must[*message.RegisterL1Validator](t)(message.NewRegisterL1Validator(
 						subnetID,
 						nodeID,
@@ -554,6 +616,10 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 			updateTx: func(t *testing.T, tx *platform.Tx) {
 				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Message = newWarpMessageBytes(
 					t,
+					env,
+					chainID,
+					address,
+					warpSignature,
 					must[*message.RegisterL1Validator](t)(message.NewRegisterL1Validator(
 						ids.GenerateTestID(), // invalid subnetID
 						nodeID,
@@ -595,6 +661,10 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 			updateTx: func(t *testing.T, tx *platform.Tx) {
 				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Message = newWarpMessageBytes(
 					t,
+					env,
+					chainID,
+					address,
+					warpSignature,
 					must[*message.RegisterL1Validator](t)(message.NewRegisterL1Validator(
 						subnetID,
 						nodeID,
@@ -624,6 +694,10 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 			updateTx: func(t *testing.T, tx *platform.Tx) {
 				tx.Unsigned.(*platform.RegisterL1ValidatorTx).Message = newWarpMessageBytes(
 					t,
+					env,
+					chainID,
+					address,
+					warpSignature,
 					must[*message.RegisterL1Validator](t)(message.NewRegisterL1Validator(
 						subnetID,
 						nodeID,
@@ -704,6 +778,9 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 			}
 
 			feeCalculator := state.PickFeeCalculator(env.config, env.state)
+			if tt.feeCalculator != nil {
+				feeCalculator = tt.feeCalculator
+			}
 			_, _, _, got = StandardTx(
 				&env.backend,
 				feeCalculator,
@@ -723,8 +800,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees so the tx is funded with real inputs and outputs.
-	env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
-	env.config.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
+	enableL1Fees(env)
 
 	initialSK, err := localsigner.New()
 	require.NoError(err)
@@ -732,41 +808,17 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	initialPoP, err := signer.NewProofOfPossession(initialSK)
 	require.NoError(err)
 
-	var (
-		subnetID = testSubnet1.ID()
-		chainID  = ids.GenerateTestID()
-		address  = utils.RandomBytes(32)
-	)
+	subnetID := testSubnet1.ID()
 
 	// Convert the subnet to an L1 with one active validator
-	convertWallet := newWallet(t, env, walletConfig{})
-	convertSubnetToL1Tx, err := convertWallet.IssueConvertSubnetToL1Tx(
-		subnetID,
-		chainID,
-		address,
-		[]*platform.ConvertSubnetToL1Validator{{
-			NodeID:                ids.GenerateTestNodeID().Bytes(),
-			Weight:                1,
-			Balance:               units.Avax,
-			Signer:                *initialPoP,
-			RemainingBalanceOwner: message.PChainOwner{},
-			DeactivationOwner:     message.PChainOwner{},
-		}},
-	)
-	require.NoError(err)
-
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(err)
-
-	_, _, _, err = StandardTx(
-		&env.backend,
-		state.PickFeeCalculator(env.config, env.state),
-		convertSubnetToL1Tx,
-		diff,
-	)
-	require.NoError(err)
-	require.NoError(diff.Apply(env.state))
-	require.NoError(env.state.Commit())
+	chainID, address := convertSubnetToL1(t, env, &platform.ConvertSubnetToL1Validator{
+		NodeID:                ids.GenerateTestNodeID().Bytes(),
+		Weight:                1,
+		Balance:               units.Avax,
+		Signer:                *initialPoP,
+		RemainingBalanceOwner: message.PChainOwner{},
+		DeactivationOwner:     message.PChainOwner{},
+	})
 
 	var (
 		nodeID           = ids.GenerateTestNodeID()
@@ -825,7 +877,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	diff, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, env.state)
@@ -879,8 +931,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees so the txs are funded with real inputs and outputs.
-	env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
-	env.config.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
+	enableL1Fees(env)
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)
@@ -894,40 +945,18 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 	)
 	var (
 		subnetID     = testSubnet1.ID()
-		chainID      = ids.GenerateTestID()
-		address      = utils.RandomBytes(32)
 		validationID = subnetID.Append(0)
 	)
 
 	// Convert the subnet to an L1 with one active validator
-	convertWallet := newWallet(t, env, walletConfig{})
-	convertSubnetToL1Tx, err := convertWallet.IssueConvertSubnetToL1Tx(
-		subnetID,
-		chainID,
-		address,
-		[]*platform.ConvertSubnetToL1Validator{{
-			NodeID:                ids.GenerateTestNodeID().Bytes(),
-			Weight:                initialWeight,
-			Balance:               balance,
-			Signer:                *pop,
-			RemainingBalanceOwner: message.PChainOwner{},
-			DeactivationOwner:     message.PChainOwner{},
-		}},
-	)
-	require.NoError(t, err)
-
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(t, err)
-
-	_, _, _, err = StandardTx(
-		&env.backend,
-		state.PickFeeCalculator(env.config, env.state),
-		convertSubnetToL1Tx,
-		diff,
-	)
-	require.NoError(t, err)
-	require.NoError(t, diff.Apply(env.state))
-	require.NoError(t, env.state.Commit())
+	chainID, address := convertSubnetToL1(t, env, &platform.ConvertSubnetToL1Validator{
+		NodeID:                ids.GenerateTestNodeID().Bytes(),
+		Weight:                initialWeight,
+		Balance:               balance,
+		Signer:                *pop,
+		RemainingBalanceOwner: message.PChainOwner{},
+		DeactivationOwner:     message.PChainOwner{},
+	})
 
 	initialL1Validator, err := env.state.GetL1Validator(validationID)
 	require.NoError(t, err)
@@ -961,25 +990,13 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 		warpSignature,
 	))
 
-	// newWarpMessageBytes wraps an addressed-call payload into warp message
-	// bytes. The executor doesn't verify the warp signature, so reusing
-	// warpSignature for every payload is fine.
-	newWarpMessageBytes := func(t *testing.T, payloadBytes []byte) []byte {
-		return must[*warp.Message](t)(warp.NewMessage(
-			must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
-				env.ctx.NetworkID,
-				chainID,
-				must[*payload.AddressedCall](t)(payload.NewAddressedCall(
-					address,
-					payloadBytes,
-				)).Bytes(),
-			)),
-			warpSignature,
-		)).Bytes()
-	}
 	newL1ValidatorWeightMessageBytes := func(t *testing.T, validationID ids.ID, nonce, weight uint64) []byte {
 		return newWarpMessageBytes(
 			t,
+			env,
+			chainID,
+			address,
+			warpSignature,
 			must[*message.L1ValidatorWeight](t)(message.NewL1ValidatorWeight(
 				validationID,
 				nonce,
@@ -1000,10 +1017,11 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 	}
 
 	tests := []struct {
-		name        string
-		want        error
-		updateTx    func(*testing.T, *platform.Tx)
-		updateState func(*testing.T, *state.Diff)
+		name          string
+		feeCalculator txfee.Calculator
+		want          error
+		updateTx      func(*testing.T, *platform.Tx)
+		updateState   func(*testing.T, *state.Diff)
 	}{
 		{
 			name: "invalid_prior_to_etna",
@@ -1025,6 +1043,16 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).Memo = []byte("memo!")
 			},
 			want: avax.ErrMemoTooLarge,
+		},
+		{
+			name: "insufficient_fee",
+			// The wallet funds the tx at the current price. A higher execution
+			// price leaves its outputs and balances covered but underpays the fee.
+			feeCalculator: txfee.NewDynamicCalculator(
+				env.config.DynamicFeeConfig.Weights,
+				100*env.config.DynamicFeeConfig.MinPrice,
+			),
+			want: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
 			name: "flow_checker_failed",
@@ -1066,6 +1094,10 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 			updateTx: func(t *testing.T, tx *platform.Tx) {
 				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).Message = newWarpMessageBytes(
 					t,
+					env,
+					chainID,
+					address,
+					warpSignature,
 					must[*message.SubnetToL1Conversion](t)(message.NewSubnetToL1Conversion(ids.Empty)).Bytes(),
 				)
 			},
@@ -1164,6 +1196,9 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 			}
 
 			feeCalculator := state.PickFeeCalculator(env.config, env.state)
+			if tt.feeCalculator != nil {
+				feeCalculator = tt.feeCalculator
+			}
 			_, _, _, got = StandardTx(
 				&env.backend,
 				feeCalculator,
@@ -1181,8 +1216,7 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees so the txs are funded with real inputs and outputs.
-	env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
-	env.config.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
+	enableL1Fees(env)
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)
@@ -1196,8 +1230,6 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	)
 	var (
 		subnetID  = testSubnet1.ID()
-		chainID   = ids.GenerateTestID()
-		address   = utils.RandomBytes(32)
 		validator = &platform.ConvertSubnetToL1Validator{
 			NodeID:  ids.GenerateTestNodeID().Bytes(),
 			Weight:  initialWeight,
@@ -1218,27 +1250,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	)
 
 	// Convert the subnet to an L1 with one active validator
-	convertWallet := newWallet(t, env, walletConfig{})
-	convertSubnetToL1Tx, err := convertWallet.IssueConvertSubnetToL1Tx(
-		subnetID,
-		chainID,
-		address,
-		[]*platform.ConvertSubnetToL1Validator{validator},
-	)
-	require.NoError(t, err)
-
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(t, err)
-
-	_, _, _, err = StandardTx(
-		&env.backend,
-		state.PickFeeCalculator(env.config, env.state),
-		convertSubnetToL1Tx,
-		diff,
-	)
-	require.NoError(t, err)
-	require.NoError(t, diff.Apply(env.state))
-	require.NoError(t, env.state.Commit())
+	chainID, address := convertSubnetToL1(t, env, validator)
 
 	initialL1Validator, err := env.state.GetL1Validator(validationID)
 	require.NoError(t, err)
@@ -1276,21 +1288,18 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	// the validator with the given nonce. The executor doesn't verify the warp
 	// signature, so reusing warpSignature is fine.
 	newRemoveValidatorWarpMessageBytes := func(t *testing.T, nonce uint64) []byte {
-		return must[*warp.Message](t)(warp.NewMessage(
-			must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
-				env.ctx.NetworkID,
-				chainID,
-				must[*payload.AddressedCall](t)(payload.NewAddressedCall(
-					address,
-					must[*message.L1ValidatorWeight](t)(message.NewL1ValidatorWeight(
-						validationID,
-						nonce,
-						0,
-					)).Bytes(),
-				)).Bytes(),
-			)),
+		return newWarpMessageBytes(
+			t,
+			env,
+			chainID,
+			address,
 			warpSignature,
-		)).Bytes()
+			must[*message.L1ValidatorWeight](t)(message.NewL1ValidatorWeight(
+				validationID,
+				nonce,
+				0,
+			)).Bytes(),
+		)
 	}
 
 	// putL1Validator adds another L1 validator to the subnet to allow the
@@ -1438,8 +1447,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees and allow a single active L1 validator.
-	env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
-	env.config.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
+	enableL1Fees(env)
 	env.config.ValidatorFeeConfig.Capacity = 1
 
 	sk, err := localsigner.New()
@@ -1454,41 +1462,22 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 	)
 
 	// Convert the subnet to an L1 with one inactive validator
-	convertWallet := newWallet(t, env, walletConfig{})
-	convertSubnetToL1Tx, err := convertWallet.IssueConvertSubnetToL1Tx(
-		subnetID,
-		ids.GenerateTestID(),
-		utils.RandomBytes(32),
-		[]*platform.ConvertSubnetToL1Validator{{
-			NodeID:                ids.GenerateTestNodeID().Bytes(),
-			Weight:                1,
-			Balance:               0,
-			Signer:                *pop,
-			RemainingBalanceOwner: message.PChainOwner{},
-			DeactivationOwner:     message.PChainOwner{},
-		}},
-	)
-	require.NoError(t, err)
-
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(t, err)
-
-	_, _, _, err = StandardTx(
-		&env.backend,
-		state.PickFeeCalculator(env.config, env.state),
-		convertSubnetToL1Tx,
-		diff,
-	)
-	require.NoError(t, err)
-	require.NoError(t, diff.Apply(env.state))
-	require.NoError(t, env.state.Commit())
+	convertSubnetToL1(t, env, &platform.ConvertSubnetToL1Validator{
+		NodeID:                ids.GenerateTestNodeID().Bytes(),
+		Weight:                1,
+		Balance:               0,
+		Signer:                *pop,
+		RemainingBalanceOwner: message.PChainOwner{},
+		DeactivationOwner:     message.PChainOwner{},
+	})
 
 	const balanceIncrease = units.NanoAvax
 	tests := []struct {
-		name        string
-		want        error
-		updateTx    func(*testing.T, *platform.Tx)
-		updateState func(*testing.T, *state.Diff)
+		name          string
+		feeCalculator txfee.Calculator
+		want          error
+		updateTx      func(*testing.T, *platform.Tx)
+		updateState   func(*testing.T, *state.Diff)
 	}{
 		{
 			name: "invalid_prior_to_etna",
@@ -1517,6 +1506,16 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 				tx.Unsigned.(*platform.IncreaseL1ValidatorBalanceTx).Balance = math.MaxUint64
 			},
 			want: safemath.ErrOverflow,
+		},
+		{
+			name: "insufficient_fee",
+			// The wallet funds the tx at the current price. A higher execution
+			// price leaves its outputs and balances covered but underpays the fee.
+			feeCalculator: txfee.NewDynamicCalculator(
+				env.config.DynamicFeeConfig.Weights,
+				100*env.config.DynamicFeeConfig.MinPrice,
+			),
+			want: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
 			name: "flow_checker_failed",
@@ -1590,6 +1589,9 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 			}
 
 			feeCalculator := state.PickFeeCalculator(env.config, env.state)
+			if tt.feeCalculator != nil {
+				feeCalculator = tt.feeCalculator
+			}
 			_, _, _, got = StandardTx(
 				&env.backend,
 				feeCalculator,
@@ -1609,8 +1611,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees so the txs are funded with real inputs and outputs.
-	env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
-	env.config.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
+	enableL1Fees(env)
 
 	sk, err := localsigner.New()
 	require.NoError(err)
@@ -1624,42 +1625,22 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 	)
 
 	// Convert the subnet to an L1 with one inactive validator
-	convertWallet := newWallet(t, env, walletConfig{})
-	convertSubnetToL1Tx, err := convertWallet.IssueConvertSubnetToL1Tx(
-		subnetID,
-		ids.GenerateTestID(),
-		utils.RandomBytes(32),
-		[]*platform.ConvertSubnetToL1Validator{{
-			NodeID:  ids.GenerateTestNodeID().Bytes(),
-			Weight:  1,
-			Balance: 0,
-			Signer:  *pop,
-			// RemainingBalanceOwner and DeactivationOwner are initialized so
-			// that later reflect based equality checks pass.
-			RemainingBalanceOwner: message.PChainOwner{
-				Threshold: 0,
-				Addresses: []ids.ShortID{},
-			},
-			DeactivationOwner: message.PChainOwner{
-				Threshold: 0,
-				Addresses: []ids.ShortID{},
-			},
-		}},
-	)
-	require.NoError(err)
-
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(err)
-
-	_, _, _, err = StandardTx(
-		&env.backend,
-		state.PickFeeCalculator(env.config, env.state),
-		convertSubnetToL1Tx,
-		diff,
-	)
-	require.NoError(err)
-	require.NoError(diff.Apply(env.state))
-	require.NoError(env.state.Commit())
+	convertSubnetToL1(t, env, &platform.ConvertSubnetToL1Validator{
+		NodeID:  ids.GenerateTestNodeID().Bytes(),
+		Weight:  1,
+		Balance: 0,
+		Signer:  *pop,
+		// RemainingBalanceOwner and DeactivationOwner are initialized so
+		// that later reflect based equality checks pass.
+		RemainingBalanceOwner: message.PChainOwner{
+			Threshold: 0,
+			Addresses: []ids.ShortID{},
+		},
+		DeactivationOwner: message.PChainOwner{
+			Threshold: 0,
+			Addresses: []ids.ShortID{},
+		},
+	})
 
 	initialL1Validator, err := env.state.GetL1Validator(validationID)
 	require.NoError(err)
@@ -1672,7 +1653,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 	)
 	require.NoError(err)
 
-	diff, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, env.state)
@@ -1700,8 +1681,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 func TestStandardExecutorDisableL1ValidatorTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees so the txs are funded with real inputs and outputs.
-	env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
-	env.config.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
+	enableL1Fees(env)
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)
@@ -1715,40 +1695,20 @@ func TestStandardExecutorDisableL1ValidatorTxErrors(t *testing.T) {
 	)
 
 	// Convert the subnet to an L1 with one active validator
-	convertWallet := newWallet(t, env, walletConfig{})
-	convertSubnetToL1Tx, err := convertWallet.IssueConvertSubnetToL1Tx(
-		subnetID,
-		ids.GenerateTestID(),
-		utils.RandomBytes(32),
-		[]*platform.ConvertSubnetToL1Validator{{
-			NodeID:  ids.GenerateTestNodeID().Bytes(),
-			Weight:  1,
-			Balance: units.Avax,
-			Signer:  *pop,
-			RemainingBalanceOwner: message.PChainOwner{
-				Threshold: 1,
-				Addresses: []ids.ShortID{ids.GenerateTestShortID()},
-			},
-			DeactivationOwner: message.PChainOwner{
-				Threshold: 1,
-				Addresses: []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
-			},
-		}},
-	)
-	require.NoError(t, err)
-
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(t, err)
-
-	_, _, _, err = StandardTx(
-		&env.backend,
-		state.PickFeeCalculator(env.config, env.state),
-		convertSubnetToL1Tx,
-		diff,
-	)
-	require.NoError(t, err)
-	require.NoError(t, diff.Apply(env.state))
-	require.NoError(t, env.state.Commit())
+	convertSubnetToL1(t, env, &platform.ConvertSubnetToL1Validator{
+		NodeID:  ids.GenerateTestNodeID().Bytes(),
+		Weight:  1,
+		Balance: units.Avax,
+		Signer:  *pop,
+		RemainingBalanceOwner: message.PChainOwner{
+			Threshold: 1,
+			Addresses: []ids.ShortID{ids.GenerateTestShortID()},
+		},
+		DeactivationOwner: message.PChainOwner{
+			Threshold: 1,
+			Addresses: []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()},
+		},
+	})
 
 	tests := []struct {
 		name        string
@@ -1842,8 +1802,7 @@ func TestStandardExecutorDisableL1ValidatorTxErrors(t *testing.T) {
 func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 	// Charge non-zero fees so the txs are funded with real inputs and outputs.
-	env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
-	env.config.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
+	enableL1Fees(env)
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)
@@ -1874,27 +1833,7 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	)
 
 	// Convert the subnet to an L1 with one active validator
-	convertWallet := newWallet(t, env, walletConfig{})
-	convertSubnetToL1Tx, err := convertWallet.IssueConvertSubnetToL1Tx(
-		subnetID,
-		ids.GenerateTestID(),
-		utils.RandomBytes(32),
-		[]*platform.ConvertSubnetToL1Validator{validator},
-	)
-	require.NoError(t, err)
-
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(t, err)
-
-	_, _, _, err = StandardTx(
-		&env.backend,
-		state.PickFeeCalculator(env.config, env.state),
-		convertSubnetToL1Tx,
-		diff,
-	)
-	require.NoError(t, err)
-	require.NoError(t, diff.Apply(env.state))
-	require.NoError(t, env.state.Commit())
+	convertSubnetToL1(t, env, validator)
 
 	initialL1Validator, err := env.state.GetL1Validator(validationID)
 	require.NoError(t, err)

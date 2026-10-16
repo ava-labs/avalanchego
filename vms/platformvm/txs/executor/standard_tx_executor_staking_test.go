@@ -33,13 +33,9 @@ func TestStandardExecutorAddValidatorTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Banff)
 
 	var (
-		nodeID       = ids.GenerateTestNodeID()
-		startTime    = genesistest.DefaultValidatorStartTime.Add(time.Second)
-		endTime      = startTime.Add(env.config.MinStakeDuration)
-		rewardsOwner = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		}
+		nodeID    = ids.GenerateTestNodeID()
+		startTime = genesistest.DefaultValidatorStartTime.Add(time.Second)
+		endTime   = startTime.Add(env.config.MinStakeDuration)
 	)
 
 	// putPendingValidator adds nodeID to the primary network's pending
@@ -56,7 +52,7 @@ func TestStandardExecutorAddValidatorTxErrors(t *testing.T) {
 				End:    uint64(endTime.Unix()),
 				Wght:   env.config.MinValidatorStake,
 			},
-			rewardsOwner,
+			newOwner(),
 			reward.PercentDenominator,
 		)
 		require.NoError(t, err)
@@ -127,13 +123,7 @@ func TestStandardExecutorAddValidatorTxErrors(t *testing.T) {
 		{
 			name: "insufficient_balance_to_cover_stake",
 			updateState: func(diff *state.Diff) {
-				// Remove all UTXOs owned by the tx's key
-				utxoIDs, err := env.state.UTXOIDs(genesistest.DefaultFundedKeys[0].Address().Bytes(), ids.Empty, math.MaxInt32)
-				require.NoError(t, err)
-
-				for _, utxoID := range utxoIDs {
-					diff.DeleteUTXO(utxoID)
-				}
+				deleteUTXOsOwnedBy(t, env, diff, genesistest.DefaultFundedKeys[0])
 			},
 			want: errFlowCheckFailed,
 		},
@@ -153,7 +143,7 @@ func TestStandardExecutorAddValidatorTxErrors(t *testing.T) {
 					End:    uint64(endTime.Unix()),
 					Wght:   env.config.MinValidatorStake,
 				},
-				rewardsOwner,
+				newOwner(),
 				reward.PercentDenominator,
 			)
 			require.NoError(t, err)
@@ -203,10 +193,7 @@ func TestStandardExecutorAddValidatorTx(t *testing.T) {
 			End:    uint64(endTime.Unix()),
 			Wght:   env.config.MinValidatorStake,
 		},
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
+		newOwner(),
 		reward.PercentDenominator,
 	)
 	require.NoError(err)
@@ -245,10 +232,6 @@ func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 
 	var (
 		currentTimestamp = env.state.GetTimestamp()
-		rewardsOwner     = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		}
 
 		genesisNodeID      = genesistest.DefaultNodeIDs[0]
 		validatorID        = ids.GenerateTestNodeID()
@@ -269,7 +252,7 @@ func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 				End:    uint64(validatorEndTime.Unix()),
 				Wght:   weight,
 			},
-			rewardsOwner,
+			newOwner(),
 			reward.PercentDenominator,
 		)
 		require.NoError(t, err)
@@ -355,13 +338,7 @@ func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 				validator.End = genesistest.DefaultValidatorEndTimeUnix
 			},
 			updateState: func(diff *state.Diff) {
-				// Remove all UTXOs owned by the tx's key
-				utxoIDs, err := env.state.UTXOIDs(genesistest.DefaultFundedKeys[0].Address().Bytes(), ids.Empty, math.MaxInt32)
-				require.NoError(t, err)
-
-				for _, utxoID := range utxoIDs {
-					diff.DeleteUTXO(utxoID)
-				}
+				deleteUTXOsOwnedBy(t, env, diff, genesistest.DefaultFundedKeys[0])
 			},
 			want: errFlowCheckFailed,
 		},
@@ -388,7 +365,7 @@ func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 					End:    uint64(validatorEndTime.Unix()),
 					Wght:   env.config.MinDelegatorStake,
 				},
-				rewardsOwner,
+				newOwner(),
 			)
 			require.NoError(t, err)
 
@@ -452,10 +429,6 @@ func TestStandardExecutorAddDelegatorTx(t *testing.T) {
 			env.config.UpgradeConfig.BanffTime = env.state.GetTimestamp()
 
 			var (
-				rewardsOwner = &secp256k1fx.OutputOwners{
-					Threshold: 1,
-					Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-				}
 				validatorID        = ids.GenerateTestNodeID()
 				validatorStartTime = genesistest.DefaultValidatorStartTime.Add(5 * time.Second)
 				validatorEndTime   = genesistest.DefaultValidatorEndTime.Add(-5 * time.Second)
@@ -473,7 +446,7 @@ func TestStandardExecutorAddDelegatorTx(t *testing.T) {
 					End:    uint64(validatorEndTime.Unix()),
 					Wght:   tt.validatorWeight(env),
 				},
-				rewardsOwner,
+				newOwner(),
 				reward.PercentDenominator,
 			)
 			require.NoError(err)
@@ -505,7 +478,7 @@ func TestStandardExecutorAddDelegatorTx(t *testing.T) {
 					End:    uint64(validatorEndTime.Unix()),
 					Wght:   env.config.MinDelegatorStake,
 				},
-				rewardsOwner,
+				newOwner(),
 			)
 			require.NoError(err)
 
@@ -560,10 +533,7 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 				End:    uint64(pendingValidatorEndTime.Unix()),
 				Wght:   env.config.MinValidatorStake,
 			},
-			&secp256k1fx.OutputOwners{
-				Threshold: 1,
-				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-			},
+			newOwner(),
 			reward.PercentDenominator,
 		)
 		require.NoError(t, err)
@@ -751,6 +721,60 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 	}
 }
 
+// TestStandardExecutorAddSubnetValidatorTxStakeDurationErrors verifies that,
+// post-Durango, an [platform.AddSubnetValidatorTx] whose staking period,
+// measured from the current chain time, is outside the configured bounds is
+// rejected.
+func TestStandardExecutorAddSubnetValidatorTxStakeDurationErrors(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
+	chainTime := env.state.GetTimestamp()
+
+	tests := []struct {
+		name    string
+		endTime time.Time
+		want    error
+	}{
+		{
+			name:    "stake_too_short",
+			endTime: chainTime.Add(env.config.MinStakeDuration - time.Second),
+			want:    errStakeTooShort,
+		},
+		{
+			// Helicon only lowers the minimum staking duration of primary
+			// network validators.
+			name:    "stake_shorter_than_pre_helicon_minimum",
+			endTime: chainTime.Add(env.config.HeliconMinStakeDuration),
+			want:    errStakeTooShort,
+		},
+		{
+			name:    "stake_too_long",
+			endTime: chainTime.Add(env.config.MaxStakeDuration + time.Second),
+			want:    ErrStakeTooLong,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wallet := newWallet(t, env, walletConfig{})
+			tx, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
+				Validator: platform.Validator{
+					NodeID: genesistest.DefaultNodeIDs[0],
+					End:    uint64(tt.endTime.Unix()),
+					Wght:   genesistest.DefaultValidatorWeight,
+				},
+				Subnet: testSubnet1.ID(),
+			})
+			require.NoError(t, err)
+
+			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(t, err)
+
+			_, _, _, err = StandardTx(&env.backend, state.PickFeeCalculator(env.config, diff), tx, diff)
+			require.ErrorIs(t, err, tt.want)
+		})
+	}
+}
+
 // TestStandardExecutorAddSubnetValidatorTx verifies the successful execution
 // of an [platform.AddSubnetValidatorTx].
 func TestStandardExecutorAddSubnetValidatorTx(t *testing.T) {
@@ -796,10 +820,7 @@ func TestStandardExecutorAddSubnetValidatorTx(t *testing.T) {
 						End:    uint64(pendingValidatorEndTime.Unix()),
 						Wght:   env.config.MinValidatorStake,
 					},
-					&secp256k1fx.OutputOwners{
-						Threshold: 1,
-						Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-					},
+					newOwner(),
 					reward.PercentDenominator,
 				)
 				require.NoError(t, err)
@@ -873,11 +894,6 @@ func TestStandardExecutorAddPermissionlessValidatorTxErrors(t *testing.T) {
 	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(t, err)
 
-	rewardsOwner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-	}
-
 	tests := []struct {
 		name     string
 		want     error
@@ -913,8 +929,8 @@ func TestStandardExecutorAddPermissionlessValidatorTxErrors(t *testing.T) {
 				},
 				pop,
 				env.ctx.AVAXAssetID,
-				rewardsOwner,
-				rewardsOwner,
+				newOwner(),
+				newOwner(),
 				reward.PercentDenominator,
 			)
 			require.NoError(t, err)
@@ -954,12 +970,8 @@ func TestStandardExecutorAddPermissionlessValidatorTx(t *testing.T) {
 	require.NoError(err)
 
 	var (
-		nodeID       = ids.GenerateTestNodeID()
-		endTime      = env.state.GetTimestamp().Add(env.config.HeliconMinStakeDuration)
-		rewardsOwner = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		}
+		nodeID  = ids.GenerateTestNodeID()
+		endTime = env.state.GetTimestamp().Add(env.config.HeliconMinStakeDuration)
 	)
 
 	// Stake for the Helicon minimum staking duration
@@ -974,8 +986,8 @@ func TestStandardExecutorAddPermissionlessValidatorTx(t *testing.T) {
 		},
 		pop,
 		env.ctx.AVAXAssetID,
-		rewardsOwner,
-		rewardsOwner,
+		newOwner(),
+		newOwner(),
 		reward.PercentDenominator,
 	)
 	require.NoError(err)
@@ -1008,12 +1020,8 @@ func TestStandardExecutorAddPermissionlessDelegatorTxErrors(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 
 	var (
-		nodeID       = genesistest.DefaultNodeIDs[0]
-		endTime      = env.state.GetTimestamp().Add(env.config.MinStakeDuration)
-		rewardsOwner = &secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		}
+		nodeID  = genesistest.DefaultNodeIDs[0]
+		endTime = env.state.GetTimestamp().Add(env.config.MinStakeDuration)
 	)
 
 	// setWeight updates the delegator's weight and its stake output
@@ -1116,7 +1124,7 @@ func TestStandardExecutorAddPermissionlessDelegatorTxErrors(t *testing.T) {
 					Subnet: constants.PrimaryNetworkID,
 				},
 				env.ctx.AVAXAssetID,
-				rewardsOwner,
+				newOwner(),
 			)
 			require.NoError(t, err)
 
@@ -1163,10 +1171,7 @@ func TestStandardExecutorAddPermissionlessDelegatorTx(t *testing.T) {
 			Subnet: constants.PrimaryNetworkID,
 		},
 		env.ctx.AVAXAssetID,
-		&secp256k1fx.OutputOwners{
-			Threshold: 1,
-			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-		},
+		newOwner(),
 	)
 	require.NoError(err)
 
