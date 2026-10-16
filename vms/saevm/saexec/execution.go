@@ -473,10 +473,6 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 		return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
 	}
 
-	// Responsibility for untracking lies with the VM once it deems this block's
-	// post-execution state to no longer be consensus-critical.
-	e.Tracker.Track(root)
-
 	// The strict ordering of the remaining calls guarantees invariants that
 	// MUST NOT be broken:
 	//
@@ -502,7 +498,7 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 	}
 	// b's settled root stays tracked until settlement passes b, which requires a
 	// later block to execute, so the root is still available here.
-	return e.Tracker.BlockExecuted(b.SettledStateRoot(), root, b.NumberU64()) // (5)
+	return e.tracker.BlockExecuted(b.SettledStateRoot(), root, b.NumberU64()) // (5)
 }
 
 // NullReceiptStore discards transaction receipts.

@@ -4,6 +4,7 @@
 package firewood
 
 import (
+	"math"
 	"math/big"
 	"testing"
 
@@ -661,13 +662,12 @@ func TestInvalidConfig(t *testing.T) {
 				cfg.RevisionsInMemory = 1
 				return cfg
 			},
-			wantErr: errTooFewRevisions,
+			wantErr: nil, // floors to DeferredCommitInterval + 1
 		},
 		{
 			name: "commit_interval_too_big",
 			cfg: func(cfg Config) Config {
-				cfg.DeferredCommitInterval = 5
-				cfg.RevisionsInMemory = 5
+				cfg.DeferredCommitInterval = math.MaxUint64
 				return cfg
 			},
 			wantErr: errCommitIntervalTooBig,
@@ -998,7 +998,7 @@ func TestHashAfterRevisionEviction(t *testing.T) {
 	// Persist RevisionsInMemory newer roots. Firewood drops root1 from its
 	// by-hash lookup at that point even though sdb's handle keeps it alive.
 	tip := root1
-	for i := uint64(2); i <= uint64(cfg.RevisionsInMemory)+1; i++ {
+	for i := uint64(2); i <= cfg.RevisionsInMemory+1; i++ {
 		blk := newStateDB(t, db, tip)
 		blk.SetNonce(addr3, i)
 

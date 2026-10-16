@@ -9,12 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -85,7 +87,7 @@ func TestNewTracker(t *testing.T) {
 			if err != nil {
 				return
 			}
-			require.NoErrorf(t, tr.Close(types.EmptyRootHash), "%T.Close()", tr)
+			require.NoErrorf(t, tr.Close(), "%T.Close()", tr)
 
 			// If the snapshot is enabled, we would expect to find the root on disk.
 			var wantRoot common.Hash
@@ -94,6 +96,75 @@ func TestNewTracker(t *testing.T) {
 			}
 			gotRoot := rawdb.ReadSnapshotRoot(db)
 			require.Equal(t, wantRoot, gotRoot, "rawdb.ReadSnapshotRoot()")
+		})
+	}
+}
+
+func TestTrackerStateHistory(t *testing.T) {
+	tests := []struct {
+		name         string
+		stateHistory uint64
+		wantHistory  uint64
+	}{
+		{
+			name:        "default",
+			wantHistory: 128,
+		},
+		{
+			name:         "below_min",
+			stateHistory: 8,
+			wantHistory:  128,
+		},
+		{
+			name:         "above_min",
+			stateHistory: 256,
+			wantHistory:  256,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			numBlocks := 3 * tt.wantHistory
+
+			tr, err := NewTracker(
+				rawdb.NewMemoryDatabase(),
+				Config{
+					Scheme:         rawdb.HashScheme,
+					CommitInterval: numBlocks + 1, // avoid committing any states
+					StateHistory:   tt.stateHistory,
+				},
+				types.EmptyRootHash,
+				t.TempDir(),
+				loggingtest.New(t, logging.Debug),
+			)
+			require.NoError(t, err, "NewTracker()")
+
+			root := types.EmptyRootHash
+			t.Cleanup(func() { assert.NoError(t, tr.Close()) })
+			roots := make([]common.Hash, 0, numBlocks)
+			addr := common.Address{1}
+			for height := uint64(1); height <= numBlocks; height++ {
+				sdb, err := tr.StateDB(root)
+				require.NoErrorf(t, err, "%T.StateDB() at height %d", tr, height)
+				sdb.SetNonce(addr, height) // unique state
+				root, err = sdb.Commit(height, true /* EIP-158 */)
+				require.NoErrorf(t, err, "%T.Commit(%d)", tr, height)
+				roots = append(roots, root)
+
+				require.NoErrorf(t, tr.BlockExecuted(types.EmptyRootHash, root, height), "%T.BlockExecuted(%d)", tr, height)
+			}
+
+			for i, pastRoot := range roots {
+				pastHeight := uint64(i) + 1
+				_, err := tr.StateDB(pastRoot)
+
+				var wantErr testerr.Want
+				if numBlocks-pastHeight >= tt.wantHistory {
+					wantErr = testerr.As[*trie.MissingNodeError](nil)
+				}
+				if diff := testerr.Diff(err, wantErr); diff != "" {
+					t.Errorf("mismatch at height %d: %s", pastHeight, diff)
+				}
+			}
 		})
 	}
 }
@@ -193,9 +264,16 @@ func TestTrackerClose(t *testing.T) {
 	)
 
 	root := writeBlock(t, tr, types.EmptyRootHash, 1)
-	require.NoErrorf(t, tr.Close(root), "%T.Close([root])", tr)
+	executionRoot := writeBlock(t, tr, root, 2)
+	require.NoError(t, tr.BlockExecuted(root, executionRoot, 2))
+	require.NoErrorf(t, tr.Close(), "%T.Close()", tr)
 
 	cache := state.NewDatabase(db)
+	t.Run("unsettled_trie_unavailable", func(t *testing.T) {
+		_, err := state.New(executionRoot, cache, nil)
+		var missing *trie.MissingNodeError
+		require.ErrorAs(t, err, &missing)
+	})
 	t.Run("trie_available", func(t *testing.T) {
 		_, err := state.New(root, cache, nil)
 		require.NoError(t, err, "state.New([root])")
@@ -238,7 +316,7 @@ func TestTrackerMaybeCap(t *testing.T) {
 	require.NoError(t, err, "NewTracker()")
 
 	prevRoot := types.EmptyRootHash
-	t.Cleanup(func() { assert.NoErrorf(t, tr.Close(prevRoot), "%T.Close()", tr) })
+	t.Cleanup(func() { assert.NoErrorf(t, tr.Close(), "%T.Close()", tr) })
 
 	inMemorySize := func() common.StorageSize {
 		_, dirties, _ := tr.cache.TrieDB().Size()
@@ -249,7 +327,7 @@ func TestTrackerMaybeCap(t *testing.T) {
 	for height := uint64(1); height < cfg.CommitInterval; height++ {
 		root := writeBlock(t, tr, prevRoot, height)
 		before := inMemorySize()
-		require.NoErrorf(t, tr.BlockExecuted(common.Hash{}, root, height), "%T.BlockExecuted() at height %d", tr, height)
+		require.NoErrorf(t, tr.BlockExecuted(types.EmptyRootHash, root, height), "%T.BlockExecuted() at height %d", tr, height)
 		after := inMemorySize()
 
 		// Invariant: whatever schedule maybeCap uses to shrink its target, the
@@ -267,7 +345,6 @@ func TestTrackerMaybeCap(t *testing.T) {
 	require.Greater(t, capsFired, 5, "test did not generate enough state to exercise capping")
 
 	root := writeBlock(t, tr, prevRoot, commitInterval)
-	prevRoot = root // for cleanup
 	before := inMemorySize()
 	require.NoErrorf(t, tr.BlockExecuted(root, root, commitInterval), "%T.BlockExecuted() at height %d", tr, commitInterval)
 	require.Less(t, inMemorySize(), before, "in-memory size did not drop after commit at the interval")
@@ -367,7 +444,7 @@ func BenchmarkTrackerCommitInterval(b *testing.B) {
 					}
 
 					b.StopTimer()
-					require.NoErrorf(b, tr.Close(prevRoot), "%T.Close()", tr)
+					require.NoErrorf(b, tr.Close(), "%T.Close()", tr)
 					require.NoErrorf(b, db.Close(), "%T.Close()", db)
 					b.StartTimer()
 				}
