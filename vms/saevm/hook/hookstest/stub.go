@@ -134,8 +134,7 @@ func (s *Stub) BuildHeader(parent *types.Header) (*types.Header, error) {
 	return hdr, nil
 }
 
-// StampHeader proxies to [Stub.StampHeaderFn] if non-nil, otherwise it is a
-// no-op.
+// StampHeader proxies to [Stub.StampHeaderFn] if non-nil, otherwise it is a no-op.
 func (s *Stub) StampHeader(hdr *types.Header, settled hook.SettledView) error {
 	if fn := s.StampHeaderFn; fn != nil {
 		return fn(hdr, settled)

@@ -80,7 +80,7 @@ type Points interface {
 	// These operations will be performed during both worst-case and actual
 	// execution.
 	EndOfBlockOps(*types.Block) ([]Op, error)
-	// AdmitTransaction gates inclusion when building and verifying blocks, and MUST
+	// AdmitTransaction guards inclusion when building and verifying blocks, and MUST
 	// NOT modify tx. It never runs during execution, and sees modules once settled.
 	AdmitTransaction(from common.Address, tx *types.Transaction, settled SettledView) error
 	// StartExecutingBlock applies state changes before the block's transactions
