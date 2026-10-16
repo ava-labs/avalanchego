@@ -157,6 +157,7 @@ func TestStandardExecutorImportTx(t *testing.T) {
 		name          string
 		sourceChainID ids.ID
 		assets        map[ids.ID]uint64
+		feeKey        *secp256k1.PrivateKey
 	}{
 		{
 			name:          "import_avax_from_x_chain",
@@ -181,6 +182,15 @@ func TestStandardExecutorImportTx(t *testing.T) {
 				env.ctx.AVAXAssetID: units.Avax,
 			},
 		},
+		{
+			// No AVAX is imported, so the fee is paid with P-chain UTXOs.
+			name:          "import_non_avax_paying_fee_with_p_chain_funds",
+			sourceChainID: env.ctx.XChainID,
+			assets: map[ids.ID]uint64{
+				customAssetID: 1,
+			},
+			feeKey: genesistest.DefaultFundedKeys[0],
+		},
 	}
 
 	for _, tt := range tests {
@@ -196,8 +206,12 @@ func TestStandardExecutorImportTx(t *testing.T) {
 				randSrc,
 			)
 
+			keys := []*secp256k1.PrivateKey{sourceKey}
+			if tt.feeKey != nil {
+				keys = append(keys, tt.feeKey)
+			}
 			wallet := newWallet(t, env, walletConfig{
-				keys:     []*secp256k1.PrivateKey{sourceKey},
+				keys:     keys,
 				chainIDs: []ids.ID{tt.sourceChainID},
 			})
 
@@ -209,6 +223,9 @@ func TestStandardExecutorImportTx(t *testing.T) {
 
 			tx := stx.Unsigned.(*platform.ImportTx)
 			require.NotEmpty(tx.ImportedInputs)
+			if tt.feeKey != nil {
+				require.NotEmpty(tx.Ins)
+			}
 			numInputs := len(tx.Ins) + len(tx.ImportedInputs)
 			require.Equal(len(stx.Creds), numInputs, "should have the same number of credentials as inputs")
 
