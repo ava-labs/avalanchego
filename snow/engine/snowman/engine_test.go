@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -66,6 +67,16 @@ func MakeParseBlockF(blks ...[]*snowmantest.Block) func(context.Context, []byte)
 			}
 		}
 		return nil, errUnknownBlock
+	}
+}
+
+// requireIssuedSources asserts the value of the blks_issued counter for every
+// source label. A source missing from [expected] must be zero.
+func requireIssuedSources(t *testing.T, e *Engine, expected map[string]float64) {
+	t.Helper()
+	for _, source := range []string{chitsSource, pushGossipSource, pullQuerySource, builtSource, unknownSource} {
+		require.Equalf(t, expected[source], testutil.ToFloat64(e.metrics.issued.WithLabelValues(source)),
+			"blks_issued{source=%q}", source)
 	}
 }
 
@@ -220,6 +231,7 @@ func TestEngineQuery(t *testing.T) {
 	require.True(sendChitsCalled)
 	require.True(getBlockCalled)
 	require.NotNil(getRequest)
+	requireIssuedSources(t, engine, nil) // [parent] was requested, not issued yet.
 
 	var queryRequest *common.Request
 	sender.SendPullQueryF = func(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, blockID ids.ID, requestedHeight uint64) {
@@ -242,6 +254,7 @@ func TestEngineQuery(t *testing.T) {
 	// send a pull query.
 	require.NoError(engine.Put(t.Context(), getRequest.NodeID, getRequest.RequestID, parent.Bytes()))
 	require.NotNil(queryRequest)
+	requireIssuedSources(t, engine, map[string]float64{pullQuerySource: 1})
 
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		switch blkID {
@@ -305,6 +318,7 @@ func TestEngineQuery(t *testing.T) {
 	require.Equal(snowtest.Accepted, parent.Status)
 	require.Equal(snowtest.Accepted, child.Status)
 	require.Zero(engine.blocked.NumDependencies())
+	requireIssuedSources(t, engine, map[string]float64{pullQuerySource: 1, chitsSource: 1})
 }
 
 func TestEngineMultipleQuery(t *testing.T) {
@@ -575,6 +589,7 @@ func TestEnginePushQuery(t *testing.T) {
 
 	require.True(*chitted)
 	require.True(*queried)
+	requireIssuedSources(t, te, map[string]float64{pushGossipSource: 1})
 }
 
 func TestEngineBuildBlock(t *testing.T) {

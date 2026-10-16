@@ -306,7 +306,7 @@ func (e *Engine) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uin
 func (e *Engine) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID, requestedHeight uint64) error {
 	e.sendChits(ctx, nodeID, requestID, requestedHeight)
 
-	issuedMetric := e.metrics.issued.WithLabelValues(pushGossipSource)
+	issuedMetric := e.metrics.issued.WithLabelValues(pullQuerySource)
 
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
@@ -370,7 +370,7 @@ func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32,
 		zap.Uint64("acceptedHeight", acceptedHeight),
 	)
 
-	issuedMetric := e.metrics.issued.WithLabelValues(pullGossipSource)
+	issuedMetric := e.metrics.issued.WithLabelValues(chitsSource)
 	if err := e.issueFromByID(ctx, nodeID, preferredID, issuedMetric); err != nil {
 		return err
 	}
