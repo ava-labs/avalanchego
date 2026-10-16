@@ -14,9 +14,12 @@ inputs:
   setup_bazel:
     description: 'Whether to run Bazel setup before executing the command'
     default: 'false'
-  setup_go_module_cache:
-    description: 'Prepare dependencies for Go commands outside Bazel, even when Bazel setup is enabled'
+  nix_setup_complete:
+    description: 'Skip Nix setup only when an earlier step completed it successfully in this job'
     default: 'false'
+  setup_go_module_cache:
+    description: 'Module preparation: auto for non-Bazel jobs, true to force it, false when already prepared'
+    default: 'auto'
   filter_by_owner:
     default: ''
   artifact_prefix:
@@ -69,12 +72,13 @@ runs:
       if: ${{ inputs.setup_bazel == 'true' }}
     # Install nix and ensure promtail and prometheus are available
     - id: install-nix
+      if: ${{ inputs.nix_setup_complete != 'true' }}
       uses: ./.github/actions/install-nix
       with:
         # Gazelle's cache does not supply dependencies for Go commands outside
         # Bazel, such as load-contract binding generation.
         # See docs/go-toolchains-and-caches.md#dependency-preparation.
-        setup_go_module_cache: ${{ inputs.setup_bazel != 'true' || inputs.setup_go_module_cache == 'true' }}
+        setup_go_module_cache: ${{ inputs.setup_go_module_cache == 'true' || (inputs.setup_go_module_cache == 'auto' && inputs.setup_bazel != 'true') }}
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash
@@ -127,12 +131,12 @@ runs:
       shell: nix develop --command bash -x {0}
       run: ./scripts/run_task.sh log-ci-disk-state-docker
     - name: Upload tmpnet data
-      if: ${{ always() && inputs.runtime == 'process' && steps.install-nix.outcome == 'success' }}
+      if: ${{ always() && inputs.runtime == 'process' && (inputs.nix_setup_complete == 'true' || steps.install-nix.outcome == 'success') }}
       uses: ./.github/actions/upload-tmpnet-artifact
       with:
         name: ${{ inputs.artifact_prefix }}-tmpnet-data
     - name: Collect kind diagnostics
-      if: ${{ always() && inputs.runtime == 'kube' && steps.install-nix.outcome == 'success' }}
+      if: ${{ always() && inputs.runtime == 'kube' && (inputs.nix_setup_complete == 'true' || steps.install-nix.outcome == 'success') }}
       uses: ./.github/actions/collect-kind-diagnostics
       with:
         artifact_name: ${{ inputs.artifact_prefix }}-kind-diagnostics

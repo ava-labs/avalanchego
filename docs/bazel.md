@@ -636,18 +636,19 @@ task bazel-test-load-subnet-evm-race
 task bazel-test-warp-subnet-evm-race
 ```
 
-These tests use Bazel-built binaries so that CI can reuse compiled outputs. A
-job that uses `go build` compiles AvalancheGo, plugins, and test binaries again
-each time it runs. Bazel's remote cache shares individual outputs across jobs
-and runs. To make these jobs faster, first look for ways to increase cache
+These tests use Bazel-built binaries so that CI can reuse compiled outputs.
+Bazel's remote cache shares individual outputs across jobs and runs. To make these jobs faster, first look for ways to increase cache
 reuse. For how this differs from a GitHub Actions cache archive, see
 [Archive caches and content-addressable caches](./ci.md#archive-caches-and-content-addressable-caches).
 
 [CI runs the default E2E suite and monitored tests](../.github/workflows/bazel.yml)
 through the same tasks used locally. The Go workflow also runs the default E2E
-suite with race detection to test artifacts built with `go build`. This follows the
-[CI entrypoint conventions](./ci.md#principles) and avoids a separate artifact
-lifecycle.
+suite to test artifacts built with `go build`. For its race-detection and
+caching policy, see
+[Race detection and output caching](./ci.md#race-detection-and-output-caching).
+Using the same tasks locally and in CI follows the
+[CI entrypoint conventions](./ci.md#principles). It also avoids a separate
+artifact lifecycle.
 
 PR and scheduled CI select different monitored test groups. Disabled groups
 still appear as skipped checks. The goal is to give those checks readable names,
