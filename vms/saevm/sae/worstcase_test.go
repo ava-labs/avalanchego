@@ -27,6 +27,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math/intmath"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -270,6 +274,107 @@ func TestWorstCase(t *testing.T) {
 					}
 				}
 			}
+		})
+	}
+}
+
+// stampedGasTarget differs from the stub's default target, so its effect is visible.
+const stampedGasTarget gas.Gas = 8_000_000
+
+// transferTx returns a minimal signed transfer from the wallet account.
+func (s *SUT) transferTx(tb testing.TB, account int) *types.Transaction {
+	tb.Helper()
+	return s.wallet.SetNonceAndSign(tb, account, &types.DynamicFeeTx{
+		To:        &common.Address{},
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+}
+
+func TestBuildOnUnsettledParent(t *testing.T) {
+	timeOpt, _ := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	_, sut := newSUT(t, 2, timeOpt)
+
+	const revoked, other = 0, 1
+	parent := sut.runConsensusLoop(t, sut.transferTx(t, revoked))
+
+	var stampedFrom common.Hash
+	sut.hooks.AdmitTransactionFn = func(
+		from common.Address,
+		_ *types.Transaction,
+		_ hook.SettledView,
+	) error {
+		if from == sut.wallet.Addresses()[revoked] {
+			return errors.New("sender revoked")
+		}
+		return nil
+	}
+	sut.hooks.StampHeaderFn = func(_ *types.Header, settled hook.SettledView) error {
+		stampedFrom = settled.Header.Hash()
+		return nil
+	}
+
+	// Building and verifying replay the parent, which admission now rejects.
+	b := sut.runConsensusLoop(t, sut.transferTx(t, other))
+	require.Less(t, b.LastSettled().Height(), parent.Height(), "parent MUST be unsettled")
+	assert.Equal(t, b.LastSettled().Hash(), stampedFrom, "settled header seen by StampHeader")
+}
+
+func TestStampedGasTargetReachesWorstCase(t *testing.T) {
+	_, sut := newSUT(t, 1)
+
+	sut.hooks.StampHeaderFn = func(hdr *types.Header, _ hook.SettledView) error {
+		return hookstest.StampGasTarget(hdr, stampedGasTarget)
+	}
+	first := sut.runConsensusLoop(t, sut.transferTx(t, 0))
+	second := sut.runConsensusLoop(t, sut.transferTx(t, 0))
+	want := uint64(worstcase.SafeMaxBlockSize(gastime.SafeRateOfTarget(stampedGasTarget)))
+	require.NotEqual(t, want, first.Header().GasLimit, "first block MUST use the unstamped target")
+
+	assert.Equal(t, stampedGasTarget, first.WorstCaseBounds().LatestEndTime.Target(), "target of the stamped block's own worst-case end time")
+	assert.Equal(t, want, second.Header().GasLimit, "gas limit after a block stamped with the target")
+}
+
+func TestVerifyRestampsHeader(t *testing.T) {
+	errStamp := errors.New("stamping refused")
+	tests := []struct {
+		name     string
+		restamp  gas.Gas
+		stampErr error
+		wantErr  error
+	}{
+		{
+			name:    "same_stamp",
+			restamp: stampedGasTarget,
+		},
+		{
+			name:    "different_stamp",
+			restamp: stampedGasTarget + 1,
+			wantErr: errHashMismatch,
+		},
+		{
+			name:     "stamp_error",
+			stampErr: errStamp,
+			wantErr:  errStamp,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, sut := newSUT(t, 1)
+			sut.hooks.StampHeaderFn = func(hdr *types.Header, _ hook.SettledView) error {
+				return hookstest.StampGasTarget(hdr, stampedGasTarget)
+			}
+			b := sut.buildAndParseBlock(t, sut.genesis, sut.transferTx(t, 0))
+
+			sut.hooks.StampHeaderFn = func(hdr *types.Header, _ hook.SettledView) error {
+				if tt.stampErr != nil {
+					return tt.stampErr
+				}
+				return hookstest.StampGasTarget(hdr, tt.restamp)
+			}
+			require.ErrorIs(t, b.Verify(ctx), tt.wantErr, "Verify() after restamping")
+			_, err := sut.BuildBlock(ctx)
+			require.ErrorIs(t, err, tt.stampErr, "BuildBlock() after restamping")
 		})
 	}
 }

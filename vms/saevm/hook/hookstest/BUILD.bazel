@@ -4,6 +4,7 @@ go_library(
     name = "hookstest",
     testonly = True,
     srcs = [
+        "conformance.go",
         "stub.canoto.go",
         "stub.go",
     ],
@@ -21,7 +22,6 @@ go_library(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",
-        "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_ava_labs_libevm//params",
         "@com_github_holiman_uint256//:uint256",

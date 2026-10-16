@@ -178,7 +178,7 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 		nodeID:  ids.GenerateTestNodeID(),
 	}, opts...)
 
-	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
+	vm := NewSinceGenesis(hookstest.Conformance(tb, conf.hooks), conf.vmConfig)
 	snow := adaptor.Convert(vm)
 
 	ctx := tb.Context()
