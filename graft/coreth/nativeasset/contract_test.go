@@ -18,8 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -447,7 +447,7 @@ func TestStatefulPrecompile(t *testing.T) {
 
 	// AP5 was the last fork with these contracts enabled.
 	cfg := params.WithExtra(
-		&params.ChainConfig{
+		&ethparams.ChainConfig{
 			ChainID:             big.NewInt(1),
 			HomesteadBlock:      big.NewInt(0),
 			DAOForkBlock:        big.NewInt(0),
@@ -463,13 +463,13 @@ func TestStatefulPrecompile(t *testing.T) {
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp: new(uint64),
-				ApricotPhase2BlockTimestamp: new(uint64),
-				ApricotPhase3BlockTimestamp: new(uint64),
-				ApricotPhase4BlockTimestamp: new(uint64),
-				ApricotPhase5BlockTimestamp: new(uint64),
+		&cparams.ChainConfig{
+			NetworkUpgrades: cparams.NetworkUpgrades{
+				ApricotPhase1Timestamp: new(uint64),
+				ApricotPhase2Timestamp: new(uint64),
+				ApricotPhase3Timestamp: new(uint64),
+				ApricotPhase4Timestamp: new(uint64),
+				ApricotPhase5Timestamp: new(uint64),
 			},
 		},
 	)

@@ -24,7 +24,6 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -35,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
@@ -43,7 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	graftparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	cchainstate "github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -161,7 +161,7 @@ func delayExponent(h *types.Header) dynamic.DelayExponent {
 	return dynamic.InitialDelayExponent
 }
 
-func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
+func targetExponent(config *cparams.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
 	if te := customtypes.GetHeaderExtra(h).TargetExponent; te != nil {
 		return *te, nil
 	}
@@ -178,7 +178,7 @@ func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.Target
 }
 
 func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	config := corethparams.GetExtra(h.chainConfig)
+	config := graftparams.GetExtra(h.chainConfig)
 	te, err := targetExponent(config, header)
 	if err != nil {
 		te = dynamic.InitialTargetExponent
@@ -251,8 +251,8 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 }
 
 func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
-	config := corethparams.GetExtra(h.chainConfig)
-	if isFirstDurangoBlock := corethparams.GetRulesExtra(rules).IsDurango && !config.IsDurango(parent.Time); isFirstDurangoBlock {
+	config := graftparams.GetExtra(h.chainConfig)
+	if isFirstDurangoBlock := graftparams.GetRulesExtra(rules).IsDurango && !config.IsDurango(parent.Time); isFirstDurangoBlock {
 		activatePrecompile(statedb, corethwarp.ContractAddress)
 	}
 	return nil
@@ -342,7 +342,7 @@ func (h *hooks) VerifyBlockSyntax(b *types.Block) error {
 	// For genesis and pre-ApricotPhase1 blocks, the header's ExtDataHash is
 	// expected to be empty with the actual data expected to be committed to in
 	// [extDataHashes].
-	if height := b.NumberU64(); height == 0 || !corethparams.GetExtra(h.chainConfig).IsApricotPhase1(b.Time()) {
+	if height := b.NumberU64(); height == 0 || !graftparams.GetExtra(h.chainConfig).IsApricotPhase1(b.Time()) {
 		wantHash := customtypes.EmptyExtDataHash
 		if want, ok := extDataHashes[h.ctx.NetworkID][height]; ok {
 			wantHash = want
@@ -390,7 +390,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 
 	nowMS := uint64(now.UnixMilli())
 
-	config := corethparams.GetExtra(b.chainConfig)
+	config := graftparams.GetExtra(b.chainConfig)
 	te, err := targetExponent(config, parent)
 	if err != nil {
 		return nil, fmt.Errorf("getting target exponent: %w", err)
@@ -542,7 +542,7 @@ func (b *builder) BuildBlock(
 	}
 
 	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
-	rulesExtra := corethparams.GetRulesExtra(rules)
+	rulesExtra := graftparams.GetRulesExtra(rules)
 	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, rulesExtra, ethTxs)
 	if err != nil {
 		return nil, fmt.Errorf("verifying warp messages: %w", err)

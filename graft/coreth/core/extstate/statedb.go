@@ -16,6 +16,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // RegisterExtras registers hooks with libevm to achieve Avalanche state
@@ -64,7 +66,7 @@ func New(vm *state.StateDB) *StateDB {
 	}
 }
 
-func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, dst *common.Address, precompiles []common.Address, list types.AccessList) {
+func (s *StateDB) Prepare(rules ethparams.Rules, sender, coinbase common.Address, dst *common.Address, precompiles []common.Address, list types.AccessList) {
 	rulesExtra := params.GetRulesExtra(rules)
 	s.predicates = predicate.FromAccessList(rulesExtra, list)
 	s.StateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)

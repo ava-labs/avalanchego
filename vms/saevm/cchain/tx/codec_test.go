@@ -17,13 +17,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	graftparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 )
@@ -185,11 +185,11 @@ func TestFromBlock(t *testing.T) {
 		preAP5Time uint64 = 0
 		ap5Time           = preAP5Time + 1
 	)
-	config := corethparams.WithExtra(
+	config := graftparams.WithExtra(
 		&params.ChainConfig{},
-		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase5BlockTimestamp: new(ap5Time),
+		&cparams.ChainConfig{
+			NetworkUpgrades: cparams.NetworkUpgrades{
+				ApricotPhase5Timestamp: new(ap5Time),
 			},
 		},
 	)
