@@ -1,0 +1,8 @@
+exports_files([
+    "build_tmpnetctl.sh",
+    "kind-image-cache.sh",
+    "kind-with-registry.sh",
+    "produce-kind-image-cache.sh",
+    "run_task.sh",
+    "start_kind_cluster.sh",
+])

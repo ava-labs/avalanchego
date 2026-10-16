@@ -350,12 +350,16 @@ func deployIngressController(ctx context.Context, log logging.Logger, configPath
 
 	log.Info("deploying traefik ingress controller using Helm")
 
-	// Add the Traefik Helm repository.
-	if err := runHelmCommand(ctx, "repo", "add", "traefik", ingressChartRepo); err != nil {
-		return stacktrace.Errorf("failed to add helm repo: %w", err)
-	}
-	if err := runHelmCommand(ctx, "repo", "update"); err != nil {
-		return stacktrace.Errorf("failed to update helm repos: %w", err)
+	// Offline mode supplies a repository and chart cache produced by the online
+	// cache producer. Do not let Helm hide a missing image by reaching the network.
+	if os.Getenv("AVALANCHEGO_KIND_OFFLINE") != "true" {
+		// Add the Traefik Helm repository.
+		if err := runHelmCommand(ctx, "repo", "add", "traefik", ingressChartRepo); err != nil {
+			return stacktrace.Errorf("failed to add helm repo: %w", err)
+		}
+		if err := runHelmCommand(ctx, "repo", "update"); err != nil {
+			return stacktrace.Errorf("failed to update helm repos: %w", err)
+		}
 	}
 
 	// Install Traefik with Helm values.
@@ -473,12 +477,14 @@ func deployChaosMesh(ctx context.Context, log logging.Logger, configPath string,
 
 	log.Info("deploying chaos mesh using Helm")
 
-	// Add the helm repo for chaos-mesh
-	if err := runHelmCommand(ctx, "repo", "add", "chaos-mesh", chaosMeshChartRepo); err != nil {
-		return stacktrace.Errorf("failed to add chaos mesh helm repo: %w", err)
-	}
-	if err := runHelmCommand(ctx, "repo", "update"); err != nil {
-		return stacktrace.Errorf("failed to update helm repos: %w", err)
+	if os.Getenv("AVALANCHEGO_KIND_OFFLINE") != "true" {
+		// Add the Helm repo for Chaos Mesh.
+		if err := runHelmCommand(ctx, "repo", "add", "chaos-mesh", chaosMeshChartRepo); err != nil {
+			return stacktrace.Errorf("failed to add chaos mesh helm repo: %w", err)
+		}
+		if err := runHelmCommand(ctx, "repo", "update"); err != nil {
+			return stacktrace.Errorf("failed to update helm repos: %w", err)
+		}
 	}
 
 	// Install Chaos Mesh with all required settings including ingress
