@@ -721,6 +721,60 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 	}
 }
 
+// TestStandardExecutorAddSubnetValidatorTxStakeDurationErrors verifies that,
+// post-Durango, an [platform.AddSubnetValidatorTx] whose staking period,
+// measured from the current chain time, is outside the configured bounds is
+// rejected.
+func TestStandardExecutorAddSubnetValidatorTxStakeDurationErrors(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
+	chainTime := env.state.GetTimestamp()
+
+	tests := []struct {
+		name    string
+		endTime time.Time
+		want    error
+	}{
+		{
+			name:    "stake_too_short",
+			endTime: chainTime.Add(env.config.MinStakeDuration - time.Second),
+			want:    errStakeTooShort,
+		},
+		{
+			// Helicon only lowers the minimum staking duration of primary
+			// network validators.
+			name:    "stake_shorter_than_pre_helicon_minimum",
+			endTime: chainTime.Add(env.config.HeliconMinStakeDuration),
+			want:    errStakeTooShort,
+		},
+		{
+			name:    "stake_too_long",
+			endTime: chainTime.Add(env.config.MaxStakeDuration + time.Second),
+			want:    ErrStakeTooLong,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wallet := newWallet(t, env, walletConfig{})
+			tx, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
+				Validator: platform.Validator{
+					NodeID: genesistest.DefaultNodeIDs[0],
+					End:    uint64(tt.endTime.Unix()),
+					Wght:   genesistest.DefaultValidatorWeight,
+				},
+				Subnet: testSubnet1.ID(),
+			})
+			require.NoError(t, err)
+
+			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(t, err)
+
+			_, _, _, err = StandardTx(&env.backend, state.PickFeeCalculator(env.config, diff), tx, diff)
+			require.ErrorIs(t, err, tt.want)
+		})
+	}
+}
+
 // TestStandardExecutorAddSubnetValidatorTx verifies the successful execution
 // of an [platform.AddSubnetValidatorTx].
 func TestStandardExecutorAddSubnetValidatorTx(t *testing.T) {

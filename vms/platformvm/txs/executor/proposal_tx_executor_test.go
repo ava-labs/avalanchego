@@ -231,6 +231,16 @@ func TestProposalTxExecuteAddDelegatorErrors(t *testing.T) {
 			nodeID:    maxStakeNodeID,
 			want:      ErrOverDelegated,
 		},
+		{
+			name:      "issued_after_banff",
+			startTime: startTime,
+			endTime:   endTime,
+			nodeID:    minStakeNodeID,
+			updateState: func(_ *testing.T, diff *state.Diff) {
+				diff.SetTimestamp(env.config.UpgradeConfig.BanffTime)
+			},
+			want: errProposedAddStakerTxAfterBanff,
+		},
 	}
 
 	for _, tt := range tests {
@@ -475,6 +485,16 @@ func TestProposalTxExecuteAddSubnetValidatorErrors(t *testing.T) {
 			},
 			want: ErrDuplicateValidator,
 		},
+		{
+			name:      "issued_after_banff",
+			nodeID:    stagedNodeID,
+			startTime: stagedStartTime,
+			endTime:   stagedEndTime,
+			updateState: func(_ *testing.T, diff *state.Diff) {
+				diff.SetTimestamp(env.config.UpgradeConfig.BanffTime)
+			},
+			want: errProposedAddStakerTxAfterBanff,
+		},
 	}
 
 	for _, tt := range tests {
@@ -592,6 +612,16 @@ func TestProposalTxExecuteAddValidatorErrors(t *testing.T) {
 				deleteUTXOsOwnedBy(t, env, diff, feeKey)
 			},
 			want: errFlowCheckFailed,
+		},
+		{
+			name:      "issued_after_banff",
+			nodeID:    ids.GenerateTestNodeID(),
+			startTime: genesistest.DefaultValidatorStartTimeUnix + 1,
+			endTime:   genesistest.DefaultValidatorEndTimeUnix,
+			updateState: func(_ *testing.T, diff *state.Diff) {
+				diff.SetTimestamp(env.config.UpgradeConfig.BanffTime)
+			},
+			want: errProposedAddStakerTxAfterBanff,
 		},
 	}
 

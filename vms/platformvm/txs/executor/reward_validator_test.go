@@ -296,8 +296,17 @@ func TestRewardValidatorTxErrors(t *testing.T) {
 		name        string
 		txID        ids.ID
 		updateState func(*state.Diff)
+		updateTx    func(*platform.Tx)
 		want        error
 	}{
+		{
+			name: "tx_fails_syntactic_verification",
+			txID: stakerToRemove.TxID,
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.RewardValidatorTx).TxID = ids.Empty
+			},
+			want: platform.ErrMissingTxID,
+		},
 		{
 			name: "chain_time_before_staker_end_time",
 			txID: stakerToRemove.TxID,
@@ -322,7 +331,12 @@ func TestRewardValidatorTxErrors(t *testing.T) {
 				tt.updateState(diff)
 			}
 
-			_, _, err = executeProposalTx(t, env, diff, newRewardValidatorTx(t, tt.txID))
+			tx := newRewardValidatorTx(t, tt.txID)
+			if tt.updateTx != nil {
+				tt.updateTx(tx)
+			}
+
+			_, _, err = executeProposalTx(t, env, diff, tx)
 			require.ErrorIs(t, err, tt.want)
 		})
 	}
@@ -796,6 +810,13 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 		tx   func(t testing.TB, txID ids.ID, endTime time.Time) *platform.Tx
 		want error
 	}{
+		{
+			name: "tx_fails_syntactic_verification",
+			tx: func(t testing.TB, _ ids.ID, endTime time.Time) *platform.Tx {
+				return newRewardAutoRenewedValidatorTx(t, ids.Empty, endTime)
+			},
+			want: platform.ErrMissingTxID,
+		},
 		{
 			name: "wrong_staker",
 			tx: func(t testing.TB, _ ids.ID, endTime time.Time) *platform.Tx {
