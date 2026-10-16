@@ -19,6 +19,18 @@ avalanchego_path="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cache_root="${BAZEL_IMAGE_CACHE_ROOT:-${avalanchego_path}/.cache/bazel-image}"
 builder_tag="docker.io/library/avalanchego-bazel-builder:phase1"
 registry_image="localhost:5000/avalanchego-bazel:phase3"
+
+# CI restores these digest-pinned Docker inputs from an Actions cache. Keep
+# local tags distinct by platform because Docker's classic image store cannot
+# retain both platforms under one tag.
+docker_cache_archive="${BAZEL_IMAGE_DOCKER_CACHE_ARCHIVE:-}"
+write_docker_cache="${BAZEL_IMAGE_WRITE_DOCKER_CACHE:-false}"
+registry_base_image="docker.io/library/registry@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373"
+registry_base_image_tag="avalanchego-ci/registry:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373"
+debian_base_image_amd64="docker.io/library/debian@sha256:5ae3c39ebd15e229dcedd5cee596b2497182493d41ff162e824ba13fc1b2b867"
+debian_base_image_arm64="docker.io/library/debian@sha256:6bd27d44e6c32a66bbd72d7cb2b76a8ae3497ec2e5274a81abd1b37f6013fa1f"
+debian_base_image_amd64_tag="avalanchego-ci/debian-12-slim:5ae3c39ebd15e229dcedd5cee596b2497182493d41ff162e824ba13fc1b2b867-amd64"
+debian_base_image_arm64_tag="avalanchego-ci/debian-12-slim:6bd27d44e6c32a66bbd72d7cb2b76a8ae3497ec2e5274a81abd1b37f6013fa1f-arm64"
 case "$(uname -m)" in
   x86_64) builder_architecture=amd64 ;;
   aarch64 | arm64) builder_architecture=arm64 ;;
@@ -69,6 +81,45 @@ if [[ ! -S /var/run/docker.sock ]]; then
   exit 1
 fi
 
+if [[ -n "$docker_cache_archive" && -f "$docker_cache_archive" ]]; then
+  docker load --input "$docker_cache_archive"
+fi
+
+ensure_docker_image() {
+  local source_image="$1"
+  local platform="$2"
+  local local_image="$3"
+  local expected_architecture
+  local image_architecture
+  local image_id
+
+  if docker image inspect "$local_image" > /dev/null 2>&1; then
+    return
+  fi
+
+  expected_architecture="${platform#linux/}"
+  if image_id="$(docker image inspect --format '{{.Id}} {{.Architecture}}' "$source_image" 2> /dev/null)"; then
+    read -r image_id image_architecture <<<"$image_id"
+    if [[ "$image_architecture" == "$expected_architecture" ]]; then
+      docker tag "$image_id" "$local_image"
+      return
+    fi
+  fi
+
+  docker pull --platform "$platform" "$source_image"
+  image_id="$(docker image inspect --format '{{.Id}}' "$source_image")"
+  docker tag "$image_id" "$local_image"
+}
+
+# Build-only local validation does not need Docker base images. CI populates its
+# archive in build-only mode too, so a later test-mode job can restore all
+# Docker inputs without a registry pull.
+if ! "$build_only" || [[ -n "$docker_cache_archive" ]]; then
+  ensure_docker_image "$registry_base_image" "linux/${builder_architecture}" "$registry_base_image_tag"
+  ensure_docker_image "$debian_base_image_amd64" linux/amd64 "$debian_base_image_amd64_tag"
+  ensure_docker_image "$debian_base_image_arm64" linux/arm64 "$debian_base_image_arm64_tag"
+fi
+
 docker_socket_gid="$(stat -c '%g' /var/run/docker.sock)"
 
 mkdir -p \
@@ -85,10 +136,24 @@ cd "$avalanchego_path"
 # image build so Bazel does not discard its analysis cache when options change.
 bazelisk shutdown > /dev/null 2>&1 || true
 
-bazelisk run "//bazel/image:load_builder_${builder_architecture}" \
-  --repository_cache="$outer_repository_cache" \
-  --disk_cache="$outer_disk_cache" \
-  --remote_upload_local_results=false
+if ! docker image inspect "$builder_tag" > /dev/null 2>&1; then
+  bazelisk run "//bazel/image:load_builder_${builder_architecture}" \
+    --repository_cache="$outer_repository_cache" \
+    --disk_cache="$outer_disk_cache" \
+    --remote_upload_local_results=false
+fi
+
+if [[ "$write_docker_cache" == true && -n "$docker_cache_archive" ]]; then
+  mkdir -p "$(dirname "$docker_cache_archive")"
+  temporary_docker_cache_archive="${docker_cache_archive}.tmp"
+  docker image save \
+    --output "$temporary_docker_cache_archive" \
+    "$builder_tag" \
+    "$registry_base_image_tag" \
+    "$debian_base_image_amd64_tag" \
+    "$debian_base_image_arm64_tag"
+  mv "$temporary_docker_cache_archive" "$docker_cache_archive"
+fi
 
 builder_digest="$(docker image inspect --format '{{.Id}}' "$builder_tag")"
 git_commit="$(git rev-parse HEAD)"
@@ -104,7 +169,7 @@ image_arguments=()
 if ! "$build_only"; then
   # Host networking makes this disposable registry available as localhost to
   # the inner builder that pushes the image index.
-  registry_container_id="$(docker run --rm --detach --network host registry:2)"
+  registry_container_id="$(docker run --rm --detach --network host "$registry_base_image_tag")"
   image_command=(run //bazel/image:push_avalanchego)
   image_arguments=(-- --insecure)
 fi
@@ -208,10 +273,14 @@ for architecture in amd64 arm64; do
 
   if ! "$build_only"; then
     echo "running ${architecture} image binary in fresh Debian 12 slim"
+    case "$architecture" in
+      amd64) debian_smoke_image="$debian_base_image_amd64_tag" ;;
+      arm64) debian_smoke_image="$debian_base_image_arm64_tag" ;;
+    esac
     docker run --rm \
       --platform "linux/${architecture}" \
       --mount "type=bind,src=${binary_path},dst=/avalanchego,readonly" \
-      debian:12-slim \
+      "$debian_smoke_image" \
       /avalanchego --version
   fi
 done

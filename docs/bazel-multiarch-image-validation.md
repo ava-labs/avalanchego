@@ -88,8 +88,15 @@ The Linux `build-avalanchego-image` job in `.github/workflows/bazel.yml` runs
 action. The job is part of `bazel-required`.
 
 The Bazel dependency list includes the builder and image-push targets. The
-setup job fetches these targets before the image job. This avoids making the
-image job fetch the builder dependencies for the first time.
+setup job fetches these targets before the AvalancheGo image job. This avoids
+making the job fetch the builder dependencies for the first time.
+
+The AvalancheGo image job also restores a Docker image archive. It contains
+the native Bazel Debian builder, the disposable registry, and the Debian
+runtime bases for both test platforms. The cache key includes the architecture
+and all builder and image-base inputs. Only `master` writes a new archive.
+Pull requests restore it, so a cache hit does not download these images from a
+container registry.
 
 The normal Dockerfile/Buildx image validation remains in Go CI. Do not remove
 that path or treat the two paths as the same test. Compare their results when
