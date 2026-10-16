@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
@@ -115,7 +116,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			precompileAddr:       NativeAssetBalanceAddr,
 			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
 			value:                common.U2560,
-			gasInput:             params.AssetBalanceApricot,
+			gasInput:             AssetBalanceCost,
 			expectedGasRemaining: 0,
 			expectedErr:          nil,
 			expectedResult:       zeroBytes,
@@ -140,7 +141,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			precompileAddr:       NativeAssetBalanceAddr,
 			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
 			value:                common.U2560,
-			gasInput:             params.AssetBalanceApricot,
+			gasInput:             AssetBalanceCost,
 			expectedGasRemaining: 0,
 			expectedErr:          nil,
 			expectedResult:       zeroBytes,
@@ -164,7 +165,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			precompileAddr:       NativeAssetBalanceAddr,
 			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
 			value:                common.U2560,
-			gasInput:             params.AssetBalanceApricot,
+			gasInput:             AssetBalanceCost,
 			expectedGasRemaining: 0,
 			expectedErr:          nil,
 			expectedResult:       oneHundredBytes,
@@ -180,7 +181,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			precompileAddr:       NativeAssetBalanceAddr,
 			input:                nil,
 			value:                common.U2560,
-			gasInput:             params.AssetBalanceApricot,
+			gasInput:             AssetBalanceCost,
 			expectedGasRemaining: 0,
 			expectedErr:          vm.ErrExecutionReverted,
 			expectedResult:       nil,
@@ -196,7 +197,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			precompileAddr:       NativeAssetBalanceAddr,
 			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
 			value:                common.U2560,
-			gasInput:             params.AssetBalanceApricot - 1,
+			gasInput:             AssetBalanceCost - 1,
 			expectedGasRemaining: 0,
 			expectedErr:          vm.ErrOutOfGas,
 			expectedResult:       nil,
@@ -212,8 +213,8 @@ func TestStatefulPrecompile(t *testing.T) {
 			precompileAddr:       NativeAssetBalanceAddr,
 			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
 			value:                u256Hundred,
-			gasInput:             params.AssetBalanceApricot,
-			expectedGasRemaining: params.AssetBalanceApricot,
+			gasInput:             AssetBalanceCost,
+			expectedGasRemaining: AssetBalanceCost,
 			expectedErr:          vm.ErrInsufficientBalance,
 			expectedResult:       nil,
 			name:                 "native asset balance: non-zero value with insufficient funds reverts before running pre-compile",
@@ -232,7 +233,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
 			value:                common.U2560,
-			gasInput:             params.AssetCallApricot + ethparams.CallNewAccountGas + 123,
+			gasInput:             AssetCallCost + ethparams.CallNewAccountGas + 123,
 			expectedGasRemaining: 123,
 			expectedErr:          nil,
 			expectedResult:       nil,
@@ -265,7 +266,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
 			value:                uint256.NewInt(49),
-			gasInput:             params.AssetCallApricot + ethparams.CallNewAccountGas,
+			gasInput:             AssetCallCost + ethparams.CallNewAccountGas,
 			expectedGasRemaining: 0,
 			expectedErr:          nil,
 			expectedResult:       nil,
@@ -300,7 +301,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(51), nil),
 			value:                uint256.NewInt(50),
-			gasInput:             params.AssetCallApricot,
+			gasInput:             AssetCallCost,
 			expectedGasRemaining: 0,
 			expectedErr:          vm.ErrInsufficientBalance,
 			expectedResult:       nil,
@@ -332,8 +333,8 @@ func TestStatefulPrecompile(t *testing.T) {
 			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
 			value:                uint256.NewInt(51),
-			gasInput:             params.AssetCallApricot,
-			expectedGasRemaining: params.AssetCallApricot,
+			gasInput:             AssetCallCost,
+			expectedGasRemaining: AssetCallCost,
 			expectedErr:          vm.ErrInsufficientBalance,
 			expectedResult:       nil,
 			name:                 "native asset call: insufficient funds",
@@ -364,7 +365,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
 			value:                uint256.NewInt(50),
-			gasInput:             params.AssetCallApricot - 1,
+			gasInput:             AssetCallCost - 1,
 			expectedGasRemaining: 0,
 			expectedErr:          vm.ErrOutOfGas,
 			expectedResult:       nil,
@@ -384,7 +385,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
 			value:                uint256.NewInt(50),
-			gasInput:             params.AssetCallApricot + ethparams.CallNewAccountGas - 1,
+			gasInput:             AssetCallCost + ethparams.CallNewAccountGas - 1,
 			expectedGasRemaining: 0,
 			expectedErr:          vm.ErrOutOfGas,
 			expectedResult:       nil,
@@ -416,7 +417,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			precompileAddr:       NativeAssetCallAddr,
 			input:                make([]byte, 24),
 			value:                uint256.NewInt(50),
-			gasInput:             params.AssetCallApricot + ethparams.CallNewAccountGas,
+			gasInput:             AssetCallCost + ethparams.CallNewAccountGas,
 			expectedGasRemaining: ethparams.CallNewAccountGas,
 			expectedErr:          vm.ErrExecutionReverted,
 			expectedResult:       nil,
@@ -436,18 +437,47 @@ func TestStatefulPrecompile(t *testing.T) {
 			precompileAddr:       GenesisContractAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
 			value:                common.U2560,
-			gasInput:             params.AssetCallApricot + ethparams.CallNewAccountGas,
-			expectedGasRemaining: params.AssetCallApricot + ethparams.CallNewAccountGas,
+			gasInput:             AssetCallCost + ethparams.CallNewAccountGas,
+			expectedGasRemaining: AssetCallCost + ethparams.CallNewAccountGas,
 			expectedErr:          vm.ErrExecutionReverted,
 			expectedResult:       nil,
 			name:                 "deprecated contract",
 		},
 	}
+
+	// AP5 was the last fork with these contracts enabled.
+	cfg := params.WithExtra(
+		&params.ChainConfig{
+			ChainID:             big.NewInt(1),
+			HomesteadBlock:      big.NewInt(0),
+			DAOForkBlock:        big.NewInt(0),
+			DAOForkSupport:      true,
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0),
+			ConstantinopleBlock: big.NewInt(0),
+			PetersburgBlock:     big.NewInt(0),
+			IstanbulBlock:       big.NewInt(0),
+			MuirGlacierBlock:    big.NewInt(0),
+			BerlinBlock:         big.NewInt(0),
+			LondonBlock:         big.NewInt(0),
+		},
+		&extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
+				ApricotPhase1BlockTimestamp: new(uint64),
+				ApricotPhase2BlockTimestamp: new(uint64),
+				ApricotPhase3BlockTimestamp: new(uint64),
+				ApricotPhase4BlockTimestamp: new(uint64),
+				ApricotPhase5BlockTimestamp: new(uint64),
+			},
+		},
+	)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			stateDB := test.setupStateDB()
 			// Create EVM with BlockNumber and Time initialized to 0 to enable Apricot Rules.
-			evm := vm.NewEVM(vmCtx, vm.TxContext{}, stateDB, params.TestApricotPhase5Config, vm.Config{}) // Use ApricotPhase5Config because these precompiles are deprecated in ApricotPhase6.
+			evm := vm.NewEVM(vmCtx, vm.TxContext{}, stateDB, cfg, vm.Config{})
 			ret, gasRemaining, err := evm.Call(vm.AccountRef(test.from), test.precompileAddr, test.input, test.gasInput, test.value)
 			require.ErrorIs(t, err, test.expectedErr)
 			require.Equalf(t, test.expectedGasRemaining, gasRemaining, "unexpected gas remaining (%d of %d)", gasRemaining, test.gasInput)

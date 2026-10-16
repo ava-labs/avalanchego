@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras/extrastest"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompiletest"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
@@ -54,7 +53,7 @@ var (
 	testVdrs    []*testValidator
 	vdrs        map[ids.NodeID]*validators.GetValidatorOutput
 
-	graniteRules = extrastest.ForkToAvalancheRules(upgradetest.Granite)
+	graniteRules = forkToAvalancheRules(upgradetest.Granite)
 )
 
 func init() {
@@ -810,7 +809,7 @@ func makeWarpPredicateTests(tb testing.TB, rules extras.AvalancheRules) []precom
 func TestWarpPredicate(t *testing.T) {
 	for _, fork := range forks {
 		t.Run(fork.String(), func(t *testing.T) {
-			rules := extrastest.ForkToAvalancheRules(fork)
+			rules := forkToAvalancheRules(fork)
 			tests := makeWarpPredicateTests(t, rules)
 			precompiletest.RunPredicateTests(t, tests)
 		})
@@ -820,7 +819,7 @@ func TestWarpPredicate(t *testing.T) {
 func BenchmarkWarpPredicate(b *testing.B) {
 	for _, fork := range forks {
 		b.Run(fork.String(), func(b *testing.B) {
-			rules := extrastest.ForkToAvalancheRules(fork)
+			rules := forkToAvalancheRules(fork)
 			tests := makeWarpPredicateTests(b, rules)
 			precompiletest.RunPredicateBenchmarks(b, tests)
 		})

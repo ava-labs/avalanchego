@@ -7,9 +7,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/upgrade"
-
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -235,27 +232,6 @@ func (n NetworkUpgrades) Description() string {
 	banner += fmt.Sprintf(" - Helicon Timestamp:                @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.15.0)\n", ptrToString(n.HeliconTimestamp))
 	banner += fmt.Sprintf(" - Igloo Timestamp:                  @%-10v (Unscheduled)\n", ptrToString(n.IglooTimestamp))
 	return banner
-}
-
-func GetNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
-	return NetworkUpgrades{
-		ApricotPhase1BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase1Time),
-		ApricotPhase2BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase2Time),
-		ApricotPhase3BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase3Time),
-		ApricotPhase4BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase4Time),
-		ApricotPhase5BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase5Time),
-		ApricotPhasePre6BlockTimestamp:  utils.TimeToNewUint64(agoUpgrade.ApricotPhasePre6Time),
-		ApricotPhase6BlockTimestamp:     utils.TimeToNewUint64(agoUpgrade.ApricotPhase6Time),
-		ApricotPhasePost6BlockTimestamp: utils.TimeToNewUint64(agoUpgrade.ApricotPhasePost6Time),
-		BanffBlockTimestamp:             utils.TimeToNewUint64(agoUpgrade.BanffTime),
-		CortinaBlockTimestamp:           utils.TimeToNewUint64(agoUpgrade.CortinaTime),
-		DurangoBlockTimestamp:           utils.TimeToNewUint64(agoUpgrade.DurangoTime),
-		EtnaTimestamp:                   utils.TimeToNewUint64(agoUpgrade.EtnaTime),
-		FortunaTimestamp:                utils.TimeToNewUint64(agoUpgrade.FortunaTime),
-		GraniteTimestamp:                utils.TimeToNewUint64(agoUpgrade.GraniteTime),
-		HeliconTimestamp:                utils.TimeToNewUint64(agoUpgrade.HeliconTime),
-		IglooTimestamp:                  utils.TimeToNewUint64(agoUpgrade.IglooTime),
-	}
 }
 
 type AvalancheRules struct {
