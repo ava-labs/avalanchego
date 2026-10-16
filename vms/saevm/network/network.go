@@ -5,6 +5,7 @@
 package network
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -22,6 +23,8 @@ import (
 )
 
 var (
+	errUnknownSyncProtocol = errors.New("unknown sync protocol")
+
 	_ validators.Connector = (*Network)(nil)
 	_ common.AppHandler    = (*Network)(nil)
 )
@@ -59,13 +62,17 @@ var syncHandlerIDs = map[string]uint64{
 	"leaf":        p2p.EVMLeafRequestHandlerID,
 	"code":        p2p.EVMCodeRequestHandlerID,
 	"block":       p2p.EVMBlockRequestHandlerID,
-	"atomic_leaf": p2p.EVMAtomicLeafRequestHandlerID,
+	"cchain_leaf": p2p.EVMAtomicLeafRequestHandlerID,
 }
 
 // TrackingClient returns a client for the sync protocol served under handlerID,
-// scored by that protocol's own [peertracker.PeerTracker]. handlerID MUST be a sync protocol.
-func (n *Network) TrackingClient(handlerID uint64) *peertracker.Client {
-	return peertracker.NewClient(n.Network, handlerID, n.peerTrackers[handlerID])
+// scored by that protocol's own [peertracker.PeerTracker].
+func (n *Network) TrackingClient(handlerID uint64) (*peertracker.Client, error) {
+	peerTracker, ok := n.peerTrackers[handlerID]
+	if !ok {
+		return nil, fmt.Errorf("%w: handler %d", errUnknownSyncProtocol, handlerID)
+	}
+	return peertracker.NewClient(n.Network, handlerID, peerTracker), nil
 }
 
 // New creates the P2P network with a registered validator set.

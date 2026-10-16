@@ -99,9 +99,13 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		maxLeafRequestSize = 1024
 	)
 
+	blockClient, err := s.network.TrackingClient(p2p.EVMBlockRequestHandlerID)
+	if err != nil {
+		return err
+	}
 	blockSyncer := syncblock.NewSyncer(
 		s.snowCtx.Log,
-		syncblock.NewClient(s.snowCtx.Log, s.network.TrackingClient(p2p.EVMBlockRequestHandlerID)),
+		syncblock.NewClient(s.snowCtx.Log, blockClient),
 		s.db,
 		s.blockParser,
 		summary.AcceptedHash,
@@ -123,9 +127,13 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		return fmt.Errorf("%w: %s at height %d", errSynchronousBlock, summary.AcceptedHash, summary.AcceptedHeight)
 	}
 
+	codeClient, err := s.network.TrackingClient(p2p.EVMCodeRequestHandlerID)
+	if err != nil {
+		return err
+	}
 	codeSyncer, err := code.NewSyncer(
 		s.snowCtx.Log,
-		code.NewClient(s.snowCtx.Log, s.network.TrackingClient(p2p.EVMCodeRequestHandlerID)),
+		code.NewClient(s.snowCtx.Log, codeClient),
 		s.db,
 	)
 	if err != nil {
@@ -141,12 +149,16 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	}
 	s.snowCtx.Log.Info("finished wiping snapshot")
 
+	leafClient, err := s.network.TrackingClient(p2p.EVMLeafRequestHandlerID)
+	if err != nil {
+		return err
+	}
 	// TODO(powerslider): Remove dependency on graft.
 	evmSyncer, err := evmstate.NewSyncer(
 		s.snowCtx.Log,
 		hashdb.NewClient(
 			s.snowCtx.Log,
-			s.network.TrackingClient(p2p.EVMLeafRequestHandlerID),
+			leafClient,
 			common.HashLength,
 		),
 		s.db,

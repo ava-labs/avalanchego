@@ -24,7 +24,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 - C-Chain metrics no longer include the `transition` prefix. For example, `avalanche_evm_transition_sae_last_executed_height` is now `avalanche_evm_sae_last_executed_height`.
 - Added `avalanche_evm_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
-- SAE state sync scores peers separately for each sync protocol, so `avalanche_evm_p2p_peer_tracker_{num_tracked_peers,num_responsive_peers,average_bandwidth}` are replaced by one set per protocol: `avalanche_evm_p2p_peer_tracker_<protocol>_*` with `<protocol>` one of `leaf`, `code`, `block` or `atomic_leaf`.
+- SAE state sync scores peers separately for each sync protocol, so `avalanche_evm_p2p_peer_tracker_{num_tracked_peers,num_responsive_peers,average_bandwidth}` are replaced by one set per protocol: `avalanche_evm_p2p_peer_tracker_<protocol>_*` with `<protocol>` one of `leaf`, `code`, `block` or `cchain_leaf`.
 
 ### Fixes
 

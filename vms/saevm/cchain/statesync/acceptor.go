@@ -94,8 +94,12 @@ func (h *Handler) sync(ctx context.Context, evmSyncer *statesync.Syncer, s *summ
 		zap.Stringer("acceptedHash", s.summary.AcceptedHash),
 		zap.Uint64("acceptedHeight", s.summary.AcceptedHeight),
 	)
+	crossChainClient, err := h.network.TrackingClient(p2p.EVMAtomicLeafRequestHandlerID)
+	if err != nil {
+		return err
+	}
 	crossChainSyncer := state.NewSyncer(
-		h.network.TrackingClient(p2p.EVMAtomicLeafRequestHandlerID),
+		crossChainClient,
 		h.state,
 		s.settledRoot,
 		settledHeight,

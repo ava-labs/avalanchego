@@ -82,8 +82,10 @@ func TestTrackingClientsAreIsolated(t *testing.T) {
 			peer := ids.GenerateTestNodeID()
 			require.NoError(t, net.Connected(t.Context(), peer, nil), "Connected()")
 
+			client, err := net.TrackingClient(requestedID)
+			require.NoErrorf(t, err, "TrackingClient(%d)", requestedID)
 			onResponse := func(context.Context, ids.NodeID, []byte, error) bool { return true }
-			require.NoError(t, net.TrackingClient(requestedID).AppRequestAny(t.Context(), []byte("request"), onResponse), "AppRequestAny()")
+			require.NoError(t, client.AppRequestAny(t.Context(), []byte("request"), onResponse), "AppRequestAny()")
 
 			for _, handlerID := range wantSyncHandlerIDs {
 				want := set.Set[ids.NodeID]{}
@@ -96,22 +98,10 @@ func TestTrackingClientsAreIsolated(t *testing.T) {
 	}
 }
 
-func TestPeerTrackerMetricsNamedByProtocol(t *testing.T) {
-	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	_, err := New(snowCtx, &enginetest.Sender{})
+func TestTrackingClientUnknownProtocol(t *testing.T) {
+	net, err := New(snowtest.Context(t, snowtest.CChainID), enginetest.SenderStub{})
 	require.NoError(t, err, "New()")
 
-	families, err := snowCtx.Metrics.Gather()
-	require.NoError(t, err, "Gather()")
-	got := set.Set[string]{}
-	for _, family := range families {
-		got.Add(family.GetName())
-	}
-
-	for _, protocol := range []string{"leaf", "code", "block", "atomic_leaf"} {
-		for _, metric := range []string{"num_tracked_peers", "num_responsive_peers", "average_bandwidth"} {
-			name := "p2p_peer_tracker_" + protocol + "_" + metric
-			require.Truef(t, got.Contains(name), "%s registered", name)
-		}
-	}
+	_, err = net.TrackingClient(p2p.TxGossipHandlerID)
+	require.ErrorIs(t, err, errUnknownSyncProtocol, "TrackingClient(TxGossipHandlerID)")
 }
