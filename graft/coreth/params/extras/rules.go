@@ -7,11 +7,12 @@ import (
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 )
 
 type Rules struct {
 	// Rules for Avalanche releases
-	AvalancheRules
+	cparams.AvalancheRules
 
 	// Precompiles maps addresses to stateful precompiled contracts that are enabled
 	// for this rule set.

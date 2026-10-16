@@ -38,7 +38,7 @@ var P256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
 
 type RulesExtra extras.Rules
 
-func GetRulesExtra(r Rules) *extras.Rules {
+func GetRulesExtra(r ethparams.Rules) *extras.Rules {
 	rules := payloads.Rules.GetPointer(&r)
 	return (*extras.Rules)(rules)
 }
@@ -224,7 +224,7 @@ func (a accessibleState) GetBlockContext() contract.BlockContext {
 
 func (a accessibleState) GetRules() precompileconfig.Rules {
 	chainConfigExtra := GetExtra(a.GetPrecompileEnv().ChainConfig())
-	return chainConfigExtra.GetAvalancheRules(a.GetBlockContext().Timestamp())
+	return chainConfigExtra.Rules(a.GetBlockContext().Timestamp())
 }
 
 func (a accessibleState) GetSnowContext() *snow.Context {

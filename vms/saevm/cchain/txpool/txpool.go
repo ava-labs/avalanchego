@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/heap"
@@ -30,6 +29,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // Backend that the [Txpool] depends on for current chain state.
@@ -70,7 +71,7 @@ type Txpool struct {
 // [Txpool.Close] MUST be called during shutdown to release allocated resources.
 func New(
 	snowCtx *snow.Context,
-	chainConfig *params.ChainConfig,
+	chainConfig *ethparams.ChainConfig,
 	pending *Pending,
 	chain Backend,
 	maxSize int,
@@ -107,7 +108,7 @@ func New(
 }
 
 func (p *Txpool) updateState(
-	chainConfig *params.ChainConfig,
+	chainConfig *ethparams.ChainConfig,
 	chain Backend,
 	executed <-chan core.ChainHeadEvent,
 ) {
@@ -268,7 +269,7 @@ func (p *Txpool) verifyOp(op hook.Op) error {
 
 // inputUTXOs returns the union of all UTXO IDs consumed by transactions in b,
 // covering both EVM-native account+nonce inputs and cross-chain inputs.
-func inputUTXOs(b *types.Block, c *params.ChainConfig) (set.Set[ids.ID], error) {
+func inputUTXOs(b *types.Block, c *ethparams.ChainConfig) (set.Set[ids.ID], error) {
 	var (
 		ethTxs = b.Transactions()
 		signer = blocks.Signer(b, c)

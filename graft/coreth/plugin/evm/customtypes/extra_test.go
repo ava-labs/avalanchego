@@ -12,15 +12,14 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
-
-	paramsextras "github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 )
 
 func TestPredicateBytesFromExtra(t *testing.T) {
 	tests := []struct {
 		name  string
-		rules paramsextras.AvalancheRules
+		rules cparams.AvalancheRules
 		extra []byte
 		want  []byte
 	}{
@@ -44,27 +43,27 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "fortuna_empty_extra",
-			rules: paramsextras.AvalancheRules{
+			rules: cparams.AvalancheRules{
 				IsFortuna: true,
 			},
 		},
 		{
 			name: "fortuna_too_short",
-			rules: paramsextras.AvalancheRules{
+			rules: cparams.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra: make([]byte, acp176StateSize-1),
 		},
 		{
 			name: "fortuna_empty_predicate",
-			rules: paramsextras.AvalancheRules{
+			rules: cparams.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra: make([]byte, acp176StateSize),
 		},
 		{
 			name: "fortuna_non_empty_predicate",
-			rules: paramsextras.AvalancheRules{
+			rules: cparams.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra: []byte{
@@ -74,13 +73,13 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "helicon_empty_predicate",
-			rules: paramsextras.AvalancheRules{
+			rules: cparams.AvalancheRules{
 				IsHelicon: true,
 			},
 		},
 		{
 			name: "helicon_non_empty_predicate",
-			rules: paramsextras.AvalancheRules{
+			rules: cparams.AvalancheRules{
 				IsHelicon: true,
 			},
 			extra: []byte{5},

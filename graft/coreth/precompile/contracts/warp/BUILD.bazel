@@ -40,7 +40,6 @@ graft_go_test(
     ],
     embed = [":warp"],
     deps = [
-        "//graft/coreth/params/extras",
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/precompileconfig",
         "//graft/coreth/precompile/precompiletest",
@@ -62,6 +61,7 @@ graft_go_test(
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
+        "//vms/saevm/cchain/cparams",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_stretchr_testify//require",

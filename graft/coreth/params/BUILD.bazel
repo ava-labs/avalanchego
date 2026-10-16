@@ -9,7 +9,6 @@ package(default_visibility = [
 go_library(
     name = "params",
     srcs = [
-        "config.go",
         "config_extra.go",
         "config_libevm.go",
         "hooks_libevm.go",
@@ -26,6 +25,7 @@ go_library(
         "//snow",
         "//utils/set",
         "//vms/evm/predicate",
+        "//vms/saevm/cchain/cparams",
         "//vms/saevm/hook",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/vm",
@@ -38,7 +38,6 @@ go_library(
 graft_go_test(
     name = "params_test",
     srcs = [
-        "config_test.go",
         "hooks_libevm_test.go",
         "main_test.go",
         "protocol_params_test.go",
@@ -46,7 +45,7 @@ graft_go_test(
     embed = [":params"],
     deps = [
         "//graft/coreth/params/extras",
-        "//graft/evm/utils",
+        "//vms/saevm/cchain/cparams",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//params",
         "@com_github_stretchr_testify//assert",

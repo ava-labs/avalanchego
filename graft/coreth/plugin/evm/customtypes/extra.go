@@ -9,9 +9,8 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
-
-	paramsextras "github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 )
 
 // Sizes of the fee state that prefixes the extra data of pre-Helicon headers.
@@ -24,7 +23,7 @@ var ErrInsufficientFeeState = errors.New("insufficient length for ACP-176 fee st
 
 // PredicateBytesFromExtra returns the predicate result bytes from the header's
 // extra data. If the extra data is not long enough, an empty slice is returned.
-func PredicateBytesFromExtra(rules paramsextras.AvalancheRules, extra []byte) []byte {
+func PredicateBytesFromExtra(rules cparams.AvalancheRules, extra []byte) []byte {
 	offset := predicateBytesOffset(rules)
 	// Prior to Durango, the VM enforces the extra data is smaller than or equal
 	// to `offset`.
@@ -35,7 +34,7 @@ func PredicateBytesFromExtra(rules paramsextras.AvalancheRules, extra []byte) []
 	return extra[offset:]
 }
 
-func predicateBytesOffset(rules paramsextras.AvalancheRules) int {
+func predicateBytesOffset(rules cparams.AvalancheRules) int {
 	switch {
 	case rules.IsHelicon:
 		return 0
