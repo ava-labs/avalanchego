@@ -41,7 +41,11 @@ type Syncer struct {
 // [p2p.EVMAtomicLeafRequestHandlerID]. The [State] MUST NOT be altered concurrently.
 func NewSyncer(client *peertracker.Client, state *State, root common.Hash, height uint64) *Syncer {
 	return &Syncer{
-		fetcher:      hashdb.NewClient(state.snowCtx.Log, client, keyLength),
+		fetcher: hashdb.NewClient(
+			state.snowCtx.Log,
+			client,
+			keyLength,
+		),
 		targetRoot:   root,
 		targetHeight: height,
 		state:        state,
