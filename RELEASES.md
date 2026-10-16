@@ -8,12 +8,13 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 - Added the `IncreaseAutoRenewedValidatorStakeTx` P-Chain transaction, activated with Igloo. It locks additional stake for an auto-renewed validator, which is added to the validator's weight at the start of its next cycle without affecting the current cycle.
 - Added the `CancelAutoRenewedValidatorStakeIncreaseTx` P-Chain transaction, activated with Igloo. It cancels a stake increase that has not been applied yet and returns its stake.
+- Added the `DecreaseAutoRenewedValidatorStakeTx` P-Chain transaction, activated with Igloo. It withdraws stake from an auto-renewed validator at the start of its next cycle, as long as the validator keeps at least the minimum stake.
 
 ### APIs
 
 - The `avax.getAtomicTxStatus` C-Chain RPC, deprecated in v1.15.0, is removed. Use `avax.getAtomicTx`, which fails for a tx that has not been accepted.
 - Added:
-  - `pendingStakeIncrease`, `pendingStakeIncreases` and `appliedStakeIncrease` fields to `platform.getCurrentValidators` results for auto-renewed validators
+  - `pendingStakeIncrease`, `pendingStakeIncreases`, `appliedStakeIncrease`, `pendingStakeDecrease` and `withdrawnStake` fields to `platform.getCurrentValidators` results for auto-renewed validators
 
 ### Configs
 

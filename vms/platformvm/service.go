@@ -958,6 +958,8 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 					PendingStakeIncrease:      new(avajson.Uint64(stakingInfo.PendingStakeIncrease)),
 					PendingStakeIncreases:     &pendingStakeIncreases,
 					AppliedStakeIncrease:      new(avajson.Uint64(stakingInfo.AccruedStakeIncrease)),
+					PendingStakeDecrease:      new(avajson.Uint64(stakingInfo.PendingStakeDecrease)),
+					WithdrawnStake:            new(avajson.Uint64(stakingInfo.WithdrawnStake)),
 				}
 			}
 

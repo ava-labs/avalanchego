@@ -113,7 +113,7 @@ type AutoRenewedConfig struct {
 	// Cumulative rewards auto-compounded into the validator's weight over
 	// completed cycles, split by source:
 	//
-	//	weight = tx.Weight + RestakedValidationRewards + RestakedDelegateeRewards + AppliedStakeIncrease
+	//	weight = tx.Weight + RestakedValidationRewards + RestakedDelegateeRewards + AppliedStakeIncrease - WithdrawnStake
 	//
 	// Distinct from AccruedDelegateeReward, which holds only the commission
 	// pending in the current cycle. Nil if the node does not report them, which
@@ -130,4 +130,10 @@ type AutoRenewedConfig struct {
 	// Cumulative stake increases added to the validator's weight over
 	// completed cycles. Nil if the node does not report it.
 	AppliedStakeIncrease *json.Uint64 `json:"appliedStakeIncrease,omitempty"`
+	// Stake to withdraw at the start of the next cycle. Nil if the node does
+	// not report it.
+	PendingStakeDecrease *json.Uint64 `json:"pendingStakeDecrease,omitempty"`
+	// Cumulative stake withdrawn from the validator's stake outputs over
+	// completed cycles. Nil if the node does not report it.
+	WithdrawnStake *json.Uint64 `json:"withdrawnStake,omitempty"`
 }

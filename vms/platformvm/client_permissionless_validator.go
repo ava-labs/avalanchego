@@ -78,6 +78,8 @@ type ClientAutoRenewedConfig struct {
 	PendingStakeIncrease      *uint64
 	PendingStakeIncreases     []ClientStakeIncrease
 	AppliedStakeIncrease      *uint64
+	PendingStakeDecrease      *uint64
+	WithdrawnStake            *uint64
 }
 
 // ClientStakeIncrease is a stake increase of an auto-renewed validator.
@@ -249,5 +251,7 @@ func apiAutoRenewedConfigToClient(cfg *api.AutoRenewedConfig) (*ClientAutoRenewe
 		PendingStakeIncrease:      (*uint64)(cfg.PendingStakeIncrease),
 		PendingStakeIncreases:     pendingStakeIncreases,
 		AppliedStakeIncrease:      (*uint64)(cfg.AppliedStakeIncrease),
+		PendingStakeDecrease:      (*uint64)(cfg.PendingStakeDecrease),
+		WithdrawnStake:            (*uint64)(cfg.WithdrawnStake),
 	}, nil
 }

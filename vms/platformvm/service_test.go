@@ -885,6 +885,8 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 		delegateeReward       uint64
 		pendingStakeIncreases []uint64
 		appliedStakeIncrease  uint64
+		pendingStakeDecrease  uint64
+		withdrawnStake        uint64
 	}{
 		{
 			name: "nothing restaked",
@@ -910,6 +912,12 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 			pendingStakeIncreases: []uint64{2_000, 1_000},
 			appliedStakeIncrease:  5_000,
 		},
+		{
+			name:                 "pending stake decrease reported apart from withdrawn stake",
+			appliedStakeIncrease: 5_000,
+			pendingStakeDecrease: 1_000,
+			withdrawnStake:       4_000,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -921,7 +929,7 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 			endTime := startTime.Add(period)
 			// Restaked rewards and pending stake increases are added to the
 			// weight on every renewal, after which they are reported as applied.
-			weight := service.vm.MinValidatorStake + test.restakedValidation + test.restakedDelegatee + test.appliedStakeIncrease
+			weight := service.vm.MinValidatorStake + test.restakedValidation + test.restakedDelegatee + test.appliedStakeIncrease - test.withdrawnStake
 
 			rewardOwner := &secp256k1fx.OutputOwners{
 				Threshold: 1,
@@ -1006,6 +1014,8 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 				NextPeriod:                periodSeconds,
 				PendingStakeIncrease:      pendingStakeIncrease,
 				AccruedStakeIncrease:      test.appliedStakeIncrease,
+				PendingStakeDecrease:      test.pendingStakeDecrease,
+				WithdrawnStake:            test.withdrawnStake,
 				PendingStakeIncreaseTxIDs: pendingStakeIncreaseTxIDs,
 			}))
 			require.NoError(diff.Apply(service.vm.state))
@@ -1061,6 +1071,8 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 					PendingStakeIncrease:      new(avajson.Uint64(pendingStakeIncrease)),
 					PendingStakeIncreases:     &wantPendingStakeIncreases,
 					AppliedStakeIncrease:      new(avajson.Uint64(test.appliedStakeIncrease)),
+					PendingStakeDecrease:      new(avajson.Uint64(test.pendingStakeDecrease)),
+					WithdrawnStake:            new(avajson.Uint64(test.withdrawnStake)),
 				},
 				DelegatorCount:  new(avajson.Uint64),
 				DelegatorWeight: new(avajson.Uint64),
