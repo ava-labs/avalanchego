@@ -8,6 +8,7 @@ set -euo pipefail
 # e.g.,
 # source ./scripts/bazel_ci_dependency_list.sh
 # bazel_ci_target_patterns       # Bazel target patterns whose dependencies setup prepares for later CI jobs
+# bazel_ci_linux_target_patterns # Bazel target patterns used only on Linux CI
 #
 # Update this file when Bazel CI starts running a new command. The targets are
 # fetched by ./scripts/cache_bazel_ci_build_dependencies.sh. The target patterns
@@ -17,7 +18,7 @@ set -euo pipefail
 bazel_ci_target_patterns() {
   cat <<'EOF'
 //main:avalanchego
-//...
+//... -- -//bazel/image/...
 //ids:ids_test
 EOF
 }
@@ -29,6 +30,13 @@ bazel_ci_additional_dependency_targets() {
   cat <<'EOF'
 @buildifier_prebuilt//:buildifier
 @@buildozer++buildozer_binary+buildozer_binary//:buildozer.exe
+EOF
+}
+
+bazel_ci_linux_target_patterns() {
+  cat <<'EOF'
+//bazel/image:load_builder_amd64
+//bazel/image:push_avalanchego
 EOF
 }
 
