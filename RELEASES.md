@@ -9,6 +9,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 ### Features
 
 - Added `vms/evm/evmclient`, which combines standard Ethereum, Geth-specific, raw RPC, and Avalanche-specific EVM methods.
+- `eth_getLogs` now respects the node's C-Chain config option for `api-resolve-pending-to-last-executed`.
 
 ### APIs
 
@@ -19,6 +20,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 ### Configs
 
 - The `eth-apis` C-Chain option, deprecated in v1.15.0, is removed. The node now ignores it and logs a warning like any other unrecognized option. Set `apis` instead.
+- `api-max-blocks-per-request` was added back to the C-Chain config.
 
 ### Metrics
 
