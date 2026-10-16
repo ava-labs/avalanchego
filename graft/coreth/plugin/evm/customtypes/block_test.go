@@ -33,14 +33,18 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
+
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
+
+	ethparams "github.com/ava-labs/libevm/params"
 
 	// This test file has to be in package types_test to avoid a circular
 	// dependency when importing `params`. We dot-import the package to mimic
@@ -317,10 +321,32 @@ func BenchmarkEncodeBlock(b *testing.B) {
 
 func makeBenchBlock() *types.Block {
 	var (
+		testChainConfig = cparams.WithExtra(
+			&ethparams.ChainConfig{
+				ChainID:             big.NewInt(1),
+				HomesteadBlock:      big.NewInt(0),
+				DAOForkBlock:        big.NewInt(0),
+				DAOForkSupport:      true,
+				EIP150Block:         big.NewInt(0),
+				EIP155Block:         big.NewInt(0),
+				EIP158Block:         big.NewInt(0),
+				ByzantiumBlock:      big.NewInt(0),
+				ConstantinopleBlock: big.NewInt(0),
+				PetersburgBlock:     big.NewInt(0),
+				IstanbulBlock:       big.NewInt(0),
+				MuirGlacierBlock:    big.NewInt(0),
+				BerlinBlock:         big.NewInt(0),
+				LondonBlock:         big.NewInt(0),
+				ShanghaiTime:        utils.PointerTo[uint64](0),
+				CancunTime:          utils.PointerTo[uint64](0),
+			},
+			&cparams.ChainConfig{},
+		)
+
 		key, _   = crypto.GenerateKey()
 		txs      = make([]*types.Transaction, 70)
 		receipts = make([]*types.Receipt, len(txs))
-		signer   = types.LatestSigner(params.TestChainConfig)
+		signer   = types.LatestSigner(testChainConfig)
 		uncles   = make([]*types.Header, 3)
 	)
 	header := &types.Header{

@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -21,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -207,8 +207,8 @@ func TestTargetExponent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fortuna := &extras.ChainConfig{
-				NetworkUpgrades: extras.NetworkUpgrades{
+			fortuna := &cparams.ChainConfig{
+				NetworkUpgrades: cparams.NetworkUpgrades{
 					FortunaTimestamp: new(uint64(fortunaTime)),
 				},
 			}

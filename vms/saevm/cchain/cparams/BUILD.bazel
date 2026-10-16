@@ -1,25 +1,25 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
-load("//.bazel:defs.bzl", "graft_go_test")
+load("//.bazel:defs.bzl", "go_test")
 
 package(default_visibility = [
-    "//graft/coreth:__subpackages__",
-    "//graft/coreth:external_consumers",
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
 ])
 
 go_library(
-    name = "params",
+    name = "cparams",
     srcs = [
         "config.go",
-        "config_extra.go",
-        "config_libevm.go",
-        "hooks_libevm.go",
-        "protocol_params_ext.go",
+        "network_upgrades.go",
+        "precompile_upgrade.go",
+        "register.go",
+        "rules.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/graft/coreth/params",
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams",
+    visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/nativeasset",
-        "//graft/coreth/params/extras",
-        "//graft/coreth/plugin/evm/customheader",
+        "//graft/coreth/plugin/evm/upgrade/ap3",
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/modules",
         "//graft/coreth/precompile/precompileconfig",
@@ -27,6 +27,7 @@ go_library(
         "//graft/evm/utils",
         "//snow",
         "//utils/set",
+        "//vms/evm/acp176",
         "//vms/evm/predicate",
         "//vms/saevm/hook",
         "@com_github_ava_labs_libevm//common",
@@ -37,19 +38,29 @@ go_library(
     ],
 )
 
-graft_go_test(
-    name = "params_test",
+go_test(
+    name = "cparams_test",
     srcs = [
         "config_test.go",
-        "hooks_libevm_test.go",
-        "main_test.go",
+        "network_upgrades_test.go",
         "protocol_params_test.go",
+        "register_test.go",
+        "rules_test.go",
     ],
-    embed = [":params"],
+    embed = [":cparams"],
     deps = [
-        "//graft/coreth/params/extras",
+        "//graft/coreth/nativeasset",
+        "//graft/coreth/plugin/evm/upgrade/ap3",
+        "//graft/coreth/precompile/contracts/warp",
+        "//graft/coreth/precompile/precompileconfig",
         "//graft/evm/utils",
+        "//snow",
+        "//vms/evm/acp176",
+        "//vms/evm/predicate",
+        "@com_github_arr4n_shed//testerr",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//params",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",

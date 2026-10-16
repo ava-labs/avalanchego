@@ -19,15 +19,14 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -79,7 +78,7 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 	// schedule is configured by ctx.
 	chainID := g.Config.ChainID
 	u := &ctx.NetworkUpgrades
-	g.Config = corethparams.WithExtra(
+	g.Config = cparams.WithExtra(
 		&ethparams.ChainConfig{
 			ChainID:             chainID,
 			HomesteadBlock:      big.NewInt(0),
@@ -98,35 +97,31 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 			ShanghaiTime:        utils.TimeToNewUint64(u.DurangoTime),
 			CancunTime:          utils.TimeToNewUint64(u.EtnaTime),
 		},
-		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase1Time),
-				ApricotPhase2BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase2Time),
-				ApricotPhase3BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase3Time),
-				ApricotPhase4BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase4Time),
-				ApricotPhase5BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase5Time),
-				ApricotPhasePre6BlockTimestamp:  utils.TimeToNewUint64(u.ApricotPhasePre6Time),
-				ApricotPhase6BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase6Time),
-				ApricotPhasePost6BlockTimestamp: utils.TimeToNewUint64(u.ApricotPhasePost6Time),
-				BanffBlockTimestamp:             utils.TimeToNewUint64(u.BanffTime),
-				CortinaBlockTimestamp:           utils.TimeToNewUint64(u.CortinaTime),
-				DurangoBlockTimestamp:           utils.TimeToNewUint64(u.DurangoTime),
-				EtnaTimestamp:                   utils.TimeToNewUint64(u.EtnaTime),
-				FortunaTimestamp:                utils.TimeToNewUint64(u.FortunaTime),
-				GraniteTimestamp:                utils.TimeToNewUint64(u.GraniteTime),
-				HeliconTimestamp:                utils.TimeToNewUint64(u.HeliconTime),
-				IglooTimestamp:                  utils.TimeToNewUint64(u.IglooTime),
+		&cparams.ChainConfig{
+			NetworkUpgrades: cparams.NetworkUpgrades{
+				ApricotPhase1Timestamp:     utils.TimeToNewUint64(u.ApricotPhase1Time),
+				ApricotPhase2Timestamp:     utils.TimeToNewUint64(u.ApricotPhase2Time),
+				ApricotPhase3Timestamp:     utils.TimeToNewUint64(u.ApricotPhase3Time),
+				ApricotPhase4Timestamp:     utils.TimeToNewUint64(u.ApricotPhase4Time),
+				ApricotPhase5Timestamp:     utils.TimeToNewUint64(u.ApricotPhase5Time),
+				ApricotPhasePre6Timestamp:  utils.TimeToNewUint64(u.ApricotPhasePre6Time),
+				ApricotPhase6Timestamp:     utils.TimeToNewUint64(u.ApricotPhase6Time),
+				ApricotPhasePost6Timestamp: utils.TimeToNewUint64(u.ApricotPhasePost6Time),
+				BanffTimestamp:             utils.TimeToNewUint64(u.BanffTime),
+				CortinaTimestamp:           utils.TimeToNewUint64(u.CortinaTime),
+				DurangoTimestamp:           utils.TimeToNewUint64(u.DurangoTime),
+				EtnaTimestamp:              utils.TimeToNewUint64(u.EtnaTime),
+				FortunaTimestamp:           utils.TimeToNewUint64(u.FortunaTime),
+				GraniteTimestamp:           utils.TimeToNewUint64(u.GraniteTime),
+				HeliconTimestamp:           utils.TimeToNewUint64(u.HeliconTime),
+				IglooTimestamp:             utils.TimeToNewUint64(u.IglooTime),
 			},
-			AvalancheContext: extras.AvalancheContext{
-				SnowCtx: ctx,
-			},
-			UpgradeConfig: extras.UpgradeConfig{
-				PrecompileUpgrades: []extras.PrecompileUpgrade{
-					{
-						Config: warp.NewDefaultConfig(
-							utils.TimeToNewUint64(u.DurangoTime),
-						),
-					},
+			SnowCtx: ctx,
+			PrecompileUpgrades: []cparams.PrecompileUpgrade{
+				{
+					Config: warp.NewDefaultConfig(
+						utils.TimeToNewUint64(u.DurangoTime),
+					),
 				},
 			},
 		},
@@ -268,7 +263,7 @@ func (g *genesis) block() (*types.Block, error) {
 		h.GasLimit = ethparams.GenesisGasLimit
 	}
 
-	c := corethparams.GetExtra(g.Config)
+	c := cparams.GetExtra(g.Config)
 	if c.IsApricotPhase3(g.Timestamp) { // Also called London
 		h.BaseFee = g.BaseFee
 		if h.BaseFee == nil {
@@ -377,7 +372,7 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 	// the genesis timestamp is already after the Warp activation, then the
 	// state needs to reflect that or the precompile would never be marked as
 	// active.
-	if c := corethparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
+	if c := cparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
 		activatePrecompile(statedb, warp.ContractAddress)
 	}
 

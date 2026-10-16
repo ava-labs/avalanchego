@@ -13,7 +13,6 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
@@ -144,14 +144,14 @@ func TestFromReceipts(t *testing.T) {
 
 // newRules returns rules with the warp precompile registered at each of the
 // given addresses.
-func newRules(contracts ...common.Address) *extras.Rules {
+func newRules(contracts ...common.Address) *cparams.RulesExtra {
 	contract := corethwarp.NewDefaultConfig(new(uint64))
 
 	predicaters := make(map[common.Address]precompileconfig.Predicater, len(contracts))
 	for _, addr := range contracts {
 		predicaters[addr] = contract
 	}
-	return &extras.Rules{
+	return &cparams.RulesExtra{
 		Predicaters: predicaters,
 	}
 }

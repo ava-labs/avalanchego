@@ -9,8 +9,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 )
 
 // RegisterExtras registers all the C-Chain's libevm hooks and payloads.
@@ -22,7 +22,7 @@ func RegisterExtras() {
 	core.RegisterExtras()
 	customtypes.Register()
 	extstate.RegisterExtras()
-	params.RegisterExtras()
+	cparams.RegisterExtras()
 }
 
 // WithTempRegisteredExtras runs `fn` with temporary registration otherwise
@@ -33,7 +33,7 @@ func WithTempRegisteredExtras(fn func() error) error {
 			core.WithTempRegisteredExtras,
 			customtypes.WithTempRegisteredExtras,
 			extstate.WithTempRegisteredExtras,
-			params.WithTempRegisteredExtras,
+			cparams.WithTempRegisteredExtras,
 		} {
 			inner := fn
 			fn = func() error { return wrap(lock, inner) }

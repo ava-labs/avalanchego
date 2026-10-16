@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
@@ -30,10 +31,20 @@ var (
 	NativeAssetCallAddr    = common.HexToAddress("0x0100000000000000000000000000000000000002")
 )
 
+const (
+	// AssetBalanceCost is the gas cost of a native asset balance lookup.
+	// Based on the cost of an SLOAD operation since native asset balances are
+	// kept in state storage.
+	AssetBalanceCost uint64 = 2100
+	// AssetCallCost is the gas cost of a native asset call. This reflects
+	// the additional work done for the native asset transfer itself, which is
+	// a write to state storage. The cost of creating a new account and normal
+	// value transfer is assessed separately from this cost.
+	AssetCallCost uint64 = 20000
+)
+
 // NativeAssetBalance is a precompiled contract used to retrieve the native asset balance
-type NativeAssetBalance struct {
-	GasCost uint64
-}
+type NativeAssetBalance struct{}
 
 // PackNativeAssetBalanceInput packs the arguments into the required input data for a transaction to be passed into
 // the native asset balance contract.
@@ -56,12 +67,12 @@ func UnpackNativeAssetBalanceInput(input []byte) (common.Address, common.Hash, e
 }
 
 // Run implements StatefulPrecompiledContract
-func (b *NativeAssetBalance) Run(accessibleState contract.AccessibleState, _ common.Address, _ common.Address, input []byte, suppliedGas uint64, _ bool) (ret []byte, remainingGas uint64, err error) {
+func (*NativeAssetBalance) Run(accessibleState contract.AccessibleState, _ common.Address, _ common.Address, input []byte, suppliedGas uint64, _ bool) (ret []byte, remainingGas uint64, err error) {
 	// input: encodePacked(address 20 bytes, assetID 32 bytes)
-	if suppliedGas < b.GasCost {
+	if suppliedGas < AssetBalanceCost {
 		return nil, 0, vm.ErrOutOfGas
 	}
-	remainingGas = suppliedGas - b.GasCost
+	remainingGas = suppliedGas - AssetBalanceCost
 
 	address, assetID, err := UnpackNativeAssetBalanceInput(input)
 	if err != nil {
@@ -77,10 +88,7 @@ func (b *NativeAssetBalance) Run(accessibleState contract.AccessibleState, _ com
 
 // NativeAssetCall atomically transfers a native asset to a recipient address as well as calling that
 // address
-type NativeAssetCall struct {
-	GasCost           uint64
-	CallNewAccountGas uint64
-}
+type NativeAssetCall struct{}
 
 // PackNativeAssetCallInput packs the arguments into the required input data for a transaction to be passed into
 // the native asset contract.
@@ -109,7 +117,7 @@ func UnpackNativeAssetCallInput(input []byte) (common.Address, common.Hash, *big
 // Run implements [contract.StatefulPrecompiledContract]
 func (c *NativeAssetCall) Run(accessibleState contract.AccessibleState, caller common.Address, _ common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	env := accessibleState.GetPrecompileEnv()
-	if !env.UseGas(c.GasCost) {
+	if !env.UseGas(AssetCallCost) {
 		return nil, 0, vm.ErrOutOfGas
 	}
 	ret, err = c.run(env, accessibleState.GetStateDB(), caller, input, readOnly)
@@ -124,7 +132,7 @@ func (c *NativeAssetCall) Run(accessibleState contract.AccessibleState, caller c
 // run implements the contract logic, using `env.Gas()` and `env.UseGas()` in
 // place of `suppliedGas` and returning `remainingGas`, respectively. This
 // avoids mixing gas-accounting patterns when using `env.Call()`.
-func (c *NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.StateDB, caller common.Address, input []byte, readOnly bool) (ret []byte, err error) {
+func (*NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.StateDB, caller common.Address, input []byte, readOnly bool) (ret []byte, err error) {
 	if readOnly {
 		return nil, vm.ErrExecutionReverted
 	}
@@ -144,7 +152,7 @@ func (c *NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.Sta
 	snapshot := stateDB.Snapshot()
 
 	if !stateDB.Exist(to) {
-		if !env.UseGas(c.CallNewAccountGas) {
+		if !env.UseGas(params.CallNewAccountGas) {
 			return nil, vm.ErrOutOfGas
 		}
 		stateDB.CreateAccount(to)
