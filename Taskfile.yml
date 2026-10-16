@@ -577,13 +577,6 @@ tasks:
       - task: build-xsvm
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
 
-  test-e2e-ci:
-    desc: Runs e2e tests in parallel with race detection enabled
-    cmds:
-      - task: build-race
-      - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
-
   test-e2e-kube:
     desc: Runs e2e tests against a network deployed to kube
     cmds:
