@@ -100,7 +100,8 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			return signedTx
 		}
 
-		// gasLimit is half of the block gas limit, so each transaction fits in a block.
+		// gasLimit equals the minimum ACP-176 block capacity, and half the minimum
+		// SAE block gas limit, so each transaction fits in a block.
 		gasLimit := uint64(dynamic.MinTarget * gastime.TargetToRate * saeparams.TauSeconds)
 		tc.Log().Info("set gas limit",
 			zap.Uint64("gasLimit", gasLimit),

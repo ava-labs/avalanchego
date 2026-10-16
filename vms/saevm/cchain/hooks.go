@@ -5,6 +5,7 @@ package cchain
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,13 +26,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
@@ -161,6 +162,8 @@ func delayExponent(h *types.Header) dynamic.DelayExponent {
 	return dynamic.InitialDelayExponent
 }
 
+var errInsufficientFeeState = errors.New("insufficient length for ACP-176 fee state")
+
 func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
 	if te := customtypes.GetHeaderExtra(h).TargetExponent; te != nil {
 		return *te, nil
@@ -169,8 +172,17 @@ func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.Target
 		return dynamic.InitialTargetExponent, nil
 	}
 
-	// The block might be the last synchronous block running with ACP-176.
-	return customheader.TargetExponentFromExtra(h.Extra)
+	// The block might be the last synchronous block running with ACP-176, whose
+	// fee state ends with the target excess.
+	if len(h.Extra) < corethparams.ACP176StateSize {
+		return 0, fmt.Errorf("%w: expected at least %d bytes but got %d bytes",
+			errInsufficientFeeState,
+			corethparams.ACP176StateSize,
+			len(h.Extra),
+		)
+	}
+	targetExcess := h.Extra[corethparams.ACP176StateSize-wrappers.LongLen:]
+	return dynamic.TargetExponent(binary.BigEndian.Uint64(targetExcess)), nil
 }
 
 func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {

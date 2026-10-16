@@ -4,6 +4,7 @@
 package cchain
 
 import (
+	"bytes"
 	"encoding/binary"
 	"math/big"
 	"testing"
@@ -14,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -26,6 +26,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 )
 
 func TestDelayExponent(t *testing.T) {
@@ -163,6 +165,12 @@ func TestAncestorInputIDs(t *testing.T) {
 func TestTargetExponent(t *testing.T) {
 	const fortunaTime = 100
 
+	// Non-zero capacity and excess catch reading the wrong field.
+	feeState := binary.BigEndian.AppendUint64(
+		bytes.Repeat([]byte{0xff}, corethparams.ACP176StateSize-wrappers.LongLen),
+		5_000, // target excess
+	)
+
 	tests := []struct {
 		name    string
 		header  *types.Header
@@ -188,22 +196,31 @@ func TestTargetExponent(t *testing.T) {
 			want:   dynamic.InitialTargetExponent,
 		},
 		{
-			name: "no_field_fortuna_legacy_state",
+			name: "no_field_fortuna_fee_state",
 			header: &types.Header{
 				Time:   fortunaTime,
 				Number: big.NewInt(1),
-				Extra:  binary.BigEndian.AppendUint64(make([]byte, 2*wrappers.LongLen), 5_000),
+				Extra:  feeState,
 			},
 			want: 5_000,
 		},
 		{
-			name: "no_field_fortuna_invalid_extra",
+			name: "no_field_fortuna_fee_state_and_predicate",
 			header: &types.Header{
 				Time:   fortunaTime,
 				Number: big.NewInt(1),
-				Extra:  []byte{0x01},
+				Extra:  append(bytes.Clone(feeState), 1, 2, 3),
 			},
-			wantErr: customheader.ErrInsufficientFeeState,
+			want: 5_000,
+		},
+		{
+			name: "no_field_fortuna_short_extra",
+			header: &types.Header{
+				Time:   fortunaTime,
+				Number: big.NewInt(1),
+				Extra:  feeState[:len(feeState)-1],
+			},
+			wantErr: errInsufficientFeeState,
 		},
 	}
 
