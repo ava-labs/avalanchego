@@ -152,6 +152,27 @@ jobs:
         os: [ubuntu-24.04-amd64-4-core]
     steps:
       - uses: actions/checkout@v5
+      - id: setup-go
+        uses: ./.github/actions/setup-go-for-project
+      - id: cache-policy
+        uses: ./.github/actions/cache-policy
+        with:
+          request-cache-save: 'true'
+      - id: cache-key
+        name: Determine Go e2e build-cache key
+        shell: bash
+        run: |
+          cache_key_prefix="go-e2e-${{ matrix.os }}-${{ runner.arch }}-"
+          echo "cache-key=${cache_key_prefix}$(./scripts/workflow-hash-go-unit-inputs.sh)" >> "$GITHUB_OUTPUT"
+          echo "cache-key-prefix=${cache_key_prefix}" >> "$GITHUB_OUTPUT"
+      - id: e2e-cache
+        name: Restore Go e2e build cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.setup-go.outputs.go-build-cache-path }}
+          key: ${{ steps.cache-key.outputs.cache-key }}
+          restore-keys: |
+            ${{ steps.cache-key.outputs.cache-key-prefix }}
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -166,6 +187,12 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+      - name: Save Go e2e build cache
+        if: ${{ steps.cache-policy.outputs.cache-save-allowed == 'true' && steps.e2e-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ steps.setup-go.outputs.go-build-cache-path }}
+          key: ${{ steps.cache-key.outputs.cache-key }}
 
   e2e-bootstrap-monitor:
     needs: setup-cache-linux-amd64
