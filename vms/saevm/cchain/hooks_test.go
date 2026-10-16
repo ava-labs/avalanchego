@@ -4,6 +4,7 @@
 package cchain
 
 import (
+	"encoding/binary"
 	"math/big"
 	"testing"
 
@@ -13,12 +14,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
@@ -190,7 +192,7 @@ func TestTargetExponent(t *testing.T) {
 			header: &types.Header{
 				Time:   fortunaTime,
 				Number: big.NewInt(1),
-				Extra:  (&acp176.State{TargetExcess: 5_000}).Bytes(),
+				Extra:  binary.BigEndian.AppendUint64(make([]byte, 2*wrappers.LongLen), 5_000),
 			},
 			want: 5_000,
 		},
@@ -201,7 +203,7 @@ func TestTargetExponent(t *testing.T) {
 				Number: big.NewInt(1),
 				Extra:  []byte{0x01},
 			},
-			wantErr: acp176.ErrStateInsufficientLength,
+			wantErr: customheader.ErrInsufficientFeeState,
 		},
 	}
 
