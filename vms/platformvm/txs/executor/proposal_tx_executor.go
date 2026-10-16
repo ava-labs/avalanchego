@@ -627,7 +627,7 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx platform.DelegatorTx
 	//            AddSubnetValidatorTx.
 	vdrTx, ok := vdrTxIntf.Unsigned.(platform.ValidatorTx)
 	if !ok {
-		return errWrongTxType
+		return errUnexpectedStakerTxType
 	}
 
 	// Calculate split of reward between delegator/delegatee
