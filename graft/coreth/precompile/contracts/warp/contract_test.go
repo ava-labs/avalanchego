@@ -13,11 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras/extrastest"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompiletest"
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
@@ -32,13 +33,36 @@ var forks = []upgradetest.Fork{
 	upgradetest.Granite,
 }
 
+func forkToAvalancheRules(fork upgradetest.Fork) extras.AvalancheRules {
+	u := upgradetest.GetConfig(fork)
+	networkUpgrades := extras.NetworkUpgrades{
+		ApricotPhase1BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase1Time),
+		ApricotPhase2BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase2Time),
+		ApricotPhase3BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase3Time),
+		ApricotPhase4BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase4Time),
+		ApricotPhase5BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase5Time),
+		ApricotPhasePre6BlockTimestamp:  utils.TimeToNewUint64(u.ApricotPhasePre6Time),
+		ApricotPhase6BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase6Time),
+		ApricotPhasePost6BlockTimestamp: utils.TimeToNewUint64(u.ApricotPhasePost6Time),
+		BanffBlockTimestamp:             utils.TimeToNewUint64(u.BanffTime),
+		CortinaBlockTimestamp:           utils.TimeToNewUint64(u.CortinaTime),
+		DurangoBlockTimestamp:           utils.TimeToNewUint64(u.DurangoTime),
+		EtnaTimestamp:                   utils.TimeToNewUint64(u.EtnaTime),
+		FortunaTimestamp:                utils.TimeToNewUint64(u.FortunaTime),
+		GraniteTimestamp:                utils.TimeToNewUint64(u.GraniteTime),
+		HeliconTimestamp:                utils.TimeToNewUint64(u.HeliconTime),
+		IglooTimestamp:                  utils.TimeToNewUint64(u.IglooTime),
+	}
+	return networkUpgrades.GetAvalancheRules(uint64(upgrade.InitiallyActiveTime.Unix()))
+}
+
 func runTests(
 	t *testing.T,
 	makeTests func(tb testing.TB, rules extras.AvalancheRules) []precompiletest.PrecompileTest,
 ) {
 	for _, fork := range forks {
 		t.Run(fork.String(), func(t *testing.T) {
-			rules := extrastest.ForkToAvalancheRules(fork)
+			rules := forkToAvalancheRules(fork)
 			tests := makeTests(t, rules)
 			precompiletest.RunPrecompileTests(t, Module, tests)
 		})
@@ -51,7 +75,7 @@ func runBenchmarks(
 ) {
 	for _, fork := range forks {
 		b.Run(fork.String(), func(b *testing.B) {
-			rules := extrastest.ForkToAvalancheRules(fork)
+			rules := forkToAvalancheRules(fork)
 			tests := makeTests(b, rules)
 			precompiletest.RunPrecompileBenchmarks(b, Module, tests)
 		})

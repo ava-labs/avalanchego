@@ -5,12 +5,6 @@ package params
 
 import "github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 
-const (
-	// TODO: Value to pass to geth's Rules by default where the appropriate
-	// context is not available in the avalanche code. (similar to context.TODO())
-	IsMergeTODO = true
-)
-
 func GetExtra(c *ChainConfig) *extras.ChainConfig {
 	ex := payloads.ChainConfig.Get(c)
 	if ex == nil {
