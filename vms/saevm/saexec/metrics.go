@@ -262,7 +262,7 @@ func (m *metrics) observeExecuteDuration(start, end time.Time, b *blocks.Block, 
 		start:    start,
 		end:      end,
 		consumed: res.GasConsumed,
-		rate:     res.rate,
+		rate:     b.ParentBlock().ExecutedByGasTime().Rate(),
 	})
 }
 

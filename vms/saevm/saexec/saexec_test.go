@@ -833,8 +833,7 @@ func FuzzOpCodes(f *testing.F) {
 		var logger *loggingtest.Logger = sut.logger
 		// Errors in execution (i.e. reverts) are fine, but we don't want them
 		// bubbling up any further.
-		_, err := sut.execute(b, logger)
-		require.NoErrorf(t, err, "%T.execute()", sut.Executor)
+		require.NoErrorf(t, sut.execute(b, logger), "%T.execute()", sut.Executor)
 	})
 }
 
