@@ -142,4 +142,4 @@ Importantly, updating the last-settled pointer, $I(\sigma \in S)$, MAY be delaye
 
 5. If `blocks.Block.WaitUntilExecuted()` (broadcast) returns with `nil` error then `saexec.Executor.LastExecuted()` (polling) will return a block at the same or greater height.
 
-6. When `hook.Points.AdmitTransaction` or `hook.BlockBuilder.StampHeader` is called while building or verifying $b_n$, the post-execution state of the last block settled as of $b_n$ can be opened, because worst-case accounting only starts from an executed block and $b_\sigma \in S \implies b_\sigma \in E$. Every node therefore admits and stamps against the same settled state.
+6. While building or verifying $b_n$, `hook.Points.AdmitTransaction()` and `hook.BlockBuilder.StampHeader()` can open the post-execution state of its last settled block $b_\sigma$ because $b_\sigma \in S \implies b_\sigma \in E$. Every node resolves the same $b_\sigma$, so every node admits and stamps against the same state.
