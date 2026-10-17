@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
-	"github.com/ava-labs/avalanchego/ids"
 )
 
 var (
@@ -17,15 +16,17 @@ var (
 	_ sync.Marshaler[struct{}]    = changeProofMarshaler{}
 )
 
-type rangeProofMarshaler struct{}
-
-func (rangeProofMarshaler) Marshal(r *RangeProof) ([]byte, error) {
-	return r.rp.MarshalBinary()
+type rangeProofMarshaler struct {
+	db *ffi.Database
 }
 
-func (rangeProofMarshaler) Unmarshal(data []byte) (*RangeProof, error) {
-	proof := new(ffi.RangeProof)
-	if err := proof.UnmarshalBinary(data); err != nil {
+func (rangeProofMarshaler) Marshal(r *RangeProof) ([]byte, error) {
+	return r.rp.Marshal()
+}
+
+func (m rangeProofMarshaler) Unmarshal(data []byte) (*RangeProof, error) {
+	proof, err := m.db.UnmarshalRangeProof(data)
+	if err != nil {
 		return nil, err
 	}
 	return &RangeProof{
@@ -34,9 +35,8 @@ func (rangeProofMarshaler) Unmarshal(data []byte) (*RangeProof, error) {
 }
 
 type RangeProof struct {
-	rp        *ffi.RangeProof
-	root      ids.ID
-	maxLength int
+	rp  *ffi.RangeProof
+	vrp *ffi.VerifiedRangeProof
 }
 
 // TODO: implement an actual ChangeProof marshaler.
