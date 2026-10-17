@@ -36,7 +36,6 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		reqType  message.LeafsRequestType
 		nodeType message.NodeType
 		req      hashdb.LeafRange
 		resp     message.LeafsResponse
@@ -45,8 +44,7 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 		want     hashdb.Leaves
 	}{
 		{
-			name:     "account_trie_over_subnet_evm",
-			reqType:  message.SubnetEVMLeafsRequestType,
+			name:     "account_trie",
 			nodeType: message.StateTrieNode,
 			req: hashdb.LeafRange{
 				Root:  root,
@@ -56,7 +54,7 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 				Keys: [][]byte{{0x01}},
 				Vals: [][]byte{{0x0a}},
 			},
-			wantReq: message.SubnetEVMLeafsRequest{
+			wantReq: message.LeafsRequest{
 				Root:     root,
 				Limit:    1024,
 				NodeType: message.StateTrieNode,
@@ -67,8 +65,7 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 			},
 		},
 		{
-			name:     "storage_trie_over_coreth",
-			reqType:  message.CorethLeafsRequestType,
+			name:     "storage_trie",
 			nodeType: message.NodeType(2),
 			req: hashdb.LeafRange{
 				Root:    root,
@@ -80,7 +77,7 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 				Keys: [][]byte{{0x03}},
 				Vals: [][]byte{{0x0c}},
 			},
-			wantReq: message.CorethLeafsRequest{
+			wantReq: message.LeafsRequest{
 				Root:     root,
 				Account:  account,
 				Start:    []byte{0x01},
@@ -95,7 +92,6 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 		{
 			// The client verifies the proof, so it never reaches the caller.
 			name:     "proof_is_stripped_and_more_is_carried",
-			reqType:  message.SubnetEVMLeafsRequestType,
 			nodeType: message.StateTrieNode,
 			req: hashdb.LeafRange{
 				Root:  root,
@@ -107,7 +103,7 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 				More:      true,
 				ProofVals: [][]byte{{0xff}},
 			},
-			wantReq: message.SubnetEVMLeafsRequest{
+			wantReq: message.LeafsRequest{
 				Root:     root,
 				Limit:    8,
 				NodeType: message.StateTrieNode,
@@ -119,14 +115,13 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 		},
 		{
 			name:     "client_error_propagates",
-			reqType:  message.SubnetEVMLeafsRequestType,
 			nodeType: message.StateTrieNode,
 			req: hashdb.LeafRange{
 				Root:  root,
 				Limit: 8,
 			},
 			err: errStub,
-			wantReq: message.SubnetEVMLeafsRequest{
+			wantReq: message.LeafsRequest{
 				Root:     root,
 				Limit:    8,
 				NodeType: message.StateTrieNode,
@@ -142,7 +137,7 @@ func TestLeafFetcher_FetchLeaves(t *testing.T) {
 				err:  tt.err,
 			}
 
-			got, more, err := NewLeafFetcher(stub, tt.reqType, tt.nodeType).
+			got, more, err := NewLeafFetcher(stub, tt.nodeType).
 				FetchLeaves(t.Context(), tt.req)
 
 			require.ErrorIs(t, err, tt.err)

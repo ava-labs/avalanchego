@@ -47,7 +47,7 @@ VM-specific code that uses this package:
 
 - `coreth/plugin/evm/`: Implements `StateSyncableVM`. `StateSyncClient` orchestrates the top-level sync steps. `coreth/plugin/evm/atomic/sync/` syncs the atomic trie via the `Extender` interface.
 - `subnet-evm/plugin/evm/`: Implements `StateSyncableVM` for subnet-evm VMs (no atomic trie).
-- `message`: Contains structs that are serialized and sent over the network during state sync. Supports both coreth and subnet-evm wire formats via `LeafsRequestType`.
+- `message`: Contains structs that are serialized and sent over the network during state sync. `message.Codec` serializes them.
 
 ## Sync summaries & engine involvement
 

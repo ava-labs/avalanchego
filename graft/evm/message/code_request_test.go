@@ -11,9 +11,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 )
 
 // TestMarshalCodeRequest requires that the structure or serialization logic hasn't changed, primarily to
@@ -25,16 +23,14 @@ func TestMarshalCodeRequest(t *testing.T) {
 
 	base64CodeRequest := "AAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAHNvbWUgY29kZSBwbHM="
 
-	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-		codeRequestBytes, err := c.Marshal(message.Version, codeRequest)
-		require.NoError(t, err)
-		require.Equal(t, base64CodeRequest, base64.StdEncoding.EncodeToString(codeRequestBytes))
+	codeRequestBytes, err := message.Codec.Marshal(message.Version, codeRequest)
+	require.NoError(t, err)
+	require.Equal(t, base64CodeRequest, base64.StdEncoding.EncodeToString(codeRequestBytes))
 
-		var req message.CodeRequest
-		_, err = c.Unmarshal(codeRequestBytes, &req)
-		require.NoError(t, err)
-		require.Equal(t, codeRequest.Hashes, req.Hashes)
-	})
+	var req message.CodeRequest
+	_, err = message.Codec.Unmarshal(codeRequestBytes, &req)
+	require.NoError(t, err)
+	require.Equal(t, codeRequest.Hashes, req.Hashes)
 }
 
 // TestMarshalCodeResponse requires that the structure or serialization logic hasn't changed, primarily to
@@ -53,14 +49,12 @@ func TestMarshalCodeResponse(t *testing.T) {
 	}
 
 	base64CodeResponse := "AAAAAAABAAAAMlL9/AchgmVPFj9fD5piHXKVZsdNEAN8TXu7BAfR4sZJgYVa2GgdDYbR6R4AFnk5y2aU"
-	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-		codeResponseBytes, err := c.Marshal(message.Version, codeResponse)
-		require.NoError(t, err)
-		require.Equal(t, base64CodeResponse, base64.StdEncoding.EncodeToString(codeResponseBytes))
+	codeResponseBytes, err := message.Codec.Marshal(message.Version, codeResponse)
+	require.NoError(t, err)
+	require.Equal(t, base64CodeResponse, base64.StdEncoding.EncodeToString(codeResponseBytes))
 
-		var resp message.CodeResponse
-		_, err = c.Unmarshal(codeResponseBytes, &resp)
-		require.NoError(t, err)
-		require.Equal(t, codeResponse.Data, resp.Data)
-	})
+	var resp message.CodeResponse
+	_, err = message.Codec.Unmarshal(codeResponseBytes, &resp)
+	require.NoError(t, err)
+	require.Equal(t, codeResponse.Data, resp.Data)
 }
