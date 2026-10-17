@@ -161,7 +161,10 @@ func (c Config) targetCommitSize() common.StorageSize {
 	return defaultTargetCommitSize
 }
 
-var _ StateDBOpener = (*Tracker)(nil)
+var (
+	_ StateDBOpener         = (*Tracker)(nil)
+	_ ReadOnlyStateDBOpener = (*Tracker)(nil)
+)
 
 // Tracker provides an abstraction to state-related operations, managing all
 // database operations not exposed by the [state.StateDB] itself.
@@ -349,6 +352,12 @@ func (t *Tracker) Untrack(root common.Hash) {
 // leak or state corruption.
 func (t *Tracker) StateDB(root common.Hash) (*state.StateDB, error) {
 	return state.New(root, t.cache, t.snaps)
+}
+
+// ReadOnlyStateDB is [Tracker.StateDB] for state that MUST NOT be committed.
+// Committing the result returns [ErrReadOnlyStateDB] whatever the scheme.
+func (t *Tracker) ReadOnlyStateDB(root common.Hash) (*state.StateDB, error) {
+	return state.New(root, readOnlyDatabase{t.cache}, t.snaps)
 }
 
 // Close commits the state at root to disk, flattens any snapshot onto it, and
