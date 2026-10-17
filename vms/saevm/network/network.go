@@ -5,6 +5,7 @@
 package network
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -22,6 +23,8 @@ import (
 )
 
 var (
+	errUnknownSyncProtocol = errors.New("unknown sync protocol")
+
 	_ validators.Connector = (*Network)(nil)
 	_ common.AppHandler    = (*Network)(nil)
 )
@@ -29,15 +32,15 @@ var (
 // config sets optional parameters for the P2P network.
 type config struct {
 	// trackedPeers provides an exclusive list of nodes that will be connected
-	// through the [peertracker.PeerTracker] on the [Network].
+	// through every [peertracker.PeerTracker] on the [Network].
 	trackedPeers set.Set[ids.NodeID]
 }
 
 // An Option provides overrides to default network behavior.
 type Option = options.Option[config]
 
-// WithAllowedTrackedPeers restricts the peers available in the
-// [Network.PeerTracker] to only those in the provided set.
+// WithAllowedTrackedPeers restricts the peers available to every
+// [Network.TrackingClient] to only those in the provided set.
 func WithAllowedTrackedPeers(ids set.Set[ids.NodeID]) Option {
 	return options.Func[config](func(c *config) {
 		c.trackedPeers = ids
@@ -50,7 +53,26 @@ type Network struct {
 	*p2p.Network
 	ValidatorPeers *p2p.Validators
 	Peers          *p2p.Peers
-	PeerTracker    *peertracker.PeerTracker
+	peerTrackers   map[uint64]*peertracker.PeerTracker
+}
+
+// syncHandlerIDs each get their own [peertracker.PeerTracker], because bandwidth
+// scales with response size and so is only comparable within one protocol.
+var syncHandlerIDs = map[string]uint64{
+	"leaf":        p2p.EVMLeafRequestHandlerID,
+	"code":        p2p.EVMCodeRequestHandlerID,
+	"block":       p2p.EVMBlockRequestHandlerID,
+	"cchain_leaf": p2p.EVMAtomicLeafRequestHandlerID,
+}
+
+// TrackingClient returns a client for the sync protocol served under handlerID,
+// scored by that protocol's own [peertracker.PeerTracker].
+func (n *Network) TrackingClient(handlerID uint64) (*peertracker.Client, error) {
+	peerTracker, ok := n.peerTrackers[handlerID]
+	if !ok {
+		return nil, fmt.Errorf("%w: handler %d", errUnknownSyncProtocol, handlerID)
+	}
+	return peertracker.NewClient(n.Network, handlerID, peerTracker), nil
 }
 
 // New creates the P2P network with a registered validator set.
@@ -74,15 +96,21 @@ func New(
 		maxValidatorSetStaleness,
 	)
 
-	peerTracker, err := peertracker.New(
-		snowCtx.Log,
-		"peer_tracker",
-		reg,
-		set.Of(snowCtx.NodeID),
-		nil,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("creating peer tracker: %w", err)
+	connectionHandlers := []p2p.ConnectionHandler{peers, validatorPeers}
+	peerTrackers := make(map[uint64]*peertracker.PeerTracker, len(syncHandlerIDs))
+	for name, handlerID := range syncHandlerIDs {
+		peerTracker, err := peertracker.New(
+			snowCtx.Log,
+			"peer_tracker_"+name,
+			reg,
+			set.Of(snowCtx.NodeID),
+			nil,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("creating %s peer tracker: %w", name, err)
+		}
+		peerTrackers[handlerID] = peerTracker
+		connectionHandlers = append(connectionHandlers, withFilter(peerTracker, cfg.trackedPeers))
 	}
 
 	const namespace = "network"
@@ -91,9 +119,7 @@ func New(
 		sender,
 		reg,
 		namespace,
-		peers,
-		validatorPeers,
-		withFilter(peerTracker, cfg.trackedPeers),
+		connectionHandlers...,
 	)
 	if err != nil {
 		return nil, err
@@ -102,7 +128,7 @@ func New(
 		Network:        network,
 		Peers:          peers,
 		ValidatorPeers: validatorPeers,
-		PeerTracker:    peerTracker,
+		peerTrackers:   peerTrackers,
 	}, nil
 }
 
