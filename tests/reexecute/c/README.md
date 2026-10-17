@@ -88,29 +88,10 @@ This performs the following steps:
 2. Copy the current state as of the default task's initial height into `$EXECUTION_DATA_DIR/current-state` (state as of height 100) using the VM's default config (hashdb full)
 3. Build and execute a Golang Benchmark a single time to execute the default block range (block range [101, 250k])
 
-The final output displays the top-level metrics from the benchmark run, which is simply mgas/s for the C-Chain:
+The final output logs the top-level metrics from the benchmark run, which is simply mgas/s for the C-Chain:
 
 ```
-[09-02|16:25:21.481] INFO vm-executor c/vm_reexecute_test.go:383 executing block {"height": 250000, "eta": "0s"}
-[09-02|16:25:21.483] INFO vm-executor c/vm_reexecute_test.go:401 finished executing sequence
-[09-02|16:25:21.485] INFO c-chain-reexecution c/vm_reexecute_test.go:194 shutting down VM
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/txpool/legacypool/legacypool.go:449 Transaction pool stopped
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:966 Closing quit channel
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:969 Stopping Acceptor
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:972 Acceptor queue drained                   t="4.359µs"
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:975 Shutting down sender cacher
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:979 Closing scope
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:983 Waiting for background processes to complete
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:1002 Shutting down state manager
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:1007 State manager shut down                  t=198ns
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:1012 Blockchain stopped
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> eth/backend.go:404 Stopped shutdownTracker
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> eth/backend.go:407 Closed chaindb
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> eth/backend.go:409 Stopped EventMux
-[09-02|16:25:21.485] INFO c-chain-reexecution c/vm_reexecute_test.go:181 shutting down DB
-BenchmarkReexecuteRange/[101,250000]-Config-archive-6         	       1	        85.29 mgas/s
-PASS
-ok  	github.com/ava-labs/avalanchego/tests/reexecute/c	313.560s
+INFO c-chain-reexecution BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-dev {"result": "85.29 mgas/s"}
 ```
 
 ## How to Create and Use a Re-Execution Snapshot

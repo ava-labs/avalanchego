@@ -57,7 +57,7 @@ func init() {
 		&firewoodEnabledArg,
 		"firewood",
 		false,
-		"whether to use Firewood in Coreth",
+		"whether to use Firewood on the C-Chain",
 	)
 	flag.IntVar(
 		&numWorkersArg,
