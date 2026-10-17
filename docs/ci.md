@@ -466,10 +466,11 @@ The cache-writing setup jobs use
 It requests saves from `setup-go-for-project`, `setup-task`, and `install-nix`
 only when `cache-policy` permits cache writing. Other uses of these actions are
 restore-only. `install-nix` can use the same module-cache action as a
-restore-only consumer. Disabling `setup_go_module_cache` skips preparation for
-Go tasks outside Bazel. It does not prepare those dependencies through Gazelle's
-cache or set `GOPROXY=off` for those tasks. A job that disables their module
-downloads must prepare their dependencies separately.
+restore-only consumer. Disabling `install-nix`'s `setup_go_module_cache` input
+skips preparation for Go tasks outside Bazel. This input does not prepare those
+dependencies through Gazelle's cache or set `GOPROXY=off`. Jobs that need these
+dependencies must prepare them before disabling module downloads.
+
 The implicit `actions/setup-go` cache is disabled because its
 post-job save cannot be limited to `master` runs by `cache-policy`.
 
