@@ -14,3 +14,5 @@ use (
 // an older genproto version that conflicts with the new split modules (googleapis/rpc,
 // googleapis/api). The replace forces a version that knows to defer to the submodules.
 replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20230526161137-0005af68ea54
+
+replace github.com/ava-labs/firewood-go-ethhash/ffi => github.com/ava-labs/firewood-go-ethhash/ffi v0.0.0-20261017000332-2ffb3756f4d3
