@@ -5,6 +5,7 @@ package cchain
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,8 +32,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
@@ -161,6 +162,8 @@ func delayExponent(h *types.Header) dynamic.DelayExponent {
 	return dynamic.InitialDelayExponent
 }
 
+var errInsufficientFeeState = errors.New("insufficient length for ACP-176 fee state")
+
 func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
 	if te := customtypes.GetHeaderExtra(h).TargetExponent; te != nil {
 		return *te, nil
@@ -169,12 +172,17 @@ func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.Target
 		return dynamic.InitialTargetExponent, nil
 	}
 
-	// The block might be the last synchronous block running with ACP-176.
-	state, err := acp176.ParseState(h.Extra)
-	if err != nil {
-		return 0, fmt.Errorf("parsing fee state: %w", err)
+	// The block might be the last synchronous block running with ACP-176, whose
+	// fee state ends with the target excess.
+	if len(h.Extra) < corethparams.ACP176StateSize {
+		return 0, fmt.Errorf("%w: expected at least %d bytes but got %d bytes",
+			errInsufficientFeeState,
+			corethparams.ACP176StateSize,
+			len(h.Extra),
+		)
 	}
-	return dynamic.TargetExponent(state.TargetExcess), nil
+	targetExcess := h.Extra[corethparams.ACP176StateSize-wrappers.LongLen:]
+	return dynamic.TargetExponent(binary.BigEndian.Uint64(targetExcess)), nil
 }
 
 func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {

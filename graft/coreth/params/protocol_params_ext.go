@@ -3,6 +3,14 @@
 
 package params
 
+import "github.com/ava-labs/avalanchego/utils/wrappers"
+
+// Sizes of the fee state that prefixes the extra data of pre-Helicon headers.
+const (
+	ap3WindowSize   = 10 * wrappers.LongLen
+	ACP176StateSize = 3 * wrappers.LongLen // capacity, excess, target excess
+)
+
 const (
 	// Avalanche Stateful Precompile Params
 	// Gas price for native asset balance lookup. Based on the cost of an SLOAD operation since native

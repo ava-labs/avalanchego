@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 )
@@ -31,6 +32,84 @@ func TestRulesExtra_MinimumGasConsumption(t *testing.T) {
 				AvalancheRules: extras.AvalancheRules{IsHelicon: tt.isHelicon},
 			})
 			assert.Equalf(t, tt.want, r.MinimumGasConsumption(tt.limit), "%T.MinimumGasConsumption(%d)", r, tt.limit)
+		})
+	}
+}
+
+func TestPredicateBytesFromExtra(t *testing.T) {
+	tests := []struct {
+		name  string
+		rules extras.AvalancheRules
+		extra []byte
+		want  []byte
+	}{
+		{
+			name: "empty_extra",
+		},
+		{
+			name:  "too_short",
+			extra: make([]byte, ap3WindowSize-1),
+		},
+		{
+			name:  "empty_predicate",
+			extra: make([]byte, ap3WindowSize),
+		},
+		{
+			name: "non_empty_predicate",
+			extra: []byte{
+				ap3WindowSize: 5,
+			},
+			want: []byte{5},
+		},
+		{
+			name: "fortuna_empty_extra",
+			rules: extras.AvalancheRules{
+				IsFortuna: true,
+			},
+		},
+		{
+			name: "fortuna_too_short",
+			rules: extras.AvalancheRules{
+				IsFortuna: true,
+			},
+			extra: make([]byte, ACP176StateSize-1),
+		},
+		{
+			name: "fortuna_empty_predicate",
+			rules: extras.AvalancheRules{
+				IsFortuna: true,
+			},
+			extra: make([]byte, ACP176StateSize),
+		},
+		{
+			name: "fortuna_non_empty_predicate",
+			rules: extras.AvalancheRules{
+				IsFortuna: true,
+			},
+			extra: []byte{
+				ACP176StateSize: 5,
+			},
+			want: []byte{5},
+		},
+		{
+			name: "helicon_empty_predicate",
+			rules: extras.AvalancheRules{
+				IsHelicon: true,
+			},
+		},
+		{
+			name: "helicon_non_empty_predicate",
+			rules: extras.AvalancheRules{
+				IsHelicon: true,
+			},
+			extra: []byte{5},
+			want:  []byte{5},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := predicateBytesFromExtra(tt.rules, tt.extra)
+			require.Equal(t, tt.want, got, "predicateBytesFromExtra()")
 		})
 	}
 }

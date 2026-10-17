@@ -63,7 +63,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
-	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
@@ -3424,6 +3423,8 @@ func deployContract(ctx context.Context, t *testing.T, vm *VM, gasPrice *big.Int
 }
 
 func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
+	const timeToFillCapacity = 5 // seconds
+
 	ctx := t.Context()
 	tests := []struct {
 		name                  string
@@ -3460,7 +3461,7 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 			fork:                  upgradetest.Fortuna,
 			deployGasPrice:        big.NewInt(testMinGasPrice),
 			txGasPrice:            big.NewInt(testMinGasPrice),
-			preDeployTime:         params.InvalidateDelegateUnix - acp176.TimeToFillCapacity - 1,
+			preDeployTime:         params.InvalidateDelegateUnix - timeToFillCapacity - 1,
 			refillCapacityFortuna: true,
 			wantIncluded:          true,
 			wantReceiptStatus:     types.ReceiptStatusSuccessful,
@@ -3499,7 +3500,7 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 				// Ensure gas capacity is refilled relative to the parent block's timestamp
 				parent := vm.blockChain.CurrentBlock()
 				parentTime := time.Unix(int64(parent.Time), 0)
-				minRefillTime := parentTime.Add(acp176.TimeToFillCapacity * time.Second)
+				minRefillTime := parentTime.Add(timeToFillCapacity * time.Second)
 				if vm.clock.Time().Before(minRefillTime) {
 					vm.clock.Set(minRefillTime)
 				}
