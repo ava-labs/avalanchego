@@ -130,7 +130,7 @@ func (ts *Topological) Initialize(
 	ts.lastAcceptedID = lastAcceptedID
 	ts.lastAcceptedHeight = lastAcceptedHeight
 	ts.blocks = map[ids.ID]*snowmanBlock{
-		lastAcceptedID: {t: ts},
+		lastAcceptedID: {t: ts, height: lastAcceptedHeight},
 	}
 	ts.preferredHeights = make(map[uint64]ids.ID)
 	ts.preference = lastAcceptedID
@@ -168,8 +168,9 @@ func (ts *Topological) Add(blk Block) error {
 	// add the block as a child of its parent, and add the block to the tree
 	parentNode.AddChild(blk)
 	ts.blocks[blkID] = &snowmanBlock{
-		t:   ts,
-		blk: blk,
+		t:      ts,
+		blk:    blk,
+		height: height,
 	}
 
 	// If we are extending the preference, this is the new preference
@@ -207,8 +208,11 @@ func (ts *Topological) LastAccepted() (ids.ID, uint64) {
 	return ts.lastAcceptedID, ts.lastAcceptedHeight
 }
 
-func (ts *Topological) Preference() ids.ID {
-	return ts.preference
+func (ts *Topological) Preference() (ids.ID, uint64) {
+	if ts.preference == ids.Empty {
+		return ts.preference, 0
+	}
+	return ts.preference, ts.blocks[ts.preference].height
 }
 
 func (ts *Topological) PreferenceAtHeight(height uint64) (ids.ID, bool) {
