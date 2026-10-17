@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -104,6 +105,7 @@ func Context(tb testing.TB, chainID ids.ID) *snow.Context {
 		AVAXAssetID: AVAXAssetID,
 
 		Log:          logging.NoLog{},
+		Tracer:       trace.Noop,
 		SharedMemory: sharedMemory,
 		BCLookup:     aliaser,
 		Metrics:      metrics.NewPrefixGatherer(),
