@@ -181,6 +181,40 @@ func Test_CalculatePrice(t *testing.T) {
 	}
 }
 
+func Test_CalculatePriceWithExcessConversion(t *testing.T) {
+	tests := []struct {
+		name             string
+		minPrice         Price
+		excess           Gas
+		factor1, factor2 Gas
+		want             Price
+	}{
+		{
+			name:     "denominator_2x_max_uint64",
+			minPrice: 10,
+			excess:   math.MaxUint64,
+			factor1:  2,
+			factor2:  math.MaxUint64,
+			want:     16, // floor(10 * e^0.5)
+		},
+		{
+			name:     "denominator_4x_max_uint64",
+			minPrice: 10,
+			excess:   math.MaxUint64,
+			factor1:  math.MaxUint64,
+			factor2:  4,
+			want:     12, // floor(10 * e^0.25)
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CalculatePriceWithExcessConversion(tt.minPrice, tt.excess, tt.factor1, tt.factor2)
+			require.Equal(t, tt.want, got, "CalculatePriceWithExcessConversion(%d, %d, %d, %d)", tt.minPrice, tt.excess, tt.factor1, tt.factor2)
+		})
+	}
+}
+
 func Benchmark_CalculatePrice(b *testing.B) {
 	for _, test := range calculatePriceTests {
 		b.Run(fmt.Sprintf("%d*e^(%d/%d)=%d", test.minPrice, test.excess, test.excessConversionConstant, test.expected), func(b *testing.B) {
