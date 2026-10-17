@@ -38,6 +38,7 @@ go_library(
         "//utils/dynamicip",
         "//utils/ips",
         "//utils/logging",
+        "//utils/memlimit",
         "//utils/perms",
         "//utils/profiler",
         "//utils/set",

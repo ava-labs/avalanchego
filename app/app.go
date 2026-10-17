@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/memlimit"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 
@@ -65,6 +66,14 @@ func New(config nodeconfig.Config) (App, error) {
 	fdLimit := config.FdLimit
 	if err := ulimit.Set(fdLimit, log); err != nil {
 		log.Fatal("failed to set fd-limit",
+			zap.Error(err),
+		)
+		logFactory.Close()
+		return nil, err
+	}
+
+	if err := memlimit.Set(config.MemoryLimitRatio, log); err != nil {
+		log.Fatal("failed to set memory limit",
 			zap.Error(err),
 		)
 		logFactory.Close()

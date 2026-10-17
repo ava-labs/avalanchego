@@ -158,6 +158,7 @@ A LevelDB config file must be JSON and may have these keys. Any keys not given w
 | Flag | Env Var | Type | Default  | Description |
 |--------|--------|------|----|--------------------|
 | `--fd-limit` | `AVAGO_FD_LIMIT` | int | `32768` | Attempts to raise the process file descriptor limit to at least this value and error if the value is above the system max. |
+| `--memory-limit-ratio` | `AVAGO_MEMORY_LIMIT_RATIO` | float | `0.8` | Sets the Go runtime memory limit (`GOMEMLIMIT`) to this fraction of the cgroup memory limit, or of total system memory when not in a limited cgroup. The limit only bounds the Go heap; the remainder is headroom for memory allocated outside it, primarily by firewood. `0` disables the limit. Ignored if the `GOMEMLIMIT` environment variable is set. |
 
 ### Genesis
 
