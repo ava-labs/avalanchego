@@ -37,6 +37,10 @@ This release updates the plugin version to `47`. All plugins must update to rema
 - Updated the minimum Go version from `1.25.10` to `1.26.8`.
 - Helicon is now active from genesis on local networks. A local network started on a previous version is not compatible with this version.
 
+### Fixes
+
+- Fixed nodes with `proposerNumHistoricalBlocks` set failing to start after state syncing on top of previously accepted blocks.
+
 ### Metrics
 
 - Added `avalanche_platformvm_local_delegated_staked` (gauge): amount (in nAVAX) of AVAX delegated to this node on the Primary Network.
