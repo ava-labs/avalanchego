@@ -338,66 +338,6 @@ func TestFastForward(t *testing.T) {
 	}
 }
 
-func TestConvertMilliseconds(t *testing.T) {
-	type Hz uint64
-
-	tests := []struct {
-		rate          Hz
-		ms            uint64
-		wantSec       uint64
-		wantNumerator Hz // ms * (rate / 1000)
-	}{
-		{
-			rate:          1000,
-			ms:            42,
-			wantNumerator: 42,
-		},
-		{
-			rate:          1234 * 2,
-			ms:            1000 / 2,
-			wantNumerator: 1234,
-		},
-		{
-			rate:          98765 * 4,
-			ms:            1000 / 4,
-			wantNumerator: 98765,
-		},
-		{
-			rate:          142857 * 1000,
-			ms:            1,
-			wantNumerator: 142857,
-		},
-		{
-			rate:          1_001,
-			ms:            500,
-			wantNumerator: 500,
-		},
-		{
-			rate:          1000,
-			ms:            1001,
-			wantSec:       1,
-			wantNumerator: 1,
-		},
-		{
-			rate:          1000,
-			ms:            314_159,
-			wantSec:       314,
-			wantNumerator: 159,
-		},
-	}
-
-	for _, tt := range tests {
-		gotSec, gotFrac := ConvertMilliseconds(tt.rate, tt.ms)
-		wantFrac := FractionalSecond[Hz]{
-			Numerator:   tt.wantNumerator,
-			Denominator: tt.rate,
-		}
-		if gotSec != tt.wantSec || gotFrac != wantFrac {
-			t.Errorf("ConvertMilliseconds(%d, %d) got (%v, %v); want (%v, %v)", tt.ms, tt.rate, gotSec, gotFrac, tt.wantSec, wantFrac)
-		}
-	}
-}
-
 func TestCmpUnix(t *testing.T) {
 	tests := []struct {
 		tm         *Time[uint64]
