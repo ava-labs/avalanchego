@@ -21,7 +21,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
@@ -29,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
-	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -117,6 +115,7 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 				FortunaTimestamp:                utils.TimeToNewUint64(u.FortunaTime),
 				GraniteTimestamp:                utils.TimeToNewUint64(u.GraniteTime),
 				HeliconTimestamp:                utils.TimeToNewUint64(u.HeliconTime),
+				IglooTimestamp:                  utils.TimeToNewUint64(u.IglooTime),
 			},
 			AvalancheContext: extras.AvalancheContext{
 				SnowCtx: ctx,
@@ -138,6 +137,8 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 var (
 	mainnetChainID = big.NewInt(43114)
 	fujiChainID    = big.NewInt(43113)
+	// for use with the synchronoustest fixture
+	testFixtureChainID = big.NewInt(43110)
 )
 
 func berlinBlock(chainID *big.Int) int64 {
@@ -146,8 +147,8 @@ func berlinBlock(chainID *big.Int) int64 {
 		return 1_640_340 // https://snowtrace.io/block/1640340?chainid=43114, AP2 activation block
 	case utils.BigEqual(chainID, fujiChainID):
 		return 184_985 // https://testnet.snowtrace.io/block/184985?chainid=43113, AP2 activation block
-	case utils.BigEqual(chainID, corethparams.TestFixtureChainID):
-		return corethparams.TestFixtureBerlinBlock
+	case utils.BigEqual(chainID, testFixtureChainID):
+		return 3 // AP2 activation block of the synchronoustest fixture
 	default:
 		return 0
 	}
@@ -159,8 +160,8 @@ func londonBlock(chainID *big.Int) int64 {
 		return 3_308_552 // https://snowtrace.io/block/3308552?chainid=43114, AP3 activation block
 	case utils.BigEqual(chainID, fujiChainID):
 		return 805_078 // https://testnet.snowtrace.io/block/805078?chainid=43113, AP3 activation block
-	case utils.BigEqual(chainID, corethparams.TestFixtureChainID):
-		return corethparams.TestFixtureLondonBlock
+	case utils.BigEqual(chainID, testFixtureChainID):
+		return 5 // AP3 activation block of the synchronoustest fixture
 	default:
 		return 0
 	}
@@ -206,9 +207,9 @@ func (g *genesis) verifyAndWriteBlock(db ethdb.Database) error {
 		return errNoHeadHeader
 	}
 	height, timestamp := head.Number.Uint64(), head.Time
-	// TODO(JonathanOppenheimer): coreth exposes a `skip-upgrade-check` config
-	// that bypasses this compatibility check; we need to make such a check
-	// unnecessary for the c-chain.
+	// TODO(JonathanOppenheimer): make this compatibility check unnecessary for
+	// the c-chain, rather than exposing a `skip-upgrade-check` config that
+	// bypasses it.
 	if err := prev.CheckCompatible(g.Config, height, timestamp); err != nil {
 		return fmt.Errorf("incompatible chain config: %w", err)
 	}
@@ -233,6 +234,8 @@ func writeGenesisBlock(db ethdb.Database, block *types.Block, config *ethparams.
 	rawdb.WriteChainConfig(b, hash, config)
 	return b.Write()
 }
+
+const ap3BaseFee = 225 * ethparams.GWei
 
 func (g *genesis) block() (*types.Block, error) {
 	root, err := g.root()
@@ -269,7 +272,7 @@ func (g *genesis) block() (*types.Block, error) {
 	if c.IsApricotPhase3(g.Timestamp) { // Also called London
 		h.BaseFee = g.BaseFee
 		if h.BaseFee == nil {
-			h.BaseFee = big.NewInt(ap3.InitialBaseFee)
+			h.BaseFee = big.NewInt(ap3BaseFee)
 		}
 	}
 
@@ -284,13 +287,13 @@ func (g *genesis) block() (*types.Block, error) {
 	}
 
 	if c.IsGranite(g.Timestamp) {
-		headerExtra.TimeMilliseconds = avalancheutils.PointerTo(g.Timestamp * 1000)
-		headerExtra.MinDelayExcess = avalancheutils.PointerTo(acp226.InitialDelayExcess)
+		headerExtra.TimeMilliseconds = new(g.Timestamp * 1000)
+		headerExtra.MinDelayExcess = new(acp226.InitialDelayExcess)
 	}
 
 	if c.IsHelicon(g.Timestamp) {
-		headerExtra.TargetExponent = avalancheutils.PointerTo(dynamic.InitialTargetExponent)
-		headerExtra.MinPriceExponent = avalancheutils.PointerTo(dynamic.InitialPriceExponent)
+		headerExtra.TargetExponent = new(dynamic.InitialTargetExponent)
+		headerExtra.MinPriceExponent = new(dynamic.InitialPriceExponent)
 
 		// The genesis block is synchronous, so the markers must be zero to
 		// conform with [hook.Synchronous]. Most synchronous blocks omit these

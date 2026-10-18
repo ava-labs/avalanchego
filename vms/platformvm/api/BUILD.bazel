@@ -19,7 +19,14 @@ go_library(
 
 go_test(
     name = "api_test",
-    srcs = ["height_test.go"],
+    srcs = [
+        "height_test.go",
+        "validator_test.go",
+    ],
     embed = [":api"],
-    deps = ["@com_github_stretchr_testify//require"],
+    deps = [
+        "//ids",
+        "//utils/json",
+        "@com_github_stretchr_testify//require",
+    ],
 )

@@ -125,6 +125,7 @@ go_test(
         "//vms/platformvm/validators/fee",
         "//vms/secp256k1fx",
         "//vms/types",
+        "@com_github_ava_labs_libevm//libevm/options",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",
         "@com_github_thepudds_fzgen//fuzzer",

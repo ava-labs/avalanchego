@@ -7,10 +7,8 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/evm/acp176",
     visibility = ["//visibility:public"],
     deps = [
-        "//utils/math",
         "//utils/wrappers",
         "//vms/components/gas",
-        "@com_github_holiman_uint256//:uint256",
     ],
 )
 
@@ -20,7 +18,6 @@ go_test(
     embed = [":acp176"],
     deps = [
         "//vms/components/gas",
-        "@com_github_ava_labs_libevm//common",
         "@com_github_stretchr_testify//require",
     ],
 )

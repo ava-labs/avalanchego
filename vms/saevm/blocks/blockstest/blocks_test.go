@@ -64,7 +64,7 @@ func TestIntegration(t *testing.T) {
 	dest := common.Address{'d', 'e', 's', 't'}
 	for i := range numBlocks {
 		// Genesis is block 0
-		blockNum := uint64(i + 1) //#nosec G115 -- Known to not overflow
+		blockNum := uint64(i + 1)
 
 		var txs types.Transactions
 		for range txsPerAccountPerBlock {

@@ -57,7 +57,20 @@ source ./scripts/lint_warn_assert.sh
 # to modify the file headers (if missing), remove "--verify" flag
 # TESTS='license_header' ADDLICENSE_FLAGS="--debug" ./scripts/lint.sh
 _addlicense_flags=${ADDLICENSE_FLAGS:-"--verify --debug"}
-function test_license_header {
+
+# Directory carrying its own (BUSL) license header, checked separately from the
+# rest of the repository.
+SAE_L1_DIR='./vms/saevm/l1s'
+
+# Checks the license headers of all Go files matched by the extra `find`
+# arguments passed after the config file.
+#
+# $1: go-license config file
+# $@: additional `find` arguments, applied on top of the standard exclusions
+function _check_license_header {
+  local config="$1"
+  shift
+
   local files=()
   while IFS= read -r line; do files+=("$line"); done < <(
     find . -type f -name '*.go' \
@@ -68,14 +81,27 @@ function test_license_header {
       ! -path './**/*mock/*.go' \
       ! -name '*.canoto.go' \
       ! -name '*.bindings.go' \
-      "${FIND_EXCLUDES[@]}"
+      "${FIND_EXCLUDES[@]}" \
+      "$@"
     )
+
+  if [[ ${#files[@]} -eq 0 ]]; then
+    return 0
+  fi
 
   # shellcheck disable=SC2086
   ./scripts/run_tool.sh go-license \
-  --config=./header.yml \
+  --config="${config}" \
   ${_addlicense_flags} \
   "${files[@]}"
+}
+
+function test_license_header {
+  # Both checks are always run so that all offending files are reported.
+  local result=0
+  _check_license_header ./header.yml ! -path "${SAE_L1_DIR}/*" || result=1
+  _check_license_header ./header_sael1.yml -path "${SAE_L1_DIR}/*" || result=1
+  return "${result}"
 }
 
 function test_single_import {

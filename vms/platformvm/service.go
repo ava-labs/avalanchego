@@ -923,9 +923,11 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 					return nil, err
 				}
 				vdr.AutoRenewedConfig = &platformapi.AutoRenewedConfig{
-					ValidatorAuthority:       apiAuthority,
-					NextPeriod:               avajson.Uint64(stakingInfo.NextPeriod),
-					AutoCompoundRewardShares: avajson.Uint32(stakingInfo.AutoCompoundRewardShares),
+					ValidatorAuthority:        apiAuthority,
+					NextPeriod:                avajson.Uint64(stakingInfo.NextPeriod),
+					AutoCompoundRewardShares:  avajson.Uint32(stakingInfo.AutoCompoundRewardShares),
+					RestakedValidationRewards: new(avajson.Uint64(stakingInfo.AccruedValidationRewards)),
+					RestakedDelegateeRewards:  new(avajson.Uint64(stakingInfo.AccruedDelegateeRewards)),
 				}
 			}
 

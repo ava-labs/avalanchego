@@ -36,7 +36,7 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("proposervm"), func(
 
 			for i := 0; i < 3; i++ {
 				// Create and send a simple transaction to trigger block production
-				nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), senderEthAddress)
+				nonce, err := ethClient.NonceAt(tc.DefaultContext(), senderEthAddress, nil)
 				require.NoError(err)
 				gasPrice := e2e.SuggestGasPrice(tc, ethClient)
 				tx := types.NewTransaction(

@@ -17,4 +17,5 @@ var ForkToChainConfig = map[upgradetest.Fork]*params.ChainConfig{
 	upgradetest.Fortuna:       params.TestFortunaChainConfig,
 	upgradetest.Granite:       params.TestGraniteChainConfig,
 	upgradetest.Helicon:       params.TestHeliconChainConfig,
+	upgradetest.Igloo:         params.TestIglooChainConfig,
 }

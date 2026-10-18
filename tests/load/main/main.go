@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
@@ -58,7 +57,7 @@ func init() {
 		&firewoodEnabledArg,
 		"firewood",
 		false,
-		"whether to use Firewood in Coreth",
+		"whether to use Firewood on the C-Chain",
 	)
 	flag.IntVar(
 		&numWorkersArg,
@@ -85,7 +84,7 @@ func main() {
 	keys, err := tmpnet.NewPrivateKeys(numWorkersArg)
 	require.NoError(err)
 
-	primaryChainConfigs := tmpnet.DefaultChainConfigs()
+	var primaryChainConfigs map[string]tmpnet.ConfigMap
 	if firewoodEnabledArg {
 		primaryChainConfigs = newPrimaryChainConfigsWithFirewood()
 	}
@@ -186,7 +185,7 @@ func newTokenContract(
 		return nil, err
 	}
 
-	if _, err := bind.WaitDeployed(ctx, client, tx); err != nil {
+	if err := load.WaitDeployed(ctx, client, tx); err != nil {
 		return nil, err
 	}
 
@@ -213,25 +212,15 @@ func newTokenContract(
 	return contract, nil
 }
 
-// newPrimaryChainConfigsWithFirewood extends the default primary chain configs
-// by enabling Firewood on the C-Chain.
+// newPrimaryChainConfigsWithFirewood returns primary chain configs that enable
+// Firewood on the C-Chain.
 func newPrimaryChainConfigsWithFirewood() map[string]tmpnet.ConfigMap {
-	primaryChainConfigs := tmpnet.DefaultChainConfigs()
-	if _, ok := primaryChainConfigs[blockchainID]; !ok {
-		primaryChainConfigs[blockchainID] = make(tmpnet.ConfigMap)
+	return map[string]tmpnet.ConfigMap{
+		blockchainID: {
+			"state-scheme":       "firewood",
+			"snapshot-cache":     0,
+			"pruning-enabled":    true,
+			"state-sync-enabled": false,
+		},
 	}
-
-	// firewoodConfig represents the minimum configuration required to enable
-	// Firewood in Coreth.
-	//
-	// Ref: https://github.com/ava-labs/avalanchego/graft/coreth/issues/1180
-	firewoodConfig := tmpnet.ConfigMap{
-		"state-scheme":       "firewood",
-		"snapshot-cache":     0,
-		"pruning-enabled":    true,
-		"state-sync-enabled": false,
-	}
-
-	maps.Copy(primaryChainConfigs[blockchainID], firewoodConfig)
-	return primaryChainConfigs
 }

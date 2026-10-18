@@ -515,10 +515,11 @@ an upper bound because it does not account for burnt tokens, including transacti
 ```
 platform.getCurrentSupply ({
   subnetID: string // optional
-}) -> { supply: int }
+}) -> { supply: string, height: string }
 ```
 
 - `supply` is an upper bound on the number of tokens that exist.
+- `height` is the height of the last accepted block.
 
 **Example Call:**
 
@@ -539,7 +540,8 @@ curl -X POST --data '{
 {
   "jsonrpc": "2.0",
   "result": {
-    "supply": "365865167637779183"
+    "supply": "365865167637779183",
+    "height": "56"
   },
   "id": 1
 }
@@ -589,13 +591,23 @@ platform.getCurrentValidators({
             addresses: string[]
         },
         potentialReward: string,
+        accruedDelegateeReward: string,
         delegationFee: string,
         uptime: string,
         connected: bool,
         signer: {
             publicKey: string,
-            proofOfPosession: string
+            proofOfPossession: string
         },
+        validatorAuthority: {
+            locktime: string,
+            threshold: string,
+            addresses: string[]
+        },
+        nextPeriod: string,
+        autoCompoundRewardShares: string,
+        restakedValidationRewards: string,
+        restakedDelegateeRewards: string,
         delegatorCount: string,
         delegatorWeight: string,
         delegators: []{
@@ -638,13 +650,39 @@ platform.getCurrentValidators({
   - `delegationRewardOwner` is an `OutputOwners` output which includes `locktime`, `threshold` and
     array of `addresses`. Specifies the owner of the potential reward earned from delegations. Omitted if `subnetID` is not the Primary Network.
   - `potentialReward` is the potential reward earned from staking. Omitted if `subnetID` is not the Primary Network.
-  - `delegationFeeRate` is the percent fee this validator charges when others delegate stake to
+  - `accruedDelegateeReward` is the reward, in nAVAX, that this validator earned from its
+    `delegationFee` on delegations that ended in the current validation period. For an
+    auto-renewed validator, the period is the current cycle. The P-Chain pays out or restakes
+    this reward when the period ends. Omitted if `subnetID` is not the Primary Network.
+  - `delegationFee` is the percent fee this validator charges when others delegate stake to
     them. Omitted if `subnetID` is not the Primary Network.
   - `uptime` is the % of time the queried node has reported the peer as online and validating the
     Subnet. Omitted if `subnetID` is not the Primary Network.
   - `connected` is if the node is connected and tracks the Subnet. Omitted if `subnetID` is not the Primary Network.
   - `signer` is the node's BLS public key and proof of possession. Omitted if the validator doesn't
     have a BLS public key. Omitted if `subnetID` is not the Primary Network.
+  - `validatorAuthority`, `nextPeriod` and `autoCompoundRewardShares` are returned only for
+    auto-renewed validators, that is, validators created with `AddAutoRenewedValidatorTx` (ACP-236,
+    Helicon). All three are omitted for every other validator, so their presence is how an
+    auto-renewed validator is distinguished from a fixed-term one. They are flattened into the
+    validator object rather than nested under a parent field.
+    - `validatorAuthority` is an `OutputOwners` output which includes `locktime`, `threshold` and
+      array of `addresses`. Specifies the owner authorized to change this validator's configuration
+      with a `SetAutoRenewedValidatorConfigTx`.
+    - `nextPeriod` is the duration in seconds of the next validation cycle.
+    - `autoCompoundRewardShares` is the percentage of rewards restaked at the end of each cycle,
+      expressed in millionths in the range `[0, 1000000]`. `500000` means half the rewards are
+      restaked and half are paid out.
+    - `endTime` for an auto-renewed validator is the end of the current cycle, not the end of the
+      validation. On renewal `startTime` becomes the old `endTime`, `endTime` moves forward by
+      `nextPeriod`, and `weight` grows by whatever share of the rewards was auto-compounded, capped
+      at `MaxValidatorStake`. `txID` stays the same across renewals, so a changed `endTime` must not
+      be treated as a new validator.
+  - `restakedValidationRewards` and `restakedDelegateeRewards` are returned only for auto-renewed
+    validators. They are the rewards, in nAVAX, restaked into `weight` over all completed cycles.
+    `weight` is the stake in the `AddAutoRenewedValidatorTx` plus both values.
+    - `restakedValidationRewards` is the restaked part of the rewards earned from staking.
+    - `restakedDelegateeRewards` is the restaked part of the rewards earned from delegations.
   - `delegatorCount` is the number of delegators on this validator.
     Omitted if `subnetID` is not the Primary Network.
   - `delegatorWeight` is total weight of delegators on this validator.
@@ -698,6 +736,7 @@ curl -X POST --data '{
           "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
         },
         "potentialReward": "117431493426",
+        "accruedDelegateeReward": "0",
         "delegationFee": "10.0000",
         "uptime": "0.0000",
         "connected": false,
@@ -724,6 +763,59 @@ curl -X POST --data '{
   "id": 1
 }
 ```
+
+**Example Response (auto-renewed Primary Network validator):**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "validators": [
+      {
+        "txID": "2NNkpYTGfTFLSGXJcHtVv6drwVU2cczhmjK2uhvwDyxwsjzZMm",
+        "startTime": "1790089200",
+        "endTime": "1790262000",
+        "weight": "2000000000000",
+        "nodeID": "NodeID-5mb46qkSBj81k9g9e4VFjGGSbaaSLFRzD",
+        "validationRewardOwner": {
+          "locktime": "0",
+          "threshold": "1",
+          "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
+        },
+        "delegationRewardOwner": {
+          "locktime": "0",
+          "threshold": "1",
+          "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
+        },
+        "potentialReward": "620095131",
+        "accruedDelegateeReward": "0",
+        "delegationFee": "10.0000",
+        "uptime": "99.9800",
+        "connected": true,
+        "validatorAuthority": {
+          "locktime": "0",
+          "threshold": "1",
+          "addresses": ["P-avax18jma8ppw3nhx5r4ap8clazz0dps7rv5ukulre5"]
+        },
+        "nextPeriod": "172800",
+        "autoCompoundRewardShares": "500000",
+        "restakedValidationRewards": "0",
+        "restakedDelegateeRewards": "0",
+        "delegatorCount": "0",
+        "delegatorWeight": "0",
+        "delegators": []
+      }
+    ]
+  },
+  "id": 1
+}
+```
+
+Here `nextPeriod` is `172800` seconds (48 hours) and `autoCompoundRewardShares` is `500000`,
+meaning half of each cycle's rewards are restaked into `weight` and half are paid out to
+`validationRewardOwner`. `startTime` is Helicon activation on Mainnet and `endTime` is one 48-hour
+cycle later, so this validator is in its first cycle. No cycle has ended, so
+`restakedValidationRewards` and `restakedDelegateeRewards` are both `0`.
 
 **Example Response (L1):**
 
@@ -941,7 +1033,7 @@ curl -X POST --data '{
     "jsonrpc": "2.0",
     "method": "platform.getL1Validator",
     "params": {
-      "validationID": ["9FAftNgNBrzHUMMApsSyV6RcFiL9UmCbvsCu28xdLV2mQ7CMo"]
+      "validationID": "9FAftNgNBrzHUMMApsSyV6RcFiL9UmCbvsCu28xdLV2mQ7CMo"
     },
     "id": 1
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
@@ -1039,7 +1131,7 @@ curl -X POST --data '{
     "method" :"platform.getMinStake",
     "params": {
         "subnetID":"11111111111111111111111111111111LpoYY"
-    },
+    }
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
 ```
 
@@ -1074,7 +1166,7 @@ platform.getRewardUTXOs({
     txID: string,
     encoding: string // optional
 }) -> {
-    numFetched: integer,
+    numFetched: string,
     utxos: []string,
     encoding: string
 }
@@ -1160,7 +1252,6 @@ curl -X POST --data '{
         "validatorsOnly": true
     },
     "id": 1
-}
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
 ```
 
@@ -1259,8 +1350,8 @@ platform.getSubnet({
 
 - `subnetID` is the ID of the Subnet to get information about. If omitted, fails.
 - `threshold` signatures from addresses in `controlKeys` are needed to make changes to
-  a permissioned subnet. If the Subnet is not a PoA Subnet, then `threshold` will be `0` and `controlKeys`
-  will be empty.
+  a permissioned subnet. `controlKeys` and `threshold` always show the Subnet owner. For an L1 or
+  an elastic Subnet, `isPermissioned` is `false`.
 - changes can not be made into the subnet until `locktime` is in the past.
 - `subnetTransformationTxID` is the ID of the transaction that changed the subnet into an elastic one, if it exists.
 - `conversionID` is the ID of the conversion from a permissioned Subnet into an L1, if it exists.
@@ -1329,8 +1420,9 @@ platform.getSubnets({
   Subnets.
 - `id` is the Subnet’s ID.
 - `threshold` signatures from addresses in `controlKeys` are needed to add a validator to the
-  Subnet. If the Subnet is not a PoA Subnet, then `threshold` will be `0` and `controlKeys` will be
-  empty.
+  Subnet. For the Primary Network and for an elastic Subnet, `threshold` is `0` and `controlKeys` is
+  empty. For an L1, `controlKeys` and `threshold` show the Subnet owner. The owner cannot add a
+  validator to an L1.
 
 **Example Call:**
 
@@ -1371,7 +1463,7 @@ Get the current P-Chain timestamp.
 **Signature:**
 
 ```
-platform.getTimestamp() -> {time: string}
+platform.getTimestamp() -> {timestamp: string}
 ```
 
 **Example Call:**
@@ -1382,7 +1474,6 @@ curl -X POST --data '{
     "method": "platform.getTimestamp",
     "params": {},
     "id": 1
-}
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
 ```
 
@@ -1425,7 +1516,6 @@ curl -X POST --data '{
       "subnetID": "11111111111111111111111111111111LpoYY"
     },
     "id": 1
-}
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
 ```
 
@@ -1451,10 +1541,9 @@ curl -X POST --data '{
     "jsonrpc": "2.0",
     "method": "platform.getTotalStake",
     "params": {
-        "subnetID": "2bRCr6B4MiEfSjidDwxDpdCyviwnfUVqB2HGwhm947w9YYqb7r",
+        "subnetID": "2bRCr6B4MiEfSjidDwxDpdCyviwnfUVqB2HGwhm947w9YYqb7r"
     },
     "id": 1
-}
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/P
 ```
 
@@ -1597,6 +1686,8 @@ platform.getTxStatus({
 `status` is one of:
 
 - `Committed`: The transaction is (or will be) accepted by every node
+- `Aborted`: The network accepted the abort option of this proposal transaction, for example a
+  reward transaction. This status is final
 - `Processing`: The transaction is being voted on by this node
 - `Dropped`: The transaction will never be accepted by any node in the network, check `reason` field
   for more information
@@ -1834,12 +1925,25 @@ curl -X POST --data '{
 {
   "jsonrpc": "2.0",
   "result": {
-    "validators": {
-      "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg": 2000000000000000,
-      "NodeID-GWPcbFJZFfZreETSoWjPimr846mXEKCtu": 2000000000000000,
-      "NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ": 2000000000000000,
-      "NodeID-NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN": 2000000000000000,
-      "NodeID-P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5": 2000000000000000
+    "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg": {
+      "publicKey": "0x900c9b119b5c82d781d4b49be78c3fc7ae65f2b435b7ed9e3a8b9a03e475edff86d8a64827fec8db23a6f236afbf127d",
+      "weight": "2000000000000000"
+    },
+    "NodeID-GWPcbFJZFfZreETSoWjPimr846mXEKCtu": {
+      "publicKey": "0xaccd61ceb90c61628aa0fa34acab27ecb08f6897e9ccad283578c278c52109f9e10e4f8bc31aa6d7905c4e1623de367e",
+      "weight": "2000000000000000"
+    },
+    "NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ": {
+      "publicKey": "0xa058ff27a4c570664bfa28e34939368539a1340867951943d0f56fa8aac13bc09ff64f341acf8cc0cef74202c2d6f9c0",
+      "weight": "2000000000000000"
+    },
+    "NodeID-NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN": {
+      "publicKey": "0xa10b6955a85684a0f5c94b8381f04506f1bee60625927d372323f78b3d30196cc56c8618c77eaf429298e74673d832c3",
+      "weight": "2000000000000000"
+    },
+    "NodeID-P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5": {
+      "publicKey": "0x8048109c3da13de0700f9f3590c3270bfc42277417f6d0cc84282947e1a1f8b4980fd3e3fe223acf0f56a5838890814a",
+      "weight": "2000000000000000"
     }
   },
   "id": 1
@@ -1968,7 +2072,6 @@ curl -X POST --data '{
   "result": {
     "capacity": 20000,
     "target": 10000,
-    "targetPerSecond": 50000,
     "minPrice": 512,
     "excessConversionConstant": 1246488515
   },

@@ -16,11 +16,9 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//utils",
-        "//utils/json",
         "//utils/logging",
         "//utils/rpc",
         "//utils/set",
-        "@com_github_gorilla_rpc//v2:rpc",
         "@com_github_prometheus_client_golang//prometheus",
         "@org_uber_go_zap//:zap",
     ],

@@ -1,5 +1,4 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
-load("//.bazel:defs.bzl", "graft_go_test")
 
 package(default_visibility = [
     "//graft/coreth:__subpackages__",
@@ -10,19 +9,5 @@ go_library(
     name = "ap3",
     srcs = ["window.go"],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3",
-    deps = [
-        "//graft/evm/utils",
-        "//utils/wrappers",
-        "@com_github_ava_labs_libevm//common/math",
-    ],
-)
-
-graft_go_test(
-    name = "ap3_test",
-    srcs = ["window_test.go"],
-    embed = [":ap3"],
-    deps = [
-        "@com_github_ava_labs_libevm//common/math",
-        "@com_github_stretchr_testify//require",
-    ],
+    deps = ["//utils/wrappers"],
 )

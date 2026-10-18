@@ -6,15 +6,10 @@ ARG GO_VERSION=INVALID # This value is not intended to be used but silences a wa
 # Always use the native platform to ensure fast builds
 FROM --platform=$BUILDPLATFORM golang:$GO_VERSION-bookworm AS builder
 
-WORKDIR /build
+# Dependencies are served from the host's local module-proxy cache.
+ENV GOPROXY=file:///gomodproxy,off
 
-# Copy and download avalanche dependencies using go mod
-COPY go.mod .
-COPY go.sum .
-COPY graft/coreth ./graft/coreth
-COPY graft/subnet-evm ./graft/subnet-evm
-COPY graft/evm ./graft/evm
-RUN go mod download
+WORKDIR /build
 
 # Copy the code into the container
 COPY . .
@@ -44,7 +39,8 @@ RUN if [ "$TARGETPLATFORM" = "linux/arm64" ] && [ "$BUILDPLATFORM" != "linux/arm
 ARG RACE_FLAG=""
 ARG BUILD_SCRIPT=build.sh
 ARG AVALANCHEGO_COMMIT=""
-RUN . ./build_env.sh && \
+RUN --network=none --mount=type=bind,from=gomodcache,source=.,target=/gomodproxy,ro \
+    . ./build_env.sh && \
     echo "{CC=$CC, TARGETPLATFORM=$TARGETPLATFORM, BUILDPLATFORM=$BUILDPLATFORM}" && \
     export GOARCH=$(echo ${TARGETPLATFORM} | cut -d / -f2) && \
     export AVALANCHEGO_COMMIT="${AVALANCHEGO_COMMIT}" && \

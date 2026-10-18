@@ -221,9 +221,10 @@ func NewTestNetwork(
 		return nil, err
 	}
 
+	upgrades := upgrade.GetConfig(cfg.NetworkID)
 	return NewNetwork(
 		cfg,
-		upgrade.GetConfig(cfg.NetworkID).HeliconTime, // Must be updated for each network upgrade
+		upgrades.LatestTime(),
 		msgCreator,
 		metrics,
 		log,

@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -53,26 +54,63 @@ import (
 
 var defaultValidatorNodeID = ids.GenerateTestNodeID()
 
-func newTestState(t testing.TB, db database.Database) *State {
-	return newTestStateWithUpgrade(
-		t,
-		db,
-		upgradetest.GetConfig(upgradetest.Latest),
-		reward.Config{
-			MaxConsumptionRate: .12 * reward.PercentDenominator,
-			MinConsumptionRate: .1 * reward.PercentDenominator,
-			MintingPeriod:      365 * 24 * time.Hour,
-			SupplyCap:          720 * units.MegaAvax,
-		},
-	)
+var defaultRewardConfig = reward.Config{
+	MaxConsumptionRate: .12 * reward.PercentDenominator,
+	MinConsumptionRate: .1 * reward.PercentDenominator,
+	MintingPeriod:      365 * 24 * time.Hour,
+	SupplyCap:          720 * units.MegaAvax,
 }
 
-func newTestStateWithUpgrade(
-	t testing.TB,
-	db database.Database,
-	upgradeConfig upgrade.Config,
-	rewardConfig reward.Config,
-) *State {
+// testStateConfig holds the [New] inputs that tests override.
+type testStateConfig struct {
+	upgradeConfig upgrade.Config
+	rewardConfig  reward.Config
+	localNodeID   ids.NodeID
+	metrics       metrics.Metrics
+}
+
+// A testStateOption overrides a default [newTestState] input.
+type testStateOption = options.Option[testStateConfig]
+
+// withUpgradeConfig overrides the default upgrade config.
+func withUpgradeConfig(c upgrade.Config) testStateOption {
+	return options.Func[testStateConfig](func(cfg *testStateConfig) {
+		cfg.upgradeConfig = c
+	})
+}
+
+// withRewardConfig overrides the default reward config.
+func withRewardConfig(c reward.Config) testStateOption {
+	return options.Func[testStateConfig](func(cfg *testStateConfig) {
+		cfg.rewardConfig = c
+	})
+}
+
+// withLocalNodeID overrides the default local node ID.
+func withLocalNodeID(id ids.NodeID) testStateOption {
+	return options.Func[testStateConfig](func(cfg *testStateConfig) {
+		cfg.localNodeID = id
+	})
+}
+
+// withMetrics overrides the default metrics.
+func withMetrics(m metrics.Metrics) testStateOption {
+	return options.Func[testStateConfig](func(cfg *testStateConfig) {
+		cfg.metrics = m
+	})
+}
+
+// newTestState constructs a [State] over db. It uses the latest upgrade config,
+// [defaultRewardConfig], a fresh local node ID, and [metrics.Noop] unless
+// overridden by opts.
+func newTestState(t testing.TB, db database.Database, opts ...testStateOption) *State {
+	cfg := options.ApplyTo(&testStateConfig{
+		upgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
+		rewardConfig:  defaultRewardConfig,
+		localNodeID:   ids.GenerateTestNodeID(),
+		metrics:       metrics.Noop,
+	}, opts...)
+
 	s, err := New(
 		db,
 		genesistest.NewBytes(t, genesistest.Config{
@@ -80,15 +118,15 @@ func newTestStateWithUpgrade(
 		}),
 		prometheus.NewRegistry(),
 		validators.NewManager(),
-		upgradeConfig,
+		cfg.upgradeConfig,
 		&config.Default,
 		&snow.Context{
 			NetworkID: constants.UnitTestID,
-			NodeID:    ids.GenerateTestNodeID(),
+			NodeID:    cfg.localNodeID,
 			Log:       logging.NoLog{},
 		},
-		metrics.Noop,
-		rewardConfig,
+		cfg.metrics,
+		cfg.rewardConfig,
 	)
 	require.NoError(t, err)
 	return s
@@ -143,7 +181,7 @@ func TestNewInitializesGenesisValidatorsWithPrimaryNetworkRewards(t *testing.T) 
 		MintingPeriod:      365 * 24 * time.Hour,
 		SupplyCap:          720 * units.MegaAvax,
 	}
-	s := newTestStateWithUpgrade(t, memdb.New(), upgradeConfig, rewardConfig)
+	s := newTestState(t, memdb.New(), withUpgradeConfig(upgradeConfig), withRewardConfig(rewardConfig))
 
 	wantReward := reward.NewPrimaryNetworkCalculator(rewardConfig, upgradeConfig).Calculate(
 		startTime,
@@ -5075,4 +5113,111 @@ func requireBeforeAndAfterReload(t *testing.T, db database.Database, s *State, a
 
 	assert(s)
 	assert(newTestState(t, db))
+}
+
+type stakeMetrics struct {
+	metrics.Metrics
+
+	local     uint64
+	delegated uint64
+	total     uint64
+}
+
+func (m *stakeMetrics) SetLocalStake(s uint64) {
+	m.local = s
+}
+
+func (m *stakeMetrics) SetLocalDelegatedStake(s uint64) {
+	m.delegated = s
+}
+
+func (m *stakeMetrics) SetTotalStake(s uint64) {
+	m.total = s
+}
+
+func TestStakeMetricsDelegated(t *testing.T) {
+	require := require.New(t)
+
+	const delegatorWeight = 2 * genesistest.DefaultValidatorWeight
+
+	m := &stakeMetrics{Metrics: metrics.Noop}
+	s := newTestState(t, memdb.New(), withLocalNodeID(defaultValidatorNodeID), withMetrics(m))
+
+	require.Equal(genesistest.DefaultValidatorWeight, m.local)
+	require.Zero(m.delegated)
+	require.Equal(genesistest.DefaultValidatorWeight, m.total)
+
+	delegator := newTestStaker(constants.PrimaryNetworkID, defaultValidatorNodeID)
+	delegator.Weight = delegatorWeight
+	require.NoError(s.PutCurrentDelegator(delegator))
+	s.SetHeight(1)
+	require.NoError(s.Commit())
+
+	require.Equal(genesistest.DefaultValidatorWeight+delegatorWeight, m.local)
+	require.Equal(delegatorWeight, m.delegated)
+	require.Equal(genesistest.DefaultValidatorWeight+delegatorWeight, m.total)
+
+	require.NoError(s.DeleteCurrentDelegator(delegator))
+	s.SetHeight(2)
+	require.NoError(s.Commit())
+
+	require.Equal(genesistest.DefaultValidatorWeight, m.local)
+	require.Zero(m.delegated)
+	require.Equal(genesistest.DefaultValidatorWeight, m.total)
+}
+
+// TestStakeMetricsReload covers initValidatorSets, which rebuilds the validator
+// manager from disk rather than from a commit.
+func TestStakeMetricsReload(t *testing.T) {
+	require := require.New(t)
+
+	const delegatorWeight = 2 * genesistest.DefaultValidatorWeight
+
+	db := memdb.New()
+	m := &stakeMetrics{Metrics: metrics.Noop}
+	s := newTestState(t, db, withLocalNodeID(defaultValidatorNodeID), withMetrics(m))
+
+	// The delegator needs a backing tx to survive the reload.
+	unsigned := createPermissionlessDelegatorTx(constants.PrimaryNetworkID, platform.Validator{
+		NodeID: defaultValidatorNodeID,
+		Start:  genesistest.DefaultValidatorStartTimeUnix,
+		End:    genesistest.DefaultValidatorEndTimeUnix,
+		Wght:   delegatorWeight,
+	})
+	tx := &platform.Tx{Unsigned: unsigned}
+	require.NoError(tx.Initialize(platform.Codec))
+	delegator, err := NewCurrentStaker(
+		tx.ID(),
+		unsigned,
+		genesistest.DefaultValidatorStartTime,
+		unsigned.EndTime(),
+		unsigned.Weight(),
+		0,
+	)
+	require.NoError(err)
+
+	s.AddTx(tx, status.Committed)
+	require.NoError(s.PutCurrentDelegator(delegator))
+	s.SetHeight(1)
+	require.NoError(s.Commit())
+
+	require.Equal(genesistest.DefaultValidatorWeight+delegatorWeight, m.local)
+	require.Equal(delegatorWeight, m.delegated)
+
+	reloaded := &stakeMetrics{Metrics: metrics.Noop}
+	newTestState(t, db, withLocalNodeID(defaultValidatorNodeID), withMetrics(reloaded))
+
+	require.Equal(genesistest.DefaultValidatorWeight+delegatorWeight, reloaded.local)
+	require.Equal(delegatorWeight, reloaded.delegated)
+}
+
+func TestStakeMetricsNotAValidator(t *testing.T) {
+	require := require.New(t)
+
+	m := &stakeMetrics{Metrics: metrics.Noop}
+	newTestState(t, memdb.New(), withLocalNodeID(ids.GenerateTestNodeID()), withMetrics(m))
+
+	require.Zero(m.local)
+	require.Zero(m.delegated)
+	require.Equal(genesistest.DefaultValidatorWeight, m.total)
 }

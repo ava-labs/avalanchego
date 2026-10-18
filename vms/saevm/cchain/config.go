@@ -76,7 +76,7 @@ type config struct {
 
 	// State & trie
 	Pruning           bool   `json:"pruning-enabled"` // If enabled, trie roots are only persisted every commit-interval blocks.
-	CommitInterval    uint64 `json:"commit-interval"` // HashDB: blocks between trie persistence. Pruning Firewood: max unpersisted revisions.
+	CommitInterval    uint64 `json:"commit-interval"` // HashDB: blocks between trie persistence. Firewood: max unpersisted revisions.
 	TrieCleanCache    uint64 `json:"trie-clean-cache"`
 	SnapshotCache     uint64 `json:"snapshot-cache"`
 	AllowMissingTries bool   `json:"allow-missing-tries"` // If enabled, checks preventing an incomplete trie index are skipped.
@@ -99,8 +99,8 @@ type config struct {
 	// BatchRequestLimit is the maximum number of requests per JSON-RPC batch;
 	// 0 = no limit. An unset config uses the default (1000).
 	BatchRequestLimit uint64 `json:"batch-request-limit"`
-	// APIMaxDuration limits how long an eth_call (or eth_callDetailed) runs.
-	// Non-positive values result in no limit. Defaults to no limit.
+	// APIMaxDuration limits how long each call to the /rpc and /ws endpoints
+	// runs. Non-positive values result in no limit. Defaults to no limit.
 	APIMaxDuration               duration `json:"api-max-duration"`
 	ResolvePendingToLastExecuted bool     `json:"api-resolve-pending-to-last-executed"`
 
@@ -113,7 +113,6 @@ type config struct {
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
 
 	internalConfig
-	deprecatedConfig
 }
 
 // internalConfig holds undocumented, test-only options, kept out of config.md.
@@ -156,14 +155,6 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	}
 	if err := json.Unmarshal(b, &c); err != nil {
 		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
-	}
-
-	// TODO(JonathanOppenheimer): delete together with deprecated.go.
-	if c.EthAPIs != nil {
-		_, apisSet := keys["apis"]
-		if err := c.applyDeprecatedAPINames(snowCtx.Log, apisSet); err != nil {
-			return config{}, err
-		}
 	}
 
 	var unrecognized []string
@@ -239,7 +230,7 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 			APIs:                c.APIs,
 			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
 			BatchRequestLimit:   c.BatchRequestLimit,
-			EVMTimeout:          c.APIMaxDuration.Duration,
+			CallTimeout:         c.APIMaxDuration.Duration,
 			// GasCap and TxFeeCap are set to reasonable values for mainnet
 			// C-Chain. They are left unconfigurable to minimize the size of the
 			// user config.

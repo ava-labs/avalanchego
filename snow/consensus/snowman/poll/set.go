@@ -203,12 +203,12 @@ func (s *set) Len() int {
 
 func (s *set) String() string {
 	sb := strings.Builder{}
-	sb.WriteString(fmt.Sprintf("current polls: (Size = %d)", s.polls.Len()))
+	fmt.Fprintf(&sb, "current polls: (Size = %d)", s.polls.Len())
 	iter := s.polls.NewIterator()
 	for iter.Next() {
 		requestID := iter.Key()
 		poll := iter.Value().(Poll)
-		sb.WriteString(fmt.Sprintf("\n    RequestID %d:\n        %s", requestID, poll.PrefixedString("        ")))
+		fmt.Fprintf(&sb, "\n    RequestID %d:\n        %s", requestID, poll.PrefixedString("        "))
 	}
 	return sb.String()
 }

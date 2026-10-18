@@ -29,7 +29,6 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
-	"k8s.io/utils/ptr"
 
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
@@ -91,7 +90,7 @@ func NewNodeStatefulSet(
 	return &appsv1.StatefulSet{
 		ObjectMeta: objectMeta,
 		Spec: appsv1.StatefulSetSpec{
-			Replicas:    ptr.To[int32](1),
+			Replicas:    new(int32(1)),
 			ServiceName: name,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
@@ -446,7 +445,7 @@ func applyManifest(
 		// Use server-side apply to create or update the resource
 		_, err = resourceInterface.Patch(ctx, obj.GetName(), types.ApplyPatchType, data, metav1.PatchOptions{
 			FieldManager: "tmpnet-apply",
-			Force:        ptr.To(true),
+			Force:        new(true),
 		})
 		if err != nil {
 			return stacktrace.Errorf("failed to apply %s %s/%s: %w", gvk.Kind, resourceNamespace, obj.GetName(), err)

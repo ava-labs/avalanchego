@@ -24,19 +24,12 @@ go_library(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//core/vm",
-        "@com_github_ava_labs_libevm//crypto",
-        "@com_github_ava_labs_libevm//libevm/stateconf",
-        "@com_github_holiman_uint256//:uint256",
         "@org_uber_go_mock//gomock",
     ],
 )
 
 graft_go_test(
     name = "contract_test",
-    srcs = [
-        "mocks_generate_test.go",
-        "utils_test.go",
-    ],
+    srcs = ["mocks_generate_test.go"],
     embed = [":contract"],
-    deps = ["@com_github_stretchr_testify//require"],
 )

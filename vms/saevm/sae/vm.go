@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/state/snapshot"
@@ -25,6 +26,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
+	_ "github.com/ava-labs/avalanchego/vms/saevm/firewood" // registers metrics
+
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
@@ -33,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/unwind"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
@@ -43,7 +47,9 @@ import (
 
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	evmprometheus "github.com/ava-labs/avalanchego/vms/evm/metrics/prometheus"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	ethmetrics "github.com/ava-labs/libevm/metrics"
 )
 
 // directory that stores execution results database under the chain data directory
@@ -54,10 +60,7 @@ func ExecutionResultsPath(chainDataDir string) string {
 }
 
 // VM implements all of [adaptor.ChainVM] except for the `Initialize` method,
-// which needs to be provided by a harness. In all cases, the harness MUST
-// ensure that the last-synchronous block (which MAY be the genesis) is
-// canonical on disk with its post-execution state committed before [NewVM] is
-// called.
+// which needs to be provided by a harness.
 type VM struct {
 	network *network.Network
 	hooks   hook.Points
@@ -72,7 +75,8 @@ type VM struct {
 
 	preference atomic.Pointer[blocks.Block]
 	last       struct {
-		accepted, settled atomic.Pointer[blocks.Block]
+		accepted atomic.Pointer[blocks.Block]
+		settled  *atomic.Pointer[blocks.Block]
 	}
 	acceptedBlocks event.FeedOf[*blocks.Block]
 	// Consensus-critical blocks are those either (a) undergoing a consensus
@@ -110,9 +114,10 @@ type Config struct {
 // NewVM returns a new [VM] that is ready for use immediately upon return.
 // [VM.Shutdown] MUST be called to release resources.
 //
-// The state root of the last synchronous block MUST be available when creating
-// a [triedb.Database] from the provided [ethdb.Database] and [triedb.Config]
-// (the latter provided via the [Config]).
+// The genesis block MUST be canonical in the provided [ethdb.Database]. The
+// post-execution state of the genesis, or of a later settled block, MUST be
+// available when creating a [triedb.Database] from the provided
+// [ethdb.Database] and [triedb.Config] (the latter provided via the [Config]).
 func NewVM[T hook.Transaction](
 	ctx context.Context,
 	hooks hook.PointsG[T],
@@ -141,6 +146,12 @@ func NewVM[T hook.Transaction](
 	if err != nil {
 		return nil, fmt.Errorf("registering sae metrics: %w", err)
 	}
+	if err := snowCtx.Metrics.Register(customrawdb.FirewoodScheme, ffi.Gatherer{}); err != nil {
+		return nil, fmt.Errorf("registering firewood metrics: %w", err)
+	}
+	if err := snowCtx.Metrics.Register("eth", evmprometheus.NewGatherer(ethmetrics.DefaultRegistry)); err != nil {
+		return nil, fmt.Errorf("registering libevm metrics: %w", err)
+	}
 
 	// ==========  Execution Results DB  ==========
 	xdbDir := ExecutionResultsPath(snowCtx.ChainDataDir)
@@ -151,7 +162,8 @@ func NewVM[T hook.Transaction](
 	closers.Push(&xdb)
 
 	// ==========  Block State  ==========
-	exec, consensusCritical, err := recoverExecutor(ctx, db, xdb, chainConfig, snowCtx, hooks, cfg, reg)
+	lastSettled := new(atomic.Pointer[blocks.Block])
+	exec, consensusCritical, err := recoverExecutor(ctx, db, xdb, lastSettled, chainConfig, snowCtx, hooks, cfg, reg)
 	if err != nil {
 		return nil, fmt.Errorf("creating new execution: %w", err)
 	}
@@ -196,6 +208,7 @@ func NewVM[T hook.Transaction](
 		newTxs:  newTxs,
 		closers: closers,
 	}
+	vm.last.settled = lastSettled
 
 	// ==========  Frontiers  ==========
 	{
@@ -205,7 +218,7 @@ func NewVM[T hook.Transaction](
 
 		s := e.LastSettled()
 		vm.last.settled.Store(s)
-		metrics.markSettled(s.Height())
+		metrics.setFrontiers(s, blocks.Range(s, e))
 	}
 
 	// ==========  RPC Provider  ==========

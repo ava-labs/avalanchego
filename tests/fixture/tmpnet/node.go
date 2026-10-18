@@ -428,6 +428,11 @@ func (n *Node) WaitForHealthy(ctx context.Context) error {
 	for {
 		healthy, err := n.IsHealthy(ctx)
 		switch {
+		case errors.Is(err, errNotRunning):
+			// WaitForHealthy is called after the runtime has started the node.
+			// Recovering from a stopped node requires an explicit lifecycle
+			// operation, so retrying the health check cannot succeed.
+			return stacktrace.Errorf("node %q stopped before becoming healthy: %w", n.NodeID, err)
 		case errors.Is(err, ErrUnrecoverableNodeHealthCheck):
 			return stacktrace.Errorf("node %q saw unrecoverable health check: %w", n.NodeID, err)
 		case err != nil:

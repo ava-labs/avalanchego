@@ -205,6 +205,7 @@ func NewPullGossiper[T Gossipable](
 	log logging.Logger,
 	marshaller Marshaller[T],
 	set PullGossiperSet[T],
+	sampler p2p.NodeSampler,
 	client *p2p.Client,
 	metrics Metrics,
 	pollSize int,
@@ -213,6 +214,7 @@ func NewPullGossiper[T Gossipable](
 		log:        log,
 		marshaller: marshaller,
 		set:        set,
+		sampler:    sampler,
 		client:     client,
 		metrics:    metrics,
 		pollSize:   pollSize,
@@ -235,6 +237,7 @@ type PullGossiper[T Gossipable] struct {
 	log        logging.Logger
 	marshaller Marshaller[T]
 	set        PullGossiperSet[T]
+	sampler    p2p.NodeSampler
 	client     *p2p.Client
 	metrics    Metrics
 	pollSize   int
@@ -248,8 +251,14 @@ func (p *PullGossiper[_]) Gossip(ctx context.Context) error {
 	}
 
 	for i := 0; i < p.pollSize; i++ {
-		err := p.client.AppRequestAny(ctx, msgBytes, p.handleResponse)
-		if err != nil && !errors.Is(err, p2p.ErrNoPeers) {
+		sampled := p.sampler.Sample(ctx, 1)
+		err := p.client.AppRequest(
+			ctx,
+			set.Of(sampled...),
+			msgBytes,
+			p.handleResponse,
+		)
+		if err != nil {
 			return err
 		}
 	}
