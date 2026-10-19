@@ -28,6 +28,9 @@ type snowmanBlock struct {
 	// as their parent. If this node has not had a child issued under it, this value
 	// will be nil
 	children map[ids.ID]Block
+
+	// height is the height of this block in the chain. The genesis block has a height of 0.
+	height uint64
 }
 
 func (n *snowmanBlock) AddChild(child Block) {

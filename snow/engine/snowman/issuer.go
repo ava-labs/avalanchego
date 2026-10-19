@@ -33,7 +33,7 @@ func (i *issuer) Execute(ctx context.Context, _ []ids.ID, abandoned []ids.ID) er
 	// If the parent block was abandoned, this block should be abandoned as
 	// well.
 	blkID := i.blk.ID()
-	delete(i.e.pending, blkID)
+	i.e.pending.Remove(blkID)
 	i.e.markAsUnverified(i.blk)
 	return i.e.blocked.Abandon(ctx, blkID)
 }
