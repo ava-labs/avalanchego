@@ -4,7 +4,6 @@
 package syncer
 
 import (
-	"bytes"
 	"context"
 	"errors"
 
@@ -69,7 +68,7 @@ func newWithDB(
 	return sync.NewSyncer(
 		db,
 		sync.Config[*RangeProof, struct{}]{
-			RangeProofMarshaler:   rangeProofMarshaler{},
+			RangeProofMarshaler:   rangeProofMarshaler{db: db.(*database).db},
 			ChangeProofMarshaler:  changeProofMarshaler{},
 			EmptyRoot:             ids.ID(types.EmptyRootHash),
 			ProofClient:           proofClient,
@@ -98,39 +97,30 @@ func (db *database) GetRangeProofAtRoot(_ context.Context, rootID ids.ID, start 
 }
 
 func (*database) VerifyRangeProof(_ context.Context, proof *RangeProof, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
-	// Extra data must be provided at commit time.
-	// TODO: remove this once the FFI no longer requires it.
-	proof.root = expectedEndRootID
-	proof.maxLength = maxLength
-
-	return proof.rp.Verify(ffi.Hash(expectedEndRootID), start, end, uint32(maxLength))
+	vrp, err := proof.rp.Verify(ffi.Hash(expectedEndRootID), start, end, uint32(maxLength))
+	if err != nil {
+		return err
+	}
+	proof.vrp = vrp
+	return nil
 }
 
-func (db *database) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error) {
-	_, err := db.db.VerifyAndCommitRangeProof(proof.rp, start, end, ffi.Hash(proof.root), uint32(proof.maxLength))
+func (db *database) CommitRangeProof(_ context.Context, _, _ maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error) {
+	_, err := proof.vrp.Commit()
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
 	}
 
-	nextKeyRange, err := proof.rp.FindNextKey()
+	nextKeyRanges, err := proof.vrp.NextKeyRanges()
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
 	}
 	// No error indicates the range is complete.
-	if nextKeyRange == nil {
+	if len(nextKeyRanges) == 0 {
 		return maybe.Nothing[[]byte](), nil
 	}
 
-	nextKey := nextKeyRange.StartKey()
-	if err := nextKeyRange.Free(); err != nil {
-		return maybe.Nothing[[]byte](), err
-	}
-
-	// TODO: This will eventually be handled by `FindNextKey`.
-	if (end.HasValue() && bytes.Compare(nextKey, end.Value()) > 0) || (start.HasValue() && bytes.Equal(nextKey, start.Value())) {
-		return maybe.Nothing[[]byte](), nil
-	}
-
+	nextKey := nextKeyRanges[0].StartKey
 	return maybe.Some(nextKey), nil
 }
 

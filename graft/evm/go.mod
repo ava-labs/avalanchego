@@ -102,3 +102,5 @@ require (
 )
 
 replace github.com/ava-labs/avalanchego => ../../
+
+replace github.com/ava-labs/firewood-go-ethhash/ffi => github.com/ava-labs/firewood-go-ethhash/ffi v0.0.0-20261017000332-2ffb3756f4d3

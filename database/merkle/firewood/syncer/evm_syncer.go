@@ -46,15 +46,19 @@ func NewEVM(
 }
 
 func (e *evmDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error) {
+	if proof == nil || proof.vrp == nil {
+		return maybe.Nothing[[]byte](), errors.New("invalid proof")
+	}
 	// First enqueue any code hashes found in the proof.
 	// If an error occurs here, we don't want to commit the proof to the database, because the
 	// code hashes will never be requested.
-	var codeHashes []common.Hash
-	for h, err := range proof.rp.CodeHashes() {
-		if err != nil {
-			return maybe.Nothing[[]byte](), err
-		}
-		codeHashes = append(codeHashes, common.Hash(h))
+	hashes, err := proof.vrp.CodeHashes()
+	if err != nil {
+		return maybe.Nothing[[]byte](), err
+	}
+	codeHashes := make([]common.Hash, 0, len(hashes))
+	for _, hash := range hashes {
+		codeHashes = append(codeHashes, common.Hash(hash))
 	}
 	if err := e.codeQueue.AddCode(codeHashes); err != nil {
 		return maybe.Nothing[[]byte](), err

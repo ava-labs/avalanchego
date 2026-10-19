@@ -348,6 +348,8 @@ github.com/arr4n/shed v0.0.0-20260217105731-4cd15adfa100 h1:j0Pj/Gq5XTbJEyzoSX82
 github.com/arr4n/shed v0.0.0-20260217105731-4cd15adfa100/go.mod h1:eD5UkxiWTdbkqM7mg2Xf981SAeWQ/Q80js/1rFcKpfg=
 github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a h1:idn718Q4B6AGu/h5Sxe66HYVdqdGu2l9Iebqhi/AEoA=
 github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a/go.mod h1:lB+ZfQJz7igIIfQNfa7Ml4HSf2uFQQRzpGGRXenZAgY=
+github.com/ava-labs/firewood-go-ethhash/ffi v0.0.0-20261017000332-2ffb3756f4d3 h1:9azrTdEQEX4I5zKrFFTOZ4ciLXQBFEabG+pgiBqMEAI=
+github.com/ava-labs/firewood-go-ethhash/ffi v0.0.0-20261017000332-2ffb3756f4d3/go.mod h1:ltRGJfFEdV1fPCm5cx7W8vQj1g/nM+XGsbuAROfr4ok=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.3.0/go.mod h1:71C76bo47zlDX9gWnn3p/0QZQXkTQ/GNqUNI6fchvjs=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.7.0/go.mod h1:3pf8KGfCmqegWoY5/pZ1NHUcyuRkfl/vHQuOjsdUtbI=
 github.com/ava-labs/libevm v1.13.15-0.20260629092640-7d62036142ff/go.mod h1:6NxGoR1aLABnfLy+fncXRj0W6rUoUrXghnAWZ+Rhr4o=
