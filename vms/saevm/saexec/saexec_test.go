@@ -1036,6 +1036,53 @@ func missingTrieNodeError(root common.Hash) testerr.Want {
 	})
 }
 
+// TestSettledStateAvailability checks that the settled state of the
+// last-executed block remains available even when settlement lags execution by
+// more than the number of recently executed states retained in memory. Block
+// building and verification open this state for worst-case checks, so losing
+// it stalls the node. This is not needed for Firewood, which commits the
+// settled root on every block, nor any archival node, which never prunes.
+func TestSettledStateAvailability(t *testing.T) {
+	// Every block after the first settles the first. The tracker retains the
+	// most recent [core.TriesInMemory] executed states, including the latest,
+	// so this is the smallest lag at which the settled state is evicted.
+	const lag = core.TriesInMemory
+	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
+		c.commitInterval = 2 * lag // guarantee no states are committed
+	}))
+	e, chain := sut.Executor, sut.chain
+
+	newBlock := func(opts ...blockstest.ChainOption) *blocks.Block {
+		return chain.NewBlock(t, types.Transactions{
+			sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+				To:       &common.Address{},
+				Gas:      params.TxGas,
+				GasPrice: big.NewInt(1),
+			}),
+		}, opts...)
+	}
+
+	settled := newBlock()
+	require.NoErrorf(t, e.Enqueue(ctx, settled), "%T.Enqueue() settled block", e)
+	require.NoErrorf(t, settled.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted() on settled block", settled)
+	settledRoot := settled.PostExecutionStateRoot()
+
+	for range lag {
+		b := newBlock(blockstest.WithEthBlockOptions(
+			blockstest.ModifyHeader(func(h *types.Header) {
+				h.Root = settledRoot
+			}),
+		))
+		require.NoErrorf(t, e.Enqueue(ctx, b), "%T.Enqueue()", e)
+	}
+	final := chain.Last()
+	require.NoErrorf(t, final.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted() on last-enqueued block", final)
+	require.Equal(t, settledRoot, final.SettledStateRoot(), "%T.SettledStateRoot() of last-executed block", final)
+
+	_, err := e.StateDB(final.SettledStateRoot())
+	require.NoErrorf(t, err, "%T.StateDB([settled root of last-executed block %d])", e, final.NumberU64())
+}
+
 // TestRecoveryStateAvailability checks that each configuration of the TrieDB
 // matches the expected state availability to avoid leaks and accurately
 // execute subsequent blocks.
