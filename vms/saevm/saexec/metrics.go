@@ -301,8 +301,8 @@ func (s *executionSpan) gasTime() time.Duration {
 	// See nosec rationale for why we ignore the (impossible) overflow error.
 	ns, _, _ := intmath.MulDiv(
 		s.consumed,                           // gas
-		gas.Gas(time.Second/time.Nanosecond), // no unit
-		s.rate,                               // gas/time
+		gas.Gas(time.Second/time.Nanosecond), // ns/s
+		s.rate,                               // gas/s
 	)
 	return time.Duration(ns) //#nosec G115 -- Known to be O(seconds) so won't overflow int64
 }
