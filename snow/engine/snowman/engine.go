@@ -306,7 +306,7 @@ func (e *Engine) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uin
 func (e *Engine) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID, requestedHeight uint64) error {
 	e.sendChits(ctx, nodeID, requestID, requestedHeight)
 
-	issuedMetric := e.metrics.issued.WithLabelValues(pushGossipSource)
+	issuedMetric := e.metrics.issued.WithLabelValues(pullQuerySource)
 
 	// Try to issue [blkID] to consensus.
 	// If we're missing an ancestor, request it from [vdr]
@@ -344,7 +344,7 @@ func (e *Engine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uin
 		e.metrics.numUselessPushQueryBytes.Add(float64(len(blkBytes)))
 	}
 
-	issuedMetric := e.metrics.issued.WithLabelValues(pushGossipSource)
+	issuedMetric := e.metrics.issued.WithLabelValues(pushQuerySource)
 
 	// issue the block into consensus. If the block has already been issued,
 	// this will be a noop. If this block has missing dependencies, nodeID will
@@ -370,7 +370,7 @@ func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32,
 		zap.Uint64("acceptedHeight", acceptedHeight),
 	)
 
-	issuedMetric := e.metrics.issued.WithLabelValues(pullGossipSource)
+	issuedMetric := e.metrics.issued.WithLabelValues(chitsSource)
 	if err := e.issueFromByID(ctx, nodeID, preferredID, issuedMetric); err != nil {
 		return err
 	}
