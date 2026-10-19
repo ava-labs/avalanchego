@@ -4993,6 +4993,7 @@ func TestAutoRenewedValidatorStakeIncreaseStateReload(t *testing.T) {
 		PendingStakeIncreaseTxIDs: pendingStakeIncreaseTxIDs,
 		AccruedStakeIncreaseTxIDs: accruedStakeIncreaseTxIDs,
 		PendingStakeDecrease:      pendingStakeDecrease,
+		PendingStakeDecreaseTxIDs: []ids.ID{ids.GenerateTestID()},
 		WithdrawnStake:            withdrawnStake,
 	}
 

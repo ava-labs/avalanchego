@@ -61,6 +61,9 @@ type validatorMetadata struct {
 	// PendingStakeDecrease is the stake to withdraw at the start of the next
 	// cycle.
 	PendingStakeDecrease uint64 `v3:"true"`
+	// PendingStakeDecreaseTxIDs are the IDs of the txs that requested
+	// PendingStakeDecrease.
+	PendingStakeDecreaseTxIDs []ids.ID `v3:"true"`
 	// WithdrawnStake is the sum of stake withdrawn from the validator's stake
 	// outputs in previous cycles.
 	WithdrawnStake uint64 `v3:"true"`
@@ -111,6 +114,9 @@ func parseValidatorMetadata(bytes []byte, metadata *validatorMetadata) error {
 		if len(metadata.AccruedStakeIncreaseTxIDs) == 0 {
 			metadata.AccruedStakeIncreaseTxIDs = nil
 		}
+		if len(metadata.PendingStakeDecreaseTxIDs) == 0 {
+			metadata.PendingStakeDecreaseTxIDs = nil
+		}
 	}
 	metadata.lastUpdated = time.Unix(int64(metadata.LastUpdated), 0)
 	return nil
@@ -153,6 +159,12 @@ type StakingInfo struct {
 	// PendingStakeDecrease is the stake to withdraw at the start of the next
 	// cycle.
 	PendingStakeDecrease uint64
+	// PendingStakeDecreaseTxIDs are the IDs of the txs that requested
+	// PendingStakeDecrease. These stake decreases can still be cancelled.
+	//
+	// The slice may be shared with other [StakingInfo] values, so it MUST be
+	// copied before being modified.
+	PendingStakeDecreaseTxIDs []ids.ID
 	// WithdrawnStake is the sum of stake withdrawn from the validator's stake
 	// outputs in previous cycles. Withdrawals draw from the outputs of the tx
 	// that created the validator, then from the outputs of its applied stake
@@ -172,6 +184,7 @@ func stakingInfoFromMetadata(vdrMetadata *validatorMetadata) StakingInfo {
 		PendingStakeIncreaseTxIDs: vdrMetadata.PendingStakeIncreaseTxIDs,
 		AccruedStakeIncreaseTxIDs: vdrMetadata.AccruedStakeIncreaseTxIDs,
 		PendingStakeDecrease:      vdrMetadata.PendingStakeDecrease,
+		PendingStakeDecreaseTxIDs: vdrMetadata.PendingStakeDecreaseTxIDs,
 		WithdrawnStake:            vdrMetadata.WithdrawnStake,
 	}
 }
@@ -288,6 +301,7 @@ func (vs *validatorState) SetStakingInfo(
 	metadata.PendingStakeIncreaseTxIDs = stakingInfo.PendingStakeIncreaseTxIDs
 	metadata.AccruedStakeIncreaseTxIDs = stakingInfo.AccruedStakeIncreaseTxIDs
 	metadata.PendingStakeDecrease = stakingInfo.PendingStakeDecrease
+	metadata.PendingStakeDecreaseTxIDs = stakingInfo.PendingStakeDecreaseTxIDs
 	metadata.WithdrawnStake = stakingInfo.WithdrawnStake
 
 	vs.addUpdatedTxID(vdrID, subnetID, metadata.txID)
