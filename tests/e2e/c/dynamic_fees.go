@@ -22,8 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-
-	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
 )
 
 // This test uses the compiled bytecode for `consume_gas.sol` as well as its ABI
@@ -100,9 +99,9 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			return signedTx
 		}
 
-		// gasLimit equals the minimum ACP-176 block capacity, and half the minimum
-		// SAE block gas limit, so each transaction fits in a block.
-		gasLimit := uint64(dynamic.MinTarget * gastime.TargetToRate * saeparams.TauSeconds)
+		// Each transaction burns all its gas to raise the base fee, so it uses a
+		// full block at the minimum target.
+		gasLimit := uint64(worstcase.SafeMaxBlockSize(dynamic.MinTarget * gastime.TargetToRate))
 		tc.Log().Info("set gas limit",
 			zap.Uint64("gasLimit", gasLimit),
 		)

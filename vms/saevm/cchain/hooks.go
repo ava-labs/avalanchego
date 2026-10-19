@@ -172,8 +172,9 @@ func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.Target
 		return dynamic.InitialTargetExponent, nil
 	}
 
-	// The block might be the last synchronous block running with ACP-176, whose
-	// fee state ends with the target excess.
+	// Synchronous blocks store the target excess as the last field of the
+	// ACP-176 fee state prefixing their extra data. It is needed to execute and
+	// recover them, and to build on the last one.
 	if len(h.Extra) < corethparams.ACP176StateSize {
 		return 0, fmt.Errorf("%w: expected at least %d bytes but got %d bytes",
 			errInsufficientFeeState,

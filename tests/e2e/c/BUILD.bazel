@@ -27,7 +27,7 @@ go_library(
         "//vms/proposervm",
         "//vms/saevm/cchain/dynamic",
         "//vms/saevm/gastime",
-        "//vms/saevm/params",
+        "//vms/saevm/worstcase",
         "//vms/secp256k1fx",
         "//wallet/subnet/primary/common",
         "@com_connectrpc_connect//:connect",
