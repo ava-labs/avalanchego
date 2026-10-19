@@ -20,7 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/network/p2p/tracking"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -104,7 +104,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		s.snowCtx.Log,
 		syncblock.NewClient(
 			s.snowCtx.Log,
-			tracking.NewClient(
+			peertracker.NewClient(
 				s.network.Network,
 				p2p.EVMBlockRequestHandlerID,
 				s.network.PeerTracker,
@@ -135,7 +135,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		s.snowCtx.Log,
 		code.NewClient(
 			s.snowCtx.Log,
-			tracking.NewClient(
+			peertracker.NewClient(
 				s.network.Network,
 				p2p.EVMCodeRequestHandlerID,
 				s.network.PeerTracker,
@@ -161,7 +161,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		s.snowCtx.Log,
 		hashdb.NewClient(
 			s.snowCtx.Log,
-			tracking.NewClient(
+			peertracker.NewClient(
 				s.network.Network,
 				p2p.EVMLeafRequestHandlerID,
 				s.network.PeerTracker,

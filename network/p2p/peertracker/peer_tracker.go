@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package p2p
+package peertracker
 
 import (
 	"errors"
@@ -39,8 +39,8 @@ const (
 // preferring to contact peers with known good bandwidth, connecting
 // to new peers with an exponentially decaying probability.
 //
-// Prefer the tracking subpackage, which pairs each request with its outcome.
-// Use RegisterRequest and its pair directly only where a [Client] cannot.
+// Prefer a [Client], which pairs each request with its outcome. Use
+// RegisterRequest and its pair directly only where a [Client] cannot.
 type PeerTracker struct {
 	// Lock to protect concurrent access to the peer tracker
 	lock sync.RWMutex
@@ -75,7 +75,7 @@ type peerTrackerMetrics struct {
 	averageBandwidth   prometheus.Gauge
 }
 
-func NewPeerTracker(
+func New(
 	log logging.Logger,
 	metricsNamespace string,
 	registerer prometheus.Registerer,

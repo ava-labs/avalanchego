@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
 
-	"github.com/ava-labs/avalanchego/network/p2p/tracking"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/network"
 
@@ -42,7 +42,7 @@ type Client struct {
 // NewClient returns a [Client] reading the trie served at client's handler ID.
 func NewClient(
 	log logging.Logger,
-	client *tracking.Client,
+	client *peertracker.Client,
 	trieKeyLength int,
 ) *Client {
 	return &Client{
