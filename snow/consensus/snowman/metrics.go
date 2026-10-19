@@ -18,6 +18,7 @@ import (
 
 type processingStart struct {
 	time       time.Time
+	height     uint64
 	pollNumber uint64
 }
 
@@ -166,9 +167,10 @@ func newMetrics(
 	return m, errs.Err
 }
 
-func (m *metrics) Issued(blkID ids.ID, pollNumber uint64) {
+func (m *metrics) Issued(blkID ids.ID, height uint64, pollNumber uint64) {
 	m.processingBlocks.Put(blkID, processingStart{
 		time:       time.Now(),
+		height:     height,
 		pollNumber: pollNumber,
 	})
 	m.numProcessing.Inc()
@@ -233,12 +235,15 @@ func (m *metrics) Rejected(blkID ids.ID, pollNumber uint64, blockSize int) {
 	m.latRejected.Observe(float64(duration))
 }
 
-func (m *metrics) MeasureAndGetOldestDuration() time.Duration {
-	_, oldestOp, exists := m.processingBlocks.Oldest()
+// MeasureAndGetOldest returns the ID, height, and processing duration of the
+// block that has been processing the longest. If no blocks are processing, a
+// zero duration is returned.
+func (m *metrics) MeasureAndGetOldest() (ids.ID, uint64, time.Duration) {
+	blkID, oldestOp, exists := m.processingBlocks.Oldest()
 	if !exists {
-		return 0
+		return ids.Empty, 0, 0
 	}
-	return time.Since(oldestOp.time)
+	return blkID, oldestOp.height, time.Since(oldestOp.time)
 }
 
 func (m *metrics) SuccessfulPoll() {
