@@ -41,7 +41,6 @@ go_library(
         "//utils/timer/mockable",
         "//version",
         "//vms/evm/sync/customrawdb",
-        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//accounts",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/bitutil",
@@ -59,6 +58,7 @@ go_library(
         "@com_github_ava_labs_libevm//rlp",
         "@com_github_ava_labs_libevm//trie",
         "@com_github_ava_labs_libevm//triedb",
+        "@firewood//ffi:ffi_ethhash",
     ],
 )
 

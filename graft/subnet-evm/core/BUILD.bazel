@@ -66,7 +66,6 @@ go_library(
         "//vms/evm/predicate",
         "//vms/evm/prefetch",
         "//vms/evm/sync/customrawdb",
-        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/bitutil",
         "@com_github_ava_labs_libevm//common/hexutil",
@@ -92,6 +91,7 @@ go_library(
         "@com_github_ava_labs_libevm//trie",
         "@com_github_ava_labs_libevm//triedb",
         "@com_github_holiman_uint256//:uint256",
+        "@firewood//ffi:ffi_ethhash",
     ],
 )
 

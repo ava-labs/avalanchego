@@ -8,6 +8,23 @@ bazel_dep(name = "gazelle", version = "0.54.0", repo_name = "bazel_gazelle")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.4")
+bazel_dep(name = "firewood", version = "0.0.0")
+bazel_dep(name = "rules_rust", version = "0.69.0")
+
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    edition = "2024",
+    versions = ["1.95.0"],
+)
+use_repo(rust, "rust_toolchains")
+
+register_toolchains("@rust_toolchains//:all")
+
+git_override(
+    module_name = "firewood",
+    commit = "ce02ebf493bf056d6ff39f768b7a17e2b5697c8c",
+    remote = "https://github.com/ava-labs/firewood.git",
+)
 
 # Go SDK - reads version from go.mod (ensured consistent with all go.mod files)
 go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
@@ -23,10 +40,6 @@ GO_OVERRIDES = {
     "github.com/supranational/blst": {
         "build_gen": "off",
         "patches": ["//.bazel/patches:com_github_supranational_blst.patch"],
-    },
-    "github.com/ava-labs/firewood-go-ethhash/ffi": {
-        "build_gen": "off",
-        "patches": ["//.bazel/patches:com_github_ava_labs_firewood_go_ethhash_ffi.patch"],
     },
     "github.com/consensys/gnark-crypto": {
         "patches": ["//.bazel/patches:com_github_consensys_gnark_crypto_asm_includes.patch"],

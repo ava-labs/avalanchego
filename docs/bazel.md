@@ -27,7 +27,7 @@ avalanchego monorepo.
   - [Patched Dependencies](#patched-dependencies)
     - [Patching strategies](#patching-strategies)
     - [libevm (secp256k1)](#libevm-secp256k1)
-    - [firewood-go-ethhash FFI](#firewood-go-ethhash-ffi)
+    - [Firewood FFI](#firewood-ffi)
     - [blst (BLS Signatures)](#blst-bls-signatures)
     - [gnark-crypto (BLS12-381 for KZG)](#gnark-crypto-bls12-381-for-kzg)
   - [Protocol Buffers](#protocol-buffers)
@@ -378,7 +378,7 @@ files are warranted: `cc_library` targets with platform-specific
 | Dependency | Issue | Solution |
 |------------|-------|----------|
 | `ava-labs/libevm` | Missing C sources for secp256k1 | Custom BUILD files + gazelle directive excludes secp256k1 dir |
-| `firewood-go-ethhash/ffi` | Pre-built static libraries | Custom BUILD files with `cc_import` |
+| Firewood FFI | Source Bazel target | `@firewood//ffi:ffi_ethhash` |
 | `supranational/blst` | Complex CGO with assembly | Custom BUILD files (gazelle disabled) |
 | `consensys/gnark-crypto` | Assembly cross-package includes | `no-sandbox` on bls12-381 `fp` and `fr` targets |
 
@@ -391,14 +391,37 @@ sources.
 secp256k1 directory from generation. See `Patch Maintenance` below
 for how to edit these.
 
-#### firewood-go-ethhash FFI
+#### Firewood FFI
 
-**Problem:** Pre-built static libraries with `-L` paths that don't work
-in Bazel's sandbox.
+**Problem:** Firewood Go code imports the published
+`github.com/ava-labs/firewood-go-ethhash/ffi` module. That module includes
+pre-built static libraries. Bazel must build Firewood from source.
 
-**Solution:** Custom BUILD files with `cc_import` for proper static
-library linking. Gazelle can't generate these rules for pre-built
-libraries. See `Patch Maintenance` below for how to edit these.
+**Solution:** [`MODULE.bazel`](../MODULE.bazel) declares the Firewood module
+and pins it with `git_override`. The commit must be available from the configured
+remote. The root module registers Rust 1.95.0. A dependency module cannot register
+a toolchain for the root build.
+
+[`@firewood//ffi:ffi_ethhash`](../graft/evm/firewood/BUILD.bazel) has the same
+Go import path as the published Ethereum FFI module. Go source files keep that
+import path. Bazel `go_library` targets depend on the Firewood Bazel target. This
+links the source-built Rust library. Ordinary Go builds do not use Bazel targets,
+so they continue to use the published module.
+
+Bazel sets the `firewood_bazel` build tag in [`.bazelrc`](../.bazelrc). The tag
+selects the source FFI API while Firewood has an unreleased API change. The
+untagged files select the published API. Remove this adapter after the published
+module includes the source API name.
+
+When you update the Firewood commit, run:
+
+```sh
+bazel mod tidy
+bazel test //graft/evm/firewood:firewood_test
+```
+
+Run the affected Bazel unit and end-to-end suites before you merge a change that
+updates the integration.
 
 #### blst (BLS Signatures)
 

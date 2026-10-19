@@ -19,10 +19,10 @@ go_library(
         "//network/p2p/peertracker",
         "//utils/logging",
         "//utils/maybe",
-        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_prometheus_client_golang//prometheus",
+        "@firewood//ffi:ffi_ethhash",
     ],
 )
 
@@ -35,10 +35,10 @@ go_test(
         "//database/merkle/sync/synctest",
         "//ids",
         "//network/p2p/peertracker/peertrackertest",
-        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
+        "@firewood//ffi:ffi_ethhash",
         "@org_uber_go_goleak//:goleak",
     ],
 )
