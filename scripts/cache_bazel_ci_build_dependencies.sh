@@ -21,5 +21,6 @@ while IFS= read -r target_set; do
 done < <(bazel_ci_dependency_targets)
 
 # bazel-check-metadata also runs `bazel mod deps`. It has no target patterns,
-# but it must be able to load every repository in the module graph offline.
+# but it must load every repository in the module graph with repository and
+# Go module downloads disabled.
 bazelisk mod deps --lockfile_mode=error >/dev/null

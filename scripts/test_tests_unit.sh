@@ -40,8 +40,7 @@ case "\${1-}" in
       "${repo_root}/graft/coreth")
         printf '%s\n' \
           github.com/ava-labs/avalanchego/graft/coreth/unit \
-          github.com/ava-labs/avalanchego/graft/coreth/mocks \
-          github.com/ava-labs/avalanchego/graft/coreth/tests/warp
+          github.com/ava-labs/avalanchego/graft/coreth/mocks
         ;;
       "${repo_root}/graft/evm")
         printf '%s\n' \

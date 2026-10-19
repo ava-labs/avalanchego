@@ -55,7 +55,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		gasTipCap = big.NewInt(minFeePerGas)
 	)
 
-	ginkgo.It("should ensure that the gas price is affected by load", func() {
+	ginkgo.It("should ensure that the gas price is affected by load", ginkgo.Label(e2e.SkipSharedNetworkBootstrapCheckLabel), func() {
 		tc.By("creating a new private network to ensure isolation from other tests")
 		env := e2e.GetEnv(tc)
 		publicNetwork := env.GetNetwork()
@@ -78,7 +78,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		key := privateNetwork.PreFundedKeys[0]
 		ethAddress := key.EthAddress()
 
-		tc.By("initializing a coreth client")
+		tc.By("initializing a cchain client")
 		node := privateNetwork.Nodes[0]
 		nodeURI := tmpnet.NodeURI{
 			NodeID: node.NodeID,

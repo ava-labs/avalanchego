@@ -10,8 +10,9 @@ avalanchego monorepo.
 - [Why Bazel?](#why-bazel)
 - [Architecture Overview](#architecture-overview)
   - [Toolchain Strategy](#toolchain-strategy)
+  - [Go dependency preparation](#go-dependency-preparation)
   - [Version Pinning](#version-pinning)
-  - [Repository tools and external-dependency fetches](#repository-tools-and-external-dependency-fetches)
+  - [External-dependency fetches](#external-dependency-fetches)
   - [Why Bazel 8?](#why-bazel-8)
   - [Multi-Module Structure](#multi-module-structure)
   - [Key Configuration Files](#key-configuration-files)
@@ -111,13 +112,10 @@ task bazel-clean
 
 ### Toolchain Strategy
 
-The build uses `go_sdk.from_file()` to read the Go version from
-`go.mod`, ensuring a single source of truth without manual syncing:
-
-```python
-go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
-go_sdk.from_file(go_mod = "//:go.mod")
-```
+[`MODULE.bazel`](../MODULE.bazel) uses `go_sdk.from_file()` to select a managed
+Go toolchain from `go.mod`. Bazel uses this toolchain to compile Go targets.
+These builds do not require a separately installed Go compiler. Commands outside
+Bazel can still require Go on `PATH`.
 
 **Approaches considered:**
 
@@ -125,13 +123,38 @@ go_sdk.from_file(go_mod = "//:go.mod")
 |----------|------|------|
 | `go_sdk.from_file()` (chosen) | Reproducible, single source of truth via go.mod, no nix required | None significant |
 | `go_sdk.download()` | Explicit version in MODULE.bazel | Go version must be synced manually across go.mod files |
-| `go_sdk.host()` | Uses system Go | Requires nix shell, not hermetic outside nix |
+| `go_sdk.host()` | Uses system Go | Requires Go on `PATH`; depends on host setup |
 | `rules_nixpkgs_go` | Bazel calls Nix directly, fully hermetic | **Incompatible with rules_go v0.57+** (toolchain API mismatch) |
 
 > **Note:** rules_nixpkgs_go v0.13.0 proved incompatible with rules_go
 > v0.56.0+. The rules_go toolchain API changed in ways that
 > rules_nixpkgs_go doesn't support. See:
 > https://github.com/tweag/rules_nixpkgs/issues/667
+
+### Go dependency preparation
+
+Bazel builds need both a toolchain and dependency sources:
+
+1. Gazelle's `go_deps` extension reads the Go workspace metadata.
+2. Gazelle's `go_repository` rules use a Go module cache to obtain dependency
+   modules and prepare external source repositories.
+3. Bazel compiles those repositories with its managed Go toolchain.
+
+[`setup-bazel`](../.github/actions/setup-bazel/action.yml) configures Gazelle's
+shared cache at `$HOME/.cache/bazel-go-repository-modcache`. Its [configuration
+helper](../.github/actions/setup-bazel/configure-bazelrc.sh) sets `GOMODCACHE`
+through `--repo_env` and enables `GO_REPOSITORY_USE_HOST_MODCACHE=1`. In this
+Gazelle setting, `HOST_MODCACHE` refers to the module cache available to
+Gazelle's repository rules, not to a host Go compiler.  Without these settings,
+Gazelle keeps module downloads in each Bazel work area.  The CI path is not a
+default for all local Bazel commands.
+
+See [Go toolchains and dependency caches](./go-toolchains-and-caches.md) for
+cache boundaries, preparation order, and the limits of download restrictions.
+
+A task with a Bazel name can also run Go commands outside Bazel. For example,
+`bazel-test-e2e-smoke` builds the node with Bazel, but uses Go to build XSVM and
+the E2E test binary. Its Nix environment supplies Go for those commands.
 
 ### Version Pinning
 
@@ -643,8 +666,8 @@ replace the Ubuntu smoke test with a non-smoke E2E test. Each setup job checks
 Bazel metadata. On `master`, a cache miss makes each setup job prepare the CI
 dependency list. The job then disables downloads, checks metadata, and saves the
 cache. Setup jobs can duplicate this work when they share a key. On other refs,
-each Bazel-consuming job prepares its own non-exact restore before it runs
-offline. Those jobs do not save the cache.
+each Bazel-consuming job prepares its own non-exact restore before it disables
+repository and module downloads. Those jobs do not save the cache.
 
 The daily scheduled workflow runs one full unit-test job on Ubuntu 22.04 and
 24.04, on AMD64 and ARM64, and on macOS 26 ARM64. It also runs the same focused
@@ -733,8 +756,9 @@ configuration are outside this repository's scope.
 
 The Bazel CI cache setup configures four types of cached data:
 
-- Bazel `repository_cache`
-- shared Gazelle `GOMODCACHE`
+- Bazel repository cache at `$HOME/.cache/bazel-repository-cache`, selected
+  with `--repository_cache`
+- shared Gazelle module cache; see [Go dependency preparation](#go-dependency-preparation)
 - the Bazel binary in a versioned `~/.cache/bazelisk` subdirectory
 - Bazel remote action and test-result data
 
@@ -754,13 +778,10 @@ cache contains them. The job cannot depend on the Bazel workflow setup job becau
 `needs` does not cross workflows. The Bazel workflow keeps the only cache-writing
 setup job.
 
-The shared `GOMODCACHE` is required because Gazelle `go_repository` otherwise
-keeps Go module downloads in each Bazel work area. Thus, a later job can use the
-network after the setup fetch runs. The action prevents this behavior with these
-settings:
-
-- `GO_REPOSITORY_USE_HOST_MODCACHE=1`
-- `GOMODCACHE=...`
+The shared Gazelle module cache lets later jobs reuse prepared module inputs
+instead of downloading them in a new Bazel work area. See
+[Go dependency preparation](#go-dependency-preparation) for the cache path and
+the meaning of `GO_REPOSITORY_USE_HOST_MODCACHE`.
 
 The remote cache is separate from the GitHub Actions caches. Bazel reads it and
 writes to it during configured pre-merge builds and tests. It stores action
@@ -825,9 +846,11 @@ On other refs, a non-exact restore also prepares dependencies. These jobs do
 not save a cache entry. The setup job disables downloads and checks metadata.
 Later Bazel-consuming jobs also disable downloads after preparation. The action
 sets `--repository_disable_download` and `GOPROXY=off` for repository rules.
-`--repository_disable_download` blocks Bazel downloads. `GOPROXY=off` blocks
-Gazelle `go_repository` subprocesses. If a later rule needs a missing download,
-Bazel fails instead of downloading it.
+`--repository_disable_download` blocks Bazel repository downloads.
+`GOPROXY=off` prevents Gazelle's Go commands from downloading missing modules.
+Those commands can still read cached modules. A missing module causes a failure
+instead of a download. These controls do not block all network access; see
+[download restrictions](./go-toolchains-and-caches.md#download-restrictions).
 
 The checked-in list has two parts:
 
@@ -876,8 +899,8 @@ When modifying `setup-bazel`, `run_task.sh`, `run_bazel_ci_command.sh`,
 preserve these invariants:
 
 - CI can launch `task` without assuming a preinstalled repo-specific wrapper
-- jobs that also prepare host Go dependencies run `setup-bazel` before
-  `setup-go-for-project` or `install-nix` disables `GOPROXY`; see
+- jobs that also prepare dependencies for Go tasks outside Bazel run `setup-bazel`
+  before `setup-go-for-project` or `install-nix` disables `GOPROXY`; see
   [CI dependency provisioning](./ci.md#provision-ci-job-dependencies)
 - on `master`, every `setup` job requests a cache save after it checks metadata;
   see [CI cache policy](./ci.md#ci-cache-policy) for cache preparation and
@@ -907,7 +930,7 @@ Validate changes proportionally:
   - an exact restore
   - a non-exact restore
   - a cache miss
-- confirm that Bazel preparation populates its separate Go module cache before
+- confirm that Bazel preparation populates Gazelle's separate module cache before
   Go setup disables `GOPROXY`
 - confirm that the workload succeeds with repository downloads disabled.
   An exact hit alone does not test this ordering constraint

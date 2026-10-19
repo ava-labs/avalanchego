@@ -24,6 +24,7 @@ go_library(
         "//database/prefixdb",
         "//ids",
         "//network/p2p",
+        "//network/p2p/peertracker",
         "//snow",
         "//utils/constants",
         "//utils/set",

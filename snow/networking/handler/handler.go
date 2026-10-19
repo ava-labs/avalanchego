@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -129,7 +129,7 @@ type handler struct {
 
 	// Tracks the peers that are currently connected to this subnet
 	peerTracker commontracker.Peers
-	p2pTracker  *p2p.PeerTracker
+	p2pTracker  *peertracker.PeerTracker
 }
 
 // Initialize this consensus handler
@@ -144,7 +144,7 @@ func New(
 	resourceTracker tracker.ResourceTracker,
 	subnet subnets.Subnet,
 	peerTracker commontracker.Peers,
-	p2pTracker *p2p.PeerTracker,
+	p2pTracker *peertracker.PeerTracker,
 	reg prometheus.Registerer,
 	haltBootstrapping func(),
 ) (Handler, error) {

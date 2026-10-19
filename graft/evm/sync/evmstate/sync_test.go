@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -633,7 +634,11 @@ func TestSyncOverProtoLeafProtocol(t *testing.T) {
 
 	stateSyncer, err := NewSyncer(
 		log,
-		leafproto.NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker),
+		leafproto.NewClient(
+			log,
+			peertracker.NewClient(net, p2p.EVMLeafRequestHandlerID, tracker),
+			common.HashLength,
+		),
 		clientEthDB,
 		root,
 		codeQueue,

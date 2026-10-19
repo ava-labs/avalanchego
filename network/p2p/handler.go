@@ -30,7 +30,6 @@ const (
 	EVMLeafRequestHandlerID
 	EVMCodeRequestHandlerID
 	EVMBlockRequestHandlerID
-	// EVMAtomicLeafRequestHandlerID is reserved for the coreth atomic-trie syncer.
 	EVMAtomicLeafRequestHandlerID
 )
 

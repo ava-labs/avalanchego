@@ -10,11 +10,8 @@ go_library(
     srcs = ["test_rules.go"],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/params/extras/extrastest",
     deps = [
-        "//graft/coreth/params",
         "//graft/coreth/params/extras",
-        "//graft/coreth/params/paramstest",
         "//upgrade",
         "//upgrade/upgradetest",
-        "@com_github_ava_labs_libevm//common",
     ],
 )

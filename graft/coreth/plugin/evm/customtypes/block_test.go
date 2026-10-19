@@ -33,7 +33,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/internal/blocktest"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
@@ -41,6 +40,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/trie"
 
 	// This test file has to be in package types_test to avoid a circular
 	// dependency when importing `params`. We dot-import the package to mimic
@@ -353,7 +353,7 @@ func makeBenchBlock() *types.Block {
 			Extra:      []byte("benchmark uncle"),
 		}
 	}
-	return types.NewBlock(header, txs, uncles, receipts, blocktest.NewHasher())
+	return types.NewBlock(header, txs, uncles, receipts, trie.NewStackTrie(nil))
 }
 
 func TestAP4BlockEncoding(t *testing.T) {

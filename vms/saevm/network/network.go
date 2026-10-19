@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -28,7 +29,7 @@ var (
 // config sets optional parameters for the P2P network.
 type config struct {
 	// trackedPeers provides an exclusive list of nodes that will be connected
-	// through the [p2p.PeerTracker] on the [Network].
+	// through the [peertracker.PeerTracker] on the [Network].
 	trackedPeers set.Set[ids.NodeID]
 }
 
@@ -49,7 +50,7 @@ type Network struct {
 	*p2p.Network
 	ValidatorPeers *p2p.Validators
 	Peers          *p2p.Peers
-	PeerTracker    *p2p.PeerTracker
+	PeerTracker    *peertracker.PeerTracker
 }
 
 // New creates the P2P network with a registered validator set.
@@ -73,7 +74,7 @@ func New(
 		maxValidatorSetStaleness,
 	)
 
-	peerTracker, err := p2p.NewPeerTracker(
+	peerTracker, err := peertracker.New(
 		snowCtx.Log,
 		"peer_tracker",
 		reg,
