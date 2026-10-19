@@ -10,6 +10,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 - [How CI is organized](#how-ci-is-organized)
   - [Workflows coordinate repository operations](#workflows-coordinate-repository-operations)
   - [Keep Go CI unified](#keep-go-ci-unified)
+  - [Generated-source checks](#generated-source-checks)
   - [Required checks and the merge queue](#required-checks-and-the-merge-queue)
   - [Go and Bazel CI workflow layout](#go-and-bazel-ci-workflow-layout)
   - [Platform-specific setup dependencies](#platform-specific-setup-dependencies)
@@ -96,6 +97,24 @@ Name a component-specific job `<check>-<component>`, such as `lint-evm`. Omit
 the component for a repository-wide check. The aggregate job is an exception.
 Include the workflow name in `go-required`. This name keeps the required check
 distinct in GitHub output.
+
+### Generated-source checks
+
+The `checks` job in [`.github/workflows/go.yml`](../.github/workflows/go.yml)
+runs generated-source and module-metadata checks in sequence. One job avoids
+repeating runner, Go, Nix, and Bazel setup.
+
+Each source-generator task updates the checkout and then checks that it is
+clean. A failed task can leave generated files staged. The workflow resets the
+CI checkout after each source-generator task. This reset lets later checks run
+against the commit under test.
+
+Keep the reset in the workflow. Do not add it to a task. Contributors can run
+the tasks in a working directory that contains uncommitted changes.
+
+Each check step continues after failure. The final step fails the job when one
+or more checks fail. When you add a source-generator check, give its step a
+cleanup step and add its outcome to the final step.
 
 ### Required checks and the merge queue
 

@@ -68,7 +68,7 @@ jobs:
           run: ./scripts/run_task.sh test-build-image
           working_directory: ./graft/subnet-evm
 
-  check-contract-bindings:
+  checks:
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
@@ -76,67 +76,101 @@ jobs:
         shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/install-nix
-      - run: ./scripts/run_task.sh check-generate-load-contract-bindings
-
-  check-generated-canoto:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
-      - shell: bash
-        run: ./scripts/run_task.sh check-generate-canoto
-
-  check-generated-mocks:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
-      - shell: bash
-        run: ./scripts/run_task.sh check-generate-mocks
-
-  check-generated-protobuf:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    defaults:
-      run:
-        shell: nix develop --command bash -x {0}
-    steps:
-      - uses: actions/checkout@v5
-      # Use the dev shell instead of bufbuild/buf-action to ensure the dev shell provides the expected versions
-      - uses: ./.github/actions/install-nix
-      - run: ./scripts/run_task.sh check-generate-protobuf
-
-  check-go-mod-tidy:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      # Prepare Bazel's separate Go module cache before Go setup disables GOPROXY.
+      # Prepare Bazel's separate Go module cache before install-nix disables
+      # GOPROXY. check-go-mod-tidy also validates MODULE.bazel's Go mappings.
       - uses: ./.github/actions/setup-bazel
-      - uses: ./.github/actions/setup-go-for-project
-      - shell: bash
-        run: ./scripts/run_task.sh check-go-mod-tidy
+        env:
+          # This job does not build Bazel targets.
+          BAZEL_REMOTE_CACHE_ENABLED: 'false'
+      # The dev shell provides the generators and restores the Go module cache.
+      - uses: ./.github/actions/install-nix
 
-  check-links:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 # v1.2.5
+      - id: contract-bindings
+        name: Check generated contract bindings
+        continue-on-error: true
+        run: ./scripts/run_task.sh check-generate-load-contract-bindings
+      - name: Restore clean checkout after contract bindings check
+        if: ${{ always() }}
+        run: git reset --hard HEAD && git clean -ffd
+
+      - id: canoto
+        name: Check generated Canoto code
+        continue-on-error: true
+        run: ./scripts/run_task.sh check-generate-canoto
+      - name: Restore clean checkout after Canoto check
+        if: ${{ always() }}
+        run: git reset --hard HEAD && git clean -ffd
+
+      - id: mocks
+        name: Check generated mocks
+        continue-on-error: true
+        run: ./scripts/run_task.sh check-generate-mocks
+      - name: Restore clean checkout after mocks check
+        if: ${{ always() }}
+        run: git reset --hard HEAD && git clean -ffd
+
+      - id: protobuf
+        name: Check generated protobuf
+        continue-on-error: true
+        run: ./scripts/run_task.sh check-generate-protobuf
+      - name: Restore clean checkout after protobuf check
+        if: ${{ always() }}
+        run: git reset --hard HEAD && git clean -ffd
+
+      - id: go_mod_tidy
+        name: Check Go module metadata
+        continue-on-error: true
+        run: ./scripts/run_task.sh check-go-mod-tidy
+      - name: Restore clean checkout after module metadata check
+        if: ${{ always() }}
+        run: git reset --hard HEAD && git clean -ffd
+
+      - id: links
+        name: Check links
+        continue-on-error: true
+        uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 # v1.2.5
         with:
           fail_level: any
 
-  check-tauseconds:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - name: Check for TauSeconds misuse with time.Add()
+      - id: tauseconds
+        name: Check for TauSeconds misuse with time.Add()
+        continue-on-error: true
         run: |
           if grep -rn '\.Add([^)]*TauSeconds' --include='*.go' .; then
             echo "ERROR: Use params.Tau (time.Duration) with time.Add(), not TauSeconds (int)"
             echo "TauSeconds would be interpreted as nanoseconds, not seconds"
+            exit 1
+          fi
+
+      - name: Fail if any check failed
+        if: ${{ always() }}
+        env:
+          CONTRACT_BINDINGS_OUTCOME: ${{ steps.contract-bindings.outcome }}
+          CANOTO_OUTCOME: ${{ steps.canoto.outcome }}
+          MOCKS_OUTCOME: ${{ steps.mocks.outcome }}
+          PROTOBUF_OUTCOME: ${{ steps.protobuf.outcome }}
+          GO_MOD_TIDY_OUTCOME: ${{ steps.go_mod_tidy.outcome }}
+          LINKS_OUTCOME: ${{ steps.links.outcome }}
+          TAUSECONDS_OUTCOME: ${{ steps.tauseconds.outcome }}
+        run: |
+          failed_checks=()
+          while IFS='=' read -r name outcome; do
+            if [[ "$outcome" == 'failure' ]]; then
+              failed_checks+=("$name")
+            fi
+          done <<EOF
+          contract bindings=$CONTRACT_BINDINGS_OUTCOME
+          Canoto=$CANOTO_OUTCOME
+          mocks=$MOCKS_OUTCOME
+          protobuf=$PROTOBUF_OUTCOME
+          Go module metadata=$GO_MOD_TIDY_OUTCOME
+          links=$LINKS_OUTCOME
+          TauSeconds=$TAUSECONDS_OUTCOME
+          EOF
+
+          if ((${#failed_checks[@]})); then
+            echo 'Failed checks:'
+            printf '  %s\n' "${failed_checks[@]}"
             exit 1
           fi
 
