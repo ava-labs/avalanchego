@@ -39,7 +39,7 @@ func TestRollingGasThroughput(t *testing.T) {
 			span: executionSpan{
 				start:    at(0),
 				end:      at(sec),
-				consumed: 2e6,
+				executed: 2e6,
 				rate:     1e6,
 			},
 			wantHeadroom:     (2e6 / 1e6) / 1, // (gas-clock seconds = consumed/rate) / (wall-clock seconds)
@@ -50,7 +50,7 @@ func TestRollingGasThroughput(t *testing.T) {
 			span: executionSpan{
 				start:    at(sec),
 				end:      at(2 * sec),
-				consumed: 0.5e6,
+				executed: 0.5e6,
 				rate:     1e6,
 			},
 			wantHeadroom:     (2e6/1e6 + 0.5e6/1e6) / (1 + 1),
@@ -61,7 +61,7 @@ func TestRollingGasThroughput(t *testing.T) {
 			span: executionSpan{
 				start:    at(5500 * ms),
 				end:      at(6 * sec), // cutoff == end of first block, which is evicted
-				consumed: 1e6,
+				executed: 1e6,
 				rate:     2e6,
 			},
 			wantHeadroom:     (0.5e6/1e6 + 1e6/2e6) / (1 + 0.5),
@@ -72,7 +72,7 @@ func TestRollingGasThroughput(t *testing.T) {
 			span: executionSpan{
 				start:    at(6 * sec),
 				end:      at(6800 * ms), // cutoff partway through second block, which is kept
-				consumed: 4e6,
+				executed: 4e6,
 				rate:     3e6,
 			},
 			wantHeadroom:     (0.5e6/1e6 + 1e6/2e6 + 4e6/3e6) / (1 + 0.5 + 0.8),
@@ -83,7 +83,7 @@ func TestRollingGasThroughput(t *testing.T) {
 			span: executionSpan{
 				start:    at(20 * sec),
 				end:      at(23_500 * ms),
-				consumed: 7e6,
+				executed: 7e6,
 				rate:     2e6,
 			},
 			wantHeadroom:     (7e6 / 2e6) / 3.5,

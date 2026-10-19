@@ -189,12 +189,12 @@ type (
 
 	// ExecutionResults holds the outputs of [Execute].
 	ExecutionResults struct {
-		BaseFee     *uint256.Int
-		Signer      types.Signer
-		BlockCtx    vm.BlockContext
-		Receipts    types.Receipts
-		GasConsumed gas.Gas
-		FinishBy    struct {
+		BaseFee                  *uint256.Int
+		Signer                   types.Signer
+		BlockCtx                 vm.BlockContext
+		Receipts                 types.Receipts
+		GasConsumed, GasExecuted gas.Gas
+		FinishBy                 struct {
 			Gas  *gastime.Time
 			Wall time.Time
 		}
@@ -362,6 +362,7 @@ func Execute(
 		if err != nil {
 			return nil, fmt.Errorf("%w: transaction execution errored (not reverted) [%d](%#x): %v", errFatal, ti, tx.Hash(), err)
 		}
+		res.GasExecuted += gas.Gas(receipt.GasExecuted)
 
 		perTxClock.Tick(gas.Gas(receipt.GasUsed))
 		// Interim execution time reports live canonical progress. Historical
@@ -419,6 +420,7 @@ func Execute(
 	for i, o := range ops {
 		b.CheckOpBurnerBalanceBounds(stateDB, numTxs+i, o)
 		res.GasConsumed += o.Gas
+		res.GasExecuted += o.Gas
 		perTxClock.Tick(o.Gas)
 		if config.canonical && !synchronous {
 			b.SwapInterimExecutionTime(perTxClock)

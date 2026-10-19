@@ -259,7 +259,7 @@ func (m *metrics) observeExecuteDuration(start, end time.Time, b *blocks.Block, 
 		m.averageExecutedGasCharged.observe(executionSpan{
 			start:    start,
 			end:      end,
-			consumed: res.GasConsumed,
+			executed: res.GasExecuted,
 			rate:     res.rate,
 		})
 	}
@@ -267,12 +267,12 @@ func (m *metrics) observeExecuteDuration(start, end time.Time, b *blocks.Block, 
 
 type executionSpan struct {
 	start, end     time.Time
-	consumed, rate gas.Gas
+	executed, rate gas.Gas
 }
 
 func (r *rollingGasThroughput) observe(s executionSpan) {
 	r.history.PushRight(s)
-	r.total.gas += s.consumed
+	r.total.gas += s.executed
 	r.total.wallTime += s.wallTime()
 	r.total.gasTime += s.gasTime()
 
@@ -285,7 +285,7 @@ func (r *rollingGasThroughput) observe(s executionSpan) {
 			break
 		}
 		r.history.PopLeft()
-		r.total.gas -= old.consumed
+		r.total.gas -= old.executed
 		r.total.wallTime -= old.wallTime()
 		r.total.gasTime -= old.gasTime()
 	}
@@ -299,7 +299,7 @@ func (r *rollingGasThroughput) observe(s executionSpan) {
 func (s *executionSpan) gasTime() time.Duration {
 	// See nosec rationale for why we ignore the (impossible) overflow error.
 	ns, _, _ := intmath.MulDiv(
-		s.consumed,                           // gas
+		s.executed,                           // gas
 		gas.Gas(time.Second/time.Nanosecond), // ns/s
 		s.rate,                               // gas/s
 	)
