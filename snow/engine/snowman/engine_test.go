@@ -8,6 +8,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"runtime/debug"
 	"slices"
 	"testing"
 	"time"
@@ -3546,6 +3548,117 @@ func (m *mockPChainProgressUpdater) SetProgress(height uint64) {
 	m.setProgressF(height)
 }
 
+func TestEngineLaggingCatchUpLongGap(t *testing.T) {
+	// In this test we have two nodes - a lagging node and an up-to-date node. The
+	// lagging node is behind the up-to-date node by 200,000 blocks, and the
+	// up-to-date node only answers queries for the top and bottom ranges of blocks below:
+	//
+	//	height
+	//	200,000 ─┐  tip
+	//	         │  blocks that the up-to-date node will answer queries for
+	//	100,001 ─┘
+	//
+	//	100,000 ─┐  for these blocks, the request times out, which causes
+	//	 90,001 ─┘  a recursive abandonment of block scheduling from the bottom up,
+	//              resulting in a call stack 100,000 deep unless we short-circuit it.
+	//	 90,000 ─┐
+	//	         │  These blocks are answered by the up-to-date node,
+	//	      1 ─┘  resulting in the lagging node climbing from the bottom to 90,000.
+	//	      0    genesis, where the lagging node starts
+	//
+	// Both routes run at once. The lagging node climbs from genesis to
+	// 90,000 and accepts every block up to it, while the recursive retrieval of blocks from the
+	// tip accumulates a job per block and then collapses because the middle range of blocks are not retrievable.
+	// We stop the climb at 90,000 only to show that it reaches an arbitrary but high height.
+
+	const (
+		// blockGap is how far ahead the up-to-date engine is.
+		blockGap = 200_000
+		// heightAtWhichUpdatedNodeRefusesToAnswer is the height that above it the up-to-date engine will answer queries,
+		// but below it it will refuse answering, unless the height is below catchUpHeight,
+		// which is how far the lagging engine can climb.
+		heightAtWhichUpdatedNodeRefusesToAnswer = 100_000
+		// catchUpHeight is how many blocks the peer answers from the bottom, which is
+		// how far the lagging engine can climb.
+		catchUpHeight = 90_000
+		maxStack      = 8 << 20
+	)
+
+	require := require.New(t)
+	// We set the max stack limit to something smaller (8MB) so the test will not
+	// require a lot of resources to run.
+	prevMaxStack := debug.SetMaxStack(maxStack)
+	defer debug.SetMaxStack(prevMaxStack) // restore the previous limit once the test finishes
+
+	// Build a chain from genesis to [blockGap] blocks above it.
+	chain := make([]*snowmantest.Block, blockGap)
+	parent := snowmantest.Genesis
+	for i := range chain {
+		chain[i] = snowmantest.BuildChild(parent)
+		parent = chain[i]
+	}
+	tip := chain[len(chain)-1]
+
+	laggingNodeID := ids.GenerateTestNodeID()
+	upToDateNodeID := ids.GenerateTestNodeID()
+	network := snowmanenginetest.NewNetwork(t)
+
+	newEngine := func(self, peer ids.NodeID, vm *snowmanenginetest.VM) *Engine {
+		cfg := DefaultConfig(t)
+		require.NoError(cfg.Validators.AddStaker(cfg.Ctx.SubnetID, peer, nil, ids.Empty, 1))
+		require.NoError(cfg.ConnectedValidators.Connected(t.Context(), peer, version.Current))
+		cfg.Validators.RegisterSetCallbackListener(cfg.Ctx.SubnetID, cfg.ConnectedValidators)
+		cfg.VM = vm
+
+		cfg.Sender = network.CreateSender(self)
+		snowGetHandler, err := getter.New(vm, cfg.Sender, cfg.Ctx.Log, time.Second, 2000, cfg.Ctx.Registerer)
+		require.NoError(err)
+		cfg.AllGetsServer = snowGetHandler
+
+		e, err := New(cfg)
+		require.NoError(err)
+		network.Register(self, e)
+		return e
+	}
+
+	// To make sure the up-to-date node only answers queries for the top and bottom ranges of blocks,
+	// we just override its 'Has' method.
+	upToDateVM := snowmanenginetest.NewVM(t, chain)
+	upToDateVM.LastAcceptedBlock = tip
+
+	// The updated node only replies if the block is either above [heightAtWhichUpdatedNodeRefusesToAnswer]
+	// or below [catchUpHeight].
+	upToDateVM.Has = func(blk *snowmantest.Block) bool {
+		return blk.Height() >= heightAtWhichUpdatedNodeRefusesToAnswer || blk.Height() <= catchUpHeight
+	}
+
+	laggingVM := snowmanenginetest.NewVM(t, chain)
+	laggingVM.Has = func(blk *snowmantest.Block) bool {
+		return blk.Status == snowtest.Accepted
+	}
+
+	upToDateEngine := newEngine(upToDateNodeID, laggingNodeID, upToDateVM)
+	laggingEngine := newEngine(laggingNodeID, upToDateNodeID, laggingVM)
+
+	require.NoError(upToDateEngine.Start(t.Context(), 0))
+	require.NoError(laggingEngine.Start(t.Context(), 0))
+
+	// Trigger the lagging engine to start catching up by gossiping the tip of the chain.
+	// Gossip() makes a Pull Query to the up-to-date engine, which will respond with a Get request for the tip.
+	require.NoError(laggingEngine.Gossip(t.Context()))
+	require.NoError(network.DeliverMessages())
+	require.False(network.HasQueuedMessagesToDispatch())
+
+	// The lagging engine climbed from the bottom, one block at a time to our target height.
+	_, lastAcceptedHeight := laggingEngine.Consensus.LastAccepted()
+	require.Equal(uint64(catchUpHeight), lastAcceptedHeight)
+
+	// The lagging engine should have accepted all blocks up to catchUpHeight.
+	for i := range catchUpHeight {
+		require.Equal(snowtest.Accepted, chain[i].Status)
+	}
+}
+
 func TestEngineNetworkBuildsAndAcceptsBlocks(t *testing.T) {
 	require := require.New(t)
 
@@ -3615,4 +3728,371 @@ func TestEngineNetworkBuildsAndAcceptsBlocks(t *testing.T) {
 			require.Equal(uint64(i+1), acceptedHeight)
 		}
 	}
+}
+
+// TestEngineAbandonsBlocksTooFarAhead tests when the engine decides to fetch a missing parent block or abandon it.
+// If the parent block is above [maxAllowedBlockPreferenceHeightDistanceIngestion] in height it should abandon the block and not fetch it.
+// If the parent block is at or below [maxAllowedBlockPreferenceHeightDistanceIngestion] in height, it should fetch it.
+// The height arithmetic must also tolerate uint64 overflow: when last accepted is near the top of the uint64
+// range, adding the allowed distance overflows, and in that case we still fetch.
+func TestEngineAbandonsBlocksTooFarAhead(t *testing.T) {
+	tests := []struct {
+		name                string
+		laggingLastAccepted uint64 // the lagging node's last accepted height
+		childHeight         uint64 // the offered block, whose parent is missing
+		expectFetch         bool
+	}{
+		{
+			name:                "at the cutoff is fetched",
+			laggingLastAccepted: 0,
+			childHeight:         maxAllowedBlockPreferenceHeightDistanceIngestion,
+			expectFetch:         true,
+		},
+		{
+			name:                "just past the cutoff is abandoned",
+			laggingLastAccepted: 0,
+			childHeight:         maxAllowedBlockPreferenceHeightDistanceIngestion + 1,
+			expectFetch:         false,
+		},
+		{
+			name:                "overflow of the cutoff is fetched",
+			laggingLastAccepted: math.MaxUint64 - 100,
+			childHeight:         math.MaxUint64,
+			expectFetch:         true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			newBlock := func(height uint64, parentID ids.ID, status snowtest.Status) *snowmantest.Block {
+				id := ids.GenerateTestID()
+				return &snowmantest.Block{
+					Decidable:  snowtest.Decidable{IDV: id, Status: status},
+					ParentV:    parentID,
+					HeightV:    height,
+					TimestampV: snowmantest.GenesisTimestamp,
+					BytesV:     id[:],
+				}
+			}
+
+			// [chain] is every block that both fake VMs know about.
+			// We only need a few blocks, at arbitrary heights, not a continuous chain.
+			chain := []*snowmantest.Block{snowmantest.Genesis}
+
+			var laggingLastAccepted *snowmantest.Block
+			if test.laggingLastAccepted != 0 { // Used to test the uint64 overflow case.
+				laggingLastAccepted = newBlock(test.laggingLastAccepted, snowmantest.GenesisID, snowtest.Accepted)
+				chain = append(chain, laggingLastAccepted)
+			}
+
+			// [missingParent] is the block the lagging node is missing; [lastBlockOfUpdatedNode] is the
+			// block the peer prefers, built on top of [missingParent].
+			missingParent := newBlock(test.childHeight-1, snowmantest.GenesisID, snowtest.Undecided)
+			lastBlockOfUpdatedNode := newBlock(test.childHeight, missingParent.ID(), snowtest.Undecided)
+			chain = append(chain, missingParent, lastBlockOfUpdatedNode)
+
+			network := snowmanenginetest.NewNetwork(t)
+
+			laggingNodeID := ids.GenerateTestNodeID()
+			upToDateNodeID := ids.GenerateTestNodeID()
+
+			// The up-to-date node prefers [lastBlockOfUpdatedNode] and serves every block except
+			// [missingParent], recording whenever it is asked for [missingParent]. That request
+			// is the signal that the lagging node chose to fetch rather than
+			// abandon.
+			var parentRequested bool
+			upToDateVM := snowmanenginetest.NewVM(t, chain)
+			upToDateVM.LastAcceptedBlock = lastBlockOfUpdatedNode
+
+			// If Has() is called, it means the lagging node is asking for a block.
+			// If the block is [missingParent], we record that it was requested.
+			upToDateVM.Has = func(blk *snowmantest.Block) bool {
+				if blk.ID() == missingParent.ID() {
+					parentRequested = true
+					return false
+				}
+				return true
+			}
+
+			// The lagging node holds only blocks it has already accepted, so it
+			// must fetch anything above its last accepted block from the peer.
+			laggingVM := snowmanenginetest.NewVM(t, chain)
+			laggingVM.LastAcceptedBlock = laggingLastAccepted
+			laggingVM.Has = func(blk *snowmantest.Block) bool {
+				return blk.Status == snowtest.Accepted
+			}
+
+			newEngine := func(self, peer ids.NodeID, vm *snowmanenginetest.VM) *Engine {
+				cfg := DefaultConfig(t)
+				require.NoError(cfg.Validators.AddStaker(cfg.Ctx.SubnetID, peer, nil, ids.Empty, 1))
+				require.NoError(cfg.ConnectedValidators.Connected(t.Context(), peer, version.Current))
+				cfg.Validators.RegisterSetCallbackListener(cfg.Ctx.SubnetID, cfg.ConnectedValidators)
+				cfg.VM = vm
+
+				cfg.Sender = network.CreateSender(self)
+				snowGetHandler, err := getter.New(vm, cfg.Sender, cfg.Ctx.Log, time.Second, 2000, cfg.Ctx.Registerer)
+				require.NoError(err)
+				cfg.AllGetsServer = snowGetHandler
+
+				e, err := New(cfg)
+				require.NoError(err)
+				network.Register(self, e)
+				return e
+			}
+
+			upToDateEngine := newEngine(upToDateNodeID, laggingNodeID, upToDateVM)
+			laggingEngine := newEngine(laggingNodeID, upToDateNodeID, laggingVM)
+
+			require.NoError(upToDateEngine.Start(t.Context(), 0))
+			require.NoError(laggingEngine.Start(t.Context(), 0))
+
+			// The lagging node pull-queries the peer (triggered by gossip), learns about [lastBlockOfUpdatedNode], fetches
+			// it, and then either requests [missingParent] or abandons it depending on how
+			// far ahead [lastBlockOfUpdatedNode] is.
+			require.NoError(laggingEngine.Gossip(t.Context()))
+			require.NoError(network.DeliverMessages())
+			require.False(network.HasQueuedMessagesToDispatch())
+
+			require.Equal(test.expectFetch, parentRequested)
+		})
+	}
+}
+
+// newFakeEngine registers an engine for [self] on [network], backed by the fake
+// [vm] and treating [peers] as its connected validators. Get requests are
+// served from [vm] through the standard getter, so a node only answers for the
+// blocks its own fake VM reports holding.
+func newFakeEngine(
+	t *testing.T,
+	network *snowmanenginetest.Network,
+	self ids.NodeID,
+	vm *snowmanenginetest.VM,
+	peers ...ids.NodeID,
+) *Engine {
+	require := require.New(t)
+
+	cfg := DefaultConfig(t)
+	for _, peer := range peers {
+		require.NoError(cfg.Validators.AddStaker(cfg.Ctx.SubnetID, peer, nil, ids.Empty, 1))
+		require.NoError(cfg.ConnectedValidators.Connected(t.Context(), peer, version.Current))
+	}
+	cfg.Validators.RegisterSetCallbackListener(cfg.Ctx.SubnetID, cfg.ConnectedValidators)
+	cfg.VM = vm
+	cfg.Sender = network.CreateSender(self)
+
+	snowGetHandler, err := getter.New(vm, cfg.Sender, cfg.Ctx.Log, time.Second, 2000, cfg.Ctx.Registerer)
+	require.NoError(err)
+	cfg.AllGetsServer = snowGetHandler
+
+	e, err := New(cfg)
+	require.NoError(err)
+	network.Register(self, e)
+	require.NoError(e.Start(t.Context(), 0))
+	return e
+}
+
+// newChain builds a contiguous chain of [length] blocks ascending in height, so
+// chain[i] is the parent of chain[i+1] - the same orientation as
+// [snowmantest.BuildChain]. Its oldest block names a parent that nobody holds,
+// so walking the chain never bottoms out on a block we have accepted.
+//
+// Tests that need a malformed chain rewrite the heights in place afterwards.
+func newChain(length int) []*snowmantest.Block {
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, length)
+	chain[0].ParentV = ids.GenerateTestID()
+	return chain
+}
+
+// newNodeAndEmptyPeer registers a node and a peer on [network]. Neither holds
+// any block of [chain], so the only way the node learns about a block is from
+// the message that carries it.
+func newNodeAndEmptyPeer(
+	t *testing.T,
+	network *snowmanenginetest.Network,
+	chain []*snowmantest.Block,
+) (*Engine, ids.NodeID) {
+	nodeID := ids.GenerateTestNodeID()
+	peerID := ids.GenerateTestNodeID()
+
+	peerVM := snowmanenginetest.NewVM(t, chain)
+	peerVM.Has = func(*snowmantest.Block) bool {
+		return false
+	}
+	newFakeEngine(t, network, peerID, peerVM, nodeID)
+
+	nodeVM := snowmanenginetest.NewVM(t, chain)
+	nodeVM.Has = func(*snowmantest.Block) bool {
+		return false
+	}
+	return newFakeEngine(t, network, nodeID, nodeVM, peerID), peerID
+}
+
+// TestEngineStopsBufferingBlocksTooFarAhead tests that the engine queues only
+// blocks within [maxAllowedBlockAcceptedHeightDistanceIngestion] of its last
+// accepted block, however many blocks a peer pushes.
+// The blocks are pushed bottom up, so each one finds its parent already queued.
+func TestEngineStopsBufferingBlocksTooFarAhead(t *testing.T) {
+	const heightLimit = maxAllowedBlockAcceptedHeightDistanceIngestion
+
+	tests := []struct {
+		name      string
+		numBlocks int
+	}{
+		{name: "fewer blocks than the limit", numBlocks: heightLimit / 2},
+		{name: "exactly the limit", numBlocks: heightLimit},
+		{name: "many times the limit", numBlocks: 3 * heightLimit},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			chain := newChain(test.numBlocks)
+			network := snowmanenginetest.NewNetwork(t)
+			node, peerID := newNodeAndEmptyPeer(t, network, chain)
+
+			_, lastAcceptedHeight := node.Consensus.LastAccepted()
+			highestAllowed := lastAcceptedHeight + heightLimit
+
+			var peakPending, peakBlockedDependencies int
+			for i, blk := range chain {
+				require.NoError(node.PushQuery(t.Context(), peerID, uint32(i+1), blk.Bytes(), 0))
+				peakPending = max(peakPending, len(node.pending))
+				peakBlockedDependencies = max(peakBlockedDependencies, node.blocked.NumDependencies())
+
+				for _, queued := range node.pending {
+					require.LessOrEqual(queued.Height(), highestAllowed)
+				}
+			}
+
+			require.LessOrEqual(peakPending, heightLimit)
+			require.LessOrEqual(peakBlockedDependencies, heightLimit)
+
+			// Ensure the bounds above aren't vacuous. The most that can ever
+			// be queued is one short of the limit: a block at the last
+			// accepted height plus one either extends the accepted block and
+			// is issued straight away, or points to another parent and is
+			// dropped as a rejected fork.
+			atLeast := min(test.numBlocks, heightLimit) - 1
+			require.GreaterOrEqual(peakPending, atLeast)
+			require.GreaterOrEqual(peakBlockedDependencies, atLeast)
+
+			// The block at the limit was queued and the one above it wasn't.
+			if test.numBlocks > heightLimit {
+				var highestQueued uint64
+				for _, queued := range node.pending {
+					highestQueued = max(highestQueued, queued.Height())
+				}
+				require.Equal(highestAllowed, highestQueued)
+			}
+
+			require.NoError(network.DeliverMessages())
+			require.False(network.HasQueuedMessagesToDispatch())
+			require.Empty(node.pending)
+			require.Zero(node.blocked.NumDependencies())
+			require.Zero(node.Consensus.NumProcessing())
+		})
+	}
+}
+
+// TestEngineRecoversFromIngestionCap tests that a node with
+// [maxAllowedBlockAcceptedHeightDistanceIngestion] blocks processing above its
+// last accepted block still finalizes them and then catches up.
+func TestEngineRecoversFromIngestionCap(t *testing.T) {
+	const (
+		heightLimit = maxAllowedBlockAcceptedHeightDistanceIngestion
+		chainLength = 3 * heightLimit
+	)
+
+	require := require.New(t)
+
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, chainLength)
+	tip := chain[len(chain)-1]
+
+	network := snowmanenginetest.NewNetwork(t)
+	nodeID := ids.GenerateTestNodeID()
+	peerID := ids.GenerateTestNodeID()
+
+	var node *Engine
+	nodeVM := snowmanenginetest.NewVM(t, chain)
+	nodeVM.Has = func(blk *snowmantest.Block) bool {
+		return blk.Status == snowtest.Accepted || node.Consensus.Processing(blk.ID())
+	}
+	node = newFakeEngine(t, network, nodeID, nodeVM, peerID)
+
+	peerVM := snowmanenginetest.NewVM(t, chain)
+	peerVM.LastAcceptedBlock = tip
+	peerCfg := DefaultConfig(t)
+	peerCfg.VM = peerVM
+	peerCfg.Sender = network.CreateSender(peerID)
+	peerGetHandler, err := getter.New(peerVM, peerCfg.Sender, peerCfg.Ctx.Log, time.Second, 2000, peerCfg.Ctx.Registerer)
+	require.NoError(err)
+	peerCfg.AllGetsServer = peerGetHandler
+	peer, err := New(peerCfg)
+	require.NoError(err)
+	var requestedHeights []uint64
+	network.Register(peerID, &queryObserver{
+		Handler: peer,
+		onQuery: func(requestedHeight uint64) {
+			// The node must never poll for a block it would refuse to ingest.
+			_, lastAcceptedHeight := node.Consensus.LastAccepted()
+			require.LessOrEqual(requestedHeight, lastAcceptedHeight+heightLimit)
+			requestedHeights = append(requestedHeights, requestedHeight)
+		},
+	})
+	require.NoError(peer.Start(t.Context(), 0))
+
+	// While the peer pushes the chain to the node, the node sees its only
+	// validator as disconnected, so it issues every block without polling for
+	// it. The node ends up with [heightLimit] blocks processing and none accepted.
+	require.NoError(node.ConnectedValidators.Disconnected(t.Context(), peerID))
+	for i, blk := range chain[:heightLimit] {
+		require.NoError(node.PushQuery(t.Context(), peerID, uint32(i+1), blk.Bytes(), 0))
+	}
+	require.Equal(heightLimit, node.Consensus.NumProcessing())
+	require.Zero(network.Outstanding())
+
+	// Even though we push the next block, the node is at its ingestion cap and refuses to queue it.
+	require.NoError(node.PushQuery(t.Context(), peerID, heightLimit+1, chain[heightLimit].Bytes(), 0))
+	require.Equal(heightLimit, node.Consensus.NumProcessing())
+	require.Empty(node.pending)
+
+	// The validator reconnects and the node polls it. The poll asks for the
+	// block at the limit rather than the one above the preference, and its
+	// single vote finalizes the backlog.
+	require.NoError(node.ConnectedValidators.Connected(t.Context(), peerID, version.Current))
+	require.NoError(node.Gossip(t.Context()))
+	require.NoError(network.DeliverMessages())
+
+	// We polled only for the block at the limit, and nothing more.
+	require.Equal([]uint64{heightLimit}, requestedHeights)
+	acceptedID, _ := node.Consensus.LastAccepted()
+	require.Equal(chain[heightLimit-1].ID(), acceptedID) // We accepted all blocks up to the limit.
+
+	// With the backlog accepted the limit has moved, so the node can resume
+	// fetching and climbs the rest of the chain.
+	require.NoError(node.Gossip(t.Context()))
+	require.NoError(network.DeliverMessages())
+
+	acceptedID, _ = node.Consensus.LastAccepted()
+	require.Equal(tip.ID(), acceptedID)
+}
+
+// queryObserver forwards a node's messages to the wrapped handler and reports
+// the requested height of every query to [onQuery] first.
+type queryObserver struct {
+	common.Handler
+	onQuery func(requestedHeight uint64)
+}
+
+func (o *queryObserver) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID, requestedHeight uint64) error {
+	o.onQuery(requestedHeight)
+	return o.Handler.PullQuery(ctx, nodeID, requestID, blkID, requestedHeight)
+}
+
+func (o *queryObserver) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte, requestedHeight uint64) error {
+	o.onQuery(requestedHeight)
+	return o.Handler.PushQuery(ctx, nodeID, requestID, blkBytes, requestedHeight)
 }
