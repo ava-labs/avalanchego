@@ -71,6 +71,19 @@ func TestSyncPersistence(t *testing.T) {
 	}
 }
 
+func TestCheckpointSyncsDataWithoutSyncToDisk(t *testing.T) {
+	db := newDatabase(t, DefaultConfig().WithSyncToDisk(false))
+	require.NoError(t, db.Put(1, randomBlock(t)))
+
+	// A closed handle makes the data file sync fail, which shows the
+	// checkpoint syncs data before writing the header.
+	f, ok := db.fileCache.Get(0)
+	require.True(t, ok)
+	require.NoError(t, f.Close())
+
+	require.ErrorIs(t, db.Close(), os.ErrClosed)
+}
+
 func TestNew_Params(t *testing.T) {
 	tempDir := t.TempDir()
 	tests := []struct {
