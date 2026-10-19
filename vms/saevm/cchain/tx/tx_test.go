@@ -1457,6 +1457,14 @@ func TestVerifyCredentials(t *testing.T) {
 			wantErr: ErrVerifyingTransfer,
 		},
 		{
+			name: "import_output_as_input",
+			tx: imp(func(tx *Tx) {
+				tx.Unsigned.(*Import).ImportedInputs[0].In = &secp256k1fx.TransferOutput{}
+			}),
+			utxos:   validUTXOs,
+			wantErr: secp256k1fx.ErrWrongInputType,
+		},
+		{
 			name: "export_valid",
 			tx:   validExportTx(),
 		},
