@@ -18,7 +18,6 @@ go_library(
     deps = [
         "//vms/evm/firewood",
         "//vms/evm/saedb",
-        "@com_github_ava_labs_firewood_go_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",
@@ -34,6 +33,7 @@ go_library(
         "@com_github_ava_labs_libevm//trie/triestate",
         "@com_github_ava_labs_libevm//triedb",
         "@com_github_ava_labs_libevm//triedb/database",
+        "@firewood//ffi",
     ],
 )
 

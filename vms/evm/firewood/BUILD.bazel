@@ -16,7 +16,6 @@ go_library(
     deps = [
         "//utils/linked",
         "//utils/logging",
-        "@com_github_ava_labs_firewood_go_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",
@@ -30,6 +29,7 @@ go_library(
         "@com_github_ava_labs_libevm//trie/triestate",
         "@com_github_ava_labs_libevm//triedb",
         "@com_github_ava_labs_libevm//triedb/database",
+        "@firewood//ffi",
         "@org_uber_go_zap//:zap",
     ],
 )

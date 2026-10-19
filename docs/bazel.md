@@ -27,7 +27,7 @@ avalanchego monorepo.
   - [Patched Dependencies](#patched-dependencies)
     - [Patching strategies](#patching-strategies)
     - [libevm (secp256k1)](#libevm-secp256k1)
-    - [firewood-go FFI](#firewood-go-ffi)
+    - [Firewood FFI](#firewood-ffi)
     - [blst (BLS Signatures)](#blst-bls-signatures)
     - [gnark-crypto (BLS12-381 for KZG)](#gnark-crypto-bls12-381-for-kzg)
   - [Protocol Buffers](#protocol-buffers)
@@ -393,14 +393,27 @@ sources.
 secp256k1 directory from generation. See `Patch Maintenance` below
 for how to edit these.
 
-#### firewood-go FFI
+#### Firewood FFI
 
-**Problem:** Pre-built static libraries with `-L` paths that don't work
-in Bazel's sandbox.
+Firewood Go code imports the published `github.com/ava-labs/firewood-go/ffi`
+module, which includes pre-built static libraries. Bazel builds Firewood from
+source instead.
 
-**Solution:** Custom BUILD files with `cc_import` for proper static
-library linking. Gazelle can't generate these rules for pre-built
-libraries. See `Patch Maintenance` below for how to edit these.
+[`MODULE.bazel`](../MODULE.bazel) declares Firewood with a `git_override` and
+registers its Rust toolchain. Go libraries that import the FFI depend on
+[`@firewood//ffi:ffi`](../graft/evm/firewood/BUILD.bazel), which has
+the same Go import path as the published FFI. Ordinary Go builds continue to
+use the published module.
+
+When you update the Firewood commit, run:
+
+```sh
+bazel mod tidy
+bazel test //graft/evm/firewood:firewood_test
+```
+
+Run the affected Bazel unit and end-to-end suites before merging an integration
+update.
 
 #### blst (BLS Signatures)
 

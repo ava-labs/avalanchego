@@ -8,6 +8,35 @@ bazel_dep(name = "gazelle", version = "0.54.0", repo_name = "bazel_gazelle")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.4")
+bazel_dep(name = "firewood", version = "0.0.0")
+bazel_dep(name = "rules_rust", version = "0.69.0")
+
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    edition = "2024",
+    sha256s = {
+        "cargo-1.100.0-aarch64-unknown-linux-gnu.tar.xz": "d07ee80eb6ba3c5845c554ac88086e1ff5d63f83d99c3c09cb32504cbedd6844",
+        "cargo-1.100.0-x86_64-unknown-linux-gnu.tar.xz": "7e29ce07d7c6e92d1826870575ba27d57fff6cb3e754aa57d99099cb88fab35d",
+        "clippy-1.100.0-aarch64-unknown-linux-gnu.tar.xz": "941f71acaf2a181d66776b3b889b72d64a90cc405b8f6c41a4b5ac8cd99a36b1",
+        "clippy-1.100.0-x86_64-unknown-linux-gnu.tar.xz": "0d18df3bff6c852ef8243727fed075ecb33dbf93b8ab8c138c2f45e3f270102a",
+        "llvm-tools-1.100.0-aarch64-unknown-linux-gnu.tar.xz": "929514c642010b884575525fce876d3fb9b9eeec76cd825b79b3b917a7088fc6",
+        "llvm-tools-1.100.0-x86_64-unknown-linux-gnu.tar.xz": "2c84cada1aef73339b1a2d101a35cd78d71072c8f6a3921bf1abb852c3f42ad3",
+        "rust-std-1.100.0-aarch64-unknown-linux-gnu.tar.xz": "c73f62fbe5d837f9807ed9e0076575dd8d3475c79af2b30e3570d328e6713f8f",
+        "rust-std-1.100.0-x86_64-unknown-linux-gnu.tar.xz": "4591b6486594ded52ecd6135db95bf9355bbd3ca7a380888b141528bbcf9a5d4",
+        "rustc-1.100.0-aarch64-unknown-linux-gnu.tar.xz": "fcbfa5b8a0cb28f0c4edfb6dda6910ee910993db31f05258613f5cd5b851263a",
+        "rustc-1.100.0-x86_64-unknown-linux-gnu.tar.xz": "f1d0b1dec81dab6f523cd098507763487b0d4bd7fd2c87582f154128719be03b",
+    },
+    versions = ["1.100.0"],
+)
+use_repo(rust, "rust_toolchains")
+
+register_toolchains("@rust_toolchains//:all")
+
+git_override(
+    module_name = "firewood",
+    commit = "3ee7438c349a5d23d03f9299202a8708dd7f7555",
+    remote = "https://github.com/ava-labs/firewood.git",
+)
 
 # Go SDK - reads version from go.mod (ensured consistent with all go.mod files)
 go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
@@ -23,10 +52,6 @@ GO_OVERRIDES = {
     "github.com/supranational/blst": {
         "build_gen": "off",
         "patches": ["//.bazel/patches:com_github_supranational_blst.patch"],
-    },
-    "github.com/ava-labs/firewood-go/ffi": {
-        "build_gen": "off",
-        "patches": ["//.bazel/patches:com_github_ava_labs_firewood_go_ffi.patch"],
     },
     "github.com/consensys/gnark-crypto": {
         "patches": ["//.bazel/patches:com_github_consensys_gnark_crypto_asm_includes.patch"],
