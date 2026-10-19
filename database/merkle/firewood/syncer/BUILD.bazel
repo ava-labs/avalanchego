@@ -7,6 +7,8 @@ go_library(
         "evm_syncer.go",
         "handler.go",
         "proof.go",
+        "proof_ffi_bazel.go",
+        "proof_ffi_published.go",
         "syncer.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/database/merkle/firewood/syncer",

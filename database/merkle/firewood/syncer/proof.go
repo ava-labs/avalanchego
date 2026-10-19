@@ -20,12 +20,16 @@ var (
 type rangeProofMarshaler struct{}
 
 func (rangeProofMarshaler) Marshal(r *RangeProof) ([]byte, error) {
-	return r.rp.MarshalBinary()
+	bytes, err := marshalRangeProof(r.rp)
+	if dropErr := dropRangeProof(r.rp); err == nil && dropErr != nil {
+		return nil, dropErr
+	}
+	return bytes, err
 }
 
 func (rangeProofMarshaler) Unmarshal(data []byte) (*RangeProof, error) {
-	proof := new(ffi.RangeProof)
-	if err := proof.UnmarshalBinary(data); err != nil {
+	proof, err := unmarshalRangeProof(data)
+	if err != nil {
 		return nil, err
 	}
 	return &RangeProof{
