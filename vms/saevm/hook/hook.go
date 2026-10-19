@@ -111,9 +111,6 @@ type BlockBuilder[T Transaction] interface {
 	// SAE always uses this method instead of directly constructing a header, to
 	// ensure any libevm header extras are properly populated.
 	BuildHeader(parent *types.Header) (*types.Header, error)
-	// StampHeader sets header fields derived from the settled view. It MUST NOT
-	// change the parent hash, number, time or block time.
-	StampHeader(header *types.Header, settled SettledView) error
 	// PotentialEndOfBlockOps returns an iterator of custom transactions that
 	// would be valid to include into a block.
 	//

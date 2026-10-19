@@ -231,10 +231,6 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		}
 	}
 
-	// Stamped fields MUST be in place before worst-case accounting copies the header.
-	if err := builder.StampHeader(hdr, state.Settled()); err != nil {
-		return nil, fmt.Errorf("stamping header: %w", err)
-	}
 	hdr.Root = lastSettled.PostExecutionStateRoot()
 	if err := state.StartBlock(hdr); err != nil {
 		// A full queue is a normal mode of operation (backpressure working as

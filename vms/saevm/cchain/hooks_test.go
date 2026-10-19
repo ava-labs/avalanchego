@@ -301,7 +301,6 @@ func TestBuilderConformance(t *testing.T) {
 
 		hdr, err := builder.BuildHeader(parent)
 		require.NoError(t, err, "BuildHeader()")
-		require.NoError(t, builder.StampHeader(hdr, hook.SettledView{Header: parent}), "StampHeader()")
 		hdr.Root = parent.Root
 		hdr.GasLimit = parent.GasLimit
 		hdr.BaseFee = parent.BaseFee

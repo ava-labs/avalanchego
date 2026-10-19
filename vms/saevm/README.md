@@ -47,9 +47,9 @@ Every hook runs at one of five points, and reads only what that point provides.
   - Reads its data directory.
 - **Consensus**
   - Runs while building a block, and again while verifying it by rebuilding.
-  - Hooks: `BuildHeader`, `StampHeader`, `PotentialEndOfBlockOps`, `BuildBlock`, `BlockRebuilderFrom`, `AdmitTransaction` and libevm's `AccessListGas`.
+  - Hooks: `BuildHeader`, `PotentialEndOfBlockOps`, `BuildBlock`, `BlockRebuilderFrom`, `AdmitTransaction` and libevm's `AccessListGas`.
   - Reads the parent header and the P-Chain context.
-  - `StampHeader` and `AdmitTransaction` also read the settled view: the settled block's header, rules and read-only post-state.
+  - `AdmitTransaction` also reads the settled view: the settled block's header, rules and read-only post-state.
 - **Pure**
   - Runs at any time.
   - Hooks: `BlockTime`, `GasConfigAfter`, `SettledBy`, `EndOfBlockOps` and `VerifyBlockSyntax`.
@@ -79,11 +79,9 @@ Consensus accepts a block before it executes, so implementers MUST follow these 
 4. **Admission lags module changes.**
    - `AdmitTransaction` sees modules as of the settled block.
    - A module activation or role change reaches admission only once its block settles, at least τ later.
-5. **Header values derived from state are stamped.**
-   - `StampHeader` MUST write anything that `GasConfigAfter`, `BlockTime`, `SettledBy` or execution reads from module state.
-   - It runs before worst-case accounting copies the header.
-   - After `BuildHeader`, no hook may change the parent hash, number, time or block time.
-   - After `StampHeader`, no hook may change stamped values or the values SAE sets.
+5. **Later hooks keep the header SAE relies on.**
+   - After `BuildHeader`, no hook may change the parent hash, number, time, block time or gas configuration.
+   - No hook may change the values SAE sets: the state root, gas limit, base fee and gas used.
    - `hookstest.Conformance` checks this in tests.
 6. **Only an account's own transactions debit it.**
    - Nothing else may lower an externally owned account's balance, change its nonce or give it code.

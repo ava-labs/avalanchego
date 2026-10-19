@@ -37,7 +37,6 @@ type Stub struct {
 	ExecutionResultsDBFn   func(string) (saetypes.ExecutionResults, error)
 	VerifyBlockSyntaxFn    func(*types.Block) error
 	AdmitTransactionFn     func(common.Address, *types.Transaction, hook.SettledView) error
-	StampHeaderFn          func(*types.Header, hook.SettledView) error
 	StartExecutingBlockFn  func(params.Rules, *state.StateDB, *types.Header, *types.Block) error
 	FinishExecutingBlockFn func(*state.StateDB, *types.Block, types.Receipts) error
 	GasPriceConfig         gastime.GasPriceConfig
@@ -73,13 +72,6 @@ func WithInvalidOpIDs(invalidOps set.Set[ids.ID]) HookOption {
 func WithOps(ops []Op) HookOption {
 	return options.Func[Stub](func(s *Stub) {
 		s.Ops = ops
-	})
-}
-
-// WithStampHeaderFn overrides the default no-op StampHeader function.
-func WithStampHeaderFn(fn func(*types.Header, hook.SettledView) error) HookOption {
-	return options.Func[Stub](func(s *Stub) {
-		s.StampHeaderFn = fn
 	})
 }
 
@@ -132,25 +124,6 @@ func (s *Stub) BuildHeader(parent *types.Header) (*types.Header, error) {
 		Extra:      e.MarshalCanoto(),
 	}
 	return hdr, nil
-}
-
-// StampHeader proxies to [Stub.StampHeaderFn] if non-nil, otherwise it is a no-op.
-func (s *Stub) StampHeader(hdr *types.Header, settled hook.SettledView) error {
-	if fn := s.StampHeaderFn; fn != nil {
-		return fn(hdr, settled)
-	}
-	return nil
-}
-
-// StampGasTarget records target in hdr, for [Stub.GasConfigAfter] to return.
-func StampGasTarget(hdr *types.Header, target gas.Gas) error {
-	var e extra
-	if err := e.UnmarshalCanoto(hdr.Extra); err != nil {
-		return err
-	}
-	e.target = target
-	hdr.Extra = e.MarshalCanoto()
-	return nil
 }
 
 // PotentialEndOfBlockOps ignores its arguments and returns [Stub.Ops] as a
@@ -214,26 +187,16 @@ func (s *Stub) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[Op], error)
 		return nil, err
 	}
 
-	return NewStub(
-		s.Target,
-		WithInvalidOpIDs(s.InvalidOpIDs),
-		WithOps(e.ops),
-		WithStampHeaderFn(s.StampHeaderFn),
-		WithNow(func() time.Time {
-			return time.Unix(
-				int64(b.Time()), //#nosec G115 -- Won't overflow for a few millennia
-				int64(e.subSec),
-			)
-		}),
-	), nil
+	return NewStub(s.Target, WithInvalidOpIDs(s.InvalidOpIDs), WithOps(e.ops), WithNow(func() time.Time {
+		return time.Unix(
+			int64(b.Time()), //#nosec G115 -- Won't overflow for a few millennia
+			int64(e.subSec),
+		)
+	})), nil
 }
 
-// GasConfigAfter returns the target recorded by [StampGasTarget], defaulting to
-// [Stub.Target], and [Stub.GasPriceConfig].
-func (s *Stub) GasConfigAfter(hdr *types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	if t := getHeaderExtra(hdr).target; t != 0 {
-		return t, s.GasPriceConfig
-	}
+// GasConfigAfter ignores its argument and always returns [Stub.Target] and [Stub.GasPriceConfig].
+func (s *Stub) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig) {
 	return s.Target, s.GasPriceConfig
 }
 
@@ -319,7 +282,6 @@ type extra struct {
 	subSec  time.Duration `canoto:"int,1"` //nolint:staticcheck // subSec intentionally communicates that the value is < time.Second
 	ops     []Op          `canoto:"repeated value,2"`
 	settled storedSettled `canoto:"value,3"`
-	target  gas.Gas       `canoto:"uint,4"`
 
 	canotoData canotoData_extra
 }

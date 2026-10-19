@@ -367,11 +367,6 @@ type builder struct {
 	desired      desiredParams
 }
 
-// StampHeader is a no-op, because the C-Chain derives no header field from state.
-func (*builder) StampHeader(*types.Header, hook.SettledView) error {
-	return nil
-}
-
 var (
 	errHeliconUnactivated = errors.New("helicon is not activated")
 	errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")

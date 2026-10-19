@@ -80,9 +80,9 @@ type checker[T hook.Transaction] struct {
 	points hook.Points
 	inner  hook.BlockBuilder[T]
 
-	stampedID  identity
-	stampedGas gasView
-	assigned   assigned
+	builtID  identity
+	builtGas gasView
+	assigned assigned
 }
 
 var _ hook.BlockBuilder[Op] = (*checker[Op])(nil)
@@ -114,30 +114,24 @@ func assignedOf(hdr *types.Header) assigned {
 	}
 }
 
-func (c *checker[T]) requireAsStamped(where string, hdr *types.Header) {
+func (c *checker[T]) requireAsBuilt(where string, hdr *types.Header) {
 	c.tb.Helper()
-	if got := c.identityOf(hdr); got != c.stampedID {
-		c.tb.Errorf("%s: header identity %+v, stamped as %+v", where, got, c.stampedID)
+	if got := c.identityOf(hdr); got != c.builtID {
+		c.tb.Errorf("%s: header identity %+v, built as %+v", where, got, c.builtID)
 	}
-	if got := c.gasOf(hdr); got != c.stampedGas {
-		c.tb.Errorf("%s: gas configuration %+v, stamped as %+v", where, got, c.stampedGas)
+	if got := c.gasOf(hdr); got != c.builtGas {
+		c.tb.Errorf("%s: gas configuration %+v, built as %+v", where, got, c.builtGas)
 	}
 }
 
 func (c *checker[T]) BuildHeader(parent *types.Header) (*types.Header, error) {
-	return c.inner.BuildHeader(parent)
-}
-
-func (c *checker[T]) StampHeader(hdr *types.Header, settled hook.SettledView) error {
-	c.tb.Helper()
-	before := c.identityOf(hdr)
-	err := c.inner.StampHeader(hdr, settled)
-	if after := c.identityOf(hdr); after != before {
-		c.tb.Errorf("StampHeader changed header identity from %+v to %+v", before, after)
+	hdr, err := c.inner.BuildHeader(parent)
+	if err != nil {
+		return nil, err
 	}
-	c.stampedID = before
-	c.stampedGas = c.gasOf(hdr)
-	return err
+	c.builtID = c.identityOf(hdr)
+	c.builtGas = c.gasOf(hdr)
+	return hdr, nil
 }
 
 func (c *checker[T]) PotentialEndOfBlockOps(
@@ -147,7 +141,7 @@ func (c *checker[T]) PotentialEndOfBlockOps(
 	source saetypes.BlockSource,
 ) iter.Seq[T] {
 	c.tb.Helper()
-	c.requireAsStamped("PotentialEndOfBlockOps", hdr)
+	c.requireAsBuilt("PotentialEndOfBlockOps", hdr)
 	c.assigned = assignedOf(hdr)
 	return c.inner.PotentialEndOfBlockOps(ctx, hdr, lastSettled, source)
 }
@@ -161,7 +155,7 @@ func (c *checker[T]) BuildBlock(
 	settled hook.Settled,
 ) (*types.Block, error) {
 	c.tb.Helper()
-	c.requireAsStamped("BuildBlock", hdr)
+	c.requireAsBuilt("BuildBlock", hdr)
 	if got := assignedOf(hdr); got != c.assigned {
 		c.tb.Errorf("PotentialEndOfBlockOps changed SAE-assigned fields from %+v to %+v", c.assigned, got)
 	}
@@ -172,7 +166,7 @@ func (c *checker[T]) BuildBlock(
 		return nil, err
 	}
 	final := b.Header()
-	c.requireAsStamped("built block", final)
+	c.requireAsBuilt("built block", final)
 	if got := assignedOf(final); got != c.assigned {
 		c.tb.Errorf("BuildBlock changed SAE-assigned fields from %+v to %+v", c.assigned, got)
 	}

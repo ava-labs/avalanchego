@@ -172,11 +172,6 @@ func (s *State) GasLimit() uint64 {
 	return uint64(s.maxBlockSize)
 }
 
-// Settled returns the settled view that admission sees.
-func (s *State) Settled() hook.SettledView {
-	return s.settled
-}
-
 // BaseFee returns the worst-case base fee for the current block.
 func (s *State) BaseFee() *uint256.Int {
 	return s.baseFee

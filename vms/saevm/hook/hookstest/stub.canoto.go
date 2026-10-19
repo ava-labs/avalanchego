@@ -30,12 +30,10 @@ const (
 	canoto__extra__subSec  = 1
 	canoto__extra__ops     = 2
 	canoto__extra__settled = 3
-	canoto__extra__target  = 4
 
 	canoto__extra__subSec__tag  = "\x08" // canoto.Tag(canoto__extra__subSec, canoto.Varint)
 	canoto__extra__ops__tag     = "\x12" // canoto.Tag(canoto__extra__ops, canoto.Len)
 	canoto__extra__settled__tag = "\x1a" // canoto.Tag(canoto__extra__settled, canoto.Len)
-	canoto__extra__target__tag  = "\x20" // canoto.Tag(canoto__extra__target, canoto.Varint)
 )
 
 type canotoData_extra struct {
@@ -75,12 +73,6 @@ func (*extra) CanotoSpec(types ...reflect.Type) *canoto.Spec {
 				/*Pointer:       */ false,
 				/*types:         */ types,
 			),
-			{
-				FieldNumber: canoto__extra__target,
-				Name:        "target",
-				OneOf:       "",
-				TypeUint:    canoto.SizeOf(zero.target),
-			},
 		},
 	}
 	s.CalculateCanotoCache()
@@ -206,17 +198,6 @@ func (c *extra) UnmarshalCanotoFrom(r canoto.Reader) error {
 				return err
 			}
 			r.B = remainingBytes
-		case canoto__extra__target:
-			if wireType != canoto.Varint {
-				return canoto.ErrUnexpectedWireType
-			}
-
-			if err := canoto.ReadUint(&r, &c.target); err != nil {
-				return err
-			}
-			if canoto.IsZero(c.target) {
-				return canoto.ErrZeroValue
-			}
 		default:
 			return canoto.ErrUnknownField
 		}
@@ -268,9 +249,6 @@ func (c *extra) CalculateCanotoCache() {
 	(&c.settled).CalculateCanotoCache()
 	if fieldSize := (&c.settled).CachedCanotoSize(); fieldSize != 0 {
 		size += uint64(len(canoto__extra__settled__tag)) + canoto.SizeUint(fieldSize) + fieldSize
-	}
-	if !canoto.IsZero(c.target) {
-		size += uint64(len(canoto__extra__target__tag)) + canoto.SizeUint(c.target)
 	}
 	atomic.StoreUint64(&c.canotoData.size, size)
 }
@@ -326,10 +304,6 @@ func (c *extra) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
 		canoto.Append(&w, canoto__extra__settled__tag)
 		canoto.AppendUint(&w, fieldSize)
 		w = (&c.settled).MarshalCanotoInto(w)
-	}
-	if !canoto.IsZero(c.target) {
-		canoto.Append(&w, canoto__extra__target__tag)
-		canoto.AppendUint(&w, c.target)
 	}
 	return w
 }
