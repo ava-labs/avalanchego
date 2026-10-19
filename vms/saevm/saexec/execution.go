@@ -94,7 +94,7 @@ func (e *Executor) processQueue() (ret *Unhealthy) {
 			zap.Int("tx_count", len(block.Transactions())),
 		)
 
-		_, err := e.execute(block, log)
+		err := e.execute(block, log)
 		switch {
 		case errors.Is(err, errFatal):
 			log.Fatal( //nolint:gocritic // False positive, will not terminate the process
@@ -131,19 +131,19 @@ const (
 	triePrefetcherParallelism = 16
 )
 
-func (e *Executor) execute(b *blocks.Block, log logging.Logger) (*ExecutionResults, error) {
+func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	// If the VM were to encounter an error after enqueuing the block, we would
 	// receive the same block twice for execution should consensus retry
 	// acceptance.
 	if last := e.lastExecuted.Load().Hash(); last != b.ParentHash() {
-		return nil, fmt.Errorf("executing block built on parent %#x when last executed %#x", b.ParentHash(), last)
+		return fmt.Errorf("executing block built on parent %#x when last executed %#x", b.ParentHash(), last)
 	}
 
 	start := time.Now()
 
 	stateDB, err := e.StateDB(b.ParentBlock().PostExecutionStateRoot())
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// The prefetcher loads trie nodes during execution which removes the loads
 	// at Commit time. On historical mainnet C-Chain it cut mean block insertion
@@ -165,14 +165,13 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) (*ExecutionResul
 		WithReceiptStore(e.receipts),
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if err := e.afterExecution(b, stateDB, result); err != nil {
-		return nil, err
+		return err
 	}
-
 	e.metrics.observeExecuteDuration(start, time.Now(), b, result)
-	return result, nil
+	return nil
 }
 
 type (
