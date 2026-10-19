@@ -312,8 +312,6 @@ func withVMTime(tb testing.TB, startTime time.Time) (sutOption, *saetest.Clock) 
 	tb.Helper()
 	c := saetest.NewClock(startTime, time.Nanosecond)
 	opt := options.Func[sutConfig](func(cfg *sutConfig) {
-		// TODO(StephenButtolph) unify the time functions provided in the config
-		// and the hooks.
 		cfg.hooks.Now = c.Now
 		cfg.vmConfig.Now = c.Now
 	})

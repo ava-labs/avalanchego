@@ -261,6 +261,23 @@ pull-request trigger verifies that this machinery remains usable in avalanchego
 CI. Keep workflow-specific triggers, matrices, and runner setup in the workflows.
 Do not duplicate dependency provisioning or `run-polyrepo` there.
 
+Keep pull-request benchmark check names short. GitHub can hide a job duration
+when its name is long. Short names make slow jobs visible in the pull-request
+summary without opening each workflow.
+
+Include the test name in each pull-request benchmark check. Include a matrix value
+only when it distinguishes two jobs. For example, omit runner labels and timeout
+values when they do not distinguish jobs. Include the runner label in a scheduled
+check when the same test runs on more than one runner.
+
+`native` and `container` identify the benchmark configuration. They do not
+identify the runner provider.
+
+For example, PR checks use:
+
+- `C-Chain Re-exec / native / hashdb-101-250k`
+- `C-Chain Re-exec / container / hashdb-archive-101-250k`
+
 ## Provision CI job dependencies
 
 Nix provides the repository's preferred local development environment. See
