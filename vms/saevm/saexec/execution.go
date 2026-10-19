@@ -131,7 +131,7 @@ const (
 	triePrefetcherParallelism = 16
 )
 
-func (e *Executor) execute(b *blocks.Block, log logging.Logger) (res *ExecutionResults, _ error) { //nolint:unparam // False positive; used by deferred function
+func (e *Executor) execute(b *blocks.Block, log logging.Logger) (*ExecutionResults, error) {
 	// If the VM were to encounter an error after enqueuing the block, we would
 	// receive the same block twice for execution should consensus retry
 	// acceptance.
@@ -140,14 +140,11 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) (res *ExecutionR
 	}
 
 	start := time.Now()
-	defer func() {
-		e.metrics.observeExecuteDuration(start, time.Now(), b, res)
-	}()
+
 	stateDB, err := e.StateDB(b.ParentBlock().PostExecutionStateRoot())
 	if err != nil {
 		return nil, err
 	}
-
 	// The prefetcher loads trie nodes during execution which removes the loads
 	// at Commit time. On historical mainnet C-Chain it cut mean block insertion
 	// from 99.76ms to 44.84ms:
@@ -173,6 +170,8 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) (res *ExecutionR
 	if err := e.afterExecution(b, stateDB, result); err != nil {
 		return nil, err
 	}
+
+	e.metrics.observeExecuteDuration(start, time.Now(), b, result)
 	return result, nil
 }
 

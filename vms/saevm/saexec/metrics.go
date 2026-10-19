@@ -255,15 +255,14 @@ func (m *metrics) setExecuted(block *blocks.Block) {
 func (m *metrics) observeExecuteDuration(start, end time.Time, b *blocks.Block, res *ExecutionResults) {
 	m.executeBlockDuration.Observe(end.Sub(start).Seconds())
 
-	if res == nil /* e.g. on error */ || b.Synchronous() {
-		return
+	if !b.Synchronous() {
+		m.averageExecutedGasCharged.observe(executionSpan{
+			start:    start,
+			end:      end,
+			consumed: res.GasConsumed,
+			rate:     res.rate,
+		})
 	}
-	m.averageExecutedGasCharged.observe(executionSpan{
-		start:    start,
-		end:      end,
-		consumed: res.GasConsumed,
-		rate:     res.rate,
-	})
 }
 
 type executionSpan struct {
