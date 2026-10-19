@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompiletest"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 
 	agoUtils "github.com/ava-labs/avalanchego/utils"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -33,32 +33,32 @@ var forks = []upgradetest.Fork{
 	upgradetest.Granite,
 }
 
-func forkToAvalancheRules(fork upgradetest.Fork) extras.AvalancheRules {
+func forkToAvalancheRules(fork upgradetest.Fork) cparams.AvalancheRules {
 	u := upgradetest.GetConfig(fork)
-	networkUpgrades := extras.NetworkUpgrades{
-		ApricotPhase1BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase1Time),
-		ApricotPhase2BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase2Time),
-		ApricotPhase3BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase3Time),
-		ApricotPhase4BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase4Time),
-		ApricotPhase5BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase5Time),
-		ApricotPhasePre6BlockTimestamp:  utils.TimeToNewUint64(u.ApricotPhasePre6Time),
-		ApricotPhase6BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase6Time),
-		ApricotPhasePost6BlockTimestamp: utils.TimeToNewUint64(u.ApricotPhasePost6Time),
-		BanffBlockTimestamp:             utils.TimeToNewUint64(u.BanffTime),
-		CortinaBlockTimestamp:           utils.TimeToNewUint64(u.CortinaTime),
-		DurangoBlockTimestamp:           utils.TimeToNewUint64(u.DurangoTime),
-		EtnaTimestamp:                   utils.TimeToNewUint64(u.EtnaTime),
-		FortunaTimestamp:                utils.TimeToNewUint64(u.FortunaTime),
-		GraniteTimestamp:                utils.TimeToNewUint64(u.GraniteTime),
-		HeliconTimestamp:                utils.TimeToNewUint64(u.HeliconTime),
-		IglooTimestamp:                  utils.TimeToNewUint64(u.IglooTime),
+	networkUpgrades := cparams.NetworkUpgrades{
+		ApricotPhase1Timestamp:     utils.TimeToNewUint64(u.ApricotPhase1Time),
+		ApricotPhase2Timestamp:     utils.TimeToNewUint64(u.ApricotPhase2Time),
+		ApricotPhase3Timestamp:     utils.TimeToNewUint64(u.ApricotPhase3Time),
+		ApricotPhase4Timestamp:     utils.TimeToNewUint64(u.ApricotPhase4Time),
+		ApricotPhase5Timestamp:     utils.TimeToNewUint64(u.ApricotPhase5Time),
+		ApricotPhasePre6Timestamp:  utils.TimeToNewUint64(u.ApricotPhasePre6Time),
+		ApricotPhase6Timestamp:     utils.TimeToNewUint64(u.ApricotPhase6Time),
+		ApricotPhasePost6Timestamp: utils.TimeToNewUint64(u.ApricotPhasePost6Time),
+		BanffTimestamp:             utils.TimeToNewUint64(u.BanffTime),
+		CortinaTimestamp:           utils.TimeToNewUint64(u.CortinaTime),
+		DurangoTimestamp:           utils.TimeToNewUint64(u.DurangoTime),
+		EtnaTimestamp:              utils.TimeToNewUint64(u.EtnaTime),
+		FortunaTimestamp:           utils.TimeToNewUint64(u.FortunaTime),
+		GraniteTimestamp:           utils.TimeToNewUint64(u.GraniteTime),
+		HeliconTimestamp:           utils.TimeToNewUint64(u.HeliconTime),
+		IglooTimestamp:             utils.TimeToNewUint64(u.IglooTime),
 	}
-	return networkUpgrades.GetAvalancheRules(uint64(upgrade.InitiallyActiveTime.Unix()))
+	return networkUpgrades.Rules(uint64(upgrade.InitiallyActiveTime.Unix()))
 }
 
 func runTests(
 	t *testing.T,
-	makeTests func(tb testing.TB, rules extras.AvalancheRules) []precompiletest.PrecompileTest,
+	makeTests func(tb testing.TB, rules cparams.AvalancheRules) []precompiletest.PrecompileTest,
 ) {
 	for _, fork := range forks {
 		t.Run(fork.String(), func(t *testing.T) {
@@ -71,7 +71,7 @@ func runTests(
 
 func runBenchmarks(
 	b *testing.B,
-	makeTests func(tb testing.TB, rules extras.AvalancheRules) []precompiletest.PrecompileTest,
+	makeTests func(tb testing.TB, rules cparams.AvalancheRules) []precompiletest.PrecompileTest,
 ) {
 	for _, fork := range forks {
 		b.Run(fork.String(), func(b *testing.B) {
@@ -82,7 +82,7 @@ func runBenchmarks(
 	}
 }
 
-func getBlockchainIDTests(tb testing.TB, rules extras.AvalancheRules) []precompiletest.PrecompileTest {
+func getBlockchainIDTests(tb testing.TB, rules cparams.AvalancheRules) []precompiletest.PrecompileTest {
 	callerAddr := common.HexToAddress("0x0123")
 
 	defaultSnowCtx := snowtest.Context(tb, snowtest.CChainID)
@@ -148,7 +148,7 @@ func BenchmarkGetBlockchainID(b *testing.B) {
 	runBenchmarks(b, getBlockchainIDTests)
 }
 
-func sendWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []precompiletest.PrecompileTest {
+func sendWarpMessageTests(tb testing.TB, rules cparams.AvalancheRules) []precompiletest.PrecompileTest {
 	callerAddr := common.HexToAddress("0x0123")
 
 	defaultSnowCtx := snowtest.Context(tb, snowtest.CChainID)
@@ -258,7 +258,7 @@ func BenchmarkSendWarpMessage(b *testing.B) {
 	runBenchmarks(b, sendWarpMessageTests)
 }
 
-func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []precompiletest.PrecompileTest {
+func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.AvalancheRules) []precompiletest.PrecompileTest {
 	networkID := uint32(54321)
 	callerAddr := common.HexToAddress("0x0123")
 	sourceAddress := common.HexToAddress("0x456789")
@@ -555,7 +555,7 @@ func BenchmarkGetVerifiedWarpMessage(b *testing.B) {
 	runBenchmarks(b, getVerifiedWarpMessageTests)
 }
 
-func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) []precompiletest.PrecompileTest {
+func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.AvalancheRules) []precompiletest.PrecompileTest {
 	networkID := uint32(54321)
 	callerAddr := common.HexToAddress("0x0123")
 	sourceChainID := ids.GenerateTestID()

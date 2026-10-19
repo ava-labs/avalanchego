@@ -9,10 +9,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 )
 
 func TestMain(m *testing.M) {
@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 func TestPredicateBytesFromExtra(t *testing.T) {
 	tests := []struct {
 		name     string
-		rules    extras.AvalancheRules
+		rules    cparams.AvalancheRules
 		extra    []byte
 		expected []byte
 	}{
@@ -51,7 +51,7 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "fortuna_empty_extra",
-			rules: extras.AvalancheRules{
+			rules: cparams.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra:    nil,
@@ -59,7 +59,7 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "fortuna_too_short",
-			rules: extras.AvalancheRules{
+			rules: cparams.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra:    make([]byte, acp176.StateSize-1),
@@ -67,7 +67,7 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "fortuna_empty_predicate",
-			rules: extras.AvalancheRules{
+			rules: cparams.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra:    make([]byte, acp176.StateSize),
@@ -75,7 +75,7 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "fortuna_non_empty_predicate",
-			rules: extras.AvalancheRules{
+			rules: cparams.AvalancheRules{
 				IsFortuna: true,
 			},
 			extra: []byte{
@@ -85,7 +85,7 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "helicon_empty_predicate",
-			rules: extras.AvalancheRules{
+			rules: cparams.AvalancheRules{
 				IsHelicon: true,
 			},
 			extra:    nil,
@@ -93,7 +93,7 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "helicon_non_empty_predicate",
-			rules: extras.AvalancheRules{
+			rules: cparams.AvalancheRules{
 				IsHelicon: true,
 			},
 			extra:    []byte{5},
