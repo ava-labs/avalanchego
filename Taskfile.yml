@@ -80,13 +80,21 @@ tasks:
       - task: bazel-mod-tidy
       - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'
 
-  bazel-build-image:
+  bazel-build-image-avalanchego:
     desc: Build the local multi-platform AvalancheGo image with Bazel
     cmd: '{{.NIX_RUN}} ./scripts/bazel_image_spike.sh --build-only'
 
-  bazel-test-build-image:
+  bazel-build-image-subnet-evm:
+    desc: Build the local multi-platform Subnet-EVM image with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/bazel_subnet_evm_image.sh --build-only'
+
+  bazel-test-build-image-avalanchego:
     desc: Test the local multi-platform AvalancheGo image with Bazel
     cmd: '{{.NIX_RUN}} ./scripts/bazel_image_spike.sh'
+
+  bazel-test-build-image-subnet-evm:
+    desc: Test the local multi-platform Subnet-EVM image with Bazel
+    cmd: '{{.NIX_RUN}} ./scripts/bazel_subnet_evm_image.sh'
 
   bazel-test-e2e:
     desc: Run E2E tests with bazel-built binary

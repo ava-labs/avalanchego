@@ -13,6 +13,7 @@ inputs=(
   bazel/image/BUILD.bazel
   bazel/image/bookworm.lock.json
   scripts/bazel_image_spike.sh
+  scripts/bazel_subnet_evm_image.sh
 )
 input_digest="$(sha256sum "${inputs[@]}" | sha256sum | awk '{print $1}')"
 printf 'key=avalanchego-image-docker-v1-%s-%s-%s\n' \

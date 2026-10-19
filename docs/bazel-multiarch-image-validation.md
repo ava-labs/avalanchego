@@ -1,4 +1,4 @@
-# Bazel multi-architecture AvalancheGo image validation
+# Bazel multi-architecture image validation
 
 ## Contents
 
@@ -11,35 +11,41 @@
 
 ## Overview
 
-This validation builds the AvalancheGo runtime image with Bazel. It validates
-Linux amd64 and Linux arm64 images.
+This validation builds AvalancheGo and Subnet-EVM images with Bazel. It
+validates Linux amd64 and Linux arm64 images.
 
-This path does not publish a production image. The Dockerfile and Buildx path
-remains an independent comparison path.
+This path does not publish a production image. The Dockerfile and Buildx paths
+remain independent comparison paths.
 
-The validation checks:
+The AvalancheGo validation checks:
 
 - the amd64 and arm64 AvalancheGo binaries;
 - the ELF machine type of each binary;
 - an OCI index with amd64 and arm64 manifests; and
 - `avalanchego --version` in each binary and final image.
 
+The Subnet-EVM validation checks the same platform index properties. It extracts
+the plugin from its packaged layer. It checks the plugin ELF machine type. It
+runs `plugin --version` in a Debian container and in each final image.
+
 ## Run the validation
 
 Run these commands from the repository root:
 
 ```text
-task bazel-build-image
-task bazel-test-build-image
+task bazel-build-image-avalanchego
+task bazel-test-build-image-avalanchego
+task bazel-build-image-subnet-evm
+task bazel-test-build-image-subnet-evm
 ```
 
-`bazel-build-image` builds the OCI index. It does not start a registry or run
-containers.
+The two build tasks build their OCI indexes. They do not start a registry or
+run containers.
 
-`bazel-test-build-image` also starts a local registry. It runs the direct
-binaries and the final images for both platforms.
+The two test tasks start a local registry. They run direct binaries or plugins
+and the final images for both platforms.
 
-The test requires a Linux Docker host, the Docker socket, host networking, and
+The tests require a Linux Docker host, the Docker socket, host networking, and
 QEMU. QEMU runs only the non-native runtime image. Bazel always runs in a
 native builder container.
 
@@ -53,25 +59,41 @@ The outer Bazel process builds and loads the builder. The inner Bazel process
 runs `//bazel/image:push_avalanchego` once. Its `image_from_binary` dependency
 builds both target binaries in one Bazel analysis.
 
-The script reads the OCI index and the push target runfiles. It extracts each
-binary from its exact runtime layer. It checks the binary before it tests the
-final image.
+The AvalancheGo script reads the OCI index and the push target runfiles. It
+extracts each binary from its exact runtime layer. It checks the binary before
+it tests the final image.
 
-Test mode pushes the index to a disposable registry at `localhost:5000`. It
+The Subnet-EVM script uses the same builder and platform transition. Its image
+uses the platform-matched AvalancheGo manifest as its base. It adds the
+platform-matched plugin at:
+
+```text
+/avalanchego/build/plugins/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy
+```
+
+The script extracts the plugin from that final layer. It does not copy a plugin
+through a Docker staging directory.
+
+Test mode pushes each index to a disposable registry at `localhost:5000`. It
 inspects the index and runs both final image platforms.
 
-Local validation stores outer and inner Bazel data in `.cache/bazel-image/`.
-Set `BAZEL_IMAGE_CACHE_ROOT` to select another location. Keep `.cache` in
-`.bazelignore`. Bazel metadata generation must not scan nested Bazel output
-roots.
+Local AvalancheGo validation stores outer and inner Bazel data in
+`.cache/bazel-image/`. Local Subnet-EVM validation uses
+`.cache/bazel-subnet-evm-image/`. Set `BAZEL_IMAGE_CACHE_ROOT` to select another
+location. Keep `.cache` in `.bazelignore`. Bazel metadata generation must not
+scan nested Bazel output roots.
 
 Set `BAZEL_IMAGE_REPOSITORY_CACHE` to reuse a prepared outer repository cache.
 CI sets this value for the Bazel dependency cache.
 
 ## CI caches
 
-The Linux `build-avalanchego-image` job in `.github/workflows/bazel.yml` runs
-`bazel-test-build-image`.
+The Linux `build-avalanchego-image` job runs
+`bazel-test-build-image-avalanchego`. The Linux `build-subnet-evm-image` job
+runs `bazel-test-build-image-subnet-evm`. Both jobs are in
+`.github/workflows/bazel.yml`. They run after `setup`, so they run in parallel.
+They set up QEMU and use the Docker disk-space action. Both jobs are part of
+`bazel-required`.
 
 The setup job fetches the builder and image targets. It stores downloaded Bazel
 repositories. It does not store compiled action outputs.
@@ -81,10 +103,12 @@ passes remote-cache settings into the inner builder only when CI supplies both
 values. OCI layers, manifests, indexes, pushes, and the builder use
 `no-remote-cache`. These outputs are large or local-only.
 
-The job also restores a Docker image archive. The archive contains the native
-Bazel builder, the local registry, and both Debian runtime bases. The cache key
-includes the runner architecture and all archive inputs. Only `master` writes a
-new archive. Pull requests can restore it without downloading these images.
+Both image jobs restore the same Docker image archive. The archive contains
+the native Bazel builder, the local registry, and both Debian runtime bases.
+The cache key includes the runner architecture and all archive inputs. Only
+`master` writes a new archive. Pull requests can restore it without downloading
+these images. The jobs do not share local Bazel outputs. They reuse remote
+Bazel action-cache entries when the action inputs match.
 
 Do not add remote-cache or registry credentials to the builder image, workspace,
 or command output.
@@ -95,8 +119,13 @@ Keep the Bazel AvalancheGo image comparable with the Dockerfile image. Check
 both platforms after changes to the base image, executable path, working
 directory, command, entrypoint, or platform list.
 
-Keep the direct binary checks and the final-image checks. A successful Bazel
-build alone does not prove that the image contains the correct binary.
+Keep the Subnet-EVM plugin path and VM ID. Keep the platform-matched
+AvalancheGo base. Do not build a plugin outside Bazel and copy it into a Docker
+staging directory.
+
+Keep the direct binary or plugin checks and the final-image checks. A successful
+Bazel build alone does not prove that the image contains the correct binary or
+plugin.
 
 The local registry is a test input. Do not use its address, insecure transport,
 or host networking as a production publishing design.
@@ -111,8 +140,11 @@ Run these checks after changes to the image rules, script, or CI workflow:
 
 ```text
 bash -n scripts/bazel_image_spike.sh
-task bazel-build-image
-task bazel-test-build-image
+bash -n scripts/bazel_subnet_evm_image.sh
+task bazel-build-image-avalanchego
+task bazel-test-build-image-avalanchego
+task bazel-build-image-subnet-evm
+task bazel-test-build-image-subnet-evm
 task lint-shell
 task lint-action
 task bazel-fmt

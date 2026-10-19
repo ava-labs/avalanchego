@@ -37,6 +37,7 @@ bazel_ci_linux_target_patterns() {
   cat <<'EOF'
 //bazel/image:load_builder_amd64
 //bazel/image:push_avalanchego
+//bazel/image:push_subnet_evm
 EOF
 }
 

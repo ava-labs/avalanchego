@@ -135,3 +135,28 @@ image_push(
     tag = "phase3",
     tags = ["no-remote-cache"],
 )
+
+# Layer the platform-matched Subnet-EVM plugin onto the corresponding
+# platform-matched AvalancheGo runtime manifest.
+image_from_binary(
+    name = "subnet_evm",
+    base = ":avalanchego",
+    binary = "//graft/subnet-evm/plugin:plugin",
+    entrypoint = [],
+    include_runfiles = False,
+    path = "/avalanchego/build/plugins/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy",
+    platforms = [
+        ":linux_amd64",
+        ":linux_arm64",
+    ],
+    tags = ["no-remote-cache"],
+)
+
+image_push(
+    name = "push_subnet_evm",
+    image = ":subnet_evm",
+    registry = "localhost:5000",
+    repository = "subnet-evm-bazel",
+    tag = "phase3",
+    tags = ["no-remote-cache"],
+)
