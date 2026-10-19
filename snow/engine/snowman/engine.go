@@ -35,6 +35,7 @@ import (
 
 const (
 	nonVerifiedCacheSize = 64 * units.MiB
+	decidedIDsSize       = 1024
 	errInsufficientStake = "insufficient connected stake"
 )
 
@@ -93,6 +94,13 @@ type Engine struct {
 	// number of times build block needs to be called once the number of
 	// processing blocks has gone below the optimal number.
 	pendingBuildBlocks int
+
+	// IDs of blocks that a Put showed to be decided. Such a block is never
+	// issued, so a Get for it only brings back a block that is dropped. The
+	// cache holds at most decidedIDsSize IDs. When it is full, Put evicts the
+	// least recently used ID, and a lookup (Get) makes an ID the most recently
+	// used. An evicted ID is requested again.
+	decidedIDs *lru.Cache[ids.ID, struct{}]
 }
 
 func New(config Config) (*Engine, error) {
@@ -152,6 +160,7 @@ func New(config Config) (*Engine, error) {
 		polls:                       polls,
 		blkReqs:                     bimap.New[common.Request, ids.ID](),
 		blkReqSourceMetric:          make(map[common.Request]prometheus.Counter),
+		decidedIDs:                  lru.NewCache[ids.ID, struct{}](decidedIDsSize),
 	}, nil
 }
 
@@ -264,6 +273,13 @@ func (e *Engine) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, b
 
 	if !e.shouldIssueBlock(blk) {
 		e.metrics.numUselessPutBytes.Add(float64(len(blkBytes)))
+	}
+
+	// A decided block is never issued, so a Get for it can only bring back a
+	// block that is dropped. Remember it, so that a later Chits naming it does
+	// not send another Get.
+	if e.isDecided(blk) {
+		e.decidedIDs.Put(blk.ID(), struct{}{})
 	}
 
 	// issue the block into consensus. If the block has already been issued,
@@ -418,7 +434,8 @@ func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32,
 
 func (e *Engine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	lastAcceptedID, lastAcceptedHeight, ok := e.acceptedFrontiers.LastAccepted(nodeID)
-	if ok {
+	_, ourLastAcceptedHeight := e.Consensus.LastAccepted()
+	if ok && lastAcceptedHeight > ourLastAcceptedHeight {
 		return e.Chits(ctx, nodeID, requestID, lastAcceptedID, lastAcceptedID, lastAcceptedID, lastAcceptedHeight)
 	}
 
@@ -426,6 +443,21 @@ func (e *Engine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID u
 		e:         e,
 		nodeID:    nodeID,
 		requestID: requestID,
+	}
+	if ok {
+		// The peer reports a last accepted block at or below our height. A
+		// truthful report names a decided block, whose vote is dropped. If the
+		// VM stores that block, it is issued as on the Chits path, which
+		// releases whatever waits on it. If the VM does not store it, nothing
+		// is requested: a Get would go to the peer that just failed the query,
+		// and a misreporting peer loses only its own vote.
+		if blk, err := e.getBlock(ctx, lastAcceptedID); err == nil {
+			issuedMetric := e.metrics.issued.WithLabelValues(pullGossipSource)
+			if err = e.issueFrom(ctx, nodeID, blk, issuedMetric); err != nil {
+				return err
+			}
+		}
+		v.responseOptions = []ids.ID{lastAcceptedID}
 	}
 	if err := e.blocked.Schedule(ctx, v); err != nil {
 		return err
@@ -714,9 +746,9 @@ func (e *Engine) issueFromByID(
 ) error {
 	blk, err := e.getBlock(ctx, blkID)
 	if err != nil {
-		// If the block is not locally available, request it from the peer.
-		e.sendRequest(ctx, nodeID, blkID, issuedMetric)
-		return nil //nolint:nilerr
+		// If the block is not locally available, request it from the peer
+		// unless a Put showed it to be decided.
+		return e.requestOrRelease(ctx, nodeID, blkID, issuedMetric)
 	}
 	return e.issueFrom(ctx, nodeID, blk, issuedMetric)
 }
@@ -742,12 +774,35 @@ func (e *Engine) issueFrom(
 		blkID = blk.Parent()
 		blk, err = e.getBlock(ctx, blkID)
 		if err != nil {
-			// If the block is not locally available, request it from the peer.
-			e.sendRequest(ctx, nodeID, blkID, issuedMetric)
-			return nil //nolint:nilerr
+			// If the block is not locally available, request it from the peer
+			// unless a Put showed it to be decided.
+			return e.requestOrRelease(ctx, nodeID, blkID, issuedMetric)
 		}
 	}
 
+	return e.releaseBlock(ctx, blkID)
+}
+
+// requestOrRelease requests [blkID] from [nodeID], unless a Put showed [blkID]
+// to be decided. Then nothing is requested for [blkID], and whatever waits on
+// it is released, as it is for a stored decided block.
+func (e *Engine) requestOrRelease(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	blkID ids.ID,
+	issuedMetric prometheus.Counter,
+) error {
+	if _, ok := e.decidedIDs.Get(blkID); ok {
+		e.metrics.numDecidedGetsSkipped.Inc()
+		return e.releaseBlock(ctx, blkID)
+	}
+	e.sendRequest(ctx, nodeID, blkID, issuedMetric)
+	return nil
+}
+
+// releaseBlock removes the outstanding request for [blkID]. Unless [blkID] is
+// pending, it also releases whatever is blocked on it.
+func (e *Engine) releaseBlock(ctx context.Context, blkID ids.ID) error {
 	// Remove any outstanding requests for this block
 	if req, ok := e.blkReqs.DeleteValue(blkID); ok {
 		delete(e.blkReqSourceMetric, req)

@@ -67,10 +67,12 @@ go_test(
         "//snow/engine/snowman/getter",
         "//snow/snowtest",
         "//snow/validators",
+        "//utils/bag",
         "//utils/logging",
         "//utils/set",
         "//version",
         "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_golang//prometheus/testutil",
         "@com_github_stretchr_testify//require",
     ],
 )
