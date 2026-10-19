@@ -34,6 +34,10 @@ type VM struct {
 	// that the block's parent is known. A non-nil error fails verification.
 	VerifyF func(*snowmantest.Block) error
 
+	// OnGetBlock, if non-nil, is called with the ID of every block that GetBlock
+	// is asked for, whether or not the VM holds it.
+	OnGetBlock func(blkID ids.ID)
+
 	byBytes          map[string]*snowmantest.Block
 	verified         map[ids.ID]*snowmantest.Block // verified and undecided
 	accepted         map[ids.ID]*snowmantest.Block
@@ -79,6 +83,9 @@ func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 
 // GetBlock returns a block that is accepted, or verified and not decided.
 func (vm *VM) GetBlock(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+	if vm.OnGetBlock != nil {
+		vm.OnGetBlock(blkID)
+	}
 	if blk, ok := vm.accepted[blkID]; ok {
 		return vm.wrap(blk), nil
 	}
