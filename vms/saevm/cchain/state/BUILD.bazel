@@ -60,6 +60,8 @@ go_test(
         "//database/prefixdb",
         "//graft/coreth/plugin/evm/customtypes",
         "//ids",
+        "//network/p2p",
+        "//network/p2p/peertracker",
         "//snow/snowtest",
         "//utils/constants",
         "//utils/logging",
