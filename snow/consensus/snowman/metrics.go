@@ -235,10 +235,10 @@ func (m *metrics) Rejected(blkID ids.ID, pollNumber uint64, blockSize int) {
 	m.latRejected.Observe(float64(duration))
 }
 
-// MeasureAndGetOldest returns the ID, height, and processing duration of the
-// block that has been processing the longest. If no blocks are processing, a
-// zero duration is returned.
-func (m *metrics) MeasureAndGetOldest() (ids.ID, uint64, time.Duration) {
+// MeasureAndGetOldestProcessing returns the ID, height, and processing duration
+// of the block that has been processing the longest. If no blocks are
+// processing, the zero values are returned.
+func (m *metrics) MeasureAndGetOldestProcessing() (ids.ID, uint64, time.Duration) {
 	blkID, oldestOp, exists := m.processingBlocks.Oldest()
 	if !exists {
 		return ids.Empty, 0, 0
