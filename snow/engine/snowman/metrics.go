@@ -32,6 +32,7 @@ type metrics struct {
 	numProcessingAncestorFetchesDropped   prometheus.Counter
 	numProcessingAncestorFetchesSucceeded prometheus.Counter
 	numProcessingAncestorFetchesUnneeded  prometheus.Counter
+	numDecidedGetsSkipped                 prometheus.Counter
 	selectedVoteIndex                     metric.Averager
 	issuerStake                           metric.Averager
 	issued                                *prometheus.CounterVec
@@ -97,6 +98,10 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 			Name: "num_processing_ancestor_fetches_unneeded",
 			Help: "Number of votes that were directly applied to blocks",
 		}),
+		numDecidedGetsSkipped: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "num_decided_gets_skipped",
+			Help: "Number of Get requests not sent for blocks already shown to be decided",
+		}),
 		selectedVoteIndex: metric.NewAveragerWithErrs(
 			"selected_vote_index",
 			"index of the voteID that was passed into consensus",
@@ -140,6 +145,7 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 		reg.Register(m.numProcessingAncestorFetchesDropped),
 		reg.Register(m.numProcessingAncestorFetchesSucceeded),
 		reg.Register(m.numProcessingAncestorFetchesUnneeded),
+		reg.Register(m.numDecidedGetsSkipped),
 		reg.Register(m.issued),
 		reg.Register(m.blockTimeSkew),
 	)

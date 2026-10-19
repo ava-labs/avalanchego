@@ -25,11 +25,13 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 - C-Chain metrics no longer include the `transition` prefix. For example, `avalanche_evm_transition_sae_last_executed_height` is now `avalanche_evm_sae_last_executed_height`.
 - Added `avalanche_evm_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
+- Added `avalanche_snowman_num_decided_gets_skipped` (counter): Get requests not sent for blocks already shown to be decided.
 
 ### Fixes
 
 - Fixed C-Chain `api-max-duration` only limiting `eth_call` since Helicon. It again limits every call to the `/rpc` and `/ws` endpoints, and a WebSocket call that times out doesn't close its connection.
 - Snowman no longer requests a peer's last accepted block when that block is at or below our height and its query fails.
+- Snowman no longer re-requests a block that an earlier `Put` showed to be decided. Remembered decided blocks are bounded at 1024.
 
 ## [v1.15.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.1)
 
