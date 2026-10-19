@@ -15,25 +15,12 @@ const (
 
 type RunStatefulPrecompileFunc func(accessibleState AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error)
 
-// ActivationFunc defines a function that is used to determine if a function is active
-// The return value is whether or not the function is active
-type ActivationFunc func(AccessibleState) bool
-
 // StatefulPrecompileFunction defines a function implemented by a stateful precompile
 type StatefulPrecompileFunction struct {
 	// selector is the 4 byte function selector for this function
 	selector []byte
 	// execute is performed when this function is selected
 	execute RunStatefulPrecompileFunc
-	// activation is checked before this function is executed
-	activation ActivationFunc
-}
-
-func (f *StatefulPrecompileFunction) IsActivated(accessibleState AccessibleState) bool {
-	if f.activation == nil {
-		return true
-	}
-	return f.activation(accessibleState)
 }
 
 // NewStatefulPrecompileFunction creates a stateful precompile function with the given arguments
@@ -90,11 +77,6 @@ func (s *statefulPrecompileWithFunctionSelectors) Run(accessibleState Accessible
 	function, ok := s.functions[string(selector)]
 	if !ok {
 		return nil, suppliedGas, fmt.Errorf("invalid function selector %#x", selector)
-	}
-
-	// Check if the function is activated
-	if !function.IsActivated(accessibleState) {
-		return nil, suppliedGas, fmt.Errorf("invalid non-activated function selector %#x", selector)
 	}
 
 	return function.execute(accessibleState, caller, addr, functionInput, suppliedGas, readOnly)

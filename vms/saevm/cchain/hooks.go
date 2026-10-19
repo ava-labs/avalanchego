@@ -541,7 +541,7 @@ func (b *builder) BuildBlock(
 		return nil, fmt.Errorf("marshalling txs: %w", err)
 	}
 
-	rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)
+	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
 	rulesExtra := corethparams.GetRulesExtra(rules)
 	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, rulesExtra, ethTxs)
 	if err != nil {
