@@ -1051,6 +1051,7 @@ func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
 	stakingInfo.AccruedStakeIncreaseTxIDs = slices.Concat(stakingInfo.AccruedStakeIncreaseTxIDs, stakingInfo.PendingStakeIncreaseTxIDs)
 	stakingInfo.PendingStakeIncreaseTxIDs = nil
 	stakingInfo.PendingStakeDecrease = 0
+	stakingInfo.PendingStakeDecreaseTxIDs = nil
 	stakingInfo.WithdrawnStake = newWithdrawnStake
 
 	if err := e.onCommitState.SetStakingInfo(validator.SubnetID, validator.NodeID, stakingInfo); err != nil {

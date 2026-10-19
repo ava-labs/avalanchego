@@ -5729,7 +5729,8 @@ func TestStandardExecutorCancelAutoRenewedValidatorStakeIncreaseTxErrors(t *test
 
 // TestStandardExecutorDecreaseAutoRenewedValidatorStakeTx verifies that a stake
 // decrease is recorded as pending without changing the validator or returning
-// any stake, and that it doesn't modify the parent state.
+// any stake, and that competing txs executed on sibling diffs don't overwrite
+// each other's pending tx IDs.
 func TestStandardExecutorDecreaseAutoRenewedValidatorStakeTx(t *testing.T) {
 	const (
 		pendingDecrease = units.MilliAvax
@@ -5769,12 +5770,25 @@ func TestStandardExecutorDecreaseAutoRenewedValidatorStakeTx(t *testing.T) {
 	uStakerTx := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
 	subnetID, nodeID := uStakerTx.SubnetID(), uStakerTx.NodeID()
 
+	// Seed a previous stake decrease. The slice has spare capacity to verify
+	// that executing the tx on a diff doesn't modify the parent state.
+	pendingDecreaseTxID := ids.GenerateTestID()
+	pendingDecreaseTxIDs := make([]ids.ID, 1, 4)
+	pendingDecreaseTxIDs[0] = pendingDecreaseTxID
 	initialStakingInfo, err := env.state.GetStakingInfo(subnetID, nodeID)
 	require.NoError(t, err)
 	initialStakingInfo.PendingStakeDecrease = pendingDecrease
+	initialStakingInfo.PendingStakeDecreaseTxIDs = pendingDecreaseTxIDs
 	require.NoError(t, env.state.SetStakingInfo(subnetID, nodeID, initialStakingInfo))
 
 	initialValidator, err := env.state.GetCurrentValidator(subnetID, nodeID)
+	require.NoError(t, err)
+
+	// A competing tx is built before the tx is issued, so both spend the same
+	// UTXOs, as competing txs in sibling blocks would.
+	uSiblingTx, err := wallet.Builder().NewDecreaseAutoRenewedValidatorStakeTx(stakerTx.ID(), amount)
+	require.NoError(t, err)
+	siblingTx, err := walletsigner.SignUnsigned(t.Context(), wallet.Signer(), uSiblingTx)
 	require.NoError(t, err)
 
 	decreaseTx, err := wallet.IssueDecreaseAutoRenewedValidatorStakeTx(stakerTx.ID(), amount)
@@ -5807,10 +5821,32 @@ func TestStandardExecutorDecreaseAutoRenewedValidatorStakeTx(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, decreaseTx.Unsigned.(*platform.DecreaseAutoRenewedValidatorStakeTx).SyntacticallyVerified)
 
-	// Executing the tx must not modify the parent state.
+	// The competing tx must not overwrite the tx ID recorded by the first one.
+	siblingDiff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		siblingTx,
+		siblingDiff,
+	)
+	require.NoError(t, err)
+
+	siblingStakingInfo, err := siblingDiff.GetStakingInfo(subnetID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, []ids.ID{pendingDecreaseTxID, siblingTx.ID()}, siblingStakingInfo.PendingStakeDecreaseTxIDs)
+
+	diffStakingInfo, err := diff.GetStakingInfo(subnetID, nodeID)
+	require.NoError(t, err)
+	require.Equal(t, []ids.ID{pendingDecreaseTxID, decreaseTx.ID()}, diffStakingInfo.PendingStakeDecreaseTxIDs)
+
+	// Executing the tx must not modify the parent state. The tx IDs are
+	// compared against a new slice, as initialStakingInfo shares its slice
+	// with the parent state.
 	stakingInfo, err := env.state.GetStakingInfo(subnetID, nodeID)
 	require.NoError(t, err)
-	require.Equal(t, initialStakingInfo, stakingInfo)
+	require.Equal(t, pendingDecrease, stakingInfo.PendingStakeDecrease)
+	require.Equal(t, []ids.ID{pendingDecreaseTxID}, stakingInfo.PendingStakeDecreaseTxIDs)
 
 	require.NoError(t, diff.Apply(env.state))
 
@@ -5819,6 +5855,7 @@ func TestStandardExecutorDecreaseAutoRenewedValidatorStakeTx(t *testing.T) {
 
 	wantStakingInfo := initialStakingInfo
 	wantStakingInfo.PendingStakeDecrease = pendingDecrease + amount
+	wantStakingInfo.PendingStakeDecreaseTxIDs = []ids.ID{pendingDecreaseTxID, decreaseTx.ID()}
 	require.Equal(t, wantStakingInfo, stakingInfo)
 
 	// The stake is only withdrawn at the start of the next cycle, so the
@@ -5966,6 +6003,15 @@ func TestStandardExecutorDecreaseAutoRenewedValidatorStakeTxErrors(t *testing.T)
 				require.NoError(t, diff.SetStakingInfo(constants.PrimaryNetworkID, nodeID, stakingInfo))
 			},
 			wantErr: errAutoRenewedValidatorStopping,
+		},
+		{
+			name: "too_many_stake_decreases",
+			updateState: func(t testing.TB, diff *state.Diff) {
+				stakingInfo := stakingInfo
+				stakingInfo.PendingStakeDecreaseTxIDs = make([]ids.ID, maxPendingStakeDecreaseTxs)
+				require.NoError(t, diff.SetStakingInfo(constants.PrimaryNetworkID, nodeID, stakingInfo))
+			},
+			wantErr: errTooManyStakeDecreases,
 		},
 		{
 			name: "below_minimum_stake",

@@ -1492,12 +1492,17 @@ func (e *standardTxExecutor) DecreaseAutoRenewedValidatorStakeTx(tx *platform.De
 		return fmt.Errorf("adding pending stake decrease: %w", err)
 	}
 
+	// The tx ID is recorded so that the stake decrease can be cancelled. The
+	// slice is copied because it may be shared with the parent state.
+	txID := e.tx.ID()
+	stakingInfo.PendingStakeDecreaseTxIDs = append(slices.Clone(stakingInfo.PendingStakeDecreaseTxIDs), txID)
+
 	if err := e.state.SetStakingInfo(validator.SubnetID, validator.NodeID, stakingInfo); err != nil {
 		return fmt.Errorf("setting staking info: %w", err)
 	}
 
 	avax.Consume(e.state, tx.Ins)
-	avax.Produce(e.state, e.tx.ID(), tx.Outs)
+	avax.Produce(e.state, txID, tx.Outs)
 
 	return nil
 }

@@ -49,6 +49,7 @@ var (
 	errAutoRenewedValidatorStopping    = errors.New("auto-renewed validator is stopping at the end of its current cycle")
 	errTooManyStakeIncreases           = errors.New("too many stake increases")
 	errStakeIncreaseNotPending         = errors.New("stake increase is not pending")
+	errTooManyStakeDecreases           = errors.New("too many stake decreases")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -1267,6 +1268,12 @@ func verifyCancelAutoRenewedValidatorStakeIncreaseTx(
 	return validator, stakingInfo, nil
 }
 
+// maxPendingStakeDecreaseTxs is the maximum number of pending
+// DecreaseAutoRenewedValidatorStakeTxs for a single auto-renewed validator. The
+// IDs of these txs are stored in the validator's metadata until the start of
+// the next cycle, so the number must be bounded.
+const maxPendingStakeDecreaseTxs = 64
+
 // verifyDecreaseAutoRenewedValidatorStakeTx carries out the validation for a
 // DecreaseAutoRenewedValidatorStakeTx.
 func verifyDecreaseAutoRenewedValidatorStakeTx(
@@ -1298,10 +1305,14 @@ func verifyDecreaseAutoRenewedValidatorStakeTx(
 		return validator, stakingInfo, nil
 	}
 
-	if stakingInfo.NextPeriod == 0 {
+	switch {
+	case stakingInfo.NextPeriod == 0:
 		// The stake would never be withdrawn, as the validator stops at the
 		// end of its current cycle and all of its stake is returned.
 		return nil, state.StakingInfo{}, errAutoRenewedValidatorStopping
+
+	case len(stakingInfo.PendingStakeDecreaseTxIDs) >= maxPendingStakeDecreaseTxs:
+		return nil, state.StakingInfo{}, errTooManyStakeDecreases
 	}
 
 	validatorRules, err := getValidatorRules(backend, chainState, autoRenewedStakerTx.SubnetID())

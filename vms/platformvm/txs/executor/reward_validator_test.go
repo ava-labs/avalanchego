@@ -1884,6 +1884,7 @@ func TestRewardAutoRenewedValidatorTxStakeDecrease(t *testing.T) {
 			stakingInfo.AccruedValidationRewards = accruedValidationRewards
 			stakingInfo.AccruedDelegateeRewards = accruedDelegateeRewards
 			stakingInfo.PendingStakeDecrease = tt.decrease
+			stakingInfo.PendingStakeDecreaseTxIDs = []ids.ID{ids.GenerateTestID()}
 			require.NoError(t, diff.SetStakingInfo(subnetID, nodeID, stakingInfo))
 			require.NoError(t, diff.Apply(env.state))
 			require.NoError(t, env.state.Commit())
@@ -1904,6 +1905,7 @@ func TestRewardAutoRenewedValidatorTxStakeDecrease(t *testing.T) {
 			stakingInfo, err = onCommitState.GetStakingInfo(subnetID, nodeID)
 			require.NoError(t, err)
 			require.Zero(t, stakingInfo.PendingStakeDecrease)
+			require.Empty(t, stakingInfo.PendingStakeDecreaseTxIDs)
 			require.Equal(t, tt.wantFromPrincipal+tt.wantFromAddition, stakingInfo.WithdrawnStake)
 			require.Equal(t, accruedValidationRewards-tt.wantFromValidationRewards, stakingInfo.AccruedValidationRewards)
 			require.Equal(t, accruedDelegateeRewards-tt.wantFromDelegateeRewards, stakingInfo.AccruedDelegateeRewards)
