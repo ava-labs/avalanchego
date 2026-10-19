@@ -13,8 +13,8 @@ import (
 const (
 	// chitsSource counts blocks learned from chits in response to a query.
 	chitsSource = "chits"
-	// pushGossipSource counts blocks learned from a PushQuery.
-	pushGossipSource = "push_gossip"
+	// pushQuerySource counts blocks learned from a PushQuery.
+	pushQuerySource = "push_query"
 	// pullQuerySource counts blocks learned from a PullQuery.
 	pullQuerySource = "pull_query"
 	// builtSource counts blocks that were built locally.
@@ -127,7 +127,7 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 
 	// Register the labels
 	m.issued.WithLabelValues(chitsSource)
-	m.issued.WithLabelValues(pushGossipSource)
+	m.issued.WithLabelValues(pushQuerySource)
 	m.issued.WithLabelValues(pullQuerySource)
 	m.issued.WithLabelValues(builtSource)
 	m.issued.WithLabelValues(unknownSource)

@@ -344,7 +344,7 @@ func (e *Engine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uin
 		e.metrics.numUselessPushQueryBytes.Add(float64(len(blkBytes)))
 	}
 
-	issuedMetric := e.metrics.issued.WithLabelValues(pushGossipSource)
+	issuedMetric := e.metrics.issued.WithLabelValues(pushQuerySource)
 
 	// issue the block into consensus. If the block has already been issued,
 	// this will be a noop. If this block has missing dependencies, nodeID will

@@ -74,7 +74,7 @@ func MakeParseBlockF(blks ...[]*snowmantest.Block) func(context.Context, []byte)
 // source label. A source missing from [expected] must be zero.
 func requireIssuedSources(t *testing.T, e *Engine, expected map[string]float64) {
 	t.Helper()
-	for _, source := range []string{chitsSource, pushGossipSource, pullQuerySource, builtSource, unknownSource} {
+	for _, source := range []string{chitsSource, pushQuerySource, pullQuerySource, builtSource, unknownSource} {
 		require.Equalf(t, expected[source], testutil.ToFloat64(e.metrics.issued.WithLabelValues(source)),
 			"blks_issued{source=%q}", source)
 	}
@@ -589,7 +589,7 @@ func TestEnginePushQuery(t *testing.T) {
 
 	require.True(*chitted)
 	require.True(*queried)
-	requireIssuedSources(t, te, map[string]float64{pushGossipSource: 1})
+	requireIssuedSources(t, te, map[string]float64{pushQuerySource: 1})
 }
 
 func TestEngineBuildBlock(t *testing.T) {
