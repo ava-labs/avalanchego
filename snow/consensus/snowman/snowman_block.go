@@ -29,7 +29,7 @@ type snowmanBlock struct {
 	// will be nil
 	children map[ids.ID]Block
 
-	// height is the height of this block in the chain. The genesis block has a height of 0.
+	// height is the height of this block in the chain.
 	height uint64
 }
 
