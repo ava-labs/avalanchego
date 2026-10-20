@@ -418,7 +418,8 @@ func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32,
 
 func (e *Engine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	lastAcceptedID, lastAcceptedHeight, ok := e.acceptedFrontiers.LastAccepted(nodeID)
-	if ok {
+	_, ourLastAcceptedHeight := e.Consensus.LastAccepted()
+	if ok && lastAcceptedHeight > ourLastAcceptedHeight {
 		return e.Chits(ctx, nodeID, requestID, lastAcceptedID, lastAcceptedID, lastAcceptedID, lastAcceptedHeight)
 	}
 
