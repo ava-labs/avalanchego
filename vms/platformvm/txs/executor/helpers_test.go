@@ -166,10 +166,11 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment {
 }
 
 type walletConfig struct {
-	config    *config.Internal
-	keys      []*secp256k1.PrivateKey
-	subnetIDs []ids.ID
-	chainIDs  []ids.ID
+	config        *config.Internal
+	keys          []*secp256k1.PrivateKey
+	subnetIDs     []ids.ID
+	validationIDs []ids.ID
+	chainIDs      []ids.ID
 }
 
 func newWallet(t testing.TB, e *environment, c walletConfig) wallet.Wallet {
@@ -179,14 +180,19 @@ func newWallet(t testing.TB, e *environment, c walletConfig) wallet.Wallet {
 	if len(c.keys) == 0 {
 		c.keys = genesistest.DefaultFundedKeys
 	}
+
+	subnets, err := e.state.GetSubnetIDs()
+	require.NoError(t, err)
+	subnets = append(subnets, c.subnetIDs...)
+
 	return txstest.NewWallet(
 		t,
 		e.ctx,
 		c.config,
 		e.state,
 		secp256k1fx.NewKeychain(c.keys...),
-		c.subnetIDs,
-		nil, // validationIDs
+		subnets,
+		c.validationIDs,
 		c.chainIDs,
 	)
 }
@@ -307,6 +313,55 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 	return res
 }
 
+// executeProposalTx executes tx as a proposal tx on fresh onCommitState and
+// onAbortState diffs built on top of diff.
+func executeProposalTx(
+	t testing.TB,
+	env *environment,
+	diff *state.Diff,
+	tx *platform.Tx,
+) (onCommitState *state.Diff, onAbortState *state.Diff, err error) {
+	t.Helper()
+
+	stakerAdditionAfterDeletionLegality := state.StakerAdditionAfterDeletionLegality(
+		env.config.UpgradeConfig.IsHeliconActivated(diff.GetTimestamp()),
+	)
+	onCommitState, err = state.NewDiffOn(diff, stakerAdditionAfterDeletionLegality)
+	require.NoError(t, err)
+
+	onAbortState, err = state.NewDiffOn(diff, stakerAdditionAfterDeletionLegality)
+	require.NoError(t, err)
+
+	feeCalculator := state.PickFeeCalculator(env.config, diff)
+	return onCommitState, onAbortState, ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	)
+}
+
+// newOwner returns a 1-of-1 owner with a random address.
+func newOwner() *secp256k1fx.OutputOwners {
+	return &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+}
+
+// deleteUTXOsOwnedBy removes every UTXO owned by key on diff.
+func deleteUTXOsOwnedBy(t testing.TB, env *environment, diff *state.Diff, key *secp256k1.PrivateKey) {
+	t.Helper()
+
+	utxoIDs, err := env.state.UTXOIDs(key.Address().Bytes(), ids.Empty, math.MaxInt32)
+	require.NoError(t, err)
+
+	for _, utxoID := range utxoIDs {
+		diff.DeleteUTXO(utxoID)
+	}
+}
+
 func must[T any](t require.TestingT) func(T, error) T {
 	return func(val T, err error) T {
 		require.NoError(t, err)
@@ -314,11 +369,12 @@ func must[T any](t require.TestingT) func(T, error) T {
 	}
 }
 
-func newAdvanceTimeTx(t testing.TB, timestamp time.Time) (*platform.Tx, error) {
+func newAdvanceTimeTx(t testing.TB, timestamp time.Time) *platform.Tx {
+	t.Helper()
+
 	utx := &platform.AdvanceTimeTx{Time: uint64(timestamp.Unix())}
 	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
-	if err != nil {
-		return nil, err
-	}
-	return tx, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID))
+	require.NoError(t, err)
+	require.NoError(t, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID)))
+	return tx
 }
