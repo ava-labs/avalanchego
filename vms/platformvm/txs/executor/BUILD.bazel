@@ -65,6 +65,7 @@ go_test(
         "staker_tx_verification_test.go",
         "stakers_test.go",
         "staking_rules_test.go",
+        "standard_tx_executor_l1_test.go",
         "standard_tx_executor_test.go",
         "state_changes_test.go",
         "warp_verifier_test.go",
