@@ -30,6 +30,54 @@ writing, running of instrumented binaries on Macs (arm64) is not possible
 without emulation (which would be very slow). To support test development
 on Macs, a local build will not be instrumented.
 
+## Bazel image validation
+
+Use this task to build and test the Bazel-owned AvalancheGo setup on a native
+Linux arm64 host:
+
+```bash
+task bazel-test-antithesis-images-avalanchego
+```
+
+The task builds these single-platform `linux/arm64` images:
+
+- `antithesis-avalanchego-node:bazel`
+- `antithesis-avalanchego-workload:bazel`
+- `antithesis-avalanchego-config:bazel`
+
+The task uses the pinned Bazel Debian builder image. The inner Bazel process
+builds the node, workload, and config OCI images. Docker loads these completed
+images and runs the Compose smoke test. Docker does not build an Antithesis
+Dockerfile in this path.
+
+The node and workload binaries use race detection. The config image contains
+the generated Compose file and the required volume directories. OCI layers do
+not keep empty directories, so the Bazel rule adds marker files to those
+volume directories.
+
+This task does not validate the artifact sent to Antithesis. It does not run
+`goinstrumentor`, add symbols, or add `libvoidstar.so`. The amd64 CI path must
+perform those checks after it is implemented.
+
+Do not replace the existing Docker and Buildx Antithesis tasks with this task.
+Keep the Dockerfiles as the behavior reference until the Bazel amd64 validation
+is complete.
+
+The task requires a Docker socket at `/var/run/docker.sock`. It stores Bazel
+state in `.cache/bazel-antithesis/`. Delete that directory to reset its local
+cache.
+
+When you change the Bazel image rules, image paths, entrypoint, Compose output,
+or validation script, run:
+
+```bash
+bash -n scripts/tests.build_antithesis_images_bazel.sh
+task bazel-test-antithesis-images-avalanchego
+task lint-shell
+task bazel-fmt
+git diff --check
+```
+
 ## Defining a new test setup
 
 When defining a new test setup - whether for avalanchego, Subnet-EVM,

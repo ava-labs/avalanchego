@@ -93,6 +93,7 @@ jobs:
         env:
           BAZEL_IMAGE_DOCKER_CACHE_ARCHIVE: ${{ runner.temp }}/avalanchego-bazel-image/docker-images.tar
           BAZEL_IMAGE_WRITE_DOCKER_CACHE: ${{ steps.avalanchego-image-docker-cache-policy.outputs.cache-save-allowed }}
+          BAZEL_IMAGE_REQUIRE_CACHED_DOCKER_INPUTS: ${{ steps.restore-avalanchego-image-docker-cache.outputs.cache-hit == 'true' }}
         with:
           setup-qemu: 'true'
           docker-username: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_USERNAME || '' }}

@@ -114,6 +114,10 @@ tasks:
       - cmd: |
           {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.sh --ginkgo.focus-file=c/api.go'
 
+  bazel-test-antithesis-images-avalanchego:
+    desc: Build and smoke-test native Bazel-owned Antithesis AvalancheGo images
+    cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.build_antithesis_images_bazel.sh'
+
   bazel-test-unit:
     desc: Run cacheable Go unit tests with Bazel
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh all'

@@ -25,6 +25,7 @@ registry_image="localhost:5000/avalanchego-bazel:phase3"
 # retain both platforms under one tag.
 docker_cache_archive="${BAZEL_IMAGE_DOCKER_CACHE_ARCHIVE:-}"
 write_docker_cache="${BAZEL_IMAGE_WRITE_DOCKER_CACHE:-false}"
+require_cached_docker_inputs="${BAZEL_IMAGE_REQUIRE_CACHED_DOCKER_INPUTS:-false}"
 registry_base_image="docker.io/library/registry@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373"
 registry_base_image_tag="avalanchego-ci/registry:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373"
 debian_base_image_amd64="docker.io/library/debian@sha256:5ae3c39ebd15e229dcedd5cee596b2497182493d41ff162e824ba13fc1b2b867"
@@ -106,6 +107,11 @@ ensure_docker_image() {
     fi
   fi
 
+  if [[ "$require_cached_docker_inputs" == true ]]; then
+    echo "missing cached Docker input ${source_image} for ${platform}" >&2
+    exit 1
+  fi
+
   docker pull --platform "$platform" "$source_image"
   image_id="$(docker image inspect --format '{{.Id}}' "$source_image")"
   docker tag "$image_id" "$local_image"
@@ -146,9 +152,10 @@ fi
 if [[ "$write_docker_cache" == true && -n "$docker_cache_archive" ]]; then
   mkdir -p "$(dirname "$docker_cache_archive")"
   temporary_docker_cache_archive="${docker_cache_archive}.tmp"
+  # Cache only immutable external inputs. The Bazel-built builder is an output
+  # and must be rebuilt from the checked-in source.
   docker image save \
     --output "$temporary_docker_cache_archive" \
-    "$builder_tag" \
     "$registry_base_image_tag" \
     "$debian_base_image_amd64_tag" \
     "$debian_base_image_arm64_tag"

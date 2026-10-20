@@ -6,14 +6,12 @@ set -euo pipefail
 : "${RUNNER_OS:?RUNNER_OS must be set}"
 : "${RUNNER_ARCH:?RUNNER_ARCH must be set}"
 
+# This archive contains only the external registry and Debian images selected
+# by bazel_image_spike.sh. Bazel repositories and Bazel-built images use their
+# own caches and do not affect this key.
 inputs=(
-  .bazelversion
-  MODULE.bazel
-  MODULE.bazel.lock
-  bazel/image/BUILD.bazel
-  bazel/image/bookworm.lock.json
   scripts/bazel_image_spike.sh
 )
 input_digest="$(sha256sum "${inputs[@]}" | sha256sum | awk '{print $1}')"
-printf 'key=avalanchego-image-docker-v1-%s-%s-%s\n' \
+printf 'key=avalanchego-image-docker-v2-%s-%s-%s\n' \
   "$RUNNER_OS" "$RUNNER_ARCH" "$input_digest" >> "$GITHUB_OUTPUT"

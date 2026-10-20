@@ -1,0 +1,113 @@
+load("@rules_img//img:image.bzl", "image_from_binary", "image_manifest")
+load("@rules_img//img:layer.bzl", "file_metadata", "image_layer")
+load("@rules_img//img:load.bzl", "image_load")
+load("@rules_img_images.bzl", "image")
+
+package(default_visibility = ["//visibility:public"])
+
+# The compose generator creates these directories for bind-mounted node logs.
+# OCI layers do not preserve empty directories, so retain a marker in each one.
+genrule(
+    name = "avalanchego_compose_config",
+    outs = [
+        "config/docker-compose.yml",
+        "config/guest.sh",
+        "config/volumes/avalanche-bootstrap-node/logs/.keep",
+        "config/volumes/avalanche-node-1/logs/.keep",
+        "config/volumes/avalanche-node-2/logs/.keep",
+        "config/volumes/avalanche-node-3/logs/.keep",
+        "config/volumes/avalanche-node-4/logs/.keep",
+    ],
+    cmd = " && ".join([
+        "mkdir -p $(@D)/config/volumes/avalanche-bootstrap-node/logs",
+        "mkdir -p $(@D)/config/volumes/avalanche-node-1/logs",
+        "mkdir -p $(@D)/config/volumes/avalanche-node-2/logs",
+        "mkdir -p $(@D)/config/volumes/avalanche-node-3/logs",
+        "mkdir -p $(@D)/config/volumes/avalanche-node-4/logs",
+        "TARGET_PATH=$(@D)/config IMAGE_TAG=bazel $(location //tests/antithesis/avalanchego/gencomposeconfig)",
+        "touch $(@D)/config/volumes/avalanche-bootstrap-node/logs/.keep",
+        "touch $(@D)/config/volumes/avalanche-node-1/logs/.keep",
+        "touch $(@D)/config/volumes/avalanche-node-2/logs/.keep",
+        "touch $(@D)/config/volumes/avalanche-node-3/logs/.keep",
+        "touch $(@D)/config/volumes/avalanche-node-4/logs/.keep",
+    ]),
+    tools = ["//tests/antithesis/avalanchego/gencomposeconfig"],
+)
+
+image_layer(
+    name = "avalanchego_node_layer",
+    srcs = {
+        "/avalanchego/build/entrypoint.sh": "//tests/antithesis/avalanchego:entrypoint.sh",
+    },
+    file_metadata = {
+        "/avalanchego/build/entrypoint.sh": file_metadata(mode = "0755"),
+    },
+)
+
+# This is intentionally an uninstrumented native image. Instrumented amd64
+# images are a separate target because goinstrumentor is amd64-only.
+image_from_binary(
+    name = "avalanchego_node",
+    base = image("debian_12_slim"),
+    binary = "//main:avalanchego",
+    cmd = ["./entrypoint.sh"],
+    entrypoint = [],
+    include_runfiles = False,
+    layers = [":avalanchego_node_layer"],
+    path = "/avalanchego/build/avalanchego",
+    platforms = ["//bazel/image:linux_arm64"],
+    working_dir = "/avalanchego/build",
+)
+
+image_from_binary(
+    name = "avalanchego_workload",
+    base = ":avalanchego_node",
+    binary = "//tests/antithesis/avalanchego:avalanchego",
+    cmd = ["./workload"],
+    entrypoint = [],
+    include_runfiles = False,
+    path = "/avalanchego/build/workload",
+    platforms = ["//bazel/image:linux_arm64"],
+    working_dir = "/avalanchego/build",
+)
+
+image_layer(
+    name = "avalanchego_config_layer",
+    srcs = {
+        "/docker-compose.yml": ":config/docker-compose.yml",
+        "/guest.sh": ":config/guest.sh",
+        "/volumes/avalanche-bootstrap-node/logs/.keep": ":config/volumes/avalanche-bootstrap-node/logs/.keep",
+        "/volumes/avalanche-node-1/logs/.keep": ":config/volumes/avalanche-node-1/logs/.keep",
+        "/volumes/avalanche-node-2/logs/.keep": ":config/volumes/avalanche-node-2/logs/.keep",
+        "/volumes/avalanche-node-3/logs/.keep": ":config/volumes/avalanche-node-3/logs/.keep",
+        "/volumes/avalanche-node-4/logs/.keep": ":config/volumes/avalanche-node-4/logs/.keep",
+    },
+    file_metadata = {
+        "/guest.sh": file_metadata(mode = "0755"),
+    },
+)
+
+image_manifest(
+    name = "avalanchego_config",
+    entrypoint = [],
+    layers = [":avalanchego_config_layer"],
+    platform = "//bazel/image:linux_arm64",
+)
+
+image_load(
+    name = "load_avalanchego_node",
+    image = ":avalanchego_node",
+    tag = "antithesis-avalanchego-node:bazel",
+)
+
+image_load(
+    name = "load_avalanchego_workload",
+    image = ":avalanchego_workload",
+    tag = "antithesis-avalanchego-workload:bazel",
+)
+
+image_load(
+    name = "load_avalanchego_config",
+    image = ":avalanchego_config",
+    tag = "antithesis-avalanchego-config:bazel",
+)
