@@ -15,7 +15,7 @@ import (
 var (
 	_ UnsignedTx = (*RewardAutoRenewedValidatorTx)(nil)
 
-	errMissingTxID      = errors.New("missing staker id")
+	ErrMissingTxID      = errors.New("missing staker id")
 	errMissingTimestamp = errors.New("missing timestamp")
 )
 
@@ -66,7 +66,7 @@ func (tx *RewardAutoRenewedValidatorTx) SyntacticVerify(*snow.Context) error {
 	case tx == nil:
 		return ErrNilTx
 	case tx.TxID == ids.Empty:
-		return errMissingTxID
+		return ErrMissingTxID
 	case tx.Timestamp == 0:
 		return errMissingTimestamp
 	}

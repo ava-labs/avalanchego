@@ -223,6 +223,20 @@ func TestStandardExecutorConvertSubnetToL1TxErrors(t *testing.T) {
 			want: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
+			name: "flow_checker_failed",
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.ConvertSubnetToL1Tx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			want: utxo.ErrInsufficientUnlockedFunds,
+		},
+		{
 			name: "validators_balance_overflow",
 			updateTx: func(_ *testing.T, tx *platform.Tx) {
 				// The validator balances sum to more than math.MaxUint64
@@ -524,6 +538,20 @@ func TestStandardExecutorRegisterL1ValidatorTxErrors(t *testing.T) {
 				env.config.DynamicFeeConfig.Weights,
 				100*env.config.DynamicFeeConfig.MinPrice,
 			),
+			want: utxo.ErrInsufficientUnlockedFunds,
+		},
+		{
+			name: "flow_checker_failed",
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.RegisterL1ValidatorTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
 			want: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
@@ -1027,6 +1055,20 @@ func TestStandardExecutorSetL1ValidatorWeightTxErrors(t *testing.T) {
 			want: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
+			name: "flow_checker_failed",
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.SetL1ValidatorWeightTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			want: utxo.ErrInsufficientUnlockedFunds,
+		},
+		{
 			name: "invalid_warp_message",
 			updateTx: func(_ *testing.T, tx *platform.Tx) {
 				tx.Unsigned.(*platform.SetL1ValidatorWeightTx).Message = []byte{}
@@ -1473,6 +1515,20 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTxErrors(t *testing.T) {
 				env.config.DynamicFeeConfig.Weights,
 				100*env.config.DynamicFeeConfig.MinPrice,
 			),
+			want: utxo.ErrInsufficientUnlockedFunds,
+		},
+		{
+			name: "flow_checker_failed",
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.IncreaseL1ValidatorBalanceTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
 			want: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{

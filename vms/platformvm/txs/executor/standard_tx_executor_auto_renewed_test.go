@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/iterator"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
@@ -162,6 +163,20 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 				diff.SetTimestamp(env.backend.Config.UpgradeConfig.HeliconTime.Add(-1 * time.Second))
 			},
 			want: errHeliconUpgradeNotActive,
+		},
+		{
+			name: "tx_fails_syntactic_verification",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddAutoRenewedValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid_memo_length",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddAutoRenewedValidatorTx).Memo = []byte("memo!")
+			},
+			want: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "weight_too_small",
@@ -461,6 +476,20 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 				diff.SetTimestamp(env.backend.Config.UpgradeConfig.HeliconTime.Add(-1 * time.Second))
 			},
 			wantErr: errHeliconUpgradeNotActive,
+		},
+		{
+			name: "tx_fails_syntactic_verification",
+			updateTx: func(_ testing.TB, _ *platform.SetAutoRenewedValidatorConfigTx, stx *platform.Tx) {
+				stx.Unsigned.(*platform.SetAutoRenewedValidatorConfigTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			},
+			wantErr: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid_memo_length",
+			updateTx: func(_ testing.TB, tx *platform.SetAutoRenewedValidatorConfigTx, _ *platform.Tx) {
+				tx.Memo = []byte("memo!")
+			},
+			wantErr: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "stopped_validator",
