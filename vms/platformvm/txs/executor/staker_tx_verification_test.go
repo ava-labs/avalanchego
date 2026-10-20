@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
@@ -30,7 +29,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 	type test struct {
 		name        string
 		backend     *Backend
-		chain       state.Chain
+		diff        *state.Diff
 		sTxF        func() *platform.Tx
 		txF         func() *platform.AddPermissionlessValidatorTx
 		expectedErr error
@@ -86,15 +85,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					},
 				},
 			},
-			ValidatorRewardsOwner: &secp256k1fx.OutputOwners{
-				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-				Threshold: 1,
-			},
-			DelegatorRewardsOwner: &secp256k1fx.OutputOwners{
-				Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-				Threshold: 1,
-			},
-			DelegationShares: 20_000,
+			ValidatorRewardsOwner: newOwner(),
+			DelegatorRewardsOwner: newOwner(),
+			DelegationShares:      20_000,
 		}
 		verifiedSignedTx = platform.Tx{
 			Unsigned: &verifiedTx,
@@ -113,10 +106,11 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 			},
 
-			chain: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				s.SetTimestamp(now)
-				return s
+			diff: func() *state.Diff {
+				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
+				require.NoError(t, err)
+				diff.SetTimestamp(now)
+				return diff
 			}(),
 			sTxF: func() *platform.Tx {
 				return nil
@@ -135,10 +129,11 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: &utils.Atomic[bool]{},
 			},
-			chain: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				s.SetTimestamp(now)
-				return s
+			diff: func() *state.Diff {
+				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
+				require.NoError(t, err)
+				diff.SetTimestamp(now)
+				return diff
 			}(),
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
@@ -157,10 +152,11 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			chain: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				s.SetTimestamp(verifiedTx.StartTime())
-				return s
+			diff: func() *state.Diff {
+				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
+				require.NoError(t, err)
+				diff.SetTimestamp(verifiedTx.StartTime())
+				return diff
 			}(),
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
@@ -179,11 +175,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			chain: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				s.SetTimestamp(now)
-				s.AddSubnetTransformation(&transformTx)
-				return s
+			diff: func() *state.Diff {
+				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
+				require.NoError(t, err)
+				diff.SetTimestamp(now)
+				diff.AddSubnetTransformation(&transformTx)
+				return diff
 			}(),
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
@@ -204,11 +201,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			chain: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				s.SetTimestamp(now)
-				s.AddSubnetTransformation(&transformTx)
-				return s
+			diff: func() *state.Diff {
+				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
+				require.NoError(t, err)
+				diff.SetTimestamp(now)
+				diff.AddSubnetTransformation(&transformTx)
+				return diff
 			}(),
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
@@ -229,11 +227,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			chain: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				s.SetTimestamp(now)
-				s.AddSubnetTransformation(&transformTx)
-				return s
+			diff: func() *state.Diff {
+				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
+				require.NoError(t, err)
+				diff.SetTimestamp(now)
+				diff.AddSubnetTransformation(&transformTx)
+				return diff
 			}(),
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
@@ -255,11 +254,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			chain: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				s.SetTimestamp(now)
-				s.AddSubnetTransformation(&transformTx)
-				return s
+			diff: func() *state.Diff {
+				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
+				require.NoError(t, err)
+				diff.SetTimestamp(now)
+				diff.AddSubnetTransformation(&transformTx)
+				return diff
 			}(),
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
@@ -284,11 +284,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			chain: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				s.SetTimestamp(time.Unix(1, 0))
-				s.AddSubnetTransformation(&transformTx)
-				return s
+			diff: func() *state.Diff {
+				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
+				require.NoError(t, err)
+				diff.SetTimestamp(time.Unix(1, 0))
+				diff.AddSubnetTransformation(&transformTx)
+				return diff
 			}(),
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
@@ -313,11 +314,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			chain: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				s.SetTimestamp(now)
-				s.AddSubnetTransformation(&transformTx)
-				return s
+			diff: func() *state.Diff {
+				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
+				require.NoError(t, err)
+				diff.SetTimestamp(now)
+				diff.AddSubnetTransformation(&transformTx)
+				return diff
 			}(),
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
@@ -344,24 +346,25 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			chain: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				s.SetTimestamp(now)
-				s.AddSubnetTransformation(&transformTx)
+			diff: func() *state.Diff {
+				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
+				require.NoError(t, err)
+				diff.SetTimestamp(now)
+				diff.AddSubnetTransformation(&transformTx)
 				// State says validator exists
 				primaryNetworkVdr := &state.Staker{
 					EndTime:  mockable.MaxTime,
 					SubnetID: constants.PrimaryNetworkID,
 					NodeID:   verifiedTx.NodeID(),
 				}
-				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
+				require.NoError(t, diff.PutCurrentValidator(primaryNetworkVdr))
 				staker := &state.Staker{
 					EndTime:  mockable.MaxTime,
 					SubnetID: subnetID,
 					NodeID:   verifiedTx.NodeID(),
 				}
-				require.NoError(t, s.PutCurrentValidator(staker))
-				return s
+				require.NoError(t, diff.PutCurrentValidator(staker))
+				return diff
 			}(),
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
@@ -380,10 +383,11 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			chain: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				s.SetTimestamp(now)
-				s.AddSubnetTransformation(&transformTx)
+			diff: func() *state.Diff {
+				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
+				require.NoError(t, err)
+				diff.SetTimestamp(now)
+				diff.AddSubnetTransformation(&transformTx)
 
 				// Validator time isn't subset of primary network validator time
 				primaryNetworkVdr := &state.Staker{
@@ -391,8 +395,8 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					SubnetID: constants.PrimaryNetworkID,
 					NodeID:   verifiedTx.NodeID(),
 				}
-				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
-				return s
+				require.NoError(t, diff.PutCurrentValidator(primaryNetworkVdr))
+				return diff
 			}(),
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
@@ -411,17 +415,18 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				Ctx:          ctx,
 				Bootstrapped: utils.NewAtomic(true),
 			},
-			chain: func() *state.State {
-				s := statetest.New(t, statetest.Config{})
-				s.SetTimestamp(now)
-				s.AddSubnetTransformation(&transformTx)
+			diff: func() *state.Diff {
+				diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
+				require.NoError(t, err)
+				diff.SetTimestamp(now)
+				diff.AddSubnetTransformation(&transformTx)
 				primaryNetworkVdr := &state.Staker{
 					EndTime:  mockable.MaxTime,
 					SubnetID: constants.PrimaryNetworkID,
 					NodeID:   verifiedTx.NodeID(),
 				}
-				require.NoError(t, s.PutCurrentValidator(primaryNetworkVdr))
-				return s
+				require.NoError(t, diff.PutCurrentValidator(primaryNetworkVdr))
+				return diff
 			}(),
 			sTxF: func() *platform.Tx {
 				return &verifiedSignedTx
@@ -441,7 +446,7 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				tx      = tt.txF()
 			)
 
-			err := verifyAddPermissionlessValidatorTx(backend, tt.chain, sTx, tx)
+			err := verifyAddPermissionlessValidatorTx(backend, tt.diff, sTx, tx)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
