@@ -159,13 +159,13 @@ To regenerate the protobuf go code, run `scripts/run_task.sh generate-protobuf` 
 
 This should only be necessary when upgrading protobuf versions or modifying .proto definition files.
 
-To use this script, you must have [buf](https://docs.buf.build/installation) (v1.31.0), protoc-gen-go (v1.33.0) and protoc-gen-go-grpc (v1.3.0) installed.
+To use this script, you must have [buf](https://buf.build/docs/cli/installation/) (v1.70.0), protoc-gen-go (v1.36.11) and protoc-gen-go-grpc (v1.6.2) installed. These versions are enforced by `scripts/protobuf_codegen.sh` and are provided by the nix dev shell (see [Nix](CONTRIBUTING.md#nix)).
 
-To install the buf dependencies:
+To install the protoc plugins without nix:
 
 ```sh
-go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.33.0
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3.0
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.2
 ```
 
 If you have not already, you may need to add `$GOPATH/bin` to your `$PATH`:
@@ -178,8 +178,6 @@ If you extract buf to ~/software/buf/bin, the following should work:
 
 ```sh
 export PATH=$PATH:~/software/buf/bin/:~/go/bin
-go get google.golang.org/protobuf/cmd/protoc-gen-go
-go get google.golang.org/protobuf/cmd/protoc-gen-go-grpc
 scripts/run_task.sh generate-protobuf
 ```
 
