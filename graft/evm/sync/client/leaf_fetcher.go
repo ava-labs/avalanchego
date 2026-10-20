@@ -13,18 +13,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 )
 
-// LeafFetcher reads leaf ranges over the message protocol. One [Client] serves both
 // LeafFetcher reads leaf ranges over the message protocol.
 type LeafFetcher struct {
-	client   types.LeafClient
-	nodeType message.NodeType
+	client types.LeafClient
 }
 
-func NewLeafFetcher(c types.LeafClient, nodeType message.NodeType) *LeafFetcher {
-	return &LeafFetcher{
-		client:   c,
-		nodeType: nodeType,
-	}
+func NewLeafFetcher(c types.LeafClient) *LeafFetcher {
+	return &LeafFetcher{client: c}
 }
 
 func (f *LeafFetcher) FetchLeaves(ctx context.Context, req hashdb.LeafRange) (hashdb.Leaves, bool, error) {
@@ -35,11 +30,10 @@ func (f *LeafFetcher) FetchLeaves(ctx context.Context, req hashdb.LeafRange) (ha
 
 	// End is always nil, [hashdb.LeafRange] carries no end key.
 	resp, err := f.client.GetLeafs(ctx, message.LeafsRequest{
-		Root:     req.Root,
-		Account:  account,
-		Start:    req.Start,
-		Limit:    req.Limit,
-		NodeType: f.nodeType,
+		Root:    req.Root,
+		Account: account,
+		Start:   req.Start,
+		Limit:   req.Limit,
 	})
 	if err != nil {
 		return hashdb.Leaves{}, false, err

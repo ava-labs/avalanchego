@@ -81,7 +81,7 @@ func testSync(t *testing.T, test syncTest) {
 	// Create the state syncer.
 	stateSyncer, err := NewSyncer(
 		loggingtest.New(t, logging.Debug),
-		client.NewLeafFetcher(mockClient, message.StateTrieNode),
+		client.NewLeafFetcher(mockClient),
 		clientEthDB,
 		root,
 		fetcher,

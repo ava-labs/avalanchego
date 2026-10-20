@@ -16,27 +16,16 @@ const MaxCodeHashesPerRequest = 5
 
 var _ Request = LeafsRequest{}
 
-// NodeType outlines the trie that a leaf node belongs to
-// handlers.LeafsRequestHandler uses this information to determine
-// which trie type to fetch the information from
-type NodeType uint8
-
-const (
-	StateTrieNode      = NodeType(1)
-	StateTrieKeyLength = common.HashLength
-)
+const StateTrieKeyLength = common.HashLength
 
 // LeafsRequest is a request for a range of leaves from the trie at Root.
 // Account selects a storage trie, or the account trie when empty.
-//
-// NodeType is not serialized, to stay wire-compatible with existing nodes.
 type LeafsRequest struct {
-	Root     common.Hash `serialize:"true"`
-	Account  common.Hash `serialize:"true"`
-	Start    []byte      `serialize:"true"`
-	End      []byte      `serialize:"true"`
-	Limit    uint16      `serialize:"true"`
-	NodeType NodeType
+	Root    common.Hash `serialize:"true"`
+	Account common.Hash `serialize:"true"`
+	Start   []byte      `serialize:"true"`
+	End     []byte      `serialize:"true"`
+	Limit   uint16      `serialize:"true"`
 }
 
 func (l LeafsRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler RequestHandler) ([]byte, error) {
@@ -45,8 +34,8 @@ func (l LeafsRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID u
 
 func (l LeafsRequest) String() string {
 	return fmt.Sprintf(
-		"LeafsRequest(Root=%s, Account=%s, Start=%s, End=%s, Limit=%d, NodeType=%d)",
-		l.Root, l.Account, common.Bytes2Hex(l.Start), common.Bytes2Hex(l.End), l.Limit, l.NodeType,
+		"LeafsRequest(Root=%s, Account=%s, Start=%s, End=%s, Limit=%d)",
+		l.Root, l.Account, common.Bytes2Hex(l.Start), common.Bytes2Hex(l.End), l.Limit,
 	)
 }
 

@@ -28,12 +28,11 @@ func TestMarshalLeafsRequest(t *testing.T) {
 	endBytes := randomBytes(t, r, common.HashLength)
 
 	request := message.LeafsRequest{
-		Root:     common.BytesToHash([]byte("im ROOTing for ya")),
-		Account:  common.Hash{},
-		Start:    startBytes,
-		End:      endBytes,
-		Limit:    1024,
-		NodeType: message.StateTrieNode,
+		Root:    common.BytesToHash([]byte("im ROOTing for ya")),
+		Account: common.Hash{},
+		Start:   startBytes,
+		End:     endBytes,
+		Limit:   1024,
 	}
 
 	leafsRequestBytes, err := message.Codec.Marshal(message.Version, request)
@@ -47,8 +46,6 @@ func TestMarshalLeafsRequest(t *testing.T) {
 	require.Equal(t, request.Start, decoded.Start)
 	require.Equal(t, request.End, decoded.End)
 	require.Equal(t, request.Limit, decoded.Limit)
-	// NodeType should not be serialized
-	require.Equal(t, message.NodeType(0), decoded.NodeType)
 }
 
 // TestMarshalLeafsResponse requires that the structure or serialization logic hasn't changed, primarily to
@@ -71,53 +68,6 @@ func TestMarshalLeafsResponse(t *testing.T) {
 	require.Equal(t, leafsResponse.Vals, l.Vals)
 	require.False(t, l.More) // make sure it is not serialized
 	require.Equal(t, leafsResponse.ProofVals, l.ProofVals)
-}
-
-// TestLeafsRequestNodeTypeNotSerialized verifies that NodeType is not serialized
-// and does not affect the encoded output. This ensures backward compatibility.
-func TestLeafsRequestNodeTypeNotSerialized(t *testing.T) {
-	// set random seed for deterministic random
-	r := newTestRand()
-	startBytes := randomBytes(t, r, common.HashLength)
-	endBytes := randomBytes(t, r, common.HashLength)
-
-	// Create request without explicit NodeType (defaults to 0)
-	leafsRequestDefault := message.LeafsRequest{
-		Root:     common.BytesToHash([]byte("test root")),
-		Account:  common.Hash{},
-		Start:    startBytes,
-		End:      endBytes,
-		Limit:    512,
-		NodeType: message.NodeType(0),
-	}
-
-	// Create request with explicit NodeType
-	leafsRequestWithNodeType := message.LeafsRequest{
-		Root:     common.BytesToHash([]byte("test root")),
-		Account:  common.Hash{},
-		Start:    startBytes,
-		End:      endBytes,
-		Limit:    512,
-		NodeType: message.StateTrieNode,
-	}
-
-	bytesDefault, err := message.Codec.Marshal(message.Version, leafsRequestDefault)
-	require.NoError(t, err)
-
-	bytesWithNodeType, err := message.Codec.Marshal(message.Version, leafsRequestWithNodeType)
-	require.NoError(t, err)
-
-	require.Equal(t, bytesDefault, bytesWithNodeType, "NodeType should not affect serialization")
-
-	var unmarshaled message.LeafsRequest
-	_, err = message.Codec.Unmarshal(bytesWithNodeType, &unmarshaled)
-	require.NoError(t, err)
-
-	require.Equal(t, message.NodeType(0), unmarshaled.NodeType, "NodeType should not be serialized")
-	require.Equal(t, leafsRequestDefault.Root, unmarshaled.Root)
-	require.Equal(t, leafsRequestDefault.Start, unmarshaled.Start)
-	require.Equal(t, leafsRequestDefault.End, unmarshaled.End)
-	require.Equal(t, leafsRequestDefault.Limit, unmarshaled.Limit)
 }
 
 func newTestRand() *rand.Rand {

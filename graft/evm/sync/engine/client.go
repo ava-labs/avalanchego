@@ -296,10 +296,9 @@ func (c *client) Shutdown() error {
 // Error returns a non-nil error if one occurred during the sync.
 func (c *client) Error() error { return c.err }
 
-// AcceptSync implements Acceptor. It resets the blockchain to the synced block,
-// preparing it for execution, and updates disk and memory pointers so the VM
-// is ready for bootstrapping. Also executes any shared memory operations from
-// the atomic trie to shared memory.
+// AcceptSync resets the blockchain to the synced block, preparing it for
+// execution, and updates disk and memory pointers so the VM is ready for
+// bootstrapping.
 func (c *client) AcceptSync(ctx context.Context, summary message.Syncable) error {
 	stateBlock, err := c.config.State.GetBlock(ctx, ids.ID(summary.GetBlockHash()))
 	if err != nil {

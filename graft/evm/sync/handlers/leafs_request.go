@@ -77,7 +77,7 @@ func NewLeafsRequestHandler(trieDB *triedb.Database, snapshotProvider SnapshotPr
 // Specified Limit in message.LeafsRequest is overridden to maxLeavesLimit if it is greater than maxLeavesLimit
 // Expects returned errors to be treated as FATAL
 // Never returns errors
-// Returns nothing if NodeType is invalid or requested trie root is not found
+// Returns nothing if requested trie root is not found
 // Assumes ctx is active
 func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error) {
 	startTime := time.Now()

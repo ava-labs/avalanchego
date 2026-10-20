@@ -13,7 +13,6 @@ go_library(
         "//database",
         "//database/versiondb",
         "//graft/evm/message",
-        "//graft/evm/sync/handlers",
         "//graft/subnet-evm/consensus/dummy",
         "//graft/subnet-evm/core",
         "//graft/subnet-evm/params",
