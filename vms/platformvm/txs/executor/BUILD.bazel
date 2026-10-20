@@ -63,6 +63,7 @@ go_test(
         "stakers_test.go",
         "staking_rules_test.go",
         "standard_tx_executor_atomic_test.go",
+        "standard_tx_executor_auto_renewed_test.go",
         "standard_tx_executor_l1_test.go",
         "standard_tx_executor_staking_test.go",
         "standard_tx_executor_subnet_test.go",
