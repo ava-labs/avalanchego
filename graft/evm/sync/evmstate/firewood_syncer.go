@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/tracking"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 
 	merklesync "github.com/ava-labs/avalanchego/database/merkle/sync"
 )
@@ -37,7 +37,7 @@ func NewFirewoodSyncer(
 	db *ffi.Database,
 	target common.Hash,
 	codeQueue *code.Queue,
-	client *tracking.Client,
+	client *peertracker.Client,
 ) (*FirewoodSyncer, error) {
 	s, err := syncer.NewEVM(
 		config,

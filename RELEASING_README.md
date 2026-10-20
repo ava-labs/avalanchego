@@ -7,7 +7,7 @@ This document covers the complete release process for AvalancheGo and its integr
 AvalancheGo is a monorepo which contains:
 
 - **AvalancheGo** - The main Avalanche node implementation
-- **Coreth** (in [graft/coreth/](graft/coreth/)) - C-Chain EVM implementation, compiled into AvalancheGo
+- **Coreth** (in [graft/coreth/](graft/coreth/)) - C-Chain types, params and precompiles used by [SAEVM](vms/saevm/), compiled into AvalancheGo
 - **Subnet-EVM** (in [graft/subnet-evm/](graft/subnet-evm/)) - Subnet-EVM plugin, released as a separate binary
 
 For the rationale behind the multi-module tagging process, see [Multi-Module Release Strategy](docs/design/multi-module-release.md).

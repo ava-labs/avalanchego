@@ -19,8 +19,6 @@ type Module struct {
 	// Contract returns a thread-safe singleton that can be used as the StatefulPrecompiledContract when
 	// this config is enabled.
 	Contract contract.StatefulPrecompiledContract
-	// Configurator is used to configure the stateful precompile when the config is enabled.
-	contract.Configurator
 }
 
 type moduleArray []Module

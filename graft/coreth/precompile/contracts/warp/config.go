@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/log"
 
@@ -27,7 +26,6 @@ const (
 var (
 	_ precompileconfig.Config     = (*Config)(nil)
 	_ precompileconfig.Predicater = (*Config)(nil)
-	_ precompileconfig.Accepter   = (*Config)(nil)
 )
 
 var (
@@ -70,26 +68,6 @@ func NewDefaultConfig(blockTimestamp *uint64) *Config {
 // Key returns the key for the Warp precompileconfig.
 // This should be the same key as used in the precompile module.
 func (*Config) Key() string { return ConfigKey }
-
-func (*Config) Accept(acceptCtx *precompileconfig.AcceptContext, blockHash common.Hash, blockNumber uint64, txHash common.Hash, logIndex int, _ []common.Hash, logData []byte) error {
-	unsignedMessage, err := UnpackSendWarpEventDataToMessage(logData)
-	if err != nil {
-		return fmt.Errorf("failed to parse warp log data into unsigned message (TxHash: %s, LogIndex: %d): %w", txHash, logIndex, err)
-	}
-	log.Debug(
-		"Accepted warp unsigned message",
-		"blockHash", blockHash,
-		"blockNumber", blockNumber,
-		"txHash", txHash,
-		"logIndex", logIndex,
-		"logData", common.Bytes2Hex(logData),
-		"warpMessageID", unsignedMessage.ID(),
-	)
-	if err := acceptCtx.Warp.AddMessage(unsignedMessage); err != nil {
-		return fmt.Errorf("failed to add warp message during accept (TxHash: %s, LogIndex: %d): %w", txHash, logIndex, err)
-	}
-	return nil
-}
 
 // PredicateGas returns the amount of gas necessary to verify the predicate
 // PredicateGas charges for:

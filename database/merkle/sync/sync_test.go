@@ -20,9 +20,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
-	"github.com/ava-labs/avalanchego/network/p2p/tracking"
-	"github.com/ava-labs/avalanchego/network/p2p/tracking/trackingtest"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker/peertrackertest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
@@ -155,17 +154,17 @@ func withDB(d *db) sutOption {
 }
 
 // selfClient returns a client that routes back to handler.
-func selfClient(t *testing.T, ctx context.Context, handler p2p.Handler) *tracking.Client {
+func selfClient(t *testing.T, ctx context.Context, handler p2p.Handler) *peertracker.Client {
 	t.Helper()
 
-	return trackingtest.NewSelfClient(t, ctx, ids.EmptyNodeID, handler)
+	return peertrackertest.NewSelfClient(t, ctx, ids.EmptyNodeID, handler)
 }
 
 // newSUT returns a syncer targeting targetRoot that fetches through client.
 func newSUT(
 	t *testing.T,
 	targetRoot ids.ID,
-	client *tracking.Client,
+	client *peertracker.Client,
 	opts ...sutOption,
 ) *sut {
 	t.Helper()
@@ -460,8 +459,8 @@ func TestSyncerShutdownDoesNotDescorePeer(t *testing.T) {
 					},
 				}
 
-				tracker := p2ptest.NewTracker(t)
-				client := trackingtest.NewSelfClientWithTracker(t, ctx, nodeID, handler, tracker)
+				tracker := peertrackertest.New(t)
+				client := peertrackertest.NewSelfClientWithTracker(t, ctx, nodeID, handler, tracker)
 
 				syncer = newSUT(t, targetRoot, client)
 
@@ -516,7 +515,7 @@ func TestSyncerScoresProofSource(t *testing.T) {
 
 				// An unusable proof is retried forever, so stop the syncer from
 				// inside the second request rather than racing it from outside.
-				tracker := p2ptest.NewTracker(t)
+				tracker := peertrackertest.New(t)
 				served := 0
 				handler := p2p.TestHandler{
 					AppRequestF: func(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *common.AppError) {
@@ -540,7 +539,7 @@ func TestSyncerScoresProofSource(t *testing.T) {
 				syncer := newSUT(
 					t,
 					targetRoot,
-					trackingtest.NewSelfClientWithTracker(t, ctx, nodeID, handler, tracker),
+					peertrackertest.NewSelfClientWithTracker(t, ctx, nodeID, handler, tracker),
 				)
 
 				require.ErrorIsf(t, syncer.Sync(ctx), tt.wantErr, "%T.Sync()", syncer)
@@ -553,7 +552,7 @@ func TestSyncerScoresProofSource(t *testing.T) {
 	}
 }
 
-func responsive(tracker *p2p.PeerTracker, nodeID ids.NodeID) bool {
+func responsive(tracker *peertracker.PeerTracker, nodeID ids.NodeID) bool {
 	peers := tracker.ResponsivePeers()
 	return peers.Contains(nodeID)
 }

@@ -4,6 +4,9 @@
 // Package synchronoustest provides a deterministic, pre-generated C-Chain
 // history crossing every pre-SAE network upgrade, for tests that need realistic
 // synchronous blocks.
+//
+// The fixture was recorded from the pre-SAE C-Chain VM, which has since been
+// deleted, so it is frozen and cannot be regenerated.
 package synchronoustest
 
 import (

@@ -14,7 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/tracking"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
@@ -41,7 +41,7 @@ func New(
 	config Config,
 	db *ffi.Database,
 	targetRoot ids.ID,
-	proofClient *tracking.Client,
+	proofClient *peertracker.Client,
 ) (*sync.Syncer[*RangeProof, struct{}], error) {
 	return newWithDB(
 		config,
@@ -55,7 +55,7 @@ func newWithDB(
 	config Config,
 	db sync.DB[*RangeProof, struct{}],
 	targetRoot ids.ID,
-	proofClient *tracking.Client,
+	proofClient *peertracker.Client,
 ) (*sync.Syncer[*RangeProof, struct{}], error) {
 	if config.Registerer == nil {
 		config.Registerer = prometheus.NewRegistry()

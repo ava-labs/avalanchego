@@ -10,6 +10,7 @@ go_library(
         "//api/metrics",
         "//ids",
         "//network/p2p",
+        "//network/p2p/peertracker",
         "//snow",
         "//snow/engine/common",
         "//snow/validators",

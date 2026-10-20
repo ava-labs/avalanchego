@@ -19,11 +19,13 @@ This release updates the plugin version to `47`. All plugins must update to rema
 ### Configs
 
 - The `eth-apis` C-Chain option, deprecated in v1.15.0, is removed. The node now ignores it and logs a warning like any other unrecognized option. Set `apis` instead.
+- Removed `pull-gossip-requests-per-validator` from the P-Chain config. It has had no effect since v1.14.2. The node ignores the key if a config still sets it.
 
 ### Metrics
 
 - C-Chain metrics no longer include the `transition` prefix. For example, `avalanche_evm_transition_sae_last_executed_height` is now `avalanche_evm_sae_last_executed_height`.
 - Added `avalanche_evm_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
+- Added `avalanche_evm_sae_execution_gas_rate_headroom` (histogram), `avalanche_evm_sae_execution_gas_rate_headroom_latest` (gauge), and `avalanche_evm_sae_tau_second_avg_executed_gas_per_second` (gauge) to monitor gas-vs-wall clock skew during execution, for tuning the gas target.
 
 ### Fixes
 

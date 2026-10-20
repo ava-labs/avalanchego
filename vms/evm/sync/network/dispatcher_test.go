@@ -7,22 +7,21 @@ import (
 	"context"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
-	"github.com/ava-labs/avalanchego/network/p2p/tracking/trackingtest"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker/peertrackertest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/version"
 
 	syncpb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -71,7 +70,7 @@ func TestDispatcher_SendBytes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			tracker := newTestTracker(t, nodeID)
+			tracker := peertrackertest.New(t)
 			c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 				t, ctx, nodeID, tt.handler, tracker,
 			)
@@ -88,7 +87,7 @@ func TestDispatcher_SendBytes(t *testing.T) {
 				return
 			}
 
-			assert.Empty(t, cmp.Diff(tt.want, got, protocmp.Transform()), "cmp.Diff(want, got)")
+			require.Empty(t, cmp.Diff(tt.want, got, protocmp.Transform()), "cmp.Diff(want, got)")
 		})
 	}
 }
@@ -110,18 +109,18 @@ func TestDispatcher_CancelInFlight(t *testing.T) {
 		},
 	}
 
-	tracker := newTestTracker(t, nodeID)
-	seedResponsive(t, tracker, nodeID)
+	tracker := peertrackertest.New(t)
 	c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
 		t, t.Context(), nodeID, handler, tracker,
 	)
+	peertrackertest.SeedResponsive(t, tracker, nodeID)
 
 	reqBytes, err := proto.Marshal(&syncpb.GetLeafRequest{})
 	require.NoError(t, err, "proto.Marshal(req)")
 
 	_, err = c.sendBytes(ctx, reqBytes, acceptLeaf)
 	require.ErrorIsf(t, err, context.Canceled, "%T.sendBytes()", c)
-	assert.Truef(t, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
+	require.Truef(t, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
 }
 
 // Success scores the peer responsive, failure de-scores it. De-score rows
@@ -163,24 +162,28 @@ func TestDispatcher_PeerScoring(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := t.Context()
-			nodeID := ids.GenerateTestNodeID()
-			tracker := newTestTracker(t, nodeID)
-			if tt.seed {
-				seedResponsive(t, tracker, nodeID)
-			}
-			c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
-				t, ctx, nodeID, tt.handler, tracker,
-			)
+			synctest.Test(t, func(t *testing.T) {
+				ctx := t.Context()
+				nodeID := ids.GenerateTestNodeID()
+				tracker := peertrackertest.New(t)
+				c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
+					t, ctx, nodeID, tt.handler, tracker,
+				)
+				if tt.seed {
+					peertrackertest.SeedResponsive(t, tracker, nodeID)
+				}
 
-			verify := acceptLeaf
-			if tt.rejectResp {
-				verify = rejectLeaf
-			}
-			_, err := c.sendBytes(ctx, reqBytes, verify)
-			require.ErrorIsf(t, err, tt.wantErr, "%T.sendBytes()", c)
+				verify := acceptLeaf
+				if tt.rejectResp {
+					verify = rejectLeaf
+				}
+				_, err := c.sendBytes(ctx, reqBytes, verify)
+				require.ErrorIsf(t, err, tt.wantErr, "%T.sendBytes()", c)
 
-			assert.Equalf(t, tt.wantResponsive, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
+				// The client scores after onResponse delivers the result.
+				synctest.Wait()
+				require.Equalf(t, tt.wantResponsive, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
+			})
 		})
 	}
 }
@@ -222,39 +225,21 @@ func scriptedHandler(responses ...scriptResponse) (p2p.Handler, *atomic.Int32) {
 	return h, &calls
 }
 
-// seedResponsive marks nodeID responsive so a later de-score is a real
-// 1 -> 0 transition.
-func seedResponsive(t *testing.T, tracker *p2p.PeerTracker, nodeID ids.NodeID) {
-	t.Helper()
-	tracker.RegisterRequest(nodeID)
-	tracker.RegisterResponse(nodeID, 1)
-	require.Truef(t, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
-}
-
-func newTestTracker(t *testing.T, peers ...ids.NodeID) *p2p.PeerTracker {
-	t.Helper()
-	tracker := p2ptest.NewTracker(t)
-	for _, nodeID := range peers {
-		tracker.Connected(nodeID, &version.Application{Major: 99})
-	}
-	return tracker
-}
-
 func newTestDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any](
 	t *testing.T,
 	ctx context.Context,
 	nodeID ids.NodeID,
 	h p2p.Handler,
-	peers *p2p.PeerTracker,
+	peers *peertracker.PeerTracker,
 ) *Dispatcher[Req, In, Resp, Out] {
 	t.Helper()
 	return &Dispatcher[Req, In, Resp, Out]{
 		log:    loggingtest.New(t, logging.Debug),
-		client: trackingtest.NewSelfClientWithTracker(t, ctx, nodeID, h, peers),
+		client: peertrackertest.NewSelfClientWithTracker(t, ctx, nodeID, h, peers),
 	}
 }
 
-func responsive(tracker *p2p.PeerTracker, nodeID ids.NodeID) bool {
+func responsive(tracker *peertracker.PeerTracker, nodeID ids.NodeID) bool {
 	peers := tracker.ResponsivePeers()
 	return peers.Contains(nodeID)
 }

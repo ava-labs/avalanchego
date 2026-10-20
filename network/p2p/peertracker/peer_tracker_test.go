@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package p2p
+package peertracker
 
 import (
 	"testing"
@@ -18,7 +18,7 @@ import (
 
 func TestPeerTracker(t *testing.T) {
 	require := require.New(t)
-	p, err := NewPeerTracker(
+	p, err := New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
@@ -142,7 +142,7 @@ func TestRegisterRequestIgnoresUnknownPeers(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			p, err := NewPeerTracker(
+			p, err := New(
 				loggingtest.New(t, logging.Debug),
 				"",
 				prometheus.NewRegistry(),

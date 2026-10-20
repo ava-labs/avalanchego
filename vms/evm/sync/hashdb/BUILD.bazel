@@ -14,7 +14,7 @@ go_library(
     deps = [
         "//ids",
         "//network/p2p",
-        "//network/p2p/tracking",
+        "//network/p2p/peertracker",
         "//proto/pb/sync",
         "//snow/engine/common",
         "//utils/logging",
@@ -44,7 +44,7 @@ go_test(
     deps = [
         "//ids",
         "//network/p2p",
-        "//network/p2p/tracking",
+        "//network/p2p/peertracker",
         "//proto/pb/sync",
         "//snow/engine/common",
         "//utils/logging",
