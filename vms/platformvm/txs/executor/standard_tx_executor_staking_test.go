@@ -75,6 +75,13 @@ func TestStandardExecutorAddValidatorTxErrors(t *testing.T) {
 		updateState func(*state.Diff)
 	}{
 		{
+			name: "tx_fails_syntactic_verification",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
+		{
 			name: "empty_node_id",
 			updateTx: func(tx *platform.Tx) {
 				tx.Unsigned.(*platform.AddValidatorTx).Validator.NodeID = ids.EmptyNodeID
@@ -165,6 +172,55 @@ func TestStandardExecutorAddValidatorTxErrors(t *testing.T) {
 	}
 }
 
+// TestStandardExecutorAddValidatorTx verifies the successful execution of an
+// [platform.AddValidatorTx].
+func TestStandardExecutorAddValidatorTx(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t, upgradetest.Banff)
+	wallet := newWallet(t, env, walletConfig{})
+
+	var (
+		nodeID    = ids.GenerateTestNodeID()
+		startTime = genesistest.DefaultValidatorStartTime.Add(time.Second)
+		endTime   = startTime.Add(env.config.MinStakeDuration)
+	)
+
+	stx, err := wallet.IssueAddValidatorTx(
+		&platform.Validator{
+			NodeID: nodeID,
+			Start:  uint64(startTime.Unix()),
+			End:    uint64(endTime.Unix()),
+			Wght:   env.config.MinValidatorStake,
+		},
+		newOwner(),
+		reward.PercentDenominator,
+	)
+	require.NoError(err)
+
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+
+	feeCalculator := state.PickFeeCalculator(env.config, diff)
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		stx,
+		diff,
+	)
+	require.NoError(err)
+
+	requireBaseTxApplied(t, env, diff, feeCalculator, stx)
+
+	// assert the validator was added to the pending validator set
+	gotStaker, err := diff.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+	require.Equal(stx.ID(), gotStaker.TxID)
+	require.Equal(env.config.MinValidatorStake, gotStaker.Weight)
+	require.Equal(startTime.Unix(), gotStaker.StartTime.Unix())
+	require.Equal(endTime.Unix(), gotStaker.EndTime.Unix())
+}
+
 // TestStandardExecutorAddDelegatorTxErrors verifies the failure cases of
 // [platform.AddDelegatorTx] execution.
 func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
@@ -222,6 +278,13 @@ func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 		updateTx    func(*platform.Tx)
 		updateState func(*state.Diff)
 	}{
+		{
+			name: "tx_fails_syntactic_verification",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddDelegatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
 		{
 			name: "validator_stops_before_delegator",
 			updateTx: func(tx *platform.Tx) {
@@ -518,6 +581,13 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 		updateState func(*state.Diff)
 	}{
 		{
+			name: "tx_fails_syntactic_verification",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddSubnetValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
+		{
 			name: "subnet_validator_stops_after_primary_network",
 			updateTx: func(tx *platform.Tx) {
 				tx.Unsigned.(*platform.AddSubnetValidatorTx).Validator.End = genesistest.DefaultValidatorEndTimeUnix + 1
@@ -651,6 +721,60 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 	}
 }
 
+// TestStandardExecutorAddSubnetValidatorTxStakeDurationErrors verifies that,
+// post-Durango, an [platform.AddSubnetValidatorTx] whose staking period,
+// measured from the current chain time, is outside the configured bounds is
+// rejected.
+func TestStandardExecutorAddSubnetValidatorTxStakeDurationErrors(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
+	chainTime := env.state.GetTimestamp()
+
+	tests := []struct {
+		name    string
+		endTime time.Time
+		want    error
+	}{
+		{
+			name:    "stake_too_short",
+			endTime: chainTime.Add(env.config.MinStakeDuration - time.Second),
+			want:    errStakeTooShort,
+		},
+		{
+			// Helicon only lowers the minimum staking duration of primary
+			// network validators.
+			name:    "stake_shorter_than_pre_helicon_minimum",
+			endTime: chainTime.Add(env.config.HeliconMinStakeDuration),
+			want:    errStakeTooShort,
+		},
+		{
+			name:    "stake_too_long",
+			endTime: chainTime.Add(env.config.MaxStakeDuration + time.Second),
+			want:    ErrStakeTooLong,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wallet := newWallet(t, env, walletConfig{})
+			tx, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
+				Validator: platform.Validator{
+					NodeID: genesistest.DefaultNodeIDs[0],
+					End:    uint64(tt.endTime.Unix()),
+					Wght:   genesistest.DefaultValidatorWeight,
+				},
+				Subnet: testSubnet1.ID(),
+			})
+			require.NoError(t, err)
+
+			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(t, err)
+
+			_, _, _, err = StandardTx(&env.backend, state.PickFeeCalculator(env.config, diff), tx, diff)
+			require.ErrorIs(t, err, tt.want)
+		})
+	}
+}
+
 // TestStandardExecutorAddSubnetValidatorTx verifies the successful execution
 // of an [platform.AddSubnetValidatorTx].
 func TestStandardExecutorAddSubnetValidatorTx(t *testing.T) {
@@ -776,6 +900,13 @@ func TestStandardExecutorAddPermissionlessValidatorTxErrors(t *testing.T) {
 		updateTx func(*platform.Tx)
 	}{
 		{
+			name: "tx_fails_syntactic_verification",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
+		{
 			name: "stake_duration_shorter_than_pre_helicon_minimum",
 			updateTx: func(tx *platform.Tx) {
 				validator := &tx.Unsigned.(*platform.AddPermissionlessValidatorTx).Validator
@@ -881,6 +1012,192 @@ func TestStandardExecutorAddPermissionlessValidatorTx(t *testing.T) {
 	require.Equal(stx.ID(), gotStaker.TxID)
 	require.Equal(env.config.MinValidatorStake, gotStaker.Weight)
 	require.Equal(endTime.Unix(), gotStaker.EndTime.Unix())
+}
+
+// TestStandardExecutorAddPermissionlessDelegatorTxErrors verifies the failure
+// cases of [platform.AddPermissionlessDelegatorTx] execution.
+func TestStandardExecutorAddPermissionlessDelegatorTxErrors(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
+
+	var (
+		nodeID  = genesistest.DefaultNodeIDs[0]
+		endTime = env.state.GetTimestamp().Add(env.config.MinStakeDuration)
+	)
+
+	// setWeight updates the delegator's weight and its stake output
+	// consistently, as the two must match syntactically.
+	setWeight := func(tx *platform.Tx, weight uint64) {
+		unsignedTx := tx.Unsigned.(*platform.AddPermissionlessDelegatorTx)
+		unsignedTx.Validator.Wght = weight
+		unsignedTx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).Amt = weight
+	}
+
+	tests := []struct {
+		name     string
+		want     error
+		updateTx func(*platform.Tx)
+	}{
+		{
+			name: "tx_fails_syntactic_verification",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessDelegatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "weight_too_small",
+			updateTx: func(tx *platform.Tx) {
+				setWeight(tx, env.config.MinDelegatorStake-1)
+			},
+			want: errWeightTooSmall,
+		},
+		{
+			name: "stake_too_short",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessDelegatorTx).Validator.End = uint64(env.state.GetTimestamp().Add(time.Second).Unix())
+			},
+			want: errStakeTooShort,
+		},
+		{
+			name: "stake_too_long",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessDelegatorTx).Validator.End = uint64(env.state.GetTimestamp().Add(env.config.MaxStakeDuration + time.Second).Unix())
+			},
+			want: ErrStakeTooLong,
+		},
+		{
+			name: "wrong_staked_asset_id",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessDelegatorTx).StakeOuts[0].Asset.ID = ids.GenerateTestID()
+			},
+			want: errWrongStakedAssetID,
+		},
+		{
+			name: "validator_not_found",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessDelegatorTx).Validator.NodeID = ids.GenerateTestNodeID()
+			},
+			want: database.ErrNotFound,
+		},
+		{
+			name: "delegator_stops_after_validator",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessDelegatorTx).Validator.End = genesistest.DefaultValidatorEndTimeUnix + 1
+			},
+			want: errPeriodMismatch,
+		},
+		{
+			name: "over_delegation",
+			updateTx: func(tx *platform.Tx) {
+				setWeight(tx, env.config.MaxValidatorStake)
+			},
+			want: ErrOverDelegated,
+		},
+		{
+			name: "flow_checker_failed",
+			updateTx: func(tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.AddPermissionlessDelegatorTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			want: errFlowCheckFailed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// The tx stakes AVAX, so issue each tx from a fresh wallet to keep
+			// the wallet's UTXO view consistent with env.state.
+			wallet := newWallet(t, env, walletConfig{})
+			tx, err := wallet.IssueAddPermissionlessDelegatorTx(
+				&platform.SubnetValidator{
+					Validator: platform.Validator{
+						NodeID: nodeID,
+						End:    uint64(endTime.Unix()),
+						Wght:   env.config.MinDelegatorStake,
+					},
+					Subnet: constants.PrimaryNetworkID,
+				},
+				env.ctx.AVAXAssetID,
+				newOwner(),
+			)
+			require.NoError(t, err)
+
+			diff, got := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(t, got)
+
+			if tt.updateTx != nil {
+				tt.updateTx(tx)
+			}
+
+			feeCalculator := state.PickFeeCalculator(env.config, diff)
+			_, _, _, got = StandardTx(
+				&env.backend,
+				feeCalculator,
+				tx,
+				diff,
+			)
+
+			require.ErrorIs(t, got, tt.want)
+		})
+	}
+}
+
+// TestStandardExecutorAddPermissionlessDelegatorTx verifies the successful
+// execution of an [platform.AddPermissionlessDelegatorTx].
+func TestStandardExecutorAddPermissionlessDelegatorTx(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t, upgradetest.Latest)
+	wallet := newWallet(t, env, walletConfig{})
+
+	var (
+		nodeID  = genesistest.DefaultNodeIDs[0]
+		endTime = env.state.GetTimestamp().Add(env.config.MinStakeDuration)
+	)
+
+	stx, err := wallet.IssueAddPermissionlessDelegatorTx(
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
+				NodeID: nodeID,
+				End:    uint64(endTime.Unix()),
+				Wght:   env.config.MinDelegatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
+		env.ctx.AVAXAssetID,
+		newOwner(),
+	)
+	require.NoError(err)
+
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+
+	feeCalculator := state.PickFeeCalculator(env.config, diff)
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		stx,
+		diff,
+	)
+	require.NoError(err)
+
+	requireBaseTxApplied(t, env, diff, feeCalculator, stx)
+
+	// assert the delegator was added to the current delegator set
+	delegatorIt, err := diff.GetCurrentDelegatorIterator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+
+	gotDelegators := iterator.ToSlice(delegatorIt)
+	require.Len(gotDelegators, 1)
+	require.Equal(stx.ID(), gotDelegators[0].TxID)
+	require.Equal(env.config.MinDelegatorStake, gotDelegators[0].Weight)
+	require.Equal(endTime.Unix(), gotDelegators[0].EndTime.Unix())
 }
 
 // TestStandardExecutorRemoveSubnetValidatorTxErrors verifies the failure cases

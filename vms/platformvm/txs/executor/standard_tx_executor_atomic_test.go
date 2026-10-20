@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"math"
 	"math/rand"
 	"testing"
 	"time"
@@ -16,15 +17,105 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
 var fundedSharedMemoryCalls byte
+
+// TestStandardExecutorImportTxErrors verifies the failure cases of
+// [platform.ImportTx] execution.
+func TestStandardExecutorImportTxErrors(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
+
+	sourceKey, err := secp256k1.NewPrivateKey()
+	require.NoError(t, err)
+
+	env.msm.SharedMemory = fundedSharedMemory(
+		t,
+		env,
+		sourceKey,
+		env.ctx.XChainID,
+		map[ids.ID]uint64{
+			env.ctx.AVAXAssetID: 1,
+		},
+		rand.NewSource(0),
+	)
+
+	tests := []struct {
+		name     string
+		want     error
+		updateTx func(*platform.Tx)
+	}{
+		{
+			name: "tx_fails_syntactic_verification",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.ImportTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "import_from_same_chain",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.ImportTx).SourceChain = env.ctx.ChainID
+			},
+			want: verify.ErrSameChainID,
+		},
+		{
+			name: "flow_checker_failed",
+			updateTx: func(tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.ImportTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			want: utxo.ErrInsufficientUnlockedFunds,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wallet := newWallet(t, env, walletConfig{
+				keys:     []*secp256k1.PrivateKey{sourceKey},
+				chainIDs: []ids.ID{env.ctx.XChainID},
+			})
+
+			tx, err := wallet.IssueImportTx(
+				env.ctx.XChainID,
+				newOwner(),
+			)
+			require.NoError(t, err)
+
+			if tt.updateTx != nil {
+				tt.updateTx(tx)
+			}
+
+			diff, got := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(t, got)
+
+			feeCalculator := state.PickFeeCalculator(env.config, diff)
+			_, _, _, got = StandardTx(
+				&env.backend,
+				feeCalculator,
+				tx,
+				diff,
+			)
+
+			require.ErrorIs(t, got, tt.want)
+		})
+	}
+}
 
 // TestStandardExecutorImportTx verifies the successful execution of an
 // [platform.ImportTx].
@@ -219,6 +310,83 @@ func fundedSharedMemory(
 	}
 
 	return sm
+}
+
+// TestStandardExecutorExportTxErrors verifies the failure cases of
+// [platform.ExportTx] execution.
+func TestStandardExecutorExportTxErrors(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
+
+	tests := []struct {
+		name     string
+		want     error
+		updateTx func(*platform.Tx)
+	}{
+		{
+			name: "tx_fails_syntactic_verification",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.ExportTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "export_to_same_chain",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.ExportTx).DestinationChain = env.ctx.ChainID
+			},
+			want: verify.ErrSameChainID,
+		},
+		{
+			name: "flow_checker_failed",
+			updateTx: func(tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.ExportTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			want: utxo.ErrInsufficientUnlockedFunds,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// The tx spends AVAX, so issue each tx from a fresh wallet to keep
+			// the wallet's UTXO view consistent with env.state.
+			wallet := newWallet(t, env, walletConfig{})
+			tx, err := wallet.IssueExportTx(
+				env.ctx.XChainID,
+				[]*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt:          units.Avax,
+						OutputOwners: *newOwner(),
+					},
+				}},
+			)
+			require.NoError(t, err)
+
+			diff, got := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(t, got)
+
+			if tt.updateTx != nil {
+				tt.updateTx(tx)
+			}
+
+			feeCalculator := state.PickFeeCalculator(env.config, diff)
+			_, _, _, got = StandardTx(
+				&env.backend,
+				feeCalculator,
+				tx,
+				diff,
+			)
+
+			require.ErrorIs(t, got, tt.want)
+		})
+	}
 }
 
 // TestStandardExecutorExportTx verifies the successful execution of an
