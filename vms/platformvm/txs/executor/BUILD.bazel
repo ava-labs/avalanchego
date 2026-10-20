@@ -120,7 +120,6 @@ go_test(
         "//vms/platformvm/warp/message",
         "//vms/platformvm/warp/payload",
         "//vms/secp256k1fx",
-        "//vms/types",
         "//wallet/chain/p/builder",
         "//wallet/chain/p/wallet",
         "//wallet/subnet/primary/common",
