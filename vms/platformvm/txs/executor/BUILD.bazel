@@ -56,7 +56,6 @@ go_test(
     name = "executor_test",
     srcs = [
         "advance_time_test.go",
-        "create_chain_test.go",
         "export_test.go",
         "helpers_test.go",
         "import_test.go",
@@ -67,6 +66,7 @@ go_test(
         "staking_rules_test.go",
         "standard_tx_executor_l1_test.go",
         "standard_tx_executor_staking_test.go",
+        "standard_tx_executor_subnet_test.go",
         "standard_tx_executor_test.go",
         "state_changes_test.go",
         "warp_verifier_test.go",
