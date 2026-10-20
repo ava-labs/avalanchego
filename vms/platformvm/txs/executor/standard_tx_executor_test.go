@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"errors"
 	"math"
 	"math/rand"
 	"testing"
@@ -30,8 +29,6 @@ import (
 // This tests that the math performed during TransformSubnetTx execution can
 // never overflow
 const _ time.Duration = math.MaxUint32 * time.Second
-
-var errTest = errors.New("non-nil error")
 
 // Verifies that [AddValidatorTx] and [AddDelegatorTx] are disabled post-Durango
 func TestDurangoDisabledTransactions(t *testing.T) {

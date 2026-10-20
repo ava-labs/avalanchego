@@ -9,32 +9,22 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxo/utxomock"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
@@ -1080,169 +1070,53 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 	}
 }
 
-// Returns a RemoveSubnetValidatorTx that passes syntactic verification.
-// Memo field is empty as required post Durango activation
-func newRemoveSubnetValidatorTx(t *testing.T) (*platform.RemoveSubnetValidatorTx, *platform.Tx) {
-	t.Helper()
-
-	creds := []verify.Verifiable{
-		&secp256k1fx.Credential{
-			Sigs: make([][65]byte, 1),
-		},
-		&secp256k1fx.Credential{
-			Sigs: make([][65]byte, 1),
-		},
-	}
-	unsignedTx := &platform.RemoveSubnetValidatorTx{
-		BaseTx: platform.BaseTx{
-			BaseTx: avax.BaseTx{
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID: ids.GenerateTestID(),
-					},
-					Asset: avax.Asset{
-						ID: ids.GenerateTestID(),
-					},
-					In: &secp256k1fx.TransferInput{
-						Amt: 1,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{0, 1},
-						},
-					},
-				}},
-				Outs: []*avax.TransferableOutput{
-					{
-						Asset: avax.Asset{
-							ID: ids.GenerateTestID(),
-						},
-						Out: &secp256k1fx.TransferOutput{
-							Amt: 1,
-							OutputOwners: secp256k1fx.OutputOwners{
-								Threshold: 1,
-								Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-							},
-						},
-					},
-				},
-			},
-		},
-		Subnet: ids.GenerateTestID(),
-		NodeID: ids.GenerateTestNodeID(),
-		SubnetAuth: &secp256k1fx.Credential{
-			Sigs: make([][65]byte, 1),
-		},
-	}
-	tx := &platform.Tx{
-		Unsigned: unsignedTx,
-		Creds:    creds,
-	}
-	require.NoError(t, tx.Initialize(platform.Codec))
-	return unsignedTx, tx
-}
-
-// mock implementations that can be used in tests
-// for verifying RemoveSubnetValidatorTx.
-type removeSubnetValidatorTxVerifyEnv struct {
-	latestForkTime time.Time
-	fx             *fxmock.Fx
-	flowChecker    *utxomock.Verifier
-	unsignedTx     *platform.RemoveSubnetValidatorTx
-	tx             *platform.Tx
-	state          *state.Diff
-	staker         *state.Staker
-}
-
-// Returns mock implementations that can be used in tests
-// for verifying RemoveSubnetValidatorTx.
-func newValidRemoveSubnetValidatorTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) removeSubnetValidatorTxVerifyEnv {
-	t.Helper()
-
-	now := time.Now()
-	mockFx := fxmock.NewFx(ctrl)
-	mockFlowChecker := utxomock.NewVerifier(ctrl)
-	unsignedTx, tx := newRemoveSubnetValidatorTx(t)
-	s := statetest.New(t, statetest.Config{})
-	stateDiff, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
-	require.NoError(t, err)
-
-	return removeSubnetValidatorTxVerifyEnv{
-		latestForkTime: now,
-		fx:             mockFx,
-		flowChecker:    mockFlowChecker,
-		unsignedTx:     unsignedTx,
-		tx:             tx,
-		state:          stateDiff,
-		staker: &state.Staker{
-			TxID:     ids.GenerateTestID(),
-			NodeID:   unsignedTx.NodeID,
-			SubnetID: unsignedTx.Subnet,
-			Priority: platform.SubnetPermissionedValidatorCurrentPriority,
-		},
-	}
-}
-
 func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
+	var (
+		env    = newEnvironment(t, upgradetest.Etna)
+		wallet = newWallet(t, env, walletConfig{
+			subnetIDs: []ids.ID{testSubnet1.ID()},
+		})
+		nodeID = genesistest.DefaultNodeIDs[0]
+	)
+
+	testSubnetID := ids.GenerateTestID()
+
 	type test struct {
 		name            string
-		newExecutor     func(*gomock.Controller) (*platform.RemoveSubnetValidatorTx, *standardTxExecutor)
-		stateAssertions func(*testing.T, state.Chain, *platform.Tx)
+		updateTx        func(*platform.Tx)
+		updateStaker    func(*state.Staker)
+		updateState     func(*state.Diff)
+		stateAssertions func(*testing.T, *state.Diff, *platform.Tx)
 		expectedErr     error
 	}
 
 	tests := []test{
 		{
 			name: "valid tx",
-			newExecutor: func(ctrl *gomock.Controller) (*platform.RemoveSubnetValidatorTx, *standardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				env.state.SetTimestamp(env.latestForkTime)
-				require.NoError(t, env.state.PutCurrentValidator(env.staker))
-				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
+			updateState: func(diff *state.Diff) {
 				// This isn't actually called, but is added here as a regression
 				// test to ensure that converted subnets can still remove
 				// permissioned validators.
-				env.state.SetSubnetToL1Conversion(env.unsignedTx.Subnet, state.SubnetToL1Conversion{
+				diff.SetSubnetToL1Conversion(testSubnet1.ID(), state.SubnetToL1Conversion{
 					ConversionID: ids.GenerateTestID(),
 					ChainID:      ids.GenerateTestID(),
 					Addr:         []byte("address"),
 				})
-				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
-				env.flowChecker.EXPECT().VerifySpend(
-					env.unsignedTx, env.state, env.unsignedTx.Ins, env.unsignedTx.Outs, env.tx.Creds[:len(env.tx.Creds)-1], gomock.Any(),
-				).Return(nil).Times(1)
-
-				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
-				}
-				feeCalculator := txfee.NewSimpleCalculator(0)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
 			},
-			stateAssertions: func(t *testing.T, state state.Chain, sTx *platform.Tx) {
+			stateAssertions: func(t *testing.T, diff *state.Diff, sTx *platform.Tx) {
 				tx := sTx.Unsigned.(*platform.RemoveSubnetValidatorTx)
 				// assert that the validator was removed from the current validator set
-				_, err := state.GetCurrentValidator(tx.Subnet, tx.NodeID)
+				_, err := diff.GetCurrentValidator(tx.Subnet, tx.NodeID)
 				require.ErrorIs(t, err, database.ErrNotFound)
 
 				// assert the utxos inputs were deleted
 				for _, utxo := range tx.Ins {
-					_, err := state.GetUTXO(utxo.InputID())
+					_, err := diff.GetUTXO(utxo.InputID())
 					require.ErrorIs(t, err, database.ErrNotFound)
 				}
 
 				for _, expectedOut := range sTx.UTXOs() {
-					utxo, err := state.GetUTXO(expectedOut.InputID())
+					utxo, err := diff.GetUTXO(expectedOut.InputID())
 					require.NoError(t, err)
 
 					require.Equal(t, expectedOut.Out, utxo.Out)
@@ -1252,201 +1126,64 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 		},
 		{
 			name: "tx fails syntactic verification",
-			newExecutor: func(ctrl *gomock.Controller) (*platform.RemoveSubnetValidatorTx, *standardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				// Setting the subnet ID to the Primary Network ID makes the tx fail syntactic verification
-				env.tx.Unsigned.(*platform.RemoveSubnetValidatorTx).Subnet = constants.PrimaryNetworkID
-
-				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-				}
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
+			updateTx: func(tx *platform.Tx) {
+				// Setting the subnet to the primary network ID makes the tx
+				// syntactically invalid
+				tx.Unsigned.(*platform.RemoveSubnetValidatorTx).Subnet = constants.PrimaryNetworkID
 			},
 			expectedErr: platform.ErrRemovePrimaryNetworkValidator,
 		},
 		{
 			name: "node isn't a validator of the subnet",
-			newExecutor: func(ctrl *gomock.Controller) (*platform.RemoveSubnetValidatorTx, *standardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-
-				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-				}
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
+			updateStaker: func(staker *state.Staker) {
+				staker.NodeID = ids.GenerateTestNodeID()
 			},
 			expectedErr: errNotValidator,
 		},
 		{
 			name: "validator is permissionless",
-			newExecutor: func(ctrl *gomock.Controller) (*platform.RemoveSubnetValidatorTx, *standardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-
-				staker := *env.staker
+			updateStaker: func(staker *state.Staker) {
 				staker.Priority = platform.SubnetPermissionlessValidatorCurrentPriority
-
-				env.state.SetTimestamp(env.latestForkTime)
-				require.NoError(t, env.state.PutCurrentValidator(&staker))
-
-				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-				}
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
 			},
 			expectedErr: errRemovePermissionlessValidator,
 		},
 		{
 			name: "can't find subnet",
-			newExecutor: func(ctrl *gomock.Controller) (*platform.RemoveSubnetValidatorTx, *standardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				require.NoError(t, env.state.PutCurrentValidator(env.staker))
-
-				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-				}
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.RemoveSubnetValidatorTx).Subnet = testSubnetID
+			},
+			updateStaker: func(staker *state.Staker) {
+				staker.SubnetID = testSubnetID
 			},
 			expectedErr: database.ErrNotFound,
 		},
 		{
 			name: "tx has no credentials",
-			newExecutor: func(ctrl *gomock.Controller) (*platform.RemoveSubnetValidatorTx, *standardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				// Remove credentials
-				env.tx.Creds = nil
-				require.NoError(t, env.state.PutCurrentValidator(env.staker))
-				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
-
-				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-				}
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
+			updateTx: func(tx *platform.Tx) {
+				tx.Creds = nil
 			},
 			expectedErr: errWrongNumberOfCredentials,
 		},
 		{
 			name: "no permission to remove validator",
-			newExecutor: func(ctrl *gomock.Controller) (*platform.RemoveSubnetValidatorTx, *standardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				require.NoError(t, env.state.PutCurrentValidator(env.staker))
-				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
-				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(errTest)
-
-				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-				}
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
+			updateTx: func(tx *platform.Tx) {
+				// Remove a signature from the subnet auth credential
+				cred := tx.Creds[len(tx.Creds)-1].(*secp256k1fx.Credential)
+				cred.Sigs = cred.Sigs[1:]
 			},
 			expectedErr: errUnauthorizedModification,
 		},
 		{
 			name: "flow checker failed",
-			newExecutor: func(ctrl *gomock.Controller) (*platform.RemoveSubnetValidatorTx, *standardTxExecutor) {
-				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
-				require.NoError(t, env.state.PutCurrentValidator(env.staker))
-				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
-				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
-				env.flowChecker.EXPECT().VerifySpend(
-					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
-				).Return(errTest)
-
-				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-				}
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+			updateTx: func(tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.RemoveSubnetValidatorTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
 					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
+				})
 			},
 			expectedErr: errFlowCheckFailed,
 		},
@@ -1455,14 +1192,46 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
 
-			unsignedTx, executor := tt.newExecutor(ctrl)
-			err := executor.RemoveSubnetValidatorTx(unsignedTx)
+			tx, err := wallet.IssueRemoveSubnetValidatorTx(
+				nodeID,
+				testSubnet1.ID(),
+			)
+			require.NoError(err)
+
+			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+			require.NoError(err)
+
+			if tt.updateTx != nil {
+				tt.updateTx(tx)
+			}
+
+			staker := &state.Staker{
+				TxID:     ids.GenerateTestID(),
+				NodeID:   nodeID,
+				SubnetID: testSubnet1.ID(),
+				Priority: platform.SubnetPermissionedValidatorCurrentPriority,
+			}
+			if tt.updateStaker != nil {
+				tt.updateStaker(staker)
+			}
+			require.NoError(diff.PutCurrentValidator(staker))
+
+			if tt.updateState != nil {
+				tt.updateState(diff)
+			}
+
+			feeCalculator := state.PickFeeCalculator(env.config, env.state)
+			_, _, _, err = StandardTx(
+				&env.backend,
+				feeCalculator,
+				tx,
+				diff,
+			)
 			require.ErrorIs(err, tt.expectedErr)
 
 			if tt.stateAssertions != nil {
-				tt.stateAssertions(t, executor.state, executor.tx)
+				tt.stateAssertions(t, diff, tx)
 			}
 		})
 	}

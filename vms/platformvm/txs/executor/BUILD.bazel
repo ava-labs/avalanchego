@@ -105,7 +105,6 @@ go_test(
         "//vms/components/verify",
         "//vms/platformvm/config",
         "//vms/platformvm/fx",
-        "//vms/platformvm/fx/fxmock",
         "//vms/platformvm/genesis/genesistest",
         "//vms/platformvm/platform",
         "//vms/platformvm/reward",
@@ -116,7 +115,6 @@ go_test(
         "//vms/platformvm/txs/fee",
         "//vms/platformvm/txs/txstest",
         "//vms/platformvm/utxo",
-        "//vms/platformvm/utxo/utxomock",
         "//vms/platformvm/validators/fee",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/message",
@@ -127,6 +125,5 @@ go_test(
         "//wallet/chain/p/wallet",
         "//wallet/subnet/primary/common",
         "@com_github_stretchr_testify//require",
-        "@org_uber_go_mock//gomock",
     ],
 )
