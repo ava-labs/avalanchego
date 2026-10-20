@@ -400,6 +400,20 @@ type Wallet interface {
 		options ...common.Option,
 	) (*platform.Tx, error)
 
+	// IssueCancelAutoRenewedValidatorStakeDecreaseTx creates, signs, and
+	// issues a transaction to cancel a pending stake decrease of an existing
+	// auto-renewed validator, so that the stake stays staked.
+	//
+	// - txID is the transaction ID of the AddAutoRenewedValidatorTx that
+	//   created the validator.
+	// - stakeDecreaseTxID is the transaction ID of the
+	//   DecreaseAutoRenewedValidatorStakeTx to cancel.
+	IssueCancelAutoRenewedValidatorStakeDecreaseTx(
+		txID ids.ID,
+		stakeDecreaseTxID ids.ID,
+		options ...common.Option,
+	) (*platform.Tx, error)
+
 	// IssueUnsignedTx signs and issues the unsigned tx.
 	IssueUnsignedTx(
 		utx platform.UnsignedTx,
@@ -785,6 +799,22 @@ func (w *wallet) IssueDecreaseAutoRenewedValidatorStakeTx(
 	utx, err := w.builder.NewDecreaseAutoRenewedValidatorStakeTx(
 		txID,
 		amount,
+		options...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return w.IssueUnsignedTx(utx, options...)
+}
+
+func (w *wallet) IssueCancelAutoRenewedValidatorStakeDecreaseTx(
+	txID ids.ID,
+	stakeDecreaseTxID ids.ID,
+	options ...common.Option,
+) (*platform.Tx, error) {
+	utx, err := w.builder.NewCancelAutoRenewedValidatorStakeDecreaseTx(
+		txID,
+		stakeDecreaseTxID,
 		options...,
 	)
 	if err != nil {

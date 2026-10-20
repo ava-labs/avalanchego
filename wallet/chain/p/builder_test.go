@@ -1165,6 +1165,52 @@ func TestDecreaseAutoRenewedValidatorStakeTx(t *testing.T) {
 	require.Equal(wantTx, gotTx)
 }
 
+func TestCancelAutoRenewedValidatorStakeDecreaseTx(t *testing.T) {
+	var (
+		require = require.New(t)
+
+		stakeDecreaseTxID = ids.GenerateTestID()
+
+		chainUTXOs = utxotest.NewDeterministicChainUTXOs(t, map[ids.ID][]*avax.UTXO{
+			constants.PlatformChainID: utxos,
+		})
+		backend = wallet.NewBackend(chainUTXOs, validationOwners)
+		builder = builder.New(set.Of(utxoAddr, validationAuthAddr), testContextPostEtna, backend)
+	)
+
+	gotTx, err := builder.NewCancelAutoRenewedValidatorStakeDecreaseTx(
+		validationID,
+		stakeDecreaseTxID,
+	)
+	require.NoError(err)
+	requireFeeIsCorrect(
+		require,
+		dynamicFeeCalculator,
+		gotTx,
+		&gotTx.BaseTx.BaseTx,
+		nil,
+		nil,
+		nil,
+	)
+
+	require.Equal(testContextPostEtna.NetworkID, gotTx.NetworkID)
+	require.Equal(constants.PlatformChainID, gotTx.BlockchainID)
+	require.Nil(gotTx.Memo)
+
+	// BaseTx is asserted separately because UTXO selection is fee-dependent
+	// and checked by requireFeeIsCorrect above.
+	gotTx.BaseTx = platform.BaseTx{}
+
+	wantTx := &platform.CancelAutoRenewedValidatorStakeDecreaseTx{
+		TxID:              validationID,
+		StakeDecreaseTxID: stakeDecreaseTxID,
+		Auth: &secp256k1fx.Input{
+			SigIndices: []uint32{0},
+		},
+	}
+	require.Equal(wantTx, gotTx)
+}
+
 func makeTestUTXOs(utxosKey *secp256k1.PrivateKey) []*avax.UTXO {
 	// Note: we avoid ids.GenerateTestNodeID here to make sure that UTXO IDs
 	// won't change run by run. This simplifies checking what utxos are included
