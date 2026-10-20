@@ -20,4 +20,5 @@ go_library(
 go_binary(
     name = "plugin",
     embed = [":plugin_lib"],
+    visibility = ["//bazel/image:__pkg__"],
 )

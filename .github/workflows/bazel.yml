@@ -97,7 +97,46 @@ jobs:
           setup-qemu: 'true'
           docker-username: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_USERNAME || '' }}
           docker-password: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_PASSWORD || '' }}
-          run: BAZEL_IMAGE_REPOSITORY_CACHE="$HOME/.cache/bazel-repository-cache" ./scripts/run_task.sh bazel-test-build-image
+          run: BAZEL_IMAGE_REPOSITORY_CACHE="$HOME/.cache/bazel-repository-cache" ./scripts/run_task.sh bazel-test-build-image-avalanchego
+      - name: Save AvalancheGo image Docker cache
+        if: ${{ runner.os == 'Linux' && steps.avalanchego-image-docker-cache-policy.outputs.cache-save-allowed == 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/avalanchego-bazel-image/docker-images.tar
+          key: ${{ steps.avalanchego-image-docker-cache-key.outputs.key }}
+
+  build-subnet-evm-image:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.image_timeout_minutes }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-bazel
+      - id: avalanchego-image-docker-cache-key
+        if: ${{ runner.os == 'Linux' }}
+        run: ./scripts/workflow-avalanchego-image-docker-cache-key.sh
+      - id: restore-avalanchego-image-docker-cache
+        if: ${{ runner.os == 'Linux' }}
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ runner.temp }}/avalanchego-bazel-image/docker-images.tar
+          key: ${{ steps.avalanchego-image-docker-cache-key.outputs.key }}
+      - id: avalanchego-image-docker-cache-policy
+        if: ${{ runner.os == 'Linux' }}
+        uses: ./.github/actions/cache-policy
+        with:
+          request-cache-save: ${{ steps.restore-avalanchego-image-docker-cache.outputs.cache-hit != 'true' }}
+      - name: Test multi-platform Subnet-EVM image with Bazel
+        if: ${{ runner.os == 'Linux' }}
+        uses: ./.github/actions/run-docker-with-disk-space
+        env:
+          BAZEL_IMAGE_DOCKER_CACHE_ARCHIVE: ${{ runner.temp }}/avalanchego-bazel-image/docker-images.tar
+          BAZEL_IMAGE_WRITE_DOCKER_CACHE: ${{ steps.avalanchego-image-docker-cache-policy.outputs.cache-save-allowed }}
+        with:
+          setup-qemu: 'true'
+          docker-username: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_USERNAME || '' }}
+          docker-password: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_PASSWORD || '' }}
+          run: BAZEL_IMAGE_REPOSITORY_CACHE="$HOME/.cache/bazel-repository-cache" ./scripts/run_task.sh bazel-test-build-image-subnet-evm
       - name: Save AvalancheGo image Docker cache
         if: ${{ runner.os == 'Linux' && steps.avalanchego-image-docker-cache-policy.outputs.cache-save-allowed == 'true' }}
         uses: actions/cache/save@v5
