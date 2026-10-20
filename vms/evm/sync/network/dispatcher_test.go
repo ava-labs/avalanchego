@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -88,7 +87,7 @@ func TestDispatcher_SendBytes(t *testing.T) {
 				return
 			}
 
-			assert.Empty(t, cmp.Diff(tt.want, got, protocmp.Transform()), "cmp.Diff(want, got)")
+			require.Empty(t, cmp.Diff(tt.want, got, protocmp.Transform()), "cmp.Diff(want, got)")
 		})
 	}
 }
@@ -121,7 +120,7 @@ func TestDispatcher_CancelInFlight(t *testing.T) {
 
 	_, err = c.sendBytes(ctx, reqBytes, acceptLeaf)
 	require.ErrorIsf(t, err, context.Canceled, "%T.sendBytes()", c)
-	assert.Truef(t, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
+	require.Truef(t, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
 }
 
 // Success scores the peer responsive, failure de-scores it. De-score rows
@@ -183,7 +182,7 @@ func TestDispatcher_PeerScoring(t *testing.T) {
 
 				// The client scores after onResponse delivers the result.
 				synctest.Wait()
-				assert.Equalf(t, tt.wantResponsive, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
+				require.Equalf(t, tt.wantResponsive, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
 			})
 		})
 	}
