@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -33,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
@@ -362,11 +364,14 @@ func deleteUTXOsOwnedBy(t testing.TB, env *environment, diff *state.Diff, key *s
 	}
 }
 
-func must[T any](t require.TestingT) func(T, error) T {
-	return func(val T, err error) T {
-		require.NoError(t, err)
-		return val
-	}
+func newProofOfPossession(t testing.TB) *signer.ProofOfPossession {
+	t.Helper()
+
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
+	return pop
 }
 
 func newAdvanceTimeTx(t testing.TB, timestamp time.Time) *platform.Tx {
@@ -377,4 +382,30 @@ func newAdvanceTimeTx(t testing.TB, timestamp time.Time) *platform.Tx {
 	require.NoError(t, err)
 	require.NoError(t, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID)))
 	return tx
+}
+
+func newRewardValidatorTx(t testing.TB, txID ids.ID) *platform.Tx {
+	t.Helper()
+
+	utx := &platform.RewardValidatorTx{TxID: txID}
+	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
+	require.NoError(t, err)
+	require.NoError(t, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID)))
+	return tx
+}
+
+func newRewardAutoRenewedValidatorTx(t testing.TB, txID ids.ID, timestamp time.Time) *platform.Tx {
+	t.Helper()
+
+	utx := &platform.RewardAutoRenewedValidatorTx{TxID: txID, Timestamp: uint64(timestamp.Unix())}
+	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
+	require.NoError(t, err)
+	return tx
+}
+
+func must[T any](t require.TestingT) func(T, error) T {
+	return func(val T, err error) T {
+		require.NoError(t, err)
+		return val
+	}
 }
