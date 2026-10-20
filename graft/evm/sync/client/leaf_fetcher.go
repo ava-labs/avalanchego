@@ -14,7 +14,7 @@ import (
 )
 
 // LeafFetcher reads leaf ranges over the message protocol. One [Client] serves both
-// the state and atomic tries, so the node type is fixed per syncer, not per client.
+// LeafFetcher reads leaf ranges over the message protocol.
 type LeafFetcher struct {
 	client   types.LeafClient
 	nodeType message.NodeType
