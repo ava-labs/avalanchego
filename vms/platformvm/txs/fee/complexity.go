@@ -266,6 +266,15 @@ var (
 		gas.DBRead:  2, // read tx + read stake increase tx
 		gas.DBWrite: 1, // update staker
 	}
+	IntrinsicCancelAutoRenewedValidatorStakeDecreaseTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.IDLen + // txID
+			ids.IDLen + // stakeDecreaseTxID
+			wrappers.IntLen + // auth typeID
+			wrappers.IntLen, // authCredential typeID
+		gas.DBRead:  2, // read tx + read stake decrease tx
+		gas.DBWrite: 1, // update staker
+	}
 	IntrinsicDecreaseAutoRenewedValidatorStakeTxComplexities = gas.Dimensions{
 		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
 			ids.IDLen + // txID
@@ -922,6 +931,22 @@ func (c *complexityVisitor) IncreaseAutoRenewedValidatorStakeTx(tx *platform.Inc
 		&baseTxComplexity,
 		&authComplexity,
 		&outputsComplexity,
+	)
+	return err
+}
+
+func (c *complexityVisitor) CancelAutoRenewedValidatorStakeDecreaseTx(tx *platform.CancelAutoRenewedValidatorStakeDecreaseTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	authComplexity, err := AuthComplexity(tx.Auth)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicCancelAutoRenewedValidatorStakeDecreaseTxComplexities.Add(
+		&baseTxComplexity,
+		&authComplexity,
 	)
 	return err
 }

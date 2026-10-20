@@ -178,6 +178,10 @@ func (*proposalTxExecutor) DecreaseAutoRenewedValidatorStakeTx(*platform.Decreas
 	return ErrWrongTxType
 }
 
+func (*proposalTxExecutor) CancelAutoRenewedValidatorStakeDecreaseTx(*platform.CancelAutoRenewedValidatorStakeDecreaseTx) error {
+	return ErrWrongTxType
+}
+
 func (e *proposalTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 	// AddValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddValidatorTxs must be issued into

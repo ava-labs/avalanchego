@@ -42,4 +42,5 @@ type TxVisitor interface {
 	IncreaseAutoRenewedValidatorStakeTx(*IncreaseAutoRenewedValidatorStakeTx) error
 	CancelAutoRenewedValidatorStakeIncreaseTx(*CancelAutoRenewedValidatorStakeIncreaseTx) error
 	DecreaseAutoRenewedValidatorStakeTx(*DecreaseAutoRenewedValidatorStakeTx) error
+	CancelAutoRenewedValidatorStakeDecreaseTx(*CancelAutoRenewedValidatorStakeDecreaseTx) error
 }
