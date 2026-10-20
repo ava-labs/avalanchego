@@ -5055,10 +5055,3 @@ func TestStandardExecutorRewardAutoRenewedValidatorTx(t *testing.T) {
 	)
 	require.ErrorIs(t, err, errWrongTxType)
 }
-
-func must[T any](t require.TestingT) func(T, error) T {
-	return func(val T, err error) T {
-		require.NoError(t, err)
-		return val
-	}
-}
