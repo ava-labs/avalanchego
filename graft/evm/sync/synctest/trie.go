@@ -59,8 +59,8 @@ func FillAccountsWithOverlappingStorage(
 // Returns the root of the generated trie, the slice of keys inserted into the trie in lexicographical
 // order, and the slice of corresponding values.
 //
-// This is safe for use with HashDB, intended for use creating a storage trie independent of an account,
-// or for an atomic trie.
+// This is safe for use with HashDB, intended for use creating a storage trie
+// independent of an account.
 func GenerateIndependentTrie(t *testing.T, r *rand.Rand, trieDB *triedb.Database, numKeys int) (common.Hash, [][]byte, [][]byte) {
 	testTrie, err := trie.New(trie.TrieID(types.EmptyRootHash), trieDB)
 	require.NoError(t, err)
