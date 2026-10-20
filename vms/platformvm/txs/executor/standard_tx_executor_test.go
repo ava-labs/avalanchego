@@ -4,7 +4,7 @@
 package executor
 
 import (
-	"math"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -26,83 +26,36 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
 
-// This tests that the math performed during TransformSubnetTx execution can
-// never overflow
-const _ time.Duration = math.MaxUint32 * time.Second
-
-// Verifies that [AddValidatorTx] and [AddDelegatorTx] are disabled post-Durango
+// Verifies that [platform.AddValidatorTx] and [platform.AddDelegatorTx] are disabled post-Durango
 func TestDurangoDisabledTransactions(t *testing.T) {
-	type test struct {
-		name        string
-		buildTx     func(t *testing.T, env *environment) *platform.Tx
-		expectedErr error
+	env := newEnvironment(t, upgradetest.Durango)
+	wallet := newWallet(t, env, walletConfig{})
+
+	validator := &platform.Validator{
+		NodeID: ids.GenerateTestNodeID(),
+		Start:  genesistest.DefaultValidatorStartTimeUnix,
+		End:    genesistest.DefaultValidatorEndTimeUnix,
+		Wght:   env.config.MinValidatorStake,
 	}
 
-	rewardsOwner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-	}
-
-	tests := []test{
+	tests := []struct {
+		name string
+		tx   func() (*platform.Tx, error)
+		want error
+	}{
 		{
 			name: "AddValidatorTx",
-			buildTx: func(t *testing.T, env *environment) *platform.Tx {
-				var (
-					nodeID    = ids.GenerateTestNodeID()
-					chainTime = env.state.GetTimestamp()
-					endTime   = chainTime.Add(defaultMaxStakingDuration)
-				)
-
-				wallet := newWallet(t, env, walletConfig{})
-				tx, err := wallet.IssueAddValidatorTx(
-					&platform.Validator{
-						NodeID: nodeID,
-						Start:  0,
-						End:    uint64(endTime.Unix()),
-						Wght:   defaultMinValidatorStake,
-					},
-					rewardsOwner,
-					reward.PercentDenominator,
-				)
-				require.NoError(t, err)
-
-				return tx
+			tx: func() (*platform.Tx, error) {
+				return wallet.IssueAddValidatorTx(validator, newOwner(), reward.PercentDenominator)
 			},
-			expectedErr: errAddValidatorTxPostDurango,
+			want: errAddValidatorTxPostDurango,
 		},
 		{
 			name: "AddDelegatorTx",
-			buildTx: func(t *testing.T, env *environment) *platform.Tx {
-				require := require.New(t)
-
-				var primaryValidator *state.Staker
-				it, err := env.state.GetCurrentStakerIterator()
-				require.NoError(err)
-				for it.Next() {
-					staker := it.Value()
-					if staker.Priority != platform.PrimaryNetworkValidatorCurrentPriority {
-						continue
-					}
-					primaryValidator = staker
-					break
-				}
-				it.Release()
-
-				wallet := newWallet(t, env, walletConfig{})
-				tx, err := wallet.IssueAddDelegatorTx(
-					&platform.Validator{
-						NodeID: primaryValidator.NodeID,
-						Start:  0,
-						End:    uint64(primaryValidator.EndTime.Unix()),
-						Wght:   defaultMinValidatorStake,
-					},
-					rewardsOwner,
-				)
-				require.NoError(err)
-
-				return tx
+			tx: func() (*platform.Tx, error) {
+				return wallet.IssueAddDelegatorTx(validator, newOwner())
 			},
-			expectedErr: errAddDelegatorTxPostDurango,
+			want: errAddDelegatorTxPostDurango,
 		},
 	}
 
@@ -110,134 +63,78 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, upgradetest.Durango)
-			env.ctx.Lock.Lock()
-			defer env.ctx.Lock.Unlock()
-
-			onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
+			tx, err := tt.tx()
 			require.NoError(err)
 
-			tx := tt.buildTx(t, env)
-			feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
+			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(err)
+
+			feeCalculator := state.PickFeeCalculator(env.config, diff)
 			_, _, _, err = StandardTx(
 				&env.backend,
 				feeCalculator,
 				tx,
-				onAcceptState,
+				diff,
 			)
-			require.ErrorIs(err, tt.expectedErr)
+			require.ErrorIs(err, tt.want)
 		})
 	}
 }
 
-// Verifies that the Memo field is required to be empty post-Durango
+// TestDurangoMemoField verifies that post-Durango, txs with a non-empty memo
+// field are rejected.
 func TestDurangoMemoField(t *testing.T) {
-	type test struct {
-		name      string
-		setupTest func(t *testing.T, env *environment, memoField []byte) (*platform.Tx, *state.Diff)
-	}
+	env := newEnvironment(t, upgradetest.Durango)
+	wallet := newWallet(t, env, walletConfig{})
 
-	owners := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-	}
+	owners := newOwner()
+	memoOpt := common.WithMemo([]byte{'m'})
 
-	tests := []test{
+	tests := []struct {
+		tx func() (*platform.Tx, error)
+	}{
 		{
-			name: "AddSubnetValidatorTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*platform.Tx, *state.Diff) {
-				require := require.New(t)
-
-				var primaryValidator *state.Staker
-				it, err := env.state.GetCurrentStakerIterator()
-				require.NoError(err)
-				for it.Next() {
-					staker := it.Value()
-					if staker.Priority != platform.PrimaryNetworkValidatorCurrentPriority {
-						continue
-					}
-					primaryValidator = staker
-					break
-				}
-				it.Release()
-
-				subnetID := testSubnet1.ID()
-				wallet := newWallet(t, env, walletConfig{
-					subnetIDs: []ids.ID{subnetID},
-				})
-				tx, err := wallet.IssueAddSubnetValidatorTx(
+			tx: func() (*platform.Tx, error) {
+				return wallet.IssueAddSubnetValidatorTx(
 					&platform.SubnetValidator{
 						Validator: platform.Validator{
-							NodeID: primaryValidator.NodeID,
-							Start:  0,
-							End:    uint64(primaryValidator.EndTime.Unix()),
-							Wght:   defaultMinValidatorStake,
+							NodeID: ids.GenerateTestNodeID(),
+							Start:  uint64(env.state.GetTimestamp().Unix()),
+							End:    uint64(env.state.GetTimestamp().Add(env.config.MinStakeDuration).Unix()),
+							Wght:   env.config.MinValidatorStake,
 						},
-						Subnet: subnetID,
+						Subnet: testSubnet1.ID(),
 					},
-					common.WithMemo(memoField),
+					memoOpt,
 				)
-				require.NoError(err)
-
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(err)
-				return tx, onAcceptState
 			},
 		},
 		{
-			name: "CreateChainTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*platform.Tx, *state.Diff) {
-				require := require.New(t)
-
-				subnetID := testSubnet1.ID()
-				wallet := newWallet(t, env, walletConfig{
-					subnetIDs: []ids.ID{subnetID},
-				})
-
-				tx, err := wallet.IssueCreateChainTx(
-					subnetID,
-					[]byte{},
+			tx: func() (*platform.Tx, error) {
+				return wallet.IssueCreateChainTx(
+					testSubnet1.ID(),
+					nil,
 					ids.GenerateTestID(),
-					[]ids.ID{},
+					nil,
 					"aaa",
-					common.WithMemo(memoField),
+					memoOpt,
 				)
-				require.NoError(err)
-
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(err)
-				return tx, onAcceptState
 			},
 		},
 		{
-			name: "CreateSubnetTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*platform.Tx, *state.Diff) {
-				require := require.New(t)
-
-				wallet := newWallet(t, env, walletConfig{})
-				tx, err := wallet.IssueCreateSubnetTx(
-					owners,
-					common.WithMemo(memoField),
-				)
-				require.NoError(err)
-
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(err)
-				return tx, onAcceptState
+			tx: func() (*platform.Tx, error) {
+				return wallet.IssueCreateSubnetTx(owners, memoOpt)
 			},
 		},
 		{
-			name: "ImportTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*platform.Tx, *state.Diff) {
-				require := require.New(t)
-
+			tx: func() (*platform.Tx, error) {
 				var (
 					sourceChain  = env.ctx.XChainID
 					sourceKey    = genesistest.DefaultFundedKeys[1]
 					sourceAmount = 10 * units.Avax
 				)
 
-				sharedMemory := fundedSharedMemory(
+				env.msm.SharedMemory = fundedSharedMemory(
 					t,
 					env,
 					sourceKey,
@@ -247,31 +144,20 @@ func TestDurangoMemoField(t *testing.T) {
 					},
 					rand.NewSource(0),
 				)
-				env.msm.SharedMemory = sharedMemory
 
 				wallet := newWallet(t, env, walletConfig{
 					chainIDs: []ids.ID{sourceChain},
 				})
-
-				tx, err := wallet.IssueImportTx(
+				return wallet.IssueImportTx(
 					sourceChain,
 					owners,
-					common.WithMemo(memoField),
+					memoOpt,
 				)
-				require.NoError(err)
-
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(err)
-				return tx, onAcceptState
 			},
 		},
 		{
-			name: "ExportTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*platform.Tx, *state.Diff) {
-				require := require.New(t)
-
-				wallet := newWallet(t, env, walletConfig{})
-				tx, err := wallet.IssueExportTx(
+			tx: func() (*platform.Tx, error) {
+				return wallet.IssueExportTx(
 					env.ctx.XChainID,
 					[]*avax.TransferableOutput{{
 						Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
@@ -280,85 +166,23 @@ func TestDurangoMemoField(t *testing.T) {
 							OutputOwners: *owners,
 						},
 					}},
-					common.WithMemo(memoField),
+					memoOpt,
 				)
-				require.NoError(err)
-
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(err)
-				return tx, onAcceptState
 			},
 		},
 		{
-			name: "RemoveSubnetValidatorTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*platform.Tx, *state.Diff) {
-				require := require.New(t)
-
-				var primaryValidator *state.Staker
-				it, err := env.state.GetCurrentStakerIterator()
-				require.NoError(err)
-				for it.Next() {
-					staker := it.Value()
-					if staker.Priority != platform.PrimaryNetworkValidatorCurrentPriority {
-						continue
-					}
-					primaryValidator = staker
-					break
-				}
-				it.Release()
-
-				endTime := primaryValidator.EndTime
-
-				subnetID := testSubnet1.ID()
-				wallet := newWallet(t, env, walletConfig{
-					subnetIDs: []ids.ID{subnetID},
-				})
-				subnetValTx, err := wallet.IssueAddSubnetValidatorTx(
-					&platform.SubnetValidator{
-						Validator: platform.Validator{
-							NodeID: primaryValidator.NodeID,
-							Start:  0,
-							End:    uint64(endTime.Unix()),
-							Wght:   genesistest.DefaultValidatorWeight,
-						},
-						Subnet: subnetID,
-					},
+			tx: func() (*platform.Tx, error) {
+				return wallet.IssueRemoveSubnetValidatorTx(
+					genesistest.DefaultNodeIDs[0],
+					testSubnet1.ID(),
+					memoOpt,
 				)
-				require.NoError(err)
-
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(err)
-
-				feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
-				_, _, _, err = StandardTx(
-					&env.backend,
-					feeCalculator,
-					subnetValTx,
-					onAcceptState,
-				)
-				require.NoError(err)
-
-				tx, err := wallet.IssueRemoveSubnetValidatorTx(
-					primaryValidator.NodeID,
-					subnetID,
-					common.WithMemo(memoField),
-				)
-				require.NoError(err)
-				return tx, onAcceptState
 			},
 		},
 		{
-			name: "TransformSubnetTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*platform.Tx, *state.Diff) {
-				require := require.New(t)
-
-				subnetID := testSubnet1.ID()
-				wallet := newWallet(t, env, walletConfig{
-					subnetIDs: []ids.ID{subnetID},
-				})
-
-				tx, err := wallet.IssueTransformSubnetTx(
-					subnetID,                  // subnetID
+			tx: func() (*platform.Tx, error) {
+				return wallet.IssueTransformSubnetTx(
+					testSubnet1.ID(),          // subnetID
 					ids.GenerateTestID(),      // assetID
 					10,                        // initial supply
 					10,                        // max supply
@@ -372,36 +196,26 @@ func TestDurangoMemoField(t *testing.T) {
 					10,                        // min delegator stake
 					1,                         // max validator weight factor
 					80,                        // uptime requirement
-					common.WithMemo(memoField),
+					memoOpt,
 				)
-				require.NoError(err)
-
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(err)
-				return tx, onAcceptState
 			},
 		},
 		{
-			name: "AddPermissionlessValidatorTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*platform.Tx, *state.Diff) {
-				require := require.New(t)
-				var (
-					nodeID    = ids.GenerateTestNodeID()
-					chainTime = env.state.GetTimestamp()
-					endTime   = chainTime.Add(defaultMaxStakingDuration)
-				)
+			tx: func() (*platform.Tx, error) {
 				sk, err := localsigner.New()
-				require.NoError(err)
+				if err != nil {
+					return nil, err
+				}
 				pop, err := signer.NewProofOfPossession(sk)
-				require.NoError(err)
+				if err != nil {
+					return nil, err
+				}
 
-				wallet := newWallet(t, env, walletConfig{})
-				tx, err := wallet.IssueAddPermissionlessValidatorTx(
+				return wallet.IssueAddPermissionlessValidatorTx(
 					&platform.SubnetValidator{
 						Validator: platform.Validator{
-							NodeID: nodeID,
-							Start:  0,
-							End:    uint64(endTime.Unix()),
+							NodeID: ids.GenerateTestNodeID(),
+							End:    uint64(env.state.GetTimestamp().Add(env.config.MaxStakeDuration).Unix()),
 							Wght:   env.config.MinValidatorStake,
 						},
 						Subnet: constants.PrimaryNetworkID,
@@ -411,160 +225,110 @@ func TestDurangoMemoField(t *testing.T) {
 					owners,
 					owners,
 					reward.PercentDenominator,
-					common.WithMemo(memoField),
+					memoOpt,
 				)
-				require.NoError(err)
-
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(err)
-				return tx, onAcceptState
 			},
 		},
 		{
-			name: "AddPermissionlessDelegatorTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*platform.Tx, *state.Diff) {
-				require := require.New(t)
-
-				var primaryValidator *state.Staker
-				it, err := env.state.GetCurrentStakerIterator()
-				require.NoError(err)
-				for it.Next() {
-					staker := it.Value()
-					if staker.Priority != platform.PrimaryNetworkValidatorCurrentPriority {
-						continue
-					}
-					primaryValidator = staker
-					break
-				}
-				it.Release()
-
-				wallet := newWallet(t, env, walletConfig{})
-				tx, err := wallet.IssueAddPermissionlessDelegatorTx(
+			tx: func() (*platform.Tx, error) {
+				return wallet.IssueAddPermissionlessDelegatorTx(
 					&platform.SubnetValidator{
 						Validator: platform.Validator{
-							NodeID: primaryValidator.NodeID,
+							NodeID: genesistest.DefaultNodeIDs[0],
 							Start:  0,
-							End:    uint64(primaryValidator.EndTime.Unix()),
-							Wght:   defaultMinValidatorStake,
+							End:    genesistest.DefaultValidatorEndTimeUnix,
+							Wght:   env.config.MinValidatorStake,
 						},
 						Subnet: constants.PrimaryNetworkID,
 					},
 					env.ctx.AVAXAssetID,
 					owners,
-					common.WithMemo(memoField),
+					memoOpt,
 				)
-				require.NoError(err)
-
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(err)
-				return tx, onAcceptState
 			},
 		},
 		{
-			name: "TransferSubnetOwnershipTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*platform.Tx, *state.Diff) {
-				require := require.New(t)
-
-				subnetID := testSubnet1.ID()
-				wallet := newWallet(t, env, walletConfig{
-					subnetIDs: []ids.ID{subnetID},
-				})
-
-				tx, err := wallet.IssueTransferSubnetOwnershipTx(
-					subnetID,
+			tx: func() (*platform.Tx, error) {
+				return wallet.IssueTransferSubnetOwnershipTx(
+					testSubnet1.ID(),
 					owners,
-					common.WithMemo(memoField),
+					memoOpt,
 				)
-				require.NoError(err)
-
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(err)
-				return tx, onAcceptState
 			},
 		},
 		{
-			name: "BaseTx",
-			setupTest: func(t *testing.T, env *environment, memoField []byte) (*platform.Tx, *state.Diff) {
-				require := require.New(t)
-
-				wallet := newWallet(t, env, walletConfig{})
-				tx, err := wallet.IssueBaseTx(
-					[]*avax.TransferableOutput{
-						{
-							Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
-							Out: &secp256k1fx.TransferOutput{
-								Amt: 1,
-								OutputOwners: secp256k1fx.OutputOwners{
-									Threshold: 1,
-									Addrs:     []ids.ShortID{ids.ShortEmpty},
-								},
-							},
+			tx: func() (*platform.Tx, error) {
+				return wallet.IssueBaseTx(
+					[]*avax.TransferableOutput{{
+						Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+						Out: &secp256k1fx.TransferOutput{
+							Amt:          1,
+							OutputOwners: *owners,
 						},
-					},
-					common.WithMemo(memoField),
+					}},
+					memoOpt,
 				)
-				require.NoError(err)
-
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
-				require.NoError(err)
-				return tx, onAcceptState
 			},
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		tx, err := tt.tx()
+		require.NoError(t, err)
+
+		name := fmt.Sprintf("%T", tx.Unsigned)
+		t.Run(name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, upgradetest.Durango)
-			env.ctx.Lock.Lock()
-			defer env.ctx.Lock.Unlock()
+			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(err)
 
-			feeCalculator := state.PickFeeCalculator(env.config, env.state)
-
-			// Populated memo field should error
-			tx, onAcceptState := tt.setupTest(t, env, []byte{'m', 'e', 'm', 'o'})
-			_, _, _, err := StandardTx(
-				&env.backend,
-				feeCalculator,
-				tx,
-				onAcceptState,
-			)
-			require.ErrorIs(err, avax.ErrMemoTooLarge)
-
-			// Empty memo field should not error
-			tx, onAcceptState = tt.setupTest(t, env, []byte{})
+			feeCalculator := state.PickFeeCalculator(env.config, diff)
 			_, _, _, err = StandardTx(
 				&env.backend,
 				feeCalculator,
 				tx,
-				onAcceptState,
+				diff,
 			)
-			require.NoError(err)
+			require.ErrorIs(err, avax.ErrMemoTooLarge)
 		})
 	}
 }
 
-// Verifies that [TransformSubnetTx] is disabled post-Etna
+// Verifies that [platform.TransformSubnetTx] is disabled post-Etna
 func TestEtnaDisabledTransactions(t *testing.T) {
 	require := require.New(t)
 
 	env := newEnvironment(t, upgradetest.Etna)
-	env.ctx.Lock.Lock()
-	defer env.ctx.Lock.Unlock()
+	wallet := newWallet(t, env, walletConfig{})
 
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
+	tx, err := wallet.IssueTransformSubnetTx(
+		testSubnet1.ID(),
+		ids.GenerateTestID(),
+		10,
+		10,
+		0,
+		reward.PercentDenominator,
+		2,
+		10,
+		time.Minute,
+		time.Hour,
+		1,
+		10,
+		1,
+		80,
+	)
+	require.NoError(err)
+
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, env.state)
-	tx := &platform.Tx{
-		Unsigned: &platform.TransformSubnetTx{},
-	}
 	_, _, _, err = StandardTx(
 		&env.backend,
 		feeCalculator,
 		tx,
-		onAcceptState,
+		diff,
 	)
 	require.ErrorIs(err, errTransformSubnetTxPostEtna)
 }
@@ -582,10 +346,6 @@ func TestStandardExecutorAddPermissionlessValidatorTxFlowCheckFails(t *testing.T
 	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(err)
 
-	rewardsOwner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-	}
 	endTime := env.state.GetTimestamp().Add(defaultMinStakingDuration)
 	tx, err := wallet.IssueAddPermissionlessValidatorTx(
 		&platform.SubnetValidator{
@@ -598,8 +358,8 @@ func TestStandardExecutorAddPermissionlessValidatorTxFlowCheckFails(t *testing.T
 		},
 		pop,
 		env.ctx.AVAXAssetID,
-		rewardsOwner,
-		rewardsOwner,
+		newOwner(),
+		newOwner(),
 		reward.PercentDenominator,
 	)
 	require.NoError(err)
@@ -620,4 +380,38 @@ func TestStandardExecutorAddPermissionlessValidatorTxFlowCheckFails(t *testing.T
 	)
 
 	require.ErrorIs(gotErr, errFlowCheckFailed)
+}
+
+// TestStandardExecutorBaseTx verifies the successful execution of a
+// [platform.BaseTx].
+func TestStandardExecutorBaseTx(t *testing.T) {
+	require := require.New(t)
+
+	env := newEnvironment(t, upgradetest.Latest)
+	wallet := newWallet(t, env, walletConfig{})
+
+	stx, err := wallet.IssueBaseTx(
+		[]*avax.TransferableOutput{{
+			Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+			Out: &secp256k1fx.TransferOutput{
+				Amt:          units.Avax,
+				OutputOwners: *newOwner(),
+			},
+		}},
+	)
+	require.NoError(err)
+
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+
+	feeCalculator := state.PickFeeCalculator(env.config, diff)
+	_, _, _, err = StandardTx(
+		&env.backend,
+		feeCalculator,
+		stx,
+		diff,
+	)
+	require.NoError(err)
+
+	requireBaseTxApplied(t, env, diff, feeCalculator, stx)
 }
