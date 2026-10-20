@@ -55,7 +55,6 @@ go_library(
 go_test(
     name = "executor_test",
     srcs = [
-        "advance_time_test.go",
         "helpers_test.go",
         "proposal_tx_executor_test.go",
         "reward_validator_test.go",
