@@ -574,8 +574,13 @@ category (120s). See Custom Test Macros for how this is wired up.
 
 Tests that are not unit tests (e2e tests, integration tests, load
 tests) must have `tags = ["manual"]` in their BUILD.bazel file. This
-excludes them from `bazel test //...` which should only run unit
-tests.
+excludes them from wildcard commands such as `bazel test //...` and
+`bazel build //...`; those commands should not select non-unit-test work.
+
+Tags do not propagate through dependencies. Targets that exist only to build
+or run a non-unit test, such as a test-binary `genrule` or an E2E `sh_binary`
+runner, must also have `tags = ["manual"]`. Explicit commands, such as
+`bazel run //tests/e2e:e2e_runner`, still select manual targets.
 
 The Go unit-test script excludes equivalent directories during package
 selection. See [`scripts/tests.unit.sh`](../scripts/tests.unit.sh).
