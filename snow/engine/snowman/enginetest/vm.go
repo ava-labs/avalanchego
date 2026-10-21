@@ -16,54 +16,43 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 )
 
-// ErrParentNotAccepted is returned by a block's Verify when the VM is
-// configured with [VM.VerifyRequiresAcceptedParent] and the block's parent has
-// not been accepted yet.
-var ErrParentNotAccepted = errors.New("parent not accepted")
+// ErrUnknownParent is returned by a block's Verify when its parent is neither
+// accepted nor verified.
+var ErrUnknownParent = errors.New("unknown parent")
 
-// VM is a fake [block.ChainVM].
+// VM is a fake [block.ChainVM]
 type VM struct {
 	blocktest.VM
 
-	// Has reports if this node holds a block.
-	// The node always holds its last accepted block.
-	// If nil we have all blocks in the chain.
-	Has func(*snowmantest.Block) bool
+	// VerifyF, if non-nil, is called by a block's Verify after the VM checked
+	// that the block's parent is known. A non-nil error fails verification.
+	VerifyF func(*snowmantest.Block) error
 
-	// RequireAcceptedParentToVerify, when non-nil, gates block verification:
-	// a block for which it returns true fails Verify with [ErrParentNotAccepted]
-	// until its parent has been accepted.
-	RequireAcceptedParentToVerify func(*snowmantest.Block) bool
-
-	// LastAcceptedBlock is the block that LastAccepted returns.
-	// If LastAcceptedBlock is nil, LastAccepted reports the highest accepted block in
-	// the chain.
-	LastAcceptedBlock *snowmantest.Block
-
-	byID            map[ids.ID]*snowmantest.Block
-	byBytes         map[string]*snowmantest.Block
-	byHeight        map[uint64]*snowmantest.Block
-	highestAccepted *snowmantest.Block
+	byBytes          map[string]*snowmantest.Block
+	verified         map[ids.ID]*snowmantest.Block // verified and undecided
+	accepted         map[ids.ID]*snowmantest.Block
+	acceptedByHeight map[uint64]*snowmantest.Block
+	lastAccepted     *snowmantest.Block
 }
 
-// NewVM returns a [VM] for the given chain. The heights must ascend and be contiguous.
+// NewVM returns a [VM] that can parse the given chain. The heights must ascend
+// and be contiguous. The genesis block, and any prefix of [chain] that is
+// already accepted, are the VM's accepted blocks.
 func NewVM(t *testing.T, chain []*snowmantest.Block) *VM {
 	vm := &VM{
-		byID:            make(map[ids.ID]*snowmantest.Block, len(chain)+1),
-		byBytes:         make(map[string]*snowmantest.Block, len(chain)+1),
-		byHeight:        make(map[uint64]*snowmantest.Block, len(chain)+1),
-		highestAccepted: snowmantest.Genesis,
+		byBytes:          make(map[string]*snowmantest.Block, len(chain)+1),
+		verified:         make(map[ids.ID]*snowmantest.Block),
+		accepted:         make(map[ids.ID]*snowmantest.Block, len(chain)+1),
+		acceptedByHeight: make(map[uint64]*snowmantest.Block, len(chain)+1),
 	}
-	for _, blk := range chain {
-		vm.byID[blk.ID()] = blk
-		vm.byBytes[string(blk.Bytes())] = blk
-		vm.byHeight[blk.Height()] = blk
-	}
-	// The genesis block is always available, even if the caller left it out of the
-	// chain.
-	vm.byID[snowmantest.GenesisID] = snowmantest.Genesis
 	vm.byBytes[string(snowmantest.Genesis.Bytes())] = snowmantest.Genesis
-	vm.byHeight[snowmantest.Genesis.Height()] = snowmantest.Genesis
+	vm.markAccepted(snowmantest.Genesis)
+	for _, blk := range chain {
+		vm.byBytes[string(blk.Bytes())] = blk
+		if blk.Status == snowtest.Accepted {
+			vm.markAccepted(blk)
+		}
+	}
 
 	vm.T = t
 	vm.Default(true)
@@ -72,16 +61,24 @@ func NewVM(t *testing.T, chain []*snowmantest.Block) *VM {
 	return vm
 }
 
-// GetBlock returns a block if this node holds it.
+// BuildBlock returns the block built by [VM.BuildBlockF], tracked by the VM.
+func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {
+	blk, err := vm.VM.BuildBlock(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return vm.ParseBlock(ctx, blk.Bytes())
+}
+
+// GetBlock returns a block that is accepted, or verified and not decided.
 func (vm *VM) GetBlock(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-	blk, ok := vm.byID[blkID]
-	if !ok {
-		return nil, database.ErrNotFound
+	if blk, ok := vm.accepted[blkID]; ok {
+		return vm.wrap(blk), nil
 	}
-	if !vm.has(blk) {
-		return nil, database.ErrNotFound
+	if blk, ok := vm.verified[blkID]; ok {
+		return vm.wrap(blk), nil
 	}
-	return vm.wrap(blk), nil
+	return nil, database.ErrNotFound
 }
 
 // ParseBlock returns any block in the chain. It does this even if the node does
@@ -94,64 +91,70 @@ func (vm *VM) ParseBlock(_ context.Context, blkBytes []byte) (snowman.Block, err
 	return vm.wrap(blk), nil
 }
 
-// wrap returns [blk] as-is, or, if the VM is configured to gate its
-// verification on parent acceptance, wrapped so that Verify enforces that.
-func (vm *VM) wrap(blk *snowmantest.Block) snowman.Block {
-	if vm.RequireAcceptedParentToVerify != nil && vm.RequireAcceptedParentToVerify(blk) {
-		return &acceptGatedBlock{Block: blk, vm: vm}
-	}
-	return blk
-}
-
-// acceptGatedBlock is a block whose Verify only succeeds once its parent has
-// been accepted, modeling a VM that verifies against accepted parent state.
-type acceptGatedBlock struct {
-	*snowmantest.Block
-	vm *VM
-}
-
-func (b *acceptGatedBlock) Verify(ctx context.Context) error {
-	if parent, ok := b.vm.byID[b.Parent()]; ok && parent.Status != snowtest.Accepted {
-		return ErrParentNotAccepted
-	}
-	return b.Block.Verify(ctx)
-}
-
-// LastAccepted reports [VM.LastAcceptedBlock]. If [VM.LastAcceptedBlock] is nil,
-// LastAccepted reports the highest accepted block in the chain.
+// LastAccepted returns the last accepted block.
 func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
-	return vm.lastAccepted().ID(), nil
+	return vm.lastAccepted.ID(), nil
 }
 
-// GetBlockIDAtHeight returns the ID of the block at the given height.
+// GetBlockIDAtHeight returns the ID of the accepted block at the given height.
 func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
-	blk, ok := vm.byHeight[height]
-	if !ok || !vm.has(blk) {
+	blk, ok := vm.acceptedByHeight[height]
+	if !ok {
 		return ids.Empty, database.ErrNotFound
 	}
 	return blk.ID(), nil
 }
 
-func (vm *VM) lastAccepted() *snowmantest.Block {
-	if vm.LastAcceptedBlock != nil {
-		return vm.LastAcceptedBlock
-	}
+func (vm *VM) wrap(blk *snowmantest.Block) snowman.Block {
+	return &block{Block: blk, vm: vm}
+}
 
-	// The engine accepts blocks in ascending height order. The search therefore
-	// starts at the highest accepted block that it found before, and does not read
-	// the chain again.
-	for {
-		next, ok := vm.byHeight[vm.highestAccepted.Height()+1]
-		if !ok || next.Status != snowtest.Accepted {
-			return vm.highestAccepted
-		}
-		vm.highestAccepted = next
+func (vm *VM) markAccepted(blk *snowmantest.Block) {
+	delete(vm.verified, blk.ID())
+	vm.accepted[blk.ID()] = blk
+	vm.acceptedByHeight[blk.Height()] = blk
+	if vm.lastAccepted == nil || blk.Height() > vm.lastAccepted.Height() {
+		vm.lastAccepted = blk
 	}
 }
 
-func (vm *VM) has(blk *snowmantest.Block) bool {
-	if blk.ID() == vm.lastAccepted().ID() {
-		return true
+// block is a [snowmantest.Block] whose verification and decision update the
+// state of the [VM] that returned it.
+type block struct {
+	*snowmantest.Block
+	vm *VM
+}
+
+func (b *block) Verify(ctx context.Context) error {
+	_, parentAccepted := b.vm.accepted[b.Parent()]
+	_, parentVerified := b.vm.verified[b.Parent()]
+	if !parentAccepted && !parentVerified {
+		return ErrUnknownParent
 	}
-	return vm.Has == nil || vm.Has(blk)
+	if b.vm.VerifyF != nil {
+		if err := b.vm.VerifyF(b.Block); err != nil {
+			return err
+		}
+	}
+	if err := b.Block.Verify(ctx); err != nil {
+		return err
+	}
+	b.vm.verified[b.ID()] = b.Block
+	return nil
+}
+
+func (b *block) Accept(ctx context.Context) error {
+	if err := b.Block.Accept(ctx); err != nil {
+		return err
+	}
+	b.vm.markAccepted(b.Block)
+	return nil
+}
+
+func (b *block) Reject(ctx context.Context) error {
+	if err := b.Block.Reject(ctx); err != nil {
+		return err
+	}
+	delete(b.vm.verified, b.ID())
+	return nil
 }
