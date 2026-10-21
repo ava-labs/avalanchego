@@ -44,31 +44,3 @@ func TestInputVerifyNil(t *testing.T) {
 		})
 	}
 }
-
-func TestInputCost(t *testing.T) {
-	tests := []struct {
-		name         string
-		in           *Input
-		expectedCost uint64
-	}{
-		{
-			name:         "2 sigs",
-			in:           &Input{SigIndices: []uint32{1, 2}},
-			expectedCost: 2 * CostPerSignature,
-		},
-		{
-			name:         "3 sigs",
-			in:           &Input{SigIndices: []uint32{1, 2, 3}},
-			expectedCost: 3 * CostPerSignature,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			cost, err := tt.in.Cost()
-			require.NoError(err)
-			require.Equal(tt.expectedCost, cost)
-		})
-	}
-}

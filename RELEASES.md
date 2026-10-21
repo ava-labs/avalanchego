@@ -9,6 +9,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 ### Features
 
 - Added `vms/evm/evmclient`, which combines standard Ethereum, Geth-specific, raw RPC, and Avalanche-specific EVM methods.
+- Updated the minimum Go version from `1.26.8` to `1.26.10`.
 
 ### APIs
 
@@ -25,6 +26,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 - C-Chain metrics no longer include the `transition` prefix. For example, `avalanche_evm_transition_sae_last_executed_height` is now `avalanche_evm_sae_last_executed_height`.
 - Added `avalanche_evm_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
+- Added `avalanche_evm_sae_execution_gas_rate_headroom` (histogram), `avalanche_evm_sae_execution_gas_rate_headroom_latest` (gauge), and `avalanche_evm_sae_tau_second_avg_executed_gas_per_second` (gauge) to monitor gas-vs-wall clock skew during execution, for tuning the gas target.
 
 ### Fixes
 
