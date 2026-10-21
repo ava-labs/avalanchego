@@ -9,6 +9,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -126,7 +127,7 @@ func (n *Network) locateHandler(nodeID ids.NodeID) common.Handler {
 
 // registerExpectingResponse records that requester waits for a response from responder. The kind
 // value gives the type of the request.
-func (n *Network) registerExpectingResponse(requester, responder ids.NodeID, requestID uint32, kind requestKind) {
+func (n *Network) registerExpectingResponse(requester, responder ids.NodeID, requestID uint32, kind message.Op) {
 	n.awaiting = append(n.awaiting, pendingRequest{
 		requester: requester,
 		responder: responder,
@@ -137,7 +138,7 @@ func (n *Network) registerExpectingResponse(requester, responder ids.NodeID, req
 
 // registerResponse removes the request that matches a response. A responder sends its
 // response with the request ID that the requester made.
-func (n *Network) registerResponse(responder, requester ids.NodeID, requestID uint32, kind requestKind) {
+func (n *Network) registerResponse(responder, requester ids.NodeID, requestID uint32, kind message.Op) {
 	n.awaiting = slices.DeleteFunc(n.awaiting, func(req pendingRequest) bool {
 		return req.requester == requester &&
 			req.responder == responder &&
@@ -152,11 +153,11 @@ func (n *Network) dispatchLackOfResponse(req pendingRequest) {
 		handler := n.locateHandler(req.requester)
 		ctx := context.Background()
 		switch req.kind {
-		case fetchBlock:
+		case message.PutOp:
 			return handler.GetFailed(ctx, req.responder, req.requestID)
-		case fetchAncestors:
+		case message.AncestorsOp:
 			return handler.GetAncestorsFailed(ctx, req.responder, req.requestID)
-		case queryPreference:
+		case message.ChitsOp:
 			return handler.QueryFailed(ctx, req.responder, req.requestID)
 		default:
 			return fmt.Errorf("unhandled request kind %d", req.kind)
@@ -164,19 +165,11 @@ func (n *Network) dispatchLackOfResponse(req pendingRequest) {
 	})
 }
 
-type requestKind int
-
-const (
-	fetchBlock requestKind = iota
-	fetchAncestors
-	queryPreference
-)
-
 type pendingRequest struct {
 	requester ids.NodeID
 	responder ids.NodeID
 	requestID uint32
-	kind      requestKind
+	kind      message.Op
 }
 
 // Sender sends the messages from one node into the network. The embedded
@@ -188,28 +181,28 @@ type Sender struct {
 }
 
 func (s *Sender) SendGet(_ context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) {
-	s.network.registerExpectingResponse(s.self, nodeID, requestID, fetchBlock)
+	s.network.registerExpectingResponse(s.self, nodeID, requestID, message.PutOp)
 	s.network.push(func() error {
 		return s.network.locateHandler(nodeID).Get(context.Background(), s.self, requestID, blkID)
 	})
 }
 
 func (s *Sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32, blk []byte) {
-	s.network.registerResponse(s.self, nodeID, requestID, fetchBlock)
+	s.network.registerResponse(s.self, nodeID, requestID, message.PutOp)
 	s.network.push(func() error {
 		return s.network.locateHandler(nodeID).Put(context.Background(), s.self, requestID, blk)
 	})
 }
 
 func (s *Sender) SendGetAncestors(_ context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) {
-	s.network.registerExpectingResponse(s.self, nodeID, requestID, fetchAncestors)
+	s.network.registerExpectingResponse(s.self, nodeID, requestID, message.AncestorsOp)
 	s.network.push(func() error {
 		return s.network.locateHandler(nodeID).GetAncestors(context.Background(), s.self, requestID, blkID)
 	})
 }
 
 func (s *Sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID uint32, blks [][]byte) {
-	s.network.registerResponse(s.self, nodeID, requestID, fetchAncestors)
+	s.network.registerResponse(s.self, nodeID, requestID, message.AncestorsOp)
 	s.network.push(func() error {
 		return s.network.locateHandler(nodeID).Ancestors(context.Background(), s.self, requestID, blks)
 	})
@@ -217,7 +210,7 @@ func (s *Sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 
 func (s *Sender) SendPullQuery(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, blkID ids.ID, requestedHeight uint64) {
 	for _, nodeID := range sortedNodeIDs(nodeIDs) {
-		s.network.registerExpectingResponse(s.self, nodeID, requestID, queryPreference)
+		s.network.registerExpectingResponse(s.self, nodeID, requestID, message.ChitsOp)
 		s.network.push(func() error {
 			return s.network.locateHandler(nodeID).PullQuery(context.Background(), s.self, requestID, blkID, requestedHeight)
 		})
@@ -226,7 +219,7 @@ func (s *Sender) SendPullQuery(_ context.Context, nodeIDs set.Set[ids.NodeID], r
 
 func (s *Sender) SendPushQuery(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, blk []byte, requestedHeight uint64) {
 	for _, nodeID := range sortedNodeIDs(nodeIDs) {
-		s.network.registerExpectingResponse(s.self, nodeID, requestID, queryPreference)
+		s.network.registerExpectingResponse(s.self, nodeID, requestID, message.ChitsOp)
 		s.network.push(func() error {
 			return s.network.locateHandler(nodeID).PushQuery(context.Background(), s.self, requestID, blk, requestedHeight)
 		})
@@ -234,7 +227,7 @@ func (s *Sender) SendPushQuery(_ context.Context, nodeIDs set.Set[ids.NodeID], r
 }
 
 func (s *Sender) SendChits(_ context.Context, nodeID ids.NodeID, requestID uint32, _, preferredIDAtHeight, acceptedID ids.ID, acceptedHeight uint64) {
-	s.network.registerResponse(s.self, nodeID, requestID, queryPreference)
+	s.network.registerResponse(s.self, nodeID, requestID, message.ChitsOp)
 	s.network.push(func() error {
 		return s.network.locateHandler(nodeID).Chits(context.Background(), s.self, requestID, preferredIDAtHeight, acceptedID, acceptedHeight)
 	})
