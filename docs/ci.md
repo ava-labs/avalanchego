@@ -26,6 +26,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
     - [Event behavior](#event-behavior)
     - [Go module cache](#go-module-cache)
     - [Go unit-test cache](#go-unit-test-cache)
+    - [Go E2E build cache](#go-e2e-build-cache)
     - [Bazel dependency cache](#bazel-dependency-cache)
     - [Nix store cache](#nix-store-cache)
     - [Binfmt image cache](#binfmt-image-cache)
@@ -253,7 +254,7 @@ For example, end-to-end jobs in
 ```yaml
 - uses: ./.github/actions/run-monitored-tmpnet-cmd
   with:
-    run: ./scripts/run_task.sh test-e2e-ci
+    run: ./scripts/run_task.sh test-e2e
 ```
 
 Do not use a composite action as the only entrypoint for an operation that
@@ -369,10 +370,11 @@ check. These restrictions do not isolate the workload from the network; see
 ### Input-cache lifecycle
 
 GitHub-hosted runners are temporary. GitHub Actions caching is currently used
-for build inputs - tools and dependencies - and the Go unit job's build and test
-results. A cache miss must still let the job obtain its required input before the job
-disables dependency downloads. GitHub Actions caches are immutable: the first
-successful save for a key wins. Later saves of that key do not replace it.
+for build inputs - tools and dependencies - plus the Go unit job's build and
+test results and the Go E2E job's `GOCACHE` output. A cache miss must still let
+the job obtain its required input before the job disables dependency downloads.
+GitHub Actions caches are immutable: the first successful save for a key wins.
+Later saves of that key do not replace it.
 
 Bazel is configured to cache outputs via its separate remote cache, but still
 depends on GitHub Actions caching for its repository inputs.
@@ -575,6 +577,18 @@ The unit job is the cache producer. It saves only after tests finish and when
 `cache-policy` permits it. See [Validate cache saves before
 merge](#validate-cache-saves-before-merge) for the temporary pull-request
 exception and cleanup procedure.
+
+#### Go E2E build cache
+
+The Go `e2e` job restores `GOCACHE` to reuse compiled output for the node,
+XSVM plugin, and E2E test binary. It uses a normal build to reduce CI run time.
+Its key includes the runner label and architecture plus the same source, module,
+fixture, and embedded-file hash used by the unit-test cache. A same-runner
+prefix fallback preserves compiled output when the exact inputs change.
+
+The job saves the cache only after successful E2E tests. `cache-policy` permits
+saves on `master` and temporarily on the pull request selected to validate cache
+writes. Other pull requests restore the cache but do not save it.
 
 #### Bazel dependency cache
 
