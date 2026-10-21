@@ -10,6 +10,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 - Added `vms/evm/evmclient`, which combines standard Ethereum, Geth-specific, raw RPC, and Avalanche-specific EVM methods.
 - Updated the minimum Go version from `1.26.8` to `1.26.10`.
+- `eth_getLogs` now respects the node's C-Chain config option for `api-resolve-pending-to-last-executed`.
 
 ### APIs
 
@@ -21,6 +22,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 - The `eth-apis` C-Chain option, deprecated in v1.15.0, is removed. The node now ignores it and logs a warning like any other unrecognized option. Set `apis` instead.
 - Removed `pull-gossip-requests-per-validator` from the P-Chain config. It has had no effect since v1.14.2. The node ignores the key if a config still sets it.
+- `api-max-blocks-per-request` was added back to the C-Chain config.
 
 ### Metrics
 
