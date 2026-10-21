@@ -15,6 +15,7 @@ just before the response is written.
 | Header | Value |
 | --- | --- |
 | `Gas-Used` | Total gas used by every `eth_call` in the request, batches included. Omitted if no `eth_call` executed. |
+| `Rpc-Error-Codes` | Each JSON-RPC error code in the response with its count, as an RFC 9651 list sorted by code, e.g. `-32601;count=1, 3;count=2`. Read from the encoded body, so it includes errors created by the libevm RPC server. Omitted if no response has an error. |
 
 ## Stateful RPCs
 
