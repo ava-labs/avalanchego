@@ -77,6 +77,10 @@ func (n *Network) Register(nodeID ids.NodeID, handler common.Handler) {
 // DeliverMessages returns when the queue is empty and no request waits for an
 // answer.
 func (n *Network) DeliverMessages() error {
+	defer func() {
+		// Make sure that the network has no more messages in the queue, or requests that waits for an answer.
+		require.False(n.t, len(n.queue) > 0 || len(n.awaiting) > 0)
+	}()
 	delivered := 0
 	for {
 		for len(n.queue) > 0 {
@@ -103,12 +107,6 @@ func (n *Network) DeliverMessages() error {
 			n.dispatchLackOfResponse(req)
 		}
 	}
-}
-
-// HasQueuedMessagesToDispatch reports if the network has a message in the queue,
-// or a request that waits for an answer.
-func (n *Network) HasQueuedMessagesToDispatch() bool {
-	return len(n.queue) > 0 || len(n.awaiting) > 0
 }
 
 // Outstanding reports the number of requests that wait for an answer.

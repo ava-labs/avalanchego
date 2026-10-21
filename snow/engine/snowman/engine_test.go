@@ -2873,7 +2873,6 @@ func TestEngineForkNearAcceptFrontierAdvancesAcceptFrontier(t *testing.T) {
 			// builds forkA without any forkB convergence interfering.
 			require.NoError(nodeEngine.PullQuery(t.Context(), peerID, 0, forkATip.ID(), 0))
 			require.NoError(network.DeliverMessages())
-			require.False(network.HasQueuedMessagesToDispatch())
 
 			// The node now holds all of forkA as a tall processing chain preferred over
 			// Genesis, with nothing accepted yet.
@@ -2912,7 +2911,6 @@ func TestEngineForkNearAcceptFrontierAdvancesAcceptFrontier(t *testing.T) {
 			for height := uint64(1); height <= uint64(forkLen); height++ {
 				require.NoError(nodeEngine.Gossip(t.Context()))
 				require.NoError(network.DeliverMessages())
-				require.False(network.HasQueuedMessagesToDispatch())
 
 				_, acceptedHeight := nodeEngine.Consensus.LastAccepted()
 				require.Equal(height, acceptedHeight)
@@ -3605,7 +3603,6 @@ func TestEngineNetworkBuildsAndAcceptsBlocks(t *testing.T) {
 		builder := engines[i%len(engines)]
 		require.NoError(builder.Notify(t.Context(), common.PendingTxs)) // Trigger to build the next block in the chain.
 		require.NoError(network.DeliverMessages())
-		require.False(network.HasQueuedMessagesToDispatch())
 
 		// The block was accepted, and both engines agree on it as their tip.
 		require.Equal(snowtest.Accepted, blk.Status)
