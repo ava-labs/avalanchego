@@ -71,12 +71,12 @@ func (n *Network) Register(nodeID ids.NodeID, handler common.Handler) {
 // can enqueue more messages while DeliverMessages runs, and DeliverMessages also
 // sends those.
 //
-// When the queue is empty, DeliverMessages reports a failure for each request
-// that no handler registered a response. It then dispatches those failure messages.
+// When the queue is empty, DeliverMessages fails due to each request
+// that no handler registered a response.
 //
 // DeliverMessages returns when the queue is empty and no request waits for an
 // answer.
-func (n *Network) DeliverMessages() error {
+func (n *Network) DeliverMessages() {
 	defer func() {
 		// Make sure that the network has no more messages in the queue, or requests that waits for an answer.
 		require.False(n.t, len(n.queue) > 0 || len(n.awaiting) > 0)
@@ -92,12 +92,12 @@ func (n *Network) DeliverMessages() error {
 				"network delivered more than %d messages; handlers are likely looping", defaultMaxMessages)
 
 			if err := next(); err != nil {
-				return err
+				require.NoError(n.t, err)
 			}
 		}
 
 		if len(n.awaiting) == 0 {
-			return nil
+			return
 		}
 
 		// The queue is empty. No handler will answer the requests that remain.
