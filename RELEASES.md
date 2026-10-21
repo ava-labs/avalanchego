@@ -9,6 +9,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 ### Features
 
 - Added `vms/evm/evmclient`, which combines standard Ethereum, Geth-specific, raw RPC, and Avalanche-specific EVM methods.
+- Updated the minimum Go version from `1.26.8` to `1.26.10`.
 
 ### APIs
 
