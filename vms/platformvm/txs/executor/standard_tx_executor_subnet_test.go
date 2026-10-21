@@ -202,6 +202,13 @@ func TestStandardExecutorCreateChainTxErrors(t *testing.T) {
 		updateState func(*state.Diff)
 	}{
 		{
+			name: "tx_fails_syntactic_verification",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.CreateChainTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
+		{
 			name: "insufficient_control_signatures",
 			updateTx: func(tx *platform.Tx) {
 				// Remove a signature from the subnet auth credential
@@ -327,6 +334,69 @@ func TestStandardExecutorCreateChainTx(t *testing.T) {
 	require.Contains(gotChainIDs, stx.ID())
 }
 
+// TestStandardExecutorCreateSubnetTxErrors verifies the failure cases of
+// [platform.CreateSubnetTx] execution.
+func TestStandardExecutorCreateSubnetTxErrors(t *testing.T) {
+	var (
+		env    = newEnvironment(t, upgradetest.Latest)
+		wallet = newWallet(t, env, walletConfig{})
+	)
+
+	tests := []struct {
+		name     string
+		want     error
+		updateTx func(*platform.Tx)
+	}{
+		{
+			name: "tx_fails_syntactic_verification",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.CreateSubnetTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "flow_checker_failed",
+			updateTx: func(tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.CreateSubnetTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			want: utxo.ErrInsufficientUnlockedFunds,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx, err := wallet.IssueCreateSubnetTx(
+				newOwner(),
+			)
+			require.NoError(t, err)
+
+			diff, got := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(t, got)
+
+			if tt.updateTx != nil {
+				tt.updateTx(tx)
+			}
+
+			feeCalculator := state.PickFeeCalculator(env.config, diff)
+			_, _, _, got = StandardTx(
+				&env.backend,
+				feeCalculator,
+				tx,
+				diff,
+			)
+
+			require.ErrorIs(t, got, tt.want)
+		})
+	}
+}
+
 // TestStandardExecutorCreateSubnetTx verifies the successful execution of a
 // [platform.CreateSubnetTx].
 func TestStandardExecutorCreateSubnetTx(t *testing.T) {
@@ -366,6 +436,109 @@ func TestStandardExecutorCreateSubnetTx(t *testing.T) {
 	subnetIDs, err := env.state.GetSubnetIDs()
 	require.NoError(err)
 	require.Contains(subnetIDs, subnetID)
+}
+
+// TestStandardExecutorTransferSubnetOwnershipTxErrors verifies the failure
+// cases of [platform.TransferSubnetOwnershipTx] execution.
+func TestStandardExecutorTransferSubnetOwnershipTxErrors(t *testing.T) {
+	var (
+		env      = newEnvironment(t, upgradetest.Latest)
+		subnetID = testSubnet1.ID()
+	)
+
+	tests := []struct {
+		name        string
+		want        error
+		updateTx    func(*platform.Tx)
+		updateState func(*state.Diff)
+	}{
+		{
+			name: "invalid_prior_to_durango",
+			updateState: func(diff *state.Diff) {
+				diff.SetTimestamp(env.config.UpgradeConfig.DurangoTime.Add(-1 * time.Second))
+			},
+			want: errDurangoUpgradeNotActive,
+		},
+		{
+			name: "tx_fails_syntactic_verification",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.TransferSubnetOwnershipTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "subnet_not_found",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.TransferSubnetOwnershipTx).Subnet = ids.GenerateTestID()
+			},
+			want: database.ErrNotFound,
+		},
+		{
+			name: "tx_has_no_credentials",
+			updateTx: func(tx *platform.Tx) {
+				tx.Creds = nil
+			},
+			want: errWrongNumberOfCredentials,
+		},
+		{
+			name: "insufficient_control_signatures",
+			updateTx: func(tx *platform.Tx) {
+				// Remove a signature from the subnet auth credential
+				cred := tx.Creds[len(tx.Creds)-1].(*secp256k1fx.Credential)
+				cred.Sigs = cred.Sigs[1:]
+			},
+			want: errUnauthorizedModification,
+		},
+		{
+			name: "flow_checker_failed",
+			updateTx: func(tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.TransferSubnetOwnershipTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			want: errFlowCheckFailed,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// The wallet tracks the subnet owner change once it issues the tx,
+			// so issue each tx from a fresh wallet to keep the subnet auth
+			// signable.
+			wallet := newWallet(t, env, walletConfig{})
+			tx, err := wallet.IssueTransferSubnetOwnershipTx(
+				subnetID,
+				newOwner(),
+			)
+			require.NoError(t, err)
+
+			diff, got := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(t, got)
+
+			if tt.updateTx != nil {
+				tt.updateTx(tx)
+			}
+
+			if tt.updateState != nil {
+				tt.updateState(diff)
+			}
+
+			feeCalculator := state.PickFeeCalculator(env.config, diff)
+			_, _, _, got = StandardTx(
+				&env.backend,
+				feeCalculator,
+				tx,
+				diff,
+			)
+
+			require.ErrorIs(t, got, tt.want)
+		})
+	}
 }
 
 // TestStandardExecutorTransferSubnetOwnershipTx verifies the successful
