@@ -23,7 +23,7 @@ var HandlerPaths = []string{rpcHTTPExtensionPath, wsHTTPExtensionPath}
 func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	s := vm.rpcProvider.Server()
 	return map[string]http.Handler{
-		rpcHTTPExtensionPath: s,
+		rpcHTTPExtensionPath: vm.rpcProvider.HTTPHandler(),
 		wsHTTPExtensionPath:  s.WebsocketHandler([]string{"*"}),
 	}, nil
 }

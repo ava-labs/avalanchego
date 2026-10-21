@@ -5,6 +5,7 @@ package rpc
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/ava-labs/libevm/eth/filters"
 	"github.com/ava-labs/libevm/libevm/debug"
@@ -269,6 +270,12 @@ var apiServices = []apiService{
 // handlers for every enabled [API] registered.
 func (p *Provider) Server() *rpc.Server {
 	return p.server
+}
+
+// HTTPHandler returns the handler for JSON-RPC over HTTP: [Provider.Server]
+// with per-request response headers added.
+func (p *Provider) HTTPHandler() http.Handler {
+	return withResponseHeaders(p.server)
 }
 
 func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
