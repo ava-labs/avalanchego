@@ -209,9 +209,6 @@ func (ts *Topological) LastAccepted() (ids.ID, uint64) {
 }
 
 func (ts *Topological) Preference() (ids.ID, uint64) {
-	if ts.preference == ids.Empty {
-		return ts.preference, 0
-	}
 	return ts.preference, ts.blocks[ts.preference].height
 }
 
