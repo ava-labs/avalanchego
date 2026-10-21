@@ -18,8 +18,8 @@ import (
 	commonenginetest "github.com/ava-labs/avalanchego/snow/engine/enginetest"
 )
 
-// defaultMaxMessages makes the deliver loop fail fast instead of looping indefinitely if a handler is misbehaving.
-const defaultMaxMessages = 50_000_000
+// maxMessages makes the deliver loop fail fast instead of looping indefinitely if a handler is misbehaving.
+const maxMessages = 50_000_000
 
 // Network is a fake network to connect engines in a test.
 // The network adds each message to a queue and the messages are dispatched via DeliverMessages.
@@ -88,8 +88,8 @@ func (n *Network) DeliverMessages() {
 			n.queue = n.queue[1:]
 
 			delivered++
-			require.LessOrEqual(n.t, delivered, defaultMaxMessages,
-				"network delivered more than %d messages; handlers are likely looping", defaultMaxMessages)
+			require.LessOrEqual(n.t, delivered, maxMessages,
+				"network delivered more than %d messages; handlers are likely looping", maxMessages)
 
 			if err := next(); err != nil {
 				require.NoError(n.t, err)
