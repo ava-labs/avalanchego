@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -42,6 +43,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/chain/p/wallet"
+
+	txfee "github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 )
 
 const (
@@ -408,4 +411,50 @@ func must[T any](t require.TestingT) func(T, error) T {
 		require.NoError(t, err)
 		return val
 	}
+}
+
+// requireBaseTxApplied asserts that executing stx on diff consumed the tx's
+// inputs, produced its outputs, and burned exactly the fee charged by
+// feeCalculator.
+func requireBaseTxApplied(
+	t testing.TB,
+	env *environment,
+	diff *state.Diff,
+	feeCalculator txfee.Calculator,
+	tx *platform.Tx,
+) {
+	require := require.New(t)
+
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx.Unsigned)
+	require.NoError(err)
+
+	// The inputs were consumed
+	for _, in := range ins {
+		_, err := diff.GetUTXO(in.InputID())
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	// The outputs were produced
+	for _, wantUTXO := range tx.UTXOs() {
+		gotUTXO, err := diff.GetUTXO(wantUTXO.InputID())
+		require.NoError(err)
+		require.Equal(wantUTXO, gotUTXO)
+	}
+
+	// Exactly the fee was burned: the consumed AVAX covers the outputs, the
+	// AVAX produced outside of UTXOs (stake, balances, exports) and the fee.
+	var consumedAVAX uint64
+	for _, in := range ins {
+		if in.AssetID() == env.ctx.AVAXAssetID {
+			consumedAVAX += in.In.Amount()
+		}
+	}
+	for _, out := range outs {
+		if out.AssetID() == env.ctx.AVAXAssetID {
+			producedAVAX += out.Out.Amount()
+		}
+	}
+	fee, err := feeCalculator.CalculateFee(tx.Unsigned)
+	require.NoError(err)
+	require.Equal(consumedAVAX, producedAVAX+fee)
 }
