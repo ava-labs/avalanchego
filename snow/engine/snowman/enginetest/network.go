@@ -233,8 +233,6 @@ func (s *Sender) SendPushQuery(_ context.Context, nodeIDs set.Set[ids.NodeID], r
 	}
 }
 
-// SendChits mirrors the receive path: the preferred ID is still carried by
-// [common.Sender], but the handler no longer takes it, so it is dropped here.
 func (s *Sender) SendChits(_ context.Context, nodeID ids.NodeID, requestID uint32, _, preferredIDAtHeight, acceptedID ids.ID, acceptedHeight uint64) {
 	s.network.registerResponse(s.self, nodeID, requestID, queryPreference)
 	s.network.push(func() error {
@@ -242,7 +240,6 @@ func (s *Sender) SendChits(_ context.Context, nodeID ids.NodeID, requestID uint3
 	})
 }
 
-// sortedNodeIDs sorts the node IDs.
 func sortedNodeIDs(nodeIDs set.Set[ids.NodeID]) []ids.NodeID {
 	sorted := nodeIDs.List()
 	slices.SortFunc(sorted, ids.NodeID.Compare)
