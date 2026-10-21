@@ -493,6 +493,12 @@ bazel coverage //...
 # Run all E2E tests with Bazel-built runtime dependencies
 task bazel-test-e2e
 
+# Run E2E tests with race detection
+task bazel-test-e2e-race
+
+# Run E2E tests serially with race detection
+task bazel-test-e2e-race-serial
+
 # Run E2E tests serially with Bazel-built runtime dependencies
 task bazel-test-e2e-serial
 
@@ -507,6 +513,10 @@ The [Bazel runner](../scripts/tests.e2e.bazel.sh) uses the
 [shared E2E script](../scripts/tests.e2e.sh) to execute these prebuilt binaries.
 Bazel can cache the binary builds. E2E test execution does not use cached test
 results.
+
+Scheduled Bazel CI runs serial E2E tests on every scheduled platform. It enables
+race detection only on Ubuntu 24.04 AMD64. This matches the scheduled unit-test
+policy. It limits race detection to one platform.
 
 [CI builds and executes E2E tests in one job](../.github/workflows/bazel.yml)
 through the same tasks used locally.
