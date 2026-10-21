@@ -76,12 +76,6 @@ jobs:
         shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
-      # Prepare Bazel's separate Go module cache before install-nix disables
-      # GOPROXY. check-go-mod-tidy also validates MODULE.bazel's Go mappings.
-      - uses: ./.github/actions/setup-bazel
-        env:
-          # This job does not build Bazel targets.
-          BAZEL_REMOTE_CACHE_ENABLED: 'false'
       # The dev shell provides the generators and restores the Go module cache.
       - uses: ./.github/actions/install-nix
 
@@ -90,7 +84,7 @@ jobs:
         continue-on-error: true
         run: ./scripts/run_task.sh check-generate-load-contract-bindings
       - name: Restore clean checkout after contract bindings check
-        if: ${{ always() }}
+        if: ${{ !cancelled() }}
         run: git reset --hard HEAD && git clean -ffd
 
       - id: canoto
@@ -98,7 +92,7 @@ jobs:
         continue-on-error: true
         run: ./scripts/run_task.sh check-generate-canoto
       - name: Restore clean checkout after Canoto check
-        if: ${{ always() }}
+        if: ${{ !cancelled() }}
         run: git reset --hard HEAD && git clean -ffd
 
       - id: mocks
@@ -106,7 +100,7 @@ jobs:
         continue-on-error: true
         run: ./scripts/run_task.sh check-generate-mocks
       - name: Restore clean checkout after mocks check
-        if: ${{ always() }}
+        if: ${{ !cancelled() }}
         run: git reset --hard HEAD && git clean -ffd
 
       - id: protobuf
@@ -114,15 +108,7 @@ jobs:
         continue-on-error: true
         run: ./scripts/run_task.sh check-generate-protobuf
       - name: Restore clean checkout after protobuf check
-        if: ${{ always() }}
-        run: git reset --hard HEAD && git clean -ffd
-
-      - id: go_mod_tidy
-        name: Check Go module metadata
-        continue-on-error: true
-        run: ./scripts/run_task.sh check-go-mod-tidy
-      - name: Restore clean checkout after module metadata check
-        if: ${{ always() }}
+        if: ${{ !cancelled() }}
         run: git reset --hard HEAD && git clean -ffd
 
       - id: links
@@ -143,34 +129,21 @@ jobs:
           fi
 
       - name: Fail if any check failed
-        if: ${{ always() }}
+        if: ${{ !cancelled() }}
         env:
-          CONTRACT_BINDINGS_OUTCOME: ${{ steps.contract-bindings.outcome }}
-          CANOTO_OUTCOME: ${{ steps.canoto.outcome }}
-          MOCKS_OUTCOME: ${{ steps.mocks.outcome }}
-          PROTOBUF_OUTCOME: ${{ steps.protobuf.outcome }}
-          GO_MOD_TIDY_OUTCOME: ${{ steps.go_mod_tidy.outcome }}
-          LINKS_OUTCOME: ${{ steps.links.outcome }}
-          TAUSECONDS_OUTCOME: ${{ steps.tauseconds.outcome }}
+          STEPS_JSON: ${{ toJSON(steps) }}
         run: |
-          failed_checks=()
-          while IFS='=' read -r name outcome; do
-            if [[ "$outcome" == 'failure' ]]; then
-              failed_checks+=("$name")
-            fi
-          done <<EOF
-          contract bindings=$CONTRACT_BINDINGS_OUTCOME
-          Canoto=$CANOTO_OUTCOME
-          mocks=$MOCKS_OUTCOME
-          protobuf=$PROTOBUF_OUTCOME
-          Go module metadata=$GO_MOD_TIDY_OUTCOME
-          links=$LINKS_OUTCOME
-          TauSeconds=$TAUSECONDS_OUTCOME
-          EOF
+          failed_checks="$(
+            jq -r '
+              to_entries[]
+              | select(.value.outcome == "failure")
+              | .key
+            ' <<<"$STEPS_JSON"
+          )"
 
-          if ((${#failed_checks[@]})); then
+          if [[ -n "$failed_checks" ]]; then
             echo 'Failed checks:'
-            printf '  %s\n' "${failed_checks[@]}"
+            sed 's/^/  /' <<<"$failed_checks"
             exit 1
           fi
 

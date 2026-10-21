@@ -101,20 +101,20 @@ distinct in GitHub output.
 ### Generated-source checks
 
 The `checks` job in [`.github/workflows/go.yml`](../.github/workflows/go.yml)
-runs generated-source and module-metadata checks in sequence. One job avoids
-repeating runner, Go, Nix, and Bazel setup.
+runs generated-source and lightweight consistency checks in sequence. One job
+avoids repeating runner and Nix setup.
 
 Each source-generator task updates the checkout and then checks that it is
 clean. A failed task can leave generated files staged. The workflow resets the
 CI checkout after each source-generator task. This reset lets later checks run
-against the commit under test.
+against the commit under test. Cleanup does not run when GitHub cancels the job.
 
 Keep the reset in the workflow. Do not add it to a task. Contributors can run
 the tasks in a working directory that contains uncommitted changes.
 
 Each check step continues after failure. The final step fails the job when one
-or more checks fail. When you add a source-generator check, give its step a
-cleanup step and add its outcome to the final step.
+or more checks fail. When you add a source-generator check, give its step an ID
+and a cleanup step.
 
 ### Required checks and the merge queue
 
@@ -320,9 +320,9 @@ cache and version rules.
 
 Choose the setup action that provides the job's dependencies. Bazel provides
 Go for its targets, but a job that also runs Go commands outside Bazel needs
-`setup-go-for-project` or the Nix dev shell. For example, `check-go-mod-tidy`
-uses both `setup-bazel` and `setup-go-for-project`, while `lint-avalanchego`
-uses `setup-bazel` and `install-nix` for flake-provided tools.
+`setup-go-for-project` or the Nix dev shell. For example, `lint-avalanchego`
+uses `setup-bazel` before `install-nix` because its module-metadata check
+invokes `bazelisk mod tidy`.
 
 When combining these actions, run `setup-bazel` before either Go setup action
 disables `GOPROXY`. They prepare separate module caches. See
