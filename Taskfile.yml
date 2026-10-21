@@ -83,11 +83,27 @@ tasks:
   bazel-test-e2e:
     desc: Run E2E tests with Bazel-built runtime dependencies
     vars:
+      BAZEL_ARGS: '{{.BAZEL_ARGS | default ""}}'
       SERIAL: '{{.SERIAL | default .E2E_SERIAL | default ""}}'
     env:
       BAZEL_CI_TARGET_PATTERNS: //tests/e2e:e2e_runner
       E2E_SERIAL: '{{.SERIAL}}'
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run "$BAZEL_CI_TARGET_PATTERNS" -- {{.E2E_ARGS}} {{.CLI_ARGS}}'
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run {{.BAZEL_ARGS}} "$BAZEL_CI_TARGET_PATTERNS" -- {{.E2E_ARGS}} {{.CLI_ARGS}}'
+
+  bazel-test-e2e-race:
+    desc: Run E2E tests with Bazel-built runtime dependencies and race detection
+    cmds:
+      - task: bazel-test-e2e
+        vars:
+          BAZEL_ARGS: --config=race
+
+  bazel-test-e2e-race-serial:
+    desc: Run E2E tests serially with Bazel-built runtime dependencies and race detection
+    cmds:
+      - task: bazel-test-e2e
+        vars:
+          BAZEL_ARGS: --config=race
+          SERIAL: '1'
 
   bazel-test-e2e-serial:
     desc: Run E2E tests serially with Bazel-built runtime dependencies
