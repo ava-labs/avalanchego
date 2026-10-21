@@ -31,6 +31,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 ### Fixes
 
 - Fixed C-Chain `api-max-duration` only limiting `eth_call` since Helicon. It again limits every call to the `/rpc` and `/ws` endpoints, and a WebSocket call that times out doesn't close its connection.
+- Snowman no longer requests a peer's last accepted block when that block is at or below our height and its query fails.
 
 ## [v1.15.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.1)
 
