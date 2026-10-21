@@ -34,8 +34,17 @@ import (
 )
 
 const (
-	nonVerifiedCacheSize = 64 * units.MiB
-	errInsufficientStake = "insufficient connected stake"
+	// maxAllowedBlockPreferenceHeightDistanceIngestion limits how far ahead (by height) a block may be
+	// from the last preferred height before the engine stops fetching missing ancestors for it.
+	// This limits how far we can replicate blocks that we're not sure about their acceptance before we cascade abandon them.
+	maxAllowedBlockPreferenceHeightDistanceIngestion = 100
+	// maxAllowedBlockAcceptedHeightDistanceIngestion limits how far ahead (by height) a block may be
+	// from the last accepted height.
+	// This prevents us from replicating blocks that are too far ahead and therefore can be replicated later,
+	// once we've accepted more blocks.
+	maxAllowedBlockAcceptedHeightDistanceIngestion = 1000
+	nonVerifiedCacheSize                           = 64 * units.MiB
+	errInsufficientStake                           = "insufficient connected stake"
 )
 
 var _ common.Engine = (*Engine)(nil)
@@ -156,7 +165,6 @@ func New(config Config) (*Engine, error) {
 }
 
 func (e *Engine) Gossip(ctx context.Context) error {
-	lastAcceptedID, lastAcceptedHeight := e.Consensus.LastAccepted()
 	if numProcessing := e.Consensus.NumProcessing(); numProcessing != 0 {
 		e.Ctx.Log.Debug("skipping block gossip",
 			zap.String("reason", "blocks currently processing"),
@@ -184,12 +192,14 @@ func (e *Engine) Gossip(ctx context.Context) error {
 		return nil
 	}
 
-	nextHeightToAccept, err := math.Add(lastAcceptedHeight, 1)
+	preferredID, preferredHeight := e.Consensus.Preference()
+
+	nextHeightToPrefer, err := math.Add(preferredHeight, 1)
 	if err != nil {
 		e.Ctx.Log.Error("skipping block gossip",
 			zap.String("reason", "block height overflow"),
-			zap.Stringer("blkID", lastAcceptedID),
-			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+			zap.Stringer("preferredID", preferredID),
+			zap.Uint64("preferredHeight", preferredHeight),
 			zap.Error(err),
 		)
 		return nil
@@ -200,8 +210,8 @@ func (e *Engine) Gossip(ctx context.Context) error {
 		ctx,
 		set.Of(vdrID),
 		e.requestID,
-		e.Consensus.Preference(),
-		nextHeightToAccept,
+		preferredID,
+		nextHeightToPrefer,
 	)
 	return nil
 }
@@ -226,6 +236,10 @@ func (e *Engine) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, b
 		// because GetFailed doesn't utilize the assumption that we actually
 		// sent a Get message, we can safely call GetFailed here to potentially
 		// abandon the request.
+		return e.GetFailed(ctx, nodeID, requestID)
+	}
+
+	if e.isBlockTooFarAhead(blk, nodeID, requestID) {
 		return e.GetFailed(ctx, nodeID, requestID)
 	}
 
@@ -275,6 +289,30 @@ func (e *Engine) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, b
 		return err
 	}
 	return e.executeDeferredWork(ctx)
+}
+
+func (e *Engine) isBlockTooFarAhead(blk snowman.Block, nodeID ids.NodeID, requestID uint32) bool {
+	_, lastAcceptedHeight := e.Consensus.LastAccepted()
+	maxAllowedBlockIngestionHeight, err := math.Add(lastAcceptedHeight, maxAllowedBlockAcceptedHeightDistanceIngestion)
+	if err != nil {
+		e.Ctx.Log.Debug("Overflow when calculating max allowed block ingestion height",
+			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight), zap.Error(err))
+		return false
+	}
+
+	if blk.Height() > maxAllowedBlockIngestionHeight {
+		e.Ctx.Log.Debug("skipping block ingestion",
+			zap.String("reason", "block height too far ahead of last accepted height"),
+			zap.Stringer("nodeID", nodeID),
+			zap.Uint32("requestID", requestID),
+			zap.Stringer("blkID", blk.ID()),
+			zap.Uint64("blkHeight", blk.Height()),
+			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+			zap.Uint64("maxAllowedBlockIngestionHeight", maxAllowedBlockIngestionHeight),
+		)
+		return true
+	}
+	return false
 }
 
 func (e *Engine) GetFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
@@ -340,6 +378,10 @@ func (e *Engine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uin
 		return nil
 	}
 
+	if e.isBlockTooFarAhead(blk, nodeID, requestID) {
+		return e.executeDeferredWork(ctx)
+	}
+
 	if !e.shouldIssueBlock(blk) {
 		e.metrics.numUselessPushQueryBytes.Add(float64(len(blkBytes)))
 	}
@@ -358,55 +400,34 @@ func (e *Engine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uin
 	return e.executeDeferredWork(ctx)
 }
 
-func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) error {
+func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) error {
 	e.acceptedFrontiers.SetLastAccepted(nodeID, acceptedID, acceptedHeight)
 
 	e.Ctx.Log.Verbo("called Chits for the block",
 		zap.Stringer("nodeID", nodeID),
 		zap.Uint32("requestID", requestID),
-		zap.Stringer("preferredID", preferredID),
 		zap.Stringer("preferredIDAtHeight", preferredIDAtHeight),
 		zap.Stringer("acceptedID", acceptedID),
 		zap.Uint64("acceptedHeight", acceptedHeight),
 	)
 
 	issuedMetric := e.metrics.issued.WithLabelValues(chitsSource)
-	if err := e.issueFromByID(ctx, nodeID, preferredID, issuedMetric); err != nil {
+
+	if err := e.issueFromByID(ctx, nodeID, preferredIDAtHeight, issuedMetric); err != nil {
 		return err
 	}
 
-	var (
-		preferredIDAtHeightShouldBlock bool
-		// Invariant: The order of [responseOptions] must be [preferredID] then
-		// (optionally) [preferredIDAtHeight]. During vote application, the
-		// first vote that can be applied will be used. So, the votes should be
-		// populated in order of decreasing height.
-		responseOptions = []ids.ID{preferredID}
-	)
-	if preferredID != preferredIDAtHeight {
-		if err := e.issueFromByID(ctx, nodeID, preferredIDAtHeight, issuedMetric); err != nil {
-			return err
-		}
-		preferredIDAtHeightShouldBlock = e.canDependOn(preferredIDAtHeight)
-		responseOptions = append(responseOptions, preferredIDAtHeight)
-	}
-
-	// Will record chits once [preferredID] and [preferredIDAtHeight] have been
-	// issued into consensus
+	// Will record chits once [preferredIDAtHeight] has been issued into consensus
 	v := &voter{
-		e:               e,
-		nodeID:          nodeID,
-		requestID:       requestID,
-		responseOptions: responseOptions,
+		e:         e,
+		nodeID:    nodeID,
+		requestID: requestID,
+		vote:      preferredIDAtHeight,
 	}
 
-	// Wait until [preferredID] and [preferredIDAtHeight] have been issued to
-	// consensus before applying this chit.
+	// Wait until [preferredIDAtHeight] has been issued to consensus before applying this chit.
 	var deps []ids.ID
-	if e.canDependOn(preferredID) {
-		deps = append(deps, preferredID)
-	}
-	if preferredIDAtHeightShouldBlock {
+	if e.canDependOn(preferredIDAtHeight) {
 		deps = append(deps, preferredIDAtHeight)
 	}
 
@@ -419,7 +440,7 @@ func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32,
 func (e *Engine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	lastAcceptedID, lastAcceptedHeight, ok := e.acceptedFrontiers.LastAccepted(nodeID)
 	if ok {
-		return e.Chits(ctx, nodeID, requestID, lastAcceptedID, lastAcceptedID, lastAcceptedID, lastAcceptedHeight)
+		return e.Chits(ctx, nodeID, requestID, lastAcceptedID, lastAcceptedID, lastAcceptedHeight)
 	}
 
 	v := &voter{
@@ -601,7 +622,7 @@ func (e *Engine) sendChits(ctx context.Context, nodeID ids.NodeID, requestID uin
 	}
 
 	var (
-		preference         = e.Consensus.Preference()
+		preference, _      = e.Consensus.Preference()
 		preferenceAtHeight ids.ID
 	)
 	if requestedHeight < lastAcceptedHeight {
@@ -666,7 +687,7 @@ func (e *Engine) buildBlocks(ctx context.Context) error {
 		// The newly created block should be built on top of the preferred block.
 		// Otherwise, the new block doesn't have the best chance of being confirmed.
 		parentID := blk.Parent()
-		if pref := e.Consensus.Preference(); parentID != pref {
+		if pref, _ := e.Consensus.Preference(); parentID != pref {
 			e.Ctx.Log.Warn("built block with unexpected parent",
 				zap.Stringer("expectedParentID", pref),
 				zap.Stringer("parentID", parentID),
@@ -696,7 +717,7 @@ func (e *Engine) buildBlocks(ctx context.Context) error {
 func (e *Engine) repoll(ctx context.Context) {
 	// if we are issuing a repoll, we should gossip our current preferences to
 	// propagate the most likely branch as quickly as possible
-	prefID := e.Consensus.Preference()
+	prefID, _ := e.Consensus.Preference()
 
 	for i := e.polls.Len(); i < e.Params.ConcurrentRepolls; i++ {
 		e.sendQuery(ctx, prefID, nil, false)
@@ -732,20 +753,28 @@ func (e *Engine) issueFrom(
 ) error {
 	// issue [blk] and its ancestors to consensus.
 	blkID := blk.ID()
+	// Invariant: [blkID] is the ID of [blk] at the top of every iteration.
 	for e.shouldIssueBlock(blk) {
-		err := e.issue(ctx, nodeID, blk, false, issuedMetric)
+		parentID := blk.Parent()
+		parent, err := e.getBlock(ctx, parentID)
 		if err != nil {
-			return err
+			// We don't have the parent, so we need to request it from the peer.
+			// But we only want to request it if the parent isn't too far ahead of our preferred block.
+			if !e.shouldFetchParent(blk.Height(), parentID) {
+				break
+			}
+
+			if err := e.issue(ctx, nodeID, blk, false, issuedMetric); err != nil {
+				return err
+			}
+			e.sendRequest(ctx, nodeID, parentID, issuedMetric)
+			return nil
 		}
 
-		// If we don't have this ancestor, request it from [nodeID]
-		blkID = blk.Parent()
-		blk, err = e.getBlock(ctx, blkID)
-		if err != nil {
-			// If the block is not locally available, request it from the peer.
-			e.sendRequest(ctx, nodeID, blkID, issuedMetric)
-			return nil //nolint:nilerr
+		if err := e.issue(ctx, nodeID, blk, false, issuedMetric); err != nil {
+			return err
 		}
+		blkID, blk = parentID, parent
 	}
 
 	// Remove any outstanding requests for this block
@@ -758,6 +787,27 @@ func (e *Engine) issueFrom(
 		return e.blocked.Abandon(ctx, blkID)
 	}
 	return nil
+}
+
+// shouldFetchParent reports whether we are willing to fetch [parentID], the
+// missing parent of a block at [childHeight].
+func (e *Engine) shouldFetchParent(childHeight uint64, parentID ids.ID) bool {
+	_, lastPreferredHeight := e.Consensus.Preference()
+	if maxPreferredHeightAllowedToFetch, err := math.Add(lastPreferredHeight, maxAllowedBlockPreferenceHeightDistanceIngestion); err == nil && maxPreferredHeightAllowedToFetch < childHeight {
+		e.Ctx.Log.Debug("not fetching block because it is too far ahead of our last preferred height",
+			zap.Stringer("blkID", parentID),
+			zap.Uint64("childHeight", childHeight),
+			zap.Uint64("lastPreferredHeight", lastPreferredHeight),
+			zap.Uint64("maxPreferredHeightAllowedToFetch", maxPreferredHeightAllowedToFetch),
+		)
+		return false
+	}
+
+	// Reaching here means either the addition overflowed - which can only happen
+	// when lastPreferredHeight is near maxuint64, in which case childHeight is
+	// not far ahead at all - or childHeight is inside the window.
+
+	return true
 }
 
 // issueWithAncestors attempts to issue the branch ending with [blk] to
@@ -892,16 +942,40 @@ func (e *Engine) sendQuery(
 		return
 	}
 
-	_, lastAcceptedHeight := e.Consensus.LastAccepted()
-	nextHeightToAccept, err := math.Add(lastAcceptedHeight, 1)
+	_, preferredHeight := e.Consensus.Preference()
+	nextHeightToPrefer, err := math.Add(preferredHeight, 1)
 	if err != nil {
 		e.Ctx.Log.Error("dropped query for block",
 			zap.String("reason", "block height overflow"),
 			zap.Stringer("blkID", blkID),
-			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+			zap.Uint64("preferredHeight", preferredHeight),
 			zap.Error(err),
 		)
 		return
+	}
+
+	_, lastAcceptedHeight := e.Consensus.LastAccepted()
+
+	blockIngestionLimit, blockIngestionLimitOverflowErr := math.Add(lastAcceptedHeight, maxAllowedBlockAcceptedHeightDistanceIngestion)
+	if blockIngestionLimitOverflowErr != nil {
+		e.Ctx.Log.Debug("Overflow when computing block ingestion limit",
+			zap.Stringer("blkID", blkID),
+			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+			zap.Error(blockIngestionLimitOverflowErr),
+		)
+		// If the addition overflowed, it means that lastAcceptedHeight is near maxuint64.
+		// In this case, we can safely query for the next height to prefer, as it is not too far ahead of our last accepted height.
+	}
+
+	heightToAskAbout := nextHeightToPrefer
+	if nextHeightToPrefer > blockIngestionLimit && blockIngestionLimitOverflowErr == nil {
+		heightToAskAbout = blockIngestionLimit
+		e.Ctx.Log.Debug("querying for block at a lower height than preferred",
+			zap.Stringer("blkID", blkID),
+			zap.Uint64("nextHeightToPrefer", nextHeightToPrefer),
+			zap.Uint64("blockIngestionLimit", blockIngestionLimit),
+			zap.Uint64("heightToAskAbout", heightToAskAbout),
+		)
 	}
 
 	vdrBag := bag.Of(vdrIDs...)
@@ -917,9 +991,9 @@ func (e *Engine) sendQuery(
 
 	vdrSet := set.Of(vdrIDs...)
 	if push {
-		e.Sender.SendPushQuery(ctx, vdrSet, e.requestID, blkBytes, nextHeightToAccept)
+		e.Sender.SendPushQuery(ctx, vdrSet, e.requestID, blkBytes, heightToAskAbout)
 	} else {
-		e.Sender.SendPullQuery(ctx, vdrSet, e.requestID, blkID, nextHeightToAccept)
+		e.Sender.SendPullQuery(ctx, vdrSet, e.requestID, blkID, heightToAskAbout)
 	}
 }
 
@@ -999,7 +1073,8 @@ func (e *Engine) deliver(
 		}
 	}
 
-	if err := e.VM.SetPreference(ctx, e.Consensus.Preference()); err != nil {
+	pref, _ := e.Consensus.Preference()
+	if err := e.VM.SetPreference(ctx, pref); err != nil {
 		return err
 	}
 
