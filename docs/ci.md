@@ -27,6 +27,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
     - [Nix store cache](#nix-store-cache)
     - [Binfmt image cache](#binfmt-image-cache)
       - [Validate binfmt cache changes](#validate-binfmt-cache-changes)
+    - [OCI image input cache](#oci-image-input-cache)
     - [Changing input caches safely](#changing-input-caches-safely)
   - [Task](#task)
 - [Using Nix in GitHub Actions](#using-nix-in-github-actions)
@@ -595,6 +596,27 @@ that changes the cache:
 
 Keep the temporary exception limited to the binfmt cache. This check does not
 verify authenticated pulls on `master`.
+
+#### OCI image input cache
+
+An image-validation job can cache a tar archive of its pinned external OCI
+inputs. For example, the Bazel AvalancheGo image job caches its runtime and
+registry images. The job restores the archive before image construction and
+loads it with `docker load`.
+
+The cache key must include every file that changes the selected external input.
+The job must pull a missing image by its platform-specific digest and give it a
+local tag before saving the archive. A mutable tag is not an input identity.
+
+Save only external inputs. Do not save generated node, workload, config, or
+builder images. They are build outputs. They must be rebuilt from the checked-in
+source and can use the Bazel remote cache for their actions.
+
+Use `actions/cache/restore` before construction. Use `cache-policy` to save only
+on `master`. On a warm run, set the build's cached-input requirement from the
+exact cache-hit output. The build must fail if an expected input is absent,
+rather than pulling it. Add a producer and an offline completeness check when
+the input set is too large to inspect manually.
 
 #### Changing input caches safely
 
