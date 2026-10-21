@@ -90,7 +90,13 @@ func TestPermissionlessValidatorMarshalJSON(t *testing.T) {
 					},
 					AppliedStakeIncrease: new(avajson.Uint64(5_000)),
 					PendingStakeDecrease: new(avajson.Uint64(1_000)),
-					WithdrawnStake:       new(avajson.Uint64(4_000)),
+					PendingStakeDecreases: &[]StakeDecrease{
+						{
+							TxID:   ids.Empty,
+							Amount: 1_000,
+						},
+					},
+					WithdrawnStake: new(avajson.Uint64(4_000)),
 				},
 			},
 			expected: `{
@@ -109,6 +115,7 @@ func TestPermissionlessValidatorMarshalJSON(t *testing.T) {
 				"pendingStakeIncreases": [{"txID": "11111111111111111111111111111111LpoYY", "amount": "2000"}],
 				"appliedStakeIncrease": "5000",
 				"pendingStakeDecrease": "1000",
+				"pendingStakeDecreases": [{"txID": "11111111111111111111111111111111LpoYY", "amount": "1000"}],
 				"withdrawnStake": "4000"
 			}`,
 		},

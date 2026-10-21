@@ -79,11 +79,18 @@ type ClientAutoRenewedConfig struct {
 	PendingStakeIncreases     []ClientStakeIncrease
 	AppliedStakeIncrease      *uint64
 	PendingStakeDecrease      *uint64
+	PendingStakeDecreases     []ClientStakeDecrease
 	WithdrawnStake            *uint64
 }
 
 // ClientStakeIncrease is a stake increase of an auto-renewed validator.
 type ClientStakeIncrease struct {
+	TxID   ids.ID
+	Amount uint64
+}
+
+// ClientStakeDecrease is a stake decrease of an auto-renewed validator.
+type ClientStakeDecrease struct {
 	TxID   ids.ID
 	Amount uint64
 }
@@ -242,6 +249,17 @@ func apiAutoRenewedConfigToClient(cfg *api.AutoRenewedConfig) (*ClientAutoRenewe
 		}
 	}
 
+	var pendingStakeDecreases []ClientStakeDecrease
+	if cfg.PendingStakeDecreases != nil {
+		pendingStakeDecreases = make([]ClientStakeDecrease, len(*cfg.PendingStakeDecreases))
+		for i, stakeDecrease := range *cfg.PendingStakeDecreases {
+			pendingStakeDecreases[i] = ClientStakeDecrease{
+				TxID:   stakeDecrease.TxID,
+				Amount: uint64(stakeDecrease.Amount),
+			}
+		}
+	}
+
 	return &ClientAutoRenewedConfig{
 		ValidatorAuthority:        validatorAuthority,
 		NextPeriod:                uint64(cfg.NextPeriod),
@@ -252,6 +270,7 @@ func apiAutoRenewedConfigToClient(cfg *api.AutoRenewedConfig) (*ClientAutoRenewe
 		PendingStakeIncreases:     pendingStakeIncreases,
 		AppliedStakeIncrease:      (*uint64)(cfg.AppliedStakeIncrease),
 		PendingStakeDecrease:      (*uint64)(cfg.PendingStakeDecrease),
+		PendingStakeDecreases:     pendingStakeDecreases,
 		WithdrawnStake:            (*uint64)(cfg.WithdrawnStake),
 	}, nil
 }

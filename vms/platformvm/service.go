@@ -684,6 +684,29 @@ func (s *Service) loadStakeIncreases(txIDs []ids.ID) ([]platformapi.StakeIncreas
 	return stakeIncreases, nil
 }
 
+// loadStakeDecreases returns the stake decreases requested by the
+// DecreaseAutoRenewedValidatorStakeTxs with the provided IDs.
+func (s *Service) loadStakeDecreases(txIDs []ids.ID) ([]platformapi.StakeDecrease, error) {
+	stakeDecreases := make([]platformapi.StakeDecrease, len(txIDs))
+	for i, txID := range txIDs {
+		tx, _, err := s.vm.state.GetTx(txID)
+		if err != nil {
+			return nil, fmt.Errorf("getting stake decrease tx %s: %w", txID, err)
+		}
+
+		stakeDecreaseTx, ok := tx.Unsigned.(*platform.DecreaseAutoRenewedValidatorStakeTx)
+		if !ok {
+			return nil, fmt.Errorf("expected *platform.DecreaseAutoRenewedValidatorStakeTx but got %T", tx.Unsigned)
+		}
+
+		stakeDecreases[i] = platformapi.StakeDecrease{
+			TxID:   txID,
+			Amount: avajson.Uint64(stakeDecreaseTx.Amount),
+		}
+	}
+	return stakeDecreases, nil
+}
+
 func (s *Service) loadStakerTxAttributes(txID ids.ID) (*stakerAttributes, error) {
 	// Lookup tx from the cache first.
 	attr, found := s.stakerAttributesCache.Get(txID)
@@ -949,6 +972,10 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 				if err != nil {
 					return nil, err
 				}
+				pendingStakeDecreases, err := s.loadStakeDecreases(stakingInfo.PendingStakeDecreaseTxIDs)
+				if err != nil {
+					return nil, err
+				}
 				vdr.AutoRenewedConfig = &platformapi.AutoRenewedConfig{
 					ValidatorAuthority:        apiAuthority,
 					NextPeriod:                avajson.Uint64(stakingInfo.NextPeriod),
@@ -959,6 +986,7 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 					PendingStakeIncreases:     &pendingStakeIncreases,
 					AppliedStakeIncrease:      new(avajson.Uint64(stakingInfo.AccruedStakeIncrease)),
 					PendingStakeDecrease:      new(avajson.Uint64(stakingInfo.PendingStakeDecrease)),
+					PendingStakeDecreases:     &pendingStakeDecreases,
 					WithdrawnStake:            new(avajson.Uint64(stakingInfo.WithdrawnStake)),
 				}
 			}

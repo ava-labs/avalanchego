@@ -885,7 +885,7 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 		delegateeReward       uint64
 		pendingStakeIncreases []uint64
 		appliedStakeIncrease  uint64
-		pendingStakeDecrease  uint64
+		pendingStakeDecreases []uint64
 		withdrawnStake        uint64
 	}{
 		{
@@ -913,10 +913,10 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 			appliedStakeIncrease:  5_000,
 		},
 		{
-			name:                 "pending stake decrease reported apart from withdrawn stake",
-			appliedStakeIncrease: 5_000,
-			pendingStakeDecrease: 1_000,
-			withdrawnStake:       4_000,
+			name:                  "pending stake decrease reported apart from withdrawn stake",
+			appliedStakeIncrease:  5_000,
+			pendingStakeDecreases: []uint64{1_000, 500},
+			withdrawnStake:        4_000,
 		},
 	}
 	for _, test := range tests {
@@ -1006,6 +1006,28 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 				})
 			}
 
+			var (
+				pendingStakeDecrease      uint64
+				pendingStakeDecreaseTxIDs []ids.ID
+				wantPendingStakeDecreases = []pchainapi.StakeDecrease{}
+			)
+			for _, amount := range test.pendingStakeDecreases {
+				stakeDecreaseTx := &platform.Tx{Unsigned: &platform.DecreaseAutoRenewedValidatorStakeTx{
+					TxID:   tx.ID(),
+					Auth:   &secp256k1fx.Input{},
+					Amount: amount,
+				}}
+				require.NoError(stakeDecreaseTx.Initialize(platform.Codec))
+				diff.AddTx(stakeDecreaseTx, status.Committed)
+
+				pendingStakeDecrease += amount
+				pendingStakeDecreaseTxIDs = append(pendingStakeDecreaseTxIDs, stakeDecreaseTx.ID())
+				wantPendingStakeDecreases = append(wantPendingStakeDecreases, pchainapi.StakeDecrease{
+					TxID:   stakeDecreaseTx.ID(),
+					Amount: avajson.Uint64(amount),
+				})
+			}
+
 			require.NoError(diff.SetStakingInfo(staker.SubnetID, staker.NodeID, state.StakingInfo{
 				DelegateeReward:           test.delegateeReward,
 				AccruedValidationRewards:  test.restakedValidation,
@@ -1014,9 +1036,10 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 				NextPeriod:                periodSeconds,
 				PendingStakeIncrease:      pendingStakeIncrease,
 				AccruedStakeIncrease:      test.appliedStakeIncrease,
-				PendingStakeDecrease:      test.pendingStakeDecrease,
+				PendingStakeDecrease:      pendingStakeDecrease,
 				WithdrawnStake:            test.withdrawnStake,
 				PendingStakeIncreaseTxIDs: pendingStakeIncreaseTxIDs,
+				PendingStakeDecreaseTxIDs: pendingStakeDecreaseTxIDs,
 			}))
 			require.NoError(diff.Apply(service.vm.state))
 			require.NoError(service.vm.state.Commit())
@@ -1071,7 +1094,8 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 					PendingStakeIncrease:      new(avajson.Uint64(pendingStakeIncrease)),
 					PendingStakeIncreases:     &wantPendingStakeIncreases,
 					AppliedStakeIncrease:      new(avajson.Uint64(test.appliedStakeIncrease)),
-					PendingStakeDecrease:      new(avajson.Uint64(test.pendingStakeDecrease)),
+					PendingStakeDecrease:      new(avajson.Uint64(pendingStakeDecrease)),
+					PendingStakeDecreases:     &wantPendingStakeDecreases,
 					WithdrawnStake:            new(avajson.Uint64(test.withdrawnStake)),
 				},
 				DelegatorCount:  new(avajson.Uint64),

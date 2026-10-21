@@ -610,6 +610,10 @@ platform.getCurrentValidators({
         },
         appliedStakeIncrease: string,
         pendingStakeDecrease: string,
+        pendingStakeDecreases: []{
+            txID: string,
+            amount: string
+        },
         withdrawnStake: string,
         delegatorCount: string,
         delegatorWeight: string,
@@ -682,6 +686,9 @@ platform.getCurrentValidators({
       previous cycles. Requires Igloo.
     - `pendingStakeDecrease` is the stake, in nAVAX, that will be withdrawn at the start of the next
       cycle. Requires Igloo.
+    - `pendingStakeDecreases` lists each `DecreaseAutoRenewedValidatorStakeTx` that requested
+      `pendingStakeDecrease`, with its `txID` and `amount` in nAVAX. These stake decreases can be
+      cancelled with a `CancelAutoRenewedValidatorStakeDecreaseTx`. Requires Igloo.
     - `withdrawnStake` is the total stake, in nAVAX, withdrawn from `weight` by stake decreases in
       previous cycles. Requires Igloo.
     - `endTime` for an auto-renewed validator is the end of the current cycle, not the end of the

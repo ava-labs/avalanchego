@@ -102,6 +102,13 @@ type StakeIncrease struct {
 	Amount json.Uint64 `json:"amount"`
 }
 
+// StakeDecrease is the repr. of a DecreaseAutoRenewedValidatorStakeTx sent
+// over APIs.
+type StakeDecrease struct {
+	TxID   ids.ID      `json:"txID"`
+	Amount json.Uint64 `json:"amount"`
+}
+
 // AutoRenewedConfig holds the config fields specific to auto-renewed validators.
 type AutoRenewedConfig struct {
 	// The owner authorized to modify this validator's config.
@@ -133,6 +140,9 @@ type AutoRenewedConfig struct {
 	// Stake to withdraw at the start of the next cycle. Nil if the node does
 	// not report it.
 	PendingStakeDecrease *json.Uint64 `json:"pendingStakeDecrease,omitempty"`
+	// The txs that requested PendingStakeDecrease. These stake decreases can
+	// still be cancelled. Nil if the node does not report them.
+	PendingStakeDecreases *[]StakeDecrease `json:"pendingStakeDecreases,omitempty"`
 	// Cumulative stake withdrawn from the validator's stake outputs over
 	// completed cycles. Nil if the node does not report it.
 	WithdrawnStake *json.Uint64 `json:"withdrawnStake,omitempty"`

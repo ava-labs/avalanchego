@@ -103,7 +103,13 @@ func TestClientGetCurrentValidators(t *testing.T) {
 					},
 					AppliedStakeIncrease: new(avajson.Uint64(5_000)),
 					PendingStakeDecrease: new(avajson.Uint64(1_000)),
-					WithdrawnStake:       new(avajson.Uint64(4_000)),
+					PendingStakeDecreases: &[]api.StakeDecrease{
+						{
+							TxID:   ids.Empty,
+							Amount: 1_000,
+						},
+					},
+					WithdrawnStake: new(avajson.Uint64(4_000)),
 				},
 			},
 			expected: ClientPermissionlessValidator{
@@ -124,7 +130,13 @@ func TestClientGetCurrentValidators(t *testing.T) {
 					},
 					AppliedStakeIncrease: new(uint64(5_000)),
 					PendingStakeDecrease: new(uint64(1_000)),
-					WithdrawnStake:       new(uint64(4_000)),
+					PendingStakeDecreases: []ClientStakeDecrease{
+						{
+							TxID:   ids.Empty,
+							Amount: 1_000,
+						},
+					},
+					WithdrawnStake: new(uint64(4_000)),
 				},
 			},
 		},
