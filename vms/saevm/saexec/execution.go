@@ -140,14 +140,11 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	}
 
 	start := time.Now()
-	defer func() {
-		e.metrics.observeExecuteDuration(time.Since(start))
-	}()
+
 	stateDB, err := e.StateDB(b.ParentBlock().PostExecutionStateRoot())
 	if err != nil {
 		return err
 	}
-
 	// The prefetcher loads trie nodes during execution which removes the loads
 	// at Commit time. On historical mainnet C-Chain it cut mean block insertion
 	// from 99.76ms to 44.84ms:
@@ -170,7 +167,11 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
-	return e.afterExecution(b, stateDB, result)
+	if err := e.afterExecution(b, stateDB, result); err != nil {
+		return err
+	}
+	e.metrics.observeExecuteDuration(start, time.Now(), b, result)
+	return nil
 }
 
 type (
@@ -188,15 +189,19 @@ type (
 
 	// ExecutionResults holds the outputs of [Execute].
 	ExecutionResults struct {
-		BaseFee     *uint256.Int
-		Signer      types.Signer
-		BlockCtx    vm.BlockContext
-		Receipts    types.Receipts
-		GasConsumed gas.Gas
-		FinishBy    struct {
+		BaseFee                  *uint256.Int
+		Signer                   types.Signer
+		BlockCtx                 vm.BlockContext
+		Receipts                 types.Receipts
+		GasConsumed, GasExecuted gas.Gas
+		FinishBy                 struct {
 			Gas  *gastime.Time
 			Wall time.Time
 		}
+		// The final [gastime.Time] is from after the change in
+		// [gastime.Time.Rate] so may differ from the rate at which the block
+		// was actually executed.
+		rate gas.Gas
 	}
 )
 
@@ -335,6 +340,7 @@ func Execute(
 		Signer:   signer,
 		BlockCtx: core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
 		Receipts: make(types.Receipts, len(txs)),
+		rate:     gasClock.Rate(),
 	}
 
 	for ti, tx := range txs {
@@ -356,6 +362,7 @@ func Execute(
 		if err != nil {
 			return nil, fmt.Errorf("%w: transaction execution errored (not reverted) [%d](%#x): %v", errFatal, ti, tx.Hash(), err)
 		}
+		res.GasExecuted += gas.Gas(receipt.GasExecuted)
 
 		perTxClock.Tick(gas.Gas(receipt.GasUsed))
 		// Interim execution time reports live canonical progress. Historical
@@ -413,6 +420,7 @@ func Execute(
 	for i, o := range ops {
 		b.CheckOpBurnerBalanceBounds(stateDB, numTxs+i, o)
 		res.GasConsumed += o.Gas
+		res.GasExecuted += o.Gas
 		perTxClock.Tick(o.Gas)
 		if config.canonical && !synchronous {
 			b.SwapInterimExecutionTime(perTxClock)

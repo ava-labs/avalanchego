@@ -410,7 +410,7 @@ func TestExecution(t *testing.T) {
 	opts := cmp.Options{
 		cmpopts.IgnoreFields(
 			types.Receipt{},
-			"GasUsed", "CumulativeGasUsed",
+			"GasUsed", "GasExecuted", "CumulativeGasUsed",
 			"Bloom",
 		),
 		cmputils.BigInts(),
@@ -985,7 +985,7 @@ func TestContextualOpCodes(t *testing.T) {
 			diffopts := cmp.Options{
 				cmpopts.IgnoreFields(
 					types.Receipt{},
-					"Bloom", "ContractAddress", "CumulativeGasUsed", "GasUsed",
+					"Bloom", "ContractAddress", "CumulativeGasUsed", "GasUsed", "GasExecuted",
 				),
 				cmpopts.IgnoreFields(
 					types.Log{},
