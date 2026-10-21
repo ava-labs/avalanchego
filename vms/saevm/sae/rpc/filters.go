@@ -32,6 +32,9 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 		return api.FilterAPI.GetLogs(ctx, crit)
 	}
 
+	// [filters.FilterCriteria.UnmarshalJSON] guarantees that FromBlock and ToBlock
+	// are both valid [rpc.BlockNumber] values.
+
 	start, foundStart := api.resolve(crit.FromBlock)
 	if !foundStart {
 		// All special numbers resolve, so this must be a future block.

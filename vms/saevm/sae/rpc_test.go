@@ -974,7 +974,7 @@ func TestGetLogsRange(t *testing.T) {
 			// libevm always resolves pending to last executed, but the config is NOT set.
 			name:    "pending_resolves_to_last_accepted",
 			query:   map[string]any{"fromBlock": "pending", "toBlock": "pending"},
-			wantErr: testerr.Contains("failed to get logs for block #3"),
+			wantErr: testerr.Contains("failed to get logs for block #3"), // from libevm
 		},
 		{
 			name:    "future_range_reversed",
