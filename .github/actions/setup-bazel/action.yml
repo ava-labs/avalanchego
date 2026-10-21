@@ -16,7 +16,8 @@ runs:
         request-cache-save: ${{ inputs.is-setup-job }}
 
     # The Go workflow owns Task cache writes.
-    - uses: ./.github/actions/setup-task
+    - id: setup-task
+      uses: ./.github/actions/setup-task
 
     - name: Ensure runner disk space
       uses: ./.github/actions/ensure-disk-space
@@ -104,6 +105,6 @@ runs:
         key: ${{ steps.cache-key.outputs.cache-key }}
 
     - name: Log Bazel disk diagnostics
-      if: ${{ failure() }}
+      if: ${{ failure() && steps.setup-task.outcome == 'success' }}
       shell: bash
       run: ./scripts/run_task.sh log-ci-disk-state-bazel
