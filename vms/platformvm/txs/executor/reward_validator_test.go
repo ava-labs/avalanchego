@@ -1547,6 +1547,38 @@ func increaseAutoRenewedValidatorStake(
 	return tx
 }
 
+// decreaseAutoRenewedValidatorStake issues a DecreaseAutoRenewedValidatorStakeTx
+// for the validator created by the tx with stakerTxID and commits it to the
+// state.
+func decreaseAutoRenewedValidatorStake(
+	t testing.TB,
+	env *environment,
+	wallet wallet.Wallet,
+	stakerTxID ids.ID,
+	amount uint64,
+) *platform.Tx {
+	t.Helper()
+
+	tx, err := wallet.IssueDecreaseAutoRenewedValidatorStakeTx(stakerTxID, amount)
+	require.NoError(t, err)
+
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+
+	_, _, _, err = StandardTx(
+		&env.backend,
+		state.PickFeeCalculator(env.config, env.state),
+		tx,
+		diff,
+	)
+	require.NoError(t, err)
+	diff.AddTx(tx, status.Committed)
+
+	require.NoError(t, diff.Apply(env.state))
+	require.NoError(t, env.state.Commit())
+	return tx
+}
+
 // rewardAutoRenewedValidator executes the RewardAutoRenewedValidatorTx that ends
 // the current cycle of the validator created by stakerTx and returns the
 // resulting commit and abort states.

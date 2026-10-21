@@ -6081,6 +6081,391 @@ func TestStandardExecutorDecreaseAutoRenewedValidatorStakeTxErrors(t *testing.T)
 	}
 }
 
+// TestStandardExecutorCancelAutoRenewedValidatorStakeDecreaseTx verifies that a
+// cancelled stake decrease is removed from the pending stake decrease, leaves
+// the other pending stake decreases in place, and that competing txs executed
+// on sibling diffs don't modify each other's or the parent's pending tx IDs.
+func TestStandardExecutorCancelAutoRenewedValidatorStakeDecreaseTx(t *testing.T) {
+	const (
+		cancelledAmount = 2 * units.MilliAvax
+		remainingAmount = 3 * units.MilliAvax
+	)
+
+	tests := []struct {
+		name string
+		// restake reports whether the validator continues after its current
+		// cycle. Stake decreases can be cancelled either way.
+		restake bool
+	}{
+		{
+			name:    "restaking_validator",
+			restake: true,
+		},
+		{
+			name:    "stopping_validator",
+			restake: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			env := newEnvironment(t, upgradetest.Latest)
+			// Charge a non-zero fee so the tx is funded with a real input and
+			// change output, letting us assert UTXO consumption/production below.
+			env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
+
+			var (
+				wallet        = newWallet(t, env, walletConfig{})
+				feeCalculator = state.PickFeeCalculator(env.config, env.state)
+			)
+
+			cfg := autoRenewedValidatorConfig{
+				weight:                   2 * defaultMinValidatorStake,
+				delegationRewardShares:   reward.PercentDenominator / 10,
+				autoCompoundRewardShares: reward.PercentDenominator,
+				restake:                  true,
+			}
+			stakerTx, err := wallet.IssueAddAutoRenewedValidatorTx(
+				ids.GenerateTestNodeID(),
+				cfg.weight,
+				newProofOfPossession(t),
+				&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+				&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{ids.GenerateTestShortID()}},
+				&secp256k1fx.OutputOwners{},
+				cfg.delegationRewardShares,
+				cfg.autoCompoundRewardShares,
+				env.config.MinStakeDuration,
+			)
+			require.NoError(t, err)
+			addAutoRenewedValidator(t, env, stakerTx, cfg)
+
+			uStakerTx := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
+			subnetID, nodeID := uStakerTx.SubnetID(), uStakerTx.NodeID()
+
+			cancelledTx := decreaseAutoRenewedValidatorStake(t, env, wallet, stakerTx.ID(), cancelledAmount)
+			remainingTx := decreaseAutoRenewedValidatorStake(t, env, wallet, stakerTx.ID(), remainingAmount)
+
+			if !tt.restake {
+				stakingInfo, err := env.state.GetStakingInfo(subnetID, nodeID)
+				require.NoError(t, err)
+				stakingInfo.NextPeriod = 0
+				require.NoError(t, env.state.SetStakingInfo(subnetID, nodeID, stakingInfo))
+			}
+
+			initialValidator, err := env.state.GetCurrentValidator(subnetID, nodeID)
+			require.NoError(t, err)
+			initialStakingInfo, err := env.state.GetStakingInfo(subnetID, nodeID)
+			require.NoError(t, err)
+			require.Equal(t, cancelledAmount+remainingAmount, initialStakingInfo.PendingStakeDecrease)
+			require.Equal(t, []ids.ID{cancelledTx.ID(), remainingTx.ID()}, initialStakingInfo.PendingStakeDecreaseTxIDs)
+
+			// A competing tx is built before the tx is issued, so both spend the
+			// same UTXOs, as competing txs in sibling blocks would.
+			uSiblingTx, err := wallet.Builder().NewCancelAutoRenewedValidatorStakeDecreaseTx(
+				stakerTx.ID(),
+				remainingTx.ID(),
+			)
+			require.NoError(t, err)
+			siblingTx, err := walletsigner.SignUnsigned(t.Context(), wallet.Signer(), uSiblingTx)
+			require.NoError(t, err)
+
+			cancelTx, err := wallet.IssueCancelAutoRenewedValidatorStakeDecreaseTx(
+				stakerTx.ID(),
+				cancelledTx.ID(),
+			)
+			require.NoError(t, err)
+
+			// Before execution: the input UTXOs exist and the output UTXOs don't.
+			inputIDs := cancelTx.InputIDs()
+			require.NotEmpty(t, inputIDs)
+			for inputID := range inputIDs {
+				_, err := env.state.GetUTXO(inputID)
+				require.NoError(t, err)
+			}
+
+			outputUTXOs := cancelTx.UTXOs()
+			require.NotEmpty(t, outputUTXOs)
+			for _, outputUTXO := range outputUTXOs {
+				_, err := env.state.GetUTXO(outputUTXO.InputID())
+				require.ErrorIs(t, err, database.ErrNotFound)
+			}
+
+			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+			require.NoError(t, err)
+
+			_, _, _, err = StandardTx(
+				&env.backend,
+				feeCalculator,
+				cancelTx,
+				diff,
+			)
+			require.NoError(t, err)
+			require.True(t, cancelTx.Unsigned.(*platform.CancelAutoRenewedValidatorStakeDecreaseTx).SyntacticallyVerified)
+
+			// The competing tx cancels the other stake decrease, and must not
+			// modify the tx IDs seen by the first one.
+			siblingDiff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+			require.NoError(t, err)
+			_, _, _, err = StandardTx(
+				&env.backend,
+				feeCalculator,
+				siblingTx,
+				siblingDiff,
+			)
+			require.NoError(t, err)
+
+			siblingStakingInfo, err := siblingDiff.GetStakingInfo(subnetID, nodeID)
+			require.NoError(t, err)
+			require.Equal(t, cancelledAmount, siblingStakingInfo.PendingStakeDecrease)
+			require.Equal(t, []ids.ID{cancelledTx.ID()}, siblingStakingInfo.PendingStakeDecreaseTxIDs)
+
+			diffStakingInfo, err := diff.GetStakingInfo(subnetID, nodeID)
+			require.NoError(t, err)
+			require.Equal(t, []ids.ID{remainingTx.ID()}, diffStakingInfo.PendingStakeDecreaseTxIDs)
+
+			// Executing the tx must not modify the parent state. The tx IDs are
+			// compared against a new slice, as initialStakingInfo shares its
+			// slice with the parent state.
+			stakingInfo, err := env.state.GetStakingInfo(subnetID, nodeID)
+			require.NoError(t, err)
+			require.Equal(t, cancelledAmount+remainingAmount, stakingInfo.PendingStakeDecrease)
+			require.Equal(t, []ids.ID{cancelledTx.ID(), remainingTx.ID()}, stakingInfo.PendingStakeDecreaseTxIDs)
+
+			require.NoError(t, diff.Apply(env.state))
+
+			stakingInfo, err = env.state.GetStakingInfo(subnetID, nodeID)
+			require.NoError(t, err)
+
+			wantStakingInfo := initialStakingInfo
+			wantStakingInfo.PendingStakeDecrease = remainingAmount
+			wantStakingInfo.PendingStakeDecreaseTxIDs = []ids.ID{remainingTx.ID()}
+			require.Equal(t, wantStakingInfo, stakingInfo)
+
+			// The stake decrease was never withdrawn, so the validator must not
+			// be modified.
+			validator, err := env.state.GetCurrentValidator(subnetID, nodeID)
+			require.NoError(t, err)
+			require.Equal(t, initialValidator, validator)
+
+			// After execution: the input UTXOs are consumed and the change outputs
+			// are created.
+			for inputID := range inputIDs {
+				_, err := env.state.GetUTXO(inputID)
+				require.ErrorIs(t, err, database.ErrNotFound)
+			}
+
+			for _, wantUTXO := range outputUTXOs {
+				gotUTXO, err := env.state.GetUTXO(wantUTXO.InputID())
+				require.NoError(t, err)
+				require.Equal(t, wantUTXO, gotUTXO)
+			}
+		})
+	}
+}
+
+func TestStandardExecutorCancelAutoRenewedValidatorStakeDecreaseTxErrors(t *testing.T) {
+	var (
+		env           = newEnvironment(t, upgradetest.Latest)
+		wallet        = newWallet(t, env, walletConfig{})
+		feeCalculator = state.PickFeeCalculator(env.config, env.state)
+	)
+
+	it, err := env.state.GetCurrentStakerIterator()
+	require.NoError(t, err)
+
+	validators := iterator.ToSlice(it)
+	require.NotEmpty(t, validators)
+	fixedStakerTxID := validators[0].TxID
+
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
+
+	nodeID := ids.GenerateTestNodeID()
+
+	addPastAutoRenewedValidatorTx, err := wallet.IssueAddAutoRenewedValidatorTx(
+		nodeID,
+		env.config.MinValidatorStake,
+		pop,
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		0,
+		0,
+		env.config.MinStakeDuration,
+	)
+	require.NoError(t, err)
+
+	addAutoRenewedValidatorTx, err := wallet.IssueAddAutoRenewedValidatorTx(
+		nodeID,
+		2*env.config.MinValidatorStake,
+		pop,
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{Threshold: 1, Addrs: []ids.ShortID{genesistest.DefaultFundedKeys[0].Address()}},
+		500_000,
+		300_000,
+		2*env.config.MinStakeDuration,
+	)
+	require.NoError(t, err)
+
+	validatorTx := addAutoRenewedValidatorTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
+
+	startTime := time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0)
+	duration := time.Duration(validatorTx.Period) * time.Second
+	staker, err := state.NewCurrentStaker(
+		addAutoRenewedValidatorTx.ID(),
+		validatorTx,
+		startTime,
+		startTime.Add(duration),
+		validatorTx.Weight(),
+		0,
+	)
+	require.NoError(t, err)
+
+	// The pending stake decrease tx is not in the state, as verification
+	// fails before it is read. The tx that created a previous validator is
+	// recorded as a stake decrease to check the type of the tx that is read.
+	pendingStakeDecreaseTxID := ids.GenerateTestID()
+	stakingInfo := state.StakingInfo{
+		AutoCompoundRewardShares: validatorTx.AutoCompoundRewardShares,
+		NextPeriod:               validatorTx.Period,
+		PendingStakeDecrease:     units.MilliAvax,
+		PendingStakeDecreaseTxIDs: []ids.ID{
+			pendingStakeDecreaseTxID,
+			addPastAutoRenewedValidatorTx.ID(),
+		},
+	}
+
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	require.NoError(t, err)
+	diff.AddTx(addPastAutoRenewedValidatorTx, status.Committed)
+	diff.AddTx(addAutoRenewedValidatorTx, status.Committed)
+	require.NoError(t, diff.PutCurrentValidator(staker))
+	require.NoError(t, diff.SetStakingInfo(constants.PrimaryNetworkID, nodeID, stakingInfo))
+	require.NoError(t, diff.Apply(env.state))
+
+	tests := []struct {
+		name              string
+		stakeDecreaseTxID ids.ID
+		updateTx          func(testing.TB, *platform.CancelAutoRenewedValidatorStakeDecreaseTx, *platform.Tx)
+		updateState       func(testing.TB, *state.Diff)
+		wantErr           error
+	}{
+		{
+			name: "invalid_upgrade",
+			updateState: func(_ testing.TB, diff *state.Diff) {
+				diff.SetTimestamp(env.backend.Config.UpgradeConfig.IglooTime.Add(-1 * time.Second))
+			},
+			wantErr: errIglooUpgradeNotActive,
+		},
+		{
+			name: "stopped_validator",
+			updateState: func(t testing.TB, diff *state.Diff) {
+				require.NoError(t, diff.DeleteCurrentValidator(staker))
+			},
+			wantErr: database.ErrNotFound,
+		},
+		{
+			name: "missing_staker_tx",
+			updateTx: func(_ testing.TB, tx *platform.CancelAutoRenewedValidatorStakeDecreaseTx, _ *platform.Tx) {
+				tx.TxID = ids.GenerateTestID()
+			},
+			wantErr: database.ErrNotFound,
+		},
+		{
+			name: "invalid_staker_tx",
+			updateTx: func(_ testing.TB, tx *platform.CancelAutoRenewedValidatorStakeDecreaseTx, _ *platform.Tx) {
+				tx.TxID = addPastAutoRenewedValidatorTx.ID()
+			},
+			wantErr: errInvalidStakerTx,
+		},
+		{
+			name: "invalid_staker_tx_type",
+			updateTx: func(_ testing.TB, tx *platform.CancelAutoRenewedValidatorStakeDecreaseTx, _ *platform.Tx) {
+				tx.TxID = fixedStakerTxID
+			},
+			wantErr: errInvalidStakerTxType,
+		},
+		{
+			name:              "unknown_stake_decrease",
+			stakeDecreaseTxID: ids.GenerateTestID(),
+			wantErr:           errStakeDecreaseNotPending,
+		},
+		{
+			name: "withdrawn_stake_decrease",
+			updateState: func(t testing.TB, diff *state.Diff) {
+				// The stake decrease was withdrawn at the start of the current
+				// cycle.
+				stakingInfo := stakingInfo
+				stakingInfo.PendingStakeDecrease = 0
+				stakingInfo.PendingStakeDecreaseTxIDs = nil
+				stakingInfo.WithdrawnStake = units.MilliAvax
+				require.NoError(t, diff.SetStakingInfo(constants.PrimaryNetworkID, nodeID, stakingInfo))
+			},
+			wantErr: errStakeDecreaseNotPending,
+		},
+		{
+			name:              "unexpected_stake_decrease_tx_type",
+			stakeDecreaseTxID: addPastAutoRenewedValidatorTx.ID(),
+			wantErr:           errUnexpectedStakeDecreaseTxType,
+		},
+		{
+			name: "invalid_auth",
+			updateTx: func(t testing.TB, tx *platform.CancelAutoRenewedValidatorStakeDecreaseTx, sTx *platform.Tx) {
+				dummySig, err := genesistest.DefaultFundedKeys[1].SignHash([]byte{})
+				require.NoError(t, err)
+
+				tx.Auth = &secp256k1fx.Input{SigIndices: []uint32{0}}
+				sTx.Creds = []verify.Verifiable{&secp256k1fx.Credential{}, &secp256k1fx.Credential{
+					Sigs: [][secp256k1.SignatureLen]byte{[secp256k1.SignatureLen]byte(dummySig)},
+				}}
+			},
+			wantErr: secp256k1fx.ErrWrongSig,
+		},
+		{
+			name: "wrong_number_of_credentials",
+			updateTx: func(_ testing.TB, _ *platform.CancelAutoRenewedValidatorStakeDecreaseTx, sTx *platform.Tx) {
+				sTx.Creds = nil
+			},
+			wantErr: errWrongNumberOfCredentials,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+			require.NoError(t, err)
+
+			stakeDecreaseTxID := pendingStakeDecreaseTxID
+			if tt.stakeDecreaseTxID != ids.Empty {
+				stakeDecreaseTxID = tt.stakeDecreaseTxID
+			}
+			tx, err := wallet.IssueCancelAutoRenewedValidatorStakeDecreaseTx(addAutoRenewedValidatorTx.ID(), stakeDecreaseTxID)
+			require.NoError(t, err)
+
+			if tt.updateState != nil {
+				tt.updateState(t, diff)
+			}
+
+			if tt.updateTx != nil {
+				tt.updateTx(t, tx.Unsigned.(*platform.CancelAutoRenewedValidatorStakeDecreaseTx), tx)
+			}
+
+			_, _, _, err = StandardTx(
+				&env.backend,
+				feeCalculator,
+				tx,
+				diff,
+			)
+
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
+}
+
 func TestStandardExecutorRewardAutoRenewedValidatorTx(t *testing.T) {
 	env := newEnvironment(t, upgradetest.Latest)
 

@@ -50,6 +50,7 @@ var (
 	errTooManyStakeIncreases           = errors.New("too many stake increases")
 	errStakeIncreaseNotPending         = errors.New("stake increase is not pending")
 	errTooManyStakeDecreases           = errors.New("too many stake decreases")
+	errStakeDecreaseNotPending         = errors.New("stake decrease is not pending")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -1332,6 +1333,61 @@ func verifyDecreaseAutoRenewedValidatorStakeTx(
 	}
 	if totalDecrease > maxDecrease {
 		return nil, state.StakingInfo{}, fmt.Errorf("%w: decreasing by %d would leave less than the minimum stake of %d", ErrWeightTooSmall, totalDecrease, validatorRules.minValidatorStake)
+	}
+
+	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, autoRenewedStakerTx.ValidatorAuthority, tx.Auth)
+	if err != nil {
+		return nil, state.StakingInfo{}, err
+	}
+
+	if err := verifySpend(
+		backend,
+		feeCalculator,
+		chainState,
+		tx,
+		baseTxCreds,
+	); err != nil {
+		return nil, state.StakingInfo{}, err
+	}
+
+	return validator, stakingInfo, nil
+}
+
+// verifyCancelAutoRenewedValidatorStakeDecreaseTx carries out the validation for
+// a CancelAutoRenewedValidatorStakeDecreaseTx.
+func verifyCancelAutoRenewedValidatorStakeDecreaseTx(
+	backend *Backend,
+	feeCalculator fee.Calculator,
+	chainState state.Chain,
+	sTx *platform.Tx,
+	tx *platform.CancelAutoRenewedValidatorStakeDecreaseTx,
+) (*state.Staker, state.StakingInfo, error) {
+	if !backend.Config.UpgradeConfig.IsIglooActivated(chainState.GetTimestamp()) {
+		return nil, state.StakingInfo{}, errIglooUpgradeNotActive
+	}
+
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return nil, state.StakingInfo{}, err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return nil, state.StakingInfo{}, err
+	}
+
+	autoRenewedStakerTx, validator, stakingInfo, err := getAutoRenewedValidator(chainState, tx.TxID)
+	if err != nil {
+		return nil, state.StakingInfo{}, err
+	}
+
+	// Stake decreases that were already withdrawn at the start of a cycle
+	// can't be cancelled.
+	if !slices.Contains(stakingInfo.PendingStakeDecreaseTxIDs, tx.StakeDecreaseTxID) {
+		return nil, state.StakingInfo{}, fmt.Errorf("%w: %s", errStakeDecreaseNotPending, tx.StakeDecreaseTxID)
+	}
+
+	if !backend.Bootstrapped.Get() {
+		// Not bootstrapped yet -- don't need to do full verification.
+		return validator, stakingInfo, nil
 	}
 
 	baseTxCreds, err := verifyAuthorization(backend.Fx, sTx, autoRenewedStakerTx.ValidatorAuthority, tx.Auth)

@@ -52,6 +52,7 @@ var (
 	errEtnaUpgradeNotActive             = errors.New("attempting to use an Etna-upgrade feature prior to activation")
 	errHeliconUpgradeNotActive          = errors.New("attempting to use a Helicon-upgrade feature prior to activation")
 	errIglooUpgradeNotActive            = errors.New("attempting to use an Igloo-upgrade feature prior to activation")
+	errUnexpectedStakeDecreaseTxType    = errors.New("unexpected stake decrease transaction type")
 	errTransformSubnetTxPostEtna        = errors.New("TransformSubnetTx is not permitted post-Etna")
 	errMaxNumActiveValidators           = errors.New("already at the max number of active validators")
 	errCouldNotLoadSubnetToL1Conversion = errors.New("could not load subnet conversion")
@@ -1480,10 +1481,6 @@ func (*standardTxExecutor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRene
 	return ErrWrongTxType
 }
 
-func (*standardTxExecutor) CancelAutoRenewedValidatorStakeDecreaseTx(*platform.CancelAutoRenewedValidatorStakeDecreaseTx) error {
-	return ErrWrongTxType
-}
-
 func (e *standardTxExecutor) DecreaseAutoRenewedValidatorStakeTx(tx *platform.DecreaseAutoRenewedValidatorStakeTx) error {
 	validator, stakingInfo, err := verifyDecreaseAutoRenewedValidatorStakeTx(e.backend, e.feeCalculator, e.state, e.tx, tx)
 	if err != nil {
@@ -1509,6 +1506,49 @@ func (e *standardTxExecutor) DecreaseAutoRenewedValidatorStakeTx(tx *platform.De
 	avax.Produce(e.state, txID, tx.Outs)
 
 	return nil
+}
+
+func (e *standardTxExecutor) CancelAutoRenewedValidatorStakeDecreaseTx(tx *platform.CancelAutoRenewedValidatorStakeDecreaseTx) error {
+	validator, stakingInfo, err := verifyCancelAutoRenewedValidatorStakeDecreaseTx(e.backend, e.feeCalculator, e.state, e.tx, tx)
+	if err != nil {
+		return err
+	}
+
+	stakeDecreaseTx, err := getStakeDecreaseTx(e.state, tx.StakeDecreaseTxID)
+	if err != nil {
+		return err
+	}
+
+	stakingInfo.PendingStakeDecrease, err = math.Sub(stakingInfo.PendingStakeDecrease, stakeDecreaseTx.Amount)
+	if err != nil {
+		return fmt.Errorf("removing pending stake decrease: %w", err)
+	}
+
+	// The slice is copied because it may be shared with the parent state.
+	i := slices.Index(stakingInfo.PendingStakeDecreaseTxIDs, tx.StakeDecreaseTxID)
+	stakingInfo.PendingStakeDecreaseTxIDs = slices.Delete(slices.Clone(stakingInfo.PendingStakeDecreaseTxIDs), i, i+1)
+
+	if err := e.state.SetStakingInfo(validator.SubnetID, validator.NodeID, stakingInfo); err != nil {
+		return fmt.Errorf("setting staking info: %w", err)
+	}
+
+	avax.Consume(e.state, tx.Ins)
+	avax.Produce(e.state, e.tx.ID(), tx.Outs)
+
+	return nil
+}
+
+func getStakeDecreaseTx(chainState state.Chain, txID ids.ID) (*platform.DecreaseAutoRenewedValidatorStakeTx, error) {
+	tx, _, err := chainState.GetTx(txID)
+	if err != nil {
+		return nil, fmt.Errorf("getting stake decrease tx %s: %w", txID, err)
+	}
+
+	stakeDecreaseTx, ok := tx.Unsigned.(*platform.DecreaseAutoRenewedValidatorStakeTx)
+	if !ok {
+		return nil, fmt.Errorf("%w: %T", errUnexpectedStakeDecreaseTxType, tx.Unsigned)
+	}
+	return stakeDecreaseTx, nil
 }
 
 func (e *standardTxExecutor) CancelAutoRenewedValidatorStakeIncreaseTx(tx *platform.CancelAutoRenewedValidatorStakeIncreaseTx) error {
