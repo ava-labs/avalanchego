@@ -1,0 +1,33 @@
+name: Restore Kind image cache
+description: Download and load the shared Kind host and containerd image cache
+
+inputs:
+  artifact-name:
+    description: Workflow artifact containing the Kind image cache
+    required: false
+    default: kind-images
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/download-artifact@v6
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: .ci/kind-images
+
+    - name: Verify Kind image cache
+      shell: bash
+      run: |
+        set -euo pipefail
+        cache_dir="$GITHUB_WORKSPACE/.ci/kind-images"
+        manifest="$cache_dir/manifest"
+        for entry in \
+          'host-images.tar host_images_sha256' \
+          'containerd-images.tar containerd_images_sha256' \
+          'helm-cache.tar helm_cache_sha256'; do
+          read -r archive key <<<"$entry"
+          expected="$(awk -F= -v key="$key" '$1 == key { print $2 }' "$manifest")"
+          [[ -n "$expected" && "$expected" == "$(sha256sum "$cache_dir/$archive" | awk '{print $1}')" ]]
+        done
+        echo "AVALANCHEGO_KIND_HOST_IMAGES_ARCHIVE=$cache_dir/host-images.tar" >> "$GITHUB_ENV"
+        echo "AVALANCHEGO_KIND_CONTAINERD_IMAGES_ARCHIVE=$cache_dir/containerd-images.tar" >> "$GITHUB_ENV"

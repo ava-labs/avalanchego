@@ -19,7 +19,25 @@
 # TODO(marun) Migrate this script to golang
 set -o errexit
 
-# 1. Create registry container unless it already exists
+# tmpnetctl finds this script through PATH, so $0 can be only its basename.
+# Resolve it before locating the adjacent cache helper.
+script_path="$(command -v "$0" 2>/dev/null || printf '%s' "$0")"
+script_dir="$(CDPATH='' cd -- "$(dirname -- "$script_path")" && pwd)"
+
+# 1. Restore the host image archive before the registry or Kind can need it.
+if [ -n "${AVALANCHEGO_KIND_HOST_IMAGES_ARCHIVE:-}" ]; then
+  if [ ! -r "${AVALANCHEGO_KIND_HOST_IMAGES_ARCHIVE}" ]; then
+    echo "Kind host image archive is not readable: ${AVALANCHEGO_KIND_HOST_IMAGES_ARCHIVE}" >&2
+    exit 1
+  fi
+  docker image load --input "${AVALANCHEGO_KIND_HOST_IMAGES_ARCHIVE}"
+fi
+if [ "${AVALANCHEGO_KIND_OFFLINE:-}" = 'true' ] && [ -z "${AVALANCHEGO_KIND_HOST_IMAGES_ARCHIVE:-}" ]; then
+  echo 'offline Kind mode requires AVALANCHEGO_KIND_HOST_IMAGES_ARCHIVE' >&2
+  exit 1
+fi
+
+# 2. Create registry container unless it already exists
 reg_name='kind-registry'
 reg_port='5001'
 if [ "$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true)" != 'true' ]; then
@@ -28,7 +46,7 @@ if [ "$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true
     registry:2
 fi
 
-# 2. Create kind cluster with containerd registry config dir enabled
+# 3. Create kind cluster with containerd registry config dir enabled
 # TODO: kind will eventually enable this by default and this patch will
 # be unnecessary.
 #
@@ -36,7 +54,20 @@ fi
 # https://github.com/kubernetes-sigs/kind/issues/2875
 # https://github.com/containerd/containerd/blob/main/docs/cri/config.md#registry-configuration
 # See: https://github.com/containerd/containerd/blob/main/docs/hosts.md
-cat <<EOF | kind create cluster --config=-
+# Kind otherwise requests its default node image by digest, even when the
+# corresponding cached image is present only under its version tag.
+if [ "${AVALANCHEGO_KIND_OFFLINE:-}" = 'true' ]; then
+  kind_node_image="$(docker image ls --format '{{.Repository}}:{{.Tag}}' | awk '/^kindest\/node:/ { print; exit }')"
+  if [ -z "$kind_node_image" ]; then
+    echo 'offline Kind mode requires a tagged kindest/node image' >&2
+    exit 1
+  fi
+  set -- --image "$kind_node_image"
+else
+  set --
+fi
+
+cat <<EOF | kind create cluster "$@" --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 containerdConfigPatches:
@@ -53,7 +84,21 @@ nodes:
     protocol: TCP
 EOF
 
-# 3. Add the registry config to the nodes
+# CI image-cache plumbing. Keep this explicit and optional so local Kind use
+# still pulls normally when no cache archive is configured. Offline mode is
+# enforced by running this script against a networkless Docker daemon.
+if [ "${AVALANCHEGO_KIND_OFFLINE:-}" = 'true' ] && [ -z "${AVALANCHEGO_KIND_CONTAINERD_IMAGES_ARCHIVE:-}" ]; then
+  echo 'offline Kind mode requires AVALANCHEGO_KIND_CONTAINERD_IMAGES_ARCHIVE' >&2
+  exit 1
+fi
+if [ -n "${AVALANCHEGO_KIND_IMAGE_CACHE_SNAPSHOT_DIR:-}" ]; then
+  "$script_dir/kind-image-cache.sh" snapshot-containerd "$AVALANCHEGO_KIND_IMAGE_CACHE_SNAPSHOT_DIR"
+fi
+if [ -n "${AVALANCHEGO_KIND_CONTAINERD_IMAGES_ARCHIVE:-}" ]; then
+  "$script_dir/kind-image-cache.sh" import-containerd "$AVALANCHEGO_KIND_CONTAINERD_IMAGES_ARCHIVE"
+fi
+
+# 4. Add the registry config to the nodes
 #
 # This is necessary because localhost resolves to loopback addresses that are
 # network-namespace local.
@@ -69,13 +114,13 @@ for node in $(kind get nodes); do
 EOF
 done
 
-# 4. Connect the registry to the cluster network if not already connected
+# 5. Connect the registry to the cluster network if not already connected
 # This allows kind to bootstrap the network but ensures they're on the same network
 if [ "$(docker inspect -f='{{json .NetworkSettings.Networks.kind}}' "${reg_name}")" = 'null' ]; then
   docker network connect "kind" "${reg_name}"
 fi
 
-# 5. Document the local registry
+# 6. Document the local registry
 # https://github.com/kubernetes/enhancements/tree/master/keps/sig-cluster-lifecycle/generic/1755-communicating-a-local-registry
 cat <<EOF | kubectl apply -f -
 apiVersion: v1
