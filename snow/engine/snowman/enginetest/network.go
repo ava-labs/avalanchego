@@ -63,6 +63,7 @@ func (n *Network) CreateSender(nodeID ids.NodeID) *Sender {
 // before the network delivers a message to nodeID.
 // The [handler] is often the snowman engine of the node.
 func (n *Network) Register(nodeID ids.NodeID, handler common.Handler) {
+	n.t.Helper()
 	require.NotContains(n.t, n.handlers, nodeID, "node %s already registered", nodeID)
 	n.handlers[nodeID] = handler
 }
@@ -77,6 +78,7 @@ func (n *Network) Register(nodeID ids.NodeID, handler common.Handler) {
 // DeliverMessages returns when the queue is empty and no request waits for an
 // answer.
 func (n *Network) DeliverMessages() {
+	n.t.Helper()
 	defer func() {
 		// Make sure that the network has no more messages in the queue, or requests that waits for an answer.
 		require.False(n.t, len(n.queue) > 0 || len(n.awaiting) > 0)
@@ -109,11 +111,6 @@ func (n *Network) DeliverMessages() {
 	}
 }
 
-// Outstanding reports the number of requests that wait for an answer.
-func (n *Network) Outstanding() int {
-	return len(n.awaiting)
-}
-
 func (n *Network) push(f func() error) {
 	n.queue = append(n.queue, f)
 }
@@ -121,6 +118,7 @@ func (n *Network) push(f func() error) {
 // locateHandler finds the recipient when the network delivers the message. The
 // order in which you register the nodes is therefore not important.
 func (n *Network) locateHandler(nodeID ids.NodeID) common.Handler {
+	n.t.Helper()
 	handler, ok := n.handlers[nodeID]
 	require.True(n.t, ok, "message sent to node %s, which was never registered", nodeID)
 	return handler
