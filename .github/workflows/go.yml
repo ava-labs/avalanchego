@@ -68,7 +68,7 @@ jobs:
           run: ./scripts/run_task.sh test-build-image
           working_directory: ./graft/subnet-evm
 
-  check-contract-bindings:
+  checks:
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
@@ -76,67 +76,74 @@ jobs:
         shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
+      # The dev shell provides the generators and restores the Go module cache.
       - uses: ./.github/actions/install-nix
-      - run: ./scripts/run_task.sh check-generate-load-contract-bindings
 
-  check-generated-canoto:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
-      - shell: bash
+      - id: contract-bindings
+        name: Check generated contract bindings
+        continue-on-error: true
+        run: ./scripts/run_task.sh check-generate-load-contract-bindings
+      - name: Restore clean checkout after contract bindings check
+        if: ${{ !cancelled() }}
+        run: git reset --hard HEAD && git clean -ffd
+
+      - id: canoto
+        name: Check generated Canoto code
+        continue-on-error: true
         run: ./scripts/run_task.sh check-generate-canoto
+      - name: Restore clean checkout after Canoto check
+        if: ${{ !cancelled() }}
+        run: git reset --hard HEAD && git clean -ffd
 
-  check-generated-mocks:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
-      - shell: bash
+      - id: mocks
+        name: Check generated mocks
+        continue-on-error: true
         run: ./scripts/run_task.sh check-generate-mocks
+      - name: Restore clean checkout after mocks check
+        if: ${{ !cancelled() }}
+        run: git reset --hard HEAD && git clean -ffd
 
-  check-generated-protobuf:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    defaults:
-      run:
-        shell: nix develop --command bash -x {0}
-    steps:
-      - uses: actions/checkout@v5
-      # Use the dev shell instead of bufbuild/buf-action to ensure the dev shell provides the expected versions
-      - uses: ./.github/actions/install-nix
-      - run: ./scripts/run_task.sh check-generate-protobuf
+      - id: protobuf
+        name: Check generated protobuf
+        continue-on-error: true
+        run: ./scripts/run_task.sh check-generate-protobuf
+      - name: Restore clean checkout after protobuf check
+        if: ${{ !cancelled() }}
+        run: git reset --hard HEAD && git clean -ffd
 
-  check-go-mod-tidy:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      # Prepare Bazel's separate Go module cache before Go setup disables GOPROXY.
-      - uses: ./.github/actions/setup-bazel
-      - uses: ./.github/actions/setup-go-for-project
-      - shell: bash
-        run: ./scripts/run_task.sh check-go-mod-tidy
-
-  check-links:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 # v1.2.5
+      - id: links
+        name: Check links
+        continue-on-error: true
+        uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 # v1.2.5
         with:
           fail_level: any
 
-  check-tauseconds:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - name: Check for TauSeconds misuse with time.Add()
+      - id: tauseconds
+        name: Check for TauSeconds misuse with time.Add()
+        continue-on-error: true
         run: |
           if grep -rn '\.Add([^)]*TauSeconds' --include='*.go' .; then
             echo "ERROR: Use params.Tau (time.Duration) with time.Add(), not TauSeconds (int)"
             echo "TauSeconds would be interpreted as nanoseconds, not seconds"
+            exit 1
+          fi
+
+      - name: Fail if any check failed
+        if: ${{ !cancelled() }}
+        env:
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          failed_checks="$(
+            jq -r '
+              to_entries[]
+              | select(.value.outcome == "failure")
+              | .key
+            ' <<<"$STEPS_JSON"
+          )"
+
+          if [[ -n "$failed_checks" ]]; then
+            echo 'Failed checks:'
+            sed 's/^/  /' <<<"$failed_checks"
             exit 1
           fi
 
