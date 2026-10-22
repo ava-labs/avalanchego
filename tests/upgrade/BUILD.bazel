@@ -12,3 +12,29 @@ go_test(
         "@com_github_stretchr_testify//require",
     ],
 )
+
+genrule(
+    name = "upgrade_test_binary",
+    testonly = True,
+    srcs = [":upgrade_test"],
+    outs = ["upgrade.test"],
+    cmd = "cp $< $@",
+)
+
+sh_binary(
+    name = "runner",
+    testonly = True,
+    srcs = ["//scripts:tests.upgrade.bazel.sh"],
+    args = [
+        "$(location //main:avalanchego)",
+        "$(location :upgrade_test_binary)",
+        "$(location @com_github_onsi_ginkgo_v2//ginkgo:ginkgo)",
+    ],
+    data = [
+        ":upgrade_test_binary",
+        "//main:avalanchego",
+        "//scripts:tests.upgrade.sh",
+        "@com_github_onsi_ginkgo_v2//ginkgo",
+    ],
+    visibility = ["//visibility:public"],
+)

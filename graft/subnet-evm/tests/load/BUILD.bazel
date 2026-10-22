@@ -21,3 +21,32 @@ graft_go_test(
         "@com_github_stretchr_testify//require",
     ],
 )
+
+genrule(
+    name = "load_test_binary",
+    testonly = True,
+    srcs = [":load_test"],
+    outs = ["load.test"],
+    cmd = "cp $< $@",
+)
+
+sh_binary(
+    name = "runner",
+    testonly = True,
+    srcs = ["//graft/subnet-evm/scripts:tests.e2e.bazel.sh"],
+    args = [
+        "$(location //main:avalanchego)",
+        "$(location //graft/subnet-evm/plugin)",
+        "$(location :load_test_binary)",
+        "$(location //graft/subnet-evm/cmd/simulator/main)",
+    ],
+    data = [
+        ":load_test_binary",
+        "//graft/subnet-evm/cmd/simulator/main",
+        "//graft/subnet-evm/plugin",
+        "//graft/subnet-evm/scripts:run.sh",
+        "//graft/subnet-evm/scripts:run_simulator.sh",
+        "//main:avalanchego",
+    ],
+    visibility = ["//visibility:public"],
+)
