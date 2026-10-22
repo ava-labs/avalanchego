@@ -133,6 +133,10 @@ func (c Config) TrieDBConfig(dataDir string, log logging.Logger) *triedb.Config 
 	}
 }
 
+// stateHistory returns the number of recent states to retain in memory. This
+// MUST be >= [core.TriesInMemory], because snapshot generation resumes at the
+// root of its disk layer, which is never more than [core.TriesInMemory] blocks
+// behind.
 func (c Config) stateHistory() uint64 {
 	return max(core.TriesInMemory, c.StateHistory)
 }
@@ -294,10 +298,8 @@ func (t *Tracker) BlockExecuted(settledRoot, executionRoot common.Hash, height u
 	return nil
 }
 
-// retain holds a reference to `root` until [core.TriesInMemory] later roots
-// have been retained. This is necessary because snapshot generation resumes at
-// the root of its disk layer, which is never more than [core.TriesInMemory]
-// blocks behind.
+// retain holds a reference to `root` until [Config.stateHistory] later roots
+// have been retained.
 func (t *Tracker) retain(root common.Hash) {
 	t.Track(root)
 	if toEvict := t.recent[t.recentNext]; toEvict != (common.Hash{}) {

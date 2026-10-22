@@ -42,7 +42,7 @@ type Config struct {
 	CacheSizeBytes uint
 	Archive        bool
 	// StateHistory is the minimum number of recently committed states
-	// guaranteed to be available. // If not set/too low, this value will be set
+	// guaranteed to be available. If not set/too low, this value will be set
 	// to [Config.DeferredCommitInterval] + 1.
 	StateHistory uint64
 	// DeferredCommitInterval is the maximum bumber of revisions that may become
