@@ -14,18 +14,21 @@ import (
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/params"
+	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetrace"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip"
 	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 // blockBuilder hides [blockBuilderG]'s generic type behind non-generic methods.
@@ -77,7 +80,14 @@ func (b *blockBuilderG[_]) rebuild(
 	bCtx *block.Context,
 	parent *blocks.Block,
 	block *blocks.Block,
-) (*blocks.Block, error) {
+) (_ *blocks.Block, err error) {
+	ctx, span := saetrace.Start(ctx, "saevm.rebuild", oteltrace.WithAttributes(
+		saetrace.Uint64("block_height", block.Height()),
+		saetrace.Hash("block_hash", block.Hash()),
+	))
+	defer span.End()
+	defer func() { saetrace.RecordError(span, err) }()
+
 	// Moving sender caching into [VM.ParseBlock] is not robust as there is
 	// insufficient spam protection, so it must be done here.
 	signer := block.Signer(b.exec.ChainConfig())
@@ -145,7 +155,14 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	pendingTxs func(txpool.PendingFilter) []*txgossip.LazyTransaction,
 	builder hook.BlockBuilder[T],
 	blockByteBudget uint64,
-) (*blocks.Block, error) {
+) (_ *blocks.Block, err error) {
+	ctx, span := saetrace.Start(ctx, "saevm.buildWithTxs", oteltrace.WithAttributes(
+		saetrace.Uint64("parent_height", parent.Height()),
+		saetrace.Hash("parent_hash", parent.Hash()),
+	))
+	defer span.End()
+	defer func() { saetrace.RecordError(span, err) }()
+
 	hdr, err := builder.BuildHeader(parent.Header())
 	if err != nil {
 		return nil, err
@@ -170,6 +187,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		return nil, err
 	}
 
+	span.SetAttributes(saetrace.Uint64("last_settled_height", lastSettled.Height()))
 	log = log.With(
 		zap.Uint64("last_settled_height", lastSettled.Height()),
 		zap.Stringer("last_settled_hash", lastSettled.Hash()),
@@ -185,6 +203,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	}
 
 	unsettled := blocks.Range(lastSettled, parent)
+	span.SetAttributes(attribute.Int("unsettled_blocks", len(unsettled)))
 	for _, block := range unsettled {
 		blockLog := log.With(
 			zap.Uint64("block_height", block.Height()),
@@ -254,6 +273,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		})
 		included      []*types.Transaction
 		includedBytes uint64
+		skipped       int
 	)
 	for _, ltx := range candidates {
 		// If we don't have enough gas remaining in the block for the minimum
@@ -270,6 +290,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		tx, ok := ltx.Resolve()
 		if !ok {
 			txLog.Debug("Could not resolve lazy transaction")
+			skipped++
 			continue
 		}
 
@@ -283,6 +304,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 				zap.Uint64("tx_bytes", txBytes),
 				zap.Uint64("included_bytes", includedBytes),
 			)
+			skipped++
 			continue
 		}
 
@@ -291,9 +313,11 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		// ApplyTx().
 		if err := state.ApplyTx(tx); err != nil {
 			txLog.Debug("Could not apply transaction", zap.Error(err))
+			skipped++
 			continue
 		}
 		txLog.Trace("Including transaction")
+		span.AddEvent("tx", oteltrace.WithAttributes(saetrace.Hash("tx_hash", tx.Hash())))
 		included = append(included, tx)
 		includedBytes += txBytes
 	}
@@ -370,6 +394,11 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		return nil, err
 	}
 	block.SetWorstCaseBounds(bounds)
+	span.SetAttributes(
+		attribute.Int("tx_count", len(included)),
+		attribute.Int("txs_skipped", skipped),
+		saetrace.Uint64("block_bytes", ethB.Size()),
+	)
 	return block, nil
 }
 
