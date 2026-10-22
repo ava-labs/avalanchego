@@ -26,23 +26,30 @@ jobs:
         include:
           - platform_name: ubuntu-22.04-amd64
             runner: ubuntu-22.04
+            run_e2e_race_tests: false
             run_race_shuffle_unit_tests: false
           - platform_name: ubuntu-22.04-arm64
             runner: ubuntu-22.04-arm
+            run_e2e_race_tests: false
             run_race_shuffle_unit_tests: false
           - platform_name: ubuntu-24.04-amd64
             runner: ubuntu-24.04
+            run_e2e_race_tests: true
             run_race_shuffle_unit_tests: true
           - platform_name: ubuntu-24.04-arm64
             runner: ubuntu-24.04-arm
+            run_e2e_race_tests: false
             run_race_shuffle_unit_tests: false
           - platform_name: macos-26-arm64
             runner: macos-26
+            run_e2e_race_tests: false
             run_race_shuffle_unit_tests: false
     uses: ./.github/workflows/bazel.yml
     with:
       platform_name: ${{ matrix.platform_name }}
       runner: ${{ matrix.runner }}
+      run_e2e_serially: true
+      run_e2e_race_tests: ${{ matrix.run_e2e_race_tests }}
       run_race_shuffle_unit_tests: ${{ matrix.run_race_shuffle_unit_tests }}
       # Scheduled jobs run broader tests without the remote action cache.
       setup_timeout_minutes: 20

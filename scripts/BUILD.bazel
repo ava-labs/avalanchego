@@ -1,0 +1,7 @@
+exports_files(
+    [
+        "tests.e2e.bazel.sh",
+        "tests.e2e.sh",
+    ],
+    visibility = ["//tests/e2e:__pkg__"],
+)
