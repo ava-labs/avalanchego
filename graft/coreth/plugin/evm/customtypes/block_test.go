@@ -33,12 +33,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 
@@ -320,7 +320,7 @@ func makeBenchBlock() *types.Block {
 		key, _   = crypto.GenerateKey()
 		txs      = make([]*types.Transaction, 70)
 		receipts = make([]*types.Receipt, len(txs))
-		signer   = types.LatestSigner(params.TestChainConfig)
+		signer   = types.LatestSigner(ethparams.TestChainConfig)
 		uncles   = make([]*types.Header, 3)
 	)
 	header := &types.Header{

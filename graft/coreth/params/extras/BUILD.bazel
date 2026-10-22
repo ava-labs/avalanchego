@@ -20,7 +20,6 @@ go_library(
         "//graft/coreth/precompile/precompileconfig",
         "//graft/evm/utils",
         "//snow",
-        "//upgrade",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//params",
     ],

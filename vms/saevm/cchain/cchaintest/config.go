@@ -15,6 +15,25 @@ import (
 // ChainConfig returns a new C-Chain config with all network upgrades active.
 func ChainConfig() *params.ChainConfig {
 	c := *saetest.ChainConfig()
-	extra := *extras.TestIglooChainConfig
+	extra := extras.ChainConfig{
+		NetworkUpgrades: extras.NetworkUpgrades{
+			ApricotPhase1BlockTimestamp:     new(uint64),
+			ApricotPhase2BlockTimestamp:     new(uint64),
+			ApricotPhase3BlockTimestamp:     new(uint64),
+			ApricotPhase4BlockTimestamp:     new(uint64),
+			ApricotPhase5BlockTimestamp:     new(uint64),
+			ApricotPhasePre6BlockTimestamp:  new(uint64),
+			ApricotPhase6BlockTimestamp:     new(uint64),
+			ApricotPhasePost6BlockTimestamp: new(uint64),
+			BanffBlockTimestamp:             new(uint64),
+			CortinaBlockTimestamp:           new(uint64),
+			DurangoBlockTimestamp:           new(uint64),
+			EtnaTimestamp:                   new(uint64),
+			FortunaTimestamp:                new(uint64),
+			GraniteTimestamp:                new(uint64),
+			HeliconTimestamp:                new(uint64),
+			IglooTimestamp:                  new(uint64),
+		},
+	}
 	return corethparams.WithExtra(&c, &extra)
 }
