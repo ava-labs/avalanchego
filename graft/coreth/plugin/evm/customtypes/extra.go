@@ -17,7 +17,7 @@ import (
 // Sizes of the fee state that prefixes the extra data of pre-Helicon headers.
 const (
 	ap3WindowSize   = 10 * wrappers.LongLen
-	ACP176StateSize = 3 * wrappers.LongLen // capacity, excess, target excess
+	acp176StateSize = 3 * wrappers.LongLen // capacity, excess, target excess
 )
 
 var ErrInsufficientFeeState = errors.New("insufficient length for ACP-176 fee state")
