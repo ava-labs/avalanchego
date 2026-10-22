@@ -55,5 +55,6 @@ func TargetExcessFromExtra(extra []byte) (uint64, error) {
 			len(extra),
 		)
 	}
-	return binary.BigEndian.Uint64(extra[ACP176StateSize-wrappers.LongLen:]), nil
+	const targetIndex = ACP176StateSize-wrappers.LongLen
+	return binary.BigEndian.Uint64(extra[targetIndex:]), nil
 }
