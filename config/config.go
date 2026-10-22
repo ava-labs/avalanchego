@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"os"
 	"path/filepath"
@@ -791,11 +792,6 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	}
 
 	var err error
-	config.StakingTLSCert, err = getStakingTLSCert(v)
-	if err != nil {
-		return node.StakingConfig{}, err
-	}
-
 	config.StakingSignerConfig, err = getStakingSignerConfig(v)
 	if err != nil {
 		return node.StakingConfig{}, err
@@ -1339,16 +1335,92 @@ func getPluginDir(v *viper.Viper) (string, error) {
 	return pluginDir, nil
 }
 
+// NewDefault returns the config that the command line gives a node with only
+// --network-id=networkID and --data-dir=dataDir set. Unlike the command line,
+// it ignores AVAGO_ environment variables and config files, and it reads and
+// writes no files: the staking TLS cert and BLS key are ephemeral, and nothing
+// is read from or created in dataDir.
+func NewDefault(networkID uint32, dataDir string) (node.Config, error) {
+	// Without AutomaticEnv or a config file, v sees only the flag defaults.
+	v := viper.New()
+	if err := v.BindPFlags(BuildFlagSet()); err != nil {
+		return node.Config{}, err
+	}
+	v.Set(DataDirKey, dataDir)
+
+	nodeConfig, err := newNodeConfig(v, networkID)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	cert, err := staking.NewTLSCert()
+	if err != nil {
+		return node.Config{}, fmt.Errorf("couldn't generate ephemeral staking key/cert: %w", err)
+	}
+	nodeConfig.StakingTLSCert = *cert
+	nodeConfig.StakingSignerConfig = node.StakingSignerConfig{EphemeralSignerEnabled: true}
+	nodeConfig.PluginDir = getExpandedArg(v, PluginDirKey)
+	nodeConfig.ChainConfigs = make(map[string]chains.ChainConfig)
+	return nodeConfig, nil
+}
+
+// GetNodeConfig returns the config that v describes. Unlike [NewDefault], it
+// reads the staking key files and creates them if they do not exist, creates
+// the plugin dir, and reads chain configs, subnet configs, and aliases from
+// their files.
 func GetNodeConfig(v *viper.Viper) (node.Config, error) {
-	var (
-		nodeConfig node.Config
-		err        error
-	)
+	networkID, err := constants.NetworkID(v.GetString(NetworkNameKey))
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	nodeConfig, err := newNodeConfig(v, networkID)
+	if err != nil {
+		return node.Config{}, err
+	}
 
 	nodeConfig.PluginDir, err = getPluginDir(v)
 	if err != nil {
 		return node.Config{}, err
 	}
+
+	nodeConfig.StakingTLSCert, err = getStakingTLSCert(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	nodeConfig.ChainConfigs, err = getChainConfigs(v)
+	if err != nil {
+		return node.Config{}, fmt.Errorf("couldn't read chain configs: %w", err)
+	}
+
+	subnetConfigs, err := getSubnetConfigs(v, nodeConfig.TrackedSubnets.List())
+	if err != nil {
+		return node.Config{}, fmt.Errorf("couldn't read subnet configs: %w", err)
+	}
+	maps.Copy(nodeConfig.SubnetConfigs, subnetConfigs)
+
+	nodeConfig.VMAliases, err = getVMAliases(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	nodeConfig.ChainAliases, err = getChainAliases(v)
+	if err != nil {
+		return node.Config{}, err
+	}
+
+	nodeConfig.ProvidedFlags = providedFlags(v)
+	return nodeConfig, nil
+}
+
+// newNodeConfig returns the parts of the config that v describes which need
+// no files.
+func newNodeConfig(v *viper.Viper, networkID uint32) (node.Config, error) {
+	var (
+		nodeConfig = node.Config{NetworkID: networkID}
+		err        error
+	)
 
 	nodeConfig.ConsensusShutdownTimeout = v.GetDuration(ConsensusShutdownTimeoutKey)
 	if nodeConfig.ConsensusShutdownTimeout < 0 {
@@ -1371,12 +1443,6 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	// Logging
 	nodeConfig.LoggingConfig, err = getLoggingConfig(v)
-	if err != nil {
-		return node.Config{}, err
-	}
-
-	// Network ID
-	nodeConfig.NetworkID, err = constants.NetworkID(v.GetString(NetworkNameKey))
 	if err != nil {
 		return node.Config{}, err
 	}
@@ -1454,20 +1520,16 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	// Subnet Configs
-	subnetConfigs, err := getSubnetConfigs(v, nodeConfig.TrackedSubnets.List())
-	if err != nil {
-		return node.Config{}, fmt.Errorf("couldn't read subnet configs: %w", err)
-	}
-
+	// Subnet Configs. GetNodeConfig adds the tracked subnets' configs.
 	primaryNetworkConfig := getPrimaryNetworkConfig(v)
 	if err := primaryNetworkConfig.ValidParameters(); err != nil {
 		return node.Config{}, fmt.Errorf("invalid consensus parameters: %w", err)
 	}
-	subnetConfigs[constants.PrimaryNetworkID] = primaryNetworkConfig
 
 	nodeConfig.ProposerMinBlockDelay = v.GetDuration(ProposerVMMinBlockDelayKey)
-	nodeConfig.SubnetConfigs = subnetConfigs
+	nodeConfig.SubnetConfigs = map[ids.ID]subnets.Config{
+		constants.PrimaryNetworkID: primaryNetworkConfig,
+	}
 
 	// Benchlist
 	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, primaryNetworkConfig.SnowParameters)
@@ -1500,25 +1562,8 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, err
 	}
 
-	// Chain Configs
-	nodeConfig.ChainConfigs, err = getChainConfigs(v)
-	if err != nil {
-		return node.Config{}, fmt.Errorf("couldn't read chain configs: %w", err)
-	}
-
 	// Profiler
 	nodeConfig.ProfilerConfig, err = getProfilerConfig(v)
-	if err != nil {
-		return node.Config{}, err
-	}
-
-	// VM Aliases
-	nodeConfig.VMAliases, err = getVMAliases(v)
-	if err != nil {
-		return node.Config{}, err
-	}
-	// Chain aliases
-	nodeConfig.ChainAliases, err = getChainAliases(v)
 	if err != nil {
 		return node.Config{}, err
 	}
@@ -1551,8 +1596,6 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.ChainDataDir = getExpandedArg(v, ChainDataDirKey)
 
 	nodeConfig.ProcessContextFilePath = getExpandedArg(v, ProcessContextFileKey)
-
-	nodeConfig.ProvidedFlags = providedFlags(v)
 	return nodeConfig, nil
 }
 

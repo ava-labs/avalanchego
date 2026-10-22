@@ -350,7 +350,12 @@ func (n *Network) DefaultGenesis() (*genesis.UnparsedConfig, error) {
 	}
 	keysToFund = append(keysToFund, n.PreFundedKeys...)
 
-	return NewTestGenesis(defaultNetworkID, n.Nodes, keysToFund)
+	stakers, err := stakersForNodes(n.Nodes)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewTestGenesis(defaultNetworkID, stakers, keysToFund)
 }
 
 // UpgradeConfig configures the latest upgrade:

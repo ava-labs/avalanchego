@@ -4,6 +4,7 @@
 package config
 
 import (
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -1320,6 +1321,69 @@ func TestResolveConsensusMode(t *testing.T) {
 			require.Equal(t, tt.want, resolveConsensusMode(&tt.input))
 		})
 	}
+}
+
+// TestNewDefault checks that NewDefault gives the config that the command line
+// gives with only the network ID and data dir set, apart from the ephemeral
+// keys.
+func TestNewDefault(t *testing.T) {
+	for _, networkID := range []uint32{constants.MainnetID, constants.FujiID, constants.LocalID, 99999} {
+		t.Run(constants.NetworkName(networkID), func(t *testing.T) {
+			dataDir := t.TempDir()
+
+			// The ephemeral key flags keep the command line from reading key
+			// files, as NewDefault does.
+			v, err := BuildViper(BuildFlagSet(), []string{
+				"--" + NetworkNameKey + "=" + constants.NetworkName(networkID),
+				"--" + DataDirKey + "=" + dataDir,
+				"--" + StakingEphemeralCertEnabledKey,
+				"--" + StakingEphemeralSignerEnabledKey,
+			})
+			require.NoError(t, err)
+			want, err := GetNodeConfig(v)
+			require.NoError(t, err)
+
+			got, err := NewDefault(networkID, dataDir)
+			require.NoError(t, err)
+			require.NotNil(t, got.StakingTLSCert.Leaf)
+
+			// Each ephemeral cert is new, each call samples its own
+			// bootstrappers, and only the command line has provided flags.
+			want.StakingTLSCert, got.StakingTLSCert = tls.Certificate{}, tls.Certificate{}
+			require.Len(t, got.Bootstrappers, len(want.Bootstrappers))
+			want.Bootstrappers, got.Bootstrappers = nil, nil
+			want.ProvidedFlags = nil
+			require.Equal(t, want, got)
+		})
+	}
+}
+
+// TestNewDefaultIsHermetic checks that NewDefault ignores AVAGO_ environment
+// variables, reads nothing from the data dir, and writes nothing to it or to
+// the default data dir.
+func TestNewDefaultIsHermetic(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv(EnvVarName(EnvPrefix, NetworkNameKey), constants.FujiName)
+
+	// The command line would fail to parse this file.
+	dataDir := t.TempDir()
+	aliases := filepath.Join(dataDir, "configs", "vms", "aliases.json")
+	require.NoError(t, os.MkdirAll(filepath.Dir(aliases), 0o700))
+	require.NoError(t, os.WriteFile(aliases, []byte("not json"), 0o600))
+
+	got, err := NewDefault(constants.MainnetID, dataDir)
+	require.NoError(t, err)
+	require.Equal(t, constants.MainnetID, got.NetworkID)
+	require.Nil(t, got.VMAliases)
+
+	homeEntries, err := os.ReadDir(home)
+	require.NoError(t, err)
+	require.Empty(t, homeEntries)
+
+	dataEntries, err := os.ReadDir(dataDir)
+	require.NoError(t, err)
+	require.Len(t, dataEntries, 1) // only configs, which holds the aliases file
 }
 
 func setupViperFlags() *viper.Viper {

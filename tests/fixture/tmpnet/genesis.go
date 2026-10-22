@@ -42,12 +42,12 @@ var (
 // Helper type to simplify configuring X-Chain genesis balances
 type XChainBalanceMap map[ids.ShortID]uint64
 
-// Create a genesis struct valid for bootstrapping a test
-// network. Note that many of the genesis fields (e.g. reward
-// addresses) are randomly generated or hard-coded.
+// NewTestGenesis returns a genesis for a test network whose initial validators
+// are stakers, and which funds keysToFund on the X-Chain and C-Chain. Other
+// fields, such as the address that holds the stake, are random or fixed.
 func NewTestGenesis(
 	networkID uint32,
-	nodes []*Node,
+	stakers []genesis.Staker,
 	keysToFund []*secp256k1.PrivateKey,
 ) (*genesis.UnparsedConfig, error) {
 	// Validate inputs
@@ -55,16 +55,20 @@ func NewTestGenesis(
 	case constants.TestnetID, constants.MainnetID, constants.LocalID:
 		return nil, stacktrace.Wrap(errInvalidNetworkIDForGenesis)
 	}
-	if len(nodes) == 0 {
+	if len(stakers) == 0 {
 		return nil, stacktrace.Wrap(errMissingStakersForGenesis)
 	}
 	if len(keysToFund) == 0 {
 		return nil, stacktrace.Wrap(errNoKeysForGenesis)
 	}
 
-	initialStakers, err := stakersForNodes(networkID, nodes)
-	if err != nil {
-		return nil, stacktrace.Errorf("failed to configure stakers for nodes: %w", err)
+	initialStakers := make([]genesis.UnparsedStaker, len(stakers))
+	for i, s := range stakers {
+		var err error
+		initialStakers[i], err = s.Unparse(networkID)
+		if err != nil {
+			return nil, stacktrace.Errorf("unparse staker %s: %w", s.NodeID, err)
+		}
 	}
 
 	// Address that controls stake doesn't matter -- generate it randomly
@@ -165,23 +169,20 @@ func NewTestGenesis(
 }
 
 // Returns staker configuration for the given set of nodes.
-func stakersForNodes(networkID uint32, nodes []*Node) ([]genesis.UnparsedStaker, error) {
+func stakersForNodes(nodes []*Node) ([]genesis.Staker, error) {
 	// Give staking rewards for initial validators to a random address. Any testing of staking rewards
 	// will be easier to perform with nodes other than the initial validators since the timing of
 	// staking can be more easily controlled.
-	rewardAddr, err := address.Format("X", constants.GetHRP(networkID), ids.GenerateTestShortID().Bytes())
-	if err != nil {
-		return nil, stacktrace.Errorf("failed to format reward address: %w", err)
-	}
+	rewardAddr := ids.GenerateTestShortID()
 
 	// Configure provided nodes as initial stakers
-	initialStakers := make([]genesis.UnparsedStaker, len(nodes))
+	initialStakers := make([]genesis.Staker, len(nodes))
 	for i, node := range nodes {
 		pop, err := node.GetProofOfPossession()
 		if err != nil {
 			return nil, stacktrace.Errorf("failed to derive proof of possession for node %s: %w", node.NodeID, err)
 		}
-		initialStakers[i] = genesis.UnparsedStaker{
+		initialStakers[i] = genesis.Staker{
 			NodeID:        node.NodeID,
 			RewardAddress: rewardAddr,
 			DelegationFee: .01 * reward.PercentDenominator,

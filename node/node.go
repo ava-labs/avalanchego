@@ -124,11 +124,21 @@ var (
 	errUpgradeWithinTheHour = errors.New("imminent network upgrade detected - update immediately")
 )
 
-// New returns an instance of Node
+// Options are hooks for running a node inside a test process. A nil *Options
+// runs a normal node.
+type Options struct {
+	// DialContext, if not nil, opens every connection that the node dials to
+	// a peer, in place of the default dialer and its rate limit. The node
+	// still listens on its staking port.
+	DialContext func(ctx context.Context, network, address string) (net.Conn, error)
+}
+
+// New returns an instance of Node. opts may be nil.
 func New(
 	config *node.Config,
 	logFactory logging.Factory,
 	logger logging.Logger,
+	opts *Options,
 ) (*Node, error) {
 	tlsCert := config.StakingTLSCert.Leaf
 	stakingCert, err := staking.ParseCertificate(tlsCert.Raw)
@@ -143,6 +153,9 @@ func New(
 		StakingTLSCert:   stakingCert,
 		ID:               ids.NodeIDFromCert(stakingCert),
 		Config:           config,
+	}
+	if opts != nil {
+		n.options = *opts
 	}
 
 	n.StakingSigner, err = newStakingSigner(config.StakingSignerConfig)
@@ -408,6 +421,8 @@ type Node struct {
 
 	// Closed when a sufficient amount of bootstrap nodes are connected to
 	onSufficientlyConnected chan struct{}
+
+	options Options
 }
 
 /*
@@ -628,6 +643,10 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	n.Config.NetworkConfig.CPUTargeter = n.cpuTargeter
 	n.Config.NetworkConfig.DiskTargeter = n.diskTargeter
 
+	d := dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig, n.Log)
+	if n.options.DialContext != nil {
+		d = dialFunc(n.options.DialContext)
+	}
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
 		n.Config.UpgradeConfig.LatestTime(),
@@ -635,11 +654,30 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		reg,
 		n.Log,
 		listener,
-		dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig, n.Log),
+		d,
 		consensusRouter,
 	)
 
 	return err
+}
+
+// APIURI returns the URI of the node's API server, with the port that it
+// bound.
+func (n *Node) APIURI() string {
+	return n.apiURI
+}
+
+// StakingAddress returns the address that the node listens on for peers, with
+// the port that it bound.
+func (n *Node) StakingAddress() netip.AddrPort {
+	return n.stakingAddress
+}
+
+// dialFunc adapts [Options.DialContext] to [dialer.Dialer].
+type dialFunc func(ctx context.Context, network, address string) (net.Conn, error)
+
+func (f dialFunc) Dial(ctx context.Context, ip netip.AddrPort) (net.Conn, error) {
+	return f(ctx, constants.NetworkType, ip.String())
 }
 
 // Write process context to the configured path. Supports the use of
