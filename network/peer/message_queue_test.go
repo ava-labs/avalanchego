@@ -25,7 +25,7 @@ func TestMessageQueue(t *testing.T) {
 		0,
 	)
 
-	mc := newMessageCreator(t)
+	mc := newMessageCreator(t, false)
 	msgs := []*message.OutboundMessage{}
 	numToSend := 10
 

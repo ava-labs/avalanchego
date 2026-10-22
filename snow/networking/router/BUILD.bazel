@@ -41,6 +41,7 @@ go_test(
     srcs = [
         "chain_router_test.go",
         "main_test.go",
+        "traced_router_test.go",
     ],
     embed = [":router"],
     deps = [
@@ -73,6 +74,10 @@ go_test(
         "//version",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",
+        "@io_opentelemetry_go_otel//attribute",
+        "@io_opentelemetry_go_otel_sdk//trace",
+        "@io_opentelemetry_go_otel_sdk//trace/tracetest",
+        "@io_opentelemetry_go_otel_trace//:trace",
         "@org_uber_go_goleak//:goleak",
         "@org_uber_go_mock//gomock",
     ],
