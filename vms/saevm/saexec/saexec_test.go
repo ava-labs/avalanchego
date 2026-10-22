@@ -50,6 +50,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest/escrow"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetrace/saetracetest"
 
 	saehookstest "github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
@@ -833,7 +834,7 @@ func FuzzOpCodes(f *testing.F) {
 		var logger *loggingtest.Logger = sut.logger
 		// Errors in execution (i.e. reverts) are fine, but we don't want them
 		// bubbling up any further.
-		require.NoErrorf(t, sut.execute(b, logger), "%T.execute()", sut.Executor)
+		require.NoErrorf(t, sut.execute(t.Context(), b, logger, 0), "%T.execute()", sut.Executor)
 	})
 }
 
@@ -1410,4 +1411,28 @@ func TestExecuteReturnsStateDBError(t *testing.T) {
 			require.ErrorIs(t, err, errAccountRead, "Execute()")
 		})
 	}
+}
+
+func TestExecuteSpanParentedOnEnqueueContext(t *testing.T) {
+	ctx, sut := newSUT(t)
+	tp, exp := saetracetest.NewTestProvider(t)
+	ctx, root := tp.Tracer("t").Start(ctx, "root")
+	b := sut.chain.NewBlock(t, nil)
+	require.NoError(t, sut.Enqueue(ctx, b), "Enqueue()")
+	require.NoError(t, b.WaitUntilExecuted(ctx), "WaitUntilExecuted()")
+	// Execution is signalled before its spans end; closing waits for them.
+	require.NoError(t, sut.Close(), "Close()")
+	root.End()
+	spans := exp.GetSpans()
+	require.Equal(t, root.SpanContext().SpanID(), saetracetest.ParentOf(t, spans, "saexec.Execute").SpanID(), "Execute parent")
+	saetracetest.ParentOf(t, spans, "saexec.afterExecution")
+}
+
+func TestExecuteSurvivesEnqueueContextCancel(t *testing.T) {
+	ctx, sut := newSUT(t)
+	cctx, cancel := context.WithCancel(ctx)
+	b := sut.chain.NewBlock(t, nil)
+	require.NoError(t, sut.Enqueue(cctx, b), "Enqueue()")
+	cancel()
+	require.NoError(t, b.WaitUntilExecuted(ctx), "WaitUntilExecuted() after cancelling the Enqueue context")
 }
