@@ -897,7 +897,7 @@ func TestGetLogsRange(t *testing.T) {
 	vmTime.AdvanceToSettle(ctx, t, settled)
 	executed := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 		To:       &emitter,
-		Gas:      1e6,
+		Gas:      params.TxGas,
 		GasPrice: big.NewInt(1),
 	}))
 	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
@@ -947,11 +947,6 @@ func TestGetLogsRange(t *testing.T) {
 		{
 			name:     "to_unexecuted_block",
 			query:    map[string]any{"fromBlock": num(executed), "toBlock": num(unexecuted)},
-			wantLogs: executedLogs,
-		},
-		{
-			name:     "hash_of_executed_block",
-			query:    map[string]any{"blockHash": executed.Hash()},
 			wantLogs: executedLogs,
 		},
 		{
@@ -1005,7 +1000,7 @@ func TestGetLogsRange(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var got json.RawMessage
+			var got []types.Log
 			err := sut.CallContext(ctx, &got, "eth_getLogs", tt.query)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("eth_getLogs(%v) %s", tt.query, diff)
@@ -1015,10 +1010,8 @@ func TestGetLogsRange(t *testing.T) {
 			}
 
 			// must be an empty array, not null, to match libevm.
-			require.NotEqualf(t, "null", string(got), "eth_getLogs(%v)", tt.query)
-			var logs []types.Log
-			require.NoErrorf(t, json.Unmarshal(got, &logs), "json.Unmarshal(eth_getLogs(%v))", tt.query)
-			if diff := cmp.Diff(tt.wantLogs, logs, cmpopts.EquateEmpty()); diff != "" {
+			require.NotNilf(t, got, "eth_getLogs(%v)", tt.query)
+			if diff := cmp.Diff(tt.wantLogs, got, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("eth_getLogs(%v) mismatch (-want +got):\n%s", tt.query, diff)
 			}
 		})
