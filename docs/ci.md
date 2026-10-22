@@ -13,6 +13,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
   - [Generated-source checks](#generated-source-checks)
   - [Required checks and the merge queue](#required-checks-and-the-merge-queue)
   - [Go and Bazel CI workflow layout](#go-and-bazel-ci-workflow-layout)
+  - [Validate scheduled job changes before merge](#validate-scheduled-job-changes-before-merge)
   - [Platform-specific setup dependencies](#platform-specific-setup-dependencies)
   - [Go unit test platforms](#go-unit-test-platforms)
   - [Local composite actions define reusable GitHub Actions behavior](#local-composite-actions-define-reusable-github-actions-behavior)
@@ -185,6 +186,36 @@ merge-group Go entrypoints use `go.yml`; scheduled Go uses `go-unit.yml`.
 Smoke workflows run a minimal macOS test. This test verifies that unit tests
 can run on macOS. The Linux pre-merge job and scheduled jobs run the full unit
 suite.
+
+### Validate scheduled job changes before merge
+
+Validate changes to scheduled job execution before merge. Normal pull-request
+CI is sufficient when it covers the affected behavior. Otherwise, run the
+scheduled configuration through a manual dispatch or a temporary pull-request
+trigger.
+
+Scheduled jobs provide additional platform coverage and test configurations.
+They also help find intermittent failures. Running all this coverage on every
+pull request would increase CI time and cost. However, changes to tasks,
+scripts, workflows, runners, artifacts, or platform support can break scheduled
+execution. Maintainers must decide which behavior needs additional validation.
+
+Choose the validation method for the workflow:
+
+- **New scheduled-only workflow:** Add a temporary pull-request trigger or
+  another temporary pull-request path. Validate the workflow, then remove the
+  temporary path before merge. Include `workflow_dispatch` in the merged
+  workflow so maintainers can validate later changes before merge. GitHub
+  cannot dispatch a new workflow until it exists on the default branch.
+- **Existing scheduled-only workflow:** Use `workflow_dispatch` to run it
+  against the pull-request branch. Keep this invocation compatible with
+  scheduled execution. In the Actions UI, select the pull-request branch and
+  start the workflow. `Scheduled Go` and `Scheduled Bazel` support this method.
+- **Workflow that also runs on pull requests:** Use its normal pull-request
+  coverage when both paths have the same behavior. `workflow_dispatch` is not
+  required. If the scheduled path differs, choose an additional pre-merge
+  validation method for any affected behavior that pull-request CI does not
+  cover.
 
 ### Platform-specific setup dependencies
 

@@ -3,6 +3,10 @@ name: Scheduled Bazel
 # Full platform coverage runs separately from pre-merge Bazel CI. This keeps
 # scheduled-only jobs out of pull-request workflow runs.
 on:
+  # Allow a maintainer to trigger this workflow against a PR branch. This can verify
+  # the correctness of changes that affect this workflow before those changes are
+  # merged.
+  workflow_dispatch:
   schedule:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC
 
