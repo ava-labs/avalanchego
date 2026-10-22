@@ -894,7 +894,6 @@ func TestGetLogsRange(t *testing.T) {
 		Gas:      1e6,
 		GasPrice: big.NewInt(1),
 		Data:     saetest.LogTopOfStackAfter(saetest.Ops(vm.PUSH0)), // contract creation, so this runs and emits a log
-
 	}))
 	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
 	executedLogs := []types.Log{*executed.Receipts()[0].Logs[0]}
