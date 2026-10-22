@@ -24,7 +24,7 @@ const tracerName = "github.com/ava-labs/avalanchego/vms/saevm"
 // Start starts a span as a child of the span in ctx, using that span's tracer
 // provider. If ctx carries no recording span, the returned span is a no-op.
 func Start(ctx context.Context, name string, opts ...oteltrace.SpanStartOption) (context.Context, oteltrace.Span) {
-	return oteltrace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, name, opts...)
+	return oteltrace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, name, opts...) //nolint:spancheck // the caller ends the returned span
 }
 
 // Uint64 returns an integer attribute if v fits in an int64, otherwise a

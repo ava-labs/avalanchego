@@ -237,8 +237,8 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, Op, error) {
 }
 
 func (mb *msgBuilder) createOutbound(ctx context.Context, m *p2p.Message, compressionType compression.Type, bypassThrottling bool) (*OutboundMessage, error) {
-	if mb.tracingEnabled {
-		m.TraceContext = trace.MarshalSpanContext(oteltrace.SpanContextFromContext(ctx))
+	if sc := oteltrace.SpanContextFromContext(ctx); mb.tracingEnabled && sc.IsValid() && !sc.IsRemote() {
+		m.TraceContext = trace.MarshalSpanContext(sc)
 	}
 	b, saved, op, err := mb.marshal(m, compressionType)
 	if err != nil {

@@ -22,7 +22,7 @@ import (
 func (s *Set) SendTx(ctx context.Context, ethTx *types.Transaction) error {
 	var _ ethapi.Backend // protect the import for [comment] rendering
 
-	ctx, span := saetrace.Start(ctx, "txgossip.SendTx")
+	_, span := saetrace.Start(ctx, "txgossip.SendTx")
 	defer span.End()
 	span.SetAttributes(
 		saetrace.Hash("tx_hash", ethTx.Hash()),

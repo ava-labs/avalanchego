@@ -79,7 +79,7 @@ func newTracerProvider(exporter sdktrace.SpanExporter, config Config) *sdktrace.
 		// Deliberately NOT ParentBased: remote span contexts arrive from any peer
 		// and must not be able to force sampling. Ratio-by-trace-ID also makes
 		// every node with the same rate reach the same decision, so cross-node
-		// traces are complete. See docs/superpowers/specs/2026-10-21-end-to-end-tracing-design.md.
+		// traces are complete.
 		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.TraceSampleRate)),
 	)
 }

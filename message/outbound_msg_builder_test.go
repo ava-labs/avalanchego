@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/compression"
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 func Test_newOutboundBuilder(t *testing.T) {
@@ -68,4 +69,11 @@ func TestOutboundTraceContextFromCtx(t *testing.T) {
 	m.Reset()
 	require.NoError(t, proto.Unmarshal(out.Bytes, &m), "proto.Unmarshal()")
 	require.Empty(t, m.GetTraceContext(), "TraceContext without span")
+
+	remoteCtx := oteltrace.ContextWithRemoteSpanContext(t.Context(), trace.UnmarshalSpanContext(trace.MarshalSpanContext(span.SpanContext())))
+	out, err = b.Chits(remoteCtx, ids.GenerateTestID(), 1, ids.GenerateTestID(), ids.GenerateTestID(), ids.GenerateTestID(), 3)
+	require.NoError(t, err, "Chits() with remote span context")
+	m.Reset()
+	require.NoError(t, proto.Unmarshal(out.Bytes, &m), "proto.Unmarshal()")
+	require.Empty(t, m.GetTraceContext(), "TraceContext with remote-only span context")
 }

@@ -60,9 +60,6 @@ func (*coinbaseAsAuthor) Author(h *types.Header) (common.Address, error) {
 }
 
 func (b *backend) GetEVM(ctx context.Context, msg *core.Message, sdb *state.StateDB, hdr *types.Header, cfg *vm.Config, bCtx *vm.BlockContext) *vm.EVM {
-	_, span := saetrace.Start(ctx, "saerpc.GetEVM")
-	defer span.End()
-
 	if bCtx == nil {
 		bCtx = new(vm.BlockContext)
 		*bCtx = core.NewEVMBlockContext(hdr, b.ChainContext(), &hdr.Coinbase)

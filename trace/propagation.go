@@ -52,7 +52,7 @@ func UnmarshalSpanContext(b []byte) oteltrace.SpanContext {
 	return oteltrace.NewSpanContext(oteltrace.SpanContextConfig{
 		TraceID:    oteltrace.TraceID(b[2:18]),
 		SpanID:     oteltrace.SpanID(b[19:27]),
-		TraceFlags: oteltrace.TraceFlags(b[28]),
+		TraceFlags: oteltrace.TraceFlags(b[28]) & oteltrace.FlagsSampled,
 		Remote:     true,
 	})
 }

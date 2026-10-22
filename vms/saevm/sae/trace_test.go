@@ -112,7 +112,7 @@ func TestWaitUntilExecutedSpanEndsOnCancel(t *testing.T) {
 	acceptCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	time.AfterFunc(100*time.Millisecond, cancel)
-	require.NotNil(t, blk.Accept(acceptCtx), "Accept() with cancelled context")
+	require.ErrorIs(t, blk.Accept(acceptCtx), context.Canceled, "Accept()")
 	root.End()
 
 	var found bool

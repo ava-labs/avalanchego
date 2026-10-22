@@ -164,7 +164,7 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) (err error) {
 		saetrace.RecordError(wspan, err)
 		wspan.End()
 		if err != nil {
-			return fmt.Errorf("waiting for block %d to execute: %v", b.Height(), err)
+			return fmt.Errorf("waiting for block %d to execute: %w", b.Height(), err)
 		}
 	}
 

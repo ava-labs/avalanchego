@@ -23,7 +23,7 @@ func NewTestProvider(tb testing.TB) (*sdktrace.TracerProvider, *tracetest.InMemo
 	exp := tracetest.NewInMemoryExporter()
 	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(exp), sdktrace.WithSampler(sdktrace.AlwaysSample()))
 	tb.Cleanup(func() {
-		require.NoError(tb, tp.Shutdown(context.Background()), "TracerProvider.Shutdown()")
+		require.NoError(tb, tp.Shutdown(context.WithoutCancel(tb.Context())), "TracerProvider.Shutdown()")
 	})
 	return tp, exp
 }

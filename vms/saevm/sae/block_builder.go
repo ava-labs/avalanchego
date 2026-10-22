@@ -313,7 +313,9 @@ func (b *blockBuilderG[T]) buildWithTxs(
 			continue
 		}
 		txLog.Trace("Including transaction")
-		span.AddEvent("tx", oteltrace.WithAttributes(saetrace.Hash("tx_hash", tx.Hash())))
+		if span.IsRecording() {
+			span.AddEvent("tx", oteltrace.WithAttributes(saetrace.Hash("tx_hash", tx.Hash())))
+		}
 		included = append(included, tx)
 		includedBytes += txBytes
 	}

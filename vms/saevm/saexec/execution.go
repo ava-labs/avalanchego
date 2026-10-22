@@ -48,7 +48,7 @@ var (
 type queuedBlock struct {
 	// ctx carries only the values (e.g. the tracing span) of the context passed
 	// to [Executor.Enqueue]; it is never cancelled.
-	ctx        context.Context //nolint:containedctx // Carried through the queue by design
+	ctx        context.Context
 	block      *blocks.Block
 	enqueuedAt time.Time
 }
@@ -184,12 +184,14 @@ func (e *Executor) execute(ctx context.Context, b *blocks.Block, log logging.Log
 	if err != nil {
 		return err
 	}
-	for _, r := range result.Receipts {
-		span.AddEvent("tx", oteltrace.WithAttributes(
-			saetrace.Hash("tx_hash", r.TxHash),
-			saetrace.Uint64("gas_used", r.GasUsed),
-			saetrace.Uint64("status", r.Status),
-		))
+	if span.IsRecording() {
+		for _, r := range result.Receipts {
+			span.AddEvent("tx", oteltrace.WithAttributes(
+				saetrace.Hash("tx_hash", r.TxHash),
+				saetrace.Uint64("gas_used", r.GasUsed),
+				saetrace.Uint64("status", r.Status),
+			))
+		}
 	}
 	_, afterSpan := saetrace.Start(ctx, "saexec.afterExecution")
 	err = e.afterExecution(b, stateDB, result)

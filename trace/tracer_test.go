@@ -29,3 +29,23 @@ func TestSamplerIgnoresRemoteSampledFlag(t *testing.T) {
 	require.NoError(t, tp.ForceFlush(t.Context()), "ForceFlush()")
 	require.Empty(t, exp.GetSpans(), "a remote sampled parent must not force sampling")
 }
+
+func TestSamplerSamplesRemoteParentAtFullRate(t *testing.T) {
+	exp := tracetest.NewInMemoryExporter()
+	tp := newTracerProvider(exp, Config{TraceSampleRate: 1})
+	t.Cleanup(func() { _ = tp.Shutdown(t.Context()) })
+
+	parent := oteltrace.NewSpanContext(oteltrace.SpanContextConfig{
+		TraceID:    oteltrace.TraceID{1},
+		SpanID:     oteltrace.SpanID{1},
+		TraceFlags: oteltrace.FlagsSampled,
+		Remote:     true,
+	})
+	ctx := oteltrace.ContextWithRemoteSpanContext(t.Context(), parent)
+	_, span := tp.Tracer("t").Start(ctx, "child")
+	span.End()
+	require.NoError(t, tp.ForceFlush(t.Context()), "ForceFlush()")
+	spans := exp.GetSpans()
+	require.Len(t, spans, 1, "spans exported at full sample rate")
+	require.Equal(t, parent.TraceID(), spans[0].Parent.TraceID(), "child must join the remote trace")
+}

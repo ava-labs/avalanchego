@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
@@ -59,4 +60,15 @@ func TestUnmarshalSpanContextRejects(t *testing.T) {
 			require.False(t, UnmarshalSpanContext(in).IsValid(), "UnmarshalSpanContext(%q).IsValid()", name)
 		})
 	}
+}
+
+func TestUnmarshalSpanContextMasksFlags(t *testing.T) {
+	b := MarshalSpanContext(testSpanContext())
+	b[28] = 0xFF
+	got := UnmarshalSpanContext(b)
+	require.Equal(t, oteltrace.FlagsSampled, got.TraceFlags(), "flags 0xFF masked")
+	b[28] = 0x00
+	got = UnmarshalSpanContext(b)
+	require.True(t, got.IsValid(), "UnmarshalSpanContext().IsValid() with zero flags")
+	require.Equal(t, oteltrace.TraceFlags(0), got.TraceFlags(), "flags 0x00")
 }
