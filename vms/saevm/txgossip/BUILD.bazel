@@ -15,6 +15,7 @@ go_library(
         "//ids",
         "//network/p2p/gossip",
         "//vms/saevm/params",
+        "//vms/saevm/saetrace",
         "//vms/saevm/saexec",
         "//vms/saevm/types",
         "//vms/saevm/worstcase",

@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/ethapi"
 
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetrace"
 )
 
 // SendTx implements the respective method of [ethapi.Backend], accepting
@@ -21,6 +22,13 @@ import (
 func (s *Set) SendTx(ctx context.Context, ethTx *types.Transaction) error {
 	var _ ethapi.Backend // protect the import for [comment] rendering
 
+	ctx, span := saetrace.Start(ctx, "txgossip.SendTx")
+	defer span.End()
+	span.SetAttributes(
+		saetrace.Hash("tx_hash", ethTx.Hash()),
+		saetrace.Uint64("tx_nonce", ethTx.Nonce()),
+	)
+
 	// Note: the Bloom filter is only necessary for pull gossip, which is only
 	// done between validator nodes. Validators are encouraged to NOT expose RPC
 	// APIs (i.e. this method) and SHOULD therefore only add transactions via
@@ -28,6 +36,7 @@ func (s *Set) SendTx(ctx context.Context, ethTx *types.Transaction) error {
 	// pull+Bloom vs API+push under recommended usage patterns.
 
 	if err := errors.Join(s.set.addToPool(true /*local*/, ethTx)...); err != nil {
+		saetrace.RecordError(span, err)
 		return err
 	}
 	for _, add := range s.pushTo {

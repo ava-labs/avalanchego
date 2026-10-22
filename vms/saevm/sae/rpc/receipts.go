@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/rpc"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetrace"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 )
 
@@ -28,7 +29,11 @@ func (b *backend) GetReceipts(ctx context.Context, hash common.Hash) (types.Rece
 // getReceipts resolves receipts and the underlying [types.Block] by number or
 // hash, checking in-memory blocks first then falling back to the database.
 // Returns nils for blocks that are not yet executed.
-func (b *backend) getReceipts(ctx context.Context, numOrHash rpc.BlockNumberOrHash) (types.Receipts, *types.Block, error) {
+func (b *backend) getReceipts(ctx context.Context, numOrHash rpc.BlockNumberOrHash) (_ types.Receipts, _ *types.Block, err error) {
+	ctx, span := saetrace.Start(ctx, "saerpc.getReceipts")
+	defer span.End()
+	defer func() { saetrace.RecordError(span, err) }()
+
 	blk, err := b.restoreExecutedBlock(ctx, numOrHash)
 	switch {
 	case errors.Is(err, blocks.ErrNotFound):
@@ -36,6 +41,7 @@ func (b *backend) getReceipts(ctx context.Context, numOrHash rpc.BlockNumberOrHa
 	case err != nil:
 		return nil, nil, err
 	default:
+		span.SetAttributes(saetrace.Uint64("block_height", blk.NumberU64()))
 		return blk.Receipts(), blk.EthBlock(), nil
 	}
 }

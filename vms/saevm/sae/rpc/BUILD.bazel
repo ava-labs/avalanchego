@@ -33,6 +33,7 @@ go_library(
         "//vms/saevm/gasprice",
         "//vms/saevm/hook",
         "//vms/saevm/saedb",
+        "//vms/saevm/saetrace",
         "//vms/saevm/saexec",
         "//vms/saevm/txgossip",
         "@com_github_ava_labs_libevm//:libevm",
@@ -62,6 +63,7 @@ go_library(
         "@com_github_ava_labs_libevm//rlp",
         "@com_github_ava_labs_libevm//rpc",
         "@com_github_ava_labs_libevm//trie",
+        "@io_opentelemetry_go_otel//attribute",
         "@org_uber_go_zap//:zap",
     ],
 )
