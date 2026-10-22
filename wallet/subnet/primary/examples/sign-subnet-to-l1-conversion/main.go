@@ -94,6 +94,7 @@ func main() {
 	}
 
 	appRequest, err := messageBuilder.AppRequest(
+		context.Background(),
 		constants.PlatformChainID,
 		0,
 		time.Hour,

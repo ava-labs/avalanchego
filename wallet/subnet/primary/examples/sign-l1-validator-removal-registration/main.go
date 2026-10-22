@@ -182,6 +182,7 @@ func main() {
 	}
 
 	appRequest, err := mesageBuilder.AppRequest(
+		context.Background(),
 		constants.PlatformChainID,
 		0,
 		time.Hour,

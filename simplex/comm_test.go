@@ -44,7 +44,7 @@ func TestCommSendMessage(t *testing.T) {
 	comm, err := NewComm(config)
 	require.NoError(t, err)
 
-	outboundMsg, err := config.OutboundMsgBuilder.SimplexMessage(newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
+	outboundMsg, err := config.OutboundMsgBuilder.SimplexMessage(t.Context(), newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
 	require.NoError(t, err)
 	expectedSendConfig := common.SendConfig{
 		NodeIDs: set.Of(destinationNodeID),
@@ -63,7 +63,7 @@ func TestCommBroadcast(t *testing.T) {
 
 	comm, err := NewComm(config)
 	require.NoError(t, err)
-	outboundMsg, err := config.OutboundMsgBuilder.SimplexMessage(newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
+	outboundMsg, err := config.OutboundMsgBuilder.SimplexMessage(t.Context(), newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
 	require.NoError(t, err)
 	nodes := make([]ids.NodeID, 0, len(comm.Nodes()))
 	for _, node := range comm.Nodes() {

@@ -467,7 +467,7 @@ func TestSend(t *testing.T) {
 	net0 := networks[0]
 
 	mc := newMessageCreator(t)
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
+	outboundGetMsg, err := mc.Get(t.Context(), ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	toSend := set.Of(nodeIDs[1])
@@ -512,7 +512,7 @@ func TestSendWithFilter(t *testing.T) {
 	net0 := networks[0]
 
 	mc := newMessageCreator(t)
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
+	outboundGetMsg, err := mc.Get(t.Context(), ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	toSend := set.Of(nodeIDs...)

@@ -206,7 +206,7 @@ func TestSend(t *testing.T) {
 	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
 	awaitReady(t, peer0, peer1)
 
-	outboundGetMsg, err := config0.MessageCreator.Get(ids.Empty, 1, time.Second, ids.Empty)
+	outboundGetMsg, err := config0.MessageCreator.Get(t.Context(), ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	require.True(peer0.Send(t.Context(), outboundGetMsg))
@@ -692,7 +692,7 @@ func TestShouldDisconnect(t *testing.T) {
 func sendAndFlush(t *testing.T, sender *testPeer, receiver *testPeer) {
 	t.Helper()
 	mc := newMessageCreator(t)
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
+	outboundGetMsg, err := mc.Get(t.Context(), ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(t, err)
 	require.True(t, sender.Send(t.Context(), outboundGetMsg))
 	inboundGetMsg := <-receiver.inboundMsgChan
