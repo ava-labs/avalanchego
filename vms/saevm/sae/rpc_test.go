@@ -702,19 +702,6 @@ func TestMempoolTxGetters(t *testing.T) {
 	}
 }
 
-// logsFrom returns the logs of all receipts of the given blocks, in order.
-func logsFrom(bs ...*blocks.Block) []types.Log {
-	var logs []types.Log
-	for _, b := range bs {
-		for _, r := range b.Receipts() {
-			for _, l := range r.Logs {
-				logs = append(logs, *l)
-			}
-		}
-	}
-	return logs
-}
-
 func TestGetLogs(t *testing.T) {
 	// We shorten section size to reduce number of required blocks in the test.
 	const bloomSectionSize = 8
@@ -775,6 +762,18 @@ func TestGetLogs(t *testing.T) {
 		_, got := be.BloomStatus()
 		require.Equal(c, uint64(1), got, "%T.BloomStatus() sections", be)
 	}, 5*time.Second, 100*time.Millisecond, "bloom indexer never finished")
+
+	logsFrom := func(bs ...*blocks.Block) []types.Log {
+		var logs []types.Log
+		for _, b := range bs {
+			for _, r := range b.Receipts() {
+				for _, l := range r.Logs {
+					logs = append(logs, *l)
+				}
+			}
+		}
+		return logs
+	}
 
 	ptr := func(h common.Hash) *common.Hash { return &h }
 
@@ -902,8 +901,7 @@ func TestGetLogsRange(t *testing.T) {
 		GasPrice: big.NewInt(1),
 	}))
 	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
-	executedLogs := logsFrom(executed)
-	require.NotEmptyf(t, executedLogs, "logsFrom(%T)", executed)
+	executedLogs := []types.Log{*executed.Receipts()[0].Logs[0]}
 
 	unexecuted := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 		To:       &blockingPrecompile,
