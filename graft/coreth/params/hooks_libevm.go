@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
@@ -146,30 +147,6 @@ func (r RulesExtra) precompileOverrideBuiltin(addr common.Address) (libevm.Preco
 	return precompile, ok
 }
 
-// predicateBytesFromExtra returns the predicate result bytes from the header's
-// extra data. If the extra data is not long enough, an empty slice is returned.
-func predicateBytesFromExtra(rules extras.AvalancheRules, extra []byte) []byte {
-	offset := predicateBytesOffset(rules)
-	// Prior to Durango, the VM enforces the extra data is smaller than or equal
-	// to `offset`.
-	// After Durango, the VM pre-verifies the extra data past `offset` is valid.
-	if len(extra) <= offset {
-		return nil
-	}
-	return extra[offset:]
-}
-
-func predicateBytesOffset(rules extras.AvalancheRules) int {
-	switch {
-	case rules.IsHelicon:
-		return 0
-	case rules.IsFortuna:
-		return ACP176StateSize
-	default:
-		return ap3WindowSize
-	}
-}
-
 func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.PrecompiledContract {
 	run := func(env vm.PrecompileEnvironment, input []byte, suppliedGas uint64) ([]byte, uint64, error) {
 		header, err := env.BlockHeader()
@@ -178,7 +155,7 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 		}
 		var predicateResults predicate.BlockResults
 		rules := GetRulesExtra(env.Rules()).AvalancheRules
-		if predicateResultsBytes := predicateBytesFromExtra(rules, header.Extra); len(predicateResultsBytes) > 0 {
+		if predicateResultsBytes := customtypes.PredicateBytesFromExtra(rules, header.Extra); len(predicateResultsBytes) > 0 {
 			predicateResults, err = predicate.ParseBlockResults(predicateResultsBytes)
 			if err != nil {
 				panic(err) // Should never happen, as results are already validated in block validation

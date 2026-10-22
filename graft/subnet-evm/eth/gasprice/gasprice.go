@@ -65,7 +65,7 @@ const (
 
 var (
 	DefaultMaxPrice           = big.NewInt(150 * params.GWei)
-	DefaultMinPrice           = big.NewInt(1) // 1 wei
+	DefaultMinPrice           = big.NewInt(params.Wei)
 	DefaultMinBaseFee         = big.NewInt(legacy.BaseFee)
 	DefaultMinGasUsed         = big.NewInt(6_000_000) // block gas limit is 8,000,000
 	DefaultMaxLookbackSeconds = uint64(80)

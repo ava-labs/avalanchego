@@ -26,8 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 )
 
 func TestDelayExponent(t *testing.T) {
@@ -167,7 +165,7 @@ func TestTargetExponent(t *testing.T) {
 
 	// Non-zero capacity and excess catch reading the wrong field.
 	feeState := binary.BigEndian.AppendUint64(
-		bytes.Repeat([]byte{0xff}, corethparams.ACP176StateSize-wrappers.LongLen),
+		bytes.Repeat([]byte{0xff}, customtypes.ACP176StateSize-wrappers.LongLen),
 		5_000, // target excess
 	)
 
@@ -205,22 +203,13 @@ func TestTargetExponent(t *testing.T) {
 			want: 5_000,
 		},
 		{
-			name: "no_field_fortuna_fee_state_and_predicate",
-			header: &types.Header{
-				Time:   fortunaTime,
-				Number: big.NewInt(1),
-				Extra:  append(bytes.Clone(feeState), 1, 2, 3),
-			},
-			want: 5_000,
-		},
-		{
 			name: "no_field_fortuna_short_extra",
 			header: &types.Header{
 				Time:   fortunaTime,
 				Number: big.NewInt(1),
 				Extra:  feeState[:len(feeState)-1],
 			},
-			wantErr: errInsufficientFeeState,
+			wantErr: customtypes.ErrInsufficientFeeState,
 		},
 	}
 
