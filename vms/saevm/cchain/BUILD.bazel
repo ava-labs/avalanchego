@@ -13,7 +13,6 @@ package_group(
     packages = [
         "//graft/coreth/core",
         "//graft/coreth/nativeasset",
-        "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/precompiletest",
         "//main",
         "//node",
