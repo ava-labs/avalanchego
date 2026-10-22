@@ -97,7 +97,6 @@ go_library(
         "//vms/evm/metrics/prometheus",
         "//vms/evm/sync/customrawdb",
         "//vms/evm/uptimetracker",
-        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/rawdb",
@@ -115,6 +114,7 @@ go_library(
         "@com_github_gorilla_rpc//v2:rpc",
         "@com_github_holiman_uint256//:uint256",
         "@com_github_prometheus_client_golang//prometheus",
+        "@firewood//ffi:ffi_ethhash",
         "@org_uber_go_zap//:zap",
     ],
 )

@@ -130,7 +130,7 @@ func New(config Config) (*TrieDB, error) {
 		ffi.WithReadCacheStrategy(ffi.CacheAllReads), // Based on benchmarking, highest cache hit rate
 		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
 		ffi.WithRevisions(config.RevisionsInMemory),
-		ffi.WithDeferredPersistenceCommitCount(config.DeferredCommitInterval),
+		withPersistenceGap(config.DeferredCommitInterval),
 		ffi.WithExpensiveMetrics(),
 	}
 	if config.Archive {

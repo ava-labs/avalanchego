@@ -9,6 +9,7 @@ common --experimental_isolated_extension_usages
 common --enable_platform_specific_config
 
 # Go settings
+build --define gotags=firewood_bazel
 
 # Test settings
 test --test_output=errors

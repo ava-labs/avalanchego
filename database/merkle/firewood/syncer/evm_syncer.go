@@ -46,6 +46,13 @@ func NewEVM(
 }
 
 func (e *evmDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error) {
+	droppedByDatabase := false
+	defer func() {
+		if !droppedByDatabase {
+			_ = dropRangeProof(proof.rp)
+		}
+	}()
+
 	// First enqueue any code hashes found in the proof.
 	// If an error occurs here, we don't want to commit the proof to the database, because the
 	// code hashes will never be requested.
@@ -59,6 +66,7 @@ func (e *evmDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]b
 	if err := e.codeQueue.AddCode(codeHashes); err != nil {
 		return maybe.Nothing[[]byte](), err
 	}
+	droppedByDatabase = true
 	nextKey, err := e.db.CommitRangeProof(ctx, start, end, proof)
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
