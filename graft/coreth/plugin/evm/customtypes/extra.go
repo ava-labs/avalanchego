@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 
-	paramsextras "github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+
+	paramsextras "github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 )
 
 // Sizes of the fee state that prefixes the extra data of pre-Helicon headers.
@@ -44,10 +46,10 @@ func predicateBytesOffset(rules paramsextras.AvalancheRules) int {
 	}
 }
 
-// TargetExcessFromExtra returns the target excess stored as the last field of
-// the ACP-176 fee state prefixing the extra data of Fortuna through pre-Helicon
-// headers.
-func TargetExcessFromExtra(extra []byte) (uint64, error) {
+// TargetExponentFromExtra returns the target exponent stored as the last field
+// of the ACP-176 fee state prefixing the extra data of Fortuna through
+// pre-Helicon headers.
+func TargetExponentFromExtra(extra []byte) (dynamic.TargetExponent, error) {
 	if len(extra) < ACP176StateSize {
 		return 0, fmt.Errorf("%w: expected at least %d bytes but got %d bytes",
 			ErrInsufficientFeeState,
@@ -55,6 +57,6 @@ func TargetExcessFromExtra(extra []byte) (uint64, error) {
 			len(extra),
 		)
 	}
-	const targetIndex = ACP176StateSize-wrappers.LongLen
-	return binary.BigEndian.Uint64(extra[targetIndex:]), nil
+	const targetIndex = ACP176StateSize - wrappers.LongLen
+	return dynamic.TargetExponent(binary.BigEndian.Uint64(extra[targetIndex:])), nil
 }

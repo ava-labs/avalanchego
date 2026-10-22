@@ -4,8 +4,6 @@
 package cchain
 
 import (
-	"bytes"
-	"encoding/binary"
 	"math/big"
 	"testing"
 
@@ -19,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
@@ -163,12 +160,6 @@ func TestAncestorInputIDs(t *testing.T) {
 func TestTargetExponent(t *testing.T) {
 	const fortunaTime = 100
 
-	// Non-zero capacity and excess catch reading the wrong field.
-	feeState := binary.BigEndian.AppendUint64(
-		bytes.Repeat([]byte{0xff}, customtypes.ACP176StateSize-wrappers.LongLen),
-		5_000, // target excess
-	)
-
 	tests := []struct {
 		name    string
 		header  *types.Header
@@ -194,21 +185,8 @@ func TestTargetExponent(t *testing.T) {
 			want:   dynamic.InitialTargetExponent,
 		},
 		{
-			name: "no_field_fortuna_fee_state",
-			header: &types.Header{
-				Time:   fortunaTime,
-				Number: big.NewInt(1),
-				Extra:  feeState,
-			},
-			want: 5_000,
-		},
-		{
-			name: "no_field_fortuna_short_extra",
-			header: &types.Header{
-				Time:   fortunaTime,
-				Number: big.NewInt(1),
-				Extra:  feeState[:len(feeState)-1],
-			},
+			name:    "no_field_fortuna_parses_extra",
+			header:  &types.Header{Time: fortunaTime, Number: big.NewInt(1)},
 			wantErr: customtypes.ErrInsufficientFeeState,
 		},
 	}

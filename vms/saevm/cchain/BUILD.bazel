@@ -160,7 +160,6 @@ go_test(
         "//utils/logging/loggingtest",
         "//utils/set",
         "//utils/units",
-        "//utils/wrappers",
         "//version",
         "//vms/components/avax",
         "//vms/components/gas",

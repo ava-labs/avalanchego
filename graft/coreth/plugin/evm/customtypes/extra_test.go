@@ -11,8 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	paramsextras "github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+
+	paramsextras "github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 )
 
 func TestPredicateBytesFromExtra(t *testing.T) {
@@ -93,7 +95,7 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 	}
 }
 
-func TestTargetExcessFromExtra(t *testing.T) {
+func TestTargetExponentFromExtra(t *testing.T) {
 	// Non-zero capacity and excess catch reading the wrong field.
 	feeState := binary.BigEndian.AppendUint64(
 		bytes.Repeat([]byte{0xff}, ACP176StateSize-wrappers.LongLen),
@@ -103,7 +105,7 @@ func TestTargetExcessFromExtra(t *testing.T) {
 	tests := []struct {
 		name    string
 		extra   []byte
-		want    uint64
+		want    dynamic.TargetExponent
 		wantErr error
 	}{
 		{
@@ -124,9 +126,9 @@ func TestTargetExcessFromExtra(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := TargetExcessFromExtra(tt.extra)
-			require.ErrorIs(t, err, tt.wantErr, "TargetExcessFromExtra()")
-			assert.Equal(t, tt.want, got, "TargetExcessFromExtra()")
+			got, err := TargetExponentFromExtra(tt.extra)
+			require.ErrorIs(t, err, tt.wantErr, "TargetExponentFromExtra()")
+			assert.Equal(t, tt.want, got, "TargetExponentFromExtra()")
 		})
 	}
 }

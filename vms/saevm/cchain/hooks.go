@@ -168,14 +168,9 @@ func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.Target
 		return dynamic.InitialTargetExponent, nil
 	}
 
-	// Synchronous blocks store the target excess as the last field of the
-	// ACP-176 fee state prefixing their extra data. It is needed to execute and
-	// recover them, and to build on the last one.
-	targetExcess, err := customtypes.TargetExcessFromExtra(h.Extra)
-	if err != nil {
-		return 0, err
-	}
-	return dynamic.TargetExponent(targetExcess), nil
+	// Synchronous blocks store the target exponent in their ACP-176 fee state.
+	// Only the last one's is used, as the parent of the first SAE block.
+	return customtypes.TargetExponentFromExtra(h.Extra)
 }
 
 func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
