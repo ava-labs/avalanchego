@@ -10,15 +10,16 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-	avatrace "github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -237,7 +238,7 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, Op, error) {
 
 func (mb *msgBuilder) createOutbound(ctx context.Context, m *p2p.Message, compressionType compression.Type, bypassThrottling bool) (*OutboundMessage, error) {
 	if mb.tracingEnabled {
-		m.TraceContext = avatrace.MarshalSpanContext(oteltrace.SpanContextFromContext(ctx))
+		m.TraceContext = trace.MarshalSpanContext(oteltrace.SpanContextFromContext(ctx))
 	}
 	b, saved, op, err := mb.marshal(m, compressionType)
 	if err != nil {
@@ -275,7 +276,7 @@ func (mb *msgBuilder) parseInbound(
 
 	var spanContext oteltrace.SpanContext
 	if mb.tracingEnabled {
-		spanContext = avatrace.UnmarshalSpanContext(m.GetTraceContext())
+		spanContext = trace.UnmarshalSpanContext(m.GetTraceContext())
 	}
 
 	return &InboundMessage{

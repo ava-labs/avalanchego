@@ -11,14 +11,15 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/staking"
-	avatrace "github.com/ava-labs/avalanchego/trace"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/compression"
+
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 func TestMessage(t *testing.T) {
@@ -807,7 +808,7 @@ func TestTraceContextDisabled(t *testing.T) {
 
 	// A disabled node ignores a field written by a peer.
 	msg := newTestPut(t)
-	msg.TraceContext = avatrace.MarshalSpanContext(span.SpanContext())
+	msg.TraceContext = trace.MarshalSpanContext(span.SpanContext())
 	require.NotEmpty(t, msg.TraceContext, "MarshalSpanContext()")
 	b, err := proto.Marshal(msg)
 	require.NoError(t, err, "proto.Marshal()")
