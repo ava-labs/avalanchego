@@ -8,12 +8,35 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/eth/filters"
 	"github.com/ava-labs/libevm/rpc"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 )
+
+// A filterBackend is a [backend] that hides accepted blocks until they are
+// executed. Headers are written on acceptance but logs only on execution, and
+// libevm's filter system errors on any header whose logs are missing.
+type filterBackend struct {
+	*backend
+}
+
+func (b filterBackend) HeaderByNumber(ctx context.Context, n rpc.BlockNumber) (*types.Header, error) {
+	return b.executed(b.backend.HeaderByNumber(ctx, n))
+}
+
+func (b filterBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
+	return b.executed(b.backend.HeaderByHash(ctx, hash))
+}
+
+func (b filterBackend) executed(h *types.Header, err error) (*types.Header, error) {
+	if err != nil || h == nil || h.Number.Uint64() > b.LastExecuted().Height() {
+		return nil, err
+	}
+	return h, nil
+}
 
 // filterAPI is a replacement for a [filters.FilterAPI] which applies [Config]
 // for any call to [filters.FilterAPI.GetLogs]. This does NOT apply to any
@@ -47,8 +70,7 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 	end, foundEnd := api.resolve(crit.ToBlock)
 	if !foundEnd {
 		// All special numbers resolve, so this must be a future block. Cap at
-		// the last-accepted block, where libevm would stop anyway and if that
-		// block hasn't executed yet, libevm errors when reading its logs.
+		// the last-accepted block, where libevm would stop anyway.
 		end = api.b.LastAccepted().Height()
 	}
 

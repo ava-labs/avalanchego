@@ -702,6 +702,19 @@ func TestMempoolTxGetters(t *testing.T) {
 	}
 }
 
+// logsFrom returns the logs of all receipts of the given blocks, in order.
+func logsFrom(bs ...*blocks.Block) []types.Log {
+	var logs []types.Log
+	for _, b := range bs {
+		for _, r := range b.Receipts() {
+			for _, l := range r.Logs {
+				logs = append(logs, *l)
+			}
+		}
+	}
+	return logs
+}
+
 func TestGetLogs(t *testing.T) {
 	// We shorten section size to reduce number of required blocks in the test.
 	const bloomSectionSize = 8
@@ -762,18 +775,6 @@ func TestGetLogs(t *testing.T) {
 		_, got := be.BloomStatus()
 		require.Equal(c, uint64(1), got, "%T.BloomStatus() sections", be)
 	}, 5*time.Second, 100*time.Millisecond, "bloom indexer never finished")
-
-	logsFrom := func(bs ...*blocks.Block) []types.Log {
-		var logs []types.Log
-		for _, b := range bs {
-			for _, r := range b.Receipts() {
-				for _, l := range r.Logs {
-					logs = append(logs, *l)
-				}
-			}
-		}
-		return logs
-	}
 
 	ptr := func(h common.Hash) *common.Hash { return &h }
 
@@ -880,9 +881,14 @@ func TestGetLogsRange(t *testing.T) {
 	const maxBlocksPerRequest = 2
 
 	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
+	emitter := common.Address{'l', 'o', 'g'}
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
-	ctx, sut := newSUT(t, 1, precompileOpt, timeOpt, options.Func[sutConfig](func(c *sutConfig) {
+	emitterOpt := withPrecompile(emitter, vm.NewStatefulPrecompile(func(env vm.PrecompileEnvironment, _ []byte) ([]byte, error) {
+		env.StateDB().AddLog(&types.Log{Address: env.Addresses().EVMSemantic.Self})
+		return nil, nil
+	}))
+	ctx, sut := newSUT(t, 1, precompileOpt, emitterOpt, timeOpt, options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.RPCConfig.MaxBlocksPerRequest = maxBlocksPerRequest
 	}))
 	defer unblock()
@@ -890,8 +896,14 @@ func TestGetLogsRange(t *testing.T) {
 	genesis := sut.lastAcceptedBlock(t)
 	settled := sut.runConsensusLoop(t)
 	vmTime.AdvanceToSettle(ctx, t, settled)
-	executed := sut.runConsensusLoop(t)
+	executed := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		To:       &emitter,
+		Gas:      1e6,
+		GasPrice: big.NewInt(1),
+	}))
 	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
+	executedLogs := logsFrom(executed)
+	require.NotEmptyf(t, executedLogs, "logsFrom(%T)", executed)
 
 	unexecuted := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 		To:       &blockingPrecompile,
@@ -905,9 +917,10 @@ func TestGetLogsRange(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		query   map[string]any
-		wantErr testerr.Want
+		name     string
+		query    map[string]any
+		wantLogs []types.Log
+		wantErr  testerr.Want
 	}{
 		{
 			name:  "at_limit",
@@ -929,14 +942,24 @@ func TestGetLogsRange(t *testing.T) {
 			wantErr: testerr.Contains("requested too many blocks from 0 to 3, maximum is set to 2"),
 		},
 		{
-			name:    "to_future_block",
-			query:   map[string]any{"fromBlock": num(executed), "toBlock": future + 100},
-			wantErr: testerr.Contains("failed to get logs for block #3"), // from libevm
+			name:     "to_future_block",
+			query:    map[string]any{"fromBlock": num(executed), "toBlock": future + 100},
+			wantLogs: executedLogs,
 		},
 		{
-			name:    "to_unexecuted_block",
-			query:   map[string]any{"fromBlock": num(executed), "toBlock": num(unexecuted)},
-			wantErr: testerr.Contains("failed to get logs for block #3"), // from libevm
+			name:     "to_unexecuted_block",
+			query:    map[string]any{"fromBlock": num(executed), "toBlock": num(unexecuted)},
+			wantLogs: executedLogs,
+		},
+		{
+			name:     "hash_of_executed_block",
+			query:    map[string]any{"blockHash": executed.Hash()},
+			wantLogs: executedLogs,
+		},
+		{
+			name:    "hash_of_unexecuted_block",
+			query:   map[string]any{"blockHash": unexecuted.Hash()},
+			wantErr: testerr.Contains("unknown block"), // from libevm
 		},
 		{
 			name:  "from_unexecuted_block",
@@ -972,9 +995,8 @@ func TestGetLogsRange(t *testing.T) {
 		},
 		{
 			// libevm always resolves pending to last executed, but the config is NOT set.
-			name:    "pending_resolves_to_last_accepted",
-			query:   map[string]any{"fromBlock": "pending", "toBlock": "pending"},
-			wantErr: testerr.Contains("failed to get logs for block #3"), // from libevm
+			name:  "pending_resolves_to_last_accepted",
+			query: map[string]any{"fromBlock": "pending", "toBlock": "pending"},
 		},
 		{
 			name:    "future_range_reversed",
@@ -995,7 +1017,12 @@ func TestGetLogsRange(t *testing.T) {
 			}
 
 			// must be an empty array, not null, to match libevm.
-			assert.JSONEqf(t, "[]", string(got), "eth_getLogs(%v)", tt.query)
+			require.NotEqualf(t, "null", string(got), "eth_getLogs(%v)", tt.query)
+			var logs []types.Log
+			require.NoErrorf(t, json.Unmarshal(got, &logs), "json.Unmarshal(eth_getLogs(%v))", tt.query)
+			if diff := cmp.Diff(tt.wantLogs, logs, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("eth_getLogs(%v) mismatch (-want +got):\n%s", tt.query, diff)
+			}
 		})
 	}
 }
