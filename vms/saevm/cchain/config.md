@@ -26,7 +26,7 @@ Default values are overridden only if specified in the given config file. It is 
 
 Configuration is provided as a JSON object. All fields are optional unless otherwise specified.
 
-Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no longer exists — are ignored, and the node logs a warning naming them. The one exception is [`eth-apis`](#deprecated-eth-apis), which is deprecated but still honoured.
+Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no longer exists — are ignored, and the node logs a warning naming them.
 
 ## Block Building
 
@@ -46,6 +46,7 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 | `snapshot-cache` | int | Size of the snapshot disk layer clean cache in MB. | `256` |
 | `allow-missing-tries` | bool | Suppress warnings about an incomplete trie index. | `false` |
 | `state-scheme` | string | EXPERIMENTAL: specifies the database scheme used to store state data; either `hash` or `firewood`. | `hash` |
+| `state-history` | uint64 | Number of recently executed states to guarantee available in memory. The minimum possible value is the default. | `128` |
 
 ## Transaction Pool
 
@@ -62,7 +63,8 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 | `apis` | array of strings | The JSON-RPC APIs this node serves, see [Available APIs](#available-apis). Methods of an API that is not listed, including APIs added in later releases, are not served, and calling one returns a `the method ... does not exist/is not available` error. An unrecognised name is a fatal configuration error. | every API marked *enabled* in [Available APIs](#available-apis) |
 | `allow-unprotected-txs` | bool | Allow unprotected transactions (without EIP-155 replay protection). | `false` |
 | `batch-request-limit` | uint64 | Maximum number of requests that can be batched in an RPC call (`0` = no limit). | `1000` |
-| `api-max-duration` | duration | Maximum duration of an `eth_call` (or `eth_callDetailed`) execution. Accepts a [Go duration string](https://pkg.go.dev/time#ParseDuration) (e.g. `"30s"`, `"2h45m"`); valid units are `ns`, `us`, `ms`, `s`, `m` and `h`. Non-positive values result in no limit. | `0` |
+| `api-max-duration` | duration | Maximum duration of each call to the `/rpc` and `/ws` endpoints. A call that times out doesn't close its WebSocket connection. Accepts a [Go duration string](https://pkg.go.dev/time#ParseDuration), such as `"30s"`. Non-positive values result in no limit. | `0` |
+| `api-max-blocks-per-request` | uint64 | Maximum number of blocks per `eth_getLogs` request (`0` = no limit). | `0` |
 | `api-resolve-pending-to-last-executed` | bool | Requests for the "pending" block return the last-executed instead of the last-accepted to allow compatibility with EVM-ecosystem tooling that expect the pending block to have post-execution artefacts. | `true` |
 
 ### Available APIs
@@ -82,16 +84,6 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 | `profile` | disabled | Process introspection and profiling: `debug_blockProfile`, `debug_cpuProfile`, `debug_freeOSMemory`, `debug_gcStats`, `debug_goTrace`, `debug_memStats`, `debug_mutexProfile`, `debug_setBlockProfileRate`, `debug_setGCPercent`, `debug_setMutexProfileFraction`, `debug_stacks`, `debug_start{CPUProfile,GoTrace}`, `debug_stop{CPUProfile,GoTrace}`, `debug_verbosity`, `debug_vmodule`, `debug_write{Block,Mem,Mutex}Profile` |
 
 `eth_subscribe` is only available over the websocket endpoint (`/ext/bc/C/ws`).
-
-### Deprecated: `eth-apis`
-
-`eth-apis`, the pre-SAE C-Chain's API allowlist, is deprecated and **WILL BE
-REMOVED in the next release**; migrate to `apis`. Until then, the node maps
-each `eth-apis` name onto the `apis` values that serve the same methods and
-logs the resulting `apis` value to copy into the config. Names whose methods no
-longer exist (e.g. `admin`, `internal-personal`) are ignored with a warning, and
-an unrecognised name remains a fatal configuration error. If a config sets both
-options, `apis` wins and `eth-apis` is ignored.
 
 ## State Sync
 

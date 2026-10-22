@@ -65,7 +65,13 @@ runs:
     - uses: ./.github/actions/setup-bazel
       if: ${{ inputs.setup_bazel == 'true' }}
     # Install nix and ensure promtail and prometheus are available
-    - uses: ./.github/actions/install-nix
+    - id: install-nix
+      uses: ./.github/actions/install-nix
+      with:
+        # Bazel setup prepares Gazelle's cache separately. Skip preparation of
+        # the non-Bazel Go module cache when this job uses Bazel.
+        # See docs/go-toolchains-and-caches.md#dependency-preparation.
+        setup_go_module_cache: ${{ inputs.setup_bazel != 'true' }}
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash
@@ -115,15 +121,15 @@ runs:
       run: ./scripts/run_task.sh log-ci-disk-state-bazel
     - name: Log Docker disk diagnostics
       if: ${{ steps.run-command.outcome == 'failure' && inputs.runtime == 'kube' }}
-      shell: bash
+      shell: nix develop --command bash -x {0}
       run: ./scripts/run_task.sh log-ci-disk-state-docker
     - name: Upload tmpnet data
-      if: always() && (inputs.runtime == 'process')
+      if: ${{ always() && inputs.runtime == 'process' && steps.install-nix.outcome == 'success' }}
       uses: ./.github/actions/upload-tmpnet-artifact
       with:
         name: ${{ inputs.artifact_prefix }}-tmpnet-data
     - name: Collect kind diagnostics
-      if: always() && (inputs.runtime == 'kube')
+      if: ${{ always() && inputs.runtime == 'kube' && steps.install-nix.outcome == 'success' }}
       uses: ./.github/actions/collect-kind-diagnostics
       with:
         artifact_name: ${{ inputs.artifact_prefix }}-kind-diagnostics

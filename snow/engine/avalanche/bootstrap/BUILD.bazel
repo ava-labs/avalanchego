@@ -15,7 +15,7 @@ go_library(
     deps = [
         "//cache/lru",
         "//ids",
-        "//network/p2p",
+        "//network/p2p/peertracker",
         "//proto/pb/p2p",
         "//snow",
         "//snow/choices",
@@ -43,7 +43,7 @@ go_test(
         "//database/memdb",
         "//database/prefixdb",
         "//ids",
-        "//network/p2p",
+        "//network/p2p/peertracker",
         "//proto/pb/p2p",
         "//snow",
         "//snow/choices",

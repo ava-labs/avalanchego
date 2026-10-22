@@ -7,7 +7,6 @@ import (
 	"context"
 	"math/big"
 	"strings"
-	"time"
 
 	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
@@ -19,8 +18,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/cortina"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
@@ -58,7 +55,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		gasTipCap = big.NewInt(minFeePerGas)
 	)
 
-	ginkgo.It("should ensure that the gas price is affected by load", func() {
+	ginkgo.It("should ensure that the gas price is affected by load", ginkgo.Label(e2e.SkipSharedNetworkBootstrapCheckLabel), func() {
 		tc.By("creating a new private network to ensure isolation from other tests")
 		env := e2e.GetEnv(tc)
 		publicNetwork := env.GetNetwork()
@@ -81,7 +78,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		key := privateNetwork.PreFundedKeys[0]
 		ethAddress := key.EthAddress()
 
-		tc.By("initializing a coreth client")
+		tc.By("initializing a cchain client")
 		node := privateNetwork.Nodes[0]
 		nodeURI := tmpnet.NodeURI{
 			NodeID: node.NodeID,
@@ -101,19 +98,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		}
 
 		// gasLimit is the maximum amount of gas that can be used in a block.
-		var gasLimit uint64
-		tc.By("checking if Fortuna is activated", func() {
-			infoClient := info.NewClient(nodeURI.URI)
-			upgrades, err := infoClient.Upgrades(tc.DefaultContext())
-			require.NoError(err)
-
-			now := time.Now()
-			if upgrades.IsFortunaActivated(now) {
-				gasLimit = acp176.MinMaxCapacity
-			} else {
-				gasLimit = cortina.GasLimit
-			}
-		})
+		gasLimit := uint64(acp176.MinMaxCapacity)
 		tc.Log().Info("set gas limit",
 			zap.Uint64("gasLimit", gasLimit),
 		)

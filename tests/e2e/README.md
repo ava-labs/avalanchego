@@ -95,13 +95,37 @@ immediately without executing any tests:
 ./bin/gingko -v ./tests/e2e -- --stop-network
 ```
 
-## Skipping bootstrap checks
+## Bootstrap checks
 
-By default many tests will attempt to bootstrap a new node with the
-post-test network state. While this is a valuable activity to perform
-in CI, it can add considerable latency to test development. To disable
-these bootstrap checks during development, set the
-`E2E_SKIP_BOOTSTRAP_CHECKS` env var to a non-empty value:
+The suite starts a shared network for most tests. Some tests start a private
+network to avoid being affected by changes made by other tests.
+
+In a serial run, the suite checks whether a new node can bootstrap from the
+shared network after each successful test. Tests can opt out with
+`ginkgo.Label(e2e.SkipSharedNetworkBootstrapCheckLabel)`. For example, a test that
+uses only a private network does not need a shared-network check. Tests with
+private networks can check those networks before they shut down.
+
+The first failed shared-network check narrows the investigation to changes
+since the last passing check. No other test changes the shared network during
+a serial check. An opted-out test can fall within this interval.
+
+In a parallel run, another test can change the shared network during a
+per-test check. A failure cannot identify which test changed the network.
+Concurrent checks can also compete for resources on CI runners. Parallel
+runs therefore do not check the shared network after each test.
+
+After a parallel run, the suite checks the shared network once. It runs this
+check only if an eligible test passed and no test failed. If all selected tests
+opt out, the suite does not check the shared network. Serial runs do not
+perform a post-suite check because eligible tests already perform per-test
+checks. Private-network checks still run within their tests in either mode.
+
+If the final check fails, a serial run can help identify the cause. Test order
+and accumulated network changes can affect whether the failure occurs again.
+
+To disable all bootstrap checks, set the `E2E_SKIP_BOOTSTRAP_CHECKS` environment
+variable to a non-empty value. This also disables checks for private networks:
 
 ```bash
 E2E_SKIP_BOOTSTRAP_CHECKS=1 ./bin/ginkgo -v ./tests/e2e ...

@@ -29,10 +29,9 @@ func NewStorage(db database.Database, msgs ...*warp.UnsignedMessage) *Storage {
 		overrides[m.ID()] = m
 	}
 	const (
-		// dbPrefix matches coreth's warpDB prefix to ensure the same underlying
-		// database structure during the VM transition. Coreth similarly uses
-		// [prefixdb.New], not [prefixdb.NewNested], so that behavior MUST be
-		// maintained here as well.
+		// dbPrefix, and the use of [prefixdb.New] rather than
+		// [prefixdb.NewNested], are part of the on-disk format and MUST NOT
+		// change.
 		dbPrefix  = "warp"
 		cacheSize = 500
 	)

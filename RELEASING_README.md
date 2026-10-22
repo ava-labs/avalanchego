@@ -7,7 +7,7 @@ This document covers the complete release process for AvalancheGo and its integr
 AvalancheGo is a monorepo which contains:
 
 - **AvalancheGo** - The main Avalanche node implementation
-- **Coreth** (in [graft/coreth/](graft/coreth/)) - C-Chain EVM implementation, compiled into AvalancheGo
+- **Coreth** (in [graft/coreth/](graft/coreth/)) - C-Chain types, params and precompiles used by [SAEVM](vms/saevm/), compiled into AvalancheGo
 - **Subnet-EVM** (in [graft/subnet-evm/](graft/subnet-evm/)) - Subnet-EVM plugin, released as a separate binary
 
 For the rationale behind the multi-module tagging process, see [Multi-Module Release Strategy](docs/design/multi-module-release.md).
@@ -97,7 +97,7 @@ If this release activates a new network upgrade on Mainnet:
    DEFAULT_VERSION="1.15.1"
    ```
 
-1. In [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml), comment out the `Run e2e tests` step of the `upgrade` job, leaving `actions/checkout` so the job still has a step:
+1. In [`.github/workflows/go.yml`](.github/workflows/go.yml), comment out the `Run e2e tests` step of the `upgrade` job, leaving `actions/checkout` so the job still has a step:
 
    ```yaml
    upgrade:
@@ -315,7 +315,7 @@ export NEXT_VERSION=v1.15.2
    git diff "$VERSION" origin/master -- RELEASES.md
    ```
 
-1. If you disabled the `upgrade` job in [step 2](#activating-a-network-upgrade-on-mainnet), enable it again in [`.github/workflows/go-ci-pre-merge.yml`](.github/workflows/go-ci-pre-merge.yml). Uncomment the `Run e2e tests` step and delete the `TODO` comment.
+1. If you disabled the `upgrade` job in [step 2](#activating-a-network-upgrade-on-mainnet), enable it again in [`.github/workflows/go.yml`](.github/workflows/go.yml). Uncomment the `Run e2e tests` step and delete the `TODO` comment.
 
 1. Create PR and merge:
 

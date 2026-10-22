@@ -4,9 +4,35 @@
 
 This release updates the plugin version to `47`. All plugins must update to remain compatible.
 
+**Nodes that last ran before Helicon activated must first run v1.15.0 or v1.15.1 until the C-Chain has bootstrapped past Helicon, or resync from an empty database.**
+
+### Features
+
+- Added `vms/evm/evmclient`, which combines standard Ethereum, Geth-specific, raw RPC, and Avalanche-specific EVM methods.
+- Updated the minimum Go version from `1.26.8` to `1.26.10`.
+- `eth_getLogs` now respects the node's C-Chain config option for `api-resolve-pending-to-last-executed`.
+
+### APIs
+
+- The `avax.getAtomicTxStatus` C-Chain RPC, deprecated in v1.15.0, is removed. Use `avax.getAtomicTx`, which fails for a tx that has not been accepted.
+- Added:
+  - `restakedValidationRewards` and `restakedDelegateeRewards` fields to `platform.getCurrentValidators` results for auto-renewed validators
+
+### Configs
+
+- The `eth-apis` C-Chain option, deprecated in v1.15.0, is removed. The node now ignores it and logs a warning like any other unrecognized option. Set `apis` instead.
+- Removed `pull-gossip-requests-per-validator` from the P-Chain config. It has had no effect since v1.14.2. The node ignores the key if a config still sets it.
+- `api-max-blocks-per-request` was added back to the C-Chain config.
+
 ### Metrics
 
-- Added `avalanche_evm_transition_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
+- C-Chain metrics no longer include the `transition` prefix. For example, `avalanche_evm_transition_sae_last_executed_height` is now `avalanche_evm_sae_last_executed_height`.
+- Added `avalanche_evm_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
+- Added `avalanche_evm_sae_execution_gas_rate_headroom` (histogram), `avalanche_evm_sae_execution_gas_rate_headroom_latest` (gauge), and `avalanche_evm_sae_tau_second_avg_executed_gas_per_second` (gauge) to monitor gas-vs-wall clock skew during execution, for tuning the gas target.
+
+### Fixes
+
+- Fixed C-Chain `api-max-duration` only limiting `eth_call` since Helicon. It again limits every call to the `/rpc` and `/ws` endpoints, and a WebSocket call that times out doesn't close its connection.
 
 ## [v1.15.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.1)
 
@@ -15,11 +41,6 @@ This release updates the plugin version to `47`. All plugins must update to rema
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 - Updated the minimum Go version from `1.25.10` to `1.26.8`.
 - Helicon is now active from genesis on local networks. A local network started on a previous version is not compatible with this version.
-
-### APIs
-
-- Added:
-  - `restakedValidationRewards` and `restakedDelegateeRewards` fields to `platform.getCurrentValidators` results for auto-renewed validators
 
 ### Metrics
 

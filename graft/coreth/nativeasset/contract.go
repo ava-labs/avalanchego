@@ -22,6 +22,9 @@ import (
 // BLS12-381 Curve Operations added to the set of precompiled contracts
 
 var (
+	// GenesisContractAddr is the address of the deprecated native-asset
+	// genesis contract. It is the same account as the blackhole address that
+	// receives burned fees.
 	GenesisContractAddr    = common.HexToAddress("0x0100000000000000000000000000000000000000")
 	NativeAssetBalanceAddr = common.HexToAddress("0x0100000000000000000000000000000000000001")
 	NativeAssetCallAddr    = common.HexToAddress("0x0100000000000000000000000000000000000002")

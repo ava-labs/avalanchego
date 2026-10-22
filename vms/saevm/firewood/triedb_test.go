@@ -4,6 +4,7 @@
 package firewood
 
 import (
+	"math"
 	"math/big"
 	"testing"
 
@@ -658,16 +659,15 @@ func TestInvalidConfig(t *testing.T) {
 		{
 			name: "too_few_revisions",
 			cfg: func(cfg Config) Config {
-				cfg.RevisionsInMemory = 1
+				cfg.StateHistory = 1 // Firewood requires >= 2
 				return cfg
 			},
-			wantErr: errTooFewRevisions,
+			wantErr: nil, // floors to DeferredCommitInterval + 1
 		},
 		{
 			name: "commit_interval_too_big",
 			cfg: func(cfg Config) Config {
-				cfg.DeferredCommitInterval = 5
-				cfg.RevisionsInMemory = 5
+				cfg.DeferredCommitInterval = math.MaxUint64
 				return cfg
 			},
 			wantErr: errCommitIntervalTooBig,
@@ -962,7 +962,7 @@ func TestHashAfterTipMovesPastParent(t *testing.T) {
 // Firewood's in-memory revision window still hashes.
 func TestHashAfterRevisionEviction(t *testing.T) {
 	cfg := DefaultConfig(t.TempDir(), loggingtest.New(t, logging.Debug))
-	cfg.RevisionsInMemory = 6
+	cfg.StateHistory = 6
 	cfg.DeferredCommitInterval = 5
 
 	// Guarantee one non-empty state root is on disk, since the empty state is always available.
@@ -998,7 +998,7 @@ func TestHashAfterRevisionEviction(t *testing.T) {
 	// Persist RevisionsInMemory newer roots. Firewood drops root1 from its
 	// by-hash lookup at that point even though sdb's handle keeps it alive.
 	tip := root1
-	for i := uint64(2); i <= uint64(cfg.RevisionsInMemory)+1; i++ {
+	for i := uint64(2); i <= cfg.StateHistory+1; i++ {
 		blk := newStateDB(t, db, tip)
 		blk.SetNonce(addr3, i)
 

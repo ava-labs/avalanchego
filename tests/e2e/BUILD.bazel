@@ -13,7 +13,6 @@ go_test(
     srcs = ["e2e_test.go"],
     tags = ["manual"],  # keep
     deps = [
-        "//graft/coreth/plugin/evm",
         "//tests/e2e/banff",
         "//tests/e2e/c",
         "//tests/e2e/faultinjection",
@@ -23,8 +22,40 @@ go_test(
         "//tests/e2e/x/transfer",
         "//tests/fixture/e2e",
         "//tests/fixture/tmpnet",
+        "//utils/perms",
+        "//vms/saevm/cchain/libevm",
         "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_onsi_ginkgo_v2//types",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_zap//:zap",
     ],
+)
+
+genrule(
+    name = "e2e_test_binary",
+    testonly = True,
+    srcs = [":e2e_test"],
+    outs = ["e2e.test"],
+    cmd = "cp $< $@",
+    tags = ["manual"],
+)
+
+sh_binary(
+    name = "e2e_runner",
+    testonly = True,
+    srcs = ["//scripts:tests.e2e.bazel.sh"],
+    args = [
+        "$(location //main:avalanchego)",
+        "$(location :e2e_test_binary)",
+        "$(location @com_github_onsi_ginkgo_v2//ginkgo:ginkgo)",
+        "$(location //vms/example/xsvm/cmd/xsvm:xsvm)",
+    ],
+    data = [
+        ":e2e_test_binary",
+        "//main:avalanchego",
+        "//scripts:tests.e2e.sh",
+        "//vms/example/xsvm/cmd/xsvm",
+        "@com_github_onsi_ginkgo_v2//ginkgo",
+    ],
+    tags = ["manual"],
 )
