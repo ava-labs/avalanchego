@@ -4,7 +4,6 @@
 package utils
 
 const (
-	Wei   = 1
-	GWei  = 1_000_000_000 * Wei
-	Ether = 1_000_000_000 * GWei
+	Wei  = 1
+	GWei = 1_000_000_000 * Wei
 )
