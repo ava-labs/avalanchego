@@ -147,22 +147,22 @@ func TestTrackerStateHistory(t *testing.T) {
 			)
 			require.NoError(t, err, "NewTracker()")
 
-			root := types.EmptyRootHash
+			lastRoot := types.EmptyRootHash
 			t.Cleanup(func() {
-				assert.NoErrorf(t, tr.Close(root), "%T.Close()", tr)
+				assert.NoErrorf(t, tr.Close(lastRoot), "%T.Close()", tr)
 			})
 
 			roots := make([]common.Hash, 0, numBlocks)
 			addr := common.Address{1}
 			for height := uint64(1); height <= numBlocks; height++ {
-				sdb, err := tr.StateDB(root)
+				sdb, err := tr.StateDB(lastRoot)
 				require.NoErrorf(t, err, "%T.StateDB() at height %d", tr, height)
 				sdb.SetNonce(addr, height) // unique state
-				root, err = sdb.Commit(height, true /* EIP-158 */)
+				lastRoot, err = sdb.Commit(height, true /* EIP-158 */)
 				require.NoErrorf(t, err, "%T.Commit(%d)", tr, height)
-				roots = append(roots, root)
+				roots = append(roots, lastRoot)
 
-				require.NoErrorf(t, tr.BlockExecuted(types.EmptyRootHash, root, height), "%T.BlockExecuted(%d)", tr, height)
+				require.NoErrorf(t, tr.BlockExecuted(types.EmptyRootHash, lastRoot, height), "%T.BlockExecuted(%d)", tr, height)
 			}
 
 			for i, pastRoot := range roots {
