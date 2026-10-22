@@ -226,6 +226,7 @@ func New(
 		networkRegisterer,
 		n.Config.NetworkConfig.CompressionType,
 		n.Config.NetworkConfig.MaximumInboundMessageTimeout,
+		false,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("problem initializing message creator: %w", err)

@@ -61,7 +61,7 @@ func BenchmarkMarshalHandshake(b *testing.B) {
 
 	useBuilder := os.Getenv("USE_BUILDER") != ""
 
-	codec, err := newMsgBuilder(prometheus.NewRegistry(), 10*time.Second)
+	codec, err := newMsgBuilder(prometheus.NewRegistry(), 10*time.Second, false)
 	require.NoError(err)
 
 	b.Logf("proto length %d-byte (use builder %v)", msgLen, useBuilder)
@@ -69,7 +69,7 @@ func BenchmarkMarshalHandshake(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if useBuilder {
-			_, err = codec.createOutbound(&msg, compression.TypeNone, false)
+			_, err = codec.createOutbound(b.Context(), &msg, compression.TypeNone, false)
 		} else {
 			_, err = proto.Marshal(&msg)
 		}
@@ -118,7 +118,7 @@ func BenchmarkUnmarshalHandshake(b *testing.B) {
 	require.NoError(err)
 
 	useBuilder := os.Getenv("USE_BUILDER") != ""
-	codec, err := newMsgBuilder(prometheus.NewRegistry(), 10*time.Second)
+	codec, err := newMsgBuilder(prometheus.NewRegistry(), 10*time.Second, false)
 	require.NoError(err)
 
 	b.StartTimer()

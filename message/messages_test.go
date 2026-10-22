@@ -11,11 +11,13 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/staking"
+	avatrace "github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/compression"
 )
 
@@ -25,6 +27,7 @@ func TestMessage(t *testing.T) {
 	mb, err := newMsgBuilder(
 		prometheus.NewRegistry(),
 		5*time.Second,
+		false,
 	)
 	require.NoError(t, err)
 
@@ -655,7 +658,7 @@ func TestMessage(t *testing.T) {
 		t.Run(tv.desc, func(t *testing.T) {
 			require := require.New(t)
 
-			encodedMsg, err := mb.createOutbound(tv.msg, tv.compressionType, tv.bypassThrottling)
+			encodedMsg, err := mb.createOutbound(t.Context(), tv.msg, tv.compressionType, tv.bypassThrottling)
 			require.NoError(err)
 
 			require.Equal(tv.bypassThrottling, encodedMsg.BypassThrottling)
@@ -681,6 +684,7 @@ func TestInboundMessageToString(t *testing.T) {
 	mb, err := newMsgBuilder(
 		prometheus.NewRegistry(),
 		5*time.Second,
+		false,
 	)
 	require.NoError(err)
 
@@ -710,6 +714,7 @@ func TestEmptyInboundMessage(t *testing.T) {
 	mb, err := newMsgBuilder(
 		prometheus.NewRegistry(),
 		5*time.Second,
+		false,
 	)
 	require.NoError(err)
 
@@ -729,6 +734,7 @@ func TestNilInboundMessage(t *testing.T) {
 	mb, err := newMsgBuilder(
 		prometheus.NewRegistry(),
 		5*time.Second,
+		false,
 	)
 	require.NoError(err)
 
@@ -746,4 +752,79 @@ func TestNilInboundMessage(t *testing.T) {
 	require.IsType(&p2p.Ping{}, parsedMsg.Message)
 	pingMsg := parsedMsg.Message.(*p2p.Ping)
 	require.NotNil(pingMsg)
+}
+
+func newTestPut(t *testing.T) *p2p.Message {
+	t.Helper()
+	chainID := ids.GenerateTestID()
+	return &p2p.Message{
+		Message: &p2p.Message_Put{
+			Put: &p2p.Put{
+				ChainId:   chainID[:],
+				RequestId: 1,
+				Container: []byte("container"),
+			},
+		},
+	}
+}
+
+func TestTraceContext(t *testing.T) {
+	mb, err := newMsgBuilder(prometheus.NewRegistry(), time.Second, true)
+	require.NoError(t, err, "newMsgBuilder()")
+
+	tp := sdktrace.NewTracerProvider()
+	ctx, span := tp.Tracer("test").Start(t.Context(), "span")
+	defer span.End()
+	sc := span.SpanContext()
+
+	for _, compressionType := range []compression.Type{compression.TypeNone, compression.TypeZstd} {
+		t.Run(compressionType.String(), func(t *testing.T) {
+			out, err := mb.createOutbound(ctx, newTestPut(t), compressionType, false)
+			require.NoError(t, err, "createOutbound()")
+
+			in, err := mb.parseInbound(out.Bytes, ids.EmptyNodeID, nil)
+			require.NoError(t, err, "parseInbound()")
+			require.Equal(t, sc.TraceID(), in.SpanContext().TraceID(), "SpanContext().TraceID()")
+			require.Equal(t, sc.SpanID(), in.SpanContext().SpanID(), "SpanContext().SpanID()")
+			require.True(t, in.SpanContext().IsRemote(), "SpanContext().IsRemote()")
+		})
+	}
+}
+
+func TestTraceContextDisabled(t *testing.T) {
+	mb, err := newMsgBuilder(prometheus.NewRegistry(), time.Second, false)
+	require.NoError(t, err, "newMsgBuilder()")
+
+	tp := sdktrace.NewTracerProvider()
+	ctx, span := tp.Tracer("test").Start(t.Context(), "span")
+	defer span.End()
+
+	out, err := mb.createOutbound(ctx, newTestPut(t), compression.TypeNone, false)
+	require.NoError(t, err, "createOutbound()")
+	var m p2p.Message
+	require.NoError(t, proto.Unmarshal(out.Bytes, &m), "proto.Unmarshal()")
+	require.Empty(t, m.GetTraceContext(), "GetTraceContext()")
+
+	// A disabled node ignores a field written by a peer.
+	msg := newTestPut(t)
+	msg.TraceContext = avatrace.MarshalSpanContext(span.SpanContext())
+	require.NotEmpty(t, msg.TraceContext, "MarshalSpanContext()")
+	b, err := proto.Marshal(msg)
+	require.NoError(t, err, "proto.Marshal()")
+	in, err := mb.parseInbound(b, ids.EmptyNodeID, nil)
+	require.NoError(t, err, "parseInbound()")
+	require.False(t, in.SpanContext().IsValid(), "SpanContext().IsValid()")
+}
+
+func TestTraceContextMalformed(t *testing.T) {
+	mb, err := newMsgBuilder(prometheus.NewRegistry(), time.Second, true)
+	require.NoError(t, err, "newMsgBuilder()")
+
+	msg := newTestPut(t)
+	msg.TraceContext = []byte{1, 2, 3}
+	b, err := proto.Marshal(msg)
+	require.NoError(t, err, "proto.Marshal()")
+	in, err := mb.parseInbound(b, ids.EmptyNodeID, nil)
+	require.NoError(t, err, "parseInbound()")
+	require.False(t, in.SpanContext().IsValid(), "SpanContext().IsValid()")
 }

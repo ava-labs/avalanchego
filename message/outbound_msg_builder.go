@@ -4,6 +4,7 @@
 package message
 
 import (
+	"context"
 	"net/netip"
 	"time"
 
@@ -207,6 +208,7 @@ func (b *outMsgBuilder) Ping(
 	primaryUptime uint32,
 ) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_Ping{
 				Ping: &p2p.Ping{
@@ -221,6 +223,7 @@ func (b *outMsgBuilder) Ping(
 
 func (b *outMsgBuilder) Pong() (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_Pong{
 				Pong: &p2p.Pong{},
@@ -253,6 +256,7 @@ func (b *outMsgBuilder) Handshake(
 	subnetIDBytes := make([][]byte, len(trackedSubnets))
 	encodeIDs(trackedSubnets, subnetIDBytes)
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_Handshake{
 				Handshake: &p2p.Handshake{
@@ -292,6 +296,7 @@ func (b *outMsgBuilder) GetPeerList(
 	requestAllSubnetIPs bool,
 ) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_GetPeerList{
 				GetPeerList: &p2p.GetPeerList{
@@ -321,6 +326,7 @@ func (b *outMsgBuilder) PeerList(peers []*ips.ClaimedIPPort, bypassThrottling bo
 		}
 	}
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_PeerList_{
 				PeerList_: &p2p.PeerList{
@@ -339,6 +345,7 @@ func (b *outMsgBuilder) GetStateSummaryFrontier(
 	deadline time.Duration,
 ) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_GetStateSummaryFrontier{
 				GetStateSummaryFrontier: &p2p.GetStateSummaryFrontier{
@@ -359,6 +366,7 @@ func (b *outMsgBuilder) StateSummaryFrontier(
 	summary []byte,
 ) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_StateSummaryFrontier_{
 				StateSummaryFrontier_: &p2p.StateSummaryFrontier{
@@ -380,6 +388,7 @@ func (b *outMsgBuilder) GetAcceptedStateSummary(
 	heights []uint64,
 ) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_GetAcceptedStateSummary{
 				GetAcceptedStateSummary: &p2p.GetAcceptedStateSummary{
@@ -403,6 +412,7 @@ func (b *outMsgBuilder) AcceptedStateSummary(
 	summaryIDBytes := make([][]byte, len(summaryIDs))
 	encodeIDs(summaryIDs, summaryIDBytes)
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_AcceptedStateSummary_{
 				AcceptedStateSummary_: &p2p.AcceptedStateSummary{
@@ -423,6 +433,7 @@ func (b *outMsgBuilder) GetAcceptedFrontier(
 	deadline time.Duration,
 ) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_GetAcceptedFrontier{
 				GetAcceptedFrontier: &p2p.GetAcceptedFrontier{
@@ -443,6 +454,7 @@ func (b *outMsgBuilder) AcceptedFrontier(
 	containerID ids.ID,
 ) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_AcceptedFrontier_{
 				AcceptedFrontier_: &p2p.AcceptedFrontier{
@@ -466,6 +478,7 @@ func (b *outMsgBuilder) GetAccepted(
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_GetAccepted{
 				GetAccepted: &p2p.GetAccepted{
@@ -489,6 +502,7 @@ func (b *outMsgBuilder) Accepted(
 	containerIDBytes := make([][]byte, len(containerIDs))
 	encodeIDs(containerIDs, containerIDBytes)
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_Accepted_{
 				Accepted_: &p2p.Accepted{
@@ -511,6 +525,7 @@ func (b *outMsgBuilder) GetAncestors(
 	engineType p2p.EngineType,
 ) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_GetAncestors{
 				GetAncestors: &p2p.GetAncestors{
@@ -533,6 +548,7 @@ func (b *outMsgBuilder) Ancestors(
 	containers [][]byte,
 ) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_Ancestors_{
 				Ancestors_: &p2p.Ancestors{
@@ -554,6 +570,7 @@ func (b *outMsgBuilder) Get(
 	containerID ids.ID,
 ) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_Get{
 				Get: &p2p.Get{
@@ -575,6 +592,7 @@ func (b *outMsgBuilder) Put(
 	container []byte,
 ) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_Put{
 				Put: &p2p.Put{
@@ -597,6 +615,7 @@ func (b *outMsgBuilder) PushQuery(
 	requestedHeight uint64,
 ) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_PushQuery{
 				PushQuery: &p2p.PushQuery{
@@ -621,6 +640,7 @@ func (b *outMsgBuilder) PullQuery(
 	requestedHeight uint64,
 ) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_PullQuery{
 				PullQuery: &p2p.PullQuery{
@@ -646,6 +666,7 @@ func (b *outMsgBuilder) Chits(
 	acceptedHeight uint64,
 ) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_Chits{
 				Chits: &p2p.Chits{
@@ -670,6 +691,7 @@ func (b *outMsgBuilder) AppRequest(
 	msg []byte,
 ) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_AppRequest{
 				AppRequest: &p2p.AppRequest{
@@ -687,6 +709,7 @@ func (b *outMsgBuilder) AppRequest(
 
 func (b *outMsgBuilder) AppResponse(chainID ids.ID, requestID uint32, msg []byte) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_AppResponse{
 				AppResponse: &p2p.AppResponse{
@@ -703,6 +726,7 @@ func (b *outMsgBuilder) AppResponse(chainID ids.ID, requestID uint32, msg []byte
 
 func (b *outMsgBuilder) AppError(chainID ids.ID, requestID uint32, errorCode int32, errorMessage string) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_AppError{
 				AppError: &p2p.AppError{
@@ -720,6 +744,7 @@ func (b *outMsgBuilder) AppError(chainID ids.ID, requestID uint32, errorCode int
 
 func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_AppGossip{
 				AppGossip: &p2p.AppGossip{
@@ -735,6 +760,7 @@ func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (*OutboundMessage,
 
 func (b *outMsgBuilder) SimplexMessage(msg *p2p.Simplex) (*OutboundMessage, error) {
 	return b.builder.createOutbound(
+		context.Background(),
 		&p2p.Message{
 			Message: &p2p.Message_Simplex{
 				Simplex: msg,

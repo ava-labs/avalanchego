@@ -4,15 +4,18 @@
 package message
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	avatrace "github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -42,6 +45,13 @@ type InboundMessage struct {
 	Expiration            time.Time
 	BytesSavedCompression int
 	onFinishedHandling    func()
+	spanContext           oteltrace.SpanContext
+}
+
+// SpanContext returns the remote span context carried by the message, which
+// is invalid if the message carried none or tracing is disabled.
+func (m *InboundMessage) SpanContext() oteltrace.SpanContext {
+	return m.spanContext
 }
 
 func (m *InboundMessage) OnFinishedHandling() {
@@ -75,11 +85,13 @@ type msgBuilder struct {
 	duration       *prometheus.GaugeVec   // type + op + direction
 
 	maxMessageTimeout time.Duration
+	tracingEnabled    bool
 }
 
 func newMsgBuilder(
 	metrics prometheus.Registerer,
 	maxMessageTimeout time.Duration,
+	tracingEnabled bool,
 ) (*msgBuilder, error) {
 	zstdCompressor, err := compression.NewZstdCompressor(constants.DefaultMaxMessageSize)
 	if err != nil {
@@ -104,6 +116,7 @@ func newMsgBuilder(
 		),
 
 		maxMessageTimeout: maxMessageTimeout,
+		tracingEnabled:    tracingEnabled,
 	}
 	return mb, errors.Join(
 		metrics.Register(mb.count),
@@ -222,7 +235,10 @@ func (mb *msgBuilder) unmarshal(b []byte) (*p2p.Message, int, Op, error) {
 	return m, bytesSavedCompression, op, nil
 }
 
-func (mb *msgBuilder) createOutbound(m *p2p.Message, compressionType compression.Type, bypassThrottling bool) (*OutboundMessage, error) {
+func (mb *msgBuilder) createOutbound(ctx context.Context, m *p2p.Message, compressionType compression.Type, bypassThrottling bool) (*OutboundMessage, error) {
+	if mb.tracingEnabled {
+		m.TraceContext = avatrace.MarshalSpanContext(oteltrace.SpanContextFromContext(ctx))
+	}
 	b, saved, op, err := mb.marshal(m, compressionType)
 	if err != nil {
 		return nil, err
@@ -257,7 +273,13 @@ func (mb *msgBuilder) parseInbound(
 		expiration = time.Now().Add(deadline)
 	}
 
+	var spanContext oteltrace.SpanContext
+	if mb.tracingEnabled {
+		spanContext = avatrace.UnmarshalSpanContext(m.GetTraceContext())
+	}
+
 	return &InboundMessage{
+		spanContext:           spanContext,
 		NodeID:                nodeID,
 		Op:                    op,
 		Message:               msg,

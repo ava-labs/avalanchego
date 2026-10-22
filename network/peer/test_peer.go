@@ -79,6 +79,7 @@ func StartTestPeer(
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
+		false,
 	)
 	if err != nil {
 		return nil, err

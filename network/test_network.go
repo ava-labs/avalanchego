@@ -216,6 +216,7 @@ func NewTestNetwork(
 		metrics,
 		constants.DefaultNetworkCompressionType,
 		constants.DefaultNetworkMaximumInboundTimeout,
+		false,
 	)
 	if err != nil {
 		return nil, err

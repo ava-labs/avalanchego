@@ -52,6 +52,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
+		false,
 	)
 	require.NoError(t, err)
 
