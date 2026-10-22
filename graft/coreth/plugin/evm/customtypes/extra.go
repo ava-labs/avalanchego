@@ -40,7 +40,7 @@ func predicateBytesOffset(rules paramsextras.AvalancheRules) int {
 	case rules.IsHelicon:
 		return 0
 	case rules.IsFortuna:
-		return ACP176StateSize
+		return acp176StateSize
 	default:
 		return ap3WindowSize
 	}
@@ -50,13 +50,13 @@ func predicateBytesOffset(rules paramsextras.AvalancheRules) int {
 // of the ACP-176 fee state prefixing the extra data of Fortuna through
 // pre-Helicon headers.
 func TargetExponentFromExtra(extra []byte) (dynamic.TargetExponent, error) {
-	if len(extra) < ACP176StateSize {
+	if len(extra) < acp176StateSize {
 		return 0, fmt.Errorf("%w: expected at least %d bytes but got %d bytes",
 			ErrInsufficientFeeState,
-			ACP176StateSize,
+			acp176StateSize,
 			len(extra),
 		)
 	}
-	const targetIndex = ACP176StateSize - wrappers.LongLen
+	const targetIndex = acp176StateSize - wrappers.LongLen
 	return dynamic.TargetExponent(binary.BigEndian.Uint64(extra[targetIndex:])), nil
 }

@@ -53,14 +53,14 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 			rules: paramsextras.AvalancheRules{
 				IsFortuna: true,
 			},
-			extra: make([]byte, ACP176StateSize-1),
+			extra: make([]byte, acp176StateSize-1),
 		},
 		{
 			name: "fortuna_empty_predicate",
 			rules: paramsextras.AvalancheRules{
 				IsFortuna: true,
 			},
-			extra: make([]byte, ACP176StateSize),
+			extra: make([]byte, acp176StateSize),
 		},
 		{
 			name: "fortuna_non_empty_predicate",
@@ -68,7 +68,7 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 				IsFortuna: true,
 			},
 			extra: []byte{
-				ACP176StateSize: 5,
+				acp176StateSize: 5,
 			},
 			want: []byte{5},
 		},
@@ -98,7 +98,7 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 func TestTargetExponentFromExtra(t *testing.T) {
 	// Non-zero capacity and excess catch reading the wrong field.
 	feeState := binary.BigEndian.AppendUint64(
-		bytes.Repeat([]byte{0xff}, ACP176StateSize-wrappers.LongLen),
+		bytes.Repeat([]byte{0xff}, acp176StateSize-wrappers.LongLen),
 		5_000, // target excess
 	)
 
