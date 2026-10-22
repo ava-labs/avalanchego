@@ -54,7 +54,7 @@ func errIsType[T error]() testerr.Want {
 const testChainID = 43111
 
 var (
-	testGenesisTime = uint64(upgrade.InitiallyActiveTime.Unix())
+	testGenesisTime = upgrade.UnixTimestamp(upgrade.InitiallyActiveTime)
 
 	testAllocAddr = common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")
 	testAllocFund = big.NewInt(1_000_000_000_000_000_000)
@@ -331,7 +331,7 @@ func TestParseGenesis(t *testing.T) {
 			// Everything other than the config must be
 			// passed through unmodified.
 			var want ethcore.Genesis
-			require.NoError(t, json.Unmarshal([]byte(test.genesis), &want), "json.Marshal()")
+			require.NoError(t, json.Unmarshal([]byte(test.genesis), &want), "json.Unmarshal()")
 			opts := cmp.Options{
 				cmputils.BigInts(),
 				cmpopts.EquateEmpty(),
@@ -419,7 +419,7 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 			var legacy legacy.Genesis
 			require.NoError(t, json.Unmarshal([]byte(s.genesis), &legacy), "json.Unmarshal()")
 			l1params.GetExtra(legacy.Config).NetworkUpgrades.SetDefaults(ctx.NetworkUpgrades)
-			require.NoError(t, l1params.SetEthUpgrades(legacy.Config))
+			require.NoError(t, l1params.SetEthUpgrades(legacy.Config), "l1params.SetEthUpgrades()")
 			want := legacy.ToBlock()
 
 			require.Equalf(t, want.Root(), got.Root(), "%T.block().Root()", g)
