@@ -62,18 +62,24 @@ func New(config Config) (Tracer, error) {
 		return nil, err
 	}
 
-	tracerProviderOpts := []sdktrace.TracerProviderOption{
+	tracerProvider := newTracerProvider(exporter, config)
+	return &tracer{
+		Tracer: tracerProvider.Tracer(config.AppName),
+		tp:     tracerProvider,
+	}, nil
+}
+
+func newTracerProvider(exporter sdktrace.SpanExporter, config Config) *sdktrace.TracerProvider {
+	return sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exporter, sdktrace.WithExportTimeout(tracerExportTimeout)),
 		sdktrace.WithResource(resource.NewWithAttributes(semconv.SchemaURL,
 			attribute.String("version", config.Version),
 			semconv.ServiceNameKey.String(config.AppName),
 		)),
+		// Deliberately NOT ParentBased: remote span contexts arrive from any peer
+		// and must not be able to force sampling. Ratio-by-trace-ID also makes
+		// every node with the same rate reach the same decision, so cross-node
+		// traces are complete. See docs/superpowers/specs/2026-10-21-end-to-end-tracing-design.md.
 		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.TraceSampleRate)),
-	}
-
-	tracerProvider := sdktrace.NewTracerProvider(tracerProviderOpts...)
-	return &tracer{
-		Tracer: tracerProvider.Tracer(config.AppName),
-		tp:     tracerProvider,
-	}, nil
+	)
 }

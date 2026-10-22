@@ -30,10 +30,12 @@ go_test(
     srcs = [
         "exporter_type_test.go",
         "propagation_test.go",
+        "tracer_test.go",
     ],
     embed = [":trace"],
     deps = [
         "@com_github_stretchr_testify//require",
+        "@io_opentelemetry_go_otel_sdk//trace/tracetest",
         "@io_opentelemetry_go_otel_trace//:trace",
     ],
 )

@@ -35,6 +35,7 @@ go_library(
         "//utils/bloom",
         "//utils/constants",
         "//utils/logging",
+        "//utils/units",
         "//utils/unwind",
         "//version",
         "//vms/evm/metrics/prometheus",

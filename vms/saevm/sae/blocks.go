@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -45,7 +46,10 @@ func (vm *VM) BuildBlock(ctx context.Context, bCtx *block.Context) (*blocks.Bloc
 }
 
 // saeparams.MaxBlockBytes < constants.DefaultMaxMessageSize
-const _ uint = constants.DefaultMaxMessageSize - saeparams.MaxBlockBytes - 1
+const _ uint = constants.DefaultMaxMessageSize - saeparams.MaxBlockBytes - maxEnvelopeOverhead
+
+// maxEnvelopeOverhead reserves room for p2p envelope fields such as trace_context, chain ID and request ID.
+const maxEnvelopeOverhead = 1 * units.KiB
 
 var (
 	errUnknownParent     = errors.New("unknown parent")
