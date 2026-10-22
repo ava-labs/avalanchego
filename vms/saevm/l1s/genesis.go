@@ -46,6 +46,8 @@ var (
 	errAirdropHash                = errors.New("airdrops are not supported")
 )
 
+// genesis is defined as a new type to prevent similar looking, but incorrect,
+// libevm genesis functions from being used inadvertently.
 type genesis core.Genesis
 
 // parseGenesis decodes the genesis bytes and populates the upgrade schedule.
@@ -85,18 +87,17 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 		return nil, fmt.Errorf("%w: %s", errAirdropHash, g.AirdropHash)
 	}
 
-	extras, err := newExtras(ctx, g.Config, upgradeConfig)
+	extra, err := newExtras(ctx, g.Config, upgradeConfig)
 	if err != nil {
 		return nil, err
 	}
-	if gasLimit := extras.FeeConfig.GasLimit.Uint64(); gasLimit != g.GasLimit {
+	if gasLimit := extra.FeeConfig.GasLimit.Uint64(); gasLimit != g.GasLimit {
 		return nil, fmt.Errorf("%w: fee config %d vs genesis %d", errGasLimitMismatch, gasLimit, g.GasLimit)
 	}
 
-	chainID := g.Config.ChainID
 	cfg := l1params.WithExtra(
 		&params.ChainConfig{
-			ChainID:             chainID,
+			ChainID:             g.Config.ChainID,
 			HomesteadBlock:      big.NewInt(0),
 			DAOForkBlock:        big.NewInt(0),
 			DAOForkSupport:      true,
@@ -110,10 +111,10 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        extras.DurangoTimestamp,
-			CancunTime:          extras.EtnaTimestamp,
+			ShanghaiTime:        extra.DurangoTimestamp,
+			CancunTime:          extra.EtnaTimestamp,
 		},
-		extras,
+		extra,
 	)
 	if err := cfg.CheckConfigForkOrder(); err != nil {
 		return nil, err
@@ -133,13 +134,15 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 }
 
 func newExtras(ctx *snow.Context, cfg *params.ChainConfig, upgradeConfig extras.UpgradeConfig) (*extras.ChainConfig, error) {
-	provided := l1params.GetExtra(cfg)
-	cpy := *provided
+	cpy := *l1params.GetExtra(cfg)
 	if cpy.FeeConfig == commontype.EmptyFeeConfig {
 		cpy.FeeConfig = l1params.DefaultFeeConfig
 	}
 
-	cpy.NetworkUpgrades = networkUpgrades(provided.NetworkUpgrades, ctx, upgradeConfig)
+	cpy.NetworkUpgrades.SetDefaults(ctx.NetworkUpgrades)
+	if upgradeConfig.NetworkUpgradeOverrides != nil {
+		cpy.NetworkUpgrades.Override(upgradeConfig.NetworkUpgradeOverrides)
+	}
 	cpy.UpgradeConfig = upgradeConfig
 	cpy.AvalancheContext = extras.AvalancheContext{
 		SnowCtx: ctx,
@@ -150,15 +153,6 @@ func newExtras(ctx *snow.Context, cfg *params.ChainConfig, upgradeConfig extras.
 	}
 
 	return &cpy, nil
-}
-
-func networkUpgrades(existing extras.NetworkUpgrades, ctx *snow.Context, upgradeConfig extras.UpgradeConfig) extras.NetworkUpgrades {
-	upgrades := existing
-	upgrades.SetDefaults(ctx.NetworkUpgrades)
-	if upgradeConfig.NetworkUpgradeOverrides != nil {
-		upgrades.Override(upgradeConfig.NetworkUpgradeOverrides)
-	}
-	return upgrades
 }
 
 var errNoHeadHeader = errors.New("no head header")
@@ -187,7 +181,7 @@ func (g *genesis) verifyAndWriteBlock(db ethdb.Database) error {
 	}
 
 	// If the rules change for the head block, it may have been executed
-	// incorrectly.  The upgrade config is stored separately from the chain
+	// incorrectly. The upgrade config is stored separately from the chain
 	// config.
 	var prevUpgrades extras.UpgradeConfig
 	prev, err := customrawdb.ReadChainConfig(db, hash, &prevUpgrades)
