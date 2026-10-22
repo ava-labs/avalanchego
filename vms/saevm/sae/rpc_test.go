@@ -880,14 +880,9 @@ func TestGetLogsRange(t *testing.T) {
 	const maxBlocksPerRequest = 2
 
 	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
-	emitter := common.Address{'l', 'o', 'g'}
 	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
-	emitterOpt := withPrecompile(emitter, vm.NewStatefulPrecompile(func(env vm.PrecompileEnvironment, _ []byte) ([]byte, error) {
-		env.StateDB().AddLog(&types.Log{Address: env.Addresses().EVMSemantic.Self})
-		return nil, nil
-	}))
-	ctx, sut := newSUT(t, 1, precompileOpt, emitterOpt, timeOpt, options.Func[sutConfig](func(c *sutConfig) {
+	ctx, sut := newSUT(t, 1, precompileOpt, timeOpt, options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.RPCConfig.MaxBlocksPerRequest = maxBlocksPerRequest
 	}))
 	defer unblock()
@@ -896,9 +891,10 @@ func TestGetLogsRange(t *testing.T) {
 	settled := sut.runConsensusLoop(t)
 	vmTime.AdvanceToSettle(ctx, t, settled)
 	executed := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-		To:       &emitter,
-		Gas:      params.TxGas,
+		Gas:      1e6,
 		GasPrice: big.NewInt(1),
+		Data:     saetest.LogTopOfStackAfter(saetest.Ops(vm.PUSH0)), // runs as a constructor
+
 	}))
 	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
 	executedLogs := []types.Log{*executed.Receipts()[0].Logs[0]}
