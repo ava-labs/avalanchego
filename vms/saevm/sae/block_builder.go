@@ -273,7 +273,6 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		})
 		included      []*types.Transaction
 		includedBytes uint64
-		skipped       int
 	)
 	for _, ltx := range candidates {
 		// If we don't have enough gas remaining in the block for the minimum
@@ -290,7 +289,6 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		tx, ok := ltx.Resolve()
 		if !ok {
 			txLog.Debug("Could not resolve lazy transaction")
-			skipped++
 			continue
 		}
 
@@ -304,7 +302,6 @@ func (b *blockBuilderG[T]) buildWithTxs(
 				zap.Uint64("tx_bytes", txBytes),
 				zap.Uint64("included_bytes", includedBytes),
 			)
-			skipped++
 			continue
 		}
 
@@ -313,7 +310,6 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		// ApplyTx().
 		if err := state.ApplyTx(tx); err != nil {
 			txLog.Debug("Could not apply transaction", zap.Error(err))
-			skipped++
 			continue
 		}
 		txLog.Trace("Including transaction")
@@ -396,7 +392,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	block.SetWorstCaseBounds(bounds)
 	span.SetAttributes(
 		attribute.Int("tx_count", len(included)),
-		attribute.Int("txs_skipped", skipped),
+		attribute.Int("txs_skipped", len(candidates)-len(included)),
 		saetrace.Uint64("block_bytes", ethB.Size()),
 	)
 	return block, nil
