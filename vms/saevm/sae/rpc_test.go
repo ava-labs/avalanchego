@@ -893,7 +893,7 @@ func TestGetLogsRange(t *testing.T) {
 	executed := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 		Gas:      1e6,
 		GasPrice: big.NewInt(1),
-		Data:     saetest.LogTopOfStackAfter(saetest.Ops(vm.PUSH0)), // runs as a constructor
+		Data:     saetest.LogTopOfStackAfter(saetest.Ops(vm.PUSH0)), // contract creation, so this runs and emits a log
 
 	}))
 	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
