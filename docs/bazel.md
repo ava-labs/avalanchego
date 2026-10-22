@@ -697,6 +697,11 @@ See [E2E runner](#e2e-runner) for build and execution details.
 See [E2E runner capacity](./ci.md#use-beefier-runners-for-faster-e2e-jobs) for the
 shared runner-sizing policy.
 
+The macOS smoke E2E job does not collect metrics or logs. Monitoring installs
+Nix to provide Prometheus and Promtail. Nix installation adds too much time to
+pre-merge macOS CI. The scheduled full E2E job collects metrics and logs. Both
+jobs upload tmpnet data to help diagnose failures.
+
 Previously, Bazel CI divided the full unit-test suite among three
 component-specific jobs. These jobs ran in parallel to keep the pre-merge
 runtime acceptable. Pre-merge tests now use remote caching and do not use race
