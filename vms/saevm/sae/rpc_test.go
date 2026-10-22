@@ -890,8 +890,13 @@ func TestGetLogsRange(t *testing.T) {
 	genesis := sut.lastAcceptedBlock(t)
 	settled := sut.runConsensusLoop(t)
 	vmTime.AdvanceToSettle(ctx, t, settled)
-	executed := sut.runConsensusLoop(t)
+	executed := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		Gas:      1e6,
+		GasPrice: big.NewInt(1),
+		Data:     saetest.LogTopOfStackAfter(saetest.Ops(vm.PUSH0)), // contract creation, so this runs and emits a log
+	}))
 	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
+	executedLogs := []types.Log{*executed.Receipts()[0].Logs[0]}
 
 	unexecuted := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
 		To:       &blockingPrecompile,
@@ -905,9 +910,10 @@ func TestGetLogsRange(t *testing.T) {
 	}
 
 	tests := []struct {
-		name    string
-		query   map[string]any
-		wantErr testerr.Want
+		name     string
+		query    map[string]any
+		wantLogs []types.Log
+		wantErr  testerr.Want
 	}{
 		{
 			name:  "at_limit",
@@ -929,14 +935,19 @@ func TestGetLogsRange(t *testing.T) {
 			wantErr: testerr.Contains("requested too many blocks from 0 to 3, maximum is set to 2"),
 		},
 		{
-			name:    "to_future_block",
-			query:   map[string]any{"fromBlock": num(executed), "toBlock": future + 100},
-			wantErr: testerr.Contains("failed to get logs for block #3"), // from libevm
+			name:     "to_future_block",
+			query:    map[string]any{"fromBlock": num(executed), "toBlock": future + 100},
+			wantLogs: executedLogs,
 		},
 		{
-			name:    "to_unexecuted_block",
-			query:   map[string]any{"fromBlock": num(executed), "toBlock": num(unexecuted)},
-			wantErr: testerr.Contains("failed to get logs for block #3"), // from libevm
+			name:     "to_unexecuted_block",
+			query:    map[string]any{"fromBlock": num(executed), "toBlock": num(unexecuted)},
+			wantLogs: executedLogs,
+		},
+		{
+			name:    "hash_of_unexecuted_block",
+			query:   map[string]any{"blockHash": unexecuted.Hash()},
+			wantErr: testerr.Contains("unknown block"), // from libevm
 		},
 		{
 			name:  "from_unexecuted_block",
@@ -972,9 +983,8 @@ func TestGetLogsRange(t *testing.T) {
 		},
 		{
 			// libevm always resolves pending to last executed, but the config is NOT set.
-			name:    "pending_resolves_to_last_accepted",
-			query:   map[string]any{"fromBlock": "pending", "toBlock": "pending"},
-			wantErr: testerr.Contains("failed to get logs for block #3"), // from libevm
+			name:  "pending_resolves_to_last_accepted",
+			query: map[string]any{"fromBlock": "pending", "toBlock": "pending"},
 		},
 		{
 			name:    "future_range_reversed",
@@ -985,7 +995,7 @@ func TestGetLogsRange(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var got json.RawMessage
+			var got []types.Log
 			err := sut.CallContext(ctx, &got, "eth_getLogs", tt.query)
 			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
 				t.Fatalf("eth_getLogs(%v) %s", tt.query, diff)
@@ -995,7 +1005,10 @@ func TestGetLogsRange(t *testing.T) {
 			}
 
 			// must be an empty array, not null, to match libevm.
-			assert.JSONEqf(t, "[]", string(got), "eth_getLogs(%v)", tt.query)
+			require.NotNilf(t, got, "eth_getLogs(%v)", tt.query)
+			if diff := cmp.Diff(tt.wantLogs, got, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("eth_getLogs(%v) mismatch (-want +got):\n%s", tt.query, diff)
+			}
 		})
 	}
 }

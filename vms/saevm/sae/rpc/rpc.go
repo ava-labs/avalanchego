@@ -149,7 +149,7 @@ func New(chain Chain, config Config) (*Provider, error) {
 	}
 
 	filter := filters.NewFilterAPI(
-		filters.NewFilterSystem(back, filters.Config{}),
+		filters.NewFilterSystem(filterBackend{back}, filters.Config{}),
 		false, /*isLightClient*/
 	)
 	srv, err := back.server(filter)
