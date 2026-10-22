@@ -21,8 +21,8 @@ on:
         default: ''
       # Chaos test specific inputs
       config:
-        description: 'VM config preset (firewood, firewood-archive). Required for custom tests.'
-        default: 'firewood'
+        description: 'VM config preset (firewood, firewood-archive). Required for custom tests; overrides the preset of a named test.'
+        default: ''
       min-wait-time:
         description: 'Minimum wait time before killing the process (e.g., 120s, 2m).'
         default: '120s'
