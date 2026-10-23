@@ -14,14 +14,11 @@ import (
 
 // Config that is used to describe the options of the continuous profiler.
 type Config struct {
-	Dir         string        `json:"dir"`
-	Enabled     bool          `json:"enabled"`
-	Freq        time.Duration `json:"freq"`
-	MaxNumFiles int           `json:"maxNumFiles"`
-	// MutexProfileFraction is passed to runtime.SetMutexProfileFraction: on
-	// average 1/n mutex contention events are reported in the lock profile.
-	// 0 disables mutex profiling.
-	MutexProfileFraction int `json:"mutexProfileFraction"`
+	Dir                  string        `json:"dir"`
+	Enabled              bool          `json:"enabled"`
+	Freq                 time.Duration `json:"freq"`
+	MaxNumFiles          int           `json:"maxNumFiles"`
+	MutexProfileFraction int           `json:"mutexProfileFraction"`
 }
 
 // ContinuousProfiler periodically captures CPU, memory, and lock profiles
@@ -39,9 +36,9 @@ type continuousProfiler struct {
 	closer chan struct{}
 }
 
-func NewContinuous(dir string, freq time.Duration, maxNumFiles int) ContinuousProfiler {
+func NewContinuous(dir string, freq time.Duration, maxNumFiles int, mutexProfileFraction int) ContinuousProfiler {
 	return &continuousProfiler{
-		profiler:    newProfiler(dir),
+		profiler:    newProfiler(dir, mutexProfileFraction),
 		freq:        freq,
 		maxNumFiles: maxNumFiles,
 		closer:      make(chan struct{}),

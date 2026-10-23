@@ -1238,6 +1238,7 @@ func (vm *VM) startContinuousProfiler() {
 		filepath.Clean(vm.config.ContinuousProfilerDir),
 		vm.config.ContinuousProfilerFrequency.Duration,
 		vm.config.ContinuousProfilerMaxFiles,
+		1,
 	)
 	defer vm.profiler.Shutdown()
 

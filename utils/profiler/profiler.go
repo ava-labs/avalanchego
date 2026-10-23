@@ -51,19 +51,22 @@ type profiler struct {
 	memProfileName,
 	lockProfileName string
 
+	mutexProfileFraction int
+
 	cpuProfileFile *os.File
 }
 
 func New(dir string) Profiler {
-	return newProfiler(dir)
+	return newProfiler(dir, 1)
 }
 
-func newProfiler(dir string) *profiler {
+func newProfiler(dir string, mutexProfileFraction int) *profiler {
 	return &profiler{
-		dir:             dir,
-		cpuProfileName:  filepath.Join(dir, cpuProfileFile),
-		memProfileName:  filepath.Join(dir, memProfileFile),
-		lockProfileName: filepath.Join(dir, lockProfileFile),
+		dir:                  dir,
+		mutexProfileFraction: mutexProfileFraction,
+		cpuProfileName:       filepath.Join(dir, cpuProfileFile),
+		memProfileName:       filepath.Join(dir, memProfileFile),
+		lockProfileName:      filepath.Join(dir, lockProfileFile),
 	}
 }
 
@@ -83,6 +86,7 @@ func (p *profiler) StartCPUProfiler() error {
 		_ = file.Close() // Return the original error
 		return err
 	}
+	runtime.SetMutexProfileFraction(p.mutexProfileFraction)
 
 	p.cpuProfileFile = file
 	return nil

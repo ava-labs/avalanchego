@@ -220,7 +220,7 @@ You can configure your node to continuously run memory/CPU profiles and save the
 | `--profile-dir` | `AVAGO_PROFILE_DIR` | string | `$HOME/.avalanchego/profiles/` | If profiling is enabled, node continuously runs memory/CPU profiles and puts them at this directory. |
 | `--profile-continuous-freq` | `AVAGO_PROFILE_CONTINUOUS_FREQ` | duration | `15m` | How often a new CPU/memory profile is created. |
 | `--profile-continuous-max-files` | `AVAGO_PROFILE_CONTINUOUS_MAX_FILES` | int | `5` | Maximum number of CPU/memory profile files to keep. |
-| `--profile-mutex-fraction` | `AVAGO_PROFILE_MUTEX_FRACTION` | int | `0` | On average 1/n mutex contention events are reported in the lock profile (continuous profiling and `admin.lockProfile`). `0` disables mutex profiling. The mutex profile is cumulative since startup, so low values grow it quickly. |
+| `--profile-continuous-mutex-fraction` | `AVAGO_PROFILE_CONTINUOUS_MUTEX_FRACTION` | int | `1` | Mutex profile fraction used by continuous profiling: on average 1 of every n mutex contention events is recorded in the lock profile. `1` records all events, `0` disables mutex profiling. The mutex profile is cumulative since startup, so on busy nodes low values make it grow quickly. |
 
 ### Network
 

@@ -1010,8 +1010,8 @@ func TestGetProfilerConfigMutexFraction(t *testing.T) {
 		expectedErr      error
 	}{
 		{
-			name:             "default disables mutex profiling",
-			expectedFraction: 0,
+			name:             "default records all mutex events",
+			expectedFraction: 1,
 		},
 		{
 			name:             "positive fraction",
@@ -1030,7 +1030,7 @@ func TestGetProfilerConfigMutexFraction(t *testing.T) {
 			require := require.New(t)
 			v := setupViperFlags()
 			if tt.set != nil {
-				v.Set(ProfileMutexFractionKey, *tt.set)
+				v.Set(ProfileContinuousMutexFractionKey, *tt.set)
 			}
 
 			config, err := getProfilerConfig(v)
