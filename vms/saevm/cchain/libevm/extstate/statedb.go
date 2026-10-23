@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/holiman/uint256"
 
@@ -19,16 +20,31 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 )
 
-// StateDBHooks normalizes state keys so that they never collide with multicoin
-// balances. Keys are normalized unless [stateconf.SkipStateKeyTransformation]
-// is used.
+// RegisterExtras registers the libevm hook that normalizes state keys, so that
+// they never collide with multicoin balances. Keys are normalized unless
+// [stateconf.SkipStateKeyTransformation] is used.
 //
-// It MUST only be registered by `vms/saevm/cchain/libevm`, which registers it
-// together with the C-Chain's other libevm extras.
-type StateDBHooks struct{}
+// It MUST NOT be called more than once and is therefore only allowed in tests
+// and `package main`, to avoid polluting other packages that transitively
+// depend on this one but don't need registration.
+func RegisterExtras() {
+	state.RegisterExtras(normalizeStateKeysHook{})
+}
+
+// WithTempRegisteredExtras runs fn with the state-key normalization hook
+// temporarily registered. The previous hook is restored after fn returns.
+//
+// Callers SHOULD NOT call it directly, and SHOULD instead use
+// `vms/saevm/cchain/libevm.WithTempRegisteredExtras()`, which registers all
+// C-Chain extras together.
+func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
+	return state.WithTempRegisteredExtras(lock, normalizeStateKeysHook{}, fn)
+}
+
+type normalizeStateKeysHook struct{}
 
 // TransformStateKey maps normal storage keys away from the multicoin partition.
-func (StateDBHooks) TransformStateKey(_ common.Address, key common.Hash) common.Hash {
+func (normalizeStateKeysHook) TransformStateKey(_ common.Address, key common.Hash) common.Hash {
 	normalizeStateKey(&key)
 	return key
 }

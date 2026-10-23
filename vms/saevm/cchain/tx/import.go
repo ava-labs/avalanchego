@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/extstate"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"

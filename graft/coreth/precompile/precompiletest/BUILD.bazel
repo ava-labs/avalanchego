@@ -19,7 +19,7 @@ go_library(
         "//graft/coreth/precompile/precompileconfig",
         "//snow/snowtest",
         "//vms/evm/predicate",
-        "//vms/saevm/cchain/extstate",
+        "//vms/saevm/cchain/libevm/extstate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",

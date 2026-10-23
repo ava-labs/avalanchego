@@ -6,8 +6,6 @@ package customtypes
 import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
-
-	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 type isMultiCoin bool
@@ -18,8 +16,4 @@ func IsMultiCoin(s *state.StateDB, addr common.Address) bool {
 
 func SetMultiCoin(s *state.StateDB, addr common.Address, to bool) {
 	state.SetExtra(s, extras.StateAccount, addr, isMultiCoin(to))
-}
-
-func IsAccountMultiCoin(s ethtypes.StateOrSlimAccount) bool {
-	return bool(extras.StateAccount.Get(s))
 }

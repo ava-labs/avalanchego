@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/extstate"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 	ethparams "github.com/ava-labs/libevm/params"

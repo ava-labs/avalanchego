@@ -35,7 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/extstate"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"

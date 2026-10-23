@@ -27,7 +27,7 @@ graft_go_test(
         "//graft/coreth/core",
         "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
-        "//vms/saevm/cchain/extstate",
+        "//vms/saevm/cchain/libevm/extstate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",
