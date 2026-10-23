@@ -17,6 +17,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 - The `avax.getAtomicTxStatus` C-Chain RPC, deprecated in v1.15.0, is removed. Use `avax.getAtomicTx`, which fails for a tx that has not been accepted.
 - Added:
   - `restakedValidationRewards` and `restakedDelegateeRewards` fields to `platform.getCurrentValidators` results for auto-renewed validators
+- `admin.stopCPUProfiler` now disables mutex profiling, which `admin.startCPUProfiler` enables. Before, mutex contention kept being recorded until the node restarted.
 
 ### Configs
 
