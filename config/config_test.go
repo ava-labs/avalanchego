@@ -1015,7 +1015,7 @@ func TestGetProfilerConfigMutexFraction(t *testing.T) {
 		},
 		{
 			name:             "positive fraction",
-			set:              &[]int{5}[0],
+			set:              new(5),
 			expectedFraction: 5,
 		},
 		{
