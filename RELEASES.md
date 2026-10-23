@@ -6,6 +6,8 @@
 
 ### APIs
 
+- `admin.lockProfile` and continuous profiling now write `lock.profile` in the binary pprof format, like the CPU and memory profiles.
+
 ### Configs
 
 ### Fixes
