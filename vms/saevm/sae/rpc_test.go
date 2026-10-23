@@ -1823,6 +1823,7 @@ func TestAPIsServed(t *testing.T) {
 		saerpc.APIChain:        "eth_blockNumber",
 		saerpc.APITx:           "eth_getTransactionCount",
 		saerpc.APISubscription: "eth_getLogs",
+		saerpc.APIFilter:       "eth_uninstallFilter",
 		saerpc.APIAvalanche:    "eth_callDetailed",
 		saerpc.APIDB:           "debug_dbGet",
 		saerpc.APIProfile:      "debug_gcStats",
@@ -1843,6 +1844,41 @@ func TestAPIsServed(t *testing.T) {
 			for api, method := range methods {
 				assert.Equalf(t, apis.Contains(api), methodRegistered(ctx, t, sut, method), "%s served with %v enabled", method, apis)
 			}
+		})
+	}
+}
+
+// TestSubscribeServed covers eth_subscribe, which [TestAPIsServed] can't probe
+// without arguments.
+func TestSubscribeServed(t *testing.T) {
+	tests := []struct {
+		name        string
+		apis        set.Set[saerpc.API]
+		wantErrCode int
+	}{
+		{
+			name: "subscription",
+			apis: set.Of(saerpc.APISubscription),
+		},
+		{
+			name:        "filter",
+			apis:        set.Of(saerpc.APIFilter),
+			wantErrCode: errCodeMethodNotFound,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, sut := newSUT(t, 0, withAPIs(tt.apis))
+
+			sub, err := sut.SubscribeNewHead(ctx, make(chan *types.Header))
+			if tt.wantErrCode != 0 {
+				var rpcErr rpc.Error
+				require.ErrorAsf(t, err, &rpcErr, "%T.SubscribeNewHead()", sut)
+				require.Equalf(t, tt.wantErrCode, rpcErr.ErrorCode(), "%T.SubscribeNewHead() error code", sut)
+				return
+			}
+			require.NoErrorf(t, err, "%T.SubscribeNewHead()", sut)
+			sub.Unsubscribe()
 		})
 	}
 }
