@@ -273,7 +273,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 			block:  make([]byte, 100),
 			setup: func(db *Database) {
 				// Change file permissions to read-only
-				file, err := db.getDataFile(0, os.O_RDWR|os.O_CREATE)
+				file, err := db.getOrOpenDataFile(0)
 				require.NoError(t, err)
 				filePath := file.Name()
 				file.Close()

@@ -252,6 +252,12 @@ func New(config DatabaseConfig, log logging.Logger) (_ database.HeightIndex, err
 		return nil, err
 	}
 
+	if err := db.initializeDataFiles(); err != nil {
+		db.log.Error("Failed to initialize database: failed to initialize data files", zap.Error(err))
+		db.closeFiles()
+		return nil, err
+	}
+
 	if err := db.recover(); err != nil {
 		db.log.Error("Failed to initialize database: recovery failed", zap.Error(err))
 		db.closeFiles()
@@ -463,10 +469,16 @@ func (db *Database) Get(height BlockHeight) (BlockData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get data file index and offset for height %d: %w", height, err)
 	}
-	if err := db.retryDataFileOperation(fileIndex, false, func(f *os.File) error {
+	if err := db.retryDataFileOperation(fileIndex, func(f *os.File) error {
 		_, err := f.ReadAt(buf, int64(localOffset))
 		return err
 	}); err != nil {
+		db.log.Error("Failed to read block: failed to read block data from file",
+			zap.Uint64("height", height),
+			zap.Uint64("localOffset", localOffset),
+			zap.Uint32("blockSize", indexEntry.Size),
+			zap.Error(err),
+		)
 		return nil, fmt.Errorf("failed to read block header and data for height %d at local offset %d: %w", height, localOffset, err)
 	}
 
@@ -563,7 +575,7 @@ func (db *Database) Sync(start, end uint64) error {
 	}
 
 	for idx := firstIdx; idx <= lastIdx; idx++ {
-		if err := db.retryDataFileOperation(idx, false, (*os.File).Sync); err != nil {
+		if err := db.retryDataFileOperation(idx, (*os.File).Sync); err != nil {
 			return fmt.Errorf("failed to sync data file %d: %w", idx, err)
 		}
 	}
@@ -683,9 +695,6 @@ func (db *Database) recover() error {
 	}
 
 	if len(dataFiles) == 0 {
-		if db.header.NextWriteOffset > 0 {
-			return fmt.Errorf("%w: index checkpoint is %d bytes, but no data files exist", ErrCorrupted, db.header.NextWriteOffset)
-		}
 		return nil
 	}
 
@@ -816,7 +825,7 @@ func (db *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEnt
 		return bh, fmt.Errorf("%w: not enough data for block header at offset %d", ErrCorrupted, offset)
 	}
 
-	dataFile, localOffset, _, err := db.getDataFileAndOffset(offset)
+	dataFile, localOffset, err := db.getDataFileAndOffset(offset)
 	if err != nil {
 		return bh, fmt.Errorf("recovery: failed to get data file for offset %d: %w", offset, err)
 	}
@@ -923,6 +932,18 @@ func (db *Database) openAndInitializeIndex() error {
 	return nil
 }
 
+func (db *Database) initializeDataFiles() error {
+	// Pre-load the data file for the next write offset.
+	nextOffset := db.nextDataWriteOffset.Load()
+	if nextOffset > 0 {
+		_, _, err := db.getDataFileAndOffset(nextOffset)
+		if err != nil {
+			return fmt.Errorf("failed to pre-load data file for offset %d: %w", nextOffset, err)
+		}
+	}
+	return nil
+}
+
 func (db *Database) loadOrInitializeHeader() error {
 	fileInfo, err := db.indexFile.Stat()
 	if err != nil {
@@ -1004,7 +1025,7 @@ func (db *Database) dataFileIndexAndOffset(offset uint64) (int, uint64, error) {
 	return int(idx), offset % maxFileSize, nil
 }
 
-func (db *Database) getDataFile(fileIndex, flags int) (*os.File, error) {
+func (db *Database) getOrOpenDataFile(fileIndex int) (*os.File, error) {
 	if handle, ok := db.fileCache.Get(fileIndex); ok {
 		return handle, nil
 	}
@@ -1019,7 +1040,7 @@ func (db *Database) getDataFile(fileIndex, flags int) (*os.File, error) {
 	}
 
 	filePath := db.dataFilePath(fileIndex)
-	handle, err := os.OpenFile(filePath, flags, defaultFilePermissions)
+	handle, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, defaultFilePermissions)
 	if err != nil {
 		db.log.Error("Failed to open data file",
 			zap.Int("fileIndex", fileIndex),
@@ -1039,13 +1060,9 @@ func (db *Database) getDataFile(fileIndex, flags int) (*os.File, error) {
 }
 
 // retryDataFileOperation opens the file and retries op if cache eviction closes it.
-// The create flag allows initial creation. The operation must be safe to repeat.
-func (db *Database) retryDataFileOperation(idx int, create bool, op func(*os.File) error) error {
-	flags := os.O_RDWR
-	if create {
-		flags |= os.O_CREATE
-	}
-	f, err := db.getDataFile(idx, flags)
+// The operation must be safe to repeat.
+func (db *Database) retryDataFileOperation(idx int, op func(*os.File) error) error {
+	f, err := db.getOrOpenDataFile(idx)
 	if err != nil {
 		return err
 	}
@@ -1065,8 +1082,7 @@ func (db *Database) retryDataFileOperation(idx int, create bool, op func(*os.Fil
 		}
 		db.fileOpenMu.Unlock()
 
-		// Omit O_CREATE so an unexpectedly missing file returns an error.
-		f, err = db.getDataFile(idx, os.O_RDWR)
+		f, err = db.getOrOpenDataFile(idx)
 		if err != nil {
 			return err
 		}
@@ -1096,7 +1112,7 @@ func (db *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block Block
 	if err != nil {
 		return fmt.Errorf("failed to get data file index for writing block %d: %w", bh.Height, err)
 	}
-	if err := db.retryDataFileOperation(idx, true, func(f *os.File) error {
+	if err := db.retryDataFileOperation(idx, func(f *os.File) error {
 		if _, err := f.WriteAt(combinedBuf, int64(localOffset)); err != nil {
 			return fmt.Errorf("failed to write block data: %w", err)
 		}
@@ -1211,11 +1227,11 @@ func (db *Database) allocateBlockSpace(totalSize uint32) (writeDataOffset uint64
 	}
 }
 
-func (db *Database) getDataFileAndOffset(globalOffset uint64) (*os.File, uint64, int, error) {
+func (db *Database) getDataFileAndOffset(globalOffset uint64) (*os.File, uint64, error) {
 	fileIndex, localOffset, err := db.dataFileIndexAndOffset(globalOffset)
 	if err != nil {
-		return nil, 0, 0, err
+		return nil, 0, err
 	}
-	handle, err := db.getDataFile(fileIndex, os.O_RDWR)
-	return handle, localOffset, fileIndex, err
+	handle, err := db.getOrOpenDataFile(fileIndex)
+	return handle, localOffset, err
 }

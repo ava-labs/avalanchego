@@ -522,11 +522,11 @@ func TestRetryDataFileOperationPreservesReplacement(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	require.NoError(t, db.Put(0, []byte("block")))
 	var replacement *os.File
-	require.NoError(t, db.retryDataFileOperation(0, false, func(f *os.File) error {
+	require.NoError(t, db.retryDataFileOperation(0, func(f *os.File) error {
 		if replacement == nil {
 			db.fileCache.Evict(0)
 			var err error
-			replacement, err = db.getDataFile(0, os.O_RDWR)
+			replacement, err = db.getOrOpenDataFile(0)
 			require.NoError(t, err)
 		}
 		return f.Sync()
