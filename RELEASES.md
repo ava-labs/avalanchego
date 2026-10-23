@@ -10,6 +10,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 - Added `vms/evm/evmclient`, which combines standard Ethereum, Geth-specific, raw RPC, and Avalanche-specific EVM methods.
 - Updated the minimum Go version from `1.26.8` to `1.26.10`.
+- `eth_getLogs` now respects the node's C-Chain config option for `api-resolve-pending-to-last-executed`.
 
 ### APIs
 
@@ -21,6 +22,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 - The `eth-apis` C-Chain option, deprecated in v1.15.0, is removed. The node now ignores it and logs a warning like any other unrecognized option. Set `apis` instead.
 - Removed `pull-gossip-requests-per-validator` from the P-Chain config. It has had no effect since v1.14.2. The node ignores the key if a config still sets it.
+- `api-max-blocks-per-request` was added back to the C-Chain config.
 
 ### Metrics
 
@@ -31,6 +33,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 ### Fixes
 
 - Fixed C-Chain `api-max-duration` only limiting `eth_call` since Helicon. It again limits every call to the `/rpc` and `/ws` endpoints, and a WebSocket call that times out doesn't close its connection.
+- Fixed C-Chain log queries (`eth_getLogs`, `eth_getFilterLogs`) failing with `failed to get logs for block #N` when the range reached an accepted block that had not yet executed. Range queries now stop at the last executed block, and `blockHash` queries for an unexecuted block return `unknown block`.
 
 ## [v1.15.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.1)
 

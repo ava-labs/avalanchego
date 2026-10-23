@@ -187,7 +187,12 @@ var apiServices = []apiService{
 		//  - newPendingTransactions
 		//  - logs
 		name: APISubscription, namespace: ethNamespace, defaultOn: true,
-		receiver: func(_ *backend, filter *filters.FilterAPI) any { return filter },
+		receiver: func(b *backend, filter *filters.FilterAPI) any {
+			return &filterAPI{
+				FilterAPI: filter,
+				b:         b,
+			}
+		},
 	},
 	{
 		// Avalanche-custom eth extensions:
