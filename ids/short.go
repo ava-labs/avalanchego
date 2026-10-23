@@ -80,17 +80,20 @@ func (id *ShortID) UnmarshalJSON(b []byte) error {
 		return errMissingQuotes
 	}
 
-	// Parse CB58 formatted string to bytes
-	bytes, err := cb58.Decode(str[1:lastIndex])
+	return id.UnmarshalText([]byte(str[1:lastIndex]))
+}
+
+// UnmarshalText decodes a CB58-formatted string, as produced by
+// [ShortID.MarshalText], into a ShortID. Unlike UnmarshalJSON, text MUST NOT
+// be quoted: this is called directly (not via UnmarshalJSON) when decoding a
+// ShortID used as a JSON object key, per [encoding.TextUnmarshaler].
+func (id *ShortID) UnmarshalText(text []byte) error {
+	bytes, err := cb58.Decode(string(text))
 	if err != nil {
 		return fmt.Errorf("couldn't decode ID to bytes: %w", err)
 	}
 	*id, err = ToShortID(bytes)
 	return err
-}
-
-func (id *ShortID) UnmarshalText(text []byte) error {
-	return id.UnmarshalJSON(text)
 }
 
 // Bytes returns the 20 byte hash as a slice. It is assumed this slice is not
