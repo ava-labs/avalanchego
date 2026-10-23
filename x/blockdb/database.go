@@ -582,6 +582,11 @@ func (db *Database) Sync(start, end uint64) error {
 		return err
 	}
 
+	return db.syncDataFiles(firstIdx, lastIdx)
+}
+
+// syncDataFiles syncs the data files in the range [firstIdx, lastIdx].
+func (db *Database) syncDataFiles(firstIdx, lastIdx int) error {
 	for idx := firstIdx; idx <= lastIdx; idx++ {
 		f, err := db.getOrOpenDataFile(idx)
 		if err != nil {
@@ -591,7 +596,6 @@ func (db *Database) Sync(start, end uint64) error {
 			return fmt.Errorf("failed to sync data file %d: %w", idx, err)
 		}
 	}
-
 	return nil
 }
 
@@ -671,20 +675,28 @@ func (db *Database) persistIndexHeader() error {
 }
 
 func (db *Database) persistIndexHeaderInternal() error {
-	// The index file must be fsync'd before the header is written to prevent
-	// a state where the header is persisted but the index entries it refers to
-	// are not. This could lead to data inconsistency on recovery.
-	if db.config.SyncToDisk {
-		if err := db.indexFile.Sync(); err != nil {
-			return fmt.Errorf("failed to sync index file before writing header state: %w", err)
-		}
-	}
-
 	header := db.header
 
 	// Update the header with the current state of the database.
 	header.NextWriteOffset = db.nextDataWriteOffset.Load()
 	header.MaxHeight = db.maxBlockHeight.Load()
+
+	// The data and index entries the header covers must be fsync'd before the
+	// header is written. Otherwise the OS can flush the header first, and after
+	// a machine crash the header claims data or index entries that were lost.
+	// Recovery then refuses to open, or never rebuilds the lost entries.
+	// With SyncToDisk, Put already fsyncs the data.
+	if !db.config.SyncToDisk && header.NextWriteOffset > db.header.NextWriteOffset {
+		firstIdx := int(db.header.NextWriteOffset / db.header.MaxDataFileSize)
+		lastIdx := int((header.NextWriteOffset - 1) / db.header.MaxDataFileSize)
+		if err := db.syncDataFiles(firstIdx, lastIdx); err != nil {
+			return fmt.Errorf("failed to sync data files before writing header state: %w", err)
+		}
+	}
+	if err := db.indexFile.Sync(); err != nil {
+		return fmt.Errorf("failed to sync index file before writing header state: %w", err)
+	}
+
 	headerBytes, err := header.MarshalBinary()
 	if err != nil {
 		return fmt.Errorf("failed to serialize header for writing state: %w", err)
@@ -692,6 +704,7 @@ func (db *Database) persistIndexHeaderInternal() error {
 	if _, err := db.indexFile.WriteAt(headerBytes, 0); err != nil {
 		return fmt.Errorf("failed to write header state to index file: %w", err)
 	}
+	db.header.NextWriteOffset = header.NextWriteOffset
 	return nil
 }
 
