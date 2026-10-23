@@ -27,9 +27,7 @@ var (
 type TestClient struct {
 	codec          codec.Manager
 	leafsHandler   handlers.LeafRequestHandler
-	leavesReceived int32
 	codesHandler   *handlers.CodeRequestHandler
-	codeReceived   int32
 	blocksHandler  *handlers.BlockRequestHandler
 	blocksReceived int32
 	// GetLeafsIntercept is called on every GetLeafs request if set to a non-nil callback.
@@ -71,7 +69,7 @@ func (ml *TestClient) GetLeafs(ctx context.Context, request message.LeafsRequest
 		return message.LeafsResponse{}, err
 	}
 
-	leafResponseIntf, numLeaves, err := parseLeafsResponse(ml.codec, request, response)
+	leafResponseIntf, _, err := parseLeafsResponse(ml.codec, request, response)
 	if err != nil {
 		return message.LeafsResponse{}, err
 	}
@@ -79,13 +77,7 @@ func (ml *TestClient) GetLeafs(ctx context.Context, request message.LeafsRequest
 	if ml.GetLeafsIntercept != nil {
 		leafsResponse, err = ml.GetLeafsIntercept(request, leafsResponse)
 	}
-	// Increment the number of leaves received by the test client
-	atomic.AddInt32(&ml.leavesReceived, int32(numLeaves))
 	return leafsResponse, err
-}
-
-func (ml *TestClient) LeavesReceived() int32 {
-	return atomic.LoadInt32(&ml.leavesReceived)
 }
 
 func (ml *TestClient) GetCode(ctx context.Context, hashes []common.Hash) ([][]byte, error) {
@@ -98,7 +90,7 @@ func (ml *TestClient) GetCode(ctx context.Context, hashes []common.Hash) ([][]by
 		return nil, err
 	}
 
-	codeBytesIntf, lenCode, err := parseCode(ml.codec, request, response)
+	codeBytesIntf, _, err := parseCode(ml.codec, request, response)
 	if err != nil {
 		return nil, err
 	}
@@ -106,14 +98,7 @@ func (ml *TestClient) GetCode(ctx context.Context, hashes []common.Hash) ([][]by
 	if ml.GetCodeIntercept != nil {
 		code, err = ml.GetCodeIntercept(hashes, code)
 	}
-	if err == nil {
-		atomic.AddInt32(&ml.codeReceived, int32(lenCode))
-	}
 	return code, err
-}
-
-func (ml *TestClient) CodeReceived() int32 {
-	return atomic.LoadInt32(&ml.codeReceived)
 }
 
 func (ml *TestClient) GetBlocks(ctx context.Context, blockHash common.Hash, height uint64, numParents uint16) ([]*types.Block, error) {

@@ -13,9 +13,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats/statstest"
 	"github.com/ava-labs/avalanchego/ids"
 
@@ -87,29 +85,27 @@ func TestCodeRequestHandler(t *testing.T) {
 		},
 	}
 
-	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-		codeRequestHandler := NewCodeRequestHandler(database, c, testHandlerStats)
-		for name, test := range tests {
-			testHandlerStats.Reset()
-			t.Run(name, func(t *testing.T) {
-				request, expectedResponse := test.setup()
-				responseBytes, err := codeRequestHandler.OnCodeRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-				require.NoError(t, err)
+	codeRequestHandler := NewCodeRequestHandler(database, message.Codec, testHandlerStats)
+	for name, test := range tests {
+		testHandlerStats.Reset()
+		t.Run(name, func(t *testing.T) {
+			request, expectedResponse := test.setup()
+			responseBytes, err := codeRequestHandler.OnCodeRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+			require.NoError(t, err)
 
-				// If the expected response is empty, require that the handler returns an empty response and return early.
-				if len(expectedResponse) == 0 {
-					require.Empty(t, responseBytes, "expected response to be empty")
-					return
-				}
-				var response message.CodeResponse
-				_, err = c.Unmarshal(responseBytes, &response)
-				require.NoError(t, err)
-				require.Len(t, response.Data, len(expectedResponse))
-				for i, code := range expectedResponse {
-					require.Equal(t, code, response.Data[i], "code bytes mismatch at index %d", i)
-				}
-				test.verifyStats(t)
-			})
-		}
-	})
+			// If the expected response is empty, require that the handler returns an empty response and return early.
+			if len(expectedResponse) == 0 {
+				require.Empty(t, responseBytes, "expected response to be empty")
+				return
+			}
+			var response message.CodeResponse
+			_, err = message.Codec.Unmarshal(responseBytes, &response)
+			require.NoError(t, err)
+			require.Len(t, response.Data, len(expectedResponse))
+			for i, code := range expectedResponse {
+				require.Equal(t, code, response.Data[i], "code bytes mismatch at index %d", i)
+			}
+			test.verifyStats(t)
+		})
+	}
 }

@@ -5,8 +5,5 @@ go_library(
     srcs = ["types.go"],
     importpath = "github.com/ava-labs/avalanchego/graft/evm/sync/types",
     visibility = ["//visibility:public"],
-    deps = [
-        "//database/versiondb",
-        "//graft/evm/message",
-    ],
+    deps = ["//graft/evm/message"],
 )

@@ -13,20 +13,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 )
 
-// LeafFetcher reads leaf ranges over the message protocol. One [Client] serves both
-// the state and atomic tries, so the node type is fixed per syncer, not per client.
+// LeafFetcher reads leaf ranges over the message protocol.
 type LeafFetcher struct {
-	client   types.LeafClient
-	reqType  message.LeafsRequestType
-	nodeType message.NodeType
+	client types.LeafClient
 }
 
-func NewLeafFetcher(c types.LeafClient, reqType message.LeafsRequestType, nodeType message.NodeType) *LeafFetcher {
-	return &LeafFetcher{
-		client:   c,
-		reqType:  reqType,
-		nodeType: nodeType,
-	}
+func NewLeafFetcher(c types.LeafClient) *LeafFetcher {
+	return &LeafFetcher{client: c}
 }
 
 func (f *LeafFetcher) FetchLeaves(ctx context.Context, req hashdb.LeafRange) (hashdb.Leaves, bool, error) {
@@ -36,14 +29,12 @@ func (f *LeafFetcher) FetchLeaves(ctx context.Context, req hashdb.LeafRange) (ha
 	}
 
 	// End is always nil, [hashdb.LeafRange] carries no end key.
-	leafsReq, err := message.NewLeafsRequest(
-		f.reqType, req.Root, account, req.Start, nil, req.Limit, f.nodeType,
-	)
-	if err != nil {
-		return hashdb.Leaves{}, false, err
-	}
-
-	resp, err := f.client.GetLeafs(ctx, leafsReq)
+	resp, err := f.client.GetLeafs(ctx, message.LeafsRequest{
+		Root:    req.Root,
+		Account: account,
+		Start:   req.Start,
+		Limit:   req.Limit,
+	})
 	if err != nil {
 		return hashdb.Leaves{}, false, err
 	}

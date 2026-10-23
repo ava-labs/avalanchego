@@ -443,7 +443,7 @@ func (vm *VM) Initialize(
 		vm.ethConfig.Miner.Etherbase = blackhole.Address
 	}
 
-	vm.networkCodec = message.SubnetEVMCodec
+	vm.networkCodec = message.Codec
 	vm.Network, err = network.NewNetwork(vm.ctx, appSender, vm.networkCodec, vm.config.MaxOutboundActiveRequests, vm.sdkMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to create network: %w", err)
@@ -641,8 +641,10 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash, ethConfig ethconfig.
 // If state sync is disabled, this function will wipe any ongoing summary from
 // disk to ensure that we do not continue syncing from an invalid snapshot.
 func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
-	leafHandlers := make(LeafHandlers)
-	leafMetricsNames := make(map[message.NodeType]string)
+	var (
+		leafHandler    handlers.LeafRequestHandler
+		leafMetricName string
+	)
 	syncStats := handlerstats.GetOrRegisterHandlerStats(metrics.Enabled)
 
 	switch scheme := vm.ethConfig.StateScheme; scheme {
@@ -658,18 +660,11 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 				}.BackendConstructor,
 			},
 		)
-		// register default leaf request handler for state trie
-		stateLeafRequestConfig := &extension.LeafRequestConfig{
-			LeafType:   message.StateTrieNode,
-			MetricName: "sync_state_trie_leaves",
-			Handler: handlers.NewLeafsRequestHandler(evmTrieDB,
-				message.StateTrieKeyLength,
-				vm.blockChain, vm.networkCodec,
-				syncStats,
-			),
-		}
-		leafHandlers[stateLeafRequestConfig.LeafType] = stateLeafRequestConfig.Handler
-		leafMetricsNames[stateLeafRequestConfig.LeafType] = stateLeafRequestConfig.MetricName
+		leafHandler = handlers.NewLeafsRequestHandler(evmTrieDB,
+			vm.blockChain, vm.networkCodec,
+			syncStats,
+		)
+		leafMetricName = "sync_state_trie_leaves"
 	case customrawdb.FirewoodScheme:
 		tdb, ok := vm.eth.BlockChain().TrieDB().Backend().(*firewood.TrieDB)
 		if !ok {
@@ -695,7 +690,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		vm.blockChain,
 		vm.chaindb,
 		vm.networkCodec,
-		leafHandlers,
+		leafHandler,
 		syncStats,
 	)
 	vm.Network.SetRequestHandler(networkHandler)
@@ -706,7 +701,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		&client.Config{
 			Network:          vm.Network,
 			Codec:            vm.networkCodec,
-			Stats:            stats.NewClientSyncerStats(leafMetricsNames),
+			Stats:            stats.NewClientSyncerStats(leafMetricName),
 			StateSyncNodeIDs: vm.config.StateSyncIDs.List(),
 			BlockParser:      vm,
 		},
@@ -728,8 +723,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		MetadataDB:          vm.metadataDB,
 		Acceptor:            vm,
 		SyncSummaryProvider: vm.extensionConfig.SyncSummaryProvider,
-		Extender:            nil,
-		LeafFetcher:         client.NewLeafFetcher(syncClient, message.SubnetEVMLeafsRequestType, message.StateTrieNode),
+		LeafFetcher:         client.NewLeafFetcher(syncClient),
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume
@@ -1284,7 +1278,7 @@ func (vm *VM) ReadLastAccepted() (common.Hash, uint64, error) {
 func defaultExtensions() *extension.Config {
 	return &extension.Config{
 		Clock:               &mockable.Clock{},
-		SyncSummaryProvider: message.NewBlockSyncSummaryProvider(message.SubnetEVMCodec),
+		SyncSummaryProvider: message.NewBlockSyncSummaryProvider(message.Codec),
 	}
 }
 

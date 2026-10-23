@@ -21,9 +21,7 @@ graft_go_test(
     srcs = ["syncer_test.go"],
     embed = [":block"],
     deps = [
-        "//codec",
         "//graft/evm/message",
-        "//graft/evm/message/messagetest",
         "//graft/evm/sync/client",
         "//graft/evm/sync/handlers",
         "//graft/evm/sync/handlers/stats",

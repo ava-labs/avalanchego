@@ -14,9 +14,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
@@ -97,24 +95,22 @@ func TestBlockSyncer_ParameterizedTests(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-			t.Run(tt.name, func(t *testing.T) {
-				t.Parallel()
-				env := newTestEnvironment(t, tt.numBlocks, c)
-				require.NoError(t, env.prePopulateBlocks(tt.prePopulateBlocks))
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			env := newTestEnvironment(t, tt.numBlocks)
+			require.NoError(t, env.prePopulateBlocks(tt.prePopulateBlocks))
 
-				syncer, err := env.createSyncer(tt.fromHeight, tt.blocksToFetch)
-				require.NoError(t, err)
+			syncer, err := env.createSyncer(tt.fromHeight, tt.blocksToFetch)
+			require.NoError(t, err)
 
-				require.NoError(t, syncer.Sync(t.Context()))
+			require.NoError(t, syncer.Sync(t.Context()))
 
-				env.verifyBlocksInDB(t, tt.expectedBlocks)
+			env.verifyBlocksInDB(t, tt.expectedBlocks)
 
-				if tt.verifyZeroBlocksReceived {
-					// Client should not have received any block requests since all blocks were on disk
-					require.Zero(t, env.client.BlocksReceived())
-				}
-			})
+			if tt.verifyZeroBlocksReceived {
+				// Client should not have received any block requests since all blocks were on disk
+				require.Zero(t, env.client.BlocksReceived())
+			}
 		})
 	}
 }
@@ -122,17 +118,15 @@ func TestBlockSyncer_ParameterizedTests(t *testing.T) {
 func TestBlockSyncer_ContextCancellation(t *testing.T) {
 	t.Parallel()
 
-	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-		env := newTestEnvironment(t, 10, c)
-		syncer, err := env.createSyncer(5, 3)
-		require.NoError(t, err)
+	env := newTestEnvironment(t, 10)
+	syncer, err := env.createSyncer(5, 3)
+	require.NoError(t, err)
 
-		// Immediately cancel the context to simulate cancellation.
-		ctx, cancel := context.WithCancel(t.Context())
-		cancel()
-		err = syncer.Sync(ctx)
-		require.ErrorIs(t, err, context.Canceled)
-	})
+	// Immediately cancel the context to simulate cancellation.
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	err = syncer.Sync(ctx)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 // testEnvironment provides an abstraction for setting up block syncer tests
@@ -143,7 +137,7 @@ type testEnvironment struct {
 }
 
 // newTestEnvironment creates a new test environment with generated blocks
-func newTestEnvironment(t *testing.T, numBlocks int, c codec.Manager) *testEnvironment {
+func newTestEnvironment(t *testing.T, numBlocks int) *testEnvironment {
 	t.Helper()
 
 	blocks := synctest.GenerateTestBlocks(t, numBlocks, nil)
@@ -163,7 +157,7 @@ func newTestEnvironment(t *testing.T, numBlocks int, c codec.Manager) *testEnvir
 
 	blockHandler := handlers.NewBlockRequestHandler(
 		blockProvider,
-		c,
+		message.Codec,
 		handlerstats.NewNoopHandlerStats(),
 	)
 
@@ -171,7 +165,7 @@ func newTestEnvironment(t *testing.T, numBlocks int, c codec.Manager) *testEnvir
 		chainDB: rawdb.NewMemoryDatabase(),
 		blocks:  blocks,
 		client: client.NewTestClient(
-			c,
+			message.Codec,
 			nil,
 			nil,
 			blockHandler,
