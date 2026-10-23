@@ -10,19 +10,18 @@ import (
 	"errors"
 	"fmt"
 	"iter"
-	"slices"
 	"sync"
 
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/libevm"
+	"github.com/google/btree"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/setmap"
@@ -225,13 +224,13 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	if _, ok := p.txs.Get(t.id); ok {
+	if _, ok := p.byID[t.id]; ok {
 		return ErrAlreadyKnown
 	}
 
 	for input := range t.inputs {
 		if conflictID, ok := p.utxos.GetKey(input); ok {
-			conflict, _ := p.txs.Get(conflictID)
+			conflict := p.byID[conflictID]
 			if t.op.GasFeeCap.Cmp(&conflict.op.GasFeeCap) <= 0 {
 				return errInsufficientFee
 			}
@@ -239,12 +238,13 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 	}
 	p.removeConflicts(t.inputs)
 
-	if p.txs.Len() >= p.maxSize {
-		_, cheap, _ := p.txs.Peek()
-		if t.op.GasFeeCap.Cmp(&cheap.op.GasFeeCap) <= 0 {
+	if len(p.byID) >= p.maxSize {
+		// maxSize > 0 and the pool is full, so the tree is non-empty.
+		cheapest, _ := p.byPrice.Max()
+		if t.op.GasFeeCap.Cmp(&cheapest.op.GasFeeCap) <= 0 {
 			return errInsufficientFee
 		}
-		p.removeConflicts(cheap.inputs)
+		p.removeConflicts(cheapest.inputs)
 	}
 
 	p.add(t)
@@ -310,15 +310,29 @@ func verifyOp(state libevm.StateReader, op hook.Op) error {
 	return nil
 }
 
+// priceTreeDegree is the degree of [Pending.byPrice]. Every node but the root
+// holds between degree-1 and 2*degree-1 transactions, so the tree stays a few
+// levels deep for the pool sizes we expect while keeping the per-node copy
+// that copy-on-write mutations pay after [Pending.Iter] small.
+const priceTreeDegree = 16
+
 // Pending stores transactions that are eligible for inclusion in a future
 // block, indexed for fast conflict lookup and ordered by gas price.
 type Pending struct {
 	lock sync.RWMutex
 	cond *lock.Cond
 
-	// txs is the collection of transactions available to be included into a
-	// block, ordered as a min-heap by gas price for eviction.
-	txs heap.Map[ids.ID, *txData]
+	// byID indexes every pooled transaction by its ID.
+	byID map[ids.ID]*txData
+	// byPrice orders every pooled transaction by [txData.lessByPrice]:
+	// decreasing gas price, so that the first item is the most valuable to
+	// include in a block and the last is the eviction candidate when the pool
+	// is full.
+	//
+	// The tree is copy-on-write. [Pending.Iter] clones it in O(1) and walks
+	// the clone without holding the pool's lock, so iteration neither copies
+	// the pool nor blocks writers for its duration.
+	byPrice *btree.BTreeG[*txData]
 	// utxos maps a txID to the set of utxoIDs it consumes.
 	utxos *setmap.SetMap[ids.ID, ids.ID]
 }
@@ -326,33 +340,38 @@ type Pending struct {
 // NewPending constructs an empty set of [Pending] transactions.
 func NewPending() *Pending {
 	p := &Pending{
-		txs: heap.NewMap[ids.ID, *txData](func(a, b *txData) bool {
-			return a.op.GasFeeCap.Lt(&b.op.GasFeeCap) // txs is a min-heap
-		}),
-		utxos: setmap.New[ids.ID, ids.ID](),
+		byID:    make(map[ids.ID]*txData),
+		byPrice: btree.NewG(priceTreeDegree, (*txData).lessByPrice),
+		utxos:   setmap.New[ids.ID, ids.ID](),
 	}
 	p.cond = lock.NewCond(p.lock.RLocker())
 	return p
 }
 
 // Iter returns an iterator over the pool's transactions in decreasing gas
-// price order.
+// price order. Transactions with equal gas prices are yielded in ascending ID
+// order, so the order is the same regardless of insertion order.
+//
+// The iterator ranges over a snapshot of the pool taken when Iter is called:
+// transactions added or removed afterwards are not observed. Taking the
+// snapshot costs O(1) regardless of the pool's size, and the pool's lock is
+// not held while iterating, so callers may perform slow work (such as
+// verifying credentials) and call other [Pending] methods from within the
+// loop.
 func (p *Pending) Iter() iter.Seq[*tx.Tx] {
-	p.lock.RLock()
-	// TODO:(StephenButtolph): Iteration shouldn't copy the pool.
-	values := heap.MapValues(p.txs)
-	p.lock.RUnlock()
-
-	slices.SortFunc(values, func(a, b *txData) int {
-		return -a.op.GasFeeCap.Cmp(&b.op.GasFeeCap)
-	})
+	// Clone is O(1) but it replaces the tree's copy-on-write context and
+	// MUST NOT run concurrently with another Clone, so it requires the write
+	// lock even though the set of transactions is unchanged. Subsequent
+	// mutations of byPrice copy only the nodes they touch, leaving the
+	// snapshot intact.
+	p.lock.Lock()
+	snapshot := p.byPrice.Clone()
+	p.lock.Unlock()
 
 	return func(yield func(*tx.Tx) bool) {
-		for _, t := range values {
-			if !yield(t.tx) {
-				return
-			}
-		}
+		snapshot.Ascend(func(t *txData) bool {
+			return yield(t.tx)
+		})
 	}
 }
 
@@ -361,7 +380,7 @@ func (p *Pending) Len() int {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	return p.txs.Len()
+	return len(p.byID)
 }
 
 // Has reports whether txID is in the pool.
@@ -369,7 +388,7 @@ func (p *Pending) Has(txID ids.ID) bool {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	_, ok := p.txs.Get(txID)
+	_, ok := p.byID[txID]
 	return ok
 }
 
@@ -379,7 +398,7 @@ func (p *Pending) AwaitTxs(ctx context.Context) error {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
-	for p.txs.Len() == 0 {
+	for len(p.byID) == 0 {
 		if err := p.cond.Wait(ctx); err != nil {
 			return err
 		}
@@ -390,14 +409,27 @@ func (p *Pending) AwaitTxs(ctx context.Context) error {
 
 func (p *Pending) removeConflicts(utxos set.Set[ids.ID]) {
 	for _, removed := range p.utxos.DeleteOverlapping(utxos) {
-		p.txs.Remove(removed.Key)
+		p.remove(removed.Key)
 	}
+}
+
+// remove deletes the transaction with txID from byID and byPrice, if present.
+// It assumes that the transaction's inputs have already been removed from
+// utxos.
+func (p *Pending) remove(txID ids.ID) {
+	t, ok := p.byID[txID]
+	if !ok {
+		return
+	}
+	delete(p.byID, txID)
+	p.byPrice.Delete(t)
 }
 
 // add inserts t into the pool. It assumes there are no existing conflicts.
 func (p *Pending) add(t *txData) {
 	p.utxos.Put(t.id, t.inputs)
-	p.txs.Push(t.id, t)
+	p.byID[t.id] = t
+	p.byPrice.ReplaceOrInsert(t)
 	p.cond.Broadcast()
 }
 
@@ -423,4 +455,16 @@ func newTxData(tx *tx.Tx, avaxAssetID ids.ID) (*txData, error) {
 		inputs: tx.InputIDs(),
 		op:     op,
 	}, nil
+}
+
+// lessByPrice orders transactions by decreasing gas price, breaking ties by
+// ascending ID. The tie-break makes the order total: every transaction has
+// exactly one position in [Pending.byPrice], which the tree relies on to find
+// it again on removal, and it makes the order in which block builders see
+// transactions independent of the order in which they arrived.
+func (t *txData) lessByPrice(o *txData) bool {
+	if c := t.op.GasFeeCap.Cmp(&o.op.GasFeeCap); c != 0 {
+		return c > 0
+	}
+	return t.id.Compare(o.id) < 0
 }
