@@ -693,10 +693,10 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 
 func getProfilerConfig(v *viper.Viper) (profiler.Config, error) {
 	config := profiler.Config{
-		Dir:         getExpandedArg(v, ProfileDirKey),
-		Enabled:     v.GetBool(ProfileContinuousEnabledKey),
-		Freq:        v.GetDuration(ProfileContinuousFreqKey),
-		MaxNumFiles: v.GetInt(ProfileContinuousMaxFilesKey),
+		Dir:                  getExpandedArg(v, ProfileDirKey),
+		Enabled:              v.GetBool(ProfileContinuousEnabledKey),
+		Freq:                 v.GetDuration(ProfileContinuousFreqKey),
+		MaxNumFiles:          v.GetInt(ProfileContinuousMaxFilesKey),
 		MutexProfileFraction: v.GetInt(ProfileContinuousMutexFractionKey),
 	}
 	if config.Freq < 0 {

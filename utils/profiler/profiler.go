@@ -20,6 +20,10 @@ const (
 	memProfileFile = "mem.profile"
 	// Name of file that lock profile is written to
 	lockProfileFile = "lock.profile"
+
+	// Mutex profile fraction used when none is configured: every mutex
+	// contention event is recorded
+	DefaultMutexProfileFraction = 1
 )
 
 var (
@@ -57,7 +61,7 @@ type profiler struct {
 }
 
 func New(dir string) Profiler {
-	return newProfiler(dir, 1)
+	return newProfiler(dir, DefaultMutexProfileFraction)
 }
 
 func newProfiler(dir string, mutexProfileFraction int) *profiler {
