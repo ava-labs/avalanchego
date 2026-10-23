@@ -83,7 +83,7 @@ go_library(
         "//vms/saevm/adaptor",
         "//vms/saevm/blocks",
         "//vms/saevm/cchain/dynamic",
-        "//vms/saevm/cchain/extstate",
+        "//vms/saevm/cchain/libevm/extstate",
         "//vms/saevm/cchain/state",
         "//vms/saevm/cchain/statesync",
         "//vms/saevm/cchain/tx",

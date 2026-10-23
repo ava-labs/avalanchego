@@ -9,7 +9,7 @@ package(default_visibility = [
 go_library(
     name = "extstate",
     srcs = ["statedb.go"],
-    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/extstate",
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate",
     deps = [
         "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
@@ -17,6 +17,7 @@ go_library(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//libevm/stateconf",
         "@com_github_holiman_uint256//:uint256",
     ],
