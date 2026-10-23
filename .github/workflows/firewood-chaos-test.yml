@@ -19,10 +19,10 @@ on:
       current-state-dir-src:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
         default: ''
-      # Chaos test specific inputs
       config:
-        description: 'VM config preset (firewood, firewood-archive). Required for custom tests; overrides the preset of a named test.'
+        description: 'VM config preset (firewood, firewood-archive). Required for custom tests.'
         default: ''
+      # Chaos test specific inputs
       min-wait-time:
         description: 'Minimum wait time before killing the process (e.g., 120s, 2m).'
         default: '120s'
