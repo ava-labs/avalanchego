@@ -6,6 +6,7 @@ exports_files(["BUILD.bazel"])
 # gazelle:exclude tools
 # gazelle:exclude .claude
 # gazelle:exclude .direnv
+# gazelle:exclude .cache
 # gazelle:exclude .bazel/patches/build_files
 # gazelle:proto disable_global
 # gazelle:map_kind go_test go_test //.bazel:defs.bzl

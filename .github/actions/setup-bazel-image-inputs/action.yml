@@ -1,0 +1,96 @@
+name: Prepare Bazel image inputs
+description: Restore and complete separate Docker and Bazel image input caches on Linux
+
+inputs:
+  cache-save-allowed:
+    description: Whether the parent setup-bazel invocation may save updated input caches
+    required: true
+  docker-username:
+    description: Docker Hub username for input preparation
+    required: false
+    default: ''
+  docker-password:
+    description: Docker Hub password for input preparation
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/ensure-disk-space
+      with:
+        diagnostic-groups: docker
+
+    - name: Login to Docker Hub for input preparation
+      if: ${{ inputs.docker-username != '' && inputs.docker-password != '' }}
+      uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
+      with:
+        username: ${{ inputs.docker-username }}
+        password: ${{ inputs.docker-password }}
+
+    - id: paths
+      shell: bash
+      run: |
+        cache_root="$RUNNER_TEMP/avalanchego-bazel-image"
+        {
+          echo "root=$cache_root"
+          echo "archive=$cache_root/docker-images.tar"
+        } >> "$GITHUB_OUTPUT"
+        {
+          echo "BAZEL_IMAGE_CACHE_ROOT=$cache_root"
+          echo "BAZEL_IMAGE_REPOSITORY_CACHE=$cache_root/outer-repository"
+          echo 'BAZEL_IMAGE_DISABLE_DOWNLOADS=true'
+        } >> "$GITHUB_ENV"
+
+    - id: cache-key
+      shell: bash
+      run: ./scripts/workflow-avalanchego-image-docker-cache-key.sh
+
+    - id: docker-cache
+      name: Restore Docker input archive
+      uses: actions/cache/restore@v5
+      with:
+        path: ${{ steps.paths.outputs.archive }}
+        key: ${{ steps.cache-key.outputs.key }}
+        restore-keys: |
+          ${{ steps.cache-key.outputs.prefix }}
+
+    - id: dependency-cache
+      name: Restore Bazel image input caches
+      uses: actions/cache/restore@v5
+      with:
+        path: |
+          ${{ steps.paths.outputs.root }}/outer-repository
+          ${{ steps.paths.outputs.root }}/inner-repository
+          ${{ steps.paths.outputs.root }}/inner-go-modules
+        key: ${{ steps.cache-key.outputs.dependency-key }}
+        restore-keys: |
+          ${{ steps.cache-key.outputs.dependency-prefix }}
+
+    # Even an exact hit must load the archive and resolve the current builder.
+    # Only misses or inexact hits permit downloads during preparation.
+    - name: Prepare missing image inputs
+      shell: bash
+      env:
+        BAZEL_IMAGE_DOCKER_CACHE_ARCHIVE: ${{ steps.paths.outputs.archive }}
+        BAZEL_IMAGE_PREPARE_DOCKER: ${{ steps.docker-cache.outputs.cache-hit != 'true' }}
+        BAZEL_IMAGE_PREPARE_DEPENDENCIES: ${{ steps.dependency-cache.outputs.cache-hit != 'true' }}
+        BAZEL_IMAGE_WRITE_DOCKER_CACHE: ${{ steps.docker-cache.outputs.cache-hit != 'true' && inputs.cache-save-allowed == 'true' }}
+      run: ./scripts/run_task.sh bazel-prepare-image-inputs
+
+    - name: Save Docker input archive
+      if: ${{ steps.docker-cache.outputs.cache-hit != 'true' && inputs.cache-save-allowed == 'true' }}
+      uses: actions/cache/save@v5
+      with:
+        path: ${{ steps.paths.outputs.archive }}
+        key: ${{ steps.cache-key.outputs.key }}
+
+    - name: Save Bazel image input caches
+      if: ${{ steps.dependency-cache.outputs.cache-hit != 'true' && inputs.cache-save-allowed == 'true' }}
+      uses: actions/cache/save@v5
+      with:
+        path: |
+          ${{ steps.paths.outputs.root }}/outer-repository
+          ${{ steps.paths.outputs.root }}/inner-repository
+          ${{ steps.paths.outputs.root }}/inner-go-modules
+        key: ${{ steps.cache-key.outputs.dependency-key }}

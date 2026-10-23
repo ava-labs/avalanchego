@@ -4,6 +4,9 @@
 # Local bazel overrides
 /.bazelrc.local
 
+# Bazel-built image caches
+/.cache/bazel-image/
+
 *.log
 *~
 .DS_Store
