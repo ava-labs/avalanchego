@@ -170,6 +170,57 @@ func TestMultiCoinBalance(t *testing.T) {
 	}
 }
 
+// FuzzMultiCoinFlagInvariant checks that an account with a positive multicoin
+// balance is always flagged as multicoin, which [extstate.StateDB.SubBalanceMultiCoin]
+// relies on to not set the flag itself.
+func FuzzMultiCoinFlagInvariant(f *testing.F) {
+	const (
+		add = iota
+		sub
+		snap
+		revert
+	)
+	// Each byte is an op in the top 2 bits and an amount in the bottom 6.
+	f.Add([]byte{
+		add<<6 | 5,
+		snap << 6,
+		sub<<6 | 4,
+		revert << 6,
+		add<<6 | 5,
+		sub<<6 | 5,
+	})
+	f.Fuzz(func(t *testing.T, ops []byte) {
+		s := newEmptyStateDB(t)
+		addr := common.Address{1}
+		coinID := common.Hash{2}
+		var snapshots []int
+
+		for _, op := range ops {
+			amount := big.NewInt(int64(op & 0x3f))
+			switch op >> 6 {
+			case add:
+				s.AddBalanceMultiCoin(addr, coinID, amount)
+			case sub:
+				// Callers MUST NOT subtract more than the balance.
+				if s.GetBalanceMultiCoin(addr, coinID).Cmp(amount) >= 0 {
+					s.SubBalanceMultiCoin(addr, coinID, amount)
+				}
+			case snap:
+				snapshots = append(snapshots, s.Snapshot())
+			case revert:
+				if n := len(snapshots); n > 0 {
+					s.RevertToSnapshot(snapshots[n-1])
+					snapshots = snapshots[:n-1]
+				}
+			}
+
+			if s.GetBalanceMultiCoin(addr, coinID).Sign() > 0 {
+				require.Truef(t, customtypes.IsMultiCoin(s.StateDB, addr), "customtypes.IsMultiCoin() with positive balance after op %#x", op)
+			}
+		}
+	})
+}
+
 // TestMultiCoinSnapshotUpdate checks that multicoin balances and flags are read
 // back from a snapshot, which [state.StateDB] prefers over the trie.
 func TestMultiCoinSnapshotUpdate(t *testing.T) {
