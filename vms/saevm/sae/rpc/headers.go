@@ -17,23 +17,20 @@ type responseHeadersKey struct{}
 //
 // A timed-out request is answered by a separate goroutine while the method
 // may still be running, so all access is guarded by mu. Values added after the
-// headers are written are not reported.
+// headers are written are not reported, because changes to an [http.Header]
+// after the response is written have no effect.
 type responseHeaders struct {
 	mu     sync.Mutex
-	sealed bool
 	gas    uint64
 	hasGas bool
 }
 
-// seal sets the accumulated headers on h, along with errorCodes as counted by
-// [parseErrorCodes]. Only the first call has any effect.
-func (rh *responseHeaders) seal(h http.Header, errorCodes map[int]int) {
+// setHeaders sets the accumulated headers on h, along with errorCodes as counted
+// by [parseErrorCodes]. It has no effect if the response has already been
+// written.
+func (rh *responseHeaders) setHeaders(h http.Header, errorCodes map[int]int) {
 	rh.mu.Lock()
 	defer rh.mu.Unlock()
-	if rh.sealed {
-		return
-	}
-	rh.sealed = true
 	if rh.hasGas {
 		h.Set(GasUsedHeader, strconv.FormatUint(rh.gas, 10))
 	}
@@ -51,8 +48,9 @@ func withResponseHeaders(next http.Handler) http.Handler {
 		next.ServeHTTP(&headerWriter{ResponseWriter: w, headers: rh}, r.WithContext(ctx))
 		// JSON-RPC "notifications" run without writing a response, so the
 		// headers are still unsent. The libevm RPC server waits for all calls
-		// before returning, so no more updates can arrive.
-		rh.seal(w.Header(), nil)
+		// before returning, so no more updates can arrive. If a response was
+		// written, this has no effect.
+		rh.setHeaders(w.Header(), nil)
 	})
 }
 
@@ -67,12 +65,12 @@ type headerWriter struct {
 }
 
 func (w *headerWriter) WriteHeader(code int) {
-	w.headers.seal(w.Header(), nil)
+	w.headers.setHeaders(w.Header(), nil)
 	w.ResponseWriter.WriteHeader(code)
 }
 
 func (w *headerWriter) Write(b []byte) (int, error) {
-	w.headers.seal(w.Header(), parseErrorCodes(b))
+	w.headers.setHeaders(w.Header(), parseErrorCodes(b))
 	return w.ResponseWriter.Write(b)
 }
 
@@ -84,7 +82,7 @@ var _ http.Flusher = (*headerWriter)(nil)
 // Embedding [http.ResponseWriter] hides the optional [http.Flusher] interface
 // of the underlying writer. The libevm RPC server flushes error responses, such
 // as timeouts, so that they reach the client before the HTTP server's write
-// deadline. Flush doesn't seal because libevm only flushes after
+// deadline. Flush doesn't set the headers because libevm only flushes after
 // [headerWriter.Write].
 func (w *headerWriter) Flush() {
 	if f, ok := w.ResponseWriter.(http.Flusher); ok {
