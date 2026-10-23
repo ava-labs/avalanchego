@@ -10,19 +10,14 @@ import (
 	"sync"
 )
 
-// GasUsedHeader is the HTTP response header carrying the total gas used by
-// every eth_call in the request, batches included. It is a decimal integer and
-// is omitted if no eth_call executed.
-const GasUsedHeader = "Gas-Used"
-
 type responseHeadersKey struct{}
 
 // responseHeaders accumulates per-request values that are reported as response
 // headers.
 //
 // A timed-out request is answered by a separate goroutine while the method
-// may still be running, so all access is guarded by mu and updates after the
-// headers are written are dropped.
+// may still be running, so all access is guarded by mu. Values added after the
+// headers are written are not reported.
 type responseHeaders struct {
 	mu     sync.Mutex
 	sealed bool
@@ -30,24 +25,7 @@ type responseHeaders struct {
 	hasGas bool
 }
 
-// addGas records gas used by a call in the request carried by ctx. It is a
-// no-op if ctx was not created by [withResponseHeaders].
-func addGas(ctx context.Context, gas uint64) {
-	rh, ok := ctx.Value(responseHeadersKey{}).(*responseHeaders)
-	if !ok {
-		return
-	}
-	rh.mu.Lock()
-	defer rh.mu.Unlock()
-	if rh.sealed {
-		return
-	}
-	rh.gas += gas
-	rh.hasGas = true
-}
-
-// seal stops further updates and sets the accumulated headers on h. Only the
-// first call has any effect.
+// seal sets the accumulated headers on h. Only the first call has any effect.
 func (rh *responseHeaders) seal(h http.Header) {
 	rh.mu.Lock()
 	defer rh.mu.Unlock()
@@ -74,10 +52,7 @@ func withResponseHeaders(next http.Handler) http.Handler {
 	})
 }
 
-var (
-	_ http.ResponseWriter = (*headerWriter)(nil)
-	_ http.Flusher        = (*headerWriter)(nil)
-)
+var _ http.ResponseWriter = (*headerWriter)(nil)
 
 // headerWriter sets the headers in [responseHeaders] immediately before the
 // response header is written.
@@ -96,8 +71,15 @@ func (w *headerWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-// Flush implements [http.Flusher], which the libevm RPC server relies on when
-// writing error responses. It doesn't seal because libevm only flushes after
+var _ http.Flusher = (*headerWriter)(nil)
+
+// Flush sends any buffered response data to the client by calling Flush on the
+// underlying [http.ResponseWriter], if it implements [http.Flusher].
+//
+// Embedding [http.ResponseWriter] hides the optional [http.Flusher] interface
+// of the underlying writer. The libevm RPC server flushes error responses, such
+// as timeouts, so that they reach the client before the HTTP server's write
+// deadline. Flush doesn't seal because libevm only flushes after
 // [headerWriter.Write].
 func (w *headerWriter) Flush() {
 	if f, ok := w.ResponseWriter.(http.Flusher); ok {

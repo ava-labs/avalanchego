@@ -6,10 +6,10 @@ go_library(
     srcs = [
         "backend.go",
         "blocks.go",
-        "call.go",
         "custom.go",
         "debug.go",
         "gasprice.go",
+        "gasused.go",
         "headers.go",
         "indexing.go",
         "mempool.go",

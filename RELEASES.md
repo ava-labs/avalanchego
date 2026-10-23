@@ -12,7 +12,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 ### APIs
 
-- Added `Gas-Used` header to SAE `/rpc` responses: the total gas used by every `eth_call` in the request, omitted if none executed
+- Added a `Gas-Used` header to C-Chain `/rpc` responses with the total gas used by every completed `eth_call` in the request.
 - The `avax.getAtomicTxStatus` C-Chain RPC, deprecated in v1.15.0, is removed. Use `avax.getAtomicTx`, which fails for a tx that has not been accepted.
 
 ### Configs
