@@ -11,6 +11,12 @@ import (
 	"strings"
 )
 
+// ErrorCodesHeader is the HTTP response header listing each JSON-RPC error
+// code in the response with the number of times it occurred, as an RFC 9651
+// list sorted by code, e.g. `-32002;count=1, 3;count=2`. It is omitted if no
+// response has an error.
+const ErrorCodesHeader = "Rpc-Error-Codes"
+
 // A jsonrpcResponse holds the only field of a JSON-RPC response read by
 // [parseErrorCodes].
 type jsonrpcResponse struct {

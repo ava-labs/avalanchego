@@ -21,10 +21,9 @@ var HandlerPaths = []string{rpcHTTPExtensionPath, wsHTTPExtensionPath}
 // CreateHandlers returns all VM-specific HTTP handlers to be exposed by the
 // node, keyed by extension.
 func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	s := vm.rpcProvider.Server()
 	return map[string]http.Handler{
 		rpcHTTPExtensionPath: vm.rpcProvider.HTTPHandler(),
-		wsHTTPExtensionPath:  s.WebsocketHandler([]string{"*"}),
+		wsHTTPExtensionPath:  vm.rpcProvider.WebsocketHandler([]string{"*"}),
 	}, nil
 }
 

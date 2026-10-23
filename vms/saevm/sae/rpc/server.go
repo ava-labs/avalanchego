@@ -266,16 +266,16 @@ var apiServices = []apiService{
 	},
 }
 
-// Server returns the Provider's [rpc.Server], with the JSON-RPC namespace
-// handlers for every enabled [API] registered.
-func (p *Provider) Server() *rpc.Server {
-	return p.server
-}
-
-// HTTPHandler returns the handler for JSON-RPC over HTTP: [Provider.Server]
-// with per-request response headers added.
+// HTTPHandler returns the handler for JSON-RPC over HTTP, serving every enabled
+// [API] with per-request response headers added.
 func (p *Provider) HTTPHandler() http.Handler {
 	return withResponseHeaders(p.server)
+}
+
+// WebsocketHandler returns the handler for JSON-RPC over websockets, serving
+// every enabled [API] to connections from allowedOrigins.
+func (p *Provider) WebsocketHandler(allowedOrigins []string) http.Handler {
+	return p.server.WebsocketHandler(allowedOrigins)
 }
 
 func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {

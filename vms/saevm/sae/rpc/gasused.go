@@ -12,6 +12,24 @@ import (
 	"github.com/ava-labs/libevm/rpc"
 )
 
+// GasUsedHeader is the HTTP response header carrying the total gas used by
+// every eth_call in the request, batches included. It is a decimal integer and
+// is omitted if no eth_call executed.
+const GasUsedHeader = "Gas-Used"
+
+// addGas records gas used by a call in the request carried by ctx. It is a
+// no-op if ctx was not created by [withResponseHeaders].
+func addGas(ctx context.Context, gas uint64) {
+	rh, ok := ctx.Value(responseHeadersKey{}).(*responseHeaders)
+	if !ok {
+		return
+	}
+	rh.mu.Lock()
+	defer rh.mu.Unlock()
+	rh.gas += gas
+	rh.hasGas = true
+}
+
 // Call overrides [ethapi.BlockChainAPI.Call] to record the gas used for
 // [GasUsedHeader]. The interceptor needs the request's context, so it is set
 // on a [ethapi.BlockChainAPI] built for each call.
