@@ -1020,7 +1020,7 @@ func TestGetProfilerConfigMutexFraction(t *testing.T) {
 		},
 		{
 			name:        "negative fraction",
-			set:         &[]int{-1}[0],
+			set:         new(-1),
 			expectedErr: errNegativeMutexProfileFraction,
 		},
 	}
