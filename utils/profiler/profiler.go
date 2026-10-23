@@ -126,7 +126,7 @@ func (p *profiler) LockProfile() error {
 	}
 
 	profile := pprof.Lookup("mutex")
-	if err := profile.WriteTo(file, 1); err != nil {
+	if err := profile.WriteTo(file, 0); err != nil {
 		_ = file.Close() // Return the original error
 		return err
 	}
