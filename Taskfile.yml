@@ -123,6 +123,10 @@ tasks:
     desc: Run cacheable Go unit tests with Bazel
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh all'
 
+  bazel-test-unit-race:
+    desc: Run cacheable Go unit tests with Bazel race detection
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh all --config=race'
+
   bazel-test-unit-race-shuffle:
     desc: Run Go unit tests with Bazel (race detection and shuffle)
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh all --config=race-shuffle --nocache_test_results'
@@ -382,6 +386,9 @@ tasks:
       - test-setup-task
       - test-sync-task-version
       - test-unit-script
+      - test-workflow-hash-go-unit-inputs
+      - test-workflow-prepare-go-unit-cache
+      - test-workflow-validate-go-unit-cache
       - check-go-version
       - check-require-directives
       - check-task-version
@@ -406,6 +413,9 @@ tasks:
       - task: test-setup-task
       - task: test-sync-task-version
       - task: test-unit-script
+      - task: test-workflow-hash-go-unit-inputs
+      - task: test-workflow-prepare-go-unit-cache
+      - task: test-workflow-validate-go-unit-cache
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
       - task: check-go-version
@@ -428,6 +438,10 @@ tasks:
   lint-yaml-fix:
     desc: Formats YAML files with yamlfmt
     cmd: '{{.NIX_RUN}} yamlfmt .'
+
+  normalize-testdata-mtimes:
+    desc: Normalizes testdata modification times for Go test-result caching
+    cmd: '{{.NIX_RUN}} ./scripts/normalize_testdata_mtimes.sh'
 
   run-polyrepo:
     desc: "Run polyrepo for orchestrating local dependencies. Example: LIBEVM_REF=v1.2.3 FIREWOOD_REF=abc123 task run-polyrepo"
@@ -662,6 +676,18 @@ tasks:
     cmds:
       - task: build
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}'
+
+  test-workflow-hash-go-unit-inputs:
+    desc: Tests hashing of Go unit-test cache inputs
+    cmd: '{{.NIX_RUN}} ./scripts/test_workflow_hash_go_unit_inputs.sh'
+
+  test-workflow-prepare-go-unit-cache:
+    desc: Tests fallback reuse and fixture invalidation for Go unit caching
+    cmd: '{{.NIX_RUN}} ./scripts/test_workflow_prepare_go_unit_cache.sh'
+
+  test-workflow-validate-go-unit-cache:
+    desc: Tests Go unit-test cache validation
+    cmd: '{{.NIX_RUN}} ./scripts/test_workflow_validate_go_unit_cache.sh'
 
   update-go-version:
     desc: "Updates go version directives across all modules. Usage: task update-go-version -- <version> (e.g. 1.25.7)"
