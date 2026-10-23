@@ -100,6 +100,7 @@ var (
 	errInvalidSignerConfig                    = fmt.Errorf("only one of the following flags can be set: %s, %s, %s, %s", StakingEphemeralSignerEnabledKey, StakingSignerKeyContentKey, StakingSignerKeyPathKey, StakingRPCSignerEndpointKey)
 	errDiskSpaceOutOfRange                    = fmt.Errorf("out of range [0,%d]", maxDiskSpaceThreshold)
 	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
+	errNegativeMutexProfileFraction           = fmt.Errorf("%s must be >= 0", ProfileContinuousMutexFractionKey)
 )
 
 func getPrimaryNetworkSnowConfig(v *viper.Viper) *snowball.Parameters {
@@ -692,13 +693,17 @@ func getIPConfig(v *viper.Viper) (node.IPConfig, error) {
 
 func getProfilerConfig(v *viper.Viper) (profiler.Config, error) {
 	config := profiler.Config{
-		Dir:         getExpandedArg(v, ProfileDirKey),
-		Enabled:     v.GetBool(ProfileContinuousEnabledKey),
-		Freq:        v.GetDuration(ProfileContinuousFreqKey),
-		MaxNumFiles: v.GetInt(ProfileContinuousMaxFilesKey),
+		Dir:                  getExpandedArg(v, ProfileDirKey),
+		Enabled:              v.GetBool(ProfileContinuousEnabledKey),
+		Freq:                 v.GetDuration(ProfileContinuousFreqKey),
+		MaxNumFiles:          v.GetInt(ProfileContinuousMaxFilesKey),
+		MutexProfileFraction: v.GetInt(ProfileContinuousMutexFractionKey),
 	}
 	if config.Freq < 0 {
 		return profiler.Config{}, fmt.Errorf("%s must be >= 0", ProfileContinuousFreqKey)
+	}
+	if config.MutexProfileFraction < 0 {
+		return profiler.Config{}, errNegativeMutexProfileFraction
 	}
 	return config, nil
 }
