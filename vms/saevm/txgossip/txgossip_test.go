@@ -13,6 +13,7 @@ import (
 	"math/rand/v2"
 	"path/filepath"
 	"slices"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -24,6 +25,7 @@ import (
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/eth"
+	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/params"
@@ -43,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -66,9 +69,12 @@ func TestMain(m *testing.M) {
 // SUT is the system under test, primarily the [Set].
 type SUT struct {
 	*Set
-	chain  *blockstest.ChainBuilder
-	wallet *saetest.Wallet
-	exec   *saexec.Executor
+	chain   *blockstest.ChainBuilder
+	wallet  *saetest.Wallet
+	exec    *saexec.Executor
+	hooks   *hookstest.Stub
+	db      ethdb.Database
+	settled *atomic.Pointer[blocks.Block]
 }
 
 func newWallet(tb testing.TB, numAccounts uint) *saetest.Wallet {
@@ -105,6 +111,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 
 	tr, err := saedb.NewTracker(db, saedb.Config{CommitInterval: saedb.DefaultCommitInterval}, genesis.EthBlock().Root(), t.TempDir(), logger)
 	require.NoError(t, err, "saedb.NewTracker()")
+	hooks := hookstest.NewStub(gasTarget)
 	exec, err := saexec.New(
 		genesis,
 		new(atomic.Pointer[blocks.Block]),
@@ -113,7 +120,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 		db,
 		xdb,
 		tr,
-		hookstest.NewStub(gasTarget),
+		hooks,
 		logger,
 		prometheus.NewRegistry(),
 	)
@@ -125,17 +132,29 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 
 	bc := NewBlockChain(exec, src.AsEthBlockSource())
 	pool := newTxPool(t, bc)
-	set, err := NewSet(exec, pool, gossip.BloomSetConfig{})
+	settled := new(atomic.Pointer[blocks.Block])
+	settled.Store(exec.LastExecuted().LastSettled())
+	set, err := NewSet(
+		exec,
+		pool,
+		gossip.BloomSetConfig{},
+		hooks,
+		settled.Load,
+		logger,
+	)
 	require.NoError(t, err, "NewSet()")
 	t.Cleanup(func() {
 		assert.NoErrorf(t, pool.Close(), "%T.Close()", pool)
 	})
 
 	return SUT{
-		Set:    set,
-		chain:  chain,
-		wallet: wallet,
-		exec:   exec,
+		Set:     set,
+		chain:   chain,
+		wallet:  wallet,
+		exec:    exec,
+		hooks:   hooks,
+		db:      db,
+		settled: settled,
 	}
 }
 
@@ -265,6 +284,192 @@ func TestSetRejectsLowGasPerByte(t *testing.T) {
 			require.Equalf(t, tt.wantErr == nil, s.Has(Transaction{tt.tx}.GossipID()), "Has(GossipID()) after %s", tt.name)
 		})
 	}
+}
+
+var errNotAdmitted = errors.New("not admitted")
+
+func signTransfer(t *testing.T, s SUT, account int) *types.Transaction {
+	t.Helper()
+	return s.wallet.SetNonceAndSign(t, account, &types.DynamicFeeTx{
+		To:        &common.Address{},
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(100),
+		GasTipCap: big.NewInt(1),
+	})
+}
+
+// rejectZeroBalance rejects a sender whose settled balance reads as zero, as a
+// failed read of an allowlist role would.
+func rejectZeroBalance(
+	from common.Address,
+	_ *types.Transaction,
+	settled hook.SettledView,
+) error {
+	if settled.State.GetBalance(from).IsZero() {
+		return errNotAdmitted
+	}
+	return nil
+}
+
+type settledBlock int
+
+const (
+	ownGenesis settledBlock = iota
+	noSettledBlock
+	foreignState        // a genesis whose state is absent from the SUT's database
+	foreignRootNodeOnly // only that genesis's root node is copied, so reads miss nodes
+)
+
+func TestSetAdmission(t *testing.T) {
+	const (
+		allowed = 0
+		blocked = 1
+	)
+	tests := []struct {
+		name     string
+		sender   int
+		rpc      bool
+		settled  settledBlock
+		unsigned bool
+		wantErr  error
+	}{
+		{
+			name:   "gossip/allowed",
+			sender: allowed,
+		},
+		{
+			name:    "gossip/blocked",
+			sender:  blocked,
+			wantErr: errNotAdmitted,
+		},
+		{
+			name:   "rpc/allowed",
+			sender: allowed,
+			rpc:    true,
+		},
+		{
+			name:    "rpc/blocked",
+			sender:  blocked,
+			rpc:     true,
+			wantErr: errNotAdmitted,
+		},
+		{
+			name:    "no_settled_block",
+			sender:  blocked,
+			settled: noSettledBlock,
+		},
+		{
+			name:    "settled_state_missing",
+			sender:  allowed,
+			settled: foreignState,
+		},
+		{
+			name:    "settled_trie_node_missing",
+			sender:  allowed,
+			settled: foreignRootNodeOnly,
+		},
+		{
+			name:     "invalid_sender",
+			unsigned: true,
+			wantErr:  txpool.ErrInvalidSender,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newSUT(t, 2)
+			s.hooks.AdmitTransactionFn = func(
+				from common.Address,
+				tx *types.Transaction,
+				settled hook.SettledView,
+			) error {
+				if from == s.wallet.Addresses()[blocked] {
+					return errNotAdmitted
+				}
+				return rejectZeroBalance(from, tx, settled)
+			}
+			switch tt.settled {
+			case noSettledBlock:
+				s.settled.Store(nil)
+			case foreignState, foreignRootNodeOnly:
+				// Balances differ from the SUT's genesis so no trie node is shared.
+				foreignDB := rawdb.NewMemoryDatabase()
+				alloc := types.GenesisAlloc{
+					s.wallet.Addresses()[allowed]: {Balance: big.NewInt(1)},
+					common.Address{0x01}:          {Balance: big.NewInt(1)},
+				}
+				foreign := blockstest.NewGenesis(t, foreignDB, saetest.ChainConfig(), alloc)
+				if tt.settled == foreignRootNodeOnly {
+					root := foreign.PostExecutionStateRoot()
+					node, err := foreignDB.Get(root[:])
+					require.NoError(t, err, "%T.Get(root)", foreignDB)
+					require.NoError(t, s.db.Put(root[:], node), "%T.Put(root)", s.db)
+				}
+				s.settled.Store(foreign)
+			}
+
+			tx := signTransfer(t, s, tt.sender)
+			if tt.unsigned {
+				tx = types.NewTx(&types.DynamicFeeTx{
+					ChainID:   tx.ChainId(),
+					To:        tx.To(),
+					Gas:       tx.Gas(),
+					GasFeeCap: tx.GasFeeCap(),
+					GasTipCap: tx.GasTipCap(),
+				})
+			}
+			var err error
+			if tt.rpc {
+				err = s.SendTx(t.Context(), tx)
+			} else {
+				err = s.Add(Transaction{tx})
+			}
+			require.ErrorIs(t, err, tt.wantErr, "adding transaction")
+			require.Equal(t, tt.wantErr == nil, s.Has(Transaction{tx}.GossipID()), "Has(GossipID())")
+		})
+	}
+}
+
+func TestSetSkipsAdmissionOfKnownTransaction(t *testing.T) {
+	s := newSUT(t, 1)
+	var blocked bool
+	s.hooks.AdmitTransactionFn = func(
+		common.Address,
+		*types.Transaction,
+		hook.SettledView,
+	) error {
+		if blocked {
+			return errNotAdmitted
+		}
+		return nil
+	}
+
+	tx := signTransfer(t, s, 0)
+	require.NoError(t, s.Add(Transaction{tx}), "Add() while admitted")
+	blocked = true
+	require.NoError(t, s.Add(Transaction{tx}), "Add() of a known transaction after its sender is blocked")
+}
+
+func TestSetConcurrentAdmission(t *testing.T) {
+	const (
+		numAccounts   = 64
+		txsPerAccount = 4
+	)
+	s := newSUT(t, numAccounts)
+	s.hooks.AdmitTransactionFn = rejectZeroBalance
+
+	txs := make([]*types.Transaction, 0, numAccounts*txsPerAccount)
+	for range txsPerAccount {
+		for i := range numAccounts {
+			txs = append(txs, signTransfer(t, s, i))
+		}
+	}
+	var wg sync.WaitGroup
+	for _, tx := range txs {
+		wg.Go(func() {
+			assert.NoError(t, s.Add(Transaction{tx}), "Add()")
+		})
+	}
+	wg.Wait()
 }
 
 func TestExecutorIntegration(t *testing.T) {

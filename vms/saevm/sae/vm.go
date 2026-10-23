@@ -179,7 +179,15 @@ func NewVM[T hook.Transaction](
 	)
 
 	// ==========  Mempool & P2P Gossip  ==========
-	pool, mempoolClosers, err := newGossipMempool(cfg.MempoolConfig, snowCtx, network, exec, ethBlockSource(consensusCritical, db), reg)
+	pool, mempoolClosers, err := newGossipMempool(
+		cfg.MempoolConfig,
+		snowCtx,
+		network,
+		exec,
+		hooks,
+		ethBlockSource(consensusCritical, db),
+		reg,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -248,6 +256,7 @@ func newGossipMempool(
 	snowCtx *snow.Context,
 	network *network.Network,
 	exec *saexec.Executor,
+	hooks hook.Points,
 	blockSource saetypes.BlockSource,
 	reg prometheus.Registerer,
 ) (_ *txgossip.Set, _ []io.Closer, retErr error) {
@@ -269,7 +278,16 @@ func newGossipMempool(
 		return nil, nil, err
 	}
 	conf := gossip.BloomSetConfig{Metrics: bloomMetrics}
-	mempool, err := txgossip.NewSet(exec, txPool, conf)
+	// Admission is off until the mempool resolves the next block's settled block.
+	noSettled := func() *blocks.Block { return nil }
+	mempool, err := txgossip.NewSet(
+		exec,
+		txPool,
+		conf,
+		hooks,
+		noSettled,
+		snowCtx.Log,
+	)
 	if err != nil {
 		return nil, nil, err
 	}
