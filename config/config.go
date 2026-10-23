@@ -697,7 +697,6 @@ func getProfilerConfig(v *viper.Viper) (profiler.Config, error) {
 		Enabled:     v.GetBool(ProfileContinuousEnabledKey),
 		Freq:        v.GetDuration(ProfileContinuousFreqKey),
 		MaxNumFiles: v.GetInt(ProfileContinuousMaxFilesKey),
-
 		MutexProfileFraction: v.GetInt(ProfileContinuousMutexFractionKey),
 	}
 	if config.Freq < 0 {
