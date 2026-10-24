@@ -20,10 +20,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/unwind"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -116,8 +114,7 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 // child of the last-known accepted block, and a map of all consensus-critical
 // blocks.
 //
-// The [saedb.Tracker] contained within the [saexec.Executor] MUST be closed
-// after the executor.
+// The caller MUST close the returned executor to release its resources.
 func recoverExecutor(
 	ctx context.Context,
 	db ethdb.Database,
@@ -133,52 +130,14 @@ func recoverExecutor(
 	_ *syncMap[common.Hash, *blocks.Block],
 	retErr error,
 ) {
-	var closers unwind.Closers
-	defer closers.CloseIfPointsToNonNil(&retErr)
-
 	rec := &recovery{db, xdb, chainConfig, snowCtx, hooks, cfg}
 
 	lastCommitted, err := rec.lastCommittedBlock()
 	if err != nil {
 		return nil, nil, fmt.Errorf("finding last committed state: %w", err)
 	}
-	lastCommittedRoot := lastCommitted.PostExecutionStateRoot()
 
-	tracker, err := saedb.NewTracker(
-		rec.db,
-		rec.config.DBConfig,
-		lastCommittedRoot,
-		rec.snowCtx.ChainDataDir,
-		rec.snowCtx.Log,
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("saedb.NewTracker(...): %w", err)
-	}
-	closers.Push(unwind.CloserFuncT(tracker.Close, lastCommittedRoot))
-
-	consensusCritical := newSyncMap[common.Hash, *blocks.Block](
-		func(b *blocks.Block) {
-			// A synchronous block settles its own post-execution root, which
-			// the [saexec.Executor] already tracks. The root MAY not exist yet,
-			// making a track here a noop, but the untrack below would still
-			// release a reference.
-			if !b.Synchronous() {
-				tracker.Track(b.SettledStateRoot())
-			}
-			// The post-execution root is tracked by the [saexec.Executor]
-			// as soon as it's known. In the case of database recovery,
-			// this occurred in [recovery.executeAllAccepted].
-		},
-		func(b *blocks.Block) {
-			if !b.Synchronous() {
-				tracker.Untrack(b.SettledStateRoot())
-			}
-			if b.Executed() { // i.e. deleted due to settlement not rejection
-				tracker.Untrack(b.PostExecutionStateRoot())
-			}
-		},
-	)
-
+	consensusCritical := newSyncMap[common.Hash, *blocks.Block]()
 	exec, err := saexec.New(
 		lastCommitted,
 		lastSettled,
@@ -186,7 +145,8 @@ func recoverExecutor(
 		rec.chainConfig,
 		rec.db,
 		rec.xdb,
-		tracker,
+		rec.config.DBConfig,
+		rec.snowCtx.ChainDataDir,
 		rec.hooks,
 		rec.snowCtx.Log,
 		reg,
@@ -194,7 +154,11 @@ func recoverExecutor(
 	if err != nil {
 		return nil, nil, fmt.Errorf("saexec.New(...): %v", err)
 	}
-	closers.Push(exec)
+	defer func() {
+		if retErr != nil {
+			retErr = errors.Join(retErr, exec.Close())
+		}
+	}()
 
 	if err := rec.executeAllAccepted(ctx, exec); err != nil {
 		return nil, nil, fmt.Errorf("executing all previously accepted blocks: %w", err)
@@ -233,9 +197,8 @@ func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Bloc
 
 func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Executor) error {
 	var (
-		after    = exec.LastExecuted()
-		last     = after
-		executed []*blocks.Block
+		after = exec.LastExecuted()
+		last  = after
 	)
 	for b, err := range rec.canonicalAfter(after) {
 		if err != nil {
@@ -244,7 +207,6 @@ func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Execut
 		if err := exec.Enqueue(ctx, b); err != nil {
 			return err
 		}
-		executed = append(executed, b)
 		last = b
 	}
 	// The [saexec.Executor] settles a synchronous block after executing it, so
@@ -263,14 +225,6 @@ func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Execut
 		zap.Uint64("last_accepted_height", last.Height()),
 	)
 
-	// Consensus only requires post-execution state after and including the
-	// last-settled block.
-	keepFrom := hook.SettledHeight(rec.hooks, last.Header())
-	for _, b := range executed {
-		if b.NumberU64() < keepFrom {
-			exec.Tracker.Untrack(b.PostExecutionStateRoot())
-		}
-	}
 	return nil
 }
 
@@ -281,8 +235,7 @@ func lastOf[E any](s []E) E {
 
 // populateConsensusCriticalBlocks populates bMap with all blocks from the last
 // executed back to, and including, the block that it settled. bMap MUST be
-// empty and MUST already have its callbacks bound to the executor's state
-// tracker.
+// empty.
 func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap *syncMap[common.Hash, *blocks.Block]) error {
 	chain := []*blocks.Block{exec.LastExecuted()} // reverse height order
 
