@@ -159,6 +159,7 @@ const (
 	ProposerVMUseCurrentHeightKey                        = "proposervm-use-current-height"
 	ProposerVMMinBlockDelayKey                           = "proposervm-min-block-delay"
 	FdLimitKey                                           = "fd-limit"
+	MemoryLimitRatioKey                                  = "memory-limit-ratio"
 	IndexEnabledKey                                      = "index-enabled"
 	IndexAllowIncompleteKey                              = "index-allow-incomplete"
 	RouterHealthMaxDropRateKey                           = "router-health-max-drop-rate"
