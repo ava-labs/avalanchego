@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/ethtest"
 	"github.com/ava-labs/libevm/params"
 	"github.com/google/go-cmp/cmp"
@@ -32,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
@@ -50,9 +50,17 @@ const (
 
 func newSUT(tb testing.TB, alloc types.GenesisAlloc) SUT {
 	tb.Helper()
+	return newSUTWithConfig(tb, saetest.ChainConfig(), alloc)
+}
+
+func newSUTWithConfig(
+	tb testing.TB,
+	config *params.ChainConfig,
+	alloc types.GenesisAlloc,
+) SUT {
+	tb.Helper()
 
 	db, cache, _ := ethtest.NewEmptyStateDB(tb)
-	config := saetest.ChainConfig()
 
 	genesis := blockstest.NewGenesis(
 		tb,
@@ -668,60 +676,149 @@ func TestStartBlockQueueFullDueToTargetChanges(t *testing.T) {
 	require.ErrorIs(t, err, ErrQueueFull, "StartBlock() with full queue")
 }
 
-func TestCanExecuteTransactionHook(t *testing.T) {
-	config := saetest.ChainConfig()
-	signer := types.LatestSigner(config)
-	const (
-		blocked = iota
-		allowed
-
-		numAccounts
-	)
-	wallet := saetest.NewUNSAFEWallet(t, numAccounts, signer)
-	sut := newSUT(t, saetest.MaxAllocFor(wallet.Addresses()...))
-
+func TestAdmitTransactionHook(t *testing.T) {
+	const blocked, allowed = 0, 1
 	errSenderBlocked := errors.New("sender blocked by allowlist")
-	sut.hooks.CanExecuteTransactionFn = func(from common.Address, _ *common.Address, _ libevm.StateReader) error {
-		if from == wallet.Addresses()[blocked] {
-			return errSenderBlocked
-		}
+	tests := []struct {
+		name           string
+		account        int
+		replay         bool
+		wantErr        error
+		wantNonceAfter uint64
+	}{
+		{
+			name:    "blocked_sender_rejected",
+			account: blocked,
+			wantErr: errSenderBlocked,
+		},
+		{
+			name:           "allowed_sender_accepted",
+			account:        allowed,
+			wantNonceAfter: 1,
+		},
+		{
+			name:           "blocked_sender_replayed_without_admission",
+			account:        blocked,
+			replay:         true,
+			wantNonceAfter: 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wallet := saetest.NewUNSAFEWallet(t, 2, types.LatestSigner(saetest.ChainConfig()))
+			sut := newSUT(t, saetest.MaxAllocFor(wallet.Addresses()...))
+			sut.hooks.AdmitTransactionFn = func(
+				from common.Address,
+				_ *types.Transaction,
+				_ hook.SettledView,
+			) error {
+				if from == wallet.Addresses()[blocked] {
+					return errSenderBlocked
+				}
+				return nil
+			}
+			require.NoError(t, sut.StartBlock(&types.Header{
+				ParentHash: sut.genesis.Hash(),
+				Number:     big.NewInt(1),
+			}), "StartBlock()")
+
+			tx := wallet.SetNonceAndSign(t, tt.account, &types.DynamicFeeTx{
+				GasFeeCap: big.NewInt(1),
+				Gas:       params.TxGas,
+				To:        &common.Address{},
+			})
+			apply := sut.ApplyTx
+			if tt.replay {
+				apply = sut.ReplayTx
+			}
+			require.ErrorIs(t, apply(tx), tt.wantErr, "ApplyTx() or ReplayTx()")
+			assert.Equal(t, tt.wantNonceAfter, sut.State.db.GetNonce(wallet.Addresses()[tt.account]), "sender nonce after applying")
+		})
+	}
+}
+
+func TestAdmitTransactionSeesSettledView(t *testing.T) {
+	config := *saetest.ChainConfig()
+	pragueTime := uint64(1)
+	config.PragueTime = &pragueTime
+	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(&config))
+	sender := wallet.Addresses()[0]
+	// The settled block is the synchronous genesis block.
+	sut := newSUTWithConfig(t, &config, saetest.MaxAllocFor(sender))
+	settledBalance := *sut.State.db.GetBalance(sender)
+
+	var got hook.SettledView
+	sut.hooks.AdmitTransactionFn = func(
+		_ common.Address,
+		_ *types.Transaction,
+		v hook.SettledView,
+	) error {
+		got = v
 		return nil
 	}
 
 	header := &types.Header{
 		ParentHash: sut.genesis.Hash(),
 		Number:     big.NewInt(1),
+		Time:       pragueTime + 1,
 	}
+	require.True(t, config.IsPrague(header.Number, header.Time), "Prague active for the block being built")
 	require.NoError(t, sut.StartBlock(header), "StartBlock()")
+	for range 2 {
+		tx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			GasFeeCap: big.NewInt(1),
+			Gas:       params.TxGas,
+			To:        &common.Address{},
+		})
+		require.NoError(t, sut.ApplyTx(tx), "ApplyTx()")
+	}
+	require.True(t, sut.State.db.GetBalance(sender).Lt(&settledBalance), "worst-case balance debited by the first transaction")
 
+	assert.Equal(t, settledBalance, *got.State.GetBalance(sender), "settled balance seen after a worst-case debit")
+	assert.Equal(t, sut.genesis.Hash(), got.Header.Hash(), "settled header")
+	assert.True(t, got.Rules.IsMerge, "settled rules computed as execution computes them")
+	assert.False(t, got.Rules.IsPrague, "settled rules predate Prague")
+}
+
+var errOpenState = errors.New("opening state")
+
+// failingOpener fails only its failOn-th StateDB call.
+type failingOpener struct {
+	saedb.StateDBOpener
+	calls, failOn int
+}
+
+func (o *failingOpener) StateDB(root common.Hash) (*state.StateDB, error) {
+	o.calls++
+	if o.calls == o.failOn {
+		return nil, errOpenState
+	}
+	return o.StateDBOpener.StateDB(root)
+}
+
+func TestNewStateOpenerErrors(t *testing.T) {
 	tests := []struct {
-		name           string
-		account        int
-		wantErr        error
-		wantNonceAfter uint64
+		name   string
+		failOn int
 	}{
 		{
-			name:           "blocked_sender_rejected",
-			account:        blocked,
-			wantErr:        errSenderBlocked,
-			wantNonceAfter: 0,
+			name:   "worst_case_state_open_fails",
+			failOn: 1,
 		},
 		{
-			name:           "allowed_sender_accepted",
-			account:        allowed,
-			wantErr:        nil,
-			wantNonceAfter: 1,
+			name:   "settled_view_state_open_fails",
+			failOn: 2,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tx := wallet.SetNonceAndSign(t, tt.account, &types.DynamicFeeTx{
-				GasFeeCap: big.NewInt(1),
-				Gas:       params.TxGas,
-				To:        &common.Address{},
-			})
-			require.ErrorIsf(t, sut.ApplyTx(tx), tt.wantErr, "ApplyTx() error")
-			assert.Equalf(t, tt.wantNonceAfter, sut.State.db.GetNonce(wallet.Addresses()[tt.account]), "sender nonce after ApplyTx()")
+			sut := newSUT(t, nil)
+			opener := &failingOpener{
+				StateDBOpener: saetest.NewStateDBOpener(sut.stateCache, nil),
+				failOn:        tt.failOn,
+			}
+			_, err := NewState(sut.hooks, sut.config, sut.genesis, opener)
+			require.ErrorIs(t, err, errOpenState, "NewState()")
 		})
 	}
 }

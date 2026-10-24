@@ -6,6 +6,7 @@ package cchain
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -23,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 )
 
 func TestDelayExponent(t *testing.T) {
@@ -264,4 +266,50 @@ func TestSettledBy(t *testing.T) {
 			require.Equal(t, tt.want, hooks.SettledBy(tt.header), "hooks.SettledBy()")
 		})
 	}
+}
+
+// Drives the builder in the order SAE calls it, so [hookstest.Conformance]
+// fails if the C-Chain changes a header value it must not.
+func TestBuilderConformance(t *testing.T) {
+	key := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
+	parent, err := sut.ethclient.HeaderByNumber(ctx, big.NewInt(0))
+	require.NoError(t, err, "HeaderByNumber(0)")
+	// A sub-second block time, so that dropping its milliseconds is visible.
+	sut.clock.Advance(1500 * time.Millisecond)
+
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	htx, err := newHookTx(stx, sut.ctx.AVAXAssetID)
+	require.NoError(t, err, "newHookTx()")
+
+	build := func(t *testing.T, builder hook.BlockBuilder[*hookTx]) *types.Block {
+		t.Helper()
+
+		hdr, err := builder.BuildHeader(parent)
+		require.NoError(t, err, "BuildHeader()")
+		hdr.Root = parent.Root
+		hdr.GasLimit = parent.GasLimit
+		hdr.BaseFee = parent.BaseFee
+		noBlocks := func(common.Hash, uint64) (*types.Block, bool) {
+			return nil, false
+		}
+		for range builder.PotentialEndOfBlockOps(ctx, hdr, parent.Hash(), noBlocks) {
+		}
+		block, err := builder.BuildBlock(
+			hdr,
+			nil, // blockContext
+			nil, // ethTxs
+			nil, // receipts
+			[]*hookTx{htx},
+			hook.Settled{GasUnix: parent.Time},
+		)
+		require.NoError(t, err, "BuildBlock()")
+		return block
+	}
+
+	hooks := hookstest.Conformance(t, sut.hooks(t))
+	built := build(t, hooks)
+	rebuilder, err := hooks.BlockRebuilderFrom(built)
+	require.NoError(t, err, "BlockRebuilderFrom()")
+	assert.Equal(t, built.Hash(), build(t, rebuilder).Hash(), "rebuilt block hash")
 }

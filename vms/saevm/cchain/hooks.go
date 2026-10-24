@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
@@ -242,7 +241,7 @@ func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
 	return ops, nil
 }
 
-func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
+func (*hooks) AdmitTransaction(common.Address, *types.Transaction, hook.SettledView) error {
 	return nil
 }
 
