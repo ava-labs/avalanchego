@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"math/big"
 	"math/rand/v2"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"os"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -358,6 +360,16 @@ func withArchival() sutOption {
 func withSnapshot() sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.DBConfig.SnapshotCacheMiB = 1
+	})
+}
+
+// withAdmitTransaction sets the admission hook before the VM starts, since the
+// mempool calls it from gossip goroutines.
+func withAdmitTransaction(
+	fn func(common.Address, *types.Transaction, hook.SettledView) error,
+) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks.AdmitTransactionFn = fn
 	})
 }
 
@@ -1374,24 +1386,72 @@ func (s *SUT) transferTx(tb testing.TB, account int) *types.Transaction {
 }
 
 func TestBuildOnUnsettledParent(t *testing.T) {
-	timeOpt, _ := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
-	_, sut := newSUT(t, 2, timeOpt)
-
-	const revoked, other = 0, 1
-	parent := sut.runConsensusLoop(t, sut.transferTx(t, revoked))
-
-	sut.hooks.AdmitTransactionFn = func(
+	var revokedAddr atomic.Pointer[common.Address]
+	admitOpt := withAdmitTransaction(func(
 		from common.Address,
 		_ *types.Transaction,
 		_ hook.SettledView,
 	) error {
-		if from == sut.wallet.Addresses()[revoked] {
+		if r := revokedAddr.Load(); r != nil && from == *r {
 			return errors.New("sender revoked")
 		}
 		return nil
-	}
+	})
+	timeOpt, _ := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	_, sut := newSUT(t, 2, timeOpt, admitOpt)
+
+	const (
+		revoked = 0
+		other   = 1
+	)
+	parent := sut.runConsensusLoop(t, sut.transferTx(t, revoked))
+	revokedAddr.Store(&sut.wallet.Addresses()[revoked])
 
 	// Building and verifying replay the parent, which admission now rejects.
 	b := sut.runConsensusLoop(t, sut.transferTx(t, other))
 	require.Less(t, b.LastSettled().Height(), parent.Height(), "parent MUST be unsettled")
+}
+
+func TestMempoolAdmitsAgainstNextSettledBlock(t *testing.T) {
+	var seenHeight atomic.Uint64
+	admitOpt := withAdmitTransaction(func(
+		_ common.Address,
+		_ *types.Transaction,
+		settled hook.SettledView,
+	) error {
+		seenHeight.Store(settled.Header.Number.Uint64())
+		return nil
+	})
+	timeOpt, clock := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 1, timeOpt, admitOpt)
+
+	b := sut.runConsensusLoop(t, sut.transferTx(t, 0))
+	require.NoError(t, b.WaitUntilExecuted(ctx), "WaitUntilExecuted()")
+	require.NoError(t, sut.SetPreference(ctx, b.ID()), "SetPreference()")
+	// b has executed, but a block built now could not settle it yet.
+	clock.Advance(saeparams.Tau - time.Second)
+
+	// The sentinel fails the assertions below if the mempool skips the hook.
+	seenHeight.Store(math.MaxUint64)
+	sut.mustSendTx(t, sut.transferTx(t, 0))
+	require.Zero(t, seenHeight.Load(), "settled height while the preference is executed but unsettled")
+
+	clock.AdvanceToSettle(ctx, t, b)
+	seenHeight.Store(math.MaxUint64)
+	sut.mustSendTx(t, sut.transferTx(t, 0))
+	require.Equal(t, b.Height(), seenHeight.Load(), "settled height once the preference can settle")
+}
+
+func TestMempoolSkipsAdmissionBeforeTau(t *testing.T) {
+	admitOpt := withAdmitTransaction(func(
+		common.Address,
+		*types.Transaction,
+		hook.SettledView,
+	) error {
+		return errors.New("rejected")
+	})
+	timeOpt, _ := withVMTime(t, time.Unix(saeparams.TauSeconds-1, 0))
+	_, sut := newSUT(t, 1, timeOpt, admitOpt)
+
+	sut.mustSendTx(t, sut.transferTx(t, 0))
 }
