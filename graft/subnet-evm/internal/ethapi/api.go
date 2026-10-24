@@ -35,6 +35,8 @@ import (
 	"math/big"
 	"strings"
 	"time"
+	"bytes"
+	"encoding/json"
 
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
@@ -961,6 +963,24 @@ type OverrideAccount struct {
 	Balance   **hexutil.Big                `json:"balance"`
 	State     *map[common.Hash]common.Hash `json:"state"`
 	StateDiff *map[common.Hash]common.Hash `json:"stateDiff"`
+}
+
+// UnmarshalJSON implements the json.Unmarshaler interface.
+// It uses a strict JSON decoder to return an explicit error if an unsupported
+// state override field (like movePrecompileToAddress) is provided.
+func (o *OverrideAccount) UnmarshalJSON(b []byte) error {
+
+	type alias OverrideAccount
+	dec := json.NewDecoder(bytes.NewReader(b))
+
+	dec.DisallowUnknownFields()
+	
+	var temp alias
+	if err := dec.Decode(&temp); err != nil {
+		return err
+	}
+	*o = OverrideAccount(temp)
+	return nil
 }
 
 // StateOverride is the collection of overridden accounts.

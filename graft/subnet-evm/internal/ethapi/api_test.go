@@ -40,6 +40,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
+	"strings"
 	"time"
 
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
@@ -2052,6 +2053,29 @@ func TestRPCGetBlockReceipts(t *testing.T) {
 			continue
 		}
 		testRPCResponseWithFile(t, i, result, "eth_getBlockReceipts", tt.file)
+	}
+}
+
+func TestOverrideAccount_UnmarshalUnknownField(t *testing.T) {
+	// 1. Valid case: only supported fields 
+	validJSON := []byte(`{"nonce": "0x1", "code": "0x1234"}`)
+	var validAcc OverrideAccount
+	if err := json.Unmarshal(validJSON, &validAcc); err != nil {
+		t.Fatalf("expected no error for valid json, got: %v", err)
+	}
+
+	// 2. Invalid case: Unsupported field (movePrecompileToAddress) pass 
+	invalidJSON := []byte(`{"nonce": "0x1", "movePrecompileToAddress": "0x0000000000000000000000000000000000000100"}`)
+	var invalidAcc OverrideAccount
+	err := json.Unmarshal(invalidJSON, &invalidAcc)
+	
+	if err == nil {
+		t.Fatal("expected error for unknown field 'movePrecompileToAddress', but got nil")
+	}
+	
+	// Error message check (DisallowUnknownFields usually "unknown field" string return)
+	if !strings.Contains(err.Error(), "unknown field") {
+		t.Errorf("expected 'unknown field' error message, got: %v", err)
 	}
 }
 
