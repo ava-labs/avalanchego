@@ -52,10 +52,7 @@ func newBlock(metadata common.ProtocolMetadata, blacklist common.Blacklist, vmBl
 		blockTracker: blockTracker,
 		blacklist:    blacklist,
 	}
-	bytes, err := block.Bytes()
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize block: %w", err)
-	}
+	bytes := block.Bytes()
 	block.digest = computeDigest(bytes)
 	return block, nil
 }
@@ -78,22 +75,34 @@ func (b *Block) BlockHeader() common.BlockHeader {
 }
 
 // Bytes returns the serialized bytes of the block.
-func (b *Block) Bytes() ([]byte, error) {
+func (b *Block) Bytes() []byte {
 	cBlock := &canotoSimplexBlock{
 		Metadata:   b.metadata.Bytes(),
 		InnerBlock: b.vmBlock.Bytes(),
 		Blacklist:  b.blacklist.Bytes(),
 	}
 
-	return cBlock.MarshalCanoto(), nil
+	return cBlock.MarshalCanoto()
 }
 
 func (b *Block) Blacklist() common.Blacklist {
 	return b.blacklist
 }
 
+// Size returns the number of bytes in the encoding of the block.
+func (b *Block) Size() int {
+	// TODO: implement
+	return 0
+}
+
+// SealingBlockInfo returns the sealing block info of the block.
+func (b *Block) SealingBlockInfo() *common.SealingBlockInfo {
+	// TODO: implement
+	return nil
+}
+
 // Verify verifies the block.
-func (b *Block) Verify(ctx context.Context) (common.VerifiedBlock, error) {
+func (b *Block) Verify(ctx context.Context, opts ...common.VerifyOptions) (common.VerifiedBlock, error) {
 	// we should not verify the genesis block
 	if b.metadata.Seq == 0 {
 		return nil, errGenesisVerification
