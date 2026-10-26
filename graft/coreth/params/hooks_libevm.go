@@ -16,7 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
@@ -155,7 +155,7 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 		}
 		var predicateResults predicate.BlockResults
 		rules := GetRulesExtra(env.Rules()).AvalancheRules
-		if predicateResultsBytes := customheader.PredicateBytesFromExtra(rules, header.Extra); len(predicateResultsBytes) > 0 {
+		if predicateResultsBytes := customtypes.PredicateBytesFromExtra(rules, header.Extra); len(predicateResultsBytes) > 0 {
 			predicateResults, err = predicate.ParseBlockResults(predicateResultsBytes)
 			if err != nil {
 				panic(err) // Should never happen, as results are already validated in block validation

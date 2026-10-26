@@ -18,7 +18,7 @@ go_library(
     deps = [
         "//graft/coreth/nativeasset",
         "//graft/coreth/params/extras",
-        "//graft/coreth/plugin/evm/customheader",
+        "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/modules",
         "//graft/coreth/precompile/precompileconfig",

@@ -156,7 +156,7 @@ func TestEngineInterfaceNoOps(t *testing.T) {
 	require.NoError(t, engine.PushQuery(ctx, nodeID, 0, nil, 0))
 
 	// common.ChitsHandler
-	require.NoError(t, engine.Chits(ctx, nodeID, 0, containerID, containerID, containerID, 0))
+	require.NoError(t, engine.Chits(ctx, nodeID, 0, containerID, containerID, 0))
 	require.NoError(t, engine.QueryFailed(ctx, nodeID, 0))
 
 	// common.AppHandler

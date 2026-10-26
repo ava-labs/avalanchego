@@ -63,7 +63,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
-	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
@@ -3424,17 +3423,19 @@ func deployContract(ctx context.Context, t *testing.T, vm *VM, gasPrice *big.Int
 }
 
 func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
+	targetBlockRate := int64(extras.DefaultFeeConfig.TargetBlockRate)
+
 	ctx := t.Context()
 	tests := []struct {
-		name                  string
-		fork                  upgradetest.Fork
-		deployGasPrice        *big.Int
-		txGasPrice            *big.Int
-		preDeployTime         int64
-		setTime               int64
-		refillCapacityFortuna bool
-		wantIncluded          bool
-		wantReceiptStatus     uint64
+		name                string
+		fork                upgradetest.Fork
+		deployGasPrice      *big.Int
+		txGasPrice          *big.Int
+		preDeployTime       int64
+		setTime             int64
+		waitOutBlockGasCost bool
+		wantIncluded        bool
+		wantReceiptStatus   uint64
 	}{
 		{
 			name:           "granite_should_revert",
@@ -3442,28 +3443,26 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 			deployGasPrice: big.NewInt(testMinGasPrice),
 			txGasPrice:     big.NewInt(testMinGasPrice),
 			// Time is irrelevant as only the fork dictates the logic
-			refillCapacityFortuna: false,
-			wantIncluded:          true,
-			wantReceiptStatus:     types.ReceiptStatusFailed,
+			wantIncluded:      true,
+			wantReceiptStatus: types.ReceiptStatusFailed,
 		},
 		{
-			name:                  "fortuna_post_cutoff_should_invalidate",
-			fork:                  upgradetest.Fortuna,
-			deployGasPrice:        big.NewInt(testMinGasPrice),
-			txGasPrice:            big.NewInt(testMinGasPrice),
-			setTime:               params.InvalidateDelegateUnix + 1,
-			refillCapacityFortuna: true,
-			wantIncluded:          false,
+			name:                "fortuna_post_cutoff_should_invalidate",
+			fork:                upgradetest.Fortuna,
+			deployGasPrice:      big.NewInt(testMinGasPrice),
+			txGasPrice:          big.NewInt(testMinGasPrice),
+			setTime:             params.InvalidateDelegateUnix + 1,
+			waitOutBlockGasCost: true,
+			wantIncluded:        false,
 		},
 		{
-			name:                  "fortuna_pre_cutoff_should_succeed",
-			fork:                  upgradetest.Fortuna,
-			deployGasPrice:        big.NewInt(testMinGasPrice),
-			txGasPrice:            big.NewInt(testMinGasPrice),
-			preDeployTime:         params.InvalidateDelegateUnix - acp176.TimeToFillCapacity - 1,
-			refillCapacityFortuna: true,
-			wantIncluded:          true,
-			wantReceiptStatus:     types.ReceiptStatusSuccessful,
+			name:              "fortuna_pre_cutoff_should_succeed",
+			fork:              upgradetest.Fortuna,
+			deployGasPrice:    big.NewInt(testMinGasPrice),
+			txGasPrice:        big.NewInt(testMinGasPrice),
+			preDeployTime:     params.InvalidateDelegateUnix - 1,
+			wantIncluded:      true,
+			wantReceiptStatus: types.ReceiptStatusSuccessful,
 		},
 	}
 
@@ -3495,13 +3494,13 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 				vm.clock.Set(time.Unix(tt.setTime, 0))
 			}
 
-			if tt.refillCapacityFortuna {
-				// Ensure gas capacity is refilled relative to the parent block's timestamp
+			if tt.waitOutBlockGasCost {
+				// Pre-Granite, a block built less than TargetBlockRate after its parent
+				// must cover a block gas cost with tips, which an empty block can't.
 				parent := vm.blockChain.CurrentBlock()
-				parentTime := time.Unix(int64(parent.Time), 0)
-				minRefillTime := parentTime.Add(acp176.TimeToFillCapacity * time.Second)
-				if vm.clock.Time().Before(minRefillTime) {
-					vm.clock.Set(minRefillTime)
+				minTime := time.Unix(int64(parent.Time)+targetBlockRate, 0)
+				if vm.clock.Time().Before(minTime) {
+					vm.clock.Set(minTime)
 				}
 			}
 

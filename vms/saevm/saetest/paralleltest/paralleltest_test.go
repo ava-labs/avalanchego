@@ -165,6 +165,7 @@ func TestNewExecutor(t *testing.T) {
 			BlockNumber:       b.Number(),
 			TxHash:            txs[i],
 			GasUsed:           gasLimit,
+			GasExecuted:       gasLimit, // == GasUsed because no [params.RulesHooks.MinimumGasConsumption]
 			CumulativeGasUsed: gasLimit,
 		}
 		if shouldRevert(want.TxHash) {

@@ -21,7 +21,7 @@ var (
 	ErrNilTransferableFxOutput = errors.New("nil transferable feature extension output is not valid")
 	ErrOutputsNotSorted        = errors.New("outputs not sorted")
 
-	ErrNilTransferableInput   = errors.New("nil transferable input is not valid")
+	errNilTransferableInput   = errors.New("nil transferable input is not valid")
 	ErrNilTransferableFxInput = errors.New("nil transferable feature extension input is not valid")
 	ErrInputsNotSortedUnique  = errors.New("inputs not sorted and unique")
 
@@ -38,19 +38,11 @@ type Amounter interface {
 	Amount() uint64
 }
 
-// Coster is a data structure that has a cost associated with it
-type Coster interface {
-	// Cost returns how much this element costs to be included in its
-	// transaction.
-	Cost() (uint64, error)
-}
-
 // TransferableIn is the interface a feature extension must provide to transfer
 // value between features extensions.
 type TransferableIn interface {
 	verify.Verifiable
 	Amounter
-	Coster
 }
 
 // TransferableOut is the interface a feature extension must provide to transfer
@@ -153,7 +145,7 @@ func (in *TransferableInput) Input() TransferableIn {
 func (in *TransferableInput) Verify() error {
 	switch {
 	case in == nil:
-		return ErrNilTransferableInput
+		return errNilTransferableInput
 	case in.In == nil:
 		return ErrNilTransferableFxInput
 	default:

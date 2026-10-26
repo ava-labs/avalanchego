@@ -46,6 +46,7 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 | `snapshot-cache` | int | Size of the snapshot disk layer clean cache in MB. | `256` |
 | `allow-missing-tries` | bool | Suppress warnings about an incomplete trie index. | `false` |
 | `state-scheme` | string | EXPERIMENTAL: specifies the database scheme used to store state data; either `hash` or `firewood`. | `hash` |
+| `state-history` | uint64 | Number of recently executed states to guarantee available in memory. The minimum possible value is the default. | `128` |
 
 ## Transaction Pool
 
@@ -63,6 +64,7 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 | `allow-unprotected-txs` | bool | Allow unprotected transactions (without EIP-155 replay protection). | `false` |
 | `batch-request-limit` | uint64 | Maximum number of requests that can be batched in an RPC call (`0` = no limit). | `1000` |
 | `api-max-duration` | duration | Maximum duration of each call to the `/rpc` and `/ws` endpoints. A call that times out doesn't close its WebSocket connection. Accepts a [Go duration string](https://pkg.go.dev/time#ParseDuration), such as `"30s"`. Non-positive values result in no limit. | `0` |
+| `api-max-blocks-per-request` | uint64 | Maximum number of blocks per `eth_getLogs` request (`0` = no limit). | `0` |
 | `api-resolve-pending-to-last-executed` | bool | Requests for the "pending" block return the last-executed instead of the last-accepted to allow compatibility with EVM-ecosystem tooling that expect the pending block to have post-execution artefacts. | `true` |
 
 ### Available APIs
