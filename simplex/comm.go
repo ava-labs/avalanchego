@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/simplex"
+	simplexcommon "github.com/ava-labs/simplex/common"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -20,18 +20,18 @@ import (
 )
 
 var (
-	_               simplex.Communication = (*Comm)(nil)
+	_               simplexcommon.Communication = (*Comm)(nil)
 	errNodeNotFound                       = errors.New("node not found in the validator list")
 )
 
 type Comm struct {
-	logger   simplex.Logger
+	logger   simplexcommon.Logger
 	subnetID ids.ID
 	chainID  ids.ID
 	// broadcastNodes are the nodes that should receive broadcast messages
 	broadcastNodes set.Set[ids.NodeID]
 	// allNodes are the IDs of all the nodes in the subnet
-	allNodes []simplex.NodeID
+	allNodes []simplexcommon.NodeID
 
 	// sender is used to send messages to other nodes
 	sender     sender.ExternalSender
@@ -40,7 +40,7 @@ type Comm struct {
 
 func NewComm(config *Config) (*Comm, error) {
 	broadcastNodes := set.NewSet[ids.NodeID](len(config.Params.InitialValidators) - 1)
-	allNodes := make([]simplex.NodeID, 0, len(config.Params.InitialValidators))
+	allNodes := make([]simplexcommon.NodeID, 0, len(config.Params.InitialValidators))
 
 	includesOurNodeID := false
 	// grab all the nodes that are validators for the subnet
@@ -74,11 +74,11 @@ func NewComm(config *Config) (*Comm, error) {
 	}, nil
 }
 
-func (c *Comm) Nodes() []simplex.NodeID {
+func (c *Comm) Nodes() []simplexcommon.NodeID {
 	return c.allNodes
 }
 
-func (c *Comm) Send(msg *simplex.Message, destination simplex.NodeID) {
+func (c *Comm) Send(msg *simplexcommon.Message, destination simplexcommon.NodeID) {
 	outboundMsg, err := c.simplexMessageToOutboundMessage(msg)
 	if err != nil {
 		c.logger.Error("Failed creating message", zap.Error(err))
@@ -99,7 +99,7 @@ func (c *Comm) Send(msg *simplex.Message, destination simplex.NodeID) {
 	c.sender.Send(outboundMsg, common.SendConfig{NodeIDs: set.Of(dest)}, c.subnetID, subnets.NoOpAllower)
 }
 
-func (c *Comm) Broadcast(msg *simplex.Message) {
+func (c *Comm) Broadcast(msg *simplexcommon.Message) {
 	outboundMsg, err := c.simplexMessageToOutboundMessage(msg)
 	if err != nil {
 		c.logger.Error("Failed creating message", zap.Error(err))
@@ -109,7 +109,7 @@ func (c *Comm) Broadcast(msg *simplex.Message) {
 	c.sender.Send(outboundMsg, common.SendConfig{NodeIDs: c.broadcastNodes}, c.subnetID, subnets.NoOpAllower)
 }
 
-func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (*message.OutboundMessage, error) {
+func (c *Comm) simplexMessageToOutboundMessage(msg *simplexcommon.Message) (*message.OutboundMessage, error) {
 	var simplexMsg *p2p.Simplex
 	switch {
 	case msg.VerifiedBlockMessage != nil:

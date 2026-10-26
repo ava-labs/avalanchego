@@ -10,7 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/simplex"
+	simplexcommon "github.com/ava-labs/simplex/common"
+	"github.com/ava-labs/simplex/simplex"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -218,7 +219,7 @@ func (e *Engine) Simplex(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simple
 	return e.epoch.HandleMessage(simplexMsg, nodeID[:])
 }
 
-func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*simplex.Message, error) {
+func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*simplexcommon.Message, error) {
 	if msg == nil {
 		return nil, errNilField
 	}
