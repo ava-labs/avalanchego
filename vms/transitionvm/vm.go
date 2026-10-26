@@ -13,6 +13,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
@@ -20,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -43,6 +45,7 @@ type VM struct {
 	preTransitionChain  Chain
 	postTransitionChain Chain
 	transitionTime      time.Time
+	now                 func() time.Time
 	apiDrainTimeout     time.Duration
 
 	// chain parameters
@@ -60,7 +63,7 @@ type VM struct {
 	consensusState utils.Atomic[snow.State]
 	preferenceSet  utils.Atomic[bool]
 	connections    *connections
-	httpHandlers   *httpHandlers
+	httpHandlers   *api.MutableHTTPHandlers
 	current        *current
 }
 
@@ -107,7 +110,7 @@ func (vm *VM) Initialize(
 	vm.appSender = appSender
 
 	vm.connections = newConnections()
-	vm.httpHandlers = newHTTPHandlers()
+	vm.httpHandlers = api.NewMutableHTTPHandlers()
 
 	log := preChainCtx.Log
 	log.Info("checking for transition marker")
@@ -141,7 +144,33 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("loading last accepted block %s: %w", lastAcceptedID, err)
 	}
 	if lastAccepted.Timestamp().Before(vm.transitionTime) {
-		return nil
+		if vm.now().Before(vm.transitionTime) {
+			return nil
+		}
+		// Transitioning is only safe once the network has sequenced at least
+		// one commit interval of blocks after the transition, so peers have a
+		// post-transition summary to serve. The production networks are known
+		// to satisfy this; a custom network may not, so it waits for the
+		// transition block instead.
+		if !constants.ProductionNetworkIDs.Contains(preChainCtx.NetworkID) {
+			log.Info("past transition time on a non-production network; waiting for the transition block")
+			return nil
+		}
+		// The network is past the transition time, so peers only serve the
+		// post-transition chain's state summaries.
+		if lastAccepted.Height() > 0 {
+			log.Info("past transition time with accepted pre-transition blocks; waiting for the transition block")
+			return nil
+		}
+		enabled, err := vm.StateSyncEnabled(ctx)
+		if err != nil {
+			return fmt.Errorf("checking whether the node will state sync: %w", err)
+		}
+		if !enabled {
+			log.Info("past transition time but not state syncing; waiting for the transition block")
+			return nil
+		}
+		log.Info("transitioning eagerly to state sync as the post-transition chain")
 	}
 	return vm.transition(ctx, lastAccepted)
 }
@@ -191,10 +220,10 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	// API requests are queued and drained during the transition to prevent APIs
 	// from hitting the pre-transition VM while it is shutting down.
 	log.Info("blocking API requests")
-	vm.httpHandlers.block()
+	vm.httpHandlers.Block()
 	defer func() {
 		log.Info("unblocking API requests")
-		vm.httpHandlers.unblock()
+		vm.httpHandlers.Unblock()
 	}()
 
 	// Draining the in-flight API requests blocks, but does not block forever.
@@ -211,7 +240,7 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	)
 	drainCtx, cancelDrain := context.WithTimeout(ctx, vm.apiDrainTimeout)
 	defer cancelDrain()
-	if err := vm.httpHandlers.drain(drainCtx); err != nil {
+	if err := vm.httpHandlers.Drain(drainCtx); err != nil {
 		log.Warn("abandoning API requests still in flight after drain timeout",
 			zap.String("stack", utils.GetStacktrace(true)),
 			zap.Error(err),
@@ -266,7 +295,7 @@ func (vm *VM) transition(ctx context.Context, last snowman.Block) error {
 	if err != nil {
 		return fmt.Errorf("creating http handlers: %w", err)
 	}
-	vm.httpHandlers.set(newHandlers)
+	vm.httpHandlers.Set(newHandlers)
 
 	if vm.preferenceSet.Get() {
 		// The VM is only notified of preference changes, so if the consensus

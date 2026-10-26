@@ -22,21 +22,21 @@ import (
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 )
 
-// SetInterimExecutionTime is expected to be called during execution of b's
+// SwapInterimExecutionTime is expected to be called during execution of b's
 // transactions, with the highest-known gas time. This MAY be at any resolution
 // but MUST be monotonic.
-func (b *Block) SetInterimExecutionTime(t *proxytime.Time[gas.Gas]) {
-	b.interimExecutionTime.Store(t.Clone())
+//
+// The returned old value is typically only useful for testing.
+func (b *Block) SwapInterimExecutionTime(t *proxytime.Time[gas.Gas]) *proxytime.Time[gas.Gas] {
+	return b.interimExecutionTime.Swap(t.Clone())
 }
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
@@ -88,6 +88,10 @@ func (e *executionResults) setBaseFee(bf *big.Int) error {
 //
 // This method MUST NOT be called more than once. The wall-clock [time.Time] is
 // for metrics only.
+//
+// A synchronous block's header commits to its state and receipts roots, so
+// nothing is written to xdb. If either root differs from the header, an error
+// is returned before anything is written.
 func (b *Block) MarkExecuted(
 	db ethdb.Database,
 	xdb saetypes.ExecutionResults,
@@ -109,9 +113,21 @@ func (b *Block) MarkExecuted(
 		)
 	}
 
+	receiptRoot := types.DeriveSha(receipts, trie.NewStackTrie(nil))
+	// The roots aren't sanity checked during verification for synchronous
+	// blocks, so we do it here.
+	if b.Synchronous() {
+		if want := b.SettledStateRoot(); stateRootPost != want {
+			return fmt.Errorf("synchronous block %d executed to state root %#x, header commits to %#x", b.NumberU64(), stateRootPost, want)
+		}
+		if want := b.SettledReceiptsRoot(); receiptRoot != want {
+			return fmt.Errorf("synchronous block %d executed to receipts root %#x, header commits to %#x", b.NumberU64(), receiptRoot, want)
+		}
+	}
+
 	e := &executionResults{
 		byGas:         *byGas.Clone(),
-		receiptRoot:   types.DeriveSha(receipts, trie.NewStackTrie(nil)),
+		receiptRoot:   receiptRoot,
 		stateRootPost: stateRootPost,
 		ephemeralExecutionResults: ephemeralExecutionResults{
 			byWall:   byWall,
@@ -131,16 +147,18 @@ func (b *Block) MarkExecuted(
 	return b.markExecutedAfterDiskArtefacts(e, lastExecuted)
 }
 
-// markExecutedOnDisk updates the [saetypes.ExecutionResults] and the head block
-// in the database. The batch is `Write()`n (yeah, it's a word now) after all
-// disk artefacts are persisted.
+// markExecutedOnDisk updates the head block in the database, and the
+// [saetypes.ExecutionResults] if the block is asynchronous. The batch is
+// `Write()`n (yeah, it's a word now) after all disk artefacts are persisted.
 func (b *Block) markExecutedOnDisk(batch ethdb.Batch, xdb saetypes.ExecutionResults, e *executionResults) error {
-	n := b.NumberU64()
-	if err := xdb.Put(n, e.MarshalCanoto()); err != nil {
-		return err
-	}
-	if err := xdb.Sync(n, n); err != nil {
-		return err
+	if !b.Synchronous() {
+		n := b.NumberU64()
+		if err := xdb.Put(n, e.MarshalCanoto()); err != nil {
+			return err
+		}
+		if err := xdb.Sync(n, n); err != nil {
+			return err
+		}
 	}
 	b.SetAsHeadBlock(batch)
 	return batch.Write()
@@ -247,40 +265,51 @@ func (b *Block) PostExecutionStateRoot() common.Hash {
 	return executionArtefact(b, "state root", (*executionResults).postExecutionStateRoot)
 }
 
+var ErrMissingExecutionResults = errors.New("missing execution results for asynchronous block")
+
 // RestoreExecutionArtefacts reloads post-execution artefacts persisted by
 // [Block.MarkExecuted] such that the block is in an equivalent state to when
-// said function was originally called.  If no execution results are found in
-// the [saetypes.ExecutionResults], they are instead inferred from the
-// block itself, and the block is marked as synchronous.
+// said function was originally called. Synchronous blocks do not persist
+// execution results, so theirs are inferred from the block itself without
+// consulting the execution-results DB; for asynchronous blocks the results are
+// loaded from the DB. Any failure to obtain the results is reported wrapped in
+// [ErrMissingExecutionResults], alongside the underlying cause.
 //
 // This function does NOT restore the block's settlement state, even if the
 // block is synchronous. The caller MUST mark the block as settled if and when
-// appropriate. Because this function breaks this invariant, any consumer
-// SHOULD consider using [RestoreSettledBlock] instead, if possible.
+// appropriate. Because this function breaks this invariant, any consumer SHOULD
+// consider using [RestoreSettledBlock] instead, if possible.
 //
 // Any error returned corrupts the block's in-memory state.
-func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
-	e, err := loadExecutionResults(xdb, b.NumberU64())
-	if errors.Is(err, database.ErrNotFound) {
-		e, err = b.synchronousExecutionResults(hooks)
-		b.synchronous = true
+func (b *Block) RestoreExecutionArtefacts(db ethdb.Database, xdb saetypes.ExecutionResults, chainConfig *params.ChainConfig) error {
+	var (
+		e   *executionResults
+		err error
+	)
+	if b.Synchronous() {
+		e, err = b.synchronousExecutionResults()
+	} else {
+		e, err = loadExecutionResults(xdb, b.NumberU64())
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: block %d (%#x): %w", ErrMissingExecutionResults, b.NumberU64(), b.Hash(), err)
 	}
 
-	e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), b.NumberU64())
-	if err := e.receipts.DeriveFields(
-		chainConfig,
-		b.Hash(),
-		b.NumberU64(),
-		b.BuildTime(),
-		e.baseFee.ToBig(),
-		nil, // SAE does not support blob transactions.
-		b.Transactions(),
-	); err != nil {
-		return fmt.Errorf("deriving receipt fields: %v", err)
+	if e.receiptRoot != types.EmptyReceiptsHash {
+		e.receipts = rawdb.ReadRawReceipts(db, b.Hash(), b.NumberU64())
+		if err := e.receipts.DeriveFields(
+			chainConfig,
+			b.Hash(),
+			b.NumberU64(),
+			b.BuildTime(),
+			e.baseFee.ToBig(),
+			nil, // SAE does not support blob transactions.
+			b.Transactions(),
+		); err != nil {
+			return fmt.Errorf("deriving receipt fields: %v", err)
+		}
 	}
+
 	return b.markExecutedAfterDiskArtefacts(e, nil)
 }
 
@@ -288,42 +317,40 @@ func (b *Block) RestoreExecutionArtefacts(hooks hook.Points, db ethdb.Database, 
 // synchronous block. Unlike asynchronously executed blocks, synchronous blocks
 // do not persist their execution results in the [saetypes.ExecutionResults]
 // database, thus they are extracted from the header.
-func (b *Block) synchronousExecutionResults(hooks hook.Points) (*executionResults, error) {
+func (b *Block) synchronousExecutionResults() (*executionResults, error) {
 	// Target, excess, and config _after_ are a requirement of
-	// [Block.MarkExecuted], as provided by [Block.WorstCaseGasTime].
-	execTime, err := b.WorstCaseGasTime(hooks)
+	// [Block.MarkExecuted], as provided by [Block.SynchronousGasTime].
+	execTime, err := b.SynchronousGasTime()
 	if err != nil {
 		return nil, err
 	}
 
-	ethB := b.EthBlock()
 	e := &executionResults{
 		byGas:         *execTime.Clone(),
-		receiptRoot:   ethB.ReceiptHash(),
-		stateRootPost: ethB.Root(),
-		// receipts are populated in [Block.restoreExecutionArtefacts], which
+		receiptRoot:   b.SettledReceiptsRoot(),
+		stateRootPost: b.SettledStateRoot(),
+		// receipts are populated in [Block.RestoreExecutionArtefacts], which
 		// calls this method, because this logic is shared.
 	}
 	e.baseFee.SetUint64(b.headerBaseFee())
 	return e, nil
 }
 
-// WorstCaseGasTime reconstructs the worst-case gas time that the block
-// committed to, from its base fee and the gas config after the block.
-func (b *Block) WorstCaseGasTime(hooks hook.Points) (*gastime.Time, error) {
-	hdr := b.Header()
-	target, cfg := hooks.GasConfigAfter(hdr)
+// SynchronousGasTime derives the gas time of b from its header. b MUST be
+// synchronous. Inverting the base fee only approximates the excess.
+func (b *Block) SynchronousGasTime() (*gastime.Time, error) {
+	target, cfg := b.hooks.GasConfigAfter(b.Header())
 	return gastime.New(
-		hooks.BlockTime(hdr),
+		b.PreciseTime(),
 		target,
 		gas.Price(b.headerBaseFee()),
 		cfg,
 	)
 }
 
-// headerBaseFee returns the block's base fee, which MAY be nil (a pre-SAE
-// header). The base fee is capped at [math.MaxUint64] but any reasonable
-// implementation has a base fee much less than [math.MaxUint64].
+// headerBaseFee returns the block's base fee, as a uint64. If the base fee is
+// nil (a pre-SAE header), 0 is returned. Additionally, the base fee is capped
+// at [math.MaxUint64] which should still handle all reasonable values.
 func (b *Block) headerBaseFee() uint64 {
 	switch bf := b.EthBlock().BaseFee(); {
 	case bf == nil:
@@ -345,26 +372,4 @@ func loadExecutionResults(xdb saetypes.ExecutionResults, blockNum uint64) (*exec
 		return nil, err
 	}
 	return e, nil
-}
-
-func persistedExecutionArtefact[T any](xdb saetypes.ExecutionResults, blockNum uint64, get func(*executionResults) T) (T, error) {
-	e, err := loadExecutionResults(xdb, blockNum)
-	if err != nil {
-		var zero T
-		return zero, err
-	}
-	return get(e), nil
-}
-
-// PostExecutionStateRoot returns the post-execution state root of a block,
-// without requiring a full [Block].
-func PostExecutionStateRoot(xdb saetypes.ExecutionResults, blockNum uint64) (common.Hash, error) {
-	return persistedExecutionArtefact(xdb, blockNum, (*executionResults).postExecutionStateRoot)
-}
-
-// ExecutionBaseFee returns the base fee after execution of the block without
-// requiring a full [Block]. It returns the base fee when the block was executed
-// (as against the worst-case prediction).
-func ExecutionBaseFee(xdb saetypes.ExecutionResults, blockNum uint64) (*uint256.Int, error) {
-	return persistedExecutionArtefact(xdb, blockNum, (*executionResults).cloneBaseFee)
 }

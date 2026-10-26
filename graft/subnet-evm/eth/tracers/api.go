@@ -1106,6 +1106,10 @@ func overrideConfig(original *params.ChainConfig, override *params.ChainConfig) 
 		params.GetExtra(copy).HeliconTimestamp = timestamp
 		canon = false
 	}
+	if timestamp := overrideExtra.IglooTimestamp; timestamp != nil {
+		params.GetExtra(copy).IglooTimestamp = timestamp
+		canon = false
+	}
 	if timestamp := override.CancunTime; timestamp != nil {
 		copy.CancunTime = timestamp
 		canon = false

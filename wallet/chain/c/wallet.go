@@ -1,16 +1,18 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// TODO: Add unit tests for the C-Chain wallet, builder, signer, and backend.
+
 package c
 
 import (
-	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/client"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
@@ -35,7 +37,7 @@ type Wallet interface {
 		chainID ids.ID,
 		to ethcommon.Address,
 		options ...common.Option,
-	) (*atomic.Tx, error)
+	) (*tx.Tx, error)
 
 	// IssueExportTx creates, signs, and issues an export transaction that
 	// attempts to send all the provided [outputs] to the requested [chainID].
@@ -46,17 +48,17 @@ type Wallet interface {
 		chainID ids.ID,
 		outputs []*secp256k1fx.TransferOutput,
 		options ...common.Option,
-	) (*atomic.Tx, error)
+	) (*tx.Tx, error)
 
-	// IssueUnsignedAtomicTx signs and issues the unsigned tx.
-	IssueUnsignedAtomicTx(
-		utx atomic.UnsignedAtomicTx,
+	// IssueUnsignedTx signs and issues the unsigned tx.
+	IssueUnsignedTx(
+		utx tx.Unsigned,
 		options ...common.Option,
-	) (*atomic.Tx, error)
+	) (*tx.Tx, error)
 
-	// IssueAtomicTx issues the signed tx.
-	IssueAtomicTx(
-		tx *atomic.Tx,
+	// IssueTx issues the signed tx.
+	IssueTx(
+		t *tx.Tx,
 		options ...common.Option,
 	) error
 }
@@ -64,8 +66,8 @@ type Wallet interface {
 func NewWallet(
 	builder Builder,
 	signer Signer,
-	avaxClient *client.Client,
-	ethClient *ethclient.Client,
+	avaxClient *cchain.Client,
+	ethClient *evmclient.Client,
 	backend Backend,
 ) Wallet {
 	return &wallet{
@@ -81,8 +83,8 @@ type wallet struct {
 	Backend
 	builder    Builder
 	signer     Signer
-	avaxClient *client.Client
-	ethClient  *ethclient.Client
+	avaxClient *cchain.Client
+	ethClient  *evmclient.Client
 }
 
 func (w *wallet) Builder() Builder {
@@ -97,7 +99,7 @@ func (w *wallet) IssueImportTx(
 	chainID ids.ID,
 	to ethcommon.Address,
 	options ...common.Option,
-) (*atomic.Tx, error) {
+) (*tx.Tx, error) {
 	baseFee, err := w.baseFee(options)
 	if err != nil {
 		return nil, err
@@ -107,14 +109,14 @@ func (w *wallet) IssueImportTx(
 	if err != nil {
 		return nil, err
 	}
-	return w.IssueUnsignedAtomicTx(utx, options...)
+	return w.IssueUnsignedTx(utx, options...)
 }
 
 func (w *wallet) IssueExportTx(
 	chainID ids.ID,
 	outputs []*secp256k1fx.TransferOutput,
 	options ...common.Option,
-) (*atomic.Tx, error) {
+) (*tx.Tx, error) {
 	baseFee, err := w.baseFee(options)
 	if err != nil {
 		return nil, err
@@ -124,34 +126,35 @@ func (w *wallet) IssueExportTx(
 	if err != nil {
 		return nil, err
 	}
-	return w.IssueUnsignedAtomicTx(utx, options...)
+	return w.IssueUnsignedTx(utx, options...)
 }
 
-func (w *wallet) IssueUnsignedAtomicTx(
-	utx atomic.UnsignedAtomicTx,
+func (w *wallet) IssueUnsignedTx(
+	utx tx.Unsigned,
 	options ...common.Option,
-) (*atomic.Tx, error) {
+) (*tx.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	tx, err := SignUnsignedAtomic(ctx, w.signer, utx)
+	t, err := SignUnsigned(ctx, w.signer, utx)
 	if err != nil {
 		return nil, err
 	}
 
-	return tx, w.IssueAtomicTx(tx, options...)
+	return t, w.IssueTx(t, options...)
 }
 
-func (w *wallet) IssueAtomicTx(
-	tx *atomic.Tx,
+func (w *wallet) IssueTx(
+	t *tx.Tx,
 	options ...common.Option,
 ) error {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
 	startTime := time.Now()
-	txID, err := w.avaxClient.IssueTx(ctx, tx.SignedBytes())
-	if err != nil {
+
+	if err := w.avaxClient.IssueTx(ctx, t); err != nil {
 		return err
 	}
+	txID := t.ID()
 
 	issuanceDuration := time.Since(startTime)
 	if f := ops.IssuanceHandler(); f != nil {
@@ -163,7 +166,7 @@ func (w *wallet) IssueAtomicTx(
 	}
 
 	if ops.AssumeDecided() {
-		return w.Backend.AcceptAtomicTx(ctx, tx)
+		return w.Backend.AcceptTx(ctx, t)
 	}
 
 	if err := w.avaxClient.AwaitTxAccepted(ctx, txID, ops.PollFrequency()); err != nil {
@@ -182,16 +185,14 @@ func (w *wallet) IssueAtomicTx(
 		})
 	}
 
-	return w.Backend.AcceptAtomicTx(ctx, tx)
+	return w.Backend.AcceptTx(ctx, t)
 }
 
-func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
+func (w *wallet) baseFee(options []common.Option) (gas.Price, error) {
 	ops := common.NewOptions(options)
-	baseFee := ops.BaseFee(nil)
-	if baseFee != nil {
+	if baseFee, ok := ops.BaseFee(); ok {
 		return baseFee, nil
 	}
 
-	ctx := ops.Context()
-	return w.ethClient.EstimateBaseFee(ctx)
+	return w.ethClient.EstimateBaseFee(ops.Context())
 }

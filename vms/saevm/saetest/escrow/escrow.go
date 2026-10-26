@@ -7,18 +7,22 @@
 // Copyright 2024 Divergence Tech Ltd.
 
 // Package escrow provides bytecode and helpers for the [Escrow.sol] contract
-// deployed to 0x370F21541173E8B773571c135e3b5617d7f38C54 on Ethereum mainnet.
+// deployed to 0xf92186Fc58dA366431e98f3Ddd563d0A3cdf4f59 on Ethereum mainnet.
 //
 // [Escrow.sol]: https://github.com/ARR4N/SWAP2/blob/fe724e87bdc998c3b497c16e35fed354e53dc3e9/src/Escrow.sol
 package escrow
 
 import (
 	"slices"
+	"strings"
+	"testing"
 
+	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/holiman/uint256"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -34,6 +38,17 @@ func CreationCode() []byte {
 // ByteCode returns the deployed EVM bytecode of the Escrow.sol contract.
 func ByteCode() []byte {
 	return common.FromHex(deployed)
+}
+
+const abiJSON = `[{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"AddressInsufficientBalance","type":"error"},{"inputs":[],"name":"FailedInnerCall","type":"error"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"ZeroBalance","type":"error"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"","type":"address"},{"indexed":false,"internalType":"uint256","name":"","type":"uint256"}],"name":"Deposit","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"","type":"address"},{"indexed":false,"internalType":"uint256","name":"","type":"uint256"}],"name":"Withdrawal","type":"event"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"balance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address payable","name":"account","type":"address"}],"name":"deposit","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[],"name":"isEscrow","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"pure","type":"function"},{"inputs":[],"name":"withdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"withdraw","outputs":[],"stateMutability":"nonpayable","type":"function"}]`
+
+// ABI returns a freshly parsed Escrow.sol ABI.
+func ABI(tb testing.TB) abi.ABI {
+	tb.Helper()
+
+	a, err := abi.JSON(strings.NewReader(abiJSON))
+	require.NoError(tb, err, "abi.JSON([Escrow.sol])")
+	return a
 }
 
 // CallDataToDeposit returns the transaction call data to deposit native token
@@ -71,13 +86,22 @@ func CallDataToWithdraw() []byte {
 }
 
 // DepositEvent returns the [types.Log] emitted by a successful transaction with
-// [CallDataToDeposit] data.
+// [CallDataToDeposit] data. It is equivalent to passing an empty log to
+// [WithDepositTopicsAndData].
 func DepositEvent(recipient common.Address, amount *uint256.Int) *types.Log {
-	return &types.Log{
-		Topics: []common.Hash{crypto.Keccak256Hash([]byte("Deposit(address,uint256)"))},
-		Data: slices.Concat(
-			make([]byte, 12), recipient[:],
-			amount.PaddedBytes(32),
-		),
-	}
+	return WithDepositTopicsAndData(new(types.Log), recipient, amount)
+}
+
+// WithDepositTopicsAndData populates the [types.Log.Topics] and
+// [types.Log.Data] fields of the provided log with those emitted by a
+// successful transaction with [CallDataToDeposit] data.
+//
+// The received log is modified and then returned for convenience.
+func WithDepositTopicsAndData(log *types.Log, recipient common.Address, amount *uint256.Int) *types.Log {
+	log.Topics = []common.Hash{crypto.Keccak256Hash([]byte("Deposit(address,uint256)"))}
+	log.Data = slices.Concat(
+		make([]byte, 12), recipient[:],
+		amount.PaddedBytes(32),
+	)
+	return log
 }

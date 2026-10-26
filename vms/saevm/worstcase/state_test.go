@@ -334,7 +334,6 @@ func TestMultipleBlocks(t *testing.T) {
 		require.NoError(t, wantLatestEndTime.AfterBlock(gas.Gas(state.GasUsed()), target, c), "AfterBlock()")
 
 		want := &blocks.WorstCaseBounds{
-			MaxBaseFee:    block.wantBaseFee,
 			LatestEndTime: wantLatestEndTime.Clone(),
 		}
 		for _, bals := range block.wantMinSenderBalances {

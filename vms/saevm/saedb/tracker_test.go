@@ -9,10 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -96,6 +101,86 @@ func TestNewTracker(t *testing.T) {
 	}
 }
 
+// TestTriesInMemory is a change-detector test to ensure the consensus-critical
+// value of [core.TriesInMemory] is not unintentionally altered in a geth
+// update.
+func TestTriesInMemory(t *testing.T) {
+	const expected = 128
+	require.Equal(t, expected, core.TriesInMemory, "core.TriesInMemory value changed upstream")
+}
+
+func TestTrackerStateHistory(t *testing.T) {
+	tests := []struct {
+		name         string
+		stateHistory uint64
+		wantHistory  uint64
+	}{
+		{
+			name:        "default",
+			wantHistory: core.TriesInMemory,
+		},
+		{
+			name:         "below_min",
+			stateHistory: 8,
+			wantHistory:  core.TriesInMemory,
+		},
+		{
+			name:         "above_min",
+			stateHistory: 256,
+			wantHistory:  256,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			numBlocks := 3 * tt.wantHistory
+
+			tr, err := NewTracker(
+				rawdb.NewMemoryDatabase(),
+				Config{
+					Scheme:         rawdb.HashScheme,
+					CommitInterval: numBlocks + 1, // avoid committing any states
+					StateHistory:   tt.stateHistory,
+				},
+				types.EmptyRootHash,
+				t.TempDir(),
+				loggingtest.New(t, logging.Debug),
+			)
+			require.NoError(t, err, "NewTracker()")
+
+			lastRoot := types.EmptyRootHash
+			t.Cleanup(func() {
+				assert.NoErrorf(t, tr.Close(lastRoot), "%T.Close()", tr)
+			})
+
+			roots := make([]common.Hash, 0, numBlocks)
+			addr := common.Address{1}
+			for height := uint64(1); height <= numBlocks; height++ {
+				sdb, err := tr.StateDB(lastRoot)
+				require.NoErrorf(t, err, "%T.StateDB() at height %d", tr, height)
+				sdb.SetNonce(addr, height) // unique state
+				lastRoot, err = sdb.Commit(height, true /* EIP-158 */)
+				require.NoErrorf(t, err, "%T.Commit(%d)", tr, height)
+				roots = append(roots, lastRoot)
+
+				require.NoErrorf(t, tr.BlockExecuted(types.EmptyRootHash, lastRoot, height), "%T.BlockExecuted(%d)", tr, height)
+			}
+
+			for i, pastRoot := range roots {
+				pastHeight := uint64(i) + 1
+				_, err := tr.StateDB(pastRoot)
+
+				var wantErr testerr.Want
+				if numBlocks-pastHeight >= tt.wantHistory {
+					wantErr = testerr.As[*trie.MissingNodeError](nil)
+				}
+				if diff := testerr.Diff(err, wantErr); diff != "" {
+					t.Errorf("mismatch at height %d: %s", pastHeight, diff)
+				}
+			}
+		})
+	}
+}
+
 // TestProtectTrieIndex simulates every pair of consecutive node runs against
 // the same database. The first run, on a fresh database, always succeeds;
 // only the second may error.
@@ -167,7 +252,52 @@ func writeBlock(tb testing.TB, tr *Tracker, prevRoot common.Hash, height uint64)
 	return root
 }
 
-// TestTrackerMaybeCap checks that [Tracker.MaybeCommit] decreases memory
+// TestTrackerClose verifies both the trie and the snapshot can be opened at the
+// state persisted by [Tracker.Close].
+func TestTrackerClose(t *testing.T) {
+	cfg := Config{
+		CommitInterval:   DefaultCommitInterval,
+		SnapshotCacheMiB: 1,
+	}
+	db := rawdb.NewMemoryDatabase()
+	log := loggingtest.New(t, logging.Debug)
+	tr, err := NewTracker(db, cfg, types.EmptyRootHash, t.TempDir(), log)
+	require.NoError(t, err, "NewTracker()")
+
+	// The snapshot is initially generated asynchronously. We wait for that to
+	// complete here so that the later check can expect a complete snapshot.
+	require.EventuallyWithT(t,
+		func(c *assert.CollectT) {
+			assert.NoErrorf(c, tr.snaps.Verify(types.EmptyRootHash), "%T.Verify([genesis root])", tr.snaps)
+		},
+		10*time.Second,      // timeout
+		10*time.Millisecond, // polling interval
+		"genesis snapshot generation",
+	)
+
+	root := writeBlock(t, tr, types.EmptyRootHash, 1)
+	require.NoErrorf(t, tr.Close(root), "%T.Close([root])", tr)
+
+	cache := state.NewDatabase(db)
+	t.Run("trie_available", func(t *testing.T) {
+		_, err := state.New(root, cache, nil)
+		require.NoError(t, err, "state.New([root])")
+	})
+	t.Run("snapshot_available", func(t *testing.T) {
+		_, err := snapshot.New(
+			snapshot.Config{
+				CacheSize: 1,
+				NoBuild:   true,
+			},
+			db,
+			cache.TrieDB(),
+			root,
+		)
+		require.NoError(t, err, "snapshot.New(NoBuild, [root])")
+	})
+}
+
+// TestTrackerMaybeCap checks that [Tracker.BlockExecuted] decreases memory
 // pressure to prevent a [triedb.Database.Commit] from being too expensive.
 func TestTrackerMaybeCap(t *testing.T) {
 	const (
@@ -202,14 +332,14 @@ func TestTrackerMaybeCap(t *testing.T) {
 	for height := uint64(1); height < cfg.CommitInterval; height++ {
 		root := writeBlock(t, tr, prevRoot, height)
 		before := inMemorySize()
-		require.NoErrorf(t, tr.MaybeCommit(common.Hash{}, root, height), "%T.MaybeCommit() at height %d", tr, height)
+		require.NoErrorf(t, tr.BlockExecuted(common.Hash{}, root, height), "%T.BlockExecuted() at height %d", tr, height)
 		after := inMemorySize()
 
 		// Invariant: whatever schedule maybeCap uses to shrink its target, the
-		// in-memory size never exceeds the configured maximum after MaybeCommit.
-		require.LessOrEqualf(t, after, common.StorageSize(maxCapBytes), "in-memory size exceeds the maximum cap after %T.MaybeCommit() at height %d", tr, height)
+		// in-memory size never exceeds the configured maximum after BlockExecuted.
+		require.LessOrEqualf(t, after, common.StorageSize(maxCapBytes), "in-memory size exceeds the maximum cap after %T.BlockExecuted() at height %d", tr, height)
 
-		// MaybeCommit can ONLY decrease memory pressure
+		// BlockExecuted can ONLY decrease memory pressure
 		if after < before {
 			capsFired++
 		}
@@ -222,7 +352,7 @@ func TestTrackerMaybeCap(t *testing.T) {
 	root := writeBlock(t, tr, prevRoot, commitInterval)
 	prevRoot = root // for cleanup
 	before := inMemorySize()
-	require.NoErrorf(t, tr.MaybeCommit(root, root, commitInterval), "%T.MaybeCommit() at height %d", tr, commitInterval)
+	require.NoErrorf(t, tr.BlockExecuted(root, root, commitInterval), "%T.BlockExecuted() at height %d", tr, commitInterval)
 	require.Less(t, inMemorySize(), before, "in-memory size did not drop after commit at the interval")
 }
 
@@ -313,7 +443,7 @@ func BenchmarkTrackerCommitInterval(b *testing.B) {
 						peakDirty = max(peakDirty, dirty)
 
 						start := time.Now()
-						require.NoErrorf(b, tr.MaybeCommit(root, root, height), "%T.MaybeCommit() at height %d", tr, height)
+						require.NoErrorf(b, tr.BlockExecuted(root, root, height), "%T.BlockExecuted() at height %d", tr, height)
 						maxPause = max(maxPause, time.Since(start))
 
 						prevRoot = root

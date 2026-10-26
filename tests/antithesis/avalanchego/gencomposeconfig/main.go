@@ -72,7 +72,7 @@ func newNetwork() (*tmpnet.Network, time.Time, error) {
 	if err != nil {
 		return nil, time.Time{}, fmt.Errorf("getting upgrade flags: %w", err)
 	}
-	return network, upgrades.HeliconTime, nil // Must be updated for each network upgrade
+	return network, upgrades.LatestTime(), nil
 }
 
 // guestScript returns a bash script that sets the system clock to a random
@@ -97,7 +97,7 @@ offset=$(( min_offset + rand %% (max_offset - min_offset + 1) ))
 
 start_epoch=$(( activation_epoch - offset ))
 start_time=$(date -u -d "@${start_epoch}" +"%%Y-%%m-%%d %%H:%%M:%%S")
-echo "Setting system clock to ${start_time} UTC; Helicon activates in ${offset}s"
+echo "Setting system clock to ${start_time} UTC; latest upgrade activates in ${offset}s"
 timedatectl set-time "${start_time}"
 `,
 		activationTime.Unix(),

@@ -24,12 +24,17 @@ SUBNET_EVM_PATH=$(
 
 # Load the constants
 source "$SUBNET_EVM_PATH"/scripts/constants.sh
+# shellcheck source=/dev/null
+source "$AVALANCHE_PATH"/scripts/lib_go_module_cache.sh
+
+# Populate the host cache with the workspace module graph before Buildx starts.
+prepare_go_module_cache "${AVALANCHE_PATH}"
 
 # buildx (BuildKit) improves the speed and UI of builds over the legacy builder and
 # simplifies creation of multi-arch images.
 #
 # Reference: https://docs.docker.com/build/buildkit/
-DOCKER_CMD="docker buildx build"
+DOCKER_CMD=("docker" "buildx" "build" "--build-context" "gomodcache=$(go_module_proxy_cache)")
 ispush=0
 if [[ -n "${PUBLISH}" ]]; then
   echo "Pushing $IMAGE_NAME:$BUILD_IMAGE_ID"
@@ -42,7 +47,7 @@ fi
 
 # Build a specified platform image if requested
 if [[ -n "${PLATFORMS}" ]]; then
-  DOCKER_CMD="${DOCKER_CMD} --platform=${PLATFORMS}"
+  DOCKER_CMD+=("--platform" "${PLATFORMS}")
   if [[ "$PLATFORMS" == *,* ]]; then ## Multi-arch
     if [[ "${IMAGE_NAME}" != *"/"* ]]; then
       echo "ERROR: Multi-arch images (multi-platform) must be pushed to a registry."
@@ -53,14 +58,14 @@ if [[ -n "${PLATFORMS}" ]]; then
 fi
 
 if [[ $ispush -eq 1 ]]; then
-  DOCKER_CMD="${DOCKER_CMD} --push"
+  DOCKER_CMD+=("--push")
 else
   ## Single arch
   #
   # Building a single-arch image with buildx and having the resulting image show up
   # in the local store of docker images (ala 'docker build') requires explicitly
   # loading it from the buildx store with '--load'.
-  DOCKER_CMD="${DOCKER_CMD} --load"
+  DOCKER_CMD+=("--load")
 fi
 
 VM_ID=${VM_ID:-"${DEFAULT_VM_ID}"}
@@ -100,11 +105,11 @@ GO_VERSION="$(go list -m -f '{{.GoVersion}}' | head -1)"
 echo "Building Docker Image: $IMAGE_NAME:$BUILD_IMAGE_ID based of AvalancheGo@$image_tag"
 # Use repo root as context so Dockerfile can access graft/ directory
 # shellcheck disable=SC2154
-${DOCKER_CMD} -t "$IMAGE_NAME:$BUILD_IMAGE_ID" -t "$IMAGE_NAME:${commit_hash}" \
+"${DOCKER_CMD[@]}" -t "$IMAGE_NAME:$BUILD_IMAGE_ID" -t "$IMAGE_NAME:${commit_hash}" \
   "$AVALANCHE_PATH" -f "$SUBNET_EVM_PATH/Dockerfile" \
   --build-arg GO_VERSION="${GO_VERSION}" \
   --build-arg AVALANCHEGO_NODE_IMAGE="$AVALANCHEGO_NODE_IMAGE" \
-  --build-arg SUBNET_EVM_COMMIT="$git_commit" \
+  --build-arg AVALANCHEGO_COMMIT="$git_commit" \
   --build-arg CURRENT_BRANCH="$image_tag" \
   --build-arg VM_ID="$VM_ID"
 

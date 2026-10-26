@@ -9,6 +9,7 @@ import (
 	"errors"
 	"math/big"
 	"math/rand/v2"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"slices"
@@ -25,13 +26,14 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
-	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/holiman/uint256"
@@ -51,6 +53,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
@@ -65,6 +69,7 @@ import (
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	saerpc "github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	libevmhookstest "github.com/ava-labs/libevm/libevm/hookstest"
 )
@@ -83,18 +88,17 @@ var _ saetest.Peer = (*SUT)(nil)
 // avoid over-reliance on internal implementation details.
 type SUT struct {
 	block.ChainVM
-	*ethclient.Client
-	rpcClient *rpc.Client
+	*evmclient.Client
+
+	wallet *saetest.Wallet
+	db     ethdb.Database
+	hooks  *hookstest.Stub
+	logger logging.Logger
+	sender *saetest.Sender
 
 	rawVM   *VM
 	genesis *blocks.Block
-	wallet  *saetest.Wallet
-	db      ethdb.Database
-	hooks   *hookstest.Stub
-	logger  *loggingtest.Logger
-
-	sender *saetest.Sender
-	close  func()
+	close   func()
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.rawVM.snowCtx.NodeID }
@@ -102,15 +106,17 @@ func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
 	sutConfig struct {
-		hooks       *hookstest.Stub
-		vmConfig    Config
-		logLevel    logging.Level
-		genesis     core.Genesis
-		db          database.Database
-		precompiles map[common.Address]libevm.PrecompiledContract
-		nodeID      ids.NodeID
-		validators  set.Set[ids.NodeID]
-		dataDir     string
+		hooks           *hookstest.Stub
+		vmConfig        Config
+		logger          logging.Logger
+		logLevel        logging.Level // ignored if logger is non-nil
+		genesis         core.Genesis
+		db              database.Database
+		precompiles     map[common.Address]libevm.PrecompiledContract
+		nodeID          ids.NodeID
+		validators      set.Set[ids.NodeID]
+		dataDir         string
+		wantShutdownErr testerr.Want
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -132,7 +138,9 @@ func withValidators(vdrs set.Set[ids.NodeID]) sutOption {
 // chainID is made a global to keep it constant across multiple SUTs.
 var chainID = ids.GenerateTestID()
 
-func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context, *SUT) {
+// tryNewSUT constructs a [SUT], returning any initialization error. Tests
+// SHOULD use [newSUT] unless asserting on such errors.
+func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error) {
 	tb.Helper()
 
 	// gasTarget is approximately the current C-Chain mainnet gas target as of
@@ -155,6 +163,7 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 			DBConfig: saedb.Config{
 				CommitInterval: saedb.DefaultCommitInterval,
 			},
+			RPCConfig: saerpc.Config{APIs: saerpc.DefaultAPIs()},
 		},
 		logLevel: logging.Debug,
 		genesis: core.Genesis{
@@ -172,17 +181,26 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
 	snow := adaptor.Convert(vm)
 
-	logger := loggingtest.New(tb, conf.logLevel)
-	ctx := logger.CancelOnError(tb.Context())
+	ctx := tb.Context()
+	switch l := conf.logger.(type) {
+	case nil:
+		ll := loggingtest.New(tb, conf.logLevel)
+		conf.logger = ll
+		ctx = ll.CancelOnError(ctx)
+
+	case *loggingtest.Logger:
+		ctx = l.CancelOnError(ctx)
+	}
+
 	snowCtx := snowtest.Context(tb, chainID)
-	snowCtx.Log = logger
+	snowCtx.Log = conf.logger
 	snowCtx.ChainDataDir = conf.dataDir
 	snowCtx.NodeID = conf.nodeID
 	saetest.SetValidators(tb, snowCtx.ValidatorState, conf.validators)
 
 	sender := saetest.NewSender(tb, conf.validators)
 
-	require.NoError(tb, snow.Initialize(
+	if err := snow.Initialize(
 		ctx,
 		snowCtx,
 		conf.db,
@@ -191,7 +209,9 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 		nil, // config bytes (not ChainConfig)
 		nil, // Fxs
 		sender,
-	), "Initialize()")
+	); err != nil {
+		return nil, err
+	}
 
 	if len(conf.precompiles) > 0 {
 		// All precompile registrations must occur after the VM is initialized,
@@ -204,51 +224,76 @@ func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context
 	closeOnce := sync.OnceFunc(func() {
 		ctx := context.WithoutCancel(tb.Context())
 		require.NoError(tb, vm.last.accepted.Load().WaitUntilExecuted(ctx), "{last-accepted block}.WaitUntilExecuted()")
-		require.NoError(tb, snow.Shutdown(ctx), "Shutdown()")
+		if diff := testerr.Diff(snow.Shutdown(ctx), conf.wantShutdownErr); diff != "" {
+			tb.Errorf("%T.Shutdown() %s", snow, diff)
+		}
 	})
-	tb.Cleanup(func() {
-		closeOnce()
-	})
+	tb.Cleanup(closeOnce)
 
 	// Avalanchego marks the local node as connected so that p2p protocols
 	// don't need to treat our node as a special case.
 	require.NoErrorf(tb, snow.Connected(ctx, snowCtx.NodeID, version.Current), "Connected(%s)", snowCtx.NodeID)
 
-	rpcClient, ethClient := dialRPC(ctx, tb, snow)
+	rpcClient := dialRPC(ctx, tb, snow, "ws", wsHTTPExtensionPath)
 	sut := &SUT{
-		ChainVM:   snow,
-		Client:    ethClient,
-		rpcClient: rpcClient,
-		rawVM:     vm.VM,
-		genesis:   vm.last.settled.Load(),
+		ChainVM: snow,
+		Client:  evmclient.New(rpcClient),
+
 		wallet: saetest.NewWalletWithKeyChain(
 			keys,
 			types.LatestSigner(conf.genesis.Config),
 		),
-		db:     newEthDB(conf.db),
+		db:     saetypes.NewEthDB(conf.db),
 		hooks:  conf.hooks,
-		logger: logger,
-		close:  closeOnce,
-
+		logger: conf.logger,
 		sender: sender,
+
+		rawVM:   vm.VM,
+		genesis: vm.last.settled.Load(),
+		close:   closeOnce,
 	}
 	sender.Start(tb, sut)
-	return ctx, sut
+	return sut, nil
 }
 
-func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM) (*rpc.Client, *ethclient.Client) {
+func newSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (context.Context, *SUT) {
+	tb.Helper()
+
+	sut, err := tryNewSUT(tb, numAccounts, opts...)
+	require.NoError(tb, err, "Initialize()")
+	return sut.context(tb), sut
+}
+
+// dialRPC serves the handler that snow creates for the HTTP extension `path`
+// and returns a client connected to it via `scheme`, typically "ws" for
+// [wsHTTPExtensionPath] or "http" for [rpcHTTPExtensionPath].
+func dialRPC(ctx context.Context, tb testing.TB, snow block.ChainVM, scheme, path string) *rpc.Client {
 	tb.Helper()
 
 	handlers, err := snow.CreateHandlers(ctx)
 	require.NoErrorf(tb, err, "%T.CreateHandlers()", snow)
-	server := httptest.NewServer(handlers[wsHTTPExtensionPath])
-	tb.Cleanup(server.Close)
-	rpcClient, err := rpc.Dial("ws://" + server.Listener.Addr().String())
-	require.NoErrorf(tb, err, "rpc.Dial(http.NewServer(%T.CreateHandlers()))", snow)
-	client := ethclient.NewClient(rpcClient)
-	tb.Cleanup(client.Close)
 
-	return rpcClient, client
+	// [http.StateHijacked] immediately removes the connection from the
+	// [httptest.Server]'s internal waitgroup, so it doesn't wait on
+	// [httptest.Server.Close] for the websocket connection to close. However,
+	// the [http.Handler] still doesn't return until the websocket is closed AND
+	// all inflight calls have completed. See additional documentation of this
+	// behavior at [http.Server.RegisterOnShutdown].
+	var inflight sync.WaitGroup
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		inflight.Add(1)
+		defer inflight.Done()
+		handlers[path].ServeHTTP(w, r)
+	})
+	tb.Cleanup(inflight.Wait)
+	server := httptest.NewServer(h)
+	tb.Cleanup(server.Close)
+
+	url := scheme + "://" + server.Listener.Addr().String()
+	client, err := rpc.DialContext(ctx, url)
+	require.NoErrorf(tb, err, "rpc.DialContext(ctx, %q)", url)
+	tb.Cleanup(client.Close)
+	return client
 }
 
 func marshalJSON(tb testing.TB, v any) []byte {
@@ -258,13 +303,6 @@ func marshalJSON(tb testing.TB, v any) []byte {
 	return buf
 }
 
-// CallContext propagates its arguments to and from [SUT.rpcClient.CallContext].
-// Embedding both the [ethclient.Client] and the underlying [rpc.Client] isn't
-// possible due to a name conflict, so this method is manually exposed.
-func (s *SUT) CallContext(ctx context.Context, result any, method string, args ...any) error {
-	return s.rpcClient.CallContext(ctx, result, method, args...)
-}
-
 // withVMTime returns an option to configure a new SUT's "now" function along
 // with a [saetest.Clock] to access and advance the time at nanosecond
 // resolution.
@@ -272,8 +310,6 @@ func withVMTime(tb testing.TB, startTime time.Time) (sutOption, *saetest.Clock) 
 	tb.Helper()
 	c := saetest.NewClock(startTime, time.Nanosecond)
 	opt := options.Func[sutConfig](func(cfg *sutConfig) {
-		// TODO(StephenButtolph) unify the time functions provided in the config
-		// and the hooks.
 		cfg.hooks.Now = c.Now
 		cfg.vmConfig.Now = c.Now
 	})
@@ -291,9 +327,37 @@ func withExecResultsDB(hdb database.HeightIndex) sutOption {
 	})
 }
 
-func withCommitInterval(interval uint64) sutOption { //nolint:unparam // always 16 for now but caller-controlled by design
+func withCommitInterval(interval uint64) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.vmConfig.DBConfig.CommitInterval = interval
+	})
+}
+
+func withDB(db database.Database) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.db = db
+	})
+}
+
+// withFirewood selects Firewood as the trie database instead of the default
+// HashDB.
+func withFirewood() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.DBConfig.Scheme = customrawdb.FirewoodScheme
+	})
+}
+
+// withArchival disables pruning, persisting every executed state root.
+func withArchival() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.DBConfig.Archival = true
+	})
+}
+
+// withSnapshot enables the state snapshot with a minimal cache.
+func withSnapshot() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.DBConfig.SnapshotCacheMiB = 1
 	})
 }
 
@@ -338,13 +402,16 @@ func registerPrecompiles(tb testing.TB, precompiles map[common.Address]libevm.Pr
 	h.Register(tb)
 }
 
-// context returns a [context.Context], derived from the [testing.TB], that is
-// cancelled if the SUT's default logger receives a log at [logging.Error] or
-// higher.
+// context returns a [context.Context], derived from the [testing.TB]. If the
+// SUT's default logger is a [loggingtest.Logger], the returned context is
+// cancelled if said logger receives a log at [logging.Error] or higher.
 //
 //nolint:thelper // Not a helper
 func (s *SUT) context(tb testing.TB) context.Context {
-	return s.logger.CancelOnError(tb.Context())
+	if l, ok := s.logger.(*loggingtest.Logger); ok {
+		return l.CancelOnError(tb.Context())
+	}
+	return tb.Context()
 }
 
 // mustSendTx guarantees all transactions are delivered to the mempool, which triggers
@@ -537,43 +604,42 @@ func (s *SUT) runConsensusLoop(tb testing.TB, txs ...*types.Transaction) *blocks
 }
 
 // deployEscrow signs and runs a deploy tx for the escrow contract from
-// s.wallet[0], in its own consensus block, returning the block, the deployed
-// contract address, and the deploy tx.
-func (s *SUT) deployEscrow(tb testing.TB) (*blocks.Block, common.Address, *types.Transaction) {
+// s.wallet[0], in its own consensus block.
+func (s *SUT) deployEscrow(tb testing.TB) common.Address {
 	tb.Helper()
 	ctx := s.context(tb)
 
-	tx := s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CreationCode(),
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		Data:      escrow.CreationCode(),
 	})
 	block := s.runConsensusLoop(tb, tx)
 	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
 	require.Equalf(tb, tx.Hash(), block.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", block)
 
-	return block, crypto.CreateAddress(s.wallet.Addresses()[0], 0), tx
+	return crypto.CreateAddress(s.wallet.Addresses()[0], tx.Nonce())
 }
 
 // depositToEscrow signs and runs a tx depositing depositVal to
 // balances[recipient] on the escrow contract at escrowAddr, in its own
-// consensus block, returning the block and the deposit tx.
-func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Address, depositVal *big.Int) (*blocks.Block, *types.Transaction) {
+// consensus block.
+func (s *SUT) depositToEscrow(tb testing.TB, escrowAddr, recipient common.Address, depositVal *big.Int) *blocks.Block {
 	tb.Helper()
 	ctx := s.context(tb)
 
-	tx := s.wallet.SetNonceAndSign(tb, 0, &types.LegacyTx{
-		To:       &escrowAddr,
-		Gas:      1e6,
-		GasPrice: big.NewInt(1),
-		Data:     escrow.CallDataToDeposit(recipient),
-		Value:    depositVal,
+	tx := s.wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
+		To:        &escrowAddr,
+		Gas:       1e6,
+		GasFeeCap: big.NewInt(2 * params.GWei),
+		Data:      escrow.CallDataToDeposit(recipient),
+		Value:     depositVal,
 	})
 	block := s.runConsensusLoop(tb, tx)
 	require.NoErrorf(tb, block.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted", block)
 	require.Equalf(tb, tx.Hash(), block.Transactions()[0].Hash(), "%T.Transactions()[0].Hash()", block)
 
-	return block, tx
+	return block
 }
 
 func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
@@ -581,6 +647,30 @@ func (s *SUT) stateAt(tb testing.TB, root common.Hash) *state.StateDB {
 	sdb, err := s.rawVM.exec.StateDB(root)
 	require.NoErrorf(tb, err, "state.New(%#x, %T.StateCache())", root, s.rawVM.exec)
 	return sdb
+}
+
+// verifySnapshot requires the snapshot to be enabled and asserts that it is
+// fully generated and reproduces the last-executed state root.
+func (s *SUT) verifySnapshot(tb require.TestingT) {
+	snaps := s.rawVM.exec.Snapshot()
+	require.NotNil(tb, snaps, "snapshot disabled")
+
+	lastExecutedRoot := s.rawVM.exec.LastExecuted().PostExecutionStateRoot()
+	assert.NoError(tb, snaps.Verify(lastExecutedRoot), "last executed snapshot root verification failed")
+}
+
+// requireSnapshotEventuallyVerified waits for background snapshot generation to
+// finish and requires the snapshot to reproduce the last-executed state root.
+func requireSnapshotEventuallyVerified(tb testing.TB, sut *SUT) {
+	tb.Helper()
+	require.EventuallyWithT(tb,
+		func(c *assert.CollectT) {
+			sut.verifySnapshot(c)
+		},
+		10*time.Second,      // timeout
+		10*time.Millisecond, // polling interval
+		"snapshot verification",
+	)
 }
 
 // lastAcceptedBlock is a convenience wrapper for calling [VM.GetBlock] with
@@ -883,151 +973,6 @@ func TestEmptyChainConfig(t *testing.T) {
 	}
 }
 
-func TestSyntacticBlockChecks(t *testing.T) {
-	ctx, sut := newSUT(t, 0)
-
-	const now = 1e6
-	sut.rawVM.config.Now = func() time.Time {
-		return time.Unix(now, 0)
-	}
-
-	bodyWithTx := types.Body{
-		Transactions: []*types.Transaction{
-			types.NewTx(&types.DynamicFeeTx{
-				To:        &zeroAddr,
-				Gas:       params.TxGas,
-				GasFeeCap: big.NewInt(1),
-				Value:     big.NewInt(1),
-			}),
-		},
-	}
-
-	tests := []struct {
-		name string
-		// mutate will receive a valid header for an empty body and should return a mutated version of it.
-		mutate      func(*types.Header) *types.Header
-		body        types.Body
-		withdrawals []*types.Withdrawal
-		wantErr     error
-	}{
-		{
-			name:   "valid_header", // base case for test setup
-			mutate: func(h *types.Header) *types.Header { return h },
-		},
-		{
-			name: "block_height_overflow_protection",
-			mutate: func(h *types.Header) *types.Header {
-				h.Number = new(big.Int).Lsh(big.NewInt(1), 64)
-				return h
-			},
-			wantErr: errBlockHeightNotUint64,
-		},
-		{
-			name: "block_time_at_maximum",
-			mutate: func(h *types.Header) *types.Header {
-				h.Time = now + maxFutureBlockSeconds
-				return h
-			},
-		},
-		{
-			name: "block_time_after_maximum",
-			mutate: func(h *types.Header) *types.Header {
-				h.Time = now + maxFutureBlockSeconds + 1
-				return h
-			},
-			wantErr: errBlockTooFarInFuture,
-		},
-		{
-			name: "invalid_tx_hash_empty",
-			mutate: func(h *types.Header) *types.Header {
-				h.TxHash = common.Hash{}
-				return h
-			},
-			wantErr: errTxHashMismatch,
-		},
-		{
-			name:    "invalid_tx_hash_nonempty",
-			mutate:  func(h *types.Header) *types.Header { return h }, // uses [types.EmptyTxsHash]
-			body:    bodyWithTx,                                       // contains a tx
-			wantErr: errTxHashMismatch,
-		},
-		{
-			name: "valid_tx_hash_nonempty",
-			mutate: func(h *types.Header) *types.Header {
-				h.TxHash = types.DeriveSha(types.Transactions(bodyWithTx.Transactions), saetest.TrieHasher())
-				return h
-			},
-			body: bodyWithTx,
-		},
-		{
-			name: "invalid_uncle_hash_empty",
-			mutate: func(h *types.Header) *types.Header {
-				h.UncleHash = common.Hash{}
-				return h
-			},
-			wantErr: errUncleHashMismatch,
-		},
-		{
-			name:   "invalid_uncle_hash_nonempty",
-			mutate: func(h *types.Header) *types.Header { return h }, // uses [types.EmptyUncleHash]
-			body: types.Body{
-				Uncles: []*types.Header{{}},
-			},
-			wantErr: errUncleHashMismatch,
-		},
-		{
-			name: "valid_uncle_hash_nonempty",
-			mutate: func(h *types.Header) *types.Header {
-				h.UncleHash = types.CalcUncleHash([]*types.Header{{}})
-				return h
-			},
-			body: types.Body{
-				Uncles: []*types.Header{{}},
-			},
-			wantErr: nil,
-		},
-		{
-			name: "nil_withdrawals_nonnil_hash",
-			mutate: func(h *types.Header) *types.Header {
-				h.WithdrawalsHash = &types.EmptyWithdrawalsHash
-				return h
-			},
-			wantErr: errWithdrawalHashMismatch,
-		},
-		{
-			name: "nonnil_withdrawals_nil_hash",
-			mutate: func(h *types.Header) *types.Header {
-				h.WithdrawalsHash = nil
-				return h
-			},
-			withdrawals: []*types.Withdrawal{},
-			wantErr:     errWithdrawalHashMismatch,
-		},
-		{
-			name: "nonnil_withdrawals_nonempty_hash",
-			mutate: func(h *types.Header) *types.Header {
-				h.WithdrawalsHash = &types.EmptyWithdrawalsHash
-				return h
-			},
-			withdrawals: []*types.Withdrawal{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			hdr := tt.mutate(&types.Header{
-				Number:    big.NewInt(1),
-				UncleHash: types.EmptyUncleHash,
-				TxHash:    types.EmptyTxsHash,
-			})
-			ethB := types.NewBlockWithHeader(hdr).WithBody(tt.body).WithWithdrawals(tt.withdrawals)
-			b := blockstest.NewBlock(t, ethB, nil, nil)
-			_, err := sut.ParseBlock(ctx, b.Bytes())
-			assert.ErrorIs(t, err, tt.wantErr, "ParseBlock(#%v @ time %v) when stubbed time is %d", hdr.Number, hdr.Time, uint64(now))
-		})
-	}
-}
-
 func TestSemanticBlockChecks(t *testing.T) {
 	const now = 1e6
 	opt, _ := withVMTime(t, time.Unix(now, 0))
@@ -1206,6 +1151,9 @@ func TestBlockSources(t *testing.T) {
 		{"unverified", unwrap(t, unverified), testerr.Equals(database.ErrNotFound), false},
 	}
 
+	ethBlockSrc := ethBlockSource(sut.rawVM.consensusCritical, sut.db)
+	headerSrc := headerSource(sut.rawVM.consensusCritical, sut.db)
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Run("GetBlock", func(t *testing.T) {
@@ -1227,7 +1175,7 @@ func TestBlockSources(t *testing.T) {
 				cmpopts.EquateEmpty(),
 			}
 			t.Run("EthBlockSource", func(t *testing.T) {
-				got, gotOK := sut.rawVM.ethBlockSource(tt.block.Hash(), tt.block.NumberU64())
+				got, gotOK := ethBlockSrc(tt.block.Hash(), tt.block.NumberU64())
 				require.Equalf(t, tt.wantSourceOK, gotOK, "%T.ethBlockSource(...)", sut.rawVM)
 				if !tt.wantSourceOK {
 					return
@@ -1237,7 +1185,7 @@ func TestBlockSources(t *testing.T) {
 				}
 			})
 			t.Run("HeaderSource", func(t *testing.T) {
-				got, gotOK := sut.rawVM.headerSource(tt.block.Hash(), tt.block.NumberU64())
+				got, gotOK := headerSrc(tt.block.Hash(), tt.block.NumberU64())
 				require.Equalf(t, tt.wantSourceOK, gotOK, "%T.headerSource(...)", sut.rawVM)
 				if !tt.wantSourceOK {
 					return
@@ -1346,4 +1294,71 @@ func TestDuplicateVerify(t *testing.T) {
 			require.NoErrorf(t, childRaw.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", childRaw)
 		})
 	}
+}
+
+// TestSnapshotGenerationSpansDiskLayerMoves generates the snapshot of a VM
+// while it accepts blocks. The snapshot MUST eventually verify against the
+// executed state, even though blocks are moving the disk layer onto a state
+// that consensus no longer needs.
+func TestSnapshotGenerationSpansDiskLayerMoves(t *testing.T) {
+	t.Parallel()
+
+	// An account with storage that no transaction touches, so only the
+	// snapshot generator opens its storage trie.
+	var (
+		storageAddr = common.Address{'s', 't', 'o', 'r', 'a', 'g', 'e'}
+		storageSlot = common.Hash{1}
+		storageVal  = common.Hash{1}
+	)
+	storageRoot := storageTrieRoot(t, storageSlot, storageVal)
+
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 1, timeOpt, withSnapshot(), options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc[storageAddr] = types.Account{
+			Storage: map[common.Hash]common.Hash{storageSlot: storageVal},
+			Balance: big.NewInt(1),
+		}
+		// This is a gross hack to emulate a slow snapshot generation. By
+		// returning an error when reading the storage root, the snapshot
+		// generation will halt until the disk root moves.
+		//
+		// TODO(StephenButtolph): Figure out a way to simulate slow snapshot
+		// generation without relying on implementation details of the snapshot
+		// or being racy.
+		c.db = saetest.NewUnreadableOnceDB(memdb.New(), storageRoot[:])
+	}))
+
+	// While generating, the snapshot keeps only 8 diff layers, so the 9th
+	// block moves the disk layer to block 1's state. Since each block settles
+	// the prior block, SAE no longer needs block 1's state. But it MUST still
+	// be held to support snapshot generation.
+	//
+	// Unfortunely, libevm doesn't expose 8 as a constant. It is hard-coded in
+	// the snapshot implementation here:
+	// https://github.com/ava-labs/libevm/blob/80edd419ae21fa745accad9f528a190b1f81c7c7/core/state/snapshot/snapshot.go#L396-L398
+	const numBlocks = 8 + 1
+	for range numBlocks {
+		b := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{},
+			Gas:       params.TxGas,
+			GasFeeCap: big.NewInt(1),
+		}))
+		require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+		vmTime.AdvanceToSettle(ctx, t, b)
+	}
+
+	requireSnapshotEventuallyVerified(t, sut)
+}
+
+// storageTrieRoot returns the root of a storage trie holding only the given
+// slot.
+func storageTrieRoot(tb testing.TB, slot, value common.Hash) common.Hash {
+	tb.Helper()
+
+	raw := common.TrimLeftZeroes(value[:])
+	encoded, err := rlp.EncodeToBytes(raw)
+	require.NoErrorf(tb, err, "rlp.EncodeToBytes(%#x)", raw)
+	st := trie.NewStackTrie(nil)
+	require.NoErrorf(tb, st.Update(crypto.Keccak256(slot[:]), encoded), "%T.Update()", st)
+	return st.Hash()
 }

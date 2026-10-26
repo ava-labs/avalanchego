@@ -5,6 +5,7 @@ package cchain
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"iter"
@@ -20,18 +21,19 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
+	_ "embed"
+
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
@@ -166,12 +168,9 @@ func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.Target
 		return dynamic.InitialTargetExponent, nil
 	}
 
-	// The block might be the last synchronous block running with ACP-176.
-	state, err := acp176.ParseState(h.Extra)
-	if err != nil {
-		return 0, fmt.Errorf("parsing fee state: %w", err)
-	}
-	return dynamic.TargetExponent(state.TargetExcess), nil
+	// Synchronous blocks store the target exponent in their ACP-176 fee state.
+	// Only the last one's is used, as the parent of the first SAE block.
+	return customtypes.TargetExponentFromExtra(h.Extra)
 }
 
 func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
@@ -222,12 +221,12 @@ func (*hooks) BlockTime(h *types.Header) time.Time {
 
 func blockTime(h *types.Header) time.Time {
 	ms := customtypes.HeaderTimeMilliseconds(h)
-	subSecondNanos := int64(ms%1000) * int64(time.Millisecond) //#nosec G115 -- ms%1000 < 1000
-	return time.Unix(int64(h.Time), subSecondNanos)            //#nosec G115 -- Won't overflow for a few millennia
+	subSecondNanos := int64(ms%1000) * int64(time.Millisecond)
+	return time.Unix(int64(h.Time), subSecondNanos) //#nosec G115 -- Won't overflow for a few millennia
 }
 
 func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	txs, err := tx.FromBlock(h.chainConfig, b)
 	if err != nil {
 		return nil, fmt.Errorf("parsing txs: %w", err)
 	}
@@ -247,7 +246,7 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
-func (h *hooks) BeforeExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
+func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
 	config := corethparams.GetExtra(h.chainConfig)
 	if isFirstDurangoBlock := corethparams.GetRulesExtra(rules).IsDurango && !config.IsDurango(parent.Time); isFirstDurangoBlock {
 		activatePrecompile(statedb, corethwarp.ContractAddress)
@@ -255,10 +254,8 @@ func (h *hooks) BeforeExecutingBlock(rules params.Rules, statedb *state.StateDB,
 	return nil
 }
 
-func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, receipts types.Receipts) error {
-	h.metrics.setMinBlockDelay(delayExponent(b.Header()).DelayDuration())
-
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ types.Receipts) error {
+	txs, err := tx.FromBlock(h.chainConfig, b)
 	if err != nil {
 		return fmt.Errorf("parsing txs: %w", err)
 	}
@@ -268,6 +265,16 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 		if err := t.TransferNonAVAX(h.ctx.AVAXAssetID, extstatedb); err != nil {
 			return fmt.Errorf("transferring non-AVAX assets of tx %s (%d): %w", t.ID(), i, err)
 		}
+	}
+	return nil
+}
+
+func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
+	h.metrics.setMinBlockDelay(delayExponent(b.Header()).DelayDuration())
+
+	txs, err := tx.FromBlock(h.chainConfig, b)
+	if err != nil {
+		return fmt.Errorf("parsing txs: %w", err)
 	}
 
 	if err := h.state.Apply(b.NumberU64(), txs); err != nil {
@@ -280,6 +287,69 @@ func (h *hooks) AfterExecutingBlock(statedb *state.StateDB, b *types.Block, rece
 	}
 	if err := h.warpStorage.Add(messages...); err != nil {
 		return fmt.Errorf("storing warp messages from receipts: %w", err)
+	}
+	return nil
+}
+
+var (
+	// errInvalidBlockVersion is returned by [hooks.VerifyBlockSyntax] when a
+	// block's BlockBodyExtra carries a Version other than 0, the only supported
+	// version.
+	errInvalidBlockVersion = errors.New("invalid block version")
+	// errExtDataUnexpectedHash is returned by [hooks.VerifyBlockSyntax] when a
+	// block's extData does not correspond to the hardcoded ExtDataHash.
+	errExtDataUnexpectedHash = errors.New("extData hash does not match expected value")
+	// errExtDataHashMismatch is returned by [hooks.VerifyBlockSyntax] when a
+	// block's extData does not hash to the ExtDataHash committed in its header.
+	errExtDataHashMismatch = errors.New("extData hash does not match header")
+
+	//go:embed extdata-fuji.json
+	fujiExtDataHashes []byte
+	//go:embed extdata-mainnet.json
+	mainnetExtDataHashes []byte
+	extDataHashes        map[uint32]map[uint64]common.Hash
+)
+
+func init() {
+	mainnet := make(map[uint64]common.Hash)
+	if err := json.Unmarshal(mainnetExtDataHashes, &mainnet); err != nil {
+		panic(fmt.Errorf("unmarshalling extdata-mainnet.json: %w", err))
+	}
+	fuji := make(map[uint64]common.Hash)
+	if err := json.Unmarshal(fujiExtDataHashes, &fuji); err != nil {
+		panic(fmt.Errorf("unmarshalling extdata-fuji.json: %w", err))
+	}
+	extDataHashes = map[uint32]map[uint64]common.Hash{
+		constants.MainnetID: mainnet,
+		constants.FujiID:    fuji,
+	}
+}
+
+func (h *hooks) VerifyBlockSyntax(b *types.Block) error {
+	if version := customtypes.BlockVersion(b); version != 0 {
+		return fmt.Errorf("%w: %d", errInvalidBlockVersion, version)
+	}
+
+	var (
+		extData        = customtypes.BlockExtData(b)
+		calculatedHash = customtypes.CalcExtDataHash(extData)
+		wantHeaderHash = calculatedHash
+	)
+	// For genesis and pre-ApricotPhase1 blocks, the header's ExtDataHash is
+	// expected to be empty with the actual data expected to be committed to in
+	// [extDataHashes].
+	if height := b.NumberU64(); height == 0 || !corethparams.GetExtra(h.chainConfig).IsApricotPhase1(b.Time()) {
+		wantHash := customtypes.EmptyExtDataHash
+		if want, ok := extDataHashes[h.ctx.NetworkID][height]; ok {
+			wantHash = want
+		}
+		if calculatedHash != wantHash {
+			return fmt.Errorf("%w: have %x, want %x", errExtDataUnexpectedHash, calculatedHash, wantHash)
+		}
+		wantHeaderHash = common.Hash{}
+	}
+	if got := customtypes.GetHeaderExtra(b.Header()).ExtDataHash; got != wantHeaderHash {
+		return fmt.Errorf("%w: have %x, want %x", errExtDataHashMismatch, got, wantHeaderHash)
 	}
 	return nil
 }
@@ -314,7 +384,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			errBelowMinBlockDelay, now, minTime, parentTime, de.DelayDuration())
 	}
 
-	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
+	nowMS := uint64(now.UnixMilli())
 
 	config := corethparams.GetExtra(b.chainConfig)
 	te, err := targetExponent(config, parent)
@@ -329,7 +399,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
-			Coinbase:         constants.BlackholeAddr,
+			Coinbase:         blackhole.Address,
 			Difficulty:       big.NewInt(1),
 			Number:           new(big.Int).Add(parent.Number, common.Big1),
 			Time:             nowMS / 1000,
@@ -467,7 +537,7 @@ func (b *builder) BuildBlock(
 		return nil, fmt.Errorf("marshalling txs: %w", err)
 	}
 
-	rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)
+	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
 	rulesExtra := corethparams.GetRulesExtra(rules)
 	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, rulesExtra, ethTxs)
 	if err != nil {
@@ -484,14 +554,7 @@ func (b *builder) BuildBlock(
 	if err != nil {
 		return nil, fmt.Errorf("serializing warp validity: %w", err)
 	}
-	// TODO(StephenButtolph): Delete [customheader.SetPredicateBytesInExtra]
-	// entirely during the coreth removal. warpValidityBytes could just be set
-	// directly.
-	header.Extra = customheader.SetPredicateBytesInExtra(
-		rulesExtra.AvalancheRules,
-		header.Extra,
-		warpValidityBytes,
-	)
+	header.Extra = warpValidityBytes
 
 	// Encode the settled block marker into the header so [hooks.SettledBy] can recover it.
 	he := customtypes.GetHeaderExtra(header)

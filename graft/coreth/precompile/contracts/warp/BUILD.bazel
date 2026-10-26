@@ -24,7 +24,6 @@ go_library(
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
-        "@com_github_ava_labs_libevm//accounts/abi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/math",
         "@com_github_ava_labs_libevm//core/types",
@@ -36,7 +35,6 @@ go_library(
 graft_go_test(
     name = "warp_test",
     srcs = [
-        "config_test.go",
         "contract_test.go",
         "predicate_test.go",
     ],
@@ -47,6 +45,7 @@ graft_go_test(
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/precompileconfig",
         "//graft/coreth/precompile/precompiletest",
+        "//graft/evm/utils",
         "//ids",
         "//snow",
         "//snow/engine/snowman/block",
@@ -66,6 +65,5 @@ graft_go_test(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_stretchr_testify//require",
-        "@org_uber_go_mock//gomock",
     ],
 )

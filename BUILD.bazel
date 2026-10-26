@@ -4,6 +4,7 @@ exports_files(["BUILD.bazel"])
 
 # gazelle:prefix github.com/ava-labs/avalanchego
 # gazelle:exclude tools
+# gazelle:exclude .claude
 # gazelle:exclude .direnv
 # gazelle:exclude .bazel/patches/build_files
 # gazelle:proto disable_global

@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
@@ -15,15 +17,14 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/stateconf"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/trie/triestate"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/libevm/triedb/database"
 	"go.uber.org/zap"
 
-	// comment resolution
-	_ "github.com/ava-labs/libevm/core/state"
-	_ "github.com/ava-labs/libevm/trie"
+	_ "github.com/ava-labs/libevm/core/state" // comment resolution
 
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -36,13 +37,16 @@ var (
 
 // Config holds the configuration for creating a [TrieDB].
 type Config struct {
-	Path              string
-	Log               logging.Logger
-	CacheSizeBytes    uint
-	RevisionsInMemory uint // must be >= 2
-	Archive           bool
-	// DeferredCommitInterval must be < RevisionsInMemory as otherwise, it's
-	// possible to reap the latest persisted revision.
+	Path           string
+	Log            logging.Logger
+	CacheSizeBytes uint
+	Archive        bool
+	// StateHistory is the minimum number of recently committed states
+	// guaranteed to be available. If not set/too low, this value will be set
+	// to [Config.DeferredCommitInterval] + 1.
+	StateHistory uint64
+	// DeferredCommitInterval is the maximum bumber of revisions that may become
+	// inaccessible on restart. This MUST be set to a non-zero value.
 	DeferredCommitInterval uint64
 	// TODO(alarso16): Should metrics match the old implementation? Do we need libevm's registration?
 }
@@ -53,7 +57,7 @@ func DefaultConfig(path string, log logging.Logger) Config {
 		Path:                   path,
 		Log:                    log,
 		CacheSizeBytes:         1024 * 1024,
-		RevisionsInMemory:      128,
+		StateHistory:           128,
 		DeferredCommitInterval: 64,
 	}
 }
@@ -77,8 +81,8 @@ func (c Config) BackendConstructor(ethdb.Database) triedb.DBOverride {
 var (
 	errNoLogger             = errors.New("Log must be provided")  //nolint:staticcheck // false positive
 	errPathNotProvided      = errors.New("Path must be provided") //nolint:staticcheck // false positive
-	errTooFewRevisions      = errors.New("RevisionsInMemory must be >= 2")
-	errCommitIntervalTooBig = errors.New("DeferredCommitInterval must be < RevisionsInMemory")
+	errStateHistoryTooBig   = fmt.Errorf("StateHistory must not exceed %d", uint64(math.MaxUint))
+	errCommitIntervalTooBig = fmt.Errorf("DeferredCommitInterval must not exceed %d", uint64(math.MaxUint-1))
 )
 
 func (c Config) validate() error {
@@ -87,10 +91,10 @@ func (c Config) validate() error {
 		return errNoLogger
 	case c.Path == "":
 		return errPathNotProvided
-	case c.RevisionsInMemory < 2:
-		return fmt.Errorf("%w: got %d", errTooFewRevisions, c.RevisionsInMemory)
-	case c.DeferredCommitInterval >= uint64(c.RevisionsInMemory):
-		return fmt.Errorf("%w: %d >= %d", errCommitIntervalTooBig, c.DeferredCommitInterval, c.RevisionsInMemory)
+	case c.StateHistory > math.MaxUint:
+		return fmt.Errorf("%w: got %d", errStateHistoryTooBig, c.StateHistory)
+	case c.DeferredCommitInterval >= math.MaxUint:
+		return fmt.Errorf("%w: got %d", errCommitIntervalTooBig, c.DeferredCommitInterval)
 	default:
 		return nil
 	}
@@ -114,6 +118,7 @@ type TrieDB struct {
 	// and the latest state can be modified at any time during execution.
 	Firewood *ffi.Database
 
+	mu          sync.RWMutex
 	pending     *ffi.Proposal
 	committable *linked.Hashmap[common.Hash, *ffi.Proposal]
 
@@ -125,10 +130,21 @@ func New(config Config) (*TrieDB, error) {
 		return nil, err
 	}
 
+	// Firewood requires > DeferredPersistenceCommitCount
+	revInMemory := config.StateHistory
+	if revInMemory <= config.DeferredCommitInterval {
+		revInMemory = config.DeferredCommitInterval + 1
+		config.Log.Info("updating provided RevisionsInMemory to be greater than DeferredCommitInterval",
+			zap.Uint64("provided", config.StateHistory),
+			zap.Uint64("deferred_commit_interval", config.DeferredCommitInterval),
+			zap.Uint64("updated", revInMemory),
+		)
+	}
+
 	options := []ffi.Option{
 		ffi.WithReadCacheStrategy(ffi.CacheAllReads), // Based on benchmarking, highest cache hit rate
 		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
-		ffi.WithRevisions(config.RevisionsInMemory),
+		ffi.WithRevisions(uint(revInMemory)), // #nosec G115 -- checked in [Config.validate]
 		ffi.WithDeferredPersistenceCommitCount(config.DeferredCommitInterval),
 		ffi.WithExpensiveMetrics(),
 	}
@@ -160,6 +176,8 @@ func New(config Config) (*TrieDB, error) {
 func (t *TrieDB) Close() error {
 	// The force close below will iterate through all open handles and free
 	// their Rust-side memory explicitly
+	t.mu.Lock()
+	defer t.mu.Unlock()
 	t.committable.Clear()
 	t.pending = nil
 
@@ -184,6 +202,8 @@ func (t *TrieDB) Initialized(genesisRoot common.Hash) bool {
 	return common.Hash(t.Firewood.Root()) != types.EmptyRootHash
 }
 
+var errParentNotLatest = errors.New("proposal parent is not the latest root")
+
 // Update considers the given root as the new head of tracked roots.  This root,
 // if different than parent, must have been created via [state.Trie.Commit] with
 // a Firewood-backed [state.StateDB]. After Update returns, the user can call
@@ -191,10 +211,23 @@ func (t *TrieDB) Initialized(genesisRoot common.Hash) bool {
 //
 //nolint:revive // removing names loses context.
 func (t *TrieDB) Update(root common.Hash, parent common.Hash, block uint64, nodes *trienode.MergedNodeSet, states *triestate.Set, _ ...stateconf.TrieDBUpdateOption) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	possible := t.pending
 	if possible == nil {
 		// Update will never be called if no state change is proposed.
 		return fmt.Errorf("no pending proposal to update for root %s", root)
+	}
+
+	// Proposals form a linear chain, so the parent MUST be the newest root
+	// tracked here.
+	latest, _, ok := t.committable.Newest()
+	if !ok {
+		latest = common.Hash(t.Firewood.Root())
+	}
+	if parent != latest {
+		return fmt.Errorf("%w: parent %s, latest %s", errParentNotLatest, parent, latest)
 	}
 
 	if gotRoot := common.Hash(possible.Root()); gotRoot != root {
@@ -215,6 +248,9 @@ func (t *TrieDB) Update(root common.Hash, parent common.Hash, block uint64, node
 //
 // Any error returned from this function should be treated as fatal.
 func (t *TrieDB) Commit(root common.Hash, report bool) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	if _, ok := t.committable.Get(root); !ok {
 		// Ideally, one would check that the root is on disk, since one should
 		// never pass a non-existent root to Commit. However, Firewood loses
@@ -253,24 +289,66 @@ func (t *TrieDB) Commit(root common.Hash, report bool) error {
 	return nil
 }
 
-// newProposal creates a new proposal from either a committable proposal or the tip of the database.
+// newRevision returns the [ffi.Revision] at root, or a [trie.MissingNodeError]
+// if Firewood has no revision for root.
+func (t *TrieDB) newRevision(root common.Hash) (*ffi.Revision, error) {
+	revision, err := t.Firewood.Revision(ffi.Hash(root))
+	if errors.Is(err, ffi.ErrRevisionNotFound) {
+		return nil, &trie.MissingNodeError{NodeHash: root}
+	}
+	return revision, err
+}
+
+var errNotProposable = errors.New("parent root is not proposable")
+
+// newProposal creates a new proposal from either a committable proposal or the
+// tip of the database. Returns an error wrapping [errNotProposable] otherwise.
 func (t *TrieDB) newProposal(parentRoot common.Hash, batchOps []ffi.BatchOp) (*ffi.Proposal, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	switch parent, foundProposal := t.committable.Get(parentRoot); {
 	case foundProposal:
 		return parent.Propose(batchOps)
 	case parentRoot == common.Hash(t.Firewood.Root()):
 		return t.Firewood.Propose(batchOps)
 	default:
-		return nil, fmt.Errorf("parent root %+x is not proposable", parentRoot)
+		return nil, fmt.Errorf("%w: %+x", errNotProposable, parentRoot)
 	}
 }
 
-// trieCommit considers the provided proposal as canonical.
-// Should be called on [state.Trie.Commit].
+// newReconstructed returns an [ffi.Reconstructed] with the state represented
+// in the revision provided.
 //
-// p MUST not be nil.
-func (t *TrieDB) trieCommit(p *ffi.Proposal) {
+// TODO(alarso16): Simplify after https://github.com/ava-labs/firewood/issues/2254
+// is merged. The below code can fail if the revision was based on a proposal,
+// but has now been reaped based on [Config.RevisionsInMemory].
+func (t *TrieDB) newReconstructed(rev *ffi.Revision) (*ffi.Reconstructed, error) {
+	newRev, err := t.Firewood.Revision(rev.Root())
+	switch {
+	case err == nil:
+		rev = newRev // rev MAY be based on a proposal, which isn't reconstructible
+	case !errors.Is(err, ffi.ErrRevisionNotFound):
+		return nil, err
+	}
+	return rev.Reconstruct(nil)
+}
+
+var errProposalPending = errors.New("a proposal is already pending")
+
+// trieCommit considers the provided proposal as canonical, to be consumed by
+// the next call to [TrieDB.Update]. Should be called on [state.Trie.Commit].
+//
+// Returns an error wrapping [errProposalPending] if a previous proposal would
+// be lost. p MUST not be nil.
+func (t *TrieDB) trieCommit(p *ffi.Proposal) error {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.pending != nil {
+		return fmt.Errorf("%w: root %s", errProposalPending, common.Hash(t.pending.Root()))
+	}
 	t.pending = p
+	return nil
 }
 
 // Scheme returns [rawdb.HashScheme] to identify the database.

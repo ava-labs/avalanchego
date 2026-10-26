@@ -18,7 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
-var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", func() {
+// This test asserts global P-Chain supply values so it cannot run concurrently with
+// other supply-changing tests.
+var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", ginkgo.Serial, func() {
 	tc := e2e.NewTestContext()
 
 	ginkgo.It("should add an auto-renewed validator and complete a staking cycle", func() {
@@ -121,6 +123,9 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", func()
 				},
 				NextPeriod:               uint64(updatedStakingPeriod.Seconds()),
 				AutoCompoundRewardShares: autoCompoundRewardShares,
+				// No cycle has renewed yet.
+				RestakedValidationRewards: new(uint64),
+				RestakedDelegateeRewards:  new(uint64),
 			}, currentValidator(tc, pvmClient, f.validatorNode.NodeID).AutoRenewedConfig)
 		})
 
@@ -182,6 +187,9 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", func()
 				},
 				NextPeriod:               uint64(updatedStakingPeriod.Seconds()),
 				AutoCompoundRewardShares: updatedAutoCompoundRewardShares,
+				// One cycle has renewed, so the totals hold that cycle's split.
+				RestakedValidationRewards: new(restakingValidationRewards1),
+				RestakedDelegateeRewards:  new(restakingDelegateeRewards1),
 			}, currentValidator(tc, pvmClient, f.validatorNode.NodeID).AutoRenewedConfig)
 		})
 
@@ -238,7 +246,20 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", func()
 
 		tc.By("checking auto-renewed validator's weight and accrued rewards", func() {
 			expectedValidatorWeight := validatorWeight + restakingValidationRewards1 + restakingDelegateeRewards1 + restakingValidationRewards2 + restakingDelegateeRewards2
-			require.Equal(tc, expectedValidatorWeight, currentValidator(tc, pvmClient, f.validatorNode.NodeID).Weight)
+			validator := currentValidator(tc, pvmClient, f.validatorNode.NodeID)
+			require.Equal(tc, expectedValidatorWeight, validator.Weight)
+			require.Equal(tc, &platformvm.ClientAutoRenewedConfig{
+				ValidatorAuthority: &platformvm.ClientOwner{
+					Locktime:  0,
+					Threshold: 1,
+					Addresses: []ids.ShortID{f.validatorFundingKey.Address()},
+				},
+				NextPeriod:               uint64(updatedStakingPeriod.Seconds()),
+				AutoCompoundRewardShares: updatedAutoCompoundRewardShares,
+				// The totals are cumulative across both renewed cycles.
+				RestakedValidationRewards: new(restakingValidationRewards1 + restakingValidationRewards2),
+				RestakedDelegateeRewards:  new(restakingDelegateeRewards1 + restakingDelegateeRewards2),
+			}, validator.AutoRenewedConfig)
 		})
 
 		var validatorThirdCyclePotentialRewards uint64
@@ -344,7 +365,5 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", func()
 		tc.By("stopping node to free up resources for a bootstrap check", func() {
 			require.NoError(tc, f.validatorNode.Stop(tc.DefaultContext()))
 		})
-
-		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 	})
 })

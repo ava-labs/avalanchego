@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
@@ -929,7 +928,7 @@ func TestGetStakingConfig_Helicon(t *testing.T) {
 		},
 		{
 			name: "overridden",
-			set:  utils.PointerTo(15 * time.Minute),
+			set:  new(15 * time.Minute),
 			want: 15 * time.Minute,
 		},
 	}
@@ -999,6 +998,46 @@ func TestGetDiskSpaceConfig(t *testing.T) {
 			_, err := GetNodeConfig(v)
 
 			require.ErrorIs(err, tt.expectedErr)
+		})
+	}
+}
+
+func TestGetProfilerConfigMutexFraction(t *testing.T) {
+	tests := []struct {
+		name             string
+		set              *int
+		expectedFraction int
+		expectedErr      error
+	}{
+		{
+			name:             "default records all mutex events",
+			expectedFraction: 1,
+		},
+		{
+			name:             "positive fraction",
+			set:              new(5),
+			expectedFraction: 5,
+		},
+		{
+			name:        "negative fraction",
+			set:         new(-1),
+			expectedErr: errNegativeMutexProfileFraction,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			v := setupViperFlags()
+			if tt.set != nil {
+				v.Set(ProfileContinuousMutexFractionKey, *tt.set)
+			}
+
+			config, err := getProfilerConfig(v)
+			require.ErrorIs(err, tt.expectedErr)
+			if tt.expectedErr == nil {
+				require.Equal(tt.expectedFraction, config.MutexProfileFraction)
+			}
 		})
 	}
 }

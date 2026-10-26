@@ -15,9 +15,28 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 )
 
-func newEthBlock(num, time uint64, parent *types.Block) *types.Block {
+func hooks() *hookstest.Stub {
+	return hookstest.NewStub(1)
+}
+
+func newSynchronousEthBlock(tb testing.TB, num, time uint64, parent *types.Block) *types.Block {
+	tb.Helper()
+	return buildEthBlock(tb, num, time, parent, nil)
+}
+
+func newEthBlock(tb testing.TB, num, time uint64, parent *types.Block, lastSettled *Block) *types.Block {
+	tb.Helper()
+	require.NotNil(tb, lastSettled, "last-settled-block argument to newEthBlock()")
+	return buildEthBlock(tb, num, time, parent, lastSettled)
+}
+
+func buildEthBlock(tb testing.TB, num, time uint64, parent *types.Block, lastSettled *Block) *types.Block {
+	tb.Helper()
+
 	hdr := &types.Header{
 		Number:  new(big.Int).SetUint64(num),
 		BaseFee: big.NewInt(1),
@@ -26,23 +45,36 @@ func newEthBlock(num, time uint64, parent *types.Block) *types.Block {
 	if parent != nil {
 		hdr.ParentHash = parent.Hash()
 	}
-	return types.NewBlockWithHeader(hdr)
+
+	var s hook.Settled
+	if ls := lastSettled; ls != nil {
+		s.Height = ls.Height()
+		s.GasNumerator = 1
+	}
+	b, err := hookstest.BuildBlock(hdr, nil, nil, nil, nil, s)
+	require.NoErrorf(tb, err, "hookstest.BuildBlock(%+v, ..., %+v)", hdr, s)
+	return b
 }
 
 func newBlock(tb testing.TB, eth *types.Block, parent, lastSettled *Block) *Block {
 	tb.Helper()
-	b, err := New(eth, parent, lastSettled, loggingtest.New(tb, logging.Warn))
+	b, err := New(eth, parent, lastSettled, hooks(), loggingtest.New(tb, logging.Warn))
 	require.NoError(tb, err, "New()")
 	return b
 }
 
+// newChain returns a slice of contiguous-height blocks. Only the last-settled
+// height for the first in the chain is required, and any missing value will
+// default to the same as its parent. Blocks that settle their own height are
+// considered synchronous.
 func newChain(tb testing.TB, startHeight, total uint64, lastSettledAtHeight map[uint64]uint64) []*Block {
 	tb.Helper()
 
 	var (
-		ethParent *types.Block
-		parent    *Block
-		blocks    []*Block
+		ethParent         *types.Block
+		parent            *Block
+		synchronousParent = true
+		blocks            []*Block
 	)
 	byNum := make(map[uint64]*Block)
 
@@ -53,17 +85,32 @@ func newChain(tb testing.TB, startHeight, total uint64, lastSettledAtHeight map[
 			settle      *Block
 			synchronous bool
 		)
-		if s, ok := lastSettledAtHeight[n]; ok {
-			if s == n {
-				require.Zero(tb, s, "Only genesis block is self-settling")
-				synchronous = true
-			} else {
-				require.Less(tb, s, n, "Last-settled height MUST be <= current height")
-				settle = byNum[s]
+		switch s, ok := lastSettledAtHeight[n]; {
+		case ok && s == n:
+			if !synchronousParent {
+				tb.Fatal("Bad test setup: synchronous block after asynchronous")
 			}
+			synchronous = true
+
+		case ok && s != n:
+			require.Less(tb, s, n, "Last-settled height MUST be <= current height")
+			settle = byNum[s]
+
+		case i == 0:
+			tb.Fatal("Bad test setup: first block in chain MUST have last-settled height specified")
+
+		default:
+			settle = parent.LastSettled()
 		}
 
-		b := newBlock(tb, newEthBlock(n, n /*time*/, ethParent), parent, settle)
+		var ethB *types.Block
+		if synchronous {
+			ethB = newSynchronousEthBlock(tb, n, n /*time*/, ethParent)
+		} else {
+			ethB = newEthBlock(tb, n, n, ethParent, settle)
+		}
+
+		b := newBlock(tb, ethB, parent, settle)
 		byNum[n] = b
 		blocks = append(blocks, b)
 		if synchronous {
@@ -74,19 +121,28 @@ func newChain(tb testing.TB, startHeight, total uint64, lastSettledAtHeight map[
 
 		parent = byNum[n]
 		ethParent = parent.EthBlock()
+		synchronousParent = synchronous
 	}
 
 	return blocks
 }
 
 func TestSetAncestors(t *testing.T) {
-	parent := newBlock(t, newEthBlock(5, 5, nil), nil, nil)
-	lastSettled := newBlock(t, newEthBlock(3, 0, nil), nil, nil)
-	child := newEthBlock(6, 6, parent.EthBlock())
+	lastSettled := newBlock(
+		t,
+		newSynchronousEthBlock(t, 3, 0, nil),
+		nil, nil,
+	)
+	parent := newBlock(
+		t,
+		newEthBlock(t, 4, 5, lastSettled.EthBlock(), lastSettled),
+		lastSettled, lastSettled,
+	)
+	child := newEthBlock(t, 5, 6, parent.EthBlock(), lastSettled)
 
 	t.Run("incorrect_parent", func(t *testing.T) {
 		// Note that the arguments to [New] are inverted.
-		_, err := New(child, lastSettled, parent, loggingtest.New(t, logging.Warn))
+		_, err := New(child, lastSettled, parent, hooks(), loggingtest.New(t, logging.Warn))
 		require.ErrorIs(t, err, errParentHashMismatch, "New() with inverted parent and last-settled blocks")
 	})
 
@@ -107,14 +163,14 @@ func TestSetAncestors(t *testing.T) {
 	}
 
 	t.Run("incompatible_destination_block", func(t *testing.T) {
-		ethB := newEthBlock(source.Height(), source.BuildTime()+1 /*hash mismatch*/, parent.EthBlock())
+		ethB := newEthBlock(t, source.Height(), source.BuildTime()+1 /*hash mismatch*/, parent.EthBlock(), lastSettled)
 		dest := newBlock(t, ethB, nil, nil)
 		require.ErrorIs(t, dest.CopyAncestorsFrom(source), errHashMismatch)
 	})
 
 	t.Run("not_incrementing_height", func(t *testing.T) {
-		ethB := newEthBlock(parent.Height() /*not incrementing*/, parent.BuildTime(), parent.EthBlock())
-		_, err := New(ethB, parent, nil, nil)
+		ethB := newEthBlock(t, parent.Height() /*not incrementing*/, parent.BuildTime(), parent.EthBlock(), lastSettled)
+		_, err := New(ethB, parent, nil, hooks(), logging.NoLog{})
 		require.ErrorIs(t, err, errBlockHeightNotIncrementing)
 	})
 }

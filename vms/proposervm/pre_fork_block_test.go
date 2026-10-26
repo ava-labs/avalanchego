@@ -381,6 +381,64 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
+func TestBlockVerify_BootstrappingPostForkChildOfPreForkParent_PChainHeightNotReached(t *testing.T) {
+	// This test ensures that when the local P-chain is behind the height referenced by a child block,
+	// the child block will still verify if the VM is in bootstrapping state.
+	// This is important because during bootstrapping, the local P-chain may not be fully synced,
+	// and replicating a child block that references a higher P-chain height is fatal to the node if the check is enforced.
+
+	require := require.New(t)
+
+	forkActivationTime := snowmantest.GenesisTimestamp // activate fork immediately, genesis is the only pre-fork block
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, forkActivationTime)
+	defer func() {
+		require.NoError(proVM.Shutdown(t.Context()))
+	}()
+
+	// The local P-chain is behind the height referenced by the child.
+	localPChainHeight := defaultPChainHeight
+	valState.GetCurrentHeightF = func(context.Context) (uint64, error) {
+		return localPChainHeight, nil
+	}
+
+	coreBlk := snowmantest.BuildChild(snowmantest.Genesis)
+	coreBlk.TimestampV = snowmantest.GenesisTimestamp
+	coreVM.GetBlockF = func(_ context.Context, id ids.ID) (snowman.Block, error) {
+		switch id {
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		case coreBlk.ID():
+			return coreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	statelessChild, err := statelessblock.BuildUnsigned(
+		snowmantest.GenesisID,
+		coreBlk.Timestamp(),
+		localPChainHeight+1, // The child references a P-chain height that is higher than the local P-chain height.
+		statelessblock.Epoch{},
+		coreBlk.Bytes(),
+	)
+	require.NoError(err)
+	child := &postForkBlock{
+		SignedBlock: statelessChild,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: coreBlk,
+		},
+	}
+
+	// In normal operation the P-chain height check is enforced.
+	err = child.Verify(t.Context())
+	require.ErrorIs(err, errPChainHeightNotReached)
+
+	// While bootstrapping the local P-chain is not assumed to be synced.
+	require.NoError(proVM.SetState(t.Context(), snow.Bootstrapping))
+	require.NoError(child.Verify(t.Context()))
+}
+
 func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 	require := require.New(t)
 

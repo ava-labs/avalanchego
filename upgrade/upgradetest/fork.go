@@ -20,6 +20,7 @@ const (
 	Fortuna
 	Granite
 	Helicon
+	Igloo
 
 	Latest Fork = iota - 1
 )
@@ -29,6 +30,8 @@ type Fork int
 
 func (f Fork) String() string {
 	switch f {
+	case Igloo:
+		return "Igloo"
 	case Helicon:
 		return "Helicon"
 	case Granite:

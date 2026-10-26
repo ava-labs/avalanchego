@@ -20,7 +20,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/heap"
@@ -283,7 +282,7 @@ func inputUTXOs(b *types.Block, c *params.ChainConfig) (set.Set[ids.ID], error) 
 		inputs.Add(tx.AccountInputID(sender, t.Nonce()))
 	}
 
-	avaxTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	avaxTxs, err := tx.FromBlock(c, b)
 	if err != nil {
 		return nil, fmt.Errorf("parsing txs: %w", err)
 	}

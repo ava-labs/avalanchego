@@ -323,13 +323,12 @@ type ChitsHandler interface {
 	// Notify this engine of the response to a previously sent PullQuery or
 	// PushQuery message with the same requestID.
 	//
-	// It is expected, but not guaranteed, that preferredID transitively
-	// references preferredIDAtHeight and acceptedID.
+	// It is expected, but not guaranteed, that preferredIDAtHeight
+	// transitively references acceptedID.
 	Chits(
 		ctx context.Context,
 		nodeID ids.NodeID,
 		requestID uint32,
-		preferredID ids.ID,
 		preferredIDAtHeight ids.ID,
 		acceptedID ids.ID,
 		acceptedHeight uint64,

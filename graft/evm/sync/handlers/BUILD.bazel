@@ -20,6 +20,7 @@ go_library(
         "//graft/evm/utils",
         "//ids",
         "//utils/units",
+        "//vms/evm/sync/hashdb",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",

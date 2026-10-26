@@ -7,13 +7,17 @@ ARG AVALANCHEGO_NODE_IMAGE="invalid-image" # This value is not intended to be us
 # ============= Compilation Stage ================
 FROM antithesis-avalanchego-builder:$BUILDER_IMAGE_TAG AS builder
 
+# Dependencies are served from the host's local module-proxy cache.
+ENV GOPROXY=file:///gomodproxy,off
+
 # The builder workdir will vary between instrumented and non-instrumented builders
 ARG BUILDER_WORKDIR
 
 WORKDIR $BUILDER_WORKDIR
 
 # Build the workload
-RUN ./scripts/build_antithesis_avalanchego_workload.sh
+RUN --network=none --mount=type=bind,from=gomodcache,source=.,target=/gomodproxy,ro \
+    ./scripts/build_antithesis_avalanchego_workload.sh
 
 # ============= Cleanup Stage ================
 # Base the workflow on the node image to support bootstrap testing

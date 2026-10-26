@@ -57,10 +57,10 @@ func WithNodeIDs(nodeIDs ...ids.NodeID) Option {
 	})
 }
 
-// NewValidators creates a BLS warp validator set, each validator with weight 1
-// and a freshly generated BLS key. The number of validators is the larger of
-// the count set by [WithMinimum] and the number of NodeIDs. Any unspecified
-// NodeIDs are freshly generated.
+// NewValidators creates a BLS warp validator set, each validator with weight 1.
+// The number of validators is the larger of the count set by [WithMinimum] and
+// the number of NodeIDs. Any unspecified NodeIDs are freshly generated, and every
+// validator gets a freshly generated BLS key.
 func NewValidators(tb testing.TB, opts ...Option) *Validators {
 	tb.Helper()
 
@@ -77,7 +77,6 @@ func NewValidators(tb testing.TB, opts ...Option) *Validators {
 	for i, nodeID := range c.nodeIDs {
 		signer, err := localsigner.New()
 		require.NoError(tb, err, "localsigner.New()")
-
 		pk := signer.PublicKey()
 		pkBytes := bls.PublicKeyToUncompressedBytes(pk)
 		vdrs[i] = &validators.Warp{

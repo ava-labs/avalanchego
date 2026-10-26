@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
@@ -41,7 +41,6 @@ var (
 		PushGossipFrequency:                         time.Second,
 		PullGossipFrequency:                         time.Second,
 		PullGossipThrottlingPeriod:                  time.Second,
-		PullGossipRequestsPerValidator:              1,
 		ExpectedBloomFilterElements:                 10,
 		ExpectedBloomFilterFalsePositiveProbability: .1,
 		MaxBloomFilterFalsePositiveProbability:      .5,
@@ -54,7 +53,7 @@ type testTxVerifier struct {
 	err error
 }
 
-func (t testTxVerifier) VerifyTx(*txs.Tx) error {
+func (t testTxVerifier) VerifyTx(*platform.Tx) error {
 	return t.err
 }
 
@@ -64,7 +63,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		mempool       *pmempool.Mempool
 		txVerifier    testTxVerifier
 		appSenderFunc func(*gomock.Controller) common.AppSender
-		tx            *txs.Tx
+		tx            *platform.Tx
 		expectedErr   error
 	}
 
@@ -80,8 +79,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 					prometheus.NewRegistry(),
 				)
 				require.NoError(t, err)
-				require.NoError(t, mempool.Add(&txs.Tx{
-					Unsigned: &txs.BaseTx{
+				require.NoError(t, mempool.Add(&platform.Tx{
+					Unsigned: &platform.BaseTx{
 						BaseTx: avax.BaseTx{
 							Ins: []*avax.TransferableInput{
 								{
@@ -101,8 +100,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				return commonmock.NewSender(ctrl)
 			},
-			tx: &txs.Tx{
-				Unsigned: &txs.BaseTx{
+			tx: &platform.Tx{
+				Unsigned: &platform.BaseTx{
 					BaseTx: avax.BaseTx{
 						Ins: []*avax.TransferableInput{
 							{
@@ -137,8 +136,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				// Shouldn't gossip the tx
 				return commonmock.NewSender(ctrl)
 			},
-			tx: &txs.Tx{
-				Unsigned: &txs.BaseTx{
+			tx: &platform.Tx{
+				Unsigned: &platform.BaseTx{
 					BaseTx: avax.BaseTx{
 						Ins: []*avax.TransferableInput{
 							{
@@ -173,8 +172,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				// Shouldn't gossip the tx
 				return commonmock.NewSender(ctrl)
 			},
-			tx: &txs.Tx{
-				Unsigned: &txs.BaseTx{
+			tx: &platform.Tx{
+				Unsigned: &platform.BaseTx{
 					BaseTx: avax.BaseTx{
 						Ins: []*avax.TransferableInput{
 							{
@@ -203,8 +202,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				)
 				require.NoError(t, err)
 
-				tx := &txs.Tx{
-					Unsigned: &txs.BaseTx{
+				tx := &platform.Tx{
+					Unsigned: &platform.BaseTx{
 						BaseTx: avax.BaseTx{
 							Ins: []*avax.TransferableInput{
 								{
@@ -227,9 +226,9 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				// Shouldn't gossip the tx
 				return commonmock.NewSender(ctrl)
 			},
-			tx: func() *txs.Tx {
-				tx := &txs.Tx{
-					Unsigned: &txs.BaseTx{
+			tx: func() *platform.Tx {
+				tx := &platform.Tx{
+					Unsigned: &platform.BaseTx{
 						BaseTx: avax.BaseTx{
 							Ins: []*avax.TransferableInput{
 								{
@@ -267,9 +266,9 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				// Shouldn't gossip the tx
 				return commonmock.NewSender(ctrl)
 			},
-			tx: func() *txs.Tx {
-				return &txs.Tx{
-					Unsigned: &txs.BaseTx{
+			tx: func() *platform.Tx {
+				return &platform.Tx{
+					Unsigned: &platform.BaseTx{
 						BaseTx: avax.BaseTx{
 							Ins: []*avax.TransferableInput{
 								{
@@ -305,8 +304,8 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 				return appSender
 			},
-			tx: &txs.Tx{
-				Unsigned: &txs.BaseTx{
+			tx: &platform.Tx{
+				Unsigned: &platform.BaseTx{
 					BaseTx: avax.BaseTx{
 						Ins: []*avax.TransferableInput{
 							{

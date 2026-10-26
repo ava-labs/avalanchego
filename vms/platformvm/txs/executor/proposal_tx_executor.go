@@ -14,9 +14,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -33,7 +33,7 @@ const (
 )
 
 var (
-	_ txs.Visitor = (*proposalTxExecutor)(nil)
+	_ platform.TxVisitor = (*proposalTxExecutor)(nil)
 
 	ErrRemoveStakerTooEarly          = errors.New("attempting to remove staker before their end time")
 	ErrRemoveWrongStaker             = errors.New("attempting to remove wrong staker")
@@ -60,7 +60,7 @@ var (
 func ProposalTx(
 	backend *Backend,
 	feeCalculator fee.Calculator,
-	tx *txs.Tx,
+	tx *platform.Tx,
 	onCommitState *state.Diff,
 	onAbortState *state.Diff,
 ) error {
@@ -82,7 +82,7 @@ type proposalTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	backend       *Backend
 	feeCalculator fee.Calculator
-	tx            *txs.Tx
+	tx            *platform.Tx
 	// [onCommitState] is the state used for validation.
 	// [onCommitState] is modified by this struct's methods to
 	// reflect changes made to the state if the proposal is committed.
@@ -92,75 +92,75 @@ type proposalTxExecutor struct {
 	onAbortState *state.Diff
 }
 
-func (*proposalTxExecutor) CreateChainTx(*txs.CreateChainTx) error {
+func (*proposalTxExecutor) CreateChainTx(*platform.CreateChainTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) CreateSubnetTx(*txs.CreateSubnetTx) error {
+func (*proposalTxExecutor) CreateSubnetTx(*platform.CreateSubnetTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) ImportTx(*txs.ImportTx) error {
+func (*proposalTxExecutor) ImportTx(*platform.ImportTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) ExportTx(*txs.ExportTx) error {
+func (*proposalTxExecutor) ExportTx(*platform.ExportTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
+func (*proposalTxExecutor) RemoveSubnetValidatorTx(*platform.RemoveSubnetValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) TransformSubnetTx(*txs.TransformSubnetTx) error {
+func (*proposalTxExecutor) TransformSubnetTx(*platform.TransformSubnetTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) AddPermissionlessValidatorTx(*txs.AddPermissionlessValidatorTx) error {
+func (*proposalTxExecutor) AddPermissionlessValidatorTx(*platform.AddPermissionlessValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) AddPermissionlessDelegatorTx(*txs.AddPermissionlessDelegatorTx) error {
+func (*proposalTxExecutor) AddPermissionlessDelegatorTx(*platform.AddPermissionlessDelegatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) TransferSubnetOwnershipTx(*txs.TransferSubnetOwnershipTx) error {
+func (*proposalTxExecutor) TransferSubnetOwnershipTx(*platform.TransferSubnetOwnershipTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) BaseTx(*txs.BaseTx) error {
+func (*proposalTxExecutor) BaseTx(*platform.BaseTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) ConvertSubnetToL1Tx(*txs.ConvertSubnetToL1Tx) error {
+func (*proposalTxExecutor) ConvertSubnetToL1Tx(*platform.ConvertSubnetToL1Tx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) RegisterL1ValidatorTx(*txs.RegisterL1ValidatorTx) error {
+func (*proposalTxExecutor) RegisterL1ValidatorTx(*platform.RegisterL1ValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) SetL1ValidatorWeightTx(*txs.SetL1ValidatorWeightTx) error {
+func (*proposalTxExecutor) SetL1ValidatorWeightTx(*platform.SetL1ValidatorWeightTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBalanceTx) error {
+func (*proposalTxExecutor) IncreaseL1ValidatorBalanceTx(*platform.IncreaseL1ValidatorBalanceTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
+func (*proposalTxExecutor) DisableL1ValidatorTx(*platform.DisableL1ValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) AddAutoRenewedValidatorTx(*txs.AddAutoRenewedValidatorTx) error {
+func (*proposalTxExecutor) AddAutoRenewedValidatorTx(*platform.AddAutoRenewedValidatorTx) error {
 	return ErrWrongTxType
 }
 
-func (*proposalTxExecutor) SetAutoRenewedValidatorConfigTx(*txs.SetAutoRenewedValidatorConfigTx) error {
+func (*proposalTxExecutor) SetAutoRenewedValidatorConfigTx(*platform.SetAutoRenewedValidatorConfigTx) error {
 	return ErrWrongTxType
 }
 
-func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
+func (e *proposalTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 	// AddValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddValidatorTxs must be issued into
 	// StandardBlocks.
@@ -210,7 +210,7 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	return nil
 }
 
-func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidatorTx) error {
 	// AddSubnetValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddSubnetValidatorTxs must be
 	// issued into StandardBlocks.
@@ -259,7 +259,7 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) 
 	return nil
 }
 
-func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+func (e *proposalTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 	// AddDelegatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddDelegatorTxs must be issued into
 	// StandardBlocks.
@@ -307,10 +307,10 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	return nil
 }
 
-func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
+func (e *proposalTxExecutor) AdvanceTimeTx(tx *platform.AdvanceTimeTx) error {
 	switch {
 	case tx == nil:
-		return txs.ErrNilTx
+		return platform.ErrNilTx
 	case len(e.tx.Creds) != 0:
 		return errWrongNumberOfCredentials
 	}
@@ -341,10 +341,10 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *txs.AdvanceTimeTx) error {
 	return err
 }
 
-func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error {
+func (e *proposalTxExecutor) RewardValidatorTx(tx *platform.RewardValidatorTx) error {
 	switch {
 	case tx == nil:
-		return txs.ErrNilTx
+		return platform.ErrNilTx
 	case tx.TxID == ids.Empty:
 		return ErrInvalidID
 	case len(e.tx.Creds) != 0:
@@ -358,11 +358,11 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 
 	// Dispatch on the concrete staker type. Only these four are rewarded here.
 	//
-	// [*txs.AddAutoRenewedValidatorTx] also implements [txs.ValidatorTx] but is
-	// rewarded through [txs.RewardAutoRenewedValidatorTx].
+	// [*platform.AddAutoRenewedValidatorTx] also implements [platform.ValidatorTx] but is
+	// rewarded through [platform.RewardAutoRenewedValidatorTx].
 	switch uStakerTx := stakerTx.Unsigned.(type) {
-	case *txs.AddValidatorTx, *txs.AddPermissionlessValidatorTx:
-		if err := e.rewardValidatorTx(uStakerTx.(txs.ValidatorTx), stakerToReward); err != nil {
+	case *platform.AddValidatorTx, *platform.AddPermissionlessValidatorTx:
+		if err := e.rewardValidatorTx(uStakerTx.(platform.ValidatorTx), stakerToReward); err != nil {
 			return err
 		}
 
@@ -374,8 +374,8 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 		if err := e.onAbortState.DeleteCurrentValidator(stakerToReward); err != nil {
 			return fmt.Errorf("deleting current validator from abort state: %w", err)
 		}
-	case *txs.AddDelegatorTx, *txs.AddPermissionlessDelegatorTx:
-		if err := e.rewardDelegatorTx(uStakerTx.(txs.DelegatorTx), stakerToReward); err != nil {
+	case *platform.AddDelegatorTx, *platform.AddPermissionlessDelegatorTx:
+		if err := e.rewardDelegatorTx(uStakerTx.(platform.DelegatorTx), stakerToReward); err != nil {
 			return err
 		}
 
@@ -411,7 +411,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 //   - NextPeriod == 0: the validator gracefully exits. It is removed, its
 //     principal is returned, and it receives all rewards for the cycle (current
 //     potential reward + accrued validation rewards + all delegatee rewards).
-func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRenewedValidatorTx) error {
+func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAutoRenewedValidatorTx) error {
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
 	}
@@ -432,7 +432,7 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *txs.RewardAutoRene
 		return err
 	}
 
-	uStakerTx, ok := stakerTx.Unsigned.(*txs.AddAutoRenewedValidatorTx)
+	uStakerTx, ok := stakerTx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
 	if !ok {
 		return errShouldBeAutoRenewedStaker
 	}
@@ -519,7 +519,7 @@ func (e *proposalTxExecutor) undoSupplyMintOnAbort(staker *state.Staker) error {
 	return nil
 }
 
-func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, validator *state.Staker) error {
+func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx platform.ValidatorTx, validator *state.Staker) error {
 	var (
 		txID    = validator.TxID
 		stake   = uValidatorTx.Stake()
@@ -602,7 +602,7 @@ func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	return nil
 }
 
-func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, delegator *state.Staker) error {
+func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx platform.DelegatorTx, delegator *state.Staker) error {
 	var (
 		txID    = delegator.TxID
 		stake   = uDelegatorTx.Stake()
@@ -627,10 +627,10 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 	}
 
 	// Invariant: Delegators must only be able to reference validator
-	//            transactions that implement [txs.ValidatorTx]. All
+	//            transactions that implement [platform.ValidatorTx]. All
 	//            validator transactions implement this interface except the
 	//            AddSubnetValidatorTx.
-	vdrTx, ok := vdrTxIntf.Unsigned.(txs.ValidatorTx)
+	vdrTx, ok := vdrTxIntf.Unsigned.(platform.ValidatorTx)
 	if !ok {
 		return ErrWrongTxType
 	}
@@ -713,7 +713,7 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 // auto-renewed validator. This includes accrued validation rewards and
 // all delegatee rewards (accrued + pending).
 func (e *proposalTxExecutor) mintRewardOnAbort(
-	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
+	addAutoRenewedValidatorTx *platform.AddAutoRenewedValidatorTx,
 	stakingInfo state.StakingInfo,
 ) error {
 	// DelegateeReward tracks pending commission from completed delegator periods.
@@ -740,7 +740,7 @@ func (e *proposalTxExecutor) mintRewardOnAbort(
 // UTXOs a prior call already added to the same diff, so a second call would
 // reuse the same (txID, outputIndex) pairs and collide on UTXO IDs.
 func (e *proposalTxExecutor) mintRewards(
-	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
+	addAutoRenewedValidatorTx *platform.AddAutoRenewedValidatorTx,
 	validationRewards uint64,
 	delegateeRewards uint64,
 	chainState *state.Diff,
@@ -784,7 +784,7 @@ func (e *proposalTxExecutor) mintRewards(
 //  4. Increases validator weight and accrued rewards by the restaking portion
 //  5. Updates the validator state
 func (e *proposalTxExecutor) restakeAutoRenewedValidatorOnCommit(
-	addAutoRenewedValidatorTx *txs.AddAutoRenewedValidatorTx,
+	addAutoRenewedValidatorTx *platform.AddAutoRenewedValidatorTx,
 	validator *state.Staker,
 	stakingInfo state.StakingInfo,
 ) error {
@@ -980,7 +980,7 @@ func (e *proposalTxExecutor) newUTXO(
 
 // unstakeUTXOs creates UTXOs to unstake a staker's staked UTXOs.
 // The UTXOs are added to all provided state diffs.
-func unstakeUTXOs(stakerTx txs.PermissionlessStaker, txID ids.ID, state *state.Diff) {
+func unstakeUTXOs(stakerTx platform.PermissionlessStaker, txID ids.ID, state *state.Diff) {
 	outputIndexOffset := len(stakerTx.Outputs())
 
 	for i, out := range stakerTx.Stake() {
@@ -997,7 +997,7 @@ func unstakeUTXOs(stakerTx txs.PermissionlessStaker, txID ids.ID, state *state.D
 	}
 }
 
-func getNextStakerToReward(chainState state.Chain, tx txs.RewardTx) (*txs.Tx, *state.Staker, error) {
+func getNextStakerToReward(chainState state.Chain, tx platform.RewardTx) (*platform.Tx, *state.Staker, error) {
 	currentStakerIterator, err := chainState.GetCurrentStakerIterator()
 	if err != nil {
 		return nil, nil, err

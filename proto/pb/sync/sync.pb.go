@@ -25,10 +25,10 @@ type GetLeafRequest struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	RootHash []byte                 `protobuf:"bytes,1,opt,name=root_hash,json=rootHash,proto3" json:"root_hash,omitempty"`
 	// Empty for account trie, non-empty for storage trie.
-	AccountHash   []byte `protobuf:"bytes,2,opt,name=account_hash,json=accountHash,proto3" json:"account_hash,omitempty"`
+	AccountHash []byte `protobuf:"bytes,2,opt,name=account_hash,json=accountHash,proto3" json:"account_hash,omitempty"`
+	// Empty for the first key.
 	StartKey      []byte `protobuf:"bytes,3,opt,name=start_key,json=startKey,proto3" json:"start_key,omitempty"`
-	EndKey        []byte `protobuf:"bytes,4,opt,name=end_key,json=endKey,proto3" json:"end_key,omitempty"`
-	KeyLimit      uint32 `protobuf:"varint,5,opt,name=key_limit,json=keyLimit,proto3" json:"key_limit,omitempty"`
+	KeyLimit      uint32 `protobuf:"varint,4,opt,name=key_limit,json=keyLimit,proto3" json:"key_limit,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -80,13 +80,6 @@ func (x *GetLeafRequest) GetAccountHash() []byte {
 func (x *GetLeafRequest) GetStartKey() []byte {
 	if x != nil {
 		return x.StartKey
-	}
-	return nil
-}
-
-func (x *GetLeafRequest) GetEndKey() []byte {
-	if x != nil {
-		return x.EndKey
 	}
 	return nil
 }
@@ -1054,13 +1047,12 @@ var File_sync_sync_proto protoreflect.FileDescriptor
 
 const file_sync_sync_proto_rawDesc = "" +
 	"\n" +
-	"\x0fsync/sync.proto\x12\x04sync\"\xa3\x01\n" +
+	"\x0fsync/sync.proto\x12\x04sync\"\x8a\x01\n" +
 	"\x0eGetLeafRequest\x12\x1b\n" +
 	"\troot_hash\x18\x01 \x01(\fR\brootHash\x12!\n" +
 	"\faccount_hash\x18\x02 \x01(\fR\vaccountHash\x12\x1b\n" +
-	"\tstart_key\x18\x03 \x01(\fR\bstartKey\x12\x17\n" +
-	"\aend_key\x18\x04 \x01(\fR\x06endKey\x12\x1b\n" +
-	"\tkey_limit\x18\x05 \x01(\rR\bkeyLimit\"\\\n" +
+	"\tstart_key\x18\x03 \x01(\fR\bstartKey\x12\x1b\n" +
+	"\tkey_limit\x18\x04 \x01(\rR\bkeyLimit\"\\\n" +
 	"\x0fGetLeafResponse\x12\x12\n" +
 	"\x04keys\x18\x01 \x03(\fR\x04keys\x12\x16\n" +
 	"\x06values\x18\x02 \x03(\fR\x06values\x12\x1d\n" +

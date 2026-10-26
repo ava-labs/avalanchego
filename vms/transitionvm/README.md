@@ -7,8 +7,7 @@ stay connected and APIs keep working across the swap.
 
 It is a [`block.ChainVM`](../../snow/engine/snowman/block/vm.go) wrapping a
 *pre-transition* and a *post-transition* [`Chain`](vm.go), forwarding every call
-to whichever is active. Its first use is the C-Chain's Coreth-to-SAEVM migration
-at Helicon.
+to whichever is active.
 
 The two VMs are not independent. They share one database and block history, so
 they must agree on layout and block format, and each must handle the other's
@@ -25,10 +24,11 @@ Construct one from a [`Factory`](factory.go) with the two factories and the swit
 time:
 
 ```go
-n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &transitionvm.Factory{
-    PreFactory:      &coreth.Factory{},
-    PostFactory:     &saevm.Factory{},
-    TransitionTime:  n.Config.UpgradeConfig.HeliconTime.Add(-10 * time.Second),
+n.VMManager.RegisterFactory(context.TODO(), vmID, &transitionvm.Factory{
+    PreFactory:      preFactory,  // the VM before the switch
+    PostFactory:     postFactory, // the VM after the switch
+    TransitionTime:  upgradeTime.Add(-10 * time.Second),
+    Now:             time.Now,
     APIDrainTimeout: 15 * time.Second,
 })
 ```
@@ -84,6 +84,50 @@ flowchart TD
     class E errCls;
 ```
 
+### Eager transition for state sync
+
+The engine runs state sync once, at startup, against the active VM — but a
+node starting after the transition faces peers that serve only the
+post-transition VM's summaries. So a node transitions *eagerly* during
+initialization when the wall clock is past the transition time, the network is
+a production network (Mainnet or Fuji), the chain is still at the genesis, and
+the node intends to state sync. The marker is written before the sync runs, so
+the commitment is **one-way**.
+
+Only production networks get the eager path. The real requirement is that the
+network sequenced at least one commit interval of blocks after the
+transition, so peers have a post-transition summary to serve; production
+networks are known to satisfy it, while a custom network may transition right
+at its genesis and strand an eagerly-committed node.
+
+The eager path requires of the VMs:
+
+- The **pre-transition VM reports during initialization whether the node will
+  state sync**.
+- The **post-transition VM state syncs a fresh database** whenever it can sync
+  at all: a node at the genesis cannot execute a chain with a synchronous
+  prefix. A node with accepted blocks is refused instead — it never
+  transitions eagerly, and bootstrap-executes to the transition block. A
+  summary at a pre-transition height is rejected once its fetched header
+  proves it synchronous, before any state is written.
+
+A committed node never falls back to executing pre-transition blocks, so it
+strands until a summary it accepts arrives — or forever:
+
+- **A wall-clock false positive** — a skewed clock, or a network that has not
+  yet built the transition block — strands the node until the network
+  transitions.
+- **No post-transition commit boundary yet**: nothing to sync to; resolves
+  itself.
+- **State sync disabled after the marker is written**: the engine skips state
+  sync entirely and falls into a bootstrap it cannot execute.
+- **State schemes that cannot sync** (Firewood): every summary is declined,
+  forever.
+
+To recover, delete the chain database and restart. For never-syncable
+configurations, also disable state sync in the new configuration; on the
+already-marked node the flag no longer helps.
+
 ### Swapping the VM underneath the node
 
 The consensus engine, network, and API server treat a chain's VM as one
@@ -98,8 +142,8 @@ flowchart TB
 
     subgraph VM["TransitionVM"]
         active{{"active VM"}}
-        pre["pre-transition VM<br/>(Coreth)"]
-        post["post-transition VM<br/>(SAEVM)"]
+        pre["pre-transition VM"]
+        post["post-transition VM"]
         pre ==>|"hands over consensus state, preference,<br/>peer connections, HTTP routes"| post
     end
 

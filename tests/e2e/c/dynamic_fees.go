@@ -4,23 +4,25 @@
 package c
 
 import (
+	"context"
 	"math/big"
 	"strings"
-	"time"
 
 	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/params"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/cortina"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
 )
 
 // This test uses the compiled bytecode for `consume_gas.sol` as well as its ABI
@@ -55,7 +57,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		gasTipCap = big.NewInt(minFeePerGas)
 	)
 
-	ginkgo.It("should ensure that the gas price is affected by load", func() {
+	ginkgo.It("should ensure that the gas price is affected by load", ginkgo.Label(e2e.SkipSharedNetworkBootstrapCheckLabel), func() {
 		tc.By("creating a new private network to ensure isolation from other tests")
 		env := e2e.GetEnv(tc)
 		publicNetwork := env.GetNetwork()
@@ -78,7 +80,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		key := privateNetwork.PreFundedKeys[0]
 		ethAddress := key.EthAddress()
 
-		tc.By("initializing a coreth client")
+		tc.By("initializing a cchain client")
 		node := privateNetwork.Nodes[0]
 		nodeURI := tmpnet.NodeURI{
 			NodeID: node.NodeID,
@@ -97,20 +99,9 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			return signedTx
 		}
 
-		// gasLimit is the maximum amount of gas that can be used in a block.
-		var gasLimit uint64
-		tc.By("checking if Fortuna is activated", func() {
-			infoClient := info.NewClient(nodeURI.URI)
-			upgrades, err := infoClient.Upgrades(tc.DefaultContext())
-			require.NoError(err)
-
-			now := time.Now()
-			if upgrades.IsFortunaActivated(now) {
-				gasLimit = acp176.MinMaxCapacity
-			} else {
-				gasLimit = cortina.GasLimit
-			}
-		})
+		// Each transaction burns all its gas to raise the base fee, so it uses a
+		// full block at the minimum target.
+		gasLimit := uint64(worstcase.SafeMaxBlockSize(dynamic.MinTarget * gastime.TargetToRate))
 		tc.Log().Info("set gas limit",
 			zap.Uint64("gasLimit", gasLimit),
 		)
@@ -120,7 +111,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		// the block that includes them is fully executed. It is not safe to
 		// assume that the "latest" block's nonce has been updated to reflect a
 		// transaction whose receipt has been returned.
-		nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), ethAddress)
+		nonce, err := ethClient.NonceAt(tc.DefaultContext(), ethAddress, nil)
 		require.NoError(err)
 
 		var contractAddress common.Address
@@ -145,7 +136,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 			nonce++
 		})
 
-		initialGasPrice, err := ethClient.EstimateBaseFee(tc.DefaultContext())
+		initialGasPrice, err := estimateBaseFee(tc.DefaultContext(), ethClient)
 		require.NoError(err)
 
 		targetGasPrice := new(big.Int).Set(initialGasPrice)
@@ -167,7 +158,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 
 			tc.Eventually(func() bool {
 				// Check the gas price
-				gasPrice, err := ethClient.EstimateBaseFee(tc.DefaultContext())
+				gasPrice, err := estimateBaseFee(tc.DefaultContext(), ethClient)
 				require.NoError(err)
 
 				// If the gas price has increased, stop the loop.
@@ -217,7 +208,7 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		tc.By("sending small transactions until a sufficient gas price decrease is detected", func() {
 			tc.Eventually(func() bool {
 				// Check the gas price
-				gasPrice, err := ethClient.EstimateBaseFee(tc.DefaultContext())
+				gasPrice, err := estimateBaseFee(tc.DefaultContext(), ethClient)
 				require.NoError(err)
 
 				// If the gas price has decreased, stop the loop.
@@ -258,3 +249,12 @@ var _ = e2e.DescribeCChain("[Dynamic Fees]", func() {
 		_ = e2e.CheckBootstrapIsPossible(tc, privateNetwork)
 	})
 })
+
+// estimateBaseFee returns the node's estimate of the next block's base fee.
+func estimateBaseFee(ctx context.Context, c *ethclient.Client) (*big.Int, error) {
+	var baseFee hexutil.Big
+	if err := c.Client().CallContext(ctx, &baseFee, "eth_baseFee"); err != nil {
+		return nil, err
+	}
+	return baseFee.ToInt(), nil
+}

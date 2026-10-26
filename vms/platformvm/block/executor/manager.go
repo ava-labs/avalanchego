@@ -8,13 +8,15 @@ import (
 	"errors"
 	"fmt"
 
+	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/metrics"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
@@ -40,12 +42,12 @@ type Manager interface {
 	Preferred() ids.ID
 
 	GetBlock(blkID ids.ID) (snowman.Block, error)
-	GetStatelessBlock(blkID ids.ID) (block.Block, error)
-	NewBlock(block.Block) snowman.Block
+	GetStatelessBlock(blkID ids.ID) (platform.Block, error)
+	NewBlock(platform.Block) snowman.Block
 
 	// VerifyTx verifies that the transaction can be issued based on the currently
 	// preferred state. This should *not* be used to verify transactions in a block.
-	VerifyTx(tx *txs.Tx) error
+	VerifyTx(tx *platform.Tx) error
 
 	// VerifyUniqueInputs verifies that the inputs are not duplicated in the
 	// provided blk or any of its ancestors pinned in memory.
@@ -86,8 +88,8 @@ func NewManager(
 
 type manager struct {
 	*backend
-	acceptor block.Visitor
-	rejector block.Visitor
+	acceptor platform.BlockVisitor
+	rejector platform.BlockVisitor
 
 	preferred         ids.ID
 	preferredCtx      *snowmanblock.Context
@@ -102,11 +104,11 @@ func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	return m.NewBlock(blk), nil
 }
 
-func (m *manager) GetStatelessBlock(blkID ids.ID) (block.Block, error) {
+func (m *manager) GetStatelessBlock(blkID ids.ID) (platform.Block, error) {
 	return m.backend.GetBlock(blkID)
 }
 
-func (m *manager) NewBlock(blk block.Block) snowman.Block {
+func (m *manager) NewBlock(blk platform.Block) snowman.Block {
 	return &Block{
 		manager: m,
 		Block:   blk,
@@ -122,7 +124,7 @@ func (m *manager) Preferred() ids.ID {
 	return m.preferred
 }
 
-func (m *manager) VerifyTx(tx *txs.Tx) error {
+func (m *manager) VerifyTx(tx *platform.Tx) error {
 	if !m.txExecutorBackend.Bootstrapped.Get() {
 		return ErrChainNotSynced
 	}
@@ -131,9 +133,13 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	// UTXO set from shared memory. To avoid issuing invalid transactions,
 	// issuance of an ImportTx during this state is completely disallowed.
 	if m.txExecutorBackend.Config.PartialSyncPrimaryNetwork {
-		if _, isImportTx := tx.Unsigned.(*txs.ImportTx); isImportTx {
+		if _, isImportTx := tx.Unsigned.(*platform.ImportTx); isImportTx {
 			return ErrImportTxWhilePartialSyncing
 		}
+	}
+
+	if err := m.verifyTransactionSizePreHelicon(tx); err != nil {
+		return err
 	}
 
 	var (
@@ -214,4 +220,17 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 
 func (m *manager) VerifyUniqueInputs(blkID ids.ID, inputs set.Set[ids.ID]) error {
 	return m.backend.verifyUniqueInputs(blkID, inputs)
+}
+
+func (m *manager) verifyTransactionSizePreHelicon(tx *platform.Tx) error {
+	if !m.txExecutorBackend.Config.UpgradeConfig.IsHeliconActivated(m.txExecutorBackend.Clk.Time()) {
+		txSize := tx.Size()
+		if txSize > codec.DefaultMaxSize {
+			m.ctx.Log.Debug("transaction verification failed, transaction too big",
+				zap.Int("txSize", txSize), zap.Int("maxTxSize", codec.DefaultMaxSize))
+			return ErrTxTooBigPreHelicon
+		}
+	}
+
+	return nil
 }

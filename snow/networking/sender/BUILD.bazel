@@ -40,7 +40,7 @@ go_test(
         "//ids",
         "//message",
         "//message/messagemock",
-        "//network/p2p",
+        "//network/p2p/peertracker",
         "//proto/pb/p2p",
         "//snow",
         "//snow/engine/common",

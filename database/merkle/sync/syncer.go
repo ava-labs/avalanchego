@@ -19,7 +19,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/merkle/sync/protoutils"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
@@ -139,14 +139,14 @@ type Syncer[R any, C any] struct {
 	closeOnce sync.Once
 
 	stateSyncNodeIdx uint32
-	metrics          SyncMetrics
+	metrics          *syncerMetrics
 }
 
 // TODO remove non-config values out of this struct
 type Config[R any, C any] struct {
 	RangeProofMarshaler   Marshaler[R]
 	ChangeProofMarshaler  Marshaler[C]
-	ProofClient           *p2p.Client
+	ProofClient           *peertracker.Client
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
@@ -174,7 +174,7 @@ func NewSyncer[R any, C any](
 		return nil, ErrZeroWorkLimit
 	}
 
-	metrics, err := NewMetrics("sync", registerer)
+	metrics, err := newSyncerMetrics("sync", registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +242,7 @@ func (s *Syncer[_, _]) setup(ctx context.Context) (context.Context, error) {
 	s.unprocessedWork.Insert(newWorkItem(ids.Empty, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), lowPriority, time.Now()))
 
 	s.syncing = true
-	ctx, s.cancelCtx = context.WithCancel(ctx)
+	ctx, s.cancelCtx = context.WithCancel(ctx) //#nosec G118 -- workLoop defers close(), and close() calls s.cancelCtx.
 	return ctx, nil
 }
 
@@ -418,24 +418,27 @@ func (s *Syncer[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, err error) {
+	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, err error) bool {
 		defer s.finishWorkItem()
 
 		if err := s.handleChangeProofResponse(ctx, targetRootID, work, changeReq, responseBytes, err); err != nil {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
-			return
+			// Our own shutdown is not the peer's fault.
+			return errors.Is(err, ErrAlreadyClosed)
 		}
+
+		return true
 	}
 
-	if err := s.sendRequest(ctx, s.config.ProofClient, requestBytes, onResponse); err != nil {
+	if err := s.sendRequest(ctx, requestBytes, onResponse); err != nil {
 		s.finishWorkItem()
 		s.setError(err)
 		return
 	}
 
-	s.metrics.RequestMade()
+	s.metrics.requestMade()
 }
 
 // Fetch and apply the range proof given by [work].
@@ -473,32 +476,35 @@ func (s *Syncer[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) {
+	onResponse := func(ctx context.Context, _ ids.NodeID, responseBytes []byte, appErr error) bool {
 		defer s.finishWorkItem()
 
 		if err := s.handleRangeProofResponse(ctx, targetRootID, work, rangeReq, responseBytes, appErr); err != nil {
 			// TODO log responses
 			s.config.Log.Debug("dropping response", zap.Error(err), zap.Stringer("request", request))
 			s.retryWork(work)
-			return
+			// Our own shutdown is not the peer's fault.
+			return errors.Is(err, ErrAlreadyClosed)
 		}
+
+		return true
 	}
 
-	if err := s.sendRequest(ctx, s.config.ProofClient, requestBytes, onResponse); err != nil {
+	if err := s.sendRequest(ctx, requestBytes, onResponse); err != nil {
 		s.finishWorkItem()
 		s.setError(err)
 		return
 	}
 
-	s.metrics.RequestMade()
+	s.metrics.requestMade()
 }
 
 func (s *Syncer[_, _]) sendRequest(
 	ctx context.Context,
-	client *p2p.Client,
 	requestBytes []byte,
-	onResponse p2p.AppResponseCallback,
+	onResponse peertracker.ResponseVerifier,
 ) error {
+	client := s.config.ProofClient
 	if len(s.config.StateSyncNodes) == 0 {
 		return client.AppRequestAny(ctx, requestBytes, onResponse)
 	}
@@ -529,11 +535,11 @@ func (s *Syncer[_, _]) shouldHandleResponse(
 	err error,
 ) error {
 	if err != nil {
-		s.metrics.RequestFailed()
+		s.metrics.requestFailed()
 		return err
 	}
 
-	s.metrics.RequestSucceeded()
+	s.metrics.requestSucceeded()
 
 	// TODO can we remove this?
 	select {
@@ -573,30 +579,20 @@ func (s *Syncer[R, _]) handleRangeProofResponse(
 		return err
 	}
 
-	root, err := ids.ToID(request.RootHash)
-	if err != nil {
-		return err
-	}
+	s.metrics.proofReceived(proofTypeRange, len(responseBytes))
 
-	if err := s.db.VerifyRangeProof(
+	if err := s.verifyAndCommitRangeProof(
 		ctx,
+		targetRootID,
+		work,
 		rangeProof,
 		protoutils.ProtoToMaybe(request.StartKey),
 		protoutils.ProtoToMaybe(request.EndKey),
-		root,
+		targetRootID,
 		int(request.KeyLimit),
 	); err != nil {
 		return fmt.Errorf("%w: %w", errInvalidRangeProof, err)
 	}
-
-	// Replace all the key-value pairs in the DB from start to end with values from the response.
-	nextKey, err := s.db.CommitRangeProof(ctx, work.start, work.end, rangeProof)
-	if err != nil {
-		s.setError(err)
-		return nil
-	}
-
-	s.completeWorkItem(work, nextKey, targetRootID)
 	return nil
 }
 
@@ -619,11 +615,6 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 
 	startKey := protoutils.ProtoToMaybe(request.StartKey)
 	endKey := protoutils.ProtoToMaybe(request.EndKey)
-	endRoot, err := ids.ToID(request.EndRootHash)
-	if err != nil {
-		return err
-	}
-
 	switch response := response.Response.(type) {
 	case *pb.ProofResponse_ChangeProof:
 		// The server had enough history to send us a change proof
@@ -631,19 +622,27 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 		if err != nil {
 			return err
 		}
-		if err := s.db.VerifyChangeProof(
+
+		s.metrics.proofReceived(proofTypeChange, len(responseBytes))
+
+		verificationStart := time.Now()
+		err = s.db.VerifyChangeProof(
 			ctx,
 			changeProof,
 			startKey,
 			endKey,
-			endRoot,
+			targetRootID,
 			int(request.KeyLimit),
-		); err != nil {
+		)
+		s.metrics.observeVerification(proofTypeChange, time.Since(verificationStart), err)
+		if err != nil {
 			return fmt.Errorf("%w due to %w", errInvalidChangeProof, err)
 		}
 
 		// if the proof wasn't empty, apply changes to the sync DB
+		commitStart := time.Now()
 		nextKey, err := s.db.CommitChangeProof(ctx, endKey, changeProof)
+		s.metrics.observeCommit(proofTypeChange, time.Since(commitStart), err)
 		if err != nil {
 			s.setError(err)
 			return nil
@@ -656,27 +655,20 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 			return err
 		}
 
+		s.metrics.proofReceived(proofTypeRange, len(responseBytes))
+
 		// The server did not have enough history to send us a change proof
 		// so they sent a range proof instead.
-		if err := s.db.VerifyRangeProof(
+		return s.verifyAndCommitRangeProof(
 			ctx,
+			targetRootID,
+			work,
 			rangeProof,
 			startKey,
 			endKey,
-			endRoot,
+			targetRootID,
 			int(request.KeyLimit),
-		); err != nil {
-			return err
-		}
-
-		// Add all the key-value pairs we got to the database.
-		nextKey, err := s.db.CommitRangeProof(ctx, work.start, work.end, rangeProof)
-		if err != nil {
-			s.setError(err)
-			return nil
-		}
-
-		s.completeWorkItem(work, nextKey, targetRootID)
+		)
 	default:
 		return fmt.Errorf(
 			"%w: %T",
@@ -684,6 +676,38 @@ func (s *Syncer[R, C]) handleChangeProofResponse(
 		)
 	}
 
+	return nil
+}
+
+// verifyAndCommitRangeProof verifies rangeProof for the keys in [start, end]
+// against root, replaces that key range in the database with the proof's
+// key-value pairs, and marks work complete.
+func (s *Syncer[R, _]) verifyAndCommitRangeProof(
+	ctx context.Context,
+	targetRootID ids.ID,
+	work *workItem,
+	rangeProof R,
+	start maybe.Maybe[[]byte],
+	end maybe.Maybe[[]byte],
+	root ids.ID,
+	keyLimit int,
+) error {
+	verificationStart := time.Now()
+	err := s.db.VerifyRangeProof(ctx, rangeProof, start, end, root, keyLimit)
+	s.metrics.observeVerification(proofTypeRange, time.Since(verificationStart), err)
+	if err != nil {
+		return err
+	}
+
+	commitStart := time.Now()
+	nextKey, err := s.db.CommitRangeProof(ctx, work.start, work.end, rangeProof)
+	s.metrics.observeCommit(proofTypeRange, time.Since(commitStart), err)
+	if err != nil {
+		s.setError(err)
+		return nil
+	}
+
+	s.completeWorkItem(work, nextKey, targetRootID)
 	return nil
 }
 

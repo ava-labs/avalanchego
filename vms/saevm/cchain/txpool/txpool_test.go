@@ -25,7 +25,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
@@ -40,10 +39,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
+	cchainlibevm "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 )
 
 func TestMain(m *testing.M) {
-	evm.RegisterAllLibEVMExtras()
+	cchainlibevm.RegisterExtras()
 	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
 }
 
@@ -140,7 +141,7 @@ func newSUT(tb testing.TB, state libevm.StateReader) (context.Context, *SUT) {
 	snowCtx.Log = log
 	pool, err := New(
 		snowCtx,
-		saetest.ChainConfig(),
+		cchaintest.ChainConfig(),
 		NewPending(),
 		backend,
 		maxSize,
@@ -339,7 +340,7 @@ func TestAdd(t *testing.T) {
 	for i := range maxSizeTxs {
 		sk := newKey(t)
 		allKeys = append(allKeys, sk)
-		amount := lowFee + uint64(i) //#nosec G115 -- Won't overflow
+		amount := lowFee + uint64(i)
 		maxSizeTxs[i] = newExport(t, []*secp256k1.PrivateKey{sk}, withAmount(amount))
 	}
 	slices.Reverse(maxSizeTxs) // Sorted by descending fee.

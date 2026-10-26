@@ -17,7 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
-var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", func() {
+// This test asserts global P-Chain supply values so it cannot run concurrently with
+// other supply-changing tests.
+var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", ginkgo.Serial, func() {
 	tc := e2e.NewTestContext()
 
 	ginkgo.It("should reward eligible stakers and not reward ineligible ones", func() {
@@ -198,7 +200,5 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", fun
 		tc.By("checking stake was returned", func() {
 			require.Equal(tc, fundedKeyBalanceBeforeExit+validatorWeight, balanceOf(tc, f.randomWalletNodeURI, f.validatorFundingKey))
 		})
-
-		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 	})
 })

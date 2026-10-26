@@ -70,15 +70,11 @@ func constructRulesExtra(c *ethparams.ChainConfig, r *ethparams.Rules, cEx *extr
 	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
 	rules.Precompiles = make(map[common.Address]precompileconfig.Config)
 	rules.Predicaters = make(map[common.Address]precompileconfig.Predicater)
-	rules.AccepterPrecompiles = make(map[common.Address]precompileconfig.Accepter)
 	for _, module := range modules.RegisteredModules() {
 		if config := cEx.GetActivePrecompileConfig(module.Address, timestamp); config != nil && !config.IsDisabled() {
 			rules.Precompiles[module.Address] = config
 			if predicater, ok := config.(precompileconfig.Predicater); ok {
 				rules.Predicaters[module.Address] = predicater
-			}
-			if precompileAccepter, ok := config.(precompileconfig.Accepter); ok {
-				rules.AccepterPrecompiles[module.Address] = precompileAccepter
 			}
 		}
 	}

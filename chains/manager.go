@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/simplex"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap/queue"
@@ -889,7 +890,7 @@ func (m *manager) createAvalancheChain(
 		return nil, err
 	}
 
-	peerTracker, err := p2p.NewPeerTracker(
+	peerTracker, err := peertracker.New(
 		ctx.Log,
 		"peer_tracker",
 		p2pReg,
@@ -1314,7 +1315,7 @@ func (m *manager) createSnowmanChain(
 		return nil, err
 	}
 
-	peerTracker, err := p2p.NewPeerTracker(
+	peerTracker, err := peertracker.New(
 		ctx.Log,
 		"peer_tracker",
 		p2pReg,

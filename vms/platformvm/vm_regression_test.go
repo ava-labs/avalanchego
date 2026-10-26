@@ -35,14 +35,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -69,7 +68,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	// create valid tx
 	addValidatorTx, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(validatorStartTime.Unix()),
 			End:    uint64(validatorEndTime.Unix()),
@@ -85,11 +84,11 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
 	require.NoError(err)
 
-	statelessBlk0, err := block.NewBanffStandardBlock(
+	statelessBlk0, err := platform.NewBanffStandardBlock(
 		lastAccepted.Timestamp().Add(time.Second),
 		lastAccepted.ID(),
 		lastAccepted.Height()+1,
-		[]*txs.Tx{addValidatorTx},
+		[]*platform.Tx{addValidatorTx},
 	)
 	require.NoError(err)
 
@@ -106,7 +105,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	// create valid tx
 	addFirstDelegatorTx, err := wallet.IssueAddDelegatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(firstDelegatorStartTime.Unix()),
 			End:    uint64(firstDelegatorEndTime.Unix()),
@@ -116,11 +115,11 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
-	statelessBlk1, err := block.NewBanffStandardBlock(
+	statelessBlk1, err := platform.NewBanffStandardBlock(
 		blk0.Timestamp().Add(time.Second),
 		blk0.ID(),
 		blk0.Height()+1,
-		[]*txs.Tx{addFirstDelegatorTx},
+		[]*platform.Tx{addFirstDelegatorTx},
 	)
 	require.NoError(err)
 
@@ -139,7 +138,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	// create valid tx
 	addSecondDelegatorTx, err := wallet.IssueAddDelegatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(secondDelegatorStartTime.Unix()),
 			End:    uint64(secondDelegatorEndTime.Unix()),
@@ -149,11 +148,11 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
-	statelessBlk2, err := block.NewBanffStandardBlock(
+	statelessBlk2, err := platform.NewBanffStandardBlock(
 		blk1.Timestamp().Add(time.Second),
 		blk1.ID(),
 		blk1.Height()+1,
-		[]*txs.Tx{addSecondDelegatorTx},
+		[]*platform.Tx{addSecondDelegatorTx},
 	)
 	require.NoError(err)
 
@@ -167,7 +166,7 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	// create invalid tx
 	addThirdDelegatorTx, err := wallet.IssueAddDelegatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(thirdDelegatorStartTime.Unix()),
 			End:    uint64(thirdDelegatorEndTime.Unix()),
@@ -177,11 +176,11 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
-	statelessBlk3, err := block.NewBanffStandardBlock(
+	statelessBlk3, err := platform.NewBanffStandardBlock(
 		blk2.Timestamp().Add(time.Second),
 		blk2.ID(),
 		blk2.Height()+1,
-		[]*txs.Tx{addThirdDelegatorTx},
+		[]*platform.Tx{addThirdDelegatorTx},
 	)
 	require.NoError(err)
 
@@ -246,7 +245,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// create valid tx
 			addValidatorTx, err := wallet.IssueAddValidatorTx(
-				&txs.Validator{
+				&platform.Validator{
 					NodeID: nodeID,
 					Start:  uint64(validatorStartTime.Unix()),
 					End:    uint64(validatorEndTime.Unix()),
@@ -262,11 +261,11 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
 			require.NoError(err)
 
-			statelessBlk0, err := block.NewBanffStandardBlock(
+			statelessBlk0, err := platform.NewBanffStandardBlock(
 				lastAccepted.Timestamp().Add(time.Second),
 				lastAccepted.ID(),
 				lastAccepted.Height()+1,
-				[]*txs.Tx{addValidatorTx},
+				[]*platform.Tx{addValidatorTx},
 			)
 			require.NoError(err)
 
@@ -277,7 +276,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// create valid tx
 			addFirstDelegatorTx, err := wallet.IssueAddDelegatorTx(
-				&txs.Validator{
+				&platform.Validator{
 					NodeID: nodeID,
 					Start:  uint64(delegator1StartTime.Unix()),
 					End:    uint64(delegator1EndTime.Unix()),
@@ -287,11 +286,11 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			)
 			require.NoError(err)
 
-			statelessBlk1, err := block.NewBanffStandardBlock(
+			statelessBlk1, err := platform.NewBanffStandardBlock(
 				blk0.Timestamp().Add(time.Second),
 				blk0.ID(),
 				blk0.Height()+1,
-				[]*txs.Tx{addFirstDelegatorTx},
+				[]*platform.Tx{addFirstDelegatorTx},
 			)
 			require.NoError(err)
 
@@ -302,7 +301,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// create valid tx
 			addSecondDelegatorTx, err := wallet.IssueAddDelegatorTx(
-				&txs.Validator{
+				&platform.Validator{
 					NodeID: nodeID,
 					Start:  uint64(delegator2StartTime.Unix()),
 					End:    uint64(delegator2EndTime.Unix()),
@@ -312,11 +311,11 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			)
 			require.NoError(err)
 
-			statelessBlk2, err := block.NewBanffStandardBlock(
+			statelessBlk2, err := platform.NewBanffStandardBlock(
 				blk1.Timestamp().Add(time.Second),
 				blk1.ID(),
 				blk1.Height()+1,
-				[]*txs.Tx{addSecondDelegatorTx},
+				[]*platform.Tx{addSecondDelegatorTx},
 			)
 			require.NoError(err)
 
@@ -327,7 +326,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// create valid tx
 			addThirdDelegatorTx, err := wallet.IssueAddDelegatorTx(
-				&txs.Validator{
+				&platform.Validator{
 					NodeID: nodeID,
 					Start:  uint64(delegator3StartTime.Unix()),
 					End:    uint64(delegator3EndTime.Unix()),
@@ -337,11 +336,11 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			)
 			require.NoError(err)
 
-			statelessBlk3, err := block.NewBanffStandardBlock(
+			statelessBlk3, err := platform.NewBanffStandardBlock(
 				blk2.Timestamp().Add(time.Second),
 				blk2.ID(),
 				blk2.Height()+1,
-				[]*txs.Tx{addThirdDelegatorTx},
+				[]*platform.Tx{addThirdDelegatorTx},
 			)
 			require.NoError(err)
 
@@ -352,7 +351,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 
 			// create valid tx
 			addFourthDelegatorTx, err := wallet.IssueAddDelegatorTx(
-				&txs.Validator{
+				&platform.Validator{
 					NodeID: nodeID,
 					Start:  uint64(delegator4StartTime.Unix()),
 					End:    uint64(delegator4EndTime.Unix()),
@@ -362,11 +361,11 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			)
 			require.NoError(err)
 
-			statelessBlk4, err := block.NewBanffStandardBlock(
+			statelessBlk4, err := platform.NewBanffStandardBlock(
 				blk3.Timestamp().Add(time.Second),
 				blk3.ID(),
 				blk3.Height()+1,
-				[]*txs.Tx{addFourthDelegatorTx},
+				[]*platform.Tx{addFourthDelegatorTx},
 			)
 			require.NoError(err)
 
@@ -470,29 +469,29 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 	preferredChainTime := preferred.Timestamp()
 	preferredHeight := preferred.Height()
 
-	statelessStandardBlk, err := block.NewBanffStandardBlock(
+	statelessStandardBlk, err := platform.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
-		[]*txs.Tx{addSubnetTx0},
+		[]*platform.Tx{addSubnetTx0},
 	)
 	require.NoError(err)
 	addSubnetBlk0 := vm.manager.NewBlock(statelessStandardBlk)
 
-	statelessStandardBlk, err = block.NewBanffStandardBlock(
+	statelessStandardBlk, err = platform.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
-		[]*txs.Tx{addSubnetTx1},
+		[]*platform.Tx{addSubnetTx1},
 	)
 	require.NoError(err)
 	addSubnetBlk1 := vm.manager.NewBlock(statelessStandardBlk)
 
-	statelessStandardBlk, err = block.NewBanffStandardBlock(
+	statelessStandardBlk, err = platform.NewBanffStandardBlock(
 		preferredChainTime,
 		addSubnetBlk1.ID(),
 		preferredHeight+2,
-		[]*txs.Tx{addSubnetTx2},
+		[]*platform.Tx{addSubnetTx2},
 	)
 	require.NoError(err)
 	addSubnetBlk2 := vm.manager.NewBlock(statelessStandardBlk)
@@ -528,7 +527,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 
 	// Create the tx to add a new validator
 	addValidatorTx, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(newValidatorStartTime.Unix()),
 			End:    uint64(newValidatorEndTime.Unix()),
@@ -549,11 +548,11 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredChainTime := preferred.Timestamp()
 	preferredHeight := preferred.Height()
 
-	statelessBlk, err := block.NewBanffStandardBlock(
+	statelessBlk, err := platform.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
-		[]*txs.Tx{addValidatorTx},
+		[]*platform.Tx{addValidatorTx},
 	)
 	require.NoError(err)
 
@@ -584,8 +583,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	}
 
 	// Create the import tx that will fail verification
-	unsignedImportTx := &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+	unsignedImportTx := &platform.ImportTx{
+		BaseTx: platform.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 		}},
@@ -600,8 +599,8 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 			},
 		},
 	}
-	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
-	require.NoError(signedImportTx.Sign(txs.Codec, [][]*secp256k1.PrivateKey{
+	signedImportTx := &platform.Tx{Unsigned: unsignedImportTx}
+	require.NoError(signedImportTx.Sign(platform.Codec, [][]*secp256k1.PrivateKey{
 		{}, // There is one input, with no required signers
 	}))
 
@@ -611,11 +610,11 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = addValidatorStandardBlk.ID()
 	preferredHeight = addValidatorStandardBlk.Height()
 
-	statelessImportBlk, err := block.NewBanffStandardBlock(
+	statelessImportBlk, err := platform.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
-		[]*txs.Tx{signedImportTx},
+		[]*platform.Tx{signedImportTx},
 	)
 	require.NoError(err)
 
@@ -632,7 +631,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
-	utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
+	utxoBytes, err := platform.Codec.Marshal(platform.CodecVersion, utxo)
 	require.NoError(err)
 
 	inputID := utxo.InputID()
@@ -662,7 +661,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	statelessAdvanceTimeStandardBlk, err := block.NewBanffStandardBlock(
+	statelessAdvanceTimeStandardBlk, err := platform.NewBanffStandardBlock(
 		newValidatorStartTime,
 		preferredID,
 		preferredHeight+1,
@@ -728,7 +727,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Create the tx to add the first new validator
 	addValidatorTx0, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID0,
 			Start:  uint64(newValidatorStartTime0.Unix()),
 			End:    uint64(newValidatorEndTime0.Unix()),
@@ -746,11 +745,11 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredChainTime := preferred.Timestamp()
 	preferredHeight := preferred.Height()
 
-	statelessAddValidatorStandardBlk0, err := block.NewBanffStandardBlock(
+	statelessAddValidatorStandardBlk0, err := platform.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
-		[]*txs.Tx{addValidatorTx0},
+		[]*platform.Tx{addValidatorTx0},
 	)
 	require.NoError(err)
 
@@ -775,7 +774,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorStandardBlk0.ID()
 	preferredHeight = addValidatorStandardBlk0.Height()
 
-	statelessAdvanceTimeStandardBlk0, err := block.NewBanffStandardBlock(
+	statelessAdvanceTimeStandardBlk0, err := platform.NewBanffStandardBlock(
 		newValidatorStartTime0,
 		preferredID,
 		preferredHeight+1,
@@ -816,8 +815,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	}
 
 	// Create the import tx that will fail verification
-	unsignedImportTx := &txs.ImportTx{
-		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+	unsignedImportTx := &platform.ImportTx{
+		BaseTx: platform.BaseTx{BaseTx: avax.BaseTx{
 			NetworkID:    vm.ctx.NetworkID,
 			BlockchainID: vm.ctx.ChainID,
 		}},
@@ -832,8 +831,8 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 			},
 		},
 	}
-	signedImportTx := &txs.Tx{Unsigned: unsignedImportTx}
-	require.NoError(signedImportTx.Sign(txs.Codec, [][]*secp256k1.PrivateKey{
+	signedImportTx := &platform.Tx{Unsigned: unsignedImportTx}
+	require.NoError(signedImportTx.Sign(platform.Codec, [][]*secp256k1.PrivateKey{
 		{}, // There is one input, with no required signers
 	}))
 
@@ -843,11 +842,11 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = advanceTimeStandardBlk0.ID()
 	preferredHeight = advanceTimeStandardBlk0.Height()
 
-	statelessImportBlk, err := block.NewBanffStandardBlock(
+	statelessImportBlk, err := platform.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
-		[]*txs.Tx{signedImportTx},
+		[]*platform.Tx{signedImportTx},
 	)
 	require.NoError(err)
 
@@ -863,7 +862,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	mutableSharedMemory.SharedMemory = m.NewSharedMemory(vm.ctx.ChainID)
 	peerSharedMemory := m.NewSharedMemory(vm.ctx.XChainID)
 
-	utxoBytes, err := txs.Codec.Marshal(txs.CodecVersion, utxo)
+	utxoBytes, err := platform.Codec.Marshal(platform.CodecVersion, utxo)
 	require.NoError(err)
 
 	inputID := utxo.InputID()
@@ -891,7 +890,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 
 	// Create the tx to add the second new validator
 	addValidatorTx1, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID1,
 			Start:  uint64(newValidatorStartTime1.Unix()),
 			End:    uint64(newValidatorEndTime1.Unix()),
@@ -907,11 +906,11 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = importBlk.ID()
 	preferredHeight = importBlk.Height()
 
-	statelessAddValidatorStandardBlk1, err := block.NewBanffStandardBlock(
+	statelessAddValidatorStandardBlk1, err := platform.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
-		[]*txs.Tx{addValidatorTx1},
+		[]*platform.Tx{addValidatorTx1},
 	)
 	require.NoError(err)
 
@@ -937,7 +936,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	preferredID = addValidatorStandardBlk1.ID()
 	preferredHeight = addValidatorStandardBlk1.Height()
 
-	statelessAdvanceTimeStandardBlk1, err := block.NewBanffStandardBlock(
+	statelessAdvanceTimeStandardBlk1, err := platform.NewBanffStandardBlock(
 		newValidatorStartTime1,
 		preferredID,
 		preferredHeight+1,
@@ -1040,7 +1039,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 
 	// Create the tx to add the first new validator
 	addValidatorTx0, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: extraNodeID,
 			Start:  uint64(newValidatorStartTime0.Unix()),
 			End:    uint64(newValidatorEndTime0.Unix()),
@@ -1061,11 +1060,11 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredChainTime := preferred.Timestamp()
 	preferredHeight := preferred.Height()
 
-	statelessStandardBlk, err := block.NewBanffStandardBlock(
+	statelessStandardBlk, err := platform.NewBanffStandardBlock(
 		preferredChainTime,
 		preferredID,
 		preferredHeight+1,
-		[]*txs.Tx{addValidatorTx0},
+		[]*platform.Tx{addValidatorTx0},
 	)
 	require.NoError(err)
 	addValidatorProposalBlk0 := vm.manager.NewBlock(statelessStandardBlk)
@@ -1097,7 +1096,7 @@ func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	preferredID = preferred.ID()
 	preferredHeight = preferred.Height()
 
-	statelessStandardBlk, err = block.NewBanffStandardBlock(
+	statelessStandardBlk, err = platform.NewBanffStandardBlock(
 		newValidatorStartTime0,
 		preferredID,
 		preferredHeight+1,
@@ -1165,7 +1164,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	// create valid tx
 	addValidatorTx, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(validatorStartTime.Unix()),
 			End:    uint64(validatorEndTime.Unix()),
@@ -1181,11 +1180,11 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
 	require.NoError(err)
 
-	statelessBlk0, err := block.NewBanffStandardBlock(
+	statelessBlk0, err := platform.NewBanffStandardBlock(
 		lastAccepted.Timestamp().Add(time.Second),
 		lastAccepted.ID(),
 		lastAccepted.Height()+1,
-		[]*txs.Tx{addValidatorTx},
+		[]*platform.Tx{addValidatorTx},
 	)
 	require.NoError(err)
 
@@ -1196,7 +1195,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	// create valid tx
 	addFirstDelegatorTx, err := wallet.IssueAddDelegatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(delegator1StartTime.Unix()),
 			End:    uint64(delegator1EndTime.Unix()),
@@ -1206,11 +1205,11 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	)
 	require.NoError(err)
 
-	statelessBlk1, err := block.NewBanffStandardBlock(
+	statelessBlk1, err := platform.NewBanffStandardBlock(
 		blk0.Timestamp().Add(time.Second),
 		blk0.ID(),
 		blk0.Height()+1,
-		[]*txs.Tx{addFirstDelegatorTx},
+		[]*platform.Tx{addFirstDelegatorTx},
 	)
 	require.NoError(err)
 
@@ -1221,7 +1220,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 
 	// create invalid tx
 	addSecondDelegatorTx, err := wallet.IssueAddDelegatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(delegator2StartTime.Unix()),
 			End:    uint64(delegator2EndTime.Unix()),
@@ -1231,11 +1230,11 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	)
 	require.NoError(err)
 
-	statelessBlk2, err := block.NewBanffStandardBlock(
+	statelessBlk2, err := platform.NewBanffStandardBlock(
 		blk1.Timestamp().Add(time.Second),
 		blk1.ID(),
 		blk1.Height()+1,
-		[]*txs.Tx{addSecondDelegatorTx},
+		[]*platform.Tx{addSecondDelegatorTx},
 	)
 	require.NoError(err)
 
@@ -1261,7 +1260,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 
 	nodeID := ids.GenerateTestNodeID()
 	addValidatorTx, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(validatorStartTime.Unix()),
 			End:    uint64(validatorEndTime.Unix()),
@@ -1280,11 +1279,11 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
 	require.NoError(err)
 
-	statelessBlk0, err := block.NewBanffStandardBlock(
+	statelessBlk0, err := platform.NewBanffStandardBlock(
 		lastAccepted.Timestamp().Add(time.Second),
 		lastAccepted.ID(),
 		lastAccepted.Height()+1,
-		[]*txs.Tx{addValidatorTx},
+		[]*platform.Tx{addValidatorTx},
 	)
 	require.NoError(err)
 
@@ -1301,11 +1300,11 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	)
 	require.NoError(err)
 
-	statelessBlk1, err := block.NewBanffStandardBlock(
+	statelessBlk1, err := platform.NewBanffStandardBlock(
 		blk0.Timestamp().Add(time.Second),
 		blk0.ID(),
 		blk0.Height()+1,
-		[]*txs.Tx{createSubnetTx},
+		[]*platform.Tx{createSubnetTx},
 	)
 	require.NoError(err)
 
@@ -1316,8 +1315,8 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 
 	subnetID := createSubnetTx.ID()
 	addSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(validatorStartTime.Unix()),
 				End:    uint64(validatorEndTime.Unix()),
@@ -1328,11 +1327,11 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	)
 	require.NoError(err)
 
-	statelessBlk2, err := block.NewBanffStandardBlock(
+	statelessBlk2, err := platform.NewBanffStandardBlock(
 		blk1.Timestamp().Add(time.Second),
 		blk1.ID(),
 		blk1.Height()+1,
-		[]*txs.Tx{addSubnetValidatorTx},
+		[]*platform.Tx{addSubnetValidatorTx},
 	)
 	require.NoError(err)
 
@@ -1362,11 +1361,11 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	// validator set into the current validator set.
 	vm.clock.Set(validatorStartTime)
 
-	statelessBlk3, err := block.NewBanffStandardBlock(
+	statelessBlk3, err := platform.NewBanffStandardBlock(
 		blk2.Timestamp().Add(time.Second),
 		blk2.ID(),
 		blk2.Height()+1,
-		[]*txs.Tx{removeSubnetValidatorTx},
+		[]*platform.Tx{removeSubnetValidatorTx},
 	)
 	require.NoError(err)
 
@@ -1398,7 +1397,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 
 	nodeID := ids.GenerateTestNodeID()
 	addValidatorTx, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(validatorStartTime.Unix()),
 			End:    uint64(validatorEndTime.Unix()),
@@ -1417,11 +1416,11 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
 	require.NoError(err)
 
-	statelessBlk0, err := block.NewBanffStandardBlock(
+	statelessBlk0, err := platform.NewBanffStandardBlock(
 		lastAccepted.Timestamp().Add(time.Second),
 		lastAccepted.ID(),
 		lastAccepted.Height()+1,
-		[]*txs.Tx{addValidatorTx},
+		[]*platform.Tx{addValidatorTx},
 	)
 	require.NoError(err)
 
@@ -1438,11 +1437,11 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	)
 	require.NoError(err)
 
-	statelessBlk1, err := block.NewBanffStandardBlock(
+	statelessBlk1, err := platform.NewBanffStandardBlock(
 		blk0.Timestamp().Add(time.Second),
 		blk0.ID(),
 		blk0.Height()+1,
-		[]*txs.Tx{createSubnetTx},
+		[]*platform.Tx{createSubnetTx},
 	)
 	require.NoError(err)
 
@@ -1453,8 +1452,8 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 
 	subnetID := createSubnetTx.ID()
 	addSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(validatorStartTime.Unix()),
 				End:    uint64(validatorEndTime.Unix()),
@@ -1465,11 +1464,11 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	)
 	require.NoError(err)
 
-	statelessBlk2, err := block.NewBanffStandardBlock(
+	statelessBlk2, err := platform.NewBanffStandardBlock(
 		blk1.Timestamp().Add(time.Second),
 		blk1.ID(),
 		blk1.Height()+1,
-		[]*txs.Tx{addSubnetValidatorTx},
+		[]*platform.Tx{addSubnetValidatorTx},
 	)
 	require.NoError(err)
 
@@ -1488,11 +1487,11 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	// validator set into the current validator set.
 	vm.clock.Set(validatorStartTime)
 
-	statelessBlk3, err := block.NewBanffStandardBlock(
+	statelessBlk3, err := platform.NewBanffStandardBlock(
 		blk2.Timestamp().Add(time.Second),
 		blk2.ID(),
 		blk2.Height()+1,
-		[]*txs.Tx{removeSubnetValidatorTx},
+		[]*platform.Tx{removeSubnetValidatorTx},
 	)
 	require.NoError(err)
 
@@ -1520,8 +1519,8 @@ func TestAddValidatorDuringRemovalPostHelicon(t *testing.T) {
 		firstEndTime = latestForkTime.Add(duration)
 	)
 
-	firstAddSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
-		Validator: txs.Validator{
+	firstAddSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
+		Validator: platform.Validator{
 			NodeID: nodeID,
 			End:    uint64(firstEndTime.Unix()),
 			Wght:   1,
@@ -1542,8 +1541,8 @@ func TestAddValidatorDuringRemovalPostHelicon(t *testing.T) {
 	require.NoError(err)
 
 	secondEndTime := firstEndTime.Add(duration)
-	secondSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
-		Validator: txs.Validator{
+	secondSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
+		Validator: platform.Validator{
 			NodeID: nodeID,
 			End:    uint64(secondEndTime.Unix()),
 			Wght:   1,
@@ -1586,8 +1585,8 @@ func TestAddValidatorDuringRemovalPreHelicon(t *testing.T) {
 		firstEndTime = latestForkTime.Add(duration)
 	)
 
-	firstAddSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
-		Validator: txs.Validator{
+	firstAddSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
+		Validator: platform.Validator{
 			NodeID: nodeID,
 			End:    uint64(firstEndTime.Unix()),
 			Wght:   1,
@@ -1608,8 +1607,8 @@ func TestAddValidatorDuringRemovalPreHelicon(t *testing.T) {
 	require.NoError(err)
 
 	secondEndTime := firstEndTime.Add(duration)
-	secondSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
-		Validator: txs.Validator{
+	secondSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
+		Validator: platform.Validator{
 			NodeID: nodeID,
 			End:    uint64(secondEndTime.Unix()),
 			Wght:   1,
@@ -1685,8 +1684,8 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 
 	// build primary network validator with BLS key
 	primaryTx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(primaryStartTime.Unix()),
 				End:    uint64(primaryEndTime.Unix()),
@@ -1720,8 +1719,8 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 
 	// insert the subnet validator
 	subnetTx, err := wallet.IssueAddSubnetValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(subnetStartTime.Unix()),
 				End:    uint64(subnetEndTime.Unix()),
@@ -1770,7 +1769,7 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(t, err)
 
 	commit := options[0].(*blockexecutor.Block)
-	require.IsType(t, &block.BanffCommitBlock{}, commit.Block)
+	require.IsType(t, &platform.BanffCommitBlock{}, commit.Block)
 
 	require.NoError(t, blk.Accept(t.Context()))
 	require.NoError(t, commit.Verify(t.Context()))
@@ -1792,8 +1791,8 @@ func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
 	require.NoError(t, err)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(primaryReStartTime.Unix()),
 				End:    uint64(primaryReEndTime.Unix()),
@@ -1902,7 +1901,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	}
 
 	primaryTx1, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(primaryStartTime1.Unix()),
 			End:    uint64(primaryEndTime1.Unix()),
@@ -1918,11 +1917,11 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
 	require.NoError(err)
 
-	statelessBlk0, err := block.NewBanffStandardBlock(
+	statelessBlk0, err := platform.NewBanffStandardBlock(
 		lastAccepted.Timestamp().Add(time.Second),
 		lastAccepted.ID(),
 		lastAccepted.Height()+1,
-		[]*txs.Tx{primaryTx1},
+		[]*platform.Tx{primaryTx1},
 	)
 	require.NoError(err)
 
@@ -1953,7 +1952,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
+	require.IsType(&platform.BanffCommitBlock{}, commit.Block)
 
 	require.NoError(blk1.Accept(t.Context()))
 	require.NoError(commit.Verify(t.Context()))
@@ -1973,8 +1972,8 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(primaryStartTime2.Unix()),
 				End:    uint64(primaryEndTime2.Unix()),
@@ -2048,7 +2047,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	}
 
 	primaryTx1, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(primaryStartTime1.Unix()),
 			End:    uint64(primaryEndTime1.Unix()),
@@ -2064,11 +2063,11 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
 	require.NoError(err)
 
-	statelessBlk0, err := block.NewBanffStandardBlock(
+	statelessBlk0, err := platform.NewBanffStandardBlock(
 		lastAccepted.Timestamp().Add(time.Second),
 		lastAccepted.ID(),
 		lastAccepted.Height()+1,
-		[]*txs.Tx{primaryTx1},
+		[]*platform.Tx{primaryTx1},
 	)
 	require.NoError(err)
 
@@ -2090,8 +2089,8 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// insert the subnet validator
 	subnetTx, err := wallet.IssueAddSubnetValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(subnetStartTime.Unix()),
 				End:    uint64(subnetEndTime.Unix()),
@@ -2138,7 +2137,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
+	require.IsType(&platform.BanffCommitBlock{}, commit.Block)
 
 	require.NoError(blk1.Accept(t.Context()))
 	require.NoError(commit.Verify(t.Context()))
@@ -2158,8 +2157,8 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 	require.NoError(err)
 
 	primaryRestartTx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(primaryStartTime2.Unix()),
 				End:    uint64(primaryEndTime2.Unix()),
@@ -2252,7 +2251,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 
 	primaryTx1, err := wallet.IssueAddValidatorTx(
-		&txs.Validator{
+		&platform.Validator{
 			NodeID: nodeID,
 			Start:  uint64(primaryStartTime1.Unix()),
 			End:    uint64(primaryEndTime1.Unix()),
@@ -2271,11 +2270,11 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
 	require.NoError(err)
 
-	statelessBlk0, err := block.NewBanffStandardBlock(
+	statelessBlk0, err := platform.NewBanffStandardBlock(
 		lastAccepted.Timestamp().Add(time.Second),
 		lastAccepted.ID(),
 		lastAccepted.Height()+1,
-		[]*txs.Tx{primaryTx1},
+		[]*platform.Tx{primaryTx1},
 	)
 	require.NoError(err)
 
@@ -2294,8 +2293,8 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 
 	// insert the subnet validator
 	subnetTx, err := wallet.IssueAddSubnetValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				Start:  uint64(subnetStartTime.Unix()),
 				End:    uint64(subnetEndTime.Unix()),
@@ -2339,7 +2338,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
-	require.IsType(&block.BanffCommitBlock{}, commit.Block)
+	require.IsType(&platform.BanffCommitBlock{}, commit.Block)
 
 	require.NoError(blk1.Accept(t.Context()))
 	require.NoError(commit.Verify(t.Context()))
@@ -2400,7 +2399,7 @@ func TestValidatorSetRaceCondition(t *testing.T) {
 
 	// If the validator set lock isn't held, the race detector should fail here.
 	for i := uint64(0); i < 1000; i++ {
-		blk, err := block.NewBanffStandardBlock(
+		blk, err := platform.NewBanffStandardBlock(
 			time.Now(),
 			vm.state.GetLastAccepted(),
 			i,
@@ -2433,7 +2432,7 @@ func TestBanffStandardBlockWithNoChangesRemainsInvalid(t *testing.T) {
 	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
 	require.NoError(err)
 
-	statelessBlk, err := block.NewBanffStandardBlock(
+	statelessBlk, err := platform.NewBanffStandardBlock(
 		lastAccepted.Timestamp(),
 		lastAcceptedID,
 		lastAccepted.Height()+1,
@@ -2472,8 +2471,8 @@ func TestSubnetValidatorManagerAfterMultipleExpiration(t *testing.T) {
 	)
 
 	// Add subnet validator V1 (weight 10).
-	firstTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
-		Validator: txs.Validator{
+	firstTx, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
+		Validator: platform.Validator{
 			NodeID: nodeID,
 			End:    uint64(firstEndTime.Unix()),
 			Wght:   10,
@@ -2498,8 +2497,8 @@ func TestSubnetValidatorManagerAfterMultipleExpiration(t *testing.T) {
 	// Replace V1 → V2 (weight 20): advance clock to V1's end time so the
 	// next block removes V1 and includes the AddSubnetValidator for V2.
 	secondEndTime := firstEndTime.Add(duration)
-	secondTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
-		Validator: txs.Validator{
+	secondTx, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
+		Validator: platform.Validator{
 			NodeID: nodeID,
 			End:    uint64(secondEndTime.Unix()),
 			Wght:   20,
@@ -2525,8 +2524,8 @@ func TestSubnetValidatorManagerAfterMultipleExpiration(t *testing.T) {
 	// Replace V2 → V3 (weight 30): same pattern, advance clock to V2's end
 	// time so the next block removes V2 and includes V3.
 	thirdEndTime := secondEndTime.Add(duration)
-	thirdTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
-		Validator: txs.Validator{
+	thirdTx, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
+		Validator: platform.Validator{
 			NodeID: nodeID,
 			End:    uint64(thirdEndTime.Unix()),
 			Wght:   30,
@@ -2586,8 +2585,8 @@ func TestSubnetValidatorRemoveAddRemoveInSingleBlock(t *testing.T) {
 
 	// Step 1: Add subnet validator V1 (weight 10) via the wallet and accept
 	// it in its own block.
-	addTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
-		Validator: txs.Validator{
+	addTx, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
+		Validator: platform.Validator{
 			NodeID: nodeID,
 			End:    uint64(firstEndTime.Unix()),
 			Wght:   10,
@@ -2618,8 +2617,8 @@ func TestSubnetValidatorRemoveAddRemoveInSingleBlock(t *testing.T) {
 	require.NoError(err)
 
 	// Tx 2: Add subnet validator V2 (same node, weight 20, different end time).
-	addTx2, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
-		Validator: txs.Validator{
+	addTx2, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
+		Validator: platform.Validator{
 			NodeID: nodeID,
 			End:    uint64(secondEndTime.Unix()),
 			Wght:   20,
@@ -2638,11 +2637,11 @@ func TestSubnetValidatorRemoveAddRemoveInSingleBlock(t *testing.T) {
 	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
 	require.NoError(err)
 
-	statelessBlk, err := block.NewBanffStandardBlock(
+	statelessBlk, err := platform.NewBanffStandardBlock(
 		lastAccepted.Timestamp().Add(time.Second),
 		lastAccepted.ID(),
 		lastAccepted.Height()+1,
-		[]*txs.Tx{removeTx1, addTx2, removeTx2},
+		[]*platform.Tx{removeTx1, addTx2, removeTx2},
 	)
 	require.NoError(err)
 
@@ -2705,8 +2704,8 @@ func TestSubnetValidatorRemoveAndReplaceInSingleBlock(t *testing.T) {
 			)
 
 			// Step 1: Add subnet validator V1 (weight 10) and accept it.
-			addTx, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
-				Validator: txs.Validator{
+			addTx, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
+				Validator: platform.Validator{
 					NodeID: nodeID,
 					End:    uint64(firstEndTime.Unix()),
 					Wght:   10,
@@ -2729,8 +2728,8 @@ func TestSubnetValidatorRemoveAndReplaceInSingleBlock(t *testing.T) {
 			removeTx, err := wallet.IssueRemoveSubnetValidatorTx(nodeID, subnetID)
 			require.NoError(err)
 
-			addTx2, err := wallet.IssueAddSubnetValidatorTx(&txs.SubnetValidator{
-				Validator: txs.Validator{
+			addTx2, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
+				Validator: platform.Validator{
 					NodeID: nodeID,
 					End:    uint64(secondEndTime.Unix()),
 					Wght:   tt.replacedWeight,
@@ -2745,11 +2744,11 @@ func TestSubnetValidatorRemoveAndReplaceInSingleBlock(t *testing.T) {
 			lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
 			require.NoError(err)
 
-			statelessBlk, err := block.NewBanffStandardBlock(
+			statelessBlk, err := platform.NewBanffStandardBlock(
 				lastAccepted.Timestamp().Add(time.Second),
 				lastAccepted.ID(),
 				lastAccepted.Height()+1,
-				[]*txs.Tx{removeTx, addTx2},
+				[]*platform.Tx{removeTx, addTx2},
 			)
 			require.NoError(err)
 
@@ -2813,8 +2812,8 @@ func TestDelegatorWeightAfterMultipleExpiration(t *testing.T) {
 
 	// Add delegator D1 (weight defaultMinDelegatorStake).
 	firstTx, err := wallet.IssueAddPermissionlessDelegatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				End:    uint64(firstEndTime.Unix()),
 				Wght:   defaultMinDelegatorStake,
@@ -2843,8 +2842,8 @@ func TestDelegatorWeightAfterMultipleExpiration(t *testing.T) {
 	// D1's end time so the next block rewards D1 and includes D2 from the mempool.
 	secondEndTime := firstEndTime.Add(duration)
 	secondTx, err := wallet.IssueAddPermissionlessDelegatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				End:    uint64(secondEndTime.Unix()),
 				Wght:   2 * defaultMinDelegatorStake,
@@ -2873,8 +2872,8 @@ func TestDelegatorWeightAfterMultipleExpiration(t *testing.T) {
 	// Replace D2 → D3 (weight 3*defaultMinDelegatorStake).
 	thirdEndTime := secondEndTime.Add(duration)
 	thirdTx, err := wallet.IssueAddPermissionlessDelegatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				End:    uint64(thirdEndTime.Unix()),
 				Wght:   3 * defaultMinDelegatorStake,
@@ -2949,8 +2948,8 @@ func TestDelegatorReplacementWeight(t *testing.T) {
 
 			// Step 1: Add delegator D1 (weight 2*defaultMinDelegatorStake) and accept.
 			addTx, err := wallet.IssueAddPermissionlessDelegatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
+				&platform.SubnetValidator{
+					Validator: platform.Validator{
 						NodeID: nodeID,
 						End:    uint64(firstEndTime.Unix()),
 						Wght:   2 * defaultMinDelegatorStake,
@@ -2973,8 +2972,8 @@ func TestDelegatorReplacementWeight(t *testing.T) {
 
 			// Step 2: Issue replacement D2 to mempool, advance time, build proposal block.
 			addTx2, err := wallet.IssueAddPermissionlessDelegatorTx(
-				&txs.SubnetValidator{
-					Validator: txs.Validator{
+				&platform.SubnetValidator{
+					Validator: platform.Validator{
 						NodeID: nodeID,
 						End:    uint64(secondEndTime.Unix()),
 						Wght:   tt.replacedWeight,
@@ -3053,8 +3052,8 @@ func TestDelegatorAndValidatorExpireTogether(t *testing.T) {
 
 	// Add a permissionless primary network validator.
 	validatorTx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				End:    uint64(endTime.Unix()),
 				Wght:   vm.MinValidatorStake,
@@ -3077,8 +3076,8 @@ func TestDelegatorAndValidatorExpireTogether(t *testing.T) {
 
 	// Add a delegator with the same EndTime as the validator.
 	delegatorTx, err := wallet.IssueAddPermissionlessDelegatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
+		&platform.SubnetValidator{
+			Validator: platform.Validator{
 				NodeID: nodeID,
 				End:    uint64(endTime.Unix()),
 				Wght:   defaultMinDelegatorStake,

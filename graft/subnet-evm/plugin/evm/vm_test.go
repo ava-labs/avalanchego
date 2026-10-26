@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
@@ -64,15 +63,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
-	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
-	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	avagoconstants "github.com/ava-labs/avalanchego/utils/constants"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -1491,13 +1489,13 @@ func TestTimeSemanticVerify(t *testing.T) {
 			name:             "Granite with TimeMilliseconds",
 			fork:             upgradetest.Granite,
 			timeSeconds:      uint64(timestamp.Unix()),
-			timeMilliseconds: avalancheutils.PointerTo(uint64(timestamp.UnixMilli())),
+			timeMilliseconds: utils.PointerTo(uint64(timestamp.UnixMilli())),
 		},
 		{
 			name:             "Fortuna with TimeMilliseconds",
 			fork:             upgradetest.Fortuna,
 			timeSeconds:      uint64(timestamp.Unix()),
-			timeMilliseconds: avalancheutils.PointerTo(uint64(timestamp.UnixMilli())),
+			timeMilliseconds: utils.PointerTo(uint64(timestamp.UnixMilli())),
 			expectedError:    customheader.ErrTimeMillisecondsBeforeGranite,
 		},
 		{
@@ -1511,14 +1509,14 @@ func TestTimeSemanticVerify(t *testing.T) {
 			name:             "Granite with mismatched TimeMilliseconds",
 			fork:             upgradetest.Granite,
 			timeSeconds:      uint64(timestamp.Unix()),
-			timeMilliseconds: avalancheutils.PointerTo(uint64(timestamp.UnixMilli()) + 1000),
+			timeMilliseconds: utils.PointerTo(uint64(timestamp.UnixMilli()) + 1000),
 			expectedError:    customheader.ErrTimeMillisecondsMismatched,
 		},
 		{
 			name:             "Block too far in the future",
 			fork:             upgradetest.Granite,
 			timeSeconds:      uint64(timestamp.Add(2 * time.Hour).Unix()),
-			timeMilliseconds: avalancheutils.PointerTo(uint64(timestamp.Add(2 * time.Hour).UnixMilli())),
+			timeMilliseconds: utils.PointerTo(uint64(timestamp.Add(2 * time.Hour).UnixMilli())),
 			expectedError:    customheader.ErrBlockTooFarInFuture,
 		},
 	}
@@ -1594,7 +1592,7 @@ func TestBuildTimeMilliseconds(t *testing.T) {
 		{
 			name:                     "granite_should_have_timestamp_milliseconds",
 			fork:                     upgradetest.Granite,
-			expectedTimeMilliseconds: avalancheutils.PointerTo(uint64(buildTime.UnixMilli())),
+			expectedTimeMilliseconds: utils.PointerTo(uint64(buildTime.UnixMilli())),
 		},
 	}
 
@@ -1754,7 +1752,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Durango]))))
 	// this manager role should not be activated because DurangoTimestamp is in the future
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-		txallowlist.ConfigKey: txallowlist.NewConfig(avalancheutils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil),
+		txallowlist.ConfigKey: txallowlist.NewConfig(utils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil),
 	}
 	durangoTime := time.Now().Add(10 * time.Hour)
 	params.GetExtra(genesis.Config).DurangoTimestamp = utils.TimeToNewUint64(durangoTime)
@@ -1897,7 +1895,7 @@ func TestVerifyManagerConfig(t *testing.T) {
 	params.GetExtra(genesis.Config).DurangoTimestamp = utils.TimeToNewUint64(durangoTimestamp)
 	// this manager role should not be activated because DurangoTimestamp is in the future
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-		txallowlist.ConfigKey: txallowlist.NewConfig(avalancheutils.PointerTo[uint64](0), testEthAddrs[0:1], nil, []common.Address{testEthAddrs[1]}),
+		txallowlist.ConfigKey: txallowlist.NewConfig(utils.PointerTo[uint64](0), testEthAddrs[0:1], nil, []common.Address{testEthAddrs[1]}),
 	}
 
 	genesisJSON, err := genesis.MarshalJSON()
@@ -2049,7 +2047,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 	configExtra := params.GetExtra(genesis.Config)
 	configExtra.GenesisPrecompiles = extras.Precompiles{
-		feemanager.ConfigKey: feemanager.NewConfig(avalancheutils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil, nil),
+		feemanager.ConfigKey: feemanager.NewConfig(utils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil, nil),
 	}
 
 	// set a lower fee config now
@@ -2193,7 +2191,7 @@ func testAllowFeeRecipientDisabled(t *testing.T, scheme string) {
 	require.NoError(t, err) // this won't return an error since miner will set the etherbase to blackhole address
 
 	ethBlock := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
-	require.Equal(t, constants.BlackholeAddr, ethBlock.Coinbase())
+	require.Equal(t, blackhole.Address, ethBlock.Coinbase())
 
 	// Create empty block from blk
 	internalBlk := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock)
@@ -2265,7 +2263,7 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-		rewardmanager.ConfigKey: rewardmanager.NewConfig(avalancheutils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil, nil),
+		rewardmanager.ConfigKey: rewardmanager.NewConfig(utils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil, nil),
 	}
 	params.GetExtra(genesis.Config).AllowFeeRecipients = true // enable this in genesis to test if this is recognized by the reward manager
 	genesisJSON, err := genesis.MarshalJSON()
@@ -2409,7 +2407,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
-		rewardmanager.ConfigKey: rewardmanager.NewConfig(avalancheutils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil, nil),
+		rewardmanager.ConfigKey: rewardmanager.NewConfig(utils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil, nil),
 	}
 	params.GetExtra(genesis.Config).AllowFeeRecipients = false // disable this in genesis
 	genesisJSON, err := genesis.MarshalJSON()
@@ -2469,7 +2467,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	newHead := <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
-	require.Equal(t, constants.BlackholeAddr, ethBlock.Coinbase()) // reward address is activated at this block so this is fine
+	require.Equal(t, blackhole.Address, ethBlock.Coinbase()) // reward address is activated at this block so this is fine
 
 	tx1 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice*3), nil)
 	signedTx1, err := types.SignTx(tx1, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[1].ToECDSA())
@@ -2494,7 +2492,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 
 	// Test Case: Disable reward manager
 	// This should revert back to burning fees
-	previousBalance := blkState.GetBalance(constants.BlackholeAddr)
+	previousBalance := blkState.GetBalance(blackhole.Address)
 
 	tvm.vm.clock.Set(disableTime) // upgrade takes effect after a block is issued, so we can set vm's clock here.
 	tx2 := types.NewTransaction(uint64(1), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice), nil)
@@ -2527,14 +2525,14 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 	ethBlock = blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
-	require.Equal(t, constants.BlackholeAddr, ethBlock.Coinbase()) // reward address was activated at previous block
+	require.Equal(t, blackhole.Address, ethBlock.Coinbase()) // reward address was activated at previous block
 	require.Greater(t, int64(ethBlock.Time()), disableTime.Unix())
 
 	// Verify that Blackhole has received fees
 	blkState, err = tvm.vm.blockChain.StateAt(ethBlock.Root())
 	require.NoError(t, err)
 
-	balance = blkState.GetBalance(constants.BlackholeAddr)
+	balance = blkState.GetBalance(blackhole.Address)
 	require.Equal(t, 1, balance.Cmp(previousBalance))
 }
 
@@ -2745,7 +2743,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	// Setup chain params
 	genesis := &core.Genesis{}
 	require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
-	precompileActivationTime := avalancheutils.PointerTo(genesis.Timestamp + 5) // 5 seconds after genesis
+	precompileActivationTime := utils.PointerTo(genesis.Timestamp + 5) // 5 seconds after genesis
 	configExtra := params.GetExtra(genesis.Config)
 	configExtra.GenesisPrecompiles = extras.Precompiles{
 		feemanager.ConfigKey: feemanager.NewConfig(precompileActivationTime, testEthAddrs[0:1], nil, nil, nil),
@@ -3425,17 +3423,19 @@ func deployContract(ctx context.Context, t *testing.T, vm *VM, gasPrice *big.Int
 }
 
 func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
+	targetBlockRate := int64(extras.DefaultFeeConfig.TargetBlockRate)
+
 	ctx := t.Context()
 	tests := []struct {
-		name                  string
-		fork                  upgradetest.Fork
-		deployGasPrice        *big.Int
-		txGasPrice            *big.Int
-		preDeployTime         int64
-		setTime               int64
-		refillCapacityFortuna bool
-		wantIncluded          bool
-		wantReceiptStatus     uint64
+		name                string
+		fork                upgradetest.Fork
+		deployGasPrice      *big.Int
+		txGasPrice          *big.Int
+		preDeployTime       int64
+		setTime             int64
+		waitOutBlockGasCost bool
+		wantIncluded        bool
+		wantReceiptStatus   uint64
 	}{
 		{
 			name:           "granite_should_revert",
@@ -3443,28 +3443,26 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 			deployGasPrice: big.NewInt(testMinGasPrice),
 			txGasPrice:     big.NewInt(testMinGasPrice),
 			// Time is irrelevant as only the fork dictates the logic
-			refillCapacityFortuna: false,
-			wantIncluded:          true,
-			wantReceiptStatus:     types.ReceiptStatusFailed,
+			wantIncluded:      true,
+			wantReceiptStatus: types.ReceiptStatusFailed,
 		},
 		{
-			name:                  "fortuna_post_cutoff_should_invalidate",
-			fork:                  upgradetest.Fortuna,
-			deployGasPrice:        big.NewInt(testMinGasPrice),
-			txGasPrice:            big.NewInt(testMinGasPrice),
-			setTime:               params.InvalidateDelegateUnix + 1,
-			refillCapacityFortuna: true,
-			wantIncluded:          false,
+			name:                "fortuna_post_cutoff_should_invalidate",
+			fork:                upgradetest.Fortuna,
+			deployGasPrice:      big.NewInt(testMinGasPrice),
+			txGasPrice:          big.NewInt(testMinGasPrice),
+			setTime:             params.InvalidateDelegateUnix + 1,
+			waitOutBlockGasCost: true,
+			wantIncluded:        false,
 		},
 		{
-			name:                  "fortuna_pre_cutoff_should_succeed",
-			fork:                  upgradetest.Fortuna,
-			deployGasPrice:        big.NewInt(testMinGasPrice),
-			txGasPrice:            big.NewInt(testMinGasPrice),
-			preDeployTime:         params.InvalidateDelegateUnix - acp176.TimeToFillCapacity - 1,
-			refillCapacityFortuna: true,
-			wantIncluded:          true,
-			wantReceiptStatus:     types.ReceiptStatusSuccessful,
+			name:              "fortuna_pre_cutoff_should_succeed",
+			fork:              upgradetest.Fortuna,
+			deployGasPrice:    big.NewInt(testMinGasPrice),
+			txGasPrice:        big.NewInt(testMinGasPrice),
+			preDeployTime:     params.InvalidateDelegateUnix - 1,
+			wantIncluded:      true,
+			wantReceiptStatus: types.ReceiptStatusSuccessful,
 		},
 	}
 
@@ -3496,13 +3494,13 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 				vm.clock.Set(time.Unix(tt.setTime, 0))
 			}
 
-			if tt.refillCapacityFortuna {
-				// Ensure gas capacity is refilled relative to the parent block's timestamp
+			if tt.waitOutBlockGasCost {
+				// Pre-Granite, a block built less than TargetBlockRate after its parent
+				// must cover a block gas cost with tips, which an empty block can't.
 				parent := vm.blockChain.CurrentBlock()
-				parentTime := time.Unix(int64(parent.Time), 0)
-				minRefillTime := parentTime.Add(acp176.TimeToFillCapacity * time.Second)
-				if vm.clock.Time().Before(minRefillTime) {
-					vm.clock.Set(minRefillTime)
+				minTime := time.Unix(int64(parent.Time)+targetBlockRate, 0)
+				if vm.clock.Time().Before(minTime) {
+					vm.clock.Set(minTime)
 				}
 			}
 
@@ -3547,26 +3545,26 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 		{
 			name:                   "pre_granite_min_delay_excess",
 			fork:                   upgradetest.Fortuna,
-			desiredMinDelay:        avalancheutils.PointerTo[uint64](1000),
+			desiredMinDelay:        utils.PointerTo[uint64](1000),
 			expectedMinDelayExcess: nil,
 		},
 		{
 			name:                   "granite_first_block_initial_delay_excess",
 			fork:                   upgradetest.Granite,
 			desiredMinDelay:        nil,
-			expectedMinDelayExcess: avalancheutils.PointerTo(acp226.InitialDelayExcess),
+			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess),
 		},
 		{
 			name:                   "granite_with_excessive_desired_min_delay_excess",
 			fork:                   upgradetest.Granite,
-			desiredMinDelay:        avalancheutils.PointerTo[uint64](4000),
-			expectedMinDelayExcess: avalancheutils.PointerTo(acp226.InitialDelayExcess + acp226.MaxDelayExcessDiff),
+			desiredMinDelay:        utils.PointerTo[uint64](4000),
+			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess + acp226.MaxDelayExcessDiff),
 		},
 		{
 			name:                   "granite_with_zero_desired_min_delay_excess",
 			fork:                   upgradetest.Granite,
-			desiredMinDelay:        avalancheutils.PointerTo[uint64](0),
-			expectedMinDelayExcess: avalancheutils.PointerTo(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff),
+			desiredMinDelay:        utils.PointerTo[uint64](0),
+			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff),
 		},
 	}
 

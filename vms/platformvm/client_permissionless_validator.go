@@ -72,6 +72,9 @@ type ClientAutoRenewedConfig struct {
 	ValidatorAuthority       *ClientOwner
 	NextPeriod               uint64
 	AutoCompoundRewardShares uint32
+	// Nil if the node does not report them. See api.AutoRenewedConfig.
+	RestakedValidationRewards *uint64
+	RestakedDelegateeRewards  *uint64
 }
 
 // ClientDelegator is the repr. of a delegator sent over client
@@ -218,8 +221,10 @@ func apiAutoRenewedConfigToClient(cfg *api.AutoRenewedConfig) (*ClientAutoRenewe
 	}
 
 	return &ClientAutoRenewedConfig{
-		ValidatorAuthority:       validatorAuthority,
-		NextPeriod:               uint64(cfg.NextPeriod),
-		AutoCompoundRewardShares: uint32(cfg.AutoCompoundRewardShares),
+		ValidatorAuthority:        validatorAuthority,
+		NextPeriod:                uint64(cfg.NextPeriod),
+		AutoCompoundRewardShares:  uint32(cfg.AutoCompoundRewardShares),
+		RestakedValidationRewards: (*uint64)(cfg.RestakedValidationRewards),
+		RestakedDelegateeRewards:  (*uint64)(cfg.RestakedDelegateeRewards),
 	}, nil
 }

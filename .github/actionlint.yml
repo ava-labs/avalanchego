@@ -1,3 +1,4 @@
 self-hosted-runner:
   labels:
     - avalanche-avalanchego-runner # Github Action Runner Controller
+    - ubuntu-24.04-amd64-4-core    # Beefier GitHub-hosted runner

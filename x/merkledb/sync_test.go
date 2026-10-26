@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -18,8 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/database/merkle/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker/peertrackertest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
@@ -28,6 +29,58 @@ var (
 	rangeProofMarshaler  = RangeProofMarshaler{}
 	changeProofMarshaler = ChangeProofMarshaler{}
 )
+
+type (
+	// sut is the syncer under test, always over the merkledb proof types.
+	sut = sync.Syncer[*RangeProof, *ChangeProof]
+
+	sutConfig struct {
+		targetRoot ids.ID
+	}
+	sutOption = options.Option[sutConfig]
+)
+
+// withTarget syncs to root rather than the zero root.
+func withTarget(root ids.ID) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.targetRoot = root
+	})
+}
+
+// selfClient returns a client that serves db's own proofs back to the caller.
+func selfClient(t *testing.T, ctx context.Context, db MerkleDB) *peertracker.Client {
+	t.Helper()
+
+	return peertrackertest.NewSelfClient(t, ctx, ids.EmptyNodeID, newTestProofHandler(t, db))
+}
+
+// newSUT returns a syncer that fills db through client.
+func newSUT(
+	t *testing.T,
+	db sync.DB[*RangeProof, *ChangeProof],
+	client *peertracker.Client,
+	opts ...sutOption,
+) *sut {
+	t.Helper()
+
+	cfg := options.ApplyTo(&sutConfig{}, opts...)
+
+	syncer, err := sync.NewSyncer(
+		db,
+		sync.Config[*RangeProof, *ChangeProof]{
+			RangeProofMarshaler:   rangeProofMarshaler,
+			ChangeProofMarshaler:  changeProofMarshaler,
+			ProofClient:           client,
+			TargetRoot:            cfg.targetRoot,
+			SimultaneousWorkLimit: 5,
+			Log:                   logging.NoLog{},
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, syncer)
+	return syncer
+}
 
 func Test_Creation(t *testing.T) {
 	require := require.New(t)
@@ -40,19 +93,7 @@ func Test_Creation(t *testing.T) {
 	require.NoError(err)
 
 	ctx := t.Context()
-	syncer, err := sync.NewSyncer(
-		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewProofHandler(db, rangeProofMarshaler, changeProofMarshaler)),
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
-	require.NotNil(syncer)
+	syncer := newSUT(t, db, selfClient(t, ctx, db))
 	require.NoError(syncer.Sync(t.Context()))
 }
 
@@ -68,31 +109,31 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 	tests := []struct {
 		name        string
 		db          MerkleDB
-		proofClient func(db MerkleDB) *p2p.Client
+		proofClient func(db MerkleDB) *peertracker.Client
 	}{
 		{
 			name: "range proof bad response - too many leaves in response",
-			proofClient: func(db MerkleDB) *p2p.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.KeyChanges = append(response.KeyChanges, KeyChange{})
 				})
 
-				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof bad response - removed first key in response",
-			proofClient: func(db MerkleDB) *p2p.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
 
-				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof bad response - removed first key in response and replaced proof",
-			proofClient: func(db MerkleDB) *p2p.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 					response.KeyChanges = []KeyChange{
@@ -113,109 +154,109 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					}
 				})
 
-				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof bad response - removed key from middle of response",
-			proofClient: func(db MerkleDB) *p2p.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					i := rand.Intn(max(1, len(response.KeyChanges)-1))
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
 
-				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof bad response - start and end proof nodes removed",
-			proofClient: func(db MerkleDB) *p2p.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
 				})
 
-				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof bad response - end proof removed",
-			proofClient: func(db MerkleDB) *p2p.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.EndProof = nil
 				})
 
-				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof bad response - empty proof",
-			proofClient: func(db MerkleDB) *p2p.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
 					response.KeyChanges = nil
 				})
 
-				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof server flake",
-			proofClient: func(db MerkleDB) *p2p.Client {
-				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
-					Handler: sync.NewProofHandler(db, rangeProofMarshaler, changeProofMarshaler),
+			proofClient: func(db MerkleDB) *peertracker.Client {
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
+					Handler: newTestProofHandler(t, db),
 					c:       &counter{m: 2},
 				})
 			},
 		},
 		{
 			name: "change proof bad response - too many keys in response",
-			proofClient: func(db MerkleDB) *p2p.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
 					response.KeyChanges = append(response.KeyChanges, make([]KeyChange, sync.DefaultRequestKeyLimit)...)
 				})
 
-				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "change proof bad response - removed first key in response",
-			proofClient: func(db MerkleDB) *p2p.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
 
-				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "change proof bad response - removed key from middle of response",
-			proofClient: func(db MerkleDB) *p2p.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
 					i := rand.Intn(max(1, len(response.KeyChanges)-1))
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
 
-				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "change proof bad response - all proof keys removed from response",
-			proofClient: func(db MerkleDB) *p2p.Client {
+			proofClient: func(db MerkleDB) *peertracker.Client {
 				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
 				})
 
-				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "change proof flaky server",
-			proofClient: func(db MerkleDB) *p2p.Client {
-				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
-					Handler: sync.NewProofHandler(db, rangeProofMarshaler, changeProofMarshaler),
+			proofClient: func(db MerkleDB) *peertracker.Client {
+				return peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
+					Handler: newTestProofHandler(t, db),
 					c:       &counter{m: 2},
 				})
 			},
@@ -240,26 +281,17 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			)
 			require.NoError(err)
 
-			proofClient := p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler))
+			proofClient := peertrackertest.NewSelfClient(
+				t,
+				ctx,
+				ids.EmptyNodeID,
+				newTestProofHandler(t, dbToSync),
+			)
 			if tt.proofClient != nil {
 				proofClient = tt.proofClient(dbToSync)
 			}
 
-			syncer, err := sync.NewSyncer(
-				db,
-				sync.Config[*RangeProof, *ChangeProof]{
-					RangeProofMarshaler:   rangeProofMarshaler,
-					ChangeProofMarshaler:  changeProofMarshaler,
-					ProofClient:           proofClient,
-					TargetRoot:            syncRoot,
-					SimultaneousWorkLimit: 5,
-					Log:                   logging.NoLog{},
-				},
-				prometheus.NewRegistry(),
-			)
-
-			require.NoError(err)
-			require.NotNil(syncer)
+			syncer := newSUT(t, db, proofClient, withTarget(syncRoot))
 
 			// Start syncing from the server
 			var eg errgroup.Group
@@ -324,20 +356,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	syncer, err := sync.NewSyncer(
-		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
-			TargetRoot:            syncRoot,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
-	require.NotNil(syncer)
+	syncer := newSUT(t, db, selfClient(t, ctx, dbToSync), withTarget(syncRoot))
 
 	// Start syncing from the server, will be cancelled by the range proof handler
 	var eg errgroup.Group
@@ -353,20 +372,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.ErrorIsf(eg.Wait(), context.Canceled, "%T.Sync()", syncer)
 
 	ctx = t.Context()
-	newSyncer, err := sync.NewSyncer(
-		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, sync.NewProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
-			TargetRoot:            syncRoot,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
-	require.NotNil(newSyncer)
+	newSyncer := newSUT(t, db, selfClient(t, ctx, dbToSync), withTarget(syncRoot))
 
 	require.NoError(newSyncer.Sync(ctx))
 
@@ -428,27 +434,19 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	defer cancel(nil)
 
 	// Allow 1 request to go through before blocking
-	actionHandler := synctest.NewCounterHandler(sync.NewProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler), func() {
+	actionHandler := synctest.NewCounterHandler(newTestProofHandler(t, dbToSync), func() {
 		err := syncer.UpdateSyncTarget(secondSyncRoot)
 		if err != nil {
 			cancel(err)
 		}
 	}, 1)
 
-	syncer, err = sync.NewSyncer(
+	syncer = newSUT(
+		t,
 		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
-			TargetRoot:            firstSyncRoot,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
+		peertrackertest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
+		withTarget(firstSyncRoot),
 	)
-	require.NoError(err)
-	require.NotNil(syncer)
 
 	require.NoError(syncer.Sync(ctx))
 
@@ -485,27 +483,28 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require.NoError(err)
 
 	var syncer *sync.Syncer[*RangeProof, *ChangeProof]
-	actionHandler := synctest.NewCounterHandler(sync.NewProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler), func() {
+	actionHandler := synctest.NewCounterHandler(newTestProofHandler(t, dbToSync), func() {
 		err := syncer.UpdateSyncTarget(root1)
 		if err != nil {
 			cancel(err)
 		}
 	}, 0)
-	syncer, err = sync.NewSyncer(
+	syncer = newSUT(
+		t,
 		db,
-		sync.Config[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   rangeProofMarshaler,
-			ChangeProofMarshaler:  changeProofMarshaler,
-			ProofClient:           p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
-			TargetRoot:            root1,
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-		},
-		prometheus.NewRegistry(),
+		peertrackertest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
+		withTarget(root1),
 	)
-	require.NoError(err)
 
 	require.NoError(syncer.Sync(ctx))
+}
+
+func newTestProofHandler(t *testing.T, db MerkleDB) *sync.ProofHandler[*RangeProof, *ChangeProof] {
+	t.Helper()
+
+	handler, err := sync.NewProofHandler(db, rangeProofMarshaler, changeProofMarshaler, prometheus.NewRegistry())
+	require.NoError(t, err, "sync.NewProofHandler()")
+	return handler
 }
 
 func generateTrie(t *testing.T, r *rand.Rand, count int) (MerkleDB, error) {

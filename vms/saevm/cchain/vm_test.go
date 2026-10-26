@@ -6,11 +6,15 @@ package cchain
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"maps"
 	"math"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -19,7 +23,6 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
-	"github.com/ava-labs/libevm/ethclient"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/google/go-cmp/cmp"
@@ -37,9 +40,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -47,7 +49,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -55,9 +56,14 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
@@ -70,15 +76,14 @@ import (
 
 	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	evmconstants "github.com/ava-labs/avalanchego/graft/evm/constants"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
+	ethereum "github.com/ava-labs/libevm"
 	ethparams "github.com/ava-labs/libevm/params"
-	ethrpc "github.com/ava-labs/libevm/rpc"
 )
 
 func TestMain(m *testing.M) {
-	evm.RegisterAllLibEVMExtras()
+	libevm.RegisterExtras()
 	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
 
@@ -89,13 +94,18 @@ var _ saetest.Peer = (*SUT)(nil)
 type SUT struct {
 	*VM
 	*Client
+	ethclient  *evmclient.Client
+	clientOnce func()
 
-	db        database.Database
-	memory    *atomic.Memory
+	ctx            *snow.Context
+	db             database.Database
+	memory         *atomic.Memory
+	sharedMemoryDB database.Database
+
 	sender    *saetest.Sender
-	ethclient *ethclient.Client
 	p2pclient *saetest.CapturingPeer
 	clock     *saetest.Clock
+	logger    *loggingtest.Logger
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.ctx.NodeID }
@@ -103,15 +113,16 @@ func (s *SUT) Sender() *saetest.Sender { return s.sender }
 
 type (
 	sutConfig struct {
-		genesis    core.Genesis
-		nodeID     ids.NodeID
-		networkID  uint32
-		validators *warptest.Validators
-		clock      *saetest.Clock
-		vmConfig   config
-		db         database.Database
-		state      snow.State
-		upgrades   upgrade.Config
+		genesis      core.Genesis
+		nodeID       ids.NodeID
+		networkID    uint32
+		validators   *warptest.Validators
+		clock        *saetest.Clock
+		vmConfig     config
+		db           database.Database
+		chainDataDir string
+		state        snow.State
+		upgrades     upgrade.Config
 
 		skipRPCTransport bool
 	}
@@ -122,6 +133,8 @@ type (
 // initialization. Defaults to [snow.NormalOp]. Use [snow.Bootstrapping] to
 // model a node that is still catching up and has not yet entered normal
 // operation (e.g. verifying blocks received from peers during bootstrap).
+// Use [snow.StateSyncing] to test state-sync specific behavior.
+// Note that any RPCs will not be available until the node is bootstrapping.
 func withState(state snow.State) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.state = state
@@ -153,6 +166,14 @@ func withDB(db database.Database) sutOption {
 	})
 }
 
+// withChainDataDir overrides the SUT's chain data directory, useful for
+// re-using the execution results DB.
+func withChainDataDir(dir string) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.chainDataDir = dir
+	})
+}
+
 // withMaxAllocFor configures the SUT's genesis to allocate the maximum possible
 // balance to each address, leaving the rest of the genesis allocation intact.
 func withMaxAllocFor(addrs ...common.Address) sutOption {
@@ -169,6 +190,21 @@ func withAccount(addr common.Address, acc types.Account) sutOption {
 	}
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.genesis.Alloc[addr] = acc
+	})
+}
+
+// withGenesis replaces the SUT's default genesis.
+func withGenesis(g core.Genesis) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis = g
+	})
+}
+
+// withUpgrades overrides the network upgrade schedule, which defaults to
+// every upgrade being active from genesis.
+func withUpgrades(u upgrade.Config) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.upgrades = u
 	})
 }
 
@@ -219,6 +255,42 @@ func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 	return opt, c
 }
 
+// withArchival disables pruning, persisting every state root.
+func withArchival() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.Pruning = false
+	})
+}
+
+// withCommitInterval sets the interval at which trie roots are persisted.
+func withCommitInterval(n uint64) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.CommitInterval = n
+	})
+}
+
+// withFirewood selects Firewood as the trie database
+func withFirewood() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.StateScheme = customrawdb.FirewoodScheme
+	})
+}
+
+// withSnapshotDisabled disables the snapshot.
+func withSnapshotDisabled() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.SnapshotCache = 0
+	})
+}
+
+// withStateSyncDisabled clears [config.StateSyncEnabled], which defaults to
+// true.
+func withStateSyncDisabled() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.StateSyncEnabled = false
+	})
+}
+
 // withPriceTarget sets [config.PriceTarget] on the SUT.
 func withPriceTarget(p gas.Price) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -238,6 +310,23 @@ func withMinDelayTarget(ms uint64) sutOption {
 	})
 }
 
+// synchronousFixture returns the fixture and options to bootstrap it from
+// genesis, with Helicon after its last block.
+func synchronousFixture(tb testing.TB) (*synchronoustest.Fixture, []sutOption, *saetest.Clock) {
+	tb.Helper()
+
+	fixture := synchronoustest.Load(tb)
+	upgrades := fixture.Upgrades
+	upgrades.HeliconTime = upgrades.GraniteTime.Add(24 * time.Hour)
+	timeOpt, clock := withVMTime(upgrades.HeliconTime)
+	return fixture, []sutOption{
+		withGenesis(fixture.CoreGenesis(tb)),
+		withUpgrades(upgrades),
+		timeOpt,
+		withState(snow.Bootstrapping),
+	}, clock
+}
+
 // newSUT initializes a cchain [VM], transitions it to the configured
 // [snow.State] (default [snow.NormalOp]), and
 // mounts its HTTP handlers behind a local [httptest.Server] at the paths
@@ -245,27 +334,42 @@ func withMinDelayTarget(ms uint64) sutOption {
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
-	// Run under the latest network upgrade rules by default.
-	chainConfig := cparams.Copy(saetest.ChainConfig())
-	cparams.WithExtra(&chainConfig, extras.TestChainConfig)
+	sut, err := tryNewSUT(tb, opts...)
+	require.NoError(tb, err, "tryNewSUT()")
+	return sut.logger.CancelOnError(tb.Context()), sut
+}
+
+var (
+	// chainDBPrefix locates the VM's database within the SUT's base database,
+	// mirroring the prefix avalanchego's chain manager applies.
+	chainDBPrefix = []byte("chain")
+	// sharedMemoryPrefix locates shared memory within the SUT's base database.
+	sharedMemoryPrefix = []byte("sharedmemory")
+)
+
+// tryNewSUT is [newSUT], returning any startup error. Tests SHOULD use
+// [newSUT] unless asserting on such errors.
+func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
+	tb.Helper()
 
 	var (
 		cfg = options.ApplyTo(&sutConfig{
 			genesis: core.Genesis{
-				Config:     &chainConfig,
+				Config:     cchaintest.ChainConfig(),
 				Timestamp:  uint64(upgrade.InitiallyActiveTime.Unix()), //#nosec G115 -- Known non-negative
 				Difficulty: big.NewInt(0),                              // irrelevant but required to marshal
 				Alloc:      types.GenesisAlloc{},
 				BaseFee:    big.NewInt(ethparams.Wei),
 			},
-			nodeID:     ids.GenerateTestNodeID(),
-			networkID:  constants.UnitTestID,
-			validators: warptest.NewValidators(tb),
-			clock:      saetest.NewClock(testStartTime, time.Millisecond),
-			vmConfig:   defaultConfig(),
-			db:         memdb.New(),
-			state:      snow.NormalOp,
-			upgrades:   upgradetest.GetConfig(upgradetest.Latest),
+			nodeID:       ids.GenerateTestNodeID(),
+			networkID:    constants.UnitTestID,
+			validators:   warptest.NewValidators(tb),
+			clock:        saetest.NewClock(testStartTime, time.Millisecond),
+			vmConfig:     defaultConfig(),
+			db:           memdb.New(),
+			chainDataDir: tb.TempDir(),
+			state:        snow.NormalOp,
+			upgrades:     upgradetest.GetConfig(upgradetest.Latest),
 		}, opts...)
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
@@ -277,8 +381,11 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	// The VM and shared memory MUST share an underlying database so that
 	// [atomic.SharedMemory.Apply] writes to the VM DB.
-	memory := atomic.NewMemory(prefixdb.New([]byte("sharedmemory"), db))
+	sharedMemoryDB := prefixdb.New(sharedMemoryPrefix, db)
+	memory := atomic.NewMemory(sharedMemoryDB)
+
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
+	snowCtx.ChainDataDir = cfg.chainDataDir
 	snowCtx.NodeID = cfg.nodeID
 	snowCtx.NetworkID = cfg.networkID
 	snowCtx.NetworkUpgrades = cfg.upgrades
@@ -287,7 +394,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	snowCtx.Log = log
 	warptest.SetValidators(tb, snowCtx, cfg.validators)
 
-	chainDB := prefixdb.New([]byte("chain"), db)
+	chainDB := prefixdb.New(chainDBPrefix, db)
 
 	genesisBytes, err := json.Marshal(cfg.genesis)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
@@ -299,7 +406,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	appSender := saetest.NewSender(tb, validatorIDs)
 
 	ctx := log.CancelOnError(tb.Context())
-	require.NoErrorf(tb, vm.Initialize(
+	if err := vm.Initialize(
 		ctx,
 		snowCtx,
 		chainDB,
@@ -308,7 +415,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		configBytes,
 		nil, // fxs
 		appSender,
-	), "%T.Initialize()", vm)
+	); err != nil {
+		return nil, fmt.Errorf("%T.Initialize(): %w", vm, err)
+	}
 	tb.Cleanup(func() {
 		// The context is cancelled before cleanup is called, so we strip the
 		// cancellation.
@@ -316,31 +425,32 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		require.NoErrorf(tb, vm.Shutdown(ctx), "%T.Shutdown()", vm)
 	})
 
-	// The engine sets the preference to the last accepted block when entering
-	// normal operation.
-	if cfg.state == snow.NormalOp {
-		lastAccepted, err := vm.LastAccepted(ctx)
-		require.NoErrorf(tb, err, "%T.LastAccepted()", vm)
-		require.NoErrorf(tb, vm.SetPreference(ctx, lastAccepted, nil), "%T.SetPreference()", vm)
-	}
-	require.NoErrorf(tb, vm.SetState(ctx, cfg.state), "%T.SetState(%s)", vm, cfg.state)
+	// This is called immediately after initialization by avalanchego, so we
+	// should test this behavior specifically.
+	handlers, err := vm.CreateHandlers(ctx)
+	require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
 
 	// Avalanchego marks the local node as connected so that p2p protocols don't
 	// need to treat our node as a special case.
 	require.NoErrorf(tb, vm.Connected(ctx, snowCtx.NodeID, version.Current), "%T.Connected(%s)", vm, snowCtx.NodeID)
 
 	sut := &SUT{
-		VM:        vm,
-		db:        db,
-		memory:    memory,
-		sender:    appSender,
-		p2pclient: saetest.NewCapturingPeer(tb, validatorIDs),
-		clock:     cfg.clock,
+		VM:             vm,
+		db:             db,
+		ctx:            snowCtx,
+		memory:         memory,
+		sharedMemoryDB: sharedMemoryDB,
+		sender:         appSender,
+		p2pclient:      saetest.NewCapturingPeer(tb, validatorIDs),
+		clock:          cfg.clock,
+		logger:         log,
 	}
 
-	if !cfg.skipRPCTransport {
-		handlers, err := vm.CreateHandlers(ctx)
-		require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
+	// Called from [SUT.SetState].
+	sut.clientOnce = sync.OnceFunc(func() {
+		if cfg.skipRPCTransport {
+			return
+		}
 
 		mux := http.NewServeMux()
 		for path, h := range handlers {
@@ -348,19 +458,42 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		}
 		server := httptest.NewServer(mux)
 		tb.Cleanup(server.Close)
+		sut.Client = NewClient(server.URL)
 
 		const wsHTTPPath = cchainHTTPPrefix + "/ws"
 		wsURI := "ws://" + server.Listener.Addr().String() + wsHTTPPath
-		ethRPCClient, err := ethrpc.Dial(wsURI)
-		require.NoErrorf(tb, err, "rpc.Dial(%s)", wsURI)
-		tb.Cleanup(ethRPCClient.Close)
+		sut.ethclient, err = evmclient.Dial(ctx, wsURI)
+		require.NoErrorf(tb, err, "client.Dial(ctx, %s)", wsURI)
+		tb.Cleanup(sut.ethclient.Close)
+	})
 
-		sut.Client = NewClient(server.URL)
-		sut.ethclient = ethclient.NewClient(ethRPCClient)
+	if cfg.state == snow.NormalOp {
+		// The engine sets the preference to the last accepted block when entering
+		// normal operation. The bootstrapper will first set it to bootstrapping.
+		if err := sut.SetState(ctx, snow.Bootstrapping); err != nil {
+			return nil, fmt.Errorf("%T.SetState(%s): %w", vm, snow.Bootstrapping, err)
+		}
+		lastAccepted, err := sut.LastAccepted(ctx)
+		require.NoErrorf(tb, err, "%T.LastAccepted()", sut.VM)
+		require.NoErrorf(tb, sut.SetPreference(ctx, lastAccepted, nil), "%T.SetPreference()", sut.VM)
 	}
+	if err := sut.SetState(ctx, cfg.state); err != nil {
+		return nil, fmt.Errorf("%T.SetState(%s): %w", vm, cfg.state, err)
+	}
+
 	appSender.Start(tb, sut)
 	saetest.ConnectTo[saetest.Peer](tb, sut, sut.p2pclient)
-	return ctx, sut
+	return sut, nil
+}
+
+func (s *SUT) SetState(ctx context.Context, state snow.State) error {
+	if err := s.VM.SetState(ctx, state); err != nil {
+		return err
+	}
+	if state >= snow.Bootstrapping {
+		s.clientOnce()
+	}
+	return nil
 }
 
 // hooks returns a new [hooks] instance that behaves equivalently to those
@@ -374,7 +507,7 @@ func (s *SUT) hooks(tb testing.TB) *hooks {
 		s.ctx,
 		s.state,
 		s.chainConfig,
-		s.txpool.Pending,
+		s.pending,
 		warp.NewStorage(s.db),
 		s.now,
 		desiredParams{},
@@ -532,7 +665,7 @@ func (s *SUT) waitForTxPoolStateUpdate(ctx context.Context, tb testing.TB, t *tx
 	// The pool updates the verification state atomically with evicting the
 	// included tx, so observing the eviction guarantees the state has been
 	// updated.
-	for s.txpool.Has(t.ID()) {
+	for s.pending.Has(t.ID()) {
 		select {
 		case <-ctx.Done():
 			require.NoErrorf(tb, ctx.Err(), "waiting for txpool to evict %s", t.ID())
@@ -575,6 +708,17 @@ func (s *SUT) buildVerifyAccept(ctx context.Context, tb testing.TB, opts ...bloc
 	return blk
 }
 
+// blockAtHeight returns the accepted block at the given height.
+func (s *SUT) blockAtHeight(ctx context.Context, tb testing.TB, height uint64) *blocks.Block {
+	tb.Helper()
+
+	id, err := s.GetBlockIDAtHeight(ctx, height)
+	require.NoErrorf(tb, err, "%T.GetBlockIDAtHeight(%d)", s.VM, height)
+	blk, err := s.GetBlock(ctx, id)
+	require.NoErrorf(tb, err, "%T.GetBlock(%s)", s.VM, id)
+	return blk
+}
+
 // lastAccepted returns the ID of the last-accepted block.
 func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 	tb.Helper()
@@ -582,6 +726,15 @@ func (s *SUT) lastAccepted(ctx context.Context, tb testing.TB) ids.ID {
 	id, err := s.LastAccepted(ctx)
 	require.NoErrorf(tb, err, "%T.LastAccepted()", s.VM)
 	return id
+}
+
+// lastAcceptedHeight returns the height of the last-accepted block.
+func (s *SUT) lastAcceptedHeight(ctx context.Context, tb testing.TB) uint64 {
+	tb.Helper()
+
+	blk, err := s.GetBlock(ctx, s.lastAccepted(ctx, tb))
+	require.NoErrorf(tb, err, "%T.GetBlock(last accepted)", s.VM)
+	return blk.Height()
 }
 
 // unblockWaitForEvent advances the [withVMTime] clock to ensure that
@@ -638,6 +791,36 @@ func (s *SUT) buildVerify(ctx context.Context, tb testing.TB, preferenceID ids.I
 	require.NoErrorf(tb, err, "%T.BuildBlock()", s.VM)
 	require.NoErrorf(tb, s.VerifyBlock(ctx, blockContext, blk), "%T.VerifyBlock()", s.VM)
 	return blk
+}
+
+// parseVerifyAccept drives a block produced by another node through
+// this SUT's consensus surface, as the engine would during bootstrapping or
+// normal operation.
+func (s *SUT) parseVerifyAccept(ctx context.Context, tb testing.TB, blk *blocks.Block) *blocks.Block {
+	tb.Helper()
+
+	parsed, err := s.ParseBlock(ctx, blk.Bytes())
+	require.NoErrorf(tb, err, "%T.ParseBlock(height %d)", s.VM, blk.Height())
+	require.NoErrorf(tb, s.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", s.VM, blk.Height())
+	require.NoErrorf(tb, s.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", s.VM, blk.Height())
+	return parsed
+}
+
+// acceptSynchronousBlocks drives blks, in order, through parse, verify, and
+// accept, asserting that each re-executes to the state and receipts roots its
+// header commits to.
+func (s *SUT) acceptSynchronousBlocks(ctx context.Context, tb testing.TB, blks []synchronoustest.Block) {
+	tb.Helper()
+
+	for _, blk := range blks {
+		parsed, err := s.ParseBlock(ctx, blk.RLP)
+		require.NoErrorf(tb, err, "%T.ParseBlock(height %d)", s.VM, blk.Number)
+		require.NoErrorf(tb, s.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", s.VM, blk.Number)
+		require.NoErrorf(tb, s.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", s.VM, blk.Number)
+
+		assert.Equalf(tb, parsed.SettledStateRoot(), parsed.PostExecutionStateRoot(), "post-execution state root of height %d", blk.Number)
+		assert.Equalf(tb, parsed.SettledReceiptsRoot(), types.DeriveSha(parsed.Receipts(), saetest.TrieHasher()), "receipts root of height %d", blk.Number)
+	}
 }
 
 // verifyTampered re-seals valid with a mutated header and returns the
@@ -759,13 +942,15 @@ func (w *wallet) newImportTx(
 	sourceChain ids.ID,
 	to common.Address,
 	fee uint64,
-) (*tx.Tx, *tx.Import) {
+) *tx.Tx {
 	tb.Helper()
+
+	utxos, err := w.client.GetAllUTXOs(ctx, []ids.ShortID{w.sk.Address()}, sourceChain)
+	require.NoErrorf(tb, err, "%T.GetAllUTXOs()", w.client)
 
 	var (
 		avaxAssetID  = w.snowCtx.AVAXAssetID
 		importedAVAX uint64
-		utxos        = w.client.getAllUTXOs(ctx, tb, sourceChain, maxGetUTXOsLimit, w.sk.Address())
 		inputs       = make([]*avax.TransferableInput, 0, len(utxos))
 	)
 	for _, utxo := range utxos {
@@ -801,7 +986,7 @@ func (w *wallet) newImportTx(
 			AssetID: avaxAssetID,
 		}},
 	}
-	return w.sign(tb, imp, len(inputs)), imp
+	return w.sign(tb, imp, len(inputs))
 }
 
 // sign wraps u in a [tx.Tx] with numCreds copies of a single-sig credential
@@ -826,11 +1011,13 @@ func addNAVAX(tb testing.TB, balance uint256.Int, nAVAXDelta int64) uint256.Int 
 
 	var (
 		op       = balance.AddOverflow
-		absDelta = uint64(nAVAXDelta)
+		absDelta uint64
 	)
 	if nAVAXDelta < 0 {
 		op = balance.SubOverflow
-		absDelta = -absDelta
+		absDelta = uint64(-nAVAXDelta)
+	} else {
+		absDelta = uint64(nAVAXDelta)
 	}
 
 	delta := tx.ScaleAVAX(absDelta)
@@ -888,7 +1075,7 @@ func TestImport(t *testing.T) {
 		receiver = txtest.NewKey(t).EthAddress()
 	)
 	const txFee = 50
-	signedImport, _ := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
+	signedImport := w.newImportTx(ctx, t, sourceChain, receiver, txFee)
 
 	blk := sut.issueAndExecute(ctx, t, signedImport)
 	sut.assertTxAccepted(ctx, t, signedImport, blk.NumberU64())
@@ -898,6 +1085,57 @@ func TestImport(t *testing.T) {
 	)
 	sut.assertAccount(t, receiver, nonce, tx.ScaleAVAX(amountMinted))
 	sut.assertUTXOsMissing(t, sut.ctx.ChainID, sourceChain, utxo)
+}
+
+func TestStatefulRPCsReconstructExtraState(t *testing.T) {
+	const (
+		commitInterval uint64 = 4
+		numBlocks             = 2*commitInterval + 3
+	)
+
+	tests := []struct {
+		name string
+		opts []sutOption
+	}{
+		{
+			name: "hashdb_pruning",
+			opts: []sutOption{withCommitInterval(commitInterval)},
+		},
+		{
+			name: "firewood_commit_interval",
+			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(commitInterval)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := txtest.NewKey(t)
+			sender := key.EthAddress()
+			timeOpt, clock := withVMTime(testStartTime)
+			opts := []sutOption{withMaxAllocFor(sender), timeOpt, withDB(memdb.New()), withChainDataDir(t.TempDir())}
+			opts = append(opts, tt.opts...)
+
+			ctx, node := newSUT(t, opts...)
+			w := newWallet(key, node.ctx, node.Client)
+			for range numBlocks {
+				blk := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+				clock.AdvanceToSettle(ctx, t, blk)
+			}
+
+			// Restarting the VM clears all caches so that every uncommitted
+			// state root MUST be reconstructed by re-execution.
+			require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+			t.Run("restart", func(t *testing.T) {
+				ctx, sut := newSUT(t, opts...)
+
+				for h := range numBlocks + 1 {
+					got, err := sut.ethclient.NonceAt(ctx, sender, new(big.Int).SetUint64(h))
+					require.NoErrorf(t, err, "%T.NonceAt(%d)", sut.ethclient, h)
+					assert.Equalf(t, h, got, "%T.NonceAt(%d): one export per block", sut.ethclient, h)
+				}
+			})
+		})
+	}
 }
 
 // TestBuildBlockOnProcessing verifies that the block builder excludes a mempool
@@ -936,6 +1174,17 @@ func TestBuildBlockOnProcessing(t *testing.T) {
 		for _, tx := range blockTxs(t, block) {
 			sut.assertTxAccepted(ctx, t, tx, block.NumberU64())
 		}
+	}
+}
+
+func assertBlockIncludes(tb testing.TB, blk *blocks.Block, ethTxs types.Transactions, stxs []*tx.Tx) {
+	tb.Helper()
+
+	if diff := cmp.Diff(ethTxs, blk.Transactions(), cmputils.TransactionsByHash()); diff != "" {
+		tb.Errorf("%T eth txs (-want +got):\n%s", blk, diff)
+	}
+	if diff := cmp.Diff(stxs, blockTxs(tb, blk), txtest.CmpOpt()); diff != "" {
+		tb.Errorf("%T cross-chain txs (-want +got):\n%s", blk, diff)
 	}
 }
 
@@ -983,12 +1232,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 	require.NoErrorf(t, sut.IssueTx(ctx, signedExport), "%T.IssueTx()", sut.Client)
 
 	blk := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
-	if diff := cmp.Diff(types.Transactions{tracedTx}, blk.Transactions(), cmputils.TransactionsByHash()); diff != "" {
-		t.Errorf("%T eth txs (-want +got):\n%s", blk, diff)
-	}
-	if diff := cmp.Diff([]*tx.Tx{signedExport}, blockTxs(t, blk), txtest.CmpOpt()); diff != "" {
-		t.Errorf("%T cross-chain txs (-want +got):\n%s", blk, diff)
-	}
+	assertBlockIncludes(t, blk, types.Transactions{tracedTx}, []*tx.Tx{signedExport})
 
 	rpc := sut.GethRPCBackends()
 	// To rebuild the state at a particular tx, the [saexec.Execute] method is
@@ -1073,6 +1317,27 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 	assert.Equalf(t, *wantBalance, sut.balance(t, sender), "sender balance reflects gas charged")
 }
 
+func TestEstimateGasIgnoresMinimumGasConsumption(t *testing.T) {
+	const (
+		gasLimit    = uint64(100_000_000)
+		minEstimate = ethparams.TxGasContractCreation
+		// The RPC estimator may stop its binary search once it is within 1.5%
+		// of the exact estimate.
+		maxEstimate = minEstimate * 1_015 / 1_000
+	)
+	from := common.Address{'m', 'e'}
+	ctx, sut := newSUT(t, withMaxAllocFor(from))
+
+	got, err := sut.ethclient.EstimateGas(ctx, ethereum.CallMsg{
+		From:      from,
+		Gas:       gasLimit,
+		GasFeeCap: big.NewInt(1),
+	})
+	require.NoError(t, err, "%T.EstimateGas(...)", sut.ethclient)
+	require.GreaterOrEqual(t, got, minEstimate, "%T.EstimateGas(...)", sut.ethclient)
+	require.LessOrEqual(t, got, maxEstimate, "%T.EstimateGas(...)", sut.ethclient)
+}
+
 // TestFeesBurnedToBlackhole verifies that each transaction's full fee (tip +
 // base fee) is credited to the blackhole address before the next transaction
 // executes.
@@ -1081,7 +1346,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 
 	contract := common.Address{'c', 'o', 'd', 'e'}
 	code := saetest.LogTopOfStackAfter(
-		saetest.Push(t, evmconstants.BlackholeAddr[:]),
+		saetest.Push(t, blackhole.Address[:]),
 		saetest.Ops(vm.BALANCE),
 	)
 	ctx, sut := newSUT(t,
@@ -1102,7 +1367,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 	}
 	sut.waitForPendingEthTxs(ctx, t, txs...)
 
-	preBurn := sut.balance(t, evmconstants.BlackholeAddr)
+	preBurn := sut.balance(t, blackhole.Address)
 	blk := sut.runConsensusLoop(ctx, t)
 	require.Zerof(t, big.NewInt(1).Cmp(blk.EthBlock().BaseFee()), "%T base fee", blk)
 	receipts := blk.Receipts()
@@ -1115,12 +1380,14 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 		require.Equalf(t, common.Hash(want.Bytes32()), got, "BALANCE(blackhole) observed by transaction %d", i)
 		want.AddUint64(&want, feePerGas*r.GasUsed)
 	}
-	assert.Equal(t, want, sut.balance(t, evmconstants.BlackholeAddr), "blackhole balance after the block")
+	assert.Equal(t, want, sut.balance(t, blackhole.Address), "blackhole balance after the block")
 }
 
-// TestParseBlock verifies that the cchain ParseBlock override accepts
-// well-formed blocks and rejects blocks with an unsupported (non-zero) version
-// or whose extData does not match the ExtDataHash committed in the header.
+// TestParseBlock verifies that ParseBlock accepts well-formed blocks and
+// rejects blocks with an unsupported (non-zero) version or whose extData does
+// not match the ExtDataHash committed in the header, in every VM mode: both
+// before bootstrapping (via the statesync SummaryHandler) and after (via the
+// embedded SAE VM).
 func TestParseBlock(t *testing.T) {
 	ctx, sut := newSUT(t, withNetworkID(constants.FujiID))
 
@@ -1231,18 +1498,31 @@ func TestParseBlock(t *testing.T) {
 			wantErr: errExtDataHashMismatch,
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			buf, err := rlp.EncodeToBytes(tt.block)
-			require.NoError(t, err, "rlp.EncodeToBytes(block)")
 
-			got, err := sut.ParseBlock(ctx, buf)
-			require.ErrorIs(t, err, tt.wantErr, "vm.ParseBlock(buf)")
-			if tt.wantErr != nil {
-				return
+	states := []snow.State{
+		snow.Initializing,
+		snow.StateSyncing,
+		snow.Bootstrapping,
+		snow.NormalOp,
+	}
+
+	for _, mode := range states {
+		t.Run(mode.String(), func(t *testing.T) {
+			sut.mode.Set(mode)
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					buf, err := rlp.EncodeToBytes(tt.block)
+					require.NoError(t, err, "rlp.EncodeToBytes(block)")
+
+					got, err := sut.ParseBlock(ctx, buf)
+					require.ErrorIs(t, err, tt.wantErr, "vm.ParseBlock(buf)")
+					if tt.wantErr != nil {
+						return
+					}
+
+					require.Equal(t, tt.block.Hash(), got.EthBlock().Hash(), "vm.ParseBlock() block hash")
+				})
 			}
-
-			require.Equal(t, tt.block.Hash(), got.EthBlock().Hash(), "vm.ParseBlock() block hash")
 		})
 	}
 }
@@ -1355,6 +1635,105 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 	})
 }
 
+// Restarting with a settled asynchronous block requires the chain data
+// directory (home of the execution-results DB) to be carried over along with
+// the database; startup fails otherwise.
+func TestRestartWithSettledAsynchronousBlock(t *testing.T) {
+	key := txtest.NewKey(t)
+	alloc := withMaxAllocFor(key.EthAddress())
+
+	timeOpt, clock := withVMTime(testStartTime)
+	db := memdb.New()
+	dataDir := t.TempDir()
+	ctx, node := newSUT(t, alloc, timeOpt, withDB(db), withChainDataDir(dataDir))
+	w := newWallet(key, node.ctx, node.Client)
+
+	settled := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	clock.AdvanceToSettle(ctx, t, settled)
+	settler := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	require.Equal(t, settled.ID(), settler.LastSettled().ID(), "settler settles the first block")
+
+	require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+
+	_, err := tryNewSUT(t, alloc, timeOpt, withDB(db))
+	require.ErrorIs(t, err, blocks.ErrMissingExecutionResults, "restart without the chain data directory")
+
+	restartedCtx, restarted := newSUT(t, alloc, timeOpt, withDB(db), withChainDataDir(dataDir))
+	require.Equal(t, settler.ID(), restarted.lastAccepted(restartedCtx, t), "restarted last-accepted")
+}
+
+// A node bootstrapping from genesis must recover from a crash after any number
+// of database writes and be able to extend the chain asynchronously.
+//
+// TODO(StephenButtolph): Also crash with Firewood.
+func TestBootstrapSynchronousBlocks(t *testing.T) {
+	fixture, opts, _ := synchronousFixture(t)
+	heights := make(map[ids.ID]int, len(fixture.Blocks))
+	for i, blk := range fixture.Blocks {
+		heights[ids.ID(blk.Hash)] = i
+	}
+	tip := fixture.Blocks[len(fixture.Blocks)-1]
+
+	// Write the X-chain's UTXOs so that we can use the fixture's shared memory
+	// as the expected shared memory.
+	funded := memdb.New()
+	fixture.PutUTXOs(
+		t,
+		atomic.NewMemory(prefixdb.New(sharedMemoryPrefix, funded)),
+		snowtest.XChainID,
+		snowtest.CChainID,
+	)
+
+	counterDB := saetest.NewCaptureDB(saetest.CopyDB(t, funded), math.MaxInt)
+	ctx, counterSUT := newSUT(t, append(opts, withDB(counterDB))...)
+	counterSUT.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
+
+	for crashAfter := range counterDB.Ops() + 1 {
+		t.Run(fmt.Sprintf("crash_after_op_%d", crashAfter), func(t *testing.T) {
+			t.Parallel()
+
+			_, opts, clock := synchronousFixture(t)
+			db := saetest.NewCaptureDB(saetest.CopyDB(t, funded), crashAfter)
+
+			dataDir := t.TempDir()
+			ctx, node := newSUT(t, append(opts, withDB(db), withChainDataDir(dataDir))...)
+			node.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
+			require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+
+			ctx, sut := newSUT(t, append(opts, withDB(db.Captured(t)), withChainDataDir(dataDir))...)
+			last := sut.lastAccepted(ctx, t)
+			height, ok := heights[last]
+			require.Truef(t, ok, "last accepted %s after restart is not a fixture block", last)
+
+			sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[height+1:])
+			require.Equal(t, ids.ID(tip.Hash), sut.lastAccepted(ctx, t), "last accepted after bootstrapping")
+
+			t.Run("shared_memory", func(t *testing.T) {
+				want := memdb.New()
+				fixture.WriteSharedMemory(t, want)
+				saetest.AssertEqualDBs(t, want, sut.sharedMemoryDB, "shared memory")
+			})
+
+			require.NoErrorf(t, sut.SetPreference(ctx, sut.lastAccepted(ctx, t), nil), "%T.SetPreference()", sut.VM)
+			require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", sut.VM)
+
+			t.Run("extend_async", func(t *testing.T) {
+				// The fixture funds three accounts and only the first two ever
+				// transact, so the third still has its genesis balance and a
+				// zero nonce.
+				w := newWallet(secp256k1.TestKeys()[2], sut.ctx, sut.Client)
+				first := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+				require.Equal(t, tip.Number+1, first.Height(), "first asynchronous block height")
+				require.Equal(t, ids.ID(tip.Hash), first.LastSettled().ID(), "first asynchronous block settles the synchronous tip")
+
+				clock.AdvanceToSettle(ctx, t, first)
+				second := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+				require.Equal(t, first.ID(), second.LastSettled().ID(), "second asynchronous block settles the first")
+			})
+		})
+	}
+}
+
 // Verifies a built block splits its timestamp: seconds in Header.Time, the full
 // millisecond instant in TimeMilliseconds.
 func TestBuildBlockPreservesMillisecondTimestamp(t *testing.T) {
@@ -1396,7 +1775,7 @@ func TestDynamicPriceExponent(t *testing.T) {
 		},
 		{
 			name:    "max_diff",
-			desired: utils.PointerTo[gas.Price](2),
+			desired: new(gas.Price(2)),
 			want: []dynamic.PriceExponent{
 				maxDiff,
 				2 * maxDiff,
@@ -1449,7 +1828,7 @@ func TestDynamicTargetExponent(t *testing.T) {
 		},
 		{
 			name:    "max_diff",
-			desired: utils.PointerTo[gas.Gas](15_000_000),
+			desired: new(gas.Gas(15_000_000)),
 			want: []dynamic.TargetExponent{
 				maxDiff,
 				2 * maxDiff,
@@ -1502,7 +1881,7 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 		},
 		{
 			name:    "votes_up_capped",
-			desired: utils.PointerTo[uint64](4000), // above the ~2000ms initial
+			desired: new(uint64(4000)), // above the ~2000ms initial
 			want: []dynamic.DelayExponent{
 				dynamic.InitialDelayExponent + maxDiff,
 				dynamic.InitialDelayExponent + 2*maxDiff,
@@ -1510,7 +1889,7 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 		},
 		{
 			name:    "votes_down_capped",
-			desired: utils.PointerTo[uint64](1000),
+			desired: new(uint64(1000)),
 			want: []dynamic.DelayExponent{
 				dynamic.InitialDelayExponent - maxDiff,
 				dynamic.InitialDelayExponent - 2*maxDiff,
@@ -1594,7 +1973,7 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 	require.NoErrorf(t, sut.IssueTx(ctx, w.newMinimalTx(t)), "%T.IssueTx()", sut.Client)
 	child := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
-	earlyMS := uint64(earliestBuildTime(parent).UnixMilli()) - 1 //#nosec G115 -- Known non-negative
+	earlyMS := uint64(earliestBuildTime(parent).UnixMilli()) - 1
 	err := sut.verifyTampered(ctx, t, child, func(hdr *types.Header) {
 		hdr.Time = earlyMS / 1000
 		tamperExtra(func(e *customtypes.HeaderExtra) {
@@ -1780,7 +2159,7 @@ func TestPreHeliconBlocksDisallowed(t *testing.T) {
 		valid := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
 
 		hdr := valid.Header()
-		preHeliconMS := uint64(preHeliconTime.UnixMilli()) //#nosec G115 -- Known non-negative
+		preHeliconMS := uint64(preHeliconTime.UnixMilli())
 		hdr.Time = preHeliconMS / 1000
 		customtypes.GetHeaderExtra(hdr).TimeMilliseconds = &preHeliconMS
 
@@ -1821,4 +2200,114 @@ func TestWarpPrecompileActivation(t *testing.T) {
 	require.NoErrorf(t, err, "%T.LastExecutedState()", sut.VM)
 	assert.Equalf(t, uint64(1), state.GetNonce(corethwarp.ContractAddress), "warp precompile nonce after first Durango block")
 	assert.Equalf(t, []byte{0x01}, state.GetCode(corethwarp.ContractAddress), "warp precompile code after first Durango block")
+}
+
+// TestConsensusGettersAfterRestart verifies that all functions routed through
+// [stateDependent] are consistent and usable on all node states after a
+// restart, which is necessary to allow network recovery.
+func TestConsensusGettersAfterRestart(t *testing.T) {
+	key := txtest.NewKey(t)
+	alloc := withMaxAllocFor(key.EthAddress())
+	db := memdb.New()
+
+	ctx, node := newSUT(t, alloc, withDB(db))
+	w := newWallet(key, node.ctx, node.Client)
+
+	genesis, err := node.GetBlock(ctx, node.lastAccepted(ctx, t))
+	require.NoErrorf(t, err, "%T.GetBlock()", node.VM)
+	const numBlocks = 3
+	want := make([]*blocks.Block, 0, numBlocks+1)
+	want = append(want, genesis)
+	for range numBlocks {
+		blk := node.issueAndExecute(ctx, t, w.newMinimalTx(t))
+		want = append(want, blk)
+	}
+	require.NoErrorf(t, node.Shutdown(ctx), "%T.Shutdown()", node.VM)
+
+	for _, state := range []snow.State{
+		snow.StateSyncing,
+		snow.Bootstrapping,
+		snow.NormalOp,
+	} {
+		t.Run(state.String(), func(t *testing.T) {
+			ctx, s := newSUT(t, alloc, withDB(db), withState(state))
+
+			wantLastAccepted := want[len(want)-1].ID()
+			gotLastAccepted, err := s.LastAccepted(ctx)
+			require.NoErrorf(t, err, "%T.LastAccepted()", s)
+			assert.Equalf(t, wantLastAccepted, gotLastAccepted, "%T.LastAccepted()", s)
+
+			for _, b := range want {
+				gotID, err := s.GetBlockIDAtHeight(ctx, b.Height())
+				require.NoErrorf(t, err, "%T.GetBlockIDAtHeight(%d)", s, b.Height())
+				assert.Equalf(t, b.ID(), gotID, "%T.GetBlockIDAtHeight(%d)", s, b.Height())
+
+				gotBlock, err := s.GetBlock(ctx, b.ID())
+				require.NoErrorf(t, err, "%T.GetBlock(%s)", s, b.ID())
+				assert.Equalf(t, b.ID(), gotBlock.ID(), "%T.GetBlock(%s).ID()", s, b.ID())
+				assert.Equalf(t, b.Height(), gotBlock.Height(), "%T.GetBlock(%s).Height()", s, b.ID())
+			}
+		})
+	}
+}
+
+// TestConsensusGettersNoState ensures that an empty VM still can serve the
+// genesis block.
+func TestConsensusGettersNoState(t *testing.T) {
+	ctx, sut := newSUT(t, withState(snow.StateSyncing))
+	hash, err := sut.LastAccepted(ctx)
+	require.NoErrorf(t, err, "%T.LastAccepted()", sut)
+	require.NotZerof(t, hash, "%T.LastAccepted()", sut)
+
+	gotID, err := sut.GetBlockIDAtHeight(ctx, 0)
+	require.NoErrorf(t, err, "%T.GetBlockIDAtHeight(%d)", sut, 0)
+	assert.Equalf(t, hash, gotID, "%T.GetBlockIDAtHeight(%d)", sut, 0)
+
+	gotBlock, err := sut.GetBlock(ctx, hash)
+	require.NoErrorf(t, err, "%T.GetBlock(%s)", sut, hash)
+	assert.Equalf(t, hash, gotBlock.ID(), "%T.GetBlock(%s).ID()", sut, hash)
+	assert.Equalf(t, uint64(0), gotBlock.Height(), "%T.GetBlock(%s).Height()", sut, hash)
+}
+
+// TestWaitForEventInitializing tests that WaitForEvent blocks if the VM isn't
+// bootstrapped or state syncing.
+func TestWaitForEventInitializing(t *testing.T) {
+	ctx, sut := newSUT(t, withState(snow.Initializing))
+
+	ctx, cancel := context.WithCancel(ctx)
+	cancel()
+	_, err := sut.WaitForEvent(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+// Re-executing synchronous blocks after a Firewood crash MUST NOT regress the
+// finalized block. Startup only searches for state at and below it, and
+// Firewood only serves its most recently persisted root.
+func TestRecoverFirewoodAcrossSynchronousTransition(t *testing.T) {
+	fixture, opts, clock := synchronousFixture(t)
+	dataDir := t.TempDir()
+	opts = append(opts, withFirewood(), withDB(memdb.New()), withChainDataDir(dataDir))
+
+	ctx, sut := newSUT(t, opts...)
+	sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
+	require.NoErrorf(t, sut.SetPreference(ctx, sut.lastAccepted(ctx, t), nil), "%T.SetPreference()", sut.VM)
+	require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", sut.VM)
+
+	w := newWallet(secp256k1.TestKeys()[2], sut.ctx, sut.Client) // the fixture's only unused account
+	for range 2 {
+		blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+		clock.AdvanceToSettle(ctx, t, blk)
+	}
+	require.NoErrorf(t, sut.Shutdown(ctx), "%T.Shutdown()", sut.VM)
+
+	// Simulates a crash rolling Firewood back before it persisted anything.
+	firewoodDir := filepath.Join(dataDir, firewood.Directory)
+	require.NoError(t, os.RemoveAll(firewoodDir), "removing Firewood directory")
+
+	// Shutdown persists the settled asynchronous root, which will then be the
+	// only root Firewood serves.
+	ctx, sut = newSUT(t, opts...)
+	require.NoErrorf(t, sut.Shutdown(ctx), "%T.Shutdown()", sut.VM)
+
+	newSUT(t, opts...)
 }

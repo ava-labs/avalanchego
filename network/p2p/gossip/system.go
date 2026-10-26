@@ -150,12 +150,13 @@ func NewSystem[T Gossipable](
 		appGossiper:  handler,
 	}
 
-	client := network.NewClient(c.HandlerID, validatorPeers)
+	client := network.NewClient(c.HandlerID)
 	const pollSize = 1
 	pullGossiper := NewPullGossiper[T](
 		c.Log,
 		marshaller,
 		set,
+		validatorPeers,
 		client,
 		metrics,
 		pollSize,

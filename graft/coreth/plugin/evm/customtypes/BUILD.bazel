@@ -10,6 +10,7 @@ go_library(
     name = "customtypes",
     srcs = [
         "block_ext.go",
+        "extra.go",
         "gen_header_serializable_json.go",
         "gen_header_serializable_rlp.go",
         "hashes_ext.go",
@@ -19,6 +20,8 @@ go_library(
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes",
     deps = [
+        "//graft/coreth/params/extras",
+        "//utils/wrappers",
         "//vms/evm/acp226",
         "//vms/saevm/cchain/dynamic",
         "@com_github_ava_labs_libevm//common",
@@ -35,15 +38,17 @@ graft_go_test(
     srcs = [
         "block_ext_test.go",
         "block_test.go",
+        "extra_test.go",
         "header_ext_test.go",
         "rlp_fuzzer_test.go",
         "types_test.go",
     ],
     embed = [":customtypes"],
     deps = [
-        "//graft/coreth/internal/blocktest",
         "//graft/coreth/params",
-        "//utils",
+        "//graft/coreth/params/extras",
+        "//graft/evm/utils",
+        "//utils/wrappers",
         "//vms/evm/acp226",
         "//vms/saevm/cchain/dynamic",
         "@com_github_ava_labs_libevm//common",
@@ -51,9 +56,11 @@ graft_go_test(
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//crypto",
         "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//trie",
         "@com_github_google_go_cmp//cmp",
         "@com_github_google_go_cmp//cmp/cmpopts",
         "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
 )
