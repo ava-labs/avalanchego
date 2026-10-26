@@ -11,6 +11,7 @@ go_library(
         "block_builder.go",
         "blocks.go",
         "consensus.go",
+        "external_builder.go",
         "health.go",
         "http.go",
         "metrics.go",
@@ -73,6 +74,7 @@ go_test(
     name = "sae_test",
     srcs = [
         "always_test.go",
+        "external_builder_test.go",
         "health_test.go",
         "http_test.go",
         "networked_test.go",

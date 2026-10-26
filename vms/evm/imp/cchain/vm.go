@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/evm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
+	"github.com/ava-labs/avalanchego/vms/evm/externalbuilder"
 	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/state"
@@ -199,6 +200,21 @@ func (vm *VM) Initialize(
 		tdbConfig := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
 		if err := genesis.setupTrieDB(ethDB, tdbConfig); err != nil {
 			return fmt.Errorf("setting up genesis trie: %w", err)
+		}
+
+		if url := userConfig.BlockBuilderURL; url != "" {
+			builder, err := externalbuilder.Dial(ctx, url)
+			if err != nil {
+				return fmt.Errorf("dialing external block builder: %w", err)
+			}
+			// Appended before [sae.VM.Shutdown] so that the connection is
+			// closed after the VM stops building blocks.
+			vm.onClose = append(vm.onClose, func(context.Context) error {
+				builder.Close()
+				return nil
+			})
+			saeConfig.ExternalBuilder = builder
+			snowCtx.Log.Info("using external block builder")
 		}
 
 		// Uses of [sae.VM] are NOT protected by [VM.closeMu]. However,

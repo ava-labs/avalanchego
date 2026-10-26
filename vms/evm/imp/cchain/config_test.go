@@ -91,6 +91,14 @@ func TestParseConfig(t *testing.T) {
 			json: `{"min-delay-target":2000}`,
 			want: with(func(c *config) { c.MinDelayTarget = new(uint64(2000)) }),
 		},
+		{
+			name: "block_building/external_builder",
+			json: `{"block-builder-url":"http://127.0.0.1:9660","block-builder-timeout":"150ms"}`,
+			want: with(func(c *config) {
+				c.BlockBuilderURL = "http://127.0.0.1:9660"
+				c.BlockBuilderTimeout = duration{150 * time.Millisecond}
+			}),
+		},
 
 		// State & trie
 		{

@@ -103,6 +103,13 @@ type Config struct {
 	DBConfig      saedb.Config
 	RPCConfig     rpc.Config
 
+	// ExternalBuilder, if non-nil, proposes the leading transactions of blocks
+	// built by this node. See [ExternalBuilder].
+	ExternalBuilder ExternalBuilder `json:"-"`
+	// ExternalBuilderTimeout bounds each call to [ExternalBuilder.ProposeTxs].
+	// [DefaultExternalBuilderTimeout] is used if it is not positive.
+	ExternalBuilderTimeout time.Duration
+
 	// Now defaults to [time.Now] if nil
 	Now func() time.Time `json:"-"`
 }
@@ -197,6 +204,8 @@ func NewVM[T hook.Transaction](
 			exec,
 			pool,
 			ethBlockSource(consensusCritical, db),
+			cfg.ExternalBuilder,
+			cfg.ExternalBuilderTimeout,
 		},
 		newTxs:  newTxs,
 		closers: closers,

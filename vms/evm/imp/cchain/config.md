@@ -35,6 +35,8 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 | `min-price-target` | integer | The target minimum gas price, in wei (aAVAX), that this node will attempt to use when creating blocks. | Parent block's target |
 | `gas-target` | integer | The target gas per second that this node will attempt to use when creating blocks. | Parent block's target |
 | `min-delay-target` | integer | The minimum delay between blocks (in milliseconds) that this node will attempt to use when creating blocks. | Parent block's target |
+| `block-builder-url` | string | HTTP, WebSocket or IPC endpoint of an external block builder. When this node builds a block, it calls the builder's `builder_proposeTxs` method with the block's header and places the returned transactions at the start of the block, followed by transactions from the mempool. Proposed transactions are validated like any other. If any of them can not be included, or the builder fails or does not respond within `block-builder-timeout`, the block is built from the mempool alone. Verification of blocks is unaffected. | Disabled |
+| `block-builder-timeout` | duration | Maximum time to wait for the external block builder to propose transactions. Accepts a [Go duration string](https://pkg.go.dev/time#ParseDuration) (e.g. `"200ms"`). Non-positive values use the default. | `200ms` |
 
 ## State and Trie
 
