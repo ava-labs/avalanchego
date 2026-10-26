@@ -326,6 +326,33 @@ func (s *State) GasUsed() uint64 {
 	return uint64(s.blockSize)
 }
 
+// A Snapshot identifies a point within a block to which [State.Revert] can
+// return.
+type Snapshot struct {
+	db        int
+	blockSize gas.Gas
+	numOps    int
+}
+
+// Snapshot returns the current point within the block.
+func (s *State) Snapshot() Snapshot {
+	return Snapshot{
+		db:        s.db.Snapshot(),
+		blockSize: s.blockSize,
+		numOps:    len(s.minOpBurnerBalances),
+	}
+}
+
+// Revert undoes every operation applied since snap was taken, invalidating
+// snap and every later snapshot. snap MUST have been taken during the current
+// block and still be valid.
+func (s *State) Revert(snap Snapshot) {
+	s.db.RevertToSnapshot(snap.db)
+	s.blockSize = snap.blockSize
+	clear(s.minOpBurnerBalances[snap.numOps:])
+	s.minOpBurnerBalances = s.minOpBurnerBalances[:snap.numOps]
+}
+
 // FinishBlock advances the [gastime.Time] in preparation for the next block.
 //
 // The returned bounds assume that every non-nil error from [State.ApplyTx]
