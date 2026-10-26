@@ -39,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/lru"
 	"github.com/ava-labs/libevm/core/types"
@@ -66,7 +65,7 @@ const (
 
 var (
 	DefaultMaxPrice           = big.NewInt(150 * params.GWei)
-	DefaultMinPrice           = big.NewInt(acp176.MinGasPrice)
+	DefaultMinPrice           = big.NewInt(params.Wei)
 	DefaultMinBaseFee         = big.NewInt(legacy.BaseFee)
 	DefaultMinGasUsed         = big.NewInt(6_000_000) // block gas limit is 8,000,000
 	DefaultMaxLookbackSeconds = uint64(80)

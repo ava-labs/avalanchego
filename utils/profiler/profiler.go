@@ -20,6 +20,10 @@ const (
 	memProfileFile = "mem.profile"
 	// Name of file that lock profile is written to
 	lockProfileFile = "lock.profile"
+
+	// Mutex profile fraction used when none is configured: every mutex
+	// contention event is recorded
+	DefaultMutexProfileFraction = 1
 )
 
 var (
@@ -51,19 +55,22 @@ type profiler struct {
 	memProfileName,
 	lockProfileName string
 
+	mutexProfileFraction int
+
 	cpuProfileFile *os.File
 }
 
 func New(dir string) Profiler {
-	return newProfiler(dir)
+	return newProfiler(dir, DefaultMutexProfileFraction)
 }
 
-func newProfiler(dir string) *profiler {
+func newProfiler(dir string, mutexProfileFraction int) *profiler {
 	return &profiler{
-		dir:             dir,
-		cpuProfileName:  filepath.Join(dir, cpuProfileFile),
-		memProfileName:  filepath.Join(dir, memProfileFile),
-		lockProfileName: filepath.Join(dir, lockProfileFile),
+		dir:                  dir,
+		mutexProfileFraction: mutexProfileFraction,
+		cpuProfileName:       filepath.Join(dir, cpuProfileFile),
+		memProfileName:       filepath.Join(dir, memProfileFile),
+		lockProfileName:      filepath.Join(dir, lockProfileFile),
 	}
 }
 
@@ -83,7 +90,7 @@ func (p *profiler) StartCPUProfiler() error {
 		_ = file.Close() // Return the original error
 		return err
 	}
-	runtime.SetMutexProfileFraction(1)
+	runtime.SetMutexProfileFraction(p.mutexProfileFraction)
 
 	p.cpuProfileFile = file
 	return nil
@@ -126,7 +133,8 @@ func (p *profiler) LockProfile() error {
 	}
 
 	profile := pprof.Lookup("mutex")
-	if err := profile.WriteTo(file, 1); err != nil {
+	const debug = 0 // 0 means binary format, 1 means human-readable format
+	if err := profile.WriteTo(file, debug); err != nil {
 		_ = file.Close() // Return the original error
 		return err
 	}

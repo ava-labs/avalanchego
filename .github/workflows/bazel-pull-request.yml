@@ -38,7 +38,8 @@ jobs:
     with:
       platform_name: linux-amd64
       runner: ubuntu-24.04
-      run_race_shuffle_unit_tests: false
+      e2e_runner: ubuntu-24.04-amd64-4-core
+      unit_test_task: bazel-test-unit-race
     secrets: inherit
 
   smoke:
