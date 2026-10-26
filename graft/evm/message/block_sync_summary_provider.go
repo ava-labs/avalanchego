@@ -27,7 +27,7 @@ func (c *BlockSyncSummaryProvider) StateSummaryAtBlock(blk *types.Block) (block.
 
 func (c *BlockSyncSummaryProvider) Parse(summaryBytes []byte, acceptImpl AcceptImplFn) (Syncable, error) {
 	summary := BlockSyncSummary{}
-	summaryID, err := ParseSyncableSummary(c.codec, summaryBytes, &summary)
+	summaryID, err := parseSyncableSummary(c.codec, summaryBytes, &summary)
 	if err != nil {
 		return nil, err
 	}

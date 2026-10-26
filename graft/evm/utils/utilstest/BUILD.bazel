@@ -4,7 +4,6 @@ load("//.bazel:defs.bzl", "graft_go_test")
 go_library(
     name = "utilstest",
     srcs = [
-        "context.go",
         "key.go",
         "snow.go",
         "timeout.go",

@@ -4,6 +4,7 @@
 package stats
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,6 +16,8 @@ import (
 var (
 	_ ClientSyncerStats = (*clientSyncerStats)(nil)
 	_ ClientSyncerStats = (*noopStats)(nil)
+
+	errNoLeafMetric = errors.New("no leaf metric registered")
 )
 
 type ClientSyncerStats interface {
@@ -76,19 +79,20 @@ func (m *messageMetric) UpdateRequestLatency(duration time.Duration) {
 }
 
 type clientSyncerStats struct {
-	leafMetrics        map[message.NodeType]MessageMetric
+	leafMetric         MessageMetric
 	codeRequestMetric  MessageMetric
 	blockRequestMetric MessageMetric
 }
 
-// NewClientSyncerStats returns stats for the client syncer
-func NewClientSyncerStats(leafMetricNames map[message.NodeType]string) *clientSyncerStats {
-	leafMetrics := make(map[message.NodeType]MessageMetric, len(leafMetricNames))
-	for nodeType, name := range leafMetricNames {
-		leafMetrics[nodeType] = NewMessageMetric(name)
+// NewClientSyncerStats returns stats for the client syncer. If leafMetricName
+// is empty, no leaf metric is registered and leaf requests are rejected.
+func NewClientSyncerStats(leafMetricName string) *clientSyncerStats {
+	var leafMetric MessageMetric
+	if leafMetricName != "" {
+		leafMetric = NewMessageMetric(leafMetricName)
 	}
 	return &clientSyncerStats{
-		leafMetrics:        leafMetrics,
+		leafMetric:         leafMetric,
 		codeRequestMetric:  NewMessageMetric("sync_code"),
 		blockRequestMetric: NewMessageMetric("sync_blocks"),
 	}
@@ -102,11 +106,10 @@ func (c *clientSyncerStats) GetMetric(msgIntf message.Request) (MessageMetric, e
 	case message.CodeRequest:
 		return c.codeRequestMetric, nil
 	case message.LeafsRequest:
-		metric, ok := c.leafMetrics[msg.LeafType()]
-		if !ok {
-			return nil, fmt.Errorf("invalid leafs request for node type: %T", msg.LeafType())
+		if c.leafMetric == nil {
+			return nil, errNoLeafMetric
 		}
-		return metric, nil
+		return c.leafMetric, nil
 	default:
 		return nil, fmt.Errorf("attempted to get metric for invalid request with type %T", msg)
 	}

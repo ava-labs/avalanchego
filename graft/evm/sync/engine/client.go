@@ -108,8 +108,6 @@ type ClientConfig struct {
 	// Extension points.
 	SyncSummaryProvider message.SyncSummaryProvider
 
-	// Extender is an optional extension point for the state sync process, and can be nil.
-	Extender      types.Extender
 	Client        syncclient.Client
 	StateSyncDone chan struct{}
 
@@ -298,10 +296,9 @@ func (c *client) Shutdown() error {
 // Error returns a non-nil error if one occurred during the sync.
 func (c *client) Error() error { return c.err }
 
-// AcceptSync implements Acceptor. It resets the blockchain to the synced block,
-// preparing it for execution, and updates disk and memory pointers so the VM
-// is ready for bootstrapping. Also executes any shared memory operations from
-// the atomic trie to shared memory.
+// AcceptSync resets the blockchain to the synced block, preparing it for
+// execution, and updates disk and memory pointers so the VM is ready for
+// bootstrapping.
 func (c *client) AcceptSync(ctx context.Context, summary message.Syncable) error {
 	stateBlock, err := c.config.State.GetBlock(ctx, ids.ID(summary.GetBlockHash()))
 	if err != nil {
@@ -347,24 +344,12 @@ func (c *client) AcceptSync(ctx context.Context, summary message.Syncable) error
 		return err
 	}
 
-	if c.config.Extender != nil {
-		if err := c.config.Extender.OnFinishBeforeCommit(c.config.LastAcceptedHeight, summary); err != nil {
-			return err
-		}
-	}
-
 	if err := c.commitMarkers(summary); err != nil {
 		return fmt.Errorf("%w: height=%d, hash=%s: %w", errCommitMarkers, block.NumberU64(), block.Hash(), err)
 	}
 
 	if err := c.config.State.SetLastAcceptedBlock(wrappedBlock); err != nil {
 		return err
-	}
-
-	if c.config.Extender != nil {
-		if err := c.config.Extender.OnFinishAfterCommit(block.NumberU64()); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -439,14 +424,6 @@ func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, e
 	}
 
 	syncers := []types.Syncer{blockSyncer, codeSyncer, stateSyncer}
-
-	if c.config.Extender != nil {
-		extenderSyncer, err := c.config.Extender.CreateSyncer(c.config.Client, c.config.VerDB, summary)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create extender syncer: %w", err)
-		}
-		syncers = append(syncers, extenderSyncer)
-	}
 
 	for _, s := range syncers {
 		if err := registry.Register(s); err != nil {

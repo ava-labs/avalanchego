@@ -35,8 +35,7 @@ type Syncer struct {
 	codeHashes <-chan common.Hash
 
 	// Config options.
-	numWorkers       int
-	codeHashesPerReq int // best-effort target size - final batch may be smaller
+	numWorkers int
 
 	// inFlight ensures only one worker fetches each hash. The slow path
 	// skips it so it can always clean up markers that AddCode just rewrote.
@@ -45,8 +44,7 @@ type Syncer struct {
 
 // codeSyncerConfig carries construction-time options for code syncer.
 type syncerConfig struct {
-	numWorkers       int
-	codeHashesPerReq int
+	numWorkers int
 }
 
 // CodeSyncerOption configures CodeSyncer at construction time.
@@ -61,32 +59,19 @@ func WithNumWorkers(n int) SyncerOption {
 	})
 }
 
-// WithCodeHashesPerRequest sets the best-effort target batch size per request.
-// The final batch may contain fewer than the configured number if insufficient
-// hashes remain when the channel is closed.
-func WithCodeHashesPerRequest(n int) SyncerOption {
-	return options.Func[syncerConfig](func(c *syncerConfig) {
-		if n > 0 {
-			c.codeHashesPerReq = n
-		}
-	})
-}
-
 // NewSyncer allows external packages (e.g., registry wiring) to create a code syncer
 // that consumes hashes from a provided fetcher queue.
 func NewSyncer(client client.Client, db ethdb.Database, codeHashes <-chan common.Hash, opts ...SyncerOption) (*Syncer, error) {
 	cfg := syncerConfig{
-		numWorkers:       defaultNumCodeFetchingWorkers,
-		codeHashesPerReq: message.MaxCodeHashesPerRequest,
+		numWorkers: defaultNumCodeFetchingWorkers,
 	}
 	options.ApplyTo(&cfg, opts...)
 
 	return &Syncer{
-		db:               db,
-		client:           client,
-		codeHashes:       codeHashes,
-		numWorkers:       cfg.numWorkers,
-		codeHashesPerReq: cfg.codeHashesPerReq,
+		db:         db,
+		client:     client,
+		codeHashes: codeHashes,
+		numWorkers: cfg.numWorkers,
 	}, nil
 }
 
@@ -152,8 +137,8 @@ func (c *Syncer) work(ctx context.Context) error {
 			}
 
 			codeHashes = append(codeHashes, codeHash)
-			// Try to batch up to [codeHashesPerReq] code hashes into a single request when more work remains.
-			if len(codeHashes) < c.codeHashesPerReq {
+			// Try to batch up to [message.MaxCodeHashesPerRequest] code hashes into a single request when more work remains.
+			if len(codeHashes) < message.MaxCodeHashesPerRequest {
 				continue
 			}
 			if err := c.fulfillCodeRequest(ctx, codeHashes); err != nil {
