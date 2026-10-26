@@ -477,6 +477,9 @@ Use the Bazel unit-test tasks to select Go test rules and exclude manual tests.
 # Run all cacheable Go unit tests
 task bazel-test-unit
 
+# Run all cacheable Go unit tests with race detection
+task bazel-test-unit-race
+
 # Run all Go unit tests with race detection and shuffle
 task bazel-test-unit-race-shuffle
 
@@ -551,8 +554,9 @@ This selection prevents Go test flags from reaching non-Go tests such as
 | Race detection | OFF | `--config=race` (enable) |
 | Shuffle | OFF | `--config=race-shuffle` (enable) |
 
-Race/shuffle tasks use `race-shuffle` and disable test-result caching so Bazel
-runs shuffled tests again. Scheduled unit-test tasks use these tasks.
+The `bazel-test-unit-race` task enables race detection and reuses cached test
+results. The `bazel-test-unit-race-shuffle` task also shuffles tests and disables
+result caching.
 
 #### Test Timeouts
 
@@ -693,6 +697,10 @@ Non-scheduled Bazel CI runs these jobs:
 - macOS pre-merge CI runs one cacheable unit-test smoke target and one focused
   E2E smoke test.
 
+Pull requests and merge groups use the same Linux unit-test task,
+`bazel-test-unit-race`. Both enable race detection and reuse test results from
+the remote cache.
+
 See [E2E runner](#e2e-runner) for build and execution details.
 See [E2E runner capacity](./ci.md#use-beefier-runners-for-faster-e2e-jobs) for the
 shared runner-sizing policy.
@@ -704,10 +712,10 @@ jobs upload tmpnet data to help diagnose failures.
 
 Previously, Bazel CI divided the full unit-test suite among three
 component-specific jobs. These jobs ran in parallel to keep the pre-merge
-runtime acceptable. Pre-merge tests now use remote caching and do not use race
-detection. These changes remove the need for separate jobs. Reconsider separate
-jobs if these conditions change or one job makes the pre-merge runtime
-unacceptable.
+runtime acceptable. Pre-merge tests now reuse results from the remote cache.
+Only tests without reusable results need to run. This makes race detection
+practical without separate jobs. Reconsider separate jobs if cache reuse declines
+or one job makes the pre-merge runtime unacceptable.
 
 Each setup job checks Bazel metadata. On `master`, a cache miss makes each setup
 job prepare the CI dependency list. The job then disables downloads, checks
