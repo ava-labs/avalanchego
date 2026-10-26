@@ -221,10 +221,7 @@ func getGenesisBlock(ctx context.Context, config *Config, blockTracker *blockTra
 	}
 
 	// set the digest
-	bytes, err := genesis.Bytes()
-	if err != nil {
-		return nil, err
-	}
+	bytes := genesis.Bytes()
 	genesis.digest = computeDigest(bytes)
 
 	return genesis, nil

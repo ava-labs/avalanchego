@@ -80,8 +80,7 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 			},
 			metadata: genesisMetadata,
 		}
-		bytes, err := block.Bytes()
-		require.NoError(t, err)
+		bytes := block.Bytes()
 
 		digest := computeDigest(bytes)
 		block.digest = digest
@@ -111,8 +110,7 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 		},
 	}
 
-	bytes, err := block.Bytes()
-	require.NoError(t, err)
+	bytes := block.Bytes()
 
 	digest := computeDigest(bytes)
 	block.digest = digest

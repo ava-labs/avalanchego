@@ -45,8 +45,7 @@ func TestBlockSerialization(t *testing.T) {
 	}
 
 	// Serialize the block
-	blockBytes, err := b.Bytes()
-	require.NoError(t, err)
+	blockBytes := b.Bytes()
 
 	tests := []struct {
 		name          string
@@ -185,12 +184,10 @@ func TestVerify(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ensure the verified block matches the original block
-	vBlockBytes, err := verifiedBlock.Bytes()
-	require.NoError(t, err)
+	vBlockBytes := verifiedBlock.Bytes()
 	require.True(t, preferenceSet)
 
-	blockBytes, err := b.Bytes()
-	require.NoError(t, err)
+	blockBytes := b.Bytes()
 	require.Equal(t, blockBytes, vBlockBytes, "block bytes should match after verification")
 }
 
