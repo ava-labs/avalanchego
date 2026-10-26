@@ -1,8 +1,8 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package extstate extends [state.StateDB] with the C-Chain's multicoin
-// balances and access-list predicates.
+// Package extstate extends [state.StateDB] with the C-Chain's imported X-Chain
+// asset balances and access-list predicates.
 package extstate
 
 import (
@@ -17,54 +17,55 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 )
 
-// RegisterExtras registers the libevm hook that normalizes state keys, so that
-// they never collide with multicoin balances. Keys are normalized unless
-// [stateconf.SkipStateKeyTransformation] is used.
+// RegisterExtras registers the libevm hook that partitions state slots into
+// storage and imported X-Chain asset balances.
 //
-// It MUST NOT be called more than once and is therefore only allowed in tests
-// and `package main`, to avoid polluting other packages that transitively
-// depend on this one but don't need registration.
+// Callers SHOULD NOT call it directly, and SHOULD instead use
+// `vms/saevm/cchain/libevm.RegisterExtras()`, which registers all
+// C-Chain extras together.
 func RegisterExtras() {
-	state.RegisterExtras(normalizeStateKeysHook{})
+	state.RegisterExtras(partitionStateKeysHook{})
 }
 
-// WithTempRegisteredExtras runs fn with the state-key normalization hook
-// temporarily registered. The previous hook is restored after fn returns.
+// WithTempRegisteredExtras runs fn with the state partition hook temporarily
+// registered. Any previous hook is restored after fn returns.
 //
 // Callers SHOULD NOT call it directly, and SHOULD instead use
 // `vms/saevm/cchain/libevm.WithTempRegisteredExtras()`, which registers all
 // C-Chain extras together.
 func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
-	return state.WithTempRegisteredExtras(lock, normalizeStateKeysHook{}, fn)
+	return state.WithTempRegisteredExtras(lock, partitionStateKeysHook{}, fn)
 }
 
-type normalizeStateKeysHook struct{}
+type partitionStateKeysHook struct{}
 
-// TransformStateKey maps normal storage keys away from the multicoin partition.
-func (normalizeStateKeysHook) TransformStateKey(_ common.Address, key common.Hash) common.Hash {
-	normalizeStateKey(&key)
+// TransformStateKey moves key into the contract storage partition.
+func (partitionStateKeysHook) TransformStateKey(_ common.Address, key common.Hash) common.Hash {
+	return storageKey(key)
+}
+
+// storageKey returns key moved into the contract storage partition.
+func storageKey(key common.Hash) common.Hash {
+	key[0] &^= 0x01
 	return key
 }
 
-// normalizeStateKey sets the 0th bit of the first byte in `key` to 0.
-// This partitions normal state storage from multicoin storage.
-func normalizeStateKey(key *common.Hash) {
-	key[0] &^= 0x01
+// assetBalanceKey returns the key of assetID's balance in the asset partition.
+func assetBalanceKey(assetID common.Hash) common.Hash {
+	assetID[0] |= 0x01
+	return assetID
 }
 
-// normalizeCoinID sets the 0th bit of the first byte in `coinID` to 1.
-// This partitions multicoin storage from normal state storage.
-func normalizeCoinID(coinID *common.Hash) {
-	coinID[0] |= 0x01
-}
+var _ contract.StateDB = (*StateDB)(nil)
 
-// StateDB wraps a [state.StateDB] with multicoin balances and the predicates of
-// the current transaction's access list.
+// StateDB wraps a [state.StateDB] with asset balances and the predicates of the
+// current transaction's access list.
 //
-// TODO(#6113): Use the predicates in SAE and share them with Subnet-EVM.
+// TODO(#6113): Share with Subnet-EVM rather than duplicating it.
 type StateDB struct {
 	*state.StateDB
 
@@ -91,10 +92,8 @@ func (s *StateDB) Prepare(
 	s.StateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)
 }
 
-// GetPredicate returns the predicate at index for address, from the access list
-// passed to [StateDB.Prepare]. If address is a precompile that uses predicates,
-// each of its entries in the list is one predicate, in list order. It returns
-// false if there is none.
+// GetPredicate returns address's index-th predicate in the access list passed
+// to [StateDB.Prepare]. It returns false if there is none.
 func (s *StateDB) GetPredicate(address common.Address, index int) (predicate.Predicate, bool) {
 	predicates := s.predicates[address]
 	if index < 0 || index >= len(predicates) {
@@ -103,17 +102,16 @@ func (s *StateDB) GetPredicate(address common.Address, index int) (predicate.Pre
 	return predicates[index], true
 }
 
-// GetBalanceMultiCoin returns the balance of coinID held by addr.
-func (s *StateDB) GetBalanceMultiCoin(addr common.Address, coinID common.Hash) *big.Int {
-	normalizeCoinID(&coinID)
-	return s.GetState(addr, coinID, stateconf.SkipStateKeyTransformation()).Big()
+// GetAssetBalance returns the balance of assetID held by addr.
+func (s *StateDB) GetAssetBalance(addr common.Address, assetID common.Hash) *big.Int {
+	return s.GetState(addr, assetBalanceKey(assetID), stateconf.SkipStateKeyTransformation()).Big()
 }
 
-// AddBalanceMultiCoin adds amount of coinID to the balance of addr. A non-zero
+// AddAssetBalance adds amount of assetID to the balance of addr. A non-zero
 // amount marks addr as a multicoin account.
 //
 // amount MUST NOT be negative.
-func (s *StateDB) AddBalanceMultiCoin(addr common.Address, coinID common.Hash, amount *big.Int) {
+func (s *StateDB) AddAssetBalance(addr common.Address, assetID common.Hash, amount *big.Int) {
 	if amount.Sign() == 0 {
 		// Like [state.StateDB.AddBalance], adding zero still touches the
 		// account, which can make it eligible for EIP-161 deletion.
@@ -124,24 +122,27 @@ func (s *StateDB) AddBalanceMultiCoin(addr common.Address, coinID common.Hash, a
 	if !customtypes.IsMultiCoin(s.StateDB, addr) {
 		customtypes.SetMultiCoin(s.StateDB, addr, true)
 	}
-	s.setBalanceMultiCoin(addr, coinID, new(big.Int).Add(s.GetBalanceMultiCoin(addr, coinID), amount))
+	balance := s.GetAssetBalance(addr, assetID)
+	balance.Add(balance, amount)
+	s.setAssetBalance(addr, assetID, balance)
 }
 
-// SubBalanceMultiCoin subtracts amount of coinID from the balance of addr.
+// SubAssetBalance subtracts amount of assetID from the balance of addr.
 //
 // amount MUST NOT be negative and MUST NOT exceed the balance.
-func (s *StateDB) SubBalanceMultiCoin(addr common.Address, coinID common.Hash, amount *big.Int) {
+func (s *StateDB) SubAssetBalance(addr common.Address, assetID common.Hash, amount *big.Int) {
 	if amount.Sign() == 0 {
 		// Like [state.StateDB.SubBalance], subtracting zero doesn't touch the
 		// account.
 		return
 	}
-	// The balance is positive, so [StateDB.AddBalanceMultiCoin] has already
+	// The balance is positive, so [StateDB.AddAssetBalance] has already
 	// marked addr as a multicoin account.
-	s.setBalanceMultiCoin(addr, coinID, new(big.Int).Sub(s.GetBalanceMultiCoin(addr, coinID), amount))
+	balance := s.GetAssetBalance(addr, assetID)
+	balance.Sub(balance, amount)
+	s.setAssetBalance(addr, assetID, balance)
 }
 
-func (s *StateDB) setBalanceMultiCoin(addr common.Address, coinID common.Hash, amount *big.Int) {
-	normalizeCoinID(&coinID)
-	s.SetState(addr, coinID, common.BigToHash(amount), stateconf.SkipStateKeyTransformation())
+func (s *StateDB) setAssetBalance(addr common.Address, assetID common.Hash, amount *big.Int) {
+	s.SetState(addr, assetBalanceKey(assetID), common.BigToHash(amount), stateconf.SkipStateKeyTransformation())
 }

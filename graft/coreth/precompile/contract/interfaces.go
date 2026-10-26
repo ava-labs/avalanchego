@@ -26,9 +26,9 @@ type StatefulPrecompiledContract interface {
 
 // StateDB is the interface for accessing EVM state
 type StateDB interface {
-	GetBalanceMultiCoin(common.Address, common.Hash) *big.Int
-	AddBalanceMultiCoin(common.Address, common.Hash, *big.Int)
-	SubBalanceMultiCoin(common.Address, common.Hash, *big.Int)
+	GetAssetBalance(common.Address, common.Hash) *big.Int
+	AddAssetBalance(common.Address, common.Hash, *big.Int)
+	SubAssetBalance(common.Address, common.Hash, *big.Int)
 
 	CreateAccount(common.Address)
 	Exist(common.Address) bool

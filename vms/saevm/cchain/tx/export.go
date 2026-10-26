@@ -270,12 +270,12 @@ func (e *Export) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) 
 			continue
 		}
 
-		coinID := common.Hash(in.AssetID)
+		assetID := common.Hash(in.AssetID)
 		amount := new(big.Int).SetUint64(in.Amount)
-		if balance := statedb.GetBalanceMultiCoin(in.Address, coinID); balance.Cmp(amount) < 0 {
-			return fmt.Errorf("%w: address %s asset %s has %d want %d", errInsufficientFunds, in.Address, coinID, balance, amount)
+		if balance := statedb.GetAssetBalance(in.Address, assetID); balance.Cmp(amount) < 0 {
+			return fmt.Errorf("%w: address %s asset %s has %d want %d", errInsufficientFunds, in.Address, assetID, balance, amount)
 		}
-		statedb.SubBalanceMultiCoin(in.Address, coinID, amount)
+		statedb.SubAssetBalance(in.Address, assetID, amount)
 	}
 	return nil
 }

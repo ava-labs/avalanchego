@@ -241,9 +241,8 @@ func (i *Import) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) 
 			continue
 		}
 
-		coinID := common.Hash(out.AssetID)
 		amount := new(big.Int).SetUint64(out.Amount)
-		statedb.AddBalanceMultiCoin(out.Address, coinID, amount)
+		statedb.AddAssetBalance(out.Address, common.Hash(out.AssetID), amount)
 	}
 	return nil
 }

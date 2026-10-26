@@ -79,7 +79,7 @@ func (*NativeAssetBalance) Run(accessibleState contract.AccessibleState, _ commo
 		return nil, remainingGas, vm.ErrExecutionReverted
 	}
 
-	res, overflow := uint256.FromBig(accessibleState.GetStateDB().GetBalanceMultiCoin(address, assetID))
+	res, overflow := uint256.FromBig(accessibleState.GetStateDB().GetAssetBalance(address, assetID))
 	if overflow {
 		return nil, remainingGas, vm.ErrExecutionReverted
 	}
@@ -145,7 +145,7 @@ func (*NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.State
 
 	// Note: it is not possible for a negative `assetAmount` to be passed in here due to the fact that decoding a
 	// byte slice into a [*big.Int] will always return a positive value, as documented on [big.Int.SetBytes].
-	if assetAmount.Sign() != 0 && stateDB.GetBalanceMultiCoin(caller, assetID).Cmp(assetAmount) < 0 {
+	if assetAmount.Sign() != 0 && stateDB.GetAssetBalance(caller, assetID).Cmp(assetAmount) < 0 {
 		return nil, vm.ErrInsufficientBalance
 	}
 
@@ -159,8 +159,8 @@ func (*NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.State
 	}
 
 	// Send `assetAmount` of `assetID` to `to` address
-	stateDB.SubBalanceMultiCoin(caller, assetID, assetAmount)
-	stateDB.AddBalanceMultiCoin(to, assetID, assetAmount)
+	stateDB.SubAssetBalance(caller, assetID, assetAmount)
+	stateDB.AddAssetBalance(to, assetID, assetAmount)
 
 	legacy := []vm.CallOption{
 		vm.WithUNSAFECallerAddressProxying(),

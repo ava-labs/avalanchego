@@ -976,16 +976,14 @@ func TestTransferNonAVAX(t *testing.T) {
 			)
 			for addr, balances := range test.want {
 				for assetID, amount := range balances {
-					coinID := common.Hash(assetID)
-					want.AddBalanceMultiCoin(addr, coinID, toBig(amount))
+					want.AddAssetBalance(addr, common.Hash(assetID), toBig(amount))
 				}
 			}
 
 			got := newEmptyStateDB(t)
 			for addr, balances := range test.init {
 				for assetID, amount := range balances {
-					coinID := common.Hash(assetID)
-					got.AddBalanceMultiCoin(addr, coinID, toBig(amount))
+					got.AddAssetBalance(addr, common.Hash(assetID), toBig(amount))
 				}
 			}
 
