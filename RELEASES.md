@@ -12,6 +12,10 @@
 
 - Added `--profile-continuous-mutex-fraction` (default `1`, which keeps the existing behavior) to set the mutex profile fraction used by continuous profiling. Set it to `0` to stop recording mutex contention, or to `n` to sample 1 of every n events.
 
+### Metrics
+
+- SAE state sync scores peers separately for each sync protocol, so `avalanche_evm_p2p_peer_tracker_{num_tracked_peers,num_responsive_peers,average_bandwidth}` are replaced by one set per protocol: `avalanche_evm_p2p_peer_tracker_<protocol>_*` with `<protocol>` one of `leaf`, `code`, `block` or `cchain_leaf`.
+
 ### Fixes
 
 - Fixed C-Chain log queries (`eth_getLogs`, `eth_getFilterLogs`) failing with `failed to get logs for block #N` when the range reached an accepted block that had not yet executed. Range queries now stop at the last executed block, and `blockHash` queries for an unexecuted block return `unknown block`.
@@ -44,12 +48,7 @@ This release updates the plugin version to `47`. All plugins must update to rema
 
 - C-Chain metrics no longer include the `transition` prefix. For example, `avalanche_evm_transition_sae_last_executed_height` is now `avalanche_evm_sae_last_executed_height`.
 - Added `avalanche_evm_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
-<<<<<<< HEAD
-- SAE state sync scores peers separately for each sync protocol, so `avalanche_evm_p2p_peer_tracker_{num_tracked_peers,num_responsive_peers,average_bandwidth}` are replaced by one set per protocol: `avalanche_evm_p2p_peer_tracker_<protocol>_*` with `<protocol>` one of `leaf`, `code`, `block` or `cchain_leaf`.
-||||||| 4d91d6458c
-=======
 - Added `avalanche_evm_sae_execution_gas_rate_headroom` (histogram), `avalanche_evm_sae_execution_gas_rate_headroom_latest` (gauge), and `avalanche_evm_sae_tau_second_avg_executed_gas_per_second` (gauge) to monitor gas-vs-wall clock skew during execution, for tuning the gas target.
->>>>>>> origin/master
 
 ### Fixes
 

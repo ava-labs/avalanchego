@@ -74,7 +74,7 @@ func TestWithAllowedTrackedPeers(t *testing.T) {
 	}
 }
 
-func TestTrackingClientsAreIsolated(t *testing.T) {
+func TestSyncClientsAreIsolated(t *testing.T) {
 	for _, requestedID := range wantSyncHandlerIDs {
 		t.Run(strconv.FormatUint(requestedID, 10), func(t *testing.T) {
 			net, err := New(snowtest.Context(t, snowtest.CChainID), enginetest.SenderStub{})
@@ -82,8 +82,8 @@ func TestTrackingClientsAreIsolated(t *testing.T) {
 			peer := ids.GenerateTestNodeID()
 			require.NoError(t, net.Connected(t.Context(), peer, nil), "Connected()")
 
-			client, err := net.TrackingClient(requestedID)
-			require.NoErrorf(t, err, "TrackingClient(%d)", requestedID)
+			client, err := net.SyncClient(requestedID)
+			require.NoErrorf(t, err, "SyncClient(%d)", requestedID)
 			onResponse := func(context.Context, ids.NodeID, []byte, error) bool { return true }
 			require.NoError(t, client.AppRequestAny(t.Context(), []byte("request"), onResponse), "AppRequestAny()")
 
@@ -98,10 +98,10 @@ func TestTrackingClientsAreIsolated(t *testing.T) {
 	}
 }
 
-func TestTrackingClientUnknownProtocol(t *testing.T) {
+func TestSyncClientUnknownProtocol(t *testing.T) {
 	net, err := New(snowtest.Context(t, snowtest.CChainID), enginetest.SenderStub{})
 	require.NoError(t, err, "New()")
 
-	_, err = net.TrackingClient(p2p.TxGossipHandlerID)
-	require.ErrorIs(t, err, errUnknownSyncProtocol, "TrackingClient(TxGossipHandlerID)")
+	_, err = net.SyncClient(p2p.TxGossipHandlerID)
+	require.ErrorIs(t, err, errUnknownSyncProtocol, "SyncClient(TxGossipHandlerID)")
 }

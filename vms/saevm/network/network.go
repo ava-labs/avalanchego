@@ -40,7 +40,7 @@ type config struct {
 type Option = options.Option[config]
 
 // WithAllowedTrackedPeers restricts the peers available to every
-// [Network.TrackingClient] to only those in the provided set.
+// [Network.SyncClient] to only those in the provided set.
 func WithAllowedTrackedPeers(ids set.Set[ids.NodeID]) Option {
 	return options.Func[config](func(c *config) {
 		c.trackedPeers = ids
@@ -65,9 +65,9 @@ var syncHandlerIDs = map[string]uint64{
 	"cchain_leaf": p2p.EVMAtomicLeafRequestHandlerID,
 }
 
-// TrackingClient returns a client for the sync protocol served under handlerID,
+// SyncClient returns a client for the sync protocol served under handlerID,
 // scored by that protocol's own [peertracker.PeerTracker].
-func (n *Network) TrackingClient(handlerID uint64) (*peertracker.Client, error) {
+func (n *Network) SyncClient(handlerID uint64) (*peertracker.Client, error) {
 	peerTracker, ok := n.peerTrackers[handlerID]
 	if !ok {
 		return nil, fmt.Errorf("%w: handler %d", errUnknownSyncProtocol, handlerID)

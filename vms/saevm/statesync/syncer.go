@@ -99,7 +99,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		maxLeafRequestSize = 1024
 	)
 
-	blockClient, err := s.network.TrackingClient(p2p.EVMBlockRequestHandlerID)
+	blockClient, err := s.network.SyncClient(p2p.EVMBlockRequestHandlerID)
 	if err != nil {
 		return err
 	}
@@ -127,7 +127,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		return fmt.Errorf("%w: %s at height %d", errSynchronousBlock, summary.AcceptedHash, summary.AcceptedHeight)
 	}
 
-	codeClient, err := s.network.TrackingClient(p2p.EVMCodeRequestHandlerID)
+	codeClient, err := s.network.SyncClient(p2p.EVMCodeRequestHandlerID)
 	if err != nil {
 		return err
 	}
@@ -149,7 +149,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	}
 	s.snowCtx.Log.Info("finished wiping snapshot")
 
-	leafClient, err := s.network.TrackingClient(p2p.EVMLeafRequestHandlerID)
+	leafClient, err := s.network.SyncClient(p2p.EVMLeafRequestHandlerID)
 	if err != nil {
 		return err
 	}
