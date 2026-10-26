@@ -28,9 +28,8 @@ on:
         default: false
       unit_test_task:
         description: 'Task to run for Bazel unit tests'
-        required: false
+        required: true
         type: string
-        default: bazel-test-unit
       enable_remote_cache:
         description: 'Enable the remote Bazel cache'
         required: false
