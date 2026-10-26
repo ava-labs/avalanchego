@@ -26,11 +26,11 @@ on:
         required: false
         type: boolean
         default: false
-      run_race_shuffle_unit_tests:
-        description: 'Run unit tests with race detection and shuffled test order'
+      unit_test_task:
+        description: 'Task to run for Bazel unit tests'
         required: false
-        type: boolean
-        default: false
+        type: string
+        default: bazel-test-unit
       enable_remote_cache:
         description: 'Enable the remote Bazel cache'
         required: false
@@ -85,7 +85,7 @@ jobs:
       - name: Run unit tests with Bazel
         uses: ./.github/actions/run-bazel-with-disk-space
         with:
-          run: ./scripts/run_task.sh ${{ inputs.run_race_shuffle_unit_tests && 'bazel-test-unit-race-shuffle' || 'bazel-test-unit' }}
+          run: ./scripts/run_task.sh ${{ inputs.unit_test_task }}
 
   e2e:
     needs: setup
