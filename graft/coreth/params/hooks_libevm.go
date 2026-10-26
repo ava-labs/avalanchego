@@ -158,24 +158,13 @@ func (r RulesExtra) precompileOverrideBuiltin(addr common.Address) (libevm.Preco
 
 func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.PrecompiledContract {
 	run := func(env vm.PrecompileEnvironment, input []byte, suppliedGas uint64) ([]byte, uint64, error) {
-		header, err := env.BlockHeader()
-		if err != nil {
-			panic(err) // Should never happen
-		}
-		var predicateResults predicate.BlockResults
 		rules := GetRulesExtra(env.Rules()).AvalancheRules
-		if predicateResultsBytes := customtypes.PredicateBytesFromExtra(rules, header.Extra); len(predicateResultsBytes) > 0 {
-			predicateResults, err = predicate.ParseBlockResults(predicateResultsBytes)
-			if err != nil {
-				panic(err) // Should never happen, as results are already validated in block validation
-			}
-		}
 		accessibleState := accessibleState{
 			env: env,
 			blockContext: &precompileBlockContext{
 				number:           env.BlockNumber(),
 				time:             env.BlockTime(),
-				predicateResults: predicateResults,
+				predicateResults: customtypes.PredicateResults(env.BlockHeader(), rules),
 			},
 		}
 
