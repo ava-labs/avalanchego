@@ -16,7 +16,8 @@ runs:
         request-cache-save: ${{ inputs.is-setup-job }}
 
     # The Go workflow owns Task cache writes.
-    - uses: ./.github/actions/setup-task
+    - id: setup-task
+      uses: ./.github/actions/setup-task
 
     - name: Ensure runner disk space
       uses: ./.github/actions/ensure-disk-space
@@ -74,9 +75,9 @@ runs:
       shell: bash
       run: ./scripts/run_task.sh bazel-cache-ci-build-dependencies
 
-    # All Bazel commands subsequent to cache preparation run offline to ensure an
-    # incomplete cache results in an error rather than silently downloading a missing
-    # dependency.
+    # Disable repository and module downloads so missing inputs cause a failure.
+    # This does not block remote-cache access or other network use.
+    # See docs/go-toolchains-and-caches.md#download-restrictions.
     - name: Disable dependency downloads
       shell: bash
       run: |
@@ -104,6 +105,6 @@ runs:
         key: ${{ steps.cache-key.outputs.cache-key }}
 
     - name: Log Bazel disk diagnostics
-      if: ${{ failure() }}
+      if: ${{ failure() && steps.setup-task.outcome == 'success' }}
       shell: bash
       run: ./scripts/run_task.sh log-ci-disk-state-bazel

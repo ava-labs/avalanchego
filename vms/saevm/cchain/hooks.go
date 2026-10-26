@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
@@ -169,12 +168,9 @@ func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.Target
 		return dynamic.InitialTargetExponent, nil
 	}
 
-	// The block might be the last synchronous block running with ACP-176.
-	state, err := acp176.ParseState(h.Extra)
-	if err != nil {
-		return 0, fmt.Errorf("parsing fee state: %w", err)
-	}
-	return dynamic.TargetExponent(state.TargetExcess), nil
+	// Synchronous blocks store the target exponent in their ACP-176 fee state.
+	// Only the last one's is used, as the parent of the first SAE block.
+	return customtypes.TargetExponentFromExtra(h.Extra)
 }
 
 func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
@@ -541,7 +537,7 @@ func (b *builder) BuildBlock(
 		return nil, fmt.Errorf("marshalling txs: %w", err)
 	}
 
-	rules := b.chainConfig.Rules(header.Number, corethparams.IsMergeTODO, header.Time)
+	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
 	rulesExtra := corethparams.GetRulesExtra(rules)
 	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, rulesExtra, ethTxs)
 	if err != nil {

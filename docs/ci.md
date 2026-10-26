@@ -10,8 +10,10 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 - [How CI is organized](#how-ci-is-organized)
   - [Workflows coordinate repository operations](#workflows-coordinate-repository-operations)
   - [Keep Go CI unified](#keep-go-ci-unified)
+  - [Generated-source checks](#generated-source-checks)
   - [Required checks and the merge queue](#required-checks-and-the-merge-queue)
   - [Go and Bazel CI workflow layout](#go-and-bazel-ci-workflow-layout)
+  - [Validate scheduled job changes before merge](#validate-scheduled-job-changes-before-merge)
   - [Platform-specific setup dependencies](#platform-specific-setup-dependencies)
   - [Go unit test platforms](#go-unit-test-platforms)
   - [Local composite actions define reusable GitHub Actions behavior](#local-composite-actions-define-reusable-github-actions-behavior)
@@ -32,8 +34,11 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 - [Using Nix in GitHub Actions](#using-nix-in-github-actions)
   - [Run `install-nix` jobs in the Nix dev shell](#run-install-nix-jobs-in-the-nix-dev-shell)
   - [Start the Nix dev shell in composite actions](#start-the-nix-dev-shell-in-composite-actions)
+  - [Guard failure handlers](#guard-failure-handlers)
 - [Runners and external actions](#runners-and-external-actions)
   - [Use versioned GitHub-hosted runners](#use-versioned-github-hosted-runners)
+  - [Use beefier runners for faster E2E jobs](#use-beefier-runners-for-faster-e2e-jobs)
+  - [Cache separation between runner providers](#cache-separation-between-runner-providers)
   - [Pin third-party actions](#pin-third-party-actions)
   - [Pinning does not eliminate supply-chain risk](#pinning-does-not-eliminate-supply-chain-risk)
 - [Validation](#validation)
@@ -93,6 +98,24 @@ Name a component-specific job `<check>-<component>`, such as `lint-evm`. Omit
 the component for a repository-wide check. The aggregate job is an exception.
 Include the workflow name in `go-required`. This name keeps the required check
 distinct in GitHub output.
+
+### Generated-source checks
+
+The `checks` job in [`.github/workflows/go.yml`](../.github/workflows/go.yml)
+runs generated-source and lightweight consistency checks in sequence. One job
+avoids repeating runner and Nix setup.
+
+Each source-generator task updates the checkout and then checks that it is
+clean. A failed task can leave generated files staged. The workflow resets the
+CI checkout after each source-generator task. This reset lets later checks run
+against the commit under test. Cleanup does not run when GitHub cancels the job.
+
+Keep the reset in the workflow. Do not add it to a task. Contributors can run
+the tasks in a working directory that contains uncommitted changes.
+
+Each check step continues after failure. The final step fails the job when one
+or more checks fail. When you add a source-generator check, give its step an ID
+and a cleanup step.
 
 ### Required checks and the merge queue
 
@@ -163,6 +186,36 @@ merge-group Go entrypoints use `go.yml`; scheduled Go uses `go-unit.yml`.
 Smoke workflows run a minimal macOS test. This test verifies that unit tests
 can run on macOS. The Linux pre-merge job and scheduled jobs run the full unit
 suite.
+
+### Validate scheduled job changes before merge
+
+Validate changes to scheduled job execution before merge. Normal pull-request
+CI is sufficient when it covers the affected behavior. Otherwise, run the
+scheduled configuration through a manual dispatch or a temporary pull-request
+trigger.
+
+Scheduled jobs provide additional platform coverage and test configurations.
+They also help find intermittent failures. Running all this coverage on every
+pull request would increase CI time and cost. However, changes to tasks,
+scripts, workflows, runners, artifacts, or platform support can break scheduled
+execution. Maintainers must decide which behavior needs additional validation.
+
+Choose the validation method for the workflow:
+
+- **New scheduled-only workflow:** Add a temporary pull-request trigger or
+  another temporary pull-request path. Validate the workflow, then remove the
+  temporary path before merge. Include `workflow_dispatch` in the merged
+  workflow so maintainers can validate later changes before merge. GitHub
+  cannot dispatch a new workflow until it exists on the default branch.
+- **Existing scheduled-only workflow:** Use `workflow_dispatch` to run it
+  against the pull-request branch. Keep this invocation compatible with
+  scheduled execution. In the Actions UI, select the pull-request branch and
+  start the workflow. `Scheduled Go` and `Scheduled Bazel` support this method.
+- **Workflow that also runs on pull requests:** Use its normal pull-request
+  coverage when both paths have the same behavior. `workflow_dispatch` is not
+  required. If the scheduled path differs, choose an additional pre-merge
+  validation method for any affected behavior that pull-request CI does not
+  cover.
 
 ### Platform-specific setup dependencies
 
@@ -259,6 +312,23 @@ pull-request trigger verifies that this machinery remains usable in avalanchego
 CI. Keep workflow-specific triggers, matrices, and runner setup in the workflows.
 Do not duplicate dependency provisioning or `run-polyrepo` there.
 
+Keep pull-request benchmark check names short. GitHub can hide a job duration
+when its name is long. Short names make slow jobs visible in the pull-request
+summary without opening each workflow.
+
+Include the test name in each pull-request benchmark check. Include a matrix value
+only when it distinguishes two jobs. For example, omit runner labels and timeout
+values when they do not distinguish jobs. Include the runner label in a scheduled
+check when the same test runs on more than one runner.
+
+`native` and `container` identify the benchmark configuration. They do not
+identify the runner provider.
+
+For example, PR checks use:
+
+- `C-Chain Re-exec / native / hashdb-101-250k`
+- `C-Chain Re-exec / container / hashdb-archive-101-250k`
+
 ## Provision CI job dependencies
 
 Nix provides the repository's preferred local development environment. See
@@ -272,7 +342,7 @@ reserved for jobs with dependencies that another setup action does not provide.
 | Dependency | Provisioning mechanism | Use when |
 | --- | --- | --- |
 | Go | [`setup-go-for-project`](../.github/actions/setup-go-for-project/) | The job needs Go and Task and does not use Nix or Bazel to provide them. |
-| Bazel | [`setup-bazel`](../.github/actions/setup-bazel/) | The job needs Bazel and Task. Bazel also provides Go. |
+| Bazel | [`setup-bazel`](../.github/actions/setup-bazel/) | The job needs Bazel and Task. Bazel manages Go for its targets, not for commands outside Bazel. |
 | Flake-provided tools | [`install-nix`](../.github/actions/install-nix/) | A job runs a command that requires a dependency from the Nix dev shell. The shell provides Go and Task. |
 
 `setup-go-for-project` and `setup-bazel` install the pinned Task release.
@@ -280,16 +350,15 @@ reserved for jobs with dependencies that another setup action does not provide.
 cache and version rules.
 
 Choose the setup action that provides the job's dependencies. Bazel provides
-Go for its targets, but a job that also runs host Go commands needs
-`setup-go-for-project` or the Nix dev shell. For example, `check-go-mod-tidy`
-uses both `setup-bazel` and `setup-go-for-project`, while `lint-avalanchego`
-uses `setup-bazel` and `install-nix` for flake-provided tools.
+Go for its targets, but a job that also runs Go commands outside Bazel needs
+`setup-go-for-project` or the Nix dev shell. For example, `lint-avalanchego`
+uses `setup-bazel` before `install-nix` because its module-metadata check
+invokes `bazelisk mod tidy`.
 
 When combining these actions, run `setup-bazel` before either Go setup action
-disables `GOPROXY`. Bazel preparation can download Go modules into its separate
-module cache on a miss or non-exact restore. Preparing the host Go module cache
-does not populate that cache. An exact Bazel cache hit can hide an incorrect
-setup order, so validate both exact hits and cold-cache preparation; see
+disables `GOPROXY`. They prepare separate module caches. See
+[Go toolchains and dependency caches](./go-toolchains-and-caches.md)
+for the boundaries. Validate both exact hits and cold-cache preparation; see
 [Bazel cache validation](./bazel.md#changing-this-safely).
 
 `install-nix` can restore Go module input, but it does not save that cache. The
@@ -300,8 +369,8 @@ workflows consume these caches without writing them.
 
 ### Cache policy overview
 
-CI caches tools and dependencies, not build or test output. Two rules govern
-these input caches:
+GitHub Actions caches tools and dependencies, not build or test output. Two rules
+govern these input caches:
 
 - **Save shared entries only from designated setup or image-build jobs on
   `master`.** Pull requests and other refs can restore entries and prepare
@@ -320,15 +389,17 @@ when a pull request adds a dependency, as well as on `master`. Disabling
 downloads detects gaps in cache preparation as CI changes; it is not a
 prerequisite for preparing the cache, which can use the network. The Task cache
 can download a release on a miss, and the Nix store cache can fetch missing
-flake store paths. Those caches do not use the offline completeness check.
+flake store paths. Those caches do not use the dependency-download completeness
+check. These restrictions do not isolate the workload from the network; see
+[download restrictions](./go-toolchains-and-caches.md#download-restrictions).
 
 ### Input-cache lifecycle
 
 GitHub-hosted runners are temporary. GitHub Actions caching is currently used
 for build inputs - tools and dependencies - not outputs (build and testing). A
-cache miss must still let the job obtain its required input before the job runs
-offline. GitHub Actions caches are immutable: the first successful save for a
-key wins and later saves of that key do not replace it.
+cache miss must still let the job obtain its required input before the job
+disables dependency downloads. GitHub Actions caches are immutable: the first
+successful save for a key wins. Later saves of that key do not replace it.
 
 Bazel is configured to cache outputs via its separate remote cache, but still
 depends on GitHub Actions caching for its repository inputs.
@@ -418,7 +489,10 @@ URL and authorization header. The scheduled Bazel workflow disables it. See
 #### Go module cache
 
 [`setup-go-module-cache`](../.github/actions/setup-go-module-cache/action.yml)
-restores `GOMODCACHE`. On a non-exact hit it runs
+restores the module cache for Go tasks outside Bazel, at `go env GOMODCACHE`.
+This does not prepare CI's separate Gazelle cache; see
+[cache boundaries](./go-toolchains-and-caches.md#separate-caches).
+On a non-exact hit or miss it runs
 [`download_go_modules.sh`](../scripts/download_go_modules.sh), which resolves
 all repository modules and the checked-in
 [`go_module_cache_manifest.tsv`](../scripts/go_module_cache_manifest.tsv).
@@ -460,8 +534,12 @@ The cache-writing setup jobs use
 It requests saves from `setup-go-for-project`, `setup-task`, and `install-nix`
 only when `cache-policy` permits cache writing. Other uses of these actions are
 restore-only. `install-nix` can use the same module-cache action as a
-restore-only consumer. Bazel jobs disable this use because Bazel has a separate
-`GOMODCACHE`. The implicit `actions/setup-go` cache is disabled because its
+restore-only consumer. Disabling `install-nix`'s `setup_go_module_cache` input
+skips preparation for Go tasks outside Bazel. This input does not prepare those
+dependencies through Gazelle's cache or set `GOPROXY=off`. Jobs that need these
+dependencies must prepare them before disabling module downloads.
+
+The implicit `actions/setup-go` cache is disabled because its
 post-job save cannot be limited to `master` runs by `cache-policy`.
 
 #### Bazel dependency cache
@@ -622,7 +700,8 @@ Before restoring the cache, `setup-task` checks for an executable at
 `$RUNNER_TEMP/task/<version>/$RUNNER_OS-$RUNNER_ARCH/task`. If one exists, the
 action skips cache restore, download, and save. This lets repeated invocations
 reuse Task within a job. For example, both `setup-bazel` and
-`setup-go-for-project` invoke `setup-task` when a job needs Bazel and host Go.
+`setup-go-for-project` invoke `setup-task` when a job needs Bazel and Go commands
+outside Bazel.
 
 Otherwise, the action restores the matching cache. Platform cache setup jobs
 in the Go workflows can save a cache entry on `master`. All other jobs are
@@ -638,10 +717,12 @@ Task.
 
 On a cache miss, the action downloads the platform release from the Task GitHub
 release and checks its SHA-256 value against the checked-in value in
-`setup_task.sh`. This avoids a host Go dependency in Bazel jobs. A source build would
-require host Go before Task can run. The checked-in checksum detects a damaged or
-changed archive in transit and makes release-archive changes visible in repository
-review.
+`setup_task.sh`. Running this prebuilt Task binary requires no Go compilation.
+Building Task from source would require Go outside Bazel before Task can run.
+This does not remove compilation from a subsequent Bazel build; see
+[Go toolchains and dependency caches](./go-toolchains-and-caches.md#toolchains-builds-and-prebuilt-binaries).
+The checked-in checksum detects a damaged or changed archive in transit. It also
+makes release-archive changes visible in repository review.
 
 When changing this setup, keep these rules:
 
@@ -697,6 +778,34 @@ A composite action cannot set `defaults.run.shell`. A calling job's default shel
 not apply to the action. Set `shell:` on each `run:` step that needs the Nix dev
 shell.
 
+### Guard failure handlers
+
+A `failure()` condition runs after any earlier step fails. An `always()` condition
+runs even when setup fails.
+
+A failure handler must check that its required setup completed. Do not run a handler
+that needs Nix, Task, or generated test data when the setup step failed. Give the
+setup step an `id`. Check its outcome in the handler condition.
+
+```yaml
+- id: install-nix
+  uses: ./.github/actions/install-nix
+
+- name: Log Docker disk diagnostics
+  if: ${{ failure() && steps.install-nix.outcome == 'success' }}
+  run: ./scripts/run_task.sh log-ci-disk-state-docker
+```
+
+Use `always()` when a handler must run after a workload failure. Also check the setup
+outcome.
+
+```yaml
+if: ${{ always() && steps.install-nix.outcome == 'success' }}
+```
+
+This keeps the first setup failure visible. It also prevents secondary failures from
+unavailable tools or missing workload output.
+
 ## Runners and external actions
 
 ### Use versioned GitHub-hosted runners
@@ -708,6 +817,27 @@ version without a reviewed repository change.
 Versioned labels do not make runner images immutable. GitHub can update the image for
 a versioned label without a repository change, and those updates can break CI. A
 versioned label prevents an unreviewed move to a new OS version.
+
+### Use beefier runners for faster E2E jobs
+
+E2E testing can only run in serial on the standard resource-constrained GitHub
+runners. Parallel execution on standard runners results in unreliable execution due to
+contention. Running E2E testing on more capable (e.g. 4+ vCPUs) runners supports
+parallel execution so that jobs finish faster. Worth it on PRs for faster iteration.
+For scheduled jobs, serial execution on standard runners is generally preferable.
+
+### Cache separation between runner providers
+
+[Blacksmith redirects cache actions to its own cache
+backend](https://docs.blacksmith.sh/blacksmith-caching/dependencies-actions).
+Populating the GitHub Actions cache does not populate the Blacksmith cache, or vice
+versa. This separation applies to exact keys and fallback keys alike.
+
+Using both providers requires populating the caches twice. Each population requires
+network downloads, which increases exposure to download failures. Maintaining both
+caches also requires additional work. For now, this repository prefers GitHub-hosted
+runners to reduce that work and failure risk. We can reconsider that preference if we
+decide we require the higher capacity and reliability advertised by Blacksmith.
 
 ### Pin third-party actions
 

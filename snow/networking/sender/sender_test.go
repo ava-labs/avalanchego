@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/message/messagemock"
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -119,7 +119,7 @@ func TestTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	p2pTracker, err := p2p.NewPeerTracker(
+	p2pTracker, err := peertracker.New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
@@ -378,7 +378,7 @@ func TestReliableMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
-	p2pTracker, err := p2p.NewPeerTracker(
+	p2pTracker, err := peertracker.New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
@@ -540,7 +540,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 			)
 			require.NoError(err)
 
-			p2pTracker, err := p2p.NewPeerTracker(
+			p2pTracker, err := peertracker.New(
 				logging.NoLog{},
 				"",
 				prometheus.NewRegistry(),

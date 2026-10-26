@@ -10,8 +10,9 @@ avalanchego monorepo.
 - [Why Bazel?](#why-bazel)
 - [Architecture Overview](#architecture-overview)
   - [Toolchain Strategy](#toolchain-strategy)
+  - [Go dependency preparation](#go-dependency-preparation)
   - [Version Pinning](#version-pinning)
-  - [Repository tools and external-dependency fetches](#repository-tools-and-external-dependency-fetches)
+  - [External-dependency fetches](#external-dependency-fetches)
   - [Why Bazel 8?](#why-bazel-8)
   - [Multi-Module Structure](#multi-module-structure)
   - [Key Configuration Files](#key-configuration-files)
@@ -33,6 +34,7 @@ avalanchego monorepo.
 - [Common Tasks](#common-tasks)
   - [Building](#building)
   - [Testing](#testing)
+    - [E2E runner](#e2e-runner)
     - [Go Test Selection](#go-test-selection)
     - [Test Options](#test-options)
     - [Test Timeouts](#test-timeouts)
@@ -111,13 +113,10 @@ task bazel-clean
 
 ### Toolchain Strategy
 
-The build uses `go_sdk.from_file()` to read the Go version from
-`go.mod`, ensuring a single source of truth without manual syncing:
-
-```python
-go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
-go_sdk.from_file(go_mod = "//:go.mod")
-```
+[`MODULE.bazel`](../MODULE.bazel) uses `go_sdk.from_file()` to select a managed
+Go toolchain from `go.mod`. Bazel uses this toolchain to compile Go targets.
+These builds do not require a separately installed Go compiler. Commands outside
+Bazel can still require Go on `PATH`.
 
 **Approaches considered:**
 
@@ -125,13 +124,34 @@ go_sdk.from_file(go_mod = "//:go.mod")
 |----------|------|------|
 | `go_sdk.from_file()` (chosen) | Reproducible, single source of truth via go.mod, no nix required | None significant |
 | `go_sdk.download()` | Explicit version in MODULE.bazel | Go version must be synced manually across go.mod files |
-| `go_sdk.host()` | Uses system Go | Requires nix shell, not hermetic outside nix |
+| `go_sdk.host()` | Uses system Go | Requires Go on `PATH`; depends on host setup |
 | `rules_nixpkgs_go` | Bazel calls Nix directly, fully hermetic | **Incompatible with rules_go v0.57+** (toolchain API mismatch) |
 
 > **Note:** rules_nixpkgs_go v0.13.0 proved incompatible with rules_go
 > v0.56.0+. The rules_go toolchain API changed in ways that
 > rules_nixpkgs_go doesn't support. See:
 > https://github.com/tweag/rules_nixpkgs/issues/667
+
+### Go dependency preparation
+
+Bazel builds need both a toolchain and dependency sources:
+
+1. Gazelle's `go_deps` extension reads the Go workspace metadata.
+2. Gazelle's `go_repository` rules use a Go module cache to obtain dependency
+   modules and prepare external source repositories.
+3. Bazel compiles those repositories with its managed Go toolchain.
+
+[`setup-bazel`](../.github/actions/setup-bazel/action.yml) configures Gazelle's
+shared cache at `$HOME/.cache/bazel-go-repository-modcache`. Its [configuration
+helper](../.github/actions/setup-bazel/configure-bazelrc.sh) sets `GOMODCACHE`
+through `--repo_env` and enables `GO_REPOSITORY_USE_HOST_MODCACHE=1`. In this
+Gazelle setting, `HOST_MODCACHE` refers to the module cache available to
+Gazelle's repository rules, not to a host Go compiler.  Without these settings,
+Gazelle keeps module downloads in each Bazel work area.  The CI path is not a
+default for all local Bazel commands.
+
+See [Go toolchains and dependency caches](./go-toolchains-and-caches.md) for
+cache boundaries, preparation order, and the limits of download restrictions.
 
 ### Version Pinning
 
@@ -451,8 +471,7 @@ bazel build //...
 
 ### Testing
 
-Use the Bazel test tasks for repository test suites. The tasks select Go test
-rules and exclude manual tests.
+Use the Bazel unit-test tasks to select Go test rules and exclude manual tests.
 
 ```bash
 # Run all cacheable Go unit tests
@@ -466,10 +485,51 @@ bazel test //utils:set_test --test_filter=TestSet_Add
 
 # Collect coverage
 bazel coverage //...
-
-# Run E2E tests (requires built binary)
-task bazel-test-e2e
 ```
+
+#### E2E runner
+
+```bash
+# Run all E2E tests with Bazel-built runtime dependencies
+task bazel-test-e2e
+
+# Run E2E tests with race detection
+task bazel-test-e2e-race
+
+# Run E2E tests serially with race detection
+task bazel-test-e2e-race-serial
+
+# Run E2E tests serially with Bazel-built runtime dependencies
+task bazel-test-e2e-serial
+
+# Run only the C-Chain ProposerVM API test
+task bazel-test-e2e-smoke
+```
+
+`task bazel-test-e2e` runs `bazel run //tests/e2e:e2e_runner`. The
+[`e2e_runner` target](../tests/e2e/BUILD.bazel) uses Bazel's Go toolchain to build
+avalanchego, Ginkgo, the E2E test binary, and XSVM.
+The [Bazel runner](../scripts/tests.e2e.bazel.sh) uses the
+[shared E2E script](../scripts/tests.e2e.sh) to execute these prebuilt binaries.
+Bazel can cache the binary builds. E2E test execution does not use cached test
+results.
+
+Scheduled Bazel CI runs serial E2E tests on every scheduled platform. It enables
+race detection only on Ubuntu 24.04 AMD64. This matches the scheduled unit-test
+policy. It limits race detection to one platform.
+
+[CI builds and executes E2E tests in one job](../.github/workflows/bazel.yml)
+through the same tasks used locally.
+This follows the [CI entrypoint conventions](./ci.md#principles) and avoids a
+separate artifact lifecycle. Remote caching lets each job reuse compiled outputs.
+
+The Bazel entrypoint uses `bazel run`, not `bazel test`. It keeps network data
+available for inspection after a failure. Network data defaults to `$HOME/.tmpnet`.
+Any sandboxed execution must preserve access to this data after a failure.
+
+The XSVM plugin link lives under `build/bazel-e2e/plugins` to keep each
+checkout's plugin state separate. This also avoids overwriting plugins from
+non-Bazel builds.
 
 #### Go Test Selection
 
@@ -514,8 +574,13 @@ category (120s). See Custom Test Macros for how this is wired up.
 
 Tests that are not unit tests (e2e tests, integration tests, load
 tests) must have `tags = ["manual"]` in their BUILD.bazel file. This
-excludes them from `bazel test //...` which should only run unit
-tests.
+excludes them from wildcard commands such as `bazel test //...` and
+`bazel build //...`; those commands should not select non-unit-test work.
+
+Tags do not propagate through dependencies. Targets that exist only to build
+or run a non-unit test, such as a test-binary `genrule` or an E2E `sh_binary`
+runner, must also have `tags = ["manual"]`. Explicit commands, such as
+`bazel run //tests/e2e:e2e_runner`, still select manual targets.
 
 The Go unit-test script excludes equivalent directories during package
 selection. See [`scripts/tests.unit.sh`](../scripts/tests.unit.sh).
@@ -595,10 +660,9 @@ uses the Go-based Task bootstrap when Task is not on `PATH`.
 See [Bazel CI External Dependency
 Caching](#bazel-ci-external-dependency-caching) for the motivation,
 cache-key design, checked-in Bazel dependency list, and [how CI checks the
-list](#enforcement). The E2E Bazel job uses the same cache setup through
-`run-monitored-tmpnet-cmd`, which also collects test data and metrics.
+list](#enforcement).
 
-That check includes the Bazel module metadata files, so lockfile drift
+The metadata check includes the Bazel module metadata files, so lockfile drift
 is caught in the metadata phase rather than showing up later as a
 surprising working-tree mutation.
 
@@ -620,15 +684,23 @@ workflow, which reduces exposure to those infrastructure failures.
 
 ### Test platforms and cache policy
 
-Bazel CI uses a small pre-merge test set. GitHub-hosted runners can fail for
+Bazel CI uses a small pre-merge platform set. GitHub-hosted runners can fail for
 reasons outside the repository. A smaller job set reduces that risk.
 
 Non-scheduled Bazel CI runs these jobs:
 
-- Ubuntu 24.04 AMD64 CI runs one full cacheable unit-test job and a focused E2E
-  smoke test.
-- macOS 26 ARM64 CI runs one cacheable unit-test smoke target and one focused
+- Linux pre-merge CI runs the full cacheable unit-test suite and full E2E suite.
+- macOS pre-merge CI runs one cacheable unit-test smoke target and one focused
   E2E smoke test.
+
+See [E2E runner](#e2e-runner) for build and execution details.
+See [E2E runner capacity](./ci.md#use-beefier-runners-for-faster-e2e-jobs) for the
+shared runner-sizing policy.
+
+The macOS smoke E2E job does not collect metrics or logs. Monitoring installs
+Nix to provide Prometheus and Promtail. Nix installation adds too much time to
+pre-merge macOS CI. The scheduled full E2E job collects metrics and logs. Both
+jobs upload tmpnet data to help diagnose failures.
 
 Previously, Bazel CI divided the full unit-test suite among three
 component-specific jobs. These jobs ran in parallel to keep the pre-merge
@@ -637,20 +709,17 @@ detection. These changes remove the need for separate jobs. Reconsider separate
 jobs if these conditions change or one job makes the pre-merge runtime
 unacceptable.
 
-The E2E smoke task selects the C-Chain ProposerVM API test. Ubuntu and macOS use
-the same task. It does not provide full E2E coverage. A future change will
-replace the Ubuntu smoke test with a non-smoke E2E test. Each setup job checks
-Bazel metadata. On `master`, a cache miss makes each setup job prepare the CI
-dependency list. The job then disables downloads, checks metadata, and saves the
-cache. Setup jobs can duplicate this work when they share a key. On other refs,
-each Bazel-consuming job prepares its own non-exact restore before it runs
-offline. Those jobs do not save the cache.
+Each setup job checks Bazel metadata. On `master`, a cache miss makes each setup
+job prepare the CI dependency list. The job then disables downloads, checks
+metadata, and saves the cache. Setup jobs can duplicate this work when they
+share a key. On other refs, each Bazel-consuming job prepares its own non-exact
+restore before it disables repository and module downloads. Those jobs do not
+save the cache.
 
-The daily scheduled workflow runs one full unit-test job on Ubuntu 22.04 and
-24.04, on AMD64 and ARM64, and on macOS 26 ARM64. It also runs the same focused
-E2E smoke test on each platform. Only the Ubuntu 24.04 AMD64 unit-test job uses
-race detection and shuffled test order. It uses `--nocache_test_results`. Thus,
-Bazel runs it again and does not use a cached random test result.
+The [daily scheduled workflow](../.github/workflows/bazel-scheduled.yml) runs
+full unit-test and E2E suites across its platform matrix. It
+includes a race-detection and shuffled-order unit-test run. That run disables
+test-result caching so it executes rather than reusing a cached random result.
 
 The scheduled workflow also disables the remote cache. This provides daily
 validation that does not depend on remote action or test results.
@@ -733,8 +802,9 @@ configuration are outside this repository's scope.
 
 The Bazel CI cache setup configures four types of cached data:
 
-- Bazel `repository_cache`
-- shared Gazelle `GOMODCACHE`
+- Bazel repository cache at `$HOME/.cache/bazel-repository-cache`, selected
+  with `--repository_cache`
+- shared Gazelle module cache; see [Go dependency preparation](#go-dependency-preparation)
 - the Bazel binary in a versioned `~/.cache/bazelisk` subdirectory
 - Bazel remote action and test-result data
 
@@ -754,13 +824,10 @@ cache contains them. The job cannot depend on the Bazel workflow setup job becau
 `needs` does not cross workflows. The Bazel workflow keeps the only cache-writing
 setup job.
 
-The shared `GOMODCACHE` is required because Gazelle `go_repository` otherwise
-keeps Go module downloads in each Bazel work area. Thus, a later job can use the
-network after the setup fetch runs. The action prevents this behavior with these
-settings:
-
-- `GO_REPOSITORY_USE_HOST_MODCACHE=1`
-- `GOMODCACHE=...`
+The shared Gazelle module cache lets later jobs reuse prepared module inputs
+instead of downloading them in a new Bazel work area. See
+[Go dependency preparation](#go-dependency-preparation) for the cache path and
+the meaning of `GO_REPOSITORY_USE_HOST_MODCACHE`.
 
 The remote cache is separate from the GitHub Actions caches. Bazel reads it and
 writes to it during configured pre-merge builds and tests. It stores action
@@ -825,9 +892,11 @@ On other refs, a non-exact restore also prepares dependencies. These jobs do
 not save a cache entry. The setup job disables downloads and checks metadata.
 Later Bazel-consuming jobs also disable downloads after preparation. The action
 sets `--repository_disable_download` and `GOPROXY=off` for repository rules.
-`--repository_disable_download` blocks Bazel downloads. `GOPROXY=off` blocks
-Gazelle `go_repository` subprocesses. If a later rule needs a missing download,
-Bazel fails instead of downloading it.
+`--repository_disable_download` blocks Bazel repository downloads.
+`GOPROXY=off` prevents Gazelle's Go commands from downloading missing modules.
+Those commands can still read cached modules. A missing module causes a failure
+instead of a download. These controls do not block all network access; see
+[download restrictions](./go-toolchains-and-caches.md#download-restrictions).
 
 The checked-in list has two parts:
 
@@ -876,8 +945,8 @@ When modifying `setup-bazel`, `run_task.sh`, `run_bazel_ci_command.sh`,
 preserve these invariants:
 
 - CI can launch `task` without assuming a preinstalled repo-specific wrapper
-- jobs that also prepare host Go dependencies run `setup-bazel` before
-  `setup-go-for-project` or `install-nix` disables `GOPROXY`; see
+- jobs that also prepare dependencies for Go tasks outside Bazel run `setup-bazel`
+  before `setup-go-for-project` or `install-nix` disables `GOPROXY`; see
   [CI dependency provisioning](./ci.md#provision-ci-job-dependencies)
 - on `master`, every `setup` job requests a cache save after it checks metadata;
   see [CI cache policy](./ci.md#ci-cache-policy) for cache preparation and
@@ -907,7 +976,7 @@ Validate changes proportionally:
   - an exact restore
   - a non-exact restore
   - a cache miss
-- confirm that Bazel preparation populates its separate Go module cache before
+- confirm that Bazel preparation populates Gazelle's separate module cache before
   Go setup disables `GOPROXY`
 - confirm that the workload succeeds with repository downloads disabled.
   An exact hit alone does not test this ordering constraint

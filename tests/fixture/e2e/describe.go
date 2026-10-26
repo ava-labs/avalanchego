@@ -8,9 +8,8 @@ import "github.com/onsi/ginkgo/v2"
 const (
 	// For label usage in ginkgo invocation, see: https://onsi.github.io/ginkgo/#spec-labels
 
-	// Label for filtering a test that is not primarily a C-Chain test
-	// but nonetheless uses the C-Chain. Intended to support
-	// execution of all C-Chain tests by the coreth repo in an e2e job.
+	// UsesCChainLabel marks a test that is not primarily a C-Chain test but
+	// nonetheless uses the C-Chain.
 	UsesCChainLabel = "uses-c"
 
 	// SkipSharedNetworkBootstrapCheckLabel excludes a test from bootstrap checks

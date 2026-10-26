@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 )
@@ -38,11 +37,6 @@ type PrecompileTest struct {
 	// ReadOnly is whether the precompile should be called in read only
 	// mode. If true, the precompile should not modify the state.
 	ReadOnly bool
-	// Config is the config to use for the precompile
-	// It should be the same precompile config that is used in the
-	// precompile's configurator.
-	// If nil, Configure will not be called.
-	Config precompileconfig.Config
 	// Predicates that the precompile should have access to.
 	Predicates []predicate.Predicate
 	// SetupBlockContext sets the expected calls on MockBlockContext for the test execution.
@@ -53,9 +47,6 @@ type PrecompileTest struct {
 	ExpectedRes []byte
 	// ExpectedErr is the expected error returned by the precompile
 	ExpectedErr error
-	// ChainConfig is the chain config to use for the precompile's block context
-	// If nil, the default chain config will be used.
-	ChainConfig precompileconfig.ChainConfig
 	// Rules is the rules to use for the precompile's block context
 	Rules extras.AvalancheRules
 }
@@ -152,13 +143,6 @@ func (test PrecompileTest) setup(t testing.TB, module modules.Module, state *tes
 
 	ctrl := gomock.NewController(t)
 
-	chainConfig := test.ChainConfig
-	if chainConfig == nil {
-		mockChainConfig := precompileconfig.NewMockChainConfig(ctrl)
-		mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(true)
-		chainConfig = mockChainConfig
-	}
-
 	blockContext := contract.NewMockBlockContext(ctrl)
 	blockContext.EXPECT().Timestamp().Return(uint64(time.Now().Unix())).AnyTimes()
 	if test.SetupBlockContext != nil {
@@ -173,10 +157,6 @@ func (test PrecompileTest) setup(t testing.TB, module modules.Module, state *tes
 	accessibleState.EXPECT().GetBlockContext().Return(blockContext).AnyTimes()
 	accessibleState.EXPECT().GetSnowContext().Return(snowContext).AnyTimes()
 	accessibleState.EXPECT().GetRules().Return(test.Rules).AnyTimes()
-
-	if test.Config != nil {
-		require.NoError(t, module.Configure(chainConfig, test.Config, state, blockContext))
-	}
 
 	input := test.Input
 	if test.InputFn != nil {

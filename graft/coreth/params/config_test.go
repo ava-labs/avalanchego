@@ -151,20 +151,20 @@ func TestConfigRules(t *testing.T) {
 		&ChainConfig{},
 		&extras.ChainConfig{
 			NetworkUpgrades: extras.NetworkUpgrades{
-				CortinaBlockTimestamp: utils.PointerTo[uint64](500),
+				DurangoBlockTimestamp: utils.PointerTo[uint64](500),
 			},
 		},
 	)
 	var stamp uint64
-	if r := c.Rules(big.NewInt(0), IsMergeTODO, stamp); GetRulesExtra(r).IsCortina {
-		t.Errorf("expected %v to not be cortina", stamp)
+	if r := c.Rules(big.NewInt(0), IsMergeTODO, stamp); GetRulesExtra(r).IsDurango {
+		t.Errorf("expected %v to not be durango", stamp)
 	}
 	stamp = 500
-	if r := c.Rules(big.NewInt(0), IsMergeTODO, stamp); !GetRulesExtra(r).IsCortina {
-		t.Errorf("expected %v to be cortina", stamp)
+	if r := c.Rules(big.NewInt(0), IsMergeTODO, stamp); !GetRulesExtra(r).IsDurango {
+		t.Errorf("expected %v to be durango", stamp)
 	}
 	stamp = math.MaxInt64
-	if r := c.Rules(big.NewInt(0), IsMergeTODO, stamp); !GetRulesExtra(r).IsCortina {
-		t.Errorf("expected %v to be cortina", stamp)
+	if r := c.Rules(big.NewInt(0), IsMergeTODO, stamp); !GetRulesExtra(r).IsDurango {
+		t.Errorf("expected %v to be durango", stamp)
 	}
 }

@@ -14,25 +14,26 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
 )
 
-// ServeResponder registers r at handlerID on a single-node loopback network.
+// ServeResponder registers r at handlerID on a single-node loopback network and
+// returns a client bound to it.
 func ServeResponder[V any, Req handlers.ProtoMessage[V], Resp proto.Message](
 	t *testing.T,
 	ctx context.Context,
 	log logging.Logger,
 	handlerID uint64,
 	r handlers.Responder[Req, Resp],
-) (*p2p.Network, *p2p.PeerTracker) {
+) *peertracker.Client {
 	t.Helper()
 
 	net, tracker := NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
 	require.NoError(t, net.AddHandler(handlerID, handlers.NewHandler(log, r)))
-	return net, tracker
+	return peertracker.NewClient(net, handlerID, tracker)
 }
 
 // RecordingResponder records every request reaching inner.

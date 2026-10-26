@@ -9,12 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/trie"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -94,6 +97,86 @@ func TestNewTracker(t *testing.T) {
 			}
 			gotRoot := rawdb.ReadSnapshotRoot(db)
 			require.Equal(t, wantRoot, gotRoot, "rawdb.ReadSnapshotRoot()")
+		})
+	}
+}
+
+// TestTriesInMemory is a change-detector test to ensure the consensus-critical
+// value of [core.TriesInMemory] is not unintentionally altered in a geth
+// update.
+func TestTriesInMemory(t *testing.T) {
+	const expected = 128
+	require.Equal(t, expected, core.TriesInMemory, "core.TriesInMemory value changed upstream")
+}
+
+func TestTrackerStateHistory(t *testing.T) {
+	tests := []struct {
+		name         string
+		stateHistory uint64
+		wantHistory  uint64
+	}{
+		{
+			name:        "default",
+			wantHistory: core.TriesInMemory,
+		},
+		{
+			name:         "below_min",
+			stateHistory: 8,
+			wantHistory:  core.TriesInMemory,
+		},
+		{
+			name:         "above_min",
+			stateHistory: 256,
+			wantHistory:  256,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			numBlocks := 3 * tt.wantHistory
+
+			tr, err := NewTracker(
+				rawdb.NewMemoryDatabase(),
+				Config{
+					Scheme:         rawdb.HashScheme,
+					CommitInterval: numBlocks + 1, // avoid committing any states
+					StateHistory:   tt.stateHistory,
+				},
+				types.EmptyRootHash,
+				t.TempDir(),
+				loggingtest.New(t, logging.Debug),
+			)
+			require.NoError(t, err, "NewTracker()")
+
+			lastRoot := types.EmptyRootHash
+			t.Cleanup(func() {
+				assert.NoErrorf(t, tr.Close(lastRoot), "%T.Close()", tr)
+			})
+
+			roots := make([]common.Hash, 0, numBlocks)
+			addr := common.Address{1}
+			for height := uint64(1); height <= numBlocks; height++ {
+				sdb, err := tr.StateDB(lastRoot)
+				require.NoErrorf(t, err, "%T.StateDB() at height %d", tr, height)
+				sdb.SetNonce(addr, height) // unique state
+				lastRoot, err = sdb.Commit(height, true /* EIP-158 */)
+				require.NoErrorf(t, err, "%T.Commit(%d)", tr, height)
+				roots = append(roots, lastRoot)
+
+				require.NoErrorf(t, tr.BlockExecuted(types.EmptyRootHash, lastRoot, height), "%T.BlockExecuted(%d)", tr, height)
+			}
+
+			for i, pastRoot := range roots {
+				pastHeight := uint64(i) + 1
+				_, err := tr.StateDB(pastRoot)
+
+				var wantErr testerr.Want
+				if numBlocks-pastHeight >= tt.wantHistory {
+					wantErr = testerr.As[*trie.MissingNodeError](nil)
+				}
+				if diff := testerr.Diff(err, wantErr); diff != "" {
+					t.Errorf("mismatch at height %d: %s", pastHeight, diff)
+				}
+			}
 		})
 	}
 }

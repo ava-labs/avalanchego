@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -129,7 +129,7 @@ type handler struct {
 
 	// Tracks the peers that are currently connected to this subnet
 	peerTracker commontracker.Peers
-	p2pTracker  *p2p.PeerTracker
+	p2pTracker  *peertracker.PeerTracker
 }
 
 // Initialize this consensus handler
@@ -144,7 +144,7 @@ func New(
 	resourceTracker tracker.ResourceTracker,
 	subnet subnets.Subnet,
 	peerTracker commontracker.Peers,
-	p2pTracker *p2p.PeerTracker,
+	p2pTracker *peertracker.PeerTracker,
 	reg prometheus.Registerer,
 	haltBootstrapping func(),
 ) (Handler, error) {
@@ -698,18 +698,6 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		return engine.PullQuery(ctx, nodeID, msg.RequestId, containerID, msg.RequestedHeight)
 
 	case *p2ppb.Chits:
-		preferredID, err := ids.ToID(msg.PreferredId)
-		if err != nil {
-			h.ctx.Log.Debug("message with invalid field",
-				zap.Stringer("nodeID", nodeID),
-				zap.Stringer("messageOp", message.ChitsOp),
-				zap.Uint32("requestID", msg.RequestId),
-				zap.String("field", "PreferredID"),
-				zap.Error(err),
-			)
-			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
-		}
-
 		preferredIDAtHeight, err := ids.ToID(msg.PreferredIdAtHeight)
 		if err != nil {
 			h.ctx.Log.Debug("message with invalid field",
@@ -734,7 +722,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			return engine.QueryFailed(ctx, nodeID, msg.RequestId)
 		}
 
-		return engine.Chits(ctx, nodeID, msg.RequestId, preferredID, preferredIDAtHeight, acceptedID, msg.AcceptedHeight)
+		return engine.Chits(ctx, nodeID, msg.RequestId, preferredIDAtHeight, acceptedID, msg.AcceptedHeight)
 
 	case *message.QueryFailed:
 		return engine.QueryFailed(ctx, nodeID, msg.RequestID)

@@ -83,15 +83,6 @@ func GetPrecompileModuleByAddress(address common.Address) (Module, bool) {
 	return Module{}, false
 }
 
-func GetPrecompileModule(key string) (Module, bool) {
-	for _, stm := range registeredModules {
-		if stm.ConfigKey == key {
-			return stm, true
-		}
-	}
-	return Module{}, false
-}
-
 func RegisteredModules() []Module {
 	return registeredModules
 }
