@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompiletest"
-	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -35,24 +34,7 @@ var forks = []upgradetest.Fork{
 
 func forkToAvalancheRules(fork upgradetest.Fork) extras.AvalancheRules {
 	u := upgradetest.GetConfig(fork)
-	networkUpgrades := extras.NetworkUpgrades{
-		ApricotPhase1BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase1Time),
-		ApricotPhase2BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase2Time),
-		ApricotPhase3BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase3Time),
-		ApricotPhase4BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase4Time),
-		ApricotPhase5BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase5Time),
-		ApricotPhasePre6BlockTimestamp:  utils.TimeToNewUint64(u.ApricotPhasePre6Time),
-		ApricotPhase6BlockTimestamp:     utils.TimeToNewUint64(u.ApricotPhase6Time),
-		ApricotPhasePost6BlockTimestamp: utils.TimeToNewUint64(u.ApricotPhasePost6Time),
-		BanffBlockTimestamp:             utils.TimeToNewUint64(u.BanffTime),
-		CortinaBlockTimestamp:           utils.TimeToNewUint64(u.CortinaTime),
-		DurangoBlockTimestamp:           utils.TimeToNewUint64(u.DurangoTime),
-		EtnaTimestamp:                   utils.TimeToNewUint64(u.EtnaTime),
-		FortunaTimestamp:                utils.TimeToNewUint64(u.FortunaTime),
-		GraniteTimestamp:                utils.TimeToNewUint64(u.GraniteTime),
-		HeliconTimestamp:                utils.TimeToNewUint64(u.HeliconTime),
-		IglooTimestamp:                  utils.TimeToNewUint64(u.IglooTime),
-	}
+	networkUpgrades := extras.GetNetworkUpgrades(u)
 	return networkUpgrades.GetAvalancheRules(uint64(upgrade.InitiallyActiveTime.Unix()))
 }
 

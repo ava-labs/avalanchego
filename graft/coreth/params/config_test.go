@@ -165,15 +165,15 @@ func TestConfigRules(t *testing.T) {
 		},
 	)
 	var stamp uint64
-	if r := c.Rules(big.NewInt(0), true /*IsMerge*/, stamp); GetRulesExtra(r).IsDurango {
+	if r := c.Rules(big.NewInt(0), true /*isMerge*/, stamp); GetRulesExtra(r).IsDurango {
 		t.Errorf("expected %v to not be durango", stamp)
 	}
 	stamp = 500
-	if r := c.Rules(big.NewInt(0), true /*IsMerge*/, stamp); !GetRulesExtra(r).IsDurango {
+	if r := c.Rules(big.NewInt(0), true /*isMerge*/, stamp); !GetRulesExtra(r).IsDurango {
 		t.Errorf("expected %v to be durango", stamp)
 	}
 	stamp = math.MaxInt64
-	if r := c.Rules(big.NewInt(0), true /*IsMerge*/, stamp); !GetRulesExtra(r).IsDurango {
+	if r := c.Rules(big.NewInt(0), true /*isMerge*/, stamp); !GetRulesExtra(r).IsDurango {
 		t.Errorf("expected %v to be durango", stamp)
 	}
 }
