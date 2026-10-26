@@ -266,3 +266,23 @@ func getSelectors(networkUUID string) (string, error) {
 
 	return strings.Join(selectors, ","), nil
 }
+
+// getTraceQLSelectors returns the TraceQL resource selectors, joined with &&.
+func getTraceQLSelectors(networkUUID string) (string, error) {
+	if len(networkUUID) > 0 {
+		return fmt.Sprintf(`resource.network_uuid = "%s"`, networkUUID), nil
+	}
+
+	selectors := []string{}
+	for _, label := range githubLabels {
+		value := os.Getenv(strings.ToUpper(label))
+		if len(value) > 0 {
+			selectors = append(selectors, fmt.Sprintf(`resource.%s = "%s"`, label, value))
+		}
+	}
+	if len(selectors) == 0 {
+		return "", stacktrace.New("no GH_* env vars set to use for selectors")
+	}
+
+	return strings.Join(selectors, " && "), nil
+}

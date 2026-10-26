@@ -1380,3 +1380,21 @@ func setupViper(configFilePath string) *viper.Viper {
 	}
 	return v
 }
+
+func TestGetTraceConfigResourceAttributes(t *testing.T) {
+	t.Run("default is empty", func(t *testing.T) {
+		cfg, err := getTraceConfig(setupViperFlags())
+		require.NoError(t, err, "getTraceConfig()")
+		require.Empty(t, cfg.ResourceAttributes, "default resource attributes")
+	})
+
+	t.Run("JSON object string from config file", func(t *testing.T) {
+		configFile := filepath.Join(t.TempDir(), "config.json")
+		content := `{"tracing-resource-attributes": "{\"network_uuid\":\"abc\",\"node_id\":\"n1\"}"}`
+		require.NoError(t, os.WriteFile(configFile, []byte(content), 0o600), "WriteFile()")
+
+		cfg, err := getTraceConfig(setupViper(configFile))
+		require.NoError(t, err, "getTraceConfig()")
+		require.Equal(t, map[string]string{"network_uuid": "abc", "node_id": "n1"}, cfg.ResourceAttributes, "resource attributes")
+	})
+}

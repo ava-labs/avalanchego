@@ -6,6 +6,8 @@ package trace
 import (
 	"context"
 	"io"
+	"maps"
+	"slices"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -33,6 +35,9 @@ type Config struct {
 
 	AppName string `json:"appName"`
 	Version string `json:"version"`
+
+	// Additional resource attributes attached to every span.
+	ResourceAttributes map[string]string `json:"resourceAttributes"`
 }
 
 type Tracer interface {
@@ -62,18 +67,29 @@ func New(config Config) (Tracer, error) {
 		return nil, err
 	}
 
-	tracerProviderOpts := []sdktrace.TracerProviderOption{
-		sdktrace.WithBatcher(exporter, sdktrace.WithExportTimeout(tracerExportTimeout)),
-		sdktrace.WithResource(resource.NewWithAttributes(semconv.SchemaURL,
-			attribute.String("version", config.Version),
-			semconv.ServiceNameKey.String(config.AppName),
-		)),
-		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.TraceSampleRate)),
-	}
-
-	tracerProvider := sdktrace.NewTracerProvider(tracerProviderOpts...)
+	tracerProvider := newTracerProvider(exporter, config)
 	return &tracer{
 		Tracer: tracerProvider.Tracer(config.AppName),
 		tp:     tracerProvider,
 	}, nil
+}
+
+func newTracerProvider(exporter sdktrace.SpanExporter, config Config) *sdktrace.TracerProvider {
+	attrs := make([]attribute.KeyValue, 0, 2+len(config.ResourceAttributes))
+	attrs = append(attrs,
+		attribute.String("version", config.Version),
+		semconv.ServiceNameKey.String(config.AppName),
+	)
+	for _, k := range slices.Sorted(maps.Keys(config.ResourceAttributes)) {
+		attrs = append(attrs, attribute.String(k, config.ResourceAttributes[k]))
+	}
+	return sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter, sdktrace.WithExportTimeout(tracerExportTimeout)),
+		sdktrace.WithResource(resource.NewWithAttributes(semconv.SchemaURL, attrs...)),
+		// Deliberately NOT ParentBased: remote span contexts arrive from any peer
+		// and must not be able to force sampling. Ratio-by-trace-ID also makes
+		// every node with the same rate reach the same decision, so cross-node
+		// traces are complete.
+		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(config.TraceSampleRate)),
+	)
 }

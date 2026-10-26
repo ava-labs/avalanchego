@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
+	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -28,6 +29,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetrace"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -42,6 +46,9 @@ var (
 // [Executor.processQueue] can record how long it spent in the queue, from
 // acceptance until its execution completed.
 type queuedBlock struct {
+	// ctx carries only the values (e.g. the tracing span) of the context passed
+	// to [Executor.Enqueue]; it is never cancelled.
+	ctx        context.Context
 	block      *blocks.Block
 	enqueuedAt time.Time
 }
@@ -53,7 +60,7 @@ func (e *Executor) Enqueue(ctx context.Context, block *blocks.Block) error {
 	e.createReceiptBuffers(block)
 
 	select {
-	case e.queue <- queuedBlock{block: block, enqueuedAt: time.Now()}:
+	case e.queue <- queuedBlock{ctx: context.WithoutCancel(ctx), block: block, enqueuedAt: time.Now()}:
 		e.metrics.markEnqueued(block)
 		if n := len(e.queue); n == cap(e.queue) {
 			// If this happens then increase the channel's buffer size.
@@ -94,7 +101,8 @@ func (e *Executor) processQueue() (ret *Unhealthy) {
 			zap.Int("tx_count", len(block.Transactions())),
 		)
 
-		err := e.execute(block, log)
+		queueWait := time.Since(qb.enqueuedAt)
+		err := e.execute(qb.ctx, block, log, queueWait)
 		switch {
 		case errors.Is(err, errFatal):
 			log.Fatal( //nolint:gocritic // False positive, will not terminate the process
@@ -131,7 +139,16 @@ const (
 	triePrefetcherParallelism = 16
 )
 
-func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
+func (e *Executor) execute(ctx context.Context, b *blocks.Block, log logging.Logger, queueWait time.Duration) (err error) {
+	ctx, span := saetrace.Start(ctx, "saexec.Execute", oteltrace.WithAttributes(
+		saetrace.Uint64("block_height", b.Height()),
+		saetrace.Hash("block_hash", b.Hash()),
+		attribute.Int("tx_count", len(b.Transactions())),
+		attribute.Int64("queue_wait_ms", queueWait.Milliseconds()),
+	))
+	defer span.End()
+	defer func() { saetrace.RecordError(span, err) }()
+
 	// If the VM were to encounter an error after enqueuing the block, we would
 	// receive the same block twice for execution should consensus retry
 	// acceptance.
@@ -167,7 +184,20 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
-	if err := e.afterExecution(b, stateDB, result); err != nil {
+	if span.IsRecording() {
+		for _, r := range result.Receipts {
+			span.AddEvent("tx", oteltrace.WithAttributes(
+				saetrace.Hash("tx_hash", r.TxHash),
+				saetrace.Uint64("gas_used", r.GasUsed),
+				saetrace.Uint64("status", r.Status),
+			))
+		}
+	}
+	_, afterSpan := saetrace.Start(ctx, "saexec.afterExecution")
+	err = e.afterExecution(b, stateDB, result)
+	saetrace.RecordError(afterSpan, err)
+	afterSpan.End()
+	if err != nil {
 		return err
 	}
 	e.metrics.observeExecuteDuration(start, time.Now(), b, result)

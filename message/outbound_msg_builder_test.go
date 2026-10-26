@@ -9,9 +9,15 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/compression"
+
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 func Test_newOutboundBuilder(t *testing.T) {
@@ -20,6 +26,7 @@ func Test_newOutboundBuilder(t *testing.T) {
 	mb, err := newMsgBuilder(
 		prometheus.NewRegistry(),
 		10*time.Second,
+		false,
 	)
 	require.NoError(t, err)
 
@@ -31,6 +38,7 @@ func Test_newOutboundBuilder(t *testing.T) {
 			builder := newOutboundBuilder(compressionType, mb)
 
 			outMsg, err := builder.GetAcceptedStateSummary(
+				t.Context(),
 				ids.GenerateTestID(),
 				12345,
 				time.Hour,
@@ -40,4 +48,32 @@ func Test_newOutboundBuilder(t *testing.T) {
 			t.Logf("outbound message with compression type %s built message with size %d", compressionType, len(outMsg.Bytes))
 		})
 	}
+}
+
+func TestOutboundTraceContextFromCtx(t *testing.T) {
+	mb, err := newMsgBuilder(prometheus.NewRegistry(), time.Second, true)
+	require.NoError(t, err, "newMsgBuilder()")
+	b := newOutboundBuilder(compression.TypeNone, mb)
+
+	ctx, span := sdktrace.NewTracerProvider().Tracer("t").Start(t.Context(), "root")
+	defer span.End()
+
+	out, err := b.Chits(ctx, ids.GenerateTestID(), 1, ids.GenerateTestID(), ids.GenerateTestID(), ids.GenerateTestID(), 3)
+	require.NoError(t, err, "Chits()")
+	var m p2p.Message
+	require.NoError(t, proto.Unmarshal(out.Bytes, &m), "proto.Unmarshal()")
+	require.Equal(t, trace.MarshalSpanContext(span.SpanContext()), m.GetTraceContext(), "TraceContext")
+
+	out, err = b.Chits(t.Context(), ids.GenerateTestID(), 1, ids.GenerateTestID(), ids.GenerateTestID(), ids.GenerateTestID(), 3)
+	require.NoError(t, err, "Chits() without span")
+	m.Reset()
+	require.NoError(t, proto.Unmarshal(out.Bytes, &m), "proto.Unmarshal()")
+	require.Empty(t, m.GetTraceContext(), "TraceContext without span")
+
+	remoteCtx := oteltrace.ContextWithRemoteSpanContext(t.Context(), trace.UnmarshalSpanContext(trace.MarshalSpanContext(span.SpanContext())))
+	out, err = b.Chits(remoteCtx, ids.GenerateTestID(), 1, ids.GenerateTestID(), ids.GenerateTestID(), ids.GenerateTestID(), 3)
+	require.NoError(t, err, "Chits() with remote span context")
+	m.Reset()
+	require.NoError(t, proto.Unmarshal(out.Bytes, &m), "proto.Unmarshal()")
+	require.Empty(t, m.GetTraceContext(), "TraceContext with remote-only span context")
 }

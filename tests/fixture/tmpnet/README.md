@@ -34,6 +34,7 @@ orchestrate the same temporary networks without the use of an rpc daemon.
   - [Running collectors](#running-collectors)
   - [Metric collection configuration](#metric-collection-configuration)
   - [Log collection configuration](#log-collection-configuration)
+  - [Traces](#traces)
   - [Labels](#labels)
   - [CI Collection](#ci-collection)
   - [Viewing](#viewing)
@@ -367,18 +368,18 @@ use to bootstrap themselves (aka staking address).
 
 Monitoring is an essential part of understanding the workings of a
 distributed system such as avalanchego. The tmpnet fixture enables
-collection of logs and metrics from temporary networks to a monitoring
-stack (prometheus+loki+grafana) to enable results to be analyzed and
+collection of logs, metrics and traces from temporary networks to a monitoring
+stack (prometheus+loki+tempo+grafana) to enable results to be analyzed and
 shared.
 
 ### Example usage
 [Top](#table-of-contents)
 
 ```bash
-# Start a nix shell to ensure the availability of promtail and prometheus.
+# Start a nix shell to ensure the availability of promtail, prometheus and alloy.
 nix develop
 
-# Enable collection of logs and metrics
+# Enable collection of logs, metrics and traces
 PROMETHEUS_URL=<url> \
 PROMETHEUS_PUSH_URL=<push url> \
 PROMETHEUS_USERNAME=<username> \
@@ -387,8 +388,13 @@ LOKI_URL=<url> \
 LOKI_PUSH_URL=<push url> \
 LOKI_USERNAME=<username> \
 LOKI_PASSWORD=<password> \
+TEMPO_URL=<url> \
+TEMPO_PUSH_URL=<push url> \
+TEMPO_USERNAME=<username> \
+TEMPO_PASSWORD=<password> \
 ./bin/tmpnetctl start-metrics-collector
 ./bin/tmpnetctl start-logs-collector
+./bin/tmpnetctl start-traces-collector
 
 # Network start emits link to grafana displaying collected logs and metrics
 ./bin/tmpnetctl start-network
@@ -396,6 +402,7 @@ LOKI_PASSWORD=<password> \
 # When done with the network, stop the collectors
 ./bin/tmpnetctl stop-metrics-collector
 ./bin/tmpnetctl stop-logs-collector
+./bin/tmpnetctl stop-traces-collector
 ```
 
 ### Running collectors
@@ -423,6 +430,21 @@ LOKI_PASSWORD=<password> \
        - `LOKI_PASSWORD`
      - A `promtail` binary available in the path
    - Once started, `promtail` can be stopped by `tmpnetctl stop-logs-collector`
+ - `tmpnetctl start-traces-collector` starts `alloy` configured to forward
+   node traces to Tempo.
+   - Requires:
+     - Config supplied as env vars:
+       - `TEMPO_PUSH_URL`
+       - `TEMPO_USERNAME`
+       - `TEMPO_PASSWORD`
+     - An `alloy` binary available in the path
+   - Once started, `alloy` can be stopped by `tmpnetctl stop-traces-collector`
+ - `tmpnetctl check-traces` queries Tempo for a network's traces.
+   - Requires:
+     - Config supplied as env vars:
+       - `TEMPO_URL`
+       - `TEMPO_USERNAME`
+       - `TEMPO_PASSWORD`
  - Starting a development shell with `nix develop` is one way to
    ensure availability of the necessary binaries and requires the
    installation of nix (e.g. `./scripts/run_task.sh install-nix`).
@@ -445,6 +467,17 @@ When a node is started, promtail configuration enabling
 collection of logs for the node is written to
 `~/.tmpnet/promtail/file_sd_configs/[network
 uuid]-[node id].json`.
+
+### Traces
+[Top](#table-of-contents)
+
+Nodes export traces to alloy only if it was running when the node
+started. Stopping alloy while a network is running just drops traces
+without affecting the nodes.
+
+A network's traces can be found in Grafana Explore -> Tempo with
+`{ resource.network_uuid = "<uuid>" }`. `tmpnetctl check-traces`
+requires a trace with spans from at least two nodes.
 
 ### Labels
 [Top](#table-of-contents)

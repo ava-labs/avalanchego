@@ -30,6 +30,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/version"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -746,7 +748,11 @@ func (p *Peer) handle(msg *message.InboundMessage) {
 	}
 
 	// Consensus and app-level messages
-	p.Router.HandleInbound(context.Background(), msg)
+	ctx := context.Background()
+	if sc := msg.SpanContext(); sc.IsValid() {
+		ctx = oteltrace.ContextWithRemoteSpanContext(ctx, sc)
+	}
+	p.Router.HandleInbound(ctx, msg)
 }
 
 func (p *Peer) handlePing(msg *p2p.Ping) {

@@ -50,6 +50,7 @@ go_library(
         "//utils/wrappers",
         "//version",
         "@com_github_prometheus_client_golang//prometheus",
+        "@io_opentelemetry_go_otel_trace//:trace",
         "@org_uber_go_zap//:zap",
     ],
 )
@@ -90,6 +91,8 @@ go_test(
         "//version",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",
+        "@io_opentelemetry_go_otel_sdk//trace",
+        "@io_opentelemetry_go_otel_trace//:trace",
         "@org_golang_x_crypto//ed25519",
         "@org_golang_x_sync//errgroup",
     ],

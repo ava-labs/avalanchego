@@ -203,6 +203,21 @@ func main() {
 	}
 	rootCmd.AddCommand(startLogsCollectorCmd)
 
+	startTracesCollectorCmd := &cobra.Command{
+		Use:   "start-traces-collector",
+		Short: "Start traces collector for local process-based nodes",
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return stacktrace.Wrap(err)
+			}
+			return tmpnet.StartAlloy(ctx, log)
+		},
+	}
+	rootCmd.AddCommand(startTracesCollectorCmd)
+
 	stopMetricsCollectorCmd := &cobra.Command{
 		Use:   "stop-metrics-collector",
 		Short: "Stop metrics collector for local process-based nodes",
@@ -232,6 +247,21 @@ func main() {
 		},
 	}
 	rootCmd.AddCommand(stopLogsCollectorCmd)
+
+	stopTracesCollectorCmd := &cobra.Command{
+		Use:   "stop-traces-collector",
+		Short: "Stop traces collector for local process-based nodes",
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return stacktrace.Wrap(err)
+			}
+			return tmpnet.StopTracesCollector(ctx, log)
+		},
+	}
+	rootCmd.AddCommand(stopTracesCollectorCmd)
 
 	var networkUUID string
 
@@ -276,6 +306,27 @@ func main() {
 		"[optional] The network UUID to check logs for. Labels read from GH_* env vars will always be used.",
 	)
 	rootCmd.AddCommand(checkLogsCmd)
+
+	checkTracesCmd := &cobra.Command{
+		Use:   "check-traces",
+		Short: "Checks whether the default tempo server has the expected cross-node traces",
+		RunE: func(*cobra.Command, []string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return stacktrace.Wrap(err)
+			}
+			return tmpnet.CheckTracesExist(ctx, log, networkUUID)
+		},
+	}
+	checkTracesCmd.PersistentFlags().StringVar(
+		&networkUUID,
+		"network-uuid",
+		"",
+		"[optional] The network UUID to check traces for. Labels read from GH_* env vars will always be used.",
+	)
+	rootCmd.AddCommand(checkTracesCmd)
 
 	var (
 		kubeconfigVars   *flags.KubeconfigVars

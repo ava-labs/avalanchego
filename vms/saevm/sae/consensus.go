@@ -12,12 +12,16 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/libevm"
+	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetrace"
+
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 // SetPreference updates the VM's currently [preferred block] with the given block context,
@@ -50,7 +54,14 @@ var errUnverifiedBlock = errors.New("block not verified")
 // execution and AcceptBlock returns once it is settled.
 //
 // [accepted]: https://github.com/ava-labs/avalanchego/tree/master/vms#block-statuses
-func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
+func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) (err error) {
+	ctx, span := saetrace.Start(ctx, "saevm.AcceptBlock", oteltrace.WithAttributes(
+		saetrace.Uint64("block_height", b.Height()),
+		saetrace.Hash("block_hash", b.Hash()),
+	))
+	defer span.End()
+	defer func() { saetrace.RecordError(span, err) }()
+
 	// Recall the terminology and ordering from the invariants document:
 	// - (D)isk then (M)emory then (I)nternal then e(X)ternal.
 	// - B accepted after all of B.Settles() settled
@@ -69,6 +80,10 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 	}
 
 	settles := b.Settles()
+	span.SetAttributes(
+		attribute.Int("settles", len(settles)),
+		attribute.Bool("synchronous", b.Synchronous()),
+	)
 	{
 		batch := vm.db.NewBatch()
 
@@ -112,6 +127,10 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 			return err
 		}
 		vm.metrics.markSettled(s)
+		span.AddEvent("settled", oteltrace.WithAttributes(
+			saetrace.Uint64("block_height", s.Height()),
+			saetrace.Hash("block_hash", s.Hash()),
+		))
 	}
 
 	// I(s ∈ S) above, before I(b ∈ A) before X(b ∈ A)
@@ -125,7 +144,11 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 	switch {
 	case b.Synchronous():
 		// See rationale above, in `range settles` loop.
-		if err := b.WaitUntilSettled(ctx); err != nil {
+		wctx, wspan := saetrace.Start(ctx, "saevm.WaitUntilSettled")
+		err := b.WaitUntilSettled(wctx)
+		saetrace.RecordError(wspan, err)
+		wspan.End()
+		if err != nil {
 			return fmt.Errorf("waiting for synchronous block %d to settle: %w", b.Height(), err)
 		}
 		vm.metrics.markSettled(b)
@@ -136,8 +159,12 @@ func (vm *VM) AcceptBlock(ctx context.Context, b *blocks.Block) error {
 		// either `Verify` or `Accept` is considered FATAL during this process.
 		// Therefore, we must ensure that avalanchego does not get too far ahead of
 		// the execution thread and FATAL during block verification.
-		if err := b.WaitUntilExecuted(ctx); err != nil {
-			return fmt.Errorf("waiting for block %d to execute: %v", b.Height(), err)
+		wctx, wspan := saetrace.Start(ctx, "saevm.WaitUntilExecuted")
+		err := b.WaitUntilExecuted(wctx)
+		saetrace.RecordError(wspan, err)
+		wspan.End()
+		if err != nil {
+			return fmt.Errorf("waiting for block %d to execute: %w", b.Height(), err)
 		}
 	}
 

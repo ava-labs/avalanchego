@@ -173,6 +173,10 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+          tempo_url: ${{ secrets.TEMPO_URL || '' }}
+          tempo_push_url: ${{ secrets.TEMPO_PUSH_URL || '' }}
+          tempo_username: ${{ secrets.TEMPO_USERNAME || '' }}
+          tempo_password: ${{ secrets.TEMPO_PASSWORD || '' }}
 
   e2e-bootstrap-monitor:
     needs: setup-cache-linux-amd64
@@ -216,6 +220,10 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+          tempo_url: ${{ secrets.TEMPO_URL || '' }}
+          tempo_push_url: ${{ secrets.TEMPO_PUSH_URL || '' }}
+          tempo_username: ${{ secrets.TEMPO_USERNAME || '' }}
+          tempo_password: ${{ secrets.TEMPO_PASSWORD || '' }}
 
   e2e-kube:
     needs: setup-cache-linux-amd64
@@ -236,6 +244,10 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+          tempo_url: ${{ secrets.TEMPO_URL || '' }}
+          tempo_push_url: ${{ secrets.TEMPO_PUSH_URL || '' }}
+          tempo_username: ${{ secrets.TEMPO_USERNAME || '' }}
+          tempo_password: ${{ secrets.TEMPO_PASSWORD || '' }}
 
   e2e-load-subnet-evm:
     needs: setup-cache-linux-amd64
@@ -259,6 +271,10 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+          tempo_url: ${{ secrets.TEMPO_URL || '' }}
+          tempo_push_url: ${{ secrets.TEMPO_PUSH_URL || '' }}
+          tempo_username: ${{ secrets.TEMPO_USERNAME || '' }}
+          tempo_password: ${{ secrets.TEMPO_PASSWORD || '' }}
 
   e2e-post-latest:
     needs: setup-cache-linux-amd64
@@ -281,6 +297,10 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+          tempo_url: ${{ secrets.TEMPO_URL || '' }}
+          tempo_push_url: ${{ secrets.TEMPO_PUSH_URL || '' }}
+          tempo_username: ${{ secrets.TEMPO_USERNAME || '' }}
+          tempo_password: ${{ secrets.TEMPO_PASSWORD || '' }}
 
   e2e-schedule-latest:
     needs: setup-cache-linux-amd64
@@ -303,6 +323,10 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+          tempo_url: ${{ secrets.TEMPO_URL || '' }}
+          tempo_push_url: ${{ secrets.TEMPO_PUSH_URL || '' }}
+          tempo_username: ${{ secrets.TEMPO_USERNAME || '' }}
+          tempo_password: ${{ secrets.TEMPO_PASSWORD || '' }}
 
   e2e-warp-subnet-evm:
     needs: setup-cache-linux-amd64
@@ -326,6 +350,10 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+          tempo_url: ${{ secrets.TEMPO_URL || '' }}
+          tempo_push_url: ${{ secrets.TEMPO_PUSH_URL || '' }}
+          tempo_username: ${{ secrets.TEMPO_USERNAME || '' }}
+          tempo_password: ${{ secrets.TEMPO_PASSWORD || '' }}
 
   fuzz:
     needs: setup-cache-linux-amd64
@@ -418,6 +446,10 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+          tempo_url: ${{ secrets.TEMPO_URL || '' }}
+          tempo_push_url: ${{ secrets.TEMPO_PUSH_URL || '' }}
+          tempo_username: ${{ secrets.TEMPO_USERNAME || '' }}
+          tempo_password: ${{ secrets.TEMPO_PASSWORD || '' }}
   # Re-enable once images are built by Bazel and can be cached; otherwise, this job is too expensive for what it evaluates.
   # load_kube_kind:
   #   name: Run load test on kind cluster
@@ -437,6 +469,10 @@ jobs:
   #         loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
   #         loki_username: ${{ secrets.LOKI_USERNAME || '' }}
   #         loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  #         tempo_url: ${{ secrets.TEMPO_URL || '' }}
+  #         tempo_push_url: ${{ secrets.TEMPO_PUSH_URL || '' }}
+  #         tempo_username: ${{ secrets.TEMPO_USERNAME || '' }}
+  #         tempo_password: ${{ secrets.TEMPO_PASSWORD || '' }}
 
   robustness:
     needs: setup-cache-linux-amd64
@@ -502,3 +538,7 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+          tempo_url: ${{ secrets.TEMPO_URL || '' }}
+          tempo_push_url: ${{ secrets.TEMPO_PUSH_URL || '' }}
+          tempo_username: ${{ secrets.TEMPO_USERNAME || '' }}
+          tempo_password: ${{ secrets.TEMPO_PASSWORD || '' }}

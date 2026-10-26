@@ -9,7 +9,7 @@ option go_package = "github.com/ava-labs/avalanchego/proto/pb/p2p";
 // Only one type can be non-null.
 message Message {
   reserved 1; // Until E upgrade is activated.
-  reserved 37; // Next unused field number.
+  reserved 38; // Next unused field number.
   // NOTES
   // Use "oneof" for each message type and set rest to null if not used.
   // That is because when the compression is enabled, we don't want to include uncompressed fields.
@@ -59,6 +59,11 @@ message Message {
     // Simplex messages:
     Simplex simplex = 36;
   }
+
+  // Optional W3C binary trace context (29 bytes) of the span that produced
+  // this message. Observability only: it MUST NOT influence message handling,
+  // and malformed values MUST be ignored. Absent when tracing is disabled.
+  bytes trace_context = 37;
 }
 
 // Ping reports a peer's perceived uptime percentage.

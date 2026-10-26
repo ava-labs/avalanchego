@@ -92,6 +92,7 @@ func (r *tracedRouter) HandleInbound(ctx context.Context, msg *message.InboundMe
 	}
 
 	ctx, span := r.tracer.Start(ctx, "tracedRouter.HandleInbound", oteltrace.WithAttributes(
+		attribute.Bool("remote_parent", oteltrace.SpanContextFromContext(ctx).IsRemote()),
 		attribute.Stringer("nodeID", msg.NodeID),
 		attribute.Stringer("messageOp", msg.Op),
 		attribute.Stringer("chainID", chainID),

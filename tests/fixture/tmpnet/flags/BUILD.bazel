@@ -1,4 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "flags",
@@ -18,5 +19,15 @@ go_library(
         "//tests/fixture/tmpnet",
         "@com_github_spf13_cast//:cast",
         "@com_github_spf13_pflag//:pflag",
+    ],
+)
+
+go_test(
+    name = "flags_test",
+    srcs = ["collector_test.go"],
+    embed = [":flags"],
+    deps = [
+        "@com_github_spf13_pflag//:pflag",
+        "@com_github_stretchr_testify//require",
     ],
 )

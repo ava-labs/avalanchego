@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -20,10 +21,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetrace"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 // ParseBlock parses the buffer via [blocks.ParseEth]. It does NOT populate the
@@ -45,7 +49,10 @@ func (vm *VM) BuildBlock(ctx context.Context, bCtx *block.Context) (*blocks.Bloc
 }
 
 // saeparams.MaxBlockBytes < constants.DefaultMaxMessageSize
-const _ uint = constants.DefaultMaxMessageSize - saeparams.MaxBlockBytes - 1
+const _ uint = constants.DefaultMaxMessageSize - saeparams.MaxBlockBytes - maxEnvelopeOverhead
+
+// maxEnvelopeOverhead reserves room for p2p envelope fields such as trace_context, chain ID and request ID.
+const maxEnvelopeOverhead = 1 * units.KiB
 
 var (
 	errUnknownParent     = errors.New("unknown parent")
@@ -56,7 +63,14 @@ var (
 
 // VerifyBlock validates the block and, if successful, populates its ancestry.
 // The block context MAY be nil.
-func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Block) error {
+func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Block) (err error) {
+	ctx, span := saetrace.Start(ctx, "saevm.VerifyBlock", oteltrace.WithAttributes(
+		saetrace.Uint64("block_height", b.Height()),
+		saetrace.Hash("block_hash", b.Hash()),
+	))
+	defer span.End()
+	defer func() { saetrace.RecordError(span, err) }()
+
 	parent, err := vm.GetBlock(ctx, b.Parent())
 	if err != nil {
 		return fmt.Errorf("%w %#x: %w", errUnknownParent, b.ParentHash(), err)
@@ -67,7 +81,9 @@ func (vm *VM) VerifyBlock(ctx context.Context, bCtx *block.Context, b *blocks.Bl
 		return fmt.Errorf("%w at height %d <= last-accepted (%d)", errBlockHeightTooLow, height, accepted)
 	}
 
-	if vm.consensusState.Get() == snow.Bootstrapping {
+	bootstrapping := vm.consensusState.Get() == snow.Bootstrapping
+	span.SetAttributes(attribute.Bool("bootstrapping", bootstrapping))
+	if bootstrapping {
 		return vm.verifyWhenBootstrapping(b, parent)
 	}
 

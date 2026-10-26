@@ -79,6 +79,7 @@ func TestTimeout(t *testing.T) {
 		metrics,
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
+		false,
 	)
 	require.NoError(err)
 
@@ -338,6 +339,7 @@ func TestReliableMessages(t *testing.T) {
 		metrics,
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
+		false,
 	)
 	require.NoError(err)
 
@@ -497,6 +499,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 				metrics,
 				constants.DefaultNetworkCompressionType,
 				10*time.Second,
+				false,
 			)
 			require.NoError(err)
 
@@ -741,6 +744,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			expectedResponseOp: message.StateSummaryFrontierOp,
 			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().GetStateSummaryFrontier(
+					gomock.Any(),
 					ctx.ChainID,
 					requestID,
 					deadline,
@@ -785,6 +789,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			expectedResponseOp: message.AcceptedStateSummaryOp,
 			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().GetAcceptedStateSummary(
+					gomock.Any(),
 					ctx.ChainID,
 					requestID,
 					deadline,
@@ -825,6 +830,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			expectedResponseOp: message.AcceptedFrontierOp,
 			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().GetAcceptedFrontier(
+					gomock.Any(),
 					ctx.ChainID,
 					requestID,
 					deadline,
@@ -864,6 +870,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			expectedResponseOp: message.AcceptedOp,
 			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().GetAccepted(
+					gomock.Any(),
 					ctx.ChainID,
 					requestID,
 					deadline,
@@ -973,6 +980,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			name: "StateSummaryFrontier",
 			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().StateSummaryFrontier(
+					gomock.Any(),
 					ctx.ChainID,
 					requestID,
 					summary,
@@ -1003,6 +1011,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			name: "AcceptedStateSummary",
 			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().AcceptedStateSummary(
+					gomock.Any(),
 					ctx.ChainID,
 					requestID,
 					summaryIDs,
@@ -1035,6 +1044,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			name: "AcceptedFrontier",
 			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().AcceptedFrontier(
+					gomock.Any(),
 					ctx.ChainID,
 					requestID,
 					summaryIDs[0],
@@ -1065,6 +1075,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 			name: "Accepted",
 			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().Accepted(
+					gomock.Any(),
 					ctx.ChainID,
 					requestID,
 					summaryIDs,
@@ -1185,6 +1196,7 @@ func TestSender_Single_Request(t *testing.T) {
 			expectedResponseOp: message.AncestorsOp,
 			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().GetAncestors(
+					gomock.Any(),
 					ctx.ChainID,
 					requestID,
 					deadline,
@@ -1226,6 +1238,7 @@ func TestSender_Single_Request(t *testing.T) {
 			expectedResponseOp: message.PutOp,
 			setMsgCreatorExpect: func(msgCreator *messagemock.OutboundMsgBuilder) {
 				msgCreator.EXPECT().Get(
+					gomock.Any(),
 					ctx.ChainID,
 					requestID,
 					deadline,

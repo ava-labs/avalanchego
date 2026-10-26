@@ -215,5 +215,6 @@ const (
 	TracingSampleRateKey                                 = "tracing-sample-rate"
 	TracingExporterTypeKey                               = "tracing-exporter-type"
 	TracingHeadersKey                                    = "tracing-headers"
+	TracingResourceAttributesKey                         = "tracing-resource-attributes"
 	ProcessContextFileKey                                = "process-context-file"
 )

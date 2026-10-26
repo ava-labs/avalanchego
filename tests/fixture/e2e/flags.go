@@ -34,6 +34,7 @@ type FlagVars struct {
 
 	checkMetricsCollected bool
 	checkLogsCollected    bool
+	checkTracesCollected  bool
 
 	networkDir     string
 	reuseNetwork   bool
@@ -93,12 +94,20 @@ func (v *FlagVars) StartLogsCollector() bool {
 	return v.collectorVars.StartLogsCollector
 }
 
+func (v *FlagVars) StartTracesCollector() bool {
+	return v.collectorVars.StartTracesCollector
+}
+
 func (v *FlagVars) CheckMetricsCollected() bool {
 	return v.checkMetricsCollected
 }
 
 func (v *FlagVars) CheckLogsCollected() bool {
 	return v.checkLogsCollected
+}
+
+func (v *FlagVars) CheckTracesCollected() bool {
+	return v.checkTracesCollected
 }
 
 func (v *FlagVars) NetworkDir() string {
@@ -184,6 +193,7 @@ func RegisterFlags(ops ...DefaultOption) *FlagVars {
 	SetCheckCollectionFlags(
 		&vars.checkMetricsCollected,
 		&vars.checkLogsCollected,
+		&vars.checkTracesCollected,
 	)
 
 	flag.StringVar(
@@ -224,7 +234,7 @@ func RegisterFlags(ops ...DefaultOption) *FlagVars {
 	return &vars
 }
 
-func SetCheckCollectionFlags(checkMetricsCollected *bool, checkLogsCollected *bool) {
+func SetCheckCollectionFlags(checkMetricsCollected, checkLogsCollected, checkTracesCollected *bool) {
 	flag.BoolVar(
 		checkMetricsCollected,
 		"check-metrics-collected",
@@ -236,5 +246,11 @@ func SetCheckCollectionFlags(checkMetricsCollected *bool, checkLogsCollected *bo
 		"check-logs-collected",
 		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_CHECK_LOGS_COLLECTED", "false")),
 		"[optional] whether to check that logs have been collected from nodes of the temporary network.",
+	)
+	flag.BoolVar(
+		checkTracesCollected,
+		"check-traces-collected",
+		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_CHECK_TRACES_COLLECTED", "false")),
+		"[optional] whether to check that traces have been collected from nodes of the temporary network.",
 	)
 }

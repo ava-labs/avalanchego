@@ -122,6 +122,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 		NodeIDs: nodeIDs,
 	}
 	msg, err := s.msgCreator.GetStateSummaryFrontier(
+		ctx,
 		s.ctx.ChainID,
 		requestID,
 		deadline,
@@ -153,6 +154,7 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 		NodeIDs: set.Of(nodeID),
 	}
 	msg, err := s.msgCreator.StateSummaryFrontier(
+		ctx,
 		s.ctx.ChainID,
 		requestID,
 		summary,
@@ -206,6 +208,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 		NodeIDs: nodeIDs,
 	}
 	msg, err := s.msgCreator.GetAcceptedStateSummary(
+		ctx,
 		s.ctx.ChainID,
 		requestID,
 		deadline,
@@ -238,6 +241,7 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 		NodeIDs: set.Of(nodeID),
 	}
 	msg, err := s.msgCreator.AcceptedStateSummary(
+		ctx,
 		s.ctx.ChainID,
 		requestID,
 		summaryIDs,
@@ -289,6 +293,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 		NodeIDs: nodeIDs,
 	}
 	msg, err := s.msgCreator.GetAcceptedFrontier(
+		ctx,
 		s.ctx.ChainID,
 		requestID,
 		deadline,
@@ -320,6 +325,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 		NodeIDs: set.Of(nodeID),
 	}
 	msg, err := s.msgCreator.AcceptedFrontier(
+		ctx,
 		s.ctx.ChainID,
 		requestID,
 		containerID,
@@ -373,6 +379,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 		NodeIDs: nodeIDs,
 	}
 	msg, err := s.msgCreator.GetAccepted(
+		ctx,
 		s.ctx.ChainID,
 		requestID,
 		deadline,
@@ -404,7 +411,7 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 	to := common.SendConfig{
 		NodeIDs: set.Of(nodeID),
 	}
-	msg, err := s.msgCreator.Accepted(s.ctx.ChainID, requestID, containerIDs)
+	msg, err := s.msgCreator.Accepted(ctx, s.ctx.ChainID, requestID, containerIDs)
 	s.sendUnlessError(log, to, msg, err)
 }
 
@@ -448,6 +455,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		NodeIDs: set.Of(nodeID),
 	}
 	msg, err := s.msgCreator.GetAncestors(
+		ctx,
 		s.ctx.ChainID,
 		requestID,
 		deadline,
@@ -467,7 +475,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 	}
 }
 
-func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) {
+func (s *sender) SendAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) {
 	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.AncestorsOp),
 		zap.Uint32("requestID", requestID),
@@ -476,7 +484,7 @@ func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 	to := common.SendConfig{
 		NodeIDs: set.Of(nodeID),
 	}
-	msg, err := s.msgCreator.Ancestors(s.ctx.ChainID, requestID, containers)
+	msg, err := s.msgCreator.Ancestors(ctx, s.ctx.ChainID, requestID, containers)
 	s.sendUnlessError(log, to, msg, err)
 }
 
@@ -517,6 +525,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		NodeIDs: set.Of(nodeID),
 	}
 	msg, err := s.msgCreator.Get(
+		ctx,
 		s.ctx.ChainID,
 		requestID,
 		deadline,
@@ -534,7 +543,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	}
 }
 
-func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32, container []byte) {
+func (s *sender) SendPut(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) {
 	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.PutOp),
 		zap.Uint32("requestID", requestID),
@@ -543,7 +552,7 @@ func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32,
 	to := common.SendConfig{
 		NodeIDs: set.Of(nodeID),
 	}
-	msg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, container)
+	msg, err := s.msgCreator.Put(ctx, s.ctx.ChainID, requestID, container)
 	s.sendUnlessError(log, to, msg, err)
 }
 
@@ -601,6 +610,7 @@ func (s *sender) SendPushQuery(
 		NodeIDs: nodeIDs,
 	}
 	msg, err := s.msgCreator.PushQuery(
+		ctx,
 		s.ctx.ChainID,
 		requestID,
 		deadline,
@@ -682,6 +692,7 @@ func (s *sender) SendPullQuery(
 		NodeIDs: nodeIDs,
 	}
 	msg, err := s.msgCreator.PullQuery(
+		ctx,
 		s.ctx.ChainID,
 		requestID,
 		deadline,
@@ -746,6 +757,7 @@ func (s *sender) SendChits(
 		NodeIDs: set.Of(nodeID),
 	}
 	msg, err := s.msgCreator.Chits(
+		ctx,
 		s.ctx.ChainID,
 		requestID,
 		preferredID,
@@ -804,6 +816,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 		NodeIDs: nodeIDs,
 	}
 	msg, err := s.msgCreator.AppRequest(
+		ctx,
 		s.ctx.ChainID,
 		requestID,
 		deadline,
@@ -857,6 +870,7 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 		NodeIDs: set.Of(nodeID),
 	}
 	msg, err := s.msgCreator.AppResponse(
+		ctx,
 		s.ctx.ChainID,
 		requestID,
 		bytes,
@@ -891,6 +905,7 @@ func (s *sender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID 
 		NodeIDs: set.Of(nodeID),
 	}
 	msg, err := s.msgCreator.AppError(
+		ctx,
 		s.ctx.ChainID,
 		requestID,
 		errorCode,
@@ -901,7 +916,7 @@ func (s *sender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID 
 }
 
 func (s *sender) SendAppGossip(
-	_ context.Context,
+	ctx context.Context,
 	to common.SendConfig,
 	bytes []byte,
 ) error {
@@ -909,7 +924,7 @@ func (s *sender) SendAppGossip(
 		zap.Stringer("messageOp", message.AppGossipOp),
 		zap.Int("payloadLen", len(bytes)),
 	)
-	msg, err := s.msgCreator.AppGossip(s.ctx.ChainID, bytes)
+	msg, err := s.msgCreator.AppGossip(ctx, s.ctx.ChainID, bytes)
 	s.sendUnlessError(log, to, msg, err)
 	return nil
 }

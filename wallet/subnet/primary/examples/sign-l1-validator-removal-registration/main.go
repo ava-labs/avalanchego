@@ -167,6 +167,7 @@ func main() {
 		prometheus.NewRegistry(),
 		compression.TypeZstd,
 		time.Hour,
+		false,
 	)
 	if err != nil {
 		log.Fatalf("failed to create message builder: %s\n", err)
@@ -181,6 +182,7 @@ func main() {
 	}
 
 	appRequest, err := mesageBuilder.AppRequest(
+		context.Background(),
 		constants.PlatformChainID,
 		0,
 		time.Hour,

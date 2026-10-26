@@ -97,6 +97,9 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 		if flagVars.StartLogsCollector() {
 			require.NoError(tmpnet.StartPromtail(tc.DefaultContext(), tc.Log()))
 		}
+		if flagVars.StartTracesCollector() {
+			require.NoError(tmpnet.StartAlloy(tc.DefaultContext(), tc.Log()))
+		}
 
 		// Register cleanups before network start to ensure they run after the network is stopped (LIFO)
 
@@ -121,6 +124,18 @@ func NewTestEnvironment(tc tests.TestContext, flagVars *FlagVars, desiredNetwork
 				ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
 				defer cancel()
 				require.NoError(tmpnet.CheckLogsExist(ctx, tc.Log(), network.UUID))
+			})
+		}
+
+		if flagVars.CheckTracesCollected() {
+			tc.DeferCleanup(func() {
+				if network == nil {
+					tc.Log().Warn("unable to check that traces were collected from an uninitialized network")
+					return
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), DefaultTimeout)
+				defer cancel()
+				require.NoError(tmpnet.CheckTracesExist(ctx, tc.Log(), network.UUID))
 			})
 		}
 	}

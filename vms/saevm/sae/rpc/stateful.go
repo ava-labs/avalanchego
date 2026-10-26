@@ -28,10 +28,12 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/rpc"
 	"github.com/ava-labs/libevm/trie"
+	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/saetrace"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 )
 
@@ -75,7 +77,16 @@ func (b *backend) StateAndHeaderByNumber(ctx context.Context, num rpc.BlockNumbe
 // StateAndHeaderByNumberOrHash fakes the returned [types.Header] to contain
 // post-execution results, mimicking a synchronous block. The [state.StateDB] is
 // opened at the post-execution root, as carried by the faked header.
-func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rpc.BlockNumberOrHash) (*state.StateDB, *types.Header, error) {
+func (b *backend) StateAndHeaderByNumberOrHash(ctx context.Context, numOrHash rpc.BlockNumberOrHash) (_ *state.StateDB, _ *types.Header, err error) {
+	ctx, span := saetrace.Start(ctx, "saerpc.StateAndHeaderByNumberOrHash")
+	defer span.End()
+	defer func() { saetrace.RecordError(span, err) }()
+	if n, ok := numOrHash.Number(); ok {
+		span.SetAttributes(attribute.Int64("block_number", int64(n)))
+	} else if h, ok := numOrHash.Hash(); ok {
+		span.SetAttributes(saetrace.Hash("block_hash", h))
+	}
+
 	if !b.config.ResolvePendingToLastExecuted {
 		if n, ok := numOrHash.Number(); ok && n == rpc.PendingBlockNumber {
 			return nil, nil, errors.New("state not available for pending block")
@@ -122,11 +133,17 @@ func (b *backend) StateAtBlock(ctx context.Context, block *types.Block, reexec u
 
 // stateAtBlock returns the state after executing block num, along with the
 // stored block it was restored from.
-func (b *backend) stateAtBlock(ctx context.Context, num uint64) (*state.StateDB, *blocks.Block, error) {
+func (b *backend) stateAtBlock(ctx context.Context, num uint64) (_ *state.StateDB, _ *blocks.Block, err error) {
+	ctx, span := saetrace.Start(ctx, "saerpc.stateAtBlock")
+	defer span.End()
+	defer func() { saetrace.RecordError(span, err) }()
+	span.SetAttributes(saetrace.Uint64("block_height", num))
+
 	sdb, lastBlock, toReexec, err := b.lastBlockWithState(ctx, num)
 	if err != nil {
 		return nil, nil, err
 	}
+	span.SetAttributes(attribute.Int("reexecuted_blocks", len(toReexec)))
 
 	// TODO(#5999): Remove this reconstruction throttler.
 	if len(toReexec) > 0 && b.replaySlots != nil {
@@ -228,7 +245,15 @@ func (b *backend) lastBlockWithState(ctx context.Context, num uint64) (*state.St
 // reexec is ignored. TODO(alarso16): Configure the tracer API to have a different maximum depth.
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
-func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, reexec uint64) (*core.Message, vm.BlockContext, *state.StateDB, tracers.StateReleaseFunc, error) {
+func (b *backend) StateAtTransaction(ctx context.Context, ethB *types.Block, txIndex int, reexec uint64) (_ *core.Message, _ vm.BlockContext, _ *state.StateDB, _ tracers.StateReleaseFunc, err error) {
+	ctx, span := saetrace.Start(ctx, "saerpc.StateAtTransaction")
+	defer span.End()
+	defer func() { saetrace.RecordError(span, err) }()
+	span.SetAttributes(
+		saetrace.Uint64("block_height", ethB.NumberU64()),
+		attribute.Int("tx_index", txIndex),
+	)
+
 	var bCtx vm.BlockContext
 	if ethB.NumberU64() == 0 {
 		return nil, bCtx, nil, nil, errors.New("no transactions in genesis")

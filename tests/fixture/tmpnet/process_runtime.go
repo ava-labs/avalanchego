@@ -174,6 +174,14 @@ func (p *ProcessRuntime) writeFlags() error {
 		config.StakingHostKey: "127.0.0.1",
 	})
 
+	if tracingFlags := tracingFlagsIfAlloyRunning(p.node.network.log, p.node.getMonitoringLabels()); tracingFlags != nil {
+		// Defaults so explicit tracing flags in node or network config win
+		flags.SetDefaults(tracingFlags)
+		p.node.network.log.Info("configured node to export traces to alloy",
+			zap.Stringer("nodeID", p.node.NodeID),
+		)
+	}
+
 	runtimeConfig := p.getRuntimeConfig()
 
 	// Only configure the plugin dir with a non-empty value to ensure the use of the

@@ -28,6 +28,7 @@ var (
 	collectorVars                  *flags.CollectorVars
 	checkMetricsCollected          bool
 	checkLogsCollected             bool
+	checkTracesCollected           bool
 )
 
 func init() {
@@ -47,6 +48,7 @@ func init() {
 	e2e.SetCheckCollectionFlags(
 		&checkMetricsCollected,
 		&checkLogsCollected,
+		&checkTracesCollected,
 	)
 }
 
@@ -76,6 +78,9 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 		if collectorVars.StartLogsCollector {
 			require.NoError(tmpnet.StartPromtail(tc.DefaultContext(), tc.Log()))
 		}
+		if collectorVars.StartTracesCollector {
+			require.NoError(tmpnet.StartAlloy(tc.DefaultContext(), tc.Log()))
+		}
 
 		// Since cleanups are run in LIFO order, adding these cleanups before StartNetwork
 		// is called ensures network shutdown will be called first.
@@ -91,6 +96,13 @@ var _ = ginkgo.Describe("[Upgrade]", func() {
 				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
 				defer cancel()
 				require.NoError(tmpnet.CheckLogsExist(ctx, tc.Log(), network.UUID))
+			})
+		}
+		if checkTracesCollected {
+			tc.DeferCleanup(func() {
+				ctx, cancel := context.WithTimeout(context.Background(), e2e.DefaultTimeout)
+				defer cancel()
+				require.NoError(tmpnet.CheckTracesExist(ctx, tc.Log(), network.UUID))
 			})
 		}
 

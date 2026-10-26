@@ -4,6 +4,7 @@
 package simplex
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -142,5 +143,5 @@ func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (*message.O
 		return nil, fmt.Errorf("unknown message type: %+v", msg)
 	}
 
-	return c.msgBuilder.SimplexMessage(simplexMsg)
+	return c.msgBuilder.SimplexMessage(context.Background(), simplexMsg)
 }

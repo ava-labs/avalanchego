@@ -34,6 +34,18 @@ inputs:
     required: true
   loki_password:
     required: true
+  tempo_url:
+    required: false
+    default: ''
+  tempo_push_url:
+    required: false
+    default: ''
+  tempo_username:
+    required: false
+    default: ''
+  tempo_password:
+    required: false
+    default: ''
   # The following inputs need never be provided by the caller. They
   # default to context values that the action's steps are unable to
   # access directly.
@@ -99,8 +111,11 @@ runs:
         TMPNET_START_METRICS_COLLECTOR: ${{ inputs.prometheus_username != '' }}
         # Skip local log collection when nodes are running in kube since collection will occur in-cluster.
         TMPNET_START_LOGS_COLLECTOR: ${{ inputs.loki_username != '' && inputs.runtime == 'process' }}
+        # Traces are only collected from process-runtime nodes.
+        TMPNET_START_TRACES_COLLECTOR: ${{ inputs.tempo_username != '' && inputs.runtime == 'process' }}
         TMPNET_CHECK_METRICS_COLLECTED: ${{ inputs.prometheus_username != '' }}
         TMPNET_CHECK_LOGS_COLLECTED: ${{ inputs.loki_username != '' }}
+        TMPNET_CHECK_TRACES_COLLECTED: ${{ inputs.tempo_username != '' && inputs.runtime == 'process' }}
         LOKI_URL: ${{ inputs.loki_url }}
         LOKI_PUSH_URL: ${{ inputs.loki_push_url }}
         LOKI_USERNAME: ${{ inputs.loki_username }}
@@ -109,6 +124,10 @@ runs:
         PROMETHEUS_PUSH_URL: ${{ inputs.prometheus_push_url }}
         PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
         PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
+        TEMPO_URL: ${{ inputs.tempo_url }}
+        TEMPO_PUSH_URL: ${{ inputs.tempo_push_url }}
+        TEMPO_USERNAME: ${{ inputs.tempo_username }}
+        TEMPO_PASSWORD: ${{ inputs.tempo_password }}
         GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
         GH_WORKFLOW: ${{ inputs.workflow }}
         GH_RUN_ID: ${{ inputs.run_id }}

@@ -35,6 +35,8 @@ wss://api.avax.network/ext/bc/C/ws
 
 > **Tip:** Use `ws://` for a node that serves HTTP. Use `wss://` for a node that serves HTTPS.
 
+When node tracing is enabled (`--tracing-exporter-type`), JSON-RPC calls over HTTP are traced from the request span into the VM. Calls over the WebSocket endpoint are **not** traced: libevm's WebSocket server roots every call in a background context, so the request span never reaches the VM. Transactions submitted over WebSocket still appear in block-building and execution spans by `tx_hash`.
+
 ### Standard Ethereum APIs
 
 The C-Chain serves methods from the [Ethereum JSON-RPC API](https://ethereum.org/en/developers/docs/apis/json-rpc/)

@@ -6,6 +6,7 @@ package peer
 import (
 	"context"
 	"crypto"
+	"fmt"
 	"net"
 	"net/netip"
 	"testing"
@@ -32,33 +33,41 @@ import (
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
+
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 type testPeer struct {
 	*Peer
 	inboundMsgChan <-chan *message.InboundMessage
+	// inboundSpanCtxChan is buffered; contexts are dropped if it is full.
+	inboundSpanCtxChan <-chan oteltrace.SpanContext
 }
 
 type rawTestPeer struct {
 	config         *Config
 	cert           *staking.Certificate
 	inboundMsgChan <-chan *message.InboundMessage
+	// inboundSpanCtxChan is buffered; contexts are dropped if it is full.
+	inboundSpanCtxChan <-chan oteltrace.SpanContext
 }
 
-func newMessageCreator(t *testing.T) message.Creator {
+func newMessageCreator(t *testing.T, tracingEnabled bool) message.Creator {
 	t.Helper()
 
 	mc, err := message.NewCreator(
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
 		10*time.Second,
+		tracingEnabled,
 	)
 	require.NoError(t, err)
 
 	return mc
 }
 
-func newConfig(t *testing.T) *Config {
+func newConfig(t *testing.T, tracingEnabled bool) *Config {
 	t.Helper()
 	require := require.New(t)
 
@@ -77,7 +86,7 @@ func newConfig(t *testing.T) *Config {
 		ReadBufferSize:       constants.DefaultNetworkPeerReadBufferSize,
 		WriteBufferSize:      constants.DefaultNetworkPeerWriteBufferSize,
 		Metrics:              metrics,
-		MessageCreator:       newMessageCreator(t),
+		MessageCreator:       newMessageCreator(t, tracingEnabled),
 		Log:                  logging.NoLog{},
 		InboundMsgThrottler:  throttling.NewNoInboundThrottler(),
 		Network:              TestNetwork,
@@ -117,14 +126,20 @@ func newRawTestPeer(t *testing.T, config *Config) *rawTestPeer {
 	config.IPSigner = NewIPSigner(ip, tls, bls)
 
 	inboundMsgChan := make(chan *message.InboundMessage)
-	config.Router = router.InboundHandlerFunc(func(_ context.Context, msg *message.InboundMessage) {
+	inboundSpanCtxChan := make(chan oteltrace.SpanContext, 16)
+	config.Router = router.InboundHandlerFunc(func(ctx context.Context, msg *message.InboundMessage) {
+		select {
+		case inboundSpanCtxChan <- oteltrace.SpanContextFromContext(ctx):
+		default:
+		}
 		inboundMsgChan <- msg
 	})
 
 	return &rawTestPeer{
-		config:         config,
-		cert:           cert,
-		inboundMsgChan: inboundMsgChan,
+		config:             config,
+		cert:               cert,
+		inboundMsgChan:     inboundMsgChan,
+		inboundSpanCtxChan: inboundSpanCtxChan,
 	}
 }
 
@@ -143,7 +158,8 @@ func startTestPeer(self *rawTestPeer, peer *rawTestPeer, conn net.Conn) *testPee
 			),
 			false,
 		),
-		inboundMsgChan: self.inboundMsgChan,
+		inboundMsgChan:     self.inboundMsgChan,
+		inboundSpanCtxChan: self.inboundSpanCtxChan,
 	}
 }
 
@@ -174,8 +190,8 @@ func must[T any](t *testing.T) func(T, error) T {
 func TestReady(t *testing.T) {
 	require := require.New(t)
 
-	config0 := newConfig(t)
-	config1 := newConfig(t)
+	config0 := newConfig(t, false)
+	config1 := newConfig(t, false)
 
 	rawPeer0 := newRawTestPeer(t, config0)
 	rawPeer1 := newRawTestPeer(t, config1)
@@ -196,8 +212,8 @@ func TestReady(t *testing.T) {
 func TestSend(t *testing.T) {
 	require := require.New(t)
 
-	config0 := newConfig(t)
-	config1 := newConfig(t)
+	config0 := newConfig(t, false)
+	config1 := newConfig(t, false)
 
 	rawPeer0 := newRawTestPeer(t, config0)
 	rawPeer1 := newRawTestPeer(t, config1)
@@ -205,7 +221,7 @@ func TestSend(t *testing.T) {
 	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
 	awaitReady(t, peer0, peer1)
 
-	outboundGetMsg, err := config0.MessageCreator.Get(ids.Empty, 1, time.Second, ids.Empty)
+	outboundGetMsg, err := config0.MessageCreator.Get(t.Context(), ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
 	require.True(peer0.Send(t.Context(), outboundGetMsg))
@@ -218,9 +234,42 @@ func TestSend(t *testing.T) {
 	require.NoError(peer1.AwaitClosed(t.Context()))
 }
 
+func TestInboundSpanContext(t *testing.T) {
+	for _, tracingEnabled := range []bool{true, false} {
+		t.Run(fmt.Sprintf("receiver tracing %t", tracingEnabled), func(t *testing.T) {
+			config0, config1 := newConfig(t, true), newConfig(t, tracingEnabled)
+			rawPeer0 := newRawTestPeer(t, config0)
+			rawPeer1 := newRawTestPeer(t, config1)
+
+			peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
+			awaitReady(t, peer0, peer1)
+
+			ctx, span := sdktrace.NewTracerProvider().Tracer("t").Start(t.Context(), "root")
+			defer span.End()
+
+			out, err := config0.MessageCreator.Get(ctx, ids.Empty, 1, time.Second, ids.Empty)
+			require.NoError(t, err, "Get()")
+			require.True(t, peer0.Send(t.Context(), out), "Send()")
+
+			<-peer1.inboundMsgChan
+			got := <-peer1.inboundSpanCtxChan
+			if tracingEnabled {
+				require.Equal(t, span.SpanContext().TraceID(), got.TraceID(), "remote TraceID")
+				require.True(t, got.IsRemote(), "IsRemote()")
+			} else {
+				require.False(t, got.IsValid(), "IsValid()")
+			}
+
+			peer1.StartClose()
+			require.NoError(t, peer0.AwaitClosed(t.Context()), "peer0.AwaitClosed()")
+			require.NoError(t, peer1.AwaitClosed(t.Context()), "peer1.AwaitClosed()")
+		})
+	}
+}
+
 func TestPingUptimes(t *testing.T) {
-	config0 := newConfig(t)
-	config1 := newConfig(t)
+	config0 := newConfig(t, false)
+	config1 := newConfig(t, false)
 
 	// The raw peers are generated outside of the test cases to avoid generating
 	// many TLS keys.
@@ -252,8 +301,8 @@ func TestPingUptimes(t *testing.T) {
 }
 
 func TestTrackedSubnets(t *testing.T) {
-	rawPeer0 := newRawTestPeer(t, newConfig(t))
-	rawPeer1 := newRawTestPeer(t, newConfig(t))
+	rawPeer0 := newRawTestPeer(t, newConfig(t, false))
+	rawPeer1 := newRawTestPeer(t, newConfig(t, false))
 
 	makeSubnetIDs := func(numSubnets int) []ids.ID {
 		subnetIDs := make([]ids.ID, numSubnets)
@@ -324,8 +373,8 @@ func TestTrackedSubnets(t *testing.T) {
 func TestInvalidBLSKeyDisconnects(t *testing.T) {
 	require := require.New(t)
 
-	sharedConfig0 := newConfig(t)
-	sharedConfig1 := newConfig(t)
+	sharedConfig0 := newConfig(t, false)
+	sharedConfig1 := newConfig(t, false)
 
 	rawPeer0 := newRawTestPeer(t, sharedConfig0)
 	rawPeer1 := newRawTestPeer(t, sharedConfig1)
@@ -361,10 +410,10 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 func TestUpgradeTime(t *testing.T) {
 	require := require.New(t)
 
-	sharedConfig0 := newConfig(t)
+	sharedConfig0 := newConfig(t, false)
 	sharedConfig0.VersionCompatibility.UpgradeTime = time.Unix(123, 0)
 
-	sharedConfig1 := newConfig(t)
+	sharedConfig1 := newConfig(t, false)
 	sharedConfig1.VersionCompatibility.UpgradeTime = time.Unix(1234, 0)
 
 	peer0, peer1 := startTestPeers(
@@ -690,8 +739,8 @@ func TestShouldDisconnect(t *testing.T) {
 // was handled by the peer.
 func sendAndFlush(t *testing.T, sender *testPeer, receiver *testPeer) {
 	t.Helper()
-	mc := newMessageCreator(t)
-	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
+	mc := newMessageCreator(t, false)
+	outboundGetMsg, err := mc.Get(t.Context(), ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(t, err)
 	require.True(t, sender.Send(t.Context(), outboundGetMsg))
 	inboundGetMsg := <-receiver.inboundMsgChan

@@ -53,6 +53,7 @@
             # Monitoring tools
             pkgsPromtail.promtail                      # Loki log shipper
             prometheus                                 # Metrics collector
+            grafana-alloy                              # Traces collector (OTLP -> Tempo)
 
             # Kube tools
             kubectl                                    # Kubernetes CLI

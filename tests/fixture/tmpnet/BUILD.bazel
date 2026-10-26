@@ -4,7 +4,9 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "tmpnet",
     srcs = [
+        "alloy.go",
         "check_monitoring.go",
+        "check_traces.go",
         "defaults.go",
         "detached_process_default.go",
         "flagsmap.go",
@@ -94,6 +96,8 @@ go_library(
 go_test(
     name = "tmpnet_test",
     srcs = [
+        "alloy_test.go",
+        "check_traces_test.go",
         "kube_runtime_test.go",
         "network_test.go",
         "node_test.go",
@@ -102,6 +106,7 @@ go_test(
     deps = [
         "//config",
         "//utils/logging",
+        "//utils/perms",
         "@com_github_stretchr_testify//require",
         "@io_k8s_api//core/v1:core",
         "@io_k8s_api//discovery/v1:discovery",

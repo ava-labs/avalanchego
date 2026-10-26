@@ -23,6 +23,7 @@ func Test_newMsgBuilder(t *testing.T) {
 	mb, err := newMsgBuilder(
 		prometheus.NewRegistry(),
 		10*time.Second,
+		false,
 	)
 	require.NoError(err)
 	require.NotNil(mb)
@@ -389,6 +390,7 @@ func TestAppError(t *testing.T) {
 	mb, err := newMsgBuilder(
 		prometheus.NewRegistry(),
 		time.Second,
+		false,
 	)
 	require.NoError(err)
 
@@ -409,7 +411,7 @@ func TestAppError(t *testing.T) {
 		},
 	}
 
-	outMsg, err := mb.createOutbound(want, compression.TypeNone, false)
+	outMsg, err := mb.createOutbound(t.Context(), want, compression.TypeNone, false)
 	require.NoError(err)
 
 	got, err := mb.parseInbound(outMsg.Bytes, nodeID, func() {})

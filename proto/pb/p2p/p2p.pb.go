@@ -108,7 +108,11 @@ type Message struct {
 	//	*Message_AppGossip
 	//	*Message_AppError
 	//	*Message_Simplex
-	Message       isMessage_Message `protobuf_oneof:"message"`
+	Message isMessage_Message `protobuf_oneof:"message"`
+	// Optional W3C binary trace context (29 bytes) of the span that produced
+	// this message. Observability only: it MUST NOT influence message handling,
+	// and malformed values MUST be ignored. Absent when tracing is disabled.
+	TraceContext  []byte `protobuf:"bytes,37,opt,name=trace_context,json=traceContext,proto3" json:"trace_context,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -380,6 +384,13 @@ func (x *Message) GetSimplex() *Simplex {
 		if x, ok := x.Message.(*Message_Simplex); ok {
 			return x.Simplex
 		}
+	}
+	return nil
+}
+
+func (x *Message) GetTraceContext() []byte {
+	if x != nil {
+		return x.TraceContext
 	}
 	return nil
 }
@@ -3376,7 +3387,7 @@ var File_p2p_p2p_proto protoreflect.FileDescriptor
 
 const file_p2p_p2p_proto_rawDesc = "" +
 	"\n" +
-	"\rp2p/p2p.proto\x12\x03p2p\"\x9d\v\n" +
+	"\rp2p/p2p.proto\x12\x03p2p\"\xc2\v\n" +
 	"\aMessage\x12)\n" +
 	"\x0fcompressed_zstd\x18\x02 \x01(\fH\x00R\x0ecompressedZstd\x12\x1f\n" +
 	"\x04ping\x18\v \x01(\v2\t.p2p.PingH\x00R\x04ping\x12\x1f\n" +
@@ -3408,8 +3419,9 @@ const file_p2p_p2p_proto_rawDesc = "" +
 	"\n" +
 	"app_gossip\x18  \x01(\v2\x0e.p2p.AppGossipH\x00R\tappGossip\x12,\n" +
 	"\tapp_error\x18\" \x01(\v2\r.p2p.AppErrorH\x00R\bappError\x12(\n" +
-	"\asimplex\x18$ \x01(\v2\f.p2p.SimplexH\x00R\asimplexB\t\n" +
-	"\amessageJ\x04\b\x01\x10\x02J\x04\b%\x10&\"$\n" +
+	"\asimplex\x18$ \x01(\v2\f.p2p.SimplexH\x00R\asimplex\x12#\n" +
+	"\rtrace_context\x18% \x01(\fR\ftraceContextB\t\n" +
+	"\amessageJ\x04\b\x01\x10\x02J\x04\b&\x10'\"$\n" +
 	"\x04Ping\x12\x16\n" +
 	"\x06uptime\x18\x01 \x01(\rR\x06uptimeJ\x04\b\x02\x10\x03\"\x12\n" +
 	"\x04PongJ\x04\b\x01\x10\x02J\x04\b\x02\x10\x03\"\xf1\x03\n" +

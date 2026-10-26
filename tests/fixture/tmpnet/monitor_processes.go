@@ -202,7 +202,7 @@ remote_write:
     send_native_histograms: true
 `, prometheusScrapeInterval, serviceDiscoveryDir, collectorConfig.url, collectorConfig.username, collectorConfig.password)
 
-	err = startCollector(ctx, log, cmdName, args, config)
+	err = startCollector(ctx, log, cmdName, args, cmdName+".yaml", config)
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -254,7 +254,7 @@ scrape_configs:
           - '%s/*.json'
 `, promtailHTTPPort, workingDir, collectorConfig.url, collectorConfig.username, collectorConfig.password, serviceDiscoveryDir)
 
-	return startCollector(ctx, log, cmdName, args, config)
+	return startCollector(ctx, log, cmdName, args, cmdName+".yaml", config)
 }
 
 func getWorkingDir(cmdName string) (string, error) {
@@ -348,6 +348,7 @@ func startCollector(
 	log logging.Logger,
 	cmdName string,
 	args string,
+	confFilename string,
 	config string,
 ) error {
 	// Determine paths
@@ -386,7 +387,6 @@ func startCollector(
 	}
 
 	// Write the collector config file
-	confFilename := cmdName + ".yaml"
 	confPath := filepath.Join(workingDir, confFilename)
 	log.Info("writing collector config",
 		zap.String("cmd", cmdName),
@@ -480,6 +480,8 @@ func getCollectorConfig(cmdName string, urlSuffix string) (collectorConfig, erro
 		baseEnvName = "PROMETHEUS"
 	case promtailCmd:
 		baseEnvName = "LOKI"
+	case alloyCmd:
+		baseEnvName = "TEMPO"
 	default:
 		return collectorConfig{}, stacktrace.Errorf("unsupported cmd: %s", cmdName)
 	}

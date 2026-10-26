@@ -17,6 +17,7 @@ go_library(
     deps = [
         "//ids",
         "//proto/pb/p2p",
+        "//trace",
         "//utils/compression",
         "//utils/constants",
         "//utils/ips",
@@ -24,6 +25,7 @@ go_library(
         "//utils/timer/mockable",
         "//version",
         "@com_github_prometheus_client_golang//prometheus",
+        "@io_opentelemetry_go_otel_trace//:trace",
         "@org_golang_google_protobuf//proto",
     ],
 )
@@ -42,10 +44,13 @@ go_test(
         "//ids",
         "//proto/pb/p2p",
         "//staking",
+        "//trace",
         "//utils/compression",
         "//utils/timer/mockable",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",
+        "@io_opentelemetry_go_otel_sdk//trace",
+        "@io_opentelemetry_go_otel_trace//:trace",
         "@org_golang_google_protobuf//proto",
     ],
 )

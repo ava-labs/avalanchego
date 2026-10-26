@@ -15,6 +15,7 @@ import (
 type CollectorVars struct {
 	StartMetricsCollector bool
 	StartLogsCollector    bool
+	StartTracesCollector  bool
 }
 
 // NewCollectorFlagVars registers collector flag variables for stdlib flag
@@ -44,5 +45,12 @@ func (v *CollectorVars) register(boolVar varFunc[bool]) {
 		"start-logs-collector",
 		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_LOGS_COLLECTOR", "false")),
 		"[optional] whether to start a local collector of logs from nodes of the temporary network.",
+	)
+
+	boolVar(
+		&v.StartTracesCollector,
+		"start-traces-collector",
+		cast.ToBool(tmpnet.GetEnvWithDefault("TMPNET_START_TRACES_COLLECTOR", "false")),
+		"[optional] whether to start a local collector of traces from nodes of the temporary network.",
 	)
 }

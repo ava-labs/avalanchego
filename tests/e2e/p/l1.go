@@ -849,6 +849,7 @@ func wrapWarpSignatureRequest(
 		prometheus.NewRegistry(),
 		constants.DefaultNetworkCompressionType,
 		p2pTimeout,
+		false,
 	)
 	if err != nil {
 		return nil, err
@@ -864,6 +865,7 @@ func wrapWarpSignatureRequest(
 	}
 
 	return p2pMessageFactory.AppRequest(
+		context.Background(),
 		msg.SourceChainID,
 		0,
 		time.Hour,

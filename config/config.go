@@ -1315,9 +1315,10 @@ func getTraceConfig(v *viper.Viper) (trace.Config, error) {
 			Insecure: v.GetBool(TracingInsecureKey),
 			Headers:  v.GetStringMapString(TracingHeadersKey),
 		},
-		TraceSampleRate: v.GetFloat64(TracingSampleRateKey),
-		AppName:         constants.AppName,
-		Version:         version.Current.String(),
+		TraceSampleRate:    v.GetFloat64(TracingSampleRateKey),
+		ResourceAttributes: v.GetStringMapString(TracingResourceAttributesKey),
+		AppName:            constants.AppName,
+		Version:            version.Current.String(),
 	}, nil
 }
 
