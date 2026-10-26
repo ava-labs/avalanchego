@@ -11,10 +11,16 @@ import (
 )
 
 const (
-	pullGossipSource = "pull_gossip"
-	pushGossipSource = "push_gossip"
-	builtSource      = "built"
-	unknownSource    = "unknown"
+	// chitsSource counts blocks learned from chits in response to a query.
+	chitsSource = "chits"
+	// pushQuerySource counts blocks learned from a PushQuery.
+	pushQuerySource = "push_query"
+	// pullQuerySource counts blocks learned from a PullQuery.
+	pullQuerySource = "pull_query"
+	// builtSource counts blocks that were built locally.
+	builtSource = "built"
+	// unknownSource counts blocks that were learned from an unknown source.
+	unknownSource = "unknown"
 )
 
 type metrics struct {
@@ -32,7 +38,6 @@ type metrics struct {
 	numProcessingAncestorFetchesDropped   prometheus.Counter
 	numProcessingAncestorFetchesSucceeded prometheus.Counter
 	numProcessingAncestorFetchesUnneeded  prometheus.Counter
-	selectedVoteIndex                     metric.Averager
 	issuerStake                           metric.Averager
 	issued                                *prometheus.CounterVec
 	blockTimeSkew                         prometheus.Gauge
@@ -97,12 +102,6 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 			Name: "num_processing_ancestor_fetches_unneeded",
 			Help: "Number of votes that were directly applied to blocks",
 		}),
-		selectedVoteIndex: metric.NewAveragerWithErrs(
-			"selected_vote_index",
-			"index of the voteID that was passed into consensus",
-			reg,
-			&errs,
-		),
 		issuerStake: metric.NewAveragerWithErrs(
 			"issuer_stake",
 			"stake weight of the peer who provided a block that was issued into consensus",
@@ -120,8 +119,9 @@ func newMetrics(reg prometheus.Registerer) (*metrics, error) {
 	}
 
 	// Register the labels
-	m.issued.WithLabelValues(pullGossipSource)
-	m.issued.WithLabelValues(pushGossipSource)
+	m.issued.WithLabelValues(chitsSource)
+	m.issued.WithLabelValues(pushQuerySource)
+	m.issued.WithLabelValues(pullQuerySource)
 	m.issued.WithLabelValues(builtSource)
 	m.issued.WithLabelValues(unknownSource)
 

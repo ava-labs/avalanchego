@@ -7,10 +7,10 @@ import (
 	"context"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
@@ -87,7 +87,7 @@ func TestDispatcher_SendBytes(t *testing.T) {
 				return
 			}
 
-			assert.Empty(t, cmp.Diff(tt.want, got, protocmp.Transform()), "cmp.Diff(want, got)")
+			require.Empty(t, cmp.Diff(tt.want, got, protocmp.Transform()), "cmp.Diff(want, got)")
 		})
 	}
 }
@@ -120,7 +120,7 @@ func TestDispatcher_CancelInFlight(t *testing.T) {
 
 	_, err = c.sendBytes(ctx, reqBytes, acceptLeaf)
 	require.ErrorIsf(t, err, context.Canceled, "%T.sendBytes()", c)
-	assert.Truef(t, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
+	require.Truef(t, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
 }
 
 // Success scores the peer responsive, failure de-scores it. De-score rows
@@ -162,24 +162,28 @@ func TestDispatcher_PeerScoring(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := t.Context()
-			nodeID := ids.GenerateTestNodeID()
-			tracker := peertrackertest.New(t)
-			c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
-				t, ctx, nodeID, tt.handler, tracker,
-			)
-			if tt.seed {
-				peertrackertest.SeedResponsive(t, tracker, nodeID)
-			}
+			synctest.Test(t, func(t *testing.T) {
+				ctx := t.Context()
+				nodeID := ids.GenerateTestNodeID()
+				tracker := peertrackertest.New(t)
+				c := newTestDispatcher[*syncpb.GetLeafRequest, syncpb.GetLeafResponse, *syncpb.GetLeafResponse, *syncpb.GetLeafResponse](
+					t, ctx, nodeID, tt.handler, tracker,
+				)
+				if tt.seed {
+					peertrackertest.SeedResponsive(t, tracker, nodeID)
+				}
 
-			verify := acceptLeaf
-			if tt.rejectResp {
-				verify = rejectLeaf
-			}
-			_, err := c.sendBytes(ctx, reqBytes, verify)
-			require.ErrorIsf(t, err, tt.wantErr, "%T.sendBytes()", c)
+				verify := acceptLeaf
+				if tt.rejectResp {
+					verify = rejectLeaf
+				}
+				_, err := c.sendBytes(ctx, reqBytes, verify)
+				require.ErrorIsf(t, err, tt.wantErr, "%T.sendBytes()", c)
 
-			assert.Equalf(t, tt.wantResponsive, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
+				// The client scores after onResponse delivers the result.
+				synctest.Wait()
+				require.Equalf(t, tt.wantResponsive, responsive(tracker, nodeID), "%T.ResponsivePeers()", tracker)
+			})
 		})
 	}
 }

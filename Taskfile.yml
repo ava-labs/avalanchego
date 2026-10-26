@@ -81,30 +81,43 @@ tasks:
       - cmd: '{{.NIX_RUN}} bazelisk mod deps --lockfile_mode=update >/dev/null'
 
   bazel-test-e2e:
-    desc: Run E2E tests with bazel-built binary
-    cmds:
-      - task: bazel-build
-      - task: build-xsvm
-      - cmd: |
-          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
-
-  bazel-test-e2e-ci:
-    desc: Run the E2E network-reuse smoke test with a Bazel-built binary [serially with race detection]
+    desc: Run E2E tests with Bazel-built runtime dependencies
+    vars:
+      BAZEL_ARGS: '{{.BAZEL_ARGS | default ""}}'
+      SERIAL: '{{.SERIAL | default .E2E_SERIAL | default ""}}'
     env:
-      E2E_SERIAL: 1
+      BAZEL_CI_TARGET_PATTERNS: //tests/e2e:e2e_runner
+      E2E_SERIAL: '{{.SERIAL}}'
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run {{.BAZEL_ARGS}} "$BAZEL_CI_TARGET_PATTERNS" -- {{.E2E_ARGS}} {{.CLI_ARGS}}'
+
+  bazel-test-e2e-race:
+    desc: Run E2E tests with Bazel-built runtime dependencies and race detection
     cmds:
-      - task: bazel-build-race
-      - task: build-xsvm
-      - cmd: |
-          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.existing.sh'
+      - task: bazel-test-e2e
+        vars:
+          BAZEL_ARGS: --config=race
+
+  bazel-test-e2e-race-serial:
+    desc: Run E2E tests serially with Bazel-built runtime dependencies and race detection
+    cmds:
+      - task: bazel-test-e2e
+        vars:
+          BAZEL_ARGS: --config=race
+          SERIAL: '1'
+
+  bazel-test-e2e-serial:
+    desc: Run E2E tests serially with Bazel-built runtime dependencies
+    cmds:
+      - task: bazel-test-e2e
+        vars:
+          SERIAL: '1'
 
   bazel-test-e2e-smoke:
-    desc: Run an E2E smoke test with bazel-built binary
+    desc: Run an E2E smoke test with Bazel-built runtime dependencies
     cmds:
-      - task: bazel-build
-      - task: build-xsvm
-      - cmd: |
-          {{.NIX_RUN}} bash -c 'AVALANCHEGO_PATH=$(bazelisk cquery --output=files //main:avalanchego 2>/dev/null) bash -x ./scripts/tests.e2e.sh --ginkgo.focus-file=c/api.go'
+      - task: bazel-test-e2e
+        vars:
+          E2E_ARGS: --ginkgo.focus-file=c/api.go
 
   bazel-test-unit:
     desc: Run cacheable Go unit tests with Bazel

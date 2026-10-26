@@ -10,8 +10,10 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 - [How CI is organized](#how-ci-is-organized)
   - [Workflows coordinate repository operations](#workflows-coordinate-repository-operations)
   - [Keep Go CI unified](#keep-go-ci-unified)
+  - [Generated-source checks](#generated-source-checks)
   - [Required checks and the merge queue](#required-checks-and-the-merge-queue)
   - [Go and Bazel CI workflow layout](#go-and-bazel-ci-workflow-layout)
+  - [Validate scheduled job changes before merge](#validate-scheduled-job-changes-before-merge)
   - [Platform-specific setup dependencies](#platform-specific-setup-dependencies)
   - [Go unit test platforms](#go-unit-test-platforms)
   - [Local composite actions define reusable GitHub Actions behavior](#local-composite-actions-define-reusable-github-actions-behavior)
@@ -32,6 +34,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 - [Using Nix in GitHub Actions](#using-nix-in-github-actions)
   - [Run `install-nix` jobs in the Nix dev shell](#run-install-nix-jobs-in-the-nix-dev-shell)
   - [Start the Nix dev shell in composite actions](#start-the-nix-dev-shell-in-composite-actions)
+  - [Guard failure handlers](#guard-failure-handlers)
 - [Runners and external actions](#runners-and-external-actions)
   - [Use versioned GitHub-hosted runners](#use-versioned-github-hosted-runners)
   - [Use beefier runners for faster E2E jobs](#use-beefier-runners-for-faster-e2e-jobs)
@@ -95,6 +98,24 @@ Name a component-specific job `<check>-<component>`, such as `lint-evm`. Omit
 the component for a repository-wide check. The aggregate job is an exception.
 Include the workflow name in `go-required`. This name keeps the required check
 distinct in GitHub output.
+
+### Generated-source checks
+
+The `checks` job in [`.github/workflows/go.yml`](../.github/workflows/go.yml)
+runs generated-source and lightweight consistency checks in sequence. One job
+avoids repeating runner and Nix setup.
+
+Each source-generator task updates the checkout and then checks that it is
+clean. A failed task can leave generated files staged. The workflow resets the
+CI checkout after each source-generator task. This reset lets later checks run
+against the commit under test. Cleanup does not run when GitHub cancels the job.
+
+Keep the reset in the workflow. Do not add it to a task. Contributors can run
+the tasks in a working directory that contains uncommitted changes.
+
+Each check step continues after failure. The final step fails the job when one
+or more checks fail. When you add a source-generator check, give its step an ID
+and a cleanup step.
 
 ### Required checks and the merge queue
 
@@ -165,6 +186,36 @@ merge-group Go entrypoints use `go.yml`; scheduled Go uses `go-unit.yml`.
 Smoke workflows run a minimal macOS test. This test verifies that unit tests
 can run on macOS. The Linux pre-merge job and scheduled jobs run the full unit
 suite.
+
+### Validate scheduled job changes before merge
+
+Validate changes to scheduled job execution before merge. Normal pull-request
+CI is sufficient when it covers the affected behavior. Otherwise, run the
+scheduled configuration through a manual dispatch or a temporary pull-request
+trigger.
+
+Scheduled jobs provide additional platform coverage and test configurations.
+They also help find intermittent failures. Running all this coverage on every
+pull request would increase CI time and cost. However, changes to tasks,
+scripts, workflows, runners, artifacts, or platform support can break scheduled
+execution. Maintainers must decide which behavior needs additional validation.
+
+Choose the validation method for the workflow:
+
+- **New scheduled-only workflow:** Add a temporary pull-request trigger or
+  another temporary pull-request path. Validate the workflow, then remove the
+  temporary path before merge. Include `workflow_dispatch` in the merged
+  workflow so maintainers can validate later changes before merge. GitHub
+  cannot dispatch a new workflow until it exists on the default branch.
+- **Existing scheduled-only workflow:** Use `workflow_dispatch` to run it
+  against the pull-request branch. Keep this invocation compatible with
+  scheduled execution. In the Actions UI, select the pull-request branch and
+  start the workflow. `Scheduled Go` and `Scheduled Bazel` support this method.
+- **Workflow that also runs on pull requests:** Use its normal pull-request
+  coverage when both paths have the same behavior. `workflow_dispatch` is not
+  required. If the scheduled path differs, choose an additional pre-merge
+  validation method for any affected behavior that pull-request CI does not
+  cover.
 
 ### Platform-specific setup dependencies
 
@@ -261,6 +312,23 @@ pull-request trigger verifies that this machinery remains usable in avalanchego
 CI. Keep workflow-specific triggers, matrices, and runner setup in the workflows.
 Do not duplicate dependency provisioning or `run-polyrepo` there.
 
+Keep pull-request benchmark check names short. GitHub can hide a job duration
+when its name is long. Short names make slow jobs visible in the pull-request
+summary without opening each workflow.
+
+Include the test name in each pull-request benchmark check. Include a matrix value
+only when it distinguishes two jobs. For example, omit runner labels and timeout
+values when they do not distinguish jobs. Include the runner label in a scheduled
+check when the same test runs on more than one runner.
+
+`native` and `container` identify the benchmark configuration. They do not
+identify the runner provider.
+
+For example, PR checks use:
+
+- `C-Chain Re-exec / native / hashdb-101-250k`
+- `C-Chain Re-exec / container / hashdb-archive-101-250k`
+
 ## Provision CI job dependencies
 
 Nix provides the repository's preferred local development environment. See
@@ -283,9 +351,9 @@ cache and version rules.
 
 Choose the setup action that provides the job's dependencies. Bazel provides
 Go for its targets, but a job that also runs Go commands outside Bazel needs
-`setup-go-for-project` or the Nix dev shell. For example, `check-go-mod-tidy`
-uses both `setup-bazel` and `setup-go-for-project`, while `lint-avalanchego`
-uses `setup-bazel` and `install-nix` for flake-provided tools.
+`setup-go-for-project` or the Nix dev shell. For example, `lint-avalanchego`
+uses `setup-bazel` before `install-nix` because its module-metadata check
+invokes `bazelisk mod tidy`.
 
 When combining these actions, run `setup-bazel` before either Go setup action
 disables `GOPROXY`. They prepare separate module caches. See
@@ -466,10 +534,11 @@ The cache-writing setup jobs use
 It requests saves from `setup-go-for-project`, `setup-task`, and `install-nix`
 only when `cache-policy` permits cache writing. Other uses of these actions are
 restore-only. `install-nix` can use the same module-cache action as a
-restore-only consumer. Disabling `setup_go_module_cache` skips preparation for
-Go tasks outside Bazel. It does not prepare those dependencies through Gazelle's
-cache or set `GOPROXY=off` for those tasks. A job that disables their module
-downloads must prepare their dependencies separately.
+restore-only consumer. Disabling `install-nix`'s `setup_go_module_cache` input
+skips preparation for Go tasks outside Bazel. This input does not prepare those
+dependencies through Gazelle's cache or set `GOPROXY=off`. Jobs that need these
+dependencies must prepare them before disabling module downloads.
+
 The implicit `actions/setup-go` cache is disabled because its
 post-job save cannot be limited to `master` runs by `cache-policy`.
 
@@ -708,6 +777,34 @@ example, a step that reads GitHub Actions environment variables can use `nix dev
 A composite action cannot set `defaults.run.shell`. A calling job's default shell does
 not apply to the action. Set `shell:` on each `run:` step that needs the Nix dev
 shell.
+
+### Guard failure handlers
+
+A `failure()` condition runs after any earlier step fails. An `always()` condition
+runs even when setup fails.
+
+A failure handler must check that its required setup completed. Do not run a handler
+that needs Nix, Task, or generated test data when the setup step failed. Give the
+setup step an `id`. Check its outcome in the handler condition.
+
+```yaml
+- id: install-nix
+  uses: ./.github/actions/install-nix
+
+- name: Log Docker disk diagnostics
+  if: ${{ failure() && steps.install-nix.outcome == 'success' }}
+  run: ./scripts/run_task.sh log-ci-disk-state-docker
+```
+
+Use `always()` when a handler must run after a workload failure. Also check the setup
+outcome.
+
+```yaml
+if: ${{ always() && steps.install-nix.outcome == 'success' }}
+```
+
+This keeps the first setup failure visible. It also prevents secondary failures from
+unavailable tools or missing workload output.
 
 ## Runners and external actions
 
