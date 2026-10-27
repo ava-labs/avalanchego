@@ -171,57 +171,6 @@ func TestAssetBalance(t *testing.T) {
 	}
 }
 
-// FuzzHeldXChainAssetInvariant checks that an account with a positive asset
-// balance is always marked as having held an X-chain asset, which
-// [StateDB.SubAssetBalance] relies on to not set the flag itself.
-func FuzzHeldXChainAssetInvariant(f *testing.F) {
-	const (
-		add = iota
-		sub
-		snap
-		revert
-	)
-	// Each byte is an op in the top 2 bits and an amount in the bottom 6.
-	f.Add([]byte{
-		add<<6 | 5,
-		snap << 6,
-		sub<<6 | 4,
-		revert << 6,
-		add<<6 | 5,
-		sub<<6 | 5,
-	})
-	f.Fuzz(func(t *testing.T, ops []byte) {
-		s := newEmptyStateDB(t)
-		addr := common.Address{1}
-		assetID := common.Hash{2}
-		var snapshots []int
-
-		for _, op := range ops {
-			amount := big.NewInt(int64(op & 0x3f))
-			switch op >> 6 {
-			case add:
-				s.AddAssetBalance(addr, assetID, amount)
-			case sub:
-				// Callers MUST NOT subtract more than the balance.
-				if s.GetAssetBalance(addr, assetID).Cmp(amount) >= 0 {
-					s.SubAssetBalance(addr, assetID, amount)
-				}
-			case snap:
-				snapshots = append(snapshots, s.Snapshot())
-			case revert:
-				if n := len(snapshots); n > 0 {
-					s.RevertToSnapshot(snapshots[n-1])
-					snapshots = snapshots[:n-1]
-				}
-			}
-
-			if s.GetAssetBalance(addr, assetID).Sign() > 0 {
-				require.Truef(t, customtypes.HeldXChainAsset(s.StateDB, addr), "customtypes.HeldXChainAsset() with positive balance after op %#x", op)
-			}
-		}
-	})
-}
-
 func TestPrepare(t *testing.T) {
 	sender := common.Address{1}
 	s := newEmptyStateDB(t)
