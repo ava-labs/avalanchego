@@ -14,7 +14,7 @@ import (
 
 // GasUsedHeader is the HTTP response header carrying the total gas used by
 // every eth_call in the request, batches included. It is a decimal integer and
-// is omitted if no eth_call executed.
+// is omitted if no eth_call completed.
 const GasUsedHeader = "Gas-Used"
 
 // addGas records gas used by a call in the request carried by ctx. It is a
