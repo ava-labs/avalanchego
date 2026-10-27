@@ -9,7 +9,17 @@ inputs:
 runs:
   using: composite
   steps:
+    # A missing ~/.tmpnet means tmpnet never started, e.g. the build failed.
+    # There is nothing to collect, and that is not the failure to report.
+    - name: Check for tmpnet data
+      id: tmpnet
+      shell: bash
+      run: |
+        if [[ -d ~/.tmpnet ]]; then
+          echo "exists=true" >> "$GITHUB_OUTPUT"
+        fi
     - name: Upload tmpnet data
+      if: steps.tmpnet.outputs.exists == 'true'
       uses: actions/upload-artifact@v6
       with:
         name: ${{ inputs.name }}
@@ -17,6 +27,4 @@ runs:
           ~/.tmpnet/networks
           ~/.tmpnet/prometheus/prometheus.log
           ~/.tmpnet/promtail/promtail.log
-        # If there is no data tmpnet might not have even started, so do not
-        # report this as a failure.
-        if-no-files-found: warn
+        if-no-files-found: error
