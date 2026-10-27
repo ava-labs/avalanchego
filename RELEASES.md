@@ -15,6 +15,7 @@
 ### Fixes
 
 - Fixed C-Chain log queries (`eth_getLogs`, `eth_getFilterLogs`) failing with `failed to get logs for block #N` when the range reached an accepted block that had not yet executed. Range queries now stop at the last executed block, and `blockHash` queries for an unexecuted block return `unknown block`.
+- Fixed `admin.stopCPUProfiler` leaving mutex profiling enabled, which kept recording mutex contention until the node restarted.
 
 ## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
 

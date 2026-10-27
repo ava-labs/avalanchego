@@ -23,6 +23,7 @@ func TestProfiler(t *testing.T) {
 	require.NoError(p.StartCPUProfiler())
 
 	require.NoError(p.StopCPUProfiler())
+	require.Zero(runtime.SetMutexProfileFraction(-1))
 
 	_, err := os.Stat(filepath.Join(dir, cpuProfileFile))
 	require.NoError(err)
