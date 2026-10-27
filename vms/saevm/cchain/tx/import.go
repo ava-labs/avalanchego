@@ -6,7 +6,6 @@ package tx
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
@@ -241,8 +240,7 @@ func (i *Import) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) 
 			continue
 		}
 
-		amount := new(big.Int).SetUint64(out.Amount)
-		statedb.AddAssetBalance(out.Address, common.Hash(out.AssetID), amount)
+		statedb.AddAssetBalance(out.Address, common.Hash(out.AssetID), uint256.NewInt(out.Amount))
 	}
 	return nil
 }

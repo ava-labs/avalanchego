@@ -6,8 +6,6 @@
 package extstate
 
 import (
-	"math/big"
-
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
@@ -103,20 +101,21 @@ func (s *StateDB) GetPredicate(address common.Address, index int) (predicate.Pre
 }
 
 // GetAssetBalance returns the balance of assetID held by addr.
-func (s *StateDB) GetAssetBalance(addr common.Address, assetID common.Hash) *big.Int {
-	return s.GetState(addr, assetBalanceKey(assetID), stateconf.SkipStateKeyTransformation()).Big()
+func (s *StateDB) GetAssetBalance(addr common.Address, assetID common.Hash) *uint256.Int {
+	balance := s.GetState(addr, assetBalanceKey(assetID), stateconf.SkipStateKeyTransformation())
+	return new(uint256.Int).SetBytes32(balance[:])
 }
 
 // AddAssetBalance adds amount of assetID to the balance of addr. A non-zero
 // amount marks addr as having held an X-chain asset.
 //
-// amount MUST NOT be negative.
-func (s *StateDB) AddAssetBalance(addr common.Address, assetID common.Hash, amount *big.Int) {
+// The resulting balance MUST NOT overflow.
+func (s *StateDB) AddAssetBalance(addr common.Address, assetID common.Hash, amount *uint256.Int) {
 	// TODO(JonathanOppenheimer): Investigate whether any historical block ever
 	// passed a zero amount to this method or [StateDB.SubAssetBalance] in a way
 	// that affected the state root, and if not, remove both special cases.
 	// NativeAssetCall is disabled at tip, so only past blocks matter.
-	if amount.Sign() == 0 {
+	if amount.IsZero() {
 		// Like [state.StateDB.AddBalance], adding zero still touches the
 		// account, which can make it eligible for EIP-161 deletion.
 		s.AddBalance(addr, new(uint256.Int))
@@ -133,9 +132,9 @@ func (s *StateDB) AddAssetBalance(addr common.Address, assetID common.Hash, amou
 
 // SubAssetBalance subtracts amount of assetID from the balance of addr.
 //
-// amount MUST NOT be negative and MUST NOT exceed the balance.
-func (s *StateDB) SubAssetBalance(addr common.Address, assetID common.Hash, amount *big.Int) {
-	if amount.Sign() == 0 {
+// amount MUST NOT exceed the balance.
+func (s *StateDB) SubAssetBalance(addr common.Address, assetID common.Hash, amount *uint256.Int) {
+	if amount.IsZero() {
 		// Like [state.stateObject.SubBalance], subtracting zero is a no-op.
 		return
 	}
@@ -146,6 +145,6 @@ func (s *StateDB) SubAssetBalance(addr common.Address, assetID common.Hash, amou
 	s.setAssetBalance(addr, assetID, balance)
 }
 
-func (s *StateDB) setAssetBalance(addr common.Address, assetID common.Hash, amount *big.Int) {
-	s.SetState(addr, assetBalanceKey(assetID), common.BigToHash(amount), stateconf.SkipStateKeyTransformation())
+func (s *StateDB) setAssetBalance(addr common.Address, assetID common.Hash, amount *uint256.Int) {
+	s.SetState(addr, assetBalanceKey(assetID), amount.Bytes32(), stateconf.SkipStateKeyTransformation())
 }
