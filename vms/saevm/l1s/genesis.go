@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
@@ -81,15 +80,14 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 		return nil, fmt.Errorf("%w: %d", errNonNilGenesisBlobGasUsed, *g.BlobGasUsed)
 	}
 
-	extras, err := newExtras(ctx, g.Config, upgradeConfig)
+	extra, err := newExtra(ctx, g.Config, upgradeConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	chainID := g.Config.ChainID
 	g.Config = l1params.WithExtra(
 		&params.ChainConfig{
-			ChainID:             chainID,
+			ChainID:             g.Config.ChainID,
 			HomesteadBlock:      big.NewInt(0),
 			DAOForkBlock:        big.NewInt(0),
 			DAOForkSupport:      true,
@@ -103,10 +101,10 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        extras.DurangoTimestamp,
-			CancunTime:          extras.EtnaTimestamp,
+			ShanghaiTime:        extra.DurangoTimestamp,
+			CancunTime:          extra.EtnaTimestamp,
 		},
-		extras,
+		extra,
 	)
 	if err := g.Config.CheckConfigForkOrder(); err != nil {
 		return nil, err
@@ -114,37 +112,26 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 	return (*genesis)(&g), nil
 }
 
-func newExtras(ctx *snow.Context, cfg *params.ChainConfig, upgradeConfig extras.UpgradeConfig) (*extras.ChainConfig, error) {
-	provided := l1params.GetExtra(cfg)
-	cpy := *provided
+// newExtra returns a copy of the extra chain config in cfg with the fee config
+// defaulted, omitted network upgrades taken from the primary network, and the
+// network upgrade overrides of upgradeConfig applied.
+func newExtra(ctx *snow.Context, cfg *params.ChainConfig, upgradeConfig extras.UpgradeConfig) (*extras.ChainConfig, error) {
+	cpy := *l1params.GetExtra(cfg)
 	if cpy.FeeConfig == (commontype.FeeConfig{}) {
 		cpy.FeeConfig = l1params.DefaultFeeConfig
 	}
 
-	cpy.NetworkUpgrades = makeUpgrades(provided.NetworkUpgrades, ctx.NetworkUpgrades, upgradeConfig.NetworkUpgradeOverrides)
-	cpy.UpgradeConfig = upgradeConfig
-	cpy.AvalancheContext = extras.AvalancheContext{
-		SnowCtx: ctx,
+	cpy.SetDefaults(ctx.NetworkUpgrades)
+	if o := upgradeConfig.NetworkUpgradeOverrides; o != nil {
+		cpy.Override(o)
 	}
+	cpy.UpgradeConfig = upgradeConfig
+	cpy.AvalancheContext = extras.AvalancheContext{SnowCtx: ctx}
 
 	if err := cpy.Verify(); err != nil {
 		return nil, err
 	}
-
 	return &cpy, nil
-}
-
-// makeUpgrades returns an [extras.NetworkUpgrades] based on the following rules:
-// - By default, use the network upgrades from the genesis.
-// - If any forks are omitted in the genesis, use the primary network's timestamps.
-// - If the upgrade config provided overrides, those take precedence.
-func makeUpgrades(inGenesis extras.NetworkUpgrades, primaryNetwork upgrade.Config, overrides *extras.NetworkUpgrades) extras.NetworkUpgrades {
-	upgrades := inGenesis
-	upgrades.SetDefaults(primaryNetwork)
-	if overrides != nil {
-		upgrades.Override(overrides)
-	}
-	return upgrades
 }
 
 var errNoHeadHeader = errors.New("no head header")
@@ -205,7 +192,6 @@ func (g *genesis) verifyAndWriteBlock(db ethdb.Database) error {
 func writeGenesisBlock(db ethdb.Database, block *types.Block, config *params.ChainConfig) error {
 	b := db.NewBatch()
 	hash := block.Hash()
-	upgradeCfg := l1params.GetExtra(config).UpgradeConfig
 
 	rawdb.WriteBlock(b, block)
 	rawdb.WriteReceipts(b, hash, genesisNumber, nil)
@@ -214,7 +200,7 @@ func writeGenesisBlock(db ethdb.Database, block *types.Block, config *params.Cha
 	rawdb.WriteHeadBlockHash(b, hash)
 	rawdb.WriteHeadHeaderHash(b, hash)
 	rawdb.WriteHeadFastBlockHash(b, hash)
-	if err := customrawdb.WriteChainConfig(b, hash, config, upgradeCfg); err != nil {
+	if err := customrawdb.WriteChainConfig(b, hash, config, l1params.GetExtra(config).UpgradeConfig); err != nil {
 		return fmt.Errorf("writing chain config: %w", err)
 	}
 	return b.Write()
