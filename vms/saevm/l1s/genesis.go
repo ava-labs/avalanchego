@@ -25,10 +25,10 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
-	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
@@ -50,7 +50,7 @@ type genesis core.Genesis
 
 // parseGenesis decodes the genesis bytes and populates the upgrade schedule.
 func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesis, error) {
-	var g legacy.Genesis
+	var g core.Genesis
 	if err := json.Unmarshal(genesisBytes, &g); err != nil {
 		return nil, fmt.Errorf("unmarshalling genesis: %w", err)
 	}
@@ -81,20 +81,15 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 		return nil, fmt.Errorf("%w: %d", errNonNilGenesisExcessBlobGas, *g.ExcessBlobGas)
 	case g.BlobGasUsed != nil:
 		return nil, fmt.Errorf("%w: %d", errNonNilGenesisBlobGasUsed, *g.BlobGasUsed)
-	case g.AirdropHash != (common.Hash{}):
-		return nil, fmt.Errorf("%w: %s", errAirdropHash, g.AirdropHash)
 	}
 
 	extras, err := newExtras(ctx, g.Config, upgradeConfig)
 	if err != nil {
 		return nil, err
 	}
-	if gasLimit := extras.FeeConfig.GasLimit.Uint64(); gasLimit != g.GasLimit {
-		return nil, fmt.Errorf("%w: fee config %d vs genesis %d", errGasLimitMismatch, gasLimit, g.GasLimit)
-	}
 
 	chainID := g.Config.ChainID
-	cfg := l1params.WithExtra(
+	g.Config = l1params.WithExtra(
 		&params.ChainConfig{
 			ChainID:             chainID,
 			HomesteadBlock:      big.NewInt(0),
@@ -115,31 +110,20 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 		},
 		extras,
 	)
-	if err := cfg.CheckConfigForkOrder(); err != nil {
+	if err := g.Config.CheckConfigForkOrder(); err != nil {
 		return nil, err
 	}
-	return &genesis{
-		Config:     cfg,
-		Nonce:      g.Nonce,
-		Timestamp:  g.Timestamp,
-		ExtraData:  g.ExtraData,
-		Difficulty: g.Difficulty,
-		Mixhash:    g.Mixhash,
-		Coinbase:   g.Coinbase,
-		Alloc:      g.Alloc,
-		BaseFee:    g.BaseFee,
-		GasLimit:   g.GasLimit,
-	}, nil
+	return (*genesis)(&g), nil
 }
 
 func newExtras(ctx *snow.Context, cfg *params.ChainConfig, upgradeConfig extras.UpgradeConfig) (*extras.ChainConfig, error) {
 	provided := l1params.GetExtra(cfg)
 	cpy := *provided
-	if cpy.FeeConfig == commontype.EmptyFeeConfig {
+	if cpy.FeeConfig == (commontype.FeeConfig{}) {
 		cpy.FeeConfig = l1params.DefaultFeeConfig
 	}
 
-	cpy.NetworkUpgrades = networkUpgrades(provided.NetworkUpgrades, ctx, upgradeConfig)
+	cpy.NetworkUpgrades = makeUpgrades(provided.NetworkUpgrades, ctx.NetworkUpgrades, upgradeConfig.NetworkUpgradeOverrides)
 	cpy.UpgradeConfig = upgradeConfig
 	cpy.AvalancheContext = extras.AvalancheContext{
 		SnowCtx: ctx,
@@ -152,11 +136,15 @@ func newExtras(ctx *snow.Context, cfg *params.ChainConfig, upgradeConfig extras.
 	return &cpy, nil
 }
 
-func networkUpgrades(existing extras.NetworkUpgrades, ctx *snow.Context, upgradeConfig extras.UpgradeConfig) extras.NetworkUpgrades {
-	upgrades := existing
-	upgrades.SetDefaults(ctx.NetworkUpgrades)
-	if upgradeConfig.NetworkUpgradeOverrides != nil {
-		upgrades.Override(upgradeConfig.NetworkUpgradeOverrides)
+// makeUpgrades returns an [extras.NetworkUpgrades] based on the following rules:
+// - By default, use the network upgrades from the genesis.
+// - If any forks are omitted in the genesis, use the primary network's timestamps.
+// - If the upgrade config provided overrides, those take precedence.
+func makeUpgrades(inGenesis extras.NetworkUpgrades, primaryNetwork upgrade.Config, overrides *extras.NetworkUpgrades) extras.NetworkUpgrades {
+	upgrades := inGenesis
+	upgrades.SetDefaults(primaryNetwork)
+	if overrides != nil {
+		upgrades.Override(overrides)
 	}
 	return upgrades
 }
@@ -267,10 +255,7 @@ func (g *genesis) block() (*types.Block, error) {
 
 	c := l1params.GetExtra(g.Config)
 	if c.IsSubnetEVM(g.Timestamp) { // Includes London
-		h.BaseFee = g.BaseFee
-		if h.BaseFee == nil {
-			h.BaseFee = new(big.Int).Set(c.FeeConfig.MinBaseFee)
-		}
+		h.BaseFee = new(big.Int).Set(c.FeeConfig.MinBaseFee)
 	}
 
 	headerExtra := customtypes.GetHeaderExtra(h)

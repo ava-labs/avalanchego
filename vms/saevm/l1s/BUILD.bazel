@@ -8,11 +8,11 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/subnet-evm/commontype",
-        "//graft/subnet-evm/core",
         "//graft/subnet-evm/params",
         "//graft/subnet-evm/params/extras",
         "//graft/subnet-evm/plugin/evm/customtypes",
         "//snow",
+        "//upgrade",
         "//vms/evm/acp226",
         "//vms/evm/sync/customrawdb",
         "@com_github_ava_labs_libevm//common",
