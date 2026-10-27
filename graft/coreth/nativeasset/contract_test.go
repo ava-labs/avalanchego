@@ -445,6 +445,7 @@ func TestStatefulPrecompile(t *testing.T) {
 		},
 	}
 
+	// nativeasset precompiles are activated at AP2.
 	cfg := params.WithExtra(
 		&params.ChainConfig{},
 		&extras.ChainConfig{

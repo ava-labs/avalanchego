@@ -18,7 +18,7 @@ import (
 // ChainConfig returns a new C-Chain config with all network upgrades active.
 func ChainConfig() *params.ChainConfig {
 	c := *saetest.ChainConfig()
-	u := upgradetest.GetConfigWithUpgradeTime(upgradetest.Igloo, time.Unix(0, 0))
+	u := upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, time.Unix(0, 0))
 	extra := extras.ChainConfig{
 		NetworkUpgrades: extras.GetNetworkUpgrades(u),
 	}
