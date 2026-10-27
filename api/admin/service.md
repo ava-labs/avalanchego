@@ -251,7 +251,7 @@ curl -X POST --data '{
 
 ### `admin.lockProfile`
 
-Writes a profile of mutex statistics to `lock.profile`.
+Writes a profile of mutex contention to `lock.profile`. Contention is only recorded while mutex profiling is enabled, which `admin.startCPUProfiler` does, so call it first. The profile is cumulative since the node started.
 
 **Signature**:
 
