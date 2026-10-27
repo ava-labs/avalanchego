@@ -24,6 +24,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
@@ -135,6 +136,22 @@ func TestAwaitTxAccepted(t *testing.T) {
 		require.NoErrorf(t, err, "%T.AwaitTxAccepted()", sut.Client)
 		sut.assertTxAccepted(ctx, t, stx, blk.NumberU64())
 	})
+}
+
+// TestGetTxNotExecuted asserts that [Client.GetTx] treats a tx as unknown while
+// it is indexed but its block is not yet marked as executed.
+func TestGetTxNotExecuted(t *testing.T) {
+	ctx, sut := newSUT(t)
+	stx := newWallet(txtest.NewKey(t), sut.ctx, sut.Client).newMinimalTx(t)
+
+	// Index the tx as executing the next block would. That block is never
+	// executed, so the SUT MUST NOT execute anything after this.
+	height := sut.LastExecuted().Height() + 1
+	require.NoErrorf(t, sut.state.Apply(height, []*tx.Tx{stx}), "%T.Apply(%d)", sut.state, height)
+
+	_, _, err := sut.GetTx(ctx, stx.ID())
+	// JSON-RPC drops the error chain, so the sentinel's text is matched.
+	require.ErrorContainsf(t, err, database.ErrNotFound.Error(), "%T.GetTx()", sut.Client)
 }
 
 // withoutEvents is a [txpool.Backend] that never sends post-execution events.

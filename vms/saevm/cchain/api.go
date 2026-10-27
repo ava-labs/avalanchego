@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
@@ -24,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
@@ -38,6 +40,7 @@ type service struct {
 	gossipSet    *gossip.BloomSet[*gossipTx]
 	pushGossiper *gossip.PushGossiper[*gossipTx]
 	state        *state.State
+	executed     blocks.ExecutionFrontier
 
 	chainAlias  string
 	hrp         string
@@ -49,6 +52,7 @@ func newService(
 	gossipSet *gossip.BloomSet[*gossipTx],
 	pushGossiper *gossip.PushGossiper[*gossipTx],
 	db *state.State,
+	executed blocks.ExecutionFrontier,
 ) (*service, error) {
 	chainAlias, err := ctx.BCLookup.PrimaryAlias(ctx.ChainID)
 	if err != nil {
@@ -66,6 +70,7 @@ func newService(
 		gossipSet:    gossipSet,
 		pushGossiper: pushGossiper,
 		state:        db,
+		executed:     executed,
 
 		chainAlias:  chainAlias,
 		hrp:         hrp,
@@ -254,6 +259,12 @@ func (s *service) GetAtomicTx(_ *http.Request, args *api.GetTxArgs, resp *GetTxR
 	)
 
 	t, height, err := s.state.GetTx(args.TxID)
+	// Txs are indexed before their block is marked as executed. Reporting a tx
+	// earlier would let a client issue a dependent tx that the txpool rejects,
+	// so it is treated as unknown until then.
+	if err == nil && height > s.executed.LastExecuted().Height() {
+		err = database.ErrNotFound
+	}
 	if err != nil {
 		return fmt.Errorf("%w: %w", errFetchingTx, err)
 	}
