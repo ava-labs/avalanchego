@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
@@ -181,12 +181,11 @@ func TestPrepare(t *testing.T) {
 
 func TestGetPredicate(t *testing.T) {
 	var (
-		predicater = common.Address{1}
+		predicater = warp.ContractAddress
 		pred       = predicate.Predicate{{2}}
 		list       = types.AccessList{{Address: predicater, StorageKeys: pred}}
 	)
 	rules := cchaintest.ChainConfig().Rules(common.Big0, true /*isMerge*/, 0)
-	params.GetRulesExtra(rules).Predicaters[predicater] = nil
 
 	tests := []struct {
 		name   string

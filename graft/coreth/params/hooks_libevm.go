@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
+	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -72,16 +72,26 @@ func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
 	return true
 }
 
-// AccessListGas computes the intrinsic gas for an access list.
-// When predicaters exist, it calculates gas per-tuple, delegating to predicate
-// contracts for addresses that have them. Otherwise, it returns override=false
-// to use the default calculation.
+// warpPredicaters charges for Warp predicates, which are the only predicates.
+var warpPredicaters = map[common.Address]evmprecompileconfig.Predicater{
+	warp.ContractAddress: warp.NewDefaultConfig(nil),
+}
+
+// HasPredicate reports whether addr's access-list entries are predicates, which
+// is only the case for the Warp precompile once Durango is active.
+func (r RulesExtra) HasPredicate(addr common.Address) bool {
+	return r.IsDurango && addr == warp.ContractAddress
+}
+
+// AccessListGas computes the intrinsic gas for an access list. Once Warp is
+// active, it calculates gas per-tuple, charging Warp predicates by
+// [warp.Config.PredicateGas]. Otherwise, it returns override=false to use the
+// default calculation.
 func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
-	rules := extras.Rules(r)
-	if !rules.PredicatersExist() {
+	if !r.IsDurango {
 		return 0, false, nil
 	}
-	gas, err := evmprecompileconfig.AccessListGasWithPredicates(rules.AvalancheRules, rules.Predicaters, accessList)
+	gas, err := evmprecompileconfig.AccessListGasWithPredicates(r.AvalancheRules, warpPredicaters, accessList)
 	return gas, true, err
 }
 
@@ -139,9 +149,8 @@ func (r RulesExtra) currentPrecompiles() map[common.Address]vm.PrecompiledContra
 	return nil
 }
 
-// precompileOverrideBuiltin specifies precompiles that were activated prior to the
-// dynamic precompile activation registry.
-// These were only active historically and are not active in the current network.
+// precompileOverrideBuiltin specifies the precompiles that were active
+// historically and are not active in the current network.
 func (r RulesExtra) precompileOverrideBuiltin(addr common.Address) (libevm.PrecompiledContract, bool) {
 	precompile, ok := r.currentPrecompiles()[addr]
 	return precompile, ok
@@ -190,15 +199,11 @@ func (r RulesExtra) PrecompileOverride(addr common.Address) (libevm.PrecompiledC
 		return p, true
 	}
 
-	if _, ok := r.Precompiles[addr]; !ok {
+	// Warp is the only stateful precompile, and is active from Durango.
+	if !r.IsDurango || addr != warp.ContractAddress {
 		return nil, false
 	}
-	module, ok := modules.GetPrecompileModuleByAddress(addr)
-	if !ok {
-		return nil, false
-	}
-
-	return makePrecompile(module.Contract), true
+	return makePrecompile(warp.WarpPrecompile), true
 }
 
 type accessibleState struct {

@@ -29,8 +29,8 @@ go_test(
     srcs = ["statedb_test.go"],
     deps = [
         ":extstate",
-        "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
+        "//graft/coreth/precompile/contracts/warp",
         "//vms/evm/predicate",
         "//vms/saevm/cchain/cchaintest",
         "//vms/saevm/cchain/libevm",

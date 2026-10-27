@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 )
 
 // PrecompileTest is a test case for a precompile
@@ -196,7 +195,10 @@ func RunPrecompileBenchmarks(b *testing.B, module modules.Module, tests []Precom
 // testStateDB allows for mocking the predicate storage slots without calling
 // Prepare on the statedb.
 type testStateDB struct {
-	*extstate.StateDB
+	*state.StateDB
+	// AssetBalances is nil, so using it panics. Only the native asset
+	// precompiles use it, and they aren't tested with this package.
+	contract.AssetBalances
 
 	predicates map[common.Address][]predicate.Predicate
 }
@@ -206,7 +208,7 @@ func newTestStateDB(t testing.TB, predicates map[common.Address][]predicate.Pred
 	statedb, err := state.New(common.Hash{}, state.NewDatabase(db), nil)
 	require.NoError(t, err)
 	return &testStateDB{
-		StateDB:    extstate.New(statedb),
+		StateDB:    statedb,
 		predicates: predicates,
 	}
 }

@@ -20,7 +20,7 @@ go_library(
         "//graft/coreth/params/extras",
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/contract",
-        "//graft/coreth/precompile/modules",
+        "//graft/coreth/precompile/contracts/warp",
         "//graft/coreth/precompile/precompileconfig",
         "//graft/evm/precompileconfig",
         "//snow",
@@ -46,6 +46,7 @@ graft_go_test(
     embed = [":params"],
     deps = [
         "//graft/coreth/params/extras",
+        "//graft/coreth/precompile/contracts/warp",
         "//graft/evm/utils",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//params",
