@@ -81,57 +81,35 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 		return nil, fmt.Errorf("%w: %d", errNonNilGenesisBlobGasUsed, *g.BlobGasUsed)
 	}
 
-	extras, err := newExtras(ctx, g.Config, upgradeConfig)
-	if err != nil {
+	if err := updateChainConfig(g.Config, upgradeConfig, ctx); err != nil {
 		return nil, err
 	}
 
-	chainID := g.Config.ChainID
-	g.Config = l1params.WithExtra(
-		&params.ChainConfig{
-			ChainID:             chainID,
-			HomesteadBlock:      big.NewInt(0),
-			DAOForkBlock:        big.NewInt(0),
-			DAOForkSupport:      true,
-			EIP150Block:         big.NewInt(0),
-			EIP155Block:         big.NewInt(0),
-			EIP158Block:         big.NewInt(0),
-			ByzantiumBlock:      big.NewInt(0),
-			ConstantinopleBlock: big.NewInt(0),
-			PetersburgBlock:     big.NewInt(0),
-			IstanbulBlock:       big.NewInt(0),
-			MuirGlacierBlock:    big.NewInt(0),
-			BerlinBlock:         big.NewInt(0),
-			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        extras.DurangoTimestamp,
-			CancunTime:          extras.EtnaTimestamp,
-		},
-		extras,
-	)
-	if err := g.Config.CheckConfigForkOrder(); err != nil {
-		return nil, err
-	}
 	return (*genesis)(&g), nil
 }
 
-func newExtras(ctx *snow.Context, cfg *params.ChainConfig, upgradeConfig extras.UpgradeConfig) (*extras.ChainConfig, error) {
-	provided := l1params.GetExtra(cfg)
-	cpy := *provided
-	if cpy.FeeConfig == (commontype.FeeConfig{}) {
-		cpy.FeeConfig = l1params.DefaultFeeConfig
+// updateChainConfig edits cfg in-place.
+func updateChainConfig(cfg *params.ChainConfig, upgradeConfig extras.UpgradeConfig, ctx *snow.Context) error {
+	extra := *l1params.GetExtra(cfg)
+	if extra.FeeConfig == (commontype.FeeConfig{}) {
+		extra.FeeConfig = l1params.DefaultFeeConfig
 	}
 
-	cpy.NetworkUpgrades = makeUpgrades(provided.NetworkUpgrades, ctx.NetworkUpgrades, upgradeConfig.NetworkUpgradeOverrides)
-	cpy.UpgradeConfig = upgradeConfig
-	cpy.AvalancheContext = extras.AvalancheContext{
+	extra.NetworkUpgrades = makeUpgrades(extra.NetworkUpgrades, ctx.NetworkUpgrades, upgradeConfig.NetworkUpgradeOverrides)
+	extra.UpgradeConfig = upgradeConfig
+	extra.AvalancheContext = extras.AvalancheContext{
 		SnowCtx: ctx,
 	}
 
-	if err := cpy.Verify(); err != nil {
-		return nil, err
+	if err := extra.Verify(); err != nil {
+		return err
 	}
 
-	return &cpy, nil
+	l1params.WithExtra(cfg, &extra)
+	if err := l1params.SetEthUpgrades(cfg); err != nil {
+		return err
+	}
+	return cfg.CheckConfigForkOrder()
 }
 
 // makeUpgrades returns an [extras.NetworkUpgrades] based on the following rules:
@@ -275,7 +253,7 @@ func (g *genesis) block() (*types.Block, error) {
 		headerExtra.MinDelayExcess = new(minDelayExcess)
 	}
 
-	// TODO: Add SAE required fields if active at genesis.
+	// TODO(alarso16): Add SAE required fields if active at genesis.
 
 	return types.NewBlock(
 		h,
@@ -328,7 +306,7 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 		return common.Hash{}, err
 	}
 
-	// TODO: Register precompiles. See [legacy.ApplyPrecompileActivations].
+	// TODO(alarso16): Register precompiles.
 
 	for addr, account := range g.Alloc {
 		statedb.SetBalance(addr, uint256.MustFromBig(account.Balance))
@@ -339,7 +317,7 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 		}
 	}
 
-	const deleteEmptyObjects = false
+	const deleteEmptyObjects = false // for historical compatibility
 	root, err := statedb.Commit(genesisNumber, deleteEmptyObjects)
 	if err != nil {
 		return common.Hash{}, fmt.Errorf("committing statedb: %w", err)
