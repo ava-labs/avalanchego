@@ -1354,6 +1354,7 @@ func (n *Node) initProfiler() {
 		filepath.Join(n.Config.ProfilerConfig.Dir, "continuous"),
 		n.Config.ProfilerConfig.Freq,
 		n.Config.ProfilerConfig.MaxNumFiles,
+		n.Config.ProfilerConfig.MutexProfileFraction,
 	)
 	go n.Log.RecoverAndPanic(func() {
 		err := n.profiler.Dispatch()

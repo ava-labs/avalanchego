@@ -351,7 +351,7 @@ When the protocol version changes:
 To verify compatibility:
 
 ```bash
-go test -run ^TestCompatibility$ github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm
+go test -run ^TestCurrentRPCChainVMCompatible$ github.com/ava-labs/avalanchego/version
 ```
 
 ## Development Tags
