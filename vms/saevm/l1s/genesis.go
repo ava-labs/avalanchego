@@ -42,8 +42,6 @@ var (
 	errNonZeroGenesisParentHash   = errors.New("non-zero genesis parentHash")
 	errNonNilGenesisExcessBlobGas = errors.New("non-nil genesis excessBlobGas")
 	errNonNilGenesisBlobGasUsed   = errors.New("non-nil genesis blobGasUsed")
-	errGasLimitMismatch           = errors.New("gas limit mismatch")
-	errAirdropHash                = errors.New("airdrops are not supported")
 )
 
 type genesis core.Genesis

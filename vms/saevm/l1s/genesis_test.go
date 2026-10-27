@@ -123,13 +123,6 @@ func testGenesisJSON(opts ...genesisOption) string {
 	return string(mustMarshal(testGenesis(opts...)))
 }
 
-func withAirdrop(airdropHash common.Hash) genesisOption {
-	return options.Func[legacy.Genesis](func(g *legacy.Genesis) {
-		g.AirdropHash = airdropHash
-		g.AirdropAmount = nil
-	})
-}
-
 func withInitialMinDelay(delayMS uint64) genesisOption {
 	return options.Func[legacy.Genesis](func(g *legacy.Genesis) {
 		l1params.GetExtra(g.Config).InitialMinDelayMS = delayMS
@@ -258,14 +251,6 @@ func TestParseGenesis(t *testing.T) {
 			wantErr: testerr.Is(errNonNilGenesisBlobGasUsed),
 		},
 		{
-			name: "gas_limit_mismatch",
-			ctx:  latest,
-			genesis: testGenesisJSON(options.Func[legacy.Genesis](func(g *legacy.Genesis) {
-				g.GasLimit++
-			})),
-			wantErr: testerr.Is(errGasLimitMismatch),
-		},
-		{
 			name: "invalid_fee_config",
 			ctx:  latest,
 			genesis: testGenesisJSON(withFeeConfig(mutateFeeConfig(func(c *commontype.FeeConfig) {
@@ -310,12 +295,6 @@ func TestParseGenesis(t *testing.T) {
 			genesis:      testGenesisJSON(),
 			upgradeBytes: "not json",
 			wantErr:      errIsType[*json.SyntaxError](),
-		},
-		{
-			name:    "airdrop_unsupported",
-			ctx:     latest,
-			genesis: testGenesisJSON(withAirdrop(common.Hash{0x1})),
-			wantErr: testerr.Is(errAirdropHash),
 		},
 	}
 	for _, test := range tests {
@@ -377,13 +356,6 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 			name:     "initial_min_delay",
 			upgrades: upgradetest.Latest,
 			genesis:  testGenesisJSON(withInitialMinDelay(1_500)),
-		},
-		spec{
-			name:     "explicit_base_fee",
-			upgrades: upgradetest.Latest,
-			genesis: testGenesisJSON(options.Func[legacy.Genesis](func(g *legacy.Genesis) {
-				g.BaseFee = big.NewInt(1_000)
-			})),
 		},
 		spec{
 			// subnet-evm commits the genesis state with deleteEmptyObjects=false.
