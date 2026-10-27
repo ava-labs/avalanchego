@@ -93,7 +93,7 @@ func (s *StateDB) Prepare(
 }
 
 // GetPredicate returns address's index-th predicate in the access list passed
-// to [StateDB.Prepare]. It returns false if there is none.
+// to [StateDB.Prepare]. It returns false if address has no predicate at index.
 func (s *StateDB) GetPredicate(address common.Address, index int) (predicate.Predicate, bool) {
 	predicates := s.predicates[address]
 	if index < 0 || index >= len(predicates) {
@@ -112,6 +112,10 @@ func (s *StateDB) GetAssetBalance(addr common.Address, assetID common.Hash) *big
 //
 // amount MUST NOT be negative.
 func (s *StateDB) AddAssetBalance(addr common.Address, assetID common.Hash, amount *big.Int) {
+	// TODO(JonathanOppenheimer): Investigate whether any historical block ever
+	// passed a zero amount to this method or [StateDB.SubAssetBalance] in a way
+	// that affected the state root, and if not, remove both special cases.
+	// NativeAssetCall is disabled at tip, so only past blocks matter.
 	if amount.Sign() == 0 {
 		// Like [state.StateDB.AddBalance], adding zero still touches the
 		// account, which can make it eligible for EIP-161 deletion.
@@ -132,8 +136,7 @@ func (s *StateDB) AddAssetBalance(addr common.Address, assetID common.Hash, amou
 // amount MUST NOT be negative and MUST NOT exceed the balance.
 func (s *StateDB) SubAssetBalance(addr common.Address, assetID common.Hash, amount *big.Int) {
 	if amount.Sign() == 0 {
-		// Like [state.StateDB.SubBalance], subtracting zero doesn't touch the
-		// account.
+		// Like [state.stateObject.SubBalance], subtracting zero is a no-op.
 		return
 	}
 	// The balance is positive, so [StateDB.AddAssetBalance] has already
