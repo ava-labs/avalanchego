@@ -32,6 +32,7 @@ go_test(
         "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
         "//vms/evm/predicate",
+        "//vms/saevm/cchain/cchaintest",
         "//vms/saevm/cchain/libevm",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",

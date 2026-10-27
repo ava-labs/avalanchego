@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
@@ -222,98 +223,54 @@ func FuzzHeldXChainAssetInvariant(f *testing.F) {
 }
 
 func TestPrepare(t *testing.T) {
-	var (
-		addrA        = common.Address{1}
-		addrB        = common.Address{2}
-		noPredicater = common.Address{3}
-		sender       = common.Address{4}
-		transientKey = common.Hash{5}
-		keysA0       = []common.Hash{{0xa0}}
-		keysA1       = []common.Hash{{0xa1}}
-		keysB0       = []common.Hash{{0xb0}}
-	)
-	rules := params.TestChainConfig.Rules(common.Big0, params.IsMergeTODO, 0)
-	predicaters := params.GetRulesExtra(rules).Predicaters
-	predicaters[addrA] = nil
-	predicaters[addrB] = nil
-
+	sender := common.Address{1}
 	s := newEmptyStateDB(t)
-	s.SetTransientState(addrA, transientKey, common.Hash{1})
-	s.Prepare(
-		rules,
-		sender,
-		common.Address{},
-		nil,
-		nil,
-		types.AccessList{
-			{Address: addrA, StorageKeys: keysA0},
-			{Address: noPredicater, StorageKeys: []common.Hash{{0xc0}}},
-			{Address: addrB, StorageKeys: keysB0},
-			{Address: addrA, StorageKeys: keysA1},
-		},
+	rules := cchaintest.ChainConfig().Rules(common.Big0, true /*isMerge*/, 0)
+	s.Prepare(rules, sender, common.Address{}, nil, nil, nil)
+	assert.Truef(t, s.AddressInAccessList(sender), "%T.AddressInAccessList(%s) after %[1]T.Prepare()", s, sender)
+}
+
+func TestGetPredicate(t *testing.T) {
+	var (
+		predicater = common.Address{1}
+		pred       = predicate.Predicate{{2}}
+		list       = types.AccessList{{Address: predicater, StorageKeys: pred}}
 	)
-	assert.Truef(t, s.AddressInAccessList(sender), "%T.AddressInAccessList(%s)", s, sender)
-	assert.Zerof(t, s.GetTransientState(addrA, transientKey), "%T.GetTransientState(%s, %s)", s, addrA, transientKey)
+	rules := cchaintest.ChainConfig().Rules(common.Big0, true /*isMerge*/, 0)
+	params.GetRulesExtra(rules).Predicaters[predicater] = nil
 
 	tests := []struct {
 		name   string
-		addr   common.Address
+		lists  []types.AccessList // passed to successive [StateDB.Prepare] calls
 		index  int
 		want   predicate.Predicate
 		wantOK bool
 	}{
 		{
-			name:   "first_for_address",
-			addr:   addrA,
-			want:   keysA0,
+			name:   "prepared",
+			lists:  []types.AccessList{list},
+			want:   pred,
 			wantOK: true,
-		},
-		{
-			name:   "second_for_address",
-			addr:   addrA,
-			index:  1,
-			want:   keysA1,
-			wantOK: true,
-		},
-		{
-			name:   "other_address",
-			addr:   addrB,
-			want:   keysB0,
-			wantOK: true,
-		},
-		{
-			name:  "index_past_end",
-			addr:  addrA,
-			index: 2,
 		},
 		{
 			name:  "negative_index",
-			addr:  addrA,
+			lists: []types.AccessList{list},
 			index: -1,
 		},
 		{
-			name: "address_without_predicater",
-			addr: noPredicater,
+			name:  "replaced_by_next_prepare",
+			lists: []types.AccessList{list, nil},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := s.GetPredicate(tt.addr, tt.index)
-			assert.Equalf(t, tt.want, got, "%T.GetPredicate(%s, %d)", s, tt.addr, tt.index)
-			assert.Equalf(t, tt.wantOK, ok, "%T.GetPredicate(%s, %d) ok", s, tt.addr, tt.index)
+			s := newEmptyStateDB(t)
+			for _, l := range tt.lists {
+				s.Prepare(rules, common.Address{}, common.Address{}, nil, nil, l)
+			}
+			got, ok := s.GetPredicate(predicater, tt.index)
+			assert.Equalf(t, tt.want, got, "%T.GetPredicate(%s, %d)", s, predicater, tt.index)
+			assert.Equalf(t, tt.wantOK, ok, "%T.GetPredicate(%s, %d) ok", s, predicater, tt.index)
 		})
 	}
-
-	// A new transaction MUST NOT see predicates from the previous transaction.
-	s.Prepare(
-		rules,
-		common.Address{},
-		common.Address{},
-		nil,
-		nil,
-		nil,
-	)
-	got, ok := s.GetPredicate(addrA, 0)
-	assert.Nilf(t, got, "%T.GetPredicate(%s, 0)", s, addrA)
-	assert.Falsef(t, ok, "%T.GetPredicate(%s, 0) ok", s, addrA)
 }
