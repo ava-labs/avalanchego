@@ -36,12 +36,7 @@ func TestBlockSerialization(t *testing.T) {
 			Seq:     1,
 			Prev:    genesisBlock.digest,
 		},
-		blacklist: common.Blacklist{
-			NodeCount: 3,
-			SuspectedNodes: []common.SuspectedNode{
-				{NodeIndex: 0, SuspectingCount: 2, OrbitSuspected: 11},
-			},
-		},
+		blacklist: common.NewBlacklist(3, common.GenesisMaxBlacklistedRounds),
 	}
 
 	// Serialize the block

@@ -21,7 +21,10 @@ var (
 	errFailedToParseSignature      = errors.New("failed to parse signature")
 )
 
-var _ common.Signer = (*BLSSigner)(nil)
+var (
+	_ common.Signer            = (*BLSSigner)(nil)
+	_ common.SignatureVerifier = (*BLSVerifier)(nil)
+)
 
 type SignFunc func(msg []byte) (*bls.Signature, error)
 
@@ -58,7 +61,7 @@ func NewBLSAuth(config *Config) (BLSSigner, BLSVerifier, error) {
 
 // Sign returns a signature on the given message using BLS signature scheme.
 // It encodes the message to sign with the chain ID, and network ID,
-func (s *BLSSigner) Sign(message []byte) ([]byte, error) {
+func (s *BLSSigner) Sign(message []byte) (common.SignatureBytes, error) {
 	message2Sign, err := encodeMessageToSign(message, s.chainID, s.networkID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode message to sign: %w", err)
@@ -113,6 +116,12 @@ func (v BLSVerifier) Verify(message []byte, signature []byte, signer common.Node
 		return errSignatureVerificationFailed
 	}
 
+	return nil
+}
+
+// VerifySignature verifies that [signature] is a valid signature over [message] by the holder of [publicKey].
+func (v BLSVerifier) VerifySignature(message []byte, signature common.SignatureBytes, publicKey common.PublicKeyBytes) error {
+	// TODO: implement
 	return nil
 }
 
