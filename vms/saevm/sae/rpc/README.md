@@ -14,7 +14,7 @@ just before the response is written.
 
 | Header | Value |
 | --- | --- |
-| `Gas-Used` | Total gas used by every `eth_call` in the request, batches included. Omitted if no `eth_call` executed. |
+| `Gas-Used` | Total gas used by every `eth_call` in the request, batches included. Omitted if no `eth_call` completed. |
 
 ## Stateful RPCs
 
