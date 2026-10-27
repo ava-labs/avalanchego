@@ -88,6 +88,7 @@ use_repo(
     "com_github_huin_goupnp",
     "com_github_jackpal_gateway",
     "com_github_jackpal_go_nat_pmp",
+    "com_github_kimmachinegun_automemlimit",
     "com_github_klauspost_compress",
     "com_github_leanovate_gopter",
     "com_github_mattn_go_colorable",

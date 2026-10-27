@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/memlimit"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -82,6 +83,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.String(DataDirKey, defaultDataDir, "Sets the base data directory where default sub-directories will be placed unless otherwise specified.")
 	// System
 	fs.Uint64(FdLimitKey, ulimit.DefaultFDLimit, "Attempts to raise the process file descriptor limit to at least this value and error if the value is above the system max")
+	fs.Float64(MemoryLimitRatioKey, memlimit.DefaultRatio, "Sets the Go runtime memory limit to this fraction of the cgroup memory limit, or of total system memory when not in a limited cgroup. 0 disables the limit. Ignored if GOMEMLIMIT is set")
 
 	// Plugin directory
 	fs.String(PluginDirKey, defaultPluginDir, "Path to the plugin directory")

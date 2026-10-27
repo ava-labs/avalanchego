@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/memlimit"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -1482,6 +1483,12 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 
 	// File Descriptor Limit
 	nodeConfig.FdLimit = v.GetUint64(FdLimitKey)
+
+	// Memory limit
+	nodeConfig.MemoryLimitRatio = v.GetFloat64(MemoryLimitRatioKey)
+	if r := nodeConfig.MemoryLimitRatio; r < 0 || r > 1 {
+		return node.Config{}, fmt.Errorf("%w: %f", memlimit.ErrInvalidRatio, r)
+	}
 
 	// Tx Fee
 	nodeConfig.TxFeeConfig = getTxFeeConfig(v, nodeConfig.NetworkID)
