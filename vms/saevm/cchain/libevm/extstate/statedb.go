@@ -108,7 +108,7 @@ func (s *StateDB) GetAssetBalance(addr common.Address, assetID common.Hash) *big
 }
 
 // AddAssetBalance adds amount of assetID to the balance of addr. A non-zero
-// amount marks addr as a multicoin account.
+// amount marks addr as having held an X-chain asset.
 //
 // amount MUST NOT be negative.
 func (s *StateDB) AddAssetBalance(addr common.Address, assetID common.Hash, amount *big.Int) {
@@ -119,8 +119,8 @@ func (s *StateDB) AddAssetBalance(addr common.Address, assetID common.Hash, amou
 		return
 	}
 
-	if !customtypes.IsMultiCoin(s.StateDB, addr) {
-		customtypes.SetMultiCoin(s.StateDB, addr, true)
+	if !customtypes.HeldXChainAsset(s.StateDB, addr) {
+		customtypes.MarkHeldXChainAsset(s.StateDB, addr)
 	}
 	balance := s.GetAssetBalance(addr, assetID)
 	balance.Add(balance, amount)
@@ -137,7 +137,7 @@ func (s *StateDB) SubAssetBalance(addr common.Address, assetID common.Hash, amou
 		return
 	}
 	// The balance is positive, so [StateDB.AddAssetBalance] has already
-	// marked addr as a multicoin account.
+	// marked addr as having held an X-chain asset.
 	balance := s.GetAssetBalance(addr, assetID)
 	balance.Sub(balance, amount)
 	s.setAssetBalance(addr, assetID, balance)

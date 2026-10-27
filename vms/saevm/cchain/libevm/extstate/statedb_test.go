@@ -119,11 +119,11 @@ func TestAssetBalance(t *testing.T) {
 		amount int64
 	}
 	tests := []struct {
-		name          string
-		ops           []op
-		want          int64
-		wantExist     bool
-		wantMultiCoin bool
+		name                string
+		ops                 []op
+		want                int64
+		wantExist           bool
+		wantHeldXChainAsset bool
 	}{
 		{
 			name:      "add_zero",
@@ -135,18 +135,18 @@ func TestAssetBalance(t *testing.T) {
 			ops:  []op{{sub: true}},
 		},
 		{
-			name:          "add",
-			ops:           []op{{amount: 10}},
-			want:          10,
-			wantExist:     true,
-			wantMultiCoin: true,
+			name:                "add",
+			ops:                 []op{{amount: 10}},
+			want:                10,
+			wantExist:           true,
+			wantHeldXChainAsset: true,
 		},
 		{
-			name:          "add_then_sub",
-			ops:           []op{{amount: 10}, {sub: true, amount: 4}},
-			want:          6,
-			wantExist:     true,
-			wantMultiCoin: true,
+			name:                "add_then_sub",
+			ops:                 []op{{amount: 10}, {sub: true, amount: 4}},
+			want:                6,
+			wantExist:           true,
+			wantHeldXChainAsset: true,
 		},
 	}
 	for _, tt := range tests {
@@ -165,15 +165,15 @@ func TestAssetBalance(t *testing.T) {
 			got := s.GetAssetBalance(addr, assetID)
 			assert.Zerof(t, big.NewInt(tt.want).Cmp(got), "%T.GetAssetBalance() = %d, want %d", s, got, tt.want)
 			assert.Equalf(t, tt.wantExist, s.Exist(addr), "%T.Exist(%s)", s, addr)
-			assert.Equal(t, tt.wantMultiCoin, customtypes.IsMultiCoin(s.StateDB, addr), "customtypes.IsMultiCoin()")
+			assert.Equal(t, tt.wantHeldXChainAsset, customtypes.HeldXChainAsset(s.StateDB, addr), "customtypes.HeldXChainAsset()")
 		})
 	}
 }
 
-// FuzzMultiCoinFlagInvariant checks that an account with a positive asset
-// balance is always flagged as multicoin, which [StateDB.SubAssetBalance]
-// relies on to not set the flag itself.
-func FuzzMultiCoinFlagInvariant(f *testing.F) {
+// FuzzHeldXChainAssetInvariant checks that an account with a positive asset
+// balance is always marked as having held an X-chain asset, which
+// [StateDB.SubAssetBalance] relies on to not set the flag itself.
+func FuzzHeldXChainAssetInvariant(f *testing.F) {
 	const (
 		add = iota
 		sub
@@ -215,7 +215,7 @@ func FuzzMultiCoinFlagInvariant(f *testing.F) {
 			}
 
 			if s.GetAssetBalance(addr, assetID).Sign() > 0 {
-				require.Truef(t, customtypes.IsMultiCoin(s.StateDB, addr), "customtypes.IsMultiCoin() with positive balance after op %#x", op)
+				require.Truef(t, customtypes.HeldXChainAsset(s.StateDB, addr), "customtypes.HeldXChainAsset() with positive balance after op %#x", op)
 			}
 		}
 	})
