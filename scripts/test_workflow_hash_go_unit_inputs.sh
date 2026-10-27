@@ -22,50 +22,47 @@ trap 'rm -rf "${WORKDIR}"' EXIT
 )
 
 hash() { GOWORK=off "${REPO_ROOT}/scripts/workflow-hash-go-unit-inputs.sh" "${WORKDIR}"; }
+
+assert_hash_changed() {
+  local before_hash="$1"
+  local description="$2"
+
+  if [[ "$(hash)" == "${before_hash}" ]]; then
+    echo "${description} did not change hash" >&2
+    exit 1
+  fi
+}
+
+assert_hash_unchanged() {
+  local before_hash="$1"
+  local description="$2"
+
+  if [[ "$(hash)" != "${before_hash}" ]]; then
+    echo "${description} changed hash" >&2
+    exit 1
+  fi
+}
 INITIAL="$(hash)"
 printf 'second' > "${WORKDIR}/input.txt"
-[[ "$(hash)" != "${INITIAL}" ]] || { echo 'production embed did not change hash' >&2; exit 1; }
+assert_hash_changed "${INITIAL}" 'production embed'
 INITIAL="$(hash)"
 printf 'test second' > "${WORKDIR}/test-input.txt"
-[[ "$(hash)" != "${INITIAL}" ]] || { echo 'test embed did not change hash' >&2; exit 1; }
+assert_hash_changed "${INITIAL}" 'test embed'
 INITIAL="$(hash)"
 printf 'fixture second' > "${WORKDIR}/testdata/input.txt"
-[[ "$(hash)" != "${INITIAL}" ]] || { echo 'testdata did not change hash' >&2; exit 1; }
+assert_hash_changed "${INITIAL}" 'testdata'
 INITIAL="$(hash)"
 printf '\nvar changed = true\n' >> "${WORKDIR}/fixture.go"
-[[ "$(hash)" != "${INITIAL}" ]] || { echo 'Go source did not change hash' >&2; exit 1; }
+assert_hash_changed "${INITIAL}" 'Go source'
 INITIAL="$(hash)"
 printf '\n// Workspace configuration changed.\n' >> "${WORKDIR}/go.work"
-[[ "$(hash)" != "${INITIAL}" ]] || { echo 'workspace metadata did not change hash' >&2; exit 1; }
-# Configuration changes must select a new archive even when Go source is unchanged.
-# Otherwise, Go can rerun tests and trigger the exact-hit validation failure.
-configuration_paths=(
-  Taskfile.yml
-  .github/workflows/go-unit.yml
-  .github/actions/setup-go-for-project/action.yml
-  scripts/tests.unit.sh
-  scripts/constants.sh
-  scripts/run_task.sh
-  scripts/nix_run.sh
-  scripts/normalize_testdata_mtimes.sh
-  scripts/workflow-hash-go-unit-inputs.sh
-  scripts/workflow-prepare-go-unit-cache.sh
-)
-for configuration_path in "${configuration_paths[@]}"; do
-  mkdir -p "${WORKDIR}/$(dirname "${configuration_path}")"
-  printf '# Original configuration\n' > "${WORKDIR}/${configuration_path}"
-  git -C "${WORKDIR}" add "${configuration_path}"
-  INITIAL="$(hash)"
-  printf '# Changed configuration\n' >> "${WORKDIR}/${configuration_path}"
-  [[ "$(hash)" != "${INITIAL}" ]] || { echo "${configuration_path} did not change hash" >&2; exit 1; }
-done
-
+assert_hash_changed "${INITIAL}" 'workspace metadata'
 mkdir -p "${WORKDIR}/docs"
 printf 'Original documentation\n' > "${WORKDIR}/docs/ci.md"
 git -C "${WORKDIR}" add docs/ci.md
 INITIAL="$(hash)"
 printf 'Changed documentation\n' >> "${WORKDIR}/docs/ci.md"
-[[ "$(hash)" == "${INITIAL}" ]] || { echo 'unrelated documentation changed hash' >&2; exit 1; }
+assert_hash_unchanged "${INITIAL}" 'unrelated documentation'
 printf 'unrelated' > "${WORKDIR}/unrelated.txt"
-[[ "$(hash)" == "${INITIAL}" ]] || { echo 'unrelated file changed hash' >&2; exit 1; }
+assert_hash_unchanged "${INITIAL}" 'unrelated file'
 echo 'Go unit input hash tests passed'

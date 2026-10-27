@@ -45,6 +45,10 @@ for module in "${MODULES[@]}"; do
 done
 
 # Include paths as well as file contents so a rename changes the key.
-while IFS= read -r -d '' input_path; do
-  printf '%s %s\n' "${input_path}" "$(git -C "${REPO_ROOT}" hash-object "${REPO_ROOT}/${input_path}")"
-done < <(sort -zu "${INPUT_PATHS}") | git hash-object --stdin
+# Git's --stdin-paths accepts newline-delimited paths, so this assumes repo
+# paths do not contain newlines.
+sorted_paths() { sort -zu "${INPUT_PATHS}" | tr '\0' '\n'; }
+paste -d' ' \
+  <(sorted_paths) \
+  <(sorted_paths | git -C "${REPO_ROOT}" hash-object --stdin-paths) |
+  git hash-object --stdin

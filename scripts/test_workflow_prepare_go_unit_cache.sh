@@ -62,7 +62,7 @@ assert_ran() {
 }
 
 prepare_cache() {
-  "${REPO_ROOT}/scripts/workflow-prepare-go-unit-cache.sh" "${GOCACHE}" "$@"
+  "${REPO_ROOT}/scripts/workflow-prepare-go-unit-cache.sh" "$@"
   [[ -f "${COMPILED_ARCHIVE}" ]] || { echo 'compiled package archive was removed' >&2; exit 1; }
 }
 

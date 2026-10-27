@@ -1,6 +1,6 @@
 name: Go Full Unit Test Jobs
 
-# Run Go unit tests; scheduled callers disable test-result reuse.
+# Run Go unit tests with optional test-result reuse.
 on:
   workflow_call:
     inputs:
@@ -12,7 +12,7 @@ on:
         required: true
         type: string
       reuse_test_results:
-        description: 'Reuse non-race test results; scheduled callers leave this disabled'
+        description: 'Reuse Go cached results for unit tests'
         required: false
         type: boolean
         default: false
@@ -71,10 +71,12 @@ jobs:
           # Separate scheduled build entries from entries whose test results
           # must be complete on an exact restore. Runner labels distinguish OS versions.
           cache_mode=${{ steps.test-config.outputs.cache-mode }}
+          go_build_cache_path="$(go env GOCACHE)"
           cache_key_platform_prefix="go-unit-${{ inputs.runner }}-${{ runner.arch }}-"
           cache_key_prefix="${cache_key_platform_prefix}${cache_mode}-"
           cache_key="${cache_key_prefix}$(./scripts/workflow-hash-go-unit-inputs.sh)"
           {
+            echo "go-build-cache-path=${go_build_cache_path}"
             echo "cache-key=${cache_key}"
             echo "cache-key-prefix=${cache_key_prefix}"
             echo "cache-key-platform-prefix=${cache_key_platform_prefix}"
@@ -83,21 +85,20 @@ jobs:
         name: Restore Go unit-test cache
         uses: actions/cache/restore@v5
         with:
-          path: ${{ steps.setup-go.outputs.go-build-cache-path }}
+          path: ${{ steps.cache-key.outputs.go-build-cache-path }}
           key: ${{ steps.cache-key.outputs.cache-key }}
           restore-keys: |
             ${{ steps.cache-key.outputs.cache-key-prefix }}
             ${{ steps.cache-key.outputs.cache-key-platform-prefix }}
       # Preserve reusable test results on fallbacks with unchanged fixtures.
-      # Scheduled jobs still rerun every test, including after exact hits.
+      # All tests run when test-result reuse is disabled.
       - name: Prepare restored Go unit cache
         shell: bash
         env:
-          GO_BUILD_CACHE: ${{ steps.setup-go.outputs.go-build-cache-path }}
           FIXTURE_HASH: ${{ hashFiles('**/testdata/**') }}
           CLEAR_TEST_RESULTS: ${{ steps.test-config.outputs.clear-test-results }}
           MATCHED_KEY: ${{ steps.unit-cache.outputs.cache-matched-key }}
-        run: ./scripts/workflow-prepare-go-unit-cache.sh "$GO_BUILD_CACHE" "$FIXTURE_HASH" "$CLEAR_TEST_RESULTS" "$MATCHED_KEY"
+        run: ./scripts/workflow-prepare-go-unit-cache.sh "$FIXTURE_HASH" "$CLEAR_TEST_RESULTS" "$MATCHED_KEY"
       - name: Run unit tests
         shell: bash
         run: |
@@ -119,5 +120,5 @@ jobs:
         if: ${{ steps.cache-policy.outputs.cache-save-allowed == 'true' && steps.unit-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5
         with:
-          path: ${{ steps.setup-go.outputs.go-build-cache-path }}
+          path: ${{ steps.cache-key.outputs.go-build-cache-path }}
           key: ${{ steps.cache-key.outputs.cache-key }}

@@ -607,44 +607,25 @@ These fallbacks let the job reuse compiled package output across modes. A
 pre-merge fallback can also reuse test results for packages with unchanged
 inputs.
 
-The table describes normal cache policy, without temporary validation
-exceptions. Cache saves require `refs/heads/master`. The `reuse_test_results`
-input determines whether jobs reuse test results.
+The cache policy below describes normal behavior, without temporary
+validation exceptions. Cache saves require `refs/heads/master`. Test-result
+reuse is enabled only for `test-unit`; shuffled tests always run without it.
+Scheduled jobs restore compiled output but run every test. On `master`, they
+save the updated build cache with test results expired. See [Validate cache
+saves before merge](#validate-cache-saves-before-merge) for temporary cache-write
+exceptions.
 
-| Event | Restore build cache | Reuse test-result cache | Save `GOCACHE` |
+| Event | Test task | Reuse test results | Save `GOCACHE` |
 | --- | --- | --- | --- |
-| Pull request | Yes | On an exact hit or a compatible fallback | No |
-| Merge queue, tag push, or `dev` push | Yes | On an exact hit or a compatible fallback | No |
-| `master` push | Yes | On an exact hit or a compatible fallback | Yes, including test results |
-| Scheduled on `master` | Yes | No | Yes, with test results expired |
-| Scheduled workflow, manual dispatch on `master` | Yes | No | Yes, with test results expired |
-| Scheduled workflow, manual dispatch on another ref | Yes | No | No |
+| Pull request | `test-unit` | Yes, on an exact hit or compatible fallback | No |
+| Merge queue, tag push, or `dev` push | `test-unit` | Yes, on an exact hit or compatible fallback | No |
+| `master` push | `test-unit` | Yes, on an exact hit or compatible fallback | Yes, including test results |
+| Scheduled on `master` | `test-unit` or `test-unit-race-shuffle` | No | Yes, with test results expired |
+| Manual dispatch on `master` | `test-unit` or `test-unit-race-shuffle` | No | Yes, with test results expired |
+| Manual dispatch on another ref | `test-unit` or `test-unit-race-shuffle` | No | No |
 
 A manual dispatch on another ref normally tests cache restoration and test
-execution, but not cache saving. See [Validate cache saves before
-merge](#validate-cache-saves-before-merge) for temporary cache-write exceptions.
-
-Scheduled jobs save build caches for platforms without a full unit job on PR or
-`master` pushes. Later scheduled runs can reuse compiled output while rerunning
-every test.
-
-Callers select one required `test_task`. The `reuse_test_results` input defaults
-to `false`. The workflow accepts these combinations:
-
-| Task | `reuse_test_results` | Cache mode |
-| --- | --- | --- |
-| `test-unit` | `true` | `build-and-test-results` |
-| `test-unit` | `false` | `build-only` |
-| `test-unit-race-shuffle` | `false` | `build-only` |
-
-The workflow rejects test-result reuse for shuffled tests.
-
-The pre-merge workflow selects `test-unit` and enables test-result reuse.
-Scheduled jobs select `test-unit` or `test-unit-race-shuffle` and leave reuse
-disabled. They retain restored build-cache entries
-but expire test results before testing. They expire test results again after
-successful tests, before a cache save. They run all tests to expose intermittent
-failures that reused test results could conceal.
+execution, but not cache saving.
 
 The two cache modes use different exact keys. A `build-only` entry has
 expired test results. Treating it as an exact test-result hit would make
