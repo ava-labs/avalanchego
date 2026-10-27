@@ -17,6 +17,8 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/event"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +35,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 )
 
 // TestIssueTxRejectsInvalidTransaction asserts that [Client.IssueTx] surfaces
@@ -131,6 +135,32 @@ func TestAwaitTxAccepted(t *testing.T) {
 		require.NoErrorf(t, err, "%T.AwaitTxAccepted()", sut.Client)
 		sut.assertTxAccepted(ctx, t, stx, blk.NumberU64())
 	})
+}
+
+// withoutEvents is a [txpool.Backend] that never sends post-execution events.
+type withoutEvents struct {
+	*sae.VM
+}
+
+func (withoutEvents) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
+	return new(event.FeedOf[core.ChainHeadEvent]).Subscribe(ch)
+}
+
+// TestTxpoolVerifiesLastExecutedState asserts that the txpool verifies against
+// the last executed state even when it never receives post-execution events.
+// APIs such as eth_getTransactionCount report a block as executed before the
+// pool receives its event.
+func TestTxpoolVerifiesLastExecutedState(t *testing.T) {
+	sk := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(sk.EthAddress()))
+	w := newWallet(sk, sut.ctx, sut.Client)
+
+	pool, err := txpool.New(sut.ctx, sut.chainConfig, txpool.NewPending(), withoutEvents{sut.VM.VM}, 1)
+	require.NoError(t, err, "txpool.New()")
+	t.Cleanup(pool.Close)
+
+	sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	require.NoErrorf(t, pool.Add(w.newMinimalTx(t)), "%T.Add()", pool)
 }
 
 // TestGetAllUTXOs asserts that [Client.GetAllUTXOs] yields each seeded UTXO
