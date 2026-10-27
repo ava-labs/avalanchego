@@ -16,10 +16,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -132,8 +132,8 @@ func TestStatefulPrecompile(t *testing.T) {
 				statedb.SetBalance(userAddr1, u256Hundred)
 				// Initialize multicoin balance and set it back to 0
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
-				wrappedStateDB.SubBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, bigHundred)
+				wrappedStateDB.SubAssetBalance(userAddr1, assetID, bigHundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
@@ -157,7 +157,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				statedb.SetBalance(userAddr1, u256Hundred)
 				// Initialize multicoin balance to 100
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, bigHundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
@@ -225,7 +225,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, bigHundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
@@ -242,8 +242,8 @@ func TestStatefulPrecompile(t *testing.T) {
 				user1Balance := statedb.GetBalance(userAddr1)
 				user2Balance := statedb.GetBalance(userAddr2)
 				wrappedStateDB := extstate.New(statedb)
-				user1AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr1, assetID)
-				user2AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr2, assetID)
+				user1AssetBalance := wrappedStateDB.GetAssetBalance(userAddr1, assetID)
+				user2AssetBalance := wrappedStateDB.GetAssetBalance(userAddr2, assetID)
 
 				expectedBalance := big.NewInt(50)
 				require.Equal(t, u256Hundred, user1Balance, "user 1 balance")
@@ -258,7 +258,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, bigHundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
@@ -276,8 +276,8 @@ func TestStatefulPrecompile(t *testing.T) {
 				user2Balance := statedb.GetBalance(userAddr2)
 				nativeAssetCallAddrBalance := statedb.GetBalance(NativeAssetCallAddr)
 				wrappedStateDB := extstate.New(statedb)
-				user1AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr1, assetID)
-				user2AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr2, assetID)
+				user1AssetBalance := wrappedStateDB.GetAssetBalance(userAddr1, assetID)
+				user2AssetBalance := wrappedStateDB.GetAssetBalance(userAddr2, assetID)
 				expectedBalance := big.NewInt(50)
 
 				require.Equal(t, uint256.NewInt(51), user1Balance, "user 1 balance")
@@ -293,7 +293,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, big.NewInt(50))
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, big.NewInt(50))
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
@@ -310,8 +310,8 @@ func TestStatefulPrecompile(t *testing.T) {
 				user1Balance := statedb.GetBalance(userAddr1)
 				user2Balance := statedb.GetBalance(userAddr2)
 				wrappedStateDB := extstate.New(statedb)
-				user1AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr1, assetID)
-				user2AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr2, assetID)
+				user1AssetBalance := wrappedStateDB.GetAssetBalance(userAddr1, assetID)
+				user2AssetBalance := wrappedStateDB.GetAssetBalance(userAddr2, assetID)
 
 				require.Equal(t, u256Hundred, user1Balance, "user 1 balance")
 				require.True(t, user2Balance.IsZero(), "user 2 balance should be zero")
@@ -325,7 +325,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, uint256.NewInt(50))
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, big.NewInt(50))
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, big.NewInt(50))
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
@@ -342,8 +342,8 @@ func TestStatefulPrecompile(t *testing.T) {
 				user1Balance := statedb.GetBalance(userAddr1)
 				user2Balance := statedb.GetBalance(userAddr2)
 				wrappedStateDB := extstate.New(statedb)
-				user1AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr1, assetID)
-				user2AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr2, assetID)
+				user1AssetBalance := wrappedStateDB.GetAssetBalance(userAddr1, assetID)
+				user2AssetBalance := wrappedStateDB.GetAssetBalance(userAddr2, assetID)
 
 				require.Equal(t, uint256.NewInt(50), user1Balance, "user 1 balance")
 				require.True(t, user2Balance.IsZero(), "user 2 balance should be zero")
@@ -357,7 +357,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, bigHundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
@@ -377,7 +377,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, bigHundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
@@ -394,8 +394,8 @@ func TestStatefulPrecompile(t *testing.T) {
 				user1Balance := statedb.GetBalance(userAddr1)
 				user2Balance := statedb.GetBalance(userAddr2)
 				wrappedStateDB := extstate.New(statedb)
-				user1AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr1, assetID)
-				user2AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr2, assetID)
+				user1AssetBalance := wrappedStateDB.GetAssetBalance(userAddr1, assetID)
+				user2AssetBalance := wrappedStateDB.GetAssetBalance(userAddr2, assetID)
 
 				require.Equal(t, u256Hundred, user1Balance, "user 1 balance")
 				require.True(t, user2Balance.IsZero(), "user 2 balance should be zero")
@@ -409,7 +409,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, bigHundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
@@ -429,7 +429,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, bigHundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},

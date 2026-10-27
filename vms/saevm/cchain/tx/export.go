@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
@@ -20,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -270,12 +270,12 @@ func (e *Export) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) 
 			continue
 		}
 
-		coinID := common.Hash(in.AssetID)
+		assetID := common.Hash(in.AssetID)
 		amount := new(big.Int).SetUint64(in.Amount)
-		if balance := statedb.GetBalanceMultiCoin(in.Address, coinID); balance.Cmp(amount) < 0 {
-			return fmt.Errorf("%w: address %s asset %s has %d want %d", errInsufficientFunds, in.Address, coinID, balance, amount)
+		if balance := statedb.GetAssetBalance(in.Address, assetID); balance.Cmp(amount) < 0 {
+			return fmt.Errorf("%w: address %s asset %s has %d want %d", errInsufficientFunds, in.Address, assetID, balance, amount)
 		}
-		statedb.SubBalanceMultiCoin(in.Address, coinID, amount)
+		statedb.SubAssetBalance(in.Address, assetID, amount)
 	}
 	return nil
 }
