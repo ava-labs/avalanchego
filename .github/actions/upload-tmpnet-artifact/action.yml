@@ -17,4 +17,6 @@ runs:
           ~/.tmpnet/networks
           ~/.tmpnet/prometheus/prometheus.log
           ~/.tmpnet/promtail/promtail.log
-        if-no-files-found: error
+        # If there is no data tmpnet might not have even started, so do not
+        # report this as a failure.
+        if-no-files-found: warn
