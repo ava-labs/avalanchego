@@ -123,6 +123,10 @@ tasks:
     desc: Run cacheable Go unit tests with Bazel
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh all'
 
+  bazel-test-unit-race:
+    desc: Run cacheable Go unit tests with Bazel race detection
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh all --config=race'
+
   bazel-test-unit-race-shuffle:
     desc: Run Go unit tests with Bazel (race detection and shuffle)
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh all --config=race-shuffle --nocache_test_results'
