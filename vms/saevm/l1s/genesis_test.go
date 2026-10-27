@@ -60,15 +60,6 @@ var (
 	testAllocFund = big.NewInt(1_000_000_000_000_000_000)
 )
 
-// mutateFeeConfig returns a copy of the default fee config with `mutate`
-// applied. The default is fully populated, so a mutation isolates the single
-// field under test.
-func mutateFeeConfig(mutate func(*commontype.FeeConfig)) commontype.FeeConfig {
-	c := l1params.DefaultFeeConfig
-	mutate(&c)
-	return c
-}
-
 func mustMarshal(v any) []byte {
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -77,11 +68,13 @@ func mustMarshal(v any) []byte {
 	return b
 }
 
-// testEthConfig returns the Ethereum portion of a chain config as an L1
-// genesis typically declares it: all block-based forks active, with the
-// time-based forks left to be derived from the Avalanche upgrades.
-func testEthConfig() *params.ChainConfig {
-	return &params.ChainConfig{
+type genesisOption = options.Option[legacy.Genesis]
+
+// testGenesis returns a minimal L1 genesis. Upgrade timestamps other than
+// SubnetEVM are left unset so that they default to the network upgrades of
+// the context used to parse the genesis.
+func testGenesis(opts ...genesisOption) *legacy.Genesis {
+	eth := &params.ChainConfig{
 		ChainID:             big.NewInt(testChainID),
 		HomesteadBlock:      big.NewInt(0),
 		EIP150Block:         big.NewInt(0),
@@ -95,16 +88,8 @@ func testEthConfig() *params.ChainConfig {
 		BerlinBlock:         big.NewInt(0),
 		LondonBlock:         big.NewInt(0),
 	}
-}
-
-type genesisOption = options.Option[legacy.Genesis]
-
-// testGenesis returns a minimal L1 genesis. Upgrade timestamps other than
-// SubnetEVM are left unset so that they default to the network upgrades of
-// the context used to parse the genesis.
-func testGenesis(opts ...genesisOption) *legacy.Genesis {
 	return options.ApplyTo(&legacy.Genesis{
-		Config: l1params.WithExtra(testEthConfig(), &extras.ChainConfig{
+		Config: l1params.WithExtra(eth, &extras.ChainConfig{
 			NetworkUpgrades: extras.NetworkUpgrades{
 				SubnetEVMTimestamp: new(uint64),
 			},
@@ -123,36 +108,46 @@ func testGenesisJSON(opts ...genesisOption) string {
 	return string(mustMarshal(testGenesis(opts...)))
 }
 
+func withGenesis(fn func(*legacy.Genesis)) genesisOption {
+	return options.Func[legacy.Genesis](fn)
+}
+
+// overridesJSON returns upgrade bytes that override the network upgrades
+// with u.
+func overridesJSON(u extras.NetworkUpgrades) string {
+	return string(mustMarshal(extras.UpgradeConfig{
+		NetworkUpgradeOverrides: &u,
+	}))
+}
+
 func withInitialMinDelay(delayMS uint64) genesisOption {
-	return options.Func[legacy.Genesis](func(g *legacy.Genesis) {
+	return withGenesis(func(g *legacy.Genesis) {
 		l1params.GetExtra(g.Config).InitialMinDelayMS = delayMS
 	})
 }
 
 func withFeeConfig(c commontype.FeeConfig) genesisOption {
-	return options.Func[legacy.Genesis](func(g *legacy.Genesis) {
+	return withGenesis(func(g *legacy.Genesis) {
 		l1params.GetExtra(g.Config).FeeConfig = c
 	})
 }
 
-func newContext(t *testing.T, fork upgradetest.Fork) *snow.Context {
+func newContext(t *testing.T, upgrades upgrade.Config) *snow.Context {
 	ctx := snowtest.Context(t, ids.GenerateTestID())
-	ctx.NetworkUpgrades = upgradetest.GetConfig(fork)
+	ctx.NetworkUpgrades = upgrades
 	ctx.Log = loggingtest.New(t, logging.Debug)
 	return ctx
 }
 
 func TestParseGenesis(t *testing.T) {
 	var (
-		latest             = newContext(t, upgradetest.Latest)
-		durango            = newContext(t, upgradetest.Durango)
-		mainnet            = newContext(t, upgradetest.Latest)
-		delayedTS          = new(testGenesisTime + 100)
-		zeroGraniteGenesis = testGenesisJSON(options.Func[legacy.Genesis](func(g *legacy.Genesis) {
+		latest = newContext(t, upgradetest.GetConfig(upgradetest.Latest))
+		// Mainnet has non-zero network upgrade times.
+		mainnet            = newContext(t, upgrade.Mainnet)
+		zeroGraniteGenesis = testGenesisJSON(withGenesis(func(g *legacy.Genesis) {
 			l1params.GetExtra(g.Config).GraniteTimestamp = new(uint64)
 		}))
 	)
-	mainnet.NetworkUpgrades = upgrade.Mainnet // neeed non-zero network upgrades
 	tests := []struct {
 		name         string
 		ctx          *snow.Context
@@ -174,11 +169,9 @@ func TestParseGenesis(t *testing.T) {
 			name:    "zero_upgrade_override_is_rejected",
 			ctx:     mainnet,
 			genesis: zeroGraniteGenesis,
-			upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
-				NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-					GraniteTimestamp: new(uint64),
-				},
-			})),
+			upgradeBytes: overridesJSON(extras.NetworkUpgrades{
+				GraniteTimestamp: new(uint64),
+			}),
 			wantErr: testerr.Contains("granite fork block timestamp is invalid"),
 		},
 		{
@@ -188,13 +181,11 @@ func TestParseGenesis(t *testing.T) {
 		},
 		{
 			name:    "upgrade_bytes",
-			ctx:     durango,
+			ctx:     newContext(t, upgradetest.GetConfig(upgradetest.Durango)),
 			genesis: testGenesisJSON(),
-			upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
-				NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-					DurangoTimestamp: delayedTS,
-				},
-			})),
+			upgradeBytes: overridesJSON(extras.NetworkUpgrades{
+				DurangoTimestamp: new(testGenesisTime + 100),
+			}),
 		},
 		{
 			name:    "invalid_json",
@@ -223,39 +214,39 @@ func TestParseGenesis(t *testing.T) {
 		{
 			name:    "non_zero_number",
 			ctx:     latest,
-			genesis: `{"config":{"chainId":43111},"gasLimit":"0x0","difficulty":"0x0","alloc":{},"number":"0x1"}`,
+			genesis: testGenesisJSON(withGenesis(func(g *legacy.Genesis) { g.Number = 1 })),
 			wantErr: testerr.Is(errNonZeroGenesisNumber),
 		},
 		{
 			name:    "non_zero_gas_used",
 			ctx:     latest,
-			genesis: `{"config":{"chainId":43111},"gasLimit":"0x0","difficulty":"0x0","alloc":{},"gasUsed":"0x1"}`,
+			genesis: testGenesisJSON(withGenesis(func(g *legacy.Genesis) { g.GasUsed = 1 })),
 			wantErr: testerr.Is(errNonZeroGenesisGasUsed),
 		},
 		{
 			name:    "nonzero_parent_hash",
 			ctx:     latest,
-			genesis: `{"config":{"chainId":43111},"gasLimit":"0x0","difficulty":"0x0","alloc":{},"parentHash":"0x0100000000000000000000000000000000000000000000000000000000000000"}`,
+			genesis: testGenesisJSON(withGenesis(func(g *legacy.Genesis) { g.ParentHash = common.Hash{1} })),
 			wantErr: testerr.Is(errNonZeroGenesisParentHash),
 		},
 		{
 			name:    "non_nil_excess_blob_gas",
 			ctx:     latest,
-			genesis: `{"config":{"chainId":43111},"gasLimit":"0x0","difficulty":"0x0","alloc":{},"excessBlobGas":"0x0"}`,
+			genesis: testGenesisJSON(withGenesis(func(g *legacy.Genesis) { g.ExcessBlobGas = new(uint64) })),
 			wantErr: testerr.Is(errNonNilGenesisExcessBlobGas),
 		},
 		{
 			name:    "non_nil_blob_gas_used",
 			ctx:     latest,
-			genesis: `{"config":{"chainId":43111},"gasLimit":"0x0","difficulty":"0x0","alloc":{},"blobGasUsed":"0x0"}`,
+			genesis: testGenesisJSON(withGenesis(func(g *legacy.Genesis) { g.BlobGasUsed = new(uint64) })),
 			wantErr: testerr.Is(errNonNilGenesisBlobGasUsed),
 		},
 		{
 			name: "invalid_fee_config",
 			ctx:  latest,
-			genesis: testGenesisJSON(withFeeConfig(mutateFeeConfig(func(c *commontype.FeeConfig) {
-				c.GasLimit = nil
-			}))),
+			genesis: testGenesisJSON(withGenesis(func(g *legacy.Genesis) {
+				l1params.GetExtra(g.Config).FeeConfig.GasLimit = nil
+			})),
 			wantErr: testerr.Is(commontype.ErrGasLimitNil),
 		},
 		{
@@ -270,23 +261,19 @@ func TestParseGenesis(t *testing.T) {
 			name:    "upgrade_override_before_network_upgrade",
 			ctx:     latest,
 			genesis: testGenesisJSON(),
-			upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
-				NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-					GraniteTimestamp: new(uint64(1)),
-				},
-			})),
+			upgradeBytes: overridesJSON(extras.NetworkUpgrades{
+				GraniteTimestamp: new(uint64(1)),
+			}),
 			wantErr: testerr.Contains("granite fork block timestamp is invalid"),
 		},
 		{
 			name:    "out_of_order_network_upgrade_overrides",
 			ctx:     latest,
 			genesis: testGenesisJSON(),
-			upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
-				NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-					// Granite remains active at [testGenesisTime]
-					EtnaTimestamp: new(testGenesisTime + 1),
-				},
-			})),
+			upgradeBytes: overridesJSON(extras.NetworkUpgrades{
+				// Granite remains active at [testGenesisTime]
+				EtnaTimestamp: new(testGenesisTime + 1),
+			}),
 			wantErr: testerr.Contains("unsupported fork ordering: etnaTimestamp enabled at timestamp"),
 		},
 		{
@@ -346,7 +333,7 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 		spec{
 			name:     "genesis_network_upgrades",
 			upgrades: upgradetest.Etna,
-			genesis: testGenesisJSON(options.Func[legacy.Genesis](func(g *legacy.Genesis) {
+			genesis: testGenesisJSON(withGenesis(func(g *legacy.Genesis) {
 				extra := l1params.GetExtra(g.Config)
 				extra.DurangoTimestamp = new(testGenesisTime + 1)
 				extra.EtnaTimestamp = new(testGenesisTime + 2)
@@ -361,14 +348,14 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 			// subnet-evm commits the genesis state with deleteEmptyObjects=false.
 			name:     "empty_account",
 			upgrades: upgradetest.Latest,
-			genesis: testGenesisJSON(options.Func[legacy.Genesis](func(g *legacy.Genesis) {
+			genesis: testGenesisJSON(withGenesis(func(g *legacy.Genesis) {
 				g.Alloc[common.Address{0xe0}] = types.Account{Balance: new(big.Int)}
 			})),
 		},
 		spec{
 			name:     "header_fields",
 			upgrades: upgradetest.Latest,
-			genesis: testGenesisJSON(options.Func[legacy.Genesis](func(g *legacy.Genesis) {
+			genesis: testGenesisJSON(withGenesis(func(g *legacy.Genesis) {
 				g.Nonce = 42
 				g.ExtraData = []byte("extra")
 				g.Mixhash = common.Hash{1}
@@ -380,7 +367,7 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 
 	for _, s := range specs {
 		t.Run(s.name, func(t *testing.T) {
-			ctx := newContext(t, s.upgrades)
+			ctx := newContext(t, upgradetest.GetConfig(s.upgrades))
 			g, err := parseGenesis(ctx, []byte(s.genesis), nil)
 			require.NoErrorf(t, err, "parseGenesis(%s)", s.genesis)
 
@@ -435,7 +422,7 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 		fork := upgradetest.Fork(_fork)
 		t.Run(fork.String(), func(t *testing.T) {
 			genesis := testGenesisJSON()
-			g, err := parseGenesis(newContext(t, fork), []byte(genesis), nil)
+			g, err := parseGenesis(newContext(t, upgradetest.GetConfig(fork)), []byte(genesis), nil)
 			require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
 
 			block, err := g.block()
@@ -461,11 +448,11 @@ func TestWriteGenesis(t *testing.T) {
 		upgradeBytes      string
 	}
 	newSpecContext := func(t *testing.T, s spec) *snow.Context {
-		ctx := newContext(t, s.fork)
+		upgrades := upgradetest.GetConfig(s.fork)
 		if !s.latestUpgradeTime.IsZero() {
-			ctx.NetworkUpgrades.IglooTime = s.latestUpgradeTime
+			upgrades.IglooTime = s.latestUpgradeTime
 		}
-		return ctx
+		return newContext(t, upgrades)
 	}
 
 	tests := []struct {
@@ -508,7 +495,7 @@ func TestWriteGenesis(t *testing.T) {
 			},
 			restart: spec{
 				fork: upgradetest.Latest,
-				genesis: testGenesisJSON(options.Func[legacy.Genesis](func(g *legacy.Genesis) {
+				genesis: testGenesisJSON(withGenesis(func(g *legacy.Genesis) {
 					g.Alloc[testAllocAddr] = types.Account{Balance: big.NewInt(1)}
 				})),
 			},
@@ -563,11 +550,9 @@ func TestWriteGenesis(t *testing.T) {
 				fork:              upgradetest.Latest,
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
 				genesis:           testGenesisJSON(),
-				upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
-					NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-						IglooTimestamp: new(testGenesisTime + 2_000),
-					},
-				})),
+				upgradeBytes: overridesJSON(extras.NetworkUpgrades{
+					IglooTimestamp: new(testGenesisTime + 2_000),
+				}),
 			},
 		},
 		{
@@ -582,11 +567,9 @@ func TestWriteGenesis(t *testing.T) {
 				fork:              upgradetest.Latest,
 				genesis:           testGenesisJSON(),
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
-				upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
-					NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-						IglooTimestamp: new(testGenesisTime + 3_000),
-					},
-				})),
+				upgradeBytes: overridesJSON(extras.NetworkUpgrades{
+					IglooTimestamp: new(testGenesisTime + 3_000),
+				}),
 			},
 			wantErr: errIsType[*params.ConfigCompatError](),
 		},
@@ -603,11 +586,9 @@ func TestWriteGenesis(t *testing.T) {
 				fork:              upgradetest.Latest,
 				genesis:           testGenesisJSON(),
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
-				upgradeBytes: string(mustMarshal(extras.UpgradeConfig{
-					NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-						IglooTimestamp: new(testGenesisTime + 3_000),
-					},
-				})),
+				upgradeBytes: overridesJSON(extras.NetworkUpgrades{
+					IglooTimestamp: new(testGenesisTime + 3_000),
+				}),
 			},
 		},
 		{
@@ -753,7 +734,7 @@ func requireStoredConfig(t *testing.T, db ethdb.Database, genesisHash common.Has
 // database and matches the root committed to by the written genesis header.
 func TestWriteGenesisState(t *testing.T) {
 	genesis := testGenesisJSON()
-	g, err := parseGenesis(newContext(t, upgradetest.Latest), []byte(genesis), nil)
+	g, err := parseGenesis(newContext(t, upgradetest.GetConfig(upgradetest.Latest)), []byte(genesis), nil)
 	require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
 
 	block, err := g.block()
