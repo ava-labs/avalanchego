@@ -14,6 +14,7 @@ go_library(
     deps = [
         "//ids",
         "//network/p2p/gossip",
+        "//utils/heap",
         "//vms/saevm/params",
         "//vms/saevm/saexec",
         "//vms/saevm/types",
@@ -33,7 +34,10 @@ go_library(
 
 go_test(
     name = "txgossip_test",
-    srcs = ["txgossip_test.go"],
+    srcs = [
+        "priority_test.go",
+        "txgossip_test.go",
+    ],
     data = glob(["testdata/**"]),
     embed = [":txgossip"],
     deps = [
