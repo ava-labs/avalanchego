@@ -259,14 +259,14 @@ func (s *service) GetAtomicTx(_ *http.Request, args *api.GetTxArgs, resp *GetTxR
 	)
 
 	t, height, err := s.state.GetTx(args.TxID)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errFetchingTx, err)
+	}
 	// Txs are indexed before their block is marked as executed. Reporting a tx
 	// earlier would let a client issue a dependent tx that the txpool rejects,
 	// so it is treated as unknown until then.
-	if err == nil && height > s.executed.LastExecuted().Height() {
-		err = database.ErrNotFound
-	}
-	if err != nil {
-		return fmt.Errorf("%w: %w", errFetchingTx, err)
+	if height > s.executed.LastExecuted().Height() {
+		return fmt.Errorf("%w: %w", errFetchingTx, database.ErrNotFound)
 	}
 	resp.Tx, err = encodeTx(t, args.Encoding)
 	if err != nil {

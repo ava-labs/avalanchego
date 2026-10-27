@@ -24,7 +24,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
@@ -138,20 +137,21 @@ func TestAwaitTxAccepted(t *testing.T) {
 	})
 }
 
-// TestGetTxNotExecuted asserts that [Client.GetTx] treats a tx as unknown while
-// it is indexed but its block is not yet marked as executed.
-func TestGetTxNotExecuted(t *testing.T) {
-	ctx, sut := newSUT(t)
-	stx := newWallet(txtest.NewKey(t), sut.ctx, sut.Client).newMinimalTx(t)
+// TestIssueAfterAwaitTxAccepted asserts that once [Client.AwaitTxAccepted]
+// returns, the next tx from the same account is accepted by the txpool.
+func TestIssueAfterAwaitTxAccepted(t *testing.T) {
+	sk := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(sk.EthAddress()))
+	w := newWallet(sk, sut.ctx, sut.Client)
 
-	// Index the tx as executing the next block would. That block is never
-	// executed, so the SUT MUST NOT execute anything after this.
-	height := sut.LastExecuted().Height() + 1
-	require.NoErrorf(t, sut.state.Apply(height, []*tx.Tx{stx}), "%T.Apply(%d)", sut.state, height)
-
-	_, _, err := sut.GetTx(ctx, stx.ID())
-	// JSON-RPC drops the error chain, so the sentinel's text is matched.
-	require.ErrorContainsf(t, err, database.ErrNotFound.Error(), "%T.GetTx()", sut.Client)
+	// A tx is indexed shortly before its block is marked as executed. Issuing
+	// many txs makes it likely that a regression issues one in that window.
+	for i := range 30 {
+		stx := w.newMinimalTx(t)
+		require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx(txs[%d])", sut.Client, i)
+		sut.buildVerifyAccept(ctx, t)
+		require.NoErrorf(t, sut.AwaitTxAccepted(ctx, stx.ID(), time.Millisecond), "%T.AwaitTxAccepted(txs[%d])", sut.Client, i)
+	}
 }
 
 // withoutEvents is a [txpool.Backend] that never sends post-execution events.
