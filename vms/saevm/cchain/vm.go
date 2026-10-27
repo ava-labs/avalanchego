@@ -255,7 +255,7 @@ func (vm *VM) Initialize(
 			if err != nil {
 				return fmt.Errorf("creating SAE handlers: %w", err)
 			}
-			service, err := newService(snowCtx, vm.gossipSet, pushGossiper, vm.state)
+			service, err := newService(snowCtx, vm.gossipSet, pushGossiper, vm.state, vm.VM)
 			if err != nil {
 				return fmt.Errorf("creating avax service: %w", err)
 			}

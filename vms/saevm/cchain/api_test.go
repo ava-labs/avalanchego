@@ -137,6 +137,23 @@ func TestAwaitTxAccepted(t *testing.T) {
 	})
 }
 
+// TestIssueAfterAwaitTxAccepted asserts that once [Client.AwaitTxAccepted]
+// returns, the next tx from the same account is accepted by the txpool.
+func TestIssueAfterAwaitTxAccepted(t *testing.T) {
+	sk := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(sk.EthAddress()))
+	w := newWallet(sk, sut.ctx, sut.Client)
+
+	// A tx is indexed shortly before its block is marked as executed. Issuing
+	// many txs makes it likely that a regression issues one in that window.
+	for i := range 30 {
+		stx := w.newMinimalTx(t)
+		require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx(txs[%d])", sut.Client, i)
+		sut.buildVerifyAccept(ctx, t)
+		require.NoErrorf(t, sut.AwaitTxAccepted(ctx, stx.ID(), time.Millisecond), "%T.AwaitTxAccepted(txs[%d])", sut.Client, i)
+	}
+}
+
 // withoutEvents is a [txpool.Backend] that never sends post-execution events.
 type withoutEvents struct {
 	*sae.VM
