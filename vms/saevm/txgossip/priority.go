@@ -4,12 +4,12 @@
 package txgossip
 
 import (
-	"slices"
-
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/holiman/uint256"
+
+	"github.com/ava-labs/avalanchego/utils/heap"
 )
 
 // A LazyTransaction couples a [txpool.LazyTransaction] with its sender.
@@ -18,56 +18,76 @@ type LazyTransaction struct {
 	Sender common.Address
 }
 
-// TransactionsByPriority calls [txpool.TxPool.Pending] with the given filter,
-// collapses the results into a slice, and sorts said slice by decreasing gas
-// tip then chronologically. Transactions from the same sender are merely sorted
-// by increasing nonce.
+// TransactionsByPriority returns [txpool.TxPool.Pending] by highest effective
+// gas tip, then first seen, then sender address. Each sender's transactions stay
+// in nonce order.
 func (s *Set) TransactionsByPriority(filter txpool.PendingFilter) []*LazyTransaction {
 	// TODO(arr4n) investigate optimisations; e.g. skipping entire accounts once
 	// the block builder has found that a lower-nonced tx is invalid.
 
-	pending := s.Pool.Pending(filter)
+	return byPriority(s.Pool.Pending(filter), filter.BaseFee)
+}
+
+// senderTxs is a sender's remaining transactions and the effective gas tip of
+// the next one.
+type senderTxs struct {
+	from common.Address
+	txs  []*txpool.LazyTransaction
+	tip  *uint256.Int
+}
+
+func byPriority(pending map[common.Address][]*txpool.LazyTransaction, baseFee *uint256.Int) []*LazyTransaction {
 	var n int
-	for _, txs := range pending {
-		n += len(txs)
-	}
-
-	all := make([]*LazyTransaction, n)
-	var i int
+	senders := make([]*senderTxs, 0, len(pending))
 	for from, txs := range pending {
-		for _, tx := range txs {
-			all[i] = &LazyTransaction{
-				LazyTransaction: tx,
-				Sender:          from,
-			}
-			i++
+		if len(txs) == 0 {
+			continue
 		}
+		n += len(txs)
+		senders = append(senders, &senderTxs{
+			from: from,
+			txs:  txs,
+			tip:  effectiveGasTip(txs[0], baseFee),
+		})
 	}
 
-	slices.SortStableFunc(all, func(a, b *LazyTransaction) int {
-		if a.Sender == b.Sender {
-			// [txpool.TxPool.Pending] already returns each slice in nonce order
-			// and we're performing a stable sort. A direct comparison of nonces
-			// would require resolving the lazy transaction.
-			return 0
+	// A sort can't respect both tip and nonce order, so merge the senders.
+	q := heap.QueueOf(func(a, b *senderTxs) bool {
+		if c := a.tip.Cmp(b.tip); c != 0 {
+			return c > 0 // Higher tips first
 		}
-
-		aTip := a.effectiveGasTip(filter.BaseFee)
-		bTip := b.effectiveGasTip(filter.BaseFee)
-		if tip := aTip.Cmp(bTip); tip != 0 {
-			return -tip // Higher tips first
+		if c := a.txs[0].Time.Compare(b.txs[0].Time); c != 0 {
+			return c < 0
 		}
+		// Senders are unique, so the order is deterministic.
+		return a.from.Cmp(b.from) < 0
+	}, senders...)
 
-		return a.Time.Compare(b.Time)
-	})
-	return all
+	all := make([]*LazyTransaction, 0, n)
+	for {
+		s, ok := q.Peek()
+		if !ok {
+			return all
+		}
+		all = append(all, &LazyTransaction{
+			LazyTransaction: s.txs[0],
+			Sender:          s.from,
+		})
+
+		if s.txs = s.txs[1:]; len(s.txs) == 0 {
+			q.Pop()
+			continue
+		}
+		s.tip = effectiveGasTip(s.txs[0], baseFee)
+		q.Fix(0)
+	}
 }
 
 // effectiveGasTip is equivalent to [types.Transaction.EffectiveGasTip] but
 // assumes that `baseFee` is either nil or <= the transaction's fee cap. This
 // assumption avoids the need for [types.ErrGasFeeCapTooLow]. If this invariant
 // is broken, effectiveGasTip returns zero.
-func (ltx *LazyTransaction) effectiveGasTip(baseFee *uint256.Int) *uint256.Int {
+func effectiveGasTip(ltx *txpool.LazyTransaction, baseFee *uint256.Int) *uint256.Int {
 	fee := ltx.GasFeeCap
 	tip := ltx.GasTipCap
 

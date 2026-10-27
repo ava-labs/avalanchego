@@ -574,19 +574,17 @@ func FuzzEffectiveGasTip(f *testing.F) {
 			require.NoErrorf(t, err, "%T.EffectiveGasTip(...)", tx)
 		}
 
-		ltx := &LazyTransaction{
-			LazyTransaction: &txpool.LazyTransaction{
-				GasFeeCap: feeCap,
-				GasTipCap: tipCap,
-			},
+		ltx := &txpool.LazyTransaction{
+			GasFeeCap: feeCap,
+			GasTipCap: tipCap,
 		}
-		got := ltx.effectiveGasTip(baseFee)
+		got := effectiveGasTip(ltx, baseFee)
 
 		if got.ToBig().Cmp(want) != 0 {
 			t.Logf("Fee cap: %v", feeCap)
 			t.Logf("Tip cap: %v", tipCap)
 			t.Logf("Base fee: %v", baseFee)
-			t.Errorf("%T.effectiveGasTip(...) got %v; want %v", ltx, got, want)
+			t.Errorf("effectiveGasTip(...) got %v; want %v", got, want)
 		}
 	})
 }
