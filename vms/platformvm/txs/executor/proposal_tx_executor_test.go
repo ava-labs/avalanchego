@@ -586,7 +586,7 @@ func TestProposalTxExecuteAddValidatorErrors(t *testing.T) {
 			nodeID:    genesistest.DefaultNodeIDs[0],
 			startTime: genesistest.DefaultValidatorStartTimeUnix + 1,
 			endTime:   genesistest.DefaultValidatorEndTimeUnix,
-			want:      errAlreadyValidator,
+			want:      ErrDuplicateValidator,
 		},
 		{
 			name:      "already_pending_validator_of_primary_network",
@@ -601,7 +601,7 @@ func TestProposalTxExecuteAddValidatorErrors(t *testing.T) {
 					Wght:   env.config.MinValidatorStake,
 				})
 			},
-			want: errAlreadyValidator,
+			want: ErrDuplicateValidator,
 		},
 		{
 			name:      "tx_fee_paying_key_has_no_funds",

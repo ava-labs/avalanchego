@@ -167,14 +167,14 @@ func TestStandardExecutorAddValidatorTxErrors(t *testing.T) {
 				_, err := AdvanceTimeTo(&env.backend, diff, startTime)
 				require.NoError(t, err)
 			},
-			want: errAlreadyValidator,
+			want: ErrDuplicateValidator,
 		},
 		{
 			name: "already_in_pending_validator_set",
 			updateState: func(diff *state.Diff) {
 				putPendingValidator(t, env, diff, pendingValidatorKey, pendingValidator)
 			},
-			want: errAlreadyValidator,
+			want: ErrDuplicateValidator,
 		},
 		{
 			name: "insufficient_balance_to_cover_stake",
