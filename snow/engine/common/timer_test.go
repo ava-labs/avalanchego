@@ -5,8 +5,12 @@ package common
 
 import (
 	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestTimeoutScheduler(t *testing.T) {
@@ -65,7 +69,7 @@ func TestTimeoutScheduler(t *testing.T) {
 				testCase.advanceTime(testCase.clock)
 			}
 
-			ts := NewTimeoutScheduler(onTimeout, ps)
+			ts := NewTimeoutScheduler(onTimeout, ps, nil)
 			ts.newTimer = newTimer
 
 			for i := 0; i < testCase.expectedInvocationCount; i++ {
@@ -90,7 +94,7 @@ func TestTimeoutSchedulerConcurrentRegister(*testing.T) {
 
 	preemptChan := make(<-chan struct{})
 
-	ts := NewTimeoutScheduler(wg.Done, preemptChan)
+	ts := NewTimeoutScheduler(wg.Done, preemptChan, nil)
 	ts.newTimer = newTimer
 
 	ts.RegisterTimeout(time.Hour) // First timeout is registered
@@ -101,6 +105,34 @@ func TestTimeoutSchedulerConcurrentRegister(*testing.T) {
 	clock <- time.Now()
 
 	wg.Wait()
+}
+
+func TestTimeoutSchedulerShutdown(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		preempt bool
+	}{
+		{name: "pending"},
+		{name: "preempted", preempt: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var called atomic.Bool
+				preemption := make(chan struct{})
+				shutdown := make(chan struct{})
+				ts := NewTimeoutScheduler(func() { called.Store(true) }, preemption, shutdown)
+				ts.RegisterTimeout(time.Hour)
+
+				close(shutdown)
+				if tt.preempt {
+					close(preemption)
+				}
+				synctest.Wait()
+
+				require.False(t, called.Load(), "timeout fired after shutdown")
+			})
+		})
+	}
 }
 
 func makeMockedTimer(clock chan time.Time) func(time.Duration) *time.Timer {

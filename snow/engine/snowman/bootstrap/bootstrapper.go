@@ -112,6 +112,8 @@ type Bootstrapper struct {
 	// number of state transitions executed
 	executedStateTransitions uint64
 	awaitingTimeout          bool
+	// closed by Shutdown to drop a pending timeout
+	shutdown chan struct{}
 
 	tree            *interval.Tree
 	missingBlockIDs set.Set[ids.ID]
@@ -150,6 +152,7 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 		onFinished:               onFinished,
 		lastProgressUpdateTime:   time.Now(),
 		etaTracker:               timer.NewEtaTracker(10, 1.2),
+		shutdown:                 make(chan struct{}),
 	}
 
 	timeout := func() {
@@ -160,7 +163,11 @@ func New(config Config, onFinished func(ctx context.Context, lastReqID uint32) e
 			bs.Config.Ctx.Log.Warn("Encountered error during bootstrapping: %w", zap.Error(err))
 		}
 	}
-	bs.TimeoutRegistrar = common.NewTimeoutScheduler(timeout, config.BootstrapTracker.AllBootstrapped())
+	bs.TimeoutRegistrar = common.NewTimeoutScheduler(
+		timeout,
+		config.BootstrapTracker.AllBootstrapped(),
+		bs.shutdown,
+	)
 
 	return bs, err
 }
@@ -809,6 +816,7 @@ func (b *Bootstrapper) Shutdown(ctx context.Context) error {
 	b.Ctx.Lock.Lock()
 	defer b.Ctx.Lock.Unlock()
 
+	close(b.shutdown)
 	return b.VM.Shutdown(ctx)
 }
 
