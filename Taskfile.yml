@@ -117,6 +117,8 @@ tasks:
     cmds:
       - task: bazel-test-e2e
         vars:
+          # THROWAWAY: break the remote cache to repro the tmpnet upload failure.
+          BAZEL_ARGS: --remote_cache=grpc://127.0.0.1:1
           E2E_ARGS: --ginkgo.focus-file=c/api.go
 
   bazel-test-unit:
