@@ -404,36 +404,39 @@ func TestSyncAfterAbandonedSync(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		ctx := t.Context()
-		sourceVM := newVM(t, tt.opts...)
-		sourceVM.acceptBlocks(t, defaultCommitInterval)
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ctx := t.Context()
+			sourceVM := newVM(t, tt.opts...)
+			sourceVM.acceptBlocks(t, defaultCommitInterval)
 
-		db := memdb.New()
-		dir := t.TempDir()
-		opts := slices.Concat(tt.opts, []sutOption{withDatabase(db), withChainDataDir(dir)})
-		client := newSUT(t, opts...)
-		saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+			db := memdb.New()
+			dir := t.TempDir()
+			opts := slices.Concat(tt.opts, []sutOption{withDatabase(db), withChainDataDir(dir)})
+			client := newSUT(t, opts...)
+			saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
 
-		abandoned, err := sourceVM.GetLastStateSummary(ctx)
-		require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
-		syncer := client.syncer()
-		require.NoErrorf(t, syncer.Sync(ctx, abandoned), "%T.Sync(%v)", syncer, abandoned)
-		// [Syncer.WriteSynced] is deliberately skipped, as if the node shut down.
+			abandoned, err := sourceVM.GetLastStateSummary(ctx)
+			require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
+			syncer := client.syncer()
+			require.NoErrorf(t, syncer.Sync(ctx, abandoned), "%T.Sync(%v)", syncer, abandoned)
+			// [Syncer.WriteSynced] is deliberately skipped, as if the node shut down.
 
-		// The network moved on while the node was down.
-		sourceVM.acceptBlocks(t, defaultCommitInterval)
-		summary, err := sourceVM.GetLastStateSummary(ctx)
-		require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
+			// The network moved on while the node was down.
+			sourceVM.acceptBlocks(t, defaultCommitInterval)
+			summary, err := sourceVM.GetLastStateSummary(ctx)
+			require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
 
-		// Test invariant: the two summaries commit to different state.
-		abandonedRoot := sourceVM.blockAtHeight(t, abandoned.Height()).Header().Root
-		summaryRoot := sourceVM.blockAtHeight(t, summary.Height()).Header().Root
-		require.NotEqual(t, abandonedRoot, summaryRoot, "state roots of the two summaries")
+			// Test invariant: the two summaries commit to different state.
+			abandonedRoot := sourceVM.blockAtHeight(t, abandoned.Height()).Header().Root
+			summaryRoot := sourceVM.blockAtHeight(t, summary.Height()).Header().Root
+			require.NotEqual(t, abandonedRoot, summaryRoot, "state roots of the two summaries")
 
-		// A restarted node constructs a fresh handler over the same database.
-		client = newSUT(t, opts...)
-		saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
-		require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
+			// A restarted node constructs a fresh handler over the same database.
+			client = newSUT(t, opts...)
+			saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+			require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
+		})
 	}
 }
 
