@@ -10,25 +10,23 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
-	"github.com/ava-labs/libevm/libevm/stateconf"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 )
 
-// RegisterExtras registers the libevm hooks that give the EVM the C-Chain's
-// behaviour: the StateDB is wrapped for multicoin state keys and, since
-// Shanghai, Difficulty is moved into Random.
+// RegisterExtras registers the libevm hooks that wrap the EVM's StateDB in an
+// [extstate.StateDB].
 //
-// It MUST NOT be called more than once and is therefore only allowed in tests
-// and `package main`, to avoid polluting other packages that transitively
-// depend on this one but don't need registration.
+// Callers SHOULD NOT call it directly, and SHOULD instead use
+// `vms/saevm/cchain/libevm.RegisterExtras()`, which registers all
+// C-Chain extras together.
 func RegisterExtras() {
 	vm.RegisterHooks(hooks{})
 }
 
 // WithTempRegisteredExtras runs fn with the C-Chain's EVM hooks temporarily
-// registered. The previous hooks are restored after fn returns.
+// registered. Any previous hooks are restored after fn returns.
 //
 // Callers SHOULD NOT call it directly, and SHOULD instead use
 // `vms/saevm/cchain/libevm.WithTempRegisteredExtras()`, which registers all
@@ -40,8 +38,9 @@ func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
 // hooks implements [vm.Hooks] to achieve the C-Chain's EVM behaviour.
 type hooks struct{}
 
-// PreprocessingGasCharge is not necessary.
-// It is required to implement the vm.Hooks interface, but is only needed post-SAE.
+// PreprocessingGasCharge returns 0: the C-Chain charges predicate verification
+// as part of a transaction's intrinsic gas, through the [params] hooks, rather
+// than as a preprocessing charge.
 func (hooks) PreprocessingGasCharge(common.Hash) (uint64, error) {
 	return 0, nil
 }
@@ -51,13 +50,11 @@ func (hooks) PreprocessingGasCharge(common.Hash) (uint64, error) {
 // Specifically, we set Random to be the same as Difficulty since Shanghai.
 // This allows using the same jump table as upstream.
 // Then we set Difficulty to 0 as it is post Merge in upstream.
-// Additionally we wrap the StateDB with the appropriate StateDB wrapper,
-// which is used in coreth to process historical pre-AP1 blocks with the
-// [StateDbAP1.GetCommittedState] method as it was historically.
+// Additionally we wrap the StateDB in an [extstate.StateDB].
 func (hooks) OverrideNewEVMArgs(args *vm.NewEVMArgs) *vm.NewEVMArgs {
-	rules := args.ChainConfig.Rules(args.BlockContext.BlockNumber, true /*isMerge*/, args.BlockContext.Time)
-	args.StateDB = wrapStateDB(rules, args.StateDB)
+	args.StateDB = wrapStateDB(args.StateDB)
 
+	rules := args.ChainConfig.Rules(args.BlockContext.BlockNumber, true /*isMerge*/, args.BlockContext.Time)
 	if rules.IsShanghai {
 		args.BlockContext.Random = new(common.Hash)
 		args.BlockContext.Random.SetBytes(args.BlockContext.Difficulty.Bytes())
@@ -67,34 +64,11 @@ func (hooks) OverrideNewEVMArgs(args *vm.NewEVMArgs) *vm.NewEVMArgs {
 	return args
 }
 
-func (hooks) OverrideEVMResetArgs(rules params.Rules, args *vm.EVMResetArgs) *vm.EVMResetArgs {
-	args.StateDB = wrapStateDB(rules, args.StateDB)
+func (hooks) OverrideEVMResetArgs(_ params.Rules, args *vm.EVMResetArgs) *vm.EVMResetArgs {
+	args.StateDB = wrapStateDB(args.StateDB)
 	return args
 }
 
-func wrapStateDB(rules params.Rules, statedb vm.StateDB) vm.StateDB {
-	wrappedStateDB := extstate.New(statedb.(*state.StateDB))
-	if params.GetRulesExtra(rules).IsApricotPhase1 {
-		return wrappedStateDB
-	}
-	return &stateDBAP0{wrappedStateDB}
-}
-
-// stateDBAP0 implements the GetCommittedState behavior that existed prior to
-// the AP1 upgrade.
-//
-// Since launch, state keys have been normalized to allow for multicoin
-// balances. However, at launch GetCommittedState was not updated. This meant
-// that gas refunds were not calculated as expected for SSTORE opcodes.
-//
-// This oversight was fixed in AP1, but in order to execute blocks prior to AP1
-// and generate the same merkle root, this behavior must be maintained.
-//
-// See the [extstate] package for details around state key normalization.
-type stateDBAP0 struct {
-	*extstate.StateDB
-}
-
-func (s *stateDBAP0) GetCommittedState(addr common.Address, key common.Hash, _ ...stateconf.StateDBStateOption) common.Hash {
-	return s.StateDB.GetCommittedState(addr, key, stateconf.SkipStateKeyTransformation())
+func wrapStateDB(statedb vm.StateDB) vm.StateDB {
+	return extstate.New(statedb.(*state.StateDB))
 }

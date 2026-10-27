@@ -37,16 +37,8 @@ func TestHooksOverrideNewEVMArgs(t *testing.T) {
 		wantDifficulty *big.Int
 	}{
 		{
-			name:           "pre_ap1_wraps_statedb_without_key_normalization",
+			name:           "pre_shanghai_keeps_difficulty",
 			config:         params.WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &extras.ChainConfig{}),
-			wantStateDB:    &stateDBAP0{},
-			wantDifficulty: difficulty,
-		},
-		{
-			name: "ap1_wraps_statedb",
-			config: params.WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &extras.ChainConfig{
-				NetworkUpgrades: extras.NetworkUpgrades{ApricotPhase1BlockTimestamp: new(uint64)},
-			}),
 			wantStateDB:    &extstate.StateDB{},
 			wantDifficulty: difficulty,
 		},

@@ -69,6 +69,9 @@ type StateDB struct {
 
 	// predicates is set by [StateDB.Prepare] and not modified during execution.
 	predicates map[common.Address][]predicate.Predicate
+	// preAP1 is set by [StateDB.Prepare] and selects the pre-AP1 behaviour of
+	// [StateDB.GetCommittedState].
+	preAP1 bool
 }
 
 // New returns a [StateDB] that wraps db.
@@ -86,8 +89,23 @@ func (s *StateDB) Prepare(
 	precompiles []common.Address,
 	list types.AccessList,
 ) {
-	s.predicates = predicate.FromAccessList((*params.RulesExtra)(params.GetRulesExtra(rules)), list)
+	rulesExtra := params.GetRulesExtra(rules)
+	s.predicates = predicate.FromAccessList((*params.RulesExtra)(rulesExtra), list)
+	s.preAP1 = !rulesExtra.IsApricotPhase1
 	s.StateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)
+}
+
+// GetCommittedState returns the committed value of addr's storage slot key.
+//
+// Since launch, keys have been moved into the contract storage partition, but
+// GetCommittedState was only updated in AP1: before that it read the
+// untransformed key, which changed the gas refunds of SSTORE. Blocks before AP1
+// must keep this behaviour to produce the same state roots.
+func (s *StateDB) GetCommittedState(addr common.Address, key common.Hash, opts ...stateconf.StateDBStateOption) common.Hash {
+	if s.preAP1 {
+		opts = append(opts, stateconf.SkipStateKeyTransformation())
+	}
+	return s.StateDB.GetCommittedState(addr, key, opts...)
 }
 
 // GetPredicate returns address's index-th predicate in the access list passed
