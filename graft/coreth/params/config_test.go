@@ -40,6 +40,15 @@ import (
 )
 
 func TestCheckCompatible(t *testing.T) {
+	var (
+		ap1Config = WithExtra(&ChainConfig{}, &extras.ChainConfig{
+			NetworkUpgrades: extras.NetworkUpgrades{
+				ApricotPhase1BlockTimestamp: new(uint64),
+			},
+		})
+		noUpgradesConfig = WithExtra(&ChainConfig{}, &extras.ChainConfig{})
+	)
+
 	type test struct {
 		stored, new   *ChainConfig
 		headBlock     uint64
@@ -47,9 +56,9 @@ func TestCheckCompatible(t *testing.T) {
 		wantErr       *ethparams.ConfigCompatError
 	}
 	tests := []test{
-		{stored: TestChainConfig, new: TestChainConfig, headBlock: 0, headTimestamp: 0, wantErr: nil},
-		{stored: TestChainConfig, new: TestChainConfig, headBlock: 0, headTimestamp: uint64(time.Now().Unix()), wantErr: nil},
-		{stored: TestChainConfig, new: TestChainConfig, headBlock: 100, wantErr: nil},
+		{stored: ap1Config, new: ap1Config, headBlock: 0, headTimestamp: 0, wantErr: nil},
+		{stored: ap1Config, new: ap1Config, headBlock: 0, headTimestamp: uint64(time.Now().Unix()), wantErr: nil},
+		{stored: ap1Config, new: ap1Config, headBlock: 100, wantErr: nil},
 		{
 			stored:        &ChainConfig{EIP150Block: big.NewInt(10)},
 			new:           &ChainConfig{EIP150Block: big.NewInt(20)},
@@ -58,7 +67,7 @@ func TestCheckCompatible(t *testing.T) {
 			wantErr:       nil,
 		},
 		{
-			stored:        TestChainConfig,
+			stored:        &ChainConfig{HomesteadBlock: big.NewInt(0)},
 			new:           &ChainConfig{HomesteadBlock: nil},
 			headBlock:     3,
 			headTimestamp: 30,
@@ -70,7 +79,7 @@ func TestCheckCompatible(t *testing.T) {
 			},
 		},
 		{
-			stored:        TestChainConfig,
+			stored:        &ChainConfig{HomesteadBlock: big.NewInt(0)},
 			new:           &ChainConfig{HomesteadBlock: big.NewInt(1)},
 			headBlock:     3,
 			headTimestamp: 30,
@@ -113,24 +122,24 @@ func TestCheckCompatible(t *testing.T) {
 			},
 		},
 		{
-			stored:        TestApricotPhase5Config,
-			new:           TestApricotPhase4Config,
+			stored:        ap1Config,
+			new:           noUpgradesConfig,
 			headBlock:     0,
 			headTimestamp: 0,
 			wantErr: &ethparams.ConfigCompatError{
-				What:         "ApricotPhase5 fork block timestamp",
+				What:         "ApricotPhase1 fork block timestamp",
 				StoredTime:   utils.PointerTo[uint64](0),
 				NewTime:      nil,
 				RewindToTime: 0,
 			},
 		},
 		{
-			stored:        TestApricotPhase5Config,
-			new:           TestApricotPhase4Config,
+			stored:        ap1Config,
+			new:           noUpgradesConfig,
 			headBlock:     10,
 			headTimestamp: 100,
 			wantErr: &ethparams.ConfigCompatError{
-				What:         "ApricotPhase5 fork block timestamp",
+				What:         "ApricotPhase1 fork block timestamp",
 				StoredTime:   utils.PointerTo[uint64](0),
 				NewTime:      nil,
 				RewindToTime: 0,
@@ -156,15 +165,15 @@ func TestConfigRules(t *testing.T) {
 		},
 	)
 	var stamp uint64
-	if r := c.Rules(big.NewInt(0), IsMergeTODO, stamp); GetRulesExtra(r).IsDurango {
+	if r := c.Rules(big.NewInt(0), true /*isMerge*/, stamp); GetRulesExtra(r).IsDurango {
 		t.Errorf("expected %v to not be durango", stamp)
 	}
 	stamp = 500
-	if r := c.Rules(big.NewInt(0), IsMergeTODO, stamp); !GetRulesExtra(r).IsDurango {
+	if r := c.Rules(big.NewInt(0), true /*isMerge*/, stamp); !GetRulesExtra(r).IsDurango {
 		t.Errorf("expected %v to be durango", stamp)
 	}
 	stamp = math.MaxInt64
-	if r := c.Rules(big.NewInt(0), IsMergeTODO, stamp); !GetRulesExtra(r).IsDurango {
+	if r := c.Rules(big.NewInt(0), true /*isMerge*/, stamp); !GetRulesExtra(r).IsDurango {
 		t.Errorf("expected %v to be durango", stamp)
 	}
 }

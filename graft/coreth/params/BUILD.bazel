@@ -13,7 +13,6 @@ go_library(
         "config_extra.go",
         "config_libevm.go",
         "hooks_libevm.go",
-        "protocol_params_ext.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/params",
     deps = [
@@ -24,7 +23,6 @@ go_library(
         "//graft/coreth/precompile/modules",
         "//graft/coreth/precompile/precompileconfig",
         "//graft/evm/precompileconfig",
-        "//graft/evm/utils",
         "//snow",
         "//utils/set",
         "//vms/evm/predicate",
