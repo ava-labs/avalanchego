@@ -42,6 +42,8 @@ const (
 	AssetCallCost uint64 = 20000
 )
 
+var _ contract.StatefulPrecompiledContract = (*NativeAssetBalance)(nil)
+
 // NativeAssetBalance is a precompiled contract used to retrieve the native asset balance
 type NativeAssetBalance struct{}
 
@@ -66,21 +68,23 @@ func UnpackNativeAssetBalanceInput(input []byte) (common.Address, common.Hash, e
 }
 
 // Run implements StatefulPrecompiledContract
-func (*NativeAssetBalance) Run(accessibleState contract.AccessibleState, _ common.Address, _ common.Address, input []byte, suppliedGas uint64, _ bool) (ret []byte, remainingGas uint64, err error) {
-	// input: encodePacked(address 20 bytes, assetID 32 bytes)
-	if suppliedGas < AssetBalanceCost {
-		return nil, 0, vm.ErrOutOfGas
+func (*NativeAssetBalance) Run(accessibleState contract.AccessibleState, _ common.Address, _ common.Address, input []byte, _ bool) ([]byte, error) {
+	env := accessibleState.GetPrecompileEnv()
+	if err := contract.DeductMaxGas(env, AssetBalanceCost); err != nil {
+		return nil, err
 	}
-	remainingGas = suppliedGas - AssetBalanceCost
 
+	// input: encodePacked(address 20 bytes, assetID 32 bytes)
 	address, assetID, err := UnpackNativeAssetBalanceInput(input)
 	if err != nil {
-		return nil, remainingGas, vm.ErrExecutionReverted
+		return nil, vm.ErrExecutionReverted
 	}
 
 	res := accessibleState.GetStateDB().GetAssetBalance(address, assetID).Bytes32()
-	return res[:], remainingGas, nil
+	return res[:], nil
 }
+
+var _ contract.StatefulPrecompiledContract = (*NativeAssetCall)(nil)
 
 // NativeAssetCall atomically transfers a native asset to a recipient address as well as calling that
 // address
@@ -111,24 +115,18 @@ func UnpackNativeAssetCallInput(input []byte) (common.Address, common.Hash, *uin
 }
 
 // Run implements [contract.StatefulPrecompiledContract]
-func (c *NativeAssetCall) Run(accessibleState contract.AccessibleState, caller common.Address, _ common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func (c *NativeAssetCall) Run(accessibleState contract.AccessibleState, caller common.Address, _ common.Address, input []byte, readOnly bool) ([]byte, error) {
 	env := accessibleState.GetPrecompileEnv()
-	if !env.UseGas(AssetCallCost) {
-		return nil, 0, vm.ErrOutOfGas
+	if err := contract.DeductMaxGas(env, AssetCallCost); err != nil {
+		return nil, err
 	}
-	ret, err = c.run(env, accessibleState.GetStateDB(), caller, input, readOnly)
-	// This precompile will be wrapped in a libevm `legacy.PrecompiledStatefulContract`, which
-	// allows for the deprecated pattern of returning remaining gas by calling
-	// env.UseGas() on the difference between gas in and gas out. Since we call
-	// UseGas() ourselves, we therefore return `suppliedGas` unchanged to stop
-	// the legacy wrapper from double-counting spends.
-	return ret, suppliedGas, err
+	return c.run(env, accessibleState.GetStateDB(), caller, input, readOnly)
 }
 
 // run implements the contract logic, using `env.Gas()` and `env.UseGas()` in
 // place of `suppliedGas` and returning `remainingGas`, respectively. This
 // avoids mixing gas-accounting patterns when using `env.Call()`.
-func (*NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.StateDB, caller common.Address, input []byte, readOnly bool) (ret []byte, err error) {
+func (*NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.StateDB, caller common.Address, input []byte, readOnly bool) ([]byte, error) {
 	if readOnly {
 		return nil, vm.ErrExecutionReverted
 	}
@@ -160,7 +158,7 @@ func (*NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.State
 		vm.WithUNSAFECallerAddressProxying(),
 		vm.WithLegacyOutboundCallGas(),
 	}
-	ret, err = env.Call(to, callData, env.Gas(), new(uint256.Int), legacy...)
+	ret, err := env.Call(to, callData, env.Gas(), new(uint256.Int), legacy...)
 	// When an error was returned by the EVM or when setting the creation code
 	// above we revert to the snapshot and consume any gas remaining. Additionally
 	// when we're in homestead this also counts for code storage gas errors.
@@ -173,8 +171,10 @@ func (*NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.State
 	return ret, err
 }
 
+var _ contract.StatefulPrecompiledContract = (*DeprecatedContract)(nil)
+
 type DeprecatedContract struct{}
 
-func (*DeprecatedContract) Run(_ contract.AccessibleState, _ common.Address, _ common.Address, _ []byte, suppliedGas uint64, _ bool) (ret []byte, remainingGas uint64, err error) {
-	return nil, suppliedGas, vm.ErrExecutionReverted
+func (*DeprecatedContract) Run(contract.AccessibleState, common.Address, common.Address, []byte, bool) ([]byte, error) {
+	return nil, vm.ErrExecutionReverted
 }

@@ -29,7 +29,6 @@ go_library(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//libevm",
-        "@com_github_ava_labs_libevm//libevm/legacy",
         "@com_github_ava_labs_libevm//params",
     ],
 )

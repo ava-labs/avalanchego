@@ -22,12 +22,14 @@ const (
 	LogDataGas uint64 = 8 // from params/protocol_params.go
 )
 
-// DeductGas checks if [suppliedGas] is sufficient against [requiredGas] and deducts [requiredGas] from [suppliedGas].
-func DeductGas(suppliedGas uint64, requiredGas uint64) (uint64, error) {
-	if suppliedGas < requiredGas {
-		return 0, vm.ErrOutOfGas
+// DeductMaxGas tries to consume requiredGas, and if not possible, consumes all
+// available and returns [vm.ErrOutOfGas].
+func DeductMaxGas(env vm.PrecompileEnvironment, requiredGas uint64) error {
+	if env.UseGas(requiredGas) {
+		return nil
 	}
-	return suppliedGas - requiredGas, nil
+	env.UseGas(env.Gas())
+	return vm.ErrOutOfGas
 }
 
 // ParseABI parses the given ABI string and returns the parsed ABI.
