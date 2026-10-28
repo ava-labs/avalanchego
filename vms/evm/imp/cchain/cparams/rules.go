@@ -76,28 +76,24 @@ func (Rules) ShouldCreditBaseFeeToCoinbase() bool {
 	return true
 }
 
-var (
-	// warpPredicaters charges for Warp predicates, which are the only predicates.
-	//
-	// TODO(JonathanOppenheimer): Charge Warp messages directly once the shared
-	// predicate gas helper is replaced.
-	warpPredicaters = map[common.Address]precompileconfig.Predicater{
-		warp.ContractAddress: &warp.Config{},
-	}
-
-	// p256VerifyAddress is the address of the p256 signature verification precompile
-	p256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
-)
+// p256VerifyAddress is the address of the p256 signature verification precompile
+var p256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
 
 // AccessListGas computes the intrinsic gas for an access list. Once Warp is
 // active, it calculates gas per-tuple, charging Warp predicates by
-// [warp.Config.PredicateGas]. Otherwise, it returns override=false to use the
+// [warp.PredicateGas]. Otherwise, it returns override=false to use the
 // default calculation.
 func (r Rules) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
 	if !r.IsDurango {
 		return 0, false, nil
 	}
-	gas, err := precompileconfig.AccessListGasWithPredicates(r, warpPredicaters, accessList)
+	gas, err := precompileconfig.AccessListGas(
+		accessList,
+		warp.ContractAddress,
+		func(msg predicate.Predicate) (uint64, error) {
+			return warp.PredicateGas(msg, r)
+		},
+	)
 	return gas, true, err
 }
 
