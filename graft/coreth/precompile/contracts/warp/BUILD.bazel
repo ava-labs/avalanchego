@@ -9,16 +9,15 @@ package(default_visibility = [
 go_library(
     name = "warp",
     srcs = [
-        "config.go",
         "contract.go",
         "contract_warp_handler.go",
+        "predicate.go",
     ],
     embedsrcs = ["IWarpMessenger.abi"],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp",
     deps = [
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/precompileconfig",
-        "//utils/constants",
         "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",

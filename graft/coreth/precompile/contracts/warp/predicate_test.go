@@ -237,7 +237,6 @@ func createValidPredicateTest(
 ) precompiletest.PredicateTest {
 	gasCost := CurrentGasConfig(rules)
 	return precompiletest.PredicateTest{
-		Config: &Config{},
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -250,93 +249,6 @@ func createValidPredicateTest(
 		GasErr:      nil,
 		ExpectedErr: nil,
 	}
-}
-
-func TestWarpMessageFromPrimaryNetwork(t *testing.T) {
-	for _, requirePrimaryNetworkSigners := range []bool{true, false} {
-		testWarpMessageFromPrimaryNetwork(t, requirePrimaryNetworkSigners)
-	}
-}
-
-func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigners bool) {
-	require := require.New(t)
-	numKeys := 10
-	cChainID := ids.GenerateTestID()
-	addressedCall, err := payload.NewAddressedCall(avalancheutils.RandomBytes(20), avalancheutils.RandomBytes(100))
-	require.NoError(err)
-	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(constants.UnitTestID, cChainID, addressedCall.Bytes())
-	require.NoError(err)
-
-	var (
-		warpValidators = validators.WarpSet{
-			Validators:  make([]*validators.Warp, 0, numKeys),
-			TotalWeight: 20 * uint64(numKeys),
-		}
-		blsSignatures = make([]*bls.Signature, 0, numKeys)
-	)
-	for i := 0; i < numKeys; i++ {
-		vdr := testVdrs[i]
-		sig, err := vdr.sk.Sign(unsignedMsg.Bytes())
-		require.NoError(err)
-		blsSignatures = append(blsSignatures, sig)
-
-		pk := vdr.sk.PublicKey()
-		warpValidators.Validators = append(warpValidators.Validators, &validators.Warp{
-			PublicKey:      pk,
-			PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
-			Weight:         20,
-			NodeIDs:        []ids.NodeID{vdr.nodeID},
-		})
-	}
-	avalancheutils.Sort(warpValidators.Validators)
-
-	aggregateSignature, err := bls.AggregateSignatures(blsSignatures)
-	require.NoError(err)
-	bitSet := set.NewBits()
-	for i := 0; i < numKeys; i++ {
-		bitSet.Add(i)
-	}
-	warpSignature := &avalancheWarp.BitSetSignature{
-		Signers: bitSet.Bytes(),
-	}
-	copy(warpSignature.Signature[:], bls.SignatureToBytes(aggregateSignature))
-	warpMsg, err := avalancheWarp.NewMessage(unsignedMsg, warpSignature)
-	require.NoError(err)
-
-	pred := predicate.New(warpMsg.Bytes())
-
-	snowCtx := snowtest.Context(t, ids.GenerateTestID())
-	snowCtx.SubnetID = ids.GenerateTestID()
-	snowCtx.CChainID = cChainID
-	snowCtx.ValidatorState = &validatorstest.State{
-		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-			require.Equal(chainID, cChainID)
-			return constants.PrimaryNetworkID, nil // Return Primary Network SubnetID
-		},
-		GetWarpValidatorSetsF: func(_ context.Context, _ uint64) (map[ids.ID]validators.WarpSet, error) {
-			return map[ids.ID]validators.WarpSet{
-				snowCtx.SubnetID:           warpValidators,
-				constants.PrimaryNetworkID: warpValidators,
-			}, nil
-		},
-	}
-
-	test := precompiletest.PredicateTest{
-		Config: &Config{RequirePrimaryNetworkSigners: requirePrimaryNetworkSigners},
-		PredicateContext: &precompileconfig.PredicateContext{
-			SnowCtx: snowCtx,
-			ProposerVMBlockCtx: &block.Context{
-				PChainHeight: 1,
-			},
-		},
-		Predicate:   pred,
-		Rules:       graniteRules,
-		Gas:         GraniteGasConfig.PredicateGasCost(len(pred), numKeys),
-		GasErr:      nil,
-		ExpectedErr: nil,
-	}
-
-	test.Run(t)
 }
 
 func TestInvalidPredicatePacking(t *testing.T) {
@@ -353,7 +265,6 @@ func TestInvalidPredicatePacking(t *testing.T) {
 	pred = append(pred, common.Hash{1}) // Invalidate the predicate byte packing
 
 	test := precompiletest.PredicateTest{
-		Config: &Config{},
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -385,7 +296,6 @@ func TestInvalidWarpMessage(t *testing.T) {
 	pred := predicate.New(warpMsgBytes)
 
 	test := precompiletest.PredicateTest{
-		Config: &Config{},
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -430,7 +340,6 @@ func TestInvalidAddressedPayload(t *testing.T) {
 	pred := predicate.New(warpMsgBytes)
 
 	test := precompiletest.PredicateTest{
-		Config: &Config{},
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -476,7 +385,6 @@ func TestInvalidBitSet(t *testing.T) {
 	})
 	pred := predicate.New(msg.Bytes())
 	test := precompiletest.PredicateTest{
-		Config: &Config{},
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -492,7 +400,9 @@ func TestInvalidBitSet(t *testing.T) {
 	test.Run(t)
 }
 
-func TestWarpSignatureWeightsDefaultQuorumNumerator(t *testing.T) {
+// TestWarpSignatureWeightsQuorumNumerator pins the 67% quorum with 100
+// equally weighted validators.
+func TestWarpSignatureWeightsQuorumNumerator(t *testing.T) {
 	snowCtx := createSnowCtx(t, []validatorRange{
 		{
 			start:     0,
@@ -502,29 +412,22 @@ func TestWarpSignatureWeightsDefaultQuorumNumerator(t *testing.T) {
 		},
 	})
 
-	allNumSigners := []int{
-		1,
-		int(WarpDefaultQuorumNumerator) - 1,
-		int(WarpDefaultQuorumNumerator),
-		int(WarpDefaultQuorumNumerator) + 1,
-		int(WarpQuorumDenominator) - 1,
-		int(WarpQuorumDenominator),
-		int(WarpQuorumDenominator) + 1,
-	}
-	tests := make([]precompiletest.PredicateTest, len(allNumSigners))
-	for i, numSigners := range allNumSigners {
-		pred := createPredicate(numSigners)
-		// The predicate is valid iff the number of signers is >= the required numerator and does not exceed the denominator.
-		var expectedErr error
-		if numSigners >= int(WarpDefaultQuorumNumerator) && numSigners <= int(WarpQuorumDenominator) {
-			expectedErr = nil
-		} else {
-			expectedErr = ErrFailedVerification
-		}
-
-		tests[i] = precompiletest.PredicateTest{
-			Name:   fmt.Sprintf("default quorum %d signature(s)", numSigners),
-			Config: &Config{},
+	var tests []precompiletest.PredicateTest
+	for _, tt := range []struct {
+		numSigners int
+		wantErr    error
+	}{
+		{numSigners: 1, wantErr: ErrFailedVerification},
+		{numSigners: 66, wantErr: ErrFailedVerification},
+		{numSigners: 67},
+		{numSigners: 68},
+		{numSigners: 99},
+		{numSigners: 100},
+		{numSigners: 101, wantErr: ErrFailedVerification},
+	} {
+		pred := createPredicate(tt.numSigners)
+		tests = append(tests, precompiletest.PredicateTest{
+			Name: fmt.Sprintf("%d_signers", tt.numSigners),
 			PredicateContext: &precompileconfig.PredicateContext{
 				SnowCtx: snowCtx,
 				ProposerVMBlockCtx: &block.Context{
@@ -533,10 +436,9 @@ func TestWarpSignatureWeightsDefaultQuorumNumerator(t *testing.T) {
 			},
 			Predicate:   pred,
 			Rules:       graniteRules,
-			Gas:         GraniteGasConfig.PredicateGasCost(len(pred), numSigners),
-			GasErr:      nil,
-			ExpectedErr: expectedErr,
-		}
+			Gas:         GraniteGasConfig.PredicateGasCost(len(pred), tt.numSigners),
+			ExpectedErr: tt.wantErr,
+		})
 	}
 	precompiletest.RunPredicateTests(t, tests)
 }
@@ -583,8 +485,7 @@ func TestWarpMultiplePredicates(t *testing.T) {
 			}
 
 			tests = append(tests, precompiletest.PredicateTest{
-				Name:   fmt.Sprintf("multiple predicates %v", validMessageIndices),
-				Config: &Config{},
+				Name: fmt.Sprintf("multiple predicates %v", validMessageIndices),
 				PredicateContext: &precompileconfig.PredicateContext{
 					SnowCtx: snowCtx,
 					ProposerVMBlockCtx: &block.Context{
@@ -602,61 +503,8 @@ func TestWarpMultiplePredicates(t *testing.T) {
 	precompiletest.RunPredicateTests(t, tests)
 }
 
-func TestWarpSignatureWeightsNonDefaultQuorumNumerator(t *testing.T) {
-	snowCtx := createSnowCtx(t, []validatorRange{
-		{
-			start:     0,
-			end:       100,
-			weight:    20,
-			publicKey: true,
-		},
-	})
-
-	nonDefaultQuorumNumerator := 50
-	// Ensure this test fails if the DefaultQuorumNumerator is changed to an
-	// unexpected value during development
-	require.NotEqual(t, nonDefaultQuorumNumerator, int(WarpDefaultQuorumNumerator))
-	allNumSigners := []int{
-		nonDefaultQuorumNumerator,
-		nonDefaultQuorumNumerator + 1,
-		99,
-		100,
-		101,
-	}
-	tests := make([]precompiletest.PredicateTest, len(allNumSigners))
-	for i, numSigners := range allNumSigners {
-		pred := createPredicate(numSigners)
-		// The predicate is valid iff the number of signers is >= the required numerator and does not exceed the denominator.
-		var expectedErr error
-		if numSigners >= nonDefaultQuorumNumerator && numSigners <= int(WarpQuorumDenominator) {
-			expectedErr = nil
-		} else {
-			expectedErr = ErrFailedVerification
-		}
-
-		tests[i] = precompiletest.PredicateTest{
-			Name:   fmt.Sprintf("non-default quorum %d signature(s)", numSigners),
-			Config: &Config{QuorumNumerator: uint64(nonDefaultQuorumNumerator)},
-			PredicateContext: &precompileconfig.PredicateContext{
-				SnowCtx: snowCtx,
-				ProposerVMBlockCtx: &block.Context{
-					PChainHeight: 1,
-				},
-			},
-			Predicate:   pred,
-			Rules:       graniteRules,
-			Gas:         GraniteGasConfig.PredicateGasCost(len(pred), numSigners),
-			GasErr:      nil,
-			ExpectedErr: expectedErr,
-		}
-	}
-
-	precompiletest.RunPredicateTests(t, tests)
-}
-
 func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
 	var (
-		config            = &Config{}
 		proposervmContext = &block.Context{
 			PChainHeight: 1,
 		}
@@ -664,8 +512,7 @@ func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
 		expectedGas = GraniteGasConfig.PredicateGasCost(len(pred), 0)
 	)
 	noValidators := precompiletest.PredicateTest{
-		Name:   "no_validators",
-		Config: config,
+		Name: "no_validators",
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx:            createSnowCtx(t, nil /*=validators*/), // No validators in state
 			ProposerVMBlockCtx: proposervmContext,
@@ -677,8 +524,7 @@ func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
 		ExpectedErr: bls.ErrNoPublicKeys,
 	}
 	weightOverflow := precompiletest.PredicateTest{
-		Name:   "weight_overflow",
-		Config: config,
+		Name: "weight_overflow",
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: createSnowCtx(t, []validatorRange{
 				{
