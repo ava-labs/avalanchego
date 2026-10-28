@@ -33,12 +33,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-// TODO: Ensure that the maximum number of expiries to track is limited to a reasonable number by this window.
 const (
-	second                            = 1
-	minute                            = 60 * second
-	hour                              = 60 * minute
-	day                               = 24 * hour
+	second = 1
+	minute = 60 * second
+	hour   = 60 * minute
+	day    = 24 * hour
+
+	// RegisterL1ValidatorTxExpiryWindow bounds how far in the future a
+	// RegisterL1ValidatorTx's warp message may expire.
+	//
+	// TODO: Ensure that the maximum number of expiries to track is limited to a reasonable number by this window.
 	RegisterL1ValidatorTxExpiryWindow = day
 )
 
@@ -60,13 +64,6 @@ var (
 	errRemovingLastValidator            = errors.New("attempting to remove the last L1 validator from a converted subnet")
 	errStateCorruption                  = errors.New("state corruption")
 )
-
-// registerL1ValidatorTxExpiryWindowSeconds bounds how far in the future a
-// RegisterL1ValidatorTx's warp message may expire.
-//
-// TODO: Ensure that the maximum number of expiries to track is limited to a
-// reasonable number by this window.
-const registerL1ValidatorTxExpiryWindowSeconds = uint64(24 * time.Hour / time.Second)
 
 // StandardTx executes the standard transaction tx.
 //
@@ -92,8 +89,7 @@ func StandardTx(
 		state:         state,
 	}
 	if err := tx.Unsigned.Visit(&standardExecutor); err != nil {
-		txID := tx.ID()
-		return nil, nil, nil, fmt.Errorf("standard tx %s failed execution: %w", txID, err)
+		return nil, nil, nil, fmt.Errorf("standard tx %s failed execution: %w", tx.ID(), err)
 	}
 	return standardExecutor.inputs, standardExecutor.atomicRequests, standardExecutor.onAccept, nil
 }
@@ -151,11 +147,10 @@ func (e *standardTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 		return err
 	}
 
-	txID := e.tx.ID()
 	if e.backend.Config.PartialSyncPrimaryNetwork && tx.Validator.NodeID == e.backend.Ctx.NodeID {
 		e.backend.Ctx.Log.Warn("verified transaction that would cause this node to become unhealthy",
 			zap.String("reason", "primary network is not being fully synced"),
-			zap.Stringer("txID", txID),
+			zap.Stringer("txID", e.tx.ID()),
 			zap.String("txType", "addValidator"),
 			zap.Stringer("nodeID", tx.Validator.NodeID),
 		)
@@ -208,15 +203,13 @@ func (e *standardTxExecutor) CreateChainTx(tx *platform.CreateChainTx) error {
 		return err
 	}
 
-	txID := e.tx.ID()
-
 	// Add the new chain to the database
 	e.state.AddChain(e.tx)
 
 	// If this proposal is committed and this node is a member of the subnet
 	// that validates the blockchain, create the blockchain
 	e.onAccept = func() {
-		e.backend.Config.CreateChain(txID, tx)
+		e.backend.Config.CreateChain(e.tx.ID(), tx)
 	}
 	return nil
 }
@@ -496,14 +489,12 @@ func (e *standardTxExecutor) AddPermissionlessValidatorTx(tx *platform.AddPermis
 		return err
 	}
 
-	txID := e.tx.ID()
-
 	if e.backend.Config.PartialSyncPrimaryNetwork &&
 		tx.Subnet == constants.PrimaryNetworkID &&
 		tx.Validator.NodeID == e.backend.Ctx.NodeID {
 		e.backend.Ctx.Log.Warn("verified transaction that would cause this node to become unhealthy",
 			zap.String("reason", "primary network is not being fully synced"),
-			zap.Stringer("txID", txID),
+			zap.Stringer("txID", e.tx.ID()),
 			zap.String("txType", "addPermissionlessValidator"),
 			zap.Stringer("nodeID", tx.Validator.NodeID),
 		)

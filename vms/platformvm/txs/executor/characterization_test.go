@@ -1537,3 +1537,8 @@ func TestCharacterizationTxTypeCoverage(t *testing.T) {
 	}
 	require.Equal(t, visitorType.NumMethod(), covered.Len(), "characterization table covers tx types that no longer exist")
 }
+
+func newProofOfPossession(t *testing.T) *signer.ProofOfPossession {
+	_, pop := newSignerWithPoP(t)
+	return pop
+}

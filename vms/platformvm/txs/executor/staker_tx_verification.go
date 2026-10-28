@@ -268,14 +268,14 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 	endTime time.Time,
 ) error {
 	primaryNetworkValidator, err := GetValidator(chainState, constants.PrimaryNetworkID, nodeID)
-	if err == database.ErrNotFound {
+	switch {
+	case err == database.ErrNotFound:
 		return fmt.Errorf(
 			"%s %w of the primary network",
 			nodeID,
 			errNotValidator,
 		)
-	}
-	if err != nil {
+	case err != nil:
 		return fmt.Errorf(
 			"failed to fetch the primary network validator for %s: %w",
 			nodeID,
@@ -285,12 +285,7 @@ func verifySubnetValidatorPrimaryNetworkRequirements(
 
 	// Ensure that the period this validator validates the specified subnet
 	// is a subset of the time they validate the primary network.
-	if !platform.BoundedBy(
-		startTime,
-		endTime,
-		primaryNetworkValidator.StartTime,
-		primaryNetworkValidator.EndTime,
-	) {
+	if !platform.BoundedBy(startTime, endTime, primaryNetworkValidator.StartTime, primaryNetworkValidator.EndTime) {
 		return errPeriodMismatch
 	}
 
@@ -330,15 +325,15 @@ func verifyNewValidator(
 
 	nodeID := tx.NodeID()
 	_, err = GetValidator(chainState, subnetID, nodeID)
-	if err == nil {
+	switch {
+	case err == nil:
 		return fmt.Errorf(
 			"%w: %s on %s",
 			ErrDuplicateValidator,
 			nodeID,
 			subnetID,
 		)
-	}
-	if err != database.ErrNotFound {
+	case !errors.Is(err, database.ErrNotFound):
 		return fmt.Errorf(
 			"failed to find whether %s is a validator on %s: %w",
 			nodeID,
@@ -442,12 +437,7 @@ func verifyNewDelegator(
 		maximumWeight = min(maximumWeight, delegatorRules.maxValidatorStake)
 	}
 
-	if !platform.BoundedBy(
-		startTime,
-		endTime,
-		validator.StartTime,
-		validator.EndTime,
-	) {
+	if !platform.BoundedBy(startTime, endTime, validator.StartTime, validator.EndTime) {
 		return errPeriodMismatch
 	}
 	overDelegated, err := overDelegated(

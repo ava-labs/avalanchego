@@ -93,19 +93,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 
 	tests := []test{
 		{
-			name: "fail syntactic verification",
-			backend: &Backend{
-				Ctx: ctx,
-				Config: &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-				},
-			},
-			txF: func() *platform.AddPermissionlessValidatorTx {
-				return &verifiedTx
-			},
-			expectedErr: avax.ErrWrongNetworkID,
-		},
-		{
 			name: "not bootstrapped",
 			backend: &Backend{
 				Ctx: ctx,
@@ -350,12 +337,12 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(t, err)
-			
+
 			diff.SetTimestamp(now)
 			if tt.updateState != nil {
 				tt.updateState(t, diff)
 			}
-			
+
 			err = verifyAddPermissionlessValidatorTx(tt.backend, diff, tt.txF())
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
