@@ -20,10 +20,10 @@ import (
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
@@ -349,7 +349,7 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 	// state needs to reflect that or the precompile would never be marked as
 	// active.
 	if c := corethparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
-		activatePrecompile(statedb, warp.ContractAddress)
+		activatePrecompile(statedb, warpmsg.ContractAddress)
 	}
 
 	const deleteEmptyObjects = true

@@ -31,7 +31,6 @@ go_test(
     deps = [
         ":extstate",
         "//graft/coreth/plugin/evm/customtypes",
-        "//graft/coreth/precompile/contracts/warp",
         "//vms/evm/warpmsg",
         "//vms/saevm/cchain/cchaintest",
         "//vms/saevm/cchain/libevm",

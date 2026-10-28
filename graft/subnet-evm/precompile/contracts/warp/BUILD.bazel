@@ -39,7 +39,7 @@ graft_go_test(
         "config_test.go",
         "contract_test.go",
         "export_test.go",
-        "predicate_test.go",
+        "message_test.go",
     ],
     embed = [":warp"],
     deps = [

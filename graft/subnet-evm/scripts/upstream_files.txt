@@ -40,11 +40,11 @@ tests/state_test_util.go
 !core/fifo_cache.go
 !core/genesis_extra_test.go
 !core/main_test.go
-!core/predicate_check.go
-!core/predicate_check_test.go
 !core/state_manager_test.go
 !core/state_processor_ext.go
 !core/state_processor_ext_test.go
+!core/warp_verify.go
+!core/warp_verify_test.go
 !eth/chain_with_final_block.go
 !eth/gasprice/fee_info_provider_test.go
 !eth/tracers/api_extra_test.go

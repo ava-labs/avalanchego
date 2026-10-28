@@ -136,17 +136,17 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 	return newEVMBlockContext(header, chain, author, header.Extra)
 }
 
-// NewEVMBlockContextWithPredicateResults creates a new context for use in the EVM with an override for the predicate results that is not present
+// NewEVMBlockContextWithWarpResults creates a new context for use in the EVM with an override for the Warp results that is not present
 // in header.Extra.
-// This function is used to create a BlockContext when the header Extra data is not fully formed yet and it's more efficient to pass in predicateResults
+// This function is used to create a BlockContext when the header Extra data is not fully formed yet and it's more efficient to pass in the encoded results
 // directly rather than re-encode the latest results when executing each individual transaction.
-func NewEVMBlockContextWithPredicateResults(header *types.Header, chain ChainContext, author *common.Address, predicateBytes []byte) vm.BlockContext {
+func NewEVMBlockContextWithWarpResults(header *types.Header, chain ChainContext, author *common.Address, resultsBytes []byte) vm.BlockContext {
 	blockCtx := NewEVMBlockContext(header, chain, author)
 	// Note this only sets the block context, which is the hand-off point for
 	// the EVM. The actual header is not modified.
 	blockCtx.Header.Extra = customheader.SetPredicateBytesInExtra(
 		bytes.Clone(header.Extra),
-		predicateBytes,
+		resultsBytes,
 	)
 	return blockCtx
 }

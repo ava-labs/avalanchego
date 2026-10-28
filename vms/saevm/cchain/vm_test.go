@@ -59,6 +59,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
@@ -75,7 +76,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
-	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
 	ethereum "github.com/ava-labs/libevm"
@@ -2186,7 +2186,7 @@ func TestWarpPrecompileActivation(t *testing.T) {
 
 	genesisState, err := sut.LastExecutedState()
 	require.NoErrorf(t, err, "%T.LastExecutedState()", sut.VM)
-	require.Empty(t, genesisState.GetCode(corethwarp.ContractAddress), "warp precompile code in pre-Durango genesis state")
+	require.Empty(t, genesisState.GetCode(warpmsg.ContractAddress), "warp precompile code in pre-Durango genesis state")
 
 	vmTime.Advance(upgradeThreshold) // activate Durango in next block
 
@@ -2195,8 +2195,8 @@ func TestWarpPrecompileActivation(t *testing.T) {
 
 	state, err := sut.LastExecutedState()
 	require.NoErrorf(t, err, "%T.LastExecutedState()", sut.VM)
-	assert.Equalf(t, uint64(1), state.GetNonce(corethwarp.ContractAddress), "warp precompile nonce after first Durango block")
-	assert.Equalf(t, []byte{0x01}, state.GetCode(corethwarp.ContractAddress), "warp precompile code after first Durango block")
+	assert.Equalf(t, uint64(1), state.GetNonce(warpmsg.ContractAddress), "warp precompile nonce after first Durango block")
+	assert.Equalf(t, []byte{0x01}, state.GetCode(warpmsg.ContractAddress), "warp precompile code after first Durango block")
 }
 
 // TestConsensusGettersAfterRestart verifies that all functions routed through

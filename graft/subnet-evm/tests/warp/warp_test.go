@@ -497,7 +497,7 @@ func (w *warpTest) deliverAddressedCallToReceivingSubnet() {
 		Data:      packedInput,
 		AccessList: types.AccessList{
 			{
-				Address:     warp.ContractAddress,
+				Address:     warpmsg.ContractAddress,
 				StorageKeys: warpmsg.Pack(w.addressedCallSignedMessage.Bytes()),
 			},
 		},
@@ -555,7 +555,7 @@ func (w *warpTest) deliverBlockHashPayload() {
 		Data:      packedInput,
 		AccessList: types.AccessList{
 			{
-				Address:     warp.ContractAddress,
+				Address:     warpmsg.ContractAddress,
 				StorageKeys: warpmsg.Pack(w.blockPayloadSignedMessage.Bytes()),
 			},
 		},
@@ -739,7 +739,7 @@ func (w *warpTest) warpLoad() {
 			Data:      packedInput,
 			AccessList: types.AccessList{
 				{
-					Address:     warp.ContractAddress,
+					Address:     warpmsg.ContractAddress,
 					StorageKeys: warpmsg.Pack(signedWarpMessageBytes),
 				},
 			},

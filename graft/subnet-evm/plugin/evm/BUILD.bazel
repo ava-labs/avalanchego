@@ -97,6 +97,7 @@ go_library(
         "//vms/evm/metrics/prometheus",
         "//vms/evm/sync/customrawdb",
         "//vms/evm/uptimetracker",
+        "//vms/evm/warpmsg",
         "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",

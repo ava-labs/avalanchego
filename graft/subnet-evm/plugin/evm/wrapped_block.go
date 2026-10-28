@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 
 	ethcore "github.com/ava-labs/libevm/core"
 )
@@ -173,7 +174,7 @@ func (b *wrappedBlock) Timestamp() time.Time { return time.Unix(int64(b.ethBlock
 
 // Verify implements the snowman.Block interface
 func (b *wrappedBlock) Verify(context.Context) error {
-	return b.verify(&precompileconfig.PredicateContext{
+	return b.verify(&warpmsg.VerifyContext{
 		SnowCtx:            b.vm.ctx,
 		ProposerVMBlockCtx: nil,
 	}, true)
@@ -202,17 +203,17 @@ func (b *wrappedBlock) ShouldVerifyWithContext(context.Context) (bool, error) {
 
 // VerifyWithContext implements the block.WithVerifyContext interface
 func (b *wrappedBlock) VerifyWithContext(_ context.Context, proposerVMBlockCtx *block.Context) error {
-	return b.verify(&precompileconfig.PredicateContext{
+	return b.verify(&warpmsg.VerifyContext{
 		SnowCtx:            b.vm.ctx,
 		ProposerVMBlockCtx: proposerVMBlockCtx,
 	}, true)
 }
 
 // Verify the block is valid.
-// Enforces that the predicates are valid within [predicateContext].
+// Enforces that the Warp messages are valid within verifyCtx.
 // Writes the block details to disk and the state to the trie manager iff writes=true.
-func (b *wrappedBlock) verify(predicateContext *precompileconfig.PredicateContext, writes bool) error {
-	if predicateContext.ProposerVMBlockCtx != nil {
+func (b *wrappedBlock) verify(verifyCtx *warpmsg.VerifyContext, writes bool) error {
+	if verifyCtx.ProposerVMBlockCtx != nil {
 		log.Debug("Verifying block with context", "block", b.ID(), "height", b.Height())
 	} else {
 		log.Debug("Verifying block without context", "block", b.ID(), "height", b.Height())
@@ -222,7 +223,7 @@ func (b *wrappedBlock) verify(predicateContext *precompileconfig.PredicateContex
 		return fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 
-	if err := b.semanticVerify(predicateContext); err != nil {
+	if err := b.semanticVerify(verifyCtx); err != nil {
 		return fmt.Errorf("failed to verify block: %w", err)
 	}
 
@@ -286,7 +287,7 @@ func (b *wrappedBlock) verifyIntrinsicGas() error {
 }
 
 // semanticVerify verifies that a *Block is internally consistent.
-func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.PredicateContext) error {
+func (b *wrappedBlock) semanticVerify(verifyCtx *warpmsg.VerifyContext) error {
 	extraConfig := params.GetExtra(b.vm.chainConfig)
 	parent := b.vm.blockChain.GetHeader(b.ethBlock.ParentHash(), b.ethBlock.NumberU64()-1)
 	if parent == nil {
@@ -314,7 +315,7 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 
 		// Verify that all the ICM messages are correctly marked as either valid
 		// or invalid.
-		if err := b.verifyPredicates(predicateContext); err != nil {
+		if err := b.verifyWarpMessages(verifyCtx); err != nil {
 			return fmt.Errorf("failed to verify predicates: %w", err)
 		}
 	}
@@ -436,8 +437,8 @@ func (b *wrappedBlock) syntacticVerify() error {
 	return nil
 }
 
-// verifyPredicates verifies the predicates in the block are valid according to predicateContext.
-func (b *wrappedBlock) verifyPredicates(predicateContext *precompileconfig.PredicateContext) error {
+// verifyWarpMessages verifies the Warp messages in the block are valid according to verifyCtx.
+func (b *wrappedBlock) verifyWarpMessages(verifyCtx *warpmsg.VerifyContext) error {
 	rules := b.vm.chainConfig.Rules(b.ethBlock.Number(), params.IsMergeTODO, b.ethBlock.Time())
 	rulesExtra := params.GetRulesExtra(rules)
 
@@ -448,22 +449,22 @@ func (b *wrappedBlock) verifyPredicates(predicateContext *precompileconfig.Predi
 		return nil
 	}
 
-	predicateResults, err := core.CheckBlockPredicates(
+	warpResults, err := core.VerifyBlockWarpMessages(
 		rules,
-		predicateContext,
+		verifyCtx,
 		b.ethBlock.Transactions(),
 	)
 	if err != nil {
 		return err
 	}
-	predicateResultsBytes, err := predicateResults.Bytes()
+	resultsBytes, err := warpResults.Bytes()
 	if err != nil {
 		return fmt.Errorf("failed to marshal predicate results: %w", err)
 	}
 	extraData := b.ethBlock.Extra()
 	headerPredicateResultsBytes := customheader.PredicateBytesFromExtra(extraData)
-	if !bytes.Equal(headerPredicateResultsBytes, predicateResultsBytes) {
-		return fmt.Errorf("%w (remote: %x local: %x)", errInvalidHeaderPredicateResults, headerPredicateResultsBytes, predicateResultsBytes)
+	if !bytes.Equal(headerPredicateResultsBytes, resultsBytes) {
+		return fmt.Errorf("%w (remote: %x local: %x)", errInvalidHeaderPredicateResults, headerPredicateResultsBytes, resultsBytes)
 	}
 	return nil
 }

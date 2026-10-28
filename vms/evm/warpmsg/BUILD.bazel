@@ -6,16 +6,23 @@ go_library(
     srcs = [
         "packed.go",
         "results.go",
+        "verify.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/warpmsg",
     visibility = ["//visibility:public"],
     deps = [
         "//codec",
         "//codec/linearcodec",
+        "//snow",
+        "//snow/engine/snowman/block",
         "//utils/set",
         "//utils/units",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//params",
     ],
 )
 

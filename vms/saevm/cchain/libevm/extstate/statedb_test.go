@@ -17,7 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
@@ -182,7 +181,7 @@ func TestPrepare(t *testing.T) {
 func TestGetWarpMessage(t *testing.T) {
 	var (
 		msg  = warpmsg.Packed{{2}}
-		list = types.AccessList{{Address: warp.ContractAddress, StorageKeys: msg}}
+		list = types.AccessList{{Address: warpmsg.ContractAddress, StorageKeys: msg}}
 	)
 	rules := cchaintest.ChainConfig().Rules(common.Big0, true /*isMerge*/, 0)
 
