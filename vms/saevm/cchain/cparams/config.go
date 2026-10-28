@@ -62,7 +62,7 @@ type ChainConfig struct {
 	// Igloo is a placeholder for the next upgrade.
 	IglooTimestamp *uint64 `json:"iglooTimestamp,omitempty"`
 
-	SnowCtx *snow.Context `json:"-"`
+	SnowCtx *snow.Context `json:"-"` // TODO(alarso16): Delete when no longer needed for Warp.
 }
 
 // FromUpgrades creates a new ChainConfig from the given [upgrade.Config].
@@ -88,21 +88,17 @@ func FromUpgrades(u upgrade.Config) *ChainConfig {
 }
 
 // CheckConfigCompatible supplements [ethparams.ChainConfig.CheckCompatible]
-// with Avalanche-specific network upgrades.
+// with Avalanche-specific network upgrades. This is not expected to be called
+// directly by any consumer.
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func (c *ChainConfig) CheckConfigCompatible(newEth *ethparams.ChainConfig, headNumber *big.Int, head uint64) *ethparams.ConfigCompatError {
 	if c == nil {
-		return nil
+		c = new(ChainConfig)
 	}
 	newCfg, ok := newEth.Hooks().(*ChainConfig)
 	if !ok || newCfg == nil {
-		// Proper registration of the extras on the libevm side should prevent this from happening.
-		return ethparams.NewTimestampCompatError(
-			fmt.Sprintf("ChainConfig.Hooks() is not a non-nil %T, got %T", c, newEth.Hooks()),
-			new(uint64),
-			nil,
-		)
+		newCfg = new(ChainConfig)
 	}
 
 	oldForks := c.forks()
@@ -130,9 +126,12 @@ func (*ChainConfig) Description() string {
 	return "ChainConfig.Description() not implemented"
 }
 
+// CheckConfigForkOrder supplements [ethparams.ChainConfig.CheckConfigForkOrder]
+// with Avalanche-specific network upgrades. This is not expected to be called
+// directly by any consumer.
 func (c *ChainConfig) CheckConfigForkOrder() error {
 	if c == nil {
-		return nil
+		c = new(ChainConfig)
 	}
 
 	forks := c.forks()

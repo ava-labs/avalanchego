@@ -5,31 +5,33 @@ package cparams_test
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"os"
 	"testing"
 
 	"github.com/arr4n/shed/testerr"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	ethparams "github.com/ava-labs/libevm/params"
+
+	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 )
 
 func TestMain(m *testing.M) {
-	corethparams.RegisterExtras()
+	libevm.RegisterExtras()
 	os.Exit(m.Run())
 }
 
 func TestCheckConfigForkOrder(t *testing.T) {
 	tests := []struct {
 		name     string
-		upgrades cparams.ChainConfig
+		upgrades ChainConfig
 		wantErr  testerr.Want
 	}{
 		{
@@ -37,7 +39,7 @@ func TestCheckConfigForkOrder(t *testing.T) {
 		},
 		{
 			name: "ascending_with_trailing_nils",
-			upgrades: cparams.ChainConfig{
+			upgrades: ChainConfig{
 				ApricotPhase1Timestamp: new(uint64),
 				ApricotPhase2Timestamp: new(uint64(1)),
 				ApricotPhase3Timestamp: new(uint64(2)),
@@ -45,14 +47,14 @@ func TestCheckConfigForkOrder(t *testing.T) {
 		},
 		{
 			name: "equal_timestamps",
-			upgrades: cparams.ChainConfig{
+			upgrades: ChainConfig{
 				ApricotPhase1Timestamp: new(uint64(5)),
 				ApricotPhase2Timestamp: new(uint64(5)),
 			},
 		},
 		{
 			name: "gap",
-			upgrades: cparams.ChainConfig{
+			upgrades: ChainConfig{
 				ApricotPhase1Timestamp: new(uint64),
 				ApricotPhase3Timestamp: new(uint64(10)),
 			},
@@ -60,14 +62,14 @@ func TestCheckConfigForkOrder(t *testing.T) {
 		},
 		{
 			name: "first_fork_missing",
-			upgrades: cparams.ChainConfig{
+			upgrades: ChainConfig{
 				ApricotPhase2Timestamp: new(uint64),
 			},
 			wantErr: testerr.Contains("Apricot Phase 1 not enabled"),
 		},
 		{
 			name: "descending",
-			upgrades: cparams.ChainConfig{
+			upgrades: ChainConfig{
 				ApricotPhase1Timestamp: new(uint64(10)),
 				ApricotPhase2Timestamp: new(uint64(5)),
 			},
@@ -99,21 +101,19 @@ func deref[T any](p *T) any {
 	return *p
 }
 
-// Tests [cparams.ChainConfig.CheckConfigCompatible] through
+// Tests [ChainConfig.CheckConfigCompatible] through
 // [ethparams.ChainConfig.CheckCompatible]. All eth fork handling is tested
 // [ethparams] and is independent of Avalanche forks.
 func TestCheckCompatible(t *testing.T) {
-	withUpgrades := func(n cparams.ChainConfig) *ethparams.ChainConfig {
-		return corethparams.WithExtra(&ethparams.ChainConfig{}, &n)
+	newEthConfig := func(c ChainConfig) *ethparams.ChainConfig {
+		return corethparams.WithExtra(&ethparams.ChainConfig{}, &c)
 	}
 
 	// checks for non-nil [ethparams.ConfigCompatError] with matching timestamps
 	compatErr := func(storedTime, newTime *uint64) testerr.Want {
+		want := ethparams.NewTimestampCompatError("", storedTime, newTime)
 		return testerr.As(func(got *ethparams.ConfigCompatError) string {
-			if utils.PtrEqual(got.StoredTime, storedTime) && utils.PtrEqual(got.NewTime, newTime) {
-				return ""
-			}
-			return fmt.Sprintf("%T with stored time %v and new time %v", got, deref(storedTime), deref(newTime))
+			return cmp.Diff(want, got, cmpopts.IgnoreFields(ethparams.ConfigCompatError{}, "What"))
 		})
 	}
 
@@ -126,50 +126,50 @@ func TestCheckCompatible(t *testing.T) {
 	}{
 		{
 			name:   "identical",
-			stored: withUpgrades(cparams.ChainConfig{DurangoTimestamp: new(uint64(50))}),
-			new:    withUpgrades(cparams.ChainConfig{DurangoTimestamp: new(uint64(50))}),
+			stored: newEthConfig(ChainConfig{DurangoTimestamp: new(uint64(50))}),
+			new:    newEthConfig(ChainConfig{DurangoTimestamp: new(uint64(50))}),
 		},
 		{
 			name:   "future_fork_rescheduled",
-			stored: withUpgrades(cparams.ChainConfig{DurangoTimestamp: new(uint64(200))}),
-			new:    withUpgrades(cparams.ChainConfig{DurangoTimestamp: new(uint64(300))}),
+			stored: newEthConfig(ChainConfig{DurangoTimestamp: new(uint64(200))}),
+			new:    newEthConfig(ChainConfig{DurangoTimestamp: new(uint64(300))}),
 		},
 		{
 			name:   "future_fork_unscheduled",
-			stored: withUpgrades(cparams.ChainConfig{DurangoTimestamp: new(uint64(200))}),
-			new:    withUpgrades(cparams.ChainConfig{}),
+			stored: newEthConfig(ChainConfig{DurangoTimestamp: new(uint64(200))}),
+			new:    newEthConfig(ChainConfig{}),
 		},
 		{
 			name:    "active_fork_rescheduled",
-			stored:  withUpgrades(cparams.ChainConfig{DurangoTimestamp: new(uint64(50))}),
-			new:     withUpgrades(cparams.ChainConfig{DurangoTimestamp: new(uint64(60))}),
+			stored:  newEthConfig(ChainConfig{DurangoTimestamp: new(uint64(50))}),
+			new:     newEthConfig(ChainConfig{DurangoTimestamp: new(uint64(60))}),
 			wantErr: compatErr(new(uint64(50)), new(uint64(60))),
 		},
 		{
 			name:    "active_fork_unscheduled",
-			stored:  withUpgrades(cparams.ChainConfig{ApricotPhase5Timestamp: new(uint64)}),
-			new:     withUpgrades(cparams.ChainConfig{}),
+			stored:  newEthConfig(ChainConfig{ApricotPhase5Timestamp: new(uint64)}),
+			new:     newEthConfig(ChainConfig{}),
 			wantErr: compatErr(new(uint64), nil),
 		},
 		{
 			name:    "fork_scheduled_in_past",
-			stored:  withUpgrades(cparams.ChainConfig{}),
-			new:     withUpgrades(cparams.ChainConfig{DurangoTimestamp: new(uint64(50))}),
+			stored:  newEthConfig(ChainConfig{}),
+			new:     newEthConfig(ChainConfig{DurangoTimestamp: new(uint64(50))}),
 			wantErr: compatErr(nil, new(uint64(50))),
 		},
 		{
 			name:    "fork_scheduled_at_head",
-			stored:  withUpgrades(cparams.ChainConfig{}),
-			new:     withUpgrades(cparams.ChainConfig{DurangoTimestamp: new(uint64(100))}),
+			stored:  newEthConfig(ChainConfig{}),
+			new:     newEthConfig(ChainConfig{DurangoTimestamp: new(uint64(100))}),
 			wantErr: compatErr(nil, new(uint64(100))),
 		},
 		{
 			name: "first_incompatible_fork_reported",
-			stored: withUpgrades(cparams.ChainConfig{
+			stored: newEthConfig(ChainConfig{
 				ApricotPhase1Timestamp: new(uint64(10)),
 				DurangoTimestamp:       new(uint64(10)),
 			}),
-			new: withUpgrades(cparams.ChainConfig{
+			new: newEthConfig(ChainConfig{
 				ApricotPhase1Timestamp: new(uint64(20)),
 				DurangoTimestamp:       new(uint64(30)),
 			}),
@@ -182,7 +182,7 @@ func TestCheckCompatible(t *testing.T) {
 		},
 		{
 			name:    "new_without_extra",
-			stored:  withUpgrades(cparams.ChainConfig{ApricotPhase5Timestamp: new(uint64)}),
+			stored:  newEthConfig(ChainConfig{ApricotPhase5Timestamp: new(uint64)}),
 			new:     &ethparams.ChainConfig{},
 			wantErr: compatErr(new(uint64), nil),
 		},
@@ -200,11 +200,11 @@ func TestCheckCompatible(t *testing.T) {
 	}
 }
 
-// TestChainConfigJSON guards the JSON encoding of [cparams.ChainConfig].
+// TestChainConfigJSON guards the JSON encoding of [ChainConfig].
 func TestChainConfigJSON(t *testing.T) {
 	tests := []struct {
 		name   string
-		config cparams.ChainConfig
+		config ChainConfig
 		json   string
 	}{
 		{
@@ -213,7 +213,7 @@ func TestChainConfigJSON(t *testing.T) {
 		},
 		{
 			name: "all_upgrades",
-			config: cparams.ChainConfig{
+			config: ChainConfig{
 				ApricotPhase1Timestamp:     new(uint64(1)),
 				ApricotPhase2Timestamp:     new(uint64(2)),
 				ApricotPhase3Timestamp:     new(uint64(3)),
@@ -253,7 +253,7 @@ func TestChainConfigJSON(t *testing.T) {
 		},
 		{
 			name: "unscheduled_upgrades_omitted",
-			config: cparams.ChainConfig{
+			config: ChainConfig{
 				ApricotPhase1Timestamp: new(uint64),
 				DurangoTimestamp:       new(uint64(100)),
 			},
@@ -288,7 +288,7 @@ func TestChainConfigJSON(t *testing.T) {
 	}
 }
 
-// TestIsForked tests fork activation through [cparams.ChainConfig.IsApricotPhase1];
+// TestIsForked tests fork activation through [ChainConfig.IsApricotPhase1];
 // every `Is<Fork>` method shares the same activation logic.
 func TestIsForked(t *testing.T) {
 	tests := []struct {
@@ -298,37 +298,37 @@ func TestIsForked(t *testing.T) {
 		isForked bool
 	}{
 		{
-			name:     "nil fork at 0",
+			name:     "nil_fork_at_0",
 			ts:       nil,
 			head:     0,
 			isForked: false,
 		},
 		{
-			name:     "nil fork at non-zero",
+			name:     "nil_fork_at_non-zero",
 			ts:       nil,
 			head:     100,
 			isForked: false,
 		},
 		{
-			name:     "zero fork at genesis",
+			name:     "zero_fork_at_genesis",
 			ts:       new(uint64),
 			head:     0,
 			isForked: true,
 		},
 		{
-			name:     "pre fork timestamp",
+			name:     "pre_fork_timestamp",
 			ts:       new(uint64(100)),
 			head:     50,
 			isForked: false,
 		},
 		{
-			name:     "at fork timestamp",
+			name:     "at_fork_timestamp",
 			ts:       new(uint64(100)),
 			head:     100,
 			isForked: true,
 		},
 		{
-			name:     "post fork timestamp",
+			name:     "post_fork_timestamp",
 			ts:       new(uint64(100)),
 			head:     150,
 			isForked: true,
@@ -336,7 +336,7 @@ func TestIsForked(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &cparams.ChainConfig{ApricotPhase1Timestamp: tt.ts}
+			c := &ChainConfig{ApricotPhase1Timestamp: tt.ts}
 			require.Equalf(t, tt.isForked, c.IsApricotPhase1(tt.head), "%T.IsApricotPhase1(%d)", c, tt.head)
 		})
 	}
