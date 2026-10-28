@@ -22,8 +22,6 @@ import (
 var (
 	_ gossip.Gossipable = (*Tx)(nil)
 
-	ErrNilSignedTx = errors.New("nil signed tx is not valid")
-
 	errSignedTxNotInitialized = errors.New("signed tx was never initialized and is not valid")
 )
 
@@ -128,14 +126,11 @@ func (tx *Tx) InputIDs() set.Set[ids.ID] {
 }
 
 func (tx *Tx) SyntacticVerify(ctx *snow.Context) error {
-	switch {
-	case tx == nil:
-		return ErrNilSignedTx
-	case tx.TxID == ids.Empty:
+	if tx.TxID == ids.Empty {
 		return errSignedTxNotInitialized
-	default:
-		return tx.Unsigned.SyntacticVerify(ctx)
 	}
+
+	return tx.Unsigned.SyntacticVerify(ctx)
 }
 
 // Sign this transaction with the provided signers

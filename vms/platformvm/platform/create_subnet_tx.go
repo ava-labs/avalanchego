@@ -28,10 +28,7 @@ func (tx *CreateSubnetTx) InitCtx(ctx *snow.Context) {
 
 // SyntacticVerify verifies that this transaction is well-formed
 func (tx *CreateSubnetTx) SyntacticVerify(ctx *snow.Context) error {
-	switch {
-	case tx == nil:
-		return ErrNilTx
-	case tx.SyntacticallyVerified: // already passed syntactic verification
+	if tx.SyntacticallyVerified {
 		return nil
 	}
 

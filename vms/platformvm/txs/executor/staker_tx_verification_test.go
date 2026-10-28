@@ -106,12 +106,18 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				},
 			},
 			sTxF: func() *platform.Tx {
-				return nil
+				unverifiedTx := verifiedTx
+				unverifiedTx.SyntacticallyVerified = false
+				unverifiedTx.NetworkID++
+
+				sTx := verifiedSignedTx
+				sTx.Unsigned = &unverifiedTx
+				return &sTx
 			},
 			txF: func() *platform.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
-			expectedErr: platform.ErrNilSignedTx,
+			expectedErr: avax.ErrWrongNetworkID,
 		},
 		{
 			name: "not bootstrapped",

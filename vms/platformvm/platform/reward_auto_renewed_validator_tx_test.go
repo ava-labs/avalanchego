@@ -18,11 +18,6 @@ func TestRewardAutoRenewedValidatorTxSyntacticVerify(t *testing.T) {
 		want error
 	}{
 		{
-			name: "nil",
-			tx:   nil,
-			want: ErrNilTx,
-		},
-		{
 			name: "missing_timestamp",
 			tx: &RewardAutoRenewedValidatorTx{
 				TxID:      ids.GenerateTestID(),
