@@ -73,7 +73,7 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 	if config.prev == nil {
 		vm := newTestVM()
 		block := &Block{
-			blacklist: common.NewBlacklist(uint16(config.numNodes)),
+			blacklist: common.NewBlacklist(uint16(config.numNodes), common.GenesisMaxBlacklistedRounds),
 			vmBlock: &wrappedBlock{
 				Block: snowmantest.Genesis,
 				vm:    vm,
@@ -277,7 +277,7 @@ func newTestFinalization(t *testing.T, configs []*Config, bh common.BlockHeader)
 	require.NoError(t, err)
 	sigAgg := &SignatureAggregator{verifier: &verifier}
 
-	finalization, err := common.NewFinalization(configs[0].Log, sigAgg, finalizedVotes)
+	finalization, err := common.NewFinalization(sigAgg, finalizedVotes)
 	require.NoError(t, err)
 	return finalization
 }

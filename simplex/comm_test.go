@@ -65,12 +65,12 @@ func TestCommBroadcast(t *testing.T) {
 	require.NoError(t, err)
 	outboundMsg, err := config.OutboundMsgBuilder.SimplexMessage(newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
 	require.NoError(t, err)
-	nodes := make([]ids.NodeID, 0, len(comm.Nodes()))
-	for _, node := range comm.Nodes() {
-		if node.Equals(config.Ctx.NodeID[:]) {
+	nodes := make([]ids.NodeID, 0, len(comm.Validators()))
+	for _, node := range comm.Validators() {
+		if node.Id.Equals(config.Ctx.NodeID[:]) {
 			continue // skip the sending node
 		}
-		nodes = append(nodes, ids.NodeID(node))
+		nodes = append(nodes, ids.NodeID(node.Id))
 	}
 
 	expectedSendConfig := common.SendConfig{

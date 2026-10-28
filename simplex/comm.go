@@ -21,7 +21,8 @@ import (
 
 var (
 	_               simplexcommon.Communication = (*Comm)(nil)
-	errNodeNotFound                       = errors.New("node not found in the validator list")
+	errNodeNotFound                             = errors.New("node not found in the validator list")
+	todoEqualWeight                             = uint64(1) // TODO: set in config
 )
 
 type Comm struct {
@@ -31,7 +32,7 @@ type Comm struct {
 	// broadcastNodes are the nodes that should receive broadcast messages
 	broadcastNodes set.Set[ids.NodeID]
 	// allNodes are the IDs of all the nodes in the subnet
-	allNodes []simplexcommon.NodeID
+	allNodes simplexcommon.Nodes
 
 	// sender is used to send messages to other nodes
 	sender     sender.ExternalSender
@@ -40,12 +41,18 @@ type Comm struct {
 
 func NewComm(config *Config) (*Comm, error) {
 	broadcastNodes := set.NewSet[ids.NodeID](len(config.Params.InitialValidators) - 1)
-	allNodes := make([]simplexcommon.NodeID, 0, len(config.Params.InitialValidators))
+	allNodes := make([]simplexcommon.Node, 0, len(config.Params.InitialValidators))
 
 	includesOurNodeID := false
 	// grab all the nodes that are validators for the subnet
 	for _, vd := range config.Params.InitialValidators {
-		allNodes = append(allNodes, vd.NodeID[:])
+		node := simplexcommon.Node{
+			Id:     vd.NodeID[:],
+			PK:     vd.PublicKey,
+			Weight: todoEqualWeight,
+		}
+
+		allNodes = append(allNodes, node)
 		if vd.NodeID == config.Ctx.NodeID {
 			includesOurNodeID = true
 			continue // skip our own node ID
@@ -74,7 +81,7 @@ func NewComm(config *Config) (*Comm, error) {
 	}, nil
 }
 
-func (c *Comm) Nodes() []simplexcommon.NodeID {
+func (c *Comm) Validators() simplexcommon.Nodes {
 	return c.allNodes
 }
 
