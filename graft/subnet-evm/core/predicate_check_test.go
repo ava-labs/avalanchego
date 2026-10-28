@@ -4,48 +4,70 @@
 package core
 
 import (
-	"errors"
 	"math"
-	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
+	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/warptest"
+
+	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-var (
-	validPredicate      = predicate.New([]byte{0})
-	invalidPredicate    = predicate.New([]byte{1})
-	errInvalidPredicate = errors.New("invalid predicate")
-)
+// newWarpMessages returns a Warp message signed by the validators in the
+// returned context, and the same message with an invalid signature.
+func newWarpMessages(t *testing.T) (*precompileconfig.PredicateContext, predicate.Predicate, predicate.Predicate) {
+	t.Helper()
 
-func verifyMockPredicate(_ *precompileconfig.PredicateContext, pred predicate.Predicate) error {
-	if slices.Equal(pred, validPredicate) {
-		return nil
+	addressedCall, err := payload.NewAddressedCall([]byte{1}, []byte{2})
+	require.NoError(t, err, "payload.NewAddressedCall()")
+	msg, err := avalancheWarp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, addressedCall.Bytes())
+	require.NoError(t, err, "avalancheWarp.NewUnsignedMessage()")
+
+	vdrs := warptest.NewValidators(t, warptest.WithMinimum(2))
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	warptest.SetValidators(t, snowCtx, vdrs)
+	predicateContext := &precompileconfig.PredicateContext{
+		SnowCtx:            snowCtx,
+		ProposerVMBlockCtx: &block.Context{},
 	}
-	return errInvalidPredicate
+	return predicateContext,
+		predicate.New(vdrs.Sign(t, msg).Bytes()),
+		predicate.New(warptest.IncorrectlySign(t, msg).Bytes())
+}
+
+// newRules returns rules with Warp enabled.
+func newRules() params.Rules {
+	rules := params.TestChainConfig.Rules(common.Big0, params.IsMergeTODO, 0)
+	params.GetRulesExtra(rules).WarpConfig = warp.NewDefaultConfig(utils.PointerTo[uint64](0))
+	return rules
 }
 
 func TestCheckBlockPredicates(t *testing.T) {
+	predicateContext, validMsg, invalidMsg := newWarpMessages(t)
+	rules := newRules()
 	var (
-		addr    = common.Address{0}
 		validTx = types.NewTx(&types.DynamicFeeTx{
 			AccessList: types.AccessList{
-				{Address: addr, StorageKeys: validPredicate},
+				{Address: warp.ContractAddress, StorageKeys: validMsg},
 			},
 			Gas: math.MaxUint64,
 		})
 		invalidTx = types.NewTx(&types.DynamicFeeTx{
 			AccessList: types.AccessList{
-				{Address: addr, StorageKeys: invalidPredicate},
+				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
 			},
 			Gas: math.MaxUint64,
 		})
@@ -54,292 +76,175 @@ func TestCheckBlockPredicates(t *testing.T) {
 		name                string
 		nilPredicateContext bool
 		txs                 []*types.Transaction
-		expected            predicate.BlockResults
-		expectedErr         error
+		want                predicate.BlockResults
+		wantErr             error
 	}{
 		{
-			name:                "invalid",
+			name:                "nil_predicate_context",
 			nilPredicateContext: true,
-			txs: []*types.Transaction{
-				validTx,
-			},
-			expectedErr: ErrMissingPredicateContext,
+			txs:                 []*types.Transaction{validTx},
+			wantErr:             ErrMissingPredicateContext,
 		},
 		{
-			name: "one_tx_one_address_one_predicate",
-			txs: []*types.Transaction{
-				validTx,
-			},
-			expected: predicate.BlockResults{
-				validTx.Hash(): {
-					addr: set.NewBits(),
-				},
+			name: "one_tx_valid",
+			txs:  []*types.Transaction{validTx},
+			want: predicate.BlockResults{
+				validTx.Hash(): {warp.ContractAddress: set.NewBits()},
 			},
 		},
 		{
-			name: "one_tx_one_address_one_invalid_predicate",
-			txs: []*types.Transaction{
-				invalidTx,
-			},
-			expected: predicate.BlockResults{
-				invalidTx.Hash(): {
-					addr: set.NewBits(0),
-				},
+			name: "one_tx_invalid",
+			txs:  []*types.Transaction{invalidTx},
+			want: predicate.BlockResults{
+				invalidTx.Hash(): {warp.ContractAddress: set.NewBits(0)},
 			},
 		},
 		{
 			name: "multiple_txs",
-			txs: []*types.Transaction{
-				validTx,
-				invalidTx,
-			},
-			expected: predicate.BlockResults{
-				validTx.Hash(): {
-					addr: set.NewBits(),
-				},
-				invalidTx.Hash(): {
-					addr: set.NewBits(0),
-				},
+			txs:  []*types.Transaction{validTx, invalidTx},
+			want: predicate.BlockResults{
+				validTx.Hash():   {warp.ContractAddress: set.NewBits()},
+				invalidTx.Hash(): {warp.ContractAddress: set.NewBits(0)},
 			},
 		},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
-			rules := params.TestChainConfig.Rules(common.Big0, params.IsMergeTODO, 0)
-			predicater := precompileconfig.NewMockPredicater(gomock.NewController(t))
-			predicater.EXPECT().PredicateGas(gomock.Any(), gomock.Any()).Return(uint64(0), nil).AnyTimes()
-			predicater.EXPECT().VerifyPredicate(gomock.Any(), gomock.Any()).DoAndReturn(verifyMockPredicate).AnyTimes()
-
-			rulesExtra := params.GetRulesExtra(rules)
-			rulesExtra.Predicaters[addr] = predicater
-
-			predicateContext := &precompileconfig.PredicateContext{
-				ProposerVMBlockCtx: &block.Context{},
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := predicateContext
+			if tt.nilPredicateContext {
+				ctx = nil
 			}
-			if test.nilPredicateContext {
-				predicateContext = nil
-			}
-
-			actual, err := CheckBlockPredicates(rules, predicateContext, test.txs)
-			require.ErrorIs(err, test.expectedErr)
-			require.Equal(test.expected, actual)
+			got, err := CheckBlockPredicates(rules, ctx, tt.txs)
+			require.ErrorIs(t, err, tt.wantErr, "CheckBlockPredicates()")
+			require.Equal(t, tt.want, got, "CheckBlockPredicates()")
 		})
 	}
 }
 
 func TestCheckTxPredicates(t *testing.T) {
-	var (
-		addr0 = common.Address{0}
-		addr1 = common.Address{1}
-	)
+	predicateContext, validMsg, invalidMsg := newWarpMessages(t)
 	tests := []struct {
 		name                string
-		predicates          set.Set[common.Address]
-		predicateGas        uint64
+		warpDisabled        bool
 		nilBlockContext     bool
 		nilPredicateContext bool
 		insufficientGas     bool
 		accessList          types.AccessList
-		expected            predicate.PrecompileResults
-		expectedErr         error
+		want                predicate.PrecompileResults
+		wantErr             error
 	}{
 		{
-			name:         "invalid_intrinsic_gas",
-			predicates:   set.Of(addr0),
-			predicateGas: math.MaxUint64,
-			accessList: types.AccessList{
-				{Address: addr0, StorageKeys: validPredicate},
-			},
-			expectedErr: ErrGasUintOverflow,
-		},
-		{
 			name:            "insufficient_intrinsic_gas",
-			predicates:      set.Of(addr0),
 			insufficientGas: true,
 			accessList: types.AccessList{
-				{Address: addr0, StorageKeys: validPredicate},
+				{Address: warp.ContractAddress, StorageKeys: validMsg},
 			},
-			expectedErr: ErrIntrinsicGas,
+			wantErr: ErrIntrinsicGas,
 		},
 		{
-			name: "no_predicaters",
-		},
-		{
-			name:       "no_predicates",
-			predicates: set.Of(addr0),
-		},
-		{
-			name:       "filtered_predicates",
-			predicates: set.Of(addr0),
+			name:                "warp_disabled",
+			warpDisabled:        true,
+			nilPredicateContext: true,
 			accessList: types.AccessList{
-				{Address: addr1, StorageKeys: validPredicate},
+				{Address: warp.ContractAddress, StorageKeys: validMsg},
+			},
+		},
+		{
+			name:                "no_warp_messages",
+			nilPredicateContext: true,
+		},
+		{
+			name:                "filtered_access_list",
+			nilPredicateContext: true,
+			accessList: types.AccessList{
+				{Address: common.Address{1}, StorageKeys: invalidMsg},
 			},
 		},
 		{
 			name:            "nil_block_context",
-			predicates:      set.Of(addr0),
 			nilBlockContext: true,
 			accessList: types.AccessList{
-				{Address: addr0, StorageKeys: validPredicate},
+				{Address: warp.ContractAddress, StorageKeys: validMsg},
 			},
-			expectedErr: ErrMissingPredicateContext,
+			wantErr: ErrMissingPredicateContext,
 		},
 		{
 			name:                "nil_predicate_context",
-			predicates:          set.Of(addr0),
 			nilPredicateContext: true,
 			accessList: types.AccessList{
-				{Address: addr0, StorageKeys: validPredicate},
+				{Address: warp.ContractAddress, StorageKeys: validMsg},
 			},
-			expectedErr: ErrMissingPredicateContext,
+			wantErr: ErrMissingPredicateContext,
 		},
 		{
-			name:                "nil_predicate_with_filtered_predicates",
-			predicates:          set.Of(addr0),
-			nilPredicateContext: true,
+			name: "one_valid",
 			accessList: types.AccessList{
-				{Address: addr1, StorageKeys: validPredicate},
+				{Address: warp.ContractAddress, StorageKeys: validMsg},
 			},
-		},
-		{
-			name:       "one_address_one_predicate",
-			predicates: set.Of(addr0),
-			accessList: types.AccessList{
-				{Address: addr0, StorageKeys: validPredicate},
-			},
-			expected: predicate.PrecompileResults{
-				addr0: set.NewBits(),
+			want: predicate.PrecompileResults{
+				warp.ContractAddress: set.NewBits(),
 			},
 		},
 		{
-			name:       "one_address_one_invalid_predicate",
-			predicates: set.Of(addr0),
+			name: "one_invalid",
 			accessList: types.AccessList{
-				{Address: addr0, StorageKeys: invalidPredicate},
+				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
 			},
-			expected: predicate.PrecompileResults{
-				addr0: set.NewBits(0),
+			want: predicate.PrecompileResults{
+				warp.ContractAddress: set.NewBits(0),
 			},
 		},
 		{
-			name:       "one_address_two_invalid_predicates",
-			predicates: set.Of(addr0),
+			name: "two_invalid",
 			accessList: types.AccessList{
-				{Address: addr0, StorageKeys: invalidPredicate},
-				{Address: addr0, StorageKeys: invalidPredicate},
+				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
+				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
 			},
-			expected: predicate.PrecompileResults{
-				addr0: set.NewBits(0, 1),
+			want: predicate.PrecompileResults{
+				warp.ContractAddress: set.NewBits(0, 1),
 			},
 		},
 		{
-			name:       "one_address_two_mixed_predicates",
-			predicates: set.Of(addr0),
+			name: "mixed_with_other_addresses",
 			accessList: types.AccessList{
-				{Address: addr0, StorageKeys: validPredicate},
-				{Address: addr0, StorageKeys: invalidPredicate},
+				{Address: warp.ContractAddress, StorageKeys: validMsg},
+				{Address: common.Address{1}, StorageKeys: invalidMsg},
+				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
+				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
+				{Address: warp.ContractAddress, StorageKeys: validMsg},
 			},
-			expected: predicate.PrecompileResults{
-				addr0: set.NewBits(1),
-			},
-		},
-		{
-			name:       "one_address_mixed_predicates",
-			predicates: set.Of(addr0),
-			accessList: types.AccessList{
-				{Address: addr0, StorageKeys: validPredicate},
-				{Address: addr0, StorageKeys: invalidPredicate},
-				{Address: addr0, StorageKeys: invalidPredicate},
-				{Address: addr0, StorageKeys: validPredicate},
-			},
-			expected: predicate.PrecompileResults{
-				addr0: set.NewBits(1, 2),
-			},
-		},
-		{
-			name:       "two_addresses_mixed_predicates",
-			predicates: set.Of(addr0, addr1),
-			accessList: types.AccessList{
-				{Address: addr0, StorageKeys: validPredicate},
-				{Address: addr1, StorageKeys: invalidPredicate},
-				{Address: addr0, StorageKeys: invalidPredicate},
-				{Address: addr0, StorageKeys: invalidPredicate},
-				{Address: addr1, StorageKeys: validPredicate},
-				{Address: addr1, StorageKeys: validPredicate},
-				{Address: addr1, StorageKeys: invalidPredicate},
-				{Address: addr1, StorageKeys: validPredicate},
-			},
-			expected: predicate.PrecompileResults{
-				addr0: set.NewBits(1, 2),
-				addr1: set.NewBits(0, 3),
-			},
-		},
-		{
-			name:       "two_addresses_all_valid_predicates",
-			predicates: set.Of(addr0, addr1),
-			accessList: types.AccessList{
-				{Address: addr0, StorageKeys: validPredicate},
-				{Address: addr1, StorageKeys: validPredicate},
-				{Address: addr0, StorageKeys: validPredicate},
-				{Address: addr0, StorageKeys: validPredicate},
-			},
-			expected: predicate.PrecompileResults{
-				addr0: set.NewBits(),
-				addr1: set.NewBits(),
-			},
-		},
-		{
-			name:       "two_addresses_all_invalid_predicates",
-			predicates: set.Of(addr0, addr1),
-			accessList: types.AccessList{
-				{Address: addr0, StorageKeys: invalidPredicate},
-				{Address: addr1, StorageKeys: invalidPredicate},
-				{Address: addr0, StorageKeys: invalidPredicate},
-				{Address: addr0, StorageKeys: invalidPredicate},
-			},
-			expected: predicate.PrecompileResults{
-				addr0: set.NewBits(0, 1, 2),
-				addr1: set.NewBits(0),
+			want: predicate.PrecompileResults{
+				warp.ContractAddress: set.NewBits(1, 2),
 			},
 		},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
-			rules := params.TestChainConfig.Rules(common.Big0, params.IsMergeTODO, 0)
-			predicater := precompileconfig.NewMockPredicater(gomock.NewController(t))
-			predicater.EXPECT().PredicateGas(gomock.Any(), gomock.Any()).Return(test.predicateGas, nil).AnyTimes()
-			predicater.EXPECT().VerifyPredicate(gomock.Any(), gomock.Any()).DoAndReturn(verifyMockPredicate).AnyTimes()
-
-			rulesExtra := params.GetRulesExtra(rules)
-			for addr := range test.predicates {
-				rulesExtra.Predicaters[addr] = predicater
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rules := newRules()
+			if tt.warpDisabled {
+				params.GetRulesExtra(rules).WarpConfig = nil
 			}
 
-			predicateContext := &precompileconfig.PredicateContext{
-				ProposerVMBlockCtx: &block.Context{},
+			c := *predicateContext
+			ctx := &c
+			if tt.nilBlockContext {
+				ctx.ProposerVMBlockCtx = nil
 			}
-			if test.nilBlockContext {
-				predicateContext.ProposerVMBlockCtx = nil
-			}
-			if test.nilPredicateContext {
-				predicateContext = nil
+			if tt.nilPredicateContext {
+				ctx = nil
 			}
 
 			gas := uint64(math.MaxUint64)
-			if test.insufficientGas {
+			if tt.insufficientGas {
 				gas = 0
 			}
 			tx := types.NewTx(&types.DynamicFeeTx{
-				AccessList: test.accessList,
+				AccessList: tt.accessList,
 				Gas:        gas,
 			})
-			actual, err := CheckTxPredicates(rules, predicateContext, tx)
-			require.ErrorIs(err, test.expectedErr)
-			require.Equal(test.expected, actual)
+			got, err := CheckTxPredicates(rules, ctx, tx)
+			require.ErrorIs(t, err, tt.wantErr, "CheckTxPredicates()")
+			require.Equal(t, tt.want, got, "CheckTxPredicates()")
 		})
 	}
 }

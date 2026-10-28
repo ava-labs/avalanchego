@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
@@ -78,16 +79,20 @@ func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
 	return (ethparams.NOOPHooks{}).ShouldCreditBaseFeeToCoinbase()
 }
 
-// AccessListGas computes the intrinsic gas for an access list.
-// When predicaters exist, it calculates gas per-tuple, delegating to predicate
-// contracts for addresses that have them. Otherwise, it returns override=false
-// to use the default calculation.
+// AccessListGas computes the intrinsic gas for an access list. While Warp is
+// enabled, it calculates gas per-tuple, charging Warp messages their predicate
+// gas. Otherwise, it returns override=false to use the default calculation.
+//
+// TODO(JonathanOppenheimer): Charge Warp messages directly once the shared
+// predicate gas helper is replaced.
 func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
-	rules := extras.Rules(r)
-	if !rules.PredicatersExist() {
+	if r.WarpConfig == nil {
 		return 0, false, nil
 	}
-	gas, err := evmprecompileconfig.AccessListGasWithPredicates(rules.AvalancheRules, rules.Predicaters, accessList)
+	predicaters := map[common.Address]evmprecompileconfig.Predicater{
+		warp.ContractAddress: r.WarpConfig,
+	}
+	gas, err := evmprecompileconfig.AccessListGasWithPredicates(r.AvalancheRules, predicaters, accessList)
 	return gas, true, err
 }
 
@@ -209,6 +214,6 @@ func (p *precompileBlockContext) Timestamp() uint64 {
 	return p.time
 }
 
-func (p *precompileBlockContext) GetPredicateResults(txHash common.Hash, precompileAddress common.Address) set.Bits {
-	return p.predicateResults.Get(txHash, precompileAddress)
+func (p *precompileBlockContext) GetWarpMessageResults(txHash common.Hash) set.Bits {
+	return p.predicateResults.Get(txHash, warp.ContractAddress)
 }

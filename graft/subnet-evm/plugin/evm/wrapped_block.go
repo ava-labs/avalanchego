@@ -182,20 +182,17 @@ func (b *wrappedBlock) Verify(context.Context) error {
 // ShouldVerifyWithContext implements the block.WithVerifyContext interface
 func (b *wrappedBlock) ShouldVerifyWithContext(context.Context) (bool, error) {
 	rules := b.vm.rules(b.ethBlock.Number(), b.ethBlock.Time())
-	predicates := rules.Predicaters
-	// Short circuit early if there are no predicates to verify
-	if len(predicates) == 0 {
+	// Short circuit early if there are no Warp messages to verify
+	if rules.WarpConfig == nil {
 		return false, nil
 	}
 
-	// Check if any transaction specifies a precompile that enforces a predicate, requiring
-	// the ProposerVMBlockCtx.
+	// Check if any transaction includes a Warp message, requiring the
+	// ProposerVMBlockCtx.
 	for _, tx := range b.ethBlock.Transactions() {
-		for _, accessTuple := range tx.AccessList() {
-			if _, ok := predicates[accessTuple.Address]; ok {
-				log.Debug("Block verification requires proposerVM context", "block", b.ID(), "height", b.Height())
-				return true, nil
-			}
+		if len(rules.WarpMessages(tx.AccessList())) > 0 {
+			log.Debug("Block verification requires proposerVM context", "block", b.ID(), "height", b.Height())
+			return true, nil
 		}
 	}
 
@@ -445,8 +442,8 @@ func (b *wrappedBlock) verifyPredicates(predicateContext *precompileconfig.Predi
 	rulesExtra := params.GetRulesExtra(rules)
 
 	switch {
-	case !rulesExtra.IsDurango && rulesExtra.PredicatersExist():
-		return errors.New("cannot enable predicates before Durango activation")
+	case !rulesExtra.IsDurango && rulesExtra.WarpConfig != nil:
+		return errors.New("cannot enable Warp before Durango activation")
 	case !rulesExtra.IsDurango:
 		return nil
 	}
