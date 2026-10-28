@@ -14,14 +14,6 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-// UpgradeConfig includes the following configs that may be specified in upgradeBytes:
-// - Timestamps that enable avalanche network upgrades,
-// - Enabling or disabling precompiles as network upgrades.
-type UpgradeConfig struct {
-	// Config for enabling and disabling precompiles as network upgrades.
-	PrecompileUpgrades []PrecompileUpgrade `json:"precompileUpgrades,omitempty"`
-}
-
 // AvalancheContext provides Avalanche specific context directly into the EVM.
 type AvalancheContext struct {
 	SnowCtx *snow.Context
@@ -31,8 +23,6 @@ type ChainConfig struct {
 	NetworkUpgrades // Config for timestamps that enable network upgrades.
 
 	AvalancheContext `json:"-"` // Avalanche specific context set during VM initialization. Not serialized.
-
-	UpgradeConfig `json:"-"` // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
 }
 
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
@@ -66,13 +56,6 @@ func (c *ChainConfig) Description() string {
 
 	banner += "Avalanche Upgrades (timestamp based):\n"
 	banner += c.NetworkUpgrades.Description()
-	banner += "\n"
-
-	upgradeConfigBytes, err := json.Marshal(c.UpgradeConfig)
-	if err != nil {
-		upgradeConfigBytes = []byte("cannot marshal UpgradeConfig")
-	}
-	banner += "Upgrade Config: " + string(upgradeConfigBytes)
 	banner += "\n"
 	return banner
 }
@@ -115,7 +98,6 @@ func (c *ChainConfig) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	// At this point we have populated all fields except PrecompileUpgrade
 	*c = ChainConfig(tmp)
 
 	return nil
@@ -145,9 +127,6 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 	// not check block timestamp forks in the same way as block number forks since
 	// it would not be a meaningful comparison. Instead, we only check that the
 	// Avalanche upgrades are enabled in order.
-	// Note: we do not add the precompile configs here because they are optional
-	// and independent, i.e. the order in which they are enabled does not impact
-	// the correctness of the chain config.
 	return checkForks(c.forkOrder())
 }
 
@@ -191,20 +170,4 @@ func checkForks(forks []fork) error {
 		}
 	}
 	return nil
-}
-
-// IsForkTransition returns true if `fork` activates during the transition from
-// `parent` to `current`.
-// Taking `parent` as a pointer allows for us to pass nil when checking forks
-// that activate during genesis.
-// Note: `parent` and `current` can be either both timestamp values, or both
-// block number values, since this function works for both block number and
-// timestamp activated forks.
-func IsForkTransition(fork *uint64, parent *uint64, current uint64) bool {
-	var parentForked bool
-	if parent != nil {
-		parentForked = isTimestampForked(fork, *parent)
-	}
-	currentForked := isTimestampForked(fork, current)
-	return !parentForked && currentForked
 }

@@ -22,7 +22,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -107,15 +106,6 @@ func TestParseGenesis(t *testing.T) {
 						AvalancheContext: extras.AvalancheContext{
 							SnowCtx: mainnetCtx,
 						},
-						UpgradeConfig: extras.UpgradeConfig{
-							PrecompileUpgrades: []extras.PrecompileUpgrade{
-								{
-									Config: warp.NewDefaultConfig(
-										new(uint64(1709740800)), // Durango
-									),
-								},
-							},
-						},
 					},
 				),
 				GasLimit:   100000000,
@@ -175,15 +165,6 @@ func TestParseGenesis(t *testing.T) {
 						AvalancheContext: extras.AvalancheContext{
 							SnowCtx: fujiCtx,
 						},
-						UpgradeConfig: extras.UpgradeConfig{
-							PrecompileUpgrades: []extras.PrecompileUpgrade{
-								{
-									Config: warp.NewDefaultConfig(
-										new(uint64(1707840000)), // Durango
-									),
-								},
-							},
-						},
 					},
 				),
 				GasLimit:   100000000,
@@ -242,15 +223,6 @@ func TestParseGenesis(t *testing.T) {
 						},
 						AvalancheContext: extras.AvalancheContext{
 							SnowCtx: localCtx,
-						},
-						UpgradeConfig: extras.UpgradeConfig{
-							PrecompileUpgrades: []extras.PrecompileUpgrade{
-								{
-									Config: warp.NewDefaultConfig(
-										initiallyActive, // Durango
-									),
-								},
-							},
 						},
 					},
 				),

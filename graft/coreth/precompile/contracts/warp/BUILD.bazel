@@ -18,7 +18,6 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp",
     deps = [
         "//graft/coreth/precompile/contract",
-        "//graft/coreth/precompile/modules",
         "//graft/coreth/precompile/precompileconfig",
         "//utils/constants",
         "//vms/evm/predicate",
@@ -36,6 +35,7 @@ graft_go_test(
     name = "warp_test",
     srcs = [
         "contract_test.go",
+        "export_test.go",
         "predicate_test.go",
     ],
     embed = [":warp"],

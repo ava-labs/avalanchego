@@ -86,7 +86,7 @@ func (s *StateDB) Prepare(
 	precompiles []common.Address,
 	list types.AccessList,
 ) {
-	s.predicates = predicate.FromAccessList(params.GetRulesExtra(rules), list)
+	s.predicates = predicate.FromAccessList((*params.RulesExtra)(params.GetRulesExtra(rules)), list)
 	s.StateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)
 }
 

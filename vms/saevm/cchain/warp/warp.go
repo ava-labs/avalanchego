@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -46,11 +45,13 @@ func FromReceipts(rs types.Receipts) ([]*avalanchewarp.UnsignedMessage, error) {
 
 var errNoBlockContext = errors.New("no block context")
 
+var warpConfig = corethwarp.NewDefaultConfig(nil)
+
 // VerifyBlock verifies the predicates of every transaction in the block.
 func VerifyBlock(
 	snowContext *snow.Context,
 	blockContext *block.Context, // MAY be nil
-	rules *extras.Rules,
+	rules predicate.Predicates,
 	txs []*types.Transaction,
 ) (predicate.BlockResults, error) {
 	type result = lazyEntry[common.Hash, predicate.PrecompileResults]
@@ -79,7 +80,7 @@ func VerifyBlock(
 		}
 		results = append(results, result{
 			key:   tx.Hash(),
-			value: verifyTx(pc, rules.Predicaters, predicates, eg),
+			value: verifyTx(pc, predicates, eg),
 		})
 	}
 	if err := eg.Wait(); err != nil {
@@ -116,7 +117,6 @@ func collect[K comparable, V any](entries []lazyEntry[K, V]) map[K]V {
 // The predicate results MUST be collected after eg.Wait has returned.
 func verifyTx(
 	pc *precompileconfig.PredicateContext,
-	contracts map[common.Address]precompileconfig.Predicater,
 	predicatesByAddress map[common.Address][]predicate.Predicate,
 	eg *errgroup.Group,
 ) lazy[predicate.PrecompileResults] {
@@ -127,7 +127,7 @@ func verifyTx(
 			key: address,
 			value: verifyContract(
 				pc,
-				contracts[address],
+				warpConfig,
 				predicates,
 				eg,
 			),
