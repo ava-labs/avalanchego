@@ -298,7 +298,8 @@ func TestStorageIndexSuccess(t *testing.T) {
 		gotBytes := gotBlock.Bytes()
 
 		require.Equal(t, expectedBytes, gotBytes)
-		require.Equal(t, finalizations[i].Finalization, gotFin.Finalization)
+		// Compare encodings, since BlockHeader caches its canoto size in an unexported field.
+		require.Equal(t, finalizations[i].Finalization.Bytes(), gotFin.Finalization.Bytes())
 
 		// verify that the blocks were also accepted in the VM
 		accepted := blocks[i].vmBlock.(*wrappedBlock).Status

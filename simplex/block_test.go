@@ -111,7 +111,10 @@ func TestBlockSerialization(t *testing.T) {
 			require.ErrorIs(t, err, tt.expectedError)
 
 			if tt.expectedError == nil {
-				require.Equal(t, b.BlockHeader().ProtocolMetadata, deserializedBlock.BlockHeader().ProtocolMetadata)
+				expectedMD := b.BlockHeader().ProtocolMetadata
+				actualMD := deserializedBlock.BlockHeader().ProtocolMetadata
+				// ProtocolMetadata caches its canoto size in an unexported field, so just compare encodings
+				require.Equal(t, expectedMD.Bytes(), actualMD.Bytes())
 				_, err := deserializedBlock.Verify(ctx)
 				require.NoError(t, err)
 			}
