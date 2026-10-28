@@ -48,18 +48,18 @@ func (m *MockBlockContext) EXPECT() *MockBlockContextMockRecorder {
 	return m.recorder
 }
 
-// GetPredicateResults mocks base method.
-func (m *MockBlockContext) GetPredicateResults(txHash common.Hash, precompileAddress common.Address) set.Bits {
+// GetWarpMessageResults mocks base method.
+func (m *MockBlockContext) GetWarpMessageResults(txHash common.Hash) set.Bits {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPredicateResults", txHash, precompileAddress)
+	ret := m.ctrl.Call(m, "GetWarpMessageResults", txHash)
 	ret0, _ := ret[0].(set.Bits)
 	return ret0
 }
 
-// GetPredicateResults indicates an expected call of GetPredicateResults.
-func (mr *MockBlockContextMockRecorder) GetPredicateResults(txHash, precompileAddress any) *gomock.Call {
+// GetWarpMessageResults indicates an expected call of GetWarpMessageResults.
+func (mr *MockBlockContextMockRecorder) GetWarpMessageResults(txHash any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPredicateResults", reflect.TypeOf((*MockBlockContext)(nil).GetPredicateResults), txHash, precompileAddress)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWarpMessageResults", reflect.TypeOf((*MockBlockContext)(nil).GetWarpMessageResults), txHash)
 }
 
 // Number mocks base method.
@@ -272,21 +272,6 @@ func (mr *MockStateDBMockRecorder) GetNonce(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNonce", reflect.TypeOf((*MockStateDB)(nil).GetNonce), arg0)
 }
 
-// GetPredicate mocks base method.
-func (m *MockStateDB) GetPredicate(address common.Address, index int) (predicate.Predicate, bool) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPredicate", address, index)
-	ret0, _ := ret[0].(predicate.Predicate)
-	ret1, _ := ret[1].(bool)
-	return ret0, ret1
-}
-
-// GetPredicate indicates an expected call of GetPredicate.
-func (mr *MockStateDBMockRecorder) GetPredicate(address, index any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPredicate", reflect.TypeOf((*MockStateDB)(nil).GetPredicate), address, index)
-}
-
 // GetState mocks base method.
 func (m *MockStateDB) GetState(arg0 common.Address, arg1 common.Hash, arg2 ...stateconf.StateDBStateOption) common.Hash {
 	m.ctrl.T.Helper()
@@ -304,6 +289,21 @@ func (mr *MockStateDBMockRecorder) GetState(arg0, arg1 any, arg2 ...any) *gomock
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]any{arg0, arg1}, arg2...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetState", reflect.TypeOf((*MockStateDB)(nil).GetState), varargs...)
+}
+
+// GetWarpMessage mocks base method.
+func (m *MockStateDB) GetWarpMessage(index int) (predicate.Predicate, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetWarpMessage", index)
+	ret0, _ := ret[0].(predicate.Predicate)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetWarpMessage indicates an expected call of GetWarpMessage.
+func (mr *MockStateDBMockRecorder) GetWarpMessage(index any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWarpMessage", reflect.TypeOf((*MockStateDB)(nil).GetWarpMessage), index)
 }
 
 // RevertToSnapshot mocks base method.
