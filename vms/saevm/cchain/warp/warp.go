@@ -45,7 +45,6 @@ func FromReceipts(rs types.Receipts) ([]*avalanchewarp.UnsignedMessage, error) {
 
 var errNoBlockContext = errors.New("no block context")
 
-// warpConfig verifies predicates, which are only ever Warp messages.
 var warpConfig = corethwarp.NewDefaultConfig(nil)
 
 // VerifyBlock verifies the predicates of every transaction in the block.
