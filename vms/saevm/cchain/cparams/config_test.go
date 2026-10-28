@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -91,14 +92,6 @@ func TestCheckConfigForkOrder(t *testing.T) {
 	})
 }
 
-// TODO(alarso16): delete this once test package is unnecessary.
-func ptrEqual[T comparable](a, b *T) bool {
-	if a == nil || b == nil {
-		return a == b
-	}
-	return *a == *b
-}
-
 func deref[T any](p *T) any {
 	if p == nil {
 		return nil
@@ -117,7 +110,7 @@ func TestCheckCompatible(t *testing.T) {
 	// checks for non-nil [ethparams.ConfigCompatError] with matching timestamps
 	compatErr := func(storedTime, newTime *uint64) testerr.Want {
 		return testerr.As(func(got *ethparams.ConfigCompatError) string {
-			if ptrEqual(got.StoredTime, storedTime) && ptrEqual(got.NewTime, newTime) {
+			if utils.PtrEqual(got.StoredTime, storedTime) && utils.PtrEqual(got.NewTime, newTime) {
 				return ""
 			}
 			return fmt.Sprintf("%T with stored time %v and new time %v", got, deref(storedTime), deref(newTime))

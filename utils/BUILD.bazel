@@ -6,6 +6,7 @@ go_library(
     srcs = [
         "atomic.go",
         "bytes.go",
+        "pointer.go",
         "slice.go",
         "sorting.go",
         "stacktrace.go",
@@ -21,6 +22,7 @@ go_test(
     srcs = [
         "atomic_test.go",
         "bytes_test.go",
+        "pointer_test.go",
         "slice_test.go",
         "sorting_test.go",
     ],

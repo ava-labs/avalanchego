@@ -15,6 +15,7 @@ go_library(
         "//graft/coreth/precompile/precompileconfig",
         "//snow",
         "//upgrade",
+        "//utils",
         "@com_github_ava_labs_libevm//params",
     ],
 )
@@ -26,6 +27,7 @@ go_test(
         ":cparams",
         "//graft/coreth/params",
         "//snow/snowtest",
+        "//utils",
         "@com_github_arr4n_shed//testerr",
         "@com_github_ava_labs_libevm//params",
         "@com_github_stretchr_testify//require",

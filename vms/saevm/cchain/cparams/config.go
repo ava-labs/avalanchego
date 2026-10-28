@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -108,7 +109,7 @@ func (c *ChainConfig) CheckConfigCompatible(newEth *ethparams.ChainConfig, headN
 	newForks := newCfg.forks()
 	for i, oldFork := range oldForks {
 		newFork := newForks[i]
-		if ptrEqual(oldFork.time, newFork.time) {
+		if utils.PtrEqual(oldFork.time, newFork.time) {
 			continue
 		}
 
@@ -123,13 +124,6 @@ func (c *ChainConfig) CheckConfigCompatible(newEth *ethparams.ChainConfig, headN
 	}
 
 	return nil
-}
-
-func ptrEqual[T comparable](x, y *T) bool {
-	if x == nil || y == nil {
-		return x == y
-	}
-	return *x == *y
 }
 
 func (*ChainConfig) Description() string {
