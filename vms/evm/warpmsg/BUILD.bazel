@@ -2,12 +2,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "go_test")
 
 go_library(
-    name = "predicate",
+    name = "warpmsg",
     srcs = [
-        "predicate.go",
+        "packed.go",
         "results.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/vms/evm/predicate",
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/warpmsg",
     visibility = ["//visibility:public"],
     deps = [
         "//codec",
@@ -20,12 +20,12 @@ go_library(
 )
 
 go_test(
-    name = "predicate_test",
+    name = "warpmsg_test",
     srcs = [
-        "predicate_test.go",
+        "packed_test.go",
         "results_test.go",
     ],
-    embed = [":predicate"],
+    embed = [":warpmsg"],
     deps = [
         "//codec",
         "//utils/set",

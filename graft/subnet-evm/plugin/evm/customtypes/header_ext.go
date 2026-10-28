@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -44,14 +44,14 @@ type HeaderExtra struct {
 	TimeMilliseconds *uint64
 	MinDelayExcess   *acp226.DelayExcess
 
-	predicateResults atomic.Pointer[predicate.BlockResults]
+	predicateResults atomic.Pointer[warpmsg.BlockResults]
 }
 
 // PredicateResults returns the parsed predicate results from the header's extra
 // data. If the extra data does not contain predicate results, or cannot be
 // parsed, nil is returned. The same rules MUST be supplied for each call to a
 // given header.
-func PredicateResults(h *ethtypes.Header, predicateBytes []byte) predicate.BlockResults {
+func PredicateResults(h *ethtypes.Header, predicateBytes []byte) warpmsg.BlockResults {
 	if len(predicateBytes) == 0 {
 		return nil
 	}
@@ -62,7 +62,7 @@ func PredicateResults(h *ethtypes.Header, predicateBytes []byte) predicate.Block
 	}
 
 	// results were already verified for canonical execution
-	results, _ := predicate.ParseBlockResults(predicateBytes)
+	results, _ := warpmsg.ParseBlockResults(predicateBytes)
 	cache.Store(&results)
 	return results
 }

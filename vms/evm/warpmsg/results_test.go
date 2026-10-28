@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package predicate
+package warpmsg
 
 import (
 	"slices"
@@ -120,7 +120,7 @@ func TestBlockResultsSet(t *testing.T) {
 	tests := []struct {
 		name  string
 		start BlockResults
-		toSet PrecompileResults
+		toSet TxResults
 		want  BlockResults
 	}{
 		{
@@ -132,11 +132,11 @@ func TestBlockResultsSet(t *testing.T) {
 		{
 			name:  "nil_allocate",
 			start: nil,
-			toSet: PrecompileResults{
+			toSet: TxResults{
 				{3}: set.NewBits(1, 2, 3),
 			},
 			want: BlockResults{
-				txHash: PrecompileResults{
+				txHash: TxResults{
 					{3}: set.NewBits(1, 2, 3),
 				},
 			},
@@ -144,11 +144,11 @@ func TestBlockResultsSet(t *testing.T) {
 		{
 			name:  "empty_allocate",
 			start: make(BlockResults),
-			toSet: PrecompileResults{
+			toSet: TxResults{
 				{3}: set.NewBits(1, 2, 3),
 			},
 			want: BlockResults{
-				txHash: PrecompileResults{
+				txHash: TxResults{
 					{3}: set.NewBits(1, 2, 3),
 				},
 			},
@@ -156,15 +156,15 @@ func TestBlockResultsSet(t *testing.T) {
 		{
 			name: "overwrite_tx",
 			start: BlockResults{
-				txHash: PrecompileResults{
+				txHash: TxResults{
 					{3}: set.NewBits(1, 2, 3),
 				},
 			},
-			toSet: PrecompileResults{
+			toSet: TxResults{
 				{3}: set.NewBits(1),
 			},
 			want: BlockResults{
-				txHash: PrecompileResults{
+				txHash: TxResults{
 					{3}: set.NewBits(1),
 				},
 			},
@@ -172,11 +172,11 @@ func TestBlockResultsSet(t *testing.T) {
 		{
 			name: "delete_tx",
 			start: BlockResults{
-				txHash: PrecompileResults{
+				txHash: TxResults{
 					{3}: set.NewBits(1, 2, 3),
 				},
 			},
-			toSet: PrecompileResults{},
+			toSet: TxResults{},
 			want:  BlockResults{},
 		},
 	}

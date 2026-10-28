@@ -1,6 +1,6 @@
-# Predicate
+# warpmsg
 
-This package contains the predicate data structure and its encoding and helper functions to unpack/pack the data structure.
+This package packs Warp messages into transaction access lists, unpacks them, and encodes the Warp verification results stored in block headers.
 
 ## Encoding
 
@@ -13,36 +13,36 @@ A byte slice of size N is encoded as:
 
 ## Results
 
-This defines how to encode `PredicateResults` within the block header's `Extra` data field.
+This defines how to encode `BlockResults` within the block header's `Extra` data field.
 
-For more information on the motivation for encoding the results of predicate verification within a block, see [here](../../../vms/platformvm/warp/README.md#processing-historical-avalanche-interchain-messages).
+For more information on the motivation for encoding the results of Warp message verification within a block, see [here](../../../vms/platformvm/warp/README.md#processing-historical-avalanche-interchain-messages).
 
 ### Serialization
 
-Results have a maximum size of 1MB enforced by the codec. The actual size depends on how much data the Precompile predicates may put into the results, the gas cost they charge, and the block gas limit. PredicateResults are encoded using the AvalancheGo codec, which serializes a map by serializing the length of the map as a `uint32` and then serializes each key-value pair sequentially.
+Results have a maximum size of 1MB enforced by the codec. The actual size depends on how many Warp messages a block verifies, the gas cost they charge, and the block gas limit. `BlockResults` are encoded using the AvalancheGo codec, which serializes a map by serializing the length of the map as a `uint32` and then serializes each key-value pair sequentially.
 
-PredicateResults:
+BlockResults:
 
 | Field | Type | Size |
 |-------|------|------|
 | codecID | uint16 | 2 bytes |
-| results | map[[32]byte]TxPredicateResults | 4 + size(results) bytes |
+| results | map[[32]byte]TxResults | 4 + size(results) bytes |
 | **Total** | | **6 + size(results)** |
 
 - `codecID` is the codec version used to serialize the payload and is hardcoded to `0x0000`
-- `results` is a map of transaction hashes to the corresponding `TxPredicateResults`
+- `results` is a map of transaction hashes to the corresponding `TxResults`
 
-TxPredicateResults
+TxResults
 
 | Field | Type | Size |
 |-------|------|------|
-| txPredicateResults | map[[20]byte][]byte | 4 + size(txPredicateResults) bytes |
+| txResults | map[[20]byte][]byte | 4 + size(txResults) bytes |
 
-- `txPredicateResults` is a map of precompile addresses to the corresponding byte array returned by the predicate
+- `txResults` is a map of precompile addresses to the bytes of the verification bitset
 
 #### Examples
 
-##### Empty Predicate Results Map
+##### Empty BlockResults
 
 ```
 // codecID
@@ -51,7 +51,7 @@ TxPredicateResults
 0x00, 0x00, 0x00, 0x00
 ```
 
-##### Predicate Map with a Single Transaction Result
+##### BlockResults with a Single Transaction
 
 ```
 // codecID
@@ -63,21 +63,21 @@ TxPredicateResults
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-// TxPredicateResults (value in results map)
-// TxPredicateResults length
+// TxResults (value in results map)
+// TxResults length
 0x00, 0x00, 0x00, 0x01,
-// precompile address (key in TxPredicateResults map)
+// precompile address (key in TxResults map)
 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x00, 0x00, 0x00, 0x00,
-// Byte array results (value in TxPredicateResults map)
+// Byte array results (value in TxResults map)
 // Length of bytes result
 0x00, 0x00, 0x00, 0x03,
 // bytes
 0x01, 0x02, 0x03
 ```
 
-##### Predicate Map with Two Transaction Results
+##### BlockResults with Two Transactions
 
 ```
 // codecID
@@ -89,14 +89,14 @@ TxPredicateResults
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-// TxPredicateResults (value in results map)
-// TxPredicateResults length
+// TxResults (value in results map)
+// TxResults length
 0x00, 0x00, 0x00, 0x01,
-// precompile address (key in TxPredicateResults map)
+// precompile address (key in TxResults map)
 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x00, 0x00, 0x00, 0x00,
-// Byte array results (value in TxPredicateResults map)
+// Byte array results (value in TxResults map)
 // Length of bytes result
 0x00, 0x00, 0x00, 0x03,
 // bytes
@@ -106,14 +106,14 @@ TxPredicateResults
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
-// TxPredicateResults (value in results map)
-// TxPredicateResults length
+// TxResults (value in results map)
+// TxResults length
 0x00, 0x00, 0x00, 0x01,
-// precompile address (key in TxPredicateResults map)
+// precompile address (key in TxResults map)
 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x00, 0x00, 0x00, 0x00,
-// Byte array results (value in TxPredicateResults map)
+// Byte array results (value in TxResults map)
 // Length of bytes result
 0x00, 0x00, 0x00, 0x03,
 // bytes

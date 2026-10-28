@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -46,7 +46,7 @@ func TestRulesExtra_AccessListGas(t *testing.T) {
 	require.NoError(t, err, "avalancheWarp.NewMessage()")
 	accessList := libevm.AccessList{{
 		Address:     warp.ContractAddress,
-		StorageKeys: predicate.New(msg.Bytes()),
+		StorageKeys: warpmsg.Pack(msg.Bytes()),
 	}}
 
 	tests := []struct {
