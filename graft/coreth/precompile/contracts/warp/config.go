@@ -66,7 +66,6 @@ func NewDefaultConfig(blockTimestamp *uint64) *Config {
 }
 
 // Key returns the key for the Warp precompileconfig.
-// This should be the same key as used in the precompile module.
 func (*Config) Key() string { return ConfigKey }
 
 // PredicateGas returns the amount of gas necessary to verify the predicate
