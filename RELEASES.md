@@ -12,9 +12,14 @@
 
 - Added `--profile-continuous-mutex-fraction` (default `1`, which keeps the existing behavior) to set the mutex profile fraction used by continuous profiling. Set it to `0` to stop recording mutex contention, or to `n` to sample 1 of every n events.
 
+### Metrics
+
+- SAE state sync scores peers separately for each sync protocol, so `avalanche_evm_p2p_peer_tracker_{num_tracked_peers,num_responsive_peers,average_bandwidth}` are replaced by one set per protocol: `avalanche_evm_p2p_peer_tracker_<protocol>_*` with `<protocol>` one of `leaf`, `code`, `block` or `cchain_leaf`.
+
 ### Fixes
 
 - Fixed C-Chain log queries (`eth_getLogs`, `eth_getFilterLogs`) failing with `failed to get logs for block #N` when the range reached an accepted block that had not yet executed. Range queries now stop at the last executed block, and `blockHash` queries for an unexecuted block return `unknown block`.
+- Fixed `admin.stopCPUProfiler` leaving mutex profiling enabled, which kept recording mutex contention until the node restarted.
 
 ## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
 

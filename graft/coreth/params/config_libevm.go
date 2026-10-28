@@ -6,12 +6,9 @@ package params
 import (
 	"math/big"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/libevm"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -66,18 +63,5 @@ func constructRulesExtra(c *ethparams.ChainConfig, r *ethparams.Rules, cEx *extr
 		return rules
 	}
 	rules.AvalancheRules = cEx.GetAvalancheRules(timestamp)
-
-	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
-	rules.Precompiles = make(map[common.Address]precompileconfig.Config)
-	rules.Predicaters = make(map[common.Address]precompileconfig.Predicater)
-	for _, module := range modules.RegisteredModules() {
-		if config := cEx.GetActivePrecompileConfig(module.Address, timestamp); config != nil && !config.IsDisabled() {
-			rules.Precompiles[module.Address] = config
-			if predicater, ok := config.(precompileconfig.Predicater); ok {
-				rules.Predicaters[module.Address] = predicater
-			}
-		}
-	}
-
 	return rules
 }

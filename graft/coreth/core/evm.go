@@ -30,8 +30,8 @@ package core
 import (
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/vm"
@@ -77,7 +77,7 @@ func (hooks) PreprocessingGasCharge(common.Hash) (uint64, error) {
 // which is used in coreth to process historical pre-AP1 blocks with the
 // [StateDbAP1.GetCommittedState] method as it was historically.
 func (hooks) OverrideNewEVMArgs(args *vm.NewEVMArgs) *vm.NewEVMArgs {
-	rules := args.ChainConfig.Rules(args.BlockContext.BlockNumber, params.IsMergeTODO, args.BlockContext.Time)
+	rules := args.ChainConfig.Rules(args.BlockContext.BlockNumber, true /*isMerge*/, args.BlockContext.Time)
 	args.StateDB = wrapStateDB(rules, args.StateDB)
 
 	if rules.IsShanghai {

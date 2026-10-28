@@ -9,7 +9,6 @@ package saetest
 
 import (
 	"context"
-	"math/big"
 	"slices"
 	"sync"
 
@@ -55,12 +54,6 @@ func TrieHasher() types.TrieHasher {
 // all testing.
 func ChainConfig() *params.ChainConfig {
 	return params.MergedTestChainConfig
-}
-
-// Rules returns the rules associated with [ChainConfig], at height and time
-// zero, and post-merge.
-func Rules() params.Rules {
-	return ChainConfig().Rules(new(big.Int), true, 0)
 }
 
 // An EventCollector collects all events received from an [event.Subscription].

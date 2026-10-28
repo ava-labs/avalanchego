@@ -40,15 +40,17 @@ func TestErrorSentinels(t *testing.T) {
 	})
 }
 
-func newLeafResponder(tb testing.TB, trieDB *triedb.Database, opts ...HandlerOption) *responder {
+func newLeafResponder(tb testing.TB, trieDB *triedb.Database) *responder {
 	tb.Helper()
-	return newResponder(loggingtest.New(tb, logging.Debug), trieDB, common.HashLength, opts...)
+	return newResponder(loggingtest.New(tb, logging.Debug), trieDB, common.HashLength)
 }
 
 func TestResponder_AppErrors(t *testing.T) {
 	t.Parallel()
 	trieDB := synctest.NewTrieDB()
-	root, _, _ := synctest.FillTrie(t, trieDB, 10)
+	root, _, _ := synctest.FillTrie(t, trieDB, 1000)
+
+	midRoot := findMidTrieNodeAtOddDepth(t, trieDB, root)
 
 	tests := []struct {
 		name    string
@@ -112,6 +114,14 @@ func TestResponder_AppErrors(t *testing.T) {
 				KeyLimit: 10,
 			},
 			wantErr: errRootNotFound,
+		},
+		{
+			name: "invalid_root",
+			req: &syncpb.GetLeafRequest{
+				RootHash: midRoot.Bytes(),
+				KeyLimit: 10,
+			},
+			wantErr: errInvalidRoot,
 		},
 	}
 
@@ -341,4 +351,30 @@ func TestFillFromSnapshot(t *testing.T) {
 			require.Equal(t, test.wantMore, more)
 		})
 	}
+}
+
+// findMidTrieNodeAtOddDepth returns the hash of an internal (non-root, non-leaf)
+// node whose path from the root is an odd number of hex nibbles.
+func findMidTrieNodeAtOddDepth(t *testing.T, trieDB *triedb.Database, root common.Hash) common.Hash {
+	t.Helper()
+
+	tr, err := trie.New(trie.TrieID(root), trieDB)
+	require.NoError(t, err)
+
+	nodeIt, err := tr.NodeIterator(nil)
+	require.NoError(t, err)
+
+	for nodeIt.Next(true) {
+		hash := nodeIt.Hash()
+		if hash == (common.Hash{}) || nodeIt.Leaf() {
+			continue
+		}
+		if len(nodeIt.Path())%2 == 1 {
+			return hash
+		}
+	}
+	require.NoError(t, nodeIt.Error())
+
+	t.Fatal("no internal node at odd nibble depth found")
+	return common.Hash{}
 }

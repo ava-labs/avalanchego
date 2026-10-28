@@ -645,13 +645,13 @@ func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx) *blo
 
 	require.NoErrorf(tb, s.IssueTx(ctx, t), "%T.IssueTx()", s.Client)
 	blk := s.runConsensusLoop(ctx, tb)
-	s.waitForTxPoolStateUpdate(ctx, tb, t)
+	s.waitForTxPoolEviction(ctx, tb, t)
 	return blk
 }
 
-// waitForTxPoolStateUpdate blocks until the txpool's verification state has
-// been updated to reflect t's executed block.
-func (s *SUT) waitForTxPoolStateUpdate(ctx context.Context, tb testing.TB, t *tx.Tx) {
+// waitForTxPoolEviction blocks until the txpool has evicted t after its block
+// was executed.
+func (s *SUT) waitForTxPoolEviction(ctx context.Context, tb testing.TB, t *tx.Tx) {
 	tb.Helper()
 
 	// Bound the wait so buggy code that never advances the pool fails fast with
@@ -662,9 +662,6 @@ func (s *SUT) waitForTxPoolStateUpdate(ctx context.Context, tb testing.TB, t *tx
 	ticker := time.NewTicker(time.Millisecond)
 	defer ticker.Stop()
 
-	// The pool updates the verification state atomically with evicting the
-	// included tx, so observing the eviction guarantees the state has been
-	// updated.
 	for s.pending.Has(t.ID()) {
 		select {
 		case <-ctx.Done():

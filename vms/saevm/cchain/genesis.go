@@ -120,15 +120,6 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 			AvalancheContext: extras.AvalancheContext{
 				SnowCtx: ctx,
 			},
-			UpgradeConfig: extras.UpgradeConfig{
-				PrecompileUpgrades: []extras.PrecompileUpgrade{
-					{
-						Config: warp.NewDefaultConfig(
-							new(upgrade.UnixTimestamp(u.DurangoTime)),
-						),
-					},
-				},
-			},
 		},
 	)
 	return (*genesis)(&g), nil

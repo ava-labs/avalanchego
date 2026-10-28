@@ -50,15 +50,14 @@ type Txpool struct {
 	*Pending
 
 	snowCtx *snow.Context
+	chain   Backend
 	sub     event.Subscription
 	maxSize int
 	wg      sync.WaitGroup
 
-	// executionLock is ordered before [Pending.lock] and [Txpool.stateLock].
-	// Acquiring executionLock with either other lock held will deadlock.
+	// executionLock is ordered before [Pending.lock]. Acquiring executionLock
+	// with [Pending.lock] held will deadlock.
 	executionLock sync.RWMutex
-	stateLock     sync.Mutex
-	state         libevm.StateReader
 }
 
 // New constructs a [Txpool] that wraps the provided [Pending].
@@ -79,36 +78,22 @@ func New(
 		return nil, fmt.Errorf("maxSize must be > 0: %d", maxSize)
 	}
 
-	// executed is unbuffered to guarantee that the pool never holds a reference
-	// to state older than the last-settled state. SAE does not guarantee that
-	// such a state exists on disk anymore.
 	executed := make(chan core.ChainHeadEvent)
-	sub := chain.SubscribeChainHeadEvent(executed)
-
-	state, err := chain.LastExecutedState()
-	if err != nil {
-		sub.Unsubscribe()
-		return nil, fmt.Errorf("getting last executed state: %w", err)
-	}
-
-	// state must be populated after [Backend.SubscribeChainHeadEvent] is called
-	// to ensure we do not miss an update.
 	p := &Txpool{
 		Pending: pending,
 		snowCtx: snowCtx,
-		sub:     sub,
+		chain:   chain,
+		sub:     chain.SubscribeChainHeadEvent(executed),
 		maxSize: maxSize,
-		state:   state,
 	}
 	p.wg.Go(func() {
-		p.updateState(chainConfig, chain, executed)
+		p.evictExecuted(chainConfig, executed)
 	})
 	return p, nil
 }
 
-func (p *Txpool) updateState(
+func (p *Txpool) evictExecuted(
 	chainConfig *params.ChainConfig,
-	chain Backend,
 	executed <-chan core.ChainHeadEvent,
 ) {
 	sub := p.sub
@@ -132,24 +117,15 @@ func (p *Txpool) updateState(
 				continue
 			}
 
-			newState, err := chain.LastExecutedState()
-			if err != nil {
-				log.Error("unable to get latest executed state",
-					zap.Error(err),
-				)
-				continue
-			}
-
 			p.executionLock.Lock()
 			p.lock.Lock()
 
 			p.removeConflicts(inputs)
-			p.state = newState
 
 			p.lock.Unlock()
 			p.executionLock.Unlock()
 
-			log.Debug("updated to new state")
+			log.Debug("removed conflicts with executed block")
 		case err := <-sub.Err():
 			if err != nil {
 				p.snowCtx.Log.Error("pool subscription failed",
@@ -218,7 +194,14 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 	if err := tx.VerifyCredentials(p.snowCtx.SharedMemory); err != nil {
 		return fmt.Errorf("%w: %w", errVerifyCredentials, err)
 	}
-	if err := p.verifyOp(t.op); err != nil {
+	// SAE updates the last executed block before it sends the execution event,
+	// so this state is at least as high as the last block processed by the
+	// pool subscription.
+	state, err := p.chain.LastExecutedState()
+	if err != nil {
+		return fmt.Errorf("getting last executed state: %w", err)
+	}
+	if err := verifyOp(state, t.op); err != nil {
 		return fmt.Errorf("%w: %w", errVerifyState, err)
 	}
 
@@ -255,15 +238,6 @@ func (p *Txpool) Add(tx *tx.Tx) error {
 func (p *Txpool) Close() {
 	p.sub.Unsubscribe()
 	p.wg.Wait()
-}
-
-func (p *Txpool) verifyOp(op hook.Op) error {
-	// [libevm.StateReader] is not thread-safe, we must lock it even for
-	// read-only operations.
-	p.stateLock.Lock()
-	defer p.stateLock.Unlock()
-
-	return verifyOp(p.state, op)
 }
 
 // inputUTXOs returns the union of all UTXO IDs consumed by transactions in b,

@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package warp
+package warp_test
 
 import (
 	"math"
@@ -13,11 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras/extrastest"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompiletest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
@@ -25,11 +25,19 @@ import (
 
 	agoUtils "github.com/ava-labs/avalanchego/utils"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+
+	. "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 )
 
 var forks = []upgradetest.Fork{
 	upgradetest.Fortuna,
 	upgradetest.Granite,
+}
+
+func forkToAvalancheRules(fork upgradetest.Fork) extras.AvalancheRules {
+	u := upgradetest.GetConfig(fork)
+	networkUpgrades := extras.GetNetworkUpgrades(u)
+	return networkUpgrades.GetAvalancheRules(uint64(upgrade.InitiallyActiveTime.Unix()))
 }
 
 func runTests(
@@ -38,9 +46,9 @@ func runTests(
 ) {
 	for _, fork := range forks {
 		t.Run(fork.String(), func(t *testing.T) {
-			rules := extrastest.ForkToAvalancheRules(fork)
+			rules := forkToAvalancheRules(fork)
 			tests := makeTests(t, rules)
-			precompiletest.RunPrecompileTests(t, Module, tests)
+			precompiletest.RunPrecompileTests(t, ContractAddress, WarpPrecompile, tests)
 		})
 	}
 }
@@ -51,9 +59,9 @@ func runBenchmarks(
 ) {
 	for _, fork := range forks {
 		b.Run(fork.String(), func(b *testing.B) {
-			rules := extrastest.ForkToAvalancheRules(fork)
+			rules := forkToAvalancheRules(fork)
 			tests := makeTests(b, rules)
-			precompiletest.RunPrecompileBenchmarks(b, Module, tests)
+			precompiletest.RunPrecompileBenchmarks(b, ContractAddress, WarpPrecompile, tests)
 		})
 	}
 }
@@ -182,7 +190,7 @@ func sendWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []precompi
 			},
 			SuppliedGas: gasConfig.SendWarpMessageBase,
 			ReadOnly:    false,
-			ExpectedErr: errInvalidSendInput,
+			ExpectedErr: ErrInvalidSendInput,
 			Rules:       rules,
 		},
 		{
@@ -454,7 +462,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(invalidPackedPredicate)),
 			ReadOnly:    false,
-			ExpectedErr: errInvalidPredicateBytes,
+			ExpectedErr: ErrInvalidPredicateBytes,
 			Rules:       rules,
 		},
 		{
@@ -467,7 +475,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(invalidWarpMsgPredicate)),
 			ReadOnly:    false,
-			ExpectedErr: errInvalidWarpMsg,
+			ExpectedErr: ErrInvalidWarpMsg,
 			Rules:       rules,
 		},
 		{
@@ -480,7 +488,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(invalidAddressedPredicate)),
 			ReadOnly:    false,
-			ExpectedErr: errInvalidAddressedPayload,
+			ExpectedErr: ErrInvalidAddressedPayload,
 			Rules:       rules,
 		},
 		{
@@ -491,7 +499,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
-			ExpectedErr: errInvalidIndexInput,
+			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
 		{
@@ -504,7 +512,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
-			ExpectedErr: errInvalidIndexInput,
+			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
 		{
@@ -517,7 +525,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
-			ExpectedErr: errInvalidIndexInput,
+			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
 	}
@@ -744,7 +752,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(invalidPackedPredicate)),
 			ReadOnly:    false,
-			ExpectedErr: errInvalidPredicateBytes,
+			ExpectedErr: ErrInvalidPredicateBytes,
 			Rules:       rules,
 		},
 		{
@@ -757,7 +765,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(invalidWarpMsgPredicate)),
 			ReadOnly:    false,
-			ExpectedErr: errInvalidWarpMsg,
+			ExpectedErr: ErrInvalidWarpMsg,
 			Rules:       rules,
 		},
 		{
@@ -770,7 +778,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(invalidHashPredicate)),
 			ReadOnly:    false,
-			ExpectedErr: errInvalidBlockHashPayload,
+			ExpectedErr: ErrInvalidBlockHashPayload,
 			Rules:       rules,
 		},
 		{
@@ -781,7 +789,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
-			ExpectedErr: errInvalidIndexInput,
+			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
 		{
@@ -794,7 +802,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
-			ExpectedErr: errInvalidIndexInput,
+			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
 		{
@@ -807,7 +815,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
-			ExpectedErr: errInvalidIndexInput,
+			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
 	}
