@@ -45,8 +45,6 @@ func FromReceipts(rs types.Receipts) ([]*avalanchewarp.UnsignedMessage, error) {
 
 var errNoBlockContext = errors.New("no block context")
 
-var warpConfig = &corethwarp.Config{}
-
 // MessagesFromAccessList returns the Warp messages in list, in order. Callers
 // MUST only call it after Durango.
 func MessagesFromAccessList(list types.AccessList) []predicate.Predicate {
@@ -141,7 +139,7 @@ func verifyTx(
 		eg.Go(func() error {
 			// TODO(StephenButtolph): Properly report unexpected errors when
 			// cleaning up the coreth precompile code.
-			failures[i] = warpConfig.VerifyPredicate(pc, msg) != nil
+			failures[i] = corethwarp.VerifyPredicate(pc, msg) != nil
 			return nil
 		})
 	}
