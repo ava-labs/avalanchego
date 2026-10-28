@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 
 	avalancheutils "github.com/ava-labs/avalanchego/utils"
-
 	ethparams "github.com/ava-labs/libevm/params"
 )
 

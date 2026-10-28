@@ -94,13 +94,6 @@ func TestCheckConfigForkOrder(t *testing.T) {
 	})
 }
 
-func deref[T any](p *T) any {
-	if p == nil {
-		return nil
-	}
-	return *p
-}
-
 // Tests [ChainConfig.CheckConfigCompatible] through
 // [ethparams.ChainConfig.CheckCompatible]. All eth fork handling is tested
 // [ethparams] and is independent of Avalanche forks.
