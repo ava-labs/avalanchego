@@ -7,12 +7,13 @@ import (
 	"context"
 	"time"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 var _ simplexcommon.BlockBuilder = (*BlockBuilder)(nil)
@@ -47,11 +48,7 @@ func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplexcommon.Pr
 			b.log.Info("Error building block", zap.Error(err))
 			continue
 		}
-		simplexBlock, err := newBlock(metadata, blacklist, vmBlock, b.blockTracker)
-		if err != nil {
-			b.log.Error("Error creating simplex block from built block", zap.Error(err))
-			return nil, false
-		}
+		simplexBlock := newBlock(metadata, blacklist, vmBlock, b.blockTracker)
 		curWait = initBackoff // Reset backoff after a successful block build
 		verifiedBlock, err := simplexBlock.Verify(ctx)
 		if err != nil {

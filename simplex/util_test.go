@@ -69,7 +69,7 @@ type newBlockConfig struct {
 	numNodes uint64
 }
 
-func newTestBlock(t *testing.T, config newBlockConfig) *Block {
+func newTestBlock(config newBlockConfig) *Block {
 	if config.prev == nil {
 		vm := newTestVM()
 		block := &Block{

@@ -45,7 +45,7 @@ type Block struct {
 	blacklist common.Blacklist
 }
 
-func newBlock(metadata common.ProtocolMetadata, blacklist common.Blacklist, vmBlock snowman.Block, blockTracker *blockTracker) (*Block, error) {
+func newBlock(metadata common.ProtocolMetadata, blacklist common.Blacklist, vmBlock snowman.Block, blockTracker *blockTracker) *Block {
 	block := &Block{
 		metadata:     metadata,
 		vmBlock:      vmBlock,
@@ -54,7 +54,7 @@ func newBlock(metadata common.ProtocolMetadata, blacklist common.Blacklist, vmBl
 	}
 	bytes := block.Bytes()
 	block.digest = computeDigest(bytes)
-	return block, nil
+	return block
 }
 
 // CanotoSimplexBlock is the Canoto representation of a block
@@ -90,19 +90,19 @@ func (b *Block) Blacklist() common.Blacklist {
 }
 
 // Size returns the number of bytes in the encoding of the block.
-func (b *Block) Size() int {
+func (*Block) Size() int {
 	// TODO: implement
 	return 0
 }
 
 // SealingBlockInfo returns the sealing block info of the block.
-func (b *Block) SealingBlockInfo() *common.SealingBlockInfo {
+func (*Block) SealingBlockInfo() *common.SealingBlockInfo {
 	// TODO: implement
 	return nil
 }
 
 // Verify verifies the block.
-func (b *Block) Verify(ctx context.Context, opts ...common.VerifyOptions) (common.VerifiedBlock, error) {
+func (b *Block) Verify(ctx context.Context, _ ...common.VerifyOptions) (common.VerifiedBlock, error) {
 	// we should not verify the genesis block
 	if b.metadata.Seq == 0 {
 		return nil, errGenesisVerification
@@ -166,7 +166,7 @@ func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) 
 		return nil, fmt.Errorf("%w: %w", errFailedToParseBlacklist, err)
 	}
 
-	return newBlock(*md, blacklist, vmblock, d.blockTracker)
+	return newBlock(*md, blacklist, vmblock, d.blockTracker), nil
 }
 
 // blockTracker is used to ensure that blocks are properly rejected, if competing blocks are accepted.

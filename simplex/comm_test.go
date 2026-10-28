@@ -6,7 +6,6 @@ package simplex
 import (
 	"testing"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -15,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 	"github.com/ava-labs/avalanchego/utils/set"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 var testSimplexMessage = simplexcommon.Message{
@@ -136,8 +137,7 @@ func TestSimplexMessageReplicationResponse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := newReplicationResponse(chainID, tt.resp)
-			require.NoError(t, err)
+			require.NotNil(t, newReplicationResponse(chainID, tt.resp))
 		})
 	}
 }

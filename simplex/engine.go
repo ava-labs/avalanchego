@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
 	"github.com/ava-labs/simplex/simplex"
 	"go.uber.org/zap"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 var _ common.Engine = (*Engine)(nil)

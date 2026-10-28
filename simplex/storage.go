@@ -132,11 +132,7 @@ func (s *Storage) Retrieve(seq uint64) (common.VerifiedBlock, common.Finalizatio
 		return nil, common.Finalization{}, err
 	}
 
-	vb, err := newBlock(finalization.Finalization.ProtocolMetadata, blacklist, block, s.blockTracker)
-	if err != nil {
-		s.log.Error("failed to create simplex block", zap.Uint64("seq", seq), zap.Error(err))
-		return nil, common.Finalization{}, err
-	}
+	vb := newBlock(finalization.Finalization.ProtocolMetadata, blacklist, block, s.blockTracker)
 
 	return vb, finalization, nil
 }

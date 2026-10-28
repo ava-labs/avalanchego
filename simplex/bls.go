@@ -120,7 +120,7 @@ func (v BLSVerifier) Verify(message []byte, signature []byte, signer common.Node
 }
 
 // VerifySignature verifies that [signature] is a valid signature over [message] by the holder of [publicKey].
-func (v BLSVerifier) VerifySignature(message []byte, signature common.SignatureBytes, publicKey common.PublicKeyBytes) error {
+func (BLSVerifier) VerifySignature(_ []byte, _ common.SignatureBytes, _ common.PublicKeyBytes) error {
 	// TODO: implement
 	return nil
 }
