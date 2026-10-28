@@ -39,7 +39,7 @@ func TestParseBlockResultsInvalid(t *testing.T) {
 					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 					0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-					// PrecompileResults length
+					// tx results length
 					0x00, 0x00, 0x00, 0x01,
 					// precompile address
 					0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -61,18 +61,35 @@ func TestParseBlockResultsInvalid(t *testing.T) {
 	}
 }
 
+func TestParseBlockResultsIgnoresOtherAddresses(t *testing.T) {
+	results := encodedBlockResults{
+		{1}: {common.Address{2}: set.NewBits(1).Bytes()},
+		{2}: {
+			common.Address{2}: set.NewBits(1).Bytes(),
+			ContractAddress:   set.NewBits(3).Bytes(),
+		},
+	}
+	b, err := resultsCodec.Marshal(version, results)
+	require.NoError(t, err, "resultsCodec.Marshal()")
+
+	got, err := ParseBlockResults(b)
+	require.NoError(t, err, "ParseBlockResults()")
+	want := BlockResults{
+		{2}: set.NewBits(3),
+	}
+	require.Equal(t, want, got, "ParseBlockResults()")
+}
+
 func TestBlockResultsGet(t *testing.T) {
 	txHash := common.Hash{1}
-	address := common.Address{2}
 	tests := []struct {
 		name    string
 		results BlockResults
 		want    set.Bits
 	}{
 		{
-			name:    "nil",
-			results: nil,
-			want:    set.NewBits(),
+			name: "nil",
+			want: set.NewBits(),
 		},
 		{
 			name:    "empty",
@@ -82,35 +99,22 @@ func TestBlockResultsGet(t *testing.T) {
 		{
 			name: "missing_tx",
 			results: BlockResults{
-				{3}: {
-					address: set.NewBits(1, 2, 3),
-				},
-			},
-			want: set.NewBits(),
-		},
-		{
-			name: "missing_address",
-			results: BlockResults{
-				txHash: {
-					{3}: set.NewBits(1, 2, 3),
-				},
+				{3}: set.NewBits(1, 2, 3),
 			},
 			want: set.NewBits(),
 		},
 		{
 			name: "found",
 			results: BlockResults{
-				txHash: {
-					address: set.NewBits(1, 2, 3),
-				},
+				txHash: set.NewBits(1, 2, 3),
 			},
 			want: set.NewBits(1, 2, 3),
 		},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			got := test.results.Get(txHash, address)
-			require.Equal(t, test.want, got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.results.Get(txHash)
+			require.Equal(t, tt.want, got, "BlockResults.Get()")
 		})
 	}
 }
@@ -120,70 +124,41 @@ func TestBlockResultsSet(t *testing.T) {
 	tests := []struct {
 		name  string
 		start BlockResults
-		toSet TxResults
+		toSet set.Bits
 		want  BlockResults
 	}{
 		{
-			name:  "nil_delete",
-			start: nil,
-			toSet: nil,
-			want:  nil,
-		},
-		{
-			name:  "nil_allocate",
-			start: nil,
-			toSet: TxResults{
-				{3}: set.NewBits(1, 2, 3),
-			},
+			name:  "nil",
+			toSet: set.NewBits(1),
 			want: BlockResults{
-				txHash: TxResults{
-					{3}: set.NewBits(1, 2, 3),
-				},
+				txHash: set.NewBits(1),
 			},
 		},
 		{
-			name:  "empty_allocate",
+			name:  "empty_bits",
 			start: make(BlockResults),
-			toSet: TxResults{
-				{3}: set.NewBits(1, 2, 3),
-			},
+			toSet: set.NewBits(),
 			want: BlockResults{
-				txHash: TxResults{
-					{3}: set.NewBits(1, 2, 3),
-				},
+				txHash: set.NewBits(),
 			},
 		},
 		{
-			name: "overwrite_tx",
+			name: "overwrite",
 			start: BlockResults{
-				txHash: TxResults{
-					{3}: set.NewBits(1, 2, 3),
-				},
+				txHash: set.NewBits(1),
+				{2}:    set.NewBits(2),
 			},
-			toSet: TxResults{
-				{3}: set.NewBits(1),
-			},
+			toSet: set.NewBits(3),
 			want: BlockResults{
-				txHash: TxResults{
-					{3}: set.NewBits(1),
-				},
+				txHash: set.NewBits(3),
+				{2}:    set.NewBits(2),
 			},
-		},
-		{
-			name: "delete_tx",
-			start: BlockResults{
-				txHash: TxResults{
-					{3}: set.NewBits(1, 2, 3),
-				},
-			},
-			toSet: TxResults{},
-			want:  BlockResults{},
 		},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			test.start.Set(txHash, test.toSet)
-			require.Equal(t, test.want, test.start)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.start.Set(txHash, tt.toSet)
+			require.Equal(t, tt.want, tt.start, "BlockResults.Set()")
 		})
 	}
 }
@@ -195,8 +170,7 @@ func TestBlockResultsBytes(t *testing.T) {
 		want  []byte
 	}{
 		{
-			name:  "nil",
-			input: nil,
+			name: "nil",
 			want: []byte{
 				// codecID
 				0x00, 0x00,
@@ -215,11 +189,9 @@ func TestBlockResultsBytes(t *testing.T) {
 			},
 		},
 		{
-			name: "single_tx_single_result",
+			name: "single_tx",
 			input: BlockResults{
-				{1}: {
-					{2}: set.NewBits(1, 2, 3),
-				},
+				{1}: set.NewBits(1, 2, 3),
 			},
 			want: []byte{
 				// codecID
@@ -231,12 +203,12 @@ func TestBlockResultsBytes(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				// PrecompileResults length
+				// tx results length
 				0x00, 0x00, 0x00, 0x01,
-				// precompile address
+				// Warp precompile address
 				0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x05,
 				// Length of bitset
 				0x00, 0x00, 0x00, 0x01,
 				// bitset
@@ -244,12 +216,9 @@ func TestBlockResultsBytes(t *testing.T) {
 			},
 		},
 		{
-			name: "single_tx_multiple_results",
+			name: "all_valid",
 			input: BlockResults{
-				{1}: {
-					{2}: set.NewBits(1, 2, 3),
-					{3}: set.NewBits(0, 1, 2, 3),
-				},
+				{1}: set.NewBits(),
 			},
 			want: []byte{
 				// codecID
@@ -261,35 +230,21 @@ func TestBlockResultsBytes(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				// PrecompileResults length
-				0x00, 0x00, 0x00, 0x02,
-				// precompile address
+				// tx results length
+				0x00, 0x00, 0x00, 0x01,
+				// Warp precompile address
 				0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x05,
 				// Length of bitset
-				0x00, 0x00, 0x00, 0x01,
-				// bitset
-				0b00001110,
-				// precompile address
-				0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00,
-				// Length of bitset
-				0x00, 0x00, 0x00, 0x01,
-				// bitset
-				0b00001111,
 			},
 		},
 		{
-			name: "multiple_txs_single_result",
+			name: "multiple_txs",
 			input: BlockResults{
-				{1}: {
-					{2}: set.NewBits(1, 2, 3),
-				},
-				{2}: {
-					{3}: set.NewBits(3, 2, 1),
-				},
+				{1}: set.NewBits(1, 2, 3),
+				{2}: set.NewBits(0),
 			},
 			want: []byte{
 				// codecID
@@ -301,12 +256,12 @@ func TestBlockResultsBytes(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				// PrecompileResults length
+				// tx results length
 				0x00, 0x00, 0x00, 0x01,
-				// precompile address
+				// Warp precompile address
 				0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x05,
 				// Length of bitset
 				0x00, 0x00, 0x00, 0x01,
 				// bitset
@@ -316,101 +271,36 @@ func TestBlockResultsBytes(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				// PrecompileResults length
+				// tx results length
 				0x00, 0x00, 0x00, 0x01,
-				// precompile address
-				0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00,
-				// Length of bitset
-				0x00, 0x00, 0x00, 0x01,
-				// bitset
-				0b00001110,
-			},
-		},
-		{
-			name: "multiple_txs_multiple_results",
-			input: BlockResults{
-				{1}: {
-					{2}: set.NewBits(1, 2, 3),
-					{3}: set.NewBits(3, 2, 1),
-				},
-				{2}: {
-					{2}: set.NewBits(1, 2, 3),
-					{3}: set.NewBits(3, 2, 1),
-				},
-			},
-			want: []byte{
-				// codecID
-				0x00, 0x00,
-				// BlockResults length
-				0x00, 0x00, 0x00, 0x02,
-				// txHash
-				0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				// PrecompileResults length
-				0x00, 0x00, 0x00, 0x02,
-				// precompile address
+				// Warp precompile address
 				0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x05,
 				// Length of bitset
 				0x00, 0x00, 0x00, 0x01,
 				// bitset
-				0b00001110,
-				// precompile address
-				0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00,
-				// Length of bitset
-				0x00, 0x00, 0x00, 0x01,
-				// bitset
-				0b00001110,
-				// txHash
-				0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				// PrecompileResults length
-				0x00, 0x00, 0x00, 0x02,
-				// precompile address
-				0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00,
-				// Length of bitset
-				0x00, 0x00, 0x00, 0x01,
-				// bitset
-				0b00001110,
-				// precompile address
-				0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00,
-				// Length of bitset
-				0x00, 0x00, 0x00, 0x01,
-				// bitset
-				0b00001110,
+				0b00000001,
 			},
 		},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			got, err := test.input.Bytes()
-			require.NoError(err)
-			require.Equal(test.want, got)
+			got, err := tt.input.Bytes()
+			require.NoError(err, "BlockResults.Bytes()")
+			require.Equal(tt.want, got, "BlockResults.Bytes()")
 
-			input := test.input
+			input := tt.input
 			if input == nil {
 				// nil and empty should be considered equivalent
 				input = make(BlockResults)
 			}
 
 			parsed, err := ParseBlockResults(got)
-			require.NoError(err)
-			require.Equal(input, parsed)
+			require.NoError(err, "ParseBlockResults()")
+			require.Equal(input, parsed, "ParseBlockResults()")
 		})
 	}
 }

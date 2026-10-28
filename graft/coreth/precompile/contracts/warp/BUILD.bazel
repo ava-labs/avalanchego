@@ -11,7 +11,7 @@ go_library(
     srcs = [
         "contract.go",
         "contract_warp_handler.go",
-        "predicate.go",
+        "message.go",
     ],
     embedsrcs = ["IWarpMessenger.abi"],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp",
@@ -34,13 +34,12 @@ graft_go_test(
     srcs = [
         "contract_test.go",
         "export_test.go",
-        "predicate_test.go",
+        "message_test.go",
     ],
     embed = [":warp"],
     deps = [
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/precompiletest",
-        "//graft/evm/precompileconfig",
         "//ids",
         "//snow",
         "//snow/engine/snowman/block",

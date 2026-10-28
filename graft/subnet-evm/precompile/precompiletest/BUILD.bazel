@@ -9,8 +9,8 @@ go_library(
     name = "precompiletest",
     srcs = [
         "test_config.go",
+        "test_message.go",
         "test_precompile.go",
-        "test_predicate.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest",
     deps = [

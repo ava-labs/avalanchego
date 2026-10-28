@@ -63,11 +63,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/vmtest"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
 	ethereum "github.com/ava-labs/libevm"
@@ -1897,7 +1897,7 @@ func TestWarpPrecompileActivation(t *testing.T) {
 
 	genesisState, err := sut.LastExecutedState()
 	require.NoErrorf(t, err, "%T.LastExecutedState()", sut.VM)
-	require.Empty(t, genesisState.GetCode(corethwarp.ContractAddress), "warp precompile code in pre-Durango genesis state")
+	require.Empty(t, genesisState.GetCode(message.ContractAddress), "warp precompile code in pre-Durango genesis state")
 
 	vmTime.Advance(upgradeThreshold) // activate Durango in next block
 
@@ -1906,8 +1906,8 @@ func TestWarpPrecompileActivation(t *testing.T) {
 
 	state, err := sut.LastExecutedState()
 	require.NoErrorf(t, err, "%T.LastExecutedState()", sut.VM)
-	assert.Equalf(t, uint64(1), state.GetNonce(corethwarp.ContractAddress), "warp precompile nonce after first Durango block")
-	assert.Equalf(t, []byte{0x01}, state.GetCode(corethwarp.ContractAddress), "warp precompile code after first Durango block")
+	assert.Equalf(t, uint64(1), state.GetNonce(message.ContractAddress), "warp precompile nonce after first Durango block")
+	assert.Equalf(t, []byte{0x01}, state.GetCode(message.ContractAddress), "warp precompile code after first Durango block")
 }
 
 // TestConsensusGettersAfterRestart verifies that all functions routed through

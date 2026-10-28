@@ -9,40 +9,42 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 )
 
-// PredicateTest defines a unit test/benchmark for verifying a precompile predicate.
-type PredicateTest struct {
+// MessageTest defines a unit test/benchmark for verifying a Warp message.
+type MessageTest struct {
 	Name string
 
-	PredicateContext *precompileconfig.PredicateContext
+	Config *warp.Config
 
-	Predicate   message.Packed
+	VerifyContext *message.VerifyContext
+
+	Packed      message.Packed
 	Rules       precompileconfig.Rules
 	Gas         uint64
 	GasErr      error
 	ExpectedErr error
 }
 
-func (test PredicateTest) Run(t testing.TB) {
+func (test MessageTest) Run(t testing.TB) {
 	t.Helper()
 	require := require.New(t)
-	predicateGas, predicateGasErr := warp.PredicateGas(test.Predicate, test.Rules)
-	require.ErrorIs(predicateGasErr, test.GasErr)
+	gas, gasErr := warp.MessageGas(test.Packed, test.Rules)
+	require.ErrorIs(gasErr, test.GasErr)
 	if test.GasErr != nil {
 		return
 	}
 
-	require.Equal(test.Gas, predicateGas)
+	require.Equal(test.Gas, gas)
 
-	predicateRes := warp.VerifyPredicate(test.PredicateContext, test.Predicate)
-	require.ErrorIs(predicateRes, test.ExpectedErr)
+	err := test.Config.VerifyMessage(test.VerifyContext, test.Packed)
+	require.ErrorIs(err, test.ExpectedErr)
 }
 
-func RunPredicateTests(t *testing.T, tests []PredicateTest) {
+func RunMessageTests(t *testing.T, tests []MessageTest) {
 	t.Helper()
 
 	for _, test := range tests {
@@ -52,7 +54,7 @@ func RunPredicateTests(t *testing.T, tests []PredicateTest) {
 	}
 }
 
-func (test PredicateTest) RunBenchmark(b *testing.B) {
+func (test MessageTest) RunBenchmark(b *testing.B) {
 	b.ReportAllocs()
 	start := time.Now()
 	b.ResetTimer()
@@ -72,7 +74,7 @@ func (test PredicateTest) RunBenchmark(b *testing.B) {
 	b.ReportMetric(float64(mgasps)/100, "mgas/s")
 }
 
-func RunPredicateBenchmarks(b *testing.B, tests []PredicateTest) {
+func RunMessageBenchmarks(b *testing.B, tests []MessageTest) {
 	b.Helper()
 
 	for _, test := range tests {

@@ -80,18 +80,17 @@ func (Rules) ShouldCreditBaseFeeToCoinbase() bool {
 var p256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
 
 // AccessListGas computes the intrinsic gas for an access list. Once Warp is
-// active, it calculates gas per-tuple, charging Warp predicates by
-// [warp.PredicateGas]. Otherwise, it returns override=false to use the
+// active, it calculates gas per-tuple, charging Warp messages by
+// [warp.MessageGas]. Otherwise, it returns override=false to use the
 // default calculation.
 func (r Rules) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
 	if !r.IsDurango {
 		return 0, false, nil
 	}
-	gas, err := precompileconfig.AccessListGas(
+	gas, err := message.AccessListGas(
 		accessList,
-		warp.ContractAddress,
 		func(msg message.Packed) (uint64, error) {
-			return warp.PredicateGas(msg, r)
+			return warp.MessageGas(msg, r)
 		},
 	)
 	return gas, true, err
@@ -167,14 +166,14 @@ var (
 		nativeasset.GenesisContractAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
 		nativeasset.NativeAssetBalanceAddr: makePrecompile(&nativeasset.DeprecatedContract{}),
 		nativeasset.NativeAssetCallAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
-		warp.ContractAddress:               makePrecompile(warp.WarpPrecompile),
+		message.ContractAddress:            makePrecompile(warp.WarpPrecompile),
 	}
 
 	precompiledContractsGranite = map[common.Address]vm.PrecompiledContract{
 		nativeasset.GenesisContractAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
 		nativeasset.NativeAssetBalanceAddr: makePrecompile(&nativeasset.DeprecatedContract{}),
 		nativeasset.NativeAssetCallAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
-		warp.ContractAddress:               makePrecompile(warp.WarpPrecompile),
+		message.ContractAddress:            makePrecompile(warp.WarpPrecompile),
 		p256VerifyAddress:                  &vm.P256Verify{},
 	}
 )
@@ -194,8 +193,8 @@ var _ contract.Environment = (*environment)(nil)
 
 type environment struct {
 	vm.PrecompileEnvironment
-	predicateResults message.BlockResults
-	rules            *Rules
+	warpResults message.BlockResults
+	rules       *Rules
 }
 
 func newEnvironment(env vm.PrecompileEnvironment) (*environment, error) {
@@ -210,7 +209,7 @@ func newEnvironment(env vm.PrecompileEnvironment) (*environment, error) {
 
 	return &environment{
 		PrecompileEnvironment: env,
-		predicateResults:      customtypes.PredicateResults(env.BlockHeader(), predicateBytes),
+		warpResults:           customtypes.PredicateResults(env.BlockHeader(), predicateBytes),
 		rules:                 rules,
 	}, nil
 }
@@ -228,5 +227,5 @@ func (e *environment) SnowContext() *snow.Context {
 }
 
 func (e *environment) WarpMessageResults(txHash common.Hash) set.Bits {
-	return e.predicateResults.Get(txHash, warp.ContractAddress)
+	return e.warpResults.Get(txHash)
 }
