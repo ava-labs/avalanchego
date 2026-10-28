@@ -149,8 +149,8 @@ func (r RulesExtra) currentPrecompiles() map[common.Address]vm.PrecompiledContra
 	return nil
 }
 
-// precompileOverrideBuiltin specifies the precompiles that were active
-// historically and are not active in the current network.
+// precompileOverrideBuiltin returns the precompile at addr that is scheduled
+// by the active fork, such as the native asset precompiles and P256Verify.
 func (r RulesExtra) precompileOverrideBuiltin(addr common.Address) (libevm.PrecompiledContract, bool) {
 	precompile, ok := r.currentPrecompiles()[addr]
 	return precompile, ok
