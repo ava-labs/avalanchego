@@ -273,7 +273,7 @@ func (e *Export) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) 
 		assetID := common.Hash(in.AssetID)
 		amount := uint256.NewInt(in.Amount)
 		if balance := statedb.GetAssetBalance(in.Address, assetID); balance.Cmp(amount) < 0 {
-			return fmt.Errorf("%w: address %s asset %s has %d want %d", errInsufficientFunds, in.Address, assetID, balance, amount)
+			return fmt.Errorf("%w: address %s asset %s has %d want %d", errInsufficientFunds, in.Address, assetID, balance, in.Amount)
 		}
 		statedb.SubAssetBalance(in.Address, assetID, amount)
 	}
