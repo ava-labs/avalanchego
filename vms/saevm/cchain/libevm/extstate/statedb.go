@@ -62,15 +62,16 @@ func assetBalanceKey(assetID common.Hash) common.Hash {
 
 var _ contract.StateDB = (*StateDB)(nil)
 
-// StateDB wraps a [state.StateDB] with asset balances and the predicates of the
-// current transaction's access list.
+// StateDB wraps a [state.StateDB] with asset balances and the Warp messages of
+// the current transaction's access list.
 //
 // TODO(#6113): Share with Subnet-EVM rather than duplicating it.
 type StateDB struct {
 	*state.StateDB
 
-	// predicates is set by [StateDB.Prepare] and not modified during execution.
-	predicates map[common.Address][]predicate.Predicate
+	// warpMessages is set by [StateDB.Prepare] and not modified during
+	// execution.
+	warpMessages []predicate.Predicate
 	// preAP1 is set by [StateDB.Prepare] and selects the pre-AP1 behaviour of
 	// [StateDB.GetCommittedState].
 	preAP1 bool
@@ -81,8 +82,8 @@ func New(db *state.StateDB) *StateDB {
 	return &StateDB{StateDB: db}
 }
 
-// Prepare calls [state.StateDB.Prepare] and records the predicates in list for
-// [StateDB.GetPredicate].
+// Prepare calls [state.StateDB.Prepare] and records the Warp messages in list
+// for [StateDB.GetWarpMessage].
 func (s *StateDB) Prepare(
 	rules params.Rules,
 	sender common.Address,
@@ -92,7 +93,7 @@ func (s *StateDB) Prepare(
 	list types.AccessList,
 ) {
 	rulesExtra := corethparams.GetRulesExtra(rules)
-	s.predicates = predicate.FromAccessList((*corethparams.RulesExtra)(rulesExtra), list)
+	s.warpMessages = (*corethparams.RulesExtra)(rulesExtra).WarpMessages(list)
 	s.preAP1 = !rulesExtra.IsApricotPhase1
 	s.StateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)
 }
@@ -110,14 +111,13 @@ func (s *StateDB) GetCommittedState(addr common.Address, key common.Hash, opts .
 	return s.StateDB.GetCommittedState(addr, key, opts...)
 }
 
-// GetPredicate returns address's index-th predicate in the access list passed
-// to [StateDB.Prepare]. It returns false if address has no predicate at index.
-func (s *StateDB) GetPredicate(address common.Address, index int) (predicate.Predicate, bool) {
-	predicates := s.predicates[address]
-	if index < 0 || index >= len(predicates) {
+// GetWarpMessage returns the index-th Warp message in the access list passed
+// to [StateDB.Prepare]. It returns false if there is no message at index.
+func (s *StateDB) GetWarpMessage(index int) (predicate.Predicate, bool) {
+	if index < 0 || index >= len(s.warpMessages) {
 		return nil, false
 	}
-	return predicates[index], true
+	return s.warpMessages[index], true
 }
 
 // GetAssetBalance returns the balance of assetID held by addr.
