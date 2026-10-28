@@ -11,7 +11,6 @@ require (
 	github.com/ava-labs/avalanchego v1.15.3
 	github.com/ava-labs/avalanchego/graft/evm v1.15.3
 	github.com/ava-labs/libevm v1.13.15-0.20261019121158-2c4d255e0a63
-	github.com/google/go-cmp v0.7.0
 	github.com/holiman/uint256 v1.2.4
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/mock v0.5.0
@@ -39,8 +38,6 @@ require (
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
-	github.com/fjl/gencodec v0.1.1 // indirect
-	github.com/garslo/gogen v0.0.0-20170306192744-1d203ffc1f61 // indirect
 	github.com/gballet/go-verkle v0.1.1-0.20231031103413-a67434b50f46 // indirect
 	github.com/getsentry/sentry-go v0.35.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
@@ -49,6 +46,7 @@ require (
 	github.com/gofrs/flock v0.12.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/renameio/v2 v2.0.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/rpc v1.2.0 // indirect
@@ -105,15 +103,9 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-// The following tools are managed here instead of in tools/external/go.mod
-// because they are already direct dependencies of the main module, or
-// because they need to parse types from this module (gencodec) and
-// workspace mode forbids -modfile.
-tool (
-	github.com/ava-labs/libevm/rlp/rlpgen
-	github.com/fjl/gencodec
-	go.uber.org/mock/mockgen
-)
+// mockgen is managed here instead of in tools/external/go.mod because it is
+// already a direct dependency of this module.
+tool go.uber.org/mock/mockgen
 
 replace (
 	github.com/ava-labs/avalanchego => ../../
