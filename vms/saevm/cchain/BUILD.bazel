@@ -13,7 +13,7 @@ package_group(
     packages = [
         "//graft/coreth/core",
         "//graft/coreth/nativeasset",
-        "//graft/coreth/precompile/precompiletest",
+        "//graft/coreth/precompile/contracts/warp",
         "//main",
         "//node",
         "//tests/e2e",
