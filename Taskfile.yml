@@ -91,7 +91,7 @@ tasks:
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run {{.BAZEL_ARGS}} "$BAZEL_CI_TARGET_PATTERNS" -- {{.E2E_ARGS}} {{.CLI_ARGS}}'
 
   bazel-test-e2e-existing-network:
-    desc: Run the E2E network-reuse test with Bazel-built inputs
+    desc: Run the existing-network E2E test with Bazel-built runtime dependencies
     cmds:
       - task: bazel-test-e2e
         vars:
@@ -99,7 +99,7 @@ tasks:
           E2E_ARGS: --existing-network
 
   bazel-test-e2e-post-latest:
-    desc: Run Bazel-built E2E tests with the latest protocol upgrade active at genesis
+    desc: Run E2E tests with Bazel-built runtime dependencies and the latest protocol upgrade active at genesis
     cmds:
       - task: bazel-test-e2e
         vars:
@@ -130,14 +130,14 @@ tasks:
           SERIAL: '1'
 
   bazel-test-e2e-schedule-latest:
-    desc: Run Bazel-built E2E tests that activate the latest protocol upgrade four minutes after network start
+    desc: Run E2E tests with Bazel-built runtime dependencies and activate the latest protocol upgrade four minutes after network start
     cmds:
       - task: bazel-test-e2e
         vars:
           E2E_ARGS: --activate-latest-after=4m
 
   bazel-test-e2e-schedule-latest-race-serial:
-    desc: Run E2E tests serially with race detection and activate the latest protocol upgrade after four minutes
+    desc: Run E2E tests serially with race detection and activate the latest protocol upgrade four minutes after network start
     cmds:
       - task: bazel-test-e2e
         vars:
@@ -160,7 +160,7 @@ tasks:
           E2E_ARGS: --ginkgo.focus-file=c/api.go
 
   bazel-test-load:
-    desc: Run load tests with Bazel-built inputs
+    desc: Run load tests with Bazel-built runtime dependencies
     env:
       BAZEL_CI_TARGET_PATTERNS: //tests/load/main:runner
     cmds:
@@ -168,7 +168,7 @@ tasks:
       - cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run "$BAZEL_CI_TARGET_PATTERNS" -- {{.CLI_ARGS}}'
 
   bazel-test-load-ci:
-    desc: Run load tests with Bazel-built inputs and the standard CI timeout
+    desc: Run load tests with Bazel-built runtime dependencies and the standard CI timeout
     vars:
       BAZEL_ARGS: '{{.BAZEL_ARGS | default ""}}'
     env:
@@ -185,7 +185,7 @@ tasks:
           BAZEL_ARGS: --config=race
 
   bazel-test-load-subnet-evm:
-    desc: Run Subnet-EVM load tests with Bazel-built inputs
+    desc: Run Subnet-EVM load tests with Bazel-built runtime dependencies
     vars:
       BAZEL_ARGS: '{{.BAZEL_ARGS | default ""}}'
     env:
@@ -194,7 +194,7 @@ tasks:
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run {{.BAZEL_ARGS}} "$BAZEL_CI_TARGET_PATTERNS" -- {{.CLI_ARGS}}'
 
   bazel-test-load-subnet-evm-race:
-    desc: Run Subnet-EVM load tests with Bazel-built inputs and race detection
+    desc: Run Subnet-EVM load tests with Bazel-built runtime dependencies and race detection
     cmds:
       - task: bazel-test-load-subnet-evm
         vars:
@@ -219,13 +219,13 @@ tasks:
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh smoke --test_filter=TestID'
 
   bazel-test-upgrade:
-    desc: Run upgrade tests with Bazel-built inputs
+    desc: Run the release-upgrade test with Bazel-built runtime dependencies
     env:
       BAZEL_CI_TARGET_PATTERNS: //tests/upgrade:runner
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run "$BAZEL_CI_TARGET_PATTERNS" -- {{.CLI_ARGS}}'
 
   bazel-test-warp-subnet-evm:
-    desc: Run Subnet-EVM warp tests with Bazel-built inputs
+    desc: Run Subnet-EVM warp tests with Bazel-built runtime dependencies
     vars:
       BAZEL_ARGS: '{{.BAZEL_ARGS | default ""}}'
     env:
@@ -233,7 +233,7 @@ tasks:
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run {{.BAZEL_ARGS}} "$BAZEL_CI_TARGET_PATTERNS" -- {{.CLI_ARGS}}'
 
   bazel-test-warp-subnet-evm-race:
-    desc: Run Subnet-EVM warp tests with Bazel-built inputs and race detection
+    desc: Run Subnet-EVM warp tests with Bazel-built runtime dependencies and race detection
     cmds:
       - task: bazel-test-warp-subnet-evm
         vars:

@@ -39,7 +39,7 @@ env:
   BAZEL_REMOTE_CACHE_AUTH_HEADER: ${{ secrets.BAZEL_REMOTE_CACHE_AUTH_HEADER || '' }}
 
 jobs:
-  binaries:
+  monitored:
     # A + suffix identifies jobs that use the higher-capacity E2E runner.
     name: ${{ matrix.name }}${{ matrix.runner == 'e2e_runner' && '+' || '' }}
     strategy:
@@ -49,7 +49,7 @@ jobs:
     timeout-minutes: ${{ inputs.timeout_minutes }}
     steps:
       - uses: actions/checkout@v5
-      - name: Run ${{ matrix.name }} with Bazel-built inputs
+      - name: Run ${{ matrix.name }} with Bazel-built runtime dependencies
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh ${{ matrix.task }}

@@ -509,20 +509,50 @@ task bazel-test-e2e-serial
 # Run only the C-Chain ProposerVM API test
 task bazel-test-e2e-smoke
 
-# Run the network-reuse E2E test
+# Run the existing-network E2E test
 task bazel-test-e2e-existing-network
 
-# Run E2E tests with different activation times for the latest protocol upgrade
+# Run the activation E2E tests
 task bazel-test-e2e-post-latest
 task bazel-test-e2e-schedule-latest
 
-# Run the other monitored tests
+# Run the load, warp, and release-upgrade tests
 task bazel-test-load-subnet-evm
 task bazel-test-warp-subnet-evm
 task bazel-test-load
 task bazel-test-load-ci # Runs with the 30-second CI load duration
 task bazel-test-upgrade
 ```
+
+These tasks run the following test suites. The CI job name for each suite
+follows its task name in parentheses.
+
+- **Default E2E suite** (`bazel-test-e2e` and its race, serial, and smoke
+  variants): runs the `tests/e2e` suite. It leaves the latest protocol upgrade
+  unscheduled.
+- **Existing-network test** (`bazel-test-e2e-existing-network`, job
+  `e2e-existing-network`): runs an XSVM test twice against one network. The
+  second run restarts and reuses the network. This test checks the
+  network-reuse tooling.
+- **Activation tests** (`bazel-test-e2e-post-latest` and
+  `bazel-test-e2e-schedule-latest`, jobs `e2e-post-latest` and
+  `e2e-schedule-latest`): run the default E2E suite with a different
+  activation time for the latest protocol upgrade. That upgrade is active at
+  genesis, or it becomes active four minutes after network start.
+- **Load tests** (`bazel-test-load` and `bazel-test-load-ci`, job `load`):
+  run the AvalancheGo load test.
+- **Subnet-EVM load and warp tests** (`bazel-test-load-subnet-evm` and
+  `bazel-test-warp-subnet-evm`, jobs `load-subnet-evm` and `warp-subnet-evm`):
+  run the Subnet-EVM Ginkgo suites.
+- **Release-upgrade test** (`bazel-test-upgrade`, job `upgrade`): upgrades a
+  network from a published AvalancheGo release to the Bazel-built binary.
+
+All suites except the default E2E suite are *monitored tests*. This name
+identifies only the CI group that runs them. Each test in the group runs
+through the
+[`run-monitored-tmpnet-cmd` action](../.github/actions/run-monitored-tmpnet-cmd/action.yml),
+which collects metrics and logs. The default E2E job also uses this action,
+but it runs as a separate job.
 
 `task bazel-test-e2e` runs `bazel run //tests/e2e:e2e_runner`. The
 [`e2e_runner` target](../tests/e2e/BUILD.bazel) uses Bazel's Go toolchain to build
@@ -532,26 +562,25 @@ The [Bazel runner](../scripts/tests.e2e.bazel.sh) uses the
 Bazel can cache the binary builds. E2E test execution does not use cached test
 results.
 
-Both `bazel-test-load` and `bazel-test-load-ci` regenerate Solidity bindings
-before Bazel builds the load-test binary. This ensures that local contract edits
-reach the test. Generation uses `solc` and Go outside Bazel through the Nix
-shell. CI prepares the separate Go module cache for this job because Gazelle's
-cache does not supply the generator's dependencies.
-
 Bazel manages Go compilation for the load tests, but not Solidity compilation
-or binding generation. Task-level generation ensures that contract edits reach
-the tests without requiring Bazel support for `solc` and `abigen`. The trade-off
-is that generation runs on every task invocation, even when Bazel reuses all
-compiled outputs. Bazel cannot cache this generation step. Keep generation in
+or binding generation. Both `bazel-test-load` and `bazel-test-load-ci`
+regenerate Solidity bindings before Bazel builds the load-test binary, so local
+contract edits reach the test. The trade-off is that generation runs on every
+task invocation, even when Bazel reuses all compiled outputs. Keep generation in
 both tasks until Bazel manages the
 [Solidity build and binding-generation pipeline](#solidity-builds-and-binding-generation).
 
-The Subnet-EVM load and warp tasks use `GINKGO_LABEL_FILTER` to select tests.  For
+Generation uses `solc` and Go outside Bazel through the Nix shell. Gazelle's
+cache does not supply the generator's dependencies. CI therefore prepares the
+separate Go module cache for the `load` jobs in both the `monitored` and
+`monitored-race` groups.
+
+The Subnet-EVM load and warp tasks use `GINKGO_LABEL_FILTER` to select tests. For
 example, `GINKGO_LABEL_FILTER='!load'` excludes the load simulation. An explicit
 `--ginkgo.label-filter` task argument overrides this environment variable.
 
-`task bazel-test-upgrade` tests an upgrade from a published AvalancheGo release
-to the Bazel-built binary. The [upgrade script](../scripts/tests.upgrade.sh)
+The release-upgrade test uses the [upgrade script](../scripts/tests.upgrade.sh),
+which downloads a published AvalancheGo release to upgrade from. The script
 downloads that release on every run, even when Bazel reuses all compiled outputs.
 This task requires access to GitHub release downloads; Bazel's caches do not
 make it runnable offline. Without an argument, it uses the script's default
@@ -562,22 +591,32 @@ without the `v` prefix:
 task bazel-test-upgrade -- 1.15.1
 ```
 
-Bazel pre-merge E2E jobs disable race detection to reduce PR-run costs.
-Scheduled Bazel CI runs the primary E2E suite serially on every scheduled
-platform. It enables race detection only on Ubuntu 24.04 AMD64. This matches
-the scheduled unit-test policy.
+Scheduled Bazel CI runs the default E2E suite serially on every scheduled
+platform. It enables race detection only on Ubuntu 24.04 AMD64, the same
+platform as the scheduled race unit-test run.
 
-CI runs network-reuse and protocol-upgrade activation variants on pull requests,
-merge groups, pushes to `master` and `dev`, and tag pushes. These jobs disable
-race detection.
+The `monitored` group runs all monitored tests without race detection. It runs
+on pull requests, merge groups, pushes to `master` and `dev`, and tag pushes.
 
-Scheduled CI also runs both protocol-upgrade activation variants, both load suites,
-and the Subnet-EVM warp suite with race detection on Ubuntu 24.04 AMD64. The
-activation variants run serially to limit resource use. The default `tests/e2e`
-run leaves the latest protocol upgrade unscheduled. The activation variants test
-it at genesis and during network operation.
+The `monitored-race` group runs in scheduled CI on Ubuntu 24.04 AMD64. It runs
+the activation tests, both load tests, and the Subnet-EVM warp test with race
+detection. The activation tests run serially to limit resource use.
 
-Network-reuse and release-upgrade jobs run only in non-scheduled CI.
+Scheduled CI does not run the existing-network or release-upgrade tests. Race
+detection would not add coverage for either test:
+
+- The existing-network test checks the network-reuse tooling.
+- The release-upgrade test restarts nodes over existing databases, waits for
+  them to become healthy, and checks that a new node can bootstrap. The
+  scheduled race E2E runs already cover those operations. Every tmpnet network
+  start restarts its bootstrap node over an existing database, and the E2E
+  suite checks bootstrapping. The only difference is that the release-upgrade
+  test reads state that a published release wrote.
+
+Add the release-upgrade test to the `monitored-race` group if AvalancheGo adds
+code that runs only for state from an earlier release, such as a database
+migration.
+
 All scheduled Bazel jobs disable the remote cache.
 
 The Subnet-EVM load simulator must complete 50,000 transactions. Its timeout is
@@ -597,27 +636,32 @@ task bazel-test-load-subnet-evm-race
 task bazel-test-warp-subnet-evm-race
 ```
 
-[CI runs the primary E2E suite and monitored tests](../.github/workflows/bazel.yml)
-through the same tasks used locally. The Go workflow also runs the primary E2E
-suite with race detection to test artifacts built with `go build`. Both build paths
-require CGO. This follows the [CI entrypoint conventions](./ci.md#principles) and
-avoids a separate artifact lifecycle. Remote caching lets each Bazel job reuse
-compiled outputs.
+These tests use Bazel-built binaries so that CI can reuse compiled outputs. A
+job that uses `go build` compiles AvalancheGo, plugins, and test binaries again
+each time it runs. Bazel's remote cache shares individual outputs across jobs
+and runs. To make these jobs faster, first look for ways to increase cache
+reuse. For how this differs from a GitHub Actions cache archive, see
+[Archive caches and content-addressable caches](./ci.md#archive-caches-and-content-addressable-caches).
+
+[CI runs the default E2E suite and monitored tests](../.github/workflows/bazel.yml)
+through the same tasks used locally. The Go workflow also runs the default E2E
+suite with race detection to test artifacts built with `go build`. This follows the
+[CI entrypoint conventions](./ci.md#principles) and avoids a separate artifact
+lifecycle.
 
 The `monitored` and `monitored-race` jobs both call
 [`bazel-monitored.yml`](../.github/workflows/bazel-monitored.yml).
 Each caller supplies a JSON test matrix. Each entry specifies a suite name and
-task. It can also specify a runner choice and network owner. The task selects the
-test configuration, including race detection. Both groups share the setup, monitoring, and execution
-steps.
-
-Put the `if` condition on the calling job. Keep matrix execution inside the called
-workflow.
+task. It can also specify a runner choice and network owner. The task selects
+the test configuration, including race detection. Both groups share the setup,
+monitoring, and execution steps.
 
 GitHub skips disabled jobs before it expands their matrices. A name such as
-`${{ matrix.name }}` can then appear literally in the checks list. The calling
-jobs use the names `monitored` and `monitored-race`, so skipped jobs still have
-readable names. When enabled, each group shows a separate job for each test suite.
+`${{ matrix.name }}` can then appear literally in the checks list. For this
+reason, put the `if` condition on the calling job, and keep matrix execution
+inside the called workflow. The calling jobs use the names `monitored` and
+`monitored-race`, so skipped jobs still have readable names. When enabled, each
+group shows a separate job for each test suite.
 
 The Bazel entrypoint uses `bazel run`, not `bazel test`. It keeps network data
 available for inspection after a failure. Network data defaults to `$HOME/.tmpnet`.
@@ -786,14 +830,17 @@ reasons outside the repository. A smaller job set reduces that risk.
 
 Non-scheduled Bazel CI runs these jobs:
 
-- Linux pre-merge CI runs the full cacheable unit-test suite, the full primary
-  E2E suite, and monitored tests.
+- Linux pre-merge CI runs the full cacheable unit-test suite, the default E2E
+  suite, and the monitored tests.
 - macOS pre-merge CI runs one cacheable unit-test smoke target and one focused
   E2E smoke test.
 
 Pull requests and merge groups use the same Linux unit-test task,
 `bazel-test-unit-race`. Both enable race detection and reuse test results from
 the remote cache.
+
+Pre-merge E2E and monitored tests run without race detection. For the reason,
+see [Race detection and output caching](./ci.md#race-detection-and-output-caching).
 
 See [E2E and monitored test runners](#e2e-and-monitored-test-runners) for build
 and execution details.

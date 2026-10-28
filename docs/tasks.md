@@ -161,8 +161,10 @@ uploads, or secrets. That is normal CI setup, not task definition.
 
 ### Good: CI runs a named task
 
-In [`.github/workflows/bazel.yml`](../.github/workflows/bazel.yml), the load
-test runs:
+In [`.github/workflows/bazel.yml`](../.github/workflows/bazel.yml), the `load`
+entry in the `monitored` job's test matrix names the `bazel-test-load-ci` task.
+[`.github/workflows/bazel-monitored.yml`](../.github/workflows/bazel-monitored.yml)
+runs each entry's task, so the load test runs:
 
 ```bash
 ./scripts/run_task.sh bazel-test-load-ci

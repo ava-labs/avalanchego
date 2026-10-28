@@ -40,7 +40,7 @@ jobs:
       runner: ubuntu-24.04
       e2e_runner: ubuntu-24.04-amd64-4-core
       unit_test_task: bazel-test-unit-race
-      run_binaries: true
+      run_monitored_tests: true
     secrets: inherit
 
   smoke:

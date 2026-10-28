@@ -30,13 +30,13 @@ on:
         description: 'Task to run for Bazel unit tests'
         required: true
         type: string
-      run_binaries:
-        description: 'Run Linux binary jobs'
+      run_monitored_tests:
+        description: 'Run the monitored tests without race detection'
         required: false
         type: boolean
         default: false
       run_monitored_race_tests:
-        description: 'Run the scheduled activation, load, and warp suites with race detection'
+        description: 'Run the activation, load, and warp monitored tests with race detection'
         required: false
         type: boolean
         default: false
@@ -140,9 +140,9 @@ jobs:
       enable_remote_cache: ${{ inputs.enable_remote_cache }}
     secrets: inherit
 
-  binaries:
+  monitored:
     name: monitored
-    if: ${{ inputs.run_binaries }}
+    if: ${{ inputs.run_monitored_tests }}
     needs: setup
     uses: ./.github/workflows/bazel-monitored.yml
     with:
