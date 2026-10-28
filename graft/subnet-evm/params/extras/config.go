@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 
+	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -185,7 +186,7 @@ func (c *ChainConfig) Description() string {
 // isForkTimestampIncompatible returns true if a fork scheduled at timestamp s1
 // cannot be rescheduled to timestamp s2 because head is already past the fork.
 func isForkTimestampIncompatible(s1, s2 *uint64, head uint64) bool {
-	return (isTimestampForked(s1, head) || isTimestampForked(s2, head)) && !configTimestampEqual(s1, s2)
+	return (isTimestampForked(s1, head) || isTimestampForked(s2, head)) && !avalancheutils.PtrEqual(s1, s2)
 }
 
 // isTimestampForked returns whether a fork scheduled at timestamp s is active
@@ -195,16 +196,6 @@ func isTimestampForked(s *uint64, head uint64) bool {
 		return false
 	}
 	return *s <= head
-}
-
-func configTimestampEqual(x, y *uint64) bool {
-	if x == nil {
-		return y == nil
-	}
-	if y == nil {
-		return x == nil
-	}
-	return *x == *y
 }
 
 // UnmarshalJSON parses the JSON-encoded data and stores the result in the

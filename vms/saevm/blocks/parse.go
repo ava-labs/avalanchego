@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 )
 
@@ -77,20 +78,9 @@ func parseEthBlock(buf []byte) (*types.Block, error) {
 			h := types.DeriveSha(w, hasher)
 			want = &h
 		}
-		if !compareHashPtrs(want, hdr.WithdrawalsHash) {
+		if !utils.PtrEqual(want, hdr.WithdrawalsHash) {
 			return nil, errWithdrawalHashMismatch
 		}
 	}
 	return b, nil
-}
-
-func compareHashPtrs(a, b *common.Hash) bool {
-	switch an, bn := a == nil, b == nil; {
-	case an && bn:
-		return true
-	case an || bn:
-		return false
-	default:
-		return *a == *b
-	}
 }

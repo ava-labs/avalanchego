@@ -17,9 +17,9 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/libevm"
+	"github.com/ava-labs/libevm/params"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/heap"
