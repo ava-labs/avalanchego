@@ -4,7 +4,6 @@
 package simplex
 
 import (
-
 	"github.com/ava-labs/simplex/common"
 
 	"github.com/ava-labs/avalanchego/ids"

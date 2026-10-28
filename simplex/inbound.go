@@ -55,6 +55,10 @@ func finalizationMessageFromP2P(finalization *p2p.QuorumCertificate, qcDeseriali
 }
 
 func blockProposalFromP2P(ctx context.Context, blockProposal *p2p.BlockProposal, deserializer *blockDeserializer) (*common.Message, error) {
+	if len(blockProposal.Block) == 0 {
+		return nil, errNilField
+	}
+
 	block, err := deserializer.DeserializeBlock(ctx, blockProposal.Block)
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize block: %w", err)
