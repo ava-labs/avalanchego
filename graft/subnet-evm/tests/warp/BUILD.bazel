@@ -64,6 +64,7 @@ sh_binary(
     data = [
         ":warp_test_binary",
         "//graft/subnet-evm/plugin",
+        "//graft/subnet-evm/scripts:vm_constants.sh",
         "//main:avalanchego",
     ],
     tags = ["manual"],

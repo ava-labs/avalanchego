@@ -47,6 +47,7 @@ sh_binary(
         "//graft/subnet-evm/cmd/simulator/main",
         "//graft/subnet-evm/plugin",
         "//graft/subnet-evm/scripts:run_simulator.sh",
+        "//graft/subnet-evm/scripts:vm_constants.sh",
         "//main:avalanchego",
     ],
     tags = ["manual"],

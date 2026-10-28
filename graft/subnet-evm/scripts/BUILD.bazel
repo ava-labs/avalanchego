@@ -6,4 +6,5 @@ package(default_visibility = [
 exports_files([
     "run_simulator.sh",
     "tests.e2e.bazel.sh",
+    "vm_constants.sh",
 ])

@@ -105,6 +105,15 @@ tasks:
         vars:
           E2E_ARGS: --activate-latest-after=0
 
+  bazel-test-e2e-post-latest-race-serial:
+    desc: Run E2E tests serially with race detection and the latest protocol upgrade active at genesis
+    cmds:
+      - task: bazel-test-e2e
+        vars:
+          BAZEL_ARGS: --config=race
+          SERIAL: '1'
+          E2E_ARGS: --activate-latest-after=0
+
   bazel-test-e2e-race:
     desc: Run E2E tests with Bazel-built runtime dependencies and race detection
     cmds:
@@ -125,6 +134,15 @@ tasks:
     cmds:
       - task: bazel-test-e2e
         vars:
+          E2E_ARGS: --activate-latest-after=4m
+
+  bazel-test-e2e-schedule-latest-race-serial:
+    desc: Run E2E tests serially with race detection and activate the latest protocol upgrade after four minutes
+    cmds:
+      - task: bazel-test-e2e
+        vars:
+          BAZEL_ARGS: --config=race
+          SERIAL: '1'
           E2E_ARGS: --activate-latest-after=4m
 
   bazel-test-e2e-serial:
@@ -151,17 +169,38 @@ tasks:
 
   bazel-test-load-ci:
     desc: Run load tests with Bazel-built inputs and the standard CI timeout
+    vars:
+      BAZEL_ARGS: '{{.BAZEL_ARGS | default ""}}'
     env:
       BAZEL_CI_TARGET_PATTERNS: //tests/load/main:runner
     cmds:
       - task: generate-load-contract-bindings
-      - cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run "$BAZEL_CI_TARGET_PATTERNS" -- --load-timeout=30s {{.CLI_ARGS}}'
+      - cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run {{.BAZEL_ARGS}} "$BAZEL_CI_TARGET_PATTERNS" -- --load-timeout=30s {{.CLI_ARGS}}'
+
+  bazel-test-load-ci-race:
+    desc: Run load tests with race detection and the standard CI timeout
+    cmds:
+      - task: bazel-test-load-ci
+        vars:
+          BAZEL_ARGS: --config=race
 
   bazel-test-load-subnet-evm:
     desc: Run Subnet-EVM load tests with Bazel-built inputs
+    vars:
+      BAZEL_ARGS: '{{.BAZEL_ARGS | default ""}}'
     env:
       BAZEL_CI_TARGET_PATTERNS: //graft/subnet-evm/tests/load:runner
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run "$BAZEL_CI_TARGET_PATTERNS" -- {{.CLI_ARGS}}'
+      SIMULATOR_TIMEOUT: '{{.SIMULATOR_TIMEOUT | default ""}}'
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run {{.BAZEL_ARGS}} "$BAZEL_CI_TARGET_PATTERNS" -- {{.CLI_ARGS}}'
+
+  bazel-test-load-subnet-evm-race:
+    desc: Run Subnet-EVM load tests with Bazel-built inputs and race detection
+    cmds:
+      - task: bazel-test-load-subnet-evm
+        vars:
+          BAZEL_ARGS: --config=race
+          # Race instrumentation slows the fixed 50,000-transaction workload.
+          SIMULATOR_TIMEOUT: 30m
 
   bazel-test-unit:
     desc: Run cacheable Go unit tests with Bazel
@@ -187,9 +226,18 @@ tasks:
 
   bazel-test-warp-subnet-evm:
     desc: Run Subnet-EVM warp tests with Bazel-built inputs
+    vars:
+      BAZEL_ARGS: '{{.BAZEL_ARGS | default ""}}'
     env:
       BAZEL_CI_TARGET_PATTERNS: //graft/subnet-evm/tests/warp:runner
-    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run "$BAZEL_CI_TARGET_PATTERNS" -- {{.CLI_ARGS}}'
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run {{.BAZEL_ARGS}} "$BAZEL_CI_TARGET_PATTERNS" -- {{.CLI_ARGS}}'
+
+  bazel-test-warp-subnet-evm-race:
+    desc: Run Subnet-EVM warp tests with Bazel-built inputs and race detection
+    cmds:
+      - task: bazel-test-warp-subnet-evm
+        vars:
+          BAZEL_ARGS: --config=race
 
   build:
     desc: Builds avalanchego

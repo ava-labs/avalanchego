@@ -24,8 +24,12 @@ if [[ "${1:-}" == "--simulator" ]]; then
   shift 2
 fi
 
+# Load only VM identity; constants.sh also runs Go and configures builds.
+# shellcheck disable=SC1091
+source "${REPO_ROOT}/graft/subnet-evm/scripts/vm_constants.sh"
+
 mkdir -p "${AVALANCHEGO_PLUGIN_DIR}"
-ln -sfn "${PLUGIN_PATH}" "${AVALANCHEGO_PLUGIN_DIR}/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy"
+ln -sfn "${PLUGIN_PATH}" "${AVALANCHEGO_PLUGIN_DIR}/${DEFAULT_VM_ID}"
 
 cd "${REPO_ROOT}/graft/subnet-evm"
 exec "${TEST_PATH}" --ginkgo.vv --ginkgo.label-filter="${GINKGO_LABEL_FILTER:-}" "$@"

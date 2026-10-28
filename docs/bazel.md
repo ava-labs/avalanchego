@@ -569,9 +569,33 @@ the scheduled unit-test policy.
 
 CI runs network-reuse and protocol-upgrade activation variants on pull requests,
 merge groups, pushes to `master` and `dev`, and tag pushes. These jobs disable
-race detection. They check network reuse and upgrade activation, not concurrency.
-The scheduled primary E2E suite provides race coverage. It does not run these
-variants.
+race detection.
+
+Scheduled CI also runs both protocol-upgrade activation variants, both load suites,
+and the Subnet-EVM warp suite with race detection on Ubuntu 24.04 AMD64. The
+activation variants run serially to limit resource use. The default `tests/e2e`
+run leaves the latest protocol upgrade unscheduled. The activation variants test
+it at genesis and during network operation.
+
+Network-reuse and release-upgrade jobs run only in non-scheduled CI.
+All scheduled Bazel jobs disable the remote cache.
+
+The Subnet-EVM load simulator must complete 50,000 transactions. Its timeout is
+five minutes without race detection and thirty minutes with race detection.
+Race instrumentation can make that workload exceed five minutes on CI runners.
+The race task increases only the time limit; it does not reduce the workload.
+`SIMULATOR_TIMEOUT` supplies the limit to the simulator script. The CI job timeout
+separately limits setup, builds, execution, and cleanup.
+
+Run the additional scheduled configurations locally with:
+
+```bash
+task bazel-test-e2e-post-latest-race-serial
+task bazel-test-e2e-schedule-latest-race-serial
+task bazel-test-load-ci-race
+task bazel-test-load-subnet-evm-race
+task bazel-test-warp-subnet-evm-race
+```
 
 [CI runs the primary E2E suite and monitored tests](../.github/workflows/bazel.yml)
 through the same tasks used locally. The Go workflow also runs the primary E2E
@@ -579,6 +603,21 @@ suite with race detection to test artifacts built with `go build`. Both build pa
 require CGO. This follows the [CI entrypoint conventions](./ci.md#principles) and
 avoids a separate artifact lifecycle. Remote caching lets each Bazel job reuse
 compiled outputs.
+
+The `monitored` and `monitored-race` jobs both call
+[`bazel-monitored.yml`](../.github/workflows/bazel-monitored.yml).
+Each caller supplies a JSON test matrix. Each entry specifies a suite name and
+task. It can also specify a runner choice and network owner. The task selects the
+test configuration, including race detection. Both groups share the setup, monitoring, and execution
+steps.
+
+Put the `if` condition on the calling job. Keep matrix execution inside the called
+workflow.
+
+GitHub skips disabled jobs before it expands their matrices. A name such as
+`${{ matrix.name }}` can then appear literally in the checks list. The calling
+jobs use the names `monitored` and `monitored-race`, so skipped jobs still have
+readable names. When enabled, each group shows a separate job for each test suite.
 
 The Bazel entrypoint uses `bazel run`, not `bazel test`. It keeps network data
 available for inspection after a failure. Network data defaults to `$HOME/.tmpnet`.

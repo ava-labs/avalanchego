@@ -8,7 +8,7 @@ set -euo pipefail
 exec "${SIMULATOR_PATH}" \
     --endpoints="${RPC_ENDPOINTS}" \
     --key-dir=./cmd/simulator/.simulator/keys \
-    --timeout=300s \
+    --timeout="${SIMULATOR_TIMEOUT:-300s}" \
     --workers=1 \
     --txs-per-worker=50000 \
     --batch-size=50000 \
