@@ -43,7 +43,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
-	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client/stats"
@@ -64,7 +63,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -79,7 +77,9 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 
+	evmmessage "github.com/ava-labs/avalanchego/graft/evm/message"
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -442,7 +442,7 @@ func (vm *VM) Initialize(
 		vm.ethConfig.Miner.Etherbase = blackhole.Address
 	}
 
-	vm.networkCodec = message.SubnetEVMCodec
+	vm.networkCodec = evmmessage.SubnetEVMCodec
 	vm.Network, err = network.NewNetwork(vm.ctx, appSender, vm.networkCodec, vm.config.MaxOutboundActiveRequests, vm.sdkMetrics)
 	if err != nil {
 		return fmt.Errorf("failed to create network: %w", err)
@@ -641,7 +641,7 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash, ethConfig ethconfig.
 // disk to ensure that we do not continue syncing from an invalid snapshot.
 func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	leafHandlers := make(LeafHandlers)
-	leafMetricsNames := make(map[message.NodeType]string)
+	leafMetricsNames := make(map[evmmessage.NodeType]string)
 	syncStats := handlerstats.GetOrRegisterHandlerStats(metrics.Enabled)
 
 	switch scheme := vm.ethConfig.StateScheme; scheme {
@@ -659,10 +659,10 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		)
 		// register default leaf request handler for state trie
 		stateLeafRequestConfig := &extension.LeafRequestConfig{
-			LeafType:   message.StateTrieNode,
+			LeafType:   evmmessage.StateTrieNode,
 			MetricName: "sync_state_trie_leaves",
 			Handler: handlers.NewLeafsRequestHandler(evmTrieDB,
-				message.StateTrieKeyLength,
+				evmmessage.StateTrieKeyLength,
 				vm.blockChain, vm.networkCodec,
 				syncStats,
 			),
@@ -728,7 +728,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		Acceptor:            vm,
 		SyncSummaryProvider: vm.extensionConfig.SyncSummaryProvider,
 		Extender:            nil,
-		LeafFetcher:         client.NewLeafFetcher(syncClient, message.SubnetEVMLeafsRequestType, message.StateTrieNode),
+		LeafFetcher:         client.NewLeafFetcher(syncClient, evmmessage.SubnetEVMLeafsRequestType, evmmessage.StateTrieNode),
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume
@@ -982,12 +982,12 @@ func (vm *VM) buildBlockWithContext(_ context.Context, proposerVMBlockCtx *block
 	} else {
 		log.Debug("Building block without context")
 	}
-	predicateCtx := &precompileconfig.PredicateContext{
+	verifyCtx := &message.VerifyContext{
 		SnowCtx:            vm.ctx,
 		ProposerVMBlockCtx: proposerVMBlockCtx,
 	}
 
-	block, err := vm.miner.GenerateBlock(predicateCtx)
+	block, err := vm.miner.GenerateBlock(verifyCtx)
 	vm.builder.handleGenerateBlock(vm.blockChain.CurrentHeader().ParentHash)
 	if err != nil {
 		return nil, err
@@ -1011,7 +1011,7 @@ func (vm *VM) buildBlockWithContext(_ context.Context, proposerVMBlockCtx *block
 	// We call verify without writes here to avoid generating a reference
 	// to the blk state root in the triedb when we are going to call verify
 	// again from the consensus engine with writes enabled.
-	if err := blk.verify(predicateCtx, false /*=writes*/); err != nil {
+	if err := blk.verify(verifyCtx, false /*=writes*/); err != nil {
 		return nil, fmt.Errorf("block failed verification due to: %w", err)
 	}
 
@@ -1284,7 +1284,7 @@ func (vm *VM) ReadLastAccepted() (common.Hash, uint64, error) {
 func defaultExtensions() *extension.Config {
 	return &extension.Config{
 		Clock:               &mockable.Clock{},
-		SyncSummaryProvider: message.NewBlockSyncSummaryProvider(message.SubnetEVMCodec),
+		SyncSummaryProvider: evmmessage.NewBlockSyncSummaryProvider(evmmessage.SubnetEVMCodec),
 	}
 }
 

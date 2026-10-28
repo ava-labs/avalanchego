@@ -42,9 +42,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
-	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	cchainstate "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/evm/types"
 )
@@ -244,7 +244,7 @@ func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, 
 	c := cparams.GetExtra(h.chainConfig)
 	r := cparams.GetRulesExtra(rules)
 	if firstDBlock := r.Is(upgrade.Durango) && !c.IsDurango(parent.Time); firstDBlock {
-		activatePrecompile(statedb, corethwarp.ContractAddress)
+		activatePrecompile(statedb, message.ContractAddress)
 	}
 	return nil
 }

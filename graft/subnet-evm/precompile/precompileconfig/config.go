@@ -32,9 +32,6 @@ type Config interface {
 	Verify(ChainConfig) error
 }
 
-// PredicateContext is the context that Warp messages are verified within.
-type PredicateContext = evmprecompileconfig.PredicateContext
-
 // Rules defines the interface that provides information about the current rules of the chain.
 type Rules = evmprecompileconfig.Rules
 
