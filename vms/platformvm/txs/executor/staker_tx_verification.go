@@ -218,7 +218,7 @@ func verifySetAutoRenewedValidatorConfigTx(
 	}
 
 	if !backend.Bootstrapped.Get() {
-		// Not bootstrapped yet, don't need to do full verification.
+		// Not bootstrapped yet -- don't need to do full verification.
 		return validator, nil
 	}
 
@@ -333,7 +333,7 @@ func verifyNewValidator(
 			nodeID,
 			subnetID,
 		)
-	case !errors.Is(err, database.ErrNotFound):
+	case err != database.ErrNotFound:
 		return fmt.Errorf(
 			"failed to find whether %s is a validator on %s: %w",
 			nodeID,

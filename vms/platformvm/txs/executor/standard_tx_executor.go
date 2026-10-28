@@ -50,8 +50,8 @@ var (
 	_ platform.TxVisitor = (*standardTxExecutor)(nil)
 
 	errEmptyNodeID                      = errors.New("validator nodeID cannot be empty")
-	errMissingStartTimePreDurango       = errors.New("staker transactions must have a StartTime pre-Durango")
 	errMaxStakeDurationTooLarge         = errors.New("max stake duration must be less than or equal to the global max stake duration")
+	errMissingStartTimePreDurango       = errors.New("staker transactions must have a StartTime pre-Durango")
 	errMaxNumActiveValidators           = errors.New("already at the max number of active validators")
 	errCouldNotLoadSubnetToL1Conversion = errors.New("could not load subnet conversion")
 	errWrongWarpMessageSourceChainID    = errors.New("wrong warp message source chain ID")
@@ -65,10 +65,10 @@ var (
 	errStateCorruption                  = errors.New("state corruption")
 )
 
-// StandardTx executes the standard transaction tx.
+// StandardTx executes the standard transaction [tx].
 //
-// state is modified to represent the state of the chain after the execution
-// of tx.
+// [state] is modified to represent the state of the chain after the execution
+// of [tx].
 //
 // Returns:
 //   - The IDs of any import UTXOs consumed.
@@ -223,9 +223,8 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *platform.CreateSubnetTx) error {
 		return err
 	}
 
-	txID := e.tx.ID()
-
 	// Add the new subnet to the database
+	txID := e.tx.ID()
 	e.state.AddSubnet(txID)
 	e.state.SetSubnetOwner(txID, tx.Owner)
 	return nil
@@ -309,12 +308,12 @@ func (e *standardTxExecutor) verifyImportTx(tx *platform.ImportTx, utxoIDs [][]b
 	}
 
 	// Verify the flowcheck
-	txFee, err := e.feeCalculator.CalculateFee(tx)
+	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
 
-	producedAVAX, err = math.Add(producedAVAX, txFee)
+	producedAVAX, err = math.Add(producedAVAX, fee)
 	if err != nil {
 		return fmt.Errorf("adding fee: %w", err)
 	}
@@ -339,7 +338,6 @@ func (e *standardTxExecutor) ExportTx(tx *platform.ExportTx) error {
 		return err
 	}
 
-	// Not bootstrapped yet, don't need to do full verification.
 	if e.backend.Bootstrapped.Get() {
 		if err := verify.SameSubnet(context.TODO(), e.backend.Ctx, tx.DestinationChain); err != nil {
 			return err
@@ -709,7 +707,6 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *platform.RegisterL1Valida
 		PublicKey:         msg.BLSPublicKey,
 		ProofOfPossession: tx.ProofOfPossession,
 	}
-
 	if err := pop.Verify(); err != nil {
 		return err
 	}
@@ -805,6 +802,8 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorW
 		return err
 	}
 
+	txID := e.tx.ID()
+
 	// Check if we are removing the validator.
 	var refundUTXO *avax.UTXO
 	if msg.Weight == 0 {
@@ -836,7 +835,7 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *platform.SetL1ValidatorW
 
 			refundUTXO = &avax.UTXO{
 				UTXOID: avax.UTXOID{
-					TxID:        e.tx.ID(),
+					TxID:        txID,
 					OutputIndex: uint32(len(tx.Outs)),
 				},
 				Asset: avax.Asset{
@@ -954,7 +953,7 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *platform.DisableL1Validato
 		return err
 	}
 
-	e.state.AddUTXO(&avax.UTXO{
+	utxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
 			TxID:        e.tx.ID(),
 			OutputIndex: uint32(len(tx.Outs)),
@@ -969,7 +968,8 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *platform.DisableL1Validato
 				Addrs:     remainingBalanceOwner.Addresses,
 			},
 		},
-	})
+	}
+	e.state.AddUTXO(utxo)
 
 	// Disable the validator
 	l1Validator.EndAccumulatedFee = 0
@@ -1209,12 +1209,12 @@ func (e *standardTxExecutor) applySpend(creds []verify.Verifiable) error {
 // verifyL1Conversion verifies that the L1 conversion of subnetID references
 // the expectedChainID and expectedAddress.
 func verifyL1Conversion(
-	chainState state.Chain,
+	state state.Chain,
 	subnetID ids.ID,
 	expectedChainID ids.ID,
 	expectedAddress []byte,
 ) error {
-	subnetToL1Conversion, err := chainState.GetSubnetToL1Conversion(subnetID)
+	subnetToL1Conversion, err := state.GetSubnetToL1Conversion(subnetID)
 	if err != nil {
 		return fmt.Errorf("%w for %s with: %w", errCouldNotLoadSubnetToL1Conversion, subnetID, err)
 	}

@@ -81,7 +81,7 @@ func ProposalTx(
 // Non-proposal txs are rejected with errWrongTxType before any verification,
 // and staker txs proposed after Banff with errProposedAddStakerTxAfterBanff.
 type proposalTxExecutor struct {
-	// inputs, to be filled before execution methods are called
+	// inputs, to be filled before visitor methods are called
 	backend       *Backend
 	feeCalculator fee.Calculator
 	tx            *platform.Tx
