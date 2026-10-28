@@ -12,7 +12,7 @@ package_group(
     name = "external_consumers",
     packages = [
         "//graft/coreth/nativeasset",
-        "//graft/coreth/precompile/precompiletest",
+        "//graft/coreth/precompile/contracts/warp",
         "//main",
         "//node",
         "//tests/e2e",
