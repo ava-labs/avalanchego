@@ -8,10 +8,7 @@ package(default_visibility = [
 
 go_library(
     name = "cparams",
-    srcs = [
-        "config.go",
-        "precompile_upgrade.go",
-    ],
+    srcs = ["config.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams",
     visibility = ["//visibility:public"],
     deps = [

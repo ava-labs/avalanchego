@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -145,9 +144,7 @@ func TestFromReceipts(t *testing.T) {
 // newRules returns rules with Durango, and therefore Warp, active iff
 // isDurango.
 func newRules(isDurango bool) corethparams.RulesExtra {
-	return corethparams.RulesExtra{
-		AvalancheRules: cparams.AvalancheRules{IsDurango: isDurango},
-	}
+	return corethparams.RulesExtra{IsDurango: isDurango}
 }
 
 func TestVerifyBlock(t *testing.T) {

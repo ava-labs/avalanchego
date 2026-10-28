@@ -196,8 +196,8 @@ func (c *ChainConfig) forks() []fork {
 	}
 }
 
-func (c *ChainConfig) Rules(timestamp uint64) AvalancheRules {
-	return AvalancheRules{
+func (c *ChainConfig) Rules(timestamp uint64) Rules {
+	return Rules{
 		IsApricotPhase1:    c.IsApricotPhase1(timestamp),
 		IsApricotPhase2:    c.IsApricotPhase2(timestamp),
 		IsApricotPhasePre6: c.IsApricotPhasePre6(timestamp),
@@ -289,9 +289,9 @@ func (c *ChainConfig) IsIgloo(time uint64) bool {
 	return isTimestampForked(c.IglooTimestamp, time)
 }
 
-// AvalancheRules defines the activation status of various Avalanche network
+// Rules defines the activation status of various Avalanche network
 // upgrades.
-type AvalancheRules struct {
+type Rules struct {
 	IsApricotPhase1    bool
 	IsApricotPhase2    bool
 	IsApricotPhasePre6 bool
@@ -304,12 +304,12 @@ type AvalancheRules struct {
 	IsIgloo            bool
 }
 
-var _ precompileconfig.Rules = AvalancheRules{}
+var _ precompileconfig.Rules = Rules{}
 
-func (a AvalancheRules) IsGraniteActivated() bool {
+func (a Rules) IsGraniteActivated() bool {
 	return a.IsGranite
 }
 
-func (a AvalancheRules) IsDurangoActivated() bool {
+func (a Rules) IsDurangoActivated() bool {
 	return a.IsDurango
 }

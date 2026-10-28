@@ -47,7 +47,7 @@ type PrecompileTest struct {
 	// ExpectedErr is the expected error returned by the precompile
 	ExpectedErr error
 	// Rules is the rules to use for the precompile's block context
-	Rules cparams.AvalancheRules
+	Rules cparams.Rules
 }
 
 type PrecompileRunparams struct {

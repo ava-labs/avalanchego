@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/libevm/libevm/legacy"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
 	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
@@ -36,11 +36,11 @@ const InvalidateDelegateUnix = 1754107200
 // P256VerifyAddress is the address of the p256 signature verification precompile
 var P256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
 
-type RulesExtra extras.Rules
+type RulesExtra cparams.Rules // TODO(alarso16): Avoid new type.
 
-func GetRulesExtra(r ethparams.Rules) *extras.Rules {
+func GetRulesExtra(r ethparams.Rules) *cparams.Rules {
 	rules := payloads.Rules.GetPointer(&r)
-	return (*extras.Rules)(rules)
+	return (*cparams.Rules)(rules)
 }
 
 func (RulesExtra) CanCreateContract(_ *libevm.AddressContext, gas uint64, _ libevm.StateReader) (uint64, error) {
@@ -57,7 +57,7 @@ func (r RulesExtra) ShouldRefundGas() bool {
 
 // MinimumGasConsumption returns the ACP-194 gas-charged floor (ceil(limit/2)).
 func (r RulesExtra) MinimumGasConsumption(limit uint64) uint64 {
-	if extras.Rules(r).IsHelicon {
+	if cparams.Rules(r).IsHelicon {
 		return hook.MinimumGasConsumption(limit)
 	}
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(limit)
@@ -91,7 +91,7 @@ func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, e
 	if !r.IsDurango {
 		return 0, false, nil
 	}
-	gas, err := evmprecompileconfig.AccessListGasWithPredicates(r.AvalancheRules, warpPredicaters, accessList)
+	gas, err := evmprecompileconfig.AccessListGasWithPredicates((cparams.Rules)(r), warpPredicaters, accessList)
 	return gas, true, err
 }
 
@@ -163,7 +163,7 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 			panic(err) // Should never happen
 		}
 		var predicateResults predicate.BlockResults
-		rules := GetRulesExtra(env.Rules()).AvalancheRules
+		rules := *GetRulesExtra(env.Rules())
 		if predicateResultsBytes := customtypes.PredicateBytesFromExtra(rules, header.Extra); len(predicateResultsBytes) > 0 {
 			predicateResults, err = predicate.ParseBlockResults(predicateResultsBytes)
 			if err != nil {

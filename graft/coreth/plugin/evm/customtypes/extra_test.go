@@ -19,7 +19,7 @@ import (
 func TestPredicateBytesFromExtra(t *testing.T) {
 	tests := []struct {
 		name  string
-		rules cparams.AvalancheRules
+		rules cparams.Rules
 		extra []byte
 		want  []byte
 	}{
@@ -43,27 +43,27 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "fortuna_empty_extra",
-			rules: cparams.AvalancheRules{
+			rules: cparams.Rules{
 				IsFortuna: true,
 			},
 		},
 		{
 			name: "fortuna_too_short",
-			rules: cparams.AvalancheRules{
+			rules: cparams.Rules{
 				IsFortuna: true,
 			},
 			extra: make([]byte, acp176StateSize-1),
 		},
 		{
 			name: "fortuna_empty_predicate",
-			rules: cparams.AvalancheRules{
+			rules: cparams.Rules{
 				IsFortuna: true,
 			},
 			extra: make([]byte, acp176StateSize),
 		},
 		{
 			name: "fortuna_non_empty_predicate",
-			rules: cparams.AvalancheRules{
+			rules: cparams.Rules{
 				IsFortuna: true,
 			},
 			extra: []byte{
@@ -73,13 +73,13 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "helicon_empty_predicate",
-			rules: cparams.AvalancheRules{
+			rules: cparams.Rules{
 				IsHelicon: true,
 			},
 		},
 		{
 			name: "helicon_non_empty_predicate",
-			rules: cparams.AvalancheRules{
+			rules: cparams.Rules{
 				IsHelicon: true,
 			},
 			extra: []byte{5},

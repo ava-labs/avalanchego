@@ -58,10 +58,9 @@ var payloads ethparams.ExtraPayloads[*cparams.ChainConfig, RulesExtra]
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func constructRulesExtra(c *ethparams.ChainConfig, r *ethparams.Rules, cEx *cparams.ChainConfig, blockNum *big.Int, isMerge bool, timestamp uint64) RulesExtra {
-	var rules RulesExtra
 	if cEx == nil {
+		var rules RulesExtra
 		return rules
 	}
-	rules.AvalancheRules = cEx.Rules(timestamp)
-	return rules
+	return (RulesExtra)(cEx.Rules(timestamp))
 }

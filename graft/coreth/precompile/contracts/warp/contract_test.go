@@ -34,7 +34,7 @@ var forks = []upgradetest.Fork{
 	upgradetest.Granite,
 }
 
-func forkToAvalancheRules(fork upgradetest.Fork) cparams.AvalancheRules {
+func forkToAvalancheRules(fork upgradetest.Fork) cparams.Rules {
 	u := upgradetest.GetConfig(fork)
 	networkUpgrades := cparams.FromUpgrades(u)
 	return networkUpgrades.Rules(uint64(upgrade.InitiallyActiveTime.Unix()))
@@ -42,7 +42,7 @@ func forkToAvalancheRules(fork upgradetest.Fork) cparams.AvalancheRules {
 
 func runTests(
 	t *testing.T,
-	makeTests func(tb testing.TB, rules cparams.AvalancheRules) []precompiletest.PrecompileTest,
+	makeTests func(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest,
 ) {
 	for _, fork := range forks {
 		t.Run(fork.String(), func(t *testing.T) {
@@ -55,7 +55,7 @@ func runTests(
 
 func runBenchmarks(
 	b *testing.B,
-	makeTests func(tb testing.TB, rules cparams.AvalancheRules) []precompiletest.PrecompileTest,
+	makeTests func(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest,
 ) {
 	for _, fork := range forks {
 		b.Run(fork.String(), func(b *testing.B) {
@@ -66,7 +66,7 @@ func runBenchmarks(
 	}
 }
 
-func getBlockchainIDTests(tb testing.TB, rules cparams.AvalancheRules) []precompiletest.PrecompileTest {
+func getBlockchainIDTests(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest {
 	callerAddr := common.HexToAddress("0x0123")
 
 	defaultSnowCtx := snowtest.Context(tb, snowtest.CChainID)
@@ -132,7 +132,7 @@ func BenchmarkGetBlockchainID(b *testing.B) {
 	runBenchmarks(b, getBlockchainIDTests)
 }
 
-func sendWarpMessageTests(tb testing.TB, rules cparams.AvalancheRules) []precompiletest.PrecompileTest {
+func sendWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest {
 	callerAddr := common.HexToAddress("0x0123")
 
 	defaultSnowCtx := snowtest.Context(tb, snowtest.CChainID)
@@ -242,7 +242,7 @@ func BenchmarkSendWarpMessage(b *testing.B) {
 	runBenchmarks(b, sendWarpMessageTests)
 }
 
-func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.AvalancheRules) []precompiletest.PrecompileTest {
+func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest {
 	networkID := uint32(54321)
 	callerAddr := common.HexToAddress("0x0123")
 	sourceAddress := common.HexToAddress("0x456789")
@@ -539,7 +539,7 @@ func BenchmarkGetVerifiedWarpMessage(b *testing.B) {
 	runBenchmarks(b, getVerifiedWarpMessageTests)
 }
 
-func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.AvalancheRules) []precompiletest.PrecompileTest {
+func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest {
 	networkID := uint32(54321)
 	callerAddr := common.HexToAddress("0x0123")
 	sourceChainID := ids.GenerateTestID()

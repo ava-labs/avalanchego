@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 )
 
@@ -28,9 +27,7 @@ func TestRulesExtra_MinimumGasConsumption(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := RulesExtra(extras.Rules{
-				AvalancheRules: cparams.AvalancheRules{IsHelicon: tt.isHelicon},
-			})
+			r := RulesExtra(cparams.Rules{IsHelicon: tt.isHelicon})
 			assert.Equalf(t, tt.want, r.MinimumGasConsumption(tt.limit), "%T.MinimumGasConsumption(%d)", r, tt.limit)
 		})
 	}

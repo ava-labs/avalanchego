@@ -233,7 +233,7 @@ func createValidPredicateTest(
 	snowCtx *snow.Context,
 	numKeys int,
 	predicate predicate.Predicate,
-	rules cparams.AvalancheRules,
+	rules cparams.Rules,
 ) precompiletest.PredicateTest {
 	gasCost := CurrentGasConfig(rules)
 	return precompiletest.PredicateTest{
@@ -702,7 +702,7 @@ func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
 	})
 }
 
-func makeWarpPredicateTests(tb testing.TB, rules cparams.AvalancheRules) []precompiletest.PredicateTest {
+func makeWarpPredicateTests(tb testing.TB, rules cparams.Rules) []precompiletest.PredicateTest {
 	allTotalNodes := []int{10, 100, 1_000, 10_000}
 	tests := make([]precompiletest.PredicateTest, len(allTotalNodes))
 	for i, totalNodes := range allTotalNodes {
