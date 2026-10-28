@@ -69,18 +69,15 @@ func getBlockchainIDTests(tb testing.TB, gasConfig GasConfig) []precompileTest {
 
 	defaultSnowCtx := snowtest.Context(tb, snowtest.CChainID)
 	blockchainID := defaultSnowCtx.ChainID
+	getBlockchainIDInput, err := PackGetBlockchainID()
+	require.NoError(tb, err)
 
 	return []precompileTest{
 		{
-			Name:   "getBlockchainID_success",
-			Caller: callerAddr,
-			InputFn: func(tb testing.TB) []byte {
-				input, err := PackGetBlockchainID()
-				require.NoError(tb, err)
-				return input
-			},
+			Name:        "getBlockchainID_success",
+			Caller:      callerAddr,
+			Input:       getBlockchainIDInput,
 			SuppliedGas: gasConfig.GetBlockchainID,
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				expectedOutput, err := PackGetBlockchainIDOutput(common.Hash(blockchainID))
 				require.NoError(tb, err)
@@ -88,13 +85,9 @@ func getBlockchainIDTests(tb testing.TB, gasConfig GasConfig) []precompileTest {
 			}(),
 		},
 		{
-			Name:   "getBlockchainID_readOnly",
-			Caller: callerAddr,
-			InputFn: func(tb testing.TB) []byte {
-				input, err := PackGetBlockchainID()
-				require.NoError(tb, err)
-				return input
-			},
+			Name:        "getBlockchainID_readOnly",
+			Caller:      callerAddr,
+			Input:       getBlockchainIDInput,
 			SuppliedGas: gasConfig.GetBlockchainID,
 			ReadOnly:    true,
 			ExpectedRes: func() []byte {
@@ -104,15 +97,10 @@ func getBlockchainIDTests(tb testing.TB, gasConfig GasConfig) []precompileTest {
 			}(),
 		},
 		{
-			Name:   "getBlockchainID_insufficient_gas",
-			Caller: callerAddr,
-			InputFn: func(tb testing.TB) []byte {
-				input, err := PackGetBlockchainID()
-				require.NoError(tb, err)
-				return input
-			},
+			Name:        "getBlockchainID_insufficient_gas",
+			Caller:      callerAddr,
+			Input:       getBlockchainIDInput,
 			SuppliedGas: gasConfig.GetBlockchainID - 1,
-			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
 		},
 	}
@@ -151,7 +139,7 @@ func sendWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompileTest {
 		{
 			Name:        "send_warp_message_readOnly",
 			Caller:      callerAddr,
-			InputFn:     func(testing.TB) []byte { return sendWarpMessageInput },
+			Input:       sendWarpMessageInput,
 			SuppliedGas: gasConfig.SendWarpMessageCost(len(sendWarpMessageInput[4:])),
 			ReadOnly:    true,
 			ExpectedErr: vm.ErrWriteProtection,
@@ -159,35 +147,29 @@ func sendWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompileTest {
 		{
 			Name:        "send_warp_message_insufficient_gas_for_first_step",
 			Caller:      callerAddr,
-			InputFn:     func(testing.TB) []byte { return sendWarpMessageInput },
+			Input:       sendWarpMessageInput,
 			SuppliedGas: gasConfig.SendWarpMessageBase - 1,
-			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
 		},
 		{
 			Name:        "send_warp_message_insufficient_gas_for_payload_bytes",
 			Caller:      callerAddr,
-			InputFn:     func(testing.TB) []byte { return sendWarpMessageInput },
+			Input:       sendWarpMessageInput,
 			SuppliedGas: gasConfig.SendWarpMessageCost(len(sendWarpMessageInput[4:])) - 1,
-			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
 		},
 		{
-			Name:   "send_warp_message_invalid_input",
-			Caller: callerAddr,
-			InputFn: func(testing.TB) []byte {
-				return sendWarpMessageInput[:4] // Include only the function selector, so that the input is invalid
-			},
+			Name:        "send_warp_message_invalid_input",
+			Caller:      callerAddr,
+			Input:       sendWarpMessageInput[:4], // Include only the function selector, so that the input is invalid
 			SuppliedGas: gasConfig.SendWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidSendInput,
 		},
 		{
 			Name:        "send_warp_message_success",
 			Caller:      callerAddr,
-			InputFn:     func(testing.TB) []byte { return sendWarpMessageInput },
+			Input:       sendWarpMessageInput,
 			SuppliedGas: gasConfig.SendWarpMessageCost(len(sendWarpMessageInput[4:])),
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				bytes, err := PackSendWarpMessageOutput(common.Hash(unsignedWarpMessage.ID()))
 				require.NoError(tb, err)
@@ -248,6 +230,8 @@ func getVerifiedWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompil
 	packedWarpMessage := message.Pack(warpMessage.Bytes())
 	getVerifiedWarpMsg, err := PackGetVerifiedWarpMessage(0)
 	require.NoError(tb, err)
+	getVerifiedWarpMsg1, err := PackGetVerifiedWarpMessage(1)
+	require.NoError(tb, err)
 
 	// Invalid warp message
 	packedInvalidWarpMsg := message.Pack([]byte{1, 2, 3})
@@ -266,10 +250,9 @@ func getVerifiedWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompil
 		{
 			Name:         "get_message_success",
 			Caller:       callerAddr,
-			InputFn:      func(testing.TB) []byte { return getVerifiedWarpMsg },
+			Input:        getVerifiedWarpMsg,
 			WarpMessages: []message.Packed{packedWarpMessage},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)),
-			ReadOnly:     false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpMessageOutput(GetVerifiedWarpMessageOutput{
 					Message: WarpMessage{
@@ -284,16 +267,11 @@ func getVerifiedWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompil
 			}(),
 		},
 		{
-			Name:   "get_message_out_of_bounds_non_zero_index",
-			Caller: callerAddr,
-			InputFn: func(tb testing.TB) []byte {
-				input, err := PackGetVerifiedWarpMessage(1)
-				require.NoError(tb, err)
-				return input
-			},
+			Name:         "get_message_out_of_bounds_non_zero_index",
+			Caller:       callerAddr,
+			Input:        getVerifiedWarpMsg1,
 			WarpMessages: []message.Packed{packedWarpMessage},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:     false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpMessageOutput(GetVerifiedWarpMessageOutput{Valid: false})
 				require.NoError(tb, err)
@@ -301,17 +279,12 @@ func getVerifiedWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompil
 			}(),
 		},
 		{
-			Name:   "get_message_success_non_zero_index",
-			Caller: callerAddr,
-			InputFn: func(tb testing.TB) []byte {
-				input, err := PackGetVerifiedWarpMessage(1)
-				require.NoError(tb, err)
-				return input
-			},
+			Name:                "get_message_success_non_zero_index",
+			Caller:              callerAddr,
+			Input:               getVerifiedWarpMsg1,
 			WarpMessages:        []message.Packed{{}, packedWarpMessage},
 			WarpMessageFailures: []int{0},
 			SuppliedGas:         gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)),
-			ReadOnly:            false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpMessageOutput(GetVerifiedWarpMessageOutput{
 					Message: WarpMessage{
@@ -326,17 +299,12 @@ func getVerifiedWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompil
 			}(),
 		},
 		{
-			Name:   "get_message_failure_non_zero_index",
-			Caller: callerAddr,
-			InputFn: func(tb testing.TB) []byte {
-				input, err := PackGetVerifiedWarpMessage(1)
-				require.NoError(tb, err)
-				return input
-			},
+			Name:                "get_message_failure_non_zero_index",
+			Caller:              callerAddr,
+			Input:               getVerifiedWarpMsg1,
 			WarpMessages:        []message.Packed{{}, packedWarpMessage},
 			WarpMessageFailures: []int{0, 1},
 			SuppliedGas:         gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:            false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpMessageOutput(GetVerifiedWarpMessageOutput{Valid: false})
 				require.NoError(tb, err)
@@ -346,9 +314,8 @@ func getVerifiedWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompil
 		{
 			Name:        "get_non_existent_message",
 			Caller:      callerAddr,
-			InputFn:     func(testing.TB) []byte { return getVerifiedWarpMsg },
+			Input:       getVerifiedWarpMsg,
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpMessageOutput(GetVerifiedWarpMessageOutput{Valid: false})
 				require.NoError(tb, err)
@@ -358,7 +325,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompil
 		{
 			Name:         "get_message_success_readOnly",
 			Caller:       callerAddr,
-			InputFn:      func(testing.TB) []byte { return getVerifiedWarpMsg },
+			Input:        getVerifiedWarpMsg,
 			WarpMessages: []message.Packed{packedWarpMessage},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)),
 			ReadOnly:     true,
@@ -378,7 +345,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompil
 		{
 			Name:        "get_non_existent_message_readOnly",
 			Caller:      callerAddr,
-			InputFn:     func(testing.TB) []byte { return getVerifiedWarpMsg },
+			Input:       getVerifiedWarpMsg,
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    true,
 			ExpectedRes: func() []byte {
@@ -390,80 +357,66 @@ func getVerifiedWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompil
 		{
 			Name:         "get_message_out_of_gas_for_base_cost",
 			Caller:       callerAddr,
-			InputFn:      func(testing.TB) []byte { return getVerifiedWarpMsg },
+			Input:        getVerifiedWarpMsg,
 			WarpMessages: []message.Packed{packedWarpMessage},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageBase - 1,
-			ReadOnly:     false,
 			ExpectedErr:  vm.ErrOutOfGas,
 		},
 		{
 			Name:         "get_message_out_of_gas",
 			Caller:       callerAddr,
-			InputFn:      func(testing.TB) []byte { return getVerifiedWarpMsg },
+			Input:        getVerifiedWarpMsg,
 			WarpMessages: []message.Packed{packedWarpMessage},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)) - 1,
-			ReadOnly:     false,
 			ExpectedErr:  vm.ErrOutOfGas,
 		},
 		{
 			Name:         "get_message_invalid_packing",
 			Caller:       callerAddr,
-			InputFn:      func(testing.TB) []byte { return getVerifiedWarpMsg },
+			Input:        getVerifiedWarpMsg,
 			WarpMessages: []message.Packed{malformedPacked},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(malformedPacked)),
-			ReadOnly:     false,
 			ExpectedErr:  ErrInvalidPacked,
 		},
 		{
 			Name:         "get_message_invalid_warp_message",
 			Caller:       callerAddr,
-			InputFn:      func(testing.TB) []byte { return getVerifiedWarpMsg },
+			Input:        getVerifiedWarpMsg,
 			WarpMessages: []message.Packed{packedInvalidWarpMsg},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedInvalidWarpMsg)),
-			ReadOnly:     false,
 			ExpectedErr:  ErrInvalidWarpMsg,
 		},
 		{
 			Name:         "get_message_invalid_addressed_payload",
 			Caller:       callerAddr,
-			InputFn:      func(testing.TB) []byte { return getVerifiedWarpMsg },
+			Input:        getVerifiedWarpMsg,
 			WarpMessages: []message.Packed{packedInvalidAddressed},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedInvalidAddressed)),
-			ReadOnly:     false,
 			ExpectedErr:  ErrInvalidAddressedPayload,
 		},
 		{
-			Name:   "get_message_index_invalid_uint32",
-			Caller: callerAddr,
-			InputFn: func(testing.TB) []byte {
-				return append(WarpABI.Methods["getVerifiedWarpMessage"].ID, new(big.Int).SetInt64(math.MaxInt64).Bytes()...)
-			},
+			Name:        "get_message_index_invalid_uint32",
+			Caller:      callerAddr,
+			Input:       append(WarpABI.Methods["getVerifiedWarpMessage"].ID, new(big.Int).SetInt64(math.MaxInt64).Bytes()...),
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
 		},
 		{
 			Name:   "get_message_index_invalid_int32",
 			Caller: callerAddr,
-			InputFn: func(tb testing.TB) []byte {
+			Input: func() []byte {
 				res, err := PackGetVerifiedWarpMessage(math.MaxInt32 + 1)
 				require.NoError(tb, err)
 				return res
-			},
+			}(),
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
 		},
 		{
-			Name:   "get_message_index_invalid_input_bytes",
-			Caller: callerAddr,
-			InputFn: func(tb testing.TB) []byte {
-				res, err := PackGetVerifiedWarpMessage(1)
-				require.NoError(tb, err)
-				return res[:len(res)-2]
-			},
+			Name:        "get_message_index_invalid_input_bytes",
+			Caller:      callerAddr,
+			Input:       getVerifiedWarpMsg1[:len(getVerifiedWarpMsg1)-2],
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
 		},
 	}
@@ -491,6 +444,8 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, gasConfig GasConfig) []precomp
 	packedWarpMessage := message.Pack(warpMessage.Bytes())
 	getVerifiedWarpBlockHash, err := PackGetVerifiedWarpBlockHash(0)
 	require.NoError(tb, err)
+	getVerifiedWarpBlockHash1, err := PackGetVerifiedWarpBlockHash(1)
+	require.NoError(tb, err)
 
 	// Invalid warp message
 	packedInvalidWarpMsg := message.Pack([]byte{1, 2, 3})
@@ -509,10 +464,9 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, gasConfig GasConfig) []precomp
 		{
 			Name:         "get_message_success",
 			Caller:       callerAddr,
-			InputFn:      func(testing.TB) []byte { return getVerifiedWarpBlockHash },
+			Input:        getVerifiedWarpBlockHash,
 			WarpMessages: []message.Packed{packedWarpMessage},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)),
-			ReadOnly:     false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpBlockHashOutput(GetVerifiedWarpBlockHashOutput{
 					WarpBlockHash: WarpBlockHash{
@@ -526,16 +480,11 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, gasConfig GasConfig) []precomp
 			}(),
 		},
 		{
-			Name:   "get_message_out_of_bounds_non_zero_index",
-			Caller: callerAddr,
-			InputFn: func(tb testing.TB) []byte {
-				input, err := PackGetVerifiedWarpBlockHash(1)
-				require.NoError(tb, err)
-				return input
-			},
+			Name:         "get_message_out_of_bounds_non_zero_index",
+			Caller:       callerAddr,
+			Input:        getVerifiedWarpBlockHash1,
 			WarpMessages: []message.Packed{packedWarpMessage},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:     false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpBlockHashOutput(GetVerifiedWarpBlockHashOutput{Valid: false})
 				require.NoError(tb, err)
@@ -543,17 +492,12 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, gasConfig GasConfig) []precomp
 			}(),
 		},
 		{
-			Name:   "get_message_success_non_zero_index",
-			Caller: callerAddr,
-			InputFn: func(tb testing.TB) []byte {
-				input, err := PackGetVerifiedWarpBlockHash(1)
-				require.NoError(tb, err)
-				return input
-			},
+			Name:                "get_message_success_non_zero_index",
+			Caller:              callerAddr,
+			Input:               getVerifiedWarpBlockHash1,
 			WarpMessages:        []message.Packed{{}, packedWarpMessage},
 			WarpMessageFailures: []int{0},
 			SuppliedGas:         gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)),
-			ReadOnly:            false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpBlockHashOutput(GetVerifiedWarpBlockHashOutput{
 					WarpBlockHash: WarpBlockHash{
@@ -567,17 +511,12 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, gasConfig GasConfig) []precomp
 			}(),
 		},
 		{
-			Name:   "get_message_failure_non_zero_index",
-			Caller: callerAddr,
-			InputFn: func(tb testing.TB) []byte {
-				input, err := PackGetVerifiedWarpBlockHash(1)
-				require.NoError(tb, err)
-				return input
-			},
+			Name:                "get_message_failure_non_zero_index",
+			Caller:              callerAddr,
+			Input:               getVerifiedWarpBlockHash1,
 			WarpMessages:        []message.Packed{{}, packedWarpMessage},
 			WarpMessageFailures: []int{0, 1},
 			SuppliedGas:         gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:            false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpBlockHashOutput(GetVerifiedWarpBlockHashOutput{Valid: false})
 				require.NoError(tb, err)
@@ -587,9 +526,8 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, gasConfig GasConfig) []precomp
 		{
 			Name:        "get_non_existent_message",
 			Caller:      callerAddr,
-			InputFn:     func(testing.TB) []byte { return getVerifiedWarpBlockHash },
+			Input:       getVerifiedWarpBlockHash,
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpBlockHashOutput(GetVerifiedWarpBlockHashOutput{Valid: false})
 				require.NoError(tb, err)
@@ -599,7 +537,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, gasConfig GasConfig) []precomp
 		{
 			Name:         "get_message_success_readOnly",
 			Caller:       callerAddr,
-			InputFn:      func(testing.TB) []byte { return getVerifiedWarpBlockHash },
+			Input:        getVerifiedWarpBlockHash,
 			WarpMessages: []message.Packed{packedWarpMessage},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)),
 			ReadOnly:     true,
@@ -618,7 +556,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, gasConfig GasConfig) []precomp
 		{
 			Name:        "get_non_existent_message_readOnly",
 			Caller:      callerAddr,
-			InputFn:     func(testing.TB) []byte { return getVerifiedWarpBlockHash },
+			Input:       getVerifiedWarpBlockHash,
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    true,
 			ExpectedRes: func() []byte {
@@ -630,80 +568,66 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, gasConfig GasConfig) []precomp
 		{
 			Name:         "get_message_out_of_gas_for_base_cost",
 			Caller:       callerAddr,
-			InputFn:      func(testing.TB) []byte { return getVerifiedWarpBlockHash },
+			Input:        getVerifiedWarpBlockHash,
 			WarpMessages: []message.Packed{packedWarpMessage},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageBase - 1,
-			ReadOnly:     false,
 			ExpectedErr:  vm.ErrOutOfGas,
 		},
 		{
 			Name:         "get_message_out_of_gas",
 			Caller:       callerAddr,
-			InputFn:      func(testing.TB) []byte { return getVerifiedWarpBlockHash },
+			Input:        getVerifiedWarpBlockHash,
 			WarpMessages: []message.Packed{packedWarpMessage},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)) - 1,
-			ReadOnly:     false,
 			ExpectedErr:  vm.ErrOutOfGas,
 		},
 		{
 			Name:         "get_message_invalid_packing",
 			Caller:       callerAddr,
-			InputFn:      func(testing.TB) []byte { return getVerifiedWarpBlockHash },
+			Input:        getVerifiedWarpBlockHash,
 			WarpMessages: []message.Packed{malformedPacked},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(malformedPacked)),
-			ReadOnly:     false,
 			ExpectedErr:  ErrInvalidPacked,
 		},
 		{
 			Name:         "get_message_invalid_warp_message",
 			Caller:       callerAddr,
-			InputFn:      func(testing.TB) []byte { return getVerifiedWarpBlockHash },
+			Input:        getVerifiedWarpBlockHash,
 			WarpMessages: []message.Packed{packedInvalidWarpMsg},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedInvalidWarpMsg)),
-			ReadOnly:     false,
 			ExpectedErr:  ErrInvalidWarpMsg,
 		},
 		{
 			Name:         "get_message_invalid_block_hash_payload",
 			Caller:       callerAddr,
-			InputFn:      func(testing.TB) []byte { return getVerifiedWarpBlockHash },
+			Input:        getVerifiedWarpBlockHash,
 			WarpMessages: []message.Packed{packedInvalidHash},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedInvalidHash)),
-			ReadOnly:     false,
 			ExpectedErr:  ErrInvalidBlockHashPayload,
 		},
 		{
-			Name:   "get_message_index_invalid_uint32",
-			Caller: callerAddr,
-			InputFn: func(testing.TB) []byte {
-				return append(WarpABI.Methods["getVerifiedWarpBlockHash"].ID, new(big.Int).SetInt64(math.MaxInt64).Bytes()...)
-			},
+			Name:        "get_message_index_invalid_uint32",
+			Caller:      callerAddr,
+			Input:       append(WarpABI.Methods["getVerifiedWarpBlockHash"].ID, new(big.Int).SetInt64(math.MaxInt64).Bytes()...),
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
 		},
 		{
 			Name:   "get_message_index_invalid_int32",
 			Caller: callerAddr,
-			InputFn: func(tb testing.TB) []byte {
+			Input: func() []byte {
 				res, err := PackGetVerifiedWarpBlockHash(math.MaxInt32 + 1)
 				require.NoError(tb, err)
 				return res
-			},
+			}(),
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
 		},
 		{
-			Name:   "get_message_invalid_index_input_bytes",
-			Caller: callerAddr,
-			InputFn: func(tb testing.TB) []byte {
-				res, err := PackGetVerifiedWarpBlockHash(1)
-				require.NoError(tb, err)
-				return res[:len(res)-2]
-			},
+			Name:        "get_message_invalid_index_input_bytes",
+			Caller:      callerAddr,
+			Input:       getVerifiedWarpBlockHash1[:len(getVerifiedWarpBlockHash1)-2],
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
 		},
 	}
