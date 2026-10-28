@@ -20,6 +20,7 @@ go_library(
     deps = [
         "//graft/evm/utils",
         "//graft/subnet-evm/commontype",
+        "//graft/subnet-evm/precompile/contracts/warp",
         "//graft/subnet-evm/precompile/modules",
         "//graft/subnet-evm/precompile/precompileconfig",
         "//snow",
@@ -27,9 +28,11 @@ go_library(
         "//utils",
         "//utils/constants",
         "//vms/evm/acp226",
+        "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//params",
     ],
 )
