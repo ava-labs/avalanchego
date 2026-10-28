@@ -4,7 +4,6 @@
 package extstate_test
 
 import (
-	"math/big"
 	"os"
 	"testing"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/stateconf"
+	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -81,13 +81,13 @@ func TestStateKeyPartition(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := newEmptyStateDB(t)
 			addr := common.Address{1}
-			balance := big.NewInt(1)
+			balance := uint256.NewInt(1)
 			s.AddAssetBalance(addr, tt.key, balance)
 			stored := common.Hash{0xff}
 			s.SetState(addr, tt.key, stored)
 
 			raw := stateconf.SkipStateKeyTransformation()
-			assert.Equalf(t, common.BigToHash(balance), s.GetState(addr, tt.wantAssetKey, raw), "%T.GetState(%s, %s) after %[1]T.AddAssetBalance(%[2]s, %s)", s, addr, tt.wantAssetKey, tt.key)
+			assert.Equalf(t, common.Hash(balance.Bytes32()), s.GetState(addr, tt.wantAssetKey, raw), "%T.GetState(%s, %s) after %[1]T.AddAssetBalance(%[2]s, %s)", s, addr, tt.wantAssetKey, tt.key)
 			assert.Equalf(t, stored, s.GetState(addr, tt.wantStateKey, raw), "%T.GetState(%s, %s) after %[1]T.SetState(%[2]s, %s)", s, addr, tt.wantStateKey, tt.key)
 		})
 	}
@@ -103,13 +103,13 @@ func FuzzStateKeyPartition(f *testing.F) {
 
 		s := newEmptyStateDB(t)
 		addr := common.Address{1}
-		want := big.NewInt(10)
+		want := uint256.NewInt(10)
 		s.AddAssetBalance(addr, key, want)
 		stored := common.Hash{0xff}
 		s.SetState(addr, key, stored)
 
 		got := s.GetAssetBalance(addr, key)
-		require.Zerof(t, want.Cmp(got), "%T.GetAssetBalance(%s, %s) = %d, want %d", s, addr, key, got, want)
+		require.Equalf(t, want, got, "%T.GetAssetBalance(%s, %s)", s, addr, key)
 		require.Equalf(t, stored, s.GetState(addr, key), "%T.GetState(%s, %s)", s, addr, key)
 	})
 }
@@ -117,12 +117,12 @@ func FuzzStateKeyPartition(f *testing.F) {
 func TestAssetBalance(t *testing.T) {
 	type op struct {
 		sub    bool
-		amount int64
+		amount uint64
 	}
 	tests := []struct {
 		name                string
 		ops                 []op
-		want                int64
+		want                uint64
 		wantExist           bool
 		wantHeldXChainAsset bool
 	}{
@@ -157,14 +157,14 @@ func TestAssetBalance(t *testing.T) {
 			assetID := common.Hash{2}
 			for _, o := range tt.ops {
 				if o.sub {
-					s.SubAssetBalance(addr, assetID, big.NewInt(o.amount))
+					s.SubAssetBalance(addr, assetID, uint256.NewInt(o.amount))
 				} else {
-					s.AddAssetBalance(addr, assetID, big.NewInt(o.amount))
+					s.AddAssetBalance(addr, assetID, uint256.NewInt(o.amount))
 				}
 			}
 
 			got := s.GetAssetBalance(addr, assetID)
-			assert.Zerof(t, big.NewInt(tt.want).Cmp(got), "%T.GetAssetBalance() = %d, want %d", s, got, tt.want)
+			assert.Equalf(t, uint256.NewInt(tt.want), got, "%T.GetAssetBalance(%s, %s)", s, addr, assetID)
 			assert.Equalf(t, tt.wantExist, s.Exist(addr), "%T.Exist(%s)", s, addr)
 			assert.Equal(t, tt.wantHeldXChainAsset, customtypes.HeldXChainAsset(s.StateDB, addr), "customtypes.HeldXChainAsset()")
 		})

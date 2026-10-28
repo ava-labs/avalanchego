@@ -6,7 +6,6 @@ package tx_test
 import (
 	"context"
 	"math"
-	"math/big"
 	"os"
 	"testing"
 
@@ -970,20 +969,17 @@ func TestTransferNonAVAX(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var (
-				want  = newEmptyStateDB(t)
-				toBig = func(v uint64) *big.Int { return new(big.Int).SetUint64(v) }
-			)
+			want := newEmptyStateDB(t)
 			for addr, balances := range test.want {
 				for assetID, amount := range balances {
-					want.AddAssetBalance(addr, common.Hash(assetID), toBig(amount))
+					want.AddAssetBalance(addr, common.Hash(assetID), uint256.NewInt(amount))
 				}
 			}
 
 			got := newEmptyStateDB(t)
 			for addr, balances := range test.init {
 				for assetID, amount := range balances {
-					got.AddAssetBalance(addr, common.Hash(assetID), toBig(amount))
+					got.AddAssetBalance(addr, common.Hash(assetID), uint256.NewInt(amount))
 				}
 			}
 

@@ -5,7 +5,6 @@ package nativeasset
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
@@ -79,11 +78,8 @@ func (*NativeAssetBalance) Run(accessibleState contract.AccessibleState, _ commo
 		return nil, remainingGas, vm.ErrExecutionReverted
 	}
 
-	res, overflow := uint256.FromBig(accessibleState.GetStateDB().GetAssetBalance(address, assetID))
-	if overflow {
-		return nil, remainingGas, vm.ErrExecutionReverted
-	}
-	return common.LeftPadBytes(res.Bytes(), 32), remainingGas, nil
+	res := accessibleState.GetStateDB().GetAssetBalance(address, assetID).Bytes32()
+	return res[:], remainingGas, nil
 }
 
 // NativeAssetCall atomically transfers a native asset to a recipient address as well as calling that
@@ -93,23 +89,23 @@ type NativeAssetCall struct{}
 // PackNativeAssetCallInput packs the arguments into the required input data for a transaction to be passed into
 // the native asset contract.
 // Assumes that [assetAmount] is non-nil.
-func PackNativeAssetCallInput(address common.Address, assetID common.Hash, assetAmount *big.Int, callData []byte) []byte {
+func PackNativeAssetCallInput(address common.Address, assetID common.Hash, assetAmount *uint256.Int, callData []byte) []byte {
 	input := make([]byte, 84+len(callData))
 	copy(input[0:20], address.Bytes())
 	copy(input[20:52], assetID.Bytes())
-	assetAmount.FillBytes(input[52:84])
+	assetAmount.WriteToSlice(input[52:84])
 	copy(input[84:], callData)
 	return input
 }
 
 // UnpackNativeAssetCallInput attempts to unpack [input] into the arguments to the native asset call precompile
-func UnpackNativeAssetCallInput(input []byte) (common.Address, common.Hash, *big.Int, []byte, error) {
+func UnpackNativeAssetCallInput(input []byte) (common.Address, common.Hash, *uint256.Int, []byte, error) {
 	if len(input) < 84 {
 		return common.Address{}, common.Hash{}, nil, nil, fmt.Errorf("native asset call input had unexpected length %d", len(input))
 	}
 	to := common.BytesToAddress(input[:20])
 	assetID := common.BytesToHash(input[20:52])
-	assetAmount := new(big.Int).SetBytes(input[52:84])
+	assetAmount := new(uint256.Int).SetBytes32(input[52:84])
 	callData := input[84:]
 	return to, assetID, assetAmount, callData, nil
 }
@@ -143,9 +139,7 @@ func (*NativeAssetCall) run(env vm.PrecompileEnvironment, stateDB contract.State
 		return nil, vm.ErrExecutionReverted
 	}
 
-	// Note: it is not possible for a negative `assetAmount` to be passed in here due to the fact that decoding a
-	// byte slice into a [*big.Int] will always return a positive value, as documented on [big.Int.SetBytes].
-	if assetAmount.Sign() != 0 && stateDB.GetAssetBalance(caller, assetID).Cmp(assetAmount) < 0 {
+	if !assetAmount.IsZero() && stateDB.GetAssetBalance(caller, assetID).Cmp(assetAmount) < 0 {
 		return nil, vm.ErrInsufficientBalance
 	}
 
