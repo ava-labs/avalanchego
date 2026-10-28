@@ -61,8 +61,6 @@ type ChainConfig struct {
 	// Igloo is a placeholder for the next upgrade.
 	IglooTimestamp *uint64 `json:"iglooTimestamp,omitempty"`
 
-	PrecompileConfigs []precompileconfig.Config `json:"-"`
-
 	SnowCtx *snow.Context `json:"-"`
 }
 

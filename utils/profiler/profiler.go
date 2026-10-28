@@ -102,6 +102,7 @@ func (p *profiler) StopCPUProfiler() error {
 	}
 
 	pprof.StopCPUProfile()
+	runtime.SetMutexProfileFraction(0)
 	err := p.cpuProfileFile.Close()
 	p.cpuProfileFile = nil
 	return err

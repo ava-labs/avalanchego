@@ -20,7 +20,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
@@ -100,16 +99,13 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		maxLeafRequestSize = 1024
 	)
 
+	blockClient, err := s.network.SyncClient(p2p.EVMBlockRequestHandlerID)
+	if err != nil {
+		return err
+	}
 	blockSyncer := syncblock.NewSyncer(
 		s.snowCtx.Log,
-		syncblock.NewClient(
-			s.snowCtx.Log,
-			peertracker.NewClient(
-				s.network.Network,
-				p2p.EVMBlockRequestHandlerID,
-				s.network.PeerTracker,
-			),
-		),
+		syncblock.NewClient(s.snowCtx.Log, blockClient),
 		s.db,
 		s.blockParser,
 		summary.AcceptedHash,
@@ -131,16 +127,13 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		return fmt.Errorf("%w: %s at height %d", errSynchronousBlock, summary.AcceptedHash, summary.AcceptedHeight)
 	}
 
+	codeClient, err := s.network.SyncClient(p2p.EVMCodeRequestHandlerID)
+	if err != nil {
+		return err
+	}
 	codeSyncer, err := code.NewSyncer(
 		s.snowCtx.Log,
-		code.NewClient(
-			s.snowCtx.Log,
-			peertracker.NewClient(
-				s.network.Network,
-				p2p.EVMCodeRequestHandlerID,
-				s.network.PeerTracker,
-			),
-		),
+		code.NewClient(s.snowCtx.Log, codeClient),
 		s.db,
 	)
 	if err != nil {
@@ -156,16 +149,16 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	}
 	s.snowCtx.Log.Info("finished wiping snapshot")
 
+	leafClient, err := s.network.SyncClient(p2p.EVMLeafRequestHandlerID)
+	if err != nil {
+		return err
+	}
 	// TODO(powerslider): Remove dependency on graft.
 	evmSyncer, err := evmstate.NewSyncer(
 		s.snowCtx.Log,
 		hashdb.NewClient(
 			s.snowCtx.Log,
-			peertracker.NewClient(
-				s.network.Network,
-				p2p.EVMLeafRequestHandlerID,
-				s.network.PeerTracker,
-			),
+			leafClient,
 			common.HashLength,
 		),
 		s.db,

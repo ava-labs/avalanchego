@@ -21,8 +21,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -104,11 +102,6 @@ func TestParseGenesis(t *testing.T) {
 						HeliconTimestamp:           new(uint64(1790089200)),
 						IglooTimestamp:             unscheduled,
 						SnowCtx:                    mainnetCtx,
-						PrecompileConfigs: []precompileconfig.Config{
-							warp.NewDefaultConfig(
-								new(uint64(1709740800)), // Durango
-							),
-						},
 					},
 				),
 				GasLimit:   100000000,
@@ -164,11 +157,6 @@ func TestParseGenesis(t *testing.T) {
 						HeliconTimestamp:           new(uint64(1785250800)),
 						IglooTimestamp:             unscheduled,
 						SnowCtx:                    fujiCtx,
-						PrecompileConfigs: []precompileconfig.Config{
-							warp.NewDefaultConfig(
-								new(uint64(1707840000)), // Durango
-							),
-						},
 					},
 				),
 				GasLimit:   100000000,
@@ -224,11 +212,6 @@ func TestParseGenesis(t *testing.T) {
 						HeliconTimestamp:           initiallyActive,
 						IglooTimestamp:             unscheduled,
 						SnowCtx:                    localCtx,
-						PrecompileConfigs: []precompileconfig.Config{
-							warp.NewDefaultConfig(
-								initiallyActive, // Durango
-							),
-						},
 					},
 				),
 				Timestamp:  *initiallyActive, // the local genesis time coincides with initial activation
@@ -609,10 +592,7 @@ func TestWriteGenesis(t *testing.T) {
 
 			cmpExtras := []cmp.Option{
 				cmp.Transformer("cparams", corethparams.GetExtra),
-				cmpopts.IgnoreFields(cparams.ChainConfig{},
-					"SnowCtx",           // supplied by test
-					"PrecompileConfigs", // not written to disk
-				),
+				cmpopts.IgnoreFields(cparams.ChainConfig{}, "SnowCtx"), // contains lock
 			}
 			if diff := cmp.Diff(g.Config, gotConfig, cmpExtras...); diff != "" {
 				t.Errorf("initial stored network upgrades (-want +got)\n%s", diff)

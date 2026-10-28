@@ -15,11 +15,9 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams",
     visibility = ["//visibility:public"],
     deps = [
-        "//graft/coreth/precompile/modules",
         "//graft/coreth/precompile/precompileconfig",
         "//snow",
         "//upgrade",
-        "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//params",
     ],
 )
@@ -30,8 +28,6 @@ go_test(
     deps = [
         ":cparams",
         "//graft/coreth/params",
-        "//graft/coreth/precompile/contracts/warp",
-        "//graft/coreth/precompile/precompileconfig",
         "//snow/snowtest",
         "@com_github_arr4n_shed//testerr",
         "@com_github_ava_labs_libevm//params",

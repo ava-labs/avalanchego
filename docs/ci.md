@@ -15,6 +15,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
   - [Go and Bazel CI workflow layout](#go-and-bazel-ci-workflow-layout)
   - [Validate scheduled job changes before merge](#validate-scheduled-job-changes-before-merge)
   - [Platform-specific setup dependencies](#platform-specific-setup-dependencies)
+  - [Race detection and output caching](#race-detection-and-output-caching)
   - [Go unit test platforms](#go-unit-test-platforms)
   - [Local composite actions define reusable GitHub Actions behavior](#local-composite-actions-define-reusable-github-actions-behavior)
   - [CI-only helpers implement CI-specific behavior](#ci-only-helpers-implement-ci-specific-behavior)
@@ -22,9 +23,13 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 - [Provision CI job dependencies](#provision-ci-job-dependencies)
 - [CI cache policy](#ci-cache-policy)
   - [Cache policy overview](#cache-policy-overview)
-  - [Input-cache lifecycle](#input-cache-lifecycle)
+  - [Cache lifecycle](#cache-lifecycle)
+    - [Validate cache saves before merge](#validate-cache-saves-before-merge)
     - [Event behavior](#event-behavior)
     - [Go module cache](#go-module-cache)
+    - [Go unit-test cache](#go-unit-test-cache)
+      - [Stable fixture modification times](#stable-fixture-modification-times)
+      - [Changing Go unit caching safely](#changing-go-unit-caching-safely)
     - [Bazel dependency cache](#bazel-dependency-cache)
     - [Nix store cache](#nix-store-cache)
     - [Binfmt image cache](#binfmt-image-cache)
@@ -231,6 +236,32 @@ Bazel avoids this cross-platform dependency problem. Each platform calls a
 reusable workflow separately, and each call contains its own setup and consumer
 jobs. Therefore, a platform's Bazel jobs wait only for that platform's setup job.
 
+### Race detection and output caching
+
+Pre-merge unit jobs must provide fast feedback, including runs with changed
+inputs. Choose race-detection policy based on those runs, not only exact cache
+hits.
+
+Go pre-merge unit tests disable race detection and shuffling. The job restores
+one GitHub Actions archive containing compiled package output and test results.
+Go can reuse unchanged package results after a fallback restore. However, changes to
+widely imported packages can force many tests to run again. Any fixture change
+expires all test results because normalized timestamps hide fixture changes from
+Go.
+
+Race detection makes these reruns too expensive for pre-merge feedback.
+Caching reduces repeated work but does not justify enabling pre-merge race
+detection.
+
+Go scheduled jobs retain race detection and shuffling on Linux AMD64. Reconsider
+pre-merge race detection if changed-input runs provide acceptable feedback times.
+
+The Linux AMD64 Bazel pre-merge unit job enables race detection. Its remote
+cache reuses individual action and test-target results. Keep test-result caching
+enabled for these tests. This provides pre-merge race coverage without the same
+broad rerun costs. macOS runs only a smoke test because its runners are slow and
+unreliable.
+
 ### Go unit test platforms
 
 The `unit` job in [`go.yml`](../.github/workflows/go.yml) calls the reusable
@@ -238,7 +269,7 @@ The `unit` job in [`go.yml`](../.github/workflows/go.yml) calls the reusable
 runs
 the unified unit test suite ([`scripts/tests.unit.sh`](../scripts/tests.unit.sh))
 through the `test-unit` task. That task disables race detection and test
-shuffling so the Go build and test cache can serve repeated runs.
+shuffling. The caller enables test-result reuse.
 
 On macOS, the `smoke` job calls
 [`go-smoke.yml`](../.github/workflows/go-smoke.yml). macOS runners are
@@ -253,7 +284,9 @@ workflow is defined in
 [`go-unit.yml`](../.github/workflows/go-unit.yml) for each platform. Only the Ubuntu
 24.04 AMD64 job runs `test-unit-race-shuffle`. This task enables race detection
 and shuffled test order. The other scheduled jobs run `test-unit` to check
-platform compatibility without race detection or shuffled test order.
+platform compatibility without race detection or shuffled test order. Scheduled
+jobs restore the cross-run `GOCACHE` for compiled package output. They then expire
+its test results so scheduled jobs run every test.
 
 ### Local composite actions define reusable GitHub Actions behavior
 
@@ -369,8 +402,9 @@ workflows consume these caches without writing them.
 
 ### Cache policy overview
 
-GitHub Actions caches tools and dependencies, not build or test output. Two rules
-govern these input caches:
+GitHub Actions caches tools, dependencies, and the Go unit job's build and test
+results. The Go unit job owns its output cache; see [Go unit-test
+cache](#go-unit-test-cache). Two rules govern the input caches:
 
 - **Save shared entries only from designated setup or image-build jobs on
   `master`.** Pull requests and other refs can restore entries and prepare
@@ -393,11 +427,11 @@ flake store paths. Those caches do not use the dependency-download completeness
 check. These restrictions do not isolate the workload from the network; see
 [download restrictions](./go-toolchains-and-caches.md#download-restrictions).
 
-### Input-cache lifecycle
+### Cache lifecycle
 
 GitHub-hosted runners are temporary. GitHub Actions caching is currently used
-for build inputs - tools and dependencies - not outputs (build and testing). A
-cache miss must still let the job obtain its required input before the job
+for build inputs - tools and dependencies - and the Go unit job's build and test
+results. A cache miss must still let the job obtain its required input before the job
 disables dependency downloads. GitHub Actions caches are immutable: the first
 successful save for a key wins. Later saves of that key do not replace it.
 
@@ -434,9 +468,11 @@ can prevent a job from saving caches, but it is set at the workflow or job
 level, before a cache setup action runs. Using it to implement this policy
 would repeat the save decision across workflow jobs. Instead, `cache-policy`
 makes that decision once for the Go, Bazel, Nix, and Task cache actions. The
-same actions restore and prepare inputs on every ref; only permitted setup
-jobs save. This also provides one place to add a temporary exception when a
+same actions restore and prepare inputs on every ref; only permitted cache
+producers save. This also provides one place to add a temporary exception when a
 pull request needs to test cache writes.
+
+#### Validate cache saves before merge
 
 To validate cache saves before merge, add a temporary exception for that pull
 request to `cache-policy`. This confines write permission to one reviewable pull
@@ -454,12 +490,20 @@ For example, add the pull-request test as the second allowed branch in
 }
 ```
 
-Replace `<pull-request-number>` for the validation run, then delete that
-conditional branch before merge. After validation, delete cache entries created
-by the temporary exception from [GitHub Actions
-caches](https://github.com/ava-labs/avalanchego/actions/caches). The entries
-created for the PR will be marked with `refs/pull/[PR number]/merge` instead of
-`master`.
+Replace `<pull-request-number>` for the validation run.
+
+To validate scheduled cache saves through manual dispatch, add a separate
+temporary exception. Limit it to `workflow_dispatch`, the pull-request branch,
+and the scheduled workflows under test.
+
+After validation:
+
+1. Remove all temporary exceptions before merge, including those for pull-request
+   runs and manual dispatches. Check that only `refs/heads/master` can save caches.
+2. Delete all cache entries created by those exceptions from [GitHub Actions
+   caches](https://github.com/ava-labs/avalanchego/actions/caches). Check both refs:
+   - Pull-request runs use `refs/pull/<pull-request-number>/merge`.
+   - Manual dispatches use `refs/heads/<branch>`.
 
 #### Event behavior
 
@@ -541,6 +585,132 @@ dependencies must prepare them before disabling module downloads.
 
 The implicit `actions/setup-go` cache is disabled because its
 post-job save cannot be limited to `master` runs by `cache-policy`.
+
+#### Go unit-test cache
+
+The Go `unit` job restores and saves `GOCACHE`. This archive contains two separate
+kinds of data: compiled package output (the build cache) and Go package test
+results (the test-result cache). `go clean -testcache` expires cached test results
+without removing compiled package output. The key includes the runner label,
+architecture, cache mode, and content hash. Different Ubuntu versions therefore use
+separate exact keys. The cache mode is `build-only` or `build-and-test-results`.
+
+The content hash covers tracked Go source, workspace and module metadata,
+`testdata`, embedded files, and test configuration. `go list` discovers embedded
+files, including test-only embeds. Test configuration includes the Taskfile,
+unit workflow, Go setup action, test script, launchers, compiler settings, and
+cache-preparation scripts.
+
+The job first tries the exact key. It then tries a prefix for the selected cache
+mode, followed by a prefix for the same runner and architecture across modes.
+These fallbacks let the job reuse compiled package output across modes. A
+pre-merge fallback can also reuse test results for packages with unchanged
+inputs.
+
+The cache policy below describes normal behavior, without temporary validation
+exceptions. Cache saves require `refs/heads/master`, successful tests, and a
+non-exact restore (a fallback or miss). An exact hit skips saving because GitHub
+Actions cannot replace an existing archive. Test-result reuse is enabled only for
+`test-unit`; shuffled tests always run without it.  Scheduled jobs restore compiled
+package output but run every test. When these save conditions hold, they save the
+updated build cache with test results expired.  See [Validate cache saves before
+merge](#validate-cache-saves-before-merge) for temporary cache-write exceptions.
+
+| Event | Test task | Reuse test results | Save `GOCACHE` |
+| --- | --- | --- | --- |
+| Pull request | `test-unit` | Yes, on an exact hit or compatible fallback | No |
+| Merge queue, tag push, or `dev` push | `test-unit` | Yes, on an exact hit or compatible fallback | No |
+| `master` push | `test-unit` | Yes, on an exact hit or compatible fallback | After successful tests and a non-exact restore, including test results |
+| Scheduled on `master` | `test-unit` or `test-unit-race-shuffle` | No | After successful tests and a non-exact restore, with test results expired |
+| Manual dispatch on `master` | `test-unit` or `test-unit-race-shuffle` | No | After successful tests and a non-exact restore, with test results expired |
+| Manual dispatch on another ref | `test-unit` or `test-unit-race-shuffle` | No | No |
+
+A manual dispatch on another ref normally tests cache restoration and test
+execution, but not cache saving.
+
+The two cache modes use different exact keys. A `build-only` entry has
+expired test results. Treating it as an exact test-result hit would make
+pre-merge cache validation fail when tests run. Pre-merge can instead restore
+it as a fallback and run the tests. On `master`, it can then save a
+`build-and-test-results` entry. GitHub Actions cannot add those test results to
+the existing immutable `build-only` entry.
+
+##### Stable fixture modification times
+
+Git checkout assigns fresh modification times. Go includes fixture modification
+times in its test-result cache keys. Fresh timestamps make tests that use fixtures
+run again, even after an exact `GOCACHE` restore on a new runner. The job
+normalizes every `testdata` file and directory to a fixed time before it restores
+`GOCACHE`. The content hash in the cache key ensures that a fixture change selects
+a different primary key. A saved marker inside `GOCACHE` records the fixture
+hash. On a fallback with different fixtures, or without a marker, the job expires
+test results but keeps compiled package output. When fixtures match, it lets Go
+reuse results for unaffected packages.
+
+On an exact `build-and-test-results` restore, jobs that reuse test results run
+[`workflow-validate-go-unit-cache.sh`](../scripts/workflow-validate-go-unit-cache.sh).
+The script fails if the log contains no Go package results. It also fails if Go
+reruns any tested package. Shuffled jobs skip this validation because Go does not
+cache shuffled test results. Scheduled jobs also skip it because they intentionally
+expire test results after restoring the cache.
+
+The unit job is the cache producer. It saves only after successful tests and a
+non-exact restore, when `cache-policy` permits it. See [Validate cache saves before
+merge](#validate-cache-saves-before-merge) for the temporary pull-request
+exception and cleanup procedure.
+
+##### Changing Go unit caching safely
+
+Go decides whether it can reuse each test result. The workflow adds a stricter
+check: every tested package must report a cached result after an exact archive restore.
+This check tests cache completeness. A warning would let an incomplete archive
+keep passing CI without the intended test-result reuse. Go can safely rerun tests
+after a flag change, but that check would fail.
+
+If you change the test configuration, keep the content hash in
+[`workflow-hash-go-unit-inputs.sh`](../scripts/workflow-hash-go-unit-inputs.sh)
+complete. Include new scripts or configuration files that affect test flags,
+package selection, compiler settings, or fixture preparation. Add a regression case to
+[`test_workflow_hash_go_unit_inputs.sh`](../scripts/test_workflow_hash_go_unit_inputs.sh).
+Unrelated documentation changes should retain the same key.
+
+If exact-hit validation fails, investigate why Go reran the tests.  Do not delete
+cache entries before this investigation. An omitted configuration input requires a
+hash update and a regression test. A hosted runner's compiler can also change
+without a runner-label change. The archive key does not include that compiler's
+version.
+
+To recover from an invalid archive:
+
+1. Identify the matched cache key in the failed job's restore step.
+2. Fix any missing hash inputs before creating a replacement archive.
+3. Delete the invalid entry from [GitHub Actions
+   caches](https://github.com/ava-labs/avalanchego/actions/caches).
+4. Run the unit job on `master` with the intended inputs. Successful tests permit
+   a new save after a fallback restore or miss.
+5. Run the job again with the same inputs. Check that the exact restore passes
+   test-result validation.
+
+Rerunning an exact-hit job without deleting the invalid entry cannot repair it.
+The job skips saving on exact hits. Pull-request runs cannot save a replacement
+without a [temporary cache-write exception](#validate-cache-saves-before-merge).
+
+Run the focused checks:
+
+```sh
+task test-workflow-hash-go-unit-inputs
+task test-workflow-prepare-go-unit-cache
+task test-workflow-validate-go-unit-cache
+```
+
+Use the [temporary cache-write exception](#validate-cache-saves-before-merge)
+to check archive reuse on GitHub-hosted runners:
+
+1. Run the unit job to save an entry.
+2. Rerun the unit job on a fresh runner with the same inputs.
+3. Check that the restore matches the exact key.
+4. Check that every tested package reports `(cached)`.
+5. Check that a scheduled job reruns tests after restoring an entry.
 
 #### Bazel dependency cache
 
@@ -673,9 +843,9 @@ When changing an input cache:
   prepared input fails rather than being silently downloaded later;
 - add each new Go tool or pinned module to the module manifest; add each Bazel
   CI target pattern and command-only dependency to the Bazel dependency list;
-- do not use a shared cache to transfer build output or test results between
-  jobs because those results depend on job-specific configuration and require a
-  dedicated transfer protocol.
+- do not store build output or test results in input caches. Outputs depend on
+  job-specific configuration. Use a separate output cache with its own
+  configuration and invalidation rules.
 
 ### Task
 

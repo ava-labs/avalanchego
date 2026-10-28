@@ -13,8 +13,6 @@ import (
 	"github.com/arr4n/shed/testerr"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 
@@ -279,9 +277,6 @@ func TestChainConfigJSON(t *testing.T) {
 				// Fields that are not part of the encoding MUST be ignored.
 				config := tt.config
 				config.SnowCtx = snowtest.Context(t, snowtest.CChainID)
-				config.PrecompileConfigs = []precompileconfig.Config{
-					warp.NewDefaultConfig(new(uint64)),
-				}
 
 				// ChainID is required.
 				ethCfg := corethparams.WithExtra(&ethparams.ChainConfig{ChainID: big.NewInt(1)}, &config)

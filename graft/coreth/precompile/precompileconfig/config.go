@@ -1,24 +1,10 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Defines the stateless interface for unmarshalling an arbitrary config of a precompile
+// Package precompileconfig re-exports predicate types from graft/evm/precompileconfig.
 package precompileconfig
 
 import evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
-
-// StatefulPrecompileConfig defines the interface for a stateful precompile to
-// be enabled via a network upgrade.
-type Config interface {
-	// Key returns the unique key for the stateful precompile.
-	Key() string
-	// Timestamp returns the timestamp at which this stateful precompile should be enabled.
-	// 1) 0 indicates that the precompile should be enabled from genesis.
-	// 2) n indicates that the precompile should be enabled in the first block with timestamp >= [n].
-	// 3) nil indicates that the precompile is never enabled.
-	Timestamp() *uint64
-	// IsDisabled returns true if this network upgrade should disable the precompile.
-	IsDisabled() bool
-}
 
 // PredicateContext is the context passed in to the Predicater interface to verify
 // a precompile predicate within a specific ProposerVM wrapper.

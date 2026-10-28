@@ -9,9 +9,5 @@ go_library(
     name = "extras",
     srcs = ["rules.go"],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/params/extras",
-    deps = [
-        "//graft/coreth/precompile/precompileconfig",
-        "//vms/saevm/cchain/cparams",
-        "@com_github_ava_labs_libevm//common",
-    ],
+    deps = ["//vms/saevm/cchain/cparams"],
 )

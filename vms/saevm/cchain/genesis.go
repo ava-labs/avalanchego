@@ -21,7 +21,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
@@ -117,11 +116,6 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 			HeliconTimestamp:           new(upgrade.UnixTimestamp(u.HeliconTime)),
 			IglooTimestamp:             new(upgrade.UnixTimestamp(u.IglooTime)),
 			SnowCtx:                    ctx,
-			PrecompileConfigs: []precompileconfig.Config{
-				warp.NewDefaultConfig(
-					new(upgrade.UnixTimestamp(u.DurangoTime)),
-				),
-			},
 		},
 	)
 	return (*genesis)(&g), nil

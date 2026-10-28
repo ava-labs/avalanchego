@@ -4,32 +4,10 @@
 package extras
 
 import (
-	"github.com/ava-labs/libevm/common"
-
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 )
 
 type Rules struct {
 	// Rules for Avalanche releases
 	cparams.AvalancheRules
-
-	// Precompiles maps addresses to stateful precompiled contracts that are enabled
-	// for this rule set.
-	// Note: none of these addresses should conflict with the address space used by
-	// any existing precompiles.
-	Precompiles map[common.Address]precompileconfig.Config
-	// Predicaters maps addresses to stateful precompile Predicaters
-	// that are enabled for this rule set.
-	Predicaters map[common.Address]precompileconfig.Predicater
-}
-
-func (r *Rules) PredicatersExist() bool {
-	return len(r.Predicaters) > 0
-}
-
-// HasPredicate implements the avalanchego predicate.Predicates interface.
-func (r *Rules) HasPredicate(addr common.Address) bool {
-	_, ok := r.Predicaters[addr]
-	return ok
 }
