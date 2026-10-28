@@ -17,12 +17,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
-	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 )
 
 // PrecompileTest is a test case for a precompile
@@ -41,7 +41,7 @@ type PrecompileTest struct {
 	// mode. If true, the precompile should not modify the state.
 	ReadOnly bool
 	// WarpMessages that the precompile should have access to.
-	WarpMessages []predicate.Predicate
+	WarpMessages []message.Packed
 	// WarpMessageFailures is a list of indices of Warp messages that failed
 	// predicate verification.
 	WarpMessageFailures []int
@@ -217,10 +217,10 @@ func (e *testEnv) WarpMessageResults(common.Hash) set.Bits {
 type testStateDB struct {
 	*extstate.StateDB
 
-	warpMessages []predicate.Predicate
+	warpMessages []message.Packed
 }
 
-func newTestStateDB(t testing.TB, warpMessages []predicate.Predicate) *testStateDB {
+func newTestStateDB(t testing.TB, warpMessages []message.Packed) *testStateDB {
 	db := rawdb.NewMemoryDatabase()
 	statedb, err := state.New(common.Hash{}, state.NewDatabase(db), nil)
 	require.NoError(t, err)
@@ -230,7 +230,7 @@ func newTestStateDB(t testing.TB, warpMessages []predicate.Predicate) *testState
 	}
 }
 
-func (s *testStateDB) GetWarpMessage(index int) (predicate.Predicate, bool) {
+func (s *testStateDB) GetWarpMessage(index int) (message.Packed, bool) {
 	if index < 0 || index >= len(s.warpMessages) {
 		return nil, false
 	}
