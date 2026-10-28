@@ -17,10 +17,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -187,10 +187,8 @@ func TestFromBlock(t *testing.T) {
 	)
 	config := corethparams.WithExtra(
 		&params.ChainConfig{},
-		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase5BlockTimestamp: new(ap5Time),
-			},
+		&cparams.ChainConfig{
+			ApricotPhase5Timestamp: new(ap5Time),
 		},
 	)
 

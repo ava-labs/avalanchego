@@ -17,8 +17,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
@@ -442,11 +442,9 @@ func TestStatefulPrecompile(t *testing.T) {
 
 	// nativeasset precompiles are activated at AP2.
 	cfg := params.WithExtra(
-		&params.ChainConfig{},
-		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase2BlockTimestamp: new(uint64),
-			},
+		&ethparams.ChainConfig{},
+		&cparams.ChainConfig{
+			ApricotPhase2Timestamp: new(uint64),
 		},
 	)
 	for _, test := range tests {

@@ -44,7 +44,6 @@ go_test(
         "//database",
         "//database/memdb",
         "//graft/coreth/params",
-        "//graft/coreth/params/extras",
         "//graft/coreth/precompile/contracts/warp",
         "//ids",
         "//snow/engine/common",

@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompiletest"
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 
 	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -233,7 +233,7 @@ func createValidPredicateTest(
 	snowCtx *snow.Context,
 	numKeys int,
 	predicate predicate.Predicate,
-	rules extras.AvalancheRules,
+	rules cparams.Rules,
 ) precompiletest.PredicateTest {
 	gasCost := CurrentGasConfig(rules)
 	return precompiletest.PredicateTest{
@@ -702,7 +702,7 @@ func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
 	})
 }
 
-func makeWarpPredicateTests(tb testing.TB, rules extras.AvalancheRules) []precompiletest.PredicateTest {
+func makeWarpPredicateTests(tb testing.TB, rules cparams.Rules) []precompiletest.PredicateTest {
 	allTotalNodes := []int{10, 100, 1_000, 10_000}
 	tests := make([]precompiletest.PredicateTest, len(allTotalNodes))
 	for i, totalNodes := range allTotalNodes {

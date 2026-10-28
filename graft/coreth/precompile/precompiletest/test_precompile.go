@@ -14,10 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 )
 
@@ -47,7 +47,7 @@ type PrecompileTest struct {
 	// ExpectedErr is the expected error returned by the precompile
 	ExpectedErr error
 	// Rules is the rules to use for the precompile's block context
-	Rules extras.AvalancheRules
+	Rules cparams.Rules
 }
 
 type PrecompileRunparams struct {
