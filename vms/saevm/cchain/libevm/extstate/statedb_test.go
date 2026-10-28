@@ -4,6 +4,7 @@
 package extstate_test
 
 import (
+	"math/big"
 	"os"
 	"testing"
 
@@ -16,6 +17,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
@@ -177,6 +180,43 @@ func TestPrepare(t *testing.T) {
 	rules := cchaintest.ChainConfig().Rules(common.Big0, true /*isMerge*/, 0)
 	s.Prepare(rules, sender, common.Address{}, nil, nil, nil)
 	assert.Truef(t, s.AddressInAccessList(sender), "%T.AddressInAccessList(%s) after %[1]T.Prepare()", s, sender)
+}
+
+func TestGetCommittedState(t *testing.T) {
+	var (
+		addr       = common.Address{1}
+		key        = common.Hash{0x01} // bit 0 set: the untransformed key is in the asset partition
+		storageVal = common.Hash{2}
+		assetVal   = common.Hash{3}
+	)
+	tests := []struct {
+		name   string
+		config *params.ChainConfig
+		want   common.Hash
+	}{
+		{
+			name:   "pre_ap1_reads_untransformed_key",
+			config: params.WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &extras.ChainConfig{}),
+			want:   assetVal,
+		},
+		{
+			name:   "ap1_reads_storage_partition",
+			config: cchaintest.ChainConfig(),
+			want:   storageVal,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newEmptyStateDB(t)
+			s.SetState(addr, key, storageVal)
+			s.SetState(addr, key, assetVal, stateconf.SkipStateKeyTransformation())
+			s.Finalise(false)
+
+			rules := tt.config.Rules(common.Big0, true /*isMerge*/, 0)
+			s.Prepare(rules, common.Address{}, common.Address{}, nil, nil, nil)
+			require.Equalf(t, tt.want, s.GetCommittedState(addr, key), "%T.GetCommittedState(%s, %s)", s, addr, key)
+		})
+	}
 }
 
 func TestGetPredicate(t *testing.T) {

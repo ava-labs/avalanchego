@@ -7,10 +7,10 @@ package libevm
 import (
 	"github.com/ava-labs/libevm/libevm"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/vm"
 )
 
 // RegisterExtras registers all the C-Chain's libevm hooks and payloads.
@@ -19,7 +19,7 @@ import (
 // and `package main`, to avoid polluting other packages that transitively
 // depend on this one but don't need registration.
 func RegisterExtras() {
-	core.RegisterExtras()
+	vm.RegisterExtras()
 	customtypes.Register()
 	extstate.RegisterExtras()
 	params.RegisterExtras()
@@ -30,7 +30,7 @@ func RegisterExtras() {
 func WithTempRegisteredExtras(fn func() error) error {
 	return libevm.WithTemporaryExtrasLock(func(lock libevm.ExtrasLock) error {
 		for _, wrap := range []func(libevm.ExtrasLock, func() error) error{
-			core.WithTempRegisteredExtras,
+			vm.WithTempRegisteredExtras,
 			customtypes.WithTempRegisteredExtras,
 			extstate.WithTempRegisteredExtras,
 			params.WithTempRegisteredExtras,
