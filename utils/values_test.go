@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPointerEqual(t *testing.T) {
+func TestPtrEqual(t *testing.T) {
 	tests := []struct {
 		name string
 		x    *int

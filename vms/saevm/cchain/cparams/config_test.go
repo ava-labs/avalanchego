@@ -96,7 +96,7 @@ func TestCheckConfigForkOrder(t *testing.T) {
 
 // Tests [ChainConfig.CheckConfigCompatible] through
 // [ethparams.ChainConfig.CheckCompatible]. All eth fork handling is tested
-// [ethparams] and is independent of Avalanche forks.
+// in [ethparams] and is independent of Avalanche forks.
 func TestCheckCompatible(t *testing.T) {
 	newEthConfig := func(c ChainConfig) *ethparams.ChainConfig {
 		return corethparams.WithExtra(&ethparams.ChainConfig{}, &c)
@@ -291,15 +291,9 @@ func TestIsForked(t *testing.T) {
 		isForked bool
 	}{
 		{
-			name:     "nil_fork_at_0",
+			name:     "nil_fork",
 			ts:       nil,
 			head:     0,
-			isForked: false,
-		},
-		{
-			name:     "nil_fork_at_non-zero",
-			ts:       nil,
-			head:     100,
 			isForked: false,
 		},
 		{

@@ -91,7 +91,7 @@ func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, e
 	if !r.IsDurango {
 		return 0, false, nil
 	}
-	gas, err := evmprecompileconfig.AccessListGasWithPredicates((cparams.Rules)(r), warpPredicaters, accessList)
+	gas, err := evmprecompileconfig.AccessListGasWithPredicates(cparams.Rules(r), warpPredicaters, accessList)
 	return gas, true, err
 }
 

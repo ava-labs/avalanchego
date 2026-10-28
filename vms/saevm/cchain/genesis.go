@@ -79,6 +79,8 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 	// schedule is configured by ctx.
 	chainID := g.Config.ChainID
 	u := ctx.NetworkUpgrades
+	extraCfg := cparams.FromUpgrades(u)
+	extraCfg.SnowCtx = ctx
 	g.Config = corethparams.WithExtra(
 		&ethparams.ChainConfig{
 			ChainID:             chainID,
@@ -98,25 +100,7 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 			ShanghaiTime:        new(upgrade.UnixTimestamp(u.DurangoTime)),
 			CancunTime:          new(upgrade.UnixTimestamp(u.EtnaTime)),
 		},
-		&cparams.ChainConfig{
-			ApricotPhase1Timestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase1Time)),
-			ApricotPhase2Timestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase2Time)),
-			ApricotPhase3Timestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase3Time)),
-			ApricotPhase4Timestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase4Time)),
-			ApricotPhase5Timestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase5Time)),
-			ApricotPhasePre6Timestamp:  new(upgrade.UnixTimestamp(u.ApricotPhasePre6Time)),
-			ApricotPhase6Timestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase6Time)),
-			ApricotPhasePost6Timestamp: new(upgrade.UnixTimestamp(u.ApricotPhasePost6Time)),
-			BanffTimestamp:             new(upgrade.UnixTimestamp(u.BanffTime)),
-			CortinaTimestamp:           new(upgrade.UnixTimestamp(u.CortinaTime)),
-			DurangoTimestamp:           new(upgrade.UnixTimestamp(u.DurangoTime)),
-			EtnaTimestamp:              new(upgrade.UnixTimestamp(u.EtnaTime)),
-			FortunaTimestamp:           new(upgrade.UnixTimestamp(u.FortunaTime)),
-			GraniteTimestamp:           new(upgrade.UnixTimestamp(u.GraniteTime)),
-			HeliconTimestamp:           new(upgrade.UnixTimestamp(u.HeliconTime)),
-			IglooTimestamp:             new(upgrade.UnixTimestamp(u.IglooTime)),
-			SnowCtx:                    ctx,
-		},
+		extraCfg,
 	)
 	return (*genesis)(&g), nil
 }

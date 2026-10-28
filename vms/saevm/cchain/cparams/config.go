@@ -17,9 +17,11 @@ import (
 
 // ChainConfig defines all Avalanche-specific forks and network changes.
 type ChainConfig struct {
-	ApricotPhase1Timestamp *uint64 `json:"apricotPhase1BlockTimestamp,omitempty"` // Apricot Phase 1 Block Timestamp
-	// Apricot Phase 2 Block Timestamp includes a modified version of the Berlin
-	// Hard Fork.
+	// Apricot Phase 1 Block introduces "atomic transactions" and gas refunds
+	// are disabled.
+	ApricotPhase1Timestamp *uint64 `json:"apricotPhase1BlockTimestamp,omitempty"`
+	// Apricot Phase 2 Block includes a modified version of the Berlin Hard
+	// Fork.
 	ApricotPhase2Timestamp *uint64 `json:"apricotPhase2BlockTimestamp,omitempty"`
 	// Apricot Phase 3 introduces dynamic fees and a modified version of the
 	// London Hard Fork.
@@ -44,8 +46,7 @@ type ChainConfig struct {
 	// Durango activates Avalanche Warp Messaging and the Shanghai Execution
 	// Spec Upgrade (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/shanghai.md#included-eips).
 	//
-	// Note: EIP-4895 is excluded since withdrawals are not relevant to the
-	// Avalanche C-Chain or Subnets running the EVM.
+	// Note: EIP-4895 is excluded since withdrawals are not relevant to Avalanche EVMs.
 	DurangoTimestamp *uint64 `json:"durangoBlockTimestamp,omitempty"`
 	// Etna activates Cancun (https://github.com/ethereum/execution-specs/blob/master/network-upgrades/mainnet-upgrades/cancun.md#included-eips)
 	// and reduces the min base fee.
@@ -166,8 +167,8 @@ type fork struct {
 	time *uint64
 }
 
-// A list of all network upgrades in chronological order. Timestamps are NOT
-// guaranteed to be in ascending order.
+// forks returns a list of all network upgrades in chronological order.
+// Timestamps are NOT guaranteed to be in ascending order.
 func (c *ChainConfig) forks() []fork {
 	return []fork{
 		{name: "Apricot Phase 1", time: c.ApricotPhase1Timestamp},
@@ -299,10 +300,10 @@ type Rules struct {
 
 var _ precompileconfig.Rules = Rules{}
 
-func (a Rules) IsGraniteActivated() bool {
-	return a.IsGranite
+func (r Rules) IsGraniteActivated() bool {
+	return r.IsGranite
 }
 
-func (a Rules) IsDurangoActivated() bool {
-	return a.IsDurango
+func (r Rules) IsDurangoActivated() bool {
+	return r.IsDurango
 }
