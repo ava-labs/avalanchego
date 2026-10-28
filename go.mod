@@ -20,7 +20,7 @@ go 1.26.10
 require (
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/grpcreflect v1.3.0
-	github.com/StephenButtolph/canoto v0.18.0
+	github.com/StephenButtolph/canoto v0.19.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/arr4n/shed v0.0.0-20260908170710-35e123a98127
 	github.com/ava-labs/avalanchego/graft/coreth v1.15.3
