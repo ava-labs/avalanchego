@@ -179,11 +179,10 @@ func TestPrepare(t *testing.T) {
 	assert.Truef(t, s.AddressInAccessList(sender), "%T.AddressInAccessList(%s) after %[1]T.Prepare()", s, sender)
 }
 
-func TestGetPredicate(t *testing.T) {
+func TestGetWarpMessage(t *testing.T) {
 	var (
-		predicater = warp.ContractAddress
-		pred       = predicate.Predicate{{2}}
-		list       = types.AccessList{{Address: predicater, StorageKeys: pred}}
+		msg  = predicate.Predicate{{2}}
+		list = types.AccessList{{Address: warp.ContractAddress, StorageKeys: msg}}
 	)
 	rules := cchaintest.ChainConfig().Rules(common.Big0, true /*isMerge*/, 0)
 
@@ -197,7 +196,7 @@ func TestGetPredicate(t *testing.T) {
 		{
 			name:   "prepared",
 			lists:  []types.AccessList{list},
-			want:   pred,
+			want:   msg,
 			wantOK: true,
 		},
 		{
@@ -216,9 +215,9 @@ func TestGetPredicate(t *testing.T) {
 			for _, l := range tt.lists {
 				s.Prepare(rules, common.Address{}, common.Address{}, nil, nil, l)
 			}
-			got, ok := s.GetPredicate(predicater, tt.index)
-			assert.Equalf(t, tt.want, got, "%T.GetPredicate(%s, %d)", s, predicater, tt.index)
-			assert.Equalf(t, tt.wantOK, ok, "%T.GetPredicate(%s, %d) ok", s, predicater, tt.index)
+			got, ok := s.GetWarpMessage(tt.index)
+			assert.Equalf(t, tt.want, got, "%T.GetWarpMessage(%d)", s, tt.index)
+			assert.Equalf(t, tt.wantOK, ok, "%T.GetWarpMessage(%d) ok", s, tt.index)
 		})
 	}
 }

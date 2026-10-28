@@ -36,8 +36,8 @@ type PrecompileTest struct {
 	// ReadOnly is whether the precompile should be called in read only
 	// mode. If true, the precompile should not modify the state.
 	ReadOnly bool
-	// Predicates that the precompile should have access to.
-	Predicates []predicate.Predicate
+	// WarpMessages that the precompile should have access to.
+	WarpMessages []predicate.Predicate
 	// SetupBlockContext sets the expected calls on MockBlockContext for the test execution.
 	SetupBlockContext func(*contract.MockBlockContext)
 	// AfterHook is called after the precompile is called.
@@ -60,9 +60,7 @@ type PrecompileRunparams struct {
 }
 
 func (test PrecompileTest) Run(t *testing.T, address common.Address, precompile contract.StatefulPrecompiledContract) {
-	state := newTestStateDB(t, map[common.Address][]predicate.Predicate{
-		address: test.Predicates,
-	})
+	state := newTestStateDB(t, test.WarpMessages)
 	runParams := test.setup(t, address, state)
 
 	if runParams.Input != nil {
@@ -78,9 +76,7 @@ func (test PrecompileTest) Run(t *testing.T, address common.Address, precompile 
 }
 
 func (test PrecompileTest) Bench(b *testing.B, address common.Address, precompile contract.StatefulPrecompiledContract) {
-	state := newTestStateDB(b, map[common.Address][]predicate.Predicate{
-		address: test.Predicates,
-	})
+	state := newTestStateDB(b, test.WarpMessages)
 	runParams := test.setup(b, address, state)
 
 	if runParams.Input == nil {
@@ -191,28 +187,27 @@ func RunPrecompileBenchmarks(b *testing.B, address common.Address, precompile co
 	}
 }
 
-// testStateDB allows for mocking the predicate storage slots without calling
-// Prepare on the statedb.
+// testStateDB allows for mocking the Warp messages without calling Prepare on
+// the statedb.
 type testStateDB struct {
 	*extstate.StateDB
 
-	predicates map[common.Address][]predicate.Predicate
+	warpMessages []predicate.Predicate
 }
 
-func newTestStateDB(t testing.TB, predicates map[common.Address][]predicate.Predicate) *testStateDB {
+func newTestStateDB(t testing.TB, warpMessages []predicate.Predicate) *testStateDB {
 	db := rawdb.NewMemoryDatabase()
 	statedb, err := state.New(common.Hash{}, state.NewDatabase(db), nil)
 	require.NoError(t, err)
 	return &testStateDB{
-		StateDB:    extstate.New(statedb),
-		predicates: predicates,
+		StateDB:      extstate.New(statedb),
+		warpMessages: warpMessages,
 	}
 }
 
-func (s *testStateDB) GetPredicate(address common.Address, index int) (predicate.Predicate, bool) {
-	preds := s.predicates[address]
-	if index < 0 || index >= len(preds) {
+func (s *testStateDB) GetWarpMessage(index int) (predicate.Predicate, bool) {
+	if index < 0 || index >= len(s.warpMessages) {
 		return nil, false
 	}
-	return preds[index], true
+	return s.warpMessages[index], true
 }
