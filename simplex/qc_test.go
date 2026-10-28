@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
+var todoEligibleSigners common.Nodes
+
 // TestQCDuplicateSigners tests verification fails if the
 // same signer signs multiple times.
 func TestQCDuplicateSigners(t *testing.T) {
@@ -40,7 +42,7 @@ func TestQCDuplicateSigners(t *testing.T) {
 	qc, err := signatureAggregator.Aggregate(signatures)
 	require.NoError(t, err)
 
-	err = qc.Verify(msg)
+	err = qc.Verify(msg, todoEligibleSigners)
 	require.ErrorIs(t, err, errDuplicateSigner)
 }
 
@@ -186,7 +188,7 @@ func TestSignatureAggregation(t *testing.T) {
 			// verify the quorum certificate
 			if tt.expectError == nil {
 				require.Len(t, qc.Signers(), common.Quorum(len(configs)))
-				require.NoError(t, qc.Verify(msg))
+				require.NoError(t, qc.Verify(msg, todoEligibleSigners))
 
 				d := QCDeserializer{verifier: &verifier}
 				// try to deserialize the quorum certificate
@@ -197,7 +199,7 @@ func TestSignatureAggregation(t *testing.T) {
 					require.Contains(t, deserializedQC.Signers(), signer)
 				}
 				require.Equal(t, qc.Bytes(), deserializedQC.Bytes())
-				require.NoError(t, deserializedQC.Verify(msg))
+				require.NoError(t, deserializedQC.Verify(msg, todoEligibleSigners))
 			}
 		})
 	}
@@ -227,10 +229,10 @@ func TestQCVerifyWithWrongMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify with original message should succeed
-	require.NoError(t, qc.Verify(originalMsg))
+	require.NoError(t, qc.Verify(originalMsg, todoEligibleSigners))
 
 	// Verify with wrong message should fail
-	err = qc.Verify(wrongMsg)
+	err = qc.Verify(wrongMsg, todoEligibleSigners)
 	require.ErrorIs(t, err, errSignatureVerificationFailed)
 }
 

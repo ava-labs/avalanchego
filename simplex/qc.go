@@ -56,8 +56,16 @@ func (qc *QC) Signers() []common.NodeID {
 	return signers
 }
 
+func (qc *QC) Size() int {
+	// TODO: implement size
+	return 0
+}
+
 // Verify checks if the quorum certificate is valid by verifying the aggregated signature against the signers' public keys.
-func (qc *QC) Verify(msg []byte) error {
+// TODO: We updated the verify function to pass in the eligble signers, since sometimes the eligible signers are not knwon
+// when the QC is created. See https://github.com/ava-labs/simplex/issues/407. In a future, pr update the Verify function to
+// use this param properly.
+func (qc *QC) Verify(msg []byte, eligibleSigners common.Nodes) error {
 	quorum := common.Quorum(len(qc.verifier.nodeID2PK))
 	if len(qc.signers) != quorum {
 		return fmt.Errorf("%w: expected %d signers but got %d", errUnexpectedSigners, quorum, len(qc.signers))
@@ -197,6 +205,13 @@ func (a *SignatureAggregator) Aggregate(signatures []common.Signature) (common.Q
 		signers:  signers,
 		sig:      aggregatedSig,
 	}, nil
+}
+
+// AppendSignatures appends signatures to an existing signature.
+// If the existing signature is empty, it just aggregates the given signatures.
+func (a *SignatureAggregator) AppendSignatures(common.SignatureBytes, ...common.SignatureBytes) (common.SignatureBytes, error) {
+	// TODO: implement
+	return nil, nil
 }
 
 // IsQuorum checks if the provided nodes are a quorum of the membership set.

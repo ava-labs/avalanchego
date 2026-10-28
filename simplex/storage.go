@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 
 	"github.com/ava-labs/simplex/common"
+	"github.com/ava-labs/simplex/simplex"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -23,7 +24,7 @@ import (
 
 var (
 	_               common.Storage = (*Storage)(nil)
-	genesisMetadata                 = common.ProtocolMetadata{
+	genesisMetadata                = common.ProtocolMetadata{
 		Version: 0,
 		Epoch:   0,
 		Round:   0,
@@ -217,7 +218,8 @@ func getGenesisBlock(ctx context.Context, config *Config, blockTracker *blockTra
 		metadata:     genesisMetadata,
 		blockTracker: blockTracker,
 		vmBlock:      snowmanGenesis,
-		blacklist:    common.NewBlacklist(uint16(len(config.Params.InitialValidators))),
+		// TODO: Set maxBlacklistRounds in config
+		blacklist: common.NewBlacklist(uint16(len(config.Params.InitialValidators)), simplex.DefaultMaxBlacklistedRounds),
 	}
 
 	// set the digest
