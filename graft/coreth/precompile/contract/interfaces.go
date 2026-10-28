@@ -25,16 +25,11 @@ type StatefulPrecompiledContract interface {
 	Run(accessibleState AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error)
 }
 
-// AssetBalances accesses the balances of imported X-Chain assets.
-type AssetBalances interface {
+// StateDB is the interface for accessing EVM state
+type StateDB interface {
 	GetAssetBalance(common.Address, common.Hash) *uint256.Int
 	AddAssetBalance(common.Address, common.Hash, *uint256.Int)
 	SubAssetBalance(common.Address, common.Hash, *uint256.Int)
-}
-
-// StateDB is the interface for accessing EVM state
-type StateDB interface {
-	AssetBalances
 
 	CreateAccount(common.Address)
 	Exist(common.Address) bool

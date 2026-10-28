@@ -3,4 +3,4 @@
 
 package contract
 
-//go:generate go tool mockgen -package=$GOPACKAGE -source=interfaces.go -destination=mocks.go -exclude_interfaces StatefulPrecompiledContract,StateReader,StateDB,AssetBalances,ConfigurationBlockContext
+//go:generate go tool mockgen -package=$GOPACKAGE -source=interfaces.go -destination=mocks.go -exclude_interfaces StatefulPrecompiledContract,StateReader,StateDB,ConfigurationBlockContext
