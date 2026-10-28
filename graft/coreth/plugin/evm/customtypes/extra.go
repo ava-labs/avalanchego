@@ -4,7 +4,7 @@
 package customtypes
 
 import (
-	"github.com/ava-labs/avalanchego/graft/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -13,7 +13,7 @@ import (
 // caching them on h. If predicateBytes is empty, or cannot be parsed, nil is
 // returned. The same predicateBytes MUST be supplied for each call to a given
 // header.
-func PredicateResults(h *ethtypes.Header, predicateBytes []byte) predicate.BlockResults {
+func PredicateResults(h *ethtypes.Header, predicateBytes []byte) message.BlockResults {
 	if len(predicateBytes) == 0 {
 		return nil
 	}
@@ -24,7 +24,7 @@ func PredicateResults(h *ethtypes.Header, predicateBytes []byte) predicate.Block
 	}
 
 	// results were already verified for canonical execution
-	results, _ := predicate.ParseBlockResults(predicateBytes)
+	results, _ := message.ParseBlockResults(predicateBytes)
 	cache.Store(&results)
 	return results
 }

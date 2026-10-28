@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
@@ -21,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp/warptest"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -28,7 +28,7 @@ import (
 
 // newWarpMessages returns a Warp message signed by the validators in the
 // returned context, and the same message with an invalid signature.
-func newWarpMessages(t *testing.T) (*precompileconfig.PredicateContext, predicate.Predicate, predicate.Predicate) {
+func newWarpMessages(t *testing.T) (*precompileconfig.PredicateContext, message.Packed, message.Packed) {
 	t.Helper()
 
 	addressedCall, err := payload.NewAddressedCall([]byte{1}, []byte{2})
@@ -44,8 +44,8 @@ func newWarpMessages(t *testing.T) (*precompileconfig.PredicateContext, predicat
 		ProposerVMBlockCtx: &block.Context{},
 	}
 	return predicateContext,
-		predicate.New(vdrs.Sign(t, msg).Bytes()),
-		predicate.New(warptest.IncorrectlySign(t, msg).Bytes())
+		message.Pack(vdrs.Sign(t, msg).Bytes()),
+		message.Pack(warptest.IncorrectlySign(t, msg).Bytes())
 }
 
 // newRules returns rules with Warp enabled.
@@ -76,7 +76,7 @@ func TestCheckBlockPredicates(t *testing.T) {
 		name                string
 		nilPredicateContext bool
 		txs                 []*types.Transaction
-		want                predicate.BlockResults
+		want                message.BlockResults
 		wantErr             error
 	}{
 		{
@@ -88,21 +88,21 @@ func TestCheckBlockPredicates(t *testing.T) {
 		{
 			name: "one_tx_valid",
 			txs:  []*types.Transaction{validTx},
-			want: predicate.BlockResults{
+			want: message.BlockResults{
 				validTx.Hash(): {warp.ContractAddress: set.NewBits()},
 			},
 		},
 		{
 			name: "one_tx_invalid",
 			txs:  []*types.Transaction{invalidTx},
-			want: predicate.BlockResults{
+			want: message.BlockResults{
 				invalidTx.Hash(): {warp.ContractAddress: set.NewBits(0)},
 			},
 		},
 		{
 			name: "multiple_txs",
 			txs:  []*types.Transaction{validTx, invalidTx},
-			want: predicate.BlockResults{
+			want: message.BlockResults{
 				validTx.Hash():   {warp.ContractAddress: set.NewBits()},
 				invalidTx.Hash(): {warp.ContractAddress: set.NewBits(0)},
 			},
@@ -130,7 +130,7 @@ func TestCheckTxPredicates(t *testing.T) {
 		nilPredicateContext bool
 		insufficientGas     bool
 		accessList          types.AccessList
-		want                predicate.PrecompileResults
+		want                message.TxResults
 		wantErr             error
 	}{
 		{
@@ -181,7 +181,7 @@ func TestCheckTxPredicates(t *testing.T) {
 			accessList: types.AccessList{
 				{Address: warp.ContractAddress, StorageKeys: validMsg},
 			},
-			want: predicate.PrecompileResults{
+			want: message.TxResults{
 				warp.ContractAddress: set.NewBits(),
 			},
 		},
@@ -190,7 +190,7 @@ func TestCheckTxPredicates(t *testing.T) {
 			accessList: types.AccessList{
 				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
 			},
-			want: predicate.PrecompileResults{
+			want: message.TxResults{
 				warp.ContractAddress: set.NewBits(0),
 			},
 		},
@@ -200,7 +200,7 @@ func TestCheckTxPredicates(t *testing.T) {
 				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
 				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
 			},
-			want: predicate.PrecompileResults{
+			want: message.TxResults{
 				warp.ContractAddress: set.NewBits(0, 1),
 			},
 		},
@@ -213,7 +213,7 @@ func TestCheckTxPredicates(t *testing.T) {
 				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
 				{Address: warp.ContractAddress, StorageKeys: validMsg},
 			},
-			want: predicate.PrecompileResults{
+			want: message.TxResults{
 				warp.ContractAddress: set.NewBits(1, 2),
 			},
 		},

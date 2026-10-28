@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
-	"github.com/ava-labs/avalanchego/graft/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -49,14 +49,14 @@ type HeaderExtra struct {
 	SettledGasNumerator *uint64
 	SettledExcess       *uint64
 
-	predicateResults atomic.Pointer[predicate.BlockResults]
+	predicateResults atomic.Pointer[message.BlockResults]
 }
 
 // PredicateResults returns the parsed predicate results from the header's extra
 // data. If the extra data does not contain predicate results, or cannot be
 // parsed, nil is returned. The same rules MUST be supplied for each call to a
 // given header.
-func PredicateResults(h *ethtypes.Header, predicateBytes []byte) predicate.BlockResults {
+func PredicateResults(h *ethtypes.Header, predicateBytes []byte) message.BlockResults {
 	if len(predicateBytes) == 0 {
 		return nil
 	}
@@ -67,7 +67,7 @@ func PredicateResults(h *ethtypes.Header, predicateBytes []byte) predicate.Block
 	}
 
 	// results were already verified for canonical execution
-	results, _ := predicate.ParseBlockResults(predicateBytes)
+	results, _ := message.ParseBlockResults(predicateBytes)
 	cache.Store(&results)
 	return results
 }

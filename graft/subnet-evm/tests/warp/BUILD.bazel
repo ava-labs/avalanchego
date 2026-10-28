@@ -12,7 +12,6 @@ graft_go_test(
     tags = ["manual"],  # keep
     deps = [
         "//api/info",
-        "//graft/evm/predicate",
         "//graft/subnet-evm/accounts/abi/bind",
         "//graft/subnet-evm/cmd/simulator/key",
         "//graft/subnet-evm/cmd/simulator/load",
@@ -29,6 +28,7 @@ graft_go_test(
         "//snow/validators",
         "//tests/fixture/e2e",
         "//tests/fixture/tmpnet",
+        "//vms/evm/imp/warp/message",
         "//vms/platformvm",
         "//vms/platformvm/api",
         "//vms/platformvm/warp",

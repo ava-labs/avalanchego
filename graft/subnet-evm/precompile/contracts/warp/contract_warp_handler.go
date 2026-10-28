@@ -78,7 +78,7 @@ func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, s
 	}
 	// Note: since the predicate is verified in advance of execution, the precompile should not
 	// hit an error during execution.
-	unpackedPredicateBytes, err := pred.Bytes()
+	unpackedPredicateBytes, err := pred.Unpack()
 	if err != nil {
 		return nil, remainingGas, fmt.Errorf("%w: %w", errInvalidPredicateBytes, err)
 	}

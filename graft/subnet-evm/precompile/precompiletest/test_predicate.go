@@ -9,9 +9,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 )
 
 // PredicateTest defines a unit test/benchmark for verifying a precompile predicate.
@@ -22,7 +22,7 @@ type PredicateTest struct {
 
 	PredicateContext *precompileconfig.PredicateContext
 
-	Predicate   predicate.Predicate
+	Predicate   message.Packed
 	Rules       precompileconfig.Rules
 	Gas         uint64
 	GasErr      error

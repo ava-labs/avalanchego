@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
@@ -30,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/vmtest"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
@@ -189,7 +189,7 @@ func warpAccessList(msgs ...*avalanchewarp.Message) types.AccessList {
 	for i, msg := range msgs {
 		al[i] = types.AccessTuple{
 			Address:     corethwarp.ContractAddress,
-			StorageKeys: predicate.New(msg.Bytes()),
+			StorageKeys: message.Pack(msg.Bytes()),
 		}
 	}
 	return al

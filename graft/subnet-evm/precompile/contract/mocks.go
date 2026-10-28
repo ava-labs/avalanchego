@@ -13,10 +13,10 @@ import (
 	big "math/big"
 	reflect "reflect"
 
-	predicate "github.com/ava-labs/avalanchego/graft/evm/predicate"
 	precompileconfig "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	snow "github.com/ava-labs/avalanchego/snow"
 	set "github.com/ava-labs/avalanchego/utils/set"
+	message "github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 	common "github.com/ava-labs/libevm/common"
 	types "github.com/ava-labs/libevm/core/types"
 	stateconf "github.com/ava-labs/libevm/libevm/stateconf"
@@ -292,10 +292,10 @@ func (mr *MockStateDBMockRecorder) GetState(arg0, arg1 any, arg2 ...any) *gomock
 }
 
 // GetWarpMessage mocks base method.
-func (m *MockStateDB) GetWarpMessage(index int) (predicate.Predicate, bool) {
+func (m *MockStateDB) GetWarpMessage(index int) (message.Packed, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetWarpMessage", index)
-	ret0, _ := ret[0].(predicate.Predicate)
+	ret0, _ := ret[0].(message.Packed)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
