@@ -82,17 +82,17 @@ func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
 // AccessListGas computes the intrinsic gas for an access list. While Warp is
 // enabled, it calculates gas per-tuple, charging Warp messages their predicate
 // gas. Otherwise, it returns override=false to use the default calculation.
-//
-// TODO(JonathanOppenheimer): Charge Warp messages directly once the shared
-// predicate gas helper is replaced.
 func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
 	if r.WarpConfig == nil {
 		return 0, false, nil
 	}
-	predicaters := map[common.Address]evmprecompileconfig.Predicater{
-		warp.ContractAddress: r.WarpConfig,
-	}
-	gas, err := evmprecompileconfig.AccessListGasWithPredicates(r.AvalancheRules, predicaters, accessList)
+	gas, err := evmprecompileconfig.AccessListGas(
+		accessList,
+		warp.ContractAddress,
+		func(msg predicate.Predicate) (uint64, error) {
+			return warp.PredicateGas(msg, r.AvalancheRules)
+		},
+	)
 	return gas, true, err
 }
 

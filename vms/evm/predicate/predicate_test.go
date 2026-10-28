@@ -10,8 +10,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestNew(t *testing.T) {
@@ -208,76 +206,61 @@ func FuzzBytesNewEqual(f *testing.F) {
 	})
 }
 
-type allowSet set.Set[common.Address]
-
-func (a allowSet) HasPredicate(addr common.Address) bool {
-	_, ok := a[addr]
-	return ok
-}
-
 func TestFromAccessList(t *testing.T) {
 	addrA := common.Address{0xAA}
 	addrB := common.Address{0xBB}
-	addrC := common.Address{0xCC}
 
 	h1 := common.Hash{1}
 	h2 := common.Hash{2}
 	h3 := common.Hash{3}
-	h4 := common.Hash{4}
 
 	tests := []struct {
-		name  string
-		rules set.Set[common.Address]
-		list  types.AccessList
-		want  map[common.Address][]Predicate
+		name string
+		list types.AccessList
+		want []Predicate
 	}{
 		{
-			name:  "empty_list",
-			rules: set.Of(addrA),
-			list:  types.AccessList{},
-			want:  map[common.Address][]Predicate{},
+			name: "empty_list",
 		},
 		{
-			name:  "no_allowed_addresses",
-			rules: set.Of(addrB),
-			list:  types.AccessList{{Address: addrA, StorageKeys: []common.Hash{h1}}},
-			want:  map[common.Address][]Predicate{},
+			name: "no_matching_address",
+			list: types.AccessList{{Address: addrB, StorageKeys: []common.Hash{h1}}},
 		},
 		{
-			name:  "single_tuple_allowed",
-			rules: set.Of(addrA),
-			list:  types.AccessList{{Address: addrA, StorageKeys: []common.Hash{h1, h2}}},
-			want:  map[common.Address][]Predicate{addrA: {{h1, h2}}},
+			name: "single_tuple",
+			list: types.AccessList{{Address: addrA, StorageKeys: []common.Hash{h1, h2}}},
+			want: []Predicate{{h1, h2}},
 		},
 		{
-			name:  "repeated_address_accumulates",
-			rules: set.Of(addrA),
+			name: "repeated_address_accumulates",
 			list: types.AccessList{
 				{Address: addrA, StorageKeys: []common.Hash{h1, h2}},
 				{Address: addrA, StorageKeys: []common.Hash{h3}},
 			},
-			want: map[common.Address][]Predicate{addrA: {{h1, h2}, {h3}}},
+			want: []Predicate{{h1, h2}, {h3}},
 		},
 		{
-			name:  "mixed_addresses_filtered",
-			rules: set.Of(addrA, addrC),
+			name: "mixed_addresses_filtered",
 			list: types.AccessList{
 				{Address: addrA, StorageKeys: []common.Hash{h1}},
 				{Address: addrB, StorageKeys: []common.Hash{h2}},
-				{Address: addrC, StorageKeys: []common.Hash{h3, h4}},
+				{Address: addrA, StorageKeys: []common.Hash{h3}},
 			},
-			want: map[common.Address][]Predicate{
-				addrA: {{h1}},
-				addrC: {{h3, h4}},
+			want: []Predicate{{h1}, {h3}},
+		},
+		{
+			name: "tuple_without_storage_keys",
+			list: types.AccessList{
+				{Address: addrA},
+				{Address: addrA, StorageKeys: []common.Hash{h1}},
 			},
+			want: []Predicate{nil, {h1}},
 		},
 	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			req := require.New(t)
-			got := FromAccessList(allowSet(tc.rules), tc.list)
-			req.Equal(tc.want, got)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := FromAccessList(tt.list, addrA)
+			require.Equal(t, tt.want, got, "FromAccessList()")
 		})
 	}
 }

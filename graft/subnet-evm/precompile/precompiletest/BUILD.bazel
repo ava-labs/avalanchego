@@ -19,6 +19,7 @@ go_library(
         "//graft/subnet-evm/core/extstate",
         "//graft/subnet-evm/params/extras",
         "//graft/subnet-evm/precompile/contract",
+        "//graft/subnet-evm/precompile/contracts/warp",
         "//graft/subnet-evm/precompile/modules",
         "//graft/subnet-evm/precompile/precompileconfig",
         "//vms/evm/predicate",

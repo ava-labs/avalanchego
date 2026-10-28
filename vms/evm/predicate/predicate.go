@@ -75,22 +75,14 @@ func (p Predicate) Bytes() ([]byte, error) {
 	return trimmed[:delimiterIndex], nil
 }
 
-type Predicates interface {
-	HasPredicate(address common.Address) bool
-}
-
-// FromAccessList extracts predicates from a transaction's access list.
-//
-// If an address is specified multiple times in the access list, each set of
-// storage keys for that address is considered an individual predicate.
-func FromAccessList(rules Predicates, list types.AccessList) map[common.Address][]Predicate {
-	predicates := make(map[common.Address][]Predicate)
-	for _, el := range list {
-		if !rules.HasPredicate(el.Address) {
-			continue
+// FromAccessList returns the storage keys of each entry in list at addr, in
+// order. Each entry is one predicate, including entries without storage keys.
+func FromAccessList(list types.AccessList, addr common.Address) []Predicate {
+	var predicates []Predicate
+	for _, tuple := range list {
+		if tuple.Address == addr {
+			predicates = append(predicates, tuple.StorageKeys)
 		}
-		predicates[el.Address] = append(predicates[el.Address], el.StorageKeys)
 	}
-
 	return predicates
 }
