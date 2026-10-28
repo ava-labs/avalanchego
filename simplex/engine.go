@@ -82,9 +82,6 @@ func newEngineWithSignerVerifier(ctx context.Context, config *Config, signer BLS
 		verifier: &verifier,
 	}
 
-	signatureAggregator := &SignatureAggregator{
-		verifier: &verifier,
-	}
 	comm, err := NewComm(config)
 	if err != nil {
 		return nil, err
@@ -126,22 +123,20 @@ func newEngineWithSignerVerifier(ctx context.Context, config *Config, signer BLS
 	}
 
 	epochConfig := simplex.EpochConfig{
-		MaxProposalWait:     config.Params.MaxNetworkDelay,
-		MaxRebroadcastWait:  config.Params.MaxRebroadcastWait,
-		QCDeserializer:      qcDeserializer,
-		Logger:              config.Log,
-		ID:                  config.Ctx.NodeID[:],
-		Signer:              &signer,
-		Verifier:            &verifier,
-		BlockDeserializer:   blockDeserializer,
-		SignatureAggregator: signatureAggregator,
-		Comm:                comm,
-		Storage:             storage,
-		WAL:                 config.WAL,
-		BlockBuilder:        blockBuilder,
-		Epoch:               simplexBlock.metadata.Epoch,
-		StartTime:           time.Now(),
-		ReplicationEnabled:  true,
+		MaxProposalWait:    config.Params.MaxNetworkDelay,
+		MaxRebroadcastWait: config.Params.MaxRebroadcastWait,
+		QCDeserializer:     qcDeserializer,
+		Logger:             config.Log,
+		ID:                 config.Ctx.NodeID[:],
+		Signer:             &signer,
+		Verifier:           &verifier,
+		BlockDeserializer:  blockDeserializer,
+		Comm:               comm,
+		Storage:            storage,
+		WAL:                config.WAL,
+		BlockBuilder:       blockBuilder,
+		StartTime:          time.Now(),
+		ReplicationEnabled: true,
 	}
 
 	epoch, err := simplex.NewEpoch(epochConfig)
