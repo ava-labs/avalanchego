@@ -65,8 +65,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
@@ -3255,7 +3255,7 @@ func TestBlockGasValidation(t *testing.T) {
 		// than 2 MiB.
 		const numPredicates = 9401
 		accessList := make(types.AccessList, 0, numPredicates)
-		predicate := predicate.New(signedMessage.Bytes())
+		predicate := warpmsg.Pack(signedMessage.Bytes())
 		for range numPredicates {
 			accessList = append(accessList, types.AccessTuple{
 				Address:     warpcontract.ContractAddress,

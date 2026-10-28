@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 )
 
 // PrecompileTest is a test case for a precompile
@@ -47,7 +47,7 @@ type PrecompileTest struct {
 	// BeforeHook is called before the precompile is called.
 	BeforeHook func(t testing.TB, state *extstate.StateDB)
 	// WarpMessages that the precompile should have access to.
-	WarpMessages []predicate.Predicate
+	WarpMessages []warpmsg.Packed
 	// SetupBlockContext sets the expected calls on MockBlockContext for the test execution.
 	SetupBlockContext func(*contract.MockBlockContext)
 	// AfterHook is called after the precompile is called.
@@ -234,10 +234,10 @@ func RunPrecompileBenchmarks(b *testing.B, module modules.Module, tests []Precom
 type testStateDB struct {
 	*extstate.StateDB
 
-	warpMessages []predicate.Predicate
+	warpMessages []warpmsg.Packed
 }
 
-func newTestStateDB(t testing.TB, warpMessages []predicate.Predicate) *testStateDB {
+func newTestStateDB(t testing.TB, warpMessages []warpmsg.Packed) *testStateDB {
 	db := rawdb.NewMemoryDatabase()
 	statedb, err := state.New(common.Hash{}, state.NewDatabase(db), nil)
 	require.NoError(t, err)
@@ -247,7 +247,7 @@ func newTestStateDB(t testing.TB, warpMessages []predicate.Predicate) *testState
 	}
 }
 
-func (s *testStateDB) GetWarpMessage(index int) (predicate.Predicate, bool) {
+func (s *testStateDB) GetWarpMessage(index int) (warpmsg.Packed, bool) {
 	if index < 0 || index >= len(s.warpMessages) {
 		return nil, false
 	}

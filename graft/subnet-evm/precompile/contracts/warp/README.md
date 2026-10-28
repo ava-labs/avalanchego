@@ -75,7 +75,7 @@ Avalanche Warp Messages are encoded as a signed Avalanche [Warp Message](https:/
 
 Since the predicate is encoded into the [Transaction Access List](https://eips.ethereum.org/EIPS/eip-2930), it is packed into 32 byte hashes intended to declare storage slots that should be pre-warmed into the cache prior to transaction execution.
 
-Therefore, we use the [`predicate`](https://github.com/ava-labs/avalanchego/tree/master/vms/evm/predicate) package to encode the actual byte slice of size N into the access list.
+Therefore, we use the [`warpmsg`](https://github.com/ava-labs/avalanchego/tree/master/vms/evm/warpmsg) package to encode the actual byte slice of size N into the access list.
 
 ### Performance Optimization: Primary Network to Avalanche L1
 

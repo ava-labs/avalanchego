@@ -22,7 +22,7 @@ go_library(
     deps = [
         "//utils/wrappers",
         "//vms/evm/acp226",
-        "//vms/evm/predicate",
+        "//vms/evm/warpmsg",
         "//vms/saevm/cchain/cparams",
         "//vms/saevm/cchain/dynamic",
         "@com_github_ava_labs_libevm//common",

@@ -22,7 +22,7 @@ go_library(
         "//graft/evm/precompileconfig",
         "//snow",
         "//utils/set",
-        "//vms/evm/predicate",
+        "//vms/evm/warpmsg",
         "//vms/saevm/cchain/cparams",
         "//vms/saevm/hook",
         "@com_github_ava_labs_libevm//common",

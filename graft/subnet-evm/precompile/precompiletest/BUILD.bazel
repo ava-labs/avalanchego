@@ -22,7 +22,7 @@ go_library(
         "//graft/subnet-evm/precompile/contracts/warp",
         "//graft/subnet-evm/precompile/modules",
         "//graft/subnet-evm/precompile/precompileconfig",
-        "//vms/evm/predicate",
+        "//vms/evm/warpmsg",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",

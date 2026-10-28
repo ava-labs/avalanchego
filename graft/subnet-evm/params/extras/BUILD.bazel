@@ -28,7 +28,7 @@ go_library(
         "//utils",
         "//utils/constants",
         "//vms/evm/acp226",
-        "//vms/evm/predicate",
+        "//vms/evm/warpmsg",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//common/math",

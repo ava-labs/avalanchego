@@ -18,7 +18,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 
@@ -181,7 +181,7 @@ func TestPrepare(t *testing.T) {
 
 func TestGetWarpMessage(t *testing.T) {
 	var (
-		msg  = predicate.Predicate{{2}}
+		msg  = warpmsg.Packed{{2}}
 		list = types.AccessList{{Address: warp.ContractAddress, StorageKeys: msg}}
 	)
 	rules := cchaintest.ChainConfig().Rules(common.Big0, true /*isMerge*/, 0)
@@ -190,7 +190,7 @@ func TestGetWarpMessage(t *testing.T) {
 		name   string
 		lists  []types.AccessList // passed to successive [StateDB.Prepare] calls
 		index  int
-		want   predicate.Predicate
+		want   warpmsg.Packed
 		wantOK bool
 	}{
 		{

@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 )
 
 // PredicateTest defines a unit test/benchmark for verifying a precompile predicate.
@@ -20,7 +20,7 @@ type PredicateTest struct {
 
 	PredicateContext *precompileconfig.PredicateContext
 
-	Predicate   predicate.Predicate
+	Predicate   warpmsg.Packed
 	Rules       precompileconfig.Rules
 	Gas         uint64
 	GasErr      error

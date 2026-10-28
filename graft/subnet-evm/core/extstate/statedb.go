@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 )
 
 type StateDB struct {
@@ -17,7 +17,7 @@ type StateDB struct {
 
 	// Ordered Warp messages as set in the tx access list.
 	// Only set in [StateDB.Prepare], and un-modified through execution.
-	warpMessages []predicate.Predicate
+	warpMessages []warpmsg.Packed
 }
 
 // New creates a new [StateDB] with the given [state.StateDB], wrapping it with
@@ -35,7 +35,7 @@ func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, d
 
 // GetWarpMessage returns the index-th Warp message in the access list passed
 // to [StateDB.Prepare]. It returns false if there is no message at index.
-func (s *StateDB) GetWarpMessage(index int) (predicate.Predicate, bool) {
+func (s *StateDB) GetWarpMessage(index int) (warpmsg.Packed, bool) {
 	if index < 0 || index >= len(s.warpMessages) {
 		return nil, false
 	}
