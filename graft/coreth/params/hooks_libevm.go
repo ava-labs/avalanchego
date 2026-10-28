@@ -4,7 +4,6 @@
 package params
 
 import (
-	"fmt"
 	"maps"
 	"math/big"
 	"slices"
@@ -12,7 +11,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
-	"github.com/ava-labs/libevm/libevm/legacy"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
@@ -28,10 +26,6 @@ import (
 	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	ethparams "github.com/ava-labs/libevm/params"
 )
-
-// invalidateDelegateTime is the Unix timestamp for August 2nd, 2025, midnight Eastern Time
-// (August 2nd, 2025, 04:00 UTC)
-const InvalidateDelegateUnix = 1754107200
 
 // P256VerifyAddress is the address of the p256 signature verification precompile
 var P256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
@@ -157,7 +151,7 @@ func (r RulesExtra) precompileOverrideBuiltin(addr common.Address) (libevm.Preco
 }
 
 func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.PrecompiledContract {
-	run := func(env vm.PrecompileEnvironment, input []byte, suppliedGas uint64) ([]byte, uint64, error) {
+	return vm.NewStatefulPrecompile(func(env vm.PrecompileEnvironment, input []byte) ([]byte, error) {
 		rules := *GetRulesExtra(env.Rules())
 		accessibleState := accessibleState{
 			env: env,
@@ -168,19 +162,12 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 			},
 		}
 
-		switch call := env.IncomingCallType(); {
-		case call != vm.DelegateCall && call != vm.CallCode: // Others always allowed
-		case rules.IsGranite:
-			return nil, 0, vm.ErrExecutionReverted
-		case env.BlockTime() >= InvalidateDelegateUnix:
-			env.InvalidateExecution(fmt.Errorf("precompile cannot be called with %s", call))
-		default:
-			// Otherwise, we allow the precompile to be called
+		if call := env.IncomingCallType(); (call == vm.DelegateCall || call == vm.CallCode) && rules.IsGranite {
+			return nil, vm.ErrExecutionReverted
 		}
 
-		return contract.Run(accessibleState, env.Addresses().EVMSemantic.Caller, env.Addresses().EVMSemantic.Self, input, suppliedGas, env.ReadOnly())
-	}
-	return vm.NewStatefulPrecompile(legacy.PrecompiledStatefulContract(run).Upgrade())
+		return contract.Run(accessibleState, env.Addresses().EVMSemantic.Caller, env.Addresses().EVMSemantic.Self, input, env.ReadOnly())
+	})
 }
 
 func (r RulesExtra) PrecompileOverride(addr common.Address) (libevm.PrecompiledContract, bool) {

@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -66,9 +67,9 @@ func (test PrecompileTest) Run(t *testing.T, address common.Address, precompile 
 	runParams := test.setup(t, address, state)
 
 	if runParams.Input != nil {
-		ret, remainingGas, err := precompile.Run(runParams.AccessibleState, runParams.Caller, runParams.ContractAddress, runParams.Input, runParams.SuppliedGas, runParams.ReadOnly)
+		ret, err := precompile.Run(runParams.AccessibleState, runParams.Caller, runParams.ContractAddress, runParams.Input, runParams.ReadOnly)
 		require.ErrorIs(t, err, test.ExpectedErr)
-		require.Equal(t, uint64(0), remainingGas)
+		require.Zero(t, runParams.AccessibleState.GetPrecompileEnv().Gas(), "remaining gas")
 		require.Equal(t, test.ExpectedRes, ret)
 	}
 
@@ -89,10 +90,11 @@ func (test PrecompileTest) Bench(b *testing.B, address common.Address, precompil
 
 	stateDB := runParams.AccessibleState.GetStateDB()
 	snapshot := stateDB.Snapshot()
+	env := runParams.AccessibleState.GetPrecompileEnv().(*testPrecompileEnv)
 
-	ret, remainingGas, err := precompile.Run(runParams.AccessibleState, runParams.Caller, runParams.ContractAddress, runParams.Input, runParams.SuppliedGas, runParams.ReadOnly)
+	ret, err := precompile.Run(runParams.AccessibleState, runParams.Caller, runParams.ContractAddress, runParams.Input, runParams.ReadOnly)
 	require.ErrorIs(b, err, test.ExpectedErr)
-	require.Equal(b, uint64(0), remainingGas)
+	require.Zero(b, env.Gas(), "remaining gas")
 	require.Equal(b, test.ExpectedRes, ret)
 
 	if test.AfterHook != nil {
@@ -107,9 +109,10 @@ func (test PrecompileTest) Bench(b *testing.B, address common.Address, precompil
 		// Revert to the previous snapshot and take a new snapshot, so we can reset the state after execution
 		stateDB.RevertToSnapshot(snapshot)
 		snapshot = stateDB.Snapshot()
+		env.gas = runParams.SuppliedGas
 
 		// Ignore return values for benchmark
-		_, _, _ = precompile.Run(runParams.AccessibleState, runParams.Caller, runParams.ContractAddress, runParams.Input, runParams.SuppliedGas, runParams.ReadOnly)
+		_, _ = precompile.Run(runParams.AccessibleState, runParams.Caller, runParams.ContractAddress, runParams.Input, runParams.ReadOnly)
 	}
 	b.StopTimer()
 
@@ -126,9 +129,10 @@ func (test PrecompileTest) Bench(b *testing.B, address common.Address, precompil
 	// Execute the test one final time to ensure that if our RevertToSnapshot logic breaks such that each run is actually failing or resulting in unexpected behavior
 	// the benchmark should catch the error here.
 	stateDB.RevertToSnapshot(snapshot)
-	ret, remainingGas, err = precompile.Run(runParams.AccessibleState, runParams.Caller, runParams.ContractAddress, runParams.Input, runParams.SuppliedGas, runParams.ReadOnly)
+	env.gas = runParams.SuppliedGas
+	ret, err = precompile.Run(runParams.AccessibleState, runParams.Caller, runParams.ContractAddress, runParams.Input, runParams.ReadOnly)
 	require.ErrorIs(b, err, test.ExpectedErr)
-	require.Equal(b, uint64(0), remainingGas)
+	require.Zero(b, env.Gas(), "remaining gas")
 	require.Equal(b, test.ExpectedRes, ret)
 
 	if test.AfterHook != nil {
@@ -155,6 +159,7 @@ func (test PrecompileTest) setup(t testing.TB, address common.Address, state *te
 	accessibleState.EXPECT().GetBlockContext().Return(blockContext).AnyTimes()
 	accessibleState.EXPECT().GetSnowContext().Return(snowContext).AnyTimes()
 	accessibleState.EXPECT().GetRules().Return(test.Rules).AnyTimes()
+	accessibleState.EXPECT().GetPrecompileEnv().Return(&testPrecompileEnv{gas: test.SuppliedGas}).AnyTimes()
 
 	input := test.Input
 	if test.InputFn != nil {
@@ -189,6 +194,26 @@ func RunPrecompileBenchmarks(b *testing.B, address common.Address, precompile co
 			test.Bench(b, address, precompile)
 		})
 	}
+}
+
+// testPrecompileEnv tracks gas usage. All other [vm.PrecompileEnvironment]
+// methods panic. The methods mirror libevm's implementation.
+type testPrecompileEnv struct {
+	vm.PrecompileEnvironment
+
+	gas uint64
+}
+
+func (e *testPrecompileEnv) Gas() uint64 {
+	return e.gas
+}
+
+func (e *testPrecompileEnv) UseGas(gas uint64) bool {
+	if e.gas < gas {
+		return false
+	}
+	e.gas -= gas
+	return true
 }
 
 // testStateDB allows for mocking the predicate storage slots without calling
