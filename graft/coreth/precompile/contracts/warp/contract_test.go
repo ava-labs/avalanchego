@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompiletest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
@@ -35,35 +34,43 @@ var gasConfigs = []struct {
 
 func runTests(
 	t *testing.T,
-	makeTests func(tb testing.TB, gasConfig GasConfig) []precompiletest.PrecompileTest,
+	makeTests func(tb testing.TB, gasConfig GasConfig) []precompileTest,
 ) {
 	for _, tt := range gasConfigs {
 		t.Run(tt.name, func(t *testing.T) {
-			tests := makeTests(t, tt.gas)
-			precompiletest.RunPrecompileTests(t, NewPrecompile(tt.gas), tests)
+			precompile := NewPrecompile(tt.gas)
+			for _, test := range makeTests(t, tt.gas) {
+				t.Run(test.Name, func(t *testing.T) {
+					test.run(t, precompile)
+				})
+			}
 		})
 	}
 }
 
 func runBenchmarks(
 	b *testing.B,
-	makeTests func(tb testing.TB, gasConfig GasConfig) []precompiletest.PrecompileTest,
+	makeTests func(tb testing.TB, gasConfig GasConfig) []precompileTest,
 ) {
 	for _, tt := range gasConfigs {
 		b.Run(tt.name, func(b *testing.B) {
-			tests := makeTests(b, tt.gas)
-			precompiletest.RunPrecompileBenchmarks(b, NewPrecompile(tt.gas), tests)
+			precompile := NewPrecompile(tt.gas)
+			for _, test := range makeTests(b, tt.gas) {
+				b.Run(test.Name, func(b *testing.B) {
+					test.bench(b, precompile)
+				})
+			}
 		})
 	}
 }
 
-func getBlockchainIDTests(tb testing.TB, gasConfig GasConfig) []precompiletest.PrecompileTest {
+func getBlockchainIDTests(tb testing.TB, gasConfig GasConfig) []precompileTest {
 	callerAddr := common.HexToAddress("0x0123")
 
 	defaultSnowCtx := snowtest.Context(tb, snowtest.CChainID)
 	blockchainID := defaultSnowCtx.ChainID
 
-	return []precompiletest.PrecompileTest{
+	return []precompileTest{
 		{
 			Name:   "getBlockchainID_success",
 			Caller: callerAddr,
@@ -119,7 +126,7 @@ func BenchmarkGetBlockchainID(b *testing.B) {
 	runBenchmarks(b, getBlockchainIDTests)
 }
 
-func sendWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompiletest.PrecompileTest {
+func sendWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompileTest {
 	callerAddr := common.HexToAddress("0x0123")
 
 	defaultSnowCtx := snowtest.Context(tb, snowtest.CChainID)
@@ -140,7 +147,7 @@ func sendWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompiletest.P
 	)
 	require.NoError(tb, err)
 
-	return []precompiletest.PrecompileTest{
+	return []precompileTest{
 		{
 			Name:        "send_warp_message_readOnly",
 			Caller:      callerAddr,
@@ -223,7 +230,7 @@ func BenchmarkSendWarpMessage(b *testing.B) {
 	runBenchmarks(b, sendWarpMessageTests)
 }
 
-func getVerifiedWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompiletest.PrecompileTest {
+func getVerifiedWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompileTest {
 	networkID := uint32(54321)
 	callerAddr := common.HexToAddress("0x0123")
 	sourceAddress := common.HexToAddress("0x456789")
@@ -255,7 +262,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompil
 	// Invalid packing by corrupting a valid packed message
 	malformedPacked := message.Packed{{}}
 
-	return []precompiletest.PrecompileTest{
+	return []precompileTest{
 		{
 			Name:         "get_message_success",
 			Caller:       callerAddr,
@@ -470,7 +477,7 @@ func BenchmarkGetVerifiedWarpMessage(b *testing.B) {
 	runBenchmarks(b, getVerifiedWarpMessageTests)
 }
 
-func getVerifiedWarpBlockHashTests(tb testing.TB, gasConfig GasConfig) []precompiletest.PrecompileTest {
+func getVerifiedWarpBlockHashTests(tb testing.TB, gasConfig GasConfig) []precompileTest {
 	networkID := uint32(54321)
 	callerAddr := common.HexToAddress("0x0123")
 	sourceChainID := ids.GenerateTestID()
@@ -498,7 +505,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, gasConfig GasConfig) []precomp
 	// Invalid packing by corrupting a valid packed message
 	malformedPacked := message.Packed{{}}
 
-	return []precompiletest.PrecompileTest{
+	return []precompileTest{
 		{
 			Name:         "get_message_success",
 			Caller:       callerAddr,

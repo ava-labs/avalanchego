@@ -1,12 +1,11 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package precompiletest
+package warp_test
 
 import (
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -21,17 +20,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
+
+	. "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 )
 
-// PrecompileTest is a test case for a precompile
-type PrecompileTest struct {
+// A precompileTest is a call to the Warp precompile and its expected outcome.
+type precompileTest struct {
 	Name string
 	// Caller is the address of the precompile caller
 	Caller common.Address
-	// Input the raw input bytes to the precompile
-	Input []byte
-	// InputFn is a function that returns the raw input bytes to the precompile
-	// If specified, Input will be ignored.
+	// InputFn returns the raw input bytes to the precompile.
 	InputFn func(t testing.TB) []byte
 	// SuppliedGas is the amount of gas supplied to the precompile
 	SuppliedGas uint64
@@ -41,7 +39,7 @@ type PrecompileTest struct {
 	// WarpMessages that the precompile should have access to.
 	WarpMessages []message.Packed
 	// WarpMessageFailures is a list of indices of Warp messages that failed
-	// predicate verification.
+	// verification.
 	WarpMessageFailures []int
 	// AfterHook is called after the precompile is called.
 	AfterHook func(t testing.TB, state contract.StateDB)
@@ -51,120 +49,60 @@ type PrecompileTest struct {
 	ExpectedErr error
 }
 
-func (test PrecompileTest) Run(t *testing.T, precompile contract.StatefulPrecompiledContract) {
-	input := test.input(t)
-
-	state := newTestStateDB(t, test.WarpMessages)
-	env := test.setup(t, state)
-
-	if input != nil {
-		ret, err := precompile.Run(env, input)
-		require.ErrorIs(t, err, test.ExpectedErr)
-		require.Zero(t, env.Gas(), "remaining gas")
-		require.Equal(t, test.ExpectedRes, ret)
-	}
-
-	if test.AfterHook != nil {
-		test.AfterHook(t, state)
-	}
+func (test precompileTest) run(t *testing.T, precompile contract.StatefulPrecompiledContract) {
+	state, call := test.prepare(t, precompile)
+	ret, remainingGas, err := call()
+	test.check(t, state, ret, remainingGas, err)
 }
 
-func (test PrecompileTest) Bench(b *testing.B, precompile contract.StatefulPrecompiledContract) {
-	input := test.input(b)
-	if input == nil {
-		b.Skip("Skipping precompile benchmark due to nil input (used for configuration tests)")
-	}
-
-	state := newTestStateDB(b, test.WarpMessages)
-	env := test.setup(b, state)
-
-	ret, err := precompile.Run(env, input)
-	require.ErrorIs(b, err, test.ExpectedErr)
-	require.Zero(b, env.Gas(), "remaining gas")
-	require.Equal(b, test.ExpectedRes, ret)
-
-	if test.AfterHook != nil {
-		test.AfterHook(b, state)
-	}
+func (test precompileTest) bench(b *testing.B, precompile contract.StatefulPrecompiledContract) {
+	state, call := test.prepare(b, precompile)
+	snapshot := state.Snapshot()
 
 	b.ReportAllocs()
-	start := time.Now()
-	b.ResetTimer()
-
-	snapshot := state.Snapshot()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		// Revert to the previous snapshot and take a new snapshot, so we can reset the state after execution
 		state.RevertToSnapshot(snapshot)
 		snapshot = state.Snapshot()
-		env.gas = test.SuppliedGas
 
-		// Ignore return values for benchmark
-		_, _ = precompile.Run(env, input)
+		_, _, _ = call()
 	}
-	b.StopTimer()
-
-	elapsed := uint64(time.Since(start))
-	if elapsed < 1 {
-		elapsed = 1
-	}
-	gasUsed := test.SuppliedGas * uint64(b.N)
 	b.ReportMetric(float64(test.SuppliedGas), "gas/op")
-	// Keep it as uint64, multiply 100 to get two digit float later
-	mgasps := (100 * 1000 * gasUsed) / elapsed
-	b.ReportMetric(float64(mgasps)/100, "mgas/s")
 
-	// Execute the test one final time to ensure that if our RevertToSnapshot logic breaks such that each run is actually failing or resulting in unexpected behavior
-	// the benchmark should catch the error here.
+	// Check one final call, so the benchmark fails if reverting to the
+	// snapshot stopped resetting the state between iterations.
 	state.RevertToSnapshot(snapshot)
-	env.gas = test.SuppliedGas
-	ret, err = precompile.Run(env, input)
-	require.ErrorIs(b, err, test.ExpectedErr)
-	require.Zero(b, env.Gas(), "remaining gas")
-	require.Equal(b, test.ExpectedRes, ret)
-
-	if test.AfterHook != nil {
-		test.AfterHook(b, state)
-	}
+	ret, remainingGas, err := call()
+	test.check(b, state, ret, remainingGas, err)
 }
 
-func (test PrecompileTest) input(tb testing.TB) []byte {
-	tb.Helper()
-	if test.InputFn != nil {
-		return test.InputFn(tb)
-	}
-	return test.Input
-}
-
-func (test PrecompileTest) setup(t testing.TB, state *testStateDB) *testEnv {
-	t.Helper()
-
-	return &testEnv{
-		gas:          test.SuppliedGas,
+// prepare returns the state precompile runs against and a function that calls
+// precompile with the supplied gas.
+func (test precompileTest) prepare(t testing.TB, precompile contract.StatefulPrecompiledContract) (*testStateDB, func() ([]byte, uint64, error)) {
+	state := newTestStateDB(t, test.WarpMessages)
+	env := &testEnv{
 		readOnly:     test.ReadOnly,
 		state:        state,
 		caller:       test.Caller,
 		snowContext:  snowtest.Context(t, snowtest.CChainID),
 		warpFailures: set.NewBits(test.WarpMessageFailures...),
 	}
-}
-
-func RunPrecompileTests(t *testing.T, precompile contract.StatefulPrecompiledContract, tests []PrecompileTest) {
-	t.Helper()
-
-	for _, test := range tests {
-		t.Run(test.Name, func(t *testing.T) {
-			test.Run(t, precompile)
-		})
+	input := test.InputFn(t)
+	return state, func() ([]byte, uint64, error) {
+		env.gas = test.SuppliedGas
+		ret, err := precompile.Run(env, input)
+		return ret, env.gas, err
 	}
 }
 
-func RunPrecompileBenchmarks(b *testing.B, precompile contract.StatefulPrecompiledContract, tests []PrecompileTest) {
-	b.Helper()
+func (test precompileTest) check(t testing.TB, state *testStateDB, ret []byte, remainingGas uint64, err error) {
+	t.Helper()
+	require.ErrorIs(t, err, test.ExpectedErr, "precompile.Run()")
+	require.Zero(t, remainingGas, "precompile.Run() remaining gas")
+	require.Equal(t, test.ExpectedRes, ret, "precompile.Run()")
 
-	for _, test := range tests {
-		b.Run(test.Name, func(b *testing.B) {
-			test.Bench(b, precompile)
-		})
+	if test.AfterHook != nil {
+		test.AfterHook(t, state)
 	}
 }
 
@@ -228,4 +166,53 @@ func (s *testStateDB) GetWarpMessage(index int) (message.Packed, bool) {
 		return nil, false
 	}
 	return s.warpMessages[index], true
+}
+
+// A messageTest is a Warp message and its expected gas and verification
+// outcome.
+type messageTest struct {
+	Name string
+
+	VerifyContext *message.VerifyContext
+
+	Packed      message.Packed
+	GasConfig   GasConfig
+	Gas         uint64
+	GasErr      error
+	ExpectedErr error
+}
+
+func (test messageTest) run(t testing.TB) {
+	t.Helper()
+	require := require.New(t)
+	gas, gasErr := test.GasConfig.MessageGas(test.Packed)
+	require.ErrorIs(gasErr, test.GasErr, "MessageGas()")
+	if test.GasErr != nil {
+		return
+	}
+
+	require.Equal(test.Gas, gas, "MessageGas()")
+
+	err := VerifyMessage(test.VerifyContext, test.Packed)
+	require.ErrorIs(err, test.ExpectedErr, "VerifyMessage()")
+}
+
+func (test messageTest) bench(b *testing.B) {
+	test.run(b)
+
+	b.ReportAllocs()
+	for b.Loop() {
+		_, _ = test.GasConfig.MessageGas(test.Packed)
+		_ = VerifyMessage(test.VerifyContext, test.Packed)
+	}
+	b.ReportMetric(float64(test.Gas), "gas/op")
+}
+
+func runMessageTests(t *testing.T, tests []messageTest) {
+	t.Helper()
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			test.run(t)
+		})
+	}
 }
