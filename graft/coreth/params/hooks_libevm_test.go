@@ -30,9 +30,9 @@ func TestRulesExtra_MinimumGasConsumption(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := RulesExtra(extras.Rules{
+			r := RulesExtra{
 				AvalancheRules: extras.AvalancheRules{IsHelicon: tt.isHelicon},
-			})
+			}
 			assert.Equalf(t, tt.want, r.MinimumGasConsumption(tt.limit), "%T.MinimumGasConsumption(%d)", r, tt.limit)
 		})
 	}
@@ -68,9 +68,9 @@ func TestRulesExtra_Warp(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := RulesExtra(extras.Rules{
+			r := RulesExtra{
 				AvalancheRules: extras.AvalancheRules{IsDurango: tt.isDurango},
-			})
+			}
 			assert.Equalf(t, tt.wantHasPredicate, r.HasPredicate(tt.addr), "%T.HasPredicate(%s)", r, tt.addr)
 			_, ok := r.PrecompileOverride(tt.addr)
 			assert.Equalf(t, tt.wantPrecompile, ok, "%T.PrecompileOverride(%s) ok", r, tt.addr)

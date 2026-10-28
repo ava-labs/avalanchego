@@ -11,7 +11,6 @@ go_library(
     srcs = [
         "config.go",
         "network_upgrades.go",
-        "rules.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/params/extras",
     deps = [

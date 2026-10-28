@@ -36,11 +36,12 @@ const InvalidateDelegateUnix = 1754107200
 // P256VerifyAddress is the address of the p256 signature verification precompile
 var P256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
 
-type RulesExtra extras.Rules
+type RulesExtra struct {
+	extras.AvalancheRules
+}
 
-func GetRulesExtra(r Rules) *extras.Rules {
-	rules := payloads.Rules.GetPointer(&r)
-	return (*extras.Rules)(rules)
+func GetRulesExtra(r Rules) *RulesExtra {
+	return payloads.Rules.GetPointer(&r)
 }
 
 func (RulesExtra) CanCreateContract(_ *libevm.AddressContext, gas uint64, _ libevm.StateReader) (uint64, error) {
@@ -57,7 +58,7 @@ func (r RulesExtra) ShouldRefundGas() bool {
 
 // MinimumGasConsumption returns the ACP-194 gas-charged floor (ceil(limit/2)).
 func (r RulesExtra) MinimumGasConsumption(limit uint64) uint64 {
-	if extras.Rules(r).IsHelicon {
+	if r.IsHelicon {
 		return hook.MinimumGasConsumption(limit)
 	}
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(limit)

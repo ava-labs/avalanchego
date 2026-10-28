@@ -538,7 +538,7 @@ func (b *builder) BuildBlock(
 	}
 
 	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
-	rulesExtra := (*corethparams.RulesExtra)(corethparams.GetRulesExtra(rules))
+	rulesExtra := corethparams.GetRulesExtra(rules)
 	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, rulesExtra, ethTxs)
 	if err != nil {
 		return nil, fmt.Errorf("verifying warp messages: %w", err)
