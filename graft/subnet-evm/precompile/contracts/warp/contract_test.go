@@ -78,7 +78,6 @@ func getBlockchainIDTests(tb testing.TB, rules extras.AvalancheRules) []precompi
 				return input
 			},
 			SuppliedGas: gasConfig.GetBlockchainID,
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				expectedOutput, err := PackGetBlockchainIDOutput(common.Hash(blockchainID))
 				require.NoError(tb, err)
@@ -112,7 +111,6 @@ func getBlockchainIDTests(tb testing.TB, rules extras.AvalancheRules) []precompi
 				return input
 			},
 			SuppliedGas: gasConfig.GetBlockchainID - 1,
-			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
 			Rules:       rules,
 		},
@@ -164,7 +162,6 @@ func sendWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []precompi
 			Caller:      callerAddr,
 			InputFn:     func(testing.TB) []byte { return sendWarpMessageInput },
 			SuppliedGas: gasConfig.SendWarpMessageBase - 1,
-			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
 			Rules:       rules,
 		},
@@ -173,7 +170,6 @@ func sendWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []precompi
 			Caller:      callerAddr,
 			InputFn:     func(testing.TB) []byte { return sendWarpMessageInput },
 			SuppliedGas: gasConfig.SendWarpMessageCost(len(sendWarpMessageInput[4:])) - 1,
-			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
 			Rules:       rules,
 		},
@@ -184,7 +180,6 @@ func sendWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []precompi
 				return sendWarpMessageInput[:4] // Include only the function selector, so that the input is invalid
 			},
 			SuppliedGas: gasConfig.SendWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidSendInput,
 			Rules:       rules,
 		},
@@ -193,7 +188,6 @@ func sendWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []precompi
 			Caller:      callerAddr,
 			InputFn:     func(testing.TB) []byte { return sendWarpMessageInput },
 			SuppliedGas: gasConfig.SendWarpMessageCost(len(sendWarpMessageInput[4:])),
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				bytes, err := PackSendWarpMessageOutput(common.Hash(unsignedWarpMessage.ID()))
 				require.NoError(tb, err)
@@ -283,7 +277,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(noFailures).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)),
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpMessageOutput(GetVerifiedWarpMessageOutput{
 					Message: WarpMessage{
@@ -311,7 +304,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(noFailures).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpMessageOutput(GetVerifiedWarpMessageOutput{Valid: false})
 				require.NoError(tb, err)
@@ -332,7 +324,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(set.NewBits(0)).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)),
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpMessageOutput(GetVerifiedWarpMessageOutput{
 					Message: WarpMessage{
@@ -360,7 +351,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(set.NewBits(0, 1)).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpMessageOutput(GetVerifiedWarpMessageOutput{Valid: false})
 				require.NoError(tb, err)
@@ -376,7 +366,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(noFailures).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpMessageOutput(GetVerifiedWarpMessageOutput{Valid: false})
 				require.NoError(tb, err)
@@ -430,7 +419,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 			InputFn:      func(testing.TB) []byte { return getVerifiedWarpMsg },
 			WarpMessages: []warpmsg.Packed{packedWarpMessage},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageBase - 1,
-			ReadOnly:     false,
 			ExpectedErr:  vm.ErrOutOfGas,
 			Rules:        rules,
 		},
@@ -443,7 +431,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(noFailures).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)) - 1,
-			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
 			Rules:       rules,
 		},
@@ -456,7 +443,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(noFailures).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(malformedPacked)),
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidPacked,
 			Rules:       rules,
 		},
@@ -469,7 +455,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(noFailures).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(packedInvalidWarpMsg)),
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidWarpMsg,
 			Rules:       rules,
 		},
@@ -482,7 +467,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(noFailures).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(packedInvalidAddressed)),
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidAddressedPayload,
 			Rules:       rules,
 		},
@@ -493,7 +477,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 				return append(WarpABI.Methods["getVerifiedWarpMessage"].ID, new(big.Int).SetInt64(math.MaxInt64).Bytes()...)
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
@@ -506,7 +489,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 				return res
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
@@ -519,7 +501,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 				return res[:len(res)-2]
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
@@ -576,7 +557,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(noFailures).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)),
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpBlockHashOutput(GetVerifiedWarpBlockHashOutput{
 					WarpBlockHash: WarpBlockHash{
@@ -603,7 +583,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(noFailures).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpBlockHashOutput(GetVerifiedWarpBlockHashOutput{Valid: false})
 				require.NoError(tb, err)
@@ -624,7 +603,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(set.NewBits(0)).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)),
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpBlockHashOutput(GetVerifiedWarpBlockHashOutput{
 					WarpBlockHash: WarpBlockHash{
@@ -651,7 +629,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(set.NewBits(0, 1)).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpBlockHashOutput(GetVerifiedWarpBlockHashOutput{Valid: false})
 				require.NoError(tb, err)
@@ -667,7 +644,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(noFailures).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedRes: func() []byte {
 				res, err := PackGetVerifiedWarpBlockHashOutput(GetVerifiedWarpBlockHashOutput{Valid: false})
 				require.NoError(tb, err)
@@ -720,7 +696,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 			InputFn:      func(testing.TB) []byte { return getVerifiedWarpBlockHash },
 			WarpMessages: []warpmsg.Packed{packedWarpMessage},
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageBase - 1,
-			ReadOnly:     false,
 			ExpectedErr:  vm.ErrOutOfGas,
 			Rules:        rules,
 		},
@@ -733,7 +708,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(noFailures).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)) - 1,
-			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
 			Rules:       rules,
 		},
@@ -746,7 +720,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(noFailures).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(malformedPacked)),
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidPacked,
 			Rules:       rules,
 		},
@@ -759,7 +732,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(noFailures).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(packedInvalidWarpMsg)),
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidWarpMsg,
 			Rules:       rules,
 		},
@@ -772,7 +744,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 				mbc.EXPECT().GetWarpMessageResults(common.Hash{}).Return(noFailures).AnyTimes()
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(packedInvalidHash)),
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidBlockHashPayload,
 			Rules:       rules,
 		},
@@ -783,7 +754,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 				return append(WarpABI.Methods["getVerifiedWarpBlockHash"].ID, new(big.Int).SetInt64(math.MaxInt64).Bytes()...)
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
@@ -796,7 +766,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 				return res
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
@@ -809,7 +778,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 				return res[:len(res)-2]
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
-			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
