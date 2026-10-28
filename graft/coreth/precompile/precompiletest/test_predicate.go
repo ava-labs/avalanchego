@@ -18,8 +18,6 @@ import (
 type PredicateTest struct {
 	Name string
 
-	Config *warp.Config
-
 	PredicateContext *precompileconfig.PredicateContext
 
 	Predicate   predicate.Predicate
@@ -40,7 +38,7 @@ func (test PredicateTest) Run(t testing.TB) {
 
 	require.Equal(test.Gas, predicateGas)
 
-	predicateRes := test.Config.VerifyPredicate(test.PredicateContext, test.Predicate)
+	predicateRes := warp.VerifyPredicate(test.PredicateContext, test.Predicate)
 	require.ErrorIs(predicateRes, test.ExpectedErr)
 }
 
