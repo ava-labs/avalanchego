@@ -74,7 +74,7 @@ func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
 
 // warpPredicaters charges for Warp predicates, which are the only predicates.
 var warpPredicaters = map[common.Address]evmprecompileconfig.Predicater{
-	warp.ContractAddress: warp.NewDefaultConfig(nil),
+	warp.ContractAddress: &warp.Config{},
 }
 
 // HasPredicate reports whether addr's access-list entries are predicates, which
