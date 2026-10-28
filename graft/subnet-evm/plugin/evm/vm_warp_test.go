@@ -123,7 +123,7 @@ func testSendWarpMessage(t *testing.T, scheme string) {
 	require.NoError(err)
 
 	// Submit a transaction to trigger sending a warp message
-	tx0 := types.NewTransaction(uint64(0), warpcontract.ContractAddress, big.NewInt(1), 100_000, big.NewInt(testMinGasPrice), warpSendMessageInput)
+	tx0 := types.NewTransaction(uint64(0), warpmsg.ContractAddress, big.NewInt(1), 100_000, big.NewInt(testMinGasPrice), warpSendMessageInput)
 	signedTx0, err := types.SignTx(tx0, types.LatestSignerForChainID(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
 	require.NoError(err)
 
@@ -429,8 +429,8 @@ func testWarpVMTransaction(t *testing.T, scheme string, unsignedMessage *avalanc
 			GasTipCap: big.NewInt(utils.GWei),
 			Value:     common.Big0,
 			Data:      txPayload,
-			AccessList: types.AccessList{{ // Access list predicate
-				Address:     warpcontract.ContractAddress,
+			AccessList: types.AccessList{{ // Packed Warp message
+				Address:     warpmsg.ContractAddress,
 				StorageKeys: warpmsg.Pack(signedMessage.Bytes()),
 			}},
 		}),
@@ -735,7 +735,7 @@ func testReceiveWarpMessage(
 			Value:     common.Big0,
 			Data:      getWarpMsgInput,
 			AccessList: types.AccessList{{
-				Address:     warpcontract.ContractAddress,
+				Address:     warpmsg.ContractAddress,
 				StorageKeys: warpmsg.Pack(signedMessage.Bytes()),
 			}},
 		}),
@@ -761,14 +761,14 @@ func testReceiveWarpMessage(
 	block2, err := vm.BuildBlockWithContext(t.Context(), validProposerCtx)
 	require.NoError(err)
 
-	// Require the block was built with a successful predicate result
+	// Require the block was built with a successful Warp result
 	ethBlock := block2.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 	headerPredicateResultsBytes := customheader.PredicateBytesFromExtra(ethBlock.Extra())
 	blockResults, err := warpmsg.ParseBlockResults(headerPredicateResultsBytes)
 	require.NoError(err)
 
-	// Predicate results encode the index of invalid warp messages in a bitset.
-	txBits := blockResults.Get(getVerifiedWarpMessageTx.Hash(), warpcontract.ContractAddress)
+	// Warp results encode the index of invalid warp messages in a bitset.
+	txBits := blockResults.Get(getVerifiedWarpMessageTx.Hash())
 	require.Zero(txBits.Len()) // Empty bitset indicates success
 
 	block2VerifyWithCtx, ok := block2.(block.WithVerifyContext)

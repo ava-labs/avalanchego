@@ -6,11 +6,10 @@ package warp
 import (
 	"fmt"
 
-	"github.com/ava-labs/libevm/common"
-
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 )
 
 var _ contract.Configurator = (*configurator)(nil)
@@ -19,13 +18,10 @@ var _ contract.Configurator = (*configurator)(nil)
 // must be unique across all precompiles.
 const ConfigKey = "warpConfig"
 
-// ContractAddress is the address of the warp precompile contract
-var ContractAddress = common.HexToAddress("0x0200000000000000000000000000000000000005")
-
 // Module is the precompile module. It is used to register the precompile contract.
 var Module = modules.Module{
 	ConfigKey:    ConfigKey,
-	Address:      ContractAddress,
+	Address:      warpmsg.ContractAddress,
 	Contract:     WarpPrecompile,
 	Configurator: &configurator{},
 }

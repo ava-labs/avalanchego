@@ -3251,15 +3251,15 @@ func TestBlockGasValidation(t *testing.T) {
 		)
 		require.NoError(err)
 
-		// 9401 is the maximum number of predicates so that the block is less
+		// 9401 is the maximum number of Warp messages so that the block is less
 		// than 2 MiB.
-		const numPredicates = 9401
-		accessList := make(types.AccessList, 0, numPredicates)
-		predicate := warpmsg.Pack(signedMessage.Bytes())
-		for range numPredicates {
+		const numMessages = 9401
+		accessList := make(types.AccessList, 0, numMessages)
+		packed := warpmsg.Pack(signedMessage.Bytes())
+		for range numMessages {
 			accessList = append(accessList, types.AccessTuple{
-				Address:     warpcontract.ContractAddress,
-				StorageKeys: predicate,
+				Address:     warpmsg.ContractAddress,
+				StorageKeys: packed,
 			})
 		}
 
@@ -3315,7 +3315,7 @@ func TestBlockGasValidation(t *testing.T) {
 			require := require.New(t)
 			ctx := t.Context()
 
-			// Configure genesis with warp precompile enabled since test uses warp predicates
+			// Configure genesis with warp precompile enabled since test uses Warp messages
 			genesis := &core.Genesis{}
 			require.NoError(genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
 			params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
