@@ -23,6 +23,7 @@ go_library(
         "//graft/coreth/params/extras",
         "//utils/wrappers",
         "//vms/evm/acp226",
+        "//vms/evm/predicate",
         "//vms/saevm/cchain/dynamic",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",

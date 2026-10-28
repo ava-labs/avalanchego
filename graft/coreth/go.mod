@@ -10,7 +10,7 @@ go 1.26.10
 require (
 	github.com/ava-labs/avalanchego v1.15.3
 	github.com/ava-labs/avalanchego/graft/evm v1.15.3
-	github.com/ava-labs/libevm v1.13.15-0.20261019121158-2c4d255e0a63
+	github.com/ava-labs/libevm v1.13.15-0.20261028200218-d398bc4dbe41
 	github.com/google/go-cmp v0.7.0
 	github.com/holiman/uint256 v1.2.4
 	github.com/stretchr/testify v1.11.1
