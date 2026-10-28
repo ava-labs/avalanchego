@@ -15,12 +15,7 @@ import (
 )
 
 // TestExecutorsRunVerifyTx ensures that every execution method of the standard
-// and proposal executors runs verifyTx: a tx that was never initialized must
-// be rejected with [platform.ErrSignedTxNotInitialized] by the executor it
-// belongs to.
-//
-// Each tx is executed at a fork where its type is allowed on that path, so
-// that the upgrade gate of verifyTx does not fire first.
+// and proposal executors runs verifyTx.
 func TestExecutorsRunVerifyTx(t *testing.T) {
 	executeStandardTx := func(env *environment, tx *platform.Tx) error {
 		t.Helper()

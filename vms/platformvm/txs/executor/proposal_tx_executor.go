@@ -77,9 +77,6 @@ func ProposalTx(
 // proposalTxExecutor verifies a proposal tx and applies its commit and abort
 // state changes. Each execution method runs [verifyTx] before the
 // state-dependent rules of its tx type.
-//
-// Non-proposal txs are rejected with errWrongTxType before any verification,
-// and staker txs proposed after Banff with errProposedAddStakerTxAfterBanff.
 type proposalTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	backend       *Backend
@@ -203,7 +200,12 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidato
 		return err
 	}
 
-	if err := verifyAddSubnetValidatorTx(e.backend, e.onCommitState, e.tx, tx); err != nil {
+	if err := verifyAddSubnetValidatorTx(
+		e.backend,
+		e.onCommitState,
+		e.tx,
+		tx,
+	); err != nil {
 		return err
 	}
 
@@ -235,7 +237,11 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 		return err
 	}
 
-	if err := verifyAddDelegatorTx(e.backend, e.onCommitState, tx); err != nil {
+	if err := verifyAddDelegatorTx(
+		e.backend,
+		e.onCommitState,
+		tx,
+	); err != nil {
 		return err
 	}
 

@@ -29,7 +29,7 @@ type fork struct {
 func newFork(name string, isActivated func(*upgrade.Config, time.Time) bool) *fork {
 	return &fork{
 		isActivated:   isActivated,
-		errNotActive:  fmt.Errorf("attempting to use a feature of the %s upgrade prior to activation", name),
+		errNotActive:  fmt.Errorf("transaction type is not activated pre-%s", name),
 		errDeprecated: fmt.Errorf("transaction type is deprecated post-%s", name),
 	}
 }
