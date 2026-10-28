@@ -19,14 +19,13 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
-	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -91,7 +90,7 @@ func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, e
 	if !r.IsDurango {
 		return 0, false, nil
 	}
-	gas, err := evmprecompileconfig.AccessListGas(
+	gas, err := precompileconfig.AccessListGas(
 		accessList,
 		warp.ContractAddress,
 		func(msg predicate.Predicate) (uint64, error) {
