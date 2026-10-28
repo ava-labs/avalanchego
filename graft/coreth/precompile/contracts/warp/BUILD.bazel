@@ -34,12 +34,13 @@ graft_go_test(
     srcs = [
         "contract_test.go",
         "export_test.go",
+        "harness_test.go",
         "message_test.go",
     ],
     embed = [":warp"],
     deps = [
         "//graft/coreth/precompile/contract",
-        "//graft/coreth/precompile/precompiletest",
+        "//graft/evm/precompileconfig",
         "//ids",
         "//snow",
         "//snow/engine/snowman/block",
@@ -58,8 +59,12 @@ graft_go_test(
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
         "//vms/saevm/cchain/cparams",
+        "//vms/saevm/cchain/libevm/extstate",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
     ],
 )
