@@ -61,5 +61,5 @@ func constructRulesExtra(c *ethparams.ChainConfig, r *ethparams.Rules, cEx *cpar
 	if cEx == nil {
 		return RulesExtra{}
 	}
-	return (RulesExtra)(cEx.Rules(timestamp))
+	return RulesExtra(cEx.Rules(timestamp))
 }

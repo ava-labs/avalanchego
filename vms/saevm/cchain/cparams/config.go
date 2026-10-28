@@ -97,6 +97,8 @@ func (c *ChainConfig) CheckConfigCompatible(newEth *ethparams.ChainConfig, headN
 	if c == nil {
 		c = new(ChainConfig)
 	}
+
+	// TODO(alarso16): Use GetExtra when in same package.
 	newCfg, ok := newEth.Hooks().(*ChainConfig)
 	if !ok || newCfg == nil {
 		newCfg = new(ChainConfig)
@@ -298,6 +300,7 @@ type Rules struct {
 	IsIgloo            bool
 }
 
+// TODO(alarso16): Delete implementation.
 var _ precompileconfig.Rules = Rules{}
 
 func (r Rules) IsGraniteActivated() bool {
