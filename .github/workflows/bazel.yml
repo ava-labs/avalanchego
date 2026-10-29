@@ -126,6 +126,8 @@ jobs:
     needs: setup
     uses: ./.github/workflows/bazel-monitored.yml
     with:
+      # Reusable workflow inputs cannot accept matrices as lists or objects, so use a JSON string.
+      # See docs/bazel.md#e2e-and-monitored-test-runners for alternatives and rationale.
       test_matrix: |
         {"include": [
           {"name": "e2e-post-latest", "task": "bazel-test-e2e-post-latest-race-serial", "network_owner": "avalanchego-e2e"},

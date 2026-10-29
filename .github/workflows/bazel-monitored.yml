@@ -45,7 +45,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.test_matrix) }}
-    runs-on: ${{ matrix.runner == 'e2e_runner' && (inputs.e2e_runner || inputs.runner) || inputs.runner }}
+    runs-on: ${{ matrix.runner == 'e2e_runner' && inputs.e2e_runner || inputs.runner }}
     timeout-minutes: ${{ inputs.timeout_minutes }}
     steps:
       - uses: actions/checkout@v5

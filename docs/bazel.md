@@ -649,19 +649,35 @@ suite with race detection to test artifacts built with `go build`. This follows 
 [CI entrypoint conventions](./ci.md#principles) and avoids a separate artifact
 lifecycle.
 
-The `monitored` and `monitored-race` jobs both call
-[`bazel-monitored.yml`](../.github/workflows/bazel-monitored.yml).
-Each caller supplies a JSON test matrix. Each entry specifies a suite name and
-task. It can also specify a runner choice and network owner. The task selects
-the test configuration, including race detection. Both groups share the setup,
-monitoring, and execution steps.
+PR and scheduled CI select different monitored test groups. Disabled groups
+still appear as skipped checks. The goal is to give those checks readable names,
+not to eliminate skipped checks.
 
 GitHub skips disabled jobs before it expands their matrices. A name such as
 `${{ matrix.name }}` can then appear literally in the checks list. For this
-reason, put the `if` condition on the calling job, and keep matrix execution
-inside the called workflow. The calling jobs use the names `monitored` and
-`monitored-race`, so skipped jobs still have readable names. When enabled, each
-group shows a separate job for each test suite.
+reason, put the `if` condition on a calling job with a fixed name. Keep matrix
+execution inside the called workflow.
+
+The `monitored` and `monitored-race` jobs both call
+[`bazel-monitored.yml`](../.github/workflows/bazel-monitored.yml).
+Their fixed names keep skipped checks readable. When enabled, each group shows
+a separate job for each test suite. Both groups share the setup, monitoring,
+and execution steps.
+
+Test selection stays in the callers so that each caller defines its test policy.
+Each matrix entry specifies a suite name and task. It can also specify a runner
+choice and network owner. The task selects the test configuration, including
+race detection.
+
+Reusable workflow inputs cannot accept lists or objects. Callers therefore pass
+matrix data as a JSON string. The called workflow converts it with `fromJSON()`.
+JSON is a consequence of passing matrices between workflows, not a requirement
+for readable skipped-check names.
+
+Defining YAML matrices in the callers would avoid JSON, but would lose readable
+names for skipped jobs. Keeping both matrices inside the called workflow would
+also avoid JSON and preserve readable names. However, it would move test
+selection away from the callers.
 
 The Bazel entrypoint uses `bazel run`, not `bazel test`. It keeps network data
 available for inspection after a failure. Network data defaults to `$HOME/.tmpnet`.
