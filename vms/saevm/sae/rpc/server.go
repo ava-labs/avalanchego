@@ -41,6 +41,7 @@ const (
 	APITx           API = "tx"
 	APISubscription API = "subscription"
 	APIFilter       API = "filter"
+	APILogs         API = "logs"
 	APIAvalanche    API = "avalanche"
 	APIDB           API = "db"
 	APIProfile      API = "profile"
@@ -173,21 +174,13 @@ var apiServices = []apiService{
 		},
 	},
 	{
-		// Standard Ethereum node APIs:
-		// - eth_getLogs
-		//
 		// geth-specific APIs:
 		// - eth_subscribe
 		//  - newHeads
 		//  - newPendingTransactions
 		//  - logs
 		name: APISubscription, namespace: ethNamespace, defaultOn: true,
-		receiver: func(b *backend, filter *filters.FilterAPI) any {
-			return &filterAPI{
-				subscriptionMethods: filter,
-				b:                   b,
-			}
-		},
+		receiver: func(_ *backend, filter *filters.FilterAPI) any { return &subscriptionAPI{filter} },
 	},
 	{
 		// Avalanche-custom eth extensions:
@@ -206,6 +199,12 @@ var apiServices = []apiService{
 		// - eth_uninstallFilter
 		name: APIFilter, namespace: ethNamespace, defaultOn: true,
 		receiver: func(_ *backend, filter *filters.FilterAPI) any { return &pollingFilterAPI{filter} },
+	},
+	{
+		// Standard Ethereum node APIs:
+		// - eth_getLogs
+		name: APILogs, namespace: ethNamespace, defaultOn: true,
+		receiver: func(b *backend, filter *filters.FilterAPI) any { return &logsAPI{filter, b} },
 	},
 	{
 		// Avalanche-custom eth extensions:
