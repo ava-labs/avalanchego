@@ -308,6 +308,14 @@ func TestRewardValidatorTxErrors(t *testing.T) {
 			want: platform.ErrMissingTxID,
 		},
 		{
+			name: "tx_has_credentials",
+			txID: stakerToRemove.TxID,
+			updateTx: func(tx *platform.Tx) {
+				tx.Creds = append(tx.Creds, &secp256k1fx.Credential{})
+			},
+			want: errWrongNumberOfCredentials,
+		},
+		{
 			name: "chain_time_before_staker_end_time",
 			txID: stakerToRemove.TxID,
 			want: errRemoveStakerTooEarly,
