@@ -190,7 +190,6 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 func TestStandardExecutorCreateChainTxErrors(t *testing.T) {
 	var (
 		env      = newEnvironment(t, upgradetest.Latest)
-		wallet   = newWallet(t, env, walletConfig{})
 		subnetID = testSubnet1.ID()
 	)
 
@@ -267,6 +266,8 @@ func TestStandardExecutorCreateChainTxErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			wallet := newWallet(t, env, walletConfig{})
+
 			tx, err := wallet.IssueCreateChainTx(
 				subnetID,
 				nil,
