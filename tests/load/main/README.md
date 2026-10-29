@@ -21,7 +21,7 @@ To run an EVM load test, execute the following commands:
 nix develop
 
 # Start load test with monitoring
-task test-load -- --start-metrics-collector --start-logs-collector
+task bazel-test-load -- --start-metrics-collector --start-logs-collector
 ```
 
 This command will create a temporary Avalanche network and perform any test setup prior

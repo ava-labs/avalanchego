@@ -50,6 +50,7 @@ jobs:
       runner: ${{ matrix.runner }}
       run_e2e_serially: true
       run_e2e_race_tests: ${{ matrix.run_e2e_race_tests }}
+      run_monitored_race_tests: ${{ matrix.platform_name == 'ubuntu-24.04-amd64' }}
       unit_test_task: ${{ matrix.unit_test_task }}
       # Scheduled jobs run broader tests without the remote action cache.
       setup_timeout_minutes: 20
