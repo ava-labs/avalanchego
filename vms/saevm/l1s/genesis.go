@@ -61,9 +61,9 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 	}
 
 	// Almost all of the fields in [core.Genesis] that are marked as testing
-	// only are explicitly disallowed. The only such field that is allowed to be
-	// configured is [core.Genesis.BaseFee], as SAE initializes the gas price
-	// to the last synchronous block's BaseFee.
+	// only are explicitly disallowed. The only such field that is allowed to
+	// be configured is [core.Genesis.BaseFee], but it is ignored and replaced
+	// with the fee configs' value.
 	switch {
 	case g.Config == nil:
 		return nil, errNoGenesisChainConfig
@@ -90,7 +90,7 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 
 // updateChainConfig edits cfg in-place.
 func updateChainConfig(cfg *params.ChainConfig, upgradeConfig extras.UpgradeConfig, ctx *snow.Context) error {
-	extra := *l1params.GetExtra(cfg)
+	extra := l1params.GetExtra(cfg)
 	if extra.FeeConfig == (commontype.FeeConfig{}) {
 		extra.FeeConfig = l1params.DefaultFeeConfig
 	}
@@ -105,7 +105,6 @@ func updateChainConfig(cfg *params.ChainConfig, upgradeConfig extras.UpgradeConf
 		return err
 	}
 
-	l1params.WithExtra(cfg, &extra)
 	if err := l1params.SetEthUpgrades(cfg); err != nil {
 		return err
 	}
@@ -151,7 +150,7 @@ func (g *genesis) verifyAndWriteBlock(db ethdb.Database) error {
 	}
 
 	// If the rules change for the head block, it may have been executed
-	// incorrectly.  The upgrade config is stored separately from the chain
+	// incorrectly. The upgrade config is stored separately from the chain
 	// config.
 	var prevUpgrades extras.UpgradeConfig
 	prev, err := customrawdb.ReadChainConfig(db, hash, &prevUpgrades)

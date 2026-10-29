@@ -26,13 +26,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -132,18 +128,11 @@ func withFeeConfig(c commontype.FeeConfig) genesisOption {
 	})
 }
 
-func newContext(t *testing.T, upgrades upgrade.Config) *snow.Context {
-	ctx := snowtest.Context(t, ids.GenerateTestID())
-	ctx.NetworkUpgrades = upgrades
-	ctx.Log = loggingtest.New(t, logging.Debug)
-	return ctx
-}
-
 func TestParseGenesis(t *testing.T) {
 	var (
-		latest = newContext(t, upgradetest.GetConfig(upgradetest.Latest))
+		latest = &snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgradetest.Latest)}
 		// Mainnet has non-zero network upgrade times.
-		mainnet            = newContext(t, upgrade.Mainnet)
+		mainnet            = &snow.Context{NetworkUpgrades: upgrade.Mainnet}
 		zeroGraniteGenesis = testGenesisJSON(withGenesis(func(g *legacy.Genesis) {
 			l1params.GetExtra(g.Config).GraniteTimestamp = new(uint64)
 		}))
@@ -181,7 +170,7 @@ func TestParseGenesis(t *testing.T) {
 		},
 		{
 			name:    "upgrade_bytes",
-			ctx:     newContext(t, upgradetest.GetConfig(upgradetest.Durango)),
+			ctx:     &snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgradetest.Durango)},
 			genesis: testGenesisJSON(),
 			upgradeBytes: overridesJSON(extras.NetworkUpgrades{
 				DurangoTimestamp: new(testGenesisTime + 100),
@@ -196,7 +185,7 @@ func TestParseGenesis(t *testing.T) {
 		{
 			name:    "missing_required_fields",
 			ctx:     latest,
-			genesis: `{"not-airdrop":true}`,
+			genesis: `{}`,
 			wantErr: testerr.Contains("missing required field"),
 		},
 		{
@@ -314,7 +303,7 @@ func TestParseGenesis(t *testing.T) {
 // the genesis hash, is identical to the one subnet-evm produces for the same
 // genesis. Existing L1s MUST retain their genesis hash.
 //
-// TODO: Delete this test when graft/subnet-evm is being deleted.
+// TODO(alarso16): Delete this test when graft/subnet-evm is being deleted.
 func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 	type spec struct {
 		name     string
@@ -367,7 +356,7 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 
 	for _, s := range specs {
 		t.Run(s.name, func(t *testing.T) {
-			ctx := newContext(t, upgradetest.GetConfig(s.upgrades))
+			ctx := &snow.Context{NetworkUpgrades: upgradetest.GetConfig(s.upgrades)}
 			g, err := parseGenesis(ctx, []byte(s.genesis), nil)
 			require.NoErrorf(t, err, "parseGenesis(%s)", s.genesis)
 
@@ -413,7 +402,7 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 		upgradetest.Granite: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
 		upgradetest.Helicon: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
 
-		// TODO: Add SAE required fields
+		// TODO(alarso16): Add SAE required fields
 		upgradetest.Igloo: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
 	}
 	_ = hashes[upgradetest.Latest] // Enforce completeness at compile time.
@@ -422,7 +411,10 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 		fork := upgradetest.Fork(_fork)
 		t.Run(fork.String(), func(t *testing.T) {
 			genesis := testGenesisJSON()
-			g, err := parseGenesis(newContext(t, upgradetest.GetConfig(fork)), []byte(genesis), nil)
+			ctx := &snow.Context{
+				NetworkUpgrades: upgradetest.GetConfig(fork),
+			}
+			g, err := parseGenesis(ctx, []byte(genesis), nil)
 			require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
 
 			block, err := g.block()
@@ -447,12 +439,12 @@ func TestWriteGenesis(t *testing.T) {
 		genesis           string
 		upgradeBytes      string
 	}
-	newSpecContext := func(t *testing.T, s spec) *snow.Context {
+	newSpecContext := func(s spec) *snow.Context {
 		upgrades := upgradetest.GetConfig(s.fork)
 		if !s.latestUpgradeTime.IsZero() {
 			upgrades.IglooTime = s.latestUpgradeTime
 		}
-		return newContext(t, upgrades)
+		return &snow.Context{NetworkUpgrades: upgrades}
 	}
 
 	tests := []struct {
@@ -644,7 +636,7 @@ func TestWriteGenesis(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
 			g, err := parseGenesis(
-				newSpecContext(t, tt.initial),
+				newSpecContext(tt.initial),
 				[]byte(tt.initial.genesis),
 				[]byte(tt.initial.upgradeBytes),
 			)
@@ -670,7 +662,7 @@ func TestWriteGenesis(t *testing.T) {
 			// The restart runs on the initialized database. It must
 			// agree on the block hash and store its own chain config.
 			g, err = parseGenesis(
-				newSpecContext(t, tt.restart),
+				newSpecContext(tt.restart),
 				[]byte(tt.restart.genesis),
 				[]byte(tt.restart.upgradeBytes),
 			)
@@ -734,7 +726,7 @@ func requireStoredConfig(t *testing.T, db ethdb.Database, genesisHash common.Has
 // database and matches the root committed to by the written genesis header.
 func TestWriteGenesisState(t *testing.T) {
 	genesis := testGenesisJSON()
-	g, err := parseGenesis(newContext(t, upgradetest.GetConfig(upgradetest.Latest)), []byte(genesis), nil)
+	g, err := parseGenesis(&snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgradetest.Latest)}, []byte(genesis), nil)
 	require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
 
 	block, err := g.block()
