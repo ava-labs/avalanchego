@@ -816,10 +816,19 @@ func TestRewardValidatorStakerTypeError(t *testing.T) {
 
 func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 	tests := []struct {
-		name string
-		tx   func(t testing.TB, txID ids.ID, endTime time.Time) *platform.Tx
-		want error
+		name        string
+		tx          func(t testing.TB, txID ids.ID, endTime time.Time) *platform.Tx
+		updateState func(*environment, *state.Diff)
+		want        error
 	}{
+		{
+			name: "invalid_prior_to_helicon",
+			tx:   newRewardAutoRenewedValidatorTx,
+			updateState: func(env *environment, diff *state.Diff) {
+				diff.SetTimestamp(env.config.UpgradeConfig.HeliconTime.Add(-time.Second))
+			},
+			want: helicon.errNotActive,
+		},
 		{
 			name: "tx_fails_syntactic_verification",
 			tx: func(t testing.TB, _ ids.ID, endTime time.Time) *platform.Tx {
@@ -892,6 +901,10 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 
 			diff.AddTx(tx, status.Committed)
 			diff.SetTimestamp(endTime)
+
+			if tt.updateState != nil {
+				tt.updateState(env, diff)
+			}
 
 			_, _, err = executeProposalTx(t, env, diff, tt.tx(t, tx.ID(), endTime))
 			require.ErrorIs(t, err, tt.want)

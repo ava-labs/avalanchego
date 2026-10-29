@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
@@ -54,32 +55,6 @@ func addPrimaryNetworkValidator(
 	require.NoError(err)
 	require.NoError(onCommitState.Apply(diff))
 	diff.AddTx(tx, status.Committed)
-}
-
-// executeAddDelegatorProposalTx issues an AddDelegatorTx for validator funded
-// by feeKeys and executes it as a proposal tx on commit/abort diffs built on top of diff,
-// returning the execution error.
-func executeAddDelegatorProposalTx(
-	t testing.TB,
-	env *environment,
-	diff *state.Diff,
-	validator *platform.Validator,
-	feeKey *secp256k1.PrivateKey,
-) error {
-	t.Helper()
-	require := require.New(t)
-
-	wallet := newWallet(t, env, walletConfig{
-		keys: []*secp256k1.PrivateKey{feeKey},
-	})
-	tx, err := wallet.IssueAddDelegatorTx(
-		validator,
-		newOwner(),
-	)
-	require.NoError(err)
-
-	_, _, err = executeProposalTx(t, env, diff, tx)
-	return err
 }
 
 func TestProposalTxExecuteAddDelegator(t *testing.T) {
@@ -122,12 +97,21 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 				Wght:   tt.validatorWeight,
 			})
 
-			err = executeAddDelegatorProposalTx(t, env, diff, &platform.Validator{
-				NodeID: nodeID,
-				Start:  uint64(startTime.Unix()),
-				End:    uint64(endTime.Unix()),
-				Wght:   env.config.MinDelegatorStake,
-			}, genesistest.DefaultFundedKeys[1])
+			wallet := newWallet(t, env, walletConfig{
+				keys: []*secp256k1.PrivateKey{genesistest.DefaultFundedKeys[1]},
+			})
+			tx, err := wallet.IssueAddDelegatorTx(
+				&platform.Validator{
+					NodeID: nodeID,
+					Start:  uint64(startTime.Unix()),
+					End:    uint64(endTime.Unix()),
+					Wght:   env.config.MinDelegatorStake,
+				},
+				newOwner(),
+			)
+			require.NoError(t, err)
+
+			_, _, err = executeProposalTx(t, env, diff, tx)
 			require.NoError(t, err)
 		})
 	}
@@ -177,8 +161,19 @@ func TestProposalTxExecuteAddDelegatorErrors(t *testing.T) {
 		endTime     uint64
 		nodeID      ids.NodeID
 		updateState func(*testing.T, *state.Diff)
+		updateTx    func(*platform.Tx)
 		want        error
 	}{
+		{
+			name:      "tx_fails_syntactic_verification",
+			startTime: startTime,
+			endTime:   endTime,
+			nodeID:    minStakeNodeID,
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddDelegatorTx).BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
 		{
 			name:      "validator_stops_validating_earlier_than_delegator",
 			startTime: genesistest.DefaultValidatorStartTimeUnix + 1,
@@ -252,12 +247,25 @@ func TestProposalTxExecuteAddDelegatorErrors(t *testing.T) {
 				tt.updateState(t, diff)
 			}
 
-			err = executeAddDelegatorProposalTx(t, env, diff, &platform.Validator{
-				NodeID: tt.nodeID,
-				Start:  tt.startTime,
-				End:    tt.endTime,
-				Wght:   env.config.MinDelegatorStake,
-			}, delegatorKey)
+			wallet := newWallet(t, env, walletConfig{
+				keys: []*secp256k1.PrivateKey{delegatorKey},
+			})
+			tx, err := wallet.IssueAddDelegatorTx(
+				&platform.Validator{
+					NodeID: tt.nodeID,
+					Start:  tt.startTime,
+					End:    tt.endTime,
+					Wght:   env.config.MinDelegatorStake,
+				},
+				newOwner(),
+			)
+			require.NoError(t, err)
+
+			if tt.updateTx != nil {
+				tt.updateTx(tx)
+			}
+
+			_, _, err = executeProposalTx(t, env, diff, tx)
 			require.ErrorIs(t, err, tt.want)
 		})
 	}
@@ -355,6 +363,16 @@ func TestProposalTxExecuteAddSubnetValidatorErrors(t *testing.T) {
 		updateTx    func(*platform.Tx)
 		want        error
 	}{
+		{
+			name:      "tx_fails_syntactic_verification",
+			nodeID:    stagedNodeID,
+			startTime: stagedStartTime + 1,
+			endTime:   stagedEndTime,
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddSubnetValidatorTx).BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
 		{
 			name:      "genesis_validator_stops_validating_subnet_after_primary_network",
 			nodeID:    genesisNodeID,
@@ -530,31 +548,62 @@ func TestProposalTxExecuteAddSubnetValidatorErrors(t *testing.T) {
 	}
 }
 
-// executeAddValidatorProposalTx issues an AddValidatorTx for validator funded
-// by feeKey and executes it as a proposal tx on commit/abort diffs built on top of diff,
-// returning the execution error.
-func executeAddValidatorProposalTx(
-	t testing.TB,
-	env *environment,
-	diff *state.Diff,
-	validator *platform.Validator,
-	feeKey *secp256k1.PrivateKey,
-) error {
-	t.Helper()
+// TestProposalTxExecuteAddValidator verifies the successful execution of a
+// proposed [platform.AddValidatorTx]: the commit branch adds the pending
+// validator and locks its stake, while the abort branch returns the stake to
+// its owner.
+func TestProposalTxExecuteAddValidator(t *testing.T) {
 	require := require.New(t)
 
-	wallet := newWallet(t, env, walletConfig{
-		keys: []*secp256k1.PrivateKey{feeKey},
-	})
+	var (
+		env    = newEnvironment(t, upgradetest.ApricotPhase5)
+		wallet = newWallet(t, env, walletConfig{})
+		nodeID = ids.GenerateTestNodeID()
+	)
+
 	tx, err := wallet.IssueAddValidatorTx(
-		validator,
+		&platform.Validator{
+			NodeID: nodeID,
+			Start:  genesistest.DefaultValidatorStartTimeUnix + 1,
+			End:    genesistest.DefaultValidatorEndTimeUnix,
+			Wght:   env.config.MinValidatorStake,
+		},
 		newOwner(),
 		reward.PercentDenominator,
 	)
 	require.NoError(err)
 
-	_, _, err = executeProposalTx(t, env, diff, tx)
-	return err
+	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	require.NoError(err)
+
+	onCommitState, onAbortState, err := executeProposalTx(t, env, diff, tx)
+	require.NoError(err)
+
+	gotValidator, err := onCommitState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	require.NoError(err)
+	require.Equal(tx.ID(), gotValidator.TxID)
+
+	_, err = onAbortState.GetPendingValidator(constants.PrimaryNetworkID, nodeID)
+	require.ErrorIs(err, database.ErrNotFound)
+
+	// Both branches consume the inputs. Only the abort branch produces the
+	// staked outputs, which follow the tx's outputs.
+	unsignedTx := tx.Unsigned.(*platform.AddValidatorTx)
+	for _, in := range unsignedTx.Ins {
+		_, err := onCommitState.GetUTXO(in.InputID())
+		require.ErrorIs(err, database.ErrNotFound)
+		_, err = onAbortState.GetUTXO(in.InputID())
+		require.ErrorIs(err, database.ErrNotFound)
+	}
+
+	stakeUTXOID := avax.UTXOID{
+		TxID:        tx.ID(),
+		OutputIndex: uint32(len(unsignedTx.Outs)),
+	}
+	_, err = onCommitState.GetUTXO(stakeUTXOID.InputID())
+	require.ErrorIs(err, database.ErrNotFound)
+	_, err = onAbortState.GetUTXO(stakeUTXOID.InputID())
+	require.NoError(err)
 }
 
 func TestProposalTxExecuteAddValidatorErrors(t *testing.T) {
@@ -572,8 +621,19 @@ func TestProposalTxExecuteAddValidatorErrors(t *testing.T) {
 		startTime   uint64
 		endTime     uint64
 		updateState func(*testing.T, *state.Diff)
+		updateTx    func(*platform.Tx)
 		want        error
 	}{
+		{
+			name:      "tx_fails_syntactic_verification",
+			nodeID:    ids.GenerateTestNodeID(),
+			startTime: genesistest.DefaultValidatorStartTimeUnix + 1,
+			endTime:   genesistest.DefaultValidatorEndTimeUnix,
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddValidatorTx).BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
 		{
 			name:      "starts_validating_at_current_timestamp",
 			nodeID:    ids.GenerateTestNodeID(),
@@ -586,7 +646,7 @@ func TestProposalTxExecuteAddValidatorErrors(t *testing.T) {
 			nodeID:    genesistest.DefaultNodeIDs[0],
 			startTime: genesistest.DefaultValidatorStartTimeUnix + 1,
 			endTime:   genesistest.DefaultValidatorEndTimeUnix,
-			want:      errAlreadyValidator,
+			want:      ErrDuplicateValidator,
 		},
 		{
 			name:      "already_pending_validator_of_primary_network",
@@ -601,7 +661,7 @@ func TestProposalTxExecuteAddValidatorErrors(t *testing.T) {
 					Wght:   env.config.MinValidatorStake,
 				})
 			},
-			want: errAlreadyValidator,
+			want: ErrDuplicateValidator,
 		},
 		{
 			name:      "tx_fee_paying_key_has_no_funds",
@@ -627,26 +687,39 @@ func TestProposalTxExecuteAddValidatorErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
 			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
-			require.NoError(t, err)
+			require.NoError(err)
 
 			if tt.updateState != nil {
 				tt.updateState(t, diff)
 			}
 
-			err = executeAddValidatorProposalTx(
-				t,
-				env,
-				diff,
-				&platform.Validator{
-					NodeID: tt.nodeID,
-					Start:  tt.startTime,
-					End:    tt.endTime,
-					Wght:   env.config.MinValidatorStake,
-				},
-				feeKey,
+			wallet := newWallet(t, env, walletConfig{
+				keys: []*secp256k1.PrivateKey{feeKey},
+			})
+
+			validator := &platform.Validator{
+				NodeID: tt.nodeID,
+				Start:  tt.startTime,
+				End:    tt.endTime,
+				Wght:   env.config.MinValidatorStake,
+			}
+
+			tx, err := wallet.IssueAddValidatorTx(
+				validator,
+				newOwner(),
+				reward.PercentDenominator,
 			)
-			require.ErrorIs(t, err, tt.want)
+			require.NoError(err)
+
+			if tt.updateTx != nil {
+				tt.updateTx(tx)
+			}
+
+			_, _, err = executeProposalTx(t, env, diff, tx)
+			require.ErrorIs(err, tt.want)
 		})
 	}
 }
@@ -747,9 +820,19 @@ func TestAdvanceTimeTxErrors(t *testing.T) {
 		name      string
 		fork      upgradetest.Fork
 		updateEnv func(*testing.T, *environment)
+		updateTx  func(*platform.Tx)
 		timestamp time.Time
 		want      error
 	}{
+		{
+			name:      "tx_fails_syntactic_verification",
+			fork:      upgradetest.ApricotPhase5,
+			timestamp: genesistest.DefaultValidatorStartTime,
+			updateTx: func(tx *platform.Tx) {
+				tx.TxID = ids.Empty
+			},
+			want: platform.ErrSignedTxNotInitialized,
+		},
 		{
 			name:      "timestamp_before_chain_time",
 			fork:      upgradetest.ApricotPhase5,
@@ -808,9 +891,14 @@ func TestAdvanceTimeTxErrors(t *testing.T) {
 				tt.updateEnv(t, env)
 			}
 
+			tx := newAdvanceTimeTx(t, tt.timestamp)
+			if tt.updateTx != nil {
+				tt.updateTx(tx)
+			}
+
 			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(t, err)
-			_, _, err = executeProposalTx(t, env, diff, newAdvanceTimeTx(t, tt.timestamp))
+			_, _, err = executeProposalTx(t, env, diff, tx)
 			require.ErrorIs(t, err, tt.want)
 		})
 	}

@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -30,7 +31,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 		name        string
 		backend     *Backend
 		updateState func(*testing.T, *state.Diff)
-		sTxF        func() *platform.Tx
 		txF         func() *platform.AddPermissionlessValidatorTx
 		expectedErr error
 	}
@@ -89,36 +89,9 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			DelegatorRewardsOwner: newOwner(),
 			DelegationShares:      20_000,
 		}
-		verifiedSignedTx = platform.Tx{
-			Unsigned: &verifiedTx,
-			Creds:    []verify.Verifiable{},
-		}
 	)
-	verifiedSignedTx.SetBytes([]byte{1}, []byte{2})
 
 	tests := []test{
-		{
-			name: "fail syntactic verification",
-			backend: &Backend{
-				Ctx: ctx,
-				Config: &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
-				},
-			},
-			sTxF: func() *platform.Tx {
-				unverifiedTx := verifiedTx
-				unverifiedTx.SyntacticallyVerified = false
-				unverifiedTx.NetworkID++
-
-				sTx := verifiedSignedTx
-				sTx.Unsigned = &unverifiedTx
-				return &sTx
-			},
-			txF: func() *platform.AddPermissionlessValidatorTx {
-				return &verifiedTx
-			},
-			expectedErr: avax.ErrWrongNetworkID,
-		},
 		{
 			name: "not bootstrapped",
 			backend: &Backend{
@@ -127,9 +100,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, activeForkTime),
 				},
 				Bootstrapped: &utils.Atomic[bool]{},
-			},
-			sTxF: func() *platform.Tx {
-				return &verifiedSignedTx
 			},
 			txF: func() *platform.AddPermissionlessValidatorTx {
 				return &platform.AddPermissionlessValidatorTx{}
@@ -148,9 +118,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.SetTimestamp(verifiedTx.StartTime())
 			},
-			sTxF: func() *platform.Tx {
-				return &verifiedSignedTx
-			},
 			txF: func() *platform.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
@@ -167,9 +134,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.AddSubnetTransformation(&transformTx)
-			},
-			sTxF: func() *platform.Tx {
-				return &verifiedSignedTx
 			},
 			txF: func() *platform.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
@@ -190,9 +154,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.AddSubnetTransformation(&transformTx)
 			},
-			sTxF: func() *platform.Tx {
-				return &verifiedSignedTx
-			},
 			txF: func() *platform.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake + 1
@@ -211,9 +172,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.AddSubnetTransformation(&transformTx)
-			},
-			sTxF: func() *platform.Tx {
-				return &verifiedSignedTx
 			},
 			txF: func() *platform.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
@@ -234,9 +192,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.AddSubnetTransformation(&transformTx)
-			},
-			sTxF: func() *platform.Tx {
-				return &verifiedSignedTx
 			},
 			txF: func() *platform.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
@@ -262,9 +217,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				diff.SetTimestamp(time.Unix(1, 0))
 				diff.AddSubnetTransformation(&transformTx)
 			},
-			sTxF: func() *platform.Tx {
-				return &verifiedSignedTx
-			},
 			txF: func() *platform.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
 				tx.Validator.Wght = unsignedTransformTx.MaxValidatorStake
@@ -287,9 +239,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 			},
 			updateState: func(_ *testing.T, diff *state.Diff) {
 				diff.AddSubnetTransformation(&transformTx)
-			},
-			sTxF: func() *platform.Tx {
-				return &verifiedSignedTx
 			},
 			txF: func() *platform.AddPermissionlessValidatorTx {
 				tx := verifiedTx // Note that this copies [verifiedTx]
@@ -329,9 +278,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				}
 				require.NoError(t, diff.PutCurrentValidator(staker))
 			},
-			sTxF: func() *platform.Tx {
-				return &verifiedSignedTx
-			},
 			txF: func() *platform.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
@@ -357,9 +303,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				}
 				require.NoError(t, diff.PutCurrentValidator(primaryNetworkVdr))
 			},
-			sTxF: func() *platform.Tx {
-				return &verifiedSignedTx
-			},
 			txF: func() *platform.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
@@ -383,9 +326,6 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 				}
 				require.NoError(t, diff.PutCurrentValidator(primaryNetworkVdr))
 			},
-			sTxF: func() *platform.Tx {
-				return &verifiedSignedTx
-			},
 			txF: func() *platform.AddPermissionlessValidatorTx {
 				return &verifiedTx
 			},
@@ -395,21 +335,61 @@ func TestVerifyAddPermissionlessValidatorTx(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var (
-				backend = tt.backend
-				sTx     = tt.sTxF()
-				tx      = tt.txF()
-			)
-
 			diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(t, err)
+
 			diff.SetTimestamp(now)
 			if tt.updateState != nil {
 				tt.updateState(t, diff)
 			}
 
-			err = verifyAddPermissionlessValidatorTx(backend, diff, sTx, tx)
+			err = verifyAddPermissionlessValidatorTx(tt.backend, diff, tt.txF())
 			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestPeriodToDuration(t *testing.T) {
+	const maxStakeDuration = 365 * 24 * time.Hour
+	maxPeriod := uint64(maxStakeDuration / time.Second)
+
+	tests := []struct {
+		name         string
+		period       uint64
+		wantDuration time.Duration
+		wantErr      error
+	}{
+		{
+			name:         "zero",
+			period:       0,
+			wantDuration: 0,
+		},
+		{
+			name:         "one_day",
+			period:       24 * 60 * 60,
+			wantDuration: 24 * time.Hour,
+		},
+		{
+			name:         "max_stake_duration",
+			period:       maxPeriod,
+			wantDuration: maxStakeDuration,
+		},
+		{
+			name:    "above_max_stake_duration",
+			period:  maxPeriod + 1,
+			wantErr: ErrStakeTooLong,
+		},
+		{
+			name:    "overflow",
+			period:  math.MaxUint64,
+			wantErr: ErrStakeTooLong,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotDuration, gotErr := periodToDuration(tt.period, maxStakeDuration)
+			require.ErrorIs(t, gotErr, tt.wantErr)
+			require.Equal(t, tt.wantDuration, gotDuration)
 		})
 	}
 }

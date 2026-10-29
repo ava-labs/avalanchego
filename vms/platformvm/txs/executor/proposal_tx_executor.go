@@ -74,6 +74,9 @@ func ProposalTx(
 	return nil
 }
 
+// proposalTxExecutor verifies a proposal tx and applies its commit and abort
+// state changes. Each execution method runs [verifyTx] before the
+// state-dependent rules of its tx type.
 type proposalTxExecutor struct {
 	// inputs, to be filled before visitor methods are called
 	backend       *Backend
@@ -157,25 +160,15 @@ func (*proposalTxExecutor) SetAutoRenewedValidatorConfigTx(*platform.SetAutoRene
 }
 
 func (e *proposalTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
-	// AddValidatorTx is a proposal transaction until the Banff fork
-	// activation. Following the activation, AddValidatorTxs must be issued into
-	// StandardBlocks.
-	currentTimestamp := e.onCommitState.GetTimestamp()
-	if e.backend.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
-		return fmt.Errorf(
-			"%w: timestamp (%s) >= Banff fork time (%s)",
-			errProposedAddStakerTxAfterBanff,
-			currentTimestamp,
-			e.backend.Config.UpgradeConfig.BanffTime,
-		)
+	if err := e.verifyStakerProposalAllowed(); err != nil {
+		return err
 	}
 
-	if err := verifyAddValidatorTx(
-		e.backend,
-		e.onCommitState,
-		e.tx,
-		tx,
-	); err != nil {
+	if err := verifyTx(e.backend, e.onCommitState.GetTimestamp(), e.tx); err != nil {
+		return err
+	}
+
+	if err := verifyAddValidatorTx(e.backend, e.onCommitState, tx); err != nil {
 		return err
 	}
 
@@ -199,17 +192,12 @@ func (e *proposalTxExecutor) AddValidatorTx(tx *platform.AddValidatorTx) error {
 }
 
 func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidatorTx) error {
-	// AddSubnetValidatorTx is a proposal transaction until the Banff fork
-	// activation. Following the activation, AddSubnetValidatorTxs must be
-	// issued into StandardBlocks.
-	currentTimestamp := e.onCommitState.GetTimestamp()
-	if e.backend.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
-		return fmt.Errorf(
-			"%w: timestamp (%s) >= Banff fork time (%s)",
-			errProposedAddStakerTxAfterBanff,
-			currentTimestamp,
-			e.backend.Config.UpgradeConfig.BanffTime,
-		)
+	if err := e.verifyStakerProposalAllowed(); err != nil {
+		return err
+	}
+
+	if err := verifyTx(e.backend, e.onCommitState.GetTimestamp(), e.tx); err != nil {
+		return err
 	}
 
 	if err := verifyAddSubnetValidatorTx(
@@ -241,23 +229,17 @@ func (e *proposalTxExecutor) AddSubnetValidatorTx(tx *platform.AddSubnetValidato
 }
 
 func (e *proposalTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
-	// AddDelegatorTx is a proposal transaction until the Banff fork
-	// activation. Following the activation, AddDelegatorTxs must be issued into
-	// StandardBlocks.
-	currentTimestamp := e.onCommitState.GetTimestamp()
-	if e.backend.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
-		return fmt.Errorf(
-			"%w: timestamp (%s) >= Banff fork time (%s)",
-			errProposedAddStakerTxAfterBanff,
-			currentTimestamp,
-			e.backend.Config.UpgradeConfig.BanffTime,
-		)
+	if err := e.verifyStakerProposalAllowed(); err != nil {
+		return err
+	}
+
+	if err := verifyTx(e.backend, e.onCommitState.GetTimestamp(), e.tx); err != nil {
+		return err
 	}
 
 	if err := verifyAddDelegatorTx(
 		e.backend,
 		e.onCommitState,
-		e.tx,
 		tx,
 	); err != nil {
 		return err
@@ -281,7 +263,7 @@ func (e *proposalTxExecutor) AddDelegatorTx(tx *platform.AddDelegatorTx) error {
 }
 
 func (e *proposalTxExecutor) AdvanceTimeTx(tx *platform.AdvanceTimeTx) error {
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+	if err := verifyTx(e.backend, e.onCommitState.GetTimestamp(), e.tx); err != nil {
 		return err
 	}
 
@@ -316,7 +298,7 @@ func (e *proposalTxExecutor) AdvanceTimeTx(tx *platform.AdvanceTimeTx) error {
 }
 
 func (e *proposalTxExecutor) RewardValidatorTx(tx *platform.RewardValidatorTx) error {
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+	if err := verifyTx(e.backend, e.onCommitState.GetTimestamp(), e.tx); err != nil {
 		return err
 	}
 
@@ -385,7 +367,7 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *platform.RewardValidatorTx) e
 //     principal is returned, and it receives all rewards for the cycle (current
 //     potential reward + accrued validation rewards + all delegatee rewards).
 func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAutoRenewedValidatorTx) error {
-	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
+	if err := verifyTx(e.backend, e.onCommitState.GetTimestamp(), e.tx); err != nil {
 		return err
 	}
 
@@ -475,8 +457,25 @@ func (e *proposalTxExecutor) RewardAutoRenewedValidatorTx(tx *platform.RewardAut
 	)
 }
 
+// verifyStakerProposalAllowed rejects staker txs proposed after Banff.
+// AddValidatorTx, AddSubnetValidatorTx, and AddDelegatorTx are proposal txs
+// until the Banff activation; following it, they must be issued into standard
+// blocks.
+func (e *proposalTxExecutor) verifyStakerProposalAllowed() error {
+	currentTimestamp := e.onCommitState.GetTimestamp()
+	if !e.backend.Config.UpgradeConfig.IsBanffActivated(currentTimestamp) {
+		return nil
+	}
+	return fmt.Errorf(
+		"%w: timestamp (%s) >= Banff fork time (%s)",
+		errProposedAddStakerTxAfterBanff,
+		currentTimestamp,
+		e.backend.Config.UpgradeConfig.BanffTime,
+	)
+}
+
 func (e *proposalTxExecutor) applySpendOnCommit(creds []verify.Verifiable) error {
-	return applySpend(e.backend, e.feeCalculator, e.onCommitState, e.tx, creds)
+	return applySpend(e.backend, e.feeCalculator, e.onCommitState, e.tx, creds, nil)
 }
 
 // applySpendOnAbort spends the UTXOs of tx in onAbortState: it consumes the

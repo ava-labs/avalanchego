@@ -22,7 +22,7 @@ import (
 var (
 	_ gossip.Gossipable = (*Tx)(nil)
 
-	errSignedTxNotInitialized = errors.New("signed tx was never initialized and is not valid")
+	ErrSignedTxNotInitialized = errors.New("signed tx was never initialized and is not valid")
 )
 
 // Tx is a signed transaction
@@ -127,7 +127,7 @@ func (tx *Tx) InputIDs() set.Set[ids.ID] {
 
 func (tx *Tx) SyntacticVerify(ctx *snow.Context) error {
 	if tx.TxID == ids.Empty {
-		return errSignedTxNotInitialized
+		return ErrSignedTxNotInitialized
 	}
 
 	return tx.Unsigned.SyntacticVerify(ctx)
