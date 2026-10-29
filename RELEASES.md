@@ -6,6 +6,7 @@
 
 ### APIs
 
+- Added a `Gas-Used` header to C-Chain `/rpc` responses with the total gas used by every completed `eth_call` in the request.
 - `admin.lockProfile` and continuous profiling now write `lock.profile` in the binary pprof format, like the CPU and memory profiles.
 
 ### Configs
