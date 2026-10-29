@@ -461,15 +461,19 @@ func TestWriteGenesis(t *testing.T) {
 	type spec struct {
 		fork              upgradetest.Fork
 		latestUpgradeTime time.Time
-		genesis           string
-		upgradeBytes      string
+		// If empty, [testGenesisJSON] is used.
+		genesis      string
+		upgradeBytes string
 	}
-	newSpecContext := func(s spec) *snow.Context {
+	parseSpec := func(s spec) (*genesis, error) {
 		upgrades := upgradetest.GetConfig(s.fork)
 		if !s.latestUpgradeTime.IsZero() {
 			upgrades.IglooTime = s.latestUpgradeTime
 		}
-		return &snow.Context{NetworkUpgrades: upgrades}
+		if s.genesis == "" {
+			s.genesis = testGenesisJSON()
+		}
+		return parseGenesis(&snow.Context{NetworkUpgrades: upgrades}, []byte(s.genesis), []byte(s.upgradeBytes))
 	}
 
 	tests := []struct {
@@ -484,31 +488,26 @@ func TestWriteGenesis(t *testing.T) {
 		{
 			name: "same_genesis",
 			initial: spec{
-				fork:    upgradetest.Latest,
-				genesis: testGenesisJSON(),
+				fork: upgradetest.Latest,
 			},
 			restart: spec{
-				fork:    upgradetest.Latest,
-				genesis: testGenesisJSON(),
+				fork: upgradetest.Latest,
 			},
 		},
 		{
 			name: "same_genesis_with_progressed_head",
 			initial: spec{
-				fork:    upgradetest.Latest,
-				genesis: testGenesisJSON(),
+				fork: upgradetest.Latest,
 			},
 			headTime: testGenesisTime + 4_000,
 			restart: spec{
-				fork:    upgradetest.Latest,
-				genesis: testGenesisJSON(),
+				fork: upgradetest.Latest,
 			},
 		},
 		{
 			name: "genesis_hash_mismatch",
 			initial: spec{
-				fork:    upgradetest.Latest,
-				genesis: testGenesisJSON(),
+				fork: upgradetest.Latest,
 			},
 			restart: spec{
 				fork: upgradetest.Latest,
@@ -521,13 +520,11 @@ func TestWriteGenesis(t *testing.T) {
 		{
 			name: "schedule_future_upgrade",
 			initial: spec{
-				fork:    upgradetest.Latest - 1,
-				genesis: testGenesisJSON(),
+				fork: upgradetest.Latest - 1,
 			},
 			restart: spec{
 				fork:              upgradetest.Latest,
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
-				genesis:           testGenesisJSON(),
 			},
 		},
 		{
@@ -535,12 +532,10 @@ func TestWriteGenesis(t *testing.T) {
 			initial: spec{
 				fork:              upgradetest.Latest,
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
-				genesis:           testGenesisJSON(),
 			},
 			restart: spec{
 				fork:              upgradetest.Latest,
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(2_000 * time.Second),
-				genesis:           testGenesisJSON(),
 			},
 		},
 		{
@@ -548,12 +543,10 @@ func TestWriteGenesis(t *testing.T) {
 			initial: spec{
 				fork:              upgradetest.Latest,
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(2_000 * time.Second),
-				genesis:           testGenesisJSON(),
 			},
 			restart: spec{
 				fork:              upgradetest.Latest,
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
-				genesis:           testGenesisJSON(),
 			},
 		},
 		{
@@ -561,12 +554,10 @@ func TestWriteGenesis(t *testing.T) {
 			initial: spec{
 				fork:              upgradetest.Latest,
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
-				genesis:           testGenesisJSON(),
 			},
 			restart: spec{
 				fork:              upgradetest.Latest,
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
-				genesis:           testGenesisJSON(),
 				upgradeBytes: overridesJSON(extras.NetworkUpgrades{
 					IglooTimestamp: new(testGenesisTime + 2_000),
 				}),
@@ -576,13 +567,11 @@ func TestWriteGenesis(t *testing.T) {
 			name: "delay_activated_network_override",
 			initial: spec{
 				fork:              upgradetest.Latest,
-				genesis:           testGenesisJSON(),
 				latestUpgradeTime: upgrade.UnscheduledActivationTime,
 			},
 			headTime: testGenesisTime + 4_000,
 			restart: spec{
 				fork:              upgradetest.Latest,
-				genesis:           testGenesisJSON(),
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
 				upgradeBytes: overridesJSON(extras.NetworkUpgrades{
 					IglooTimestamp: new(testGenesisTime + 3_000),
@@ -595,13 +584,11 @@ func TestWriteGenesis(t *testing.T) {
 			name: "delay_missed_network_upgrade",
 			initial: spec{
 				fork:              upgradetest.Latest,
-				genesis:           testGenesisJSON(),
 				latestUpgradeTime: upgrade.UnscheduledActivationTime,
 			},
 			headTime: testGenesisTime + 2_000,
 			restart: spec{
 				fork:              upgradetest.Latest,
-				genesis:           testGenesisJSON(),
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
 				upgradeBytes: overridesJSON(extras.NetworkUpgrades{
 					IglooTimestamp: new(testGenesisTime + 3_000),
@@ -616,13 +603,11 @@ func TestWriteGenesis(t *testing.T) {
 			initial: spec{
 				fork:              upgradetest.Latest,
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
-				genesis:           testGenesisJSON(),
 			},
 			headTime: testGenesisTime + 4_000,
 			restart: spec{
 				fork:              upgradetest.Latest,
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(3_000 * time.Second),
-				genesis:           testGenesisJSON(),
 			},
 			wantErr: errIsType[*params.ConfigCompatError](),
 		},
@@ -631,13 +616,11 @@ func TestWriteGenesis(t *testing.T) {
 			initial: spec{
 				fork:              upgradetest.Latest,
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(3_000 * time.Second),
-				genesis:           testGenesisJSON(),
 			},
 			headTime: testGenesisTime + 4_000,
 			restart: spec{
 				fork:              upgradetest.Latest,
 				latestUpgradeTime: upgrade.InitiallyActiveTime.Add(1_000 * time.Second),
-				genesis:           testGenesisJSON(),
 			},
 			wantErr: errIsType[*params.ConfigCompatError](),
 		},
@@ -647,12 +630,10 @@ func TestWriteGenesis(t *testing.T) {
 			// genesis-hash mismatch.
 			name: "incompatible_upgrade",
 			initial: spec{
-				fork:    upgradetest.Durango,
-				genesis: testGenesisJSON(),
+				fork: upgradetest.Durango,
 			},
 			restart: spec{
-				fork:    upgradetest.Cortina,
-				genesis: testGenesisJSON(),
+				fork: upgradetest.Cortina,
 			},
 			wantErr: errIsType[*params.ConfigCompatError](),
 		},
@@ -660,11 +641,7 @@ func TestWriteGenesis(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
-			g, err := parseGenesis(
-				newSpecContext(tt.initial),
-				[]byte(tt.initial.genesis),
-				[]byte(tt.initial.upgradeBytes),
-			)
+			g, err := parseSpec(tt.initial)
 			require.NoError(t, err, "parseGenesis(initial)")
 			require.NoErrorf(t, g.verifyAndWriteBlock(db), "%T.verifyAndWriteBlock(initial)", g)
 
@@ -686,11 +663,7 @@ func TestWriteGenesis(t *testing.T) {
 
 			// The restart runs on the initialized database. It must
 			// agree on the block hash and store its own chain config.
-			g, err = parseGenesis(
-				newSpecContext(tt.restart),
-				[]byte(tt.restart.genesis),
-				[]byte(tt.restart.upgradeBytes),
-			)
+			g, err = parseSpec(tt.restart)
 			require.NoError(t, err, "parseGenesis(restart)")
 
 			err = g.verifyAndWriteBlock(db)
