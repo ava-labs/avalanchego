@@ -130,6 +130,129 @@ func (Error) EnumDescriptor() ([]byte, []int) {
 	return file_vm_vm_proto_rawDescGZIP(), []int{1}
 }
 
+type LogLevel int32
+
+const (
+	// LOG_LEVEL_UNSPECIFIED is sent by nodes that predate this field. The VM
+	// falls back to its default level.
+	LogLevel_LOG_LEVEL_UNSPECIFIED LogLevel = 0
+	LogLevel_LOG_LEVEL_VERBO       LogLevel = 1
+	LogLevel_LOG_LEVEL_DEBUG       LogLevel = 2
+	LogLevel_LOG_LEVEL_TRACE       LogLevel = 3
+	LogLevel_LOG_LEVEL_INFO        LogLevel = 4
+	LogLevel_LOG_LEVEL_WARN        LogLevel = 5
+	LogLevel_LOG_LEVEL_ERROR       LogLevel = 6
+	LogLevel_LOG_LEVEL_FATAL       LogLevel = 7
+	LogLevel_LOG_LEVEL_OFF         LogLevel = 8
+)
+
+// Enum value maps for LogLevel.
+var (
+	LogLevel_name = map[int32]string{
+		0: "LOG_LEVEL_UNSPECIFIED",
+		1: "LOG_LEVEL_VERBO",
+		2: "LOG_LEVEL_DEBUG",
+		3: "LOG_LEVEL_TRACE",
+		4: "LOG_LEVEL_INFO",
+		5: "LOG_LEVEL_WARN",
+		6: "LOG_LEVEL_ERROR",
+		7: "LOG_LEVEL_FATAL",
+		8: "LOG_LEVEL_OFF",
+	}
+	LogLevel_value = map[string]int32{
+		"LOG_LEVEL_UNSPECIFIED": 0,
+		"LOG_LEVEL_VERBO":       1,
+		"LOG_LEVEL_DEBUG":       2,
+		"LOG_LEVEL_TRACE":       3,
+		"LOG_LEVEL_INFO":        4,
+		"LOG_LEVEL_WARN":        5,
+		"LOG_LEVEL_ERROR":       6,
+		"LOG_LEVEL_FATAL":       7,
+		"LOG_LEVEL_OFF":         8,
+	}
+)
+
+func (x LogLevel) Enum() *LogLevel {
+	p := new(LogLevel)
+	*p = x
+	return p
+}
+
+func (x LogLevel) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (LogLevel) Descriptor() protoreflect.EnumDescriptor {
+	return file_vm_vm_proto_enumTypes[2].Descriptor()
+}
+
+func (LogLevel) Type() protoreflect.EnumType {
+	return &file_vm_vm_proto_enumTypes[2]
+}
+
+func (x LogLevel) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use LogLevel.Descriptor instead.
+func (LogLevel) EnumDescriptor() ([]byte, []int) {
+	return file_vm_vm_proto_rawDescGZIP(), []int{2}
+}
+
+type LogFormat int32
+
+const (
+	// LOG_FORMAT_UNSPECIFIED is sent by nodes that predate this field. The VM
+	// falls back to its default format.
+	LogFormat_LOG_FORMAT_UNSPECIFIED LogFormat = 0
+	LogFormat_LOG_FORMAT_PLAIN       LogFormat = 1
+	LogFormat_LOG_FORMAT_COLORS      LogFormat = 2
+	LogFormat_LOG_FORMAT_JSON        LogFormat = 3
+)
+
+// Enum value maps for LogFormat.
+var (
+	LogFormat_name = map[int32]string{
+		0: "LOG_FORMAT_UNSPECIFIED",
+		1: "LOG_FORMAT_PLAIN",
+		2: "LOG_FORMAT_COLORS",
+		3: "LOG_FORMAT_JSON",
+	}
+	LogFormat_value = map[string]int32{
+		"LOG_FORMAT_UNSPECIFIED": 0,
+		"LOG_FORMAT_PLAIN":       1,
+		"LOG_FORMAT_COLORS":      2,
+		"LOG_FORMAT_JSON":        3,
+	}
+)
+
+func (x LogFormat) Enum() *LogFormat {
+	p := new(LogFormat)
+	*p = x
+	return p
+}
+
+func (x LogFormat) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (LogFormat) Descriptor() protoreflect.EnumDescriptor {
+	return file_vm_vm_proto_enumTypes[3].Descriptor()
+}
+
+func (LogFormat) Type() protoreflect.EnumType {
+	return &file_vm_vm_proto_enumTypes[3]
+}
+
+func (x LogFormat) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use LogFormat.Descriptor instead.
+func (LogFormat) EnumDescriptor() ([]byte, []int) {
+	return file_vm_vm_proto_rawDescGZIP(), []int{3}
+}
+
 type Message int32
 
 const (
@@ -163,11 +286,11 @@ func (x Message) String() string {
 }
 
 func (Message) Descriptor() protoreflect.EnumDescriptor {
-	return file_vm_vm_proto_enumTypes[2].Descriptor()
+	return file_vm_vm_proto_enumTypes[4].Descriptor()
 }
 
 func (Message) Type() protoreflect.EnumType {
-	return &file_vm_vm_proto_enumTypes[2]
+	return &file_vm_vm_proto_enumTypes[4]
 }
 
 func (x Message) Number() protoreflect.EnumNumber {
@@ -176,7 +299,7 @@ func (x Message) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Message.Descriptor instead.
 func (Message) EnumDescriptor() ([]byte, []int) {
-	return file_vm_vm_proto_rawDescGZIP(), []int{2}
+	return file_vm_vm_proto_rawDescGZIP(), []int{4}
 }
 
 type StateSummaryAcceptResponse_Mode int32
@@ -215,11 +338,11 @@ func (x StateSummaryAcceptResponse_Mode) String() string {
 }
 
 func (StateSummaryAcceptResponse_Mode) Descriptor() protoreflect.EnumDescriptor {
-	return file_vm_vm_proto_enumTypes[3].Descriptor()
+	return file_vm_vm_proto_enumTypes[5].Descriptor()
 }
 
 func (StateSummaryAcceptResponse_Mode) Type() protoreflect.EnumType {
-	return &file_vm_vm_proto_enumTypes[3]
+	return &file_vm_vm_proto_enumTypes[5]
 }
 
 func (x StateSummaryAcceptResponse_Mode) Number() protoreflect.EnumNumber {
@@ -253,6 +376,8 @@ type InitializeRequest struct {
 	ServerAddr string `protobuf:"bytes,14,opt,name=server_addr,json=serverAddr,proto3" json:"server_addr,omitempty"`
 	// network_upgrades_bytes is the json encoded network upgrades
 	NetworkUpgrades *NetworkUpgrades `protobuf:"bytes,15,opt,name=network_upgrades,json=networkUpgrades,proto3" json:"network_upgrades,omitempty"`
+	LogLevel        LogLevel         `protobuf:"varint,16,opt,name=log_level,json=logLevel,proto3,enum=vm.LogLevel" json:"log_level,omitempty"`
+	LogFormat       LogFormat        `protobuf:"varint,17,opt,name=log_format,json=logFormat,proto3,enum=vm.LogFormat" json:"log_format,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -390,6 +515,20 @@ func (x *InitializeRequest) GetNetworkUpgrades() *NetworkUpgrades {
 		return x.NetworkUpgrades
 	}
 	return nil
+}
+
+func (x *InitializeRequest) GetLogLevel() LogLevel {
+	if x != nil {
+		return x.LogLevel
+	}
+	return LogLevel_LOG_LEVEL_UNSPECIFIED
+}
+
+func (x *InitializeRequest) GetLogFormat() LogFormat {
+	if x != nil {
+		return x.LogFormat
+	}
+	return LogFormat_LOG_FORMAT_UNSPECIFIED
 }
 
 type NetworkUpgrades struct {
@@ -2879,7 +3018,7 @@ var File_vm_vm_proto protoreflect.FileDescriptor
 
 const file_vm_vm_proto_rawDesc = "" +
 	"\n" +
-	"\vvm/vm.proto\x12\x02vm\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\"io/prometheus/client/metrics.proto\"\x9c\x04\n" +
+	"\vvm/vm.proto\x12\x02vm\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\"io/prometheus/client/metrics.proto\"\xf5\x04\n" +
 	"\x11InitializeRequest\x12\x1d\n" +
 	"\n" +
 	"network_id\x18\x01 \x01(\rR\tnetworkId\x12\x1b\n" +
@@ -2901,7 +3040,10 @@ const file_vm_vm_proto_rawDesc = "" +
 	"\x0edb_server_addr\x18\r \x01(\tR\fdbServerAddr\x12\x1f\n" +
 	"\vserver_addr\x18\x0e \x01(\tR\n" +
 	"serverAddr\x12>\n" +
-	"\x10network_upgrades\x18\x0f \x01(\v2\x13.vm.NetworkUpgradesR\x0fnetworkUpgrades\"\xd1\n" +
+	"\x10network_upgrades\x18\x0f \x01(\v2\x13.vm.NetworkUpgradesR\x0fnetworkUpgrades\x12)\n" +
+	"\tlog_level\x18\x10 \x01(\x0e2\f.vm.LogLevelR\blogLevel\x12,\n" +
+	"\n" +
+	"log_format\x18\x11 \x01(\x0e2\r.vm.LogFormatR\tlogFormat\"\xd1\n" +
 	"\n" +
 	"\x0fNetworkUpgrades\x12K\n" +
 	"\x14apricot_phase_1_time\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\x11apricotPhase1Time\x12K\n" +
@@ -3086,7 +3228,22 @@ const file_vm_vm_proto_rawDesc = "" +
 	"\x11ERROR_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fERROR_CLOSED\x10\x01\x12\x13\n" +
 	"\x0fERROR_NOT_FOUND\x10\x02\x12$\n" +
-	" ERROR_STATE_SYNC_NOT_IMPLEMENTED\x10\x03*\\\n" +
+	" ERROR_STATE_SYNC_NOT_IMPLEMENTED\x10\x03*\xc9\x01\n" +
+	"\bLogLevel\x12\x19\n" +
+	"\x15LOG_LEVEL_UNSPECIFIED\x10\x00\x12\x13\n" +
+	"\x0fLOG_LEVEL_VERBO\x10\x01\x12\x13\n" +
+	"\x0fLOG_LEVEL_DEBUG\x10\x02\x12\x13\n" +
+	"\x0fLOG_LEVEL_TRACE\x10\x03\x12\x12\n" +
+	"\x0eLOG_LEVEL_INFO\x10\x04\x12\x12\n" +
+	"\x0eLOG_LEVEL_WARN\x10\x05\x12\x13\n" +
+	"\x0fLOG_LEVEL_ERROR\x10\x06\x12\x13\n" +
+	"\x0fLOG_LEVEL_FATAL\x10\a\x12\x11\n" +
+	"\rLOG_LEVEL_OFF\x10\b*i\n" +
+	"\tLogFormat\x12\x1a\n" +
+	"\x16LOG_FORMAT_UNSPECIFIED\x10\x00\x12\x14\n" +
+	"\x10LOG_FORMAT_PLAIN\x10\x01\x12\x15\n" +
+	"\x11LOG_FORMAT_COLORS\x10\x02\x12\x13\n" +
+	"\x0fLOG_FORMAT_JSON\x10\x03*\\\n" +
 	"\aMessage\x12\x17\n" +
 	"\x13MESSAGE_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13MESSAGE_BUILD_BLOCK\x10\x01\x12\x1f\n" +
@@ -3140,169 +3297,173 @@ func file_vm_vm_proto_rawDescGZIP() []byte {
 	return file_vm_vm_proto_rawDescData
 }
 
-var file_vm_vm_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
+var file_vm_vm_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
 var file_vm_vm_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
 var file_vm_vm_proto_goTypes = []any{
 	(State)(0),                                 // 0: vm.State
 	(Error)(0),                                 // 1: vm.Error
-	(Message)(0),                               // 2: vm.Message
-	(StateSummaryAcceptResponse_Mode)(0),       // 3: vm.StateSummaryAcceptResponse.Mode
-	(*InitializeRequest)(nil),                  // 4: vm.InitializeRequest
-	(*NetworkUpgrades)(nil),                    // 5: vm.NetworkUpgrades
-	(*InitializeResponse)(nil),                 // 6: vm.InitializeResponse
-	(*SetStateRequest)(nil),                    // 7: vm.SetStateRequest
-	(*SetStateResponse)(nil),                   // 8: vm.SetStateResponse
-	(*CreateHandlersResponse)(nil),             // 9: vm.CreateHandlersResponse
-	(*Handler)(nil),                            // 10: vm.Handler
-	(*NewHTTPHandlerResponse)(nil),             // 11: vm.NewHTTPHandlerResponse
-	(*WaitForEventResponse)(nil),               // 12: vm.WaitForEventResponse
-	(*BuildBlockRequest)(nil),                  // 13: vm.BuildBlockRequest
-	(*BuildBlockResponse)(nil),                 // 14: vm.BuildBlockResponse
-	(*ParseBlockRequest)(nil),                  // 15: vm.ParseBlockRequest
-	(*ParseBlockResponse)(nil),                 // 16: vm.ParseBlockResponse
-	(*GetBlockRequest)(nil),                    // 17: vm.GetBlockRequest
-	(*GetBlockResponse)(nil),                   // 18: vm.GetBlockResponse
-	(*SetPreferenceRequest)(nil),               // 19: vm.SetPreferenceRequest
-	(*BlockVerifyRequest)(nil),                 // 20: vm.BlockVerifyRequest
-	(*BlockVerifyResponse)(nil),                // 21: vm.BlockVerifyResponse
-	(*BlockAcceptRequest)(nil),                 // 22: vm.BlockAcceptRequest
-	(*BlockRejectRequest)(nil),                 // 23: vm.BlockRejectRequest
-	(*HealthResponse)(nil),                     // 24: vm.HealthResponse
-	(*VersionResponse)(nil),                    // 25: vm.VersionResponse
-	(*AppRequestMsg)(nil),                      // 26: vm.AppRequestMsg
-	(*AppRequestFailedMsg)(nil),                // 27: vm.AppRequestFailedMsg
-	(*AppResponseMsg)(nil),                     // 28: vm.AppResponseMsg
-	(*AppGossipMsg)(nil),                       // 29: vm.AppGossipMsg
-	(*ConnectedRequest)(nil),                   // 30: vm.ConnectedRequest
-	(*DisconnectedRequest)(nil),                // 31: vm.DisconnectedRequest
-	(*GetAncestorsRequest)(nil),                // 32: vm.GetAncestorsRequest
-	(*GetAncestorsResponse)(nil),               // 33: vm.GetAncestorsResponse
-	(*BatchedParseBlockRequest)(nil),           // 34: vm.BatchedParseBlockRequest
-	(*BatchedParseBlockResponse)(nil),          // 35: vm.BatchedParseBlockResponse
-	(*GetBlockIDAtHeightRequest)(nil),          // 36: vm.GetBlockIDAtHeightRequest
-	(*GetBlockIDAtHeightResponse)(nil),         // 37: vm.GetBlockIDAtHeightResponse
-	(*GatherResponse)(nil),                     // 38: vm.GatherResponse
-	(*StateSyncEnabledResponse)(nil),           // 39: vm.StateSyncEnabledResponse
-	(*GetOngoingSyncStateSummaryResponse)(nil), // 40: vm.GetOngoingSyncStateSummaryResponse
-	(*GetLastStateSummaryResponse)(nil),        // 41: vm.GetLastStateSummaryResponse
-	(*ParseStateSummaryRequest)(nil),           // 42: vm.ParseStateSummaryRequest
-	(*ParseStateSummaryResponse)(nil),          // 43: vm.ParseStateSummaryResponse
-	(*GetStateSummaryRequest)(nil),             // 44: vm.GetStateSummaryRequest
-	(*GetStateSummaryResponse)(nil),            // 45: vm.GetStateSummaryResponse
-	(*StateSummaryAcceptRequest)(nil),          // 46: vm.StateSummaryAcceptRequest
-	(*StateSummaryAcceptResponse)(nil),         // 47: vm.StateSummaryAcceptResponse
-	(*timestamppb.Timestamp)(nil),              // 48: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),                // 49: google.protobuf.Duration
-	(*_go.MetricFamily)(nil),                   // 50: io.prometheus.client.MetricFamily
-	(*emptypb.Empty)(nil),                      // 51: google.protobuf.Empty
+	(LogLevel)(0),                              // 2: vm.LogLevel
+	(LogFormat)(0),                             // 3: vm.LogFormat
+	(Message)(0),                               // 4: vm.Message
+	(StateSummaryAcceptResponse_Mode)(0),       // 5: vm.StateSummaryAcceptResponse.Mode
+	(*InitializeRequest)(nil),                  // 6: vm.InitializeRequest
+	(*NetworkUpgrades)(nil),                    // 7: vm.NetworkUpgrades
+	(*InitializeResponse)(nil),                 // 8: vm.InitializeResponse
+	(*SetStateRequest)(nil),                    // 9: vm.SetStateRequest
+	(*SetStateResponse)(nil),                   // 10: vm.SetStateResponse
+	(*CreateHandlersResponse)(nil),             // 11: vm.CreateHandlersResponse
+	(*Handler)(nil),                            // 12: vm.Handler
+	(*NewHTTPHandlerResponse)(nil),             // 13: vm.NewHTTPHandlerResponse
+	(*WaitForEventResponse)(nil),               // 14: vm.WaitForEventResponse
+	(*BuildBlockRequest)(nil),                  // 15: vm.BuildBlockRequest
+	(*BuildBlockResponse)(nil),                 // 16: vm.BuildBlockResponse
+	(*ParseBlockRequest)(nil),                  // 17: vm.ParseBlockRequest
+	(*ParseBlockResponse)(nil),                 // 18: vm.ParseBlockResponse
+	(*GetBlockRequest)(nil),                    // 19: vm.GetBlockRequest
+	(*GetBlockResponse)(nil),                   // 20: vm.GetBlockResponse
+	(*SetPreferenceRequest)(nil),               // 21: vm.SetPreferenceRequest
+	(*BlockVerifyRequest)(nil),                 // 22: vm.BlockVerifyRequest
+	(*BlockVerifyResponse)(nil),                // 23: vm.BlockVerifyResponse
+	(*BlockAcceptRequest)(nil),                 // 24: vm.BlockAcceptRequest
+	(*BlockRejectRequest)(nil),                 // 25: vm.BlockRejectRequest
+	(*HealthResponse)(nil),                     // 26: vm.HealthResponse
+	(*VersionResponse)(nil),                    // 27: vm.VersionResponse
+	(*AppRequestMsg)(nil),                      // 28: vm.AppRequestMsg
+	(*AppRequestFailedMsg)(nil),                // 29: vm.AppRequestFailedMsg
+	(*AppResponseMsg)(nil),                     // 30: vm.AppResponseMsg
+	(*AppGossipMsg)(nil),                       // 31: vm.AppGossipMsg
+	(*ConnectedRequest)(nil),                   // 32: vm.ConnectedRequest
+	(*DisconnectedRequest)(nil),                // 33: vm.DisconnectedRequest
+	(*GetAncestorsRequest)(nil),                // 34: vm.GetAncestorsRequest
+	(*GetAncestorsResponse)(nil),               // 35: vm.GetAncestorsResponse
+	(*BatchedParseBlockRequest)(nil),           // 36: vm.BatchedParseBlockRequest
+	(*BatchedParseBlockResponse)(nil),          // 37: vm.BatchedParseBlockResponse
+	(*GetBlockIDAtHeightRequest)(nil),          // 38: vm.GetBlockIDAtHeightRequest
+	(*GetBlockIDAtHeightResponse)(nil),         // 39: vm.GetBlockIDAtHeightResponse
+	(*GatherResponse)(nil),                     // 40: vm.GatherResponse
+	(*StateSyncEnabledResponse)(nil),           // 41: vm.StateSyncEnabledResponse
+	(*GetOngoingSyncStateSummaryResponse)(nil), // 42: vm.GetOngoingSyncStateSummaryResponse
+	(*GetLastStateSummaryResponse)(nil),        // 43: vm.GetLastStateSummaryResponse
+	(*ParseStateSummaryRequest)(nil),           // 44: vm.ParseStateSummaryRequest
+	(*ParseStateSummaryResponse)(nil),          // 45: vm.ParseStateSummaryResponse
+	(*GetStateSummaryRequest)(nil),             // 46: vm.GetStateSummaryRequest
+	(*GetStateSummaryResponse)(nil),            // 47: vm.GetStateSummaryResponse
+	(*StateSummaryAcceptRequest)(nil),          // 48: vm.StateSummaryAcceptRequest
+	(*StateSummaryAcceptResponse)(nil),         // 49: vm.StateSummaryAcceptResponse
+	(*timestamppb.Timestamp)(nil),              // 50: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),                // 51: google.protobuf.Duration
+	(*_go.MetricFamily)(nil),                   // 52: io.prometheus.client.MetricFamily
+	(*emptypb.Empty)(nil),                      // 53: google.protobuf.Empty
 }
 var file_vm_vm_proto_depIdxs = []int32{
-	5,  // 0: vm.InitializeRequest.network_upgrades:type_name -> vm.NetworkUpgrades
-	48, // 1: vm.NetworkUpgrades.apricot_phase_1_time:type_name -> google.protobuf.Timestamp
-	48, // 2: vm.NetworkUpgrades.apricot_phase_2_time:type_name -> google.protobuf.Timestamp
-	48, // 3: vm.NetworkUpgrades.apricot_phase_3_time:type_name -> google.protobuf.Timestamp
-	48, // 4: vm.NetworkUpgrades.apricot_phase_4_time:type_name -> google.protobuf.Timestamp
-	48, // 5: vm.NetworkUpgrades.apricot_phase_5_time:type_name -> google.protobuf.Timestamp
-	48, // 6: vm.NetworkUpgrades.apricot_phase_pre_6_time:type_name -> google.protobuf.Timestamp
-	48, // 7: vm.NetworkUpgrades.apricot_phase_6_time:type_name -> google.protobuf.Timestamp
-	48, // 8: vm.NetworkUpgrades.apricot_phase_post_6_time:type_name -> google.protobuf.Timestamp
-	48, // 9: vm.NetworkUpgrades.banff_time:type_name -> google.protobuf.Timestamp
-	48, // 10: vm.NetworkUpgrades.cortina_time:type_name -> google.protobuf.Timestamp
-	48, // 11: vm.NetworkUpgrades.durango_time:type_name -> google.protobuf.Timestamp
-	48, // 12: vm.NetworkUpgrades.etna_time:type_name -> google.protobuf.Timestamp
-	48, // 13: vm.NetworkUpgrades.fortuna_time:type_name -> google.protobuf.Timestamp
-	48, // 14: vm.NetworkUpgrades.granite_time:type_name -> google.protobuf.Timestamp
-	49, // 15: vm.NetworkUpgrades.granite_epoch_duration:type_name -> google.protobuf.Duration
-	48, // 16: vm.NetworkUpgrades.helicon_time:type_name -> google.protobuf.Timestamp
-	48, // 17: vm.NetworkUpgrades.igloo_time:type_name -> google.protobuf.Timestamp
-	48, // 18: vm.InitializeResponse.timestamp:type_name -> google.protobuf.Timestamp
-	0,  // 19: vm.SetStateRequest.state:type_name -> vm.State
-	48, // 20: vm.SetStateResponse.timestamp:type_name -> google.protobuf.Timestamp
-	10, // 21: vm.CreateHandlersResponse.handlers:type_name -> vm.Handler
-	2,  // 22: vm.WaitForEventResponse.message:type_name -> vm.Message
-	48, // 23: vm.BuildBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
-	48, // 24: vm.ParseBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
-	48, // 25: vm.GetBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
-	1,  // 26: vm.GetBlockResponse.err:type_name -> vm.Error
-	48, // 27: vm.BlockVerifyResponse.timestamp:type_name -> google.protobuf.Timestamp
-	48, // 28: vm.AppRequestMsg.deadline:type_name -> google.protobuf.Timestamp
-	16, // 29: vm.BatchedParseBlockResponse.response:type_name -> vm.ParseBlockResponse
-	1,  // 30: vm.GetBlockIDAtHeightResponse.err:type_name -> vm.Error
-	50, // 31: vm.GatherResponse.metric_families:type_name -> io.prometheus.client.MetricFamily
-	1,  // 32: vm.StateSyncEnabledResponse.err:type_name -> vm.Error
-	1,  // 33: vm.GetOngoingSyncStateSummaryResponse.err:type_name -> vm.Error
-	1,  // 34: vm.GetLastStateSummaryResponse.err:type_name -> vm.Error
-	1,  // 35: vm.ParseStateSummaryResponse.err:type_name -> vm.Error
-	1,  // 36: vm.GetStateSummaryResponse.err:type_name -> vm.Error
-	3,  // 37: vm.StateSummaryAcceptResponse.mode:type_name -> vm.StateSummaryAcceptResponse.Mode
-	1,  // 38: vm.StateSummaryAcceptResponse.err:type_name -> vm.Error
-	4,  // 39: vm.VM.Initialize:input_type -> vm.InitializeRequest
-	7,  // 40: vm.VM.SetState:input_type -> vm.SetStateRequest
-	51, // 41: vm.VM.Shutdown:input_type -> google.protobuf.Empty
-	51, // 42: vm.VM.CreateHandlers:input_type -> google.protobuf.Empty
-	51, // 43: vm.VM.NewHTTPHandler:input_type -> google.protobuf.Empty
-	51, // 44: vm.VM.WaitForEvent:input_type -> google.protobuf.Empty
-	30, // 45: vm.VM.Connected:input_type -> vm.ConnectedRequest
-	31, // 46: vm.VM.Disconnected:input_type -> vm.DisconnectedRequest
-	13, // 47: vm.VM.BuildBlock:input_type -> vm.BuildBlockRequest
-	15, // 48: vm.VM.ParseBlock:input_type -> vm.ParseBlockRequest
-	17, // 49: vm.VM.GetBlock:input_type -> vm.GetBlockRequest
-	19, // 50: vm.VM.SetPreference:input_type -> vm.SetPreferenceRequest
-	51, // 51: vm.VM.Health:input_type -> google.protobuf.Empty
-	51, // 52: vm.VM.Version:input_type -> google.protobuf.Empty
-	26, // 53: vm.VM.AppRequest:input_type -> vm.AppRequestMsg
-	27, // 54: vm.VM.AppRequestFailed:input_type -> vm.AppRequestFailedMsg
-	28, // 55: vm.VM.AppResponse:input_type -> vm.AppResponseMsg
-	29, // 56: vm.VM.AppGossip:input_type -> vm.AppGossipMsg
-	51, // 57: vm.VM.Gather:input_type -> google.protobuf.Empty
-	32, // 58: vm.VM.GetAncestors:input_type -> vm.GetAncestorsRequest
-	34, // 59: vm.VM.BatchedParseBlock:input_type -> vm.BatchedParseBlockRequest
-	36, // 60: vm.VM.GetBlockIDAtHeight:input_type -> vm.GetBlockIDAtHeightRequest
-	51, // 61: vm.VM.StateSyncEnabled:input_type -> google.protobuf.Empty
-	51, // 62: vm.VM.GetOngoingSyncStateSummary:input_type -> google.protobuf.Empty
-	51, // 63: vm.VM.GetLastStateSummary:input_type -> google.protobuf.Empty
-	42, // 64: vm.VM.ParseStateSummary:input_type -> vm.ParseStateSummaryRequest
-	44, // 65: vm.VM.GetStateSummary:input_type -> vm.GetStateSummaryRequest
-	20, // 66: vm.VM.BlockVerify:input_type -> vm.BlockVerifyRequest
-	22, // 67: vm.VM.BlockAccept:input_type -> vm.BlockAcceptRequest
-	23, // 68: vm.VM.BlockReject:input_type -> vm.BlockRejectRequest
-	46, // 69: vm.VM.StateSummaryAccept:input_type -> vm.StateSummaryAcceptRequest
-	6,  // 70: vm.VM.Initialize:output_type -> vm.InitializeResponse
-	8,  // 71: vm.VM.SetState:output_type -> vm.SetStateResponse
-	51, // 72: vm.VM.Shutdown:output_type -> google.protobuf.Empty
-	9,  // 73: vm.VM.CreateHandlers:output_type -> vm.CreateHandlersResponse
-	11, // 74: vm.VM.NewHTTPHandler:output_type -> vm.NewHTTPHandlerResponse
-	12, // 75: vm.VM.WaitForEvent:output_type -> vm.WaitForEventResponse
-	51, // 76: vm.VM.Connected:output_type -> google.protobuf.Empty
-	51, // 77: vm.VM.Disconnected:output_type -> google.protobuf.Empty
-	14, // 78: vm.VM.BuildBlock:output_type -> vm.BuildBlockResponse
-	16, // 79: vm.VM.ParseBlock:output_type -> vm.ParseBlockResponse
-	18, // 80: vm.VM.GetBlock:output_type -> vm.GetBlockResponse
-	51, // 81: vm.VM.SetPreference:output_type -> google.protobuf.Empty
-	24, // 82: vm.VM.Health:output_type -> vm.HealthResponse
-	25, // 83: vm.VM.Version:output_type -> vm.VersionResponse
-	51, // 84: vm.VM.AppRequest:output_type -> google.protobuf.Empty
-	51, // 85: vm.VM.AppRequestFailed:output_type -> google.protobuf.Empty
-	51, // 86: vm.VM.AppResponse:output_type -> google.protobuf.Empty
-	51, // 87: vm.VM.AppGossip:output_type -> google.protobuf.Empty
-	38, // 88: vm.VM.Gather:output_type -> vm.GatherResponse
-	33, // 89: vm.VM.GetAncestors:output_type -> vm.GetAncestorsResponse
-	35, // 90: vm.VM.BatchedParseBlock:output_type -> vm.BatchedParseBlockResponse
-	37, // 91: vm.VM.GetBlockIDAtHeight:output_type -> vm.GetBlockIDAtHeightResponse
-	39, // 92: vm.VM.StateSyncEnabled:output_type -> vm.StateSyncEnabledResponse
-	40, // 93: vm.VM.GetOngoingSyncStateSummary:output_type -> vm.GetOngoingSyncStateSummaryResponse
-	41, // 94: vm.VM.GetLastStateSummary:output_type -> vm.GetLastStateSummaryResponse
-	43, // 95: vm.VM.ParseStateSummary:output_type -> vm.ParseStateSummaryResponse
-	45, // 96: vm.VM.GetStateSummary:output_type -> vm.GetStateSummaryResponse
-	21, // 97: vm.VM.BlockVerify:output_type -> vm.BlockVerifyResponse
-	51, // 98: vm.VM.BlockAccept:output_type -> google.protobuf.Empty
-	51, // 99: vm.VM.BlockReject:output_type -> google.protobuf.Empty
-	47, // 100: vm.VM.StateSummaryAccept:output_type -> vm.StateSummaryAcceptResponse
-	70, // [70:101] is the sub-list for method output_type
-	39, // [39:70] is the sub-list for method input_type
-	39, // [39:39] is the sub-list for extension type_name
-	39, // [39:39] is the sub-list for extension extendee
-	0,  // [0:39] is the sub-list for field type_name
+	7,  // 0: vm.InitializeRequest.network_upgrades:type_name -> vm.NetworkUpgrades
+	2,  // 1: vm.InitializeRequest.log_level:type_name -> vm.LogLevel
+	3,  // 2: vm.InitializeRequest.log_format:type_name -> vm.LogFormat
+	50, // 3: vm.NetworkUpgrades.apricot_phase_1_time:type_name -> google.protobuf.Timestamp
+	50, // 4: vm.NetworkUpgrades.apricot_phase_2_time:type_name -> google.protobuf.Timestamp
+	50, // 5: vm.NetworkUpgrades.apricot_phase_3_time:type_name -> google.protobuf.Timestamp
+	50, // 6: vm.NetworkUpgrades.apricot_phase_4_time:type_name -> google.protobuf.Timestamp
+	50, // 7: vm.NetworkUpgrades.apricot_phase_5_time:type_name -> google.protobuf.Timestamp
+	50, // 8: vm.NetworkUpgrades.apricot_phase_pre_6_time:type_name -> google.protobuf.Timestamp
+	50, // 9: vm.NetworkUpgrades.apricot_phase_6_time:type_name -> google.protobuf.Timestamp
+	50, // 10: vm.NetworkUpgrades.apricot_phase_post_6_time:type_name -> google.protobuf.Timestamp
+	50, // 11: vm.NetworkUpgrades.banff_time:type_name -> google.protobuf.Timestamp
+	50, // 12: vm.NetworkUpgrades.cortina_time:type_name -> google.protobuf.Timestamp
+	50, // 13: vm.NetworkUpgrades.durango_time:type_name -> google.protobuf.Timestamp
+	50, // 14: vm.NetworkUpgrades.etna_time:type_name -> google.protobuf.Timestamp
+	50, // 15: vm.NetworkUpgrades.fortuna_time:type_name -> google.protobuf.Timestamp
+	50, // 16: vm.NetworkUpgrades.granite_time:type_name -> google.protobuf.Timestamp
+	51, // 17: vm.NetworkUpgrades.granite_epoch_duration:type_name -> google.protobuf.Duration
+	50, // 18: vm.NetworkUpgrades.helicon_time:type_name -> google.protobuf.Timestamp
+	50, // 19: vm.NetworkUpgrades.igloo_time:type_name -> google.protobuf.Timestamp
+	50, // 20: vm.InitializeResponse.timestamp:type_name -> google.protobuf.Timestamp
+	0,  // 21: vm.SetStateRequest.state:type_name -> vm.State
+	50, // 22: vm.SetStateResponse.timestamp:type_name -> google.protobuf.Timestamp
+	12, // 23: vm.CreateHandlersResponse.handlers:type_name -> vm.Handler
+	4,  // 24: vm.WaitForEventResponse.message:type_name -> vm.Message
+	50, // 25: vm.BuildBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
+	50, // 26: vm.ParseBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
+	50, // 27: vm.GetBlockResponse.timestamp:type_name -> google.protobuf.Timestamp
+	1,  // 28: vm.GetBlockResponse.err:type_name -> vm.Error
+	50, // 29: vm.BlockVerifyResponse.timestamp:type_name -> google.protobuf.Timestamp
+	50, // 30: vm.AppRequestMsg.deadline:type_name -> google.protobuf.Timestamp
+	18, // 31: vm.BatchedParseBlockResponse.response:type_name -> vm.ParseBlockResponse
+	1,  // 32: vm.GetBlockIDAtHeightResponse.err:type_name -> vm.Error
+	52, // 33: vm.GatherResponse.metric_families:type_name -> io.prometheus.client.MetricFamily
+	1,  // 34: vm.StateSyncEnabledResponse.err:type_name -> vm.Error
+	1,  // 35: vm.GetOngoingSyncStateSummaryResponse.err:type_name -> vm.Error
+	1,  // 36: vm.GetLastStateSummaryResponse.err:type_name -> vm.Error
+	1,  // 37: vm.ParseStateSummaryResponse.err:type_name -> vm.Error
+	1,  // 38: vm.GetStateSummaryResponse.err:type_name -> vm.Error
+	5,  // 39: vm.StateSummaryAcceptResponse.mode:type_name -> vm.StateSummaryAcceptResponse.Mode
+	1,  // 40: vm.StateSummaryAcceptResponse.err:type_name -> vm.Error
+	6,  // 41: vm.VM.Initialize:input_type -> vm.InitializeRequest
+	9,  // 42: vm.VM.SetState:input_type -> vm.SetStateRequest
+	53, // 43: vm.VM.Shutdown:input_type -> google.protobuf.Empty
+	53, // 44: vm.VM.CreateHandlers:input_type -> google.protobuf.Empty
+	53, // 45: vm.VM.NewHTTPHandler:input_type -> google.protobuf.Empty
+	53, // 46: vm.VM.WaitForEvent:input_type -> google.protobuf.Empty
+	32, // 47: vm.VM.Connected:input_type -> vm.ConnectedRequest
+	33, // 48: vm.VM.Disconnected:input_type -> vm.DisconnectedRequest
+	15, // 49: vm.VM.BuildBlock:input_type -> vm.BuildBlockRequest
+	17, // 50: vm.VM.ParseBlock:input_type -> vm.ParseBlockRequest
+	19, // 51: vm.VM.GetBlock:input_type -> vm.GetBlockRequest
+	21, // 52: vm.VM.SetPreference:input_type -> vm.SetPreferenceRequest
+	53, // 53: vm.VM.Health:input_type -> google.protobuf.Empty
+	53, // 54: vm.VM.Version:input_type -> google.protobuf.Empty
+	28, // 55: vm.VM.AppRequest:input_type -> vm.AppRequestMsg
+	29, // 56: vm.VM.AppRequestFailed:input_type -> vm.AppRequestFailedMsg
+	30, // 57: vm.VM.AppResponse:input_type -> vm.AppResponseMsg
+	31, // 58: vm.VM.AppGossip:input_type -> vm.AppGossipMsg
+	53, // 59: vm.VM.Gather:input_type -> google.protobuf.Empty
+	34, // 60: vm.VM.GetAncestors:input_type -> vm.GetAncestorsRequest
+	36, // 61: vm.VM.BatchedParseBlock:input_type -> vm.BatchedParseBlockRequest
+	38, // 62: vm.VM.GetBlockIDAtHeight:input_type -> vm.GetBlockIDAtHeightRequest
+	53, // 63: vm.VM.StateSyncEnabled:input_type -> google.protobuf.Empty
+	53, // 64: vm.VM.GetOngoingSyncStateSummary:input_type -> google.protobuf.Empty
+	53, // 65: vm.VM.GetLastStateSummary:input_type -> google.protobuf.Empty
+	44, // 66: vm.VM.ParseStateSummary:input_type -> vm.ParseStateSummaryRequest
+	46, // 67: vm.VM.GetStateSummary:input_type -> vm.GetStateSummaryRequest
+	22, // 68: vm.VM.BlockVerify:input_type -> vm.BlockVerifyRequest
+	24, // 69: vm.VM.BlockAccept:input_type -> vm.BlockAcceptRequest
+	25, // 70: vm.VM.BlockReject:input_type -> vm.BlockRejectRequest
+	48, // 71: vm.VM.StateSummaryAccept:input_type -> vm.StateSummaryAcceptRequest
+	8,  // 72: vm.VM.Initialize:output_type -> vm.InitializeResponse
+	10, // 73: vm.VM.SetState:output_type -> vm.SetStateResponse
+	53, // 74: vm.VM.Shutdown:output_type -> google.protobuf.Empty
+	11, // 75: vm.VM.CreateHandlers:output_type -> vm.CreateHandlersResponse
+	13, // 76: vm.VM.NewHTTPHandler:output_type -> vm.NewHTTPHandlerResponse
+	14, // 77: vm.VM.WaitForEvent:output_type -> vm.WaitForEventResponse
+	53, // 78: vm.VM.Connected:output_type -> google.protobuf.Empty
+	53, // 79: vm.VM.Disconnected:output_type -> google.protobuf.Empty
+	16, // 80: vm.VM.BuildBlock:output_type -> vm.BuildBlockResponse
+	18, // 81: vm.VM.ParseBlock:output_type -> vm.ParseBlockResponse
+	20, // 82: vm.VM.GetBlock:output_type -> vm.GetBlockResponse
+	53, // 83: vm.VM.SetPreference:output_type -> google.protobuf.Empty
+	26, // 84: vm.VM.Health:output_type -> vm.HealthResponse
+	27, // 85: vm.VM.Version:output_type -> vm.VersionResponse
+	53, // 86: vm.VM.AppRequest:output_type -> google.protobuf.Empty
+	53, // 87: vm.VM.AppRequestFailed:output_type -> google.protobuf.Empty
+	53, // 88: vm.VM.AppResponse:output_type -> google.protobuf.Empty
+	53, // 89: vm.VM.AppGossip:output_type -> google.protobuf.Empty
+	40, // 90: vm.VM.Gather:output_type -> vm.GatherResponse
+	35, // 91: vm.VM.GetAncestors:output_type -> vm.GetAncestorsResponse
+	37, // 92: vm.VM.BatchedParseBlock:output_type -> vm.BatchedParseBlockResponse
+	39, // 93: vm.VM.GetBlockIDAtHeight:output_type -> vm.GetBlockIDAtHeightResponse
+	41, // 94: vm.VM.StateSyncEnabled:output_type -> vm.StateSyncEnabledResponse
+	42, // 95: vm.VM.GetOngoingSyncStateSummary:output_type -> vm.GetOngoingSyncStateSummaryResponse
+	43, // 96: vm.VM.GetLastStateSummary:output_type -> vm.GetLastStateSummaryResponse
+	45, // 97: vm.VM.ParseStateSummary:output_type -> vm.ParseStateSummaryResponse
+	47, // 98: vm.VM.GetStateSummary:output_type -> vm.GetStateSummaryResponse
+	23, // 99: vm.VM.BlockVerify:output_type -> vm.BlockVerifyResponse
+	53, // 100: vm.VM.BlockAccept:output_type -> google.protobuf.Empty
+	53, // 101: vm.VM.BlockReject:output_type -> google.protobuf.Empty
+	49, // 102: vm.VM.StateSummaryAccept:output_type -> vm.StateSummaryAcceptResponse
+	72, // [72:103] is the sub-list for method output_type
+	41, // [41:72] is the sub-list for method input_type
+	41, // [41:41] is the sub-list for extension type_name
+	41, // [41:41] is the sub-list for extension extendee
+	0,  // [0:41] is the sub-list for field type_name
 }
 
 func init() { file_vm_vm_proto_init() }
@@ -3317,7 +3478,7 @@ func file_vm_vm_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_vm_vm_proto_rawDesc), len(file_vm_vm_proto_rawDesc)),
-			NumEnums:      4,
+			NumEnums:      6,
 			NumMessages:   44,
 			NumExtensions: 0,
 			NumServices:   1,

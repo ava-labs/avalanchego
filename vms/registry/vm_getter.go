@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
@@ -42,6 +43,7 @@ type VMGetterConfig struct {
 	CPUTracker      resource.ProcessTracker
 	RuntimeTracker  runtime.Tracker
 	MetricsGatherer metrics.MultiGatherer
+	LogConfig       logging.Config
 }
 
 type vmGetter struct {
@@ -106,6 +108,7 @@ func (getter *vmGetter) Get() (map[ids.ID]vms.Factory, map[ids.ID]vms.Factory, e
 			getter.config.CPUTracker,
 			getter.config.RuntimeTracker,
 			getter.config.MetricsGatherer,
+			getter.config.LogConfig,
 		)
 	}
 	return registeredVMs, unregisteredVMs, nil

@@ -5,6 +5,7 @@ package rpcchainvm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -19,13 +20,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -248,6 +253,7 @@ func TestNewHTTPHandler(t *testing.T) {
 		nil,
 		metrics.NewLabelGatherer(""),
 		logging.NoLog{},
+		logging.Config{},
 	)
 
 	handler, err := client.NewHTTPHandler(t.Context())
@@ -256,6 +262,64 @@ func TestNewHTTPHandler(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
 	require.Equal(http.StatusOK, w.Code)
+}
+
+// initializeRecorder records the request it receives and fails, so the client
+// returns before it needs a working VM.
+type initializeRecorder struct {
+	vmpb.UnimplementedVMServer
+	req *vmpb.InitializeRequest
+}
+
+var errRecorded = errors.New("recorded")
+
+func (r *initializeRecorder) Initialize(_ context.Context, req *vmpb.InitializeRequest) (*vmpb.InitializeResponse, error) {
+	r.req = req
+	return nil, errRecorded
+}
+
+func TestClientInitializeSendsLogConfig(t *testing.T) {
+	require := require.New(t)
+
+	grpcServer := grpc.NewServer()
+	defer grpcServer.Stop()
+	listener := bufconn.Listen(1024)
+
+	recorder := &initializeRecorder{}
+	vmpb.RegisterVMServer(grpcServer, recorder)
+
+	go func() {
+		_ = grpcServer.Serve(listener)
+	}()
+
+	cc, err := grpc.DialContext(t.Context(), "bufnet",
+		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
+			return listener.Dial()
+		}),
+		grpc.WithInsecure(),
+	)
+	require.NoError(err)
+	defer cc.Close()
+
+	client := NewClient(
+		cc,
+		runtime.NewManager(),
+		123,
+		nil,
+		metrics.NewLabelGatherer(""),
+		logging.NoLog{},
+		logging.Config{
+			LogLevel:     logging.Info,
+			DisplayLevel: logging.Debug,
+			LogFormat:    logging.JSON,
+		},
+	)
+
+	err = client.Initialize(t.Context(), snowtest.Context(t, snowtest.CChainID), memdb.New(), nil, nil, nil, nil, nil)
+	require.Equal(codes.Unknown, status.Code(err))
+	require.NotNil(recorder.req)
+	require.Equal(vmpb.LogLevel_LOG_LEVEL_DEBUG, recorder.req.LogLevel)
+	require.Equal(vmpb.LogFormat_LOG_FORMAT_JSON, recorder.req.LogFormat)
 }
 
 // TestConvertNetworkUpgrades_AllFieldsHandled ensures that all fields in

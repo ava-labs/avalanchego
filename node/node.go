@@ -1249,6 +1249,7 @@ func (n *Node) initVMs() error {
 			CPUTracker:      n.resourceManager,
 			RuntimeTracker:  n.runtimeManager,
 			MetricsGatherer: rpcchainvmMetricsGatherer,
+			LogConfig:       n.Config.LoggingConfig,
 		}),
 		VMManager: n.VMManager,
 	})
