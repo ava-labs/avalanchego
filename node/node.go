@@ -1859,11 +1859,6 @@ func (n *Node) shutdown() {
 		}
 
 		time.Sleep(n.Config.ShutdownWait)
-
-		// Stop health checks before shutting down their components.
-		// The API serves the last health results until it stops including a
-		// failing shuttingDown check.
-		n.health.Stop()
 	}
 
 	if n.StakingSigner != nil {
@@ -1878,6 +1873,16 @@ func (n *Node) shutdown() {
 	if n.chainManager != nil {
 		n.chainManager.Shutdown()
 	}
+
+	// Stop the health checkers after stopping chains so that shutdown does not
+	// hang if VMs are holding the consensus lock.
+	if n.health != nil {
+		// Stop health checks before shutting down their components. The last
+		// polled health check results continue being reported on the api
+		// with a failing shutting down health check.
+		n.health.Stop()
+	}
+
 	if n.benchlistManager != nil {
 		n.benchlistManager.Shutdown()
 	}
