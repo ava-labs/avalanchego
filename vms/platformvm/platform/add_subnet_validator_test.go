@@ -31,14 +31,6 @@ func TestAddSubnetValidatorTxSyntacticVerify(t *testing.T) {
 		err                  error
 	)
 
-	// Case : signed tx is nil
-	err = stx.SyntacticVerify(ctx)
-	require.ErrorIs(err, ErrNilSignedTx)
-
-	// Case : unsigned tx is nil
-	err = addSubnetValidatorTx.SyntacticVerify(ctx)
-	require.ErrorIs(err, ErrNilTx)
-
 	validatorWeight := uint64(2022)
 	subnetID := ids.ID{'s', 'u', 'b', 'n', 'e', 't', 'I', 'D'}
 	inputs := []*avax.TransferableInput{{

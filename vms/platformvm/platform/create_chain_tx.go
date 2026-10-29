@@ -52,8 +52,6 @@ type CreateChainTx struct {
 
 func (tx *CreateChainTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
-	case tx == nil:
-		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case tx.SubnetID == constants.PrimaryNetworkID:

@@ -36,8 +36,6 @@ type SetAutoRenewedValidatorConfigTx struct {
 
 func (tx *SetAutoRenewedValidatorConfigTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
-	case tx == nil:
-		return ErrNilTx
 	case tx.SyntacticallyVerified:
 		// already passed syntactic verification
 		return nil

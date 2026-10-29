@@ -1410,13 +1410,6 @@ func TestAddPermissionlessValidatorTxSyntacticVerify(t *testing.T) {
 
 	tests := []test{
 		{
-			name: "nil tx",
-			txFunc: func(*gomock.Controller) *AddPermissionlessValidatorTx {
-				return nil
-			},
-			err: ErrNilTx,
-		},
-		{
 			name: "already verified",
 			txFunc: func(*gomock.Controller) *AddPermissionlessValidatorTx {
 				return &AddPermissionlessValidatorTx{

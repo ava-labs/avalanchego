@@ -85,8 +85,6 @@ func (tx *AddPermissionlessDelegatorTx) RewardsOwner() fx.Owner {
 // SyntacticVerify returns nil iff [tx] is valid
 func (tx *AddPermissionlessDelegatorTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
-	case tx == nil:
-		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case len(tx.StakeOuts) == 0: // Ensure there is provided stake

@@ -61,8 +61,6 @@ func (tx *ImportTx) InputIDs() set.Set[ids.ID] {
 // SyntacticVerify this transaction is well-formed
 func (tx *ImportTx) SyntacticVerify(ctx *snow.Context) error {
 	switch {
-	case tx == nil:
-		return ErrNilTx
 	case tx.SyntacticallyVerified: // already passed syntactic verification
 		return nil
 	case len(tx.ImportedInputs) == 0:

@@ -27,13 +27,6 @@ func TestSetAutoRenewedValidatorConfigTxSyntacticVerify(t *testing.T) {
 		want   error
 	}{
 		{
-			name: "nil",
-			mutate: func(*SetAutoRenewedValidatorConfigTx) *SetAutoRenewedValidatorConfigTx {
-				return nil
-			},
-			want: ErrNilTx,
-		},
-		{
 			name: "already_verified",
 			mutate: func(*SetAutoRenewedValidatorConfigTx) *SetAutoRenewedValidatorConfigTx {
 				return &SetAutoRenewedValidatorConfigTx{

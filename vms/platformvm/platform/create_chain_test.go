@@ -33,18 +33,6 @@ func TestUnsignedCreateChainTxVerify(t *testing.T) {
 
 	tests := []test{
 		{
-			description: "tx is nil",
-			subnetID:    testSubnet1ID,
-			genesisData: nil,
-			vmID:        constants.AVMID,
-			fxIDs:       nil,
-			chainName:   "yeet",
-			setup: func(*CreateChainTx) *CreateChainTx {
-				return nil
-			},
-			expectedErr: ErrNilTx,
-		},
-		{
 			description: "vm ID is empty",
 			subnetID:    testSubnet1ID,
 			genesisData: nil,

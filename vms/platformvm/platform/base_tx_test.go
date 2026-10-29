@@ -580,10 +580,4 @@ func TestBaseTxSyntacticVerify(t *testing.T) {
 			require.ErrorIs(t, got, tt.want)
 		})
 	}
-
-	t.Run("nil_tx", func(t *testing.T) {
-		var tx *BaseTx
-		got := tx.SyntacticVerify(ctx)
-		require.ErrorIs(t, got, ErrNilTx)
-	})
 }
