@@ -144,9 +144,9 @@ func TestProposalTxExecuteAddDelegatorErrors(t *testing.T) {
 	// Activate AP3 so that over delegation is enforced.
 	env.config.UpgradeConfig.ApricotPhase3Time = env.state.GetTimestamp().Add(-time.Second)
 
-	// All cases are executed on top of diff, which stages a min and a max stake
-	// validator and is never applied to env.state. Both validators' staking
-	// period is strictly inside the genesis validators' period.
+	// Stage a min and a max stake validator for the cases to delegate to. Both
+	// validators' staking period is strictly inside the genesis validators'
+	// period.
 	var (
 		minStakeNodeID = ids.GenerateTestNodeID()
 		maxStakeNodeID = ids.GenerateTestNodeID()
