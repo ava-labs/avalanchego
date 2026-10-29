@@ -10,12 +10,10 @@ fi
 
 REPO_ROOT="${BUILD_WORKSPACE_DIRECTORY:-${PWD}}"
 AVALANCHEGO_PATH="$(realpath "$1")"
-AVALANCHEGO_BUILD_PATH="$(dirname "${AVALANCHEGO_PATH}")"
-AVALANCHEGO_PLUGIN_DIR="${REPO_ROOT}/build/bazel-e2e/plugins"
-AVAGO_PLUGIN_DIR="${AVALANCHEGO_PLUGIN_DIR}"
+AVAGO_PLUGIN_DIR="${REPO_ROOT}/build/bazel-e2e/plugins"
 PLUGIN_PATH="$(realpath "$2")"
 TEST_PATH="$(realpath "$3")"
-export AVALANCHEGO_PATH AVALANCHEGO_BUILD_PATH AVALANCHEGO_PLUGIN_DIR AVAGO_PLUGIN_DIR
+export AVALANCHEGO_PATH AVAGO_PLUGIN_DIR
 shift 3
 
 if [[ "${1:-}" == "--simulator" ]]; then
@@ -28,8 +26,8 @@ fi
 # shellcheck disable=SC1091
 source "${REPO_ROOT}/graft/subnet-evm/scripts/vm_constants.sh"
 
-mkdir -p "${AVALANCHEGO_PLUGIN_DIR}"
-ln -sfn "${PLUGIN_PATH}" "${AVALANCHEGO_PLUGIN_DIR}/${DEFAULT_VM_ID}"
+mkdir -p "${AVAGO_PLUGIN_DIR}"
+ln -sfn "${PLUGIN_PATH}" "${AVAGO_PLUGIN_DIR}/${DEFAULT_VM_ID}"
 
 cd "${REPO_ROOT}/graft/subnet-evm"
 exec "${TEST_PATH}" --ginkgo.vv --ginkgo.label-filter="${GINKGO_LABEL_FILTER:-}" "$@"
