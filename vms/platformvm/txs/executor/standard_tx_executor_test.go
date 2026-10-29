@@ -5,6 +5,7 @@ package executor
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"testing"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
@@ -331,6 +333,113 @@ func TestEtnaDisabledTransactions(t *testing.T) {
 		diff,
 	)
 	require.ErrorIs(err, errTransformSubnetTxPostEtna)
+}
+
+// TestStandardExecutorWrongTxType verifies that the standard executor rejects
+// every tx type that must be executed by the proposal executor.
+func TestStandardExecutorWrongTxType(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
+
+	tests := []platform.UnsignedTx{
+		&platform.AdvanceTimeTx{},
+		&platform.RewardValidatorTx{},
+		&platform.RewardAutoRenewedValidatorTx{},
+	}
+
+	for _, unsignedTx := range tests {
+		diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+		require.NoError(t, err)
+
+		feeCalculator := state.PickFeeCalculator(env.config, diff)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			&platform.Tx{Unsigned: unsignedTx},
+			diff,
+		)
+		require.ErrorIs(t, err, errWrongTxType)
+	}
+}
+
+// TestStandardExecutorBaseTxErrors verifies the failure cases of [platform.BaseTx]
+// execution.
+func TestStandardExecutorBaseTxErrors(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
+
+	tests := []struct {
+		name        string
+		want        error
+		updateTx    func(*platform.Tx)
+		updateState func(*state.Diff)
+	}{
+		{
+			name: "invalid_prior_to_durango",
+			updateState: func(diff *state.Diff) {
+				diff.SetTimestamp(env.config.UpgradeConfig.DurangoTime.Add(-1 * time.Second))
+			},
+			want: errDurangoUpgradeNotActive,
+		},
+		{
+			name: "tx_fails_syntactic_verification",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.BaseTx).BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "flow_checker_failed",
+			updateTx: func(tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.BaseTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			want: utxo.ErrInsufficientUnlockedFunds,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// The tx spends AVAX, so issue each tx from a fresh wallet to keep
+			// the wallet's UTXO view consistent with env.state.
+			wallet := newWallet(t, env, walletConfig{})
+			tx, err := wallet.IssueBaseTx(
+				[]*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt:          units.Avax,
+						OutputOwners: *newOwner(),
+					},
+				}},
+			)
+			require.NoError(t, err)
+
+			diff, got := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(t, got)
+
+			if tt.updateTx != nil {
+				tt.updateTx(tx)
+			}
+
+			if tt.updateState != nil {
+				tt.updateState(diff)
+			}
+
+			feeCalculator := state.PickFeeCalculator(env.config, diff)
+			_, _, _, got = StandardTx(
+				&env.backend,
+				feeCalculator,
+				tx,
+				diff,
+			)
+
+			require.ErrorIs(t, got, tt.want)
+		})
+	}
 }
 
 func TestStandardExecutorAddPermissionlessValidatorTxFlowCheckFails(t *testing.T) {

@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/iterator"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
@@ -164,6 +166,20 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 			want: errHeliconUpgradeNotActive,
 		},
 		{
+			name: "tx_fails_syntactic_verification",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddAutoRenewedValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			},
+			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid_memo_length",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddAutoRenewedValidatorTx).Memo = []byte("memo!")
+			},
+			want: avax.ErrMemoTooLarge,
+		},
+		{
 			name: "weight_too_small",
 			updateTx: func(tx *platform.Tx) {
 				tx.Unsigned.(*platform.AddAutoRenewedValidatorTx).StakeOuts[0].Out.(*secp256k1fx.TransferOutput).Amt = env.config.MinValidatorStake - 1
@@ -204,6 +220,20 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 				tx.Unsigned.(*platform.AddAutoRenewedValidatorTx).ValidatorNodeID = genesistest.DefaultNodeIDs[0].Bytes()
 			},
 			want: ErrDuplicateValidator,
+		},
+		{
+			name: "flow_checker_failed",
+			updateTx: func(tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			want: errFlowCheckFailed,
 		},
 	}
 
@@ -463,6 +493,20 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 			wantErr: errHeliconUpgradeNotActive,
 		},
 		{
+			name: "tx_fails_syntactic_verification",
+			updateTx: func(_ testing.TB, _ *platform.SetAutoRenewedValidatorConfigTx, stx *platform.Tx) {
+				stx.Unsigned.(*platform.SetAutoRenewedValidatorConfigTx).BaseTx.BlockchainID = ids.GenerateTestID()
+			},
+			wantErr: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid_memo_length",
+			updateTx: func(_ testing.TB, tx *platform.SetAutoRenewedValidatorConfigTx, _ *platform.Tx) {
+				tx.Memo = []byte("memo!")
+			},
+			wantErr: avax.ErrMemoTooLarge,
+		},
+		{
 			name: "stopped_validator",
 			updateState: func(t testing.TB, diff *state.Diff) {
 				require.NoError(t, diff.DeleteCurrentValidator(&state.Staker{
@@ -528,6 +572,19 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 			},
 			wantErr: errWrongNumberOfCredentials,
 		},
+		{
+			name: "flow_checker_failed",
+			updateTx: func(_ testing.TB, tx *platform.SetAutoRenewedValidatorConfigTx, _ *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				tx.Outs = append(tx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			wantErr: errFlowCheckFailed,
+		},
 	}
 
 	for _, tt := range tests {
@@ -556,19 +613,4 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
-}
-
-func TestStandardExecutorRewardAutoRenewedValidatorTx(t *testing.T) {
-	env := newEnvironment(t, upgradetest.Latest)
-
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(t, err)
-
-	_, _, _, err = StandardTx(
-		&env.backend,
-		state.PickFeeCalculator(env.config, env.state),
-		newRewardAutoRenewedValidatorTx(t, ids.GenerateTestID(), time.Unix(1, 0)),
-		diff,
-	)
-	require.ErrorIs(t, err, errWrongTxType)
 }

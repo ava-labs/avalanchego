@@ -231,6 +231,16 @@ func TestProposalTxExecuteAddDelegatorErrors(t *testing.T) {
 			nodeID:    maxStakeNodeID,
 			want:      ErrOverDelegated,
 		},
+		{
+			name:      "issued_after_banff",
+			startTime: startTime,
+			endTime:   endTime,
+			nodeID:    minStakeNodeID,
+			updateState: func(_ *testing.T, diff *state.Diff) {
+				diff.SetTimestamp(env.config.UpgradeConfig.BanffTime)
+			},
+			want: errProposedAddStakerTxAfterBanff,
+		},
 	}
 
 	for _, tt := range tests {
@@ -475,6 +485,16 @@ func TestProposalTxExecuteAddSubnetValidatorErrors(t *testing.T) {
 			},
 			want: ErrDuplicateValidator,
 		},
+		{
+			name:      "issued_after_banff",
+			nodeID:    stagedNodeID,
+			startTime: stagedStartTime,
+			endTime:   stagedEndTime,
+			updateState: func(_ *testing.T, diff *state.Diff) {
+				diff.SetTimestamp(env.config.UpgradeConfig.BanffTime)
+			},
+			want: errProposedAddStakerTxAfterBanff,
+		},
 	}
 
 	for _, tt := range tests {
@@ -593,6 +613,16 @@ func TestProposalTxExecuteAddValidatorErrors(t *testing.T) {
 			},
 			want: errFlowCheckFailed,
 		},
+		{
+			name:      "issued_after_banff",
+			nodeID:    ids.GenerateTestNodeID(),
+			startTime: genesistest.DefaultValidatorStartTimeUnix + 1,
+			endTime:   genesistest.DefaultValidatorEndTimeUnix,
+			updateState: func(_ *testing.T, diff *state.Diff) {
+				diff.SetTimestamp(env.config.UpgradeConfig.BanffTime)
+			},
+			want: errProposedAddStakerTxAfterBanff,
+		},
 	}
 
 	for _, tt := range tests {
@@ -618,6 +648,40 @@ func TestProposalTxExecuteAddValidatorErrors(t *testing.T) {
 			)
 			require.ErrorIs(t, err, tt.want)
 		})
+	}
+}
+
+// TestProposalTxExecuteWrongTxType verifies that the proposal executor rejects
+// every tx type that must be executed by the standard executor.
+func TestProposalTxExecuteWrongTxType(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
+
+	tests := []platform.UnsignedTx{
+		&platform.CreateChainTx{},
+		&platform.CreateSubnetTx{},
+		&platform.ImportTx{},
+		&platform.ExportTx{},
+		&platform.RemoveSubnetValidatorTx{},
+		&platform.TransformSubnetTx{},
+		&platform.AddPermissionlessValidatorTx{},
+		&platform.AddPermissionlessDelegatorTx{},
+		&platform.TransferSubnetOwnershipTx{},
+		&platform.BaseTx{},
+		&platform.ConvertSubnetToL1Tx{},
+		&platform.RegisterL1ValidatorTx{},
+		&platform.SetL1ValidatorWeightTx{},
+		&platform.IncreaseL1ValidatorBalanceTx{},
+		&platform.DisableL1ValidatorTx{},
+		&platform.AddAutoRenewedValidatorTx{},
+		&platform.SetAutoRenewedValidatorConfigTx{},
+	}
+
+	for _, unsignedTx := range tests {
+		diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+		require.NoError(t, err)
+
+		_, _, err = executeProposalTx(t, env, diff, &platform.Tx{Unsigned: unsignedTx})
+		require.ErrorIs(t, err, errWrongTxType)
 	}
 }
 

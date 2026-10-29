@@ -9,9 +9,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
+	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
+	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
 func TestGetMaxWeight(t *testing.T) {
@@ -56,6 +59,85 @@ func TestGetMaxWeight(t *testing.T) {
 			got, err := GetMaxWeight(env.state, staker, tt.startTime, tt.endTime)
 			require.NoError(t, err)
 			require.Equal(t, genesistest.DefaultValidatorWeight, got)
+		})
+	}
+}
+
+func TestGetMaxWeightWithDelegators(t *testing.T) {
+	var (
+		startTime           = genesistest.DefaultValidatorStartTime
+		firstDelegatorEnd   = startTime.Add(time.Hour)
+		secondDelegatorEnd  = startTime.Add(2 * time.Hour)
+		firstDelegatorWght  = uint64(10)
+		secondDelegatorWght = uint64(20)
+	)
+
+	tests := []struct {
+		name      string
+		startTime time.Time
+		endTime   time.Time
+		want      uint64
+	}{
+		{
+			name:      "window_ends_before_any_delegator_ends",
+			startTime: startTime,
+			endTime:   firstDelegatorEnd.Add(-time.Second),
+			want:      genesistest.DefaultValidatorWeight + firstDelegatorWght + secondDelegatorWght,
+		},
+		{
+			name:      "window_spans_a_delegator_end",
+			startTime: startTime,
+			endTime:   firstDelegatorEnd.Add(time.Second),
+			want:      genesistest.DefaultValidatorWeight + firstDelegatorWght + secondDelegatorWght,
+		},
+		{
+			name:      "window_starts_after_a_delegator_ends",
+			startTime: firstDelegatorEnd.Add(time.Second),
+			endTime:   secondDelegatorEnd.Add(-time.Second),
+			want:      genesistest.DefaultValidatorWeight + secondDelegatorWght,
+		},
+		{
+			name:      "window_starts_after_all_delegators_end",
+			startTime: secondDelegatorEnd.Add(time.Second),
+			endTime:   genesistest.DefaultValidatorEndTime,
+			want:      genesistest.DefaultValidatorWeight,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			env := newEnvironment(t, upgradetest.Latest)
+
+			nodeID := genesistest.DefaultNodeIDs[0]
+			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(err)
+
+			for _, delegator := range []struct {
+				weight  uint64
+				endTime time.Time
+			}{
+				{weight: firstDelegatorWght, endTime: firstDelegatorEnd},
+				{weight: secondDelegatorWght, endTime: secondDelegatorEnd},
+			} {
+				require.NoError(diff.PutCurrentDelegator(&state.Staker{
+					TxID:      ids.GenerateTestID(),
+					NodeID:    nodeID,
+					SubnetID:  constants.PrimaryNetworkID,
+					Weight:    delegator.weight,
+					StartTime: startTime,
+					EndTime:   delegator.endTime,
+					NextTime:  delegator.endTime,
+					Priority:  platform.PrimaryNetworkDelegatorCurrentPriority,
+				}))
+			}
+
+			staker, err := GetValidator(diff, constants.PrimaryNetworkID, nodeID)
+			require.NoError(err)
+
+			got, err := GetMaxWeight(diff, staker, tt.startTime, tt.endTime)
+			require.NoError(err)
+			require.Equal(tt.want, got)
 		})
 	}
 }
