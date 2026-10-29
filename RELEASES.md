@@ -7,6 +7,7 @@
 ### APIs
 
 - Added a `Gas-Used` header to C-Chain `/rpc` responses with the total gas used by every completed `eth_call` in the request.
+- Added an `Rpc-Error-Codes` header to C-Chain `/rpc` responses with the count of each JSON-RPC error code in the response, e.g. `-32601;count=1, 3;count=2`.
 - `admin.lockProfile` and continuous profiling now write `lock.profile` in the binary pprof format, like the CPU and memory profiles.
 
 ### Configs
