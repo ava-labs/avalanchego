@@ -240,6 +240,20 @@ func TestStandardExecutorCreateChainTxErrors(t *testing.T) {
 			want: database.ErrNotFound,
 		},
 		{
+			name: "flow_checker_failed",
+			updateTx: func(tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.CreateChainTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			want: utxo.ErrInsufficientUnlockedFunds,
+		},
+		{
 			name: "invalid_after_subnet_conversion",
 			updateState: func(diff *state.Diff) {
 				diff.SetSubnetToL1Conversion(subnetID, state.SubnetToL1Conversion{

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -67,6 +68,29 @@ func TestStandardExecutorImportTxErrors(t *testing.T) {
 				tx.Unsigned.(*platform.ImportTx).SourceChain = env.ctx.ChainID
 			},
 			want: verify.ErrSameChainID,
+		},
+		{
+			name: "imported_utxo_not_in_shared_memory",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.ImportTx).ImportedInputs[0].UTXOID = avax.UTXOID{
+					TxID: ids.GenerateTestID(),
+				}
+			},
+			want: database.ErrNotFound,
+		},
+		{
+			name: "local_utxo_not_found",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.ImportTx).Ins = []*avax.TransferableInput{{
+					UTXOID: avax.UTXOID{TxID: ids.GenerateTestID()},
+					Asset:  avax.Asset{ID: env.ctx.AVAXAssetID},
+					In: &secp256k1fx.TransferInput{
+						Amt:   1,
+						Input: secp256k1fx.Input{SigIndices: []uint32{0}},
+					},
+				}}
+			},
+			want: database.ErrNotFound,
 		},
 		{
 			name: "flow_checker_failed",

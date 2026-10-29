@@ -4,6 +4,7 @@
 package executor
 
 import (
+	"math"
 	"testing"
 	"time"
 
@@ -219,6 +220,20 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 				tx.Unsigned.(*platform.AddAutoRenewedValidatorTx).ValidatorNodeID = genesistest.DefaultNodeIDs[0].Bytes()
 			},
 			want: ErrDuplicateValidator,
+		},
+		{
+			name: "flow_checker_failed",
+			updateTx: func(tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.AddAutoRenewedValidatorTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			want: errFlowCheckFailed,
 		},
 	}
 
@@ -557,6 +572,19 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 			},
 			wantErr: errWrongNumberOfCredentials,
 		},
+		{
+			name: "flow_checker_failed",
+			updateTx: func(_ testing.TB, tx *platform.SetAutoRenewedValidatorConfigTx, _ *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				tx.Outs = append(tx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			wantErr: errFlowCheckFailed,
+		},
 	}
 
 	for _, tt := range tests {
@@ -585,19 +613,4 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
-}
-
-func TestStandardExecutorRewardAutoRenewedValidatorTx(t *testing.T) {
-	env := newEnvironment(t, upgradetest.Latest)
-
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(t, err)
-
-	_, _, _, err = StandardTx(
-		&env.backend,
-		state.PickFeeCalculator(env.config, env.state),
-		newRewardAutoRenewedValidatorTx(t, ids.GenerateTestID(), time.Unix(1, 0)),
-		diff,
-	)
-	require.ErrorIs(t, err, errWrongTxType)
 }

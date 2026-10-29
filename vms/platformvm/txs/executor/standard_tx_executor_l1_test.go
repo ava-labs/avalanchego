@@ -1752,6 +1752,20 @@ func TestStandardExecutorDisableL1ValidatorTxErrors(t *testing.T) {
 			want: errUnauthorizedModification,
 		},
 		{
+			name: "flow_checker_failed",
+			updateTx: func(_ *testing.T, tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.DisableL1ValidatorTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			want: utxo.ErrInsufficientUnlockedFunds,
+		},
+		{
 			name: "state_corruption",
 			updateState: func(_ *testing.T, diff *state.Diff) {
 				// The validator's balance has been fully consumed by fees

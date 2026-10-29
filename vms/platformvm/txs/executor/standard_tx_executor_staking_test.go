@@ -669,6 +669,20 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 			want:        ErrDuplicateValidator,
 		},
 		{
+			name: "flow_checker_failed",
+			updateTx: func(tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.AddSubnetValidatorTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			want: errFlowCheckFailed,
+		},
+		{
 			name: "invalid_after_subnet_conversion",
 			updateState: func(diff *state.Diff) {
 				diff.SetSubnetToL1Conversion(subnetID, state.SubnetToL1Conversion{
@@ -1033,9 +1047,10 @@ func TestStandardExecutorAddPermissionlessDelegatorTxErrors(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		want     error
-		updateTx func(*platform.Tx)
+		name        string
+		want        error
+		updateTx    func(*platform.Tx)
+		updateState func(*state.Diff)
 	}{
 		{
 			name: "tx_fails_syntactic_verification",
@@ -1094,6 +1109,24 @@ func TestStandardExecutorAddPermissionlessDelegatorTxErrors(t *testing.T) {
 			want: ErrOverDelegated,
 		},
 		{
+			name: "over_delegation_with_existing_delegators",
+			updateState: func(diff *state.Diff) {
+				// The existing delegator fills the validator's delegation
+				// capacity, so any new delegator over-delegates it.
+				require.NoError(t, diff.PutCurrentDelegator(&state.Staker{
+					TxID:      ids.GenerateTestID(),
+					NodeID:    nodeID,
+					SubnetID:  constants.PrimaryNetworkID,
+					Weight:    (primaryNetworkMaxValidatorWeightFactor - 1) * genesistest.DefaultValidatorWeight,
+					StartTime: genesistest.DefaultValidatorStartTime,
+					EndTime:   genesistest.DefaultValidatorEndTime,
+					NextTime:  genesistest.DefaultValidatorEndTime,
+					Priority:  platform.PrimaryNetworkDelegatorCurrentPriority,
+				}))
+			},
+			want: ErrOverDelegated,
+		},
+		{
 			name: "flow_checker_failed",
 			updateTx: func(tx *platform.Tx) {
 				// Produce more AVAX than the tx consumes
@@ -1133,6 +1166,10 @@ func TestStandardExecutorAddPermissionlessDelegatorTxErrors(t *testing.T) {
 
 			if tt.updateTx != nil {
 				tt.updateTx(tx)
+			}
+
+			if tt.updateState != nil {
+				tt.updateState(diff)
 			}
 
 			feeCalculator := state.PickFeeCalculator(env.config, diff)

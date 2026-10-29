@@ -335,6 +335,32 @@ func TestEtnaDisabledTransactions(t *testing.T) {
 	require.ErrorIs(err, errTransformSubnetTxPostEtna)
 }
 
+// TestStandardExecutorWrongTxType verifies that the standard executor rejects
+// every tx type that must be executed by the proposal executor.
+func TestStandardExecutorWrongTxType(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
+
+	tests := []platform.UnsignedTx{
+		&platform.AdvanceTimeTx{},
+		&platform.RewardValidatorTx{},
+		&platform.RewardAutoRenewedValidatorTx{},
+	}
+
+	for _, unsignedTx := range tests {
+		diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+		require.NoError(t, err)
+
+		feeCalculator := state.PickFeeCalculator(env.config, diff)
+		_, _, _, err = StandardTx(
+			&env.backend,
+			feeCalculator,
+			&platform.Tx{Unsigned: unsignedTx},
+			diff,
+		)
+		require.ErrorIs(t, err, errWrongTxType)
+	}
+}
+
 // TestStandardExecutorBaseTxErrors verifies the failure cases of [platform.BaseTx]
 // execution.
 func TestStandardExecutorBaseTxErrors(t *testing.T) {

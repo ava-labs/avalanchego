@@ -651,6 +651,40 @@ func TestProposalTxExecuteAddValidatorErrors(t *testing.T) {
 	}
 }
 
+// TestProposalTxExecuteWrongTxType verifies that the proposal executor rejects
+// every tx type that must be executed by the standard executor.
+func TestProposalTxExecuteWrongTxType(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
+
+	tests := []platform.UnsignedTx{
+		&platform.CreateChainTx{},
+		&platform.CreateSubnetTx{},
+		&platform.ImportTx{},
+		&platform.ExportTx{},
+		&platform.RemoveSubnetValidatorTx{},
+		&platform.TransformSubnetTx{},
+		&platform.AddPermissionlessValidatorTx{},
+		&platform.AddPermissionlessDelegatorTx{},
+		&platform.TransferSubnetOwnershipTx{},
+		&platform.BaseTx{},
+		&platform.ConvertSubnetToL1Tx{},
+		&platform.RegisterL1ValidatorTx{},
+		&platform.SetL1ValidatorWeightTx{},
+		&platform.IncreaseL1ValidatorBalanceTx{},
+		&platform.DisableL1ValidatorTx{},
+		&platform.AddAutoRenewedValidatorTx{},
+		&platform.SetAutoRenewedValidatorConfigTx{},
+	}
+
+	for _, unsignedTx := range tests {
+		diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+		require.NoError(t, err)
+
+		_, _, err = executeProposalTx(t, env, diff, &platform.Tx{Unsigned: unsignedTx})
+		require.ErrorIs(t, err, errWrongTxType)
+	}
+}
+
 // Ensure semantic verification updates the current and pending staker set
 // for the primary network
 func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
