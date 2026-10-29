@@ -111,11 +111,16 @@ var fixtureJSON []byte
 //   - Etna: adds Cancun's blobGasUsed, excessBlobGas and parentBeaconRoot
 //     header fields. A dynamic-fee transfer.
 //   - Fortuna: prefixes the extra data with the ACP-176 fee state. A
-//     dynamic-fee transfer.
-//   - Granite: adds the timeMilliseconds and minDelayExcess header fields and
-//     the ACP-226 minimum block delay. Two blocks, the second paced by that
-//     delay and carrying three transactions so tracing the last replays the
-//     first two.
+//     dynamic-fee transfer, then the deploy and call of a delegator contract
+//     that calls the warp precompile via DELEGATECALL then CALLCODE, forwarding
+//     fixed gas and storing each success flag in slots 0 and 1. Both calls
+//     succeed.
+//   - Granite: adds the timeMilliseconds and minDelayExcess header fields, the
+//     ACP-226 minimum block delay, and reverts DELEGATECALL and CALLCODE into
+//     precompiles while consuming all gas forwarded to them. Three blocks, the
+//     second paced by that delay and carrying three transactions so tracing the
+//     last replays the first two, and the third calling the delegator again so
+//     that both of its calls revert.
 //
 // # Recorded RPC responses
 //
