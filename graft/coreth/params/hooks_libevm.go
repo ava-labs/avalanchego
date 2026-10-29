@@ -163,6 +163,7 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 		}
 
 		if call := env.IncomingCallType(); (call == vm.DelegateCall || call == vm.CallCode) && rules.IsGranite {
+			env.UseGas(env.Gas())
 			return nil, vm.ErrExecutionReverted
 		}
 
