@@ -136,23 +136,36 @@ func TestParseGenesis(t *testing.T) {
 		zeroGraniteGenesis = testGenesisJSON(withGenesis(func(g *legacy.Genesis) {
 			l1params.GetExtra(g.Config).GraniteTimestamp = new(uint64)
 		}))
+
+		unscheduled    = upgrade.UnixTimestamp(upgrade.UnscheduledActivationTime)
+		latestUpgrades = extras.NetworkUpgrades{
+			SubnetEVMTimestamp: new(uint64),
+			DurangoTimestamp:   new(testGenesisTime),
+			EtnaTimestamp:      new(testGenesisTime),
+			GraniteTimestamp:   new(testGenesisTime),
+			HeliconTimestamp:   new(testGenesisTime),
+			IglooTimestamp:     new(testGenesisTime),
+		}
 	)
 	tests := []struct {
 		name         string
 		ctx          *snow.Context
 		genesis      string
 		upgradeBytes string
+		wantUpgrades extras.NetworkUpgrades
 		wantErr      testerr.Want
 	}{
 		{
-			name:    "defaults",
-			ctx:     latest,
-			genesis: testGenesisJSON(),
+			name:         "defaults",
+			ctx:          latest,
+			genesis:      testGenesisJSON(),
+			wantUpgrades: latestUpgrades,
 		},
 		{
-			name:    "zero_genesis_upgrade_uses_network_default",
-			ctx:     mainnet,
-			genesis: zeroGraniteGenesis,
+			name:         "zero_genesis_upgrade_uses_network_default",
+			ctx:          mainnet,
+			genesis:      zeroGraniteGenesis,
+			wantUpgrades: extras.GetNetworkUpgrades(upgrade.Mainnet),
 		},
 		{
 			name:    "zero_upgrade_override_is_rejected",
@@ -164,9 +177,10 @@ func TestParseGenesis(t *testing.T) {
 			wantErr: testerr.Contains("granite fork block timestamp is invalid"),
 		},
 		{
-			name:    "fee_config_defaulted",
-			ctx:     latest,
-			genesis: testGenesisJSON(withFeeConfig(commontype.EmptyFeeConfig)),
+			name:         "fee_config_defaulted",
+			ctx:          latest,
+			genesis:      testGenesisJSON(withFeeConfig(commontype.EmptyFeeConfig)),
+			wantUpgrades: latestUpgrades,
 		},
 		{
 			name:    "upgrade_bytes",
@@ -175,6 +189,14 @@ func TestParseGenesis(t *testing.T) {
 			upgradeBytes: overridesJSON(extras.NetworkUpgrades{
 				DurangoTimestamp: new(testGenesisTime + 100),
 			}),
+			wantUpgrades: extras.NetworkUpgrades{
+				SubnetEVMTimestamp: new(uint64),
+				DurangoTimestamp:   new(testGenesisTime + 100),
+				EtnaTimestamp:      new(unscheduled),
+				GraniteTimestamp:   new(unscheduled),
+				HeliconTimestamp:   new(unscheduled),
+				IglooTimestamp:     new(unscheduled),
+			},
 		},
 		{
 			name:    "invalid_json",
@@ -283,8 +305,7 @@ func TestParseGenesis(t *testing.T) {
 				return
 			}
 
-			// Everything other than the config must be
-			// passed through unmodified.
+			// Everything other than the config must be passed through unmodified.
 			var want ethcore.Genesis
 			require.NoError(t, json.Unmarshal([]byte(test.genesis), &want), "json.Unmarshal()")
 			opts := cmp.Options{
@@ -294,6 +315,10 @@ func TestParseGenesis(t *testing.T) {
 			}
 			if diff := cmp.Diff(&want, (*ethcore.Genesis)(g), opts); diff != "" {
 				t.Errorf("parseGenesis(...) (-want +got)\n%s", diff)
+			}
+
+			if diff := cmp.Diff(test.wantUpgrades, l1params.GetExtra(g.Config).NetworkUpgrades); diff != "" {
+				t.Errorf("parseGenesis(...) network upgrades (-want +got)\n%s", diff)
 			}
 		})
 	}
