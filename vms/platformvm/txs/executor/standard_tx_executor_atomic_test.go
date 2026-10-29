@@ -63,6 +63,13 @@ func TestStandardExecutorImportTxErrors(t *testing.T) {
 			want: avax.ErrWrongChainID,
 		},
 		{
+			name: "invalid_memo_length",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.ImportTx).Memo = []byte("memo!")
+			},
+			want: avax.ErrMemoTooLarge,
+		},
+		{
 			name: "import_from_same_chain",
 			updateTx: func(tx *platform.Tx) {
 				tx.Unsigned.(*platform.ImportTx).SourceChain = env.ctx.ChainID
@@ -353,6 +360,13 @@ func TestStandardExecutorExportTxErrors(t *testing.T) {
 				tx.Unsigned.(*platform.ExportTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid_memo_length",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.ExportTx).Memo = []byte("memo!")
+			},
+			want: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "export_to_same_chain",

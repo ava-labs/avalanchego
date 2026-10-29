@@ -42,11 +42,25 @@ func TestStandardExecutorTransformSubnetTxErrors(t *testing.T) {
 		updateState func(*state.Diff)
 	}{
 		{
+			name: "invalid_after_etna",
+			updateState: func(diff *state.Diff) {
+				diff.SetTimestamp(env.config.UpgradeConfig.EtnaTime)
+			},
+			want: etna.errDeprecated,
+		},
+		{
 			name: "tx_fails_syntactic_verification",
 			updateTx: func(tx *platform.Tx) {
 				tx.Unsigned.(*platform.TransformSubnetTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid_memo_length",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.TransformSubnetTx).Memo = []byte("memo!")
+			},
+			want: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "max_stake_duration_too_large",
@@ -205,6 +219,13 @@ func TestStandardExecutorCreateChainTxErrors(t *testing.T) {
 				tx.Unsigned.(*platform.CreateChainTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid_memo_length",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.CreateChainTx).Memo = []byte("memo!")
+			},
+			want: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "insufficient_control_signatures",
@@ -366,6 +387,13 @@ func TestStandardExecutorCreateSubnetTxErrors(t *testing.T) {
 			want: avax.ErrWrongChainID,
 		},
 		{
+			name: "invalid_memo_length",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.CreateSubnetTx).Memo = []byte("memo!")
+			},
+			want: avax.ErrMemoTooLarge,
+		},
+		{
 			name: "flow_checker_failed",
 			updateTx: func(tx *platform.Tx) {
 				// Produce more AVAX than the tx consumes
@@ -479,6 +507,13 @@ func TestStandardExecutorTransferSubnetOwnershipTxErrors(t *testing.T) {
 				tx.Unsigned.(*platform.TransferSubnetOwnershipTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid_memo_length",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.TransferSubnetOwnershipTx).Memo = []byte("memo!")
+			},
+			want: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "subnet_not_found",

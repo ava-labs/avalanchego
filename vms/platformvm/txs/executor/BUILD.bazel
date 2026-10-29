@@ -72,7 +72,6 @@ go_test(
         "standard_tx_executor_subnet_test.go",
         "standard_tx_executor_test.go",
         "state_changes_test.go",
-        "tx_verification_test.go",
         "warp_verifier_test.go",
     ],
     embed = [":executor"],
@@ -127,7 +126,6 @@ go_test(
         "//vms/secp256k1fx",
         "//wallet/chain/p/builder",
         "//wallet/chain/p/wallet",
-        "//wallet/subnet/primary/common",
         "@com_github_stretchr_testify//require",
     ],
 )

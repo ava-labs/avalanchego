@@ -131,6 +131,13 @@ func TestStandardExecutorAddValidatorTxErrors(t *testing.T) {
 		updateState func(*state.Diff)
 	}{
 		{
+			name: "invalid_after_durango",
+			updateState: func(diff *state.Diff) {
+				diff.SetTimestamp(env.config.UpgradeConfig.DurangoTime)
+			},
+			want: durango.errDeprecated,
+		},
+		{
 			name: "tx_fails_syntactic_verification",
 			updateTx: func(tx *platform.Tx) {
 				tx.Unsigned.(*platform.AddValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
@@ -313,6 +320,13 @@ func TestStandardExecutorAddDelegatorTxErrors(t *testing.T) {
 		updateTx    func(*platform.Tx)
 		updateState func(*state.Diff)
 	}{
+		{
+			name: "invalid_after_durango",
+			updateState: func(diff *state.Diff) {
+				diff.SetTimestamp(env.config.UpgradeConfig.DurangoTime)
+			},
+			want: durango.errDeprecated,
+		},
 		{
 			name: "tx_fails_syntactic_verification",
 			updateTx: func(tx *platform.Tx) {
@@ -560,6 +574,16 @@ func TestStandardExecutorAddSubnetValidatorTxErrors(t *testing.T) {
 				tx.Unsigned.(*platform.AddSubnetValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid_memo_length",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddSubnetValidatorTx).Memo = []byte("memo!")
+			},
+			updateState: func(diff *state.Diff) {
+				diff.SetTimestamp(env.config.UpgradeConfig.DurangoTime)
+			},
+			want: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "subnet_validator_stops_after_primary_network",
@@ -938,6 +962,13 @@ func TestStandardExecutorAddPermissionlessValidatorTxErrors(t *testing.T) {
 			want: avax.ErrWrongChainID,
 		},
 		{
+			name: "invalid_memo_length",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessValidatorTx).Memo = []byte("memo!")
+			},
+			want: avax.ErrMemoTooLarge,
+		},
+		{
 			name: "stake_duration_shorter_than_pre_helicon_minimum",
 			updateTx: func(tx *platform.Tx) {
 				validator := &tx.Unsigned.(*platform.AddPermissionlessValidatorTx).Validator
@@ -1071,6 +1102,13 @@ func TestStandardExecutorAddPermissionlessDelegatorTxErrors(t *testing.T) {
 				tx.Unsigned.(*platform.AddPermissionlessDelegatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid_memo_length",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.AddPermissionlessDelegatorTx).Memo = []byte("memo!")
+			},
+			want: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "weight_too_small",
@@ -1272,6 +1310,13 @@ func TestStandardExecutorRemoveSubnetValidatorTxErrors(t *testing.T) {
 				tx.Unsigned.(*platform.RemoveSubnetValidatorTx).BaseTx.BlockchainID = ids.GenerateTestID()
 			},
 			want: avax.ErrWrongChainID,
+		},
+		{
+			name: "invalid_memo_length",
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.RemoveSubnetValidatorTx).Memo = []byte("memo!")
+			},
+			want: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "node_is_not_a_validator_of_the_subnet",
