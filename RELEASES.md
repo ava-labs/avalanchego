@@ -12,6 +12,8 @@
 ### Configs
 
 - Added `--profile-continuous-mutex-fraction` (default `1`, which keeps the existing behavior) to set the mutex profile fraction used by continuous profiling. Set it to `0` to stop recording mutex contention, or to `n` to sample 1 of every n events.
+- Added the `filter` API to the C-Chain `apis` option. It serves the polling filter methods (`eth_newFilter`, `eth_newBlockFilter`, `eth_newPendingTransactionFilter`, `eth_getFilterChanges`, `eth_getFilterLogs`, `eth_uninstallFilter`), which moved out of `subscription`. It is enabled by default. A config that sets `apis` must add `filter` to keep serving these methods.
+- Added the `logs` API to the C-Chain `apis` option. It serves `eth_getLogs`, which moved out of `subscription`. It is enabled by default. A config that sets `apis` must add `logs` to keep serving `eth_getLogs`.
 
 ### Metrics
 

@@ -1805,10 +1805,10 @@ func withAllAPIs() sutOption {
 const errCodeMethodNotFound = -32601
 
 // methodRegistered reports whether sut serves method.
-func methodRegistered(ctx context.Context, tb testing.TB, sut *SUT, method string) bool {
+func methodRegistered(ctx context.Context, tb testing.TB, sut *SUT, method string, args ...any) bool {
 	tb.Helper()
 
-	err := sut.CallContext(ctx, new(json.RawMessage), method)
+	err := sut.CallContext(ctx, new(json.RawMessage), method, args...)
 	if err == nil {
 		return true
 	}
@@ -1818,19 +1818,25 @@ func methodRegistered(ctx context.Context, tb testing.TB, sut *SUT, method strin
 }
 
 func TestAPIsServed(t *testing.T) {
+	type call struct {
+		method string
+		args   []any
+	}
 	// A method served by each API and no other.
-	methods := map[saerpc.API]string{
-		saerpc.APIWeb3:         "web3_clientVersion",
-		saerpc.APINet:          "net_version",
-		saerpc.APITxPool:       "txpool_status",
-		saerpc.APIPrice:        "eth_gasPrice",
-		saerpc.APIChain:        "eth_blockNumber",
-		saerpc.APITx:           "eth_getTransactionCount",
-		saerpc.APISubscription: "eth_getLogs",
-		saerpc.APIAvalanche:    "eth_callDetailed",
-		saerpc.APIDB:           "debug_dbGet",
-		saerpc.APIProfile:      "debug_gcStats",
-		saerpc.APITrace:        "debug_traceBlockByNumber",
+	methods := map[saerpc.API]call{
+		saerpc.APIWeb3:         {method: "web3_clientVersion"},
+		saerpc.APINet:          {method: "net_version"},
+		saerpc.APITxPool:       {method: "txpool_status"},
+		saerpc.APIPrice:        {method: "eth_gasPrice"},
+		saerpc.APIChain:        {method: "eth_blockNumber"},
+		saerpc.APITx:           {method: "eth_getTransactionCount"},
+		saerpc.APISubscription: {method: "eth_subscribe", args: []any{"newHeads"}},
+		saerpc.APIFilter:       {method: "eth_uninstallFilter"},
+		saerpc.APILogs:         {method: "eth_getLogs"},
+		saerpc.APIAvalanche:    {method: "eth_callDetailed"},
+		saerpc.APIDB:           {method: "debug_dbGet"},
+		saerpc.APIProfile:      {method: "debug_gcStats"},
+		saerpc.APITrace:        {method: "debug_traceBlockByNumber"},
 	}
 	require.Equal(t, saerpc.AllAPIs(), set.Of(slices.Collect(maps.Keys(methods))...), "every API has a method")
 
@@ -1844,8 +1850,8 @@ func TestAPIsServed(t *testing.T) {
 	for name, apis := range configs {
 		t.Run(name, func(t *testing.T) {
 			ctx, sut := newSUT(t, 0, withAPIs(apis))
-			for api, method := range methods {
-				assert.Equalf(t, apis.Contains(api), methodRegistered(ctx, t, sut, method), "%s served with %v enabled", method, apis)
+			for api, c := range methods {
+				assert.Equalf(t, apis.Contains(api), methodRegistered(ctx, t, sut, c.method, c.args...), "%s served with %v enabled", c.method, apis)
 			}
 		})
 	}
