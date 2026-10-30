@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompiletest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -233,9 +232,9 @@ func createValidMessageTest(
 	numKeys int,
 	packed warpmsg.Packed,
 	rules cparams.Rules,
-) precompiletest.MessageTest {
+) messageTest {
 	gasCost := CurrentGasConfig(rules)
-	return precompiletest.MessageTest{
+	return messageTest{
 		VerifyContext: &warpmsg.VerifyContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -263,7 +262,7 @@ func TestInvalidPacking(t *testing.T) {
 	packed := createPacked(numKeys)
 	packed = append(packed, common.Hash{1}) // Invalidate the packing
 
-	test := precompiletest.MessageTest{
+	test := messageTest{
 		VerifyContext: &warpmsg.VerifyContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -276,7 +275,7 @@ func TestInvalidPacking(t *testing.T) {
 		GasErr: ErrInvalidPacked,
 	}
 
-	test.Run(t)
+	test.run(t)
 }
 
 func TestInvalidWarpMessage(t *testing.T) {
@@ -294,7 +293,7 @@ func TestInvalidWarpMessage(t *testing.T) {
 	warpMsgBytes = append(warpMsgBytes, byte(0x01)) // Invalidate warp message packing
 	packed := warpmsg.Pack(warpMsgBytes)
 
-	test := precompiletest.MessageTest{
+	test := messageTest{
 		VerifyContext: &warpmsg.VerifyContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -307,7 +306,7 @@ func TestInvalidWarpMessage(t *testing.T) {
 		GasErr: ErrInvalidWarpMsg,
 	}
 
-	test.Run(t)
+	test.run(t)
 }
 
 func TestInvalidAddressedPayload(t *testing.T) {
@@ -338,7 +337,7 @@ func TestInvalidAddressedPayload(t *testing.T) {
 	warpMsgBytes := warpMsg.Bytes()
 	packed := warpmsg.Pack(warpMsgBytes)
 
-	test := precompiletest.MessageTest{
+	test := messageTest{
 		VerifyContext: &warpmsg.VerifyContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -351,7 +350,7 @@ func TestInvalidAddressedPayload(t *testing.T) {
 		GasErr: ErrInvalidWarpMsgPayload,
 	}
 
-	test.Run(t)
+	test.run(t)
 }
 
 func TestInvalidBitSet(t *testing.T) {
@@ -383,7 +382,7 @@ func TestInvalidBitSet(t *testing.T) {
 		},
 	})
 	packed := warpmsg.Pack(msg.Bytes())
-	test := precompiletest.MessageTest{
+	test := messageTest{
 		VerifyContext: &warpmsg.VerifyContext{
 			SnowCtx: snowCtx,
 			ProposerVMBlockCtx: &block.Context{
@@ -396,7 +395,7 @@ func TestInvalidBitSet(t *testing.T) {
 		GasErr: ErrCannotGetNumSigners,
 	}
 
-	test.Run(t)
+	test.run(t)
 }
 
 // TestWarpSignatureWeightsQuorumNumerator pins the 67% quorum with 100
@@ -411,7 +410,7 @@ func TestWarpSignatureWeightsQuorumNumerator(t *testing.T) {
 		},
 	})
 
-	var tests []precompiletest.MessageTest
+	var tests []messageTest
 	for _, tt := range []struct {
 		numSigners int
 		wantErr    error
@@ -425,7 +424,7 @@ func TestWarpSignatureWeightsQuorumNumerator(t *testing.T) {
 		{numSigners: 101, wantErr: ErrFailedVerification},
 	} {
 		packed := createPacked(tt.numSigners)
-		tests = append(tests, precompiletest.MessageTest{
+		tests = append(tests, messageTest{
 			Name: fmt.Sprintf("%d_signers", tt.numSigners),
 			VerifyContext: &warpmsg.VerifyContext{
 				SnowCtx: snowCtx,
@@ -439,7 +438,7 @@ func TestWarpSignatureWeightsQuorumNumerator(t *testing.T) {
 			ExpectedErr: tt.wantErr,
 		})
 	}
-	precompiletest.RunMessageTests(t, tests)
+	runMessageTests(t, tests)
 }
 
 // multiple messages all correct, multiple messages all incorrect, mixed bag
@@ -453,7 +452,7 @@ func TestWarpMultipleMessages(t *testing.T) {
 		},
 	})
 
-	var tests []precompiletest.MessageTest
+	var tests []messageTest
 	for _, validMessageIndices := range [][]bool{
 		{},
 		{true, false},
@@ -483,7 +482,7 @@ func TestWarpMultipleMessages(t *testing.T) {
 				expectedErr = ErrFailedVerification
 			}
 
-			tests = append(tests, precompiletest.MessageTest{
+			tests = append(tests, messageTest{
 				Name: fmt.Sprintf("multiple messages %v", validMessageIndices),
 				VerifyContext: &warpmsg.VerifyContext{
 					SnowCtx: snowCtx,
@@ -499,7 +498,7 @@ func TestWarpMultipleMessages(t *testing.T) {
 			})
 		}
 	}
-	precompiletest.RunMessageTests(t, tests)
+	runMessageTests(t, tests)
 }
 
 func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
@@ -510,7 +509,7 @@ func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
 		packed      = createPacked(0)
 		expectedGas = GraniteGasConfig.MessageGasCost(len(packed), 0)
 	)
-	noValidators := precompiletest.MessageTest{
+	noValidators := messageTest{
 		Name: "no_validators",
 		VerifyContext: &warpmsg.VerifyContext{
 			SnowCtx:            createSnowCtx(t, nil /*=validators*/), // No validators in state
@@ -522,7 +521,7 @@ func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
 		GasErr:      nil,
 		ExpectedErr: bls.ErrNoPublicKeys,
 	}
-	weightOverflow := precompiletest.MessageTest{
+	weightOverflow := messageTest{
 		Name: "weight_overflow",
 		VerifyContext: &warpmsg.VerifyContext{
 			SnowCtx: createSnowCtx(t, []validatorRange{
@@ -541,15 +540,15 @@ func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
 		GasErr:      nil,
 		ExpectedErr: safemath.ErrOverflow,
 	}
-	precompiletest.RunMessageTests(t, []precompiletest.MessageTest{
+	runMessageTests(t, []messageTest{
 		noValidators,
 		weightOverflow,
 	})
 }
 
-func makeWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.MessageTest {
+func makeWarpMessageTests(tb testing.TB, rules cparams.Rules) []messageTest {
 	allTotalNodes := []int{10, 100, 1_000, 10_000}
-	tests := make([]precompiletest.MessageTest, len(allTotalNodes))
+	tests := make([]messageTest, len(allTotalNodes))
 	for i, totalNodes := range allTotalNodes {
 		packed := createPacked(totalNodes)
 		snowCtx := createSnowCtx(tb, []validatorRange{
@@ -645,7 +644,7 @@ func TestWarpMessage(t *testing.T) {
 		t.Run(fork.String(), func(t *testing.T) {
 			rules := forkToAvalancheRules(fork)
 			tests := makeWarpMessageTests(t, rules)
-			precompiletest.RunMessageTests(t, tests)
+			runMessageTests(t, tests)
 		})
 	}
 }
@@ -654,8 +653,9 @@ func BenchmarkWarpMessage(b *testing.B) {
 	for _, fork := range forks {
 		b.Run(fork.String(), func(b *testing.B) {
 			rules := forkToAvalancheRules(fork)
-			tests := makeWarpMessageTests(b, rules)
-			precompiletest.RunMessageBenchmarks(b, tests)
+			for _, test := range makeWarpMessageTests(b, rules) {
+				b.Run(test.Name, test.bench)
+			}
 		})
 	}
 }
