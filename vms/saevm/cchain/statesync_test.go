@@ -290,8 +290,7 @@ func TestStateSyncDisabled(t *testing.T) {
 }
 
 // TestStateSyncDBFailure checks that a database failure is surfaced to the
-// engine. Only the database fails, so this doesn't cover Firewood writes; see
-// [TestStateSyncFirewoodInterrupted].
+// engine. Only the database fails, so this doesn't cover Firewood writes.
 func TestStateSyncDBFailure(t *testing.T) {
 	tests := []struct {
 		name string

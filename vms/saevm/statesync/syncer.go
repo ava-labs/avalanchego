@@ -141,81 +141,84 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 
 // syncEVM fetches the state trie at root for the configured scheme,
 // concurrently with all code referenced by it via codeSyncer.
-func (s *Syncer) syncEVM(ctx context.Context, root common.Hash, codeSyncer *code.Syncer) (retErr error) {
+func (s *Syncer) syncEVM(ctx context.Context, root common.Hash, codeSyncer *code.Syncer) error {
 	eg, egCtx := errgroup.WithContext(ctx)
-	switch s.cfg.DBConfig.Scheme {
-	case customrawdb.FirewoodScheme:
-		// The same database that the [sae.VM] will later open.
-		tdb := triedb.NewDatabase(s.db, s.cfg.DBConfig.TrieDBConfig(s.snowCtx.ChainDataDir, s.snowCtx.Log))
-		defer func() {
-			retErr = errors.Join(retErr, tdb.Close())
-		}()
-		fw, ok := tdb.Backend().(*firewood.TrieDB)
-		if !ok {
-			return fmt.Errorf("unexpected Firewood backend %T", tdb.Backend())
-		}
-
-		c, err := s.network.SyncClient(p2p.FirewoodProofHandlerID)
-		if err != nil {
-			return fmt.Errorf("creating firewood proof client: %w", err)
-		}
-		fwSyncer, err := fwsyncer.NewEVM(
-			fwsyncer.Config{Log: s.snowCtx.Log},
-			fw.Firewood,
-			codeSyncer,
-			ids.ID(root),
-			c,
-		)
-		if err != nil {
-			return fmt.Errorf("creating firewood state syncer: %w", err)
-		}
-		eg.Go(func() error {
-			defer codeSyncer.DoneAdding()
-			return fwSyncer.Sync(egCtx)
-		})
-	default:
-		const maxLeafRequestSize = 1024
-
-		// The snapshot MUST either be empty or match the requested root.
-		// It will be regenerated anyway, so we can always wipe it.
-		// TODO(powerslider): Push into EVM syncer.
-		s.snowCtx.Log.Info("wiping snapshot before syncing state")
-		if err := graftsnap.WipeSnapshotSync(ctx, s.db); err != nil {
-			return fmt.Errorf("wiping snapshot: %w", err)
-		}
-		s.snowCtx.Log.Info("finished wiping snapshot")
-
-		c, err := s.network.SyncClient(p2p.EVMLeafRequestHandlerID)
-		if err != nil {
-			return fmt.Errorf("creating evm leaf request client: %w", err)
-		}
-
-		// TODO(powerslider): Remove dependency on graft.
-		evmSyncer, err := evmstate.NewSyncer(
-			s.snowCtx.Log,
-			hashdb.NewClient(s.snowCtx.Log, c, common.HashLength),
-			s.db,
-			root,
-			codeSyncer,
-			maxLeafRequestSize,
-		)
-		if err != nil {
-			return fmt.Errorf("creating evm state syncer: %w", err)
-		}
-		eg.Go(func() error {
-			if err := evmSyncer.Sync(egCtx); err != nil {
-				return errors.Join(
-					err,
-					evmSyncer.Finalize(),
-				)
-			}
-			return nil
-		})
-	}
 	eg.Go(func() error {
 		return codeSyncer.Sync(egCtx)
 	})
+	eg.Go(func() error {
+		if s.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
+			return s.syncFirewood(egCtx, root, codeSyncer)
+		}
+		return s.syncHashDB(egCtx, root, codeSyncer)
+	})
 	return eg.Wait()
+}
+
+func (s *Syncer) syncFirewood(ctx context.Context, root common.Hash, codeSyncer *code.Syncer) (retErr error) {
+	defer codeSyncer.DoneAdding()
+
+	// The same database that the [sae.VM] will later open.
+	tdb := triedb.NewDatabase(s.db, s.cfg.DBConfig.TrieDBConfig(s.snowCtx.ChainDataDir, s.snowCtx.Log))
+	defer func() {
+		retErr = errors.Join(retErr, tdb.Close())
+	}()
+	fw, ok := tdb.Backend().(*firewood.TrieDB)
+	if !ok {
+		return fmt.Errorf("unexpected Firewood backend %T", tdb.Backend())
+	}
+
+	c, err := s.network.SyncClient(p2p.FirewoodProofHandlerID)
+	if err != nil {
+		return fmt.Errorf("creating firewood proof client: %w", err)
+	}
+	syncer, err := fwsyncer.NewEVM(
+		fwsyncer.Config{Log: s.snowCtx.Log},
+		fw.Firewood,
+		codeSyncer,
+		ids.ID(root),
+		c,
+	)
+	if err != nil {
+		return fmt.Errorf("creating firewood state syncer: %w", err)
+	}
+	return syncer.Sync(ctx)
+}
+
+func (s *Syncer) syncHashDB(ctx context.Context, root common.Hash, codeSyncer *code.Syncer) error {
+	const maxLeafRequestSize = 1024
+
+	// The snapshot MUST either be empty or match the requested root.
+	// It will be regenerated anyway, so we can always wipe it.
+	// TODO(powerslider): Push into EVM syncer.
+	s.snowCtx.Log.Info("wiping snapshot before syncing state")
+	if err := graftsnap.WipeSnapshotSync(ctx, s.db); err != nil {
+		return fmt.Errorf("wiping snapshot: %w", err)
+	}
+	s.snowCtx.Log.Info("finished wiping snapshot")
+
+	c, err := s.network.SyncClient(p2p.EVMLeafRequestHandlerID)
+	if err != nil {
+		return fmt.Errorf("creating evm leaf request client: %w", err)
+	}
+	// TODO(powerslider): Remove dependency on graft.
+	syncer, err := evmstate.NewSyncer(
+		s.snowCtx.Log,
+		hashdb.NewClient(s.snowCtx.Log, c, common.HashLength),
+		s.db,
+		root,
+		codeSyncer,
+		maxLeafRequestSize,
+	)
+	if err != nil {
+		return fmt.Errorf("creating evm state syncer: %w", err)
+	}
+	if err := syncer.Sync(ctx); err != nil {
+		// Finalize allows the EVM syncer to resume its progress on restart.
+		// This is not required for correctness.
+		return errors.Join(err, syncer.Finalize())
+	}
+	return nil
 }
 
 // WriteSynced marks the state sync as complete on disk, allowing an [sae.VM] to
