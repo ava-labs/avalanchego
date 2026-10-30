@@ -159,10 +159,45 @@ jobs:
         os: [ubuntu-24.04-amd64-4-core]
     steps:
       - uses: actions/checkout@v5
+      - id: setup-go
+        uses: ./.github/actions/setup-go-for-project
+      - id: cache-policy
+        uses: ./.github/actions/cache-policy
+        with:
+          request-cache-save: 'true'
+      - id: cache-key
+        name: Determine Go E2E build-cache key
+        shell: bash
+        run: |
+          cache_key_prefix="go-e2e-${{ matrix.os }}-${{ runner.arch }}-no-race-"
+          cache_path="$(go env GOCACHE)"
+          input_hash="$(./scripts/workflow-hash-go-e2e-inputs.sh)"
+          {
+            echo "go-build-cache-path=${cache_path}"
+            echo "cache-key=${cache_key_prefix}${input_hash}"
+            echo "cache-key-prefix=${cache_key_prefix}"
+          } >> "$GITHUB_OUTPUT"
+      - id: e2e-cache
+        name: Restore Go E2E build cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.cache-key.outputs.go-build-cache-path }}
+          key: ${{ steps.cache-key.outputs.cache-key }}
+          restore-keys: |
+            ${{ steps.cache-key.outputs.cache-key-prefix }}
+      - id: validate-e2e-cache
+        name: Validate exact Go E2E build-cache hit
+        if: ${{ steps.e2e-cache.outputs.cache-hit == 'true' }}
+        uses: ./.github/actions/validate-go-e2e-cache
+        with:
+          mode: no-race
+          setup_go_module_cache: 'false'
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
-          run: ./scripts/run_task.sh test-e2e-ci
+          run: ./scripts/run_task.sh test-e2e
+          nix_setup_complete: ${{ steps.validate-e2e-cache.outcome == 'success' }}
+          setup_go_module_cache: 'false'
           artifact_prefix: e2e-${{ matrix.os }}
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -173,6 +208,12 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+      - name: Save Go E2E build cache
+        if: ${{ steps.cache-policy.outputs.cache-save-allowed == 'true' && steps.e2e-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ steps.cache-key.outputs.go-build-cache-path }}
+          key: ${{ steps.cache-key.outputs.cache-key }}
 
   e2e-bootstrap-monitor:
     needs: setup-cache-linux-amd64

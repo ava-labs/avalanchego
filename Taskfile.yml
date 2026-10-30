@@ -7,13 +7,19 @@
 version: '3'
 
 includes:
+  go-e2e:
+    taskfile: taskfiles/go-e2e.yml
+    flatten: true
+  go-unit:
+    taskfile: taskfiles/go-unit.yml
+    flatten: true
   packaging:
     taskfile: .github/packaging/Taskfile.yml
 
 vars:
   # Task entrypoints run through the repo's nix wrapper so they use the pinned
   # dev-shell toolchain when nix is available, without depending on cwd.
-  NIX_RUN: '{{printf "%s/scripts/nix_run.sh" .TASKFILE_DIR}}'
+  NIX_RUN: '{{printf "%s/scripts/nix_run.sh" .ROOT_DIR}}'
 
 tasks:
   default: './scripts/run_task.sh --list'
@@ -239,10 +245,6 @@ tasks:
         vars:
           BAZEL_ARGS: --config=race
 
-  build:
-    desc: Builds avalanchego
-    cmd: '{{.NIX_RUN}} ./scripts/build.sh'
-
   build-antithesis-images-avalanchego:
     desc: Builds docker images for antithesis for the avalanchego test setup
     env:
@@ -267,10 +269,6 @@ tasks:
     desc: Builds docker image for avalanchego
     cmd: '{{.NIX_RUN}} ./scripts/build_image.sh'
 
-  build-race:
-    desc: Builds avalanchego with race detection enabled
-    cmd: '{{.NIX_RUN}} ./scripts/build.sh -r'
-
   build-subnet-evm:
     desc: Builds subnet-evm plugin
     cmd: '{{.NIX_RUN}} ./graft/subnet-evm/scripts/build.sh'
@@ -283,10 +281,6 @@ tasks:
   build-tmpnetctl:
     desc: Builds tmpnetctl
     cmd: '{{.NIX_RUN}} ./scripts/build_tmpnetctl.sh'
-
-  build-xsvm:
-    desc: Builds xsvm plugin
-    cmd: '{{.NIX_RUN}} ./scripts/build_xsvm.sh'
 
   build-xsvm-image:
     desc: Builds xsvm image
@@ -490,9 +484,11 @@ tasks:
       - test-setup-task
       - test-sync-task-version
       - test-unit-script
-      - test-workflow-hash-go-unit-inputs
+      - test-workflow-hash-go-cache-inputs
       - test-workflow-prepare-go-unit-cache
       - test-workflow-validate-go-unit-cache
+      - test-workflow-validate-go-build-cache
+      - test-go-e2e-setup
       - check-go-version
       - check-require-directives
       - check-task-version
@@ -517,9 +513,11 @@ tasks:
       - task: test-setup-task
       - task: test-sync-task-version
       - task: test-unit-script
-      - task: test-workflow-hash-go-unit-inputs
+      - task: test-workflow-hash-go-cache-inputs
       - task: test-workflow-prepare-go-unit-cache
       - task: test-workflow-validate-go-unit-cache
+      - task: test-workflow-validate-go-build-cache
+      - task: test-go-e2e-setup
       - task: check-yaml-fmt
       - task: check-go-mod-tidy
       - task: check-go-version
@@ -626,20 +624,6 @@ tasks:
       - cmd: '{{.NIX_RUN}} ./scripts/test_check_ci_disk_space.sh'
       - cmd: '{{.NIX_RUN}} ./scripts/test_log_ci_disk_state.sh'
 
-  test-e2e:
-    desc: Runs e2e tests
-    cmds:
-      - task: build
-      - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
-
-  test-e2e-ci:
-    desc: Runs e2e tests in parallel with race detection enabled
-    cmds:
-      - task: build-race
-      - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
-
   test-e2e-kube:
     desc: Runs e2e tests against a network deployed to kube
     cmds:
@@ -718,17 +702,6 @@ tasks:
     desc: Tests Task version synchronization
     cmd: '{{.NIX_RUN}} ./scripts/test_sync_task_version.sh'
 
-  test-unit:
-    desc: Runs cacheable unified unit tests
-    env:
-      NO_SHUFFLE: TRUE # Allows caching
-      NO_RACE: TRUE    # Reduces execution time
-    cmd: '{{.NIX_RUN}} bash ./scripts/tests.unit.sh'
-
-  test-unit-race-shuffle:
-    desc: Runs unified unit tests with race detection and shuffle
-    cmd: '{{.NIX_RUN}} bash ./scripts/tests.unit.sh'
-
   test-unit-script:
     desc: Tests unified unit-test script behavior
     cmd: '{{.NIX_RUN}} ./scripts/test_tests_unit.sh'
@@ -738,9 +711,9 @@ tasks:
     # Mirrors the Bazel unit-test smoke target (//ids:ids_test --test_filter=TestID).
     cmd: '{{.NIX_RUN}} go test -run TestID ./ids'
 
-  test-workflow-hash-go-unit-inputs:
-    desc: Tests hashing of Go unit-test cache inputs
-    cmd: '{{.NIX_RUN}} ./scripts/test_workflow_hash_go_unit_inputs.sh'
+  test-workflow-hash-go-cache-inputs:
+    desc: Tests hashing of Go unit-test and E2E build-cache inputs
+    cmd: '{{.NIX_RUN}} ./scripts/test_workflow_hash_go_cache_inputs.sh'
 
   test-workflow-prepare-go-unit-cache:
     desc: Tests fallback reuse and fixture invalidation for Go unit caching
@@ -749,6 +722,14 @@ tasks:
   test-workflow-validate-go-unit-cache:
     desc: Tests Go unit-test cache validation
     cmd: '{{.NIX_RUN}} ./scripts/test_workflow_validate_go_unit_cache.sh'
+
+  test-go-e2e-setup:
+    desc: Checks Go E2E module preparation and monitored-action setup policy
+    cmd: '{{.NIX_RUN}} ./scripts/test_go_e2e_setup.sh'
+
+  test-workflow-validate-go-build-cache:
+    desc: Tests exact-hit Go build-cache validation with real Go builds
+    cmd: '{{.NIX_RUN}} ./scripts/test_workflow_validate_go_build_cache.sh'
 
   update-go-version:
     desc: "Updates go version directives across all modules. Usage: task update-go-version -- <version> (e.g. 1.25.7)"

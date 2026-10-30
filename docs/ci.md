@@ -31,6 +31,9 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
     - [Go unit-test cache](#go-unit-test-cache)
       - [Stable fixture modification times](#stable-fixture-modification-times)
       - [Changing Go unit caching safely](#changing-go-unit-caching-safely)
+    - [Go E2E build cache](#go-e2e-build-cache)
+      - [Go E2E exact-hit validation](#go-e2e-exact-hit-validation)
+      - [Changing Go E2E caching safely](#changing-go-e2e-caching-safely)
     - [Bazel dependency cache](#bazel-dependency-cache)
     - [Nix store cache](#nix-store-cache)
     - [Binfmt image cache](#binfmt-image-cache)
@@ -40,6 +43,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 - [Using Nix in GitHub Actions](#using-nix-in-github-actions)
   - [Run `install-nix` jobs in the Nix dev shell](#run-install-nix-jobs-in-the-nix-dev-shell)
   - [Start the Nix dev shell in composite actions](#start-the-nix-dev-shell-in-composite-actions)
+  - [Reuse Nix setup in the same job](#reuse-nix-setup-in-the-same-job)
   - [Guard failure handlers](#guard-failure-handlers)
 - [Runners and external actions](#runners-and-external-actions)
   - [Use versioned GitHub-hosted runners](#use-versioned-github-hosted-runners)
@@ -188,7 +192,9 @@ Go and Bazel use the same workflow roles and file-name pattern:
 
 Entrypoints select the reusable workflow that provides the required test policy,
 or define jobs that are specific to that event. The pull-request and
-merge-group Go entrypoints use `go.yml`; scheduled Go uses `go-unit.yml`.
+merge-group Go entrypoints use `go.yml`. Scheduled Go uses `go-unit.yml`. It
+also defines its own `e2e` job, which runs Go E2E tests serially with race
+detection.
 
 Smoke workflows run a minimal macOS test. This test verifies that unit tests
 can run on macOS. The Linux pre-merge job and scheduled jobs run the full unit
@@ -264,20 +270,30 @@ enabled for these tests. This provides pre-merge race coverage without the same
 broad rerun costs. macOS runs only a smoke test because its runners are slow and
 unreliable.
 
-Bazel E2E and monitored tests have no result caching. Bazel caches the binaries
-that these tests use, but the runners use `bazel run`, so each pre-merge run
-executes the full suite. Race detection would slow every pre-merge run, so these
-tests run with race detection only in scheduled CI. As a result, a data race
-that only these tests find appears after merge. It does not block the pull
-request. Reconsider pre-merge race detection if either of these conditions
-occurs:
+These suites do not reuse test results: Go E2E, Bazel E2E, and Bazel monitored
+tests. Bazel starts them with `bazel run`, not `bazel test`, so its remote cache
+stores no test results for them. Both build paths cache compiled output, but
+every run executes the full suite. Pull requests and the merge queue run these
+suites without race detection to keep feedback fast. Scheduled CI runs them
+with race detection.
+
+As a result, a data race that only these tests find appears after merge.
+It does not block the pull request. Reconsider pre-merge race detection if either
+of these conditions occurs:
 
 - Scheduled CI finds races often enough that later detection costs more than
   longer pre-merge runs.
 - Runs with race detection become fast enough for pre-merge CI.
 
-For the suites that scheduled CI runs with race detection, see
-[E2E and monitored test runners](./bazel.md#e2e-and-monitored-test-runners).
+Scheduled CI runs these suites with race detection:
+
+- **Go E2E:** the `e2e` job in
+  [`go-scheduled.yml`](../.github/workflows/go-scheduled.yml) runs
+  `task test-e2e-race-serial` on a standard runner. For why scheduled E2E jobs
+  run serially, see
+  [Use beefier runners for faster E2E jobs](#use-beefier-runners-for-faster-e2e-jobs).
+- **Bazel E2E and monitored tests:** see
+  [E2E and monitored test runners](./bazel.md#e2e-and-monitored-test-runners).
 
 ### Go unit test platforms
 
@@ -330,7 +346,7 @@ For example, end-to-end jobs in
 ```yaml
 - uses: ./.github/actions/run-monitored-tmpnet-cmd
   with:
-    run: ./scripts/run_task.sh test-e2e-ci
+    run: ./scripts/run_task.sh test-e2e
 ```
 
 Do not use a composite action as the only entrypoint for an operation that
@@ -419,9 +435,10 @@ workflows consume these caches without writing them.
 
 ### Cache policy overview
 
-GitHub Actions caches tools, dependencies, and the Go unit job's build and test
-results. The Go unit job owns its output cache; see [Go unit-test
-cache](#go-unit-test-cache). Two rules govern the input caches:
+GitHub Actions caches tools, dependencies, the Go unit job's build and test
+results, and the Go E2E job's compiled output. Each job owns its output cache;
+see [Go unit-test cache](#go-unit-test-cache) and
+[Go E2E build cache](#go-e2e-build-cache). Two rules govern the input caches:
 
 - **Save shared entries only from designated setup or image-build jobs on
   `master`.** Pull requests and other refs can restore entries and prepare
@@ -448,7 +465,8 @@ check. These restrictions do not isolate the workload from the network; see
 
 GitHub Actions and Bazel cache build outputs in different ways. Bazel's
 content-addressable cache is more efficient and needs less cache setup in each
-job, so jobs that build binaries for tests use Bazel. For those tests, see
+job, so most jobs that build binaries for tests use Bazel. The Go E2E jobs
+remain to test artifacts built with `go build`. For the Bazel tests, see
 [E2E and monitored test runners](./bazel.md#e2e-and-monitored-test-runners).
 
 The GitHub Actions cache stores one archive for each key. The key covers all of
@@ -456,8 +474,9 @@ the archive's inputs, so a change to any input selects a new key. The job then
 saves a new archive with all of its contents, including the parts that did not
 change. Only `master` saves these archives. If pull requests saved them, each
 pull-request run could add a full archive, and cache usage would have no
-practical limit; see [Cache lifecycle](#cache-lifecycle). The Go unit job uses
-this approach for `GOCACHE`; see [Go unit-test cache](#go-unit-test-cache).
+practical limit; see [Cache lifecycle](#cache-lifecycle). Go unit and E2E jobs
+use this approach for `GOCACHE`; see [Go unit-test cache](#go-unit-test-cache)
+and [Go E2E build cache](#go-e2e-build-cache).
 
 Bazel's remote cache stores each action output, such as one compiled package or
 one linked binary, under a hash of that action's inputs. A change uploads only
@@ -473,11 +492,12 @@ builds more of the repository.
 
 ### Cache lifecycle
 
-GitHub-hosted runners are temporary. GitHub Actions caching is currently used
-for build inputs - tools and dependencies - and the Go unit job's build and test
-results. A cache miss must still let the job obtain its required input before the job
-disables dependency downloads. GitHub Actions caches are immutable: the first
-successful save for a key wins. Later saves of that key do not replace it.
+GitHub-hosted runners are temporary. CI uses the GitHub Actions cache for build
+inputs, such as tools and dependencies. It also stores the `GOCACHE` archives of
+the Go unit and E2E jobs. A cache miss must still let
+the job obtain its required input before the job disables dependency downloads.
+GitHub Actions caches are immutable: the first successful save for a key wins.
+Later saves of that key do not replace it.
 
 Bazel is configured to cache outputs via its separate remote cache, but still
 depends on GitHub Actions caching for its repository inputs.
@@ -641,9 +661,26 @@ separate exact keys. The cache mode is `build-only` or `build-and-test-results`.
 
 The content hash covers tracked Go source, workspace and module metadata,
 `testdata`, embedded files, and test configuration. `go list` discovers embedded
-files, including test-only embeds. Test configuration includes the Taskfile,
-unit workflow, Go setup action, test script, launchers, compiler settings, and
-cache-preparation scripts.
+files, including test-only embeds. Test configuration includes the unit task
+file, the root Taskfile's global settings, the unit workflow, the Go setup action, test script, launchers, compiler settings, and
+cache-preparation scripts. The unit hash entrypoint is
+[`workflow-hash-go-unit-inputs.sh`](../scripts/workflow-hash-go-unit-inputs.sh).
+It excludes E2E workflow, action, and script configuration.
+
+Unit and E2E caches have separate configuration inputs and separate hashes.
+They share only source discovery and common toolchain inputs through
+[`workflow-hash-go-cache-inputs.sh`](../scripts/workflow-hash-go-cache-inputs.sh).
+A change to E2E configuration must not invalidate the unit archive, or vice versa.
+The regression tests check both directions.
+
+The task definitions also remain separate:
+[`go-unit.yml`](../taskfiles/go-unit.yml) and
+[`go-e2e.yml`](../taskfiles/go-e2e.yml).
+The root Taskfile includes them without changing public task names.
+Each hash includes its own task file and the root Taskfile's global settings,
+not the root task definitions. Keep cache-specific tasks in their respective files.
+This prevents an unrelated task change from invalidating either archive. See
+[Cache-specific task files](./tasks.md#cache-specific-task-files).
 
 The job first tries the exact key. It then tries a prefix for the selected cache
 mode, followed by a prefix for the same runner and architecture across modes.
@@ -711,11 +748,18 @@ This check tests cache completeness. A warning would let an incomplete archive
 keep passing CI without the intended test-result reuse. Go can safely rerun tests
 after a flag change, but that check would fail.
 
-If you change the test configuration, keep the content hash in
-[`workflow-hash-go-unit-inputs.sh`](../scripts/workflow-hash-go-unit-inputs.sh)
-complete. Include new scripts or configuration files that affect test flags,
-package selection, compiler settings, or fixture preparation. Add a regression case to
-[`test_workflow_hash_go_unit_inputs.sh`](../scripts/test_workflow_hash_go_unit_inputs.sh).
+If you change the test configuration, keep the hash inputs complete. Include new
+scripts or configuration files that affect test flags, package selection,
+compiler settings, or fixture preparation:
+
+- Add unit-only inputs to
+  [`workflow-hash-go-unit-inputs.sh`](../scripts/workflow-hash-go-unit-inputs.sh).
+- Add inputs that also affect E2E builds, such as compiler settings or toolchain
+  configuration, to
+  [`workflow-hash-go-cache-inputs.sh`](../scripts/workflow-hash-go-cache-inputs.sh).
+
+Add a regression case to
+[`test_workflow_hash_go_cache_inputs.sh`](../scripts/test_workflow_hash_go_cache_inputs.sh).
 Unrelated documentation changes should retain the same key.
 
 If exact-hit validation fails, investigate why Go reran the tests.  Do not delete
@@ -742,7 +786,7 @@ without a [temporary cache-write exception](#validate-cache-saves-before-merge).
 Run the focused checks:
 
 ```sh
-task test-workflow-hash-go-unit-inputs
+task test-workflow-hash-go-cache-inputs
 task test-workflow-prepare-go-unit-cache
 task test-workflow-validate-go-unit-cache
 ```
@@ -755,6 +799,125 @@ to check archive reuse on GitHub-hosted runners:
 3. Check that the restore matches the exact key.
 4. Check that every tested package reports `(cached)`.
 5. Check that a scheduled job reruns tests after restoring an entry.
+
+#### Go E2E build cache
+
+Go E2E jobs save `GOCACHE` in a GitHub Actions archive: the E2E build cache. A
+later run restores the archive, so Go does not compile unchanged packages again.
+The jobs always run the tests, so the cache does not remove race coverage.
+
+| Workflow | Job | Task | Cache-key prefix |
+| --- | --- | --- | --- |
+| [`go.yml`](../.github/workflows/go.yml) | `e2e` | `test-e2e` | `go-e2e-<runner>-<arch>-no-race-` |
+| [`go-scheduled.yml`](../.github/workflows/go-scheduled.yml) | `e2e` | `test-e2e-race-serial` | `go-e2e-ubuntu-24.04-<arch>-race-` |
+
+Keep separate archives for race and non-race builds. Go includes the `-race`
+setting in its build-cache keys, so a shared archive would not supply the wrong
+output. But GitHub cannot update an existing archive. With one shared key, the
+first job to save would win. The other mode's output would not be saved until
+the inputs change.
+
+Each job tries the exact key first. Then it tries the prefix for the same
+runner, architecture, and race mode. Unlike the unit job, it does not fall back
+to the other mode. `-race` changes the compiled output of every package, so the
+other mode's archive would supply few usable packages.
+
+The cache policy below describes normal behavior, without temporary validation
+exceptions. A save requires `refs/heads/master`, successful tests, and a
+non-exact restore (a fallback or miss).
+
+| Event | Job | Save the E2E build cache |
+| --- | --- | --- |
+| Pull request, merge queue, tag push, or `dev` push | Non-race | No |
+| `master` push | Non-race | After successful tests and a non-exact restore |
+| Scheduled or manual dispatch on `master` | Race | After successful tests and a non-exact restore |
+| Manual dispatch on another ref | Race | No |
+
+Each `master` push that changes the E2E hash inputs saves a new non-race
+archive. The next scheduled run then saves a new race archive. These archives
+use the same limited cache storage as the unit and input caches; see
+[Cache lifecycle](#cache-lifecycle). Reconsider this cache if a restore takes
+longer than the compilation it replaces. Also reconsider it if E2E archives
+evict input caches that `master` jobs need.
+
+Both E2E jobs compute their key with
+[`workflow-hash-go-e2e-inputs.sh`](../scripts/workflow-hash-go-e2e-inputs.sh).
+The hash covers source, embedded files, the Nix toolchain configuration, E2E
+build scripts, E2E actions, and [`go-e2e.yml`](../taskfiles/go-e2e.yml). It
+excludes unit-only configuration and the unit task definitions.
+Documentation-only changes retain the same key.
+
+`go.yml` and `go-scheduled.yml` are not hash inputs. Each workflow contains its
+own copy of the cache-key, restore, exact-hit validation, and save steps. These
+steps select the runner, the race mode, and the save conditions. They do not
+change compiled output. Keep build commands and flags in the E2E task file or
+scripts, not in the workflows. When you change the cache steps in one workflow,
+make the same change in the other.
+
+##### Go E2E exact-hit validation
+
+On an exact hit, each job runs
+[`workflow-check-go-e2e-cache.sh`](../scripts/workflow-check-go-e2e-cache.sh)
+before the E2E task adds compiled output to the cache. The script runs Go
+dry-run commands in the same Nix environment as the tests. It checks
+AvalancheGo, xsvm, Ginkgo, and the E2E test binary. The race job checks
+AvalancheGo with `-race`. The E2E tasks build xsvm and the E2E test binary
+without race detection.
+
+The script repeats the build commands of
+[`build.sh`](../scripts/build.sh), [`build_xsvm.sh`](../scripts/build_xsvm.sh),
+and the Ginkgo test build. Keep its commands the same as those builds. If they
+differ, validation checks a different build than the tests use.
+
+Validation rejects uncached dependency compilation, including CGO and assembly
+commands. It permits Go compiler commands for executable `main` packages and
+Go's generated test main. It also permits linking.
+
+AvalancheGo embeds the current commit through `-ldflags`. A different commit
+can make Go compile `main` again, even when source files do not change. VCS
+metadata can also require compilation of `main`. Such compilation does not mean
+that the E2E build cache is incomplete.
+
+The archive contains only `GOCACHE`, not the `build/` directory. Each run
+therefore links the AvalancheGo and xsvm executables again. E2E tests always
+run. Validation does not use cached test results.
+
+##### Changing Go E2E caching safely
+
+If you change E2E build settings, keep the hash inputs complete. Include new
+scripts or configuration files that affect build flags, build tags, compiled
+packages, or the toolchain. Add E2E-only inputs to
+[`workflow-hash-go-e2e-inputs.sh`](../scripts/workflow-hash-go-e2e-inputs.sh).
+Add inputs that also affect unit tests to
+[`workflow-hash-go-cache-inputs.sh`](../scripts/workflow-hash-go-cache-inputs.sh).
+Add a regression case to
+[`test_workflow_hash_go_cache_inputs.sh`](../scripts/test_workflow_hash_go_cache_inputs.sh).
+
+If exact-hit validation fails, investigate before you delete the archive. Add
+missing hash inputs and regression tests. Then follow the recovery procedure in
+[Changing Go unit caching safely](#changing-go-unit-caching-safely), with these
+changes:
+
+- Use the E2E job and its cache key instead of the unit job.
+- To save a new non-race archive, rerun the `e2e` job of a `master` push.
+- To save a new race archive, dispatch `Scheduled Go` on `master`.
+
+Rerunning the same exact hit cannot repair an immutable archive.
+
+When you change E2E caching, check both the race and non-race jobs on fresh
+runners. Check that each job saves an archive and then restores it on another
+run. Check that exact-hit validation passes and that the tests still run. Use
+the [temporary cache-write exception](#validate-cache-saves-before-merge) for
+validation before merge. The race job runs only in `Scheduled Go`, so check its
+save through the manual-dispatch exception.
+
+Run the focused local checks:
+
+```sh
+task test-go-e2e-setup
+task test-workflow-hash-go-cache-inputs
+task test-workflow-validate-go-build-cache
+```
 
 #### Bazel dependency cache
 
@@ -991,6 +1154,27 @@ example, a step that reads GitHub Actions environment variables can use `nix dev
 A composite action cannot set `defaults.run.shell`. A calling job's default shell does
 not apply to the action. Set `shell:` on each `run:` step that needs the Nix dev
 shell.
+
+### Reuse Nix setup in the same job
+
+Go E2E cache validation installs Nix and loads the development shell.
+After successful validation, the monitored action receives `nix_setup_complete: true`.
+This skips repeated Nix installation, store restoration, and flake preparation.
+The input defaults to `false`. Validation runs only after an exact hit. After a
+fallback restore or a miss, validation does not run, so the monitored action
+installs Nix itself. Artifact collection accepts either
+successful setup in the action or the explicit completion input.
+
+Set `nix_setup_complete` from the earlier setup step's successful outcome.
+Reuse setup only in the same job with the same flake configuration.
+Do not skip setup merely because `/nix` or `/nix/store` exists.
+Those directories can exist without the required flake dependencies.
+The input skips the entire `install-nix` action, including Go module preparation.
+Prepare any additional modules separately before declaring setup complete.
+
+The [tmpnet action inputs](../tests/fixture/tmpnet/README.md#ci-collection)
+document the setup controls. Run `task test-go-e2e-setup` to check input forwarding,
+setup order, and artifact collection guards.
 
 ### Guard failure handlers
 

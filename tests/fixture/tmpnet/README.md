@@ -495,7 +495,7 @@ Example usage:
   with:
     # This should be a task invocation, not a script. The task should internalize arguments and env
     # vars to ensure that the job can be reproduced locally with minimal expertise.
-    run: ./scripts/run_task.sh test-e2e-ci
+    run: ./scripts/run_task.sh test-e2e
 
     # Sets the prefix of the artifact containing the tmpnet network dir for this job.
     # Only required if a workflow uses this action more than once so that each artifact
@@ -512,6 +512,20 @@ Example usage:
     loki_username: ${{ secrets.LOKI_USERNAME || '' }}
     loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 ```
+
+Setup inputs for `run-monitored-tmpnet-cmd`:
+
+| Input | Default | Behavior |
+| --- | --- | --- |
+| `setup_go_module_cache` | `auto` | Prepare Go modules for non-Bazel jobs. Use `true` to prepare them in Bazel jobs too. Use `false` only after earlier preparation. |
+| `nix_setup_complete` | `false` | Use `true` only after successful Nix setup with the same flake in the same job. This skips `install-nix`, including module preparation. |
+
+Use the earlier setup step's successful outcome to set `nix_setup_complete`.
+Do not infer completion from the presence of `/nix` or `/nix/store`.
+The action still collects artifacts when it reuses successful setup.
+See [Reuse Nix setup in the same job](../../../docs/ci.md#reuse-nix-setup-in-the-same-job)
+and [Go module preparation](../../../docs/go-toolchains-and-caches.md#dependency-preparation)
+for the requirements and validation checks.
 
 ### Viewing
 
