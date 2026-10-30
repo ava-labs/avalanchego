@@ -29,11 +29,11 @@ func (s *Set) TransactionsByPriority(filter txpool.PendingFilter) []*LazyTransac
 }
 
 // senderTxs is a sender's remaining transactions and the effective gas tip of
-// the next one.
+// the first one.
 type senderTxs struct {
-	from common.Address
-	txs  []*txpool.LazyTransaction
-	tip  *uint256.Int
+	from     common.Address
+	txs      []*txpool.LazyTransaction
+	firstTip *uint256.Int
 }
 
 func byPriority(pending map[common.Address][]*txpool.LazyTransaction, baseFee *uint256.Int) []*LazyTransaction {
@@ -45,15 +45,15 @@ func byPriority(pending map[common.Address][]*txpool.LazyTransaction, baseFee *u
 		}
 		n += len(txs)
 		senders = append(senders, &senderTxs{
-			from: from,
-			txs:  txs,
-			tip:  effectiveGasTip(txs[0], baseFee),
+			from:     from,
+			txs:      txs,
+			firstTip: effectiveGasTip(txs[0], baseFee),
 		})
 	}
 
-	// A sort can't respect both tip and nonce order, so merge the senders.
+	// Heap by first transaction from each sender.
 	q := heap.QueueOf(func(a, b *senderTxs) bool {
-		if c := a.tip.Cmp(b.tip); c != 0 {
+		if c := a.firstTip.Cmp(b.firstTip); c != 0 {
 			return c > 0 // Higher tips first
 		}
 		if c := a.txs[0].Time.Compare(b.txs[0].Time); c != 0 {
@@ -78,7 +78,7 @@ func byPriority(pending map[common.Address][]*txpool.LazyTransaction, baseFee *u
 			q.Pop()
 			continue
 		}
-		s.tip = effectiveGasTip(s.txs[0], baseFee)
+		s.firstTip = effectiveGasTip(s.txs[0], baseFee)
 		q.Fix(0)
 	}
 }
