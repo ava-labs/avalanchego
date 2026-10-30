@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -25,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 
 	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
 // TestSimplexEngineHandlesSimplexMessages tests that the Simplex engine can handle
@@ -199,7 +199,7 @@ func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
 	require.NoError(t, err)
 
 	config.VM.(*wrappedVM).ParseBlockF = func(_ context.Context, _ []byte) (snowman.Block, error) {
-		return newTestBlock(t, newBlockConfig{round: 1}).vmBlock, nil
+		return newTestBlock(newBlockConfig{round: 1}).vmBlock, nil
 	}
 
 	require.NoError(t, engine.Start(ctx, 1))
@@ -217,7 +217,7 @@ func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
 					BlockProposal: &p2p.BlockProposal{},
 				},
 			},
-			expectedErr: errFailedToParseMetadata,
+			expectedErr: errNilField,
 		},
 		{
 			name: "BlockProposal missing vote",
@@ -413,12 +413,12 @@ func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
 // -----------------------------------------------------------------------------
 
 var (
-	blockMetadata = &simplex.ProtocolMetadata{
+	blockMetadata = &simplexcommon.ProtocolMetadata{
 		Version: 1,
 		Epoch:   2,
 		Round:   3,
 		Seq:     4,
-		Prev:    simplex.Digest{0x1, 0x2, 0x3, 0x4},
+		Prev:    simplexcommon.Digest{0x1, 0x2, 0x3, 0x4},
 	}
 
 	canotoBlock = &canotoSimplexBlock{
@@ -524,14 +524,14 @@ var (
 func buildQCWithBytes(t testing.TB, configs []*Config, msg []byte) []byte {
 	t.Helper()
 
-	sigs := make([]simplex.Signature, 0, len(configs))
+	sigs := make([]simplexcommon.Signature, 0, len(configs))
 
 	for _, config := range configs {
 		signer, _, err := NewBLSAuth(config)
 		require.NoError(t, err)
 		sig, err := signer.Sign(msg)
 		require.NoError(t, err)
-		sigs = append(sigs, simplex.Signature{
+		sigs = append(sigs, simplexcommon.Signature{
 			Signer: config.Ctx.NodeID[:],
 			Value:  sig,
 		})
@@ -909,7 +909,7 @@ func createSimplexEngineConfig(t *testing.T, reuseKeys keyReuseOption) []*Config
 	config.Sender.(*sendermock.ExternalSender).EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 
 	config.VM.(*wrappedVM).ParseBlockF = func(_ context.Context, _ []byte) (snowman.Block, error) {
-		return newTestBlock(t, newBlockConfig{round: 1}).vmBlock, nil
+		return newTestBlock(newBlockConfig{round: 1}).vmBlock, nil
 	}
 	return configs
 }
