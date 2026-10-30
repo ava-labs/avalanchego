@@ -28,7 +28,7 @@ graft_go_test(
         "//snow/validators",
         "//tests/fixture/e2e",
         "//tests/fixture/tmpnet",
-        "//vms/evm/predicate",
+        "//vms/evm/warpmsg",
         "//vms/platformvm",
         "//vms/platformvm/api",
         "//vms/platformvm/warp",

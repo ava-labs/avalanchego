@@ -14,7 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
@@ -144,7 +144,7 @@ func (*Config) Accept(acceptCtx *precompileconfig.AcceptContext, blockHash commo
 // 4. TODO: Lookup of the validator set
 //
 // If the payload of the warp message fails parsing, return a non-nil error invalidating the transaction.
-func PredicateGas(pred predicate.Predicate, rules precompileconfig.Rules) (uint64, error) {
+func PredicateGas(pred warpmsg.Packed, rules precompileconfig.Rules) (uint64, error) {
 	gasConfig := CurrentGasConfig(rules)
 
 	totalGas := gasConfig.VerifyPredicateBase
@@ -157,7 +157,7 @@ func PredicateGas(pred predicate.Predicate, rules precompileconfig.Rules) (uint6
 		return 0, fmt.Errorf("overflow adding gas cost for %d warp message chunks", len(pred))
 	}
 
-	unpackedPredicateBytes, err := pred.Bytes()
+	unpackedPredicateBytes, err := pred.Unpack()
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errInvalidPredicateBytes, err)
 	}
@@ -187,8 +187,8 @@ func PredicateGas(pred predicate.Predicate, rules precompileconfig.Rules) (uint6
 }
 
 // VerifyPredicate returns whether the predicate described by [predicateBytes] passes verification.
-func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateContext, pred predicate.Predicate) error {
-	unpackedPredicateBytes, err := pred.Bytes()
+func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateContext, pred warpmsg.Packed) error {
+	unpackedPredicateBytes, err := pred.Unpack()
 	if err != nil {
 		return fmt.Errorf("%w: %w", errInvalidPredicateBytes, err)
 	}

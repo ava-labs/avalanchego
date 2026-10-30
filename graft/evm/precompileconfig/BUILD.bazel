@@ -8,7 +8,7 @@ go_library(
     deps = [
         "//snow",
         "//snow/engine/snowman/block",
-        "//vms/evm/predicate",
+        "//vms/evm/warpmsg",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/math",
         "@com_github_ava_labs_libevm//core",

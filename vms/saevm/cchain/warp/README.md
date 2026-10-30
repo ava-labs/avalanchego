@@ -58,7 +58,7 @@ flowchart TD
 | Style | Meaning |
 |---|---|
 | Blue | This package |
-| Orange | EVM side: [warp precompile](../../../../graft/coreth/precompile/contracts/warp/README.md) and [predicate handling](../../../evm/predicate/README.md) |
+| Orange | EVM side: [warp precompile](../../../../graft/coreth/precompile/contracts/warp/README.md) and [predicate handling](../../../evm/warpmsg/README.md) |
 | Purple | AvalancheGo platform: [ACP-118 handler](../../../../network/p2p/acp118/handler.go), BLS signer |
 | Gray | External actors |
 
@@ -117,7 +117,7 @@ The two `Storage`-backed kinds are indistinguishable to the `Verifier`: precompi
 
 ### Inbound messages are predicates
 
-A signed message rides into the receiver chain inside a transaction's access list — a *predicate* (see the [predicate encoding](../../../evm/predicate/README.md)). Verifying it means checking the multi-signature against the source chain's validator set, which changes over time; the proposervm block context supplies the P-Chain height that pins it.
+A signed message rides into the receiver chain inside a transaction's access list — a *predicate* (see the [predicate encoding](../../../evm/warpmsg/README.md)). Verifying it means checking the multi-signature against the source chain's validator set, which changes over time; the proposervm block context supplies the P-Chain height that pins it.
 
 ```mermaid
 flowchart TD
@@ -181,4 +181,4 @@ Signing protocol:
 EVM side:
 
 - [coreth warp precompile](../../../../graft/coreth/precompile/contracts/warp/README.md) - `sendWarpMessage`, `getVerifiedWarpMessage`, predicate verification
-- [`vms/evm/predicate`](../../../evm/predicate/README.md) - access-list predicate encoding and results
+- [`vms/evm/warpmsg`](../../../evm/warpmsg/README.md) - access-list encoding of Warp messages and predicate results

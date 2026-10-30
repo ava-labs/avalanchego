@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package predicate
+package warpmsg
 
 import (
 	"errors"
@@ -11,31 +11,27 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 )
 
-// delimiter separates the actual predicate bytes from the padded zero bytes.
+// delimiter marks the end of the message bytes.
 //
-// Predicates are encoded in the Access List of transactions by using in the
-// access tuples. This means that the length must be a multiple of
-// [common.HashLength].
-//
-// Even if the original predicate bytes is a multiple of [common.HashLength],
-// the delimiter must be appended to support decoding.
+// Messages are stored as access-list storage keys, so the packed length must
+// be a multiple of [common.HashLength]. The delimiter is appended even when the
+// message length already is one, so that decoding works.
 const delimiter = 0xff
 
 var (
 	errMissingDelimiter = errors.New("no delimiter found")
-	errExcessPadding    = errors.New("predicate included excess padding")
+	errExcessPadding    = errors.New("excess padding")
 	errWrongDelimiter   = errors.New("wrong delimiter")
 )
 
-// Predicate is a message padded with the delimiter and zeros and chunked into
+// Packed is a message padded with the delimiter and zeros and chunked into
 // 32-byte chunks.
-type Predicate []common.Hash
+type Packed []common.Hash
 
-// New constructs a predicate from raw predicate bytes.
+// Pack packs b into storage keys.
 //
-// It chunks the predicate by appending [predicate.Delimiter] and zero-padding
-// to a multiple of 32 bytes.
-func New(b []byte) Predicate {
+// It appends the delimiter to b and zero-pads it to a multiple of 32 bytes.
+func Pack(b []byte) Packed {
 	numUnpaddedChunks := len(b) / common.HashLength
 	chunks := make([]common.Hash, numUnpaddedChunks+1)
 	// Copy over chunks that don't require padding.
@@ -49,10 +45,10 @@ func New(b []byte) Predicate {
 	return chunks
 }
 
-// Bytes converts the chunked predicate into the original message.
+// Unpack returns the bytes that were packed into p.
 //
 // Returns an error if it finds an incorrect encoding.
-func (p Predicate) Bytes() ([]byte, error) {
+func (p Packed) Unpack() ([]byte, error) {
 	padded := make([]byte, common.HashLength*len(p))
 	for i, chunk := range p {
 		copy(padded[common.HashLength*i:], chunk[:])
@@ -76,13 +72,14 @@ func (p Predicate) Bytes() ([]byte, error) {
 }
 
 // FromAccessList returns the storage keys of each entry in list at addr, in
-// order. Each entry is one predicate, including entries without storage keys.
-func FromAccessList(list types.AccessList, addr common.Address) []Predicate {
-	var predicates []Predicate
+// order. Each entry is one packed message, including entries without storage
+// keys.
+func FromAccessList(list types.AccessList, addr common.Address) []Packed {
+	var packed []Packed
 	for _, tuple := range list {
 		if tuple.Address == addr {
-			predicates = append(predicates, tuple.StorageKeys)
+			packed = append(packed, tuple.StorageKeys)
 		}
 	}
-	return predicates
+	return packed
 }

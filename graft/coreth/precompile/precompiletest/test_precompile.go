@@ -16,7 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 )
@@ -37,7 +37,7 @@ type PrecompileTest struct {
 	// mode. If true, the precompile should not modify the state.
 	ReadOnly bool
 	// WarpMessages that the precompile should have access to.
-	WarpMessages []predicate.Predicate
+	WarpMessages []warpmsg.Packed
 	// SetupBlockContext sets the expected calls on MockBlockContext for the test execution.
 	SetupBlockContext func(*contract.MockBlockContext)
 	// AfterHook is called after the precompile is called.
@@ -192,10 +192,10 @@ func RunPrecompileBenchmarks(b *testing.B, address common.Address, precompile co
 type testStateDB struct {
 	*extstate.StateDB
 
-	warpMessages []predicate.Predicate
+	warpMessages []warpmsg.Packed
 }
 
-func newTestStateDB(t testing.TB, warpMessages []predicate.Predicate) *testStateDB {
+func newTestStateDB(t testing.TB, warpMessages []warpmsg.Packed) *testStateDB {
 	db := rawdb.NewMemoryDatabase()
 	statedb, err := state.New(common.Hash{}, state.NewDatabase(db), nil)
 	require.NoError(t, err)
@@ -205,7 +205,7 @@ func newTestStateDB(t testing.TB, warpMessages []predicate.Predicate) *testState
 	}
 }
 
-func (s *testStateDB) GetWarpMessage(index int) (predicate.Predicate, bool) {
+func (s *testStateDB) GetWarpMessage(index int) (warpmsg.Packed, bool) {
 	if index < 0 || index >= len(s.warpMessages) {
 		return nil, false
 	}

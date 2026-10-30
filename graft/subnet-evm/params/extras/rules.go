@@ -9,7 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 )
 
 type Rules struct {
@@ -32,11 +32,11 @@ type Rules struct {
 // WarpMessages returns the storage keys of each Warp precompile entry in list,
 // in order. Each entry is one Warp message, including entries without storage
 // keys. It returns nil if Warp is not enabled.
-func (r *Rules) WarpMessages(list types.AccessList) []predicate.Predicate {
+func (r *Rules) WarpMessages(list types.AccessList) []warpmsg.Packed {
 	if r.WarpConfig == nil {
 		return nil
 	}
-	return predicate.FromAccessList(list, warp.ContractAddress)
+	return warpmsg.FromAccessList(list, warp.ContractAddress)
 }
 
 // IsPrecompileEnabled returns true if the precompile at `addr` is enabled for this rule set.

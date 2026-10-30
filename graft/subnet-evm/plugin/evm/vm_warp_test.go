@@ -45,7 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
@@ -431,7 +431,7 @@ func testWarpVMTransaction(t *testing.T, scheme string, unsignedMessage *avalanc
 			Data:      txPayload,
 			AccessList: types.AccessList{{ // Access list predicate
 				Address:     warpcontract.ContractAddress,
-				StorageKeys: predicate.New(signedMessage.Bytes()),
+				StorageKeys: warpmsg.Pack(signedMessage.Bytes()),
 			}},
 		}),
 		types.LatestSignerForChainID(tvm.vm.chainConfig.ChainID),
@@ -736,7 +736,7 @@ func testReceiveWarpMessage(
 			Data:      getWarpMsgInput,
 			AccessList: types.AccessList{{
 				Address:     warpcontract.ContractAddress,
-				StorageKeys: predicate.New(signedMessage.Bytes()),
+				StorageKeys: warpmsg.Pack(signedMessage.Bytes()),
 			}},
 		}),
 		types.LatestSignerForChainID(vm.chainConfig.ChainID),
@@ -764,7 +764,7 @@ func testReceiveWarpMessage(
 	// Require the block was built with a successful predicate result
 	ethBlock := block2.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 	headerPredicateResultsBytes := customheader.PredicateBytesFromExtra(ethBlock.Extra())
-	blockResults, err := predicate.ParseBlockResults(headerPredicateResultsBytes)
+	blockResults, err := warpmsg.ParseBlockResults(headerPredicateResultsBytes)
 	require.NoError(err)
 
 	// Predicate results encode the index of invalid warp messages in a bitset.

@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 
 	ethcore "github.com/ava-labs/libevm/core"
 )
@@ -29,8 +29,8 @@ func CheckBlockPredicates(
 	rules params.Rules,
 	predicateContext *precompileconfig.PredicateContext,
 	txs []*types.Transaction,
-) (predicate.BlockResults, error) {
-	var results predicate.BlockResults
+) (warpmsg.BlockResults, error) {
+	var results warpmsg.BlockResults
 	// TODO: Calculate tx predicates concurrently.
 	for _, tx := range txs {
 		txResults, err := CheckTxPredicates(rules, predicateContext, tx)
@@ -50,7 +50,7 @@ func CheckTxPredicates(
 	rules params.Rules,
 	predicateContext *precompileconfig.PredicateContext,
 	tx *types.Transaction,
-) (predicate.PrecompileResults, error) {
+) (warpmsg.TxResults, error) {
 	// Check that the transaction can cover its IntrinsicGas, including the gas
 	// required by the predicate, before verifying the predicate.
 	accessList := tx.AccessList()
@@ -88,5 +88,5 @@ func CheckTxPredicates(
 		"tx", tx.Hash(),
 		"res", bitset.String(),
 	)
-	return predicate.PrecompileResults{warp.ContractAddress: bitset}, nil
+	return warpmsg.TxResults{warp.ContractAddress: bitset}, nil
 }
