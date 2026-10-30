@@ -293,17 +293,16 @@ func (vm *VM) Initialize(
 
 		// Register state sync server
 		{
-			// TODO(alarso16): Find a way to wire in Firewood.
+			tdb, snaps := vm.VM.EVMState()
+			// Firewood can only be opened once, but a HashDB shouldn't share a cache with execution.
 			if saeConfig.DBConfig.Scheme != customrawdb.FirewoodScheme {
-				// The triedb shouldn't share a cache with execution.
-				tdb := triedb.NewDatabase(ethDB, tdbConfig)
+				tdb = triedb.NewDatabase(ethDB, tdbConfig)
 				vm.onClose = append(vm.onClose, func(context.Context) error {
 					return tdb.Close()
 				})
-				_, snaps := vm.VM.EVMState()
-				if err := statesync.RegisterHandlers(snowCtx.Log, vm.Network.Network, ethDB, tdb, snaps, vm.state); err != nil {
-					return fmt.Errorf("registering state sync server: %w", err)
-				}
+			}
+			if err := statesync.RegisterHandlers(snowCtx.Log, vm.Network.Network, ethDB, tdb, snaps, vm.state, reg); err != nil {
+				return fmt.Errorf("registering state sync server: %w", err)
 			}
 		}
 		return nil

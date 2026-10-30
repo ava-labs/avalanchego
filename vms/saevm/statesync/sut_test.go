@@ -11,12 +11,14 @@ import (
 
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -26,7 +28,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
@@ -70,6 +74,7 @@ type (
 		xdb             saetypes.ExecutionResults
 		startTime       time.Time
 		lastSynchronous uint64
+		chainDataDir    string
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -109,6 +114,24 @@ func withTime(t time.Time) sutOption {
 func withLastSynchronous(height uint64) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.lastSynchronous = height
+	})
+}
+
+// schemes are the trie database schemes under test.
+var schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}
+
+func withScheme(scheme string) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.syncConfig.DBConfig.Scheme = scheme
+	})
+}
+
+// withDiskOf reuses the disk of s, emulating a restart.
+func withDiskOf(s *sut) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.avaDB = s.cfg.avaDB
+		c.chainDataDir = s.cfg.chainDataDir
+		c.syncConfig.DBConfig = s.cfg.syncConfig.DBConfig
 	})
 }
 
@@ -153,14 +176,16 @@ func newSUT(t *testing.T, opts ...sutOption) *sut {
 				CommitInterval: defaultCommitInterval,
 			},
 		},
-		avaDB:     memdb.New(),
-		xdb:       saetest.NewExecutionResultsDB(),
-		startTime: time.Unix(genesisTimestamp, 0),
+		avaDB:        memdb.New(),
+		xdb:          saetest.NewExecutionResultsDB(),
+		startTime:    time.Unix(genesisTimestamp, 0),
+		chainDataDir: t.TempDir(),
 	}, opts...)
 
 	snowCtx := snowtest.Context(t, chainID)
 	snowCtx.Log = loggingtest.New(t, logging.Debug)
 	snowCtx.NodeID = ids.GenerateTestNodeID()
+	snowCtx.ChainDataDir = cfg.chainDataDir
 
 	clock := saetest.NewClock(cfg.startTime, time.Nanosecond)
 	hooks := hookstest.NewStub(
@@ -248,11 +273,35 @@ func (s *sut) syncTo(ctx context.Context, t *testing.T, summary *Summary) error 
 	return syncer.WriteSynced(summary)
 }
 
+// requireSyncedTo checks the synced state is loadable at root.
+func (s *sut) requireSyncedTo(t *testing.T, root ethcommon.Hash) {
+	t.Helper()
+
+	switch s.cfg.syncConfig.DBConfig.Scheme {
+	case customrawdb.FirewoodScheme:
+		tdb := triedb.NewDatabase(s.db, s.cfg.syncConfig.DBConfig.TrieDBConfig(s.snowCtx.ChainDataDir, s.snowCtx.Log))
+		defer func() {
+			require.NoError(t, tdb.Close(), "triedb.Close()")
+		}()
+		fw, ok := tdb.Backend().(*firewood.TrieDB)
+		require.Truef(t, ok, "%T.Backend() is %T", tdb, tdb.Backend())
+		require.Equal(t, root, ethcommon.Hash(fw.Firewood.Root()), "Firewood root")
+	default:
+		conf := snapshot.Config{
+			CacheSize: int(saedb.DefaultSnapshotCacheSizeMiB),
+			NoBuild:   true, // i.e. MUST be loaded from disk
+		}
+		snap, err := snapshot.New(conf, s.db, triedb.NewDatabase(s.db, nil), root)
+		defer snap.Release()
+		require.NoErrorf(t, err, "snapshot.New(NoBuild, ..., %#x)", root)
+	}
+}
+
 func (s *sut) asVM(t *testing.T, at time.Time) *vmSUT {
 	t.Helper()
 
 	return newVM(t,
-		withDatabase(s.cfg.avaDB),
+		withDiskOf(s),
 		withXDB(saetest.CloneExecutionResultsDB(t, s.cfg.xdb)),
 		withTime(at),
 	)
@@ -265,7 +314,10 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	s := newSUT(t, opts...)
 	ctx := t.Context()
 
-	chainConfig := setupGenesis(t, s.genesis, s.db, triedb.NewDatabase(s.db, nil))
+	// The VM opens its own handle, so this one MUST be closed first.
+	tdb := triedb.NewDatabase(s.db, s.cfg.syncConfig.DBConfig.TrieDBConfig(s.snowCtx.ChainDataDir, s.snowCtx.Log))
+	chainConfig := setupGenesis(t, s.genesis, s.db, tdb)
+	require.NoError(t, tdb.Close(), "triedb.Close()")
 
 	mempoolConf := legacypool.DefaultConfig // copies
 	mempoolConf.Journal = ""                // no on-disk journal in tests
@@ -282,7 +334,7 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	require.NoError(t, vm.SetState(ctx, snow.NormalOp), "SetState(NormalOp)")
 
 	tdb, snaps := vm.EVMState()
-	require.NoError(t, RegisterHandlers(s.snowCtx.Log, s.Network.Network, s.db, tdb, snaps), "RegisterHandlers")
+	require.NoError(t, RegisterHandlers(s.snowCtx.Log, s.Network.Network, s.db, tdb, snaps, prometheus.NewRegistry()), "RegisterHandlers")
 
 	return &vmSUT{
 		sut:    s,

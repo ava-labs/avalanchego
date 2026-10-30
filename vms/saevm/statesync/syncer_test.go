@@ -12,17 +12,13 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
@@ -83,39 +79,42 @@ func TestShouldAcceptSummary(t *testing.T) {
 func TestStateSyncEndToEnd(t *testing.T) {
 	t.Parallel()
 
-	const numBlocks = defaultCommitInterval + 2
-	sourceVM := newVM(t)
-	sourceVM.acceptBlocks(t, numBlocks)
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			t.Parallel()
 
-	// Handler to state sync
-	xdb := saetest.NewExecutionResultsDB()
-	db := memdb.New()
-	client := newSUT(t, withDatabase(db), withXDB(xdb))
-	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+			ctx := t.Context()
+			const numBlocks = defaultCommitInterval + 2
+			sourceVM := newVM(t, withScheme(scheme))
+			sourceVM.acceptBlocks(t, numBlocks)
 
-	ctx := t.Context()
+			// Handler to state sync
+			client := newSUT(t, withScheme(scheme))
+			saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
 
-	summary, err := sourceVM.Handler.GetLastStateSummary(ctx)
-	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
-	require.Equal(t, uint64(defaultCommitInterval), summary.Height(), "summary at last commit boundary")
+			summary, err := sourceVM.Handler.GetLastStateSummary(ctx)
+			require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
+			require.Equal(t, uint64(defaultCommitInterval), summary.Height(), "summary at last commit boundary")
 
-	require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo(%v)", client, summary)
+			require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
 
-	// During the sync, the network continued processing
-	sourceVM.acceptBlocks(t, numBlocks)
+			// During the sync, the network continued processing
+			sourceVM.acceptBlocks(t, numBlocks)
 
-	// catch up a new VM
-	clientVM := client.asVM(t, sourceVM.hooks.Now())
-	lastHeight := sourceVM.lastAcceptedBlock(t).Height()
-	for height := summary.Height() + 1; height <= lastHeight; height++ {
-		b := sourceVM.blockAtHeight(t, height)
-		parsed, err := clientVM.ParseBlock(ctx, b.Bytes())
-		require.NoErrorf(t, err, "ParseBlock(%d)", b.Height())
-		require.NoErrorf(t, clientVM.vm.VerifyBlock(ctx, nil, parsed), "VerifyBlock(%d)", b.Height())
-		require.NoErrorf(t, clientVM.vm.AcceptBlock(ctx, parsed), "AcceptBlock(%d)", b.Height())
-		require.NoErrorf(t, parsed.WaitUntilExecuted(ctx), "WaitUntilExecuted(%d)", b.Height())
+			// catch up a new VM
+			clientVM := client.asVM(t, sourceVM.hooks.Now())
+			lastHeight := sourceVM.lastAcceptedBlock(t).Height()
+			for height := summary.Height() + 1; height <= lastHeight; height++ {
+				b := sourceVM.blockAtHeight(t, height)
+				parsed, err := clientVM.ParseBlock(ctx, b.Bytes())
+				require.NoErrorf(t, err, "ParseBlock(%d)", b.Height())
+				require.NoErrorf(t, clientVM.vm.VerifyBlock(ctx, nil, parsed), "VerifyBlock(%d)", b.Height())
+				require.NoErrorf(t, clientVM.vm.AcceptBlock(ctx, parsed), "AcceptBlock(%d)", b.Height())
+				require.NoErrorf(t, parsed.WaitUntilExecuted(ctx), "WaitUntilExecuted(%d)", b.Height())
+			}
+			sourceVM.compareVMs(t, clientVM)
+		})
 	}
-	sourceVM.compareVMs(t, clientVM)
 }
 
 // TestStateSyncWithSettlementLag syncs a fresh node from a source
@@ -137,9 +136,7 @@ func TestStateSyncWithSettlementLag(t *testing.T) {
 	require.Equal(t, b1.Height(), sourceVM.hooks.SettledBy(b3.Header()).Height, "SettledBy(b3)")
 	require.Equal(t, b2.Height(), sourceVM.hooks.SettledBy(b4.Header()).Height, "SettledBy(b4)")
 
-	xdb := saetest.NewExecutionResultsDB()
-	db := memdb.New()
-	client := newSUT(t, withDatabase(db), withXDB(xdb))
+	client := newSUT(t)
 	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
 
 	summary, err := sourceVM.GetLastStateSummary(ctx)
@@ -175,9 +172,7 @@ func TestStateSyncSynchronousSettled(t *testing.T) {
 	settled := sourceVM.blockAtHeight(t, sourceVM.hooks.SettledBy(accepted.Header()).Height)
 	require.Truef(t, hook.Synchronous(sourceVM.hooks, settled.Header()), "hook.Synchronous() settled block")
 
-	xdb := saetest.NewExecutionResultsDB()
-	db := memdb.New()
-	client := newSUT(t, withDatabase(db), withXDB(xdb))
+	client := newSUT(t)
 	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
 
 	require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
@@ -200,56 +195,47 @@ func TestCancelSync(t *testing.T) {
 }
 
 // TestSyncErrorRecovers checks that any error in the sync process gracefully
-// errors and is recoverable.
+// errors and is recoverable. Only the [ethdb.Database] fails, so this doesn't
+// cover Firewood writes.
 func TestSyncErrorRecovers(t *testing.T) {
-	ctx := t.Context()
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			ctx := t.Context()
 
-	source := newVM(t)
-	source.acceptBlocks(t, defaultCommitInterval+2)
+			source := newVM(t, withScheme(scheme))
+			source.acceptBlocks(t, defaultCommitInterval+2)
 
-	summary, err := source.GetLastStateSummary(ctx)
-	require.NoErrorf(t, err, "%T.GetLastStateSummary()", source.Handler)
-	expectedRoot := source.getBlock(t, ids.ID(summary.AcceptedHash)).SettledStateRoot()
+			summary, err := source.GetLastStateSummary(ctx)
+			require.NoErrorf(t, err, "%T.GetLastStateSummary()", source.Handler)
+			expectedRoot := source.getBlock(t, ids.ID(summary.AcceptedHash)).SettledStateRoot()
 
-	for failAfter := 0; ; failAfter++ {
-		fdb := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
-		client := newSUT(t, withDatabase(fdb))
-		saetest.ConnectTo[saetest.Peer](t, client, source)
-		fdb.SetFailAfter(failAfter) // Setup (e.g. the genesis commit) is done.
+			for failAfter := 0; ; failAfter++ {
+				fdb := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
+				client := newSUT(t, withScheme(scheme), withDatabase(fdb))
+				saetest.ConnectTo[saetest.Peer](t, client, source)
+				fdb.SetFailAfter(failAfter) // Setup (e.g. the genesis commit) is done.
 
-		err = client.syncTo(ctx, t, summary)
-		if !fdb.Failed() {
-			require.NoErrorf(t, err, "%T.syncTo", client)
-			// Opening the snapshot also reads through the flaky database.
-			fdb.SetFailAfter(math.MaxInt)
-			requireSnapshotOnDisk(t, client.db, expectedRoot)
-			return
-		}
-		require.ErrorIsf(t, err, saetest.ErrInjected, "%T.syncTo()", client)
+				err = client.syncTo(ctx, t, summary)
+				if !fdb.Failed() {
+					require.NoErrorf(t, err, "%T.syncTo", client)
+					// Checking the synced state also reads through the flaky database.
+					fdb.SetFailAfter(math.MaxInt)
+					client.requireSyncedTo(t, expectedRoot)
+					return
+				}
+				require.ErrorIsf(t, err, saetest.ErrInjected, "%T.syncTo()", client)
 
-		// Any error should be recoverable.
-		t.Run("second_try", func(t *testing.T) {
-			fdb.SetFailAfter(math.MaxInt)
-			client := newSUT(t, withDatabase(fdb))
-			saetest.ConnectTo[saetest.Peer](t, client, source)
-			require.NoErrorf(t, client.syncTo(t.Context(), t, summary), "%T.syncTo()", client)
-			requireSnapshotOnDisk(t, client.db, expectedRoot)
+				// Any error should be recoverable.
+				t.Run("second_try", func(t *testing.T) {
+					fdb.SetFailAfter(math.MaxInt)
+					restarted := newSUT(t, withDiskOf(client))
+					saetest.ConnectTo[saetest.Peer](t, restarted, source)
+					require.NoErrorf(t, restarted.syncTo(t.Context(), t, summary), "%T.syncTo()", restarted)
+					restarted.requireSyncedTo(t, expectedRoot)
+				})
+			}
 		})
 	}
-}
-
-// requireSnapshotOnDisk checks that a completed sync left a snapshot that can
-// be loaded from disk without rebuilding.
-func requireSnapshotOnDisk(t *testing.T, db ethdb.Database, root common.Hash) {
-	t.Helper()
-
-	conf := snapshot.Config{
-		CacheSize: int(saedb.DefaultSnapshotCacheSizeMiB),
-		NoBuild:   true, // i.e. MUST be loaded from disk
-	}
-	snap, err := snapshot.New(conf, db, triedb.NewDatabase(db, nil), root)
-	require.NoErrorf(t, err, "snapshot.New(NoBuild, ..., %#x)", root)
-	snap.Release()
 }
 
 // TestStateSyncLong ensures that the VM can startup with blocks missing, which
@@ -260,9 +246,7 @@ func TestStateSyncLong(t *testing.T) {
 	sourceVM := newVM(t)
 	sourceVM.acceptBlocks(t, numBlocks)
 
-	xdb := saetest.NewExecutionResultsDB()
-	db := memdb.New()
-	client := newSUT(t, withDatabase(db), withXDB(xdb))
+	client := newSUT(t)
 	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
 
 	summary, err := sourceVM.GetLastStateSummary(t.Context())
@@ -340,34 +324,38 @@ func TestWriteBloomIndexer(t *testing.T) {
 func TestSyncAfterAbandonedSync(t *testing.T) {
 	t.Parallel()
 
-	ctx := t.Context()
-	sourceVM := newVM(t)
-	sourceVM.acceptBlocks(t, defaultCommitInterval)
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			t.Parallel()
 
-	db := memdb.New()
-	client := newSUT(t, withDatabase(db))
-	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+			ctx := t.Context()
+			sourceVM := newVM(t, withScheme(scheme))
+			sourceVM.acceptBlocks(t, defaultCommitInterval)
 
-	abandoned, err := sourceVM.GetLastStateSummary(ctx)
-	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
-	syncer := client.syncer()
-	require.NoErrorf(t, syncer.Sync(ctx, abandoned), "%T.Sync(%v)", syncer, abandoned)
-	// [Syncer.WriteSynced] is deliberately skipped, as if the node shut down.
+			client := newSUT(t, withScheme(scheme))
+			saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
 
-	// The network moved on while the node was down.
-	sourceVM.acceptBlocks(t, defaultCommitInterval)
-	summary, err := sourceVM.GetLastStateSummary(ctx)
-	require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
+			abandoned, err := sourceVM.GetLastStateSummary(ctx)
+			require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
+			syncer := client.syncer()
+			require.NoErrorf(t, syncer.Sync(ctx, abandoned), "%T.Sync(%v)", syncer, abandoned)
+			// [Syncer.WriteSynced] is deliberately skipped, as if the node shut down.
 
-	// Test invariant: the two summaries commit to different state.
-	abandonedRoot := sourceVM.blockAtHeight(t, abandoned.Height()).Header().Root
-	summaryRoot := sourceVM.blockAtHeight(t, summary.Height()).Header().Root
-	require.NotEqual(t, abandonedRoot, summaryRoot, "state roots of the two summaries")
+			// The network moved on while the node was down.
+			sourceVM.acceptBlocks(t, defaultCommitInterval)
+			summary, err := sourceVM.GetLastStateSummary(ctx)
+			require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
 
-	// A restarted node constructs a fresh handler over the same database.
-	client = newSUT(t, withDatabase(db))
-	saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
-	require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
+			// Test invariant: the two summaries commit to different state.
+			abandonedRoot := sourceVM.blockAtHeight(t, abandoned.Height()).Header().Root
+			summaryRoot := sourceVM.blockAtHeight(t, summary.Height()).Header().Root
+			require.NotEqual(t, abandonedRoot, summaryRoot, "state roots of the two summaries")
+
+			restarted := newSUT(t, withDiskOf(client))
+			saetest.ConnectTo[saetest.Peer](t, restarted, sourceVM)
+			require.NoErrorf(t, restarted.syncTo(ctx, t, summary), "%T.syncTo(%v)", restarted, summary)
+		})
+	}
 }
 
 func TestSyncToSynchronousBlock(t *testing.T) {

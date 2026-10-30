@@ -16,19 +16,24 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/triedb"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
+	fwsyncer "github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 	graftsnap "github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	syncblock "github.com/ava-labs/avalanchego/vms/evm/sync/block"
 )
@@ -64,11 +69,6 @@ func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
 		return false
 	}
 
-	if s.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
-		s.snowCtx.Log.Warn("State sync is not supported with Firewood scheme")
-		return false
-	}
-
 	if summary.AcceptedHeight == 0 {
 		// The genesis block is already accepted, so we don't need to do anything.
 		return false
@@ -91,13 +91,10 @@ var errSynchronousBlock = errors.New("cannot state sync to synchronous block")
 // without error, one MUST call [Syncer.WriteSynced] to finalize the state
 // sync.
 func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
-	const (
-		// TODO(alarso16): Need 256 blocks for the BLOCKHASH op code from
-		// the last settled. We should find a way to guarantee sufficient
-		// blocks, but this overestimate will work for now.
-		numBlocksToFetch   = 512
-		maxLeafRequestSize = 1024
-	)
+	// TODO(alarso16): Need 256 blocks for the BLOCKHASH op code from the last
+	// settled. We should find a way to guarantee sufficient blocks, but this
+	// overestimate will work for now.
+	const numBlocksToFetch = 512
 
 	blockClient, err := s.network.SyncClient(p2p.EVMBlockRequestHandlerID)
 	if err != nil {
@@ -140,6 +137,66 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		return fmt.Errorf("creating code syncer: %w", err)
 	}
 
+	return s.syncEVM(ctx, hdr.Root, codeSyncer)
+}
+
+// syncEVM fetches the state trie at root for the configured scheme,
+// concurrently with all code referenced by it via codeSyncer.
+func (s *Syncer) syncEVM(ctx context.Context, root common.Hash, codeSyncer *code.Syncer) error {
+	eg, egCtx := errgroup.WithContext(ctx)
+	eg.Go(func() error {
+		return codeSyncer.Sync(egCtx)
+	})
+	eg.Go(func() error {
+		if s.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
+			return s.syncFirewood(egCtx, root, codeSyncer)
+		}
+		return s.syncHashDB(egCtx, root, codeSyncer)
+	})
+	return eg.Wait()
+}
+
+func (s *Syncer) syncFirewood(ctx context.Context, root common.Hash, codeSyncer *code.Syncer) (retErr error) {
+	defer codeSyncer.DoneAdding()
+
+	// The same database that the [sae.VM] will later open.
+	tdb := triedb.NewDatabase(s.db, s.cfg.DBConfig.TrieDBConfig(s.snowCtx.ChainDataDir, s.snowCtx.Log))
+	defer func() {
+		retErr = errors.Join(retErr, tdb.Close())
+	}()
+	fw, ok := tdb.Backend().(*firewood.TrieDB)
+	if !ok {
+		return fmt.Errorf("unexpected Firewood backend %T", tdb.Backend())
+	}
+
+	c, err := s.network.SyncClient(p2p.FirewoodProofHandlerID)
+	if err != nil {
+		return fmt.Errorf("creating firewood proof client: %w", err)
+	}
+
+	reg := prometheus.NewRegistry()
+	if err := s.snowCtx.Metrics.Register("syncer_firewood", reg); err != nil {
+		return fmt.Errorf("registering firewood sync metrics: %w", err)
+	}
+	syncer, err := fwsyncer.NewEVM(
+		fwsyncer.Config{
+			Log:        s.snowCtx.Log,
+			Registerer: reg,
+		},
+		fw.Firewood,
+		codeSyncer,
+		ids.ID(root),
+		c,
+	)
+	if err != nil {
+		return fmt.Errorf("creating firewood state syncer: %w", err)
+	}
+	return syncer.Sync(ctx)
+}
+
+func (s *Syncer) syncHashDB(ctx context.Context, root common.Hash, codeSyncer *code.Syncer) error {
+	const maxLeafRequestSize = 1024
+
 	// The snapshot MUST either be empty or match the requested root.
 	// It will be regenerated anyway, so we can always wipe it.
 	// TODO(powerslider): Push into EVM syncer.
@@ -149,38 +206,26 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	}
 	s.snowCtx.Log.Info("finished wiping snapshot")
 
-	leafClient, err := s.network.SyncClient(p2p.EVMLeafRequestHandlerID)
+	c, err := s.network.SyncClient(p2p.EVMLeafRequestHandlerID)
 	if err != nil {
-		return err
+		return fmt.Errorf("creating evm leaf request client: %w", err)
 	}
 	// TODO(powerslider): Remove dependency on graft.
-	evmSyncer, err := evmstate.NewSyncer(
+	syncer, err := evmstate.NewSyncer(
 		s.snowCtx.Log,
-		hashdb.NewClient(
-			s.snowCtx.Log,
-			leafClient,
-			common.HashLength,
-		),
+		hashdb.NewClient(s.snowCtx.Log, c, common.HashLength),
 		s.db,
-		hdr.Root,
+		root,
 		codeSyncer,
 		maxLeafRequestSize,
 	)
 	if err != nil {
 		return fmt.Errorf("creating evm state syncer: %w", err)
 	}
-
-	eg, egCtx := errgroup.WithContext(ctx)
-	eg.Go(func() error {
-		return codeSyncer.Sync(egCtx)
-	})
-	eg.Go(func() error {
-		return evmSyncer.Sync(egCtx)
-	})
-	if err := eg.Wait(); err != nil {
+	if err := syncer.Sync(ctx); err != nil {
 		// Finalize allows the EVM syncer to resume its progress on restart.
 		// This is not required for correctness.
-		return errors.Join(err, evmSyncer.Finalize())
+		return errors.Join(err, syncer.Finalize())
 	}
 	return nil
 }
