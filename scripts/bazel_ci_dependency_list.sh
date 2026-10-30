@@ -8,6 +8,7 @@ set -euo pipefail
 # e.g.,
 # source ./scripts/bazel_ci_dependency_list.sh
 # bazel_ci_target_patterns       # Bazel target patterns whose dependencies setup prepares for later CI jobs
+# Image targets use separate input caches prepared by build_image_bazel.sh.
 #
 # Update this file when Bazel CI starts running a new command. The targets are
 # fetched by ./scripts/cache_bazel_ci_build_dependencies.sh. The target patterns
@@ -22,7 +23,7 @@ bazel_ci_target_patterns() {
 //tests/upgrade:runner
 //graft/subnet-evm/tests/load:runner
 //graft/subnet-evm/tests/warp:runner
-//...
+//... -- -//bazel/image/...
 //ids:ids_test
 EOF
 }
