@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
@@ -29,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
@@ -115,18 +117,21 @@ func withLastSynchronous(height uint64) sutOption {
 	})
 }
 
-// withFirewood selects Firewood as the trie database.
-func withFirewood() sutOption {
+// schemes are the trie database schemes under test.
+var schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}
+
+func withScheme(scheme string) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.syncConfig.DBConfig.Scheme = customrawdb.FirewoodScheme
+		c.syncConfig.DBConfig.Scheme = scheme
 	})
 }
 
-// withChainDataDir overrides the default fresh [testing.T.TempDir], allowing
-// Firewood to be reopened.
-func withChainDataDir(dir string) sutOption {
+// withDiskOf reuses the disk of s, emulating a restart.
+func withDiskOf(s *sut) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.chainDataDir = dir
+		c.avaDB = s.cfg.avaDB
+		c.chainDataDir = s.cfg.chainDataDir
+		c.syncConfig.DBConfig = s.cfg.syncConfig.DBConfig
 	})
 }
 
@@ -268,17 +273,37 @@ func (s *sut) syncTo(ctx context.Context, t *testing.T, summary *Summary) error 
 	return syncer.WriteSynced(summary)
 }
 
+// requireSyncedTo checks the synced state is loadable at root.
+func (s *sut) requireSyncedTo(t *testing.T, root ethcommon.Hash) {
+	t.Helper()
+
+	switch s.cfg.syncConfig.DBConfig.Scheme {
+	case customrawdb.FirewoodScheme:
+		tdb := triedb.NewDatabase(s.db, s.cfg.syncConfig.DBConfig.TrieDBConfig(s.snowCtx.ChainDataDir, s.snowCtx.Log))
+		defer func() {
+			require.NoError(t, tdb.Close(), "triedb.Close()")
+		}()
+		fw, ok := tdb.Backend().(*firewood.TrieDB)
+		require.Truef(t, ok, "%T.Backend() is %T", tdb, tdb.Backend())
+		require.Equal(t, root, ethcommon.Hash(fw.Firewood.Root()), "Firewood root")
+	default:
+		conf := snapshot.Config{
+			CacheSize: int(saedb.DefaultSnapshotCacheSizeMiB),
+			NoBuild:   true, // i.e. MUST be loaded from disk
+		}
+		snap, err := snapshot.New(conf, s.db, triedb.NewDatabase(s.db, nil), root)
+		require.NoErrorf(t, err, "snapshot.New(NoBuild, ..., %#x)", root)
+		snap.Release()
+	}
+}
+
 func (s *sut) asVM(t *testing.T, at time.Time) *vmSUT {
 	t.Helper()
 
 	return newVM(t,
-		withDatabase(s.cfg.avaDB),
+		withDiskOf(s),
 		withXDB(saetest.CloneExecutionResultsDB(t, s.cfg.xdb)),
 		withTime(at),
-		options.Func[sutConfig](func(c *sutConfig) {
-			c.syncConfig.DBConfig = s.cfg.syncConfig.DBConfig
-			c.chainDataDir = s.snowCtx.ChainDataDir
-		}),
 	)
 }
 
