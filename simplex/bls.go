@@ -92,6 +92,7 @@ func encodeMessageToSign(message []byte, chainID ids.ID, networkID uint32) ([]by
 }
 
 func (v BLSVerifier) VerifySignature(message []byte, signature common.SignatureBytes, signer common.PublicKeyBytes) error {
+	// TODO: update BLSVerify to just use signer. No need to convert to NodeID anymore.
 	key, err := ids.ToNodeID(signer)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errInvalidNodeID, err)
