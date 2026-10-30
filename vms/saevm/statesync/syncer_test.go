@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 
@@ -113,6 +115,50 @@ func TestStateSyncEndToEnd(t *testing.T) {
 				require.NoErrorf(t, parsed.WaitUntilExecuted(ctx), "WaitUntilExecuted(%d)", b.Height())
 			}
 			sourceVM.compareVMs(t, clientVM)
+		})
+	}
+}
+
+// Code deployed after genesis MUST be fetched by the sync.
+func TestStateSyncFetchesCode(t *testing.T) {
+	t.Parallel()
+
+	// Deploys a single zero byte.
+	initCode := []byte{
+		byte(vm.PUSH1), 1, // size
+		byte(vm.PUSH1), 0, // offset
+		byte(vm.RETURN),
+	}
+	codeHash := crypto.Keccak256Hash([]byte{0x00})
+
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			t.Parallel()
+
+			ctx := t.Context()
+			sourceVM := newVM(t, withScheme(scheme))
+			deploy := sourceVM.acceptTx(t, &types.LegacyTx{
+				Data:     initCode,
+				Gas:      1e6,
+				GasPrice: big.NewInt(1),
+			})
+			sourceVM.clock.AdvanceToSettle(ctx, t, deploy)
+			sourceVM.acceptBlocks(t, defaultCommitInterval)
+
+			summary, err := sourceVM.GetLastStateSummary(ctx)
+			require.NoErrorf(t, err, "%T.GetLastStateSummary()", sourceVM.Handler)
+			settled := sourceVM.hooks.SettledBy(sourceVM.blockAtHeight(t, summary.Height()).Header())
+
+			// Test invariants
+			require.Greater(t, settled.Height, deploy.Height(), "summary settles the deployment")
+			require.Truef(t, rawdb.HasCode(sourceVM.db, codeHash), "source rawdb.HasCode(%#x)", codeHash)
+
+			client := newSUT(t, withScheme(scheme))
+			saetest.ConnectTo[saetest.Peer](t, client, sourceVM)
+			require.Falsef(t, rawdb.HasCode(client.db, codeHash), "rawdb.HasCode(%#x) before sync", codeHash)
+
+			require.NoErrorf(t, client.syncTo(ctx, t, summary), "%T.syncTo(%v)", client, summary)
+			require.Truef(t, rawdb.HasCode(client.db, codeHash), "rawdb.HasCode(%#x) after sync", codeHash)
 		})
 	}
 }

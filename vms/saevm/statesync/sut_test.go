@@ -375,14 +375,20 @@ func (s *vmSUT) getBlock(t *testing.T, id ids.ID) *blocks.Block {
 // settlement; callers control settlement lag via [saetest.Clock.AdvanceToSettle].
 func (s *vmSUT) acceptBlock(t *testing.T) *blocks.Block {
 	t.Helper()
-	ctx := t.Context()
-
-	tx := s.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+	return s.acceptTx(t, &types.LegacyTx{
 		To:       &ethcommon.Address{},
 		Value:    big.NewInt(1),
 		Gas:      1e6,
 		GasPrice: big.NewInt(1),
 	})
+}
+
+// acceptTx is [vmSUT.acceptBlock] for a block holding only data.
+func (s *vmSUT) acceptTx(t *testing.T, data types.TxData) *blocks.Block {
+	t.Helper()
+	ctx := t.Context()
+
+	tx := s.wallet.SetNonceAndSign(t, 0, data)
 	backends := s.vm.GethRPCBackends()
 	require.NoErrorf(t, backends.SendTx(ctx, tx), "SendTx(%#x)", tx.Hash())
 	txgossiptest.WaitUntilPending(t, ctx, backends, tx)
