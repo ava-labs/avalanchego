@@ -44,6 +44,11 @@ func (it *iter) Next() bool {
 	it.lock.Lock()
 	defer it.lock.Unlock()
 
+	// Moving the pebble iterator may free the memory behind the current pair,
+	// so it must not be kept once Next returns false.
+	it.nextKey = nil
+	it.nextVal = nil
+
 	switch {
 	case it.err != nil:
 		it.hasNext = false
@@ -124,8 +129,10 @@ func (it *iter) release() {
 
 	// Cloning these values ensures that calling it.Key() or it.Value() after
 	// releasing the iterator will not segfault.
-	it.nextKey = slices.Clone(it.nextKey)
-	it.nextVal = slices.Clone(it.nextVal)
+	if it.hasNext {
+		it.nextKey = slices.Clone(it.nextKey)
+		it.nextVal = slices.Clone(it.nextVal)
+	}
 
 	// Remove the iterator from the list of open iterators.
 	it.db.openIterators.Remove(it)
