@@ -247,11 +247,9 @@ func createValidMessageTest(
 				PChainHeight: 1,
 			},
 		},
-		Packed:      packed,
-		Rules:       rules,
-		Gas:         gasCost.MessageGasCost(len(packed), numKeys),
-		GasErr:      nil,
-		ExpectedErr: nil,
+		Packed: packed,
+		Rules:  rules,
+		Gas:    gasCost.MessageGasCost(len(packed), numKeys),
 	}
 }
 
@@ -333,167 +331,51 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 				PChainHeight: 1,
 			},
 		},
-		Packed:      packed,
-		Rules:       graniteRules,
-		Gas:         GraniteGasConfig.MessageGasCost(len(packed), numKeys),
-		GasErr:      nil,
-		ExpectedErr: nil,
-	}
-
-	test.Run(t)
-}
-
-func TestInvalidPacking(t *testing.T) {
-	numKeys := 1
-	snowCtx := createSnowCtx(t, []validatorRange{
-		{
-			start:     0,
-			end:       numKeys,
-			weight:    20,
-			publicKey: true,
-		},
-	})
-	packed := createPacked(numKeys)
-	packed = append(packed, common.Hash{1}) // Invalidate the packing
-
-	test := precompiletest.MessageTest{
-		Config: NewDefaultConfig(utils.PointerTo[uint64](0)),
-		VerifyContext: &warpmsg.VerifyContext{
-			SnowCtx: snowCtx,
-			ProposerVMBlockCtx: &block.Context{
-				PChainHeight: 1,
-			},
-		},
 		Packed: packed,
 		Rules:  graniteRules,
 		Gas:    GraniteGasConfig.MessageGasCost(len(packed), numKeys),
-		GasErr: ErrInvalidPacked,
 	}
 
 	test.Run(t)
 }
 
-func TestInvalidWarpMessage(t *testing.T) {
-	numKeys := 1
-	snowCtx := createSnowCtx(t, []validatorRange{
-		{
-			start:     0,
-			end:       numKeys,
-			weight:    20,
-			publicKey: true,
-		},
-	})
-	warpMsg := createWarpMessage(1)
-	warpMsgBytes := warpMsg.Bytes()
-	warpMsgBytes = append(warpMsgBytes, byte(0x01)) // Invalidate warp message packing
-	packed := warpmsg.Pack(warpMsgBytes)
-
-	test := precompiletest.MessageTest{
-		Config: NewDefaultConfig(utils.PointerTo[uint64](0)),
-		VerifyContext: &warpmsg.VerifyContext{
-			SnowCtx: snowCtx,
-			ProposerVMBlockCtx: &block.Context{
-				PChainHeight: 1,
-			},
-		},
-		Packed: packed,
-		Rules:  graniteRules,
-		Gas:    GraniteGasConfig.MessageGasCost(len(packed), numKeys),
-		GasErr: ErrInvalidWarpMsg,
+func TestMessageGasErrors(t *testing.T) {
+	newMessage := func(payloadBytes []byte, signers []byte) []byte {
+		unsignedMsg, err := avalancheWarp.NewUnsignedMessage(constants.UnitTestID, sourceChainID, payloadBytes)
+		require.NoError(t, err, "NewUnsignedMessage()")
+		msg, err := avalancheWarp.NewMessage(unsignedMsg, &avalancheWarp.BitSetSignature{Signers: signers})
+		require.NoError(t, err, "NewMessage()")
+		return msg.Bytes()
 	}
-
-	test.Run(t)
-}
-
-func TestInvalidAddressedPayload(t *testing.T) {
-	numKeys := 1
-	snowCtx := createSnowCtx(t, []validatorRange{
-		{
-			start:     0,
-			end:       numKeys,
-			weight:    20,
-			publicKey: true,
-		},
-	})
-	aggregateSignature, err := bls.AggregateSignatures(blsSignatures[0:numKeys])
-	require.NoError(t, err)
-	bitSet := set.NewBits()
-	for i := 0; i < numKeys; i++ {
-		bitSet.Add(i)
-	}
-	warpSignature := &avalancheWarp.BitSetSignature{
-		Signers: bitSet.Bytes(),
-	}
-	copy(warpSignature.Signature[:], bls.SignatureToBytes(aggregateSignature))
-	// Create an unsigned message with an invalid addressed payload
-	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(constants.UnitTestID, sourceChainID, []byte{1, 2, 3})
-	require.NoError(t, err)
-	warpMsg, err := avalancheWarp.NewMessage(unsignedMsg, warpSignature)
-	require.NoError(t, err)
-	warpMsgBytes := warpMsg.Bytes()
-	packed := warpmsg.Pack(warpMsgBytes)
-
-	test := precompiletest.MessageTest{
-		Config: NewDefaultConfig(utils.PointerTo[uint64](0)),
-		VerifyContext: &warpmsg.VerifyContext{
-			SnowCtx: snowCtx,
-			ProposerVMBlockCtx: &block.Context{
-				PChainHeight: 1,
-			},
-		},
-		Packed: packed,
-		Rules:  graniteRules,
-		Gas:    GraniteGasConfig.MessageGasCost(len(packed), numKeys),
-		GasErr: ErrInvalidWarpMsgPayload,
-	}
-
-	test.Run(t)
-}
-
-func TestInvalidBitSet(t *testing.T) {
 	addressedCall, err := payload.NewAddressedCall(avalancheutils.RandomBytes(20), avalancheutils.RandomBytes(100))
-	require.NoError(t, err)
-	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(
-		constants.UnitTestID,
-		sourceChainID,
-		addressedCall.Bytes(),
-	)
-	require.NoError(t, err)
+	require.NoError(t, err, "NewAddressedCall()")
 
-	msg, err := avalancheWarp.NewMessage(
-		unsignedMsg,
-		&avalancheWarp.BitSetSignature{
-			Signers:   make([]byte, 1),
-			Signature: [bls.SignatureLen]byte{},
-		},
-	)
-	require.NoError(t, err)
-
-	numKeys := 1
-	snowCtx := createSnowCtx(t, []validatorRange{
+	precompiletest.RunMessageTests(t, []precompiletest.MessageTest{
 		{
-			start:     0,
-			end:       numKeys,
-			weight:    20,
-			publicKey: true,
+			Name:   "invalid_packing",
+			Packed: append(createPacked(1), common.Hash{1}),
+			Rules:  graniteRules,
+			GasErr: ErrInvalidPacked,
+		},
+		{
+			Name:   "invalid_warp_message",
+			Packed: warpmsg.Pack(append(createWarpMessage(1).Bytes(), 0x01)),
+			Rules:  graniteRules,
+			GasErr: ErrInvalidWarpMsg,
+		},
+		{
+			Name:   "invalid_addressed_payload",
+			Packed: warpmsg.Pack(newMessage([]byte{1, 2, 3}, set.NewBits(0).Bytes())),
+			Rules:  graniteRules,
+			GasErr: ErrInvalidWarpMsgPayload,
+		},
+		{
+			Name:   "invalid_bit_set",
+			Packed: warpmsg.Pack(newMessage(addressedCall.Bytes(), make([]byte, 1))),
+			Rules:  graniteRules,
+			GasErr: ErrCannotGetNumSigners,
 		},
 	})
-	packed := warpmsg.Pack(msg.Bytes())
-	test := precompiletest.MessageTest{
-		Config: NewDefaultConfig(utils.PointerTo[uint64](0)),
-		VerifyContext: &warpmsg.VerifyContext{
-			SnowCtx: snowCtx,
-			ProposerVMBlockCtx: &block.Context{
-				PChainHeight: 1,
-			},
-		},
-		Packed: packed,
-		Rules:  graniteRules,
-		Gas:    GraniteGasConfig.MessageGasCost(len(packed), numKeys),
-		GasErr: ErrCannotGetNumSigners,
-	}
-
-	test.Run(t)
 }
 
 func TestWarpSignatureWeightsDefaultQuorumNumerator(t *testing.T) {
@@ -538,7 +420,6 @@ func TestWarpSignatureWeightsDefaultQuorumNumerator(t *testing.T) {
 			Packed:      packed,
 			Rules:       graniteRules,
 			Gas:         GraniteGasConfig.MessageGasCost(len(packed), numSigners),
-			GasErr:      nil,
 			ExpectedErr: expectedErr,
 		}
 	}
@@ -598,7 +479,6 @@ func TestWarpMultipleMessages(t *testing.T) {
 				Packed:      packed,
 				Rules:       graniteRules,
 				Gas:         expectedGas,
-				GasErr:      nil,
 				ExpectedErr: expectedErr,
 			})
 		}
@@ -650,7 +530,6 @@ func TestWarpSignatureWeightsNonDefaultQuorumNumerator(t *testing.T) {
 			Packed:      packed,
 			Rules:       graniteRules,
 			Gas:         GraniteGasConfig.MessageGasCost(len(packed), numSigners),
-			GasErr:      nil,
 			ExpectedErr: expectedErr,
 		}
 	}
@@ -677,7 +556,6 @@ func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
 		Packed:      packed,
 		Rules:       graniteRules,
 		Gas:         expectedGas,
-		GasErr:      nil,
 		ExpectedErr: bls.ErrNoPublicKeys,
 	}
 	weightOverflow := precompiletest.MessageTest{
@@ -697,7 +575,6 @@ func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
 		Packed:      packed,
 		Rules:       graniteRules,
 		Gas:         expectedGas,
-		GasErr:      nil,
 		ExpectedErr: safemath.ErrOverflow,
 	}
 	precompiletest.RunMessageTests(t, []precompiletest.MessageTest{

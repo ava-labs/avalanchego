@@ -29,8 +29,8 @@ type precompileTest struct {
 	Name string
 	// Caller is the address of the precompile caller
 	Caller common.Address
-	// InputFn returns the raw input bytes to the precompile.
-	InputFn func(t testing.TB) []byte
+	// Input is the raw input bytes to the precompile
+	Input []byte
 	// SuppliedGas is the amount of gas supplied to the precompile
 	SuppliedGas uint64
 	// ReadOnly is whether the precompile should be called in read only
@@ -82,9 +82,8 @@ func (test precompileTest) bench(b *testing.B) {
 func (test precompileTest) prepare(t testing.TB) (*testStateDB, func() ([]byte, uint64, error)) {
 	state := newTestStateDB(t, test.WarpMessages)
 	accessibleState := test.accessibleState(t, state)
-	input := test.InputFn(t)
 	return state, func() ([]byte, uint64, error) {
-		return WarpPrecompile.Run(accessibleState, test.Caller, warpmsg.ContractAddress, input, test.SuppliedGas, test.ReadOnly)
+		return WarpPrecompile.Run(accessibleState, test.Caller, warpmsg.ContractAddress, test.Input, test.SuppliedGas, test.ReadOnly)
 	}
 }
 
