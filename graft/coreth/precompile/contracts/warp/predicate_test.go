@@ -12,8 +12,8 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompiletest"
+	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -29,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 
-	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 
@@ -37,7 +37,7 @@ import (
 )
 
 var (
-	_ avalancheutils.Sortable[*testValidator] = (*testValidator)(nil)
+	_ utils.Sortable[*testValidator] = (*testValidator)(nil)
 
 	sourceChainID  = ids.GenerateTestID()
 	sourceSubnetID = ids.GenerateTestID()
@@ -62,7 +62,7 @@ func init() {
 	for i := 0; i < numTestVdrs; i++ {
 		testVdrs = append(testVdrs, newTestValidator())
 	}
-	avalancheutils.Sort(testVdrs)
+	utils.Sort(testVdrs)
 
 	vdrs = map[ids.NodeID]*validators.GetValidatorOutput{
 		testVdrs[0].nodeID: {
@@ -356,7 +356,7 @@ func TestInvalidAddressedPayload(t *testing.T) {
 }
 
 func TestInvalidBitSet(t *testing.T) {
-	addressedCall, err := payload.NewAddressedCall(avalancheutils.RandomBytes(20), avalancheutils.RandomBytes(100))
+	addressedCall, err := payload.NewAddressedCall(utils.RandomBytes(20), utils.RandomBytes(100))
 	require.NoError(t, err)
 	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(
 		constants.UnitTestID,
