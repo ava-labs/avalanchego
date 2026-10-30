@@ -120,10 +120,10 @@ func FuzzByPriority(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		// Every 3 bytes are a transaction's sender, tip, and first-seen time.
-		// Each has only 4 values, so ties are common.
+		// Tips and times have only 4 values, so ties are common.
 		pending := make(map[common.Address][]*txpool.LazyTransaction)
 		for ; len(data) >= 3; data = data[3:] {
-			sender, tip, seen := data[0]%4, data[1]%4, data[2]%4
+			sender, tip, seen := data[0], data[1]%4, data[2]%4
 			from := common.Address{sender}
 			pending[from] = append(pending[from], &txpool.LazyTransaction{
 				GasTipCap: uint256.NewInt(uint64(tip)),
@@ -131,16 +131,16 @@ func FuzzByPriority(f *testing.F) {
 			})
 		}
 
-		// outranks reports whether `a` has higher priority than `b`, which is
-		// from `bSender`. With a nil base fee, the effective tip is the tip cap.
-		outranks := func(a *LazyTransaction, bSender common.Address, b *txpool.LazyTransaction) bool {
+		// outranks reports whether `a` has higher priority than `b`. With a nil
+		// base fee, the effective tip is the tip cap.
+		outranks := func(a, b *LazyTransaction) bool {
 			if c := a.GasTipCap.Cmp(b.GasTipCap); c != 0 {
 				return c > 0
 			}
 			if c := a.Time.Compare(b.Time); c != 0 {
 				return c < 0
 			}
-			return a.Sender.Cmp(bSender) < 0
+			return a.Sender.Cmp(b.Sender) < 0
 		}
 
 		// remaining holds each sender's transactions that are not output yet.
@@ -155,7 +155,8 @@ func FuzzByPriority(f *testing.F) {
 				if sender == got.Sender || len(txs) == 0 {
 					continue
 				}
-				require.Truef(t, outranks(got, sender, txs[0]), "byPriority()[%d] from %v does not outrank the next transaction from %v", i, got.Sender, sender)
+				next := &LazyTransaction{LazyTransaction: txs[0], Sender: sender}
+				require.Truef(t, outranks(got, next), "byPriority()[%d] from %v does not outrank the next transaction from %v", i, got.Sender, sender)
 			}
 		}
 		for sender, txs := range remaining {
