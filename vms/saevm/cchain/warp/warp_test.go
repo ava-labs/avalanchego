@@ -143,8 +143,8 @@ func TestFromReceipts(t *testing.T) {
 
 // newRules returns rules with Durango, and therefore Warp, active iff
 // isDurango.
-func newRules(isDurango bool) *corethparams.RulesExtra {
-	return &corethparams.RulesExtra{IsDurango: isDurango}
+func newRules(isDurango bool) corethparams.RulesExtra {
+	return corethparams.RulesExtra{IsDurango: isDurango}
 }
 
 func TestVerifyBlock(t *testing.T) {
