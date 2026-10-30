@@ -38,6 +38,7 @@ graft_go_test(
     srcs = [
         "config_test.go",
         "contract_test.go",
+        "export_test.go",
         "predicate_test.go",
     ],
     embed = [":warp"],

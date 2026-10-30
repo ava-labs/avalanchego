@@ -19,7 +19,6 @@ go_library(
         "//graft/subnet-evm/commontype",
         "//snow",
         "//utils",
-        "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "@com_github_ava_labs_libevm//common",
         "@org_uber_go_mock//gomock",
