@@ -292,8 +292,8 @@ func (s *sut) requireSyncedTo(t *testing.T, root ethcommon.Hash) {
 			NoBuild:   true, // i.e. MUST be loaded from disk
 		}
 		snap, err := snapshot.New(conf, s.db, triedb.NewDatabase(s.db, nil), root)
+		defer snap.Release()
 		require.NoErrorf(t, err, "snapshot.New(NoBuild, ..., %#x)", root)
-		snap.Release()
 	}
 }
 

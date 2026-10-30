@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
@@ -172,8 +173,16 @@ func (s *Syncer) syncFirewood(ctx context.Context, root common.Hash, codeSyncer 
 	if err != nil {
 		return fmt.Errorf("creating firewood proof client: %w", err)
 	}
+
+	reg := prometheus.NewRegistry()
+	if err := s.snowCtx.Metrics.Register("firewood_sync", reg); err != nil {
+		return fmt.Errorf("registering firewood sync metrics: %w", err)
+	}
 	syncer, err := fwsyncer.NewEVM(
-		fwsyncer.Config{Log: s.snowCtx.Log},
+		fwsyncer.Config{
+			Log:        s.snowCtx.Log,
+			Registerer: reg,
+		},
 		fw.Firewood,
 		codeSyncer,
 		ids.ID(root),
