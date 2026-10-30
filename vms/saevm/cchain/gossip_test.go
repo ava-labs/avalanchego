@@ -11,9 +11,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 )
 
