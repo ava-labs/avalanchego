@@ -90,6 +90,30 @@ tasks:
       E2E_SERIAL: '{{.SERIAL}}'
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run {{.BAZEL_ARGS}} "$BAZEL_CI_TARGET_PATTERNS" -- {{.E2E_ARGS}} {{.CLI_ARGS}}'
 
+  bazel-test-e2e-existing-network:
+    desc: Run the existing-network E2E test with Bazel-built runtime dependencies
+    cmds:
+      - task: bazel-test-e2e
+        vars:
+          SERIAL: '1'
+          E2E_ARGS: --existing-network
+
+  bazel-test-e2e-post-latest:
+    desc: Run E2E tests with Bazel-built runtime dependencies and the latest protocol upgrade active at genesis
+    cmds:
+      - task: bazel-test-e2e
+        vars:
+          E2E_ARGS: --activate-latest-after=0
+
+  bazel-test-e2e-post-latest-race-serial:
+    desc: Run E2E tests serially with race detection and the latest protocol upgrade active at genesis
+    cmds:
+      - task: bazel-test-e2e
+        vars:
+          BAZEL_ARGS: --config=race
+          SERIAL: '1'
+          E2E_ARGS: --activate-latest-after=0
+
   bazel-test-e2e-race:
     desc: Run E2E tests with Bazel-built runtime dependencies and race detection
     cmds:
@@ -105,6 +129,22 @@ tasks:
           BAZEL_ARGS: --config=race
           SERIAL: '1'
 
+  bazel-test-e2e-schedule-latest:
+    desc: Run E2E tests with Bazel-built runtime dependencies and activate the latest protocol upgrade four minutes after network start
+    cmds:
+      - task: bazel-test-e2e
+        vars:
+          E2E_ARGS: --activate-latest-after=4m
+
+  bazel-test-e2e-schedule-latest-race-serial:
+    desc: Run E2E tests serially with race detection and activate the latest protocol upgrade four minutes after network start
+    cmds:
+      - task: bazel-test-e2e
+        vars:
+          BAZEL_ARGS: --config=race
+          SERIAL: '1'
+          E2E_ARGS: --activate-latest-after=4m
+
   bazel-test-e2e-serial:
     desc: Run E2E tests serially with Bazel-built runtime dependencies
     cmds:
@@ -118,6 +158,49 @@ tasks:
       - task: bazel-test-e2e
         vars:
           E2E_ARGS: --ginkgo.focus-file=c/api.go
+
+  bazel-test-load:
+    desc: Run load tests with Bazel-built runtime dependencies
+    env:
+      BAZEL_CI_TARGET_PATTERNS: //tests/load/main:runner
+    cmds:
+      - task: generate-load-contract-bindings
+      - cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run "$BAZEL_CI_TARGET_PATTERNS" -- {{.CLI_ARGS}}'
+
+  bazel-test-load-ci:
+    desc: Run load tests with Bazel-built runtime dependencies and the standard CI timeout
+    vars:
+      BAZEL_ARGS: '{{.BAZEL_ARGS | default ""}}'
+    env:
+      BAZEL_CI_TARGET_PATTERNS: //tests/load/main:runner
+    cmds:
+      - task: generate-load-contract-bindings
+      - cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run {{.BAZEL_ARGS}} "$BAZEL_CI_TARGET_PATTERNS" -- --load-timeout=30s {{.CLI_ARGS}}'
+
+  bazel-test-load-ci-race:
+    desc: Run load tests with race detection and the standard CI timeout
+    cmds:
+      - task: bazel-test-load-ci
+        vars:
+          BAZEL_ARGS: --config=race
+
+  bazel-test-load-subnet-evm:
+    desc: Run Subnet-EVM load tests with Bazel-built runtime dependencies
+    vars:
+      BAZEL_ARGS: '{{.BAZEL_ARGS | default ""}}'
+    env:
+      BAZEL_CI_TARGET_PATTERNS: //graft/subnet-evm/tests/load:runner
+      SIMULATOR_TIMEOUT: '{{.SIMULATOR_TIMEOUT | default ""}}'
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run {{.BAZEL_ARGS}} "$BAZEL_CI_TARGET_PATTERNS" -- {{.CLI_ARGS}}'
+
+  bazel-test-load-subnet-evm-race:
+    desc: Run Subnet-EVM load tests with Bazel-built runtime dependencies and race detection
+    cmds:
+      - task: bazel-test-load-subnet-evm
+        vars:
+          BAZEL_ARGS: --config=race
+          # Race instrumentation slows the fixed 50,000-transaction workload.
+          SIMULATOR_TIMEOUT: 30m
 
   bazel-test-unit:
     desc: Run cacheable Go unit tests with Bazel
@@ -134,6 +217,27 @@ tasks:
   bazel-test-unit-smoke:
     desc: Run a cacheable Bazel Go unit-test smoke test
     cmd: '{{.NIX_RUN}} ./scripts/run_bazel_go_tests.sh smoke --test_filter=TestID'
+
+  bazel-test-upgrade:
+    desc: Run the release-upgrade test with Bazel-built runtime dependencies
+    env:
+      BAZEL_CI_TARGET_PATTERNS: //tests/upgrade:runner
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run "$BAZEL_CI_TARGET_PATTERNS" -- {{.CLI_ARGS}}'
+
+  bazel-test-warp-subnet-evm:
+    desc: Run Subnet-EVM warp tests with Bazel-built runtime dependencies
+    vars:
+      BAZEL_ARGS: '{{.BAZEL_ARGS | default ""}}'
+    env:
+      BAZEL_CI_TARGET_PATTERNS: //graft/subnet-evm/tests/warp:runner
+    cmd: '{{.NIX_RUN}} ./scripts/run_bazel_ci_command.sh run {{.BAZEL_ARGS}} "$BAZEL_CI_TARGET_PATTERNS" -- {{.CLI_ARGS}}'
+
+  bazel-test-warp-subnet-evm-race:
+    desc: Run Subnet-EVM warp tests with Bazel-built runtime dependencies and race detection
+    cmds:
+      - task: bazel-test-warp-subnet-evm
+        vars:
+          BAZEL_ARGS: --config=race
 
   build:
     desc: Builds avalanchego
@@ -536,29 +640,6 @@ tasks:
       - task: build-xsvm
       - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}'
 
-  test-e2e-ci-post-latest:
-    desc: Runs e2e tests in parallel with race detection enabled and posts latest activation immediately
-    cmds:
-      - task: build-race
-      - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh --activate-latest-after=0'
-
-  test-e2e-ci-schedule-latest:
-    desc: Runs e2e tests in parallel with race detection enabled and schedules latest activation after 4 minutes
-    cmds:
-      - task: build-race
-      - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.sh --activate-latest-after=4m'
-
-  test-e2e-existing-ci:
-    desc: Runs e2e tests with an existing network [serially with race detection enabled]
-    env:
-      E2E_SERIAL: 1
-    cmds:
-      - task: build-race
-      - task: build-xsvm
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.e2e.existing.sh {{.CLI_ARGS}}'
-
   test-e2e-kube:
     desc: Runs e2e tests against a network deployed to kube
     cmds:
@@ -589,20 +670,6 @@ tasks:
     vars:
       FUZZEXECS: '{{.FUZZEXECS| default "10000"}}'
     cmd: '{{.NIX_RUN}} ./scripts/build_fuzz.sh {{.FUZZEXECS}} {{.CLI_ARGS}}'
-
-  test-load:
-    desc: Runs load tests
-    cmds:
-      - task: generate-load-contract-bindings
-      - task: build
-      - cmd: '{{.NIX_RUN}} go run ./tests/load/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}'
-
-  test-load-ci:
-    desc: Runs load tests with the standard CI timeout
-    cmds:
-      - task: generate-load-contract-bindings
-      - task: build
-      - cmd: '{{.NIX_RUN}} go run ./tests/load/main --avalanchego-path=./build/avalanchego --load-timeout=30s'
 
   test-load-exclusive:
     desc: Runs load tests against kube with exclusive scheduling
@@ -670,12 +737,6 @@ tasks:
     desc: Runs one unit test package to check that Go unit tests run on a platform
     # Mirrors the Bazel unit-test smoke target (//ids:ids_test --test_filter=TestID).
     cmd: '{{.NIX_RUN}} go test -run TestID ./ids'
-
-  test-upgrade:
-    desc: Runs upgrade tests
-    cmds:
-      - task: build
-      - cmd: '{{.NIX_RUN}} bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}'
 
   test-workflow-hash-go-unit-inputs:
     desc: Tests hashing of Go unit-test cache inputs

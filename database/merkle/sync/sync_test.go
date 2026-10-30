@@ -6,6 +6,7 @@ package sync
 import (
 	"bytes"
 	"context"
+	"errors"
 	"math/rand"
 	"testing"
 	"testing/synctest"
@@ -141,13 +142,13 @@ type (
 	sut = Syncer[*proofDouble, *proofDouble]
 
 	sutConfig struct {
-		db *db
+		db DB[*proofDouble, *proofDouble]
 	}
 	sutOption = options.Option[sutConfig]
 )
 
 // withDB syncs into d rather than an empty database.
-func withDB(d *db) sutOption {
+func withDB(d DB[*proofDouble, *proofDouble]) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
 		c.db = d
 	})
@@ -341,6 +342,44 @@ func Test_Sync_BusyContextCancellation(t *testing.T) {
 
 	err := syncer.Sync(ctx)
 	require.ErrorIs(t, err, context.Canceled)
+}
+
+// failingDB fails every range proof commit after the first, which leaves the
+// rest of the range queued.
+type failingDB struct {
+	*db
+	err       error
+	committed bool
+}
+
+func (f *failingDB) CommitRangeProof(ctx context.Context, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], proof *proofDouble) (maybe.Maybe[[]byte], error) {
+	if f.committed {
+		return maybe.Nothing[[]byte](), f.err
+	}
+	f.committed = true
+	return f.db.CommitRangeProof(ctx, start, end, proof)
+}
+
+// A fatal error MUST be returned, not the cancellation it triggers.
+func TestSyncReturnsFirstFatalError(t *testing.T) {
+	// Waits for the in-flight work that outlives [Syncer.Sync].
+	synctest.Test(t, func(t *testing.T) {
+		errCommit := errors.New("commit failed")
+		response := marshalRangeProofResponse(t, &proofDouble{})
+		handler := p2p.TestHandler{
+			AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
+				return response, nil
+			},
+		}
+		clientDB := &failingDB{
+			db:  &db{},
+			err: errCommit,
+		}
+
+		ctx := t.Context()
+		syncer := newSUT(t, ids.GenerateTestID(), selfClient(t, ctx, handler), withDB(clientDB))
+		require.ErrorIsf(t, syncer.Sync(ctx), errCommit, "%T.Sync()", syncer)
+	})
 }
 
 func Test_Midpoint(t *testing.T) {

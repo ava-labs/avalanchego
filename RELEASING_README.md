@@ -97,16 +97,16 @@ If this release activates a new network upgrade on Mainnet:
    DEFAULT_VERSION="1.15.1"
    ```
 
-1. In [`.github/workflows/go.yml`](.github/workflows/go.yml), comment out the `Run e2e tests` step of the `upgrade` job, leaving `actions/checkout` so the job still has a step:
+1. In [`.github/workflows/bazel.yml`](.github/workflows/bazel.yml), remove the `upgrade` entry from the `test_matrix` of the `monitored` job. The matrix is JSON, so remove the comma after the new last entry, and put the `TODO` comment above `test_matrix:`:
 
    ```yaml
-   upgrade:
-     runs-on: ubuntu-24.04
-     steps:
-       - uses: actions/checkout@v5
-       # TODO: Reactivate test once v1.15.1 is published
-       # - name: Run e2e tests
-       #   ...
+   # TODO: Restore the upgrade entry once v1.15.1 is published:
+   # {"name": "upgrade", "task": "bazel-test-upgrade", "network_owner": "avalanchego-upgrade"}
+   test_matrix: |
+     {"include": [
+       ...
+       {"name": "load", "task": "bazel-test-load-ci"}
+     ]}
    ```
 
 The upgrade test runs the published `DEFAULT_VERSION` binary, which doesn't exist until `$VERSION` is released. [Step 9](#9-prepare-the-next-release) turns it back on.
@@ -315,7 +315,7 @@ export NEXT_VERSION=v1.15.2
    git diff "$VERSION" origin/master -- RELEASES.md
    ```
 
-1. If you disabled the `upgrade` job in [step 2](#activating-a-network-upgrade-on-mainnet), enable it again in [`.github/workflows/go.yml`](.github/workflows/go.yml). Uncomment the `Run e2e tests` step and delete the `TODO` comment.
+1. If you removed the `upgrade` entry in [step 2](#activating-a-network-upgrade-on-mainnet), restore it to the `monitored` job's `test_matrix` in [`.github/workflows/bazel.yml`](.github/workflows/bazel.yml). Add a comma after the preceding entry and delete the `TODO` comment.
 
 1. Create PR and merge:
 
