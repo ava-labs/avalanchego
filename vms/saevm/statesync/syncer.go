@@ -175,7 +175,7 @@ func (s *Syncer) syncFirewood(ctx context.Context, root common.Hash, codeSyncer 
 	}
 
 	reg := prometheus.NewRegistry()
-	if err := s.snowCtx.Metrics.Register("firewood_sync", reg); err != nil {
+	if err := s.snowCtx.Metrics.Register("syncer_firewood", reg); err != nil {
 		return fmt.Errorf("registering firewood sync metrics: %w", err)
 	}
 	syncer, err := fwsyncer.NewEVM(
