@@ -139,18 +139,18 @@ func (m *MockBlockContext) EXPECT() *MockBlockContextMockRecorder {
 	return m.recorder
 }
 
-// GetPredicateResults mocks base method.
-func (m *MockBlockContext) GetPredicateResults(txHash common.Hash, precompileAddress common.Address) set.Bits {
+// GetWarpMessageResults mocks base method.
+func (m *MockBlockContext) GetWarpMessageResults(txHash common.Hash) set.Bits {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPredicateResults", txHash, precompileAddress)
+	ret := m.ctrl.Call(m, "GetWarpMessageResults", txHash)
 	ret0, _ := ret[0].(set.Bits)
 	return ret0
 }
 
-// GetPredicateResults indicates an expected call of GetPredicateResults.
-func (mr *MockBlockContextMockRecorder) GetPredicateResults(txHash, precompileAddress any) *gomock.Call {
+// GetWarpMessageResults indicates an expected call of GetWarpMessageResults.
+func (mr *MockBlockContextMockRecorder) GetWarpMessageResults(txHash any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPredicateResults", reflect.TypeOf((*MockBlockContext)(nil).GetPredicateResults), txHash, precompileAddress)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWarpMessageResults", reflect.TypeOf((*MockBlockContext)(nil).GetWarpMessageResults), txHash)
 }
 
 // Number mocks base method.
