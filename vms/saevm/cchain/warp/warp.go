@@ -46,8 +46,6 @@ func FromReceipts(rs types.Receipts) ([]*avalanchewarp.UnsignedMessage, error) {
 
 var errNoBlockContext = errors.New("no block context")
 
-var warpConfig = &corethwarp.Config{}
-
 // VerifyBlock verifies the Warp messages of every transaction in the block.
 func VerifyBlock(
 	snowContext *snow.Context,
@@ -126,7 +124,7 @@ func verifyTx(
 		eg.Go(func() error {
 			// TODO(StephenButtolph): Properly report unexpected errors when
 			// cleaning up the coreth precompile code.
-			failures[i] = warpConfig.VerifyPredicate(pc, msg) != nil
+			failures[i] = corethwarp.VerifyPredicate(pc, msg) != nil
 			return nil
 		})
 	}

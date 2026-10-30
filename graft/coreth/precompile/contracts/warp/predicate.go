@@ -12,15 +12,14 @@ import (
 	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
 const (
-	WarpDefaultQuorumNumerator uint64 = 67
-	WarpQuorumDenominator      uint64 = 100
+	WarpQuorumNumerator   uint64 = 67
+	WarpQuorumDenominator uint64 = 100
 )
 
 var (
@@ -35,14 +34,6 @@ var (
 	errFailedVerification         = errors.New("cannot verify warp signature")
 	errCannotRetrieveValidatorSet = errors.New("cannot retrieve validator set")
 )
-
-// Config configures how Warp predicates are verified. The zero value uses the
-// default quorum.
-type Config struct {
-	// QuorumNumerator of 0 uses [WarpDefaultQuorumNumerator].
-	QuorumNumerator              uint64
-	RequirePrimaryNetworkSigners bool
-}
 
 // PredicateGas returns the amount of gas necessary to verify the predicate
 // PredicateGas charges for:
@@ -94,8 +85,8 @@ func PredicateGas(pred predicate.Predicate, rules precompileconfig.Rules) (uint6
 	return totalGas, nil
 }
 
-// VerifyPredicate returns whether the predicate described by [predicateBytes] passes verification.
-func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateContext, pred predicate.Predicate) error {
+// VerifyPredicate verifies the Warp message in pred and its signature.
+func VerifyPredicate(predicateContext *precompileconfig.PredicateContext, pred predicate.Predicate) error {
 	unpackedPredicateBytes, err := pred.Bytes()
 	if err != nil {
 		return fmt.Errorf("%w: %w", errInvalidPredicateBytes, err)
@@ -107,14 +98,9 @@ func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateCon
 		return fmt.Errorf("%w: %w", errCannotParseWarpMsg, err)
 	}
 
-	quorumNumerator := WarpDefaultQuorumNumerator
-	if c.QuorumNumerator != 0 {
-		quorumNumerator = c.QuorumNumerator
-	}
-
 	log.Debug("verifying warp message",
 		"warpMsg", warpMsg,
-		"quorumNum", quorumNumerator,
+		"quorumNum", WarpQuorumNumerator,
 		"quorumDenom", WarpQuorumDenominator,
 	)
 
@@ -129,18 +115,6 @@ func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateCon
 			"err", err,
 		)
 		return fmt.Errorf("%w: %w", errCannotRetrieveValidatorSet, err)
-	}
-
-	if sourceSubnetID == constants.PrimaryNetworkID {
-		// For the X-chain and the C-chain, chains can be configured not to
-		// require the primary network validators to have signed the warp
-		// message and to use the, likely smaller, local subnet's validator set.
-		//
-		// The primary network validator set is never required when verifying
-		// messages from the P-chain because the P-chain is always synced.
-		if !c.RequirePrimaryNetworkSigners || warpMsg.SourceChainID == constants.PlatformChainID {
-			sourceSubnetID = predicateContext.SnowCtx.SubnetID
-		}
 	}
 
 	validatorSets, err := predicateContext.SnowCtx.ValidatorState.GetWarpValidatorSets(
@@ -164,7 +138,7 @@ func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateCon
 		&warpMsg.UnsignedMessage,
 		predicateContext.SnowCtx.NetworkID,
 		validatorSet,
-		quorumNumerator,
+		WarpQuorumNumerator,
 		WarpQuorumDenominator,
 	)
 	if err != nil {
