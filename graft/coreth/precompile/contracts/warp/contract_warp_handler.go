@@ -44,19 +44,19 @@ type messageHandler interface {
 	handleMessage(msg *warp.Message) ([]byte, error)
 }
 
-func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, suppliedGas uint64, handler messageHandler) ([]byte, uint64, error) {
+func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, handler messageHandler) ([]byte, error) {
+	env := accessibleState.GetPrecompileEnv()
 	warpGasConfig := CurrentGasConfig(accessibleState.GetRules())
-	remainingGas, err := contract.DeductGas(suppliedGas, warpGasConfig.GetVerifiedWarpMessageBase)
-	if err != nil {
-		return nil, remainingGas, err
+	if err := contract.DeductMaxGas(env, warpGasConfig.GetVerifiedWarpMessageBase); err != nil {
+		return nil, err
 	}
 
 	warpIndexInput, err := UnpackGetVerifiedWarpMessageInput(input)
 	if err != nil {
-		return nil, remainingGas, fmt.Errorf("%w: %w", errInvalidIndexInput, err)
+		return nil, fmt.Errorf("%w: %w", errInvalidIndexInput, err)
 	}
 	if warpIndexInput > math.MaxInt32 {
-		return nil, remainingGas, fmt.Errorf("%w: larger than MaxInt32", errInvalidIndexInput)
+		return nil, fmt.Errorf("%w: larger than MaxInt32", errInvalidIndexInput)
 	}
 	warpIndex := int(warpIndexInput) // This conversion is safe even if int is 32 bits because we checked above.
 	state := accessibleState.GetStateDB()
@@ -64,33 +64,30 @@ func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, s
 	predicateResults := accessibleState.GetBlockContext().GetPredicateResults(state.TxHash(), ContractAddress)
 	valid := exists && !predicateResults.Contains(warpIndex)
 	if !valid {
-		return handler.packFailed(), remainingGas, nil
+		return handler.packFailed(), nil
 	}
 
 	// Note: we charge for the size of the message during both predicate verification and each time the message is read during
 	// EVM execution because each execution incurs an additional read cost.
 	msgBytesGas, overflow := math.SafeMul(warpGasConfig.PerWarpMessageChunk, uint64(len(pred)))
 	if overflow {
-		return nil, 0, vm.ErrOutOfGas
+		env.UseGas(env.Gas())
+		return nil, vm.ErrOutOfGas
 	}
-	if remainingGas, err = contract.DeductGas(remainingGas, msgBytesGas); err != nil {
-		return nil, 0, err
+	if err := contract.DeductMaxGas(env, msgBytesGas); err != nil {
+		return nil, err
 	}
 	// Note: since the predicate is verified in advance of execution, the precompile should not
 	// hit an error during execution.
 	unpackedPredicateBytes, err := pred.Bytes()
 	if err != nil {
-		return nil, remainingGas, fmt.Errorf("%w: %w", errInvalidPredicateBytes, err)
+		return nil, fmt.Errorf("%w: %w", errInvalidPredicateBytes, err)
 	}
 	warpMessage, err := warp.ParseMessage(unpackedPredicateBytes)
 	if err != nil {
-		return nil, remainingGas, fmt.Errorf("%w: %w", errInvalidWarpMsg, err)
+		return nil, fmt.Errorf("%w: %w", errInvalidWarpMsg, err)
 	}
-	res, err := handler.handleMessage(warpMessage)
-	if err != nil {
-		return nil, remainingGas, err
-	}
-	return res, remainingGas, nil
+	return handler.handleMessage(warpMessage)
 }
 
 type addressedPayloadHandler struct{}
