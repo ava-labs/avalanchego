@@ -100,9 +100,10 @@ func TestByPriority(t *testing.T) {
 	}
 }
 
-// FuzzByPriority checks that each output transaction outranks the next one
-// from every other sender. Only one output can pass, so map iteration order
-// can't change it.
+// FuzzByPriority checks that byPriority outputs every transaction exactly once,
+// keeps each sender's transactions in nonce order, and always picks the
+// highest-priority next transaction across all senders. The ranking rule itself
+// is checked by [TestByPriority].
 func FuzzByPriority(f *testing.F) {
 	// sender, tip, seen (a sender's rows are in nonce order)
 	f.Add([]byte{
@@ -131,16 +132,12 @@ func FuzzByPriority(f *testing.F) {
 			})
 		}
 
-		// outranks reports whether `a` has higher priority than `b`. With a nil
-		// base fee, the effective tip is the tip cap.
-		outranks := func(a, b *LazyTransaction) bool {
-			if c := a.GasTipCap.Cmp(b.GasTipCap); c != 0 {
-				return c > 0
+		head := func(from common.Address, ltx *txpool.LazyTransaction) *senderTxs {
+			return &senderTxs{
+				from:     from,
+				txs:      []*txpool.LazyTransaction{ltx},
+				firstTip: effectiveGasTip(ltx, nil),
 			}
-			if c := a.Time.Compare(b.Time); c != 0 {
-				return c < 0
-			}
-			return a.Sender.Cmp(b.Sender) < 0
 		}
 
 		// remaining holds each sender's transactions that are not output yet.
@@ -151,12 +148,12 @@ func FuzzByPriority(f *testing.F) {
 			require.Samef(t, txs[0], got.LazyTransaction, "byPriority()[%d] is not the next transaction from %v", i, got.Sender)
 			remaining[got.Sender] = txs[1:]
 
+			gotHead := head(got.Sender, got.LazyTransaction)
 			for sender, txs := range remaining {
 				if sender == got.Sender || len(txs) == 0 {
 					continue
 				}
-				next := &LazyTransaction{LazyTransaction: txs[0], Sender: sender}
-				require.Truef(t, outranks(got, next), "byPriority()[%d] from %v does not outrank the next transaction from %v", i, got.Sender, sender)
+				require.Truef(t, gotHead.outranks(head(sender, txs[0])), "byPriority()[%d] from %v does not outrank the next transaction from %v", i, got.Sender, sender)
 			}
 		}
 		for sender, txs := range remaining {

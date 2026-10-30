@@ -36,6 +36,19 @@ type senderTxs struct {
 	firstTip *uint256.Int
 }
 
+// outranks reports whether the first transaction of `a` has higher priority
+// than the first transaction of `b`.
+func (a *senderTxs) outranks(b *senderTxs) bool {
+	if c := a.firstTip.Cmp(b.firstTip); c != 0 {
+		return c > 0 // Higher tips first
+	}
+	if c := a.txs[0].Time.Compare(b.txs[0].Time); c != 0 {
+		return c < 0
+	}
+	// Senders are unique, so the order is deterministic.
+	return a.from.Cmp(b.from) < 0
+}
+
 func byPriority(pending map[common.Address][]*txpool.LazyTransaction, baseFee *uint256.Int) []*LazyTransaction {
 	var n int
 	senders := make([]*senderTxs, 0, len(pending))
@@ -52,16 +65,7 @@ func byPriority(pending map[common.Address][]*txpool.LazyTransaction, baseFee *u
 	}
 
 	// Heap by first transaction from each sender.
-	q := heap.QueueOf(func(a, b *senderTxs) bool {
-		if c := a.firstTip.Cmp(b.firstTip); c != 0 {
-			return c > 0 // Higher tips first
-		}
-		if c := a.txs[0].Time.Compare(b.txs[0].Time); c != 0 {
-			return c < 0
-		}
-		// Senders are unique, so the order is deterministic.
-		return a.from.Cmp(b.from) < 0
-	}, senders...)
+	q := heap.QueueOf((*senderTxs).outranks, senders...)
 
 	all := make([]*LazyTransaction, 0, n)
 	for {
