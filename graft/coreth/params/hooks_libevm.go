@@ -10,7 +10,6 @@ import (
 	"slices"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/legacy"
@@ -79,22 +78,6 @@ func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
 // predicate gas helper is replaced.
 var warpPredicaters = map[common.Address]evmprecompileconfig.Predicater{
 	warp.ContractAddress: &warp.Config{},
-}
-
-// WarpMessages returns the storage keys of each Warp precompile entry in list,
-// in order. Each entry is one Warp message, including entries without storage
-// keys. It returns nil before Durango, when Warp is not active.
-func (r RulesExtra) WarpMessages(list types.AccessList) []predicate.Predicate {
-	if !r.IsDurango {
-		return nil
-	}
-	var messages []predicate.Predicate
-	for _, tuple := range list {
-		if tuple.Address == warp.ContractAddress {
-			messages = append(messages, tuple.StorageKeys)
-		}
-	}
-	return messages
 }
 
 // AccessListGas computes the intrinsic gas for an access list. Once Warp is
