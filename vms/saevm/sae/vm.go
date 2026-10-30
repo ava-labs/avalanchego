@@ -167,16 +167,7 @@ func NewVM[T hook.Transaction](
 	if err != nil {
 		return nil, fmt.Errorf("creating new execution: %w", err)
 	}
-	closers.Push(
-		unwind.CloserFunc(func() error {
-			// We MUST NOT write a root that is more advanced than the last settled
-			// root to ensure that firewood is able to restart.
-			return exec.Tracker.Close(exec.LastExecuted().SettledStateRoot())
-		}),
-		// The executor MUST be closed before the tracker, and unwinding is
-		// performed in reverse order.
-		exec,
-	)
+	closers.Push(exec)
 
 	// ==========  Mempool & P2P Gossip  ==========
 	pool, mempoolClosers, err := newGossipMempool(cfg.MempoolConfig, snowCtx, network, exec, ethBlockSource(consensusCritical, db), reg)
