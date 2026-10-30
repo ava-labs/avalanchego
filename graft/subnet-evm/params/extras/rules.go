@@ -36,7 +36,7 @@ func (r *Rules) WarpMessages(list types.AccessList) []warpmsg.Packed {
 	if r.WarpConfig == nil {
 		return nil
 	}
-	return warpmsg.FromAccessList(list, warp.ContractAddress)
+	return warpmsg.FromAccessList(list)
 }
 
 // IsPrecompileEnabled returns true if the precompile at `addr` is enabled for this rule set.

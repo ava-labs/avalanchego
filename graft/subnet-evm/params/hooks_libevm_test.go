@@ -45,7 +45,7 @@ func TestRulesExtra_AccessListGas(t *testing.T) {
 	})
 	require.NoError(t, err, "avalancheWarp.NewMessage()")
 	accessList := libevm.AccessList{{
-		Address:     warp.ContractAddress,
+		Address:     warpmsg.ContractAddress,
 		StorageKeys: warpmsg.Pack(msg.Bytes()),
 	}}
 

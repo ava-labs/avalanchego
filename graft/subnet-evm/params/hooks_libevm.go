@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 
-	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -80,17 +79,16 @@ func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
 }
 
 // AccessListGas computes the intrinsic gas for an access list. While Warp is
-// enabled, it calculates gas per-tuple, charging Warp messages their predicate
-// gas. Otherwise, it returns override=false to use the default calculation.
+// enabled, it calculates gas per-tuple, charging Warp messages their
+// [warp.MessageGas]. Otherwise, it returns override=false to use the default calculation.
 func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
 	if r.WarpConfig == nil {
 		return 0, false, nil
 	}
-	gas, err := evmprecompileconfig.AccessListGas(
+	gas, err := warpmsg.AccessListGas(
 		accessList,
-		warp.ContractAddress,
 		func(msg warpmsg.Packed) (uint64, error) {
-			return warp.PredicateGas(msg, r.AvalancheRules)
+			return warp.MessageGas(msg, r.AvalancheRules)
 		},
 	)
 	return gas, true, err
@@ -128,9 +126,9 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 		accessibleState := accessibleState{
 			env: env,
 			blockContext: &precompileBlockContext{
-				number:           env.BlockNumber(),
-				time:             env.BlockTime(),
-				predicateResults: customtypes.PredicateResults(header, customheader.PredicateBytesFromExtra(header.Extra)),
+				number:      env.BlockNumber(),
+				time:        env.BlockTime(),
+				warpResults: customtypes.PredicateResults(header, customheader.PredicateBytesFromExtra(header.Extra)),
 			},
 		}
 
@@ -201,9 +199,9 @@ func (a accessibleState) GetPrecompileEnv() vm.PrecompileEnvironment {
 }
 
 type precompileBlockContext struct {
-	number           *big.Int
-	time             uint64
-	predicateResults warpmsg.BlockResults
+	number      *big.Int
+	time        uint64
+	warpResults warpmsg.BlockResults
 }
 
 func (p *precompileBlockContext) Number() *big.Int {
@@ -215,5 +213,5 @@ func (p *precompileBlockContext) Timestamp() uint64 {
 }
 
 func (p *precompileBlockContext) GetWarpMessageResults(txHash common.Hash) set.Bits {
-	return p.predicateResults.Get(txHash, warp.ContractAddress)
+	return p.warpResults.Get(txHash)
 }

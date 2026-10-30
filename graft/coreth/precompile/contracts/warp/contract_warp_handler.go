@@ -60,29 +60,29 @@ func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, s
 	}
 	warpIndex := int(warpIndexInput) // This conversion is safe even if int is 32 bits because we checked above.
 	state := accessibleState.GetStateDB()
-	pred, exists := state.GetWarpMessage(warpIndex)
+	packed, exists := state.GetWarpMessage(warpIndex)
 	results := accessibleState.GetBlockContext().GetWarpMessageResults(state.TxHash())
 	valid := exists && !results.Contains(warpIndex)
 	if !valid {
 		return handler.packFailed(), remainingGas, nil
 	}
 
-	// Note: we charge for the size of the message during both predicate verification and each time the message is read during
+	// Note: we charge for the size of the message during both Warp message verification and each time the message is read during
 	// EVM execution because each execution incurs an additional read cost.
-	msgBytesGas, overflow := math.SafeMul(warpGasConfig.PerWarpMessageChunk, uint64(len(pred)))
+	msgBytesGas, overflow := math.SafeMul(warpGasConfig.PerWarpMessageChunk, uint64(len(packed)))
 	if overflow {
 		return nil, 0, vm.ErrOutOfGas
 	}
 	if remainingGas, err = contract.DeductGas(remainingGas, msgBytesGas); err != nil {
 		return nil, 0, err
 	}
-	// Note: since the predicate is verified in advance of execution, the precompile should not
+	// Note: since the Warp message is verified in advance of execution, the precompile should not
 	// hit an error during execution.
-	unpackedPredicateBytes, err := pred.Unpack()
+	msgBytes, err := packed.Unpack()
 	if err != nil {
-		return nil, remainingGas, fmt.Errorf("%w: %w", errInvalidPredicateBytes, err)
+		return nil, remainingGas, fmt.Errorf("%w: %w", errInvalidPacked, err)
 	}
-	warpMessage, err := warp.ParseMessage(unpackedPredicateBytes)
+	warpMessage, err := warp.ParseMessage(msgBytes)
 	if err != nil {
 		return nil, remainingGas, fmt.Errorf("%w: %w", errInvalidWarpMsg, err)
 	}
