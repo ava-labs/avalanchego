@@ -36,13 +36,7 @@ func (r *Rules) WarpMessages(list types.AccessList) []predicate.Predicate {
 	if r.WarpConfig == nil {
 		return nil
 	}
-	var messages []predicate.Predicate
-	for _, tuple := range list {
-		if tuple.Address == warp.ContractAddress {
-			messages = append(messages, tuple.StorageKeys)
-		}
-	}
-	return messages
+	return predicate.FromAccessList(list, warp.ContractAddress)
 }
 
 // IsPrecompileEnabled returns true if the precompile at `addr` is enabled for this rule set.
