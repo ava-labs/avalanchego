@@ -27,7 +27,7 @@ func TestQCDuplicateSigners(t *testing.T) {
 	require.NoError(t, err)
 	sig, err := signer.Sign(msg)
 	require.NoError(t, err)
-	require.NoError(t, verifier.Verify(msg, sig, configs[0].Ctx.NodeID[:]))
+	require.NoError(t, verifier.VerifySignature(msg, sig, configs[0].Ctx.NodeID[:]))
 
 	signatures := make([]common.Signature, 0, quorum)
 	for range quorum {
