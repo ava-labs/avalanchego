@@ -6,12 +6,14 @@ package customtypes
 import (
 	"io"
 	"math/big"
+	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -41,6 +43,28 @@ type HeaderExtra struct {
 	BlockGasCost     *big.Int
 	TimeMilliseconds *uint64
 	MinDelayExcess   *acp226.DelayExcess
+
+	predicateResults atomic.Pointer[predicate.BlockResults]
+}
+
+// PredicateResults returns the parsed predicate results from the header's extra
+// data. If the extra data does not contain predicate results, or cannot be
+// parsed, nil is returned. The same rules MUST be supplied for each call to a
+// given header.
+func PredicateResults(h *ethtypes.Header, predicateBytes []byte) predicate.BlockResults {
+	if len(predicateBytes) == 0 {
+		return nil
+	}
+
+	cache := &GetHeaderExtra(h).predicateResults
+	if results := cache.Load(); results != nil {
+		return *results
+	}
+
+	// results were already verified for canonical execution
+	results, _ := predicate.ParseBlockResults(predicateBytes)
+	cache.Store(&results)
+	return results
 }
 
 // HeaderTimeMilliseconds returns the header timestamp in milliseconds.

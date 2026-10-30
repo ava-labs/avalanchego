@@ -5,6 +5,7 @@ package rpc
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/ava-labs/libevm/eth/filters"
 	"github.com/ava-labs/libevm/libevm/debug"
@@ -40,6 +41,8 @@ const (
 	APIChain        API = "chain"
 	APITx           API = "tx"
 	APISubscription API = "subscription"
+	APIFilter       API = "filter"
+	APILogs         API = "logs"
 	APIAvalanche    API = "avalanche"
 	APIDB           API = "db"
 	APIProfile      API = "profile"
@@ -172,27 +175,13 @@ var apiServices = []apiService{
 		},
 	},
 	{
-		// Standard Ethereum node APIS:
-		// - eth_getFilterChanges
-		// - eth_getFilterLogs
-		// - eth_getLogs
-		// - eth_newBlockFilter
-		// - eth_newFilter
-		// - eth_newPendingTransactionFilter
-		// - eth_uninstallFilter
-		//
 		// geth-specific APIs:
 		// - eth_subscribe
 		//  - newHeads
 		//  - newPendingTransactions
 		//  - logs
 		name: APISubscription, namespace: ethNamespace, defaultOn: true,
-		receiver: func(b *backend, filter *filters.FilterAPI) any {
-			return &filterAPI{
-				FilterAPI: filter,
-				b:         b,
-			}
-		},
+		receiver: func(_ *backend, filter *filters.FilterAPI) any { return &subscriptionAPI{filter} },
 	},
 	{
 		// Avalanche-custom eth extensions:
@@ -200,6 +189,23 @@ var apiServices = []apiService{
 		//  - newAcceptedTransactions
 		name: APISubscription, namespace: ethNamespace, defaultOn: true,
 		receiver: func(b *backend, _ *filters.FilterAPI) any { return &customSubscriptionAPI{b} },
+	},
+	{
+		// Standard Ethereum node APIs:
+		// - eth_getFilterChanges
+		// - eth_getFilterLogs
+		// - eth_newBlockFilter
+		// - eth_newFilter
+		// - eth_newPendingTransactionFilter
+		// - eth_uninstallFilter
+		name: APIFilter, namespace: ethNamespace, defaultOn: true,
+		receiver: func(_ *backend, filter *filters.FilterAPI) any { return &pollingFilterAPI{filter} },
+	},
+	{
+		// Standard Ethereum node APIs:
+		// - eth_getLogs
+		name: APILogs, namespace: ethNamespace, defaultOn: true,
+		receiver: func(b *backend, filter *filters.FilterAPI) any { return &logsAPI{filter, b} },
 	},
 	{
 		// Avalanche-custom eth extensions:
@@ -270,10 +276,16 @@ var apiServices = []apiService{
 	},
 }
 
-// Server returns the Provider's [rpc.Server], with the JSON-RPC namespace
-// handlers for every enabled [API] registered.
-func (p *Provider) Server() *rpc.Server {
-	return p.server
+// HTTPHandler returns the handler for JSON-RPC over HTTP, serving every enabled
+// [API] with per-request response headers added.
+func (p *Provider) HTTPHandler() http.Handler {
+	return withResponseHeaders(p.server)
+}
+
+// WebsocketHandler returns the handler for JSON-RPC over websockets, serving
+// every enabled [API] to connections from allowedOrigins.
+func (p *Provider) WebsocketHandler(allowedOrigins []string) http.Handler {
+	return p.server.WebsocketHandler(allowedOrigins)
 }
 
 func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {

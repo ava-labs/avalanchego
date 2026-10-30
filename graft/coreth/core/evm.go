@@ -30,13 +30,15 @@ package core
 import (
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/stateconf"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // RegisterExtras registers hooks with libevm to achieve Avalanche behaviour of
@@ -89,12 +91,12 @@ func (hooks) OverrideNewEVMArgs(args *vm.NewEVMArgs) *vm.NewEVMArgs {
 	return args
 }
 
-func (hooks) OverrideEVMResetArgs(rules params.Rules, args *vm.EVMResetArgs) *vm.EVMResetArgs {
+func (hooks) OverrideEVMResetArgs(rules ethparams.Rules, args *vm.EVMResetArgs) *vm.EVMResetArgs {
 	args.StateDB = wrapStateDB(rules, args.StateDB)
 	return args
 }
 
-func wrapStateDB(rules params.Rules, statedb vm.StateDB) vm.StateDB {
+func wrapStateDB(rules ethparams.Rules, statedb vm.StateDB) vm.StateDB {
 	wrappedStateDB := extstate.New(statedb.(*state.StateDB))
 	if params.GetRulesExtra(rules).IsApricotPhase1 {
 		return wrappedStateDB

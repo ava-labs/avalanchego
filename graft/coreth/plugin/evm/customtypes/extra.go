@@ -9,9 +9,11 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
-	paramsextras "github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 // Sizes of the fee state that prefixes the extra data of pre-Helicon headers.
@@ -20,11 +22,32 @@ const (
 	acp176StateSize = 3 * wrappers.LongLen // capacity, excess, target excess
 )
 
+// PredicateResults returns the parsed predicate results from the header's extra
+// data. If the extra data does not contain predicate results, or cannot be
+// parsed, nil is returned. The same rules MUST be supplied for each call to a
+// given header.
+func PredicateResults(h *ethtypes.Header, rules cparams.Rules) predicate.BlockResults {
+	predicateBytes := PredicateBytesFromExtra(rules, h.Extra)
+	if len(predicateBytes) == 0 {
+		return nil
+	}
+
+	cache := &GetHeaderExtra(h).predicateResults
+	if results := cache.Load(); results != nil {
+		return *results
+	}
+
+	// results were already verified for canonical execution
+	results, _ := predicate.ParseBlockResults(predicateBytes)
+	cache.Store(&results)
+	return results
+}
+
 var ErrInsufficientFeeState = errors.New("insufficient length for ACP-176 fee state")
 
 // PredicateBytesFromExtra returns the predicate result bytes from the header's
 // extra data. If the extra data is not long enough, an empty slice is returned.
-func PredicateBytesFromExtra(rules paramsextras.AvalancheRules, extra []byte) []byte {
+func PredicateBytesFromExtra(rules cparams.Rules, extra []byte) []byte {
 	offset := predicateBytesOffset(rules)
 	// Prior to Durango, the VM enforces the extra data is smaller than or equal
 	// to `offset`.
@@ -35,7 +58,7 @@ func PredicateBytesFromExtra(rules paramsextras.AvalancheRules, extra []byte) []
 	return extra[offset:]
 }
 
-func predicateBytesOffset(rules paramsextras.AvalancheRules) int {
+func predicateBytesOffset(rules cparams.Rules) int {
 	switch {
 	case rules.IsHelicon:
 		return 0

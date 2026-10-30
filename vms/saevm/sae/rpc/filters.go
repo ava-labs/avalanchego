@@ -38,21 +38,32 @@ func (b filterBackend) executed(h *types.Header, err error) (*types.Header, erro
 	return h, nil
 }
 
-// filterAPI is a replacement for a [filters.FilterAPI] which applies [Config]
-// for any call to [filters.FilterAPI.GetLogs]. This does NOT apply to any
-// other methods in [filters.FilterAPI].
-type filterAPI struct {
-	*filters.FilterAPI
-	b *backend
+// subscriptionAPI serves the eth_subscribe methods of a [filters.FilterAPI].
+// Only the methods of [subscriptionMethods] are served.
+type subscriptionAPI struct {
+	subscriptionMethods
+}
+
+type subscriptionMethods interface {
+	NewHeads(context.Context) (*rpc.Subscription, error)
+	NewPendingTransactions(_ context.Context, fullTx *bool) (*rpc.Subscription, error)
+	Logs(context.Context, filters.FilterCriteria) (*rpc.Subscription, error)
+}
+
+// logsAPI serves eth_getLogs of a [filters.FilterAPI], bounded by
+// [Config.MaxBlocksPerRequest].
+type logsAPI struct {
+	filter *filters.FilterAPI
+	b      *backend
 }
 
 // GetLogs overrides [filters.FilterAPI.GetLogs] to adjust the filter criteria
 // if necessary based on the [Config]. Only invalid criteria with respect to the
 // config will error before being sent to the inner call.
-func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) ([]*types.Log, error) {
+func (api *logsAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) ([]*types.Log, error) {
 	if crit.BlockHash != nil {
 		// crit.FromBlock and crit.ToBlock are ignored
-		return api.FilterAPI.GetLogs(ctx, crit)
+		return api.filter.GetLogs(ctx, crit)
 	}
 
 	// [filters.FilterCriteria.UnmarshalJSON] guarantees that FromBlock and ToBlock
@@ -64,7 +75,7 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 		// This could at most fetch logs from this block (if it has been
 		// executed after the above call) until a missing block is hit.
 		// This is assumed to be within [Config.MaxBlocksPerRequest].
-		return api.FilterAPI.GetLogs(ctx, crit)
+		return api.filter.GetLogs(ctx, crit)
 	}
 
 	end, foundEnd := api.resolve(crit.ToBlock)
@@ -87,7 +98,7 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 		// [Config.MaxBlocksPerRequest] from the last accepted block, which libevm will bound to.
 		// If ToBlock wasn't a special number, then this is user error, and will be handled
 		// by libevm.
-		return api.FilterAPI.GetLogs(ctx, crit)
+		return api.filter.GetLogs(ctx, crit)
 	}
 
 	if maxBlocks := api.b.config.MaxBlocksPerRequest; maxBlocks > 0 && end-start >= maxBlocks {
@@ -101,13 +112,13 @@ func (api *filterAPI) GetLogs(ctx context.Context, crit filters.FilterCriteria) 
 
 	crit.FromBlock = new(big.Int).SetUint64(start)
 	crit.ToBlock = new(big.Int).SetUint64(end)
-	return api.FilterAPI.GetLogs(ctx, crit)
+	return api.filter.GetLogs(ctx, crit)
 }
 
 // resolve attempts to determine the block number corresponding to the given
 // big.Int. Returning false indicates that the number supplied was non-negative
 // AND cannot be found.
-func (api *filterAPI) resolve(number *big.Int) (uint64, bool) {
+func (api *logsAPI) resolve(number *big.Int) (uint64, bool) {
 	block := rpc.LatestBlockNumber
 	if number != nil {
 		block = rpc.BlockNumber(number.Int64())
@@ -118,4 +129,21 @@ func (api *filterAPI) resolve(number *big.Int) (uint64, bool) {
 		return 0, false
 	}
 	return n, true
+}
+
+// pollingFilterAPI serves the polling methods of a [filters.FilterAPI], which
+// install filters on the node that clients poll for changes.
+// [Config.MaxBlocksPerRequest] does NOT apply to eth_getFilterLogs. Only the
+// methods of [pollingMethods] are served.
+type pollingFilterAPI struct {
+	pollingMethods
+}
+
+type pollingMethods interface {
+	NewPendingTransactionFilter(fullTx *bool) rpc.ID
+	NewBlockFilter() rpc.ID
+	NewFilter(filters.FilterCriteria) (rpc.ID, error)
+	UninstallFilter(rpc.ID) bool
+	GetFilterLogs(context.Context, rpc.ID) ([]*types.Log, error)
+	GetFilterChanges(rpc.ID) (any, error)
 }

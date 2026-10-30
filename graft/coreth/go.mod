@@ -10,7 +10,7 @@ go 1.26.10
 require (
 	github.com/ava-labs/avalanchego v1.15.3
 	github.com/ava-labs/avalanchego/graft/evm v1.15.3
-	github.com/ava-labs/libevm v1.13.15-0.20261019121158-2c4d255e0a63
+	github.com/ava-labs/libevm v1.13.15-0.20261028200218-d398bc4dbe41
 	github.com/google/go-cmp v0.7.0
 	github.com/holiman/uint256 v1.2.4
 	github.com/stretchr/testify v1.11.1
@@ -20,7 +20,7 @@ require (
 require (
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/StephenButtolph/canoto v0.18.0 // indirect
+	github.com/StephenButtolph/canoto v0.19.0 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect

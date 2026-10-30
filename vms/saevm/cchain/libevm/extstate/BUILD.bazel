@@ -1,45 +1,47 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
-load("//.bazel:defs.bzl", "graft_go_test")
+load("//.bazel:defs.bzl", "go_test")
 
 package(default_visibility = [
-    "//graft/coreth:__subpackages__",
-    "//graft/coreth:external_consumers",
+    "//vms/saevm/cchain:__subpackages__",
+    "//vms/saevm/cchain:external_consumers",
 ])
 
 go_library(
     name = "extstate",
     srcs = ["statedb.go"],
-    importpath = "github.com/ava-labs/avalanchego/graft/coreth/core/extstate",
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate",
     deps = [
         "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
+        "//graft/coreth/precompile/contract",
         "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//libevm/stateconf",
+        "@com_github_ava_labs_libevm//params",
         "@com_github_holiman_uint256//:uint256",
     ],
 )
 
-graft_go_test(
+go_test(
     name = "extstate_test",
-    srcs = [
-        "state_object_test.go",
-        "statedb_multicoin_test.go",
-    ],
-    embed = [":extstate"],
+    srcs = ["statedb_test.go"],
     deps = [
+        ":extstate",
         "//graft/coreth/plugin/evm/customtypes",
-        "//graft/evm/core/state/snapshot",
+        "//graft/coreth/precompile/contracts/warp",
+        "//vms/evm/predicate",
+        "//vms/saevm/cchain/cchaintest",
+        "//vms/saevm/cchain/libevm",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",
-        "@com_github_ava_labs_libevm//crypto",
         "@com_github_ava_labs_libevm//libevm/stateconf",
         "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
 )

@@ -15,14 +15,14 @@ import (
 	"github.com/ava-labs/libevm/libevm/legacy"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
+	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
 	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
@@ -36,11 +36,11 @@ const InvalidateDelegateUnix = 1754107200
 // P256VerifyAddress is the address of the p256 signature verification precompile
 var P256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
 
-type RulesExtra extras.Rules
+type RulesExtra cparams.Rules // TODO(alarso16): Avoid new type.
 
-func GetRulesExtra(r Rules) *extras.Rules {
+func GetRulesExtra(r ethparams.Rules) *cparams.Rules {
 	rules := payloads.Rules.GetPointer(&r)
-	return (*extras.Rules)(rules)
+	return (*cparams.Rules)(rules)
 }
 
 func (RulesExtra) CanCreateContract(_ *libevm.AddressContext, gas uint64, _ libevm.StateReader) (uint64, error) {
@@ -57,7 +57,7 @@ func (r RulesExtra) ShouldRefundGas() bool {
 
 // MinimumGasConsumption returns the ACP-194 gas-charged floor (ceil(limit/2)).
 func (r RulesExtra) MinimumGasConsumption(limit uint64) uint64 {
-	if extras.Rules(r).IsHelicon {
+	if cparams.Rules(r).IsHelicon {
 		return hook.MinimumGasConsumption(limit)
 	}
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(limit)
@@ -72,16 +72,26 @@ func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
 	return true
 }
 
-// AccessListGas computes the intrinsic gas for an access list.
-// When predicaters exist, it calculates gas per-tuple, delegating to predicate
-// contracts for addresses that have them. Otherwise, it returns override=false
-// to use the default calculation.
+// warpPredicaters charges for Warp predicates, which are the only predicates.
+var warpPredicaters = map[common.Address]evmprecompileconfig.Predicater{
+	warp.ContractAddress: &warp.Config{},
+}
+
+// HasPredicate reports whether addr's access-list entries are predicates, which
+// is only the case for the Warp precompile once Durango is active.
+func (r RulesExtra) HasPredicate(addr common.Address) bool {
+	return r.IsDurango && addr == warp.ContractAddress
+}
+
+// AccessListGas computes the intrinsic gas for an access list. Once Warp is
+// active, it calculates gas per-tuple, charging Warp predicates by
+// [warp.Config.PredicateGas]. Otherwise, it returns override=false to use the
+// default calculation.
 func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
-	rules := extras.Rules(r)
-	if !rules.PredicatersExist() {
+	if !r.IsDurango {
 		return 0, false, nil
 	}
-	gas, err := evmprecompileconfig.AccessListGasWithPredicates(rules.AvalancheRules, rules.Predicaters, accessList)
+	gas, err := evmprecompileconfig.AccessListGasWithPredicates(cparams.Rules(r), warpPredicaters, accessList)
 	return gas, true, err
 }
 
@@ -139,9 +149,8 @@ func (r RulesExtra) currentPrecompiles() map[common.Address]vm.PrecompiledContra
 	return nil
 }
 
-// precompileOverrideBuiltin specifies precompiles that were activated prior to the
-// dynamic precompile activation registry.
-// These were only active historically and are not active in the current network.
+// precompileOverrideBuiltin returns the precompile at addr that is scheduled
+// by the active fork, such as the native asset precompiles and P256Verify.
 func (r RulesExtra) precompileOverrideBuiltin(addr common.Address) (libevm.PrecompiledContract, bool) {
 	precompile, ok := r.currentPrecompiles()[addr]
 	return precompile, ok
@@ -149,24 +158,13 @@ func (r RulesExtra) precompileOverrideBuiltin(addr common.Address) (libevm.Preco
 
 func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.PrecompiledContract {
 	run := func(env vm.PrecompileEnvironment, input []byte, suppliedGas uint64) ([]byte, uint64, error) {
-		header, err := env.BlockHeader()
-		if err != nil {
-			panic(err) // Should never happen
-		}
-		var predicateResults predicate.BlockResults
-		rules := GetRulesExtra(env.Rules()).AvalancheRules
-		if predicateResultsBytes := customtypes.PredicateBytesFromExtra(rules, header.Extra); len(predicateResultsBytes) > 0 {
-			predicateResults, err = predicate.ParseBlockResults(predicateResultsBytes)
-			if err != nil {
-				panic(err) // Should never happen, as results are already validated in block validation
-			}
-		}
+		rules := *GetRulesExtra(env.Rules())
 		accessibleState := accessibleState{
 			env: env,
 			blockContext: &precompileBlockContext{
 				number:           env.BlockNumber(),
 				time:             env.BlockTime(),
-				predicateResults: predicateResults,
+				predicateResults: customtypes.PredicateResults(env.BlockHeader(), rules),
 			},
 		}
 
@@ -190,15 +188,11 @@ func (r RulesExtra) PrecompileOverride(addr common.Address) (libevm.PrecompiledC
 		return p, true
 	}
 
-	if _, ok := r.Precompiles[addr]; !ok {
+	// Warp is the only stateful precompile, and is active from Durango.
+	if !r.IsDurango || addr != warp.ContractAddress {
 		return nil, false
 	}
-	module, ok := modules.GetPrecompileModuleByAddress(addr)
-	if !ok {
-		return nil, false
-	}
-
-	return makePrecompile(module.Contract), true
+	return makePrecompile(warp.WarpPrecompile), true
 }
 
 type accessibleState struct {
@@ -224,7 +218,7 @@ func (a accessibleState) GetBlockContext() contract.BlockContext {
 
 func (a accessibleState) GetRules() precompileconfig.Rules {
 	chainConfigExtra := GetExtra(a.GetPrecompileEnv().ChainConfig())
-	return chainConfigExtra.GetAvalancheRules(a.GetBlockContext().Timestamp())
+	return chainConfigExtra.Rules(a.GetBlockContext().Timestamp())
 }
 
 func (a accessibleState) GetSnowContext() *snow.Context {

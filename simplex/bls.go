@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/simplex"
+	"github.com/ava-labs/simplex/common"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
@@ -21,7 +21,10 @@ var (
 	errFailedToParseSignature      = errors.New("failed to parse signature")
 )
 
-var _ simplex.Signer = (*BLSSigner)(nil)
+var (
+	_ common.Signer            = (*BLSSigner)(nil)
+	_ common.SignatureVerifier = (*BLSVerifier)(nil)
+)
 
 type SignFunc func(msg []byte) (*bls.Signature, error)
 
@@ -58,7 +61,7 @@ func NewBLSAuth(config *Config) (BLSSigner, BLSVerifier, error) {
 
 // Sign returns a signature on the given message using BLS signature scheme.
 // It encodes the message to sign with the chain ID, and network ID,
-func (s *BLSSigner) Sign(message []byte) ([]byte, error) {
+func (s *BLSSigner) Sign(message []byte) (common.SignatureBytes, error) {
 	message2Sign, err := encodeMessageToSign(message, s.chainID, s.networkID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode message to sign: %w", err)
@@ -88,7 +91,8 @@ func encodeMessageToSign(message []byte, chainID ids.ID, networkID uint32) ([]by
 	return Codec.Marshal(CodecVersion, &encodedSimplexMessage)
 }
 
-func (v BLSVerifier) Verify(message []byte, signature []byte, signer simplex.NodeID) error {
+func (v BLSVerifier) VerifySignature(message []byte, signature common.SignatureBytes, signer common.PublicKeyBytes) error {
+	// TODO: update BLSVerify to just use signer. No need to convert to NodeID anymore.
 	key, err := ids.ToNodeID(signer)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errInvalidNodeID, err)

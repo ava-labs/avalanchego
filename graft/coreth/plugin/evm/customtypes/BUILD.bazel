@@ -20,9 +20,10 @@ go_library(
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes",
     deps = [
-        "//graft/coreth/params/extras",
         "//utils/wrappers",
         "//vms/evm/acp226",
+        "//vms/evm/predicate",
+        "//vms/saevm/cchain/cparams",
         "//vms/saevm/cchain/dynamic",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",
@@ -45,10 +46,10 @@ graft_go_test(
     ],
     embed = [":customtypes"],
     deps = [
-        "//graft/coreth/params/extras",
         "//graft/evm/utils",
         "//utils/wrappers",
         "//vms/evm/acp226",
+        "//vms/saevm/cchain/cparams",
         "//vms/saevm/cchain/dynamic",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/math",

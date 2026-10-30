@@ -6,6 +6,23 @@ fixture](https://github.com/ava-labs/avalanchego/blob/master/tests/fixture/tmpne
 default both test suites use the tmpnet fixture to create a temporary
 network that exists for only the duration of their execution.
 
+## Running the tests
+
+Run the suites from the root of the avalanchego repository with these tasks:
+
+```bash
+task bazel-test-load-subnet-evm
+task bazel-test-warp-subnet-evm
+```
+
+The tasks use Bazel to build AvalancheGo, the Subnet-EVM plugin, the test
+binary, and (for the load suite) the load simulator. The load suite requires
+the prebuilt simulator, so `ginkgo ./tests/load` does not work without these
+tasks. For task options, see
+[E2E and monitored test runners](../../../docs/bazel.md#e2e-and-monitored-test-runners).
+
+## Reusing a temporary network
+
 It is possible to create a temporary network that can be reused across
 test runs to minimize the setup cost involved:
 
