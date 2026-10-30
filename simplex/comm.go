@@ -23,7 +23,6 @@ import (
 var (
 	_               simplexcommon.Communication = (*Comm)(nil)
 	errNodeNotFound                             = errors.New("node not found in the validator list")
-	todoEqualWeight                             = uint64(1) // TODO: set in config
 )
 
 type Comm struct {
@@ -50,7 +49,7 @@ func NewComm(config *Config) (*Comm, error) {
 		node := simplexcommon.Node{
 			Id:     vd.NodeID[:],
 			PK:     vd.PublicKey,
-			Weight: todoEqualWeight,
+			Weight: uint64(1), // TODO: set equal weights for now
 		}
 
 		allNodes = append(allNodes, node)

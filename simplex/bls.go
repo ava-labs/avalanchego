@@ -91,7 +91,7 @@ func encodeMessageToSign(message []byte, chainID ids.ID, networkID uint32) ([]by
 	return Codec.Marshal(CodecVersion, &encodedSimplexMessage)
 }
 
-func (v BLSVerifier) Verify(message []byte, signature []byte, signer common.NodeID) error {
+func (v BLSVerifier) VerifySignature(message []byte, signature common.SignatureBytes, signer common.PublicKeyBytes) error {
 	key, err := ids.ToNodeID(signer)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errInvalidNodeID, err)
@@ -116,12 +116,6 @@ func (v BLSVerifier) Verify(message []byte, signature []byte, signer common.Node
 		return errSignatureVerificationFailed
 	}
 
-	return nil
-}
-
-// VerifySignature verifies that [signature] is a valid signature over [message] by the holder of [publicKey].
-func (BLSVerifier) VerifySignature(_ []byte, _ common.SignatureBytes, _ common.PublicKeyBytes) error {
-	// TODO: implement
 	return nil
 }
 
