@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -47,11 +48,26 @@ var errNoBlockContext = errors.New("no block context")
 
 var warpConfig = &corethwarp.Config{}
 
-// VerifyBlock verifies the predicates of every transaction in the block.
+// MessagesFromAccessList returns the Warp messages in list, in order. It returns
+// nil before Durango.
+func MessagesFromAccessList(isDurango bool, list types.AccessList) []predicate.Predicate {
+	if !isDurango {
+		return nil
+	}
+	var messages []predicate.Predicate
+	for _, tuple := range list {
+		if tuple.Address == corethwarp.ContractAddress {
+			messages = append(messages, tuple.StorageKeys)
+		}
+	}
+	return messages
+}
+
+// VerifyBlock verifies the Warp messages of every transaction in the block.
 func VerifyBlock(
 	snowContext *snow.Context,
 	blockContext *block.Context, // MAY be nil
-	rules predicate.Predicates,
+	rules corethparams.RulesExtra,
 	txs []*types.Transaction,
 ) (predicate.BlockResults, error) {
 	type result = lazyEntry[common.Hash, predicate.PrecompileResults]
@@ -65,8 +81,8 @@ func VerifyBlock(
 	)
 	eg.SetLimit(runtime.GOMAXPROCS(0))
 	for _, tx := range txs {
-		predicates := predicate.FromAccessList(rules, tx.AccessList())
-		if len(predicates) == 0 {
+		messages := MessagesFromAccessList(rules.IsDurango, tx.AccessList())
+		if len(messages) == 0 {
 			continue
 		}
 		if blockContext == nil {
@@ -74,13 +90,13 @@ func VerifyBlock(
 			// doesn't leak goroutines.
 			//
 			// This check exists inside the loop rather than outside so that we
-			// don't require a non-nil block context when there are no
-			// predicates to verify.
+			// don't require a non-nil block context when there are no Warp
+			// messages to verify.
 			return nil, errNoBlockContext
 		}
 		results = append(results, result{
 			key:   tx.Hash(),
-			value: verifyTx(pc, predicates, eg),
+			value: verifyTx(pc, messages, eg),
 		})
 	}
 	if err := eg.Wait(); err != nil {
@@ -111,59 +127,31 @@ func collect[K comparable, V any](entries []lazyEntry[K, V]) map[K]V {
 	return m
 }
 
-// verifyTx enqueues the verification of a transaction's predicates onto eg.
-// Each predicate is verified in its own goroutine.
-//
-// The predicate results MUST be collected after eg.Wait has returned.
-func verifyTx(
-	pc *precompileconfig.PredicateContext,
-	predicatesByAddress map[common.Address][]predicate.Predicate,
-	eg *errgroup.Group,
-) lazy[predicate.PrecompileResults] {
-	type result = lazyEntry[common.Address, set.Bits]
-	results := make([]result, 0, len(predicatesByAddress))
-	for address, predicates := range predicatesByAddress {
-		results = append(results, result{
-			key: address,
-			value: verifyContract(
-				pc,
-				warpConfig,
-				predicates,
-				eg,
-			),
-		})
-	}
-	return func() predicate.PrecompileResults {
-		return collect(results)
-	}
-}
-
-// verifyContract enqueues the verification of each of a contract's predicates
-// onto eg. Each predicate is verified in its own goroutine.
+// verifyTx enqueues the verification of a transaction's Warp messages onto eg.
+// Each message is verified in its own goroutine.
 //
 // The results MUST be collected after eg.Wait has returned.
-func verifyContract(
+func verifyTx(
 	pc *precompileconfig.PredicateContext,
-	contract precompileconfig.Predicater,
-	predicates []predicate.Predicate,
+	messages []predicate.Predicate,
 	eg *errgroup.Group,
-) lazy[set.Bits] {
-	failures := make([]bool, len(predicates))
-	for i, pred := range predicates {
+) lazy[predicate.PrecompileResults] {
+	failures := make([]bool, len(messages))
+	for i, msg := range messages {
 		eg.Go(func() error {
 			// TODO(StephenButtolph): Properly report unexpected errors when
 			// cleaning up the coreth precompile code.
-			failures[i] = contract.VerifyPredicate(pc, pred) != nil
+			failures[i] = warpConfig.VerifyPredicate(pc, msg) != nil
 			return nil
 		})
 	}
-	return func() set.Bits {
+	return func() predicate.PrecompileResults {
 		r := set.NewBits()
 		for i, failed := range failures {
 			if failed {
 				r.Add(i)
 			}
 		}
-		return r
+		return predicate.PrecompileResults{corethwarp.ContractAddress: r}
 	}
 }

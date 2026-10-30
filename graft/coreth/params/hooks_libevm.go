@@ -73,14 +73,11 @@ func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
 }
 
 // warpPredicaters charges for Warp predicates, which are the only predicates.
+//
+// TODO(JonathanOppenheimer): Charge Warp messages directly once the shared
+// predicate gas helper is replaced.
 var warpPredicaters = map[common.Address]evmprecompileconfig.Predicater{
 	warp.ContractAddress: &warp.Config{},
-}
-
-// HasPredicate reports whether addr's access-list entries are predicates, which
-// is only the case for the Warp precompile once Durango is active.
-func (r RulesExtra) HasPredicate(addr common.Address) bool {
-	return r.IsDurango && addr == warp.ContractAddress
 }
 
 // AccessListGas computes the intrinsic gas for an access list. Once Warp is
@@ -243,6 +240,6 @@ func (p *precompileBlockContext) Timestamp() uint64 {
 	return p.time
 }
 
-func (p *precompileBlockContext) GetPredicateResults(txHash common.Hash, precompileAddress common.Address) set.Bits {
-	return p.predicateResults.Get(txHash, precompileAddress)
+func (p *precompileBlockContext) GetWarpMessageResults(txHash common.Hash) set.Bits {
+	return p.predicateResults.Get(txHash, warp.ContractAddress)
 }
