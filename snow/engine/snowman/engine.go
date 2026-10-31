@@ -398,7 +398,11 @@ func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32,
 
 func (e *Engine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	lastAcceptedID, lastAcceptedHeight, ok := e.acceptedFrontiers.LastAccepted(nodeID)
-	if ok {
+	// A block at or below our last accepted height is already decided, so a
+	// vote for it can't change consensus. Fetching such a block would only
+	// delay this poll and the polls after it.
+	_, ourLastAcceptedHeight := e.Consensus.LastAccepted()
+	if ok && lastAcceptedHeight > ourLastAcceptedHeight {
 		return e.Chits(ctx, nodeID, requestID, lastAcceptedID, lastAcceptedID, lastAcceptedHeight)
 	}
 
