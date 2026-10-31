@@ -1,0 +1,39 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+package(default_visibility = ["//vms/saevm/l1s:__subpackages__"])
+
+go_library(
+    name = "admission",
+    srcs = ["admission.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/l1s/admission",
+    deps = [
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/plugin/evm/vmerrors",
+        "//graft/subnet-evm/precompile/contracts/txallowlist",
+        "//vms/saevm/hook",
+        "@com_github_ava_labs_libevm//common",
+    ],
+)
+
+go_test(
+    name = "admission_test",
+    srcs = ["admission_test.go"],
+    embed = [":admission"],
+    deps = [
+        "//graft/evm/utils",
+        "//graft/subnet-evm/core/extstate",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/params/extras",
+        "//graft/subnet-evm/plugin/evm/vmerrors",
+        "//graft/subnet-evm/precompile/allowlist",
+        "//graft/subnet-evm/precompile/contracts/txallowlist",
+        "//vms/saevm/hook",
+        "//vms/saevm/l1s/libevm",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_stretchr_testify//require",
+    ],
+)
