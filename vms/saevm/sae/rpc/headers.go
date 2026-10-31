@@ -25,13 +25,17 @@ type responseHeaders struct {
 	hasGas bool
 }
 
-// setHeaders sets the accumulated headers on h. It has no effect if the
-// response has already been written.
-func (rh *responseHeaders) setHeaders(h http.Header) {
+// setHeaders sets the accumulated headers on h, along with errorCodes as counted
+// by [parseErrorCodes]. It has no effect if the response has already been
+// written.
+func (rh *responseHeaders) setHeaders(h http.Header, errorCodes map[int]int) {
 	rh.mu.Lock()
 	defer rh.mu.Unlock()
 	if rh.hasGas {
 		h.Set(GasUsedHeader, strconv.FormatUint(rh.gas, 10))
+	}
+	if v := formatErrorCodesHeader(errorCodes); v != "" {
+		h.Set(ErrorCodesHeader, v)
 	}
 }
 
@@ -46,26 +50,27 @@ func withResponseHeaders(next http.Handler) http.Handler {
 		// headers are still unsent. The libevm RPC server waits for all calls
 		// before returning, so no more updates can arrive. If a response was
 		// written, this has no effect.
-		rh.setHeaders(w.Header())
+		rh.setHeaders(w.Header(), nil)
 	})
 }
 
 var _ http.ResponseWriter = (*headerWriter)(nil)
 
 // headerWriter sets the headers in [responseHeaders] immediately before the
-// response header is written.
+// response header is written. The libevm RPC server writes each response,
+// batches included, in a single call to Write.
 type headerWriter struct {
 	http.ResponseWriter
 	headers *responseHeaders
 }
 
 func (w *headerWriter) WriteHeader(code int) {
-	w.headers.setHeaders(w.Header())
+	w.headers.setHeaders(w.Header(), nil)
 	w.ResponseWriter.WriteHeader(code)
 }
 
 func (w *headerWriter) Write(b []byte) (int, error) {
-	w.headers.setHeaders(w.Header())
+	w.headers.setHeaders(w.Header(), parseErrorCodes(b))
 	return w.ResponseWriter.Write(b)
 }
 
