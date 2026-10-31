@@ -1,0 +1,31 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "solanarpc",
+    srcs = [
+        "rpc.go",
+        "verifier.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/sidecar/solanarpc",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//network/p2p/oracle",
+        "@com_github_mr_tron_base58//:base58",
+    ],
+)
+
+go_test(
+    name = "solanarpc_test",
+    srcs = [
+        "integration_test.go",
+        "verifier_test.go",
+    ],
+    embed = [":solanarpc"],
+    deps = [
+        "//network/p2p/oracle",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_mr_tron_base58//:base58",
+        "@com_github_stretchr_testify//require",
+    ],
+)
