@@ -18,11 +18,14 @@
 ### Metrics
 
 - SAE state sync scores peers separately for each sync protocol, so `avalanche_evm_p2p_peer_tracker_{num_tracked_peers,num_responsive_peers,average_bandwidth}` are replaced by one set per protocol: `avalanche_evm_p2p_peer_tracker_<protocol>_*` with `<protocol>` one of `leaf`, `code`, `block` or `cchain_leaf`.
+- Added `avalanche_snowman_num_decided_gets_skipped`, the number of block requests Snowman did not send because a `Put` had already shown the block to be decided.
 
 ### Fixes
 
 - Fixed C-Chain log queries (`eth_getLogs`, `eth_getFilterLogs`) failing with `failed to get logs for block #N` when the range reached an accepted block that had not yet executed. Range queries now stop at the last executed block, and `blockHash` queries for an unexecuted block return `unknown block`.
 - Fixed `admin.stopCPUProfiler` leaving mutex profiling enabled, which kept recording mutex contention until the node restarted.
+- Fixed Snowman delaying polls after a failed query by requesting the peer's last accepted block when that block is at or below the local last accepted height.
+- Fixed Snowman requesting a block again after a `Put` had shown it to be decided. The IDs of the 1024 most recent such blocks are remembered.
 
 ## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
 

@@ -35,6 +35,7 @@ import (
 
 const (
 	nonVerifiedCacheSize = 64 * units.MiB
+	decidedIDsSize       = 1024
 	errInsufficientStake = "insufficient connected stake"
 )
 
@@ -93,6 +94,11 @@ type Engine struct {
 	// number of times build block needs to be called once the number of
 	// processing blocks has gone below the optimal number.
 	pendingBuildBlocks int
+
+	// decidedIDs holds the IDs of the most recent blocks that a Put showed to
+	// be decided. A decided block is never issued, so a Get for one of these
+	// blocks is not sent.
+	decidedIDs *lru.Cache[ids.ID, struct{}]
 }
 
 func New(config Config) (*Engine, error) {
@@ -152,6 +158,7 @@ func New(config Config) (*Engine, error) {
 		polls:                       polls,
 		blkReqs:                     bimap.New[common.Request, ids.ID](),
 		blkReqSourceMetric:          make(map[common.Request]prometheus.Counter),
+		decidedIDs:                  lru.NewCache[ids.ID, struct{}](decidedIDsSize),
 	}, nil
 }
 
@@ -265,6 +272,11 @@ func (e *Engine) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, b
 
 	if !e.shouldIssueBlock(blk) {
 		e.metrics.numUselessPutBytes.Add(float64(len(blkBytes)))
+	}
+	// Remember a decided block, so that a later Chits naming it, or a child
+	// whose parent it is, does not request it again.
+	if e.isDecided(blk) {
+		e.decidedIDs.Put(blk.ID(), struct{}{})
 	}
 
 	// issue the block into consensus. If the block has already been issued,
@@ -398,7 +410,11 @@ func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32,
 
 func (e *Engine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {
 	lastAcceptedID, lastAcceptedHeight, ok := e.acceptedFrontiers.LastAccepted(nodeID)
-	if ok {
+	// A block at or below our last accepted height is already decided, so a
+	// vote for it can't change consensus. Fetching such a block would only
+	// delay this poll and the polls after it.
+	_, ourLastAcceptedHeight := e.Consensus.LastAccepted()
+	if ok && lastAcceptedHeight > ourLastAcceptedHeight {
 		return e.Chits(ctx, nodeID, requestID, lastAcceptedID, lastAcceptedID, lastAcceptedHeight)
 	}
 
@@ -694,9 +710,7 @@ func (e *Engine) issueFromByID(
 ) error {
 	blk, err := e.getBlock(ctx, blkID)
 	if err != nil {
-		// If the block is not locally available, request it from the peer.
-		e.sendRequest(ctx, nodeID, blkID, issuedMetric)
-		return nil //nolint:nilerr
+		return e.requestOrRelease(ctx, nodeID, blkID, issuedMetric)
 	}
 	return e.issueFrom(ctx, nodeID, blk, issuedMetric)
 }
@@ -722,12 +736,33 @@ func (e *Engine) issueFrom(
 		blkID = blk.Parent()
 		blk, err = e.getBlock(ctx, blkID)
 		if err != nil {
-			// If the block is not locally available, request it from the peer.
-			e.sendRequest(ctx, nodeID, blkID, issuedMetric)
-			return nil //nolint:nilerr
+			return e.requestOrRelease(ctx, nodeID, blkID, issuedMetric)
 		}
 	}
 
+	return e.releaseBlock(ctx, blkID)
+}
+
+// requestOrRelease requests [blkID] from [nodeID], unless a Put already showed
+// the block to be decided. A decided block is never issued, so it is then
+// handled as a stored decided block is: see releaseBlock.
+func (e *Engine) requestOrRelease(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	blkID ids.ID,
+	issuedMetric prometheus.Counter,
+) error {
+	if _, ok := e.decidedIDs.Get(blkID); ok {
+		e.metrics.numDecidedGetsSkipped.Inc()
+		return e.releaseBlock(ctx, blkID)
+	}
+	e.sendRequest(ctx, nodeID, blkID, issuedMetric)
+	return nil
+}
+
+// releaseBlock removes any outstanding request for [blkID] and, unless [blkID]
+// is pending, abandons the work blocked on it.
+func (e *Engine) releaseBlock(ctx context.Context, blkID ids.ID) error {
 	// Remove any outstanding requests for this block
 	if req, ok := e.blkReqs.DeleteValue(blkID); ok {
 		delete(e.blkReqSourceMetric, req)

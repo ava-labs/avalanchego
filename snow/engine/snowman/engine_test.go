@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -3344,4 +3345,305 @@ type mockPChainProgressUpdater struct {
 
 func (m *mockPChainProgressUpdater) SetProgress(height uint64) {
 	m.setProgressF(height)
+}
+
+// setLastAccepted makes [blk] the last accepted block of [te].
+func setLastAccepted(t *testing.T, te *Engine, blk snowman.Block) {
+	ctx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.CChainID))
+	require.NoError(t, te.Consensus.Initialize(ctx, te.Params, blk.ID(), blk.Height(), blk.Timestamp()))
+}
+
+func TestEngineQueryFailedRequestsOnlyBlocksAboveLastAccepted(t *testing.T) {
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 3)
+	lastAccepted := chain[1]
+	otherAtLastAcceptedHeight := snowmantest.BuildChild(chain[0])
+
+	tests := []struct {
+		name string
+		// peerLastAccepted is the block the peer last reported as accepted, or
+		// nil if the peer never reported one.
+		peerLastAccepted *snowmantest.Block
+		expectedGets     []ids.ID
+		expectedPolls    int
+	}{
+		{
+			name:             "unknown peer",
+			peerLastAccepted: nil,
+			expectedGets:     nil,
+			expectedPolls:    0,
+		},
+		{
+			name:             "peer below last accepted",
+			peerLastAccepted: chain[0],
+			expectedGets:     nil,
+			expectedPolls:    0,
+		},
+		{
+			name:             "peer on another block at last accepted height",
+			peerLastAccepted: otherAtLastAcceptedHeight,
+			expectedGets:     nil,
+			expectedPolls:    0,
+		},
+		{
+			name:             "peer on last accepted",
+			peerLastAccepted: lastAccepted,
+			expectedGets:     nil,
+			expectedPolls:    0,
+		},
+		{
+			name:             "peer above last accepted",
+			peerLastAccepted: chain[2],
+			expectedGets:     []ids.ID{chain[2].ID()},
+			expectedPolls:    1,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
+			setLastAccepted(t, te, lastAccepted)
+			vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+				switch blkID {
+				case snowmantest.GenesisID:
+					return snowmantest.Genesis, nil
+				case lastAccepted.ID():
+					return lastAccepted, nil
+				default:
+					return nil, errUnknownBlock
+				}
+			}
+
+			if test.peerLastAccepted != nil {
+				// Genesis is stored, so this records the peer's last accepted
+				// block without sending a Get.
+				require.NoError(te.Chits(t.Context(), vdr, 1, snowmantest.GenesisID, test.peerLastAccepted.ID(), test.peerLastAccepted.Height()))
+			}
+
+			var gets []ids.ID
+			sender.SendGetF = func(_ context.Context, _ ids.NodeID, _ uint32, blkID ids.ID) {
+				gets = append(gets, blkID)
+			}
+			const requestID = 2
+			require.True(te.polls.Add(requestID, bag.Of(vdr)))
+
+			require.NoError(te.QueryFailed(t.Context(), vdr, requestID))
+			require.Equal(test.expectedGets, gets)
+			require.Equal(test.expectedPolls, te.polls.Len())
+		})
+	}
+}
+
+func TestEnginePutRemembersOnlyDecidedBlocks(t *testing.T) {
+	h1 := snowmantest.BuildChild(snowmantest.Genesis)
+	lastAccepted := snowmantest.BuildChild(h1)
+	rejected := snowmantest.BuildChild(h1)
+
+	tests := []struct {
+		name       string
+		blk        *snowmantest.Block
+		remembered bool
+	}{
+		{
+			name:       "block below last accepted",
+			blk:        h1,
+			remembered: true,
+		},
+		{
+			name:       "another block at last accepted height",
+			blk:        rejected,
+			remembered: true,
+		},
+		{
+			name:       "child of a rejected block",
+			blk:        snowmantest.BuildChild(rejected),
+			remembered: true,
+		},
+		{
+			name:       "child of last accepted",
+			blk:        snowmantest.BuildChild(lastAccepted),
+			remembered: false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
+			setLastAccepted(t, te, lastAccepted)
+			vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+				if blkID == lastAccepted.ID() {
+					return lastAccepted, nil
+				}
+				return nil, errUnknownBlock
+			}
+			vm.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
+				return test.blk, nil
+			}
+			// An undecided block is issued and queried.
+			sender.SendPullQueryF = func(context.Context, set.Set[ids.NodeID], uint32, ids.ID, uint64) {}
+			sender.SendPushQueryF = func(context.Context, set.Set[ids.NodeID], uint32, []byte, uint64) {}
+
+			// A Put with no matching request is still remembered.
+			require.NoError(te.Put(t.Context(), vdr, 0, test.blk.Bytes()))
+			_, ok := te.decidedIDs.Get(test.blk.ID())
+			require.Equal(test.remembered, ok)
+		})
+	}
+}
+
+func TestEngineDecidedBlockNotRequestedAgain(t *testing.T) {
+	require := require.New(t)
+
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 2)
+	decided, lastAccepted := chain[0], chain[1]
+	setLastAccepted(t, te, lastAccepted)
+	vm.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
+		return nil, errUnknownBlock
+	}
+	vm.ParseBlockF = func(context.Context, []byte) (snowman.Block, error) {
+		return decided, nil
+	}
+
+	var (
+		gets      int
+		requestID uint32
+	)
+	sender.SendGetF = func(_ context.Context, _ ids.NodeID, reqID uint32, blkID ids.ID) {
+		require.Equal(decided.ID(), blkID)
+		gets++
+		requestID = reqID
+	}
+
+	require.NoError(te.Chits(t.Context(), vdr, 1, decided.ID(), decided.ID(), decided.Height()))
+	require.Equal(1, gets)
+
+	require.NoError(te.Put(t.Context(), vdr, requestID, decided.Bytes()))
+	require.NoError(te.Chits(t.Context(), vdr, 2, decided.ID(), decided.ID(), decided.Height()))
+	require.Equal(1, gets, "a block a Put showed to be decided must not be requested again")
+	require.Equal(1.0, testutil.ToFloat64(te.metrics.numDecidedGetsSkipped))
+}
+
+func TestEngineDecidedParentNotRequestedAgain(t *testing.T) {
+	require := require.New(t)
+
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
+	h1 := snowmantest.BuildChild(snowmantest.Genesis)
+	lastAccepted := snowmantest.BuildChild(h1)
+	rejected := snowmantest.BuildChild(h1)
+	parent := snowmantest.BuildChild(rejected)
+	child := snowmantest.BuildChild(parent)
+	setLastAccepted(t, te, lastAccepted)
+
+	byBytes := map[string]snowman.Block{
+		string(parent.Bytes()): parent,
+		string(child.Bytes()):  child,
+	}
+	vm.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
+		return nil, errUnknownBlock
+	}
+	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
+		blk, ok := byBytes[string(blkBytes)]
+		if !ok {
+			return nil, errUnknownBlock
+		}
+		return blk, nil
+	}
+
+	var (
+		requested  []ids.ID
+		requestIDs []uint32
+	)
+	sender.SendGetF = func(_ context.Context, _ ids.NodeID, reqID uint32, blkID ids.ID) {
+		requested = append(requested, blkID)
+		requestIDs = append(requestIDs, reqID)
+	}
+
+	require.NoError(te.Put(t.Context(), vdr, 0, parent.Bytes()))
+	require.NoError(te.Chits(t.Context(), vdr, 1, child.ID(), child.ID(), child.Height()))
+	require.Equal([]ids.ID{child.ID()}, requested)
+
+	require.NoError(te.Put(t.Context(), vdr, requestIDs[0], child.Bytes()))
+	require.Equal([]ids.ID{child.ID()}, requested, "a decided parent must not be requested again")
+	require.Empty(te.pending, "the child must not be left pending")
+	require.Zero(te.blocked.NumDependencies(), "the child must not be left waiting on its parent")
+	require.Zero(te.blkReqs.Len())
+	require.Equal(1.0, testutil.ToFloat64(te.metrics.numDecidedGetsSkipped))
+}
+
+func TestEngineDecidedBlockSkipReleasesWaitingPoll(t *testing.T) {
+	require := require.New(t)
+
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 2)
+	decided, lastAccepted := chain[0], chain[1]
+	setLastAccepted(t, te, lastAccepted)
+	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		if blkID == snowmantest.GenesisID {
+			return snowmantest.Genesis, nil
+		}
+		return nil, errUnknownBlock
+	}
+
+	var requested []ids.ID
+	sender.SendGetF = func(_ context.Context, _ ids.NodeID, _ uint32, blkID ids.ID) {
+		requested = append(requested, blkID)
+	}
+
+	require.True(te.polls.Add(1, bag.Of(vdr)))
+	require.NoError(te.Chits(t.Context(), vdr, 1, decided.ID(), decided.ID(), decided.Height()))
+	require.Equal([]ids.ID{decided.ID()}, requested)
+	require.Equal(1, te.polls.Len())
+
+	// A Put of the block would remove the outstanding request itself, so the
+	// block is marked as decided directly.
+	te.decidedIDs.Put(decided.ID(), struct{}{})
+
+	require.NoError(te.Chits(t.Context(), vdr, 2, decided.ID(), decided.ID(), decided.Height()))
+	require.Equal([]ids.ID{decided.ID()}, requested, "the decided block must not be requested again")
+	require.False(te.blkReqs.HasValue(decided.ID()), "the outstanding request must be removed")
+	require.Zero(te.polls.Len(), "the poll waiting on the block must finish")
+	require.Equal(1.0, testutil.ToFloat64(te.metrics.numDecidedGetsSkipped))
+}
+
+func TestEngineDecidedIDsBounded(t *testing.T) {
+	require := require.New(t)
+
+	vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, decidedIDsSize+2)
+	decided, lastAccepted := chain[:decidedIDsSize+1], chain[decidedIDsSize+1]
+	setLastAccepted(t, te, lastAccepted)
+
+	byBytes := make(map[string]snowman.Block, len(decided))
+	for _, blk := range decided {
+		byBytes[string(blk.Bytes())] = blk
+	}
+	vm.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
+		return nil, errUnknownBlock
+	}
+	vm.ParseBlockF = func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
+		blk, ok := byBytes[string(blkBytes)]
+		if !ok {
+			return nil, errUnknownBlock
+		}
+		return blk, nil
+	}
+
+	for _, blk := range decided {
+		require.NoError(te.Put(t.Context(), vdr, 0, blk.Bytes()))
+	}
+	require.Equal(decidedIDsSize, te.decidedIDs.Len())
+
+	var requested []ids.ID
+	sender.SendGetF = func(_ context.Context, _ ids.NodeID, _ uint32, blkID ids.ID) {
+		requested = append(requested, blkID)
+	}
+
+	oldest, newest := decided[0], decided[decidedIDsSize]
+	require.NoError(te.Chits(t.Context(), vdr, 1, oldest.ID(), oldest.ID(), oldest.Height()))
+	require.Equal([]ids.ID{oldest.ID()}, requested, "the evicted oldest ID must be requested again")
+
+	require.NoError(te.Chits(t.Context(), vdr, 2, newest.ID(), newest.ID(), newest.Height()))
+	require.Equal([]ids.ID{oldest.ID()}, requested, "the newest ID must still be remembered")
 }
