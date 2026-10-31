@@ -6,6 +6,7 @@ go_library(
     srcs = [
         "errors.go",
         "factory.go",
+        "log_config.go",
         "vm.go",
         "vm_client.go",
         "vm_server.go",
@@ -69,6 +70,7 @@ go_test(
     name = "rpcchainvm_test",
     srcs = [
         "batched_vm_test.go",
+        "log_config_test.go",
         "state_syncable_vm_test.go",
         "vm_test.go",
         "with_context_vm_test.go",
@@ -99,6 +101,8 @@ go_test(
         "//vms/rpcchainvm/runtime/subprocess",
         "@com_github_stretchr_testify//require",
         "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//codes",
+        "@org_golang_google_grpc//status",
         "@org_golang_google_grpc//test/bufconn",
         "@org_uber_go_mock//gomock",
     ],

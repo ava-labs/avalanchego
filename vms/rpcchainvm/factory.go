@@ -25,6 +25,7 @@ type factory struct {
 	processTracker  resource.ProcessTracker
 	runtimeTracker  runtime.Tracker
 	metricsGatherer metrics.MultiGatherer
+	logConfig       logging.Config
 }
 
 func NewFactory(
@@ -32,12 +33,14 @@ func NewFactory(
 	processTracker resource.ProcessTracker,
 	runtimeTracker runtime.Tracker,
 	metricsGatherer metrics.MultiGatherer,
+	logConfig logging.Config,
 ) vms.Factory {
 	return &factory{
 		path:            path,
 		processTracker:  processTracker,
 		runtimeTracker:  runtimeTracker,
 		metricsGatherer: metricsGatherer,
+		logConfig:       logConfig,
 	}
 }
 
@@ -72,5 +75,5 @@ func (f *factory) New(log logging.Logger) (interface{}, error) {
 
 	f.processTracker.TrackProcess(status.Pid)
 	f.runtimeTracker.TrackRuntime(stopper)
-	return NewClient(clientConn, stopper, status.Pid, f.processTracker, f.metricsGatherer, log), nil
+	return NewClient(clientConn, stopper, status.Pid, f.processTracker, f.metricsGatherer, log, f.logConfig), nil
 }
