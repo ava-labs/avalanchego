@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
@@ -32,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -159,18 +161,26 @@ func TestSendWarpMessage(t *testing.T) {
 }
 
 // forwardAndLogCode returns runtime bytecode that forwards its calldata to
-// callee and emits the returned data as a log.
-func forwardAndLogCode(tb testing.TB, callee common.Address) []byte {
+// callee with op, CALL or DELEGATECALL, and emits the returned data as a log.
+func forwardAndLogCode(
+	tb testing.TB,
+	op vm.OpCode,
+	callee common.Address,
+) []byte {
 	tb.Helper()
+	var value []byte
+	if op == vm.CALL {
+		value = saetest.Ops(vm.PUSH0)
+	}
 	return slices.Concat(
 		// mem[0:cds) = calldata
 		saetest.Ops(vm.CALLDATASIZE, vm.PUSH0, vm.PUSH0, vm.CALLDATACOPY),
 		// call callee with mem[0:cds) as input
 		saetest.Ops(vm.PUSH0, vm.PUSH0),        // return size + offset; read via RETURNDATACOPY instead
 		saetest.Ops(vm.CALLDATASIZE, vm.PUSH0), // input size + offset
-		saetest.Ops(vm.PUSH0),                  // value
+		value,
 		saetest.Push(tb, callee[:]),
-		saetest.Ops(vm.GAS, vm.CALL),
+		saetest.Ops(vm.GAS, op),
 		saetest.Ops(vm.POP), // discard the success flag
 		// mem[0:rds) = return data
 		saetest.Ops(vm.RETURNDATASIZE, vm.PUSH0, vm.PUSH0, vm.RETURNDATACOPY),
@@ -204,7 +214,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 	)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(wallet.Addresses()...),
-		withAccount(warpLogger, types.Account{Code: forwardAndLogCode(t, corethwarp.ContractAddress)}),
+		withAccount(warpLogger, types.Account{Code: forwardAndLogCode(t, vm.CALL, corethwarp.ContractAddress)}),
 		withValidators(vdrs),
 	)
 
@@ -355,6 +365,70 @@ func TestReceiveWarpMessage(t *testing.T) {
 			require.Lenf(t, receipt.Logs, 1, "%T.Logs", receipt)
 			log := receipt.Logs[0]
 			assert.Equalf(t, tt.wantLogData, log.Data, "%T.Data (warp precompile output)", log)
+		})
+	}
+}
+
+// Verifies that delegate calls into the warp precompile revert instead
+// of invalidating the transaction, which stops SAE.
+func TestDelegateCallIntoWarpReverts(t *testing.T) {
+	tests := []struct {
+		name             string
+		op               vm.OpCode
+		wantBlockchainID bool
+	}{
+		{
+			name:             "call",
+			op:               vm.CALL,
+			wantBlockchainID: true,
+		},
+		{
+			name: "delegate_call",
+			op:   vm.DELEGATECALL,
+		},
+	}
+
+	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
+	// From this time, coreth invalidates delegate calls unless Granite reverts them first.
+	vmTime, _ := withVMTime(time.Unix(corethparams.InvalidateDelegateUnix, 0))
+	opts := []sutOption{vmTime, withMaxAllocFor(wallet.Addresses()...)}
+	callers := make([]common.Address, len(tests))
+	for i, tt := range tests {
+		callers[i] = common.Address{'c', 'a', 'l', 'l', 'e', 'r', byte(i)}
+		code := forwardAndLogCode(t, tt.op, corethwarp.ContractAddress)
+		opts = append(opts, withAccount(callers[i], types.Account{Code: code}))
+	}
+	ctx, sut := newSUT(t, opts...)
+
+	getBlockchainID, err := corethwarp.PackGetBlockchainID()
+	require.NoError(t, err, "corethwarp.PackGetBlockchainID()")
+	blockchainID, err := corethwarp.PackGetBlockchainIDOutput(common.Hash(sut.ctx.ChainID))
+	require.NoError(t, err, "corethwarp.PackGetBlockchainIDOutput()")
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+				To:        &callers[i],
+				Gas:       1_000_000,
+				GasFeeCap: big.NewInt(1),
+				Data:      getBlockchainID,
+			})
+			require.NoError(t, sut.ethclient.SendTransaction(ctx, tx), "SendTransaction()")
+
+			sut.waitForPendingEthTxs(ctx, t, tx)
+			built := sut.runConsensusLoop(ctx, t, withBlockContext(&block.Context{}))
+			receipts := built.Receipts()
+			require.Lenf(t, receipts, 1, "%T.Receipts()", built)
+			receipt := receipts[0]
+			require.Equalf(t, types.ReceiptStatusSuccessful, receipt.Status, "%T.Status", receipt)
+			require.Lenf(t, receipt.Logs, 1, "%T.Logs", receipt)
+
+			// A reverted delegate call returns no data.
+			var want []byte
+			if tt.wantBlockchainID {
+				want = blockchainID
+			}
+			assert.Equalf(t, want, receipt.Logs[0].Data, "%T.Data (warp precompile output)", receipt.Logs[0])
 		})
 	}
 }
