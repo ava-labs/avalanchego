@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -381,6 +382,25 @@ const (
 	maxFutureBlockDuration        = time.Duration(maxFutureBlockSeconds) * time.Second
 )
 
+// mempoolSettled returns the block that a block built now on the preference
+// would settle, or nil before [saeparams.Tau] or while execution lags.
+func mempoolSettled(
+	now func() time.Time,
+	preference *atomic.Pointer[blocks.Block],
+) func() *blocks.Block {
+	return func() *blocks.Block {
+		t := now()
+		if t.Unix() < saeparams.TauSeconds {
+			return nil
+		}
+		b, ok := blocks.LastToSettleAt(t.Add(-saeparams.Tau), preference.Load())
+		if !ok {
+			return nil
+		}
+		return b
+	}
+}
+
 func lastToSettle(
 	hooks hook.Points,
 	hdr *types.Header,
@@ -406,10 +426,7 @@ func lastToSettle(
 	}
 
 	// Underflow of Add(-tau) is prevented by the above check.
-	lastSettled, ok, err := blocks.LastToSettleAt(bTime.Add(-saeparams.Tau), parent)
-	if err != nil {
-		return nil, err
-	}
+	lastSettled, ok := blocks.LastToSettleAt(bTime.Add(-saeparams.Tau), parent)
 	if !ok {
 		log.Debug("Execution lagging when determining last block to settle")
 		return nil, errExecutionLagging
