@@ -8,6 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
@@ -19,6 +20,21 @@ type messageQueueMetrics struct {
 	count             *prometheus.GaugeVec
 	nodesWithMessages prometheus.Gauge
 	numExcessiveCPU   prometheus.Counter
+
+	// countByOp holds the children of count, resolved once per op so that
+	// pushing and popping a message avoids allocating and hashing a label
+	// set.
+	countByOp [message.NumOps]prometheus.Gauge
+}
+
+// countOf returns the gauge tracking queued messages with op.
+func (m *messageQueueMetrics) countOf(op message.Op) prometheus.Gauge {
+	if op >= message.NumOps {
+		// Only defined ops are expected here, but an undefined op MUST NOT
+		// panic the node, so resolve its labels the slow way.
+		return m.count.WithLabelValues(op.String())
+	}
+	return m.countByOp[op]
 }
 
 func (m *messageQueueMetrics) initialize(
@@ -44,6 +60,9 @@ func (m *messageQueueMetrics) initialize(
 		Name:      "excessive_cpu",
 		Help:      "times a message has been deferred due to excessive CPU usage",
 	})
+	for op := range message.NumOps {
+		m.countByOp[op] = m.count.WithLabelValues(op.String())
+	}
 
 	return errors.Join(
 		metricsRegisterer.Register(m.count),
