@@ -251,8 +251,10 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		return
 	}
 
-	h.nf = common.NewNotificationForwarder(h, h.subscription, h.ctx.Log)
-	h.cn.OnChange = h.nf.CheckForEvent
+	if h.cn != nil {
+		h.nf = common.NewNotificationForwarder(h, h.subscription, h.ctx.Log)
+		h.cn.OnChange = h.nf.CheckForEvent
+	}
 
 	h.ctx.Lock.Lock()
 	err = gear.Start(ctx, 0)
