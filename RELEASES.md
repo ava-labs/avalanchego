@@ -23,6 +23,7 @@
 
 - Fixed C-Chain log queries (`eth_getLogs`, `eth_getFilterLogs`) failing with `failed to get logs for block #N` when the range reached an accepted block that had not yet executed. Range queries now stop at the last executed block, and `blockHash` queries for an unexecuted block return `unknown block`.
 - Fixed `admin.stopCPUProfiler` leaving mutex profiling enabled, which kept recording mutex contention until the node restarted.
+- Fixed the order in which the C-Chain block builder considers pending transactions. They are now merged per sender, by effective gas tip, then first-seen time, as geth orders them. The previous sort's output depended on map iteration order: it could put transactions out of tip order, equal tips out of arrival order, and a sender's later nonce before an earlier one, which left that nonce out of the block.
 
 ## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
 
