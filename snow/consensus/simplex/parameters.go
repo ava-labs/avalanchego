@@ -39,10 +39,6 @@ var DefaultParameters = Parameters{
 }
 
 // Verify returns nil if the parameters are valid.
-//
-// If any condition is violated, the returned error is the [errors.Join] of
-// one error per violated condition, each wrapping [ErrInvalidParameters],
-// rather than only the first violation.
 func (p Parameters) Verify() error {
 	var errs []error
 	if p.MaxNetworkDelay <= 0 {

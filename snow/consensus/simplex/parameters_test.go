@@ -113,26 +113,13 @@ func joinedErrs(t *testing.T, err error) []error {
 }
 
 func TestParametersVerifyErrorMessage(t *testing.T) {
-	tests := []struct {
-		name            string
-		params          Parameters
-		expectedMessage string
-	}{
-		{
-			name: "single violation",
-			params: Parameters{
-				MaxNetworkDelay:    0,
-				MaxRebroadcastWait: time.Second,
-				InitialValidators:  []ValidatorInfo{{}},
-			},
-			expectedMessage: "simplex parameters must be valid: maxNetworkDelay must be positive",
-		},
+	params := Parameters{
+		MaxNetworkDelay:    0,
+		MaxRebroadcastWait: time.Second,
+		InitialValidators:  []ValidatorInfo{{}},
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			err := test.params.Verify()
-			require.ErrorIs(t, err, ErrInvalidParameters)
-			require.Equal(t, test.expectedMessage, err.Error())
-		})
-	}
+
+	err := params.Verify()
+	require.ErrorIs(t, err, ErrInvalidParameters)
+	require.Equal(t, "simplex parameters must be valid: maxNetworkDelay must be positive", err.Error())
 }

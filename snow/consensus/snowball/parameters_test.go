@@ -270,48 +270,20 @@ func joinedErrs(t *testing.T, err error) []error {
 }
 
 func TestParametersVerifyErrorMessage(t *testing.T) {
-	tests := []struct {
-		name            string
-		params          Parameters
-		expectedMessage string
-	}{
-		{
-			name: "single violation",
-			params: Parameters{
-				K:                     1,
-				AlphaPreference:       1,
-				AlphaConfidence:       1,
-				Beta:                  1,
-				ConcurrentRepolls:     0,
-				OptimalProcessing:     1,
-				MaxOutstandingItems:   1,
-				MaxItemProcessingTime: 1,
-			},
-			expectedMessage: "parameters invalid: concurrentRepolls = 0: fails the condition that: 0 < concurrentRepolls",
-		},
-		{
-			name: "fun invalid alphaConfidence",
-			params: Parameters{
-				K:                     30,
-				AlphaPreference:       28,
-				AlphaConfidence:       3,
-				Beta:                  2,
-				ConcurrentRepolls:     1,
-				OptimalProcessing:     1,
-				MaxOutstandingItems:   1,
-				MaxItemProcessingTime: 1,
-			},
-			expectedMessage: "parameters invalid: alphaConfidence = 3, alphaPreference = 28: fails the condition that: alphaPreference <= alphaConfidence\n" +
-				errMsg,
-		},
+	params := Parameters{
+		K:                     1,
+		AlphaPreference:       1,
+		AlphaConfidence:       1,
+		Beta:                  1,
+		ConcurrentRepolls:     0,
+		OptimalProcessing:     1,
+		MaxOutstandingItems:   1,
+		MaxItemProcessingTime: 1,
 	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			err := test.params.Verify()
-			require.ErrorIs(t, err, ErrParametersInvalid)
-			require.Equal(t, test.expectedMessage, err.Error())
-		})
-	}
+
+	err := params.Verify()
+	require.ErrorIs(t, err, ErrParametersInvalid)
+	require.Equal(t, "parameters invalid: concurrentRepolls = 0: concurrentRepolls <= 0", err.Error())
 }
 
 func TestParametersMinPercentConnectedHealthy(t *testing.T) {
