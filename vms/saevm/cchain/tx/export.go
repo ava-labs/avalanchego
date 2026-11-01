@@ -6,14 +6,10 @@ package tx
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/holiman/uint256"
 
-	// Imported for [atomic.UnsignedExportTx.Burned] comment resolution.
-	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
@@ -23,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -40,6 +37,11 @@ type Export struct {
 	DestinationChain ids.ID                     `serialize:"true" json:"destinationChain"`
 	Ins              []Input                    `serialize:"true" json:"inputs"`
 	ExportedOutputs  []*avax.TransferableOutput `serialize:"true" json:"exportedOutputs"`
+}
+
+// SortExportedOutputs calls [avax.SortTransferableOutputs] with the local codec.
+func SortExportedOutputs(outs []*avax.TransferableOutput) {
+	avax.SortTransferableOutputs(outs, c)
 }
 
 // Input identifies an account + nonce pair on the C-Chain that authorizes the
@@ -81,9 +83,8 @@ func AccountInputID(address common.Address, nonce uint64) ids.ID {
 	return id
 }
 
-// Like [atomic.UnsignedExportTx.Burned], burned will error if the sum of the
-// inputs exceeds MaxUint64, even if the total amount burned could be
-// represented as a uint64.
+// burned will error if the sum of the inputs exceeds MaxUint64, even if the
+// total amount burned could be represented as a uint64.
 //
 // Because the total supply of AVAX fits in a uint64, this doesn't matter in
 // practice and allows for easier fuzzing.
@@ -153,9 +154,9 @@ func (e *Export) sanityCheck(ctx *snow.Context) error {
 	if !utils.IsSortedAndUnique(e.Ins) {
 		return errInputsNotSortedUnique
 	}
-	// Like [atomic.UnsignedExportTx.Verify], outputs aren't enforced to be
-	// unique. This is safe because each output's UTXO is keyed by txID and
-	// outputIndex, so duplicate outputs still produce distinct UTXOs.
+	// Outputs aren't enforced to be unique. This is safe because each output's
+	// UTXO is keyed by txID and outputIndex, so duplicate outputs still produce
+	// distinct UTXOs.
 	if !avax.IsSortedTransferableOutputs(e.ExportedOutputs, c) {
 		return errOutputsNotSorted
 	}
@@ -269,12 +270,12 @@ func (e *Export) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) 
 			continue
 		}
 
-		coinID := common.Hash(in.AssetID)
-		amount := new(big.Int).SetUint64(in.Amount)
-		if balance := statedb.GetBalanceMultiCoin(in.Address, coinID); balance.Cmp(amount) < 0 {
-			return fmt.Errorf("%w: address %s asset %s has %d want %d", errInsufficientFunds, in.Address, coinID, balance, amount)
+		assetID := common.Hash(in.AssetID)
+		amount := uint256.NewInt(in.Amount)
+		if balance := statedb.GetAssetBalance(in.Address, assetID); balance.Cmp(amount) < 0 {
+			return fmt.Errorf("%w: address %s asset %s has %d want %d", errInsufficientFunds, in.Address, assetID, balance, in.Amount)
 		}
-		statedb.SubBalanceMultiCoin(in.Address, coinID, amount)
+		statedb.SubAssetBalance(in.Address, assetID, amount)
 	}
 	return nil
 }

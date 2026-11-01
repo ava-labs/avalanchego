@@ -13,12 +13,12 @@ import (
 
 	_ "embed"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
 
 var (
@@ -30,10 +30,12 @@ var (
 	bonusBlockConsumers set.Set[uint64]
 )
 
-func init() {
+func TestMain(m *testing.M) {
 	if err := json.Unmarshal(bonusBlockConsumersJSON, &bonusBlockConsumers); err != nil {
 		panic(err)
 	}
+	libevm.RegisterExtras()
+	os.Exit(m.Run())
 }
 
 // TestBonusBlocks asserts two properties of the mainnet bonus blocks and the
@@ -55,7 +57,7 @@ func init() {
 // forward.
 func TestBonusBlocks(t *testing.T) {
 	const (
-		url = primary.MainnetAPIURI + "/ext/bc/C/rpc"
+		url = "https://api.avax.network/ext/bc/C/rpc"
 		// envVar must be set to run the test.
 		envVar = "SAEVM_TEST_MAINNET_API"
 	)
@@ -65,8 +67,8 @@ func TestBonusBlocks(t *testing.T) {
 
 	require.False(t, bonusBlockConsumers.Overlaps(bonusBlocks), "consumers overlap the bonus blocks")
 
-	client, err := ethclient.DialContext(t.Context(), url)
-	require.NoErrorf(t, err, "ethclient.DialContext(ctx, %q)", url)
+	client, err := evmclient.Dial(t.Context(), url)
+	require.NoErrorf(t, err, "evmclient.Dial(ctx, %q)", url)
 	defer client.Close()
 
 	bonusTxs := atomicTxs(t, client, bonusBlocks)
@@ -87,7 +89,7 @@ func TestBonusBlocks(t *testing.T) {
 
 // atomicTxs returns the cross-chain transaction in each of the blocks at
 // heights.
-func atomicTxs(tb testing.TB, client *ethclient.Client, heights set.Set[uint64]) map[uint64]*tx.Tx {
+func atomicTxs(tb testing.TB, client *evmclient.Client, heights set.Set[uint64]) map[uint64]*tx.Tx {
 	tb.Helper()
 
 	var (

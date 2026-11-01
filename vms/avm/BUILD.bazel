@@ -62,7 +62,6 @@ go_library(
         "//vms/propertyfx",
         "//vms/secp256k1fx",
         "//vms/txs/mempool",
-        "@com_github_gorilla_rpc//v2:rpc",
         "@com_github_prometheus_client_golang//prometheus",
         "@org_uber_go_zap//:zap",
     ],

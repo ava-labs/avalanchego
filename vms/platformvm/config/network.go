@@ -10,21 +10,18 @@ import (
 )
 
 var DefaultNetwork = Network{
-	MaxValidatorSetStaleness:       time.Minute,
-	TargetGossipSize:               20 * units.KiB,
-	PushGossipPercentStake:         .9,
-	PushGossipNumValidators:        100,
-	PushGossipNumPeers:             0,
-	PushRegossipNumValidators:      10,
-	PushRegossipNumPeers:           0,
-	PushGossipDiscardedCacheSize:   16384,
-	PushGossipMaxRegossipFrequency: 30 * time.Second,
-	PushGossipFrequency:            500 * time.Millisecond,
-	PullGossipFrequency:            1500 * time.Millisecond,
-	PullGossipThrottlingPeriod:     time.Hour,
-	// PullGossipRequestsPerValidator = PullGossipThrottlingPeriod / PullGossipFrequency =
-	// 3600 seconds/period / 1.5 requests/second = 2400 requests/validator
-	PullGossipRequestsPerValidator:              2400,
+	MaxValidatorSetStaleness:                    time.Minute,
+	TargetGossipSize:                            20 * units.KiB,
+	PushGossipPercentStake:                      .9,
+	PushGossipNumValidators:                     100,
+	PushGossipNumPeers:                          0,
+	PushRegossipNumValidators:                   10,
+	PushRegossipNumPeers:                        0,
+	PushGossipDiscardedCacheSize:                16384,
+	PushGossipMaxRegossipFrequency:              30 * time.Second,
+	PushGossipFrequency:                         500 * time.Millisecond,
+	PullGossipFrequency:                         1500 * time.Millisecond,
+	PullGossipThrottlingPeriod:                  time.Hour,
 	ExpectedBloomFilterElements:                 8 * 1024,
 	ExpectedBloomFilterFalsePositiveProbability: .01,
 	MaxBloomFilterFalsePositiveProbability:      .05,
@@ -70,9 +67,6 @@ type Network struct {
 	// PullGossipThrottlingPeriod is how large of a window the throttler should
 	// use.
 	PullGossipThrottlingPeriod time.Duration `json:"pull-gossip-throttling-period"`
-	// PullGossipRequestsPerValidator is the number of pull gossip requests that
-	// a validator is expected to make in a throttling period.
-	PullGossipRequestsPerValidator float64 `json:"pull-gossip-requests-per-validator"`
 	// ExpectedBloomFilterElements is the number of elements to expect when
 	// creating a new bloom filter. The larger this number is, the larger the
 	// bloom filter will be.

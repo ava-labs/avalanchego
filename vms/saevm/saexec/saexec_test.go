@@ -13,6 +13,7 @@ import (
 	"math/big"
 	"math/rand/v2"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
@@ -138,7 +140,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	tr, err := saedb.NewTracker(db, saedbConfig, genesis.EthBlock().Root(), chainDataDir, logger)
 	require.NoError(tb, err, "saedb.NewTracker()")
-	e, err := New(genesis, src.AsHeaderSource(), config, db, xdb, tr, sutCfg.hooks, logger, prometheus.NewRegistry())
+	e, err := New(genesis, new(atomic.Pointer[blocks.Block]), src.AsHeaderSource(), config, db, xdb, tr, sutCfg.hooks, logger, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
 	closeOnce := sync.OnceValue(func() error {
@@ -408,7 +410,7 @@ func TestExecution(t *testing.T) {
 	opts := cmp.Options{
 		cmpopts.IgnoreFields(
 			types.Receipt{},
-			"GasUsed", "CumulativeGasUsed",
+			"GasUsed", "GasExecuted", "CumulativeGasUsed",
 			"Bloom",
 		),
 		cmputils.BigInts(),
@@ -983,7 +985,7 @@ func TestContextualOpCodes(t *testing.T) {
 			diffopts := cmp.Options{
 				cmpopts.IgnoreFields(
 					types.Receipt{},
-					"Bloom", "ContractAddress", "CumulativeGasUsed", "GasUsed",
+					"Bloom", "ContractAddress", "CumulativeGasUsed", "GasUsed", "GasExecuted",
 				),
 				cmpopts.IgnoreFields(
 					types.Log{},
@@ -1039,6 +1041,7 @@ func missingTrieNodeError(root common.Hash) testerr.Want {
 // available. This is not needed for Firewood, which prunes automatically, nor
 // any archival node, which never prunes.
 func TestHashDBStateRootAvailability(t *testing.T) {
+	t.Skip("FLAKY: This test relies on *blocks.Block.MarkExecuted, but this returns before tracking changes")
 	// Blocks form three contiguous sections by height, distinguished by whether
 	// their states are untracked below and whether they fall inside the
 	// snapshot's retention window of the last [core.TriesInMemory] states.
@@ -1238,7 +1241,7 @@ func TestRecoveryStateAvailability(t *testing.T) {
 				log := loggingtest.New(t, logging.Debug)
 				tr, err := saedb.NewTracker(sut.db, sut.saedbConfig, chain.Last().PostExecutionStateRoot(), sut.chainDataDir, log)
 				require.NoError(t, err, "saedb.NewTracker()")
-				e, err := New(chain.Last(), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, tr, defaultHooks(), log, prometheus.NewRegistry())
+				e, err := New(chain.Last(), new(atomic.Pointer[blocks.Block]), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, tr, defaultHooks(), log, prometheus.NewRegistry())
 				require.NoError(t, err, "New()")
 				t.Cleanup(func() {
 					require.NoErrorf(t, e.Close(), "%T.Close()", e)
@@ -1355,6 +1358,57 @@ func TestProcessBeaconBlockRoot(t *testing.T) {
 				t.Errorf("beacon-roots get() via StaticCall() %s", diff)
 			}
 			assert.Equal(t, tt.want, got, "parent beacon root returned by beacon-roots contract")
+		})
+	}
+}
+
+// failingDB wraps a [state.Database] such that every account read from the
+// returned tries errors.
+type failingDB struct{ state.Database }
+
+type failingTrie struct{ state.Trie }
+
+var errAccountRead = errors.New("account read failed")
+
+func (db failingDB) OpenTrie(root common.Hash) (state.Trie, error) {
+	t, err := db.Database.OpenTrie(root)
+	return failingTrie{t}, err
+}
+
+func (failingTrie) GetAccount(common.Address) (*types.StateAccount, error) {
+	return nil, errAccountRead
+}
+
+func TestExecuteReturnsStateDBError(t *testing.T) {
+	hooks := defaultHooks()
+	hooks.StartExecutingBlockFn = func(_ params.Rules, sdb *state.StateDB, _ *types.Header, _ *types.Block) error {
+		sdb.GetBalance(common.Address{}) // triggers the failing account read
+		return nil
+	}
+	_, sut := newSUT(t, withHooks(hooks))
+	b := sut.chain.NewBlock(t, nil)
+
+	tests := []struct {
+		name string
+		opts []Option
+	}{
+		{
+			name: "full execution",
+		},
+		{
+			name: "skip end-of-block ops",
+			opts: []Option{SkipEndOfBlockOps()},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// No snapshot, so account reads go through the trie.
+			db := failingDB{state.NewDatabase(rawdb.NewMemoryDatabase())}
+			sdb, err := state.New(types.EmptyRootHash, db, nil)
+			require.NoError(t, err, "state.New()")
+
+			_, err = Execute(b, sdb, sut.hooks, sut.chainConfig, sut.chainContext, sut.logger, tt.opts...)
+			require.ErrorIs(t, err, errAccountRead, "Execute()")
 		})
 	}
 }

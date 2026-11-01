@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
@@ -139,14 +140,11 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	}
 
 	start := time.Now()
-	defer func() {
-		e.metrics.observeExecuteDuration(time.Since(start))
-	}()
+
 	stateDB, err := e.StateDB(b.ParentBlock().PostExecutionStateRoot())
 	if err != nil {
 		return err
 	}
-
 	// The prefetcher loads trie nodes during execution which removes the loads
 	// at Commit time. On historical mainnet C-Chain it cut mean block insertion
 	// from 99.76ms to 44.84ms:
@@ -169,7 +167,11 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
-	return e.afterExecution(b, stateDB, result)
+	if err := e.afterExecution(b, stateDB, result); err != nil {
+		return err
+	}
+	e.metrics.observeExecuteDuration(start, time.Now(), b, result)
+	return nil
 }
 
 type (
@@ -187,15 +189,19 @@ type (
 
 	// ExecutionResults holds the outputs of [Execute].
 	ExecutionResults struct {
-		BaseFee     *uint256.Int
-		Signer      types.Signer
-		BlockCtx    vm.BlockContext
-		Receipts    types.Receipts
-		GasConsumed gas.Gas
-		FinishBy    struct {
+		BaseFee                  *uint256.Int
+		Signer                   types.Signer
+		BlockCtx                 vm.BlockContext
+		Receipts                 types.Receipts
+		GasConsumed, GasExecuted gas.Gas
+		FinishBy                 struct {
 			Gas  *gastime.Time
 			Wall time.Time
 		}
+		// The final [gastime.Time] is from after the change in
+		// [gastime.Time.Rate] so may differ from the rate at which the block
+		// was actually executed.
+		rate gas.Gas
 	}
 )
 
@@ -273,7 +279,8 @@ func stateBeforeTransactions(hooks hook.Points, rules params.Rules, stateDB *sta
 // execution after a transaction prefix for intra-block inspection.
 //
 // The gas clock and base fee come from the parent's post-execution clock,
-// except pre-SAE blocks, which use their own header's fee.
+// except pre-SAE blocks, which use their own header's fee and finish at the gas
+// time derived from their header.
 //
 // Execute only runs the deterministic hooks, so it is also safe to use for
 // historical execution. Canonical-only side effects belong in
@@ -316,7 +323,8 @@ func Execute(
 	}
 
 	baseFee := gasClock.BaseFee()
-	if hook.Synchronous(hooks, header) {
+	synchronous := b.Synchronous()
+	if synchronous {
 		baseFee = b.WorstCaseBaseFee()
 	} else {
 		b.CheckBaseFeeBound(baseFee)
@@ -332,6 +340,7 @@ func Execute(
 		Signer:   signer,
 		BlockCtx: core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
 		Receipts: make(types.Receipts, len(txs)),
+		rate:     gasClock.Rate(),
 	}
 
 	for ti, tx := range txs {
@@ -353,13 +362,17 @@ func Execute(
 		if err != nil {
 			return nil, fmt.Errorf("%w: transaction execution errored (not reverted) [%d](%#x): %v", errFatal, ti, tx.Hash(), err)
 		}
+		res.GasExecuted += gas.Gas(receipt.GasExecuted)
 
 		perTxClock.Tick(gas.Gas(receipt.GasUsed))
 		// Interim execution time reports live canonical progress. Historical
 		// execution can run only part of the same in-memory block and overwrite
-		// that progress with an earlier time. This violates monotonicity and can
-		// change the settlement decision made by LastToSettleAt.
-		if config.canonical {
+		// that progress with an earlier time. This violates monotonicity and
+		// can change the settlement decision made by LastToSettleAt.
+		//
+		// A synchronous block's final gas time is derived from its header, not
+		// from this clock, so it records no interim time.
+		if config.canonical && !synchronous {
 			b.SwapInterimExecutionTime(perTxClock)
 			// TODO(arr4n) investigate calling the same method on pending blocks in
 			// the queue. It's only worth it if [blocks.LastToSettleAt] regularly
@@ -390,6 +403,12 @@ func Execute(
 		// TODO(JonathanOppenheimer): skipping the FinishExecutingBlock hook
 		// leaks goroutines from an in-flight parallel.Processor, which requires
 		// a FinishBlock call.
+
+		// This captures MOST read errors. For the subset of DB errors through
+		// leveldb that have ignored errors in geth, we rely on the corruptabledb.
+		if err := stateDB.Error(); err != nil {
+			return nil, fmt.Errorf("during execution: %w", err)
+		}
 		return res, nil
 	}
 
@@ -401,8 +420,9 @@ func Execute(
 	for i, o := range ops {
 		b.CheckOpBurnerBalanceBounds(stateDB, numTxs+i, o)
 		res.GasConsumed += o.Gas
+		res.GasExecuted += o.Gas
 		perTxClock.Tick(o.Gas)
-		if config.canonical {
+		if config.canonical && !synchronous {
 			b.SwapInterimExecutionTime(perTxClock)
 		}
 
@@ -415,10 +435,26 @@ func Execute(
 		return nil, fmt.Errorf("finish-executing-block hook: %v", err)
 	}
 
+	// This captures MOST read errors. For the subset of DB errors through
+	// leveldb that have ignored errors in geth, we rely on the corruptabledb.
+	if err := stateDB.Error(); err != nil {
+		return nil, fmt.Errorf("during execution: %w", err)
+	}
+
 	endTime := time.Now()
-	target, gasCfg := hooks.GasConfigAfter(b.Header())
-	if err := gasClock.AfterBlock(res.GasConsumed, target, gasCfg); err != nil {
-		return nil, fmt.Errorf("after-block gas time update: %w", err)
+	if synchronous {
+		// Recovery derives synchronous gas times from the header. Execution
+		// MUST match, because the first asynchronous block advances the last
+		// synchronous block's gas time.
+		gasClock, err = b.SynchronousGasTime()
+		if err != nil {
+			return nil, fmt.Errorf("%w: deriving synchronous gas time: %v", errFatal, err)
+		}
+	} else {
+		target, gasCfg := hooks.GasConfigAfter(b.Header())
+		if err := gasClock.AfterBlock(res.GasConsumed, target, gasCfg); err != nil {
+			return nil, fmt.Errorf("after-block gas time update: %w", err)
+		}
 	}
 
 	log.Trace(
@@ -444,25 +480,37 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 	if err != nil {
 		return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
 	}
-	if err := e.Tracker.BlockExecuted(b.SettledStateRoot(), root, b.NumberU64()); err != nil {
-		return err
-	}
 
 	// Responsibility for untracking lies with the VM once it deems this block's
 	// post-execution state to no longer be consensus-critical.
 	e.Tracker.Track(root)
 
-	// The strict ordering of the next 3 calls guarantees invariants that MUST
-	// NOT be broken:
+	// The strict ordering of the remaining calls guarantees invariants that
+	// MUST NOT be broken:
 	//
 	// 1. [blocks.Block.MarkExecuted] guarantees disk then in-memory changes.
 	// 2. Internal indicator of last executed MUST follow in-memory change.
 	// 3. External indicator of last executed MUST follow internal indicator.
+	// 4. A synchronous block settles itself, which MUST follow its execution.
+	// 5. Settlement MUST be persisted before [saedb.Tracker.BlockExecuted] MAY
+	//    commit the settled state, so the committed state never leads it.
 	if err := b.MarkExecuted(e.db, e.xdb, r.FinishBy.Gas.Clone(), r.FinishBy.Wall, r.BaseFee.ToBig(), r.Receipts, root, &e.lastExecuted /* (2) */); err != nil {
 		return err
 	}
 	e.sendPostExecutionEvents(b, r) // (3)
-	return nil
+	if b.Synchronous() {            // (4)
+		// We MUST avoid moving the finalized block pointer backwards when
+		// recovery reexecutes previously executed blocks.
+		if b.ParentHash() == rawdb.ReadFinalizedBlockHash(e.db) {
+			rawdb.WriteFinalizedBlockHash(e.db, b.Hash())
+		}
+		if err := b.MarkSettled(e.lastSettled); err != nil {
+			return err
+		}
+	}
+	// b's settled root stays tracked until settlement passes b, which requires a
+	// later block to execute, so the root is still available here.
+	return e.Tracker.BlockExecuted(b.SettledStateRoot(), root, b.NumberU64()) // (5)
 }
 
 // NullReceiptStore discards transaction receipts.

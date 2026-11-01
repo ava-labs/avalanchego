@@ -8,7 +8,6 @@ go_library(
     deps = [
         "//ids",
         "//snow",
-        "//vms/components/avax",
         "//vms/components/verify",
         "//vms/nftfx",
         "//vms/propertyfx",

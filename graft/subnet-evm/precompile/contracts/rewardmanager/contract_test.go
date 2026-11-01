@@ -11,13 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -221,7 +221,7 @@ var (
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				address, isFeeRecipients := rewardmanager.GetStoredRewardAddress(state)
 				require.False(t, isFeeRecipients)
-				require.Equal(t, constants.BlackholeAddr, address)
+				require.Equal(t, blackhole.Address, address)
 
 				logs := state.Logs()
 				assertRewardsDisabled(t, logs, allowlisttest.TestManagerAddr)
@@ -243,7 +243,7 @@ var (
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				address, isFeeRecipients := rewardmanager.GetStoredRewardAddress(state)
 				require.False(t, isFeeRecipients)
-				require.Equal(t, constants.BlackholeAddr, address)
+				require.Equal(t, blackhole.Address, address)
 
 				logs := state.Logs()
 				assertRewardsDisabled(t, logs, allowlisttest.TestEnabledAddr)

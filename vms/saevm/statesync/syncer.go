@@ -75,10 +75,6 @@ func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
 	}
 
 	// If any blocks have been accepted, don't state sync.
-	//
-	// TransitionVM assumes that a node will state-sync if state-sync is enabled
-	// and the node is at the genesis block. Until transitionvm is removed, this
-	// check MUST NOT change.
 	hash := rawdb.ReadHeadFastBlockHash(s.db)
 	if hash == (common.Hash{}) {
 		s.snowCtx.Log.Warn("no last accepted hash")
@@ -103,9 +99,13 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		maxLeafRequestSize = 1024
 	)
 
+	blockClient, err := s.network.SyncClient(p2p.EVMBlockRequestHandlerID)
+	if err != nil {
+		return err
+	}
 	blockSyncer := syncblock.NewSyncer(
 		s.snowCtx.Log,
-		syncblock.NewClient(s.network.Network, s.network.PeerTracker),
+		syncblock.NewClient(s.snowCtx.Log, blockClient),
 		s.db,
 		s.blockParser,
 		summary.AcceptedHash,
@@ -127,9 +127,13 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		return fmt.Errorf("%w: %s at height %d", errSynchronousBlock, summary.AcceptedHash, summary.AcceptedHeight)
 	}
 
+	codeClient, err := s.network.SyncClient(p2p.EVMCodeRequestHandlerID)
+	if err != nil {
+		return err
+	}
 	codeSyncer, err := code.NewSyncer(
 		s.snowCtx.Log,
-		code.NewClient(s.network.Network, s.network.PeerTracker),
+		code.NewClient(s.snowCtx.Log, codeClient),
 		s.db,
 	)
 	if err != nil {
@@ -145,15 +149,17 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 	}
 	s.snowCtx.Log.Info("finished wiping snapshot")
 
+	leafClient, err := s.network.SyncClient(p2p.EVMLeafRequestHandlerID)
+	if err != nil {
+		return err
+	}
 	// TODO(powerslider): Remove dependency on graft.
 	evmSyncer, err := evmstate.NewSyncer(
 		s.snowCtx.Log,
 		hashdb.NewClient(
 			s.snowCtx.Log,
-			s.network.Network,
-			p2p.EVMLeafRequestHandlerID,
+			leafClient,
 			common.HashLength,
-			s.network.PeerTracker,
 		),
 		s.db,
 		hdr.Root,

@@ -41,6 +41,7 @@ type Executor struct {
 	queue        chan queuedBlock
 	queueErr     atomic.Pointer[Unhealthy]
 	lastExecuted atomic.Pointer[blocks.Block]
+	lastSettled  *atomic.Pointer[blocks.Block]
 
 	headEvents  event.FeedOf[core.ChainHeadEvent]
 	chainEvents event.FeedOf[core.ChainEvent]
@@ -56,11 +57,13 @@ type Executor struct {
 
 // New constructs and starts a new [Executor]. Call [Executor.Close] to stop it.
 //
-// The last-executed block MAY be the genesis block for an always-SAE chain, the
-// last pre-SAE synchronous block during transition, or the last asynchronously
-// executed block after shutdown and recovery.
+// The post-execution state of the last-executed block MUST be available.
+//
+// The Executor settles synchronous blocks after executing them and updates
+// lastSettled accordingly. lastSettled is not modified for asynchronous blocks.
 func New(
 	lastExecuted *blocks.Block,
+	lastSettled *atomic.Pointer[blocks.Block],
 	headerSrc saetypes.HeaderSource,
 	chainConfig *params.ChainConfig,
 	db ethdb.Database,
@@ -94,6 +97,7 @@ func New(
 		db:          db,
 		xdb:         xdb,
 		metrics:     m,
+		lastSettled: lastSettled,
 		receipts:    newSyncMap[common.Hash, eventual.Value[*Receipt]](),
 	}
 	e.lastExecuted.Store(lastExecuted)

@@ -146,14 +146,6 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		bootstrapIDs string
 	)
 
-	if network.PrimaryChainConfigs == nil {
-		network.PrimaryChainConfigs = make(map[string]tmpnet.ConfigMap)
-	}
-	if network.PrimaryChainConfigs["C"] == nil {
-		network.PrimaryChainConfigs["C"] = make(tmpnet.ConfigMap)
-	}
-	network.PrimaryChainConfigs["C"]["log-json-format"] = true
-
 	chainConfigContent, err := network.GetChainConfigContent()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get chain config content: %w", err)

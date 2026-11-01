@@ -157,10 +157,10 @@ The results — which predicates failed, per transaction — are encoded into th
 
 ## Maintenance notes
 
-- **Database compatibility.** `Storage`'s on-disk layout must remain byte-compatible with coreth's warp database: the C-Chain transitions from coreth to this VM on the same database, and breaking the layout silently orphans every previously persisted message. This constraint only expires once the transition is far enough in the past that those messages no longer matter.
+- **Database compatibility.** `Storage`'s on-disk layout MUST NOT change: breaking it silently orphans every previously persisted message.
 - **Off-chain messages are memory-only on purpose.** They are operator-supplied configuration, not chain data, so the persisted set stays exactly what the precompile emitted — and an off-chain message is removed by simply not supplying it on the next construction.
 - **Predicate results are encoded in the header so warp messages are never verified during bootstrapping.** Verification needs the source chain's validator set, which isn't guaranteed to be available then — bootstrapping nodes must be able to rely on the recorded results instead of re-checking signatures.
-- **VM wiring.** Harvested messages are persisted in `(*hooks).AfterExecutingBlock`, the predicate results are encoded into the header in `(*builder).BuildBlock` (both in [`../hooks.go`](../hooks.go)), and the ACP-118 handler is registered with a `Backend` implementation at VM initialization. Persisting in `AfterExecutingBlock` preserves coreth's guarantee that only messages from accepted blocks are signable, because SAE executes blocks only after acceptance.
+- **VM wiring.** Harvested messages are persisted in `(*hooks).AfterExecutingBlock`, the predicate results are encoded into the header in `(*builder).BuildBlock` (both in [`../hooks.go`](../hooks.go)), and the ACP-118 handler is registered with a `Backend` implementation at VM initialization. Persisting in `AfterExecutingBlock` guarantees that only messages from accepted blocks are signable, because SAE executes blocks only after acceptance.
 
 ## References
 

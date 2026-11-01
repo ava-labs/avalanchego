@@ -333,6 +333,7 @@ func TestSetDefaultsTreatsZeroAsUnset(t *testing.T) {
 		FortunaTimestamp:   utils.PointerTo[uint64](0),
 		GraniteTimestamp:   utils.PointerTo[uint64](0),
 		HeliconTimestamp:   utils.PointerTo[uint64](0),
+		IglooTimestamp:     utils.PointerTo[uint64](0),
 	}
 	agoUpgrades := upgradetest.GetConfig(upgradetest.Latest)
 	upgrades.SetDefaults(agoUpgrades)
@@ -345,4 +346,5 @@ func TestSetDefaultsTreatsZeroAsUnset(t *testing.T) {
 	require.Equal(t, defaults.FortunaTimestamp, upgrades.FortunaTimestamp)
 	require.Equal(t, defaults.GraniteTimestamp, upgrades.GraniteTimestamp)
 	require.Equal(t, defaults.HeliconTimestamp, upgrades.HeliconTimestamp)
+	require.Equal(t, defaults.IglooTimestamp, upgrades.IglooTimestamp)
 }

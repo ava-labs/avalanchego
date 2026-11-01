@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
 
@@ -32,7 +32,7 @@ func NewEVM(
 	db *ffi.Database,
 	codeQueue CodeQueue,
 	targetRoot ids.ID,
-	proofClient *p2p.Client,
+	proofClient *peertracker.Client,
 ) (*sync.Syncer[*RangeProof, struct{}], error) {
 	return newWithDB(
 		config,

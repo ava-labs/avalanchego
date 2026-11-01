@@ -21,6 +21,7 @@ go_library(
         "//tests/fixture/tmpnet/flags",
         "//utils/crypto/secp256k1",
         "//utils/logging",
+        "//vms/components/gas",
         "//vms/platformvm/txs/fee",
         "//vms/secp256k1fx",
         "//wallet/chain/p/builder",

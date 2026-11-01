@@ -17,7 +17,7 @@ import (
 type PredicateTest struct {
 	Name string
 
-	Config precompileconfig.Config
+	Predicater precompileconfig.Predicater
 
 	PredicateContext *precompileconfig.PredicateContext
 
@@ -31,9 +31,7 @@ type PredicateTest struct {
 func (test PredicateTest) Run(t testing.TB) {
 	t.Helper()
 	require := require.New(t)
-	predicater := test.Config.(precompileconfig.Predicater)
-
-	predicateGas, predicateGasErr := predicater.PredicateGas(test.Predicate, test.Rules)
+	predicateGas, predicateGasErr := test.Predicater.PredicateGas(test.Predicate, test.Rules)
 	require.ErrorIs(predicateGasErr, test.GasErr)
 	if test.GasErr != nil {
 		return
@@ -41,7 +39,7 @@ func (test PredicateTest) Run(t testing.TB) {
 
 	require.Equal(test.Gas, predicateGas)
 
-	predicateRes := predicater.VerifyPredicate(test.PredicateContext, test.Predicate)
+	predicateRes := test.Predicater.VerifyPredicate(test.PredicateContext, test.Predicate)
 	require.ErrorIs(predicateRes, test.ExpectedErr)
 }
 

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"connectrpc.com/grpcreflect"
-	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
@@ -29,9 +28,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/metric"
+	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/tree"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -267,15 +266,12 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 		return nil, fmt.Errorf("failed to initialize metrics: %w", err)
 	}
 
-	server := rpc.NewServer()
-	server.RegisterCodec(json.NewCodec(), "application/json")
-	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	server.RegisterInterceptFunc(metrics.InterceptRequest)
-	server.RegisterAfterFunc(metrics.AfterRequest)
-	err = server.RegisterService(&jsonrpcService{vm: vm}, "proposervm")
+	server, err := rpc.NewHandler("proposervm", &jsonrpcService{vm: vm})
 	if err != nil {
 		return nil, fmt.Errorf("failed to register proposervm service: %w", err)
 	}
+	server.RegisterInterceptFunc(metrics.InterceptRequest)
+	server.RegisterAfterFunc(metrics.AfterRequest)
 
 	if handlers == nil {
 		handlers = make(map[string]http.Handler)

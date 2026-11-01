@@ -14,14 +14,14 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: Set up QEMU (required for cross-platform builds)
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
-      - name: Create multiplatform docker builder
-        run: docker buildx create --use
       - name: Build and publish Docker images
         uses: ./.github/actions/run-docker-with-disk-space
         with:
+          setup-qemu: 'true'
+          docker-username: ${{ secrets.DOCKER_USERNAME }}
+          docker-password: ${{ secrets.DOCKER_PASS }}
           run: |
+            docker buildx create --use
             DOCKER_IMAGE="$DOCKER_IMAGE_DEFAULT" scripts/run_task.sh build-image
             DOCKER_IMAGE=avaplatform/bootstrap-monitor scripts/run_task.sh build-bootstrap-monitor-image
             IMAGE_NAME=avaplatform/subnet-evm scripts/run_task.sh build-subnet-evm-image

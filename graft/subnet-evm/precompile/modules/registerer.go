@@ -10,8 +10,8 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 )
 
 var (
@@ -34,7 +34,7 @@ var (
 		},
 	}
 
-	errBlackholeAddress          = fmt.Errorf("cannot register module that overlaps with blackhole address %s", constants.BlackholeAddr)
+	errBlackholeAddress          = fmt.Errorf("cannot register module that overlaps with blackhole address %s", blackhole.Address)
 	errAddressNotInReservedRange = errors.New("address is not in a reserved range for custom precompiles")
 )
 
@@ -54,7 +54,7 @@ func RegisterModule(stm Module) error {
 	address := stm.Address
 	key := stm.ConfigKey
 
-	if address == constants.BlackholeAddr {
+	if address == blackhole.Address {
 		return fmt.Errorf("%w: address %s ", errBlackholeAddress, address)
 	}
 	if !ReservedAddress(address) {

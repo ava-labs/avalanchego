@@ -30,7 +30,6 @@ go_library(
         "//vms/platformvm/signer",
         "//vms/propertyfx",
         "//vms/secp256k1fx",
-        "@com_github_gorilla_rpc//v2:rpc",
         "@org_uber_go_zap//:zap",
     ],
 )

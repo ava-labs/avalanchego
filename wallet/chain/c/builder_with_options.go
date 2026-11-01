@@ -6,8 +6,9 @@ package c
 import (
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
@@ -56,9 +57,9 @@ func (b *builderWithOptions) GetImportableBalance(
 func (b *builderWithOptions) NewImportTx(
 	chainID ids.ID,
 	to ethcommon.Address,
-	baseFee *big.Int,
+	baseFee gas.Price,
 	options ...common.Option,
-) (*atomic.UnsignedImportTx, error) {
+) (*tx.Import, error) {
 	return b.Builder.NewImportTx(
 		chainID,
 		to,
@@ -70,9 +71,9 @@ func (b *builderWithOptions) NewImportTx(
 func (b *builderWithOptions) NewExportTx(
 	chainID ids.ID,
 	outputs []*secp256k1fx.TransferOutput,
-	baseFee *big.Int,
+	baseFee gas.Price,
 	options ...common.Option,
-) (*atomic.UnsignedExportTx, error) {
+) (*tx.Export, error) {
 	return b.Builder.NewExportTx(
 		chainID,
 		outputs,

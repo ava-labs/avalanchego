@@ -1,13 +1,26 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "rpc",
     srcs = [
+        "handler.go",
         "json.go",
         "options.go",
         "requester.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/utils/rpc",
     visibility = ["//visibility:public"],
-    deps = ["@com_github_gorilla_rpc//v2/json2"],
+    deps = [
+        "//utils/json",
+        "@com_github_gorilla_rpc//v2:rpc",
+        "@com_github_gorilla_rpc//v2/json2",
+    ],
+)
+
+go_test(
+    name = "rpc_test",
+    srcs = ["handler_test.go"],
+    embed = [":rpc"],
+    deps = ["@com_github_stretchr_testify//require"],
 )

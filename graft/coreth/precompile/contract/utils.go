@@ -4,19 +4,15 @@
 package contract
 
 import (
-	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/core/vm"
-	"github.com/ava-labs/libevm/crypto"
 )
 
 // Gas costs for stateful precompiles
 const (
 	WriteGasCostPerSlot = 20_000
-	ReadGasCostPerSlot  = 5_000
 
 	// Per LOG operation.
 	LogGas uint64 = 375 // from params/protocol_params.go
@@ -25,20 +21,6 @@ const (
 	// Per byte cost in a LOG operation's data. Should be multiplied by the byte size of the data.
 	LogDataGas uint64 = 8 // from params/protocol_params.go
 )
-
-var functionSignatureRegex = regexp.MustCompile(`\w+\((\w*|(\w+,)+\w+)\)`)
-
-// CalculateFunctionSelector returns the 4 byte function selector that results from [functionSignature]
-// Ex. the function setBalance(addr address, balance uint256) should be passed in as the string:
-// "setBalance(address,uint256)"
-// TODO: remove this after moving to ABI based function selectors.
-func CalculateFunctionSelector(functionSignature string) []byte {
-	if !functionSignatureRegex.MatchString(functionSignature) {
-		panic(fmt.Errorf("invalid function signature: %q", functionSignature))
-	}
-	hash := crypto.Keccak256([]byte(functionSignature))
-	return hash[:4]
-}
 
 // DeductGas checks if [suppliedGas] is sufficient against [requiredGas] and deducts [requiredGas] from [suppliedGas].
 func DeductGas(suppliedGas uint64, requiredGas uint64) (uint64, error) {

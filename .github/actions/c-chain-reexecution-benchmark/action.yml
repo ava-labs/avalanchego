@@ -89,12 +89,18 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Determine whether custom refs are in use
+      id: dependency-config
+      shell: bash
+      run: echo "use-custom-refs=${{ inputs.libevm-ref != '' || inputs.firewood-ref != '' }}" >> "$GITHUB_OUTPUT"
     - name: Provision dependencies
       uses: ./.github/actions/install-nix
       with:
         github_token: ${{ inputs.github-token }}
+        # Custom refs can require modules that are not in the repository cache.
+        disable_go_proxy: ${{ steps.dependency-config.outputs.use-custom-refs != 'true' }}
     - name: Configure dependency versions
-      if: ${{ inputs.libevm-ref != '' || inputs.firewood-ref != '' }}
+      if: ${{ steps.dependency-config.outputs.use-custom-refs == 'true' }}
       shell: nix develop --command bash -x {0}
       run: ./scripts/run_task.sh run-polyrepo
       env:
@@ -103,6 +109,11 @@ runs:
         # Required for Nix builds on ARC runners
         TMPDIR: /tmp
         NIX_BUILD_TOP: /tmp
+    # Custom refs require GOPROXY during setup. Disable it before benchmarking.
+    - name: Disable the Go module proxy
+      if: ${{ steps.dependency-config.outputs.use-custom-refs == 'true' }}
+      shell: bash
+      run: echo 'GOPROXY=off' >> "$GITHUB_ENV"
     - name: Notify of metrics availability
       if: inputs.prometheus-username != ''
       shell: bash

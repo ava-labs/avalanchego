@@ -18,7 +18,7 @@ type (
 	Price uint64
 )
 
-// Cost converts the gas to nAVAX based on the price.
+// Cost returns g*price.
 //
 // If overflow would occur, an error is returned.
 func (g Gas) Cost(price Price) (uint64, error) {

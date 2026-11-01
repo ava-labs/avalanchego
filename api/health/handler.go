@@ -7,20 +7,23 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/gorilla/rpc/v2"
-
 	"github.com/ava-labs/avalanchego/utils/logging"
-
-	avajson "github.com/ava-labs/avalanchego/utils/json"
+	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
 // NewGetAndPostHandler returns a health handler that supports GET and jsonrpc
 // POST requests.
 func NewGetAndPostHandler(log logging.Logger, reporter Reporter) (http.Handler, error) {
-	newServer := rpc.NewServer()
-	codec := avajson.NewCodec()
-	newServer.RegisterCodec(codec, "application/json")
-	newServer.RegisterCodec(codec, "application/json;charset=UTF-8")
+	server, err := rpc.NewHandler(
+		"health",
+		&Service{
+			log:    log,
+			health: reporter,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	getHandler := NewGetHandler(reporter.Health)
 
@@ -28,21 +31,13 @@ func NewGetAndPostHandler(log logging.Logger, reporter Reporter) (http.Handler, 
 	// a 503 if the node isn't healthy.
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
-			newServer.ServeHTTP(w, r)
+			server.ServeHTTP(w, r)
 			return
 		}
 
 		getHandler.ServeHTTP(w, r)
 	})
-
-	err := newServer.RegisterService(
-		&Service{
-			log:    log,
-			health: reporter,
-		},
-		"health",
-	)
-	return handler, err
+	return handler, nil
 }
 
 // NewGetHandler return a health handler that supports GET requests reporting

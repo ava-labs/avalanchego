@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
@@ -26,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/utilstest"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 
 	sim "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/simulated"
 	rewardmanagerbindings "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager/rewardmanagertest/bindings"
@@ -201,7 +201,7 @@ func TestRewardManager(t *testing.T) {
 
 				currentAddr, err = testContract.CurrentRewardAddress(nil)
 				require.NoError(t, err)
-				require.Equal(t, constants.BlackholeAddr, currentAddr)
+				require.Equal(t, blackhole.Address, currentAddr)
 			},
 		},
 		{
@@ -209,7 +209,7 @@ func TestRewardManager(t *testing.T) {
 			test: func(t *testing.T, _ *sim.Backend, rewardManager *rewardmanagerbindings.IRewardManager) {
 				currentAddr, err := rewardManager.CurrentRewardAddress(nil)
 				require.NoError(t, err)
-				require.Equal(t, constants.BlackholeAddr, currentAddr)
+				require.Equal(t, blackhole.Address, currentAddr)
 			},
 		},
 		{
@@ -217,13 +217,13 @@ func TestRewardManager(t *testing.T) {
 			test: func(t *testing.T, backend *sim.Backend, _ *rewardmanagerbindings.IRewardManager) {
 				client := backend.Client()
 
-				initialBlackholeBalance, err := client.BalanceAt(t.Context(), constants.BlackholeAddr, nil)
+				initialBlackholeBalance, err := client.BalanceAt(t.Context(), blackhole.Address, nil)
 				require.NoError(t, err)
 
 				tx := sendSimpleTx(t, backend, adminKey)
 				utilstest.WaitReceiptSuccessful(t, backend, tx)
 
-				newBlackholeBalance, err := client.BalanceAt(t.Context(), constants.BlackholeAddr, nil)
+				newBlackholeBalance, err := client.BalanceAt(t.Context(), blackhole.Address, nil)
 				require.NoError(t, err)
 
 				require.Positive(t, newBlackholeBalance.Cmp(initialBlackholeBalance),
@@ -339,7 +339,7 @@ func TestIRewardManager_Events(t *testing.T) {
 				require.True(t, iter.Next(), "expected to find RewardAddressChanged event")
 				event := iter.Event
 				require.Equal(t, testContractAddr, event.Sender)
-				require.Equal(t, constants.BlackholeAddr, event.OldRewardAddress)
+				require.Equal(t, blackhole.Address, event.OldRewardAddress)
 				require.Equal(t, rewardRecipientAddr, event.NewRewardAddress)
 
 				require.False(t, iter.Next(), "expected no more events")

@@ -77,7 +77,7 @@ func TestHeaderWithNonZeroFields(t *testing.T) {
 
 	header, extra := headerWithNonZeroFields()
 	t.Run("Header", func(t *testing.T) { allFieldsSet(t, header, "extra") })
-	t.Run("HeaderExtra", func(t *testing.T) { allFieldsSet(t, extra) })
+	t.Run("HeaderExtra", func(t *testing.T) { allFieldsSet(t, extra, "predicateResults") })
 }
 
 // headerWithNonZeroFields returns a [Header] and a [HeaderExtra],

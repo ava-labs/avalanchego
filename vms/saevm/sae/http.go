@@ -21,14 +21,9 @@ var HandlerPaths = []string{rpcHTTPExtensionPath, wsHTTPExtensionPath}
 // CreateHandlers returns all VM-specific HTTP handlers to be exposed by the
 // node, keyed by extension.
 func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	s := vm.rpcProvider.Server()
 	return map[string]http.Handler{
-		rpcHTTPExtensionPath: s,
-		// TODO(StephenButtolph) coreth and subnet-evm have modified the ws
-		// handler to introduce CPU limiting and maximum request durations. We
-		// should either include those modifications into libevm, or determine
-		// that those restrictions were not required.
-		wsHTTPExtensionPath: s.WebsocketHandler([]string{"*"}),
+		rpcHTTPExtensionPath: vm.rpcProvider.HTTPHandler(),
+		wsHTTPExtensionPath:  vm.rpcProvider.WebsocketHandler([]string{"*"}),
 	}, nil
 }
 

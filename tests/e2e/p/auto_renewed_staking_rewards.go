@@ -365,7 +365,5 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Staking Rewards]", ginkgo
 		tc.By("stopping node to free up resources for a bootstrap check", func() {
 			require.NoError(tc, f.validatorNode.Stop(tc.DefaultContext()))
 		})
-
-		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 	})
 })

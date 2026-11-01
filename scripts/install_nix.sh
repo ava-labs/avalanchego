@@ -17,7 +17,8 @@ case "$(uname -s)" in
   Linux)
     echo "linux detected"
     echo "Installing using upstream Nix installer"
-    sh <(curl -L https://nixos.org/nix/install) --daemon
+    installer="$(curl -fsSL https://nixos.org/nix/install)"
+    sh -c "${installer}" nix-install --daemon
 
     echo "Enabling flakes in user config..."
     mkdir -p ~/.config/nix

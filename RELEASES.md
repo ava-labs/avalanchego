@@ -1,10 +1,62 @@
 # Release Notes
 
-## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
+## [v1.15.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.3)
 
 ### Features
 
-- Consensus parameter validation (`snowball.Parameters.Verify` and `simplex.Parameters.Verify`) now reports every violated condition instead of only the first one.
+### APIs
+
+- Added a `Gas-Used` header to C-Chain `/rpc` responses with the total gas used by every completed `eth_call` in the request.
+- `admin.lockProfile` and continuous profiling now write `lock.profile` in the binary pprof format, like the CPU and memory profiles.
+
+### Configs
+
+- Added `--profile-continuous-mutex-fraction` (default `1`, which keeps the existing behavior) to set the mutex profile fraction used by continuous profiling. Set it to `0` to stop recording mutex contention, or to `n` to sample 1 of every n events.
+- Added the `filter` API to the C-Chain `apis` option. It serves the polling filter methods (`eth_newFilter`, `eth_newBlockFilter`, `eth_newPendingTransactionFilter`, `eth_getFilterChanges`, `eth_getFilterLogs`, `eth_uninstallFilter`), which moved out of `subscription`. It is enabled by default. A config that sets `apis` must add `filter` to keep serving these methods.
+- Added the `logs` API to the C-Chain `apis` option. It serves `eth_getLogs`, which moved out of `subscription`. It is enabled by default. A config that sets `apis` must add `logs` to keep serving `eth_getLogs`.
+
+### Metrics
+
+- SAE state sync scores peers separately for each sync protocol, so `avalanche_evm_p2p_peer_tracker_{num_tracked_peers,num_responsive_peers,average_bandwidth}` are replaced by one set per protocol: `avalanche_evm_p2p_peer_tracker_<protocol>_*` with `<protocol>` one of `leaf`, `code`, `block` or `cchain_leaf`.
+
+### Fixes
+
+- Fixed C-Chain log queries (`eth_getLogs`, `eth_getFilterLogs`) failing with `failed to get logs for block #N` when the range reached an accepted block that had not yet executed. Range queries now stop at the last executed block, and `blockHash` queries for an unexecuted block return `unknown block`.
+- Fixed `admin.stopCPUProfiler` leaving mutex profiling enabled, which kept recording mutex contention until the node restarted.
+
+## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
+
+This release updates the plugin version to `47`. All plugins must update to remain compatible.
+
+**Nodes that last ran before Helicon activated must first run v1.15.0 or v1.15.1 until the C-Chain has bootstrapped past Helicon, or resync from an empty database.**
+
+### Features
+
+- Added `vms/evm/evmclient`, which combines standard Ethereum, Geth-specific, raw RPC, and Avalanche-specific EVM methods.
+- Updated the minimum Go version from `1.26.8` to `1.26.10`.
+- `eth_getLogs` now respects the node's C-Chain config option for `api-resolve-pending-to-last-executed`.
+
+### APIs
+
+- The `avax.getAtomicTxStatus` C-Chain RPC, deprecated in v1.15.0, is removed. Use `avax.getAtomicTx`, which fails for a tx that has not been accepted.
+- Added:
+  - `restakedValidationRewards` and `restakedDelegateeRewards` fields to `platform.getCurrentValidators` results for auto-renewed validators
+
+### Configs
+
+- The `eth-apis` C-Chain option, deprecated in v1.15.0, is removed. The node now ignores it and logs a warning like any other unrecognized option. Set `apis` instead.
+- Removed `pull-gossip-requests-per-validator` from the P-Chain config. It has had no effect since v1.14.2. The node ignores the key if a config still sets it.
+- `api-max-blocks-per-request` was added back to the C-Chain config.
+
+### Metrics
+
+- C-Chain metrics no longer include the `transition` prefix. For example, `avalanche_evm_transition_sae_last_executed_height` is now `avalanche_evm_sae_last_executed_height`.
+- Added `avalanche_evm_sae_unsettled_gas_limit` (gauge): worst-case gas of accepted blocks that have not yet settled.
+- Added `avalanche_evm_sae_execution_gas_rate_headroom` (histogram), `avalanche_evm_sae_execution_gas_rate_headroom_latest` (gauge), and `avalanche_evm_sae_tau_second_avg_executed_gas_per_second` (gauge) to monitor gas-vs-wall clock skew during execution, for tuning the gas target.
+
+### Fixes
+
+- Fixed C-Chain `api-max-duration` only limiting `eth_call` since Helicon. It again limits every call to the `/rpc` and `/ws` endpoints, and a WebSocket call that times out doesn't close its connection.
 
 ## [v1.15.1](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.1)
 
@@ -13,11 +65,6 @@
 - SAE `VM.HealthCheck()` reports a stalled executor, previously only surfaced via `ERROR` / `FATAL` logging
 - Updated the minimum Go version from `1.25.10` to `1.26.8`.
 - Helicon is now active from genesis on local networks. A local network started on a previous version is not compatible with this version.
-
-### APIs
-
-- Added:
-  - `restakedValidationRewards` and `restakedDelegateeRewards` fields to `platform.getCurrentValidators` results for auto-renewed validators
 
 ### Metrics
 

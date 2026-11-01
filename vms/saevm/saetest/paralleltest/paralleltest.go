@@ -6,6 +6,7 @@
 package paralleltest
 
 import (
+	"sync/atomic"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -83,7 +84,7 @@ func NewExecutor[CommonData, Prefetch any, R parallel.PrecompileResult, Aggregat
 	tr, err := saedb.NewTracker(db, dbConfig, genesis.Hash(), tb.TempDir(), logger)
 	require.NoError(tb, err, "saedb.NewTracker()")
 
-	exec, err := saexec.New(genesis, src, config, db, xdb, tr, hooks, logger, prometheus.NewRegistry())
+	exec, err := saexec.New(genesis, new(atomic.Pointer[blocks.Block]), src, config, db, xdb, tr, hooks, logger, prometheus.NewRegistry())
 	require.NoError(tb, err, "saexec.New()")
 
 	tb.Cleanup(func() {

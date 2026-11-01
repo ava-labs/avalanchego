@@ -3,7 +3,7 @@
 
 package precompileconfig
 
-import "github.com/ava-labs/avalanchego/graft/evm/utils"
+import "github.com/ava-labs/avalanchego/utils"
 
 // Upgrade contains the timestamp for the upgrade along with
 // a boolean [Disable]. If [Disable] is set, the upgrade deactivates
@@ -29,5 +29,5 @@ func (u *Upgrade) Equal(other *Upgrade) bool {
 	if other == nil {
 		return false
 	}
-	return u.Disable == other.Disable && utils.Uint64PtrEqual(u.BlockTimestamp, other.BlockTimestamp)
+	return u.Disable == other.Disable && utils.PtrEqual(u.BlockTimestamp, other.BlockTimestamp)
 }

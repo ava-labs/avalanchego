@@ -118,39 +118,17 @@ func (s *Syncer) Sync(ctx context.Context) error {
 // maxBlocks-1 of its ancestors, in descending height order. It keeps
 // re-requesting from peers until a valid chain arrives or ctx ends.
 func (s *Syncer) getBlocks(ctx context.Context, hash common.Hash, height uint64, maxBlocks uint16) ([]*types.Block, error) {
-	req := &syncpb.GetBlockRequest{
-		Height: height,
-		// The field counts parents, so it excludes the block at height.
-		NumParents: uint32(maxBlocks - 1),
-	}
-	for {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-
-		resp := &syncpb.GetBlockResponse{}
-		outcome, err := s.client.Send(ctx, req, resp)
-		if err != nil {
-			// Send already de-scored the peer, re-request from another.
-			s.log.Debug("block request failed, re-requesting",
-				zap.Error(err),
-			)
-			continue
-		}
-
-		blocks, err := verifyBlocks(hash, maxBlocks, resp.GetBlocks(), s.parseBlock)
-		if err != nil {
-			outcome.Failure()
-			s.log.Debug("invalid block response, re-requesting",
-				zap.Stringer("nodeID", outcome.NodeID()),
-				zap.Error(err),
-			)
-			continue
-		}
-
-		outcome.Success()
-		return blocks, nil
-	}
+	return s.client.Send(
+		ctx,
+		&syncpb.GetBlockRequest{
+			Height: height,
+			// The field counts parents, so it excludes the block at height.
+			NumParents: uint32(maxBlocks - 1),
+		},
+		func(resp *syncpb.GetBlockResponse) ([]*types.Block, error) {
+			return verifyBlocks(hash, maxBlocks, resp.GetBlocks(), s.parseBlock)
+		},
+	)
 }
 
 var (

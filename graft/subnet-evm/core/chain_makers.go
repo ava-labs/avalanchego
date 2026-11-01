@@ -31,12 +31,12 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/consensus/misc/eip4844"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -537,5 +537,5 @@ func (cm *chainMaker) GetFeeConfigAt(parent *types.Header) (commontype.FeeConfig
 }
 
 func (cm *chainMaker) GetCoinbaseAt(parent *types.Header) (common.Address, bool, error) {
-	return constants.BlackholeAddr, params.GetExtra(cm.config).AllowFeeRecipients, nil
+	return blackhole.Address, params.GetExtra(cm.config).AllowFeeRecipients, nil
 }

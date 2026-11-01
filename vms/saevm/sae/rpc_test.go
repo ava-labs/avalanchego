@@ -4,16 +4,20 @@
 package sae
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
 	"math"
 	"math/big"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"reflect"
 	"runtime/debug"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -117,7 +121,7 @@ func (s *SUT) testRPC(ctx context.Context, t *testing.T, tcs ...rpcTest) {
 			if tc.parallel {
 				t.Parallel()
 			}
-			t.Logf("%T.CallContext(ctx, %T, %q, %v...)", s.rpcClient, &tc.want, tc.method, tc.args)
+			t.Logf("%T.CallContext(ctx, %T, %q, %v...)", s.Client.RPC, &tc.want, tc.method, tc.args)
 			if tc.eventually {
 				require.EventuallyWithT(t, func(c *assert.CollectT) {
 					test(c)
@@ -176,7 +180,7 @@ func TestSubscriptions(t *testing.T) {
 		newLogs  = make(chan types.Log, 1)
 	)
 	{
-		sub, err := sut.rpcClient.EthSubscribe(ctx, newTxs, "newPendingTransactions")
+		sub, err := sut.EthSubscribe(ctx, newTxs, "newPendingTransactions")
 		require.NoError(t, err, "EthSubscribe(newPendingTransactions)")
 		t.Cleanup(sub.Unsubscribe)
 	}
@@ -842,6 +846,21 @@ func TestGetLogs(t *testing.T) {
 			},
 			wantLogs: logsFrom(indexed...),
 		},
+		{
+			name: "to_future_block",
+			query: ethereum.FilterQuery{
+				FromBlock: executed.Number(),
+				ToBlock:   new(big.Int).Add(executed.Number(), big.NewInt(10)),
+			},
+			wantLogs: logsFrom(executed),
+		},
+		{
+			name: "future_range",
+			query: ethereum.FilterQuery{
+				FromBlock: new(big.Int).Add(executed.Number(), big.NewInt(1)),
+				ToBlock:   new(big.Int).Add(executed.Number(), big.NewInt(10)),
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -853,6 +872,146 @@ func TestGetLogs(t *testing.T) {
 			}
 			if diff := cmp.Diff(tt.wantLogs, got, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("eth_getLogs(...) mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestGetLogsRange checks how the requested block range is resolved and
+// bounded by [saerpc.Config.MaxBlocksPerRequest], including while the
+// last-accepted block is still executing.
+func TestGetLogsRange(t *testing.T) {
+	const maxBlocksPerRequest = 2
+
+	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
+	ctx, sut := newSUT(t, 1, precompileOpt, timeOpt, options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.RPCConfig.MaxBlocksPerRequest = maxBlocksPerRequest
+	}))
+	defer unblock()
+
+	genesis := sut.lastAcceptedBlock(t)
+	settled := sut.runConsensusLoop(t)
+	vmTime.AdvanceToSettle(ctx, t, settled)
+	executed := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		Gas:      1e6,
+		GasPrice: big.NewInt(1),
+		Data:     saetest.LogTopOfStackAfter(saetest.Ops(vm.PUSH0)), // contract creation, so this runs and emits a log
+	}))
+	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
+	executedLogs := []types.Log{*executed.Receipts()[0].Logs[0]}
+
+	unexecuted := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		To:       &blockingPrecompile,
+		Gas:      params.TxGas,
+		GasPrice: big.NewInt(1),
+	}))
+	future := hexutil.Uint64(unexecuted.Height() + 1)
+
+	num := func(b *blocks.Block) hexutil.Uint64 {
+		return hexutil.Uint64(b.Height())
+	}
+
+	tests := []struct {
+		name     string
+		query    map[string]any
+		wantLogs []types.Log
+		wantErr  testerr.Want
+	}{
+		{
+			name:  "at_limit",
+			query: map[string]any{"fromBlock": num(genesis), "toBlock": num(settled)},
+		},
+		{
+			name:    "over_limit",
+			query:   map[string]any{"fromBlock": num(genesis), "toBlock": num(executed)},
+			wantErr: testerr.Contains("requested too many blocks from 0 to 2, maximum is set to 2"),
+		},
+		{
+			name:    "over_limit_to_latest",
+			query:   map[string]any{"fromBlock": num(genesis)},
+			wantErr: testerr.Contains("requested too many blocks from 0 to 2, maximum is set to 2"),
+		},
+		{
+			name:    "over_limit_to_future_block",
+			query:   map[string]any{"fromBlock": num(genesis), "toBlock": future + 100},
+			wantErr: testerr.Contains("requested too many blocks from 0 to 3, maximum is set to 2"),
+		},
+		{
+			name:     "to_future_block",
+			query:    map[string]any{"fromBlock": num(executed), "toBlock": future + 100},
+			wantLogs: executedLogs,
+		},
+		{
+			name:     "to_unexecuted_block",
+			query:    map[string]any{"fromBlock": num(executed), "toBlock": num(unexecuted)},
+			wantLogs: executedLogs,
+		},
+		{
+			name:    "hash_of_unexecuted_block",
+			query:   map[string]any{"blockHash": unexecuted.Hash()},
+			wantErr: testerr.Contains("unknown block"), // from libevm
+		},
+		{
+			name:  "from_unexecuted_block",
+			query: map[string]any{"fromBlock": num(unexecuted)},
+		},
+		{
+			name:  "from_future_block",
+			query: map[string]any{"fromBlock": future},
+		},
+		{
+			name:  "future_range",
+			query: map[string]any{"fromBlock": future, "toBlock": future + 9},
+		},
+		{
+			name:    "from_greater_than_to",
+			query:   map[string]any{"fromBlock": num(executed), "toBlock": num(settled)},
+			wantErr: testerr.Contains("invalid block range params"), // from libevm
+		},
+		{
+			name:    "with_hash_and_range_libevm_error",
+			query:   map[string]any{"blockHash": settled.Hash(), "fromBlock": future},
+			wantErr: testerr.Contains("cannot specify both BlockHash and FromBlock/ToBlock"), // from libevm
+		},
+		{
+			name:    "from_finalized_matches_settled",
+			query:   map[string]any{"fromBlock": "finalized", "toBlock": num(unexecuted)},
+			wantErr: testerr.Contains("requested too many blocks from 1 to 3, maximum is set to 2"),
+		},
+		{
+			name:    "from_pending",
+			query:   map[string]any{"fromBlock": "pending"},
+			wantErr: testerr.Contains("invalid block range params"), // from libevm
+		},
+		{
+			// libevm always resolves pending to last executed, but the config is NOT set.
+			name:  "pending_resolves_to_last_accepted",
+			query: map[string]any{"fromBlock": "pending", "toBlock": "pending"},
+		},
+		{
+			name:    "future_range_reversed",
+			query:   map[string]any{"fromBlock": future + 9, "toBlock": future},
+			wantErr: testerr.Contains("invalid block range params"), // from libevm
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got []types.Log
+			err := sut.CallContext(ctx, &got, "eth_getLogs", tt.query)
+			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
+				t.Fatalf("eth_getLogs(%v) %s", tt.query, diff)
+			}
+			if err != nil {
+				return
+			}
+
+			// must be an empty array, not null, to match libevm.
+			require.NotNilf(t, got, "eth_getLogs(%v)", tt.query)
+			if diff := cmp.Diff(tt.wantLogs, got, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("eth_getLogs(%v) mismatch (-want +got):\n%s", tt.query, diff)
 			}
 		})
 	}
@@ -1646,10 +1805,10 @@ func withAllAPIs() sutOption {
 const errCodeMethodNotFound = -32601
 
 // methodRegistered reports whether sut serves method.
-func methodRegistered(ctx context.Context, tb testing.TB, sut *SUT, method string) bool {
+func methodRegistered(ctx context.Context, tb testing.TB, sut *SUT, method string, args ...any) bool {
 	tb.Helper()
 
-	err := sut.CallContext(ctx, new(json.RawMessage), method)
+	err := sut.CallContext(ctx, new(json.RawMessage), method, args...)
 	if err == nil {
 		return true
 	}
@@ -1659,19 +1818,25 @@ func methodRegistered(ctx context.Context, tb testing.TB, sut *SUT, method strin
 }
 
 func TestAPIsServed(t *testing.T) {
+	type call struct {
+		method string
+		args   []any
+	}
 	// A method served by each API and no other.
-	methods := map[saerpc.API]string{
-		saerpc.APIWeb3:         "web3_clientVersion",
-		saerpc.APINet:          "net_version",
-		saerpc.APITxPool:       "txpool_status",
-		saerpc.APIPrice:        "eth_gasPrice",
-		saerpc.APIChain:        "eth_blockNumber",
-		saerpc.APITx:           "eth_getTransactionCount",
-		saerpc.APISubscription: "eth_getLogs",
-		saerpc.APIAvalanche:    "eth_callDetailed",
-		saerpc.APIDB:           "debug_dbGet",
-		saerpc.APIProfile:      "debug_gcStats",
-		saerpc.APITrace:        "debug_traceBlockByNumber",
+	methods := map[saerpc.API]call{
+		saerpc.APIWeb3:         {method: "web3_clientVersion"},
+		saerpc.APINet:          {method: "net_version"},
+		saerpc.APITxPool:       {method: "txpool_status"},
+		saerpc.APIPrice:        {method: "eth_gasPrice"},
+		saerpc.APIChain:        {method: "eth_blockNumber"},
+		saerpc.APITx:           {method: "eth_getTransactionCount"},
+		saerpc.APISubscription: {method: "eth_subscribe", args: []any{"newHeads"}},
+		saerpc.APIFilter:       {method: "eth_uninstallFilter"},
+		saerpc.APILogs:         {method: "eth_getLogs"},
+		saerpc.APIAvalanche:    {method: "eth_callDetailed"},
+		saerpc.APIDB:           {method: "debug_dbGet"},
+		saerpc.APIProfile:      {method: "debug_gcStats"},
+		saerpc.APITrace:        {method: "debug_traceBlockByNumber"},
 	}
 	require.Equal(t, saerpc.AllAPIs(), set.Of(slices.Collect(maps.Keys(methods))...), "every API has a method")
 
@@ -1685,8 +1850,8 @@ func TestAPIsServed(t *testing.T) {
 	for name, apis := range configs {
 		t.Run(name, func(t *testing.T) {
 			ctx, sut := newSUT(t, 0, withAPIs(apis))
-			for api, method := range methods {
-				assert.Equalf(t, apis.Contains(api), methodRegistered(ctx, t, sut, method), "%s served with %v enabled", method, apis)
+			for api, c := range methods {
+				assert.Equalf(t, apis.Contains(api), methodRegistered(ctx, t, sut, c.method, c.args...), "%s served with %v enabled", c.method, apis)
 			}
 		})
 	}
@@ -1793,4 +1958,152 @@ func hexBig(n int64) *hexutil.Big {
 
 func hexBigU(n uint64) *hexutil.Big {
 	return (*hexutil.Big)(new(big.Int).SetUint64(n))
+}
+
+func TestGasUsedHeader(t *testing.T) {
+	echoReverter := common.Address{'e', 'c', 'h', 'o'}
+	invalidJumper := common.Address{'i', 'n', 'v', 'a', 'l', 'i', 'd'}
+	blocking := common.Address{'b', 'l', 'o', 'c', 'k'}
+	const gasCap = 100e6
+	precompileOpt, unblock := withBlockingPrecompile(blocking)
+	ctx, sut := newSUT(t, 1, precompileOpt, options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.RPCConfig.CallTimeout = time.Second
+		c.vmConfig.RPCConfig.GasCap = gasCap
+		c.genesis.Alloc[echoReverter] = types.Account{
+			Code: saetest.Ops(
+				vm.CALLDATASIZE, vm.PUSH0, vm.PUSH0, vm.CALLDATACOPY,
+				vm.CALLDATASIZE, vm.PUSH0, vm.REVERT,
+			),
+			Balance: new(big.Int),
+		}
+		c.genesis.Alloc[invalidJumper] = types.Account{
+			// Jumping back to PC=0 is invalid because it's not a [vm.JUMPDEST]
+			Code:    saetest.Ops(vm.PUSH0, vm.JUMP),
+			Balance: new(big.Int),
+		}
+	}))
+
+	recipient := common.Address{'r', 'e', 'c', 'v'}
+	escrowAddr := sut.deployEscrow(t)
+	sut.depositToEscrow(t, escrowAddr, recipient, common.Big1)
+
+	// [dialRPC] isn't used because an [rpc.Client] doesn't expose response
+	// headers, and over HTTP it fails to send a notification because it expects
+	// a response body.
+	handlers, err := sut.CreateHandlers(ctx)
+	require.NoErrorf(t, err, "%T.CreateHandlers()", sut)
+	server := httptest.NewServer(handlers[rpcHTTPExtensionPath])
+	t.Cleanup(server.Close)
+
+	// MUST occur before the server is closed, which waits for blocked calls.
+	defer unblock()
+
+	latest := rpc.LatestBlockNumber.String()
+	balanceOf := ethapi.TransactionArgs{
+		To:   &escrowAddr,
+		Data: new(hexutil.Bytes(escrow.CallDataForBalance(recipient))),
+	}
+	revert := ethapi.TransactionArgs{
+		To:   &echoReverter,
+		Data: new(hexutil.Bytes{42}),
+	}
+	const (
+		balanceOfGas = "23675"
+		revertGas    = "21035"
+		batchGas     = "44710" // balanceOfGas + revertGas
+	)
+
+	type request struct {
+		JSONRPC string `json:"jsonrpc"`
+		ID      int    `json:"id,omitempty"`
+		Method  string `json:"method"`
+		Params  []any  `json:"params"`
+	}
+	newReq := func(method string, params ...any) request {
+		return request{JSONRPC: "2.0", ID: 1, Method: method, Params: params}
+	}
+
+	tests := []struct {
+		name string
+		body any
+		want string // empty if the header must be absent
+	}{
+		{
+			name: "eth_call",
+			body: newReq("eth_call", balanceOf, latest),
+			want: balanceOfGas,
+		},
+		{
+			name: "eth_call_default_block",
+			body: newReq("eth_call", balanceOf),
+			want: balanceOfGas,
+		},
+		{
+			name: "eth_call_revert",
+			body: newReq("eth_call", revert, latest),
+			want: revertGas,
+		},
+		{
+			// The call fails without reverting, so it uses all of its gas.
+			name: "eth_call_invalid_jump",
+			body: newReq("eth_call", ethapi.TransactionArgs{To: &invalidJumper}, latest),
+			want: strconv.FormatUint(gasCap, 10),
+		},
+		{
+			name: "batch",
+			body: []request{
+				newReq("eth_call", balanceOf, latest),
+				newReq("eth_call", revert, latest),
+				newReq("eth_blockNumber"),
+			},
+			want: batchGas,
+		},
+		{
+			// Without an ID, the call runs but no response is written.
+			name: "notification",
+			body: request{JSONRPC: "2.0", Method: "eth_call", Params: []any{balanceOf, latest}},
+			want: balanceOfGas,
+		},
+		{
+			name: "no_calls",
+			body: newReq("eth_blockNumber"),
+		},
+		{
+			name: "unknown_block",
+			body: newReq("eth_call", balanceOf, common.Hash{1}),
+		},
+		{
+			// The timeout response is written while the call is still running,
+			// so its gas is never reported.
+			name: "eth_call_timeout",
+			body: newReq("eth_call", ethapi.TransactionArgs{To: &blocking}, latest),
+		},
+		{
+			name: "batch_with_timeout",
+			body: []request{
+				newReq("eth_call", balanceOf, latest),
+				newReq("eth_call", ethapi.TransactionArgs{To: &blocking}, latest),
+			},
+			want: balanceOfGas,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, server.URL, bytes.NewReader(marshalJSON(t, tt.body)))
+			require.NoError(t, err, "http.NewRequestWithContext()")
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := server.Client().Do(req)
+			require.NoErrorf(t, err, "%T.Do()", server.Client())
+			defer resp.Body.Close()
+
+			require.Equal(t, http.StatusOK, resp.StatusCode, "status code")
+			got := resp.Header.Values(saerpc.GasUsedHeader)
+			if tt.want == "" {
+				require.Emptyf(t, got, "%q header", saerpc.GasUsedHeader)
+				return
+			}
+			require.Equalf(t, []string{tt.want}, got, "%q header", saerpc.GasUsedHeader)
+		})
+	}
 }

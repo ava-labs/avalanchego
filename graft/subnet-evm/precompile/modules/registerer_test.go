@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/constants"
+	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 )
 
 func TestInsertSortedByAddress(t *testing.T) {
@@ -48,7 +48,7 @@ func TestInsertSortedByAddress(t *testing.T) {
 func TestRegisterModuleInvalidAddresses(t *testing.T) {
 	// Test the blockhole address cannot be registered
 	m := Module{
-		Address: constants.BlackholeAddr,
+		Address: blackhole.Address,
 	}
 	err := RegisterModule(m)
 	require.ErrorIs(t, err, errBlackholeAddress)

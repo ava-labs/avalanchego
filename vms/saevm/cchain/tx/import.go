@@ -6,15 +6,10 @@ package tx
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 
-	// Imported for [atomic.UnsignedImportTx.Burned] comment resolution.
-	_ "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
@@ -22,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -68,9 +64,8 @@ func (i *Import) inputIDs() set.Set[ids.ID] {
 	return s
 }
 
-// Like [atomic.UnsignedImportTx.Burned], burned will error if the sum of the
-// inputs exceeds MaxUint64, even if the total amount burned could be
-// represented as a uint64.
+// burned will error if the sum of the inputs exceeds MaxUint64, even if the
+// total amount burned could be represented as a uint64.
 //
 // Because the total supply of AVAX fits in a uint64, this doesn't matter in
 // practice and allows for easier fuzzing.
@@ -245,9 +240,7 @@ func (i *Import) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) 
 			continue
 		}
 
-		coinID := common.Hash(out.AssetID)
-		amount := new(big.Int).SetUint64(out.Amount)
-		statedb.AddBalanceMultiCoin(out.Address, coinID, amount)
+		statedb.AddAssetBalance(out.Address, common.Hash(out.AssetID), uint256.NewInt(out.Amount))
 	}
 	return nil
 }

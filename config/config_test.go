@@ -1002,6 +1002,46 @@ func TestGetDiskSpaceConfig(t *testing.T) {
 	}
 }
 
+func TestGetProfilerConfigMutexFraction(t *testing.T) {
+	tests := []struct {
+		name             string
+		set              *int
+		expectedFraction int
+		expectedErr      error
+	}{
+		{
+			name:             "default records all mutex events",
+			expectedFraction: 1,
+		},
+		{
+			name:             "positive fraction",
+			set:              new(5),
+			expectedFraction: 5,
+		},
+		{
+			name:        "negative fraction",
+			set:         new(-1),
+			expectedErr: errNegativeMutexProfileFraction,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+			v := setupViperFlags()
+			if tt.set != nil {
+				v.Set(ProfileContinuousMutexFractionKey, *tt.set)
+			}
+
+			config, err := getProfilerConfig(v)
+			require.ErrorIs(err, tt.expectedErr)
+			if tt.expectedErr == nil {
+				require.Equal(tt.expectedFraction, config.MutexProfileFraction)
+			}
+		})
+	}
+}
+
 // setups config json file and writes content
 func setupConfigJSON(t *testing.T, rootPath string, value string) string {
 	configFilePath := filepath.Join(rootPath, "config.json")

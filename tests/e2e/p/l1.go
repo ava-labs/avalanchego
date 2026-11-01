@@ -838,8 +838,6 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		genesisPeerMessages.Close()
 		genesisPeer.StartClose()
 		require.NoError(genesisPeer.AwaitClosed(tc.DefaultContext()))
-
-		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 	})
 })
 

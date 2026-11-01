@@ -178,6 +178,11 @@ func TestParseConfig(t *testing.T) {
 			want: with(func(c *config) { c.AllowUnprotectedTxs = true }),
 		},
 		{
+			name: "api/max_blocks_per_request",
+			json: `{"api-max-blocks-per-request":2000}`,
+			want: with(func(c *config) { c.MaxBlocksPerRequest = 2000 }),
+		},
+		{
 			name: "api/batch_request_limit",
 			json: `{"batch-request-limit":50}`,
 			want: with(func(c *config) { c.BatchRequestLimit = 50 }),
@@ -273,6 +278,7 @@ func TestParseConfig(t *testing.T) {
 				"tx-pool-global-slots":2048,
 				"apis":["chain","trace"],
 				"allow-unprotected-txs":true,
+				"api-max-blocks-per-request":2000,
 				"batch-request-limit":50,
 				"api-max-duration":"30s",
 				"state-sync-enabled":false,
@@ -295,6 +301,7 @@ func TestParseConfig(t *testing.T) {
 				TxPoolGlobalSlots:            2048,
 				APIs:                         set.Of(rpc.APIChain, rpc.APITrace),
 				AllowUnprotectedTxs:          true,
+				MaxBlocksPerRequest:          2000,
 				BatchRequestLimit:            50,
 				APIMaxDuration:               duration{30 * time.Second},
 				WarpOffChainMessages:         []hexutil.Bytes{{0x12, 0x34}},

@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/netip"
 
-	"github.com/gorilla/rpc/v2"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/chains"
@@ -23,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
@@ -99,11 +99,8 @@ func NewService(
 	network network.Network,
 	benchlist benchlist.Manager,
 ) (http.Handler, error) {
-	server := rpc.NewServer()
-	codec := json.NewCodec()
-	server.RegisterCodec(codec, "application/json")
-	server.RegisterCodec(codec, "application/json;charset=UTF-8")
-	return server, server.RegisterService(
+	return rpc.NewHandler(
+		"info",
 		&Info{
 			Parameters:   parameters,
 			log:          log,
@@ -114,7 +111,6 @@ func NewService(
 			networking:   network,
 			benchlist:    benchlist,
 		},
-		"info",
 	)
 }
 

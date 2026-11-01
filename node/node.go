@@ -82,10 +82,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
-	"github.com/ava-labs/avalanchego/vms/transitionvm"
 
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
-	coreth "github.com/ava-labs/avalanchego/graft/coreth/plugin/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 	saevm "github.com/ava-labs/avalanchego/vms/saevm/cchain"
@@ -418,6 +416,17 @@ type Node struct {
  ******************************************************************************
  */
 
+// listen creates a TCP listener on the given address.
+//
+// See [net.Listen] for more details.
+func listen(ctx context.Context, address string) (net.Listener, error) {
+	var lc net.ListenConfig
+	// Harden against the public exploit of CVE-2026-98432 in case the node is
+	// running on a vulnerable operating system.
+	lc.SetMultipathTCP(false)
+	return lc.Listen(ctx, constants.NetworkType, address)
+}
+
 // Initialize the networking layer.
 // Assumes [n.vdrs], [n.CPUTracker], and [n.CPUTargeter] have been initialized.
 func (n *Node) initNetworking(reg prometheus.Registerer) error {
@@ -439,7 +448,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
 	// 2: https://github.com/golang/go/issues/56998
 	listenAddress := net.JoinHostPort(n.Config.ListenHost, strconv.FormatUint(uint64(n.Config.ListenPort), 10))
-	listener, err := net.Listen(constants.NetworkType, listenAddress)
+	listener, err := listen(context.TODO(), listenAddress)
 	if err != nil {
 		return err
 	}
@@ -973,7 +982,7 @@ func (n *Node) initAPIServer() error {
 	}
 
 	listenAddress := net.JoinHostPort(n.Config.HTTPHost, strconv.FormatUint(uint64(n.Config.HTTPPort), 10))
-	listener, err := net.Listen("tcp", listenAddress)
+	listener, err := listen(context.TODO(), listenAddress)
 	if err != nil {
 		return err
 	}
@@ -1228,27 +1237,7 @@ func (n *Node) initVMs() error {
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 			},
 		}),
-		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &transitionvm.Factory{
-			PreFactory:  &coreth.Factory{},
-			PostFactory: &saevm.Factory{},
-			// Transitioning starts briefly before the scheduled Helicon time.
-			//
-			// This allows all Coreth blocks to be executed using the
-			// Pre-Helicon rules and all SAE blocks to be executed using the
-			// Post-Helicon rules.
-			//
-			// Coreth enforces a minimum block time, so we must provide a
-			// sufficient window to guarantee that Coreth can build a block
-			// after the transition time but before the Helicon time. Otherwise,
-			// Coreth may accept a pre-transition block whose timestamp would
-			// force its child to execute with the Post-Helicon rules, which
-			// would cause the chain to halt. The C-Chain's minimum block time
-			// is around a second, so 10 seconds provides plenty of time to
-			// ensure this doesn't happen.
-			TransitionTime:  n.Config.UpgradeConfig.HeliconTime.Add(-10 * time.Second),
-			Now:             time.Now,
-			APIDrainTimeout: 15 * time.Second,
-		}),
+		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &saevm.Factory{}),
 	)
 	if err != nil {
 		return err
@@ -1376,6 +1365,7 @@ func (n *Node) initProfiler() {
 		filepath.Join(n.Config.ProfilerConfig.Dir, "continuous"),
 		n.Config.ProfilerConfig.Freq,
 		n.Config.ProfilerConfig.MaxNumFiles,
+		n.Config.ProfilerConfig.MutexProfileFraction,
 	)
 	go n.Log.RecoverAndPanic(func() {
 		err := n.profiler.Dispatch()

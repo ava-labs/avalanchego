@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
-	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
@@ -28,17 +27,9 @@ type StatefulPrecompiledContract interface {
 
 // StateDB is the interface for accessing EVM state
 type StateDB interface {
-	GetState(common.Address, common.Hash, ...stateconf.StateDBStateOption) common.Hash
-	SetState(common.Address, common.Hash, common.Hash, ...stateconf.StateDBStateOption)
-
-	SetNonce(common.Address, uint64)
-	GetNonce(common.Address) uint64
-
-	GetBalance(common.Address) *uint256.Int
-	AddBalance(common.Address, *uint256.Int)
-	GetBalanceMultiCoin(common.Address, common.Hash) *big.Int
-	AddBalanceMultiCoin(common.Address, common.Hash, *big.Int)
-	SubBalanceMultiCoin(common.Address, common.Hash, *big.Int)
+	GetAssetBalance(common.Address, common.Hash) *uint256.Int
+	AddAssetBalance(common.Address, common.Hash, *uint256.Int)
+	SubAssetBalance(common.Address, common.Hash, *uint256.Int)
 
 	CreateAccount(common.Address)
 	Exist(common.Address) bool
@@ -73,14 +64,4 @@ type BlockContext interface {
 	// GetPredicateResults returns the result of verifying the predicates of the
 	// given transaction, precompile address pair.
 	GetPredicateResults(txHash common.Hash, precompileAddress common.Address) set.Bits
-}
-
-type Configurator interface {
-	MakeConfig() precompileconfig.Config
-	Configure(
-		chainConfig precompileconfig.ChainConfig,
-		precompileconfig precompileconfig.Config,
-		state StateDB,
-		blockContext ConfigurationBlockContext,
-	) error
 }
