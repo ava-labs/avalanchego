@@ -443,6 +443,46 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			wantUptime:      10 * time.Second,
 			wantLastUpdated: time.Time{}.Add(20 * time.Second),
 		},
+		{
+			name: "disconnected validator reactivated",
+			steps: []testStep{
+				{
+					validators: []validators.GetCurrentValidatorOutput{
+						{
+							ValidationID: ids.ID{1},
+							NodeID:       ids.NodeID{1},
+							StartTime:    uint64(time.Time{}.Unix()),
+							IsActive:     false,
+						},
+					},
+				},
+				{
+					timestamp: time.Time{}.Add(10 * time.Second),
+					validators: []validators.GetCurrentValidatorOutput{
+						{
+							ValidationID: ids.ID{1},
+							NodeID:       ids.NodeID{1},
+							StartTime:    uint64(time.Time{}.Unix()),
+							IsActive:     true,
+						},
+					},
+				},
+				{
+					timestamp: time.Time{}.Add(80 * time.Second),
+					validators: []validators.GetCurrentValidatorOutput{
+						{
+							ValidationID: ids.ID{1},
+							NodeID:       ids.NodeID{1},
+							StartTime:    uint64(time.Time{}.Unix()),
+							IsActive:     true,
+						},
+					},
+				},
+			},
+			validationID:    ids.ID{1},
+			wantUptime:      0, // never connected
+			wantLastUpdated: time.Time{}.Add(80 * time.Second),
+		},
 	}
 
 	for _, tt := range tests {

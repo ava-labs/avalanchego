@@ -236,6 +236,9 @@ func (u *UptimeTracker) update(
 // activate treats nodeID as online
 func (u *UptimeTracker) activate(nodeID ids.NodeID) error {
 	u.deactivatedValidators.Remove(nodeID)
+	if !u.connectedValidators.Contains(nodeID) {
+		return nil
+	}
 
 	return u.manager.Connect(nodeID)
 }
