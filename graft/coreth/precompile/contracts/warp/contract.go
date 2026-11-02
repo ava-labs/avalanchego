@@ -141,7 +141,7 @@ func PackGetBlockchainIDOutput(blockchainID common.Hash) ([]byte, error) {
 func getBlockchainID(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	env := accessibleState.GetPrecompileEnv()
 	warpGasConfig := CurrentGasConfig(accessibleState.GetRules())
-	if err := contract.DeductMaxGas(env, warpGasConfig.GetBlockchainID); err != nil {
+	if err := contract.DeductGas(env, warpGasConfig.GetBlockchainID); err != nil {
 		return nil, err
 	}
 	return PackGetBlockchainIDOutput(common.Hash(accessibleState.GetSnowContext().ChainID))
@@ -234,7 +234,7 @@ func PackSendWarpMessageOutput(messageID common.Hash) ([]byte, error) {
 func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	env := accessibleState.GetPrecompileEnv()
 	warpGasConfig := CurrentGasConfig(accessibleState.GetRules())
-	if err := contract.DeductMaxGas(env, warpGasConfig.SendWarpMessageBase); err != nil {
+	if err := contract.DeductGas(env, warpGasConfig.SendWarpMessageBase); err != nil {
 		return nil, err
 	}
 	// This gas cost includes buffer room because it is based off of the total size of the input instead of the produced payload.
@@ -243,7 +243,7 @@ func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Add
 	if overflow {
 		payloadGas = math.MaxUint64
 	}
-	if err := contract.DeductMaxGas(env, payloadGas); err != nil {
+	if err := contract.DeductGas(env, payloadGas); err != nil {
 		return nil, err
 	}
 	if readOnly {

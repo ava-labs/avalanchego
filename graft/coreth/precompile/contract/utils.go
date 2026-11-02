@@ -22,9 +22,9 @@ const (
 	LogDataGas uint64 = 8 // from params/protocol_params.go
 )
 
-// DeductMaxGas tries to consume requiredGas, and if not possible, consumes all
+// DeductGas tries to consume requiredGas, and if not possible, consumes all
 // available and returns [vm.ErrOutOfGas].
-func DeductMaxGas(env vm.PrecompileEnvironment, requiredGas uint64) error {
+func DeductGas(env vm.PrecompileEnvironment, requiredGas uint64) error {
 	if env.UseGas(requiredGas) {
 		return nil
 	}

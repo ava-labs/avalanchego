@@ -72,7 +72,7 @@ func UnpackNativeAssetBalanceInput(input []byte) (common.Address, common.Hash, e
 // [PackNativeAssetBalanceInput]. Malformed input reverts.
 func (*NativeAssetBalance) Run(accessibleState contract.AccessibleState, _ common.Address, _ common.Address, input []byte, _ bool) ([]byte, error) {
 	env := accessibleState.GetPrecompileEnv()
-	if err := contract.DeductMaxGas(env, AssetBalanceCost); err != nil {
+	if err := contract.DeductGas(env, AssetBalanceCost); err != nil {
 		return nil, err
 	}
 
@@ -121,9 +121,9 @@ func UnpackNativeAssetCallInput(input []byte) (common.Address, common.Hash, *uin
 // is packed by [PackNativeAssetCallInput]. The transfer is undone if the call
 // fails. If the call fails other than by reverting, all remaining gas is
 // consumed. Read-only calls and malformed input revert.
-func (c *NativeAssetCall) Run(accessibleState contract.AccessibleState, caller common.Address, _ common.Address, input []byte, readOnly bool) ([]byte, error) {
+func (*NativeAssetCall) Run(accessibleState contract.AccessibleState, caller common.Address, _ common.Address, input []byte, readOnly bool) ([]byte, error) {
 	env := accessibleState.GetPrecompileEnv()
-	if err := contract.DeductMaxGas(env, AssetCallCost); err != nil {
+	if err := contract.DeductGas(env, AssetCallCost); err != nil {
 		return nil, err
 	}
 

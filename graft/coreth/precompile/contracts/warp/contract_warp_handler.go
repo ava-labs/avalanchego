@@ -46,7 +46,7 @@ type messageHandler interface {
 func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, handler messageHandler) ([]byte, error) {
 	env := accessibleState.GetPrecompileEnv()
 	warpGasConfig := CurrentGasConfig(accessibleState.GetRules())
-	if err := contract.DeductMaxGas(env, warpGasConfig.GetVerifiedWarpMessageBase); err != nil {
+	if err := contract.DeductGas(env, warpGasConfig.GetVerifiedWarpMessageBase); err != nil {
 		return nil, err
 	}
 
@@ -72,7 +72,7 @@ func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, h
 	if overflow {
 		msgBytesGas = math.MaxUint64
 	}
-	if err := contract.DeductMaxGas(env, msgBytesGas); err != nil {
+	if err := contract.DeductGas(env, msgBytesGas); err != nil {
 		return nil, err
 	}
 	// Note: since the predicate is verified in advance of execution, the precompile should not
