@@ -1072,7 +1072,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 
 func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 	var (
-		env    = newEnvironment(t, upgradetest.Etna)
+		env    = newEnvironment(t, upgradetest.Latest)
 		wallet = newWallet(t, env, walletConfig{
 			subnetIDs: []ids.ID{testSubnet1.ID()},
 		})
