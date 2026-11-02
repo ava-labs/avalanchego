@@ -19,6 +19,9 @@ type TestWAL struct {
 	t      *testing.T
 	lock   sync.Mutex
 	signal sync.Cond
+	// failNextAppend, if set, is the error returned by the next Append of a record of failNextRecordType.
+	failNextAppend     error
+	failNextRecordType uint16
 }
 
 func NewTestWAL(t *testing.T) *TestWAL {
@@ -51,9 +54,25 @@ func (tw *TestWAL) Delete() error {
 	return nil
 }
 
+// FailNextAppend makes the next Append of a record of the given type fail with err without writing it,
+// simulating a transient disk fault. Later appends succeed.
+func (tw *TestWAL) FailNextAppend(recordType uint16, err error) {
+	tw.lock.Lock()
+	defer tw.lock.Unlock()
+
+	tw.failNextAppend = err
+	tw.failNextRecordType = recordType
+}
+
 func (tw *TestWAL) Append(b []byte) error {
 	tw.lock.Lock()
 	defer tw.lock.Unlock()
+
+	if tw.failNextAppend != nil && len(b) >= 2 && binary.BigEndian.Uint16(b[:2]) == tw.failNextRecordType {
+		err := tw.failNextAppend
+		tw.failNextAppend = nil
+		return err
+	}
 
 	err := tw.WriteAheadLog.Append(b)
 	tw.signal.Signal()

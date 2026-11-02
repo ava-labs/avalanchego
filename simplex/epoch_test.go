@@ -2431,6 +2431,78 @@ func TestDoubleIncrementOnPersistNotarization(t *testing.T) {
 	require.Equal(t, uint64(1), e.Metadata().Round)
 }
 
+func TestFailedNotarizationAppendHaltsEpoch(t *testing.T) {
+	bb := testutil.NewTestBlockBuilder()
+	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	comm := &recordingComm{
+		Communication:     testutil.NewNoopComm(nodes),
+		BroadcastMessages: make(chan *Message, 1000),
+	}
+	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[3], comm, bb)
+	// The injected WAL failure logs an ERROR, which fails CI.
+	conf.Logger.(*testutil.TestLogger).Silence()
+
+	e, err := NewEpoch(conf)
+	require.NoError(t, err)
+	t.Cleanup(e.Stop)
+	require.NoError(t, e.Start())
+
+	// Rounds 0 and 1 are notarized but not finalized, so nothing is committed yet.
+	advanceRound(t, e, bb, true, false, nil)
+	round1Block, _ := advanceRound(t, e, bb, true, false, nil)
+
+	// Round 2: the leader proposes a block, and we vote for it.
+	const failedRound = uint64(2)
+	require.Equal(t, failedRound, e.Metadata().Round)
+	leader := LeaderForRound(nodes, failedRound)
+	_, ok := bb.BuildBlock(context.Background(), e.Metadata(), emptyBlacklist)
+	require.True(t, ok)
+	block := bb.GetBuiltBlock()
+	vote, err := testutil.NewTestVote(block, leader)
+	require.NoError(t, err)
+	require.NoError(t, e.HandleMessage(&Message{BlockMessage: &BlockMessage{Vote: *vote, Block: block}}, leader))
+	wal.AssertBlockProposal(failedRound)
+
+	// Persisting the notarization of round 2 fails once.
+	errDisk := fmt.Errorf("transient disk failure")
+	wal.FailNextAppend(NotarizationRecordType, errDisk)
+	sigAggr := e.SignatureAggregatorCreator(e.Comm.Validators())
+	notarization, err := testutil.NewNotarization(e.Logger, sigAggr, block, nodes[:3])
+	require.NoError(t, err)
+	err = e.HandleMessage(&Message{Notarization: &notarization}, nodes[1])
+	require.ErrorIs(t, err, errDisk)
+	require.False(t, wal.ContainsNotarization(failedRound))
+
+	// A peer relays a finalization for round 1, which is above the next sequence to commit.
+	// The epoch must stay halted and not act on it.
+	finalization, _ := testutil.NewFinalizationRecord(t, sigAggr, round1Block, nodes[:3])
+	err = e.HandleMessage(&Message{Finalization: &finalization}, nodes[1])
+	require.ErrorIs(t, err, errDisk)
+
+	// Let the round timer of round 2 expire several times over.
+	bb.BlockShouldBeBuilt <- struct{}{}
+	now := conf.StartTime
+	for range 15 {
+		now = now.Add(e.MaxProposalWait / 5)
+		e.AdvanceTime(now)
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	var finalizeVoted, emptyVoted bool
+	for len(comm.BroadcastMessages) > 0 {
+		msg := <-comm.BroadcastMessages
+		if msg.FinalizeVote != nil && msg.FinalizeVote.Finalization.Round == failedRound {
+			finalizeVoted = true
+		}
+		if msg.EmptyVoteMessage != nil && msg.EmptyVoteMessage.Vote.Round == failedRound {
+			emptyVoted = true
+		}
+	}
+	require.False(t, finalizeVoted && emptyVoted,
+		"node signed both a finalize vote and an empty vote for round %d", failedRound)
+	require.False(t, finalizeVoted, "node signed a finalize vote for round %d whose notarization was never persisted", failedRound)
+}
+
 // ListnerComm is a comm that listens for incoming messages
 // and sends them to the [in] channel
 type listenerComm struct {

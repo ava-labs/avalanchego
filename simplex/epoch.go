@@ -1378,6 +1378,7 @@ func (e *Epoch) persistFinalization(finalization common.Finalization) error {
 	} else {
 		finalizationRecord := common.NewQuorumRecord(finalization.QC.Bytes(), finalization.Finalization.Bytes(), common.FinalizationRecordType)
 		if err := e.WAL.Append(finalizationRecord); err != nil {
+			e.haltedError = err
 			e.Logger.Error("Failed to append finalization record to WAL", zap.Error(err))
 			return err
 		}
@@ -1640,6 +1641,7 @@ func (e *Epoch) persistEmptyNotarization(emptyVotes *EmptyVoteSet, shouldBroadca
 	emptyNotarization := emptyVotes.emptyNotarization
 	emptyNotarizationRecord := common.NewEmptyNotarizationRecord(emptyNotarization)
 	if err := e.WAL.Append(emptyNotarizationRecord); err != nil {
+		e.haltedError = err
 		e.Logger.Error("Failed to append empty notarization record to WAL", zap.Error(err))
 		return err
 	}
@@ -1735,6 +1737,7 @@ func (e *Epoch) writeNotarizationToWal(notarization common.Notarization) error {
 	notarizationRecord := common.NewQuorumRecord(notarization.QC.Bytes(), notarization.Vote.Bytes(), common.NotarizationRecordType)
 
 	if err := e.WAL.Append(notarizationRecord); err != nil {
+		e.haltedError = err
 		e.Logger.Error("Failed to append notarization record to WAL", zap.Error(err))
 		return err
 	}
@@ -2801,6 +2804,10 @@ func (e *Epoch) metadata() common.ProtocolMetadata {
 }
 
 func (e *Epoch) triggerEmptyBlockNotarization(round uint64) {
+	if e.haltedError != nil {
+		e.Logger.Debug("Not triggering empty block notarization because the epoch is halted", zap.Error(e.haltedError))
+		return
+	}
 	if e.round > round {
 		e.Logger.Debug("Not triggering empty block notarization because we advanced to a higher round",
 			zap.Uint64("round", round), zap.Uint64("currentRound", e.round))
@@ -2827,6 +2834,7 @@ func (e *Epoch) triggerEmptyBlockNotarization(round uint64) {
 
 	emptyVoteRecord := common.NewEmptyVoteRecord(emptyVote)
 	if err := e.WAL.Append(emptyVoteRecord); err != nil {
+		e.haltedError = err
 		e.Logger.Error("Failed appending empty vote", zap.Error(err))
 		return
 	}
@@ -3099,6 +3107,9 @@ func (e *Epoch) doProposed(block common.VerifiedBlock) error {
 }
 
 func (e *Epoch) voteOnBlock(block common.VerifiedBlock) (common.Vote, error) {
+	if e.haltedError != nil {
+		return common.Vote{}, e.haltedError
+	}
 	vote := common.ToBeSignedVote{BlockHeader: block.BlockHeader()}
 	sig, err := vote.Sign(e.Signer)
 	if err != nil {
@@ -3240,6 +3251,9 @@ func (e *Epoch) doNotarized(r uint64, advancedRound bool) error {
 }
 
 func (e *Epoch) maybeConstructFinalizeVoteMessage(md common.BlockHeader) (common.FinalizeVote, *common.Message, error) {
+	if e.haltedError != nil {
+		return common.FinalizeVote{}, nil, e.haltedError
+	}
 	if e.haveWeAlreadyTimedOutOnThisRound(md.Round) {
 		e.Logger.Error("Will not cast a finalize vote for a round we timed out on)", zap.Uint64("round", md.Round))
 		return common.FinalizeVote{}, nil, errAlreadyTimedOutOnRound
