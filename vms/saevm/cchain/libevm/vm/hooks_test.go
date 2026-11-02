@@ -22,8 +22,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	params.RegisterExtras()
-	RegisterExtras()
+	libevm.RegisterExtras()
 	os.Exit(m.Run())
 }
 
