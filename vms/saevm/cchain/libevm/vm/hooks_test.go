@@ -34,20 +34,17 @@ func TestHooksOverrideNewEVMArgs(t *testing.T) {
 	tests := []struct {
 		name           string
 		config         *params.ChainConfig
-		wantStateDB    vm.StateDB
 		wantRandom     *common.Hash
 		wantDifficulty *big.Int
 	}{
 		{
 			name:           "pre_shanghai_keeps_difficulty",
 			config:         corethparams.WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &cparams.ChainConfig{}),
-			wantStateDB:    &extstate.StateDB{},
 			wantDifficulty: difficulty,
 		},
 		{
 			name:           "shanghai_moves_difficulty_to_random",
 			config:         cchaintest.ChainConfig(),
-			wantStateDB:    &extstate.StateDB{},
 			wantRandom:     new(common.BigToHash(difficulty)),
 			wantDifficulty: new(big.Int),
 		},
@@ -62,12 +59,12 @@ func TestHooksOverrideNewEVMArgs(t *testing.T) {
 			}
 
 			evm := vm.NewEVM(blockCtx, vm.TxContext{}, sdb, tt.config, vm.Config{})
-			require.IsType(t, tt.wantStateDB, evm.StateDB, "vm.NewEVM().StateDB")
+			require.IsType(t, &extstate.StateDB{}, evm.StateDB, "vm.NewEVM().StateDB")
 			require.Equal(t, tt.wantRandom, evm.Context.Random, "vm.NewEVM().Context.Random")
 			require.Equal(t, tt.wantDifficulty, evm.Context.Difficulty, "vm.NewEVM().Context.Difficulty")
 
 			evm.Reset(vm.TxContext{}, sdb)
-			require.IsType(t, tt.wantStateDB, evm.StateDB, "vm.EVM.Reset() StateDB")
+			require.IsType(t, &extstate.StateDB{}, evm.StateDB, "vm.EVM.Reset() StateDB")
 		})
 	}
 }
