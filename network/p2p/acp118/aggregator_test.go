@@ -728,14 +728,14 @@ func TestSignatureAggregator_LateResponseDoesNotBlock(t *testing.T) {
 
 	// AggregateSignatures has returned, so nothing is reading the results buffer anymore.
 	// A timeout that gets delivered after should not block.
-	done := make(chan struct{})
+	errs := make(chan error, 1)
 	go func() {
-		defer close(done)
-		_ = network.AppRequestFailed(t.Context(), nodeID, requestID, common.ErrTimeout)
+		errs <- network.AppRequestFailed(t.Context(), nodeID, requestID, common.ErrTimeout)
 	}()
 
 	select {
-	case <-done:
+	case err := <-errs:
+		require.NoError(err)
 	case <-time.After(5 * time.Second):
 		require.FailNow("late AppRequestFailed callback is blocked on the results channel")
 	}
