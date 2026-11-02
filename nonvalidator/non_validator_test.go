@@ -1819,3 +1819,75 @@ func TestNonValidatorServesReplicationRequest(t *testing.T) {
 	_, ok = msgQueue.popResponse()
 	require.False(t, ok)
 }
+
+// TestNonValidatorRoutesReplicationRequestsToValidators tests a scenario where a Byzantine validator reports the genuine
+// latest sealing block with a forged finalization, whose QC lists a node that does not exist.
+// The finalization cannot be verified yet, so the non-validator must request the missing blocks from the validators
+// rather than from the signers of that QC.
+func TestNonValidatorRoutesReplicationRequestsToValidators(t *testing.T) {
+	// The chain has 10 blocks, with sealing blocks at seqs 5 and 10. The non-validator has only seqs 0 and 1.
+	tc := newSeededChain(t, testNodes, 1)
+	tc.indexEpochs(5, 10)
+
+	myNodeID := common.NodeID{100}
+	msgQueue := &messageQueue{}
+	nv, err := NewNonValidator(
+		Config{
+			Storage:                    tc.CloneUntil(2),
+			Comm:                       &routerComm{nodes: tc.nodes(), t: t, ID: myNodeID, messageQueue: msgQueue},
+			Logger:                     testutil.MakeLogger(t, 1),
+			SignatureAggregatorCreator: tc.signatureAggregatorCreator,
+			MaxSequenceWindow:          simplex.DefaultMaxRoundWindow,
+			ID:                         myNodeID,
+			StartTime:                  time.Now(),
+		},
+	)
+	require.NoError(t, err)
+	defer nv.Stop()
+
+	// With 4 validators, F+1 = 2 reports of the same sealing block are enough to accept it.
+	validators := tc.nodes()
+	require.Equal(t, 2, common.F(len(validators))+1)
+	honestValidator := validators[0].Id
+	byzantineValidator := validators[1].Id
+
+	// The Byzantine validator builds its response from the genuine sealing block 10, but swaps the finalization's QC
+	// for one signed only by a node that doesn't exist.
+	nonExistentNode := common.NodeID{99}
+	require.False(t, validators.Contains(nonExistentNode))
+
+	sealingBlock10, genuineFinalization, err := tc.Retrieve(10)
+	require.NoError(t, err)
+	forgedFinalization := common.Finalization{
+		Finalization: genuineFinalization.Finalization, // the header matches the block, so it passes the header check
+		QC:           testutil.TestQC{{Signer: nonExistentNode, Value: []byte("forged")}},
+	}
+	forgedResponse := &common.Message{ReplicationResponse: &common.ReplicationResponse{
+		Data: []common.QuorumRound{{Block: sealingBlock10.(common.Block), Finalization: &forgedFinalization}},
+	}}
+
+	// The honest validator reports sealing block 10 first. The Byzantine validator's report is the second one, which reaches
+	// the threshold, so its forged finalization is the one stored with the sealing block.
+	require.NoError(t, nv.HandleMessage(sealingResponse(tc, 10), honestValidator))
+	require.NoError(t, nv.HandleMessage(forgedResponse, byzantineValidator))
+
+	// The non-validator walks the hash chain back from sealing block 10 and requests the previous sealing block, seq 5.
+	require.Equal(t, []uint64{5}, popRequestedSeqs(t, msgQueue))
+
+	// Sealing block 5 points back to an epoch the non-validator already has, so it now knows every validator set.
+	require.NoError(t, nv.HandleMessage(sealingResponse(tc, 5), honestValidator))
+	require.True(t, nv.HasReplicatedEpochs())
+
+	// Next it requests the missing blocks 2 to 10. Each request must go to a validator.
+	// With the bug, every request goes to the non-existent node from the forged QC.
+	var requested, requestedFromNonValidators []uint64
+	for msg, ok := msgQueue.popResponse(); ok; msg, ok = msgQueue.popResponse() {
+		require.NotNil(t, msg.msg.ReplicationRequest, "unexpected message %v", msg.msg)
+		requested = append(requested, msg.msg.ReplicationRequest.Seqs...)
+		if !validators.Contains(msg.to) {
+			requestedFromNonValidators = append(requestedFromNonValidators, msg.msg.ReplicationRequest.Seqs...)
+		}
+	}
+	require.NotEmpty(t, requested, "the non-validator never requested the missing blocks")
+	require.Empty(t, requestedFromNonValidators, "missing blocks were requested from the forged QC's signer instead of a validator")
+}

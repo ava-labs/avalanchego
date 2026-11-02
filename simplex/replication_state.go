@@ -178,13 +178,7 @@ func (r *ReplicationState) StoreQuorumRound(round *common.QuorumRound) {
 	}
 
 	if round.Finalization != nil {
-		stored := r.storeSequence(round.Block, round.Finalization)
-		if !stored {
-			return
-		}
-		r.finalizationRequestor.receivedSignedQuorum(newSignedQuorum(round, r.myNodeID))
-		r.deleteOldRounds(round.Finalization.Finalization.Round)
-		r.logger.Debug("Replication State Storing Quorum Round", zap.Stringer("QR", round))
+		r.storeFinalizedQuorumRound(round, round.Finalization.QC.Signers())
 		return
 	}
 
@@ -201,6 +195,28 @@ func (r *ReplicationState) StoreQuorumRound(round *common.QuorumRound) {
 	if round.EmptyNotarization != nil {
 		r.emptyRoundTimeouts.RemoveTask(round.GetRound())
 	}
+}
+
+// StoreFinalizedQuorumRoundWithSigners stores a finalized quorum round like StoreQuorumRound, but requests
+// the sequences up to it from signers instead of from the signers of its QC.
+// It is used when the QC cannot be verified yet, so its signers cannot be trusted.
+func (r *ReplicationState) StoreFinalizedQuorumRoundWithSigners(round *common.QuorumRound, signers []common.NodeID) {
+	if !r.enabled.Load() {
+		return
+	}
+
+	r.storeFinalizedQuorumRound(round, signers)
+}
+
+func (r *ReplicationState) storeFinalizedQuorumRound(round *common.QuorumRound, signers []common.NodeID) {
+	stored := r.storeSequence(round.Block, round.Finalization)
+	if !stored {
+		return
+	}
+	finalization := round.Finalization.Finalization
+	r.finalizationRequestor.receivedSignedQuorum(newSignedQuorumFromRound(finalization.Round, finalization.Seq, signers, r.myNodeID))
+	r.deleteOldRounds(finalization.Round)
+	r.logger.Debug("Replication State Storing Quorum Round", zap.Stringer("QR", round))
 }
 
 // receivedFutureFinalization notifies the replication state a finalization was created in a future round.

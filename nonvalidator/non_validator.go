@@ -256,10 +256,12 @@ func (n *NonValidator) processEpochReplicationQuorumRound(qr *common.QuorumRound
 // processSealingBlock validates the epoch a sealing block opens and stores its quorum round.
 // The finalization has not been verified yet. Storing tells the replicator a valid sequence exists
 // and its validity is checked when the round is processed.
+// Since the QC is unverified, its signers may be forged, so the sequences up to the sealing block
+// are requested from the validators instead.
 // It assumes block is already authenticated.
 func (n *NonValidator) processSealingBlock(qr *common.QuorumRound, from common.NodeID) {
 	n.maybeOpenEpochFromSealingBlock(qr.Block, from)
-	n.storeQuorumRound(qr)
+	n.sequenceReplicator.StoreFinalizedQuorumRoundWithSigners(qr, n.Comm.Validators().NodeIDs())
 }
 
 // finishEpochReplication marks epoch replication done. Every epoch from our tip to the highest one a
