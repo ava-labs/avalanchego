@@ -218,6 +218,91 @@ func TestNonValidatorThresholdFollowsPChainTip(t *testing.T) {
 	}, 2*simplex.DefaultReplicationRequestTimeout, 100*time.Millisecond)
 }
 
+func TestHonestLeaderBuildsOnFutureDatedParent(t *testing.T) {
+	// Four validators, of which the Byzantine one is never instantiated: the honest three are a
+	// quorum on their own. It has the largest ID, so it sorts last.
+	honest := []metadata.NodeBLSMapping{newNodeMapping(1), newNodeMapping(2), newNodeMapping(3)}
+	byzantine := newNodeMapping(4)
+	validators := append(metadata.NodeBLSMappings{byzantine}, honest...)
+
+	pChain := newTestPChain(validators)
+	network := newNetwork(t, pChain)
+	var nodes []*node
+	for _, v := range honest {
+		nodes = append(nodes, network.addNode(v.NodeID[:]))
+	}
+	network.sync()
+
+	validatorIDs := network.epochValidatorSet.NodeIDs()
+	byzantineID := common.NodeID(byzantine.NodeID[:])
+
+	// Accept honest blocks until the Byzantine validator leads the round after the tip.
+	var parent metadata.StateMachineBlock
+	for {
+		blk, _ := network.acceptNewBlock()
+		parent = blk.(*ParsedBlock).StateMachineBlock
+		if simplex.LeaderForRound(validatorIDs, parent.Metadata.SimplexProtocolMetadata.Round+1).Equals(byzantineID) {
+			break
+		}
+	}
+
+	// The Byzantine leader proposes a block that is valid in every respect, but stamped 5 seconds
+	// ahead of the honest validators' clocks, which is within the default time skew limit.
+	futureTime := time.Now().Add(5 * time.Second)
+	futureDated := metadata.StateMachineBlock{
+		InnerBlock: &testInnerBlock{Height_: network.seq, TS: futureTime, Payload: []byte("future-dated")},
+		Metadata: metadata.StateMachineMetadata{
+			Timestamp: uint64(futureTime.UnixMilli()),
+			SimplexProtocolMetadata: common.ProtocolMetadata{
+				Epoch: parent.Metadata.SimplexProtocolMetadata.Epoch,
+				Round: parent.Metadata.SimplexProtocolMetadata.Round + 1,
+				Seq:   network.seq,
+				Prev:  parent.Digest(),
+			},
+			SimplexBlacklist: parent.Metadata.SimplexBlacklist,
+			SimplexEpochInfo: metadata.SimplexEpochInfo{
+				PChainReferenceHeight: parent.Metadata.SimplexEpochInfo.PChainReferenceHeight,
+				PrevVMBlockSeq:        parent.Metadata.SimplexProtocolMetadata.Seq,
+			},
+			PChainHeight: parent.Metadata.PChainHeight,
+		},
+	}
+
+	vote := common.ToBeSignedVote{BlockHeader: (&ParsedBlock{StateMachineBlock: futureDated.Clone()}).BlockHeader()}
+	sig, err := vote.Sign(&testCryptoOps{})
+	require.NoError(t, err)
+	for _, n := range nodes {
+		require.NoError(t, n.inst.HandleMessage(&common.Message{
+			BlockMessage: &common.BlockMessage{
+				Block: &ParsedBlock{StateMachineBlock: futureDated.Clone()},
+				Vote:  common.Vote{Vote: vote, Signature: common.Signature{Signer: byzantineID, Value: sig}},
+			},
+		}, byzantineID))
+	}
+
+	network.seq++
+
+	network.sync()
+	committed, _, err := nodes[0].storage.GetBlock(network.seq - 1)
+	require.NoError(t, err)
+	require.Equal(t, futureDated.Digest(), committed.Digest())
+
+	// The next round is led by an honest validator. Its block should be accepted well before
+	// the honest validators' clocks reach the parent's timestamp.
+	require.False(t, simplex.LeaderForRound(validatorIDs, futureDated.Metadata.SimplexProtocolMetadata.Round+1).Equals(byzantineID))
+	network.pending.addPendingBlock()
+	for _, n := range nodes {
+		require.Eventually(t, func() bool {
+			return n.storage.NumBlocks() > network.seq
+		}, 3*time.Second, 10*time.Millisecond,
+			"node %s did not commit an honest block on top of a future-dated parent", n.id)
+	}
+
+	child, _, err := nodes[0].storage.GetBlock(network.seq)
+	require.NoError(t, err)
+	require.GreaterOrEqual(t, child.Metadata.Timestamp, futureDated.Metadata.Timestamp)
+}
+
 // TestValidator_ValidatorSetNotChanged tests that a P-chain height increase
 // that does not have a unique validator set, does not create a new epoch
 func TestValidator_ValidatorSetNotChanged(t *testing.T) {
