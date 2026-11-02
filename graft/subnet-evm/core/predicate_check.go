@@ -67,9 +67,7 @@ func CheckTxPredicates(
 	}
 
 	rulesExtra := params.GetRulesExtra(rules)
-	warpMessages := rulesExtra.WarpMessages(accessList)
-	// If there are no Warp messages to verify, return early and skip requiring
-	// the proposervm block context to be populated.
+	warpMessages := warp.MessagesFromAccessList(rulesExtra.WarpConfig != nil, accessList)
 	if len(warpMessages) == 0 {
 		return nil, nil
 	}

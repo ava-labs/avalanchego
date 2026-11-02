@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -190,7 +191,7 @@ func (b *wrappedBlock) ShouldVerifyWithContext(context.Context) (bool, error) {
 	// Check if any transaction includes a Warp message, requiring the
 	// ProposerVMBlockCtx.
 	for _, tx := range b.ethBlock.Transactions() {
-		if len(rules.WarpMessages(tx.AccessList())) > 0 {
+		if len(warp.MessagesFromAccessList(rules.WarpConfig != nil, tx.AccessList())) > 0 {
 			log.Debug("Block verification requires proposerVM context", "block", b.ID(), "height", b.Height())
 			return true, nil
 		}
