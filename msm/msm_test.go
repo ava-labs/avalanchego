@@ -498,6 +498,82 @@ func TestMSMNormalOp(t *testing.T) {
 	}
 }
 
+func TestByzantinePChainHeightStallsHonestBuilders(t *testing.T) {
+	const simplexStartHeight, chainEndHeight = 5, 10
+	const minimumPChainHeight, currentPChainHeight = 100, 150
+
+	attacker, attackerConfig := newStateMachine(t)
+	honestBuilder, honestBuilderConfig := newStateMachine(t)
+	verifier, verifierConfig := newStateMachine(t)
+
+	chain := makeChain(t, simplexStartHeight, chainEndHeight, attackerConfig.validatorSetRetriever.result)
+	for i, block := range chain {
+		for _, tc := range []*testConfig{attackerConfig, honestBuilderConfig, verifierConfig} {
+			tc.blockStore[uint64(i)] = &outerBlock{block: block, finalization: &common.Finalization{}}
+		}
+	}
+
+	// The attacker proposes at the current P-chain height, the highest height verifiers accept.
+	attacker.GetPChainHeightForProposing = func() uint64 { return currentPChainHeight }
+	// The honest builder proposes at the lagging minimum height.
+	honestBuilder.GetPChainHeightForProposing = func() uint64 { return minimumPChainHeight }
+	honestBuilder.GetPChainHeightForVerifying = func() uint64 { return currentPChainHeight }
+	verifier.GetPChainHeightForVerifying = func() uint64 { return currentPChainHeight }
+
+	lastBlock := chain[len(chain)-1]
+	blockTime := lastBlock.InnerBlock.Timestamp().Add(time.Second)
+	fixedTime := func() time.Time { return blockTime }
+	attacker.GetTime = fixedTime
+	honestBuilder.GetTime = fixedTime
+	verifier.GetTime = fixedTime
+
+	blacklist := common.NewBlacklist(4, simplex.DefaultMaxBlacklistedRounds)
+
+	md := lastBlock.Metadata.SimplexProtocolMetadata
+	md.Seq++
+	md.Round++
+	md.Prev = lastBlock.Digest()
+
+	attackerConfig.blockBuilder.Block = &testutil.InnerBlock{
+		TS:          blockTime,
+		BlockHeight: lastBlock.InnerBlock.Height() + 1,
+		Content:     []byte{1},
+	}
+
+	attackerBlock, err := attacker.BuildBlock(context.Background(), md, blacklist)
+	require.NoError(t, err)
+	require.Equal(t, uint64(currentPChainHeight), attackerBlock.Metadata.PChainHeight)
+
+	// The attacker's block is valid, so honest nodes accept it.
+	require.NoError(t, verifier.VerifyBlock(context.Background(), attackerBlock))
+	require.NoError(t, honestBuilder.VerifyBlock(context.Background(), attackerBlock))
+
+	for _, tc := range []*testConfig{attackerConfig, honestBuilderConfig, verifierConfig} {
+		tc.blockStore[md.Seq] = &outerBlock{block: *attackerBlock}
+	}
+
+	md.Seq++
+	md.Round++
+	md.Prev = attackerBlock.Digest()
+
+	honestBlockTime := blockTime.Add(time.Second)
+	honestBuilder.GetTime = func() time.Time { return honestBlockTime }
+	verifier.GetTime = func() time.Time { return honestBlockTime }
+
+	honestBuilderConfig.blockBuilder.Block = &testutil.InnerBlock{
+		TS:          honestBlockTime,
+		BlockHeight: lastBlock.InnerBlock.Height() + 2,
+		Content:     []byte{2},
+	}
+
+	honestBlock, err := honestBuilder.BuildBlock(context.Background(), md, blacklist)
+	require.NoError(t, err)
+
+	// An honest builder must never produce a block honest verifiers reject.
+	require.NoError(t, verifier.VerifyBlock(context.Background(), honestBlock))
+	require.GreaterOrEqual(t, honestBlock.Metadata.PChainHeight, attackerBlock.Metadata.PChainHeight)
+}
+
 func TestMSMFullEpochLifecycle(t *testing.T) {
 	// Validator sets: epoch 1 uses validatorSet1, epoch 2 uses validatorSet2.
 	node1 := [20]byte{1}
