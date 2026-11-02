@@ -54,11 +54,10 @@ func (hooks) PreprocessingGasCharge(common.Hash) (uint64, error) {
 func (hooks) OverrideNewEVMArgs(args *vm.NewEVMArgs) *vm.NewEVMArgs {
 	args.StateDB = wrapStateDB(args.StateDB)
 
-	rules := args.ChainConfig.Rules(args.BlockContext.BlockNumber, true /*isMerge*/, args.BlockContext.Time)
-	if rules.IsShanghai {
-		args.BlockContext.Random = new(common.Hash)
-		args.BlockContext.Random.SetBytes(args.BlockContext.Difficulty.Bytes())
-		args.BlockContext.Difficulty = new(big.Int)
+	bc := &args.BlockContext
+	if args.ChainConfig.IsShanghai(bc.BlockNumber, bc.Time) {
+		bc.Random = new(common.BigToHash(bc.Difficulty))
+		bc.Difficulty = new(big.Int)
 	}
 
 	return args
