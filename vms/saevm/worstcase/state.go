@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 
@@ -65,6 +66,21 @@ type State struct {
 
 var errSettledBlockNotExecuted = errors.New("block marked for settling has not finished execution yet")
 
+// NewSettledView returns the view of `settled` that admission sees, with its
+// rules computed as execution computes them and its state read from `r`.
+func NewSettledView(
+	config *params.ChainConfig,
+	settled *blocks.Block,
+	r libevm.StateReader,
+) hook.SettledView {
+	hdr := settled.Header()
+	return hook.SettledView{
+		Header: hdr,
+		Rules:  config.Rules(hdr.Number, true, hdr.Time),
+		State:  r,
+	}
+}
+
 // NewState constructs a new worst-case state on top of the settled block.
 func NewState(
 	hooks hook.Points,
@@ -85,16 +101,11 @@ func NewState(
 	if err != nil {
 		return nil, err
 	}
-	hdr := settled.Header()
 	return &State{
-		hooks:  hooks,
-		config: config,
-		db:     db,
-		settled: hook.SettledView{
-			Header: hdr,
-			Rules:  config.Rules(hdr.Number, true, hdr.Time),
-			State:  settledState,
-		},
+		hooks:              hooks,
+		config:             config,
+		db:                 db,
+		settled:            NewSettledView(config, settled, settledState),
 		clock:              settled.ExecutedByGasTime(),
 		expectedParentHash: settled.Hash(),
 	}, nil

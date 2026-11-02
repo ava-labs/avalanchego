@@ -17,9 +17,13 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/holiman/uint256"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/saexec"
 	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
 
@@ -73,15 +77,24 @@ type Set struct {
 // transactions to the pool, which SHOULD NOT be populated directly.
 //
 // Transactions are vetted against the gas limit of the next block, derived
-// from exec's last-executed block; see [minGasForSize].
+// from exec's last-executed block; see [minGasForSize]. New transactions are
+// also admitted by [hook.Points.AdmitTransaction] against the block returned by
+// settled, which MAY return nil to skip admission.
 func NewSet(
 	exec *saexec.Executor,
 	pool *txpool.TxPool,
 	config gossip.BloomSetConfig,
+	hooks hook.Points,
+	settled func() *blocks.Block,
+	log logging.Logger,
 ) (*Set, error) {
 	s := &txSet{
-		exec: exec,
-		pool: pool,
+		exec:    exec,
+		pool:    pool,
+		hooks:   hooks,
+		settled: settled,
+		signer:  types.LatestSigner(exec.ChainConfig()),
+		log:     log,
 	}
 	bs, err := gossip.NewBloomSet(s, config)
 	if err != nil {
@@ -103,8 +116,12 @@ func (s *Set) MinGasForSize(size uint64) uint64 {
 var _ gossip.Set[Transaction] = (*txSet)(nil)
 
 type txSet struct {
-	exec *saexec.Executor
-	pool *txpool.TxPool
+	exec    *saexec.Executor
+	pool    *txpool.TxPool
+	hooks   hook.Points
+	settled func() *blocks.Block
+	signer  types.Signer
+	log     logging.Logger
 }
 
 // blockGasLimit returns the worst-case gas limit of the next block, based on
@@ -135,14 +152,22 @@ func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 	eligibleTxs := make([]*types.Transaction, 0, len(txs))
 	eligibleIdx := make([]int, 0, len(txs))
 	for i, tx := range txs {
-		minGas := minGasForSize(tx.Size(), blockGasLimit)
-		if tx.Gas() >= minGas {
-			eligibleTxs = append(eligibleTxs, tx)
-			eligibleIdx = append(eligibleIdx, i)
+		if minGas := minGasForSize(tx.Size(), blockGasLimit); tx.Gas() < minGas {
+			errs[i] = fmt.Errorf(
+				"%w: tx size %d bytes must specify gas limit at least %d when the block gas limit is %d",
+				errInsufficientGasPerByte,
+				tx.Size(),
+				minGas,
+				blockGasLimit,
+			)
 			continue
 		}
-		errs[i] = fmt.Errorf("%w: tx size %d bytes must specify gas limit at least %d when the block gas limit is %d",
-			errInsufficientGasPerByte, tx.Size(), minGas, blockGasLimit)
+		if err := s.admit(tx); err != nil {
+			errs[i] = fmt.Errorf("transaction blocked by AdmitTransaction hook: %w", err)
+			continue
+		}
+		eligibleTxs = append(eligibleTxs, tx)
+		eligibleIdx = append(eligibleIdx, i)
 	}
 
 	if len(eligibleTxs) == 0 {
@@ -152,6 +177,37 @@ func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 		errs[eligibleIdx[j]] = err
 	}
 	return errs
+}
+
+// admit returns the admission hook's verdict on a new transaction. It never
+// rejects because the settled block or its state is unavailable.
+func (s *txSet) admit(tx *types.Transaction) error {
+	settled := s.settled()
+	if settled == nil || s.pool.Has(tx.Hash()) {
+		return nil
+	}
+	from, err := types.Sender(s.signer, tx)
+	if err != nil {
+		return nil //nolint:nilerr // [txpool.TxPool.Add] reports the invalid sender
+	}
+	sdb, err := s.exec.StateDB(settled.PostExecutionStateRoot())
+	if err == nil {
+		verdict := s.hooks.AdmitTransaction(
+			from,
+			tx,
+			worstcase.NewSettledView(s.exec.ChainConfig(), settled, sdb),
+		)
+		// A failed read returns zero values, so the hook's verdict can't be trusted.
+		if err = sdb.Error(); err == nil {
+			return verdict
+		}
+	}
+	s.log.Debug("Skipping admission: settled state unavailable",
+		zap.Stringer("tx_hash", tx.Hash()),
+		zap.Stringer("settled_hash", settled.Hash()),
+		zap.Error(err),
+	)
+	return nil
 }
 
 // minGasForSize returns the minimum gas limit a transaction of size bytes must

@@ -11,8 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.uber.org/zap"
-
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 )
@@ -161,28 +159,18 @@ func Range(start, end *Block) []*Block {
 	return chain
 }
 
-var errIncompleteBlockHistory = errors.New("incomplete block history when determining last-settled block")
-
 // LastToSettleAt returns (a) the last block to be settled at time `settleAt` if
 // building on the specified parent block, and (b) a boolean to indicate if
 // settlement is currently possible. If the returned boolean is false, the
 // execution stream is lagging and LastToSettleAt MAY be called again after some
 // indeterminate delay.
 //
-// It is not valid to call LastToSettleAt with a parent on which
-// [Block.MarkSettled] was called directly. However, it is valid with a
-// synchronous parent.
+// It is safe to call LastToSettleAt concurrently with settlement, including of
+// `parent`.
 //
 // See the Example for [Block.WhenChildSettles] for one usage of the returned
 // block.
-func LastToSettleAt(settleAt time.Time, parent *Block) (b *Block, ok bool, _ error) {
-	defer func() {
-		// Avoids having to perform this check at every return.
-		if !ok {
-			b = nil
-		}
-	}()
-
+func LastToSettleAt(settleAt time.Time, parent *Block) (*Block, bool) {
 	settleAtGasTime := proxytime.Of[gas.Gas](settleAt)
 
 	// A block can be the last to settle at some time i.f.f. two criteria are
@@ -195,61 +183,63 @@ func LastToSettleAt(settleAt time.Time, parent *Block) (b *Block, ok bool, _ err
 	//
 	// The block currently being built can never finish in time, so we start
 	// with criterion (2) being met.
-	known := true
-
-	// The only way [Block.ParentBlock] can be nil is if `block` was already
-	// settled (see invariant in [Block]). If a block was already settled then
-	// only it or a later (i.e. unsettled) block can be returned by this loop,
-	// therefore we have a guarantee that the loop update will never result in
-	// `block==nil`.
-	for block := parent; ; block = block.ParentBlock() {
-		if block == nil {
-			// Although the below [Block.Settled] check (performed in the last
-			// loop iteration) precludes this from happening, that assumes no
-			// settlement concurrently with a call to [LastToSettleAt]. While
-			// that may be true now, the consequence of a race condition when
-			// omitting this check would be a panic for nil-pointer
-			// dereferencing.
-			parent.log.Error(
-				"Race condition when determining last block to settle",
-				zap.Stringer("parent_hash", parent.Hash()),
-				zap.Uint64("parent_height", parent.Height()),
-				zap.Time("settle_at", settleAt),
-			)
-			return nil, false, fmt.Errorf("%w: settling at %v with parent %#x (%v)", errIncompleteBlockHistory, settleAt, parent.Hash(), parent.Number())
-		}
-		// Guarantees that the loop will always exit as every block's ancestry
-		// ends at a settled block (perhaps the genesis).
-		if block.Settled() {
-			return block, known, nil
-		}
-
-		if startsNoEarlierThan := block.PreciseTime(); startsNoEarlierThan.Compare(settleAt) > 0 {
-			known = true
-			continue
-		}
-		if t := block.interimExecutionTime.Load(); t != nil && t.Compare(settleAtGasTime) > 0 {
-			known = true
-			continue
-		}
-		if e := block.execution.Load(); e != nil {
-			if e.byGas.Compare(settleAtGasTime) > 0 {
-				// There may have been a race between this check and the
-				// interim-execution one above, so we have to check again.
-				known = true
-				continue
-			}
-			return block, known, nil
-		}
-
-		// TODO(arr4n) more fine-grained checks are possible by computing the
-		// minimum possible gas consumption of blocks. For example,
-		// `block.BuildTime()+block.intrinsicGasSum()` can be compared against
-		// `equivSettleAt`, as can the sum of a chain of blocks.
-
-		// Note that a grandchild block having unknown execution completion time
-		// does not rule out knowing a child's completion time, so this could be
-		// set to true in a future loop iteration.
-		known = false
+	var (
+		block = parent
+		known = true
+		done  bool
+	)
+	for !done {
+		block, known, done = lastToSettleStep(
+			block,
+			block.ancestry.Load(),
+			settleAt,
+			settleAtGasTime,
+			known,
+		)
 	}
+	if !known {
+		return nil, false
+	}
+	return block, true
+}
+
+// lastToSettleStep checks `b` against one ancestry snapshot `a`, so concurrent
+// settlement cannot strand it. It returns the answer if done, else the parent.
+func lastToSettleStep(
+	b *Block,
+	a *ancestry,
+	settleAt time.Time,
+	settleAtGasTime *proxytime.Time[gas.Gas],
+	known bool,
+) (_ *Block, _ bool, done bool) {
+	// Every block's ancestry ends at a settled block (perhaps the genesis), so
+	// the loop always exits.
+	if a == nil {
+		return b, known, true
+	}
+
+	if startsNoEarlierThan := b.PreciseTime(); startsNoEarlierThan.Compare(settleAt) > 0 {
+		return a.parent, true, false
+	}
+	if t := b.interimExecutionTime.Load(); t != nil && t.Compare(settleAtGasTime) > 0 {
+		return a.parent, true, false
+	}
+	if e := b.execution.Load(); e != nil {
+		if e.byGas.Compare(settleAtGasTime) > 0 {
+			// There may have been a race between this check and the
+			// interim-execution one above, so we have to check again.
+			return a.parent, true, false
+		}
+		return b, known, true
+	}
+
+	// TODO(arr4n) more fine-grained checks are possible by computing the
+	// minimum possible gas consumption of blocks. For example,
+	// `block.BuildTime()+block.intrinsicGasSum()` can be compared against
+	// `equivSettleAt`, as can the sum of a chain of blocks.
+
+	// Note that a grandchild block having unknown execution completion time
+	// does not rule out knowing a child's completion time, so this could be
+	// set to true in a future loop iteration.
+	return a.parent, false, false
 }
