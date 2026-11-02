@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
+	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
@@ -26,9 +27,9 @@ type StatefulPrecompiledContract interface {
 
 // StateDB is the interface for accessing EVM state
 type StateDB interface {
-	GetBalanceMultiCoin(common.Address, common.Hash) *big.Int
-	AddBalanceMultiCoin(common.Address, common.Hash, *big.Int)
-	SubBalanceMultiCoin(common.Address, common.Hash, *big.Int)
+	GetAssetBalance(common.Address, common.Hash) *uint256.Int
+	AddAssetBalance(common.Address, common.Hash, *uint256.Int)
+	SubAssetBalance(common.Address, common.Hash, *uint256.Int)
 
 	CreateAccount(common.Address)
 	Exist(common.Address) bool

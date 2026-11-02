@@ -15,11 +15,10 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core"
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -28,9 +27,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	core.RegisterExtras()
-	customtypes.Register()
-	params.RegisterExtras()
+	libevm.RegisterExtras()
 	os.Exit(m.Run())
 }
 
@@ -49,7 +46,7 @@ func Transfer(db vm.StateDB, sender, recipient common.Address, amount *uint256.I
 func TestPackNativeAssetCallInput(t *testing.T) {
 	addr := common.BytesToAddress([]byte("hello"))
 	assetID := common.BytesToHash([]byte("ScoobyCoin"))
-	assetAmount := big.NewInt(50)
+	assetAmount := uint256.NewInt(50)
 	callData := []byte{1, 2, 3, 4, 5, 6, 7, 8}
 
 	input := PackNativeAssetCallInput(addr, assetID, assetAmount, callData)
@@ -91,13 +88,8 @@ func TestStatefulPrecompile(t *testing.T) {
 	userAddr2 := common.BytesToAddress([]byte("user2"))
 	assetID := common.BytesToHash([]byte("ScoobyCoin"))
 	zeroBytes := make([]byte, 32)
-	bigHundred := big.NewInt(100)
 	u256Hundred := uint256.NewInt(100)
-	oneHundredBytes := make([]byte, 32)
-	bigFifty := big.NewInt(50)
-	fiftyBytes := make([]byte, 32)
-	bigFifty.FillBytes(fiftyBytes)
-	bigHundred.FillBytes(oneHundredBytes)
+	oneHundredBytes := u256Hundred.Bytes32()
 
 	tests := []statefulContractTest{
 		{
@@ -132,8 +124,8 @@ func TestStatefulPrecompile(t *testing.T) {
 				statedb.SetBalance(userAddr1, u256Hundred)
 				// Initialize multicoin balance and set it back to 0
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
-				wrappedStateDB.SubBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
+				wrappedStateDB.SubAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
@@ -157,7 +149,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				statedb.SetBalance(userAddr1, u256Hundred)
 				// Initialize multicoin balance to 100
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
@@ -168,7 +160,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			gasInput:             AssetBalanceCost,
 			expectedGasRemaining: 0,
 			expectedErr:          nil,
-			expectedResult:       oneHundredBytes,
+			expectedResult:       oneHundredBytes[:],
 			name:                 "native asset balance: returns correct non-zero multicoin balance",
 		},
 		{
@@ -225,13 +217,13 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
-			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
+			input:                PackNativeAssetCallInput(userAddr2, assetID, uint256.NewInt(50), nil),
 			value:                common.U2560,
 			gasInput:             AssetCallCost + ethparams.CallNewAccountGas + 123,
 			expectedGasRemaining: 123,
@@ -242,10 +234,10 @@ func TestStatefulPrecompile(t *testing.T) {
 				user1Balance := statedb.GetBalance(userAddr1)
 				user2Balance := statedb.GetBalance(userAddr2)
 				wrappedStateDB := extstate.New(statedb)
-				user1AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr1, assetID)
-				user2AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr2, assetID)
+				user1AssetBalance := wrappedStateDB.GetAssetBalance(userAddr1, assetID)
+				user2AssetBalance := wrappedStateDB.GetAssetBalance(userAddr2, assetID)
 
-				expectedBalance := big.NewInt(50)
+				expectedBalance := uint256.NewInt(50)
 				require.Equal(t, u256Hundred, user1Balance, "user 1 balance")
 				require.True(t, user2Balance.IsZero(), "user 2 balance should be zero")
 				require.Equal(t, expectedBalance, user1AssetBalance, "user 1 asset balance")
@@ -258,13 +250,13 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
-			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
+			input:                PackNativeAssetCallInput(userAddr2, assetID, uint256.NewInt(50), nil),
 			value:                uint256.NewInt(49),
 			gasInput:             AssetCallCost + ethparams.CallNewAccountGas,
 			expectedGasRemaining: 0,
@@ -276,9 +268,9 @@ func TestStatefulPrecompile(t *testing.T) {
 				user2Balance := statedb.GetBalance(userAddr2)
 				nativeAssetCallAddrBalance := statedb.GetBalance(NativeAssetCallAddr)
 				wrappedStateDB := extstate.New(statedb)
-				user1AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr1, assetID)
-				user2AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr2, assetID)
-				expectedBalance := big.NewInt(50)
+				user1AssetBalance := wrappedStateDB.GetAssetBalance(userAddr1, assetID)
+				user2AssetBalance := wrappedStateDB.GetAssetBalance(userAddr2, assetID)
+				expectedBalance := uint256.NewInt(50)
 
 				require.Equal(t, uint256.NewInt(51), user1Balance, "user 1 balance")
 				require.True(t, user2Balance.IsZero(), "user 2 balance should be zero")
@@ -293,13 +285,13 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, big.NewInt(50))
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, uint256.NewInt(50))
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
-			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(51), nil),
+			input:                PackNativeAssetCallInput(userAddr2, assetID, uint256.NewInt(51), nil),
 			value:                uint256.NewInt(50),
 			gasInput:             AssetCallCost,
 			expectedGasRemaining: 0,
@@ -310,13 +302,13 @@ func TestStatefulPrecompile(t *testing.T) {
 				user1Balance := statedb.GetBalance(userAddr1)
 				user2Balance := statedb.GetBalance(userAddr2)
 				wrappedStateDB := extstate.New(statedb)
-				user1AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr1, assetID)
-				user2AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr2, assetID)
+				user1AssetBalance := wrappedStateDB.GetAssetBalance(userAddr1, assetID)
+				user2AssetBalance := wrappedStateDB.GetAssetBalance(userAddr2, assetID)
 
 				require.Equal(t, u256Hundred, user1Balance, "user 1 balance")
 				require.True(t, user2Balance.IsZero(), "user 2 balance should be zero")
-				require.Equal(t, big.NewInt(50), user1AssetBalance, "user 1 asset balance")
-				require.Zero(t, user2AssetBalance.Cmp(common.Big0), "user 2 asset balance should be zero")
+				require.Equal(t, uint256.NewInt(50), user1AssetBalance, "user 1 asset balance")
+				require.True(t, user2AssetBalance.IsZero(), "user 2 asset balance should be zero")
 			},
 		},
 		{
@@ -325,13 +317,13 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, uint256.NewInt(50))
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, big.NewInt(50))
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, uint256.NewInt(50))
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
-			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
+			input:                PackNativeAssetCallInput(userAddr2, assetID, uint256.NewInt(50), nil),
 			value:                uint256.NewInt(51),
 			gasInput:             AssetCallCost,
 			expectedGasRemaining: AssetCallCost,
@@ -342,13 +334,13 @@ func TestStatefulPrecompile(t *testing.T) {
 				user1Balance := statedb.GetBalance(userAddr1)
 				user2Balance := statedb.GetBalance(userAddr2)
 				wrappedStateDB := extstate.New(statedb)
-				user1AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr1, assetID)
-				user2AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr2, assetID)
+				user1AssetBalance := wrappedStateDB.GetAssetBalance(userAddr1, assetID)
+				user2AssetBalance := wrappedStateDB.GetAssetBalance(userAddr2, assetID)
 
 				require.Equal(t, uint256.NewInt(50), user1Balance, "user 1 balance")
 				require.True(t, user2Balance.IsZero(), "user 2 balance should be zero")
-				require.Equal(t, big.NewInt(50), user1AssetBalance, "user 1 asset balance")
-				require.Zero(t, user2AssetBalance.Cmp(common.Big0), "user 2 asset balance should be zero")
+				require.Equal(t, uint256.NewInt(50), user1AssetBalance, "user 1 asset balance")
+				require.True(t, user2AssetBalance.IsZero(), "user 2 asset balance should be zero")
 			},
 		},
 		{
@@ -357,13 +349,13 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
-			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
+			input:                PackNativeAssetCallInput(userAddr2, assetID, uint256.NewInt(50), nil),
 			value:                uint256.NewInt(50),
 			gasInput:             AssetCallCost - 1,
 			expectedGasRemaining: 0,
@@ -377,13 +369,13 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
-			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
+			input:                PackNativeAssetCallInput(userAddr2, assetID, uint256.NewInt(50), nil),
 			value:                uint256.NewInt(50),
 			gasInput:             AssetCallCost + ethparams.CallNewAccountGas - 1,
 			expectedGasRemaining: 0,
@@ -394,13 +386,13 @@ func TestStatefulPrecompile(t *testing.T) {
 				user1Balance := statedb.GetBalance(userAddr1)
 				user2Balance := statedb.GetBalance(userAddr2)
 				wrappedStateDB := extstate.New(statedb)
-				user1AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr1, assetID)
-				user2AssetBalance := wrappedStateDB.GetBalanceMultiCoin(userAddr2, assetID)
+				user1AssetBalance := wrappedStateDB.GetAssetBalance(userAddr1, assetID)
+				user2AssetBalance := wrappedStateDB.GetAssetBalance(userAddr2, assetID)
 
 				require.Equal(t, u256Hundred, user1Balance, "user 1 balance")
 				require.True(t, user2Balance.IsZero(), "user 2 balance should be zero")
-				require.Equal(t, bigHundred, user1AssetBalance, "user 1 asset balance")
-				require.Zero(t, user2AssetBalance.Cmp(common.Big0), "user 2 asset balance should be zero")
+				require.Equal(t, u256Hundred, user1AssetBalance, "user 1 asset balance")
+				require.True(t, user2AssetBalance.IsZero(), "user 2 asset balance should be zero")
 			},
 		},
 		{
@@ -409,7 +401,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
@@ -429,13 +421,13 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
 				wrappedStateDB := extstate.New(statedb)
-				wrappedStateDB.AddBalanceMultiCoin(userAddr1, assetID, bigHundred)
+				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
 			},
 			from:                 userAddr1,
 			precompileAddr:       GenesisContractAddr,
-			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
+			input:                PackNativeAssetCallInput(userAddr2, assetID, uint256.NewInt(50), nil),
 			value:                common.U2560,
 			gasInput:             AssetCallCost + ethparams.CallNewAccountGas,
 			expectedGasRemaining: AssetCallCost + ethparams.CallNewAccountGas,
@@ -447,11 +439,9 @@ func TestStatefulPrecompile(t *testing.T) {
 
 	// nativeasset precompiles are activated at AP2.
 	cfg := params.WithExtra(
-		&params.ChainConfig{},
-		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase2BlockTimestamp: new(uint64),
-			},
+		&ethparams.ChainConfig{},
+		&cparams.ChainConfig{
+			ApricotPhase2Timestamp: new(uint64),
 		},
 	)
 	for _, test := range tests {

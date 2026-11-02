@@ -8,8 +8,8 @@ import (
 
 	"github.com/ava-labs/libevm/params"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -19,8 +19,5 @@ import (
 func ChainConfig() *params.ChainConfig {
 	c := *saetest.ChainConfig()
 	u := upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, time.Unix(0, 0))
-	extra := extras.ChainConfig{
-		NetworkUpgrades: extras.GetNetworkUpgrades(u),
-	}
-	return corethparams.WithExtra(&c, &extra)
+	return corethparams.WithExtra(&c, cparams.FromUpgrades(u))
 }

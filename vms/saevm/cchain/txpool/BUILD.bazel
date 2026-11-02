@@ -11,7 +11,6 @@ go_library(
     srcs = ["txpool.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool",
     deps = [
-        "//graft/coreth/params",
         "//ids",
         "//snow",
         "//utils/heap",
@@ -26,6 +25,7 @@ go_library(
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//event",
         "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//params",
         "@org_uber_go_zap//:zap",
     ],
 )

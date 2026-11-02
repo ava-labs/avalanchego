@@ -1,7 +1,11 @@
 exports_files(
     [
         "tests.e2e.bazel.sh",
+        "tests.e2e.existing.sh",
         "tests.e2e.sh",
+        "tests.load.bazel.sh",
+        "tests.upgrade.bazel.sh",
+        "tests.upgrade.sh",
     ],
-    visibility = ["//tests/e2e:__pkg__"],
+    visibility = ["//visibility:public"],
 )

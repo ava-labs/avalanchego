@@ -20,6 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
+// ContractAddress is the address of the warp precompile contract
+var ContractAddress = common.HexToAddress("0x0200000000000000000000000000000000000005")
+
 const addWarpMessageBaseGasCost uint64 = 20_000 // Cost of producing and serving a BLS Signature
 
 var (

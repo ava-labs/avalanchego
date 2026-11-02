@@ -6,18 +6,15 @@ package params
 import (
 	"math/big"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/libevm"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/modules"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-func extrasToRegister() ethparams.Extras[*extras.ChainConfig, RulesExtra] {
-	return ethparams.Extras[*extras.ChainConfig, RulesExtra]{
+func extrasToRegister() ethparams.Extras[*cparams.ChainConfig, RulesExtra] {
+	return ethparams.Extras[*cparams.ChainConfig, RulesExtra]{
 		ReuseJSONRoot: true, // Reuse the root JSON input when unmarshalling the extra payload.
 		NewRules:      constructRulesExtra,
 	}
@@ -46,38 +43,23 @@ func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
 
 	return ethparams.WithTempRegisteredExtras(
 		lock, extrasToRegister(),
-		func(extras ethparams.ExtraPayloads[*extras.ChainConfig, RulesExtra]) error {
+		func(extras ethparams.ExtraPayloads[*cparams.ChainConfig, RulesExtra]) error {
 			payloads = extras
 			return fn()
 		},
 	)
 }
 
-var payloads ethparams.ExtraPayloads[*extras.ChainConfig, RulesExtra]
+var payloads ethparams.ExtraPayloads[*cparams.ChainConfig, RulesExtra]
 
 // constructRulesExtra acts as an adjunct to the [params.ChainConfig.Rules]
 // method. Its primary purpose is to construct the extra payload for the
 // [params.Rules] but it MAY also modify the [params.Rules].
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
-func constructRulesExtra(c *ethparams.ChainConfig, r *ethparams.Rules, cEx *extras.ChainConfig, blockNum *big.Int, isMerge bool, timestamp uint64) RulesExtra {
-	var rules RulesExtra
+func constructRulesExtra(c *ethparams.ChainConfig, r *ethparams.Rules, cEx *cparams.ChainConfig, blockNum *big.Int, isMerge bool, timestamp uint64) RulesExtra {
 	if cEx == nil {
-		return rules
+		return RulesExtra{}
 	}
-	rules.AvalancheRules = cEx.GetAvalancheRules(timestamp)
-
-	// Initialize the stateful precompiles that should be enabled at [blockTimestamp].
-	rules.Precompiles = make(map[common.Address]precompileconfig.Config)
-	rules.Predicaters = make(map[common.Address]precompileconfig.Predicater)
-	for _, module := range modules.RegisteredModules() {
-		if config := cEx.GetActivePrecompileConfig(module.Address, timestamp); config != nil && !config.IsDisabled() {
-			rules.Precompiles[module.Address] = config
-			if predicater, ok := config.(precompileconfig.Predicater); ok {
-				rules.Predicaters[module.Address] = predicater
-			}
-		}
-	}
-
-	return rules
+	return RulesExtra(cEx.Rules(timestamp))
 }

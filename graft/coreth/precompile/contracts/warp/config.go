@@ -23,10 +23,7 @@ const (
 	WarpQuorumDenominator      uint64 = 100
 )
 
-var (
-	_ precompileconfig.Config     = (*Config)(nil)
-	_ precompileconfig.Predicater = (*Config)(nil)
-)
+var _ precompileconfig.Predicater = (*Config)(nil)
 
 var (
 	errOverflowSignersGasCost     = errors.New("overflow calculating warp signers gas cost")
@@ -41,33 +38,13 @@ var (
 	errCannotRetrieveValidatorSet = errors.New("cannot retrieve validator set")
 )
 
-// Config implements the precompileconfig.Config interface and
-// adds specific configuration for Warp.
+// Config configures how Warp predicates are verified. The zero value uses the
+// default quorum.
 type Config struct {
-	precompileconfig.Upgrade
-	QuorumNumerator              uint64 `json:"quorumNumerator"`
-	RequirePrimaryNetworkSigners bool   `json:"requirePrimaryNetworkSigners"`
+	// QuorumNumerator of 0 uses [WarpDefaultQuorumNumerator].
+	QuorumNumerator              uint64
+	RequirePrimaryNetworkSigners bool
 }
-
-// NewConfig returns a config for a network upgrade at [blockTimestamp] that enables
-// Warp with the given quorum numerator.
-func NewConfig(blockTimestamp *uint64, quorumNumerator uint64, requirePrimaryNetworkSigners bool) *Config {
-	return &Config{
-		Upgrade:                      precompileconfig.Upgrade{BlockTimestamp: blockTimestamp},
-		QuorumNumerator:              quorumNumerator,
-		RequirePrimaryNetworkSigners: requirePrimaryNetworkSigners,
-	}
-}
-
-// NewDefaultConfig returns a config for a network upgrade at [blockTimestamp] that enables
-// Warp with the default quorum numerator (0 denotes using the default).
-func NewDefaultConfig(blockTimestamp *uint64) *Config {
-	return NewConfig(blockTimestamp, 0, false)
-}
-
-// Key returns the key for the Warp precompileconfig.
-// This should be the same key as used in the precompile module.
-func (*Config) Key() string { return ConfigKey }
 
 // PredicateGas returns the amount of gas necessary to verify the predicate
 // PredicateGas charges for:

@@ -6,7 +6,6 @@ package tx_test
 import (
 	"context"
 	"math"
-	"math/big"
 	"os"
 	"testing"
 
@@ -21,7 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
@@ -30,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -970,22 +969,17 @@ func TestTransferNonAVAX(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var (
-				want  = newEmptyStateDB(t)
-				toBig = func(v uint64) *big.Int { return new(big.Int).SetUint64(v) }
-			)
+			want := newEmptyStateDB(t)
 			for addr, balances := range test.want {
 				for assetID, amount := range balances {
-					coinID := common.Hash(assetID)
-					want.AddBalanceMultiCoin(addr, coinID, toBig(amount))
+					want.AddAssetBalance(addr, common.Hash(assetID), uint256.NewInt(amount))
 				}
 			}
 
 			got := newEmptyStateDB(t)
 			for addr, balances := range test.init {
 				for assetID, amount := range balances {
-					coinID := common.Hash(assetID)
-					got.AddBalanceMultiCoin(addr, coinID, toBig(amount))
+					got.AddAssetBalance(addr, common.Hash(assetID), uint256.NewInt(amount))
 				}
 			}
 

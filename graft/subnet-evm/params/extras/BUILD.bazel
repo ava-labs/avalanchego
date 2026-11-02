@@ -24,6 +24,7 @@ go_library(
         "//graft/subnet-evm/precompile/precompileconfig",
         "//snow",
         "//upgrade",
+        "//utils",
         "//utils/constants",
         "//vms/evm/acp226",
         "@com_github_ava_labs_libevm//common",

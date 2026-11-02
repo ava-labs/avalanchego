@@ -9,7 +9,7 @@ import (
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
-var extras ethtypes.ExtraPayloads[*HeaderExtra, *BlockBodyExtra, isMultiCoin]
+var extras ethtypes.ExtraPayloads[*HeaderExtra, *BlockBodyExtra, heldXChainAsset]
 
 // Register registers the types with libevm. It MUST NOT be called more than
 // once and therefore is only allowed to be used in tests and `package main`, to
@@ -22,7 +22,7 @@ func Register() {
 	extras = ethtypes.RegisterExtras[
 		HeaderExtra, *HeaderExtra,
 		BlockBodyExtra, *BlockBodyExtra,
-		isMultiCoin,
+		heldXChainAsset,
 	]()
 }
 
@@ -36,9 +36,9 @@ func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
 	old := extras
 	defer func() { extras = old }()
 
-	return ethtypes.WithTempRegisteredExtras[HeaderExtra, BlockBodyExtra, isMultiCoin](
+	return ethtypes.WithTempRegisteredExtras[HeaderExtra, BlockBodyExtra, heldXChainAsset](
 		lock,
-		func(e ethtypes.ExtraPayloads[*HeaderExtra, *BlockBodyExtra, isMultiCoin]) error {
+		func(e ethtypes.ExtraPayloads[*HeaderExtra, *BlockBodyExtra, heldXChainAsset]) error {
 			extras = e
 			return fn()
 		},

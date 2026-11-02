@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package warp
+package warp_test
 
 import (
 	"math"
@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompiletest"
 	"github.com/ava-labs/avalanchego/ids"
@@ -22,9 +21,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 
 	agoUtils "github.com/ava-labs/avalanchego/utils"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+
+	. "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 )
 
 var forks = []upgradetest.Fork{
@@ -32,39 +34,39 @@ var forks = []upgradetest.Fork{
 	upgradetest.Granite,
 }
 
-func forkToAvalancheRules(fork upgradetest.Fork) extras.AvalancheRules {
+func forkToAvalancheRules(fork upgradetest.Fork) cparams.Rules {
 	u := upgradetest.GetConfig(fork)
-	networkUpgrades := extras.GetNetworkUpgrades(u)
-	return networkUpgrades.GetAvalancheRules(uint64(upgrade.InitiallyActiveTime.Unix()))
+	networkUpgrades := cparams.FromUpgrades(u)
+	return networkUpgrades.Rules(uint64(upgrade.InitiallyActiveTime.Unix()))
 }
 
 func runTests(
 	t *testing.T,
-	makeTests func(tb testing.TB, rules extras.AvalancheRules) []precompiletest.PrecompileTest,
+	makeTests func(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest,
 ) {
 	for _, fork := range forks {
 		t.Run(fork.String(), func(t *testing.T) {
 			rules := forkToAvalancheRules(fork)
 			tests := makeTests(t, rules)
-			precompiletest.RunPrecompileTests(t, Module, tests)
+			precompiletest.RunPrecompileTests(t, ContractAddress, WarpPrecompile, tests)
 		})
 	}
 }
 
 func runBenchmarks(
 	b *testing.B,
-	makeTests func(tb testing.TB, rules extras.AvalancheRules) []precompiletest.PrecompileTest,
+	makeTests func(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest,
 ) {
 	for _, fork := range forks {
 		b.Run(fork.String(), func(b *testing.B) {
 			rules := forkToAvalancheRules(fork)
 			tests := makeTests(b, rules)
-			precompiletest.RunPrecompileBenchmarks(b, Module, tests)
+			precompiletest.RunPrecompileBenchmarks(b, ContractAddress, WarpPrecompile, tests)
 		})
 	}
 }
 
-func getBlockchainIDTests(tb testing.TB, rules extras.AvalancheRules) []precompiletest.PrecompileTest {
+func getBlockchainIDTests(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest {
 	callerAddr := common.HexToAddress("0x0123")
 
 	defaultSnowCtx := snowtest.Context(tb, snowtest.CChainID)
@@ -130,7 +132,7 @@ func BenchmarkGetBlockchainID(b *testing.B) {
 	runBenchmarks(b, getBlockchainIDTests)
 }
 
-func sendWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []precompiletest.PrecompileTest {
+func sendWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest {
 	callerAddr := common.HexToAddress("0x0123")
 
 	defaultSnowCtx := snowtest.Context(tb, snowtest.CChainID)
@@ -188,7 +190,7 @@ func sendWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []precompi
 			},
 			SuppliedGas: gasConfig.SendWarpMessageBase,
 			ReadOnly:    false,
-			ExpectedErr: errInvalidSendInput,
+			ExpectedErr: ErrInvalidSendInput,
 			Rules:       rules,
 		},
 		{
@@ -240,7 +242,7 @@ func BenchmarkSendWarpMessage(b *testing.B) {
 	runBenchmarks(b, sendWarpMessageTests)
 }
 
-func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []precompiletest.PrecompileTest {
+func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest {
 	networkID := uint32(54321)
 	callerAddr := common.HexToAddress("0x0123")
 	sourceAddress := common.HexToAddress("0x456789")
@@ -460,7 +462,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(invalidPackedPredicate)),
 			ReadOnly:    false,
-			ExpectedErr: errInvalidPredicateBytes,
+			ExpectedErr: ErrInvalidPredicateBytes,
 			Rules:       rules,
 		},
 		{
@@ -473,7 +475,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(invalidWarpMsgPredicate)),
 			ReadOnly:    false,
-			ExpectedErr: errInvalidWarpMsg,
+			ExpectedErr: ErrInvalidWarpMsg,
 			Rules:       rules,
 		},
 		{
@@ -486,7 +488,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(invalidAddressedPredicate)),
 			ReadOnly:    false,
-			ExpectedErr: errInvalidAddressedPayload,
+			ExpectedErr: ErrInvalidAddressedPayload,
 			Rules:       rules,
 		},
 		{
@@ -497,7 +499,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
-			ExpectedErr: errInvalidIndexInput,
+			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
 		{
@@ -510,7 +512,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
-			ExpectedErr: errInvalidIndexInput,
+			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
 		{
@@ -523,7 +525,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules extras.AvalancheRules) []p
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
-			ExpectedErr: errInvalidIndexInput,
+			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
 	}
@@ -537,7 +539,7 @@ func BenchmarkGetVerifiedWarpMessage(b *testing.B) {
 	runBenchmarks(b, getVerifiedWarpMessageTests)
 }
 
-func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) []precompiletest.PrecompileTest {
+func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest {
 	networkID := uint32(54321)
 	callerAddr := common.HexToAddress("0x0123")
 	sourceChainID := ids.GenerateTestID()
@@ -750,7 +752,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(invalidPackedPredicate)),
 			ReadOnly:    false,
-			ExpectedErr: errInvalidPredicateBytes,
+			ExpectedErr: ErrInvalidPredicateBytes,
 			Rules:       rules,
 		},
 		{
@@ -763,7 +765,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(invalidWarpMsgPredicate)),
 			ReadOnly:    false,
-			ExpectedErr: errInvalidWarpMsg,
+			ExpectedErr: ErrInvalidWarpMsg,
 			Rules:       rules,
 		},
 		{
@@ -776,7 +778,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageCost(len(invalidHashPredicate)),
 			ReadOnly:    false,
-			ExpectedErr: errInvalidBlockHashPayload,
+			ExpectedErr: ErrInvalidBlockHashPayload,
 			Rules:       rules,
 		},
 		{
@@ -787,7 +789,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
-			ExpectedErr: errInvalidIndexInput,
+			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
 		{
@@ -800,7 +802,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
-			ExpectedErr: errInvalidIndexInput,
+			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
 		{
@@ -813,7 +815,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules extras.AvalancheRules) [
 			},
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
-			ExpectedErr: errInvalidIndexInput,
+			ExpectedErr: ErrInvalidIndexInput,
 			Rules:       rules,
 		},
 	}
