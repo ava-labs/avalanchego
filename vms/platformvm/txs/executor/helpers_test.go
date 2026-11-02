@@ -306,3 +306,19 @@ func defaultFx(clk *mockable.Clock, log logging.Logger, isBootstrapped bool) fx.
 	}
 	return res
 }
+
+func must[T any](t require.TestingT) func(T, error) T {
+	return func(val T, err error) T {
+		require.NoError(t, err)
+		return val
+	}
+}
+
+func newAdvanceTimeTx(t testing.TB, timestamp time.Time) (*platform.Tx, error) {
+	utx := &platform.AdvanceTimeTx{Time: uint64(timestamp.Unix())}
+	tx, err := platform.NewSignedTx(utx, platform.Codec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(snowtest.Context(t, snowtest.PChainID))
+}
