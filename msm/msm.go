@@ -163,6 +163,7 @@ type StateMachine struct {
 	*Config
 	lock          sync.RWMutex
 	approvalStore *ApprovalStore
+	validators    map[avalanchego.NodeID]struct{}
 
 	auxInfoStore *auxInfoStore
 }
@@ -244,8 +245,15 @@ func NewStateMachine(config *Config) (*StateMachine, error) {
 	return &sm, sm.maybeInitApprovalStore(lastBlock)
 }
 
-// HandleAuxiliaryMessage processes
+// HandleAuxiliaryInfo processes auxiliary information received from a node.
 func (sm *StateMachine) HandleAuxiliaryInfo(info common.AuxiliaryInfo, from avalanchego.NodeID) {
+	sm.lock.Lock()
+	defer sm.lock.Unlock()
+
+	if _, ok := sm.validators[from]; !ok {
+		return
+	}
+
 	sm.auxInfoStore.HandleAuxiliaryMessage(info, from)
 }
 
@@ -283,6 +291,11 @@ func (sm *StateMachine) maybeInitApprovalStore(block StateMachineBlock) error {
 
 	sm.lock.Lock()
 	defer sm.lock.Unlock()
+
+	sm.validators = make(map[avalanchego.NodeID]struct{})
+	for _, vdr := range validators {
+		sm.validators[vdr.NodeID] = struct{}{}
+	}
 
 	if sm.approvalStore == nil {
 		sm.approvalStore = NewApprovalStore(sm.SignatureVerifier, validators, sm.Logger)

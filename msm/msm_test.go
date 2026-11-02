@@ -1956,6 +1956,7 @@ func TestCollectingApprovalsAuxInfoGating(t *testing.T) {
 		},
 	}
 	tc.blockStore[parentSeq] = &outerBlock{block: parent}
+	require.NoError(t, sm.OnBlockIndex(parent))
 
 	// buildAndVerify constructs the next collecting block on top of prev, stores it so it can serve
 	// as a parent (and as a back-pointer target for the aux info history), and verifies it.
@@ -2070,6 +2071,7 @@ func TestVerifyCollectingApprovalsRejectsIllegalAuxInfoBatch(t *testing.T) {
 		},
 	}
 	tc.blockStore[parentSeq] = &outerBlock{block: parent}
+	require.NoError(t, sm.OnBlockIndex(parent))
 
 	vote := common.AuxiliaryInfo{Version: 1, Data: []byte("vote-1")}
 	sm.HandleAuxiliaryInfo(vote, validators[1].NodeID)
@@ -2153,6 +2155,8 @@ func TestCollectingApprovalsAuxInfoVersionIDIsBackwardCompatible(t *testing.T) {
 	}
 	tc.blockStore[parentSeq] = &outerBlock{block: parent}
 
+	require.NoError(t, sm.OnBlockIndex(parent))
+
 	// buildAndVerify constructs the next collecting block on top of prev, verifies it, and stores it so it
 	// can serve as the next parent (and as a back-pointer target for the aux info history).
 	buildAndVerify := func(seq uint64, prev StateMachineBlock) *StateMachineBlock {
@@ -2232,6 +2236,7 @@ func TestCollectingApprovalsIncludesMultipleAuxInfoMessages(t *testing.T) {
 		},
 	}
 	tc.blockStore[parentSeq] = &outerBlock{block: parent}
+	require.NoError(t, sm.OnBlockIndex(parent))
 
 	version := sm.AuxiliaryInfoApp.DefaultVersionID()
 
