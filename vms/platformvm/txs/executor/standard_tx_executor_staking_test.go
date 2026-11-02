@@ -783,6 +783,20 @@ func TestStandardExecutorAddPermissionlessValidatorTxErrors(t *testing.T) {
 			},
 			want: errStakeTooShort,
 		},
+		{
+			name: "flow_checker_failed",
+			updateTx: func(tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.AddPermissionlessValidatorTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
+					},
+				})
+			},
+			want: errFlowCheckFailed,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1053,57 +1067,4 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	requireBaseTxApplied(t, env, diff, feeCalculator, stx)
-}
-
-func TestStandardExecutorAddPermissionlessValidatorTxFlowCheckFails(t *testing.T) {
-	require := require.New(t)
-
-	env := newEnvironment(t, upgradetest.Latest)
-	wallet := newWallet(t, env, walletConfig{keys: genesistest.DefaultFundedKeys[:1]})
-	feeCalculator := state.PickFeeCalculator(env.config, env.state)
-
-	sk, err := localsigner.New()
-	require.NoError(err)
-
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(err)
-
-	rewardsOwner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-	}
-	endTime := env.state.GetTimestamp().Add(defaultMinStakingDuration)
-	tx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&platform.SubnetValidator{
-			Validator: platform.Validator{
-				NodeID: ids.GenerateTestNodeID(),
-				End:    uint64(endTime.Unix()),
-				Wght:   env.config.MinValidatorStake,
-			},
-			Subnet: constants.PrimaryNetworkID,
-		},
-		pop,
-		env.ctx.AVAXAssetID,
-		rewardsOwner,
-		rewardsOwner,
-		reward.PercentDenominator,
-	)
-	require.NoError(err)
-
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
-	require.NoError(err)
-
-	// Remove the UTXOs the tx consumes so the flow check fails.
-	for utxoID := range tx.InputIDs() {
-		diff.DeleteUTXO(utxoID)
-	}
-
-	_, _, _, gotErr := StandardTx(
-		&env.backend,
-		feeCalculator,
-		tx,
-		diff,
-	)
-
-	require.ErrorIs(gotErr, errFlowCheckFailed)
 }
