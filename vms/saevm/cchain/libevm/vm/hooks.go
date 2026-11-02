@@ -38,9 +38,8 @@ func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
 // hooks implements [vm.Hooks] to achieve the C-Chain's EVM behaviour.
 type hooks struct{}
 
-// PreprocessingGasCharge returns 0: the C-Chain charges predicate verification
-// as part of a transaction's intrinsic gas, through the [params] hooks, rather
-// than as a preprocessing charge.
+// PreprocessingGasCharge returns 0. The C-Chain charges predicate verification
+// as part of a transaction's intrinsic gas.
 func (hooks) PreprocessingGasCharge(common.Hash) (uint64, error) {
 	return 0, nil
 }
