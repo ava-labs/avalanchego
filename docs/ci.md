@@ -23,6 +23,7 @@ to workflows and [local composite actions](https://docs.github.com/actions/shari
 - [Provision CI job dependencies](#provision-ci-job-dependencies)
 - [CI cache policy](#ci-cache-policy)
   - [Cache policy overview](#cache-policy-overview)
+  - [Archive caches and content-addressable caches](#archive-caches-and-content-addressable-caches)
   - [Cache lifecycle](#cache-lifecycle)
     - [Validate cache saves before merge](#validate-cache-saves-before-merge)
     - [Event behavior](#event-behavior)
@@ -183,6 +184,7 @@ Go and Bazel use the same workflow roles and file-name pattern:
 | Primary reusable workflow | [`bazel.yml`](../.github/workflows/bazel.yml) | [`go-unit.yml`](../.github/workflows/go-unit.yml) |
 | Pull-request and merge-group reusable workflow | n/a | [`go.yml`](../.github/workflows/go.yml) |
 | Reusable smoke workflow | [`bazel-smoke.yml`](../.github/workflows/bazel-smoke.yml) | [`go-smoke.yml`](../.github/workflows/go-smoke.yml) |
+| Reusable monitored-test workflow | [`bazel-monitored.yml`](../.github/workflows/bazel-monitored.yml) | n/a |
 
 Entrypoints select the reusable workflow that provides the required test policy,
 or define jobs that are specific to that event. The pull-request and
@@ -261,6 +263,21 @@ cache reuses individual action and test-target results. Keep test-result caching
 enabled for these tests. This provides pre-merge race coverage without the same
 broad rerun costs. macOS runs only a smoke test because its runners are slow and
 unreliable.
+
+Bazel E2E and monitored tests have no result caching. Bazel caches the binaries
+that these tests use, but the runners use `bazel run`, so each pre-merge run
+executes the full suite. Race detection would slow every pre-merge run, so these
+tests run with race detection only in scheduled CI. As a result, a data race
+that only these tests find appears after merge. It does not block the pull
+request. Reconsider pre-merge race detection if either of these conditions
+occurs:
+
+- Scheduled CI finds races often enough that later detection costs more than
+  longer pre-merge runs.
+- Runs with race detection become fast enough for pre-merge CI.
+
+For the suites that scheduled CI runs with race detection, see
+[E2E and monitored test runners](./bazel.md#e2e-and-monitored-test-runners).
 
 ### Go unit test platforms
 
@@ -426,6 +443,33 @@ can download a release on a miss, and the Nix store cache can fetch missing
 flake store paths. Those caches do not use the dependency-download completeness
 check. These restrictions do not isolate the workload from the network; see
 [download restrictions](./go-toolchains-and-caches.md#download-restrictions).
+
+### Archive caches and content-addressable caches
+
+GitHub Actions and Bazel cache build outputs in different ways. Bazel's
+content-addressable cache is more efficient and needs less cache setup in each
+job, so jobs that build binaries for tests use Bazel. For those tests, see
+[E2E and monitored test runners](./bazel.md#e2e-and-monitored-test-runners).
+
+The GitHub Actions cache stores one archive for each key. The key covers all of
+the archive's inputs, so a change to any input selects a new key. The job then
+saves a new archive with all of its contents, including the parts that did not
+change. Only `master` saves these archives. If pull requests saved them, each
+pull-request run could add a full archive, and cache usage would have no
+practical limit; see [Cache lifecycle](#cache-lifecycle). The Go unit job uses
+this approach for `GOCACHE`; see [Go unit-test cache](#go-unit-test-cache).
+
+Bazel's remote cache stores each action output, such as one compiled package or
+one linked binary, under a hash of that action's inputs. A change uploads only
+the outputs whose inputs changed, so pre-merge runs, including pull requests,
+can write to the cache. Jobs that build the same outputs share them, and each
+job downloads only the outputs that it needs.
+
+The two approaches also need different amounts of setup. Each job that uses the
+GitHub Actions cache must define what to save: a cache key, the restore order,
+and the save conditions. A Bazel job needs only the remote-cache configuration,
+and Bazel decides what to store and reuse. This difference grows as Bazel
+builds more of the repository.
 
 ### Cache lifecycle
 

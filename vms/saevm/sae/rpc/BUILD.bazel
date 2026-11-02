@@ -10,6 +10,8 @@ go_library(
         "debug.go",
         "filters.go",
         "gasprice.go",
+        "gasused.go",
+        "headers.go",
         "indexing.go",
         "mempool.go",
         "net.go",
@@ -69,7 +71,10 @@ go_library(
 
 go_test(
     name = "rpc_test",
-    srcs = ["custom_test.go"],
+    srcs = [
+        "custom_test.go",
+        "headers_test.go",
+    ],
     embed = [":rpc"],
     deps = [
         "@com_github_ava_labs_libevm//common/hexutil",

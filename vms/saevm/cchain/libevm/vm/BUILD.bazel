@@ -11,12 +11,12 @@ go_library(
     srcs = ["hooks.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/vm",
     deps = [
-        "//graft/coreth/params",
         "//vms/saevm/cchain/libevm/extstate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//params",
     ],
 )
 
@@ -25,8 +25,8 @@ go_test(
     srcs = ["hooks_test.go"],
     deps = [
         "//graft/coreth/params",
-        "//graft/coreth/params/extras",
         "//vms/saevm/cchain/cchaintest",
+        "//vms/saevm/cchain/cparams",
         "//vms/saevm/cchain/libevm",
         "//vms/saevm/cchain/libevm/extstate",
         "@com_github_ava_labs_libevm//common",
@@ -34,6 +34,7 @@ go_test(
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//params",
         "@com_github_stretchr_testify//require",
     ],
 )

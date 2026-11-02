@@ -10,8 +10,8 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
+	"github.com/ava-labs/libevm/params"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 )
 

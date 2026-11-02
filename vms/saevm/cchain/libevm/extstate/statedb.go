@@ -11,12 +11,14 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/stateconf"
+	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 )
 
 // RegisterExtras registers the libevm hook that partitions state slots into
@@ -89,8 +91,8 @@ func (s *StateDB) Prepare(
 	precompiles []common.Address,
 	list types.AccessList,
 ) {
-	rulesExtra := params.GetRulesExtra(rules)
-	s.predicates = predicate.FromAccessList((*params.RulesExtra)(rulesExtra), list)
+	rulesExtra := corethparams.GetRulesExtra(rules)
+	s.predicates = predicate.FromAccessList((*corethparams.RulesExtra)(rulesExtra), list)
 	s.preAP1 = !rulesExtra.IsApricotPhase1
 	s.StateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)
 }

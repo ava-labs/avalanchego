@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 
@@ -439,11 +439,9 @@ func TestStatefulPrecompile(t *testing.T) {
 
 	// nativeasset precompiles are activated at AP2.
 	cfg := params.WithExtra(
-		&params.ChainConfig{},
-		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase2BlockTimestamp: new(uint64),
-			},
+		&ethparams.ChainConfig{},
+		&cparams.ChainConfig{
+			ApricotPhase2Timestamp: new(uint64),
 		},
 	)
 	for _, test := range tests {

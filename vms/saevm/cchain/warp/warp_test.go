@@ -13,7 +13,6 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -145,9 +144,7 @@ func TestFromReceipts(t *testing.T) {
 // newRules returns rules with Durango, and therefore Warp, active iff
 // isDurango.
 func newRules(isDurango bool) corethparams.RulesExtra {
-	return corethparams.RulesExtra{
-		AvalancheRules: extras.AvalancheRules{IsDurango: isDurango},
-	}
+	return corethparams.RulesExtra{IsDurango: isDurango}
 }
 
 func TestVerifyBlock(t *testing.T) {

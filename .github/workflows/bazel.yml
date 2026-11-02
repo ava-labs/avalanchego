@@ -30,6 +30,16 @@ on:
         description: 'Task to run for Bazel unit tests'
         required: true
         type: string
+      run_monitored_tests:
+        description: 'Run the monitored tests without race detection'
+        required: false
+        type: boolean
+        default: false
+      run_monitored_race_tests:
+        description: 'Run the activation, load, and warp monitored tests with race detection'
+        required: false
+        type: boolean
+        default: false
       enable_remote_cache:
         description: 'Enable the remote Bazel cache'
         required: false
@@ -107,3 +117,50 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+
+  # Keep the if conditions here so skipped jobs show readable names.
+  # See docs/bazel.md#e2e-and-monitored-test-runners for the reason.
+  monitored-race:
+    name: monitored-race
+    if: ${{ inputs.run_monitored_race_tests }}
+    needs: setup
+    uses: ./.github/workflows/bazel-monitored.yml
+    with:
+      # Reusable workflow inputs cannot accept matrices as lists or objects, so use a JSON string.
+      # See docs/bazel.md#e2e-and-monitored-test-runners for alternatives and rationale.
+      test_matrix: |
+        {"include": [
+          {"name": "e2e-post-latest", "task": "bazel-test-e2e-post-latest-race-serial", "network_owner": "avalanchego-e2e"},
+          {"name": "e2e-schedule-latest", "task": "bazel-test-e2e-schedule-latest-race-serial", "network_owner": "avalanchego-e2e"},
+          {"name": "load", "task": "bazel-test-load-ci-race"},
+          {"name": "load-subnet-evm", "task": "bazel-test-load-subnet-evm-race", "network_owner": "subnet-evm-small-load"},
+          {"name": "warp-subnet-evm", "task": "bazel-test-warp-subnet-evm-race", "network_owner": "subnet-evm-warp-e2e"}
+        ]}
+      job_suffix: -race
+      runner: ${{ inputs.runner }}
+      timeout_minutes: ${{ inputs.e2e_timeout_minutes }}
+      enable_remote_cache: ${{ inputs.enable_remote_cache }}
+    secrets: inherit
+
+  monitored:
+    name: monitored
+    if: ${{ inputs.run_monitored_tests }}
+    needs: setup
+    uses: ./.github/workflows/bazel-monitored.yml
+    with:
+      # The load test has no network owner; leave its dashboard owner filter empty.
+      test_matrix: |
+        {"include": [
+          {"name": "e2e-existing-network", "task": "bazel-test-e2e-existing-network", "network_owner": "avalanchego-e2e"},
+          {"name": "e2e-post-latest", "task": "bazel-test-e2e-post-latest", "runner": "e2e_runner", "network_owner": "avalanchego-e2e"},
+          {"name": "e2e-schedule-latest", "task": "bazel-test-e2e-schedule-latest", "runner": "e2e_runner", "network_owner": "avalanchego-e2e"},
+          {"name": "load-subnet-evm", "task": "bazel-test-load-subnet-evm", "network_owner": "subnet-evm-small-load"},
+          {"name": "warp-subnet-evm", "task": "bazel-test-warp-subnet-evm", "network_owner": "subnet-evm-warp-e2e"},
+          {"name": "load", "task": "bazel-test-load-ci"},
+          {"name": "upgrade", "task": "bazel-test-upgrade", "network_owner": "avalanchego-upgrade"}
+        ]}
+      runner: ${{ inputs.runner }}
+      e2e_runner: ${{ inputs.e2e_runner }}
+      timeout_minutes: ${{ inputs.e2e_timeout_minutes }}
+      enable_remote_cache: ${{ inputs.enable_remote_cache }}
+    secrets: inherit

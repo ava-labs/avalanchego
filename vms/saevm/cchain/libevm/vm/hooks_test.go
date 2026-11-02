@@ -13,13 +13,15 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
+
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 )
 
 func TestMain(m *testing.M) {
@@ -38,7 +40,7 @@ func TestHooksOverrideNewEVMArgs(t *testing.T) {
 	}{
 		{
 			name:           "pre_shanghai_keeps_difficulty",
-			config:         params.WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &extras.ChainConfig{}),
+			config:         corethparams.WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &cparams.ChainConfig{}),
 			wantStateDB:    &extstate.StateDB{},
 			wantDifficulty: difficulty,
 		},

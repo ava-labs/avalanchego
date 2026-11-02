@@ -9,7 +9,6 @@ package(default_visibility = [
 go_library(
     name = "params",
     srcs = [
-        "config.go",
         "config_extra.go",
         "config_libevm.go",
         "hooks_libevm.go",
@@ -17,7 +16,6 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/params",
     deps = [
         "//graft/coreth/nativeasset",
-        "//graft/coreth/params/extras",
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/contracts/warp",
@@ -26,6 +24,7 @@ go_library(
         "//snow",
         "//utils/set",
         "//vms/evm/predicate",
+        "//vms/saevm/cchain/cparams",
         "//vms/saevm/hook",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/vm",
@@ -38,15 +37,13 @@ go_library(
 graft_go_test(
     name = "params_test",
     srcs = [
-        "config_test.go",
         "hooks_libevm_test.go",
         "main_test.go",
         "protocol_params_test.go",
     ],
     embed = [":params"],
     deps = [
-        "//graft/coreth/params/extras",
-        "//graft/evm/utils",
+        "//vms/saevm/cchain/cparams",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//params",
         "@com_github_stretchr_testify//assert",

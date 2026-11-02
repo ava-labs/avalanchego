@@ -31,7 +31,12 @@ export AVAGO_PLUGIN_DIR="${PLUGIN_DIR}"
 # Use the shared runner for test options and argument forwarding.
 # All binary paths are absolute, so changing to the workspace root is safe.
 # The prebuilt E2E target runs without invoking a Go compiler.
+E2E_TEST_SCRIPT="./scripts/tests.e2e.sh"
+if [[ "${1:-}" == "--existing-network" ]]; then
+  E2E_TEST_SCRIPT=./scripts/tests.e2e.existing.sh
+  shift
+fi
 export GINKGO_PATH AVALANCHEGO_PATH
 export E2E_TARGET="${E2E_TEST_PATH}"
 cd "${REPO_ROOT}"
-exec ./scripts/tests.e2e.sh "$@"
+exec "${E2E_TEST_SCRIPT}" "$@"

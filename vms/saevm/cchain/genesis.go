@@ -19,12 +19,12 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -78,7 +78,9 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 	// The JSON only specifies the chain-specific configuration; the upgrade
 	// schedule is configured by ctx.
 	chainID := g.Config.ChainID
-	u := &ctx.NetworkUpgrades
+	u := ctx.NetworkUpgrades
+	extraCfg := cparams.FromUpgrades(u)
+	extraCfg.SnowCtx = ctx
 	g.Config = corethparams.WithExtra(
 		&ethparams.ChainConfig{
 			ChainID:             chainID,
@@ -98,29 +100,7 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 			ShanghaiTime:        new(upgrade.UnixTimestamp(u.DurangoTime)),
 			CancunTime:          new(upgrade.UnixTimestamp(u.EtnaTime)),
 		},
-		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				ApricotPhase1BlockTimestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase1Time)),
-				ApricotPhase2BlockTimestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase2Time)),
-				ApricotPhase3BlockTimestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase3Time)),
-				ApricotPhase4BlockTimestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase4Time)),
-				ApricotPhase5BlockTimestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase5Time)),
-				ApricotPhasePre6BlockTimestamp:  new(upgrade.UnixTimestamp(u.ApricotPhasePre6Time)),
-				ApricotPhase6BlockTimestamp:     new(upgrade.UnixTimestamp(u.ApricotPhase6Time)),
-				ApricotPhasePost6BlockTimestamp: new(upgrade.UnixTimestamp(u.ApricotPhasePost6Time)),
-				BanffBlockTimestamp:             new(upgrade.UnixTimestamp(u.BanffTime)),
-				CortinaBlockTimestamp:           new(upgrade.UnixTimestamp(u.CortinaTime)),
-				DurangoBlockTimestamp:           new(upgrade.UnixTimestamp(u.DurangoTime)),
-				EtnaTimestamp:                   new(upgrade.UnixTimestamp(u.EtnaTime)),
-				FortunaTimestamp:                new(upgrade.UnixTimestamp(u.FortunaTime)),
-				GraniteTimestamp:                new(upgrade.UnixTimestamp(u.GraniteTime)),
-				HeliconTimestamp:                new(upgrade.UnixTimestamp(u.HeliconTime)),
-				IglooTimestamp:                  new(upgrade.UnixTimestamp(u.IglooTime)),
-			},
-			AvalancheContext: extras.AvalancheContext{
-				SnowCtx: ctx,
-			},
-		},
+		extraCfg,
 	)
 	return (*genesis)(&g), nil
 }

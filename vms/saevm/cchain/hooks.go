@@ -23,7 +23,6 @@ import (
 
 	_ "embed"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -33,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
@@ -160,7 +160,7 @@ func delayExponent(h *types.Header) dynamic.DelayExponent {
 	return dynamic.InitialDelayExponent
 }
 
-func targetExponent(config *extras.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
+func targetExponent(config *cparams.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
 	if te := customtypes.GetHeaderExtra(h).TargetExponent; te != nil {
 		return *te, nil
 	}

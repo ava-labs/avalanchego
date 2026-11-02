@@ -147,25 +147,3 @@ tasks:
   test-build-image:
     desc: Test docker image build
     cmd: '{{.NIX_RUN}} bash -x scripts/tests.build_docker_image.sh'
-
-  test-e2e-load:
-    desc: Run end-to-end load tests using Ginkgo test framework
-    cmd: '{{.NIX_RUN}} ./scripts/run_ginkgo_load.sh'
-
-  test-e2e-load-ci: # consolidated test-e2e-load
-    desc: Run E2E load tests with CI setup
-    cmds:
-      - cmd: "{{.NIX_RUN}} bash -c 'cd ../../ && ./scripts/build.sh'" # build avalanchego from root
-      - task: build # build subnet-evm
-      - task: test-e2e-load
-
-  test-e2e-warp:
-    desc: Run end-to-end warp tests using Ginkgo test framework
-    cmd: '{{.NIX_RUN}} bash -x ./scripts/run_ginkgo_warp.sh'
-
-  test-e2e-warp-ci: # consolidated test-e2e-warp
-    desc: Run E2E warp tests with CI setup
-    cmds:
-      - cmd: "{{.NIX_RUN}} bash -c 'cd ../../ && ./scripts/build.sh'" # build avalanchego from root
-      - task: build # build subnet-evm
-      - task: test-e2e-warp

@@ -13,17 +13,19 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/stateconf"
+	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
+
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 
 	. "github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 )
@@ -196,7 +198,7 @@ func TestGetCommittedState(t *testing.T) {
 	}{
 		{
 			name:   "pre_ap1_reads_untransformed_key",
-			config: params.WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &extras.ChainConfig{}),
+			config: corethparams.WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &cparams.ChainConfig{}),
 			want:   assetVal,
 		},
 		{

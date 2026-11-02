@@ -247,8 +247,13 @@ func TestRPCExtras(t *testing.T) {
 		"settledGasNumerator":   hexutil.EncodeUint64(*extra.SettledGasNumerator),
 		"settledExcess":         hexutil.EncodeUint64(*extra.SettledExcess),
 	}
-	numHeaderExtras := reflect.TypeFor[customtypes.HeaderExtra]().NumField()
-	require.Lenf(t, wantHeaderExtras, numHeaderExtras, "%T field count", customtypes.HeaderExtra{})
+	var numHeaderExtras int
+	for _, f := range reflect.VisibleFields(reflect.TypeFor[customtypes.HeaderExtra]()) {
+		if f.IsExported() {
+			numHeaderExtras++
+		}
+	}
+	require.Lenf(t, wantHeaderExtras, numHeaderExtras, "%T exported field count", extra)
 
 	var (
 		wantBlockExtras = maps.Clone(wantHeaderExtras)
