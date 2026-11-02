@@ -46,11 +46,6 @@ func (hooks) PreprocessingGasCharge(common.Hash) (uint64, error) {
 }
 
 // OverrideNewEVMArgs is a hook that is called in [vm.NewEVM].
-// It allows for the modification of the EVM arguments before the EVM is created.
-// Specifically, we set Random to be the same as Difficulty since Shanghai.
-// This allows using the same jump table as upstream.
-// Then we set Difficulty to 0 as it is post Merge in upstream.
-// Additionally we wrap the StateDB in an [extstate.StateDB].
 func (hooks) OverrideNewEVMArgs(args *vm.NewEVMArgs) *vm.NewEVMArgs {
 	args.StateDB = wrapStateDB(args.StateDB)
 
