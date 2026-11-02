@@ -1,0 +1,15 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+package(default_visibility = ["//vms/saevm/l1s:__subpackages__"])
+
+go_library(
+    name = "libevm",
+    srcs = ["libevm.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/saevm/l1s/libevm",
+    deps = [
+        "//graft/subnet-evm/core",
+        "//graft/subnet-evm/params",
+        "//graft/subnet-evm/plugin/evm/customtypes",
+        "@com_github_ava_labs_libevm//libevm",
+    ],
+)
