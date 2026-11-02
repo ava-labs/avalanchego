@@ -241,8 +241,7 @@ func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Add
 	// This ensures that we charge gas before we unpack the variable sized input.
 	payloadGas, overflow := math.SafeMul(warpGasConfig.PerWarpMessageByte, uint64(len(input)))
 	if overflow {
-		env.UseGas(env.Gas())
-		return nil, vm.ErrOutOfGas
+		payloadGas = math.MaxUint64
 	}
 	if err := contract.DeductMaxGas(env, payloadGas); err != nil {
 		return nil, err

@@ -8,7 +8,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
-	"github.com/ava-labs/libevm/core/vm"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -71,8 +70,7 @@ func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, h
 	// EVM execution because each execution incurs an additional read cost.
 	msgBytesGas, overflow := math.SafeMul(warpGasConfig.PerWarpMessageChunk, uint64(len(pred)))
 	if overflow {
-		env.UseGas(env.Gas())
-		return nil, vm.ErrOutOfGas
+		msgBytesGas = math.MaxUint64
 	}
 	if err := contract.DeductMaxGas(env, msgBytesGas); err != nil {
 		return nil, err

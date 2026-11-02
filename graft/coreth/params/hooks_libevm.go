@@ -153,6 +153,12 @@ func (r RulesExtra) precompileOverrideBuiltin(addr common.Address) (libevm.Preco
 func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.PrecompiledContract {
 	return vm.NewStatefulPrecompile(func(env vm.PrecompileEnvironment, input []byte) ([]byte, error) {
 		rules := *GetRulesExtra(env.Rules())
+
+		if call := env.IncomingCallType(); (call == vm.DelegateCall || call == vm.CallCode) && rules.IsGranite {
+			env.UseGas(env.Gas())
+			return nil, vm.ErrExecutionReverted
+		}
+
 		accessibleState := accessibleState{
 			env: env,
 			blockContext: &precompileBlockContext{
@@ -160,11 +166,6 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 				time:             env.BlockTime(),
 				predicateResults: customtypes.PredicateResults(env.BlockHeader(), rules),
 			},
-		}
-
-		if call := env.IncomingCallType(); (call == vm.DelegateCall || call == vm.CallCode) && rules.IsGranite {
-			env.UseGas(env.Gas())
-			return nil, vm.ErrExecutionReverted
 		}
 
 		return contract.Run(accessibleState, env.Addresses().EVMSemantic.Caller, env.Addresses().EVMSemantic.Self, input, env.ReadOnly())
