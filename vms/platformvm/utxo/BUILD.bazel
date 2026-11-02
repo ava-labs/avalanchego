@@ -22,10 +22,7 @@ go_library(
 
 go_test(
     name = "utxo_test",
-    srcs = [
-        "mocks_generate_test.go",
-        "verifier_test.go",
-    ],
+    srcs = ["verifier_test.go"],
     embed = [":utxo"],
     deps = [
         "//ids",

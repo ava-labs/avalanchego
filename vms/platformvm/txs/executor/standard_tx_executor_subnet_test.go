@@ -9,140 +9,33 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/ava-labs/avalanchego/vms/platformvm/config"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx/fxmock"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/utxo/utxomock"
+	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
-// Returns a TransformSubnetTx that passes syntactic verification.
-// Memo field is empty as required post Durango activation
-func newTransformSubnetTx(t *testing.T) (*platform.TransformSubnetTx, *platform.Tx) {
-	t.Helper()
-
-	creds := []verify.Verifiable{
-		&secp256k1fx.Credential{
-			Sigs: make([][65]byte, 1),
-		},
-		&secp256k1fx.Credential{
-			Sigs: make([][65]byte, 1),
-		},
-	}
-	unsignedTx := &platform.TransformSubnetTx{
-		BaseTx: platform.BaseTx{
-			BaseTx: avax.BaseTx{
-				Ins: []*avax.TransferableInput{{
-					UTXOID: avax.UTXOID{
-						TxID: ids.GenerateTestID(),
-					},
-					Asset: avax.Asset{
-						ID: ids.GenerateTestID(),
-					},
-					In: &secp256k1fx.TransferInput{
-						Amt: 1,
-						Input: secp256k1fx.Input{
-							SigIndices: []uint32{0, 1},
-						},
-					},
-				}},
-				Outs: []*avax.TransferableOutput{
-					{
-						Asset: avax.Asset{
-							ID: ids.GenerateTestID(),
-						},
-						Out: &secp256k1fx.TransferOutput{
-							Amt: 1,
-							OutputOwners: secp256k1fx.OutputOwners{
-								Threshold: 1,
-								Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-							},
-						},
-					},
-				},
-			},
-		},
-		Subnet:                   ids.GenerateTestID(),
-		AssetID:                  ids.GenerateTestID(),
-		InitialSupply:            10,
-		MaximumSupply:            10,
-		MinConsumptionRate:       0,
-		MaxConsumptionRate:       reward.PercentDenominator,
-		MinValidatorStake:        2,
-		MaxValidatorStake:        10,
-		MinStakeDuration:         1,
-		MaxStakeDuration:         2,
-		MinDelegationFee:         reward.PercentDenominator,
-		MinDelegatorStake:        1,
-		MaxValidatorWeightFactor: 1,
-		UptimeRequirement:        reward.PercentDenominator,
-		SubnetAuth: &secp256k1fx.Credential{
-			Sigs: make([][65]byte, 1),
-		},
-	}
-	tx := &platform.Tx{
-		Unsigned: unsignedTx,
-		Creds:    creds,
-	}
-	require.NoError(t, tx.Initialize(platform.Codec))
-	return unsignedTx, tx
-}
-
-// mock implementations that can be used in tests
-// for verifying TransformSubnetTx.
-type transformSubnetTxVerifyEnv struct {
-	latestForkTime time.Time
-	fx             *fxmock.Fx
-	flowChecker    *utxomock.Verifier
-	unsignedTx     *platform.TransformSubnetTx
-	tx             *platform.Tx
-	state          *state.Diff
-}
-
-// Returns mock implementations that can be used in tests
-// for verifying TransformSubnetTx.
-func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) transformSubnetTxVerifyEnv {
-	t.Helper()
-
-	now := time.Now()
-	mockFx := fxmock.NewFx(ctrl)
-	mockFlowChecker := utxomock.NewVerifier(ctrl)
-	unsignedTx, tx := newTransformSubnetTx(t)
-	s := statetest.New(t, statetest.Config{})
-	stateDiff, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
-	require.NoError(t, err)
-
-	return transformSubnetTxVerifyEnv{
-		latestForkTime: now,
-		fx:             mockFx,
-		flowChecker:    mockFlowChecker,
-		unsignedTx:     unsignedTx,
-		tx:             tx,
-		state:          stateDiff,
-	}
-}
-
 func TestStandardExecutorTransformSubnetTx(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Durango)
+	wallet := newWallet(t, env, walletConfig{
+		subnetIDs: []ids.ID{testSubnet1.ID()},
+	})
+
 	type test struct {
 		name            string
-		newExecutor     func(*gomock.Controller) (*platform.TransformSubnetTx, *standardTxExecutor)
+		updateTx        func(*platform.Tx)
+		updateState     func(*state.Diff)
 		stateAssertions func(*testing.T, *state.Diff, *platform.Tx)
 		err             error
 	}
@@ -150,187 +43,52 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 	tests := []test{
 		{
 			name: "tx fails syntactic verification",
-			newExecutor: func(ctrl *gomock.Controller) (*platform.TransformSubnetTx, *standardTxExecutor) {
-				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
-				// Setting the tx to nil makes the tx fail syntactic verification
-				env.tx.Unsigned = (*platform.TransformSubnetTx)(nil)
-
-				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-				}
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned = (*platform.TransformSubnetTx)(nil)
 			},
 			err: platform.ErrNilTx,
 		},
 		{
 			name: "max stake duration too large",
-			newExecutor: func(ctrl *gomock.Controller) (*platform.TransformSubnetTx, *standardTxExecutor) {
-				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
-				env.unsignedTx.MaxStakeDuration = math.MaxUint32
-
-				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-				}
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
+			updateTx: func(tx *platform.Tx) {
+				tx.Unsigned.(*platform.TransformSubnetTx).MaxStakeDuration = math.MaxUint32
 			},
 			err: errMaxStakeDurationTooLarge,
 		},
 		{
 			name: "fail subnet authorization",
-			newExecutor: func(ctrl *gomock.Controller) (*platform.TransformSubnetTx, *standardTxExecutor) {
-				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
-				// Remove credentials
-				env.tx.Creds = nil
-				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
-
-				cfg := &config.Internal{
-					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-					MaxStakeDuration: math.MaxInt64,
-				}
-
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
+			updateTx: func(tx *platform.Tx) {
+				tx.Creds = nil
 			},
 			err: errWrongNumberOfCredentials,
 		},
 		{
 			name: "flow checker failed",
-			newExecutor: func(ctrl *gomock.Controller) (*platform.TransformSubnetTx, *standardTxExecutor) {
-				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
-				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
-				// GetSubnetToL1Conversion and GetSubnetTransformation return ErrNotFound by default.
-				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil)
-				env.flowChecker.EXPECT().VerifySpend(
-					gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(),
-				).Return(errFlowCheckFailed)
-
-				cfg := &config.Internal{
-					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-					MaxStakeDuration: math.MaxInt64,
-				}
-
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
+			updateTx: func(tx *platform.Tx) {
+				// Produce more AVAX than the tx consumes
+				unsignedTx := tx.Unsigned.(*platform.TransformSubnetTx)
+				unsignedTx.Outs = append(unsignedTx.Outs, &avax.TransferableOutput{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt: math.MaxUint64 / 2,
 					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
+				})
 			},
-			err: errFlowCheckFailed,
+			err: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
 			name: "invalid after subnet conversion",
-			newExecutor: func(ctrl *gomock.Controller) (*platform.TransformSubnetTx, *standardTxExecutor) {
-				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
-				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
-				env.state.SetSubnetToL1Conversion(env.unsignedTx.Subnet, state.SubnetToL1Conversion{
+			updateState: func(diff *state.Diff) {
+				diff.SetSubnetToL1Conversion(testSubnet1.ID(), state.SubnetToL1Conversion{
 					ConversionID: ids.GenerateTestID(),
 					ChainID:      ids.GenerateTestID(),
 					Addr:         make([]byte, 20),
 				})
-				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
-
-				cfg := &config.Internal{
-					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-					MaxStakeDuration: math.MaxInt64,
-				}
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
 			},
 			err: errIsImmutable,
 		},
 		{
 			name: "valid tx",
-			newExecutor: func(ctrl *gomock.Controller) (*platform.TransformSubnetTx, *standardTxExecutor) {
-				env := newValidTransformSubnetTxVerifyEnv(t, ctrl)
-				subnetOwner := fxmock.NewOwner(ctrl)
-				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
-				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
-				env.flowChecker.EXPECT().VerifySpend(
-					env.unsignedTx, env.state, env.unsignedTx.Ins, env.unsignedTx.Outs, env.tx.Creds[:len(env.tx.Creds)-1], gomock.Any(),
-				).Return(nil).Times(1)
-
-				cfg := &config.Internal{
-					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
-					MaxStakeDuration: math.MaxInt64,
-				}
-
-				feeCalculator := state.PickFeeCalculator(cfg, env.state)
-				e := &standardTxExecutor{
-					backend: &Backend{
-						Config:       cfg,
-						Bootstrapped: utils.NewAtomic(true),
-						Fx:           env.fx,
-						FlowChecker:  env.flowChecker,
-						Ctx:          &snow.Context{},
-					},
-					feeCalculator: feeCalculator,
-					tx:            env.tx,
-					state:         env.state,
-				}
-				return env.unsignedTx, e
-			},
 			stateAssertions: func(t *testing.T, state *state.Diff, stx *platform.Tx) {
 				tx := stx.Unsigned.(*platform.TransformSubnetTx)
 
@@ -365,14 +123,46 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctrl := gomock.NewController(t)
+			tx, err := wallet.IssueTransformSubnetTx(
+				testSubnet1.ID(),
+				ids.GenerateTestID(),
+				10,
+				10,
+				0,
+				reward.PercentDenominator,
+				2,
+				10,
+				time.Minute,
+				time.Hour,
+				1,
+				10,
+				1,
+				80,
+			)
+			require.NoError(t, err)
 
-			unsignedTx, executor := tt.newExecutor(ctrl)
-			err := executor.TransformSubnetTx(unsignedTx)
+			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+			require.NoError(t, err)
+
+			if tt.updateTx != nil {
+				tt.updateTx(tx)
+			}
+
+			if tt.updateState != nil {
+				tt.updateState(diff)
+			}
+
+			feeCalculator := state.PickFeeCalculator(env.config, env.state)
+			_, _, _, err = StandardTx(
+				&env.backend,
+				feeCalculator,
+				tx,
+				diff,
+			)
 			require.ErrorIs(t, err, tt.err)
 
 			if tt.stateAssertions != nil {
-				tt.stateAssertions(t, executor.state, executor.tx)
+				tt.stateAssertions(t, diff, tx)
 			}
 		})
 	}
