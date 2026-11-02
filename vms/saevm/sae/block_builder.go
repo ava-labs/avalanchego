@@ -197,7 +197,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 			return nil, fmt.Errorf("starting worst-case state for block %d: %v", block.Height(), err)
 		}
 		for i, tx := range block.Transactions() {
-			if err := state.ApplyTx(tx); err != nil {
+			if err := state.ReplayTx(tx); err != nil {
 				blockLog.Warn("Could not apply tx during historical worst-case calculation",
 					zap.Int("tx_index", i),
 					zap.Stringer("tx_hash", tx.Hash()),

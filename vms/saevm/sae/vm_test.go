@@ -178,7 +178,7 @@ func tryNewSUT(tb testing.TB, numAccounts uint, opts ...sutOption) (*SUT, error)
 		nodeID:  ids.GenerateTestNodeID(),
 	}, opts...)
 
-	vm := NewSinceGenesis(conf.hooks, conf.vmConfig)
+	vm := NewSinceGenesis(hookstest.Conformance(tb, conf.hooks), conf.vmConfig)
 	snow := adaptor.Convert(vm)
 
 	ctx := tb.Context()
@@ -1361,4 +1361,37 @@ func storageTrieRoot(tb testing.TB, slot, value common.Hash) common.Hash {
 	st := trie.NewStackTrie(nil)
 	require.NoErrorf(tb, st.Update(crypto.Keccak256(slot[:]), encoded), "%T.Update()", st)
 	return st.Hash()
+}
+
+// transferTx returns a minimal signed transfer from the wallet account.
+func (s *SUT) transferTx(tb testing.TB, account int) *types.Transaction {
+	tb.Helper()
+	return s.wallet.SetNonceAndSign(tb, account, &types.DynamicFeeTx{
+		To:        &common.Address{},
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+}
+
+func TestBuildOnUnsettledParent(t *testing.T) {
+	timeOpt, _ := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	_, sut := newSUT(t, 2, timeOpt)
+
+	const revoked, other = 0, 1
+	parent := sut.runConsensusLoop(t, sut.transferTx(t, revoked))
+
+	sut.hooks.AdmitTransactionFn = func(
+		from common.Address,
+		_ *types.Transaction,
+		_ hook.SettledView,
+	) error {
+		if from == sut.wallet.Addresses()[revoked] {
+			return errors.New("sender revoked")
+		}
+		return nil
+	}
+
+	// Building and verifying replay the parent, which admission now rejects.
+	b := sut.runConsensusLoop(t, sut.transferTx(t, other))
+	require.Less(t, b.LastSettled().Height(), parent.Height(), "parent MUST be unsettled")
 }

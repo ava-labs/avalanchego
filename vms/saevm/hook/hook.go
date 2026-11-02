@@ -52,7 +52,7 @@ type PointsG[T Transaction] interface {
 }
 
 // Points define user-injected hook points which do not depend on generic
-// types.
+// types. The SAE README documents when each hook runs and what it may read.
 type Points interface {
 	// ExecutionResultsDB opens and returns a height-indexed database, which
 	// will be closed by the VM when no longer needed. It MAY use the provided
@@ -80,17 +80,18 @@ type Points interface {
 	// These operations will be performed during both worst-case and actual
 	// execution.
 	EndOfBlockOps(*types.Block) ([]Op, error)
-	// CanExecuteTransaction mirrors [params.RulesAllowlistHooks.CanExecuteTransaction]
-	// so that consumers can use a single concrete type for both SAE and libevm hooks.
-	CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error
+	// AdmitTransaction guards inclusion when building and verifying blocks, and MUST
+	// NOT modify tx. It never runs during execution, and sees modules once settled.
+	AdmitTransaction(from common.Address, tx *types.Transaction, settled SettledView) error
 	// StartExecutingBlock applies state changes before the block's transactions
 	// run. `rules` are those of the block and `parent` is the parent header. It
-	// runs during canonical and historical execution. It MUST NOT change data
-	// outside of the [state.StateDB].
+	// runs during canonical and historical execution, possibly concurrently. It
+	// MUST NOT fail or change data outside of the [state.StateDB].
 	StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error
 	// FinishExecutingBlock applies state changes after the block's transactions
 	// and end-of-block operations. It runs during canonical and historical
-	// execution. It MUST NOT change data outside of the [state.StateDB].
+	// execution, possibly concurrently, unless re-execution stops mid-block. It
+	// MUST NOT fail or change data outside of the [state.StateDB].
 	FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
 	// AfterExecutingBlock runs only during canonical execution, before the VM
 	// commits the post-execution state.
@@ -118,15 +119,16 @@ type BlockBuilder[T Transaction] interface {
 	// filtered based on the worst-case queue.
 	//
 	// SAE will filter any transactions whose [Op] can not be safely applied to
-	// the state.
+	// the state. The header is read-only.
 	PotentialEndOfBlockOps(
 		ctx context.Context,
 		header *types.Header,
 		lastSettledBlock common.Hash,
 		source saetypes.BlockSource,
 	) iter.Seq[T]
-	// BuildBlock constructs a block with the given components. The header
-	// MAY be modified, but all other arguments are read-only.
+	// BuildBlock constructs a block with the given components. It MAY modify the
+	// header without changing any value [Points] reads from it or SAE set, other
+	// than recording `settled`. All other arguments are read-only.
 	//
 	// SAE always uses this method instead of [types.NewBlock], to ensure any
 	// libevm block extras are properly populated.
@@ -218,6 +220,14 @@ func (o *Op) ApplyTo(stateDB *state.StateDB) error {
 func MinimumGasConsumption(txLimit uint64) uint64 {
 	_ = (params.RulesHooks)(nil) // keep the import to allow [] doc links
 	return intmath.CeilDiv(txLimit, saeparams.Lambda)
+}
+
+// SettledView is what consensus-time hooks see of the settled block. Its rules
+// are computed as execution computes them, and its state is read-only.
+type SettledView struct {
+	Header *types.Header
+	Rules  params.Rules
+	State  libevm.StateReader
 }
 
 // Settled includes information about the block that is settled by a header.
