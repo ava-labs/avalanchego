@@ -84,7 +84,7 @@ func CheckTxPredicates(
 			bitset.Add(i)
 		}
 	}
-	log.Debug("Warp message verify",
+	log.Debug("warp message verify",
 		"tx", tx.Hash(),
 		"res", bitset.String(),
 	)
