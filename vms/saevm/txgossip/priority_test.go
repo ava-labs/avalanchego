@@ -153,7 +153,8 @@ func FuzzByPriority(f *testing.F) {
 				if sender == got.Sender || len(txs) == 0 {
 					continue
 				}
-				require.Truef(t, gotHead.outranks(head(sender, txs[0])), "byPriority()[%d] from %v does not outrank the next transaction from %v", i, got.Sender, sender)
+				skipped := head(sender, txs[0])
+				require.Truef(t, gotHead.outranks(skipped), "byPriority()[%d] from %v does not outrank the next transaction from %v", i, got.Sender, sender)
 			}
 		}
 		for sender, txs := range remaining {
