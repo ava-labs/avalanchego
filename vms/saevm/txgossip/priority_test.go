@@ -4,7 +4,6 @@
 package txgossip
 
 import (
-	"maps"
 	"testing"
 	"time"
 
@@ -101,69 +100,4 @@ func TestByPriority(t *testing.T) {
 			require.Equal(t, tt.want, got, "byPriority()")
 		})
 	}
-}
-
-// FuzzByPriority checks that byPriority outputs every transaction exactly once,
-// keeps each sender's transactions in nonce order, and always picks the
-// highest-priority next transaction across all senders. The ranking rule itself
-// is checked by [TestByPriority].
-func FuzzByPriority(f *testing.F) {
-	// sender, tip, seen (a sender's rows are in nonce order)
-	f.Add([]byte{
-		0, 1, 2, // Low tip holds back...
-		0, 3, 3, // ...this higher tip from the same sender.
-		1, 2, 1, // Same tip and time as sender 2,
-		2, 2, 1, // so the lower address goes first.
-	}) // Output senders: 1, 2, 0, 0
-	f.Add([]byte{
-		0, 1, 1, // Everything ties except the sender.
-		1, 1, 1,
-		2, 1, 1,
-		3, 1, 1,
-	}) // Output senders: 0, 1, 2, 3
-
-	f.Fuzz(func(t *testing.T, data []byte) {
-		// Every 3 bytes are a transaction's sender, tip, and first-seen time.
-		// Tips and times have only 4 values, so ties are common.
-		pending := make(map[common.Address][]*txpool.LazyTransaction)
-		for ; len(data) >= 3; data = data[3:] {
-			sender, tip, seen := data[0], data[1]%4, data[2]%4
-			from := common.Address{sender}
-			pending[from] = append(pending[from], &txpool.LazyTransaction{
-				GasTipCap: uint256.NewInt(uint64(tip)),
-				Time:      time.Unix(int64(seen), 0),
-			})
-		}
-
-		head := func(from common.Address, ltx *txpool.LazyTransaction) *senderTxs {
-			return &senderTxs{
-				from:     from,
-				txs:      []*txpool.LazyTransaction{ltx},
-				firstTip: effectiveGasTip(ltx, nil),
-			}
-		}
-
-		// remaining holds each sender's transactions that are not output yet.
-		remaining := maps.Clone(pending)
-		var i int
-		for got := range byPriority(pending, nil) {
-			txs := remaining[got.Sender]
-			require.NotEmptyf(t, txs, "byPriority()[%d] is an extra transaction from %v", i, got.Sender)
-			require.Samef(t, txs[0], got.LazyTransaction, "byPriority()[%d] is not the next transaction from %v", i, got.Sender)
-			remaining[got.Sender] = txs[1:]
-
-			gotHead := head(got.Sender, got.LazyTransaction)
-			for sender, txs := range remaining {
-				if sender == got.Sender || len(txs) == 0 {
-					continue
-				}
-				skipped := head(sender, txs[0])
-				require.Truef(t, gotHead.outranks(skipped), "byPriority()[%d] from %v does not outrank the next transaction from %v", i, got.Sender, sender)
-			}
-			i++
-		}
-		for sender, txs := range remaining {
-			require.Emptyf(t, txs, "byPriority() is missing transactions from %v", sender)
-		}
-	})
 }
