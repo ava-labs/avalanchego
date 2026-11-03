@@ -78,7 +78,8 @@ func byPriority(pending map[common.Address][]*txpool.LazyTransaction, baseFee *u
 			Sender:          s.from,
 		})
 
-		if s.txs = s.txs[1:]; len(s.txs) == 0 {
+		s.txs = s.txs[1:]
+		if len(s.txs) == 0 {
 			q.Pop()
 			continue
 		}
