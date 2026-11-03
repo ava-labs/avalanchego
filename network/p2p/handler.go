@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"sync"
 	"time"
 
@@ -32,6 +33,36 @@ const (
 	EVMBlockRequestHandlerID
 	EVMAtomicLeafRequestHandlerID
 )
+
+// handlerName returns the name of a standard handler ID, for the event log.
+// Other IDs are returned as they are.
+func handlerName(id string) string {
+	n, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		return id
+	}
+
+	switch n {
+	case TxGossipHandlerID:
+		return "tx_gossip"
+	case AtomicTxGossipHandlerID:
+		return "atomic_tx_gossip"
+	case SignatureRequestHandlerID:
+		return "signature_request"
+	case FirewoodProofHandlerID:
+		return "firewood_proof"
+	case EVMLeafRequestHandlerID:
+		return "evm_leaf_request"
+	case EVMCodeRequestHandlerID:
+		return "evm_code_request"
+	case EVMBlockRequestHandlerID:
+		return "evm_block_request"
+	case EVMAtomicLeafRequestHandlerID:
+		return "evm_atomic_leaf_request"
+	default:
+		return id
+	}
+}
 
 var (
 	_ Handler = (*NoOpHandler)(nil)

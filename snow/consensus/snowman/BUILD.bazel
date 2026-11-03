@@ -22,6 +22,7 @@ go_library(
         "//snow/consensus/snowball",
         "//trace",
         "//utils/bag",
+        "//utils/eventlog",
         "//utils/linked",
         "//utils/logging",
         "//utils/metric",

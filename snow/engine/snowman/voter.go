@@ -54,6 +54,7 @@ func (v *voter) Execute(ctx context.Context, _ []ids.ID, _ []ids.ID) error {
 	if err := v.e.VM.SetPreference(ctx, pref); err != nil {
 		return err
 	}
+	v.e.recordTip(ctx)
 
 	if v.e.Consensus.NumProcessing() == 0 {
 		v.e.Ctx.Log.Debug("Snowman engine can quiesce")

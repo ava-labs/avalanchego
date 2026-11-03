@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/bloom"
+	"github.com/ava-labs/avalanchego/utils/eventlog"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -56,7 +57,9 @@ type Handler[T Gossipable] struct {
 	targetResponseSize int
 }
 
-func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+func (h Handler[T]) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+	ev := eventlog.FromContext(ctx)
+	ev.Set("gossip", "pull_request")
 	filter, salt, err := ParseAppRequest(requestBytes)
 	if err != nil {
 		return nil, p2p.ErrUnexpected
@@ -87,6 +90,9 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 		// check that this doesn't exceed our maximum configured target response
 		// size
 		gossipBytes = append(gossipBytes, bytes)
+		if ev != nil {
+			ev.Append("served", gossipID)
+		}
 		responseSize += len(bytes)
 
 		return responseSize <= h.targetResponseSize
@@ -112,7 +118,18 @@ func (h Handler[T]) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, req
 	return response, nil
 }
 
-func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes []byte) {
+// gossipItemEvent is what one gossiped item adds to the event of the message that
+// carried it: push gossip, or a response to a pull. ID is nil when the item
+// does not parse. Err is empty when the item was added.
+type gossipItemEvent struct {
+	ID  *ids.ID `json:"id,omitempty"`
+	Err string  `json:"err,omitempty"`
+}
+
+func (h Handler[_]) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
+	ev := eventlog.FromContext(ctx)
+	ev.Set("gossip", "push")
+
 	gossip, err := ParseAppGossip(gossipBytes)
 	if err != nil {
 		h.log.Debug("failed to unmarshal gossip", zap.Error(err))
@@ -128,16 +145,26 @@ func (h Handler[_]) AppGossip(_ context.Context, nodeID ids.NodeID, gossipBytes 
 				zap.Stringer("nodeID", nodeID),
 				zap.Error(err),
 			)
+			ev.Append("items", gossipItemEvent{Err: err.Error()})
 			continue
 		}
 
-		if err := h.set.Add(gossipable); err != nil {
+		err = h.set.Add(gossipable)
+		if err != nil {
 			h.log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("id", gossipable.GossipID()),
 				zap.Error(err),
 			)
+		}
+		if ev != nil {
+			id := gossipable.GossipID()
+			item := gossipItemEvent{ID: &id}
+			if err != nil {
+				item.Err = err.Error()
+			}
+			ev.Append("items", item)
 		}
 	}
 

@@ -1,0 +1,19 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "eventlog",
+    srcs = ["eventlog.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/eventlog",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "eventlog_test",
+    srcs = ["eventlog_test.go"],
+    embed = [":eventlog"],
+    deps = [
+        "@com_github_stretchr_testify//require",
+        "@org_golang_x_sync//errgroup",
+    ],
+)

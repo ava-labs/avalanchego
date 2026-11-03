@@ -50,6 +50,7 @@ go_library(
         "//utils/crypto/bls/signer/localsigner",
         "//utils/crypto/bls/signer/rpcsigner",
         "//utils/dynamicip",
+        "//utils/eventlog",
         "//utils/filesystem",
         "//utils/hashing",
         "//utils/ips",

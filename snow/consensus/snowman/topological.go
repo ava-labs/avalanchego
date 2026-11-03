@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils/bag"
+	"github.com/ava-labs/avalanchego/utils/eventlog"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -607,6 +608,7 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 	if err := child.Accept(ctx); err != nil {
 		return err
 	}
+	eventlog.FromContext(ctx).Append("accepted", decisionEvent{Block: pref, Height: height})
 
 	// Update the last accepted values to the newly accepted block.
 	ts.lastAcceptedID = pref
@@ -643,6 +645,7 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 		if err := child.Reject(ctx); err != nil {
 			return err
 		}
+		eventlog.FromContext(ctx).Append("rejected", decisionEvent{Block: childID, Height: child.Height()})
 		ts.metrics.Rejected(childID, ts.pollNumber, len(child.Bytes()))
 
 		// Track which blocks have been directly rejected
@@ -651,6 +654,13 @@ func (ts *Topological) acceptPreferredChild(ctx context.Context, n *snowmanBlock
 
 	// reject all the descendants of the blocks we just rejected
 	return ts.rejectTransitively(ctx, rejects)
+}
+
+// decisionEvent is what accepting or rejecting a block adds to the event of
+// the input that decided it.
+type decisionEvent struct {
+	Block  ids.ID `json:"block"`
+	Height uint64 `json:"height"`
 }
 
 // Takes in a list of rejected ids and rejects all descendants of these IDs
@@ -677,6 +687,7 @@ func (ts *Topological) rejectTransitively(ctx context.Context, rejected []ids.ID
 			if err := child.Reject(ctx); err != nil {
 				return err
 			}
+			eventlog.FromContext(ctx).Append("rejected", decisionEvent{Block: childID, Height: child.Height()})
 			ts.metrics.Rejected(childID, ts.pollNumber, len(child.Bytes()))
 
 			// add the newly rejected block to the end of the stack

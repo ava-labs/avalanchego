@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/buffer"
+	"github.com/ava-labs/avalanchego/utils/eventlog"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -267,19 +268,23 @@ func (p *PullGossiper[_]) Gossip(ctx context.Context) error {
 }
 
 func (p *PullGossiper[_]) handleResponse(
-	_ context.Context,
+	ctx context.Context,
 	nodeID ids.NodeID,
 	responseBytes []byte,
 	err error,
 ) {
+	ev := eventlog.FromContext(ctx)
 	if err != nil {
 		p.log.Debug(
 			"failed gossip request",
 			zap.Stringer("nodeID", nodeID),
 			zap.Error(err),
 		)
+		ev.Set("gossip", "pull_failed")
+		ev.Set("pull_err", err.Error())
 		return
 	}
+	ev.Set("gossip", "pull_response")
 
 	gossip, err := ParseAppResponse(responseBytes)
 	if err != nil {
@@ -298,6 +303,7 @@ func (p *PullGossiper[_]) handleResponse(
 				zap.Stringer("nodeID", nodeID),
 				zap.Error(err),
 			)
+			ev.Append("items", gossipItemEvent{Err: err.Error()})
 			continue
 		}
 
@@ -307,14 +313,21 @@ func (p *PullGossiper[_]) handleResponse(
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("id", gossipID),
 		)
-		if err := p.set.Add(gossipable); err != nil {
+		err = p.set.Add(gossipable)
+		if err != nil {
 			p.log.Debug(
 				"failed to add gossip to the known set",
 				zap.Stringer("nodeID", nodeID),
 				zap.Stringer("id", gossipID),
 				zap.Error(err),
 			)
-			continue
+		}
+		if ev != nil {
+			item := gossipItemEvent{ID: &gossipID}
+			if err != nil {
+				item.Err = err.Error()
+			}
+			ev.Append("items", item)
 		}
 	}
 

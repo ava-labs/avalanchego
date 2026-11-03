@@ -1374,6 +1374,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	if err != nil {
 		return node.Config{}, err
 	}
+	nodeConfig.LogEvents = v.GetBool(LogEventsKey)
 
 	// Network ID
 	nodeConfig.NetworkID, err = constants.NetworkID(v.GetString(NetworkNameKey))

@@ -20,6 +20,7 @@ go_library(
         "//snow/networking/timeout",
         "//subnets",
         "//trace",
+        "//utils/eventlog",
         "//utils/logging",
         "//utils/set",
         "@com_github_prometheus_client_golang//prometheus",

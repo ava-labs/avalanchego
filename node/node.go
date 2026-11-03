@@ -65,6 +65,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/rpcsigner"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
+	"github.com/ava-labs/avalanchego/utils/eventlog"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -164,6 +165,19 @@ func New(
 		zap.Reflect("providedFlags", n.Config.ProvidedFlags),
 		zap.Reflect("config", n.Config),
 	)
+
+	if config.LogEvents {
+		w := config.EventLog
+		if w == nil {
+			path := filepath.Join(config.LoggingConfig.Directory, "events.log")
+			n.eventFile, err = os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, perms.ReadWrite)
+			if err != nil {
+				return nil, fmt.Errorf("open event log: %w", err)
+			}
+			w = n.eventFile
+		}
+		n.eventLog = eventlog.NewLogger(w).With("node", n.ID)
+	}
 
 	n.VMFactoryLog, err = logFactory.Make("vm-factory")
 	if err != nil {
@@ -293,6 +307,12 @@ type Node struct {
 	Log          logging.Logger
 	VMFactoryLog logging.Logger
 	LogFactory   logging.Factory
+
+	// eventLog is nil unless Config.LogEvents is set. eventFile is nil if
+	// Config.EventLog takes the log, and is otherwise closed last on
+	// shutdown, after the chains that write to it have stopped.
+	eventLog  *eventlog.Logger
+	eventFile *os.File
 
 	// This node's unique ID used when communicating with other nodes
 	// (in consensus, for example)
@@ -1164,6 +1184,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			StakingBLSKey:                           n.StakingSigner,
 			Log:                                     n.Log,
 			LogFactory:                              n.LogFactory,
+			EventLog:                                n.eventLog,
 			VMManager:                               n.VMManager,
 			BlockAcceptorGroup:                      n.BlockAcceptorGroup,
 			TxAcceptorGroup:                         n.TxAcceptorGroup,
@@ -1948,6 +1969,14 @@ func (n *Node) shutdown() {
 		n.Log.Warn("error during tracer shutdown",
 			zap.Error(err),
 		)
+	}
+
+	if n.eventFile != nil {
+		if err := n.eventFile.Close(); err != nil {
+			n.Log.Warn("cannot close event log",
+				zap.Error(err),
+			)
+		}
 	}
 
 	n.Log.Info("finished node shutdown")

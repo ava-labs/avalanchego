@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/eventlog"
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/metric"
@@ -193,7 +194,8 @@ type ManagerConfig struct {
 	Tracer                    trace.Tracer
 	Log                       logging.Logger
 	LogFactory                logging.Factory
-	VMManager                 *vms.Manager // Manage mappings from vm ID --> vm
+	EventLog                  *eventlog.Logger // nil if the node does not log events
+	VMManager                 *vms.Manager     // Manage mappings from vm ID --> vm
 	BlockAcceptorGroup        snow.AcceptorGroup
 	TxAcceptorGroup           snow.AcceptorGroup
 	VertexAcceptorGroup       snow.AcceptorGroup
@@ -519,6 +521,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		},
 		PrimaryAlias:   primaryAlias,
 		Registerer:     prometheus.NewRegistry(),
+		EventLog:       m.EventLog.With("chain", primaryAlias),
 		BlockAcceptor:  m.BlockAcceptorGroup,
 		TxAcceptor:     m.TxAcceptorGroup,
 		VertexAcceptor: m.VertexAcceptorGroup,

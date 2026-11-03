@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/eventlog"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -76,6 +77,10 @@ type ConsensusContext struct {
 
 	// Registers all consensus metrics.
 	Registerer Registerer
+
+	// EventLog gets one line for each message the chain's handler handles.
+	// It is nil when the node does not log events.
+	EventLog *eventlog.Logger
 
 	// BlockAcceptor is the callback that will be fired whenever a VM is
 	// notified that their block was accepted.

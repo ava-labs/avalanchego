@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/eventlog"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -126,6 +127,8 @@ func (r *router) AppRequest(ctx context.Context, nodeID ids.NodeID, requestID ui
 		return r.sender.SendAppError(ctx, nodeID, requestID, ErrUnregisteredHandler.Code, ErrUnregisteredHandler.Message)
 	}
 
+	eventlog.FromContext(ctx).Set("p2p_handler", handlerName(handlerID))
+
 	// call the corresponding handler and send back a response to nodeID
 	if err := handler.AppRequest(ctx, nodeID, requestID, deadline, parsedMsg); err != nil {
 		return err
@@ -153,6 +156,7 @@ func (r *router) AppRequestFailed(ctx context.Context, nodeID ids.NodeID, reques
 		return ErrUnrequestedResponse
 	}
 
+	eventlog.FromContext(ctx).Set("p2p_handler", handlerName(pending.handlerID))
 	pending.callback(ctx, nodeID, nil, appErr)
 
 	return r.metrics.observe(
@@ -177,6 +181,7 @@ func (r *router) AppResponse(ctx context.Context, nodeID ids.NodeID, requestID u
 		return ErrUnrequestedResponse
 	}
 
+	eventlog.FromContext(ctx).Set("p2p_handler", handlerName(pending.handlerID))
 	pending.callback(ctx, nodeID, response, nil)
 
 	return r.metrics.observe(
@@ -205,6 +210,7 @@ func (r *router) AppGossip(ctx context.Context, nodeID ids.NodeID, gossip []byte
 		return nil
 	}
 
+	eventlog.FromContext(ctx).Set("p2p_handler", handlerName(handlerID))
 	handler.AppGossip(ctx, nodeID, parsedMsg)
 
 	return r.metrics.observe(

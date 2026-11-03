@@ -28,6 +28,7 @@ go_library(
         "//snow/validators",
         "//upgrade",
         "//utils/constants",
+        "//utils/eventlog",
         "//utils/logging",
         "//utils/math",
         "//utils/set",

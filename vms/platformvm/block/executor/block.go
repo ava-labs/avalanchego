@@ -5,12 +5,15 @@ package executor
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/utils/eventlog"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -81,8 +84,36 @@ func (b *Block) Verify(ctx context.Context) error {
 	)
 }
 
-func (b *Block) Accept(context.Context) error {
-	return b.Visit(b.manager.acceptor)
+func (b *Block) Accept(ctx context.Context) error {
+	if err := b.Visit(b.manager.acceptor); err != nil {
+		return err
+	}
+
+	if ev := eventlog.FromContext(ctx); ev != nil {
+		// acceptedTxs names the txs by the P-Chain block. The engine's
+		// "accepted" field names the proposervm block, whose ID differs.
+		type acceptedTx struct {
+			ID   ids.ID `json:"id"`
+			Type string `json:"type"` // the Go type name, such as CreateSubnetTx
+		}
+		type acceptedTxs struct {
+			Block  ids.ID       `json:"block"`
+			Height uint64       `json:"height"`
+			Txs    []acceptedTx `json:"txs"`
+		}
+
+		txs := b.Txs()
+		accepted := make([]acceptedTx, len(txs))
+		for i, tx := range txs {
+			accepted[i] = acceptedTx{
+				ID:   tx.ID(),
+				Type: reflect.Indirect(reflect.ValueOf(tx.Unsigned)).Type().Name(),
+			}
+		}
+		ev.Append("accepted_txs", acceptedTxs{Block: b.ID(), Height: b.Height(), Txs: accepted})
+	}
+
+	return nil
 }
 
 func (b *Block) Reject(context.Context) error {

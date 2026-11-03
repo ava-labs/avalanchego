@@ -423,7 +423,7 @@ func (h *handler) dispatchChans(ctx context.Context) {
 			msg = message.InternalGossipRequest(h.ctx.NodeID)
 		}
 
-		if err := h.handleChanMsg(msg); err != nil {
+		if err := h.handleChanMsg(ctx, msg); err != nil {
 			h.StopWithError(ctx, fmt.Errorf(
 				"%w while processing chan message: %s",
 				err,
@@ -435,7 +435,7 @@ func (h *handler) dispatchChans(ctx context.Context) {
 }
 
 // Any returned error is treated as fatal
-func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
+func (h *handler) handleSyncMsg(ctx context.Context, msg Message) (err error) {
 	var (
 		nodeID    = msg.NodeID
 		op        = msg.Op.String()
@@ -445,6 +445,8 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		// execution (may change during execution)
 		isNormalOp = h.ctx.State.Get().State == snow.NormalOp
 	)
+	ctx, ev := h.ctx.EventLog.Start(ctx, op)
+	ev.Set("from", nodeID)
 	{
 		fields := []zap.Field{
 			zap.Stringer("nodeID", nodeID),
@@ -452,6 +454,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		}
 		if requestID, ok := message.GetRequestID(body); ok {
 			fields = append(fields, zap.Uint32("requestID", requestID))
+			ev.Set("request_id", requestID)
 		}
 		if h.ctx.Log.Enabled(logging.Verbo) {
 			fields = append(fields, zap.Stringer("message", body))
@@ -490,6 +493,10 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 				zap.Stringer("message", body),
 			)
 		}
+
+		ev.Set("lock_ns", lockingTime.Nanoseconds())
+		ev.Set("handled_ns", handlingTime.Nanoseconds())
+		ev.End(err)
 	}()
 
 	// We will attempt to pass the message to the requested type for the state
@@ -770,13 +777,18 @@ func (h *handler) handleAsyncMsg(ctx context.Context, msg Message) {
 }
 
 // Any returned error is treated as fatal
-func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
+func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) (err error) {
 	var (
 		nodeID    = msg.NodeID
 		op        = msg.Op.String()
 		body      = msg.Message
 		startTime = h.clock.Time()
 	)
+	ctx, ev := h.ctx.EventLog.Start(ctx, op)
+	ev.Set("from", nodeID)
+	if requestID, ok := message.GetRequestID(body); ok {
+		ev.Set("request_id", requestID)
+	}
 	if h.ctx.Log.Enabled(logging.Verbo) {
 		h.ctx.Log.Verbo("forwarding async message to consensus",
 			zap.Stringer("nodeID", nodeID),
@@ -806,6 +818,9 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 		h.ctx.Log.Debug("finished handling async message",
 			zap.String("messageOp", op),
 		)
+
+		ev.Set("handled_ns", handlingTime.Nanoseconds())
+		ev.End(err)
 	}()
 
 	state := h.ctx.State.Get()
@@ -857,7 +872,7 @@ func (h *handler) executeAsyncMsg(ctx context.Context, msg Message) error {
 }
 
 // Any returned error is treated as fatal
-func (h *handler) handleChanMsg(msg *message.InboundMessage) error {
+func (h *handler) handleChanMsg(ctx context.Context, msg *message.InboundMessage) (err error) {
 	var (
 		op        = msg.Op.String()
 		body      = msg.Message
@@ -866,6 +881,7 @@ func (h *handler) handleChanMsg(msg *message.InboundMessage) error {
 		// execution (may change during execution)
 		isNormalOp = h.ctx.State.Get().State == snow.NormalOp
 	)
+	ctx, ev := h.ctx.EventLog.Start(ctx, op)
 	if h.ctx.Log.Enabled(logging.Verbo) {
 		h.ctx.Log.Verbo("forwarding chan message to consensus",
 			zap.String("messageOp", op),
@@ -905,6 +921,10 @@ func (h *handler) handleChanMsg(msg *message.InboundMessage) error {
 				zap.Stringer("message", body),
 			)
 		}
+
+		ev.Set("lock_ns", lockingTime.Nanoseconds())
+		ev.Set("handled_ns", handlingTime.Nanoseconds())
+		ev.End(err)
 	}()
 
 	state := h.ctx.State.Get()
@@ -920,10 +940,12 @@ func (h *handler) handleChanMsg(msg *message.InboundMessage) error {
 
 	switch msg := body.(type) {
 	case *message.VMMessage:
-		return engine.Notify(context.TODO(), common.Message(msg.Notification))
+		vmMsg := common.Message(msg.Notification)
+		ev.Set("msg", vmMsg.String())
+		return engine.Notify(ctx, vmMsg)
 
 	case *message.GossipRequest:
-		return engine.Gossip(context.TODO())
+		return engine.Gossip(ctx)
 
 	default:
 		return fmt.Errorf(

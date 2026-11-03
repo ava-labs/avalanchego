@@ -6,6 +6,7 @@ package node
 import (
 	"context"
 	"crypto/tls"
+	"io"
 	"net"
 	"net/netip"
 	"time"
@@ -166,6 +167,15 @@ type Config struct {
 	ProfilerConfig profiler.Config `json:"profilerConfig"`
 
 	LoggingConfig logging.Config `json:"loggingConfig"`
+
+	// LogEvents makes the node write one JSON line for each message a chain
+	// handles to events.log in the log directory. It is experimental and not
+	// for production use.
+	LogEvents bool `json:"logEvents"`
+	// EventLog, if not nil, takes the lines of LogEvents in place of
+	// events.log, which the node then does not open. Each Write is one whole
+	// line.
+	EventLog io.Writer `json:"-"`
 
 	PluginDir string `json:"pluginDir"`
 

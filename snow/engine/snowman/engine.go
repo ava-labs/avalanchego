@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/bimap"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/eventlog"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -93,6 +94,9 @@ type Engine struct {
 	// number of times build block needs to be called once the number of
 	// processing blocks has gone below the optimal number.
 	pendingBuildBlocks int
+
+	// recordedTip is the tip that recordTip last wrote to an event.
+	recordedTip tipEvent
 }
 
 func New(config Config) (*Engine, error) {
@@ -361,6 +365,19 @@ func (e *Engine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uin
 
 func (e *Engine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) error {
 	e.acceptedFrontiers.SetLastAccepted(nodeID, acceptedID, acceptedHeight)
+
+	// vote is the voter's preference at the height that was queried, and its
+	// last accepted block.
+	type vote struct {
+		PreferredAtHeight ids.ID `json:"preferred_at_height"`
+		Accepted          ids.ID `json:"accepted"`
+		AcceptedHeight    uint64 `json:"accepted_height"`
+	}
+	eventlog.FromContext(ctx).Set("vote", vote{
+		PreferredAtHeight: preferredIDAtHeight,
+		Accepted:          acceptedID,
+		AcceptedHeight:    acceptedHeight,
+	})
 
 	e.Ctx.Log.Verbo("called Chits for the block",
 		zap.Stringer("nodeID", nodeID),
@@ -639,6 +656,7 @@ func (e *Engine) buildBlocks(ctx context.Context) error {
 			return nil
 		}
 		e.numBuilt.Inc()
+		eventlog.FromContext(ctx).Append("built", blockEvent{Block: blk.ID(), Height: blk.Height()})
 
 		blockTimeSkew := time.Since(blk.Timestamp())
 		e.blockTimeSkew.Add(float64(blockTimeSkew))
@@ -669,6 +687,46 @@ func (e *Engine) buildBlocks(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// recordTip appends the preferred and last accepted blocks to the event in
+// ctx, if they changed since recordTip last wrote them. Callers call it after
+// each change to the preference, so an event lists every tip its input passed
+// through, the last one being the tip it left. A search for a block ID does
+// not match every poll while the block is preferred.
+func (e *Engine) recordTip(ctx context.Context) {
+	ev := eventlog.FromContext(ctx)
+	if ev == nil {
+		return
+	}
+
+	preferredID, preferredHeight := e.Consensus.Preference()
+	acceptedID, acceptedHeight := e.Consensus.LastAccepted()
+	t := tipEvent{
+		preferred:    blockEvent{Block: preferredID, Height: preferredHeight},
+		lastAccepted: blockEvent{Block: acceptedID, Height: acceptedHeight},
+	}
+	if t == e.recordedTip {
+		return
+	}
+	e.recordedTip = t
+
+	ev.Append("preferred", t.preferred)
+	ev.Append("last_accepted", t.lastAccepted)
+}
+
+// tipEvent is the preferred and last accepted blocks, as recordTip writes them.
+type tipEvent struct {
+	preferred    blockEvent
+	lastAccepted blockEvent
+}
+
+// blockEvent is what building or verifying a block adds to the event of the
+// input that caused it. Err is empty when verification passed.
+type blockEvent struct {
+	Block  ids.ID `json:"block"`
+	Height uint64 `json:"height"`
+	Err    string `json:"err,omitempty"`
 }
 
 // Issue another poll to the network, asking what it prefers given the block we prefer.
@@ -983,6 +1041,7 @@ func (e *Engine) deliver(
 	if err := e.VM.SetPreference(ctx, pref); err != nil {
 		return err
 	}
+	e.recordTip(ctx)
 
 	// If the block is now preferred, query the network for its preferences
 	// with this new block.
@@ -1061,7 +1120,15 @@ func (e *Engine) addUnverifiedBlockToConsensus(
 	blkHeight := blk.Height()
 
 	// make sure this block is valid
-	if err := blk.Verify(ctx); err != nil {
+	err := blk.Verify(ctx)
+	if ev := eventlog.FromContext(ctx); ev != nil {
+		verified := blockEvent{Block: blkID, Height: blkHeight}
+		if err != nil {
+			verified.Err = err.Error()
+		}
+		ev.Append("verified", verified)
+	}
+	if err != nil {
 		e.Ctx.Log.Debug("block verification failed",
 			zap.Stringer("nodeID", nodeID),
 			zap.Stringer("blkID", blkID),

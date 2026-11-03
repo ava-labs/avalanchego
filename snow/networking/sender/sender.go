@@ -5,6 +5,7 @@ package sender
 
 import (
 	"context"
+	"slices"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/router"
 	"github.com/ava-labs/avalanchego/snow/networking/timeout"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils/eventlog"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -126,7 +128,7 @@ func (s *sender) SendGetStateSummaryFrontier(ctx context.Context, nodeIDs set.Se
 		requestID,
 		deadline,
 	)
-	s.sendUnlessError(log, to, msg, err)
+	s.sendUnlessError(ctx, log, message.GetStateSummaryFrontierOp, requestID, to, msg, err)
 }
 
 func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, summary []byte) {
@@ -157,7 +159,7 @@ func (s *sender) SendStateSummaryFrontier(ctx context.Context, nodeID ids.NodeID
 		requestID,
 		summary,
 	)
-	s.sendUnlessError(log, to, msg, err)
+	s.sendUnlessError(ctx, log, message.StateSummaryFrontierOp, requestID, to, msg, err)
 }
 
 func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, heights []uint64) {
@@ -211,7 +213,7 @@ func (s *sender) SendGetAcceptedStateSummary(ctx context.Context, nodeIDs set.Se
 		deadline,
 		heights,
 	)
-	s.sendUnlessError(log, to, msg, err)
+	s.sendUnlessError(ctx, log, message.GetAcceptedStateSummaryOp, requestID, to, msg, err)
 }
 
 func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID, requestID uint32, summaryIDs []ids.ID) {
@@ -242,7 +244,7 @@ func (s *sender) SendAcceptedStateSummary(ctx context.Context, nodeID ids.NodeID
 		requestID,
 		summaryIDs,
 	)
-	s.sendUnlessError(log, to, msg, err)
+	s.sendUnlessError(ctx, log, message.AcceptedStateSummaryOp, requestID, to, msg, err)
 }
 
 func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32) {
@@ -293,7 +295,7 @@ func (s *sender) SendGetAcceptedFrontier(ctx context.Context, nodeIDs set.Set[id
 		requestID,
 		deadline,
 	)
-	s.sendUnlessError(log, to, msg, err)
+	s.sendUnlessError(ctx, log, message.GetAcceptedFrontierOp, requestID, to, msg, err)
 }
 
 func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
@@ -324,7 +326,7 @@ func (s *sender) SendAcceptedFrontier(ctx context.Context, nodeID ids.NodeID, re
 		requestID,
 		containerID,
 	)
-	s.sendUnlessError(log, to, msg, err)
+	s.sendUnlessError(ctx, log, message.AcceptedFrontierOp, requestID, to, msg, err)
 }
 
 func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, containerIDs []ids.ID) {
@@ -378,7 +380,7 @@ func (s *sender) SendGetAccepted(ctx context.Context, nodeIDs set.Set[ids.NodeID
 		deadline,
 		containerIDs,
 	)
-	s.sendUnlessError(log, to, msg, err)
+	s.sendUnlessError(ctx, log, message.GetAcceptedOp, requestID, to, msg, err)
 }
 
 func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerIDs []ids.ID) {
@@ -405,7 +407,7 @@ func (s *sender) SendAccepted(ctx context.Context, nodeID ids.NodeID, requestID 
 		NodeIDs: set.Of(nodeID),
 	}
 	msg, err := s.msgCreator.Accepted(s.ctx.ChainID, requestID, containerIDs)
-	s.sendUnlessError(log, to, msg, err)
+	s.sendUnlessError(ctx, log, message.AcceptedOp, requestID, to, msg, err)
 }
 
 func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
@@ -454,7 +456,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 		containerID,
 		s.engineType,
 	)
-	sent := s.sendUnlessError(log, to, msg, err)
+	sent := s.sendUnlessError(ctx, log, message.GetAncestorsOp, requestID, to, msg, err)
 
 	switch {
 	case s.timeouts.IsBenched(s.ctx.ChainID, nodeID):
@@ -467,7 +469,7 @@ func (s *sender) SendGetAncestors(ctx context.Context, nodeID ids.NodeID, reques
 	}
 }
 
-func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) {
+func (s *sender) SendAncestors(ctx context.Context, nodeID ids.NodeID, requestID uint32, containers [][]byte) {
 	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.AncestorsOp),
 		zap.Uint32("requestID", requestID),
@@ -477,7 +479,7 @@ func (s *sender) SendAncestors(_ context.Context, nodeID ids.NodeID, requestID u
 		NodeIDs: set.Of(nodeID),
 	}
 	msg, err := s.msgCreator.Ancestors(s.ctx.ChainID, requestID, containers)
-	s.sendUnlessError(log, to, msg, err)
+	s.sendUnlessError(ctx, log, message.AncestorsOp, requestID, to, msg, err)
 }
 
 func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID) {
@@ -522,7 +524,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 		deadline,
 		containerID,
 	)
-	sent := s.sendUnlessError(log, to, msg, err)
+	sent := s.sendUnlessError(ctx, log, message.GetOp, requestID, to, msg, err)
 	switch {
 	case s.timeouts.IsBenched(s.ctx.ChainID, nodeID):
 		s.failedDueToBench.With(prometheus.Labels{
@@ -534,7 +536,7 @@ func (s *sender) SendGet(ctx context.Context, nodeID ids.NodeID, requestID uint3
 	}
 }
 
-func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32, container []byte) {
+func (s *sender) SendPut(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte) {
 	log := s.ctx.Log.With(
 		zap.Stringer("messageOp", message.PutOp),
 		zap.Uint32("requestID", requestID),
@@ -544,7 +546,7 @@ func (s *sender) SendPut(_ context.Context, nodeID ids.NodeID, requestID uint32,
 		NodeIDs: set.Of(nodeID),
 	}
 	msg, err := s.msgCreator.Put(s.ctx.ChainID, requestID, container)
-	s.sendUnlessError(log, to, msg, err)
+	s.sendUnlessError(ctx, log, message.PutOp, requestID, to, msg, err)
 }
 
 func (s *sender) SendPushQuery(
@@ -607,7 +609,7 @@ func (s *sender) SendPushQuery(
 		container,
 		requestedHeight,
 	)
-	sent := s.sendUnlessError(log, to, msg, err)
+	sent := s.sendUnlessError(ctx, log, message.PushQueryOp, requestID, to, msg, err)
 	for nodeID := range nodeIDs {
 		switch {
 		case s.timeouts.IsBenched(s.ctx.ChainID, nodeID):
@@ -688,7 +690,7 @@ func (s *sender) SendPullQuery(
 		containerID,
 		requestedHeight,
 	)
-	sent := s.sendUnlessError(log, to, msg, err)
+	sent := s.sendUnlessError(ctx, log, message.PullQueryOp, requestID, to, msg, err)
 	for nodeID := range nodeIDs {
 		switch {
 		case s.timeouts.IsBenched(s.ctx.ChainID, nodeID):
@@ -753,7 +755,7 @@ func (s *sender) SendChits(
 		acceptedID,
 		acceptedHeight,
 	)
-	s.sendUnlessError(log, to, msg, err)
+	s.sendUnlessError(ctx, log, message.ChitsOp, requestID, to, msg, err)
 }
 
 func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, bytes []byte) error {
@@ -809,7 +811,7 @@ func (s *sender) SendAppRequest(ctx context.Context, nodeIDs set.Set[ids.NodeID]
 		deadline,
 		bytes,
 	)
-	sent := s.sendUnlessError(log, to, msg, err)
+	sent := s.sendUnlessError(ctx, log, message.AppRequestOp, requestID, to, msg, err)
 	for nodeID := range nodeIDs {
 		switch {
 		case s.timeouts.IsBenched(s.ctx.ChainID, nodeID):
@@ -861,7 +863,7 @@ func (s *sender) SendAppResponse(ctx context.Context, nodeID ids.NodeID, request
 		requestID,
 		bytes,
 	)
-	s.sendUnlessError(log, to, msg, err)
+	s.sendUnlessError(ctx, log, message.AppResponseOp, requestID, to, msg, err)
 	return nil
 }
 
@@ -896,12 +898,12 @@ func (s *sender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID 
 		errorCode,
 		errorMessage,
 	)
-	s.sendUnlessError(log, to, msg, err)
+	s.sendUnlessError(ctx, log, message.AppErrorOp, requestID, to, msg, err)
 	return nil
 }
 
 func (s *sender) SendAppGossip(
-	_ context.Context,
+	ctx context.Context,
 	to common.SendConfig,
 	bytes []byte,
 ) error {
@@ -910,12 +912,17 @@ func (s *sender) SendAppGossip(
 		zap.Int("payloadLen", len(bytes)),
 	)
 	msg, err := s.msgCreator.AppGossip(s.ctx.ChainID, bytes)
-	s.sendUnlessError(log, to, msg, err)
+	s.sendUnlessError(ctx, log, message.AppGossipOp, 0, to, msg, err)
 	return nil
 }
 
+// sendUnlessError sends msg unless err is set, and adds what it sent to the
+// event in ctx. requestID is ignored for app gossip, which has none.
 func (s *sender) sendUnlessError(
+	ctx context.Context,
 	log logging.Logger,
+	op message.Op,
+	requestID uint32,
 	to common.SendConfig,
 	msg *message.OutboundMessage,
 	err error,
@@ -931,5 +938,23 @@ func (s *sender) sendUnlessError(
 		zap.Reflect("to", to),
 		zap.Reflect("sent", sent),
 	)
+
+	if ev := eventlog.FromContext(ctx); ev != nil {
+		// sentMessage is the message and the peers the network sent it to.
+		type sentMessage struct {
+			Op        string       `json:"op"`
+			RequestID *uint32      `json:"request_id,omitempty"`
+			To        []ids.NodeID `json:"to"`
+		}
+
+		nodeIDs := sent.List()
+		slices.SortFunc(nodeIDs, ids.NodeID.Compare)
+		sm := sentMessage{Op: op.String(), To: nodeIDs}
+		if op != message.AppGossipOp {
+			id := requestID // a copy, so requestID stays off the heap when events are off
+			sm.RequestID = &id
+		}
+		ev.Append("sent", sm)
+	}
 	return sent
 }
