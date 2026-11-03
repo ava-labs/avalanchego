@@ -1,0 +1,33 @@
+#!/bin/sh
+# go, as gremlins runs it for the mutation score (see TestFuzz). In
+# integration mode gremlins runs `go test ./...`, which rebuilds and runs every
+# test package that imports the mutated one. Only TestFuzz judges a mutant, so
+# test only its package.
+dir=$(cd "$(dirname "$0")" && pwd)
+PATH=$(printf %s "$PATH" | tr : '\n' | grep -vxF "$dir" | paste -sd: -)
+if [ "$1" = test ]; then
+	for a; do
+		shift
+		[ "$a" = ./... ] && a=./tests/fuzz
+		set -- "$@" "$a"
+	done
+
+	# A gremlins worker runs in its own copy of the module, with one mutant
+	# applied. For TestFuzz's kill record, name the mutant by the one file of
+	# the scored packages that differs from the module's own copy, the line
+	# that differs, and that line's text without spaces, since gremlins
+	# reprints the file. gremlins tells the test nothing else.
+	orig=$(cd "$dir/../../.." && pwd)
+	if [ -n "$FUZZ_KILLS" ] && [ "$PWD" != "$orig" ]; then
+		file=$(diff -rq "$orig/vms" vms 2>/dev/null; diff -rq "$orig/network" network 2>/dev/null; diff -rq "$orig/snow" snow 2>/dev/null)
+		file=$(printf %s "$file" | sed -n 's|^Files .* and \(.*\.go\) differ$|\1|p' | head -1)
+		if [ -n "$file" ]; then
+			hunk=$(diff -w "$orig/$file" "$file" | grep -m1 '^[0-9][0-9,]*c[0-9]')
+			line=${hunk%%[,c]*}
+			mutated=${hunk##*c}
+			text=$(sed -n "${mutated%%,*}p" "$file" | tr -d ' \t')
+			export FUZZ_MUTANT="$file:$line:$text"
+		fi
+	fi
+fi
+exec go "$@"

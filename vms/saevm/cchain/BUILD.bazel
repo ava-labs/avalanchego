@@ -16,6 +16,7 @@ package_group(
         "//node",
         "//tests/e2e",
         "//tests/e2e/p",
+        "//tests/fuzz",
         "//tests/reexecute",
         "//tests/reexecute/c",
         "//tests/reexecute/chaos",

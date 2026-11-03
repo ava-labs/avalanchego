@@ -1,0 +1,10 @@
+# Mutation score of TestFuzz; see its doc comment for the command. Paths are
+# relative to the module root, where gremlins must run: it mutates only code
+# under the directory it runs from.
+unleash:
+  # TestFuzz is in another package than the code it judges.
+  integration: true
+  # Mutate only the packages the score covers (prompt R5.1). Coverage elsewhere
+  # would make every other package's code a candidate.
+  coverpkg: ./vms/platformvm/txs/executor,./vms/platformvm/block/executor,./vms/platformvm/state,./vms/platformvm/utxo,./vms/platformvm/txs/fee,./vms/platformvm/validators/fee,./vms/platformvm/txs/mempool,./vms/platformvm/network,./network/p2p/gossip,./network/peer,./vms/proposervm,./snow/consensus/snowman
+  output: tests/fuzz/mutation.json
