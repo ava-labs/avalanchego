@@ -20,10 +20,7 @@ import (
 
 const codecVersion uint16 = 0
 
-var (
-	codecManager codec.Manager
-	_            uptime.State = (*state)(nil)
-)
+var codecManager codec.Manager
 
 func init() {
 	codecManager = codec.NewManager(math.MaxInt32)
@@ -50,14 +47,15 @@ type validator struct {
 	validationID ids.ID
 }
 
+var _ uptime.State = (*state)(nil)
+
 // state holds the on-disk and cached representation of the validator set
 type state struct {
 	db database.Database
 
 	validators             map[ids.ID]*validator
 	nodeIDsToValidationIDs map[ids.NodeID]ids.ID
-	updatedValidators      set.Set[ids.ID]
-	deletedValidators      set.Set[ids.ID]
+	dirtyValidationIDs     set.Set[ids.ID]
 }
 
 func newState(db database.Database) (*state, error) {
@@ -116,7 +114,7 @@ func (s *state) SetUptime(
 	v.UpDuration = upDuration
 	v.LastUpdated = uint64(lastUpdated.Unix())
 
-	s.updatedValidators.Add(v.validationID)
+	s.dirtyValidationIDs.Add(v.validationID)
 
 	return nil
 }
@@ -135,7 +133,7 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 // during runtime operations.
 func (s *state) addNewValidator(vdr *validator) {
 	s.addValidatorToMemory(vdr.validationID, vdr)
-	s.updatedValidators.Add(vdr.validationID)
+	s.dirtyValidationIDs.Add(vdr.validationID)
 }
 
 // updateValidator sets the isActive state of the validator with the given
@@ -149,7 +147,7 @@ func (s *state) updateValidator(validationID ids.ID, isActive bool) bool {
 	}
 
 	v.IsActive = isActive
-	s.updatedValidators.Add(validationID)
+	s.dirtyValidationIDs.Add(validationID)
 	return true
 }
 
@@ -161,17 +159,22 @@ func (s *state) deleteValidator(validationID ids.ID) {
 	delete(s.validators, v.validationID)
 	delete(s.nodeIDsToValidationIDs, v.NodeID)
 
-	s.deletedValidators.Add(v.validationID)
+	s.dirtyValidationIDs.Add(v.validationID)
 }
 
 func (s *state) writeModifications() error {
 	batch := s.db.NewBatch()
 
-	for validationID := range s.updatedValidators {
-		validatorBytes, err := codecManager.Marshal(
-			codecVersion,
-			s.validators[validationID],
-		)
+	for validationID := range s.dirtyValidationIDs {
+		v, ok := s.validators[validationID]
+		if !ok {
+			if err := batch.Delete(validationID[:]); err != nil {
+				return fmt.Errorf("failed to delete validator: %w", err)
+			}
+			continue
+		}
+
+		validatorBytes, err := codecManager.Marshal(codecVersion, v)
 		if err != nil {
 			return fmt.Errorf("failed to marshal validator: %w", err)
 		}
@@ -181,19 +184,12 @@ func (s *state) writeModifications() error {
 		}
 	}
 
-	for validationID := range s.deletedValidators {
-		if err := batch.Delete(validationID[:]); err != nil {
-			return fmt.Errorf("failed to delete validator: %w", err)
-		}
-	}
-
 	if err := batch.Write(); err != nil {
 		return fmt.Errorf("failed to write batch: %w", err)
 	}
 
 	// We have written all pending updates
-	clear(s.updatedValidators)
-	clear(s.deletedValidators)
+	clear(s.dirtyValidationIDs)
 
 	return nil
 }

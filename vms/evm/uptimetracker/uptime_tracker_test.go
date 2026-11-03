@@ -549,3 +549,78 @@ func TestUptimeTracker_Restart(t *testing.T) {
 	require.Equal(20*time.Second, uptime)
 	require.Equal(time.Time{}.Add(20*time.Second), lastUpdated)
 }
+
+// TestUptimeTracker_RemoveDisconnectedValidator ensures that removing a
+// validator with a pending uptime update is reflected on restart.
+func TestUptimeTracker_RemoveDisconnectedValidator(t *testing.T) {
+	var (
+		height uint64
+		start  time.Time
+	)
+
+	var (
+		subnetID              = ids.GenerateTestID()
+		removedValidationID   = ids.GenerateTestID()
+		removedNodeID         = ids.GenerateTestNodeID()
+		remainingValidationID = ids.GenerateTestID()
+		remainingNodeID       = ids.GenerateTestNodeID()
+	)
+
+	removedValidator := &validators.GetCurrentValidatorOutput{
+		ValidationID: removedValidationID,
+		NodeID:       removedNodeID,
+		StartTime:    uint64(start.Unix()),
+		IsActive:     true,
+	}
+	remainingValidator := &validators.GetCurrentValidatorOutput{
+		ValidationID: remainingValidationID,
+		NodeID:       remainingNodeID,
+		StartTime:    uint64(start.Unix()),
+		IsActive:     true,
+	}
+	currentValidators := map[ids.ID]*validators.GetCurrentValidatorOutput{
+		removedValidationID:   removedValidator,
+		remainingValidationID: remainingValidator,
+	}
+
+	validatorState := &validatorstest.State{
+		GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+			return currentValidators, height, nil
+		},
+	}
+
+	db := memdb.New()
+	clock := &mockable.Clock{}
+	clock.Set(start)
+	uptimeTracker, err := New(validatorState, subnetID, db, clock)
+	require.NoError(t, err, "New()")
+
+	require.NoErrorf(t, uptimeTracker.Sync(t.Context()), "%T.Sync()", uptimeTracker)
+	require.NoErrorf(t, uptimeTracker.Connect(removedNodeID), "%T.Connect(%s)", uptimeTracker, removedNodeID)
+	require.NoErrorf(t, uptimeTracker.Connect(remainingNodeID), "%T.Connect(%s)", uptimeTracker, remainingNodeID)
+
+	// The node disconnects, leaving a pending uptime update, and the validator
+	// is removed from the P-chain before the next Sync.
+	clock.Set(start.Add(10 * time.Second))
+	require.NoErrorf(t, uptimeTracker.Disconnect(removedNodeID), "%T.Disconnect(%s)", uptimeTracker, removedNodeID)
+	delete(currentValidators, removedValidationID)
+	height = 1
+	require.NoErrorf(t, uptimeTracker.Sync(t.Context()), "%T.Sync() after removing a disconnected validator", uptimeTracker)
+
+	clock.Set(start.Add(20 * time.Second))
+	require.NoErrorf(t, uptimeTracker.Shutdown(), "%T.Shutdown()", uptimeTracker)
+
+	t.Run("restart", func(t *testing.T) {
+		uptimeTracker, err = New(validatorState, subnetID, db, clock)
+		require.NoError(t, err, "New()")
+		require.NoErrorf(t, uptimeTracker.Sync(t.Context()), "%T.Sync()", uptimeTracker)
+
+		_, _, err = uptimeTracker.GetUptime(removedValidationID)
+		require.ErrorIsf(t, err, ErrValidationIDNotFound, "%T.GetUptime() of removed validator", uptimeTracker)
+
+		uptime, lastUpdated, err := uptimeTracker.GetUptime(remainingValidationID)
+		require.NoErrorf(t, err, "%T.GetUptime() of remaining validator", uptimeTracker)
+		require.Equalf(t, 20*time.Second, uptime, "%T.GetUptime() uptime of remaining validator", uptimeTracker)
+		require.Equalf(t, start.Add(20*time.Second), lastUpdated, "%T.GetUptime() lastUpdated of remaining validator", uptimeTracker)
+	})
+}
