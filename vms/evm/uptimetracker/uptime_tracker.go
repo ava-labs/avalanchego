@@ -47,12 +47,22 @@ func New(
 		return nil, fmt.Errorf("failed to initialize state: %w", err)
 	}
 
+	// Validators that were persisted as inactive must continue to be treated
+	// as offline until they are observed to be active again.
+	var deactivatedValidators set.Set[ids.NodeID]
+	for _, v := range s.validators {
+		if !v.IsActive {
+			deactivatedValidators.Add(v.NodeID)
+		}
+	}
+
 	return &UptimeTracker{
-		validatorState: validatorState,
-		subnetID:       subnetID,
-		manager:        uptime.NewManager(s, clock),
-		synced:         false,
-		state:          s,
+		validatorState:        validatorState,
+		subnetID:              subnetID,
+		manager:               uptime.NewManager(s, clock),
+		synced:                false,
+		state:                 s,
+		deactivatedValidators: deactivatedValidators,
 	}, nil
 }
 
