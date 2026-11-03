@@ -4,12 +4,14 @@
 package txgossip
 
 import (
-	"slices"
+	"iter"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/holiman/uint256"
+
+	"github.com/ava-labs/avalanchego/utils/heap"
 )
 
 // A LazyTransaction couples a [txpool.LazyTransaction] with its sender.
@@ -18,56 +20,81 @@ type LazyTransaction struct {
 	Sender common.Address
 }
 
-// TransactionsByPriority calls [txpool.TxPool.Pending] with the given filter,
-// collapses the results into a slice, and sorts said slice by decreasing gas
-// tip then chronologically. Transactions from the same sender are merely sorted
-// by increasing nonce.
-func (s *Set) TransactionsByPriority(filter txpool.PendingFilter) []*LazyTransaction {
+// TransactionsByPriority yields [txpool.TxPool.Pending] by highest effective
+// gas tip, then first seen, then sender address. Each sender's transactions stay
+// in nonce order.
+func (s *Set) TransactionsByPriority(filter txpool.PendingFilter) iter.Seq[*LazyTransaction] {
 	// TODO(arr4n) investigate optimisations; e.g. skipping entire accounts once
 	// the block builder has found that a lower-nonced tx is invalid.
 
-	pending := s.Pool.Pending(filter)
-	var n int
-	for _, txs := range pending {
-		n += len(txs)
-	}
+	return byPriority(s.Pool.Pending(filter), filter.BaseFee)
+}
 
-	all := make([]*LazyTransaction, n)
-	var i int
-	for from, txs := range pending {
-		for _, tx := range txs {
-			all[i] = &LazyTransaction{
-				LazyTransaction: tx,
-				Sender:          from,
+// senderTxs is a sender's remaining transactions and the effective gas tip of
+// the first one.
+type senderTxs struct {
+	from     common.Address
+	txs      []*txpool.LazyTransaction
+	firstTip *uint256.Int
+}
+
+// outranks reports whether the first transaction of `a` has higher priority
+// than the first transaction of `b`.
+func (a *senderTxs) outranks(b *senderTxs) bool {
+	if c := a.firstTip.Cmp(b.firstTip); c != 0 {
+		return c > 0 // Higher tips first
+	}
+	if c := a.txs[0].Time.Compare(b.txs[0].Time); c != 0 {
+		return c < 0
+	}
+	// Senders are unique, so the order is deterministic.
+	return a.from.Cmp(b.from) < 0
+}
+
+func byPriority(pending map[common.Address][]*txpool.LazyTransaction, baseFee *uint256.Int) iter.Seq[*LazyTransaction] {
+	return func(yield func(*LazyTransaction) bool) {
+		senders := make([]*senderTxs, 0, len(pending))
+		for from, txs := range pending {
+			if len(txs) == 0 {
+				continue
 			}
-			i++
+			senders = append(senders, &senderTxs{
+				from:     from,
+				txs:      txs,
+				firstTip: effectiveGasTip(txs[0], baseFee),
+			})
+		}
+
+		// Heap by first transaction from each sender.
+		q := heap.QueueOf((*senderTxs).outranks, senders...)
+		for {
+			s, ok := q.Peek()
+			if !ok {
+				return
+			}
+			if !yield(&LazyTransaction{
+				LazyTransaction: s.txs[0],
+				Sender:          s.from,
+			}) {
+				return
+			}
+
+			s.txs = s.txs[1:]
+			if len(s.txs) == 0 {
+				q.Pop()
+				continue
+			}
+			s.firstTip = effectiveGasTip(s.txs[0], baseFee)
+			q.Fix(0)
 		}
 	}
-
-	slices.SortStableFunc(all, func(a, b *LazyTransaction) int {
-		if a.Sender == b.Sender {
-			// [txpool.TxPool.Pending] already returns each slice in nonce order
-			// and we're performing a stable sort. A direct comparison of nonces
-			// would require resolving the lazy transaction.
-			return 0
-		}
-
-		aTip := a.effectiveGasTip(filter.BaseFee)
-		bTip := b.effectiveGasTip(filter.BaseFee)
-		if tip := aTip.Cmp(bTip); tip != 0 {
-			return -tip // Higher tips first
-		}
-
-		return a.Time.Compare(b.Time)
-	})
-	return all
 }
 
 // effectiveGasTip is equivalent to [types.Transaction.EffectiveGasTip] but
 // assumes that `baseFee` is either nil or <= the transaction's fee cap. This
 // assumption avoids the need for [types.ErrGasFeeCapTooLow]. If this invariant
 // is broken, effectiveGasTip returns zero.
-func (ltx *LazyTransaction) effectiveGasTip(baseFee *uint256.Int) *uint256.Int {
+func effectiveGasTip(ltx *txpool.LazyTransaction, baseFee *uint256.Int) *uint256.Int {
 	fee := ltx.GasFeeCap
 	tip := ltx.GasTipCap
 
