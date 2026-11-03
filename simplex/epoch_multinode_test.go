@@ -184,9 +184,9 @@ func TestSimplexMultiNodeBlacklist(t *testing.T) {
 	// Build two more blocks, which should blacklist the fourth node.
 	// Ensure the fourth node is blacklisted by checking the blacklist on all nodes.
 	timedOut := map[uint16]uint64{3: 3}
-	emptyBlacklist := common.NewBlacklist(4, uint64(4), simplex.DefaultMaxBlacklistedRounds)
-	accused := emptyBlacklist.Next(4, simplex.DefaultMaxBlacklistedRounds, testutil.EqualWeights(emptyBlacklist.NodeCount()), timedOut, nil)
-	blacklisted := accused.Next(5, simplex.DefaultMaxBlacklistedRounds, testutil.EqualWeights(accused.NodeCount()), timedOut, nil)
+	emptyBlacklist := common.NewBlacklist(simplex.DefaultMaxBlacklistedRounds)
+	accused := emptyBlacklist.Next(common.NodeIDs(nodes).EqualWeightedNodes(), 4, simplex.DefaultMaxBlacklistedRounds, timedOut, nil)
+	blacklisted := accused.Next(common.NodeIDs(nodes).EqualWeightedNodes(), 5, simplex.DefaultMaxBlacklistedRounds, timedOut, nil)
 
 	// Build a block, ensure the blacklist contains the fourth node as a suspect.
 	net.TriggerLeaderBlockBuilder(uint64(4))
@@ -267,7 +267,7 @@ func TestSimplexMultiNodeBlacklist(t *testing.T) {
 	}
 
 	// The last node is not suspected anymore, it has been redeemed.
-	require.False(t, lastBlacklist.IsNodeSuspected(3))
+	require.False(t, lastBlacklist.IsNodeSuspected(3, uint64(len(nodes))))
 
 	// The third node will now time out.
 	for i := range allButThirdNode {
@@ -415,7 +415,7 @@ func TestSimplexMultiNodeBlacklistExpires(t *testing.T) {
 	// by a single orbit per block, so the nodes start from a finalized block of round 0 whose blacklist
 	// already has the configured max blacklisted orbits.
 	genesis, ok := testutil.NewTestBlockBuilder().BuildBlock(context.Background(), common.ProtocolMetadata{},
-		common.NewBlacklist(uint16(len(nodes)), uint64(uint16(len(nodes))), maxBlacklistedRounds))
+		common.NewBlacklist(maxBlacklistedRounds))
 	require.True(t, ok)
 	genesisFinalization, _ := testutil.NewFinalizationRecord(t, &testutil.TestSignatureAggregator{N: len(nodes)}, genesis, nodes)
 
@@ -487,25 +487,24 @@ func TestSimplexMultiNodeBlacklistExpires(t *testing.T) {
 	timeoutOnOfflineLeader(3)
 
 	// The blacklists the online nodes are expected to build, as the offline node timed out in round 3.
-	emptyBlacklist := common.NewBlacklist(uint16(len(nodes)), uint64(uint16(len(nodes))), testEpochConfig.MaxBlacklistedRounds)
+	emptyBlacklist := common.NewBlacklist(testEpochConfig.MaxBlacklistedRounds)
 	timedOut := map[uint16]uint64{offlineNodeIndex: 3}
-	accused := emptyBlacklist.Next(4, testEpochConfig.MaxBlacklistedRounds, testutil.EqualWeights(emptyBlacklist.NodeCount()), timedOut, nil)
-	blacklisted := accused.Next(5, testEpochConfig.MaxBlacklistedRounds, testutil.EqualWeights(accused.NodeCount()), timedOut, nil)
+	accused := emptyBlacklist.Next(common.NodeIDs(nodes).EqualWeightedNodes(), 4, testEpochConfig.MaxBlacklistedRounds, timedOut, nil)
+	blacklisted := accused.Next(common.NodeIDs(nodes).EqualWeightedNodes(), 5, testEpochConfig.MaxBlacklistedRounds, timedOut, nil)
 
 	// Round 4: node 0 accuses the offline node of timing out in its orbit 1.
 	blacklist := buildBlock(4, 3)
-	require.Equal(t, uint16(1), blacklist.MaxBlacklistedOrbits())
-	require.False(t, blacklist.IsNodeSuspected(offlineNodeIndex))
+	require.False(t, blacklist.IsNodeSuspected(offlineNodeIndex, uint64(len(nodes))))
 	require.True(t, accused.Equals(&blacklist), "expected %s, got %s", accused.String(), blacklist.String())
 
 	// Round 5: node 1 accuses the offline node as well, which is then blacklisted with f+1 accusations in its orbit 1.
 	blacklist = buildBlock(5, 4)
-	require.True(t, blacklist.IsNodeSuspected(offlineNodeIndex))
+	require.True(t, blacklist.IsNodeSuspected(offlineNodeIndex, uint64(len(nodes))))
 	require.True(t, blacklisted.Equals(&blacklist), "expected %s, got %s", blacklisted.String(), blacklist.String())
 
 	// Round 6: node 2 carries over the blacklist.
 	blacklist = buildBlock(6, 5)
-	require.True(t, blacklist.IsNodeSuspected(offlineNodeIndex))
+	require.True(t, blacklist.IsNodeSuspected(offlineNodeIndex, uint64(len(nodes))))
 
 	// Round 7: the offline node's turn, in its orbit 2. It is blacklisted, so it is skipped.
 	// It has now been blacklisted for a single orbit, but the blacklist is only garbage collected
@@ -514,7 +513,7 @@ func TestSimplexMultiNodeBlacklistExpires(t *testing.T) {
 
 	// Round 8: node 0 builds a block, which garbage collects the offline node, although it never redeemed itself.
 	blacklist = buildBlock(8, 6)
-	require.False(t, blacklist.IsNodeSuspected(offlineNodeIndex))
+	require.False(t, blacklist.IsNodeSuspected(offlineNodeIndex, uint64(len(nodes))))
 	require.True(t, emptyBlacklist.Equals(&blacklist), "expected an empty blacklist, got %s", blacklist.String())
 
 	// Rounds 9 and 10: nodes 1 and 2 carry over the empty blacklist.

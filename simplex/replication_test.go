@@ -554,7 +554,7 @@ func testReplicationAfterNodeDisconnects(t *testing.T, nodes []common.NodeID, st
 		require.Equal(t, endDisconnect-missedSeqs, n.Storage.NumBlocks()-1)
 	}
 
-	if blacklist.IsNodeSuspected(3) {
+	if blacklist.IsNodeSuspected(3, uint64(len(nodes))) {
 		t.Log("lagging node is blacklisted, cannot continue replication")
 		return
 	}
