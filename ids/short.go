@@ -33,7 +33,7 @@ func ToShortID(bytes []byte) (ShortID, error) {
 
 // ShortFromString is the inverse of ShortID.String()
 func ShortFromString(idStr string) (ShortID, error) {
-	bytes, err := cb58.Decode(idStr)
+	bytes, err := cb58.Decode(idStr, ShortIDLen)
 	if err != nil {
 		return ShortID{}, err
 	}
@@ -81,7 +81,7 @@ func (id *ShortID) UnmarshalJSON(b []byte) error {
 	}
 
 	// Parse CB58 formatted string to bytes
-	bytes, err := cb58.Decode(str[1:lastIndex])
+	bytes, err := cb58.Decode(str[1:lastIndex], ShortIDLen)
 	if err != nil {
 		return fmt.Errorf("couldn't decode ID to bytes: %w", err)
 	}
