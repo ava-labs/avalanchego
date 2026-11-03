@@ -29,7 +29,10 @@ func TestByPriority(t *testing.T) {
 			Time:      time.Unix(seen, 0),
 		}
 	}
-	const highFeeCap = 1_000
+	const (
+		highFeeCap = 1_000
+		lowFeeCap  = 15
+	)
 
 	//nolint:unused // Fields are only compared by require.Equal.
 	type ordered struct {
@@ -81,7 +84,7 @@ func TestByPriority(t *testing.T) {
 		{
 			name: "effective_tip_capped_by_base_fee",
 			pending: map[common.Address][]*txpool.LazyTransaction{
-				alice: {tx(1, 15, 10, 1)}, // effective tip of 5
+				alice: {tx(1, lowFeeCap, 10, 1)},
 				bob:   {tx(2, highFeeCap, 7, 2)},
 			},
 			baseFee: uint256.NewInt(10),
@@ -92,7 +95,7 @@ func TestByPriority(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var got []ordered
-			for _, ltx := range byPriority(tt.pending, tt.baseFee) {
+			for ltx := range byPriority(tt.pending, tt.baseFee) {
 				got = append(got, ordered{ltx.Sender, ltx.Hash[0]})
 			}
 			require.Equal(t, tt.want, got, "byPriority()")
@@ -142,7 +145,8 @@ func FuzzByPriority(f *testing.F) {
 
 		// remaining holds each sender's transactions that are not output yet.
 		remaining := maps.Clone(pending)
-		for i, got := range byPriority(pending, nil) {
+		var i int
+		for got := range byPriority(pending, nil) {
 			txs := remaining[got.Sender]
 			require.NotEmptyf(t, txs, "byPriority()[%d] is an extra transaction from %v", i, got.Sender)
 			require.Samef(t, txs[0], got.LazyTransaction, "byPriority()[%d] is not the next transaction from %v", i, got.Sender)
@@ -156,6 +160,7 @@ func FuzzByPriority(f *testing.F) {
 				skipped := head(sender, txs[0])
 				require.Truef(t, gotHead.outranks(skipped), "byPriority()[%d] from %v does not outrank the next transaction from %v", i, got.Sender, sender)
 			}
+			i++
 		}
 		for sender, txs := range remaining {
 			require.Emptyf(t, txs, "byPriority() is missing transactions from %v", sender)

@@ -4,6 +4,8 @@
 package txgossip
 
 import (
+	"iter"
+
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
@@ -18,10 +20,10 @@ type LazyTransaction struct {
 	Sender common.Address
 }
 
-// TransactionsByPriority returns [txpool.TxPool.Pending] by highest effective
+// TransactionsByPriority yields [txpool.TxPool.Pending] by highest effective
 // gas tip, then first seen, then sender address. Each sender's transactions stay
 // in nonce order.
-func (s *Set) TransactionsByPriority(filter txpool.PendingFilter) []*LazyTransaction {
+func (s *Set) TransactionsByPriority(filter txpool.PendingFilter) iter.Seq[*LazyTransaction] {
 	// TODO(arr4n) investigate optimisations; e.g. skipping entire accounts once
 	// the block builder has found that a lower-nonced tx is invalid.
 
@@ -49,42 +51,42 @@ func (a *senderTxs) outranks(b *senderTxs) bool {
 	return a.from.Cmp(b.from) < 0
 }
 
-func byPriority(pending map[common.Address][]*txpool.LazyTransaction, baseFee *uint256.Int) []*LazyTransaction {
-	var n int
-	senders := make([]*senderTxs, 0, len(pending))
-	for from, txs := range pending {
-		if len(txs) == 0 {
-			continue
+func byPriority(pending map[common.Address][]*txpool.LazyTransaction, baseFee *uint256.Int) iter.Seq[*LazyTransaction] {
+	return func(yield func(*LazyTransaction) bool) {
+		senders := make([]*senderTxs, 0, len(pending))
+		for from, txs := range pending {
+			if len(txs) == 0 {
+				continue
+			}
+			senders = append(senders, &senderTxs{
+				from:     from,
+				txs:      txs,
+				firstTip: effectiveGasTip(txs[0], baseFee),
+			})
 		}
-		n += len(txs)
-		senders = append(senders, &senderTxs{
-			from:     from,
-			txs:      txs,
-			firstTip: effectiveGasTip(txs[0], baseFee),
-		})
-	}
 
-	// Heap by first transaction from each sender.
-	q := heap.QueueOf((*senderTxs).outranks, senders...)
+		// Heap by first transaction from each sender.
+		q := heap.QueueOf((*senderTxs).outranks, senders...)
+		for {
+			s, ok := q.Peek()
+			if !ok {
+				return
+			}
+			if !yield(&LazyTransaction{
+				LazyTransaction: s.txs[0],
+				Sender:          s.from,
+			}) {
+				return
+			}
 
-	all := make([]*LazyTransaction, 0, n)
-	for {
-		s, ok := q.Peek()
-		if !ok {
-			return all
+			s.txs = s.txs[1:]
+			if len(s.txs) == 0 {
+				q.Pop()
+				continue
+			}
+			s.firstTip = effectiveGasTip(s.txs[0], baseFee)
+			q.Fix(0)
 		}
-		all = append(all, &LazyTransaction{
-			LazyTransaction: s.txs[0],
-			Sender:          s.from,
-		})
-
-		s.txs = s.txs[1:]
-		if len(s.txs) == 0 {
-			q.Pop()
-			continue
-		}
-		s.firstTip = effectiveGasTip(s.txs[0], baseFee)
-		q.Fix(0)
 	}
 }
 
