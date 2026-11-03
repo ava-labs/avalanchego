@@ -4,6 +4,7 @@
 package common
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -69,4 +70,69 @@ func TestNodesEqualDoesNotMutate(t *testing.T) {
 	require.True(t, nws.Equal(other))
 	require.Equal(t, Nodes{b, a}, nws)
 	require.Equal(t, Nodes{a, b}, other)
+}
+
+// TestNodesWeights checks Weights returns the weight of every node,
+// in the same order as the nodes.
+func TestNodesWeights(t *testing.T) {
+	a := Node{Id: NodeID{1}, Weight: 10, PK: PublicKeyBytes{0xa}}
+	b := Node{Id: NodeID{2}, Weight: 20, PK: PublicKeyBytes{0xb}}
+	c := Node{Id: NodeID{3}, Weight: 30, PK: PublicKeyBytes{0xc}}
+
+	testCases := []struct {
+		name     string
+		nws      Nodes
+		expected uint64s
+	}{
+		{name: "nil", expected: uint64s{}},
+		{name: "empty", nws: Nodes{}, expected: uint64s{}},
+		{name: "single node", nws: Nodes{a}, expected: uint64s{10}},
+		{name: "order is preserved", nws: Nodes{c, a, b}, expected: uint64s{30, 10, 20}},
+		{name: "zero weight", nws: Nodes{a, {Id: NodeID{4}}}, expected: uint64s{10, 0}},
+		{name: "equal weights", nws: NodeIDs{{1}, {2}, {3}}.EqualWeightedNodes(), expected: uint64s{1, 1, 1}},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			require.Equal(t, testCase.expected, testCase.nws.Weights())
+		})
+	}
+}
+
+// TestNodesWeightsDoesNotAlias checks that modifying the returned weights
+// does not modify the nodes.
+func TestNodesWeightsDoesNotAlias(t *testing.T) {
+	nws := Nodes{{Id: NodeID{1}, Weight: 10}, {Id: NodeID{2}, Weight: 20}}
+
+	weights := nws.Weights()
+	weights[0] = 99
+
+	require.Equal(t, uint64(10), nws[0].Weight)
+}
+
+func TestUint64sSum(t *testing.T) {
+	testCases := []struct {
+		name     string
+		ns       uint64s
+		expected uint64
+	}{
+		{name: "nil", expected: 0},
+		{name: "empty", ns: uint64s{}, expected: 0},
+		{name: "single element", ns: uint64s{7}, expected: 7},
+		{name: "several elements", ns: uint64s{10, 20, 30}, expected: 60},
+		{name: "zeros", ns: uint64s{0, 0, 0}, expected: 0},
+		{name: "max value", ns: uint64s{math.MaxUint64}, expected: math.MaxUint64},
+		{name: "adds up to max value", ns: uint64s{math.MaxUint64 - 5, 5}, expected: math.MaxUint64},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			require.Equal(t, testCase.expected, testCase.ns.Sum())
+		})
+	}
+}
+
+func TestNodesWeightsSum(t *testing.T) {
+	nws := Nodes{{Id: NodeID{1}, Weight: 10}, {Id: NodeID{2}, Weight: 20}, {Id: NodeID{3}, Weight: 30}}
+	require.Equal(t, uint64(60), nws.Weights().Sum())
 }

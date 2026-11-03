@@ -188,6 +188,27 @@ type SignatureAggregator interface {
 // Nodes is a list of Node elements.
 type Nodes []Node
 
+// uint64s is a list of uint64 elements.
+type uint64s []uint64
+
+// Sum returns the sum of the uint64s.
+func (ns uint64s) Sum() uint64 {
+	var sum uint64
+	for _, n := range ns {
+		sum += n
+	}
+	return sum
+}
+
+// Weights returns the weights of the nodes.
+func (nws Nodes) Weights() uint64s {
+	weights := make([]uint64, len(nws))
+	for i, nw := range nws {
+		weights[i] = nw.Weight
+	}
+	return weights
+}
+
 // NodeIDs returns the NodeIDs of the nodes in the Nodes.
 func (nws Nodes) NodeIDs() []NodeID {
 	nodes := make([]NodeID, len(nws))

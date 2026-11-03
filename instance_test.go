@@ -1176,7 +1176,7 @@ func TestInstanceBlacklistConfigurationRollsOverAcrossEpochs(t *testing.T) {
 		blacklist := block.Blacklist()
 		if len(epochSizes) == 0 || epochSizes[len(epochSizes)-1] != blacklist.NodeCount() {
 			if len(epochSizes) > 0 {
-				fresh := prevBlacklist.Stateless(blacklist.NodeCount())
+				fresh := prevBlacklist.Stateless(blacklist.NodeCount(), uint64(blacklist.NodeCount()))
 				orbits = fresh.MaxBlacklistedOrbits()
 			}
 			epochSizes = append(epochSizes, blacklist.NodeCount())

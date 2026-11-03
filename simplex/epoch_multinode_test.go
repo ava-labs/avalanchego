@@ -184,9 +184,9 @@ func TestSimplexMultiNodeBlacklist(t *testing.T) {
 	// Build two more blocks, which should blacklist the fourth node.
 	// Ensure the fourth node is blacklisted by checking the blacklist on all nodes.
 	timedOut := map[uint16]uint64{3: 3}
-	emptyBlacklist := common.NewBlacklist(4, simplex.DefaultMaxBlacklistedRounds)
-	accused := emptyBlacklist.Next(4, simplex.DefaultMaxBlacklistedRounds, timedOut, nil)
-	blacklisted := accused.Next(5, simplex.DefaultMaxBlacklistedRounds, timedOut, nil)
+	emptyBlacklist := common.NewBlacklist(4, uint64(4), simplex.DefaultMaxBlacklistedRounds)
+	accused := emptyBlacklist.Next(4, simplex.DefaultMaxBlacklistedRounds, testutil.EqualWeights(emptyBlacklist.NodeCount()), timedOut, nil)
+	blacklisted := accused.Next(5, simplex.DefaultMaxBlacklistedRounds, testutil.EqualWeights(accused.NodeCount()), timedOut, nil)
 
 	// Build a block, ensure the blacklist contains the fourth node as a suspect.
 	net.TriggerLeaderBlockBuilder(uint64(4))
@@ -415,7 +415,7 @@ func TestSimplexMultiNodeBlacklistExpires(t *testing.T) {
 	// by a single orbit per block, so the nodes start from a finalized block of round 0 whose blacklist
 	// already has the configured max blacklisted orbits.
 	genesis, ok := testutil.NewTestBlockBuilder().BuildBlock(context.Background(), common.ProtocolMetadata{},
-		common.NewBlacklist(uint16(len(nodes)), maxBlacklistedRounds))
+		common.NewBlacklist(uint16(len(nodes)), uint64(uint16(len(nodes))), maxBlacklistedRounds))
 	require.True(t, ok)
 	genesisFinalization, _ := testutil.NewFinalizationRecord(t, &testutil.TestSignatureAggregator{N: len(nodes)}, genesis, nodes)
 
@@ -487,10 +487,10 @@ func TestSimplexMultiNodeBlacklistExpires(t *testing.T) {
 	timeoutOnOfflineLeader(3)
 
 	// The blacklists the online nodes are expected to build, as the offline node timed out in round 3.
-	emptyBlacklist := common.NewBlacklist(uint16(len(nodes)), testEpochConfig.MaxBlacklistedRounds)
+	emptyBlacklist := common.NewBlacklist(uint16(len(nodes)), uint64(uint16(len(nodes))), testEpochConfig.MaxBlacklistedRounds)
 	timedOut := map[uint16]uint64{offlineNodeIndex: 3}
-	accused := emptyBlacklist.Next(4, testEpochConfig.MaxBlacklistedRounds, timedOut, nil)
-	blacklisted := accused.Next(5, testEpochConfig.MaxBlacklistedRounds, timedOut, nil)
+	accused := emptyBlacklist.Next(4, testEpochConfig.MaxBlacklistedRounds, testutil.EqualWeights(emptyBlacklist.NodeCount()), timedOut, nil)
+	blacklisted := accused.Next(5, testEpochConfig.MaxBlacklistedRounds, testutil.EqualWeights(accused.NodeCount()), timedOut, nil)
 
 	// Round 4: node 0 accuses the offline node of timing out in its orbit 1.
 	blacklist := buildBlock(4, 3)

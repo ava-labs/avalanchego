@@ -19,6 +19,7 @@ var (
 	errBlacklistNodeNotBlacklisted          = fmt.Errorf("node index not blacklisted, cannot be redeemed")
 	errBlacklistInvalidUpdateType           = fmt.Errorf("invalid blacklist update type")
 	errBlacklistInvalidNodeCount            = fmt.Errorf("block contains an invalid blacklist node count")
+	errBlacklistInvalidWeightCount          = fmt.Errorf("block contains an invalid total weight node count")
 	errBlacklistInvalidMaxBlacklistedOrbits = fmt.Errorf("block contains an invalid max blacklisted orbits")
 	errBlacklistInvalidUpdates              = fmt.Errorf("block contains invalid blacklist updates")
 	errBlacklistInvalidBlacklist            = fmt.Errorf("block contains an invalid blacklist")
@@ -52,10 +53,13 @@ type Blacklist struct {
 	// nodeCount is the configuration of the blacklist.
 	nodeCount uint16 `canoto:"uint,1"`
 
+	// totalWeight is the total weight of the nodes in the validator set.
+	totalWeight uint64 `canoto:"uint,2"`
+
 	// maxBlacklistedOrbits is the maximum number of orbits a node can be blacklisted for.
 	// Each block builder may move it by at most one orbit relative to the parent block,
 	// towards the value in its local configuration, which allows it to be changed via a rolling upgrade.
-	maxBlacklistedOrbits uint16 `canoto:"uint,2"`
+	maxBlacklistedOrbits uint16 `canoto:"uint,3"`
 
 	// State: Below are fields corresponding to state.
 	// They are optional fields and may not be present
@@ -63,18 +67,19 @@ type Blacklist struct {
 
 	// suspectedNodes is the list of nodes that are currently suspected.
 	// it's the inner state of the blacklist.
-	suspectedNodes suspectedNodes `canoto:"repeated value,3"`
+	suspectedNodes suspectedNodes `canoto:"repeated value,4"`
 
 	// updates is the list of modifications that a block builder is proposing
 	// to perform to the blacklist.
-	updates BlacklistUpdates `canoto:"repeated value,4"`
+	updates BlacklistUpdates `canoto:"repeated value,5"`
 
 	canotoData canotoData_Blacklist
 }
 
-func NewBlacklist(nodeCount uint16, maxBlacklistedRounds uint16) Blacklist {
+func NewBlacklist(nodeCount uint16, totalWeight uint64, maxBlacklistedRounds uint16) Blacklist {
 	return Blacklist{
 		nodeCount:            nodeCount,
+		totalWeight:          totalWeight,
 		maxBlacklistedOrbits: maxBlacklistedOrbitsForRounds(nodeCount, maxBlacklistedRounds),
 	}
 }
@@ -82,6 +87,11 @@ func NewBlacklist(nodeCount uint16, maxBlacklistedRounds uint16) Blacklist {
 // NodeCount returns the number of nodes the blacklist is configured for.
 func (bl *Blacklist) NodeCount() uint16 {
 	return bl.nodeCount
+}
+
+// TotalWeight returns the total weight of the nodes the blacklist is configured for.
+func (bl *Blacklist) TotalWeight() uint64 {
+	return bl.totalWeight
 }
 
 // MaxBlacklistedOrbits returns the maximum number of orbits a node can be blacklisted for.
@@ -107,20 +117,21 @@ func maxBlacklistedOrbitsForRounds(nodeCount uint16, maxBlacklistedRounds uint16
 // Stateless returns a new blacklist with the same configuration as the current blacklist, but without any state.
 // It derives the maxBlacklistedOrbits from the current blacklist, rescaled to the new node count, if possible.
 // Otherwise it returns a new blacklist with the given node count and GenesisMaxBlacklistedRounds.
-func (bl *Blacklist) Stateless(nodeCount uint16) Blacklist {
+func (bl *Blacklist) Stateless(nodeCount uint16, totalWeight uint64) Blacklist {
 	if bl.maxBlacklistedOrbits == 0 {
-		return NewBlacklist(nodeCount, GenesisMaxBlacklistedRounds)
+		return NewBlacklist(nodeCount, totalWeight, GenesisMaxBlacklistedRounds)
 	}
 	return Blacklist{
 		nodeCount:            nodeCount,
+		totalWeight:          totalWeight,
 		maxBlacklistedOrbits: rescaleMaxBlacklistedOrbits(bl.maxBlacklistedOrbits, bl.nodeCount, nodeCount),
 	}
 }
 
 // Next returns the next blacklist for the given round, based on the current blacklist and the given timed out and redeemed nodes.
-func (bl *Blacklist) Next(round uint64, maxBlacklistedRounds uint16, timedOut, redeemed map[uint16]uint64) Blacklist {
+func (bl *Blacklist) Next(round uint64, maxBlacklistedRounds uint16, weights []uint64, timedOut, redeemed map[uint16]uint64) Blacklist {
 	updates := bl.computeBlacklistUpdates(round, bl.nodeCount, timedOut, redeemed)
-	newBlacklist := bl.applyUpdates(updates, round)
+	newBlacklist := bl.applyUpdates(updates, round, weights)
 	targetOrbits := maxBlacklistedOrbitsForRounds(bl.nodeCount, maxBlacklistedRounds)
 	newBlacklist.maxBlacklistedOrbits = bl.nextMaxBlacklistedOrbits(targetOrbits)
 	return newBlacklist
@@ -170,8 +181,9 @@ func (bl *Blacklist) String() string {
 	}
 
 	return fmt.Sprintf(
-		"Blacklist(nodeCount=%d, maxBlacklistedOrbits=%d, suspectedNodes=[%s], updates=[%s])",
+		"Blacklist(nodeCount=%d, totalWeight=%d, maxBlacklistedOrbits=%d, suspectedNodes=[%s], updates=[%s])",
 		bl.nodeCount,
+		bl.totalWeight,
 		bl.maxBlacklistedOrbits,
 		strings.Join(sn, ","),
 		blacklistUpdatesAsString(bl.updates), // helper receives array
@@ -188,6 +200,9 @@ func blacklistUpdatesAsString(updates []BlacklistUpdate) string {
 
 func (bl *Blacklist) Equals(b2 *Blacklist) bool {
 	if bl.nodeCount != b2.nodeCount {
+		return false
+	}
+	if bl.totalWeight != b2.totalWeight {
 		return false
 	}
 	if bl.maxBlacklistedOrbits != b2.maxBlacklistedOrbits {
@@ -261,8 +276,9 @@ func (bl *Blacklist) IsEmpty() bool {
 
 // ApplyUpdates applies the given updates in the given round to the current blacklist and returns a new blacklist.
 // The current blacklist is not modified.
-func (bl *Blacklist) applyUpdates(updates []BlacklistUpdate, round uint64) Blacklist {
+func (bl *Blacklist) applyUpdates(updates []BlacklistUpdate, round uint64, weights []uint64) Blacklist {
 	newBlacklist := Blacklist{
+		totalWeight:          bl.totalWeight,
 		nodeCount:            bl.nodeCount,
 		maxBlacklistedOrbits: bl.maxBlacklistedOrbits,
 		suspectedNodes:       make(suspectedNodes, len(bl.suspectedNodes)),
@@ -274,11 +290,20 @@ func (bl *Blacklist) applyUpdates(updates []BlacklistUpdate, round uint64) Black
 	for i := range updates {
 		update := &updates[i]
 		orbit := orbit(round, update.NodeIndex, bl.nodeCount)
+
+		// Sanity check in case we get a too high node index.
+		// This shouldn't happen, but if it does, we should just ignore it.
+		if update.NodeIndex >= bl.nodeCount || len(weights) != int(bl.nodeCount) {
+			continue
+		}
+
+		suspectingOrRedeemingNodeWeight := weights[round%uint64(bl.nodeCount)]
+
 		switch update.Type {
 		case BlacklistOpType_NodeSuspected:
-			newBlacklist.setNodeSuspected(orbit, update.NodeIndex)
+			newBlacklist.setNodeSuspected(orbit, update.NodeIndex, suspectingOrRedeemingNodeWeight, weights)
 		case BlacklistOpType_NodeRedeemed:
-			newBlacklist.setNodeRedeemed(orbit, update.NodeIndex)
+			newBlacklist.setNodeRedeemed(orbit, update.NodeIndex, suspectingOrRedeemingNodeWeight)
 		}
 	}
 
@@ -312,7 +337,7 @@ func (bl *Blacklist) garbageCollectSuspectedNodes(round uint64) suspectedNodes {
 
 		//  Reset the redeemingCount and orbitToRedeem if it was a past orbit.
 		if sn.OrbitToRedeem < orbit {
-			newSuspectedNode.RedeemingCount = 0
+			newSuspectedNode.RedeemingWeight = 0
 			newSuspectedNode.OrbitToRedeem = 0
 		}
 		newSuspectedNodes = append(newSuspectedNodes, newSuspectedNode)
@@ -321,17 +346,12 @@ func (bl *Blacklist) garbageCollectSuspectedNodes(round uint64) suspectedNodes {
 	return newSuspectedNodes
 }
 
-func (bl *Blacklist) setNodeSuspected(orbit uint64, nodeIndex uint16) {
+func (bl *Blacklist) setNodeSuspected(orbit uint64, nodeIndex uint16, suspectingOrRedeemingNodeWeight uint64, weights []uint64) {
 	// An orbit of 0 is a no-op
 	if orbit == 0 {
 		return
 	}
 
-	// Sanity check in case we get a too high node index.
-	// This shouldn't happen, but if it does, we should just ignore it.
-	if nodeIndex >= bl.nodeCount {
-		return
-	}
 	// First, look to see if the node is already suspected.
 	// If it is, then we shouldn't further increment its count.
 	if bl.IsNodeSuspected(nodeIndex) {
@@ -340,7 +360,7 @@ func (bl *Blacklist) setNodeSuspected(orbit uint64, nodeIndex uint16) {
 
 	threshold := bl.computeThreshold()
 
-	var suspectedCount uint16
+	var suspectedWeight uint64
 
 	// Iterate through the suspected nodes to see if the node is already there.
 	// If it is, increment its count and return.
@@ -352,14 +372,12 @@ func (bl *Blacklist) setNodeSuspected(orbit uint64, nodeIndex uint16) {
 	for i := range bl.suspectedNodes {
 		sn := &bl.suspectedNodes[i]
 
-		if sn.SuspectingCount >= threshold {
-			suspectedCount++
+		if sn.SuspectingWeight >= threshold {
+			suspectedWeight += weights[sn.NodeIndex]
 		}
 	}
 
-	f := (bl.nodeCount - 1) / 3
-
-	if suspectedCount >= f {
+	if suspectedWeight+weights[nodeIndex] >= threshold {
 		// We already have f or more nodes suspected, abort because we cannot suspect any more nodes.
 		return
 	}
@@ -369,8 +387,8 @@ func (bl *Blacklist) setNodeSuspected(orbit uint64, nodeIndex uint16) {
 		// Only increment the count if the orbit is the same.
 		if sn.NodeIndex == nodeIndex {
 			if sn.OrbitSuspected == orbit {
-				// The node is already there, so increment its count.
-				sn.SuspectingCount++
+				// The node is already there, so increment its suspecting weight.
+				sn.SuspectingWeight += suspectingOrRedeemingNodeWeight
 				return
 			}
 			// Else, the orbit is different, so just return early.
@@ -380,13 +398,13 @@ func (bl *Blacklist) setNodeSuspected(orbit uint64, nodeIndex uint16) {
 
 	// If we reached here, the node isn't in the suspected list, and it is small enough, so add it instead.
 	bl.suspectedNodes = append(bl.suspectedNodes, SuspectedNode{
-		NodeIndex:       nodeIndex,
-		SuspectingCount: 1,
-		OrbitSuspected:  orbit,
+		NodeIndex:        nodeIndex,
+		SuspectingWeight: suspectingOrRedeemingNodeWeight,
+		OrbitSuspected:   orbit,
 	})
 }
 
-func (bl *Blacklist) setNodeRedeemed(orbit uint64, nodeIndex uint16) {
+func (bl *Blacklist) setNodeRedeemed(orbit uint64, nodeIndex uint16, suspectingOrRedeemingNodeWeight uint64) {
 	// An orbit of 0 is a no-op because a node cannot be suspected in orbit 0.
 	if orbit == 0 {
 		return
@@ -394,11 +412,6 @@ func (bl *Blacklist) setNodeRedeemed(orbit uint64, nodeIndex uint16) {
 
 	threshold := bl.computeThreshold()
 
-	// Sanity check in case we get a too high node index.
-	// This shouldn't happen, but if it does, we should just ignore it.
-	if nodeIndex >= bl.nodeCount {
-		return
-	}
 	// First, look to see if the node is not suspected.
 	// If it is not, then we shouldn't try to redeem it.
 	if !bl.IsNodeSuspected(nodeIndex) {
@@ -419,11 +432,11 @@ func (bl *Blacklist) setNodeRedeemed(orbit uint64, nodeIndex uint16) {
 				sn.OrbitToRedeem = orbit
 			}
 			if sn.OrbitToRedeem == orbit {
-				sn.RedeemingCount++
+				sn.RedeemingWeight += suspectingOrRedeemingNodeWeight
 			}
 			// If we have found a threshold of redeeming nodes, then we need to remove the node
 			// from the suspected list.
-			if sn.RedeemingCount >= threshold {
+			if sn.RedeemingWeight >= threshold {
 				bl.suspectedNodes = slices.Delete(bl.suspectedNodes, i, i+1)
 				return
 			}
@@ -433,9 +446,11 @@ func (bl *Blacklist) setNodeRedeemed(orbit uint64, nodeIndex uint16) {
 	}
 }
 
-func (bl *Blacklist) computeThreshold() uint16 {
-	f := (bl.nodeCount - 1) / 3
-	threshold := f + 1
+func (bl *Blacklist) computeThreshold() uint64 {
+	threshold := bl.totalWeight / 3
+	if bl.totalWeight%3 != 0 {
+		threshold++
+	}
 	return threshold
 }
 
@@ -445,7 +460,7 @@ func (bl *Blacklist) IsNodeSuspected(nodeIndex uint16) bool {
 	for i := range bl.suspectedNodes {
 		sn := &bl.suspectedNodes[i]
 		if sn.NodeIndex == nodeIndex {
-			return sn.SuspectingCount >= threshold && sn.RedeemingCount < threshold
+			return sn.SuspectingWeight >= threshold && sn.RedeemingWeight < threshold
 		}
 	}
 
@@ -454,6 +469,7 @@ func (bl *Blacklist) IsNodeSuspected(nodeIndex uint16) bool {
 
 func (bl *Blacklist) Clone() Blacklist {
 	clone := Blacklist{
+		totalWeight:          bl.totalWeight,
 		nodeCount:            bl.nodeCount,
 		maxBlacklistedOrbits: bl.maxBlacklistedOrbits,
 	}
@@ -479,9 +495,12 @@ func (bl *Blacklist) FromBytes(buff []byte) error {
 	return bl.UnmarshalCanoto(buff)
 }
 
-func (bl *Blacklist) VerifyProposedBlacklist(candidateBlacklist Blacklist, round uint64) error {
+func (bl *Blacklist) VerifyProposedBlacklist(candidateBlacklist Blacklist, round uint64, weights uint64s) error {
 	if candidateBlacklist.nodeCount != bl.nodeCount {
 		return fmt.Errorf("%s, expected %d, got %d", errBlacklistInvalidNodeCount, bl.nodeCount, candidateBlacklist.nodeCount)
+	}
+	if candidateBlacklist.totalWeight != bl.totalWeight {
+		return fmt.Errorf("%s, expected %d, got %d", errBlacklistInvalidWeightCount, bl.totalWeight, candidateBlacklist.totalWeight)
 	}
 	if len(candidateBlacklist.suspectedNodes) > int(bl.nodeCount) {
 		return fmt.Errorf("%w: %d, only %d nodes exist", errBlacklistTooManySuspectedNodes, len(candidateBlacklist.suspectedNodes), bl.nodeCount)
@@ -497,7 +516,7 @@ func (bl *Blacklist) VerifyProposedBlacklist(candidateBlacklist Blacklist, round
 	// 2) We then proceed by applying the updates to the blacklist of the previous round.
 	// Garbage collection of expired suspected nodes uses the maxBlacklistedOrbits of the previous round,
 	// and the new maxBlacklistedOrbits only takes effect in the next round.
-	expectedBlacklist := bl.applyUpdates(updates, round)
+	expectedBlacklist := bl.applyUpdates(updates, round, weights)
 	expectedBlacklist.maxBlacklistedOrbits = candidateBlacklist.maxBlacklistedOrbits
 
 	if !candidateBlacklist.Equals(&expectedBlacklist) {
@@ -622,12 +641,12 @@ type suspectedNodes []SuspectedNode
 type SuspectedNode struct {
 	// NodeIndex is the index of the suspected node among the nodes of the validator set.
 	NodeIndex uint16 `canoto:"uint,1"`
-	// SuspectingCount is the number of nodes that have suspected this node in the current orbit denoted by OrbitSuspected.
-	// If this count is >= f+1, then the node is considered blacklisted.
-	SuspectingCount uint16 `canoto:"uint,2"`
+	// SuspectingWeight is the cumulative amount of weight of nodes that have suspected this node in the current orbit denoted by OrbitSuspected.
+	// If this amount is > 33% of the total weight, then the node is considered blacklisted.
+	SuspectingWeight uint64 `canoto:"uint,2"`
 	// RedeemingCount is the number of nodes that have redeemed this node in the current orbit denoted by OrbitToRedeem.
-	// If this count reaches >= f+1, the node is removed from the blacklist.
-	RedeemingCount uint16 `canoto:"uint,3"`
+	// If this amount is > 33% of the total weight, the node is removed from the blacklist.
+	RedeemingWeight uint64 `canoto:"uint,3"`
 	// OrbitSuspected is the orbit in which the node was last suspected.
 	OrbitSuspected uint64 `canoto:"uint,4"`
 	// OrbitToRedeem is the orbit in which the node was last redeemed.
@@ -638,43 +657,43 @@ type SuspectedNode struct {
 
 func (sn *SuspectedNode) Clone() SuspectedNode {
 	return SuspectedNode{
-		NodeIndex:       sn.NodeIndex,
-		SuspectingCount: sn.SuspectingCount,
-		RedeemingCount:  sn.RedeemingCount,
-		OrbitSuspected:  sn.OrbitSuspected,
-		OrbitToRedeem:   sn.OrbitToRedeem,
+		NodeIndex:        sn.NodeIndex,
+		SuspectingWeight: sn.SuspectingWeight,
+		RedeemingWeight:  sn.RedeemingWeight,
+		OrbitSuspected:   sn.OrbitSuspected,
+		OrbitToRedeem:    sn.OrbitToRedeem,
 	}
 }
 
 func (sn *SuspectedNode) Equals(sn2 *SuspectedNode) bool {
 	return sn.NodeIndex == sn2.NodeIndex &&
-		sn.SuspectingCount == sn2.SuspectingCount &&
-		sn.RedeemingCount == sn2.RedeemingCount &&
+		sn.SuspectingWeight == sn2.SuspectingWeight &&
+		sn.RedeemingWeight == sn2.RedeemingWeight &&
 		sn.OrbitSuspected == sn2.OrbitSuspected &&
 		sn.OrbitToRedeem == sn2.OrbitToRedeem
 }
 
 func (sn *SuspectedNode) String() string {
-	return fmt.Sprintf("{NodeIndex=%d, SuspectingCount=%d, RedeemingCount=%d, OrbitSuspected=%d, OrbitToRedeem=%d}",
-		sn.NodeIndex, sn.SuspectingCount, sn.RedeemingCount, sn.OrbitSuspected, sn.OrbitToRedeem)
+	return fmt.Sprintf("{NodeIndex=%d, SuspectingWeight=%d, RedeemingWeight=%d, OrbitSuspected=%d, OrbitToRedeem=%d}",
+		sn.NodeIndex, sn.SuspectingWeight, sn.RedeemingWeight, sn.OrbitSuspected, sn.OrbitToRedeem)
 }
 
 // isStillSuspected returns true if the suspected node is still suspected in the given orbit.
-func (sn *SuspectedNode) isStillSuspected(threshold uint16, orbit uint64) bool {
+func (sn *SuspectedNode) isStillSuspected(threshold uint64, orbit uint64) bool {
 	if sn.OrbitSuspected >= orbit {
 		// orbit hasn't advanced.
 		return true
 	}
 
 	// Else, the orbit has advanced (sn.OrbitSuspected < orbit).
-	if sn.SuspectingCount < threshold {
+	if sn.SuspectingWeight < threshold {
 		// The node is not blacklisted, so since we've advanced to a new orbit,
 		// we can just drop it as not enough nodes suspected it.
 		return false
 	}
 
 	// Else, the node is blacklisted. We need to see if it has been redeemed by enough nodes.
-	if sn.RedeemingCount >= threshold {
+	if sn.RedeemingWeight >= threshold {
 		return false
 	}
 

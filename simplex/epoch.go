@@ -1685,7 +1685,7 @@ func (e *Epoch) maybeMarkLeaderAsTimedOutForFutureBlacklisting(emptyNotarization
 		}
 		blacklist = e.lastBlock.VerifiedBlock.Blacklist()
 		if e.lastBlock.Finalization.Finalization.Epoch < e.Epoch {
-			blacklist = blacklist.Stateless(uint16(len(e.validators)))
+			blacklist = blacklist.Stateless(uint16(len(e.validators)), e.validators.Weights().Sum())
 		}
 	}
 	round := emptyNotarization.Vote.Round
@@ -2512,7 +2512,7 @@ func (e *Epoch) verifyProposalMetadataAndBlacklist(block common.Block) bool {
 	// Else, either it's not the first block, or we haven't committed the first block, and it is the first block.
 	// If it's the latter we have nothing else to do.
 	// If it's the former, we need to find the parent of the block and ensure it is correct.
-	prevBlacklist := common.NewBlacklist(uint16(len(e.validatorNodeIDs)), common.GenesisMaxBlacklistedRounds)
+	prevBlacklist := common.NewBlacklist(uint16(len(e.validatorNodeIDs)), e.validators.Weights().Sum(), common.GenesisMaxBlacklistedRounds)
 	if bh.Seq < e.nextSeqToCommit() {
 		return false
 	}
@@ -2533,11 +2533,11 @@ func (e *Epoch) verifyProposalMetadataAndBlacklist(block common.Block) bool {
 
 		// If the previous block belongs to an earlier epoch, the blacklist should be empty.
 		if prevBlock.BlockHeader().Epoch < e.Epoch || prevBlacklist.IsEmpty() {
-			prevBlacklist = prevBlacklist.Stateless(uint16(len(e.validators)))
+			prevBlacklist = prevBlacklist.Stateless(uint16(len(e.validators)), e.validators.Weights().Sum())
 		}
 	}
 
-	if err := prevBlacklist.VerifyProposedBlacklist(block.Blacklist(), e.round); err != nil {
+	if err := prevBlacklist.VerifyProposedBlacklist(block.Blacklist(), e.round, e.validators.Weights()); err != nil {
 		e.Logger.Debug("Block contains an invalid blacklist", zap.Error(err))
 		return false
 	}
@@ -2638,7 +2638,7 @@ func (e *Epoch) buildBlock() {
 	}
 
 	// Create the blacklist for the next round:
-	nextBlacklist := prevBlacklist.Next(metadata.Round, e.MaxBlacklistedRounds, e.timedOutRounds, e.redeemedRounds)
+	nextBlacklist := prevBlacklist.Next(metadata.Round, e.MaxBlacklistedRounds, e.validators.Weights(), e.timedOutRounds, e.redeemedRounds)
 
 	e.Logger.Debug("Blacklist updated",
 		zap.Uint64("round", metadata.Round),
@@ -2678,12 +2678,12 @@ func (e *Epoch) retrieveBlacklistForBlockBuilding(metadata common.ProtocolMetada
 
 		// If the previous block belongs to a previous epoch, we need to reset the blacklist to be empty.
 		if metadata.Epoch > prevBlock.BlockHeader().Epoch {
-			blacklist = blacklist.Stateless(uint16(len(e.validators)))
+			blacklist = blacklist.Stateless(uint16(len(e.validators)), e.validators.Weights().Sum())
 		}
 	}
 
 	if blacklist.IsEmpty() {
-		blacklist = blacklist.Stateless(uint16(len(e.validators)))
+		blacklist = blacklist.Stateless(uint16(len(e.validators)), e.validators.Weights().Sum())
 	}
 
 	return blacklist, true
@@ -3010,7 +3010,7 @@ func (e *Epoch) retrieveLastPersistedBlacklist() (common.Blacklist, bool) {
 
 		blacklist = e.lastBlock.VerifiedBlock.Blacklist()
 		if e.lastBlock.Finalization.Finalization.Epoch < e.Epoch {
-			blacklist = blacklist.Stateless(uint16(len(e.validators)))
+			blacklist = blacklist.Stateless(uint16(len(e.validators)), e.validators.Weights().Sum())
 		}
 	}
 	return blacklist, true

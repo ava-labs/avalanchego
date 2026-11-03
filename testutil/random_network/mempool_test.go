@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var emptyBlacklist = common.NewBlacklist(4, simplex.DefaultMaxBlacklistedRounds)
+var emptyBlacklist = common.NewBlacklist(4, uint64(4), simplex.DefaultMaxBlacklistedRounds)
 
 func TestMempoolVerifiesTx(t *testing.T) {
 	logger := testutil.MakeLogger(t, 1)

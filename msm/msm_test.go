@@ -436,7 +436,7 @@ func TestMSMNormalOp(t *testing.T) {
 			md.Round++
 			md.Prev = lastBlock.Digest()
 
-			blacklist := common.NewBlacklist(4, simplex.DefaultMaxBlacklistedRounds)
+			blacklist := common.NewBlacklist(4, uint64(4), simplex.DefaultMaxBlacklistedRounds)
 
 			blockTime := lastBlock.InnerBlock.Timestamp().Add(time.Second)
 
@@ -527,7 +527,7 @@ func TestByzantinePChainHeightStallsHonestBuilders(t *testing.T) {
 	honestBuilder.GetTime = fixedTime
 	verifier.GetTime = fixedTime
 
-	blacklist := common.NewBlacklist(4, simplex.DefaultMaxBlacklistedRounds)
+	blacklist := common.NewBlacklist(4, simplex.DefaultMaxBlacklistedRounds, simplex.DefaultMaxBlacklistedRounds)
 
 	md := lastBlock.Metadata.SimplexProtocolMetadata
 	md.Seq++
@@ -1304,7 +1304,7 @@ func TestVerifyDoesNotInitializeApprovalStore(t *testing.T) {
 	tc.blockBuilder.Block = &testutil.InnerBlock{TS: blockTime, BlockHeight: lastBlock.InnerBlock.Height()}
 
 	// Build a transition block
-	block, err := sm.BuildBlock(context.Background(), md, common.NewBlacklist(4, simplex.DefaultMaxBlacklistedRounds))
+	block, err := sm.BuildBlock(context.Background(), md, common.NewBlacklist(4, uint64(4), simplex.DefaultMaxBlacklistedRounds))
 	require.NoError(t, err)
 	require.Equal(t, newPChainHeight, block.Metadata.SimplexEpochInfo.NextPChainReferenceHeight)
 
@@ -1318,7 +1318,7 @@ func TestVerifyDoesNotInitializeApprovalStore(t *testing.T) {
 		next.Round++
 		next.Prev = block.Digest()
 		tc.blockBuilder.Block = &testutil.InnerBlock{TS: blockTime, BlockHeight: block.InnerBlock.Height() + 1}
-		collecting, err := sm.BuildBlock(context.Background(), next, common.NewBlacklist(4, simplex.DefaultMaxBlacklistedRounds))
+		collecting, err := sm.BuildBlock(context.Background(), next, common.NewBlacklist(4, uint64(4), simplex.DefaultMaxBlacklistedRounds))
 		require.NoError(t, err)
 		return avalanchego.BitmaskFromBytes(collecting.Metadata.SimplexEpochInfo.NextEpochApprovals.NodeIDs)
 	}

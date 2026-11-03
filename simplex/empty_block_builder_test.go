@@ -45,7 +45,7 @@ func TestEmptyBlockBuilderReturnsRealBlockWhenBuilt(t *testing.T) {
 	}
 
 	bb.TriggerNewBlock()
-	block, ok := ebb.BuildBlock(context.Background(), md, common.NewBlacklist(5, simplex.DefaultMaxBlacklistedRounds))
+	block, ok := ebb.BuildBlock(context.Background(), md, common.NewBlacklist(5, uint64(5), simplex.DefaultMaxBlacklistedRounds))
 	require.True(t, ok)
 	require.NotNil(t, block)
 	require.Equal(t, md.Seq, block.BlockHeader().Seq)
@@ -67,7 +67,7 @@ func TestEmptyBlockBuilderReturnsEmptyBlockWhenShouldBuildEmpty(t *testing.T) {
 		ShouldBuildEmptyBlock: blocksUntilDone,
 	}
 
-	block, ok := ebb.BuildBlock(context.Background(), common.ProtocolMetadata{}, common.NewBlacklist(1, simplex.DefaultMaxBlacklistedRounds))
+	block, ok := ebb.BuildBlock(context.Background(), common.ProtocolMetadata{}, common.NewBlacklist(1, uint64(1), simplex.DefaultMaxBlacklistedRounds))
 	require.True(t, ok)
 	require.NotNil(t, block)
 }
@@ -86,7 +86,7 @@ func TestEmptyBlockBuilderReturnsNoBlockOnCallerCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // caller cancels before the call.
 
-	block, ok := ebb.BuildBlock(ctx, common.ProtocolMetadata{}, common.NewBlacklist(1, simplex.DefaultMaxBlacklistedRounds))
+	block, ok := ebb.BuildBlock(ctx, common.ProtocolMetadata{}, common.NewBlacklist(1, uint64(1), simplex.DefaultMaxBlacklistedRounds))
 	require.False(t, ok)
 	require.Nil(t, block)
 }
@@ -116,7 +116,7 @@ func TestEmptyBlockBuilderDoesNotCancelWhenShouldBuildReturnsFalse(t *testing.T)
 		bb.TriggerNewBlock()
 	}()
 
-	block, ok := ebb.BuildBlock(context.Background(), common.ProtocolMetadata{}, common.NewBlacklist(1, simplex.DefaultMaxBlacklistedRounds))
+	block, ok := ebb.BuildBlock(context.Background(), common.ProtocolMetadata{}, common.NewBlacklist(1, uint64(1), simplex.DefaultMaxBlacklistedRounds))
 	require.True(t, ok)
 	require.NotNil(t, block)
 }
@@ -138,7 +138,7 @@ func TestEmptyBlockBuilderCleansUpAfterBuild(t *testing.T) {
 	}
 
 	bb.TriggerNewBlock()
-	_, ok := ebb.BuildBlock(context.Background(), common.ProtocolMetadata{}, common.NewBlacklist(1, simplex.DefaultMaxBlacklistedRounds))
+	_, ok := ebb.BuildBlock(context.Background(), common.ProtocolMetadata{}, common.NewBlacklist(1, uint64(1), simplex.DefaultMaxBlacklistedRounds))
 	require.True(t, ok)
 
 	select {

@@ -26,19 +26,37 @@ func TestBlacklistVerifyProposedBlacklist(t *testing.T) {
 			name:      "node count mismatch",
 			nodeCount: 5,
 			proposedBlacklist: Blacklist{
-				nodeCount: 13,
+				nodeCount:   13,
+				totalWeight: 13,
 			},
 			expectedErr: errBlacklistInvalidNodeCount,
+		},
+		{
+			name: "total weight mismatch",
+			blacklist: Blacklist{
+				nodeCount:            4,
+				totalWeight:          4,
+				maxBlacklistedOrbits: 1,
+			},
+			nodeCount: 4,
+			proposedBlacklist: Blacklist{
+				nodeCount:            4,
+				totalWeight:          1,
+				maxBlacklistedOrbits: 1,
+			},
+			expectedErr: errBlacklistInvalidWeightCount,
 		},
 		{
 			name: "max blacklisted orbits increased by more than one",
 			blacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 10,
 			},
 			nodeCount: 4,
 			proposedBlacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 12,
 			},
 			expectedErr: errBlacklistInvalidMaxBlacklistedOrbits,
@@ -47,11 +65,13 @@ func TestBlacklistVerifyProposedBlacklist(t *testing.T) {
 			name: "max blacklisted orbits decreased by more than one",
 			blacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 10,
 			},
 			nodeCount: 4,
 			proposedBlacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 8,
 			},
 			expectedErr: errBlacklistInvalidMaxBlacklistedOrbits,
@@ -60,11 +80,13 @@ func TestBlacklistVerifyProposedBlacklist(t *testing.T) {
 			name: "max blacklisted orbits decreased to zero",
 			blacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 1,
 			},
 			nodeCount: 4,
 			proposedBlacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 0,
 			},
 			expectedErr: errBlacklistInvalidMaxBlacklistedOrbits,
@@ -73,11 +95,13 @@ func TestBlacklistVerifyProposedBlacklist(t *testing.T) {
 			name: "max blacklisted orbits overflows",
 			blacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: math.MaxUint16,
 			},
 			nodeCount: 4,
 			proposedBlacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 0,
 			},
 			expectedErr: errBlacklistInvalidMaxBlacklistedOrbits,
@@ -86,15 +110,17 @@ func TestBlacklistVerifyProposedBlacklist(t *testing.T) {
 			name: "invalid blacklist update",
 			blacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 1,
-				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingCount: 2, OrbitSuspected: 6, RedeemingCount: 0, OrbitToRedeem: 0}},
+				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2, OrbitSuspected: 6, RedeemingWeight: 0, OrbitToRedeem: 0}},
 			},
 			nodeCount: 4,
 			round:     29,
 			proposedBlacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 1,
-				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingCount: 2, OrbitSuspected: 6, RedeemingCount: 0, OrbitToRedeem: 0}},
+				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2, OrbitSuspected: 6, RedeemingWeight: 0, OrbitToRedeem: 0}},
 				updates:              []BlacklistUpdate{{Type: BlacklistOpType_NodeSuspected, NodeIndex: 3}},
 			},
 			expectedErr: errBlacklistInvalidUpdates,
@@ -103,15 +129,17 @@ func TestBlacklistVerifyProposedBlacklist(t *testing.T) {
 			name: "node redeemed in the same orbit it was suspected in",
 			blacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 1,
-				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingCount: 2, OrbitSuspected: 7, RedeemingCount: 0, OrbitToRedeem: 0}},
+				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2, OrbitSuspected: 7, RedeemingWeight: 0, OrbitToRedeem: 0}},
 			},
 			nodeCount: 4,
 			round:     29,
 			proposedBlacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 1,
-				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingCount: 2, OrbitSuspected: 7, RedeemingCount: 1, OrbitToRedeem: 7}},
+				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2, OrbitSuspected: 7, RedeemingWeight: 1, OrbitToRedeem: 7}},
 				updates:              []BlacklistUpdate{{Type: BlacklistOpType_NodeRedeemed, NodeIndex: 3}},
 			},
 			expectedErr: errBlacklistInvalidBlacklist,
@@ -120,15 +148,17 @@ func TestBlacklistVerifyProposedBlacklist(t *testing.T) {
 			name: "blacklist mismatch",
 			blacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 1,
-				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingCount: 2, OrbitSuspected: 6, RedeemingCount: 0, OrbitToRedeem: 0}},
+				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2, OrbitSuspected: 6, RedeemingWeight: 0, OrbitToRedeem: 0}},
 			},
 			nodeCount: 4,
 			round:     29,
 			proposedBlacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 1,
-				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingCount: 2, OrbitSuspected: 6, RedeemingCount: 0, OrbitToRedeem: 7}},
+				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2, OrbitSuspected: 6, RedeemingWeight: 0, OrbitToRedeem: 7}},
 				updates:              []BlacklistUpdate{{Type: BlacklistOpType_NodeRedeemed, NodeIndex: 3}},
 			},
 			expectedErr: errBlacklistInvalidBlacklist,
@@ -137,22 +167,24 @@ func TestBlacklistVerifyProposedBlacklist(t *testing.T) {
 			name: "blacklist mismatch - too many blacklisted",
 			blacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 1,
-				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingCount: 2}, {NodeIndex: 2, SuspectingCount: 2}},
+				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2}, {NodeIndex: 2, SuspectingWeight: 2}},
 			},
 			nodeCount: 4,
 			round:     29,
 			proposedBlacklist: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 1,
-				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingCount: 2}, {NodeIndex: 2, SuspectingCount: 2}, {NodeIndex: 1, SuspectingCount: 1}},
+				suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2}, {NodeIndex: 2, SuspectingWeight: 2}, {NodeIndex: 1, SuspectingWeight: 1}},
 				updates:              []BlacklistUpdate{{Type: BlacklistOpType_NodeSuspected, NodeIndex: 1}},
 			},
 			expectedErr: errBlacklistInvalidBlacklist,
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			err := testCase.blacklist.VerifyProposedBlacklist(testCase.proposedBlacklist, testCase.round)
+			err := testCase.blacklist.VerifyProposedBlacklist(testCase.proposedBlacklist, testCase.round, equalWeights(testCase.blacklist.nodeCount))
 			require.ErrorContains(t, err, testCase.expectedErr.Error())
 		})
 	}
@@ -285,8 +317,9 @@ func TestOrbit(t *testing.T) {
 func TestBlacklistFromBytes(t *testing.T) {
 	populated := Blacklist{
 		nodeCount:            4,
+		totalWeight:          4,
 		maxBlacklistedOrbits: 7,
-		suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingCount: 1, OrbitSuspected: 1}},
+		suspectedNodes:       suspectedNodes{{NodeIndex: 3, SuspectingWeight: 1, OrbitSuspected: 1}},
 		updates:              BlacklistUpdates{{NodeIndex: 3, Type: BlacklistOpType_NodeSuspected}},
 	}
 
@@ -298,8 +331,8 @@ func TestBlacklistFromBytes(t *testing.T) {
 	}{
 		{
 			name:              "empty blacklist",
-			data:              (&Blacklist{nodeCount: 100}).Bytes(),
-			expectedBlacklist: Blacklist{nodeCount: 100},
+			data:              (&Blacklist{nodeCount: 100, totalWeight: 100}).Bytes(),
+			expectedBlacklist: Blacklist{nodeCount: 100, totalWeight: 100},
 		},
 		{
 			name:              "populated blacklist",
@@ -327,23 +360,24 @@ func TestBlacklistFromBytes(t *testing.T) {
 
 func TestBlacklistSimpleFlow(t *testing.T) {
 	bl := Blacklist{
-		nodeCount: 4,
+		nodeCount:   4,
+		totalWeight: 4,
 	}
 	require.False(t, bl.IsNodeSuspected(2))
 
-	bl.setNodeSuspected(1, 2)
+	bl.setNodeSuspected(1, 2, 1, equalWeights(bl.nodeCount))
 	require.False(t, bl.IsNodeSuspected(2))
 
-	bl.setNodeSuspected(1, 2)
+	bl.setNodeSuspected(1, 2, 1, equalWeights(bl.nodeCount))
 	require.True(t, bl.IsNodeSuspected(2))
 
 	bl.suspectedNodes = bl.garbageCollectSuspectedNodes(5)
 	require.True(t, bl.IsNodeSuspected(2), "Suspected node is still suspected even if its OrbitSuspected advanced")
 
-	bl.setNodeRedeemed(3, 2)
+	bl.setNodeRedeemed(3, 2, 1)
 	require.True(t, bl.IsNodeSuspected(2))
 
-	bl.setNodeRedeemed(3, 2)
+	bl.setNodeRedeemed(3, 2, 1)
 	require.False(t, bl.IsNodeSuspected(2))
 }
 
@@ -364,20 +398,20 @@ func TestBlacklistCapAppliesToPendingSuspects(t *testing.T) {
 	}
 
 	t.Run("setNodeSuspected", func(t *testing.T) {
-		bl := Blacklist{nodeCount: nodeCount}
+		bl := Blacklist{nodeCount: nodeCount, totalWeight: nodeCount}
 
 		// One accusation each: both nodes are pending, neither is blacklisted.
-		bl.setNodeSuspected(1, 2)
-		bl.setNodeSuspected(1, 3)
+		bl.setNodeSuspected(1, 2, 1, equalWeights(bl.nodeCount))
+		bl.setNodeSuspected(1, 3, 1, equalWeights(bl.nodeCount))
 		require.Len(t, bl.suspectedNodes, 2)
 		require.Zero(t, countBlacklisted(bl))
 
 		// A second accusation blacklists node 2 and fills the cap.
-		bl.setNodeSuspected(1, 2)
+		bl.setNodeSuspected(1, 2, 1, equalWeights(bl.nodeCount))
 		require.True(t, bl.IsNodeSuspected(2))
 
 		// A second accusation of the pending node 3 must not blacklist it: f nodes are already blacklisted.
-		bl.setNodeSuspected(1, 3)
+		bl.setNodeSuspected(1, 3, 1, equalWeights(bl.nodeCount))
 		require.False(t, bl.IsNodeSuspected(3))
 		require.LessOrEqual(t, countBlacklisted(bl), f, "%s", bl.String())
 	})
@@ -390,12 +424,12 @@ func TestBlacklistCapAppliesToPendingSuspects(t *testing.T) {
 			require.Equal(t, orbit(firstRound, node, nodeCount), orbit(secondRound, node, nodeCount))
 		}
 
-		bl := Blacklist{nodeCount: nodeCount}
-		bl = bl.Next(firstRound, 0, map[uint16]uint64{0: firstRound, 1: firstRound}, nil)
+		bl := Blacklist{nodeCount: nodeCount, totalWeight: nodeCount}
+		bl = bl.Next(firstRound, 0, equalWeights(bl.nodeCount), map[uint16]uint64{0: firstRound, 1: firstRound}, nil)
 		require.Len(t, bl.suspectedNodes, 2)
 		require.Zero(t, countBlacklisted(bl))
 
-		bl = bl.Next(secondRound, 0, map[uint16]uint64{0: secondRound, 1: secondRound}, nil)
+		bl = bl.Next(secondRound, 0, equalWeights(bl.nodeCount), map[uint16]uint64{0: secondRound, 1: secondRound}, nil)
 		require.LessOrEqual(t, countBlacklisted(bl), f, "%s", bl.String())
 	})
 }
@@ -415,10 +449,11 @@ func FuzzBlacklistFromBytes(f *testing.F) {
 
 func TestBlacklistBytes(t *testing.T) {
 	bl := Blacklist{
-		nodeCount: 5,
+		nodeCount:   5,
+		totalWeight: 5,
 		suspectedNodes: []SuspectedNode{
-			{NodeIndex: 1, SuspectingCount: 2, OrbitSuspected: 3, RedeemingCount: 4, OrbitToRedeem: 5},
-			{NodeIndex: 6, SuspectingCount: 7, OrbitSuspected: 8, RedeemingCount: 9, OrbitToRedeem: 10},
+			{NodeIndex: 1, SuspectingWeight: 2, OrbitSuspected: 3, RedeemingWeight: 4, OrbitToRedeem: 5},
+			{NodeIndex: 6, SuspectingWeight: 7, OrbitSuspected: 8, RedeemingWeight: 9, OrbitToRedeem: 10},
 		},
 		updates: []BlacklistUpdate{
 			{Type: BlacklistOpType_NodeSuspected, NodeIndex: 11},
@@ -457,14 +492,14 @@ func TestComputeBlacklistUpdates(t *testing.T) {
 		},
 		{
 			name:            "a node is suspected and has timed out again",
-			suspectedNodes:  []SuspectedNode{{NodeIndex: 2, SuspectingCount: 2}},
+			suspectedNodes:  []SuspectedNode{{NodeIndex: 2, SuspectingWeight: 2}},
 			expectedUpdates: make([]BlacklistUpdate, 0, 4),
 			timedOut:        map[uint16]uint64{2: 10},
 			round:           13,
 		},
 		{
 			name:            "a node is suspected and has been redeemed",
-			suspectedNodes:  []SuspectedNode{{NodeIndex: 2, SuspectingCount: 2}},
+			suspectedNodes:  []SuspectedNode{{NodeIndex: 2, SuspectingWeight: 2}},
 			expectedUpdates: []BlacklistUpdate{{Type: BlacklistOpType_NodeRedeemed, NodeIndex: 2}},
 			timedOut:        map[uint16]uint64{2: 10},
 			redeemed:        map[uint16]uint64{2: 11},
@@ -472,7 +507,7 @@ func TestComputeBlacklistUpdates(t *testing.T) {
 		},
 		{
 			name:            "a node is not suspected and is now suspected",
-			suspectedNodes:  []SuspectedNode{{NodeIndex: 2, SuspectingCount: 1}},
+			suspectedNodes:  []SuspectedNode{{NodeIndex: 2, SuspectingWeight: 1}},
 			expectedUpdates: []BlacklistUpdate{{Type: BlacklistOpType_NodeSuspected, NodeIndex: 2}},
 			timedOut:        map[uint16]uint64{2: 10},
 			redeemed:        map[uint16]uint64{2: 9},
@@ -481,20 +516,20 @@ func TestComputeBlacklistUpdates(t *testing.T) {
 		{
 			name:            "a node is not suspected and is suspected and then redeemed",
 			expectedUpdates: make([]BlacklistUpdate, 0, 4),
-			suspectedNodes:  []SuspectedNode{{NodeIndex: 2, SuspectingCount: 1}},
+			suspectedNodes:  []SuspectedNode{{NodeIndex: 2, SuspectingWeight: 1}},
 			timedOut:        map[uint16]uint64{2: 10},
 			redeemed:        map[uint16]uint64{2: 11},
 			round:           13,
 		},
 		{
 			name:            "a node is not suspected and also hasn't timed out",
-			suspectedNodes:  []SuspectedNode{{NodeIndex: 2, SuspectingCount: 1}},
+			suspectedNodes:  []SuspectedNode{{NodeIndex: 2, SuspectingWeight: 1}},
 			expectedUpdates: make([]BlacklistUpdate, 0, 4),
 			timedOut:        map[uint16]uint64{2: 9},
 		},
 		{
 			name:            "a node is suspected and hasn't been redeemed",
-			suspectedNodes:  []SuspectedNode{{NodeIndex: 2, SuspectingCount: 2}},
+			suspectedNodes:  []SuspectedNode{{NodeIndex: 2, SuspectingWeight: 2}},
 			expectedUpdates: make([]BlacklistUpdate, 0, 4),
 			timedOut:        map[uint16]uint64{2: 11},
 			redeemed:        map[uint16]uint64{2: 10},
@@ -504,10 +539,11 @@ func TestComputeBlacklistUpdates(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			blacklist := Blacklist{
 				nodeCount:      4,
+				totalWeight:    4,
 				suspectedNodes: testCase.suspectedNodes,
 			}
 
-			next := blacklist.Next(testCase.round, 0, testCase.timedOut, testCase.redeemed)
+			next := blacklist.Next(testCase.round, 0, equalWeights(blacklist.nodeCount), testCase.timedOut, testCase.redeemed)
 			require.Equal(t, testCase.expectedUpdates, next.updates)
 		})
 	}
@@ -520,10 +556,10 @@ func TestAdvanceRound(t *testing.T) {
 	// NodeIDs 1 and 3 are not suspected.
 	// Node 2 can be redeemed.
 	suspectedNodesBefore := suspectedNodes{
-		{NodeIndex: 0, SuspectingCount: 2, OrbitSuspected: 1, RedeemingCount: 1, OrbitToRedeem: 1},
-		{NodeIndex: 1, SuspectingCount: 1, OrbitSuspected: 1, RedeemingCount: 0, OrbitToRedeem: 0},
-		{NodeIndex: 2, SuspectingCount: 2, OrbitSuspected: 1, RedeemingCount: 2, OrbitToRedeem: 1},
-		{NodeIndex: 3, SuspectingCount: 1, OrbitSuspected: 1, RedeemingCount: 0, OrbitToRedeem: 0},
+		{NodeIndex: 0, SuspectingWeight: 2, OrbitSuspected: 1, RedeemingWeight: 1, OrbitToRedeem: 1},
+		{NodeIndex: 1, SuspectingWeight: 1, OrbitSuspected: 1, RedeemingWeight: 0, OrbitToRedeem: 0},
+		{NodeIndex: 2, SuspectingWeight: 2, OrbitSuspected: 1, RedeemingWeight: 2, OrbitToRedeem: 1},
+		{NodeIndex: 3, SuspectingWeight: 1, OrbitSuspected: 1, RedeemingWeight: 0, OrbitToRedeem: 0},
 	}
 
 	testCases := []struct {
@@ -549,43 +585,43 @@ func TestAdvanceRound(t *testing.T) {
 		{
 			// round 4
 			suspectedNodesAfter: suspectedNodes{
-				{NodeIndex: 0, SuspectingCount: 2, OrbitSuspected: 1, RedeemingCount: 0, OrbitToRedeem: 0},
-				{NodeIndex: 1, SuspectingCount: 1, OrbitSuspected: 1, RedeemingCount: 0, OrbitToRedeem: 0},
-				{NodeIndex: 2, SuspectingCount: 2, OrbitSuspected: 1, RedeemingCount: 2, OrbitToRedeem: 1},
-				{NodeIndex: 3, SuspectingCount: 1, OrbitSuspected: 1, RedeemingCount: 0, OrbitToRedeem: 0},
+				{NodeIndex: 0, SuspectingWeight: 2, OrbitSuspected: 1, RedeemingWeight: 0, OrbitToRedeem: 0},
+				{NodeIndex: 1, SuspectingWeight: 1, OrbitSuspected: 1, RedeemingWeight: 0, OrbitToRedeem: 0},
+				{NodeIndex: 2, SuspectingWeight: 2, OrbitSuspected: 1, RedeemingWeight: 2, OrbitToRedeem: 1},
+				{NodeIndex: 3, SuspectingWeight: 1, OrbitSuspected: 1, RedeemingWeight: 0, OrbitToRedeem: 0},
 			},
 		},
 		{
 			// round 5
 			suspectedNodesAfter: suspectedNodes{
-				{NodeIndex: 0, SuspectingCount: 2, OrbitSuspected: 1, RedeemingCount: 0, OrbitToRedeem: 0},
-				{NodeIndex: 2, SuspectingCount: 2, OrbitSuspected: 1, RedeemingCount: 2, OrbitToRedeem: 1},
-				{NodeIndex: 3, SuspectingCount: 1, OrbitSuspected: 1, RedeemingCount: 0, OrbitToRedeem: 0},
+				{NodeIndex: 0, SuspectingWeight: 2, OrbitSuspected: 1, RedeemingWeight: 0, OrbitToRedeem: 0},
+				{NodeIndex: 2, SuspectingWeight: 2, OrbitSuspected: 1, RedeemingWeight: 2, OrbitToRedeem: 1},
+				{NodeIndex: 3, SuspectingWeight: 1, OrbitSuspected: 1, RedeemingWeight: 0, OrbitToRedeem: 0},
 			},
 		},
 		{
 			// round 6
 			suspectedNodesAfter: suspectedNodes{
-				{NodeIndex: 0, SuspectingCount: 2, OrbitSuspected: 1, RedeemingCount: 0, OrbitToRedeem: 0},
-				{NodeIndex: 3, SuspectingCount: 1, OrbitSuspected: 1, RedeemingCount: 0, OrbitToRedeem: 0},
+				{NodeIndex: 0, SuspectingWeight: 2, OrbitSuspected: 1, RedeemingWeight: 0, OrbitToRedeem: 0},
+				{NodeIndex: 3, SuspectingWeight: 1, OrbitSuspected: 1, RedeemingWeight: 0, OrbitToRedeem: 0},
 			},
 		},
 		{
 			// round 7
 			suspectedNodesAfter: suspectedNodes{
-				{NodeIndex: 0, SuspectingCount: 2, OrbitSuspected: 1, RedeemingCount: 0, OrbitToRedeem: 0},
+				{NodeIndex: 0, SuspectingWeight: 2, OrbitSuspected: 1, RedeemingWeight: 0, OrbitToRedeem: 0},
 			},
 		},
 		{
 			// round 8
 			suspectedNodesAfter: suspectedNodes{
-				{NodeIndex: 0, SuspectingCount: 2, OrbitSuspected: 1, RedeemingCount: 0, OrbitToRedeem: 0},
+				{NodeIndex: 0, SuspectingWeight: 2, OrbitSuspected: 1, RedeemingWeight: 0, OrbitToRedeem: 0},
 			},
 		},
 		{
 			// round 9
 			suspectedNodesAfter: suspectedNodes{
-				{NodeIndex: 0, SuspectingCount: 2, OrbitSuspected: 1, RedeemingCount: 0, OrbitToRedeem: 0},
+				{NodeIndex: 0, SuspectingWeight: 2, OrbitSuspected: 1, RedeemingWeight: 0, OrbitToRedeem: 0},
 			},
 		},
 	}
@@ -594,6 +630,7 @@ func TestAdvanceRound(t *testing.T) {
 		t.Run(fmt.Sprintf("round %d", round), func(t *testing.T) {
 			blacklist := Blacklist{
 				nodeCount:            uint16(len(nodes)),
+				totalWeight:          uint64(len(nodes)),
 				maxBlacklistedOrbits: 10,
 				suspectedNodes:       suspectedNodesBefore,
 			}
@@ -611,7 +648,8 @@ func TestAdvanceRound(t *testing.T) {
 
 func TestVerifyBlacklistUpdates(t *testing.T) {
 	testBlacklist := Blacklist{
-		nodeCount: 4,
+		nodeCount:   4,
+		totalWeight: 4,
 	}
 
 	for _, testCase := range []struct {
@@ -661,7 +699,8 @@ func TestVerifyBlacklistUpdates(t *testing.T) {
 			name: "already blacklisted",
 			Blacklist: Blacklist{
 				nodeCount:      4,
-				suspectedNodes: []SuspectedNode{{NodeIndex: 3, SuspectingCount: 2}},
+				totalWeight:    4,
+				suspectedNodes: []SuspectedNode{{NodeIndex: 3, SuspectingWeight: 2}},
 			},
 			updates: []BlacklistUpdate{
 				{Type: BlacklistOpType_NodeSuspected, NodeIndex: 3},
@@ -673,7 +712,8 @@ func TestVerifyBlacklistUpdates(t *testing.T) {
 			name: "not blacklisted, cannot be redeemed",
 			Blacklist: Blacklist{
 				nodeCount:      4,
-				suspectedNodes: []SuspectedNode{{NodeIndex: 3, SuspectingCount: 1}},
+				totalWeight:    4,
+				suspectedNodes: []SuspectedNode{{NodeIndex: 3, SuspectingWeight: 1}},
 			},
 			updates: []BlacklistUpdate{
 				{Type: BlacklistOpType_NodeRedeemed, NodeIndex: 3},
@@ -693,16 +733,17 @@ func TestBlacklistMultipleAttemptsOverSeveralOrbits(t *testing.T) {
 	// as long as the rounds are too far from each other, the node will not be blacklisted.
 
 	blacklist := Blacklist{
-		nodeCount: 4,
+		nodeCount:   4,
+		totalWeight: 4,
 	}
 
-	blacklist = blacklist.Next(4, 0, map[uint16]uint64{3: 4}, nil)
+	blacklist = blacklist.Next(4, 0, equalWeights(blacklist.nodeCount), map[uint16]uint64{3: 4}, nil)
 	require.False(t, blacklist.IsNodeSuspected(3))
 
-	blacklist = blacklist.Next(7, 0, map[uint16]uint64{3: 7}, nil)
+	blacklist = blacklist.Next(7, 0, equalWeights(blacklist.nodeCount), map[uint16]uint64{3: 7}, nil)
 	require.False(t, blacklist.IsNodeSuspected(3))
 
-	blacklist = blacklist.Next(8, 0, map[uint16]uint64{3: 8}, nil)
+	blacklist = blacklist.Next(8, 0, equalWeights(blacklist.nodeCount), map[uint16]uint64{3: 8}, nil)
 	require.True(t, blacklist.IsNodeSuspected(3))
 }
 
@@ -711,19 +752,22 @@ func TestBlacklistSimulateNetwork(t *testing.T) {
 		for rounds := 10; rounds <= 1000; rounds *= 10 {
 			t.Run(fmt.Sprintf("n=%d/r=%d", nodes, rounds), func(t *testing.T) {
 				t.Parallel()
-				testBlacklistSimulateNetwork(t, nodes, rounds)
+				testBlacklistSimulateNetwork(t, equalWeights(uint16(nodes)), rounds)
 			})
 		}
 	}
 }
 
-func testBlacklistSimulateNetwork(t *testing.T, nodeCount int, rounds int) {
-	// This test simulates a network of 'nodeCount' nodes for 'rounds' rounds.
+func testBlacklistSimulateNetwork(t *testing.T, weights []uint64, rounds int) {
+	// This test simulates a network of len(weights) nodes with the given weights for 'rounds' rounds.
 	// It ensures that blacklists that are created by a leader node,
 	// can be verified by other nodes.
 
+	nodeCount := len(weights)
+
 	var blacklist Blacklist
 	blacklist.nodeCount = uint16(nodeCount)
+	blacklist.totalWeight = uint64s(weights).Sum()
 	blacklist.maxBlacklistedOrbits = 1
 
 	crashedNodes := make(map[uint16]struct{})
@@ -781,6 +825,7 @@ func testBlacklistSimulateNetwork(t *testing.T, nodeCount int, rounds int) {
 			recoveredInRound: leaderRecoveredInRound,
 			crashedNodes:     crashedNodes,
 			nodeCount:        nodeCount,
+			weights:          weights,
 			prevBlacklist:    blacklist,
 		})
 	}
@@ -792,6 +837,7 @@ type blacklistRoundSimulationInput struct {
 	recoveredInRound map[uint16]map[uint64]struct{}
 	crashedNodes     map[uint16]struct{}
 	nodeCount        int
+	weights          []uint64
 	prevBlacklist    Blacklist
 }
 
@@ -801,6 +847,7 @@ func simulateRound(t *testing.T, blrsi blacklistRoundSimulationInput) Blacklist 
 	recoveredInRound := blrsi.recoveredInRound
 	crashedNodes := blrsi.crashedNodes
 	nodeCount := blrsi.nodeCount
+	weights := blrsi.weights
 	prevBlacklist := blrsi.prevBlacklist
 
 	leader := uint16(round % uint64(nodeCount))
@@ -808,6 +855,7 @@ func simulateRound(t *testing.T, blrsi blacklistRoundSimulationInput) Blacklist 
 		// leader is crashed, nothing further that can be done.
 		newBlacklist := Blacklist{
 			nodeCount:            prevBlacklist.nodeCount,
+			totalWeight:          prevBlacklist.totalWeight,
 			maxBlacklistedOrbits: prevBlacklist.maxBlacklistedOrbits,
 			suspectedNodes:       make([]SuspectedNode, len(prevBlacklist.suspectedNodes)),
 			updates:              make([]BlacklistUpdate, 0, len(prevBlacklist.updates)),
@@ -832,10 +880,19 @@ func simulateRound(t *testing.T, blrsi blacklistRoundSimulationInput) Blacklist 
 	}
 
 	// The blacklist starts with a single max blacklisted orbit, which is the target for zero max blacklisted rounds.
-	newBlacklist := prevBlacklist.Next(round, 0, timedOut, redeemed)
+	newBlacklist := prevBlacklist.Next(round, 0, weights, timedOut, redeemed)
 
-	err := prevBlacklist.VerifyProposedBlacklist(newBlacklist, round)
+	err := prevBlacklist.VerifyProposedBlacklist(newBlacklist, round, weights)
 	require.NoError(t, err, "round %d", round)
+
+	// The blacklisted nodes must never hold a threshold of the total weight.
+	var blacklistedWeight uint64
+	for node := uint16(0); node < uint16(nodeCount); node++ {
+		if newBlacklist.IsNodeSuspected(node) {
+			blacklistedWeight += weights[node]
+		}
+	}
+	require.Less(t, blacklistedWeight, newBlacklist.computeThreshold(), "round %d: %s", round, newBlacklist.String())
 
 	return newBlacklist
 }
@@ -849,20 +906,35 @@ func TestBlacklistEquals(t *testing.T) {
 		{
 			name: "different node count",
 			bl1: Blacklist{
-				nodeCount: 4,
+				nodeCount:   4,
+				totalWeight: 4,
 			},
 			bl2: Blacklist{
-				nodeCount: 5,
+				nodeCount:   5,
+				totalWeight: 5,
+			},
+		},
+		{
+			name: "different total weight",
+			bl1: Blacklist{
+				nodeCount:   4,
+				totalWeight: 4,
+			},
+			bl2: Blacklist{
+				nodeCount:   4,
+				totalWeight: 40,
 			},
 		},
 		{
 			name: "different max blacklisted orbits",
 			bl1: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 1,
 			},
 			bl2: Blacklist{
 				nodeCount:            4,
+				totalWeight:          4,
 				maxBlacklistedOrbits: 2,
 			},
 		},
@@ -870,34 +942,40 @@ func TestBlacklistEquals(t *testing.T) {
 			name: "different suspected nodes count",
 			bl1: Blacklist{
 				nodeCount:      4,
-				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingCount: 2}},
+				totalWeight:    4,
+				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2}},
 			},
 			bl2: Blacklist{
 				nodeCount:      4,
-				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingCount: 2}, {NodeIndex: 2, SuspectingCount: 1}},
+				totalWeight:    4,
+				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2}, {NodeIndex: 2, SuspectingWeight: 1}},
 			},
 		},
 		{
 			name: "different suspected nodes content",
 			bl1: Blacklist{
 				nodeCount:      4,
-				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingCount: 2}},
+				totalWeight:    4,
+				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2}},
 			},
 			bl2: Blacklist{
 				nodeCount:      4,
-				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingCount: 1}},
+				totalWeight:    4,
+				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingWeight: 1}},
 			},
 		},
 		{
 			name: "different updates count",
 			bl1: Blacklist{
 				nodeCount:      4,
-				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingCount: 2}},
+				totalWeight:    4,
+				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2}},
 				updates:        []BlacklistUpdate{{Type: BlacklistOpType_NodeSuspected, NodeIndex: 2}},
 			},
 			bl2: Blacklist{
 				nodeCount:      4,
-				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingCount: 2}},
+				totalWeight:    4,
+				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2}},
 				updates:        []BlacklistUpdate{{Type: BlacklistOpType_NodeSuspected, NodeIndex: 2}, {Type: BlacklistOpType_NodeRedeemed, NodeIndex: 3}},
 			},
 		},
@@ -905,12 +983,14 @@ func TestBlacklistEquals(t *testing.T) {
 			name: "different updates content",
 			bl1: Blacklist{
 				nodeCount:      4,
-				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingCount: 2}},
+				totalWeight:    4,
+				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2}},
 				updates:        []BlacklistUpdate{{Type: BlacklistOpType_NodeSuspected, NodeIndex: 2}},
 			},
 			bl2: Blacklist{
 				nodeCount:      4,
-				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingCount: 2}},
+				totalWeight:    4,
+				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2}},
 				updates:        []BlacklistUpdate{{Type: BlacklistOpType_NodeRedeemed, NodeIndex: 2}},
 			},
 		},
@@ -918,12 +998,14 @@ func TestBlacklistEquals(t *testing.T) {
 			name: "equal blacklists",
 			bl1: Blacklist{
 				nodeCount:      4,
-				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingCount: 2}},
+				totalWeight:    4,
+				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2}},
 				updates:        []BlacklistUpdate{{Type: BlacklistOpType_NodeSuspected, NodeIndex: 2}},
 			},
 			bl2: Blacklist{
 				nodeCount:      4,
-				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingCount: 2}},
+				totalWeight:    4,
+				suspectedNodes: suspectedNodes{{NodeIndex: 3, SuspectingWeight: 2}},
 				updates:        []BlacklistUpdate{{Type: BlacklistOpType_NodeSuspected, NodeIndex: 2}},
 			},
 			equals: true,
@@ -974,7 +1056,7 @@ func TestNewBlacklistMaxBlacklistedOrbits(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			bl := NewBlacklist(testCase.nodeCount, testCase.maxBlacklistedRounds)
+			bl := NewBlacklist(testCase.nodeCount, uint64(testCase.nodeCount), testCase.maxBlacklistedRounds)
 			require.Equal(t, testCase.nodeCount, bl.nodeCount)
 			require.Equal(t, testCase.expectedOrbits, bl.maxBlacklistedOrbits)
 		})
@@ -982,10 +1064,10 @@ func TestNewBlacklistMaxBlacklistedOrbits(t *testing.T) {
 }
 
 func TestBlacklistMaxBlacklistedOrbitsIsPreserved(t *testing.T) {
-	bl := NewBlacklist(4, 4620)
+	bl := NewBlacklist(4, uint64(4), 4620)
 	require.Equal(t, uint16(1155), bl.maxBlacklistedOrbits)
 
-	applied := bl.Next(5, 4620, map[uint16]uint64{1: 5}, nil)
+	applied := bl.Next(5, 4620, equalWeights(bl.nodeCount), map[uint16]uint64{1: 5}, nil)
 	require.Equal(t, bl.maxBlacklistedOrbits, applied.maxBlacklistedOrbits, "Next should carry over maxBlacklistedOrbits when it is already at the target")
 
 	cloned := applied.Clone()
@@ -1009,7 +1091,7 @@ func TestBlacklistedNodeExpiresAfterMaxBlacklistedOrbits(t *testing.T) {
 	// With 4 nodes, node 1 is in orbit k during rounds 4(k-1)+1 ... 4k.
 	// Node 1 is blacklisted in orbit 3, and is allowed to remain blacklisted for 2 orbits (3 and 4).
 	// It should be removed from the blacklist once orbit 5 is reached.
-	blacklisted := SuspectedNode{NodeIndex: blacklistedNode, SuspectingCount: 2, OrbitSuspected: orbitSuspected}
+	blacklisted := SuspectedNode{NodeIndex: blacklistedNode, SuspectingWeight: 2, OrbitSuspected: orbitSuspected}
 
 	for _, testCase := range []struct {
 		name          string
@@ -1042,19 +1124,20 @@ func TestBlacklistedNodeExpiresAfterMaxBlacklistedOrbits(t *testing.T) {
 		{
 			name:          "partial redeeming votes do not prevent expiry",
 			round:         17, // orbit 5
-			suspectedNode: SuspectedNode{NodeIndex: blacklistedNode, SuspectingCount: 2, OrbitSuspected: orbitSuspected, RedeemingCount: 1, OrbitToRedeem: 4},
+			suspectedNode: SuspectedNode{NodeIndex: blacklistedNode, SuspectingWeight: 2, OrbitSuspected: orbitSuspected, RedeemingWeight: 1, OrbitToRedeem: 4},
 			expectExpired: true,
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			bl := Blacklist{
 				nodeCount:            nodeCount,
+				totalWeight:          nodeCount,
 				maxBlacklistedOrbits: maxBlacklistedOrbits,
 				suspectedNodes:       suspectedNodes{testCase.suspectedNode},
 			}
 			require.True(t, bl.IsNodeSuspected(blacklistedNode))
 
-			next := bl.Next(testCase.round, nodeCount*maxBlacklistedOrbits, nil, nil)
+			next := bl.Next(testCase.round, nodeCount*maxBlacklistedOrbits, equalWeights(bl.nodeCount), nil, nil)
 			require.Equal(t, uint16(maxBlacklistedOrbits), next.maxBlacklistedOrbits)
 
 			if testCase.expectExpired {
@@ -1078,7 +1161,7 @@ func TestBlacklistedNodeExpiryEndToEnd(t *testing.T) {
 		blacklistedNode      = 1
 	)
 
-	bl := NewBlacklist(nodeCount, maxBlacklistedRounds)
+	bl := NewBlacklist(nodeCount, uint64(nodeCount), maxBlacklistedRounds)
 	require.Equal(t, uint16(2), bl.maxBlacklistedOrbits)
 
 	// suspect makes the leader of the given round accuse the blacklisted node of timing out in that round.
@@ -1087,19 +1170,19 @@ func TestBlacklistedNodeExpiryEndToEnd(t *testing.T) {
 	}
 
 	// Round 2 and 3 are in orbit 1 for node 1. Two accusations blacklist it (f+1 = 2).
-	bl = bl.Next(2, maxBlacklistedRounds, suspect(2), nil)
+	bl = bl.Next(2, maxBlacklistedRounds, equalWeights(bl.nodeCount), suspect(2), nil)
 	require.False(t, bl.IsNodeSuspected(blacklistedNode))
-	bl = bl.Next(3, maxBlacklistedRounds, suspect(3), nil)
+	bl = bl.Next(3, maxBlacklistedRounds, equalWeights(bl.nodeCount), suspect(3), nil)
 	require.True(t, bl.IsNodeSuspected(blacklistedNode))
 
 	// Round 4 is still orbit 1 for node 1, and orbit 2 spans rounds 5-8: still blacklisted.
 	for round := uint64(4); round <= 8; round++ {
-		bl = bl.Next(round, maxBlacklistedRounds, nil, nil)
+		bl = bl.Next(round, maxBlacklistedRounds, equalWeights(bl.nodeCount), nil, nil)
 		require.True(t, bl.IsNodeSuspected(blacklistedNode), "round %d", round)
 	}
 
 	// orbit 3 (round 9): expired.
-	bl = bl.Next(9, maxBlacklistedRounds, nil, nil)
+	bl = bl.Next(9, maxBlacklistedRounds, equalWeights(bl.nodeCount), nil, nil)
 	require.False(t, bl.IsNodeSuspected(blacklistedNode))
 	require.Empty(t, bl.suspectedNodes)
 
@@ -1108,9 +1191,9 @@ func TestBlacklistedNodeExpiryEndToEnd(t *testing.T) {
 	require.ErrorContains(t, bl.verifyBlacklistUpdates(redeem), errBlacklistNodeNotBlacklisted.Error())
 
 	// An expired node can be suspected again from scratch.
-	bl = bl.Next(10, maxBlacklistedRounds, suspect(10), nil)
+	bl = bl.Next(10, maxBlacklistedRounds, equalWeights(bl.nodeCount), suspect(10), nil)
 	require.False(t, bl.IsNodeSuspected(blacklistedNode))
-	require.Equal(t, suspectedNodes{{NodeIndex: blacklistedNode, SuspectingCount: 1, OrbitSuspected: 3}}, bl.suspectedNodes)
+	require.Equal(t, suspectedNodes{{NodeIndex: blacklistedNode, SuspectingWeight: 1, OrbitSuspected: 3}}, bl.suspectedNodes)
 }
 
 func TestBlacklistVerifyProposedBlacklistMaxBlacklistedOrbitsStep(t *testing.T) {
@@ -1127,17 +1210,17 @@ func TestBlacklistVerifyProposedBlacklistMaxBlacklistedOrbitsStep(t *testing.T) 
 		{name: "increased from zero", prev: 0, proposed: 1},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			prev := Blacklist{nodeCount: 4, maxBlacklistedOrbits: testCase.prev}
-			proposed := prev.Next(5, 0, nil, nil)
+			prev := Blacklist{nodeCount: 4, totalWeight: 4, maxBlacklistedOrbits: testCase.prev}
+			proposed := prev.Next(5, 0, equalWeights(prev.nodeCount), nil, nil)
 			proposed.maxBlacklistedOrbits = testCase.proposed
-			require.NoError(t, prev.VerifyProposedBlacklist(proposed, 5))
+			require.NoError(t, prev.VerifyProposedBlacklist(proposed, 5, equalWeights(prev.nodeCount)))
 		})
 	}
 }
 
 func TestVerifyProposedBlacklistHugeSuspectedNodesCost(t *testing.T) {
-	prev := NewBlacklist(4, 10)
-	candidate := prev.Next(5, 10, nil, nil)
+	prev := NewBlacklist(4, uint64(4), 10)
+	candidate := prev.Next(5, 10, equalWeights(prev.nodeCount), nil, nil)
 	candidate.suspectedNodes = make(suspectedNodes, 1_000_000)
 
 	// Round-trip through bytes, as the candidate would arrive over the wire.
@@ -1145,7 +1228,7 @@ func TestVerifyProposedBlacklistHugeSuspectedNodesCost(t *testing.T) {
 	require.NoError(t, decoded.FromBytes(candidate.Bytes()))
 	require.Len(t, decoded.suspectedNodes, 1_000_000)
 
-	err := prev.VerifyProposedBlacklist(decoded, 5)
+	err := prev.VerifyProposedBlacklist(decoded, 5, equalWeights(prev.nodeCount))
 	require.ErrorIs(t, err, errBlacklistTooManySuspectedNodes)
 	require.Less(t, len(err.Error()), 200)
 }
@@ -1167,8 +1250,8 @@ func TestBlacklistNextMaxBlacklistedOrbits(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			// With a single node, an orbit is a single round, so the max blacklisted rounds are the target orbits.
 			// A target of zero rounds is treated as a single orbit.
-			bl := Blacklist{nodeCount: 1, maxBlacklistedOrbits: testCase.current}
-			next := bl.Next(5, testCase.target, nil, nil)
+			bl := Blacklist{nodeCount: 1, totalWeight: 1, maxBlacklistedOrbits: testCase.current}
+			next := bl.Next(5, testCase.target, equalWeights(bl.nodeCount), nil, nil)
 			require.Equal(t, testCase.expected, next.maxBlacklistedOrbits)
 		})
 	}
@@ -1212,14 +1295,14 @@ func TestBlacklistMaxBlacklistedOrbitsRollingUpgrade(t *testing.T) {
 		targets[i] = oldTarget
 	}
 
-	bl := Blacklist{nodeCount: nodeCount, maxBlacklistedOrbits: oldTarget}
+	bl := Blacklist{nodeCount: nodeCount, totalWeight: nodeCount, maxBlacklistedOrbits: oldTarget}
 	round := uint64(0)
 
 	buildAndVerify := func() {
 		leader := round % nodeCount
 		// The leader's target orbits correspond to that many orbits' worth of rounds.
-		next := bl.Next(round, targets[leader]*nodeCount, nil, nil)
-		require.NoError(t, bl.VerifyProposedBlacklist(next, round), "round %d", round)
+		next := bl.Next(round, targets[leader]*nodeCount, equalWeights(bl.nodeCount), nil, nil)
+		require.NoError(t, bl.VerifyProposedBlacklist(next, round, equalWeights(bl.nodeCount)), "round %d", round)
 		bl = next
 		round++
 	}
@@ -1250,5 +1333,315 @@ func TestBlacklistMaxBlacklistedOrbitsRollingUpgrade(t *testing.T) {
 	for range 2 * nodeCount {
 		buildAndVerify()
 		require.Equal(t, uint16(newTarget), bl.maxBlacklistedOrbits)
+	}
+}
+
+// equalWeights returns the weights of nodeCount nodes that all have a weight of 1.
+func equalWeights(nodeCount uint16) []uint64 {
+	weights := make([]uint64, nodeCount)
+	for i := range weights {
+		weights[i] = 1
+	}
+	return weights
+}
+
+func TestBlacklistEqualWeightsThresholdMatchesNodeCount(t *testing.T) {
+	// With equal weights, the weighted threshold must be f+1 nodes, as it was when counting nodes.
+	for nodeCount := uint16(1); nodeCount <= 100; nodeCount++ {
+		bl := Blacklist{nodeCount: nodeCount, totalWeight: uint64(nodeCount)}
+		require.Equal(t, uint64(F(int(nodeCount))+1), bl.computeThreshold(), "nodeCount %d", nodeCount)
+	}
+}
+
+func TestBlacklistSuspectingWeightIsTheLeaderWeight(t *testing.T) {
+	// Node 0 holds a threshold of the weight on its own, the rest of the nodes do not.
+	weights := []uint64{10, 1, 1, 1}
+	const suspectedNode = 2
+
+	for _, testCase := range []struct {
+		name                     string
+		round                    uint64
+		expectedSuspectingWeight uint64
+		expectBlacklisted        bool
+	}{
+		{
+			name:                     "heavy leader blacklists the node on its own",
+			round:                    4, // leader is node 0
+			expectedSuspectingWeight: 10,
+			expectBlacklisted:        true,
+		},
+		{
+			name:                     "light leader does not blacklist the node on its own",
+			round:                    5, // leader is node 1
+			expectedSuspectingWeight: 1,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			bl := NewBlacklist(4, uint64s(weights).Sum(), GenesisMaxBlacklistedRounds)
+			require.Equal(t, uint64(1), orbit(testCase.round, suspectedNode, 4))
+
+			next := bl.Next(testCase.round, GenesisMaxBlacklistedRounds, weights, map[uint16]uint64{suspectedNode: testCase.round}, nil)
+			require.Equal(t, suspectedNodes{{NodeIndex: suspectedNode, SuspectingWeight: testCase.expectedSuspectingWeight, OrbitSuspected: 1}}, next.suspectedNodes)
+			require.Equal(t, testCase.expectBlacklisted, next.IsNodeSuspected(suspectedNode))
+
+			require.NoError(t, bl.VerifyProposedBlacklist(next, testCase.round, weights))
+		})
+	}
+}
+
+func TestBlacklistLightLeadersAccumulateSuspectingWeight(t *testing.T) {
+	// The total weight is 7, so the threshold is 3 and it takes three accusations of weight 1 within an orbit.
+	weights := []uint64{2, 1, 1, 1, 1, 1}
+	bl := NewBlacklist(6, uint64s(weights).Sum(), GenesisMaxBlacklistedRounds)
+	require.Equal(t, uint64(3), bl.computeThreshold())
+
+	const suspectedNode = 5
+	// Rounds 5 to 10 are all in orbit 1 of node 5.
+	// Node 1 (weight 1) accuses, then node 2 (weight 1) accuses, then node 3 (weight 1) accuses.
+	for i, round := range []uint64{7, 8, 9} {
+		require.Equal(t, uint64(1), orbit(round, suspectedNode, 6))
+		next := bl.Next(round, GenesisMaxBlacklistedRounds, weights, map[uint16]uint64{suspectedNode: round}, nil)
+		require.NoError(t, bl.VerifyProposedBlacklist(next, round, weights))
+		bl = next
+		require.Equal(t, uint64(i+1), bl.suspectedNodes[0].SuspectingWeight)
+		require.Equal(t, i == 2, bl.IsNodeSuspected(suspectedNode), "round %d", round)
+	}
+}
+
+func TestBlacklistRedeemingWeightIsTheLeaderWeight(t *testing.T) {
+	weights := []uint64{10, 1, 1, 1}
+	const blacklistedNode = 2
+
+	bl := NewBlacklist(4, uint64s(weights).Sum(), GenesisMaxBlacklistedRounds)
+	bl.suspectedNodes = suspectedNodes{{NodeIndex: blacklistedNode, SuspectingWeight: 5, OrbitSuspected: 1}}
+	require.True(t, bl.IsNodeSuspected(blacklistedNode))
+
+	redeem := func(round uint64) {
+		require.Equal(t, uint64(2), orbit(round, blacklistedNode, 4))
+		next := bl.Next(round, GenesisMaxBlacklistedRounds, weights, nil, map[uint16]uint64{blacklistedNode: round})
+		require.NoError(t, bl.VerifyProposedBlacklist(next, round, weights))
+		bl = next
+	}
+
+	// Node 3 (weight 1) redeems the node, which is not enough.
+	redeem(7)
+	require.True(t, bl.IsNodeSuspected(blacklistedNode))
+	require.Equal(t, suspectedNodes{{NodeIndex: blacklistedNode, SuspectingWeight: 5, OrbitSuspected: 1, RedeemingWeight: 1, OrbitToRedeem: 2}}, bl.suspectedNodes)
+
+	// Node 0 (weight 10) redeems the node, which pushes the redeeming weight over the threshold.
+	redeem(8)
+	require.False(t, bl.IsNodeSuspected(blacklistedNode))
+	require.Empty(t, bl.suspectedNodes)
+}
+
+func TestBlacklistVerifyProposedBlacklistUsesWeights(t *testing.T) {
+	// A blacklist built with one set of weights must not be accepted by a verifier that uses a different set of weights.
+	weights := []uint64{10, 1, 1, 1}
+	bl := NewBlacklist(4, uint64s(weights).Sum(), GenesisMaxBlacklistedRounds)
+
+	next := bl.Next(4, GenesisMaxBlacklistedRounds, weights, map[uint16]uint64{2: 4}, nil)
+	require.NoError(t, bl.VerifyProposedBlacklist(next, 4, weights))
+
+	otherWeights := []uint64{1, 10, 1, 1}
+	err := bl.VerifyProposedBlacklist(next, 4, otherWeights)
+	require.ErrorContains(t, err, errBlacklistInvalidBlacklist.Error())
+}
+
+func TestBlacklistCapIsWeightBased(t *testing.T) {
+	t.Run("equal weights allow up to f blacklisted nodes", func(t *testing.T) {
+		const nodeCount = 10
+		weights := equalWeights(nodeCount)
+		bl := Blacklist{nodeCount: nodeCount, totalWeight: nodeCount, maxBlacklistedOrbits: 1}
+		threshold := bl.computeThreshold()
+
+		bl.suspectedNodes = suspectedNodes{
+			{NodeIndex: 0, SuspectingWeight: threshold, OrbitSuspected: 1},
+			{NodeIndex: 1, SuspectingWeight: threshold, OrbitSuspected: 1},
+		}
+		bl.setNodeSuspected(1, 2, weights[9], weights)
+		require.Len(t, bl.suspectedNodes, 3, "a third node can still be accused")
+		bl.suspectedNodes[2].SuspectingWeight = threshold
+
+		bl.setNodeSuspected(1, 3, weights[9], weights)
+		require.Len(t, bl.suspectedNodes, 3, "f=3 nodes are blacklisted, a fourth cannot be accused")
+	})
+
+	t.Run("a heavy node cannot be blacklisted", func(t *testing.T) {
+		// Node 0 holds half of the weight, more than the threshold of 4 out of 10.
+		weights := []uint64{5, 1, 1, 1, 1, 1}
+		bl := Blacklist{nodeCount: 6, totalWeight: uint64s(weights).Sum(), maxBlacklistedOrbits: 1}
+
+		bl.setNodeSuspected(1, 0, weights[1], weights)
+		require.Empty(t, bl.suspectedNodes)
+
+		bl.setNodeSuspected(1, 2, weights[1], weights)
+		require.Len(t, bl.suspectedNodes, 1, "a light node can still be accused")
+	})
+
+	t.Run("the weight of the accused node counts towards the cap", func(t *testing.T) {
+		// The threshold is 4 out of 10, and node 1 (weight 1) is already blacklisted.
+		weights := []uint64{3, 1, 1, 1, 1, 1, 1, 1}
+		bl := Blacklist{nodeCount: 8, totalWeight: uint64s(weights).Sum(), maxBlacklistedOrbits: 1}
+		bl.suspectedNodes = suspectedNodes{{NodeIndex: 1, SuspectingWeight: 4, OrbitSuspected: 1}}
+		require.True(t, bl.IsNodeSuspected(1))
+		require.Len(t, bl.suspectedNodes, 1)
+
+		// Blacklisting node 0 (weight 3) would put a threshold of the weight on the blacklist.
+		bl.setNodeSuspected(1, 0, weights[3], weights)
+		require.Len(t, bl.suspectedNodes, 1)
+		require.False(t, bl.IsNodeSuspected(0))
+
+		// Node 2 (weight 1) can still be accused.
+		bl.setNodeSuspected(1, 2, weights[3], weights)
+		bl.setNodeSuspected(1, 2, weights[4], weights)
+		bl.setNodeSuspected(1, 2, weights[5], weights)
+		bl.setNodeSuspected(1, 2, weights[6], weights)
+		require.Equal(t, suspectedNodes{
+			{NodeIndex: 1, SuspectingWeight: 4, OrbitSuspected: 1},
+			{NodeIndex: 2, SuspectingWeight: 4, OrbitSuspected: 1},
+		}, bl.suspectedNodes)
+		require.True(t, bl.IsNodeSuspected(1))
+		require.True(t, bl.IsNodeSuspected(2))
+	})
+
+	t.Run("only blacklisted nodes count towards the cap", func(t *testing.T) {
+		// Node 1 is accused but not blacklisted, so its weight does not count towards the cap.
+		weights := []uint64{3, 1, 1, 1, 1, 1, 1, 1}
+		bl := Blacklist{nodeCount: 8, totalWeight: uint64s(weights).Sum(), maxBlacklistedOrbits: 1}
+		bl.suspectedNodes = suspectedNodes{{NodeIndex: 1, SuspectingWeight: 3, OrbitSuspected: 1}}
+		require.False(t, bl.IsNodeSuspected(1))
+	})
+}
+
+func TestBlacklistIgnoresMismatchingWeights(t *testing.T) {
+	const (
+		nodeCount   = 4
+		accusedNode = 2
+		// Round 3 is in orbit 1 of node 2, and round 7 is in orbit 2 of node 2.
+		suspectRound  = 3
+		suspectOrbit  = 1
+		redeemRound   = 7
+		redeemOrbit   = 2
+		blacklistedAt = suspectOrbit
+	)
+
+	suspect := []BlacklistUpdate{{Type: BlacklistOpType_NodeSuspected, NodeIndex: accusedNode}}
+	redeem := []BlacklistUpdate{{Type: BlacklistOpType_NodeRedeemed, NodeIndex: accusedNode}}
+
+	// blacklisted is the accused node after it has reached the threshold of 2.
+	blacklisted := suspectedNodes{{NodeIndex: accusedNode, SuspectingWeight: 2, OrbitSuspected: blacklistedAt}}
+
+	for _, testCase := range []struct {
+		name                   string
+		suspectedNodes         suspectedNodes
+		updates                []BlacklistUpdate
+		round                  uint64
+		weights                []uint64
+		expectedSuspectedNodes suspectedNodes
+	}{
+		{
+			// Control case: the same call with correct weights does change the blacklist,
+			// so the no-ops below are caused by the weights alone.
+			name:                   "suspect with one weight per node is applied",
+			updates:                suspect,
+			round:                  suspectRound,
+			weights:                equalWeights(nodeCount),
+			expectedSuspectedNodes: suspectedNodes{{NodeIndex: accusedNode, SuspectingWeight: 1, OrbitSuspected: suspectOrbit}},
+		},
+		{
+			name:                   "suspect with fewer weights than nodes is ignored",
+			updates:                suspect,
+			round:                  suspectRound,
+			weights:                equalWeights(nodeCount - 1),
+			expectedSuspectedNodes: suspectedNodes{},
+		},
+		{
+			// Indexing into the weights would not fail here, so this is caught only by checking the length.
+			name:                   "suspect with more weights than nodes is ignored",
+			updates:                suspect,
+			round:                  suspectRound,
+			weights:                equalWeights(nodeCount + 1),
+			expectedSuspectedNodes: suspectedNodes{},
+		},
+		{
+			name:                   "suspect of an out of range node index is ignored",
+			updates:                []BlacklistUpdate{{Type: BlacklistOpType_NodeSuspected, NodeIndex: nodeCount}},
+			round:                  suspectRound,
+			weights:                equalWeights(nodeCount),
+			expectedSuspectedNodes: suspectedNodes{},
+		},
+		{
+			// Control case: the same call with correct weights adds the leader's weight to the redeeming weight.
+			name:                   "redeem with one weight per node is applied",
+			suspectedNodes:         blacklisted,
+			updates:                redeem,
+			round:                  redeemRound,
+			weights:                equalWeights(nodeCount),
+			expectedSuspectedNodes: suspectedNodes{{NodeIndex: accusedNode, SuspectingWeight: 2, OrbitSuspected: blacklistedAt, RedeemingWeight: 1, OrbitToRedeem: redeemOrbit}},
+		},
+		{
+			name:                   "redeem with fewer weights than nodes is ignored",
+			suspectedNodes:         blacklisted,
+			updates:                redeem,
+			round:                  redeemRound,
+			weights:                equalWeights(nodeCount - 1),
+			expectedSuspectedNodes: blacklisted,
+		},
+		{
+			name:                   "redeem with more weights than nodes is ignored",
+			suspectedNodes:         blacklisted,
+			updates:                redeem,
+			round:                  redeemRound,
+			weights:                equalWeights(nodeCount + 1),
+			expectedSuspectedNodes: blacklisted,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			// The accused node must not expire between the orbit it is suspected in and the orbit it is redeemed in.
+			bl := Blacklist{
+				nodeCount:            nodeCount,
+				totalWeight:          nodeCount,
+				maxBlacklistedOrbits: 10,
+				suspectedNodes:       testCase.suspectedNodes,
+			}
+			next := bl.applyUpdates(testCase.updates, testCase.round, testCase.weights)
+			require.Equal(t, testCase.expectedSuspectedNodes, next.suspectedNodes)
+		})
+	}
+}
+
+func TestBlacklistTotalWeightIsPreserved(t *testing.T) {
+	weights := []uint64{10, 1, 1, 1}
+	bl := NewBlacklist(4, 13, GenesisMaxBlacklistedRounds)
+	require.Equal(t, uint64(13), bl.totalWeight)
+
+	next := bl.Next(4, GenesisMaxBlacklistedRounds, weights, map[uint16]uint64{2: 4}, nil)
+	require.Equal(t, uint64(13), next.totalWeight, "Next should carry over the total weight")
+
+	cloned := next.Clone()
+	require.Equal(t, uint64(13), cloned.totalWeight, "Clone should carry over the total weight")
+
+	var decoded Blacklist
+	require.NoError(t, decoded.FromBytes(next.Bytes()))
+	require.Equal(t, uint64(13), decoded.totalWeight, "serialization should preserve the total weight")
+	require.True(t, next.Equals(&decoded))
+
+	// A blacklist that arrives over the wire is verified against its parent with the total weight intact.
+	require.NoError(t, bl.VerifyProposedBlacklist(decoded, 4, weights))
+
+	stateless := next.Stateless(5, 20)
+	require.Equal(t, uint64(20), stateless.totalWeight, "Stateless should take the total weight of the new validator set")
+}
+
+func TestBlacklistSimulateWeightedNetwork(t *testing.T) {
+	for _, nodes := range []int{4, 7, 16, 64} {
+		t.Run(fmt.Sprintf("n=%d", nodes), func(t *testing.T) {
+			t.Parallel()
+			weights := make([]uint64, nodes)
+			for i := range weights {
+				weights[i] = uint64(mathrand.Intn(100) + 1)
+			}
+			testBlacklistSimulateNetwork(t, weights, 1000)
+		})
 	}
 }

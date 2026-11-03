@@ -11,13 +11,14 @@ import (
 	"github.com/ava-labs/simplex/common"
 	metadata "github.com/ava-labs/simplex/msm"
 	"github.com/ava-labs/simplex/simplex"
+	"github.com/ava-labs/simplex/testutil"
 	"github.com/stretchr/testify/require"
 )
 
 func TestParseBlockSizeMatchesBytes(t *testing.T) {
 	blacklistWithUpdate := func() common.Blacklist {
-		blacklist := common.NewBlacklist(2, simplex.DefaultMaxBlacklistedRounds)
-		return blacklist.Next(1, simplex.DefaultMaxBlacklistedRounds, map[uint16]uint64{1: 1}, nil)
+		blacklist := common.NewBlacklist(2, uint64(2), simplex.DefaultMaxBlacklistedRounds)
+		return blacklist.Next(1, simplex.DefaultMaxBlacklistedRounds, testutil.EqualWeights(blacklist.NodeCount()), map[uint16]uint64{1: 1}, nil)
 	}
 	// Case 1: Bytes() first, Size() second, size returns the cached length.
 	pb := &ParsedBlock{

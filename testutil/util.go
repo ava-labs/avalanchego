@@ -278,3 +278,12 @@ func GenerateNodeID(t *testing.T) common.NodeID {
 
 	return common.NodeID(b)
 }
+
+// EqualWeights returns the weights of nodeCount nodes that all have a weight of 1.
+func EqualWeights(nodeCount uint16) []uint64 {
+	weights := make([]uint64, nodeCount)
+	for i := range weights {
+		weights[i] = 1
+	}
+	return weights
+}
