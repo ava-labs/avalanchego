@@ -18,13 +18,13 @@ This provides IDE support for navigating and refactoring across all modules seam
 
 ### Behavioral changes from workspace mode
 
-When `go.work` is present at the repository root, some go command flags are restricted:
+When `go.work` is present at the repository root, some Golang command flags are restricted:
 
-| Flag | Workspace behavior |
-|------|-------------|
-| `-mod=readonly` | Implicit default and only allowed value |
-| `-mod=mod` | Not allowed (would modify go.mod) |
-| `-mod=vendor` | Not allowed (use `go work vendor` instead) |
+| Flag            | Workspace behavior                                |
+| --------------- | ------------------------------------------------- |
+| `-mod=readonly` | Implicit default and only allowed value           |
+| `-mod=mod`      | Not allowed (would modify go.mod)                 |
+| `-mod=vendor`   | Not allowed (use `go work vendor` instead)        |
 | `-modfile=path` | Not allowed (workspace manages module resolution) |
 
 These restrictions exist because the workspace manages dependencies across all member
@@ -36,11 +36,11 @@ GOWORK=off go <command>
 
 Other behavioral changes:
 
-| Command | Behavior Change |
-|---------|-----------------|
-| `go list -m` | Lists all workspace modules (use `head -1` or specify module path for single result) |
-| `go mod tidy` | Only affects current module; run `task go-mod-tidy` to tidy all modules |
-| `go work sync` | Updates `go.work.sum`; prefer `task sync-go-work` after dependency changes |
+| Command        | Behavior Change                                                                      |
+| -------------- | ------------------------------------------------------------------------------------ |
+| `go list -m`   | Lists all workspace modules (use `head -1` or specify module path for single result) |
+| `go mod tidy`  | Only affects current module; run `task go-mod-tidy` to tidy all modules              |
+| `go work sync` | Updates `go.work.sum`; prefer `task sync-go-work` after dependency changes           |
 
 ### Using a custom workspace
 
@@ -223,7 +223,7 @@ Common ways to run `task` in this repo include:
 ### Making an Issue
 
 - Check that the issue you're filing doesn't already exist by searching under [issues](https://github.com/ava-labs/avalanchego/issues).
-- If you're unable to find an open issue addressing the problem, [open a new one](https://github.com/ava-labs/avalanchego/issues/new/choose). Be sure to include a *title and clear description* with as much relevant information as possible.
+- If you're unable to find an open issue addressing the problem, [open a new one](https://github.com/ava-labs/avalanchego/issues/new/choose). Be sure to include a _title and clear description_ with as much relevant information as possible.
 
 ## Features
 
@@ -255,11 +255,12 @@ Mocks are auto-generated using [mockgen](https://pkg.go.dev/go.uber.org/mock/moc
 
 - To **re-generate all mocks**, use the command below from the root of the project:
 
-    ```sh
-    ./scripts/run_task.sh generate-mocks
-    ```
+  ```sh
+  ./scripts/run_task.sh generate-mocks
+  ```
 
 - To **add** an interface that needs a corresponding mock generated:
+
   - if the file `mocks_generate_test.go` exists in the package where the interface is located, either:
     - modify its `//go:generate go run go.uber.org/mock/mockgen` to generate a mock for your interface (preferred); or
     - add another `//go:generate go run go.uber.org/mock/mockgen` to generate a mock for your interface according to specific mock generation settings
@@ -275,13 +276,15 @@ Mocks are auto-generated using [mockgen](https://pkg.go.dev/go.uber.org/mock/moc
     ```
 
     Notes:
+
     1. Ideally generate all mocks to `mocks_test.go` for the package you need to use the mocks for and do not export mocks to other packages. This reduces package dependencies, reduces production code pollution and forces to have locally defined narrow interfaces.
     1. Prefer using reflect mode to generate mocks than source mode, unless you need a mock for an unexported interface, which should be rare.
+
 - To **remove** an interface from having a corresponding mock generated:
   1. Edit the `mocks_generate_test.go` file in the directory where the interface is defined
   1. If the `//go:generate` mockgen command line:
-      - generates a mock file for multiple interfaces, remove your interface from the line
-      - generates a mock file only for the interface, remove the entire line. If the file is empty, remove `mocks_generate_test.go` as well.
+     - generates a mock file for multiple interfaces, remove your interface from the line
+     - generates a mock file only for the interface, remove the entire line. If the file is empty, remove `mocks_generate_test.go` as well.
 
 ### Testing
 
