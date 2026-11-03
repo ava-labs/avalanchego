@@ -58,18 +58,8 @@ func InitNodeStakingKeyPair(keyPath, certPath string) error {
 	}
 
 	// Write key to disk
-	keyOut, err := os.Create(keyPath)
-	if err != nil {
-		return fmt.Errorf("couldn't create key file: %w", err)
-	}
-	if _, err := keyOut.Write(keyBytes); err != nil {
+	if err := perms.WriteFile(keyPath, keyBytes, perms.ReadOnly); err != nil {
 		return fmt.Errorf("couldn't write private key: %w", err)
-	}
-	if err := keyOut.Close(); err != nil {
-		return fmt.Errorf("couldn't close key file: %w", err)
-	}
-	if err := os.Chmod(keyPath, perms.ReadOnly); err != nil { // Make key read-only
-		return fmt.Errorf("couldn't change permissions on key: %w", err)
 	}
 	return nil
 }

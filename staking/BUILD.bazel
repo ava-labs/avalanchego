@@ -31,6 +31,7 @@ go_test(
     embedsrcs = ["large_rsa_key.cert"],
     deps = [
         "//utils/hashing",
+        "//utils/perms",
         "@com_github_stretchr_testify//require",
     ],
 )
