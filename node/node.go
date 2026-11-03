@@ -437,7 +437,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
 	// 2: https://github.com/golang/go/issues/56998
 	listenAddress := net.JoinHostPort(n.Config.ListenHost, strconv.FormatUint(uint64(n.Config.ListenPort), 10))
-	listener, err := net.Listen(constants.NetworkType, listenAddress)
+	listener, err := n.listen(constants.NetworkType, listenAddress)
 	if err != nil {
 		return err
 	}
@@ -628,6 +628,10 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	n.Config.NetworkConfig.CPUTargeter = n.cpuTargeter
 	n.Config.NetworkConfig.DiskTargeter = n.diskTargeter
 
+	d := dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig, n.Log)
+	if n.Config.DialContext != nil {
+		d = dialFunc(n.Config.DialContext)
+	}
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
 		n.Config.UpgradeConfig.LatestTime(),
@@ -635,11 +639,40 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		reg,
 		n.Log,
 		listener,
-		dialer.NewDialer(constants.NetworkType, n.Config.NetworkConfig.DialerConfig, n.Log),
+		d,
 		consensusRouter,
 	)
 
 	return err
+}
+
+// APIURI returns the URI of the node's API server, with the port that it
+// bound.
+func (n *Node) APIURI() string {
+	return n.apiURI
+}
+
+// StakingAddress returns the address that the node listens on for peers, with
+// the port that it bound.
+func (n *Node) StakingAddress() netip.AddrPort {
+	return n.stakingAddress
+}
+
+// listen opens a listener with Config.Listen, or with [net.Listen] if it is
+// nil.
+func (n *Node) listen(network, address string) (net.Listener, error) {
+	if n.Config.Listen != nil {
+		return n.Config.Listen(network, address)
+	}
+
+	return net.Listen(network, address)
+}
+
+// dialFunc adapts Config.DialContext to [dialer.Dialer].
+type dialFunc func(ctx context.Context, network, address string) (net.Conn, error)
+
+func (f dialFunc) Dial(ctx context.Context, ip netip.AddrPort) (net.Conn, error) {
+	return f(ctx, constants.NetworkType, ip.String())
 }
 
 // Write process context to the configured path. Supports the use of
@@ -971,7 +1004,7 @@ func (n *Node) initAPIServer() error {
 	}
 
 	listenAddress := net.JoinHostPort(n.Config.HTTPHost, strconv.FormatUint(uint64(n.Config.HTTPPort), 10))
-	listener, err := net.Listen("tcp", listenAddress)
+	listener, err := n.listen("tcp", listenAddress)
 	if err != nil {
 		return err
 	}

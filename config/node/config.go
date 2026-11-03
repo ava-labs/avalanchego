@@ -4,7 +4,9 @@
 package node
 
 import (
+	"context"
 	"crypto/tls"
+	"net"
 	"net/netip"
 	"time"
 
@@ -150,6 +152,12 @@ type Config struct {
 
 	// Network configuration
 	NetworkConfig network.Config `json:"networkConfig"`
+	// DialContext, if not nil, opens every connection that the node dials to
+	// a peer, in place of the default dialer and its rate limit.
+	DialContext func(ctx context.Context, network, address string) (net.Conn, error) `json:"-"`
+	// Listen, if not nil, opens the staking and HTTP listeners in place of
+	// [net.Listen]. A listener's address must parse as an IP and port.
+	Listen func(network, address string) (net.Listener, error) `json:"-"`
 
 	AdaptiveTimeoutConfig timer.AdaptiveTimeoutConfig `json:"adaptiveTimeoutConfig"`
 
