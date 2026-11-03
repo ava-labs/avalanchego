@@ -90,9 +90,9 @@ var (
 
 func init() {
 	errs := wrappers.Errs{}
-	vmrqBytes, err := cb58.Decode(VMRQKeyStr)
+	vmrqBytes, err := cb58.Decode(VMRQKeyStr, secp256k1.PrivateKeyLen)
 	errs.Add(err)
-	ewoqBytes, err := cb58.Decode(EWOQKeyStr)
+	ewoqBytes, err := cb58.Decode(EWOQKeyStr, secp256k1.PrivateKeyLen)
 	errs.Add(err)
 
 	VMRQKey, err = secp256k1.ToPrivateKey(vmrqBytes)
