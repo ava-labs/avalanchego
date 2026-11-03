@@ -167,7 +167,21 @@ func (u *UptimeTracker) update(
 		}
 
 		u.state.deleteValidator(validationID)
-		u.deactivatedValidators.Remove(validator.NodeID)
+
+		// A deactivated validator's connection was hidden from the uptime
+		// manager. Now that the node is no longer a validator, restore its
+		// real connection status so that it is tracked correctly if it is
+		// registered as a validator again.
+		if !u.deactivatedValidators.Contains(validator.NodeID) {
+			continue
+		}
+		if err := u.activate(validator.NodeID); err != nil {
+			return fmt.Errorf(
+				"failed to restore connection status of removed validator %s: %w",
+				validator.NodeID,
+				err,
+			)
+		}
 	}
 
 	// Add or update validators
