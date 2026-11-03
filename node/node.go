@@ -1875,6 +1875,11 @@ func (n *Node) shutdown() {
 			zap.Error(err),
 		)
 	}
+	// The API that served the checks is down, and they read the database,
+	// which closes below.
+	if n.health != nil {
+		n.health.Stop()
+	}
 	n.portMapper.UnmapAllPorts()
 	n.ipUpdater.Stop()
 	if err := n.indexer.Close(); err != nil {
