@@ -1062,8 +1062,11 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	require.NoError(diff.PutCurrentValidator(staker))
 	diff.AddTx(tx, status.Committed)
 	require.NoError(diff.Apply(env.state))
+	require.NoError(env.state.Commit())
 
 	// The above validator is now part of the staking set
+	_, ok := env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID)
+	require.True(ok)
 
 	// Queue a staker that joins the staker set after the above validator leaves
 	subnetVdr2NodeID := genesistest.DefaultNodeIDs[1]
@@ -1106,7 +1109,7 @@ func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	require.NoError(onCommitState.Apply(env.state))
 
 	require.NoError(env.state.Commit())
-	_, ok := env.config.Validators.GetValidator(subnetID, subnetVdr2NodeID)
+	_, ok = env.config.Validators.GetValidator(subnetID, subnetVdr2NodeID)
 	require.False(ok)
 	_, ok = env.config.Validators.GetValidator(subnetID, subnetValidatorNodeID)
 	require.False(ok)
