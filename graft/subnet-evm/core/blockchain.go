@@ -70,7 +70,7 @@ import (
 	// Force libevm metrics of the same name to be registered first.
 	_ "github.com/ava-labs/libevm/core"
 
-	ffi "github.com/ava-labs/firewood-go-ethhash/ffi"
+	ffi "github.com/ava-labs/firewood-go/ffi"
 )
 
 // ====== If resolving merge conflicts ======
