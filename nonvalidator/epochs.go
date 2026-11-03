@@ -147,11 +147,14 @@ type epochDigestCounter struct {
 	logger common.Logger
 
 	// sealingBlockResponses stores the highest sealing block each validator has sent us keyed by NodeID.
-	// Once we have collected f+1 messages for a finalization, the sealing block for that epoch is validated.
+	// Once we have collected a threshold of messages for a finalization, the sealing block for that epoch is validated.
 	sealingBlockResponses map[string]sealingBlockResponse
 
 	// latestValidatorSetRetriever is used to calculate the threshold of votes needed to validate an epoch
 	latestValidatorSetRetriever LatestValidatorSetRetriever
+
+	// signatureAggregatorCreator is used to create a signature aggregator to determine if we have a threshold of votes for an epoch
+	signatureAggregatorCreator common.SignatureAggregatorCreator
 }
 
 type sealingBlockResponse struct {
@@ -159,11 +162,12 @@ type sealingBlockResponse struct {
 	digest common.Digest
 }
 
-func newEpochReplicator(logger common.Logger, validatorSetRetriever LatestValidatorSetRetriever) *epochDigestCounter {
+func newEpochReplicator(logger common.Logger, validatorSetRetriever LatestValidatorSetRetriever, sac common.SignatureAggregatorCreator) *epochDigestCounter {
 	return &epochDigestCounter{
 		sealingBlockResponses:       make(map[string]sealingBlockResponse),
 		logger:                      logger,
 		latestValidatorSetRetriever: validatorSetRetriever,
+		signatureAggregatorCreator:  sac,
 	}
 }
 
@@ -184,7 +188,6 @@ func (e *epochDigestCounter) maybeObserveThresholdResponses(sealingBlockInfo *co
 
 	e.logger.Debug("Collected a sealing block", zap.Stringer("QR", sealingBlockInfo), zap.Stringer("From", from))
 
-	threshold := common.F(len(validators)) + 1
 	// the sequence number is the epoch the sealing block creates
 	response := sealingBlockResponse{epoch: bh.Seq, digest: bh.Digest}
 	if stored, ok := e.sealingBlockResponses[string(from)]; ok && stored.epoch > response.epoch {
@@ -194,22 +197,34 @@ func (e *epochDigestCounter) maybeObserveThresholdResponses(sealingBlockInfo *co
 	e.sealingBlockResponses[string(from)] = response
 
 	// check if we have a threshold of responses
-	count := 0
+	var nodes common.NodeIDs
+	nodesByID := make(map[string]common.Node)
+	for _, node := range validators {
+		nodesByID[string(node.Id)] = node
+	}
+
+	signatureAggregator := e.signatureAggregatorCreator(validators)
+
 	for from, other := range e.sealingBlockResponses {
 		if other != response {
 			continue
 		}
 
-		if !validators.Contains(common.NodeID(from)) {
+		node, exists := nodesByID[from]
+		if !exists {
 			delete(e.sealingBlockResponses, from)
 			continue
 		}
 
-		count++
-		if count >= threshold {
-			e.logger.Info("We received enough messages to validate a higher epoch", zap.Stringer("EpochInfo", sealingBlockInfo), zap.Int("Threshold", threshold), zap.Int("Responses", count))
-			return true
-		}
+		nodes = append(nodes, node.Id)
+	}
+
+	if signatureAggregator.AboveByzantineThreshold(nodes) {
+		e.logger.Info("We received enough messages to validate a higher epoch",
+			zap.Stringer("EpochInfo", sealingBlockInfo),
+			zap.Stringer("nodes", nodes),
+		)
+		return true
 	}
 
 	return false

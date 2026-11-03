@@ -190,6 +190,14 @@ func (sv *signatureAggregator) IsQuorum(signers []common.NodeID) bool {
 	return sum*3 > sv.totalWeight*2
 }
 
+func (sv *signatureAggregator) AboveByzantineThreshold(signers []common.NodeID) bool {
+	var sum uint64
+	for _, signer := range signers {
+		sum += sv.weightByNodeID[string(signer)]
+	}
+	return sum >= (sv.totalWeight/3)+1
+}
+
 func newSignatureAggregatorCreator() common.SignatureAggregatorCreator {
 	return func(weights []common.Node) common.SignatureAggregator {
 		s := &signatureAggregator{weightByNodeID: make(map[string]uint64, len(weights))}
@@ -455,6 +463,10 @@ func (concatAggregator) IsQuorum([]common.NodeID) bool {
 	return false
 }
 
+func (concatAggregator) AboveByzantineThreshold([]common.NodeID) bool {
+	return false
+}
+
 type failingAggregator struct{}
 
 func (failingAggregator) Aggregate([]common.Signature) (common.QuorumCertificate, error) {
@@ -468,6 +480,10 @@ func (failingAggregator) AppendSignatures(common.SignatureBytes, ...common.Signa
 }
 
 func (failingAggregator) IsQuorum([]common.NodeID) bool {
+	return false
+}
+
+func (failingAggregator) AboveByzantineThreshold([]common.NodeID) bool {
 	return false
 }
 

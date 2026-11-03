@@ -180,6 +180,9 @@ type SignatureAggregator interface {
 	// In the case of PoA, this means at least a quorum of the nodes are given.
 	// In the case of PoS, this means at least two thirds of the st.
 	IsQuorum([]NodeID) bool
+
+	// AboveByzantineThreshold returns true if the given signers constitute a set that includes at least one non Byzantine node.
+	AboveByzantineThreshold([]NodeID) bool
 }
 
 // Nodes is a list of Node elements.

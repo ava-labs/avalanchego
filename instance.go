@@ -187,7 +187,7 @@ func (i *Instance) startValidator(validators common.Nodes) error {
 	}
 
 	// set the future epoch listener
-	i.futureEpochMessageListener = nonvalidator.NewFutureEpochListener(i.Config.Logger, i.Config.Sender, epoch.Epoch, i.latestValidatorSet, i.onHigherSealingBlock)
+	i.futureEpochMessageListener = nonvalidator.NewFutureEpochListener(i.Config.Logger, i.Config.Sender, epoch.Epoch, i.latestValidatorSet, epochConfig.SignatureAggregatorCreator, i.onHigherSealingBlock)
 	return nil
 }
 

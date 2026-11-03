@@ -124,9 +124,10 @@ func (t *testQCDeserializer) DeserializeQuorumCertificate(bytes []byte) (common.
 }
 
 type TestSignatureAggregator struct {
-	Err          error
-	N            int
-	IsQuorumFunc func(signatures []common.NodeID) bool
+	Err                         error
+	N                           int
+	IsQuorumFunc                func(signatures []common.NodeID) bool
+	AboveByzantineThresholdFunc func(signatures []common.NodeID) bool
 }
 
 func (t *TestSignatureAggregator) AppendSignatures(existing common.SignatureBytes, sigs ...common.SignatureBytes) (common.SignatureBytes, error) {
@@ -153,6 +154,17 @@ func (t *TestSignatureAggregator) IsQuorum(signers []common.NodeID) bool {
 	}
 
 	return len(signers) >= common.Quorum(t.N)
+}
+
+func (t *TestSignatureAggregator) AboveByzantineThreshold(signers []common.NodeID) bool {
+	if t.AboveByzantineThresholdFunc != nil {
+		return t.AboveByzantineThresholdFunc(signers)
+	}
+	if t.N == 0 {
+		panic("uninitialized TestSignatureAggregator")
+	}
+
+	return len(signers) >= common.F(t.N)+1
 }
 
 type TestQC []common.Signature

@@ -277,7 +277,7 @@ func TestCollectedQuorumRound(t *testing.T) {
 			require.GreaterOrEqual(t, len(voters), threshold, "need at least threshold validators to vote with")
 			e := newEpochReplicator(testutil.MakeLogger(t, 1), func() common.Nodes {
 				return voters
-			})
+			}, countSignatureAggregatorCreator)
 
 			// Each distinct vote below the threshold leaves the epoch unconfirmed.
 			for i := 0; i < threshold-1; i++ {
@@ -299,7 +299,7 @@ func TestCollectedSealingBlockInfoOneResponsePerValidator(t *testing.T) {
 	validators := info.ValidatorSet
 	e := newEpochReplicator(testutil.MakeLogger(t, 1), func() common.Nodes {
 		return validators
-	})
+	}, countSignatureAggregatorCreator)
 
 	seq5 := newSealingTestBlock(5, 1, common.Digest{}, info).BlockHeader()
 	seq6 := newSealingTestBlock(6, 1, common.Digest{}, info).BlockHeader()
@@ -322,7 +322,7 @@ func TestCollectedSealingBlockInfoIgnoresRemovedValidators(t *testing.T) {
 	latest := validators
 	e := newEpochReplicator(testutil.MakeLogger(t, 1), func() common.Nodes {
 		return latest
-	})
+	}, countSignatureAggregatorCreator)
 
 	bh := qr.Block.BlockHeader()
 	require.False(t, e.maybeObserveThresholdResponses(info, bh, validators[0].Id))
@@ -330,4 +330,103 @@ func TestCollectedSealingBlockInfoIgnoresRemovedValidators(t *testing.T) {
 	// replace validators[0] so its old vote shouldn't make us reach a threshold of 2
 	latest = append(common.Nodes{{Id: common.NodeID{5}, Weight: 1}}, validators[1:]...)
 	require.False(t, e.maybeObserveThresholdResponses(info, bh, validators[1].Id))
+}
+
+// weightedNodes returns a validator set where the node with ID i+1 has weights[i].
+func weightedNodes(weights ...uint64) common.Nodes {
+	nodes := make(common.Nodes, len(weights))
+	for i, weight := range weights {
+		nodes[i] = common.Node{Id: common.NodeID{byte(i + 1)}, Weight: weight}
+	}
+	return nodes
+}
+
+func TestCollectedSealingBlockInfoWeightedByStake(t *testing.T) {
+	info := &common.SealingBlockInfo{}
+	sealingBlock := newSealingTestBlock(5, 1, common.Digest{1}, info).BlockHeader()
+	otherSealingBlock := newSealingTestBlock(5, 1, common.Digest{2}, info).BlockHeader()
+	require.NotEqual(t, sealingBlock.Digest, otherSealingBlock.Digest)
+
+	type report struct {
+		from     byte
+		header   common.BlockHeader
+		accepted bool
+	}
+
+	for _, tc := range []struct {
+		name       string
+		validators common.Nodes
+		reports    []report
+	}{
+		{
+			name:       "F+1 low-stake reporters are not enough",
+			validators: weightedNodes(100, 100, 100, 100, 1, 1, 1),
+			reports: []report{
+				{from: 5, header: sealingBlock},
+				{from: 6, header: sealingBlock},
+				{from: 7, header: sealingBlock},
+			},
+		},
+		{
+			name: "a single reporter with more than a third of the stake is enough",
+			// 200 of 350
+			validators: weightedNodes(200, 50, 50, 50),
+			reports: []report{
+				{from: 1, header: sealingBlock, accepted: true},
+			},
+		},
+		{
+			name: "exactly a third of the stake is not enough",
+			// 100 of 300, and then 101 of 300
+			validators: weightedNodes(100, 100, 99, 1),
+			reports: []report{
+				{from: 1, header: sealingBlock},
+				{from: 4, header: sealingBlock, accepted: true},
+			},
+		},
+		{
+			name: "stake reporting different sealing blocks is not pooled",
+			// 110 of 400 for each sealing block, and then 200 of 400 for the first one
+			validators: weightedNodes(110, 110, 90, 90),
+			reports: []report{
+				{from: 1, header: sealingBlock},
+				{from: 2, header: otherSealingBlock},
+				{from: 3, header: sealingBlock, accepted: true},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e := newEpochReplicator(testutil.MakeLogger(t, 1), func() common.Nodes {
+				return tc.validators
+			}, weightedSignatureAggregatorCreator)
+
+			for i, r := range tc.reports {
+				accepted := e.maybeObserveThresholdResponses(info, r.header, common.NodeID{r.from})
+				require.Equal(t, r.accepted, accepted, "report %d from node %d", i, r.from)
+			}
+		})
+	}
+}
+
+// TestCollectedSealingBlockInfoUsesLatestStake asserts a stored response counts with the stake
+// its sender has in the latest validator set, not the stake it had when the response arrived.
+func TestCollectedSealingBlockInfoUsesLatestStake(t *testing.T) {
+	info := &common.SealingBlockInfo{}
+	bh := newSealingTestBlock(5, 1, common.Digest{}, info).BlockHeader()
+
+	latest := weightedNodes(100, 100, 100, 100)
+	e := newEpochReplicator(testutil.MakeLogger(t, 1), func() common.Nodes {
+		return latest
+	}, weightedSignatureAggregatorCreator)
+
+	// 100 of 400
+	require.False(t, e.maybeObserveThresholdResponses(info, bh, common.NodeID{1}))
+
+	// Node 1 moves most of its stake to node 4. Under the previous stake, node 2 would bring
+	// the reporters to 200 of 400, but under the latest stake they hold only 101 of 400.
+	latest = weightedNodes(1, 100, 100, 199)
+	require.False(t, e.maybeObserveThresholdResponses(info, bh, common.NodeID{2}))
+
+	// 201 of 400
+	require.True(t, e.maybeObserveThresholdResponses(info, bh, common.NodeID{3}))
 }

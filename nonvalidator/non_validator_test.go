@@ -1891,3 +1891,69 @@ func TestNonValidatorRoutesReplicationRequestsToValidators(t *testing.T) {
 	require.NotEmpty(t, requested, "the non-validator never requested the missing blocks")
 	require.Empty(t, requestedFromNonValidators, "missing blocks were requested from the forged QC's signer instead of a validator")
 }
+
+// TestNonValidatorRejectsEpochForgedByLowStakeValidators reproduces https://github.com/ava-labs/Simplex/issues/664.
+// F(n)+1 validators holding a negligible share of the stake report a sealing block that names
+// a validator set made only of themselves. The non-validator must not adopt that epoch,
+// nor index the blocks the forged validator set finalizes.
+func TestNonValidatorRejectsEpochForgedByLowStakeValidators(t *testing.T) {
+	honest := common.Nodes{
+		{Id: common.NodeID{1}, Weight: 100},
+		{Id: common.NodeID{2}, Weight: 100},
+		{Id: common.NodeID{3}, Weight: 100},
+		{Id: common.NodeID{4}, Weight: 100},
+	}
+	attackers := common.Nodes{
+		{Id: common.NodeID{5}, Weight: 1},
+		{Id: common.NodeID{6}, Weight: 1},
+		{Id: common.NodeID{7}, Weight: 1},
+	}
+	validators := append(slices.Clone(honest), attackers...)
+	require.Len(t, attackers, common.F(len(validators))+1)
+
+	// seq 0 is genesis, seq 1 opens epoch 1 with every validator, and seq 2 is finalized in epoch 1.
+	tc := newSeededChain(t, validators, 2)
+	storage := tc.InMemStorage
+
+	nvID := common.NodeID{100}
+	nv, err := NewNonValidator(
+		Config{
+			Storage:                    storage,
+			Comm:                       &routerComm{nodes: validators, t: t, ID: nvID, messageQueue: &messageQueue{}},
+			Logger:                     testutil.MakeLogger(t, 1),
+			SignatureAggregatorCreator: weightedSignatureAggregatorCreator,
+			MaxSequenceWindow:          simplex.DefaultMaxRoundWindow,
+			ID:                         nvID,
+			StartTime:                  time.Now(),
+		},
+	)
+	require.NoError(t, err)
+	defer nv.Stop()
+
+	// The attackers make up epoch 4. Its sealing block sits at seq 4 and names epoch 4 as its own,
+	// so the non-validator has no earlier sealing block to walk back to.
+	const forgedEpoch = 4
+	forgedSeq3 := newBlock(3, forgedEpoch, tc.digest)
+	forgedSealing := newSealingTestBlock(forgedEpoch, forgedEpoch, forgedSeq3.Digest, &common.SealingBlockInfo{
+		ValidatorSet:         attackers,
+		PrevSealingBlockHash: tc.sealingBlockHash,
+	})
+
+	rr := func(block common.Block) *common.Message {
+		vb, err := block.Verify(t.Context())
+		require.NoError(t, err)
+		finalization, _ := testutil.NewFinalizationRecord(t, weightedSignatureAggregatorCreator(attackers), vb, attackers.NodeIDs())
+		return replicationResponse(common.QuorumRound{Block: block, Finalization: &finalization})
+	}
+
+	// Every attacker reports the forged sealing block, then one of them sends the block at the next sequence.
+	for _, attacker := range attackers {
+		require.NoError(t, nv.HandleMessage(rr(forgedSealing), attacker.Id))
+	}
+	require.NoError(t, nv.HandleMessage(rr(forgedSeq3), attackers[0].Id))
+
+	require.Never(t, func() bool {
+		return storage.NumBlocks() > 3
+	}, time.Second, 10*time.Millisecond, "the non-validator indexed seq 3 of epoch %d, finalized only by validators holding %d of %d stake", forgedEpoch, 3, 403)
+	require.False(t, nv.HasReplicatedEpochs(), "the non-validator adopted epoch %d from validators holding %d of %d stake", forgedEpoch, 3, 403)
+}

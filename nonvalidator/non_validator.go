@@ -141,7 +141,7 @@ func NewNonValidator(config Config) (*NonValidator, error) {
 		epochs:                epochs,
 		verifier:              common.NewBlockVerificationScheduler(config.Logger, simplex.DefaultProcessingBlocks, scheduler),
 		lock:                  lock,
-		highestEpochCollector: newEpochReplicator(config.Logger, config.Comm.Validators),
+		highestEpochCollector: newEpochReplicator(config.Logger, config.Comm.Validators, config.SignatureAggregatorCreator),
 		oneTimeVerifier:       simplex.NewOneTimeVerifier(config.Logger),
 		sequenceReplicator:    replicator,
 	}

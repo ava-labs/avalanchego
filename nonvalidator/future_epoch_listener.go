@@ -27,12 +27,12 @@ type FutureEpochListener struct {
 }
 
 // NewFutureEpochListener triggers onSealingBlock, when a threshold of responses have collected a sealing block
-func NewFutureEpochListener(logger common.Logger, sender simplex.Sender, epoch uint64, latestValidators LatestValidatorSetRetriever, onSealingBlock func(qr *common.QuorumRound)) *FutureEpochListener {
+func NewFutureEpochListener(logger common.Logger, sender simplex.Sender, epoch uint64, latestValidators LatestValidatorSetRetriever, sac common.SignatureAggregatorCreator, onSealingBlock func(qr *common.QuorumRound)) *FutureEpochListener {
 	return &FutureEpochListener{
 		logger:         logger,
 		epoch:          epoch,
 		sender:         sender,
-		collector:      newEpochReplicator(logger, latestValidators),
+		collector:      newEpochReplicator(logger, latestValidators, sac),
 		onSealingBlock: onSealingBlock,
 	}
 }

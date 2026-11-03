@@ -166,7 +166,14 @@ func (tc *testChain) appendFirstSimplexAfterGenesis(validatorSet common.Nodes) *
 }
 
 func (tc *testChain) signatureAggregatorCreator(nodes []common.Node) common.SignatureAggregator {
-	isQuorumFunc := func(signatures []common.NodeID) bool {
+	return countSignatureAggregatorCreator(nodes)
+}
+
+// countSignatureAggregatorCreator creates a SignatureAggregator that counts the signers belonging to nodes,
+// and requires a quorum of them for IsQuorum, and F+1 of them to exceed the Byzantine threshold.
+func countSignatureAggregatorCreator(nodes []common.Node) common.SignatureAggregator {
+	// countMembers counts the signers that belong to nodes.
+	countMembers := func(signatures []common.NodeID) int {
 		count := 0
 		nodeSet := make(map[string]struct{})
 		for _, node := range nodes {
@@ -179,11 +186,43 @@ func (tc *testChain) signatureAggregatorCreator(nodes []common.Node) common.Sign
 			}
 		}
 
-		return count >= common.Quorum(len(nodes))
+		return count
 	}
 	return &testutil.TestSignatureAggregator{
-		IsQuorumFunc: isQuorumFunc,
-		N:            len(nodes),
+		IsQuorumFunc: func(signatures []common.NodeID) bool {
+			return countMembers(signatures) >= common.Quorum(len(nodes))
+		},
+		AboveByzantineThresholdFunc: func(signatures []common.NodeID) bool {
+			return countMembers(signatures) >= common.F(len(nodes))+1
+		},
+		N: len(nodes),
+	}
+}
+
+// weightedSignatureAggregatorCreator creates a SignatureAggregator whose quorum is more than two thirds of the stake,
+// and whose Byzantine threshold is exceeded by more than a third of the stake.
+func weightedSignatureAggregatorCreator(nodes []common.Node) common.SignatureAggregator {
+	weights := make(map[string]uint64, len(nodes))
+	var totalWeight uint64
+	for _, node := range nodes {
+		weights[string(node.Id)] = node.Weight
+		totalWeight += node.Weight
+	}
+	signersWeight := func(signers []common.NodeID) uint64 {
+		var weight uint64
+		for _, signer := range signers {
+			weight += weights[string(signer)]
+		}
+		return weight
+	}
+	return &testutil.TestSignatureAggregator{
+		N: len(nodes),
+		IsQuorumFunc: func(signers []common.NodeID) bool {
+			return signersWeight(signers)*3 > totalWeight*2
+		},
+		AboveByzantineThresholdFunc: func(signers []common.NodeID) bool {
+			return signersWeight(signers)*3 > totalWeight
+		},
 	}
 }
 

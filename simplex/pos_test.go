@@ -33,6 +33,13 @@ func TestPoS(t *testing.T) {
 				}
 				return totalWeight > 6
 			},
+			AboveByzantineThresholdFunc: func(signatures []common.NodeID) bool {
+				var totalWeight uint64
+				for _, signer := range signatures {
+					totalWeight += weights[int(signer[0])]
+				}
+				return totalWeight > 3
+			},
 		}
 	}
 	testConf := &testutil.TestNodeConfig{SigAggregatorCreator: posSigAggregatorCreator, ReplicationEnabled: true}

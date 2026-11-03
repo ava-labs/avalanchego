@@ -59,6 +59,7 @@ func newTestFutureEpochListener(t *testing.T) *triggeredListener {
 	tl := &triggeredListener{sender: &recordingSender{}}
 	tl.FutureEpochListener = NewFutureEpochListener(testutil.MakeLogger(t, 1), tl.sender, listenerEpoch,
 		func() common.Nodes { return listenerValidators },
+		countSignatureAggregatorCreator,
 		func(qr *common.QuorumRound) { tl.triggered = append(tl.triggered, qr) })
 	return tl
 }
