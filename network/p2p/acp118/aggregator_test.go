@@ -7,7 +7,6 @@ import (
 	"context"
 	"math/big"
 	"testing"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -728,15 +727,5 @@ func TestSignatureAggregator_LateResponseDoesNotBlock(t *testing.T) {
 
 	// AggregateSignatures has returned, so nothing is reading the results buffer anymore.
 	// A timeout that gets delivered after should not block.
-	errs := make(chan error, 1)
-	go func() {
-		errs <- network.AppRequestFailed(t.Context(), nodeID, requestID, common.ErrTimeout)
-	}()
-
-	select {
-	case err := <-errs:
-		require.NoError(err)
-	case <-time.After(5 * time.Second):
-		require.FailNow("late AppRequestFailed callback is blocked on the results channel")
-	}
+	require.NoError(network.AppRequestFailed(t.Context(), nodeID, requestID, common.ErrTimeout))
 }
