@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/getter"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -3344,4 +3345,91 @@ type mockPChainProgressUpdater struct {
 
 func (m *mockPChainProgressUpdater) SetProgress(height uint64) {
 	m.setProgressF(height)
+}
+
+// setLastAccepted makes [blk] the last accepted block of [te].
+func setLastAccepted(t *testing.T, te *Engine, blk snowman.Block) {
+	ctx := snowtest.ConsensusContext(snowtest.Context(t, snowtest.CChainID))
+	require.NoError(t, te.Consensus.Initialize(ctx, te.Params, blk.ID(), blk.Height(), blk.Timestamp()))
+}
+
+func TestEngineQueryFailedRequestsOnlyBlocksAboveLastAccepted(t *testing.T) {
+	chain := snowmantest.BuildDescendants(snowmantest.Genesis, 3)
+	lastAccepted := chain[1]
+	otherAtLastAcceptedHeight := snowmantest.BuildChild(chain[0])
+
+	tests := []struct {
+		name string
+		// peerLastAccepted is the block the peer last reported as accepted, or
+		// nil if the peer never reported one.
+		peerLastAccepted *snowmantest.Block
+		expectedGets     []ids.ID
+		expectedPolls    int
+	}{
+		{
+			name:             "unknown peer",
+			peerLastAccepted: nil,
+			expectedGets:     nil,
+			expectedPolls:    0,
+		},
+		{
+			name:             "peer below last accepted",
+			peerLastAccepted: chain[0],
+			expectedGets:     nil,
+			expectedPolls:    0,
+		},
+		{
+			name:             "peer on another block at last accepted height",
+			peerLastAccepted: otherAtLastAcceptedHeight,
+			expectedGets:     nil,
+			expectedPolls:    0,
+		},
+		{
+			name:             "peer on last accepted",
+			peerLastAccepted: lastAccepted,
+			expectedGets:     nil,
+			expectedPolls:    0,
+		},
+		{
+			name:             "peer above last accepted",
+			peerLastAccepted: chain[2],
+			expectedGets:     []ids.ID{chain[2].ID()},
+			expectedPolls:    1,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			vdr, _, sender, vm, te := setup(t, DefaultConfig(t))
+			setLastAccepted(t, te, lastAccepted)
+			vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+				switch blkID {
+				case snowmantest.GenesisID:
+					return snowmantest.Genesis, nil
+				case lastAccepted.ID():
+					return lastAccepted, nil
+				default:
+					return nil, errUnknownBlock
+				}
+			}
+
+			if test.peerLastAccepted != nil {
+				// Genesis is stored, so this records the peer's last accepted
+				// block without sending a Get.
+				require.NoError(te.Chits(t.Context(), vdr, 1, snowmantest.GenesisID, test.peerLastAccepted.ID(), test.peerLastAccepted.Height()))
+			}
+
+			var gets []ids.ID
+			sender.SendGetF = func(_ context.Context, _ ids.NodeID, _ uint32, blkID ids.ID) {
+				gets = append(gets, blkID)
+			}
+			const requestID = 2
+			require.True(te.polls.Add(requestID, bag.Of(vdr)))
+
+			require.NoError(te.QueryFailed(t.Context(), vdr, requestID))
+			require.Equal(test.expectedGets, gets)
+			require.Equal(test.expectedPolls, te.polls.Len())
+		})
+	}
 }
