@@ -550,9 +550,6 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	// Commit Delegator Diff
 	require.NoError(onCommitState.Apply(env.state))
 
-	env.state.SetHeight(dummyHeight)
-	require.NoError(env.state.Commit())
-
 	tx = newRewardValidatorTx(t, vdrTx.ID())
 	diff, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(err)
@@ -630,9 +627,6 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	uVdrTx := vdrTx.Unsigned.(*platform.AddValidatorTx)
 	vdrRewardOutputIndex := len(uVdrTx.Outs) + len(uVdrTx.StakeOuts)
 	assertUTXO(t, vdrOnAbortState, vdrTx.ID(), vdrRewardOutputIndex, delPotentialReward/4, vdrRewardsOwner)
-
-	env.state.SetHeight(dummyHeight)
-	require.NoError(env.state.Commit())
 
 	// Commit Validator Diff
 	require.NoError(vdrOnCommitState.Apply(env.state))
