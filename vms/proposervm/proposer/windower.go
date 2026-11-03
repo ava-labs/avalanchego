@@ -6,6 +6,7 @@ package proposer
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/bits"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/math"
@@ -21,18 +23,22 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// Proposer list constants
+// Proposer list constants. Delays are counted in windows, so they scale with
+// the network's [WindowDuration].
 const (
-	WindowDuration = 5 * time.Second
+	// DefaultWindowDuration is the window duration of every network whose
+	// upgrade config sets none, mainnet and Fuji among them.
+	DefaultWindowDuration = WindowDuration(5 * time.Second)
 
+	// MaxVerifyWindows is the number of windows after the parent block in
+	// which, before Durango, a block must be signed by its proposer.
 	MaxVerifyWindows = 6
-	MaxVerifyDelay   = MaxVerifyWindows * WindowDuration // 30 seconds
-
+	// MaxBuildWindows is the number of windows after the parent block after
+	// which, before Durango, any node builds an unsigned block.
 	MaxBuildWindows = 60
-	MaxBuildDelay   = MaxBuildWindows * WindowDuration // 5 minutes
-
-	MaxLookAheadSlots  = 720
-	MaxLookAheadWindow = MaxLookAheadSlots * WindowDuration // 1 hour
+	// MaxLookAheadSlots is the number of slots that
+	// [Windower.MinDelayForProposer] searches for a node's next slot.
+	MaxLookAheadSlots = 720
 )
 
 var (
@@ -40,13 +46,56 @@ var (
 
 	ErrAnyoneCanPropose         = errors.New("anyone can propose")
 	ErrUnexpectedSamplerFailure = errors.New("unexpected sampler failure")
+	ErrWindowDurationTooShort   = errors.New("proposer window is shorter than one second")
 )
+
+// A WindowDuration is the length of one proposer window. It decides which
+// blocks are valid, so every node of a network must use the same one: the one
+// that [WindowDurationOf] reads from the network's upgrade config.
+type WindowDuration time.Duration
+
+// WindowDurationOf returns the window duration that upgrades sets, or
+// [DefaultWindowDuration] if it sets none. It returns
+// [ErrWindowDurationTooShort] for a window under one second, because block
+// timestamps are whole seconds.
+func WindowDurationOf(upgrades upgrade.Config) (WindowDuration, error) {
+	d := upgrades.ProposerWindowDuration
+	switch {
+	case d == 0:
+		return DefaultWindowDuration, nil
+	case d < time.Second:
+		return 0, fmt.Errorf("%w: %s", ErrWindowDurationTooShort, d)
+	}
+
+	return WindowDuration(d), nil
+}
+
+// MaxVerifyDelay is [MaxVerifyWindows] windows: before Durango, the delay
+// after the parent block from which a block needs no proposer signature.
+func (d WindowDuration) MaxVerifyDelay() time.Duration {
+	return MaxVerifyWindows * time.Duration(d)
+}
+
+// MaxBuildDelay is [MaxBuildWindows] windows: before Durango, the delay
+// after the parent block from which any node builds an unsigned block.
+func (d WindowDuration) MaxBuildDelay() time.Duration {
+	return MaxBuildWindows * time.Duration(d)
+}
+
+// TimeToSlot returns the slot that now falls in, counting windows from start.
+// It returns 0 when now is before start.
+func (d WindowDuration) TimeToSlot(start, now time.Time) uint64 {
+	if now.Before(start) {
+		return 0
+	}
+	return uint64(now.Sub(start) / time.Duration(d))
+}
 
 type Windower interface {
 	// Proposers returns the proposer list for building a block at [blockHeight]
 	// when the validator set is defined at [pChainHeight]. The list is returned
 	// in order. The minimum delay of a validator is the index they appear times
-	// [WindowDuration].
+	// the window duration.
 	Proposers(
 		ctx context.Context,
 		blockHeight,
@@ -103,16 +152,20 @@ type windower struct {
 	state       validators.State
 	subnetID    ids.ID
 	chainSource uint64
+	window      WindowDuration
 	logger      logging.Logger
 }
 
-func New(state validators.State, subnetID, chainID ids.ID, logger logging.Logger) Windower {
+// New returns a [Windower] for chainID whose delays are counted in windows of
+// length window.
+func New(state validators.State, subnetID, chainID ids.ID, window WindowDuration, logger logging.Logger) Windower {
 	w := wrappers.Packer{Bytes: chainID[:]}
 	return &windower{
 		logger:      logger,
 		state:       state,
 		subnetID:    subnetID,
 		chainSource: w.UnpackLong(),
+		window:      window,
 	}
 }
 
@@ -150,7 +203,7 @@ func (w *windower) Proposers(ctx context.Context, blockHeight, pChainHeight uint
 
 func (w *windower) Delay(ctx context.Context, blockHeight, pChainHeight uint64, validatorID ids.NodeID, maxWindows int) (time.Duration, error) {
 	if validatorID == ids.EmptyNodeID {
-		return time.Duration(maxWindows) * WindowDuration, nil
+		return time.Duration(maxWindows) * time.Duration(w.window), nil
 	}
 
 	proposers, err := w.Proposers(ctx, blockHeight, pChainHeight, maxWindows)
@@ -163,7 +216,7 @@ func (w *windower) Delay(ctx context.Context, blockHeight, pChainHeight uint64, 
 		if nodeID == validatorID {
 			return delay, nil
 		}
-		delay += WindowDuration
+		delay += time.Duration(w.window)
 	}
 	return delay, nil
 }
@@ -226,12 +279,12 @@ func (w *windower) MinDelayForProposer(
 		}
 
 		if expectedNodeID == nodeID {
-			return time.Duration(slot) * WindowDuration, nil
+			return time.Duration(slot) * time.Duration(w.window), nil
 		}
 	}
 
 	// no slots scheduled for the max window we inspect. Return max delay
-	return time.Duration(maxSlot) * WindowDuration, nil
+	return time.Duration(maxSlot) * time.Duration(w.window), nil
 }
 
 func (w *windower) makeSampler(
@@ -286,11 +339,4 @@ func (w *windower) expectedProposer(
 		return ids.EmptyNodeID, ErrUnexpectedSamplerFailure
 	}
 	return validators[indices[0]].id, nil
-}
-
-func TimeToSlot(start, now time.Time) uint64 {
-	if now.Before(start) {
-		return 0
-	}
-	return uint64(now.Sub(start) / WindowDuration)
 }

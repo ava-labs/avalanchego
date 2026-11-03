@@ -96,7 +96,8 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 			ValidatorState: vdrState,
 			Log:            logging.NoLog{},
 		},
-		Windower: windower,
+		Windower:       windower,
+		windowDuration: proposer.DefaultWindowDuration,
 	}
 
 	blk := &postForkCommonComponents{
@@ -187,7 +188,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	{
 		// Set local clock before MaxVerifyDelay from parent timestamp.
 		// Check that child block is signed.
-		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay - time.Second)
+		localTime := parentBlk.Timestamp().Add(proposer.DefaultWindowDuration.MaxVerifyDelay() - time.Second)
 		proVM.Set(localTime)
 
 		childBlkIntf, err := proVM.BuildBlock(ctx)
@@ -201,7 +202,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	{
 		// Set local clock exactly MaxVerifyDelay from parent timestamp.
 		// Check that child block is unsigned.
-		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay)
+		localTime := parentBlk.Timestamp().Add(proposer.DefaultWindowDuration.MaxVerifyDelay())
 		proVM.Set(localTime)
 
 		childBlkIntf, err := proVM.BuildBlock(ctx)
@@ -216,7 +217,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 		// Set local clock between MaxVerifyDelay and MaxBuildDelay from parent
 		// timestamp.
 		// Check that child block is unsigned.
-		localTime := parentBlk.Timestamp().Add((proposer.MaxVerifyDelay + proposer.MaxBuildDelay) / 2)
+		localTime := parentBlk.Timestamp().Add((proposer.DefaultWindowDuration.MaxVerifyDelay() + proposer.DefaultWindowDuration.MaxBuildDelay()) / 2)
 		proVM.Set(localTime)
 
 		childBlkIntf, err := proVM.BuildBlock(ctx)
@@ -230,7 +231,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	{
 		// Set local clock after MaxBuildDelay from parent timestamp.
 		// Check that child block is unsigned.
-		localTime := parentBlk.Timestamp().Add(proposer.MaxBuildDelay)
+		localTime := parentBlk.Timestamp().Add(proposer.DefaultWindowDuration.MaxBuildDelay())
 		proVM.Set(localTime)
 
 		childBlkIntf, err := proVM.BuildBlock(ctx)
@@ -315,7 +316,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	{
 		// Set local clock before MaxVerifyDelay from parent timestamp.
 		// Check that child block is not built.
-		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay - time.Second)
+		localTime := parentBlk.Timestamp().Add(proposer.DefaultWindowDuration.MaxVerifyDelay() - time.Second)
 		proVM.Set(localTime)
 
 		_, err := proVM.BuildBlock(ctx)
@@ -325,7 +326,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	{
 		// Set local clock exactly MaxVerifyDelay from parent timestamp.
 		// Check that child block is not built.
-		localTime := parentBlk.Timestamp().Add(proposer.MaxVerifyDelay)
+		localTime := parentBlk.Timestamp().Add(proposer.DefaultWindowDuration.MaxVerifyDelay())
 		proVM.Set(localTime)
 
 		_, err := proVM.BuildBlock(ctx)
@@ -335,7 +336,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	{
 		// Set local clock among MaxVerifyDelay and MaxBuildDelay from parent timestamp
 		// Check that child block is not built.
-		localTime := parentBlk.Timestamp().Add((proposer.MaxVerifyDelay + proposer.MaxBuildDelay) / 2)
+		localTime := parentBlk.Timestamp().Add((proposer.DefaultWindowDuration.MaxVerifyDelay() + proposer.DefaultWindowDuration.MaxBuildDelay()) / 2)
 		proVM.Set(localTime)
 
 		_, err := proVM.BuildBlock(ctx)
@@ -345,7 +346,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	{
 		// Set local clock after MaxBuildDelay from parent timestamp
 		// Check that child block is built and it is unsigned
-		localTime := parentBlk.Timestamp().Add(proposer.MaxBuildDelay)
+		localTime := parentBlk.Timestamp().Add(proposer.DefaultWindowDuration.MaxBuildDelay())
 		proVM.Set(localTime)
 
 		childBlkIntf, err := proVM.BuildBlock(ctx)
@@ -400,7 +401,8 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 			ValidatorState: vdrState,
 			Log:            logging.NoLog{},
 		},
-		Windower: windower,
+		Windower:       windower,
+		windowDuration: proposer.DefaultWindowDuration,
 	}
 
 	blk := &postForkCommonComponents{

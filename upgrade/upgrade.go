@@ -112,6 +112,13 @@ type Config struct {
 	HeliconTime                  time.Time     `json:"heliconTime"`
 	IglooTime                    time.Time     `json:"iglooTime"`
 	// When adding a new upgrade, follow new_upgrade_checklist.md.
+
+	// ProposerWindowDuration is the length of a proposervm proposer window.
+	// Zero means 5 seconds. Mainnet and Fuji keep zero, since a node refuses
+	// an upgrade file for them; test networks shorten it so that blocks come
+	// sooner. The proposervm refuses a window under one second. Plugin VMs do
+	// not receive it: the proposervm runs in the node.
+	ProposerWindowDuration time.Duration `json:"proposerWindowDuration,omitempty"`
 }
 
 func (c *Config) Validate() error {

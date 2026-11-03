@@ -78,6 +78,9 @@ type VM struct {
 	state.State
 
 	proposer.Windower
+	// windowDuration is the proposer window duration that Config.Upgrades
+	// sets. Initialize sets it.
+	windowDuration proposer.WindowDuration
 	tree.Tree
 	mockable.Clock
 	finishedBootstrappingAt time.Time
@@ -160,7 +163,11 @@ func (vm *VM) Initialize(
 		return err
 	}
 	vm.State = baseState
-	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID, vm.ctx.Log)
+	vm.windowDuration, err = proposer.WindowDurationOf(vm.Upgrades)
+	if err != nil {
+		return err
+	}
+	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID, vm.windowDuration, vm.ctx.Log)
 	vm.Tree = tree.New()
 	innerBlkCache, err := metercacher.New(
 		"inner_block_cache",
@@ -516,10 +523,10 @@ func (vm *VM) timeToBuild(ctx context.Context) (time.Time, bool, error) {
 			ctx,
 			childBlockHeight,
 			pChainHeight,
-			proposer.TimeToSlot(parentTimestamp, currentTime),
+			vm.windowDuration.TimeToSlot(parentTimestamp, currentTime),
 			parentTimestamp,
 		); err == nil {
-			vm.proposerBuildSlotGauge.Set(float64(proposer.TimeToSlot(parentTimestamp, nextStartTime)))
+			vm.proposerBuildSlotGauge.Set(float64(vm.windowDuration.TimeToSlot(parentTimestamp, nextStartTime)))
 		}
 	} else {
 		nextStartTime, err = vm.getPreDurangoSlotTime(

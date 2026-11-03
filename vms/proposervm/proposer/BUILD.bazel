@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//ids",
         "//snow/validators",
+        "//upgrade",
         "//utils",
         "//utils/logging",
         "//utils/math",
@@ -34,6 +35,7 @@ go_test(
         "//ids",
         "//snow/validators",
         "//snow/validators/validatorstest",
+        "//upgrade",
         "//utils/logging",
         "//utils/math",
         "@com_github_stretchr_testify//require",

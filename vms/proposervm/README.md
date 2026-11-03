@@ -39,7 +39,7 @@ For a given block, Snowman++ randomly selects a list of proposers. Block propose
 - `maxWindows` number of subnet validators are retrieved in order from the sampled set. `maxWindows` is currently set to `6`.
 - The `maxWindows` validators are the next block's proposer list.
 
-Each proposer gets assigned a submission window of length `WindowDuration`. currently set at `5 seconds`.
+Each proposer gets assigned a submission window of length `WindowDuration`: `5 seconds` unless the network's upgrade config sets `proposerWindowDuration` (at least `1 second`; mainnet and Fuji use the default). Every maximum delay counts windows, so it scales with `WindowDuration`.
 A proposer in position `i` in the proposers list has its submission windows starting `i × WindowDuration` after the parent block's timestamp. Any node can issue a block `maxWindows × WindowDuration` after the parent block's timestamp.
 
 ### Snowman++ validations

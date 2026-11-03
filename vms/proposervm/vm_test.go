@@ -95,6 +95,24 @@ func initTestProposerVM(
 	*VM,
 	database.Database,
 ) {
+	var upgrades upgrade.Config
+	if len(forkActivationTime) > 0 {
+		upgrades = upgradetest.GetConfigWithUpgradeTime(fork, forkActivationTime[0])
+	} else {
+		upgrades = upgradetest.GetConfig(fork)
+	}
+	upgrades.ApricotPhase4MinPChainHeight = minPChainHeight
+	return initTestProposerVMWithUpgrades(t, upgrades)
+}
+
+// initTestProposerVMWithUpgrades creates a proposerVM for testing that runs
+// with upgrades.
+func initTestProposerVMWithUpgrades(t *testing.T, upgrades upgrade.Config) (
+	*fullVM,
+	*validatorstest.State,
+	*VM,
+	database.Database,
+) {
 	require := require.New(t)
 
 	initialState := []byte("genesis state")
@@ -137,14 +155,6 @@ func initTestProposerVM(
 	coreVM.SetPreferenceWithContextF = func(ctx context.Context, blkID ids.ID, _ *block.Context) error {
 		return coreVM.SetPreference(ctx, blkID)
 	}
-
-	var upgrades upgrade.Config
-	if len(forkActivationTime) > 0 {
-		upgrades = upgradetest.GetConfigWithUpgradeTime(fork, forkActivationTime[0])
-	} else {
-		upgrades = upgradetest.GetConfig(fork)
-	}
-	upgrades.ApricotPhase4MinPChainHeight = minPChainHeight
 
 	proVM := New(
 		coreVM,
@@ -240,7 +250,7 @@ func (vm *VM) waitForProposerWindow() error {
 	)
 	for {
 		now := vm.Clock.Time().Truncate(time.Second)
-		slot := proposer.TimeToSlot(parentTimestamp, now)
+		slot := vm.windowDuration.TimeToSlot(parentTimestamp, now)
 		delay, err := vm.MinDelayForProposer(
 			ctx,
 			childBlockHeight,
@@ -285,6 +295,79 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 	require.NoError(err)
 
 	require.Equal(builtBlk.Timestamp().Truncate(time.Second), builtBlk.Timestamp())
+}
+
+func TestOneSecondProposerWindow(t *testing.T) {
+	upgrades := upgradetest.GetConfig(upgradetest.Latest)
+	upgrades.ProposerWindowDuration = time.Second
+	coreVM, valState, proVM, _ := initTestProposerVMWithUpgrades(t, upgrades)
+	defer func() {
+		require.NoError(t, proVM.Shutdown(t.Context()))
+	}()
+
+	// This node is light, so its slot is almost never 0 and the slot that a
+	// 5 second window would give almost never names it.
+	valState.GetValidatorSetF = func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		vdrs := map[ids.NodeID]*validators.GetValidatorOutput{
+			proVM.ctx.NodeID: {NodeID: proVM.ctx.NodeID, Weight: 1},
+		}
+		for i := range 3 {
+			nodeID := ids.BuildTestNodeID([]byte{byte(i + 1)})
+			vdrs[nodeID] = &validators.GetValidatorOutput{NodeID: nodeID, Weight: 10}
+		}
+		return vdrs, nil
+	}
+
+	// A node that never proposes waits out MaxLookAheadSlots windows.
+	nonValidatorDelay, err := proVM.MinDelayForProposer(t.Context(), 1, defaultPChainHeight, ids.GenerateTestNodeID(), 0)
+	require.NoError(t, err)
+	require.Equal(t, 12*time.Minute, nonValidatorDelay)
+
+	parentCoreBlk := snowmantest.BuildChild(snowmantest.Genesis)
+	childCoreBlk := snowmantest.BuildChild(parentCoreBlk)
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		case parentCoreBlk.ID():
+			return parentCoreBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
+		case bytes.Equal(b, parentCoreBlk.Bytes()):
+			return parentCoreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return parentCoreBlk, nil
+	}
+	parentBlk, err := proVM.BuildBlock(t.Context())
+	require.NoError(t, err)
+	require.NoError(t, parentBlk.Verify(t.Context()))
+	require.NoError(t, proVM.SetPreference(t.Context(), parentBlk.ID()))
+	require.NoError(t, proVM.waitForProposerWindow())
+
+	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
+		return childCoreBlk, nil
+	}
+	childBlk, err := proVM.BuildBlock(t.Context())
+	require.NoError(t, err)
+	require.NoError(t, childBlk.Verify(t.Context()))
+
+	window := proposer.WindowDuration(time.Second)
+	w := proposer.New(valState, proVM.ctx.SubnetID, proVM.ctx.ChainID, window, logging.NoLog{})
+	pChainHeight := parentBlk.(*postForkBlock).PChainHeight()
+	wantDelay, err := w.MinDelayForProposer(t.Context(), childBlk.Height(), pChainHeight, proVM.ctx.NodeID, 0)
+	require.NoError(t, err)
+	require.Equal(t, parentBlk.Timestamp().Add(wantDelay), childBlk.Timestamp())
 }
 
 func TestBuildBlockIsIdempotent(t *testing.T) {
@@ -1474,7 +1557,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		return zBlock, nil
 	}
 	require.NoError(proVM.SetPreference(t.Context(), bBlock.ID()))
-	proVM.Set(proVM.Time().Add(proposer.MaxBuildDelay))
+	proVM.Set(proVM.Time().Add(proposer.DefaultWindowDuration.MaxBuildDelay()))
 	cBlock, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 	coreVM.BuildBlockF = nil
@@ -1535,7 +1618,7 @@ func TestTooFarAdvanced(t *testing.T) {
 
 	ySlb, err = statelessblock.BuildUnsigned(
 		aBlock.ID(),
-		aBlock.Timestamp().Add(proposer.MaxVerifyDelay),
+		aBlock.Timestamp().Add(proposer.DefaultWindowDuration.MaxVerifyDelay()),
 		defaultPChainHeight,
 		statelessblock.Epoch{},
 		yBlock.Bytes(),
@@ -2521,7 +2604,7 @@ func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 		t.Context(),
 		statefulBlock.Height()+1,
 		statelessBlock.PChainHeight(),
-		proposer.TimeToSlot(parentTimestamp, currentTime),
+		proVM.windowDuration.TimeToSlot(parentTimestamp, currentTime),
 		parentTimestamp,
 	)
 	require.NoError(err)
