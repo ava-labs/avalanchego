@@ -19,6 +19,7 @@ fi
 
 readonly coreth_prefix="github.com/ava-labs/avalanchego/graft/coreth"
 readonly evm_prefix="github.com/ava-labs/avalanchego/graft/evm"
+readonly simplex_prefix="github.com/ava-labs/avalanchego/graft/simplex"
 readonly subnet_evm_prefix="github.com/ava-labs/avalanchego/graft/subnet-evm"
 
 package_list_file="$(mktemp)"
@@ -31,6 +32,8 @@ trap 'rm -f "${package_list_file}"' EXIT
   cd "${repo_root}/graft/coreth"
   go list ./...
   cd "${repo_root}/graft/evm"
+  go list ./...
+  cd "${repo_root}/graft/simplex"
   go list ./...
   cd "${repo_root}/graft/subnet-evm"
   go list ./...

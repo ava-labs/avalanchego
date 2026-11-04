@@ -29,6 +29,7 @@ TAG_PREFIXES=(
     ""
     "graft/coreth/"
     "graft/evm/"
+    "graft/simplex/"
     "graft/subnet-evm/"
 )
 
