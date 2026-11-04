@@ -45,31 +45,43 @@ func NullBackend(dir string, log logging.Logger) triedb.DBConstructor {
 	}
 }
 
-// NullDB keeps the state in Go maps: a flat base and one layer of writes per
-// block above it, at most [Window] layers. The oldest layer is flattened into
-// the base when a block makes more.
+// NullDB keeps the newest state in flat Go maps, written in place at commit, plus one undo
+// record (the old values of what the block wrote) per block for reads at the [Window] older
+// roots. A read at the newest root is one map lookup.
 type NullDB struct {
-	mu         sync.RWMutex
-	log        logging.Logger
-	baseRoot   common.Hash
-	baseHeight uint64
-	accounts   map[common.Address]*types.StateAccount
-	storage    map[common.Address]map[common.Hash]common.Hash
-	layers     []*nullLayer           // oldest first; layers[i] is at height baseHeight+i+1
-	heights    map[common.Hash]uint64 // every readable root
+	mu        sync.RWMutex
+	log       logging.Logger
+	tipRoot   common.Hash
+	tipHeight uint64
+	accounts  map[common.Address]*types.StateAccount
+	storage   map[nullSlot]common.Hash  // key: address, incarnation, slot
+	inc       map[common.Address]uint32 // an account's storage incarnation (a wipe starts a new one)
+	undo      []*nullUndo               // oldest first; the last is the newest block's
+	heights   map[common.Hash]uint64    // every readable root
 }
 
-type nullLayer struct {
-	root common.Hash
-	w    *writes
+type nullSlot struct {
+	a   common.Address
+	inc uint32
+	k   common.Hash
+}
+
+// nullUndo is one block's old values (an absent account is a nil pointer).
+type nullUndo struct {
+	root   common.Hash
+	height uint64
+	accts  map[common.Address]*types.StateAccount
+	slots  map[nullSlot]common.Hash
+	incs   map[common.Address]uint32
 }
 
 func newNullDB(log logging.Logger) *NullDB {
 	return &NullDB{
 		log:      log,
-		baseRoot: types.EmptyRootHash,
+		tipRoot:  types.EmptyRootHash,
 		accounts: map[common.Address]*types.StateAccount{},
-		storage:  map[common.Address]map[common.Hash]common.Hash{},
+		storage:  map[nullSlot]common.Hash{},
+		inc:      map[common.Address]uint32{},
 		heights:  map[common.Hash]uint64{types.EmptyRootHash: 0},
 	}
 }
@@ -80,12 +92,7 @@ func (n *NullDB) WrapState(db state.Database) state.Database {
 
 func (n *NullDB) logger() logging.Logger { return n.log }
 
-func (n *NullDB) tip() common.Hash {
-	if len(n.layers) == 0 {
-		return n.baseRoot
-	}
-	return n.layers[len(n.layers)-1].root
-}
+func (n *NullDB) tip() common.Hash { return n.tipRoot }
 
 func (n *NullDB) known(root common.Hash) bool {
 	n.mu.RLock()
@@ -94,55 +101,58 @@ func (n *NullDB) known(root common.Hash) bool {
 	return ok
 }
 
-// upTo returns the layers from root's own down to the base, newest first.
-// The caller holds mu.
-func (n *NullDB) upTo(root common.Hash) ([]*nullLayer, error) {
+// height is root's height. The caller holds mu.
+func (n *NullDB) height(root common.Hash) (uint64, error) {
 	h, ok := n.heights[root]
 	if !ok {
-		return nil, &trie.MissingNodeError{NodeHash: root}
+		return 0, &trie.MissingNodeError{NodeHash: root}
 	}
-	ls := slices.Clone(n.layers[:h-n.baseHeight])
-	slices.Reverse(ls)
-	return ls, nil
+	return h, nil
 }
 
 func (n *NullDB) account(root common.Hash, a common.Address) (*types.StateAccount, error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	ls, err := n.upTo(root)
+	h, err := n.height(root)
 	if err != nil {
 		return nil, err
 	}
-	for _, l := range ls {
-		if x, ok := l.w.accts[a]; ok {
-			if x == nil {
-				return nil, nil
-			}
-			return x.Copy(), nil
+	x := n.accounts[a]
+	for i := len(n.undo) - 1; i >= 0 && n.undo[i].height > h; i-- { // older roots only
+		if old, ok := n.undo[i].accts[a]; ok {
+			x = old
 		}
 	}
-	if x := n.accounts[a]; x != nil {
-		return x.Copy(), nil
+	if x == nil {
+		return nil, nil
 	}
-	return nil, nil
+	return x.Copy(), nil
 }
 
 func (n *NullDB) slot(root common.Hash, a common.Address, k common.Hash) (common.Hash, error) {
 	n.mu.RLock()
 	defer n.mu.RUnlock()
-	ls, err := n.upTo(root)
+	h, err := n.height(root)
 	if err != nil {
 		return common.Hash{}, err
 	}
-	for _, l := range ls {
-		if v, ok := l.w.slots[a][k]; ok {
-			return v, nil
-		}
-		if l.w.deleted[a] {
-			return common.Hash{}, nil
+	if h == n.tipHeight {
+		return n.storage[nullSlot{a, n.inc[a], k}], nil
+	}
+	inc := n.inc[a]
+	for i := len(n.undo) - 1; i >= 0 && n.undo[i].height > h; i-- {
+		if old, ok := n.undo[i].incs[a]; ok {
+			inc = old
 		}
 	}
-	return n.storage[a][k], nil
+	key := nullSlot{a, inc, k}
+	v := n.storage[key]
+	for i := len(n.undo) - 1; i >= 0 && n.undo[i].height > h; i-- {
+		if old, ok := n.undo[i].slots[key]; ok {
+			v = old
+		}
+	}
+	return v, nil
 }
 
 // rootOn is the root of w on parent. The caller holds mu.
@@ -151,7 +161,7 @@ func (n *NullDB) rootOn(parent common.Hash, w *writes) (common.Hash, uint64, err
 	if !ok {
 		return common.Hash{}, 0, &trie.MissingNodeError{NodeHash: parent}
 	}
-	if parent == types.EmptyRootHash && len(n.layers) == 0 && len(n.accounts) == 0 {
+	if parent == types.EmptyRootHash && len(n.undo) == 0 && len(n.accounts) == 0 {
 		// Genesis keeps its real Merkle root: the VM computes it with hashdb.
 		root, err := genesisRoot(w)
 		return root, h + 1, err
@@ -179,50 +189,60 @@ func (n *NullDB) commit(parent common.Hash, w *writes) (common.Hash, error) {
 	if err != nil {
 		return common.Hash{}, err
 	}
-	n.layers = append(n.layers, &nullLayer{root: root, w: w.clone()})
-	n.heights[root] = h
-	for len(n.layers) > Window {
-		n.flattenOldest()
-	}
-	return root, nil
-}
-
-// flattenOldest moves the oldest layer into the base. The caller holds mu.
-func (n *NullDB) flattenOldest() {
-	l := n.layers[0]
-	n.layers[0] = nil
-	n.layers = n.layers[1:]
-	for a := range l.w.deleted {
-		delete(n.storage, a)
-	}
-	for a, x := range l.w.accts {
+	u := &nullUndo{root: root, height: h, accts: map[common.Address]*types.StateAccount{}, slots: map[nullSlot]common.Hash{}, incs: map[common.Address]uint32{}}
+	setAcct := func(a common.Address, x *types.StateAccount) {
+		if _, ok := u.accts[a]; !ok {
+			u.accts[a] = n.accounts[a]
+		}
 		if x == nil {
 			delete(n.accounts, a)
-			delete(n.storage, a)
 		} else {
-			n.accounts[a] = x
+			n.accounts[a] = x.Copy()
 		}
 	}
-	for a, m := range l.w.slots {
-		s := n.storage[a]
-		if s == nil {
-			s = map[common.Hash]common.Hash{}
-			n.storage[a] = s
+	wipe := func(a common.Address) { // a new storage incarnation: the old slots stay, unread
+		if _, ok := u.incs[a]; !ok {
+			u.incs[a] = n.inc[a]
 		}
+		n.inc[a]++
+	}
+	for a := range w.deleted {
+		wipe(a)
+	}
+	for a, x := range w.accts {
+		if x == nil {
+			wipe(a)
+		}
+		setAcct(a, x)
+	}
+	for a, m := range w.slots {
+		inc := n.inc[a]
 		for k, v := range m {
+			key := nullSlot{a, inc, k}
+			if _, ok := u.slots[key]; !ok {
+				u.slots[key] = n.storage[key]
+			}
 			if v == (common.Hash{}) {
-				delete(s, k)
+				delete(n.storage, key)
 			} else {
-				s[k] = v
+				n.storage[key] = v
 			}
 		}
-		if len(s) == 0 {
-			delete(n.storage, a)
+	}
+	n.undo = append(n.undo, u)
+	n.heights[root] = h
+	n.tipRoot, n.tipHeight = root, h
+	for len(n.undo) > Window { // the oldest readable root goes
+		old := n.undo[0]
+		n.undo[0] = nil
+		n.undo = n.undo[1:]
+		for r, x := range n.heights {
+			if x < old.height {
+				delete(n.heights, r)
+			}
 		}
 	}
-	delete(n.heights, n.baseRoot)
-	n.baseRoot = l.root
-	n.baseHeight++
+	return root, nil
 }
 
 // genesisRoot is the Merkle root of w on an empty state.
