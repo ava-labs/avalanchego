@@ -20,9 +20,9 @@ package settleledger
 // path can write — and the batch lives for one call, so nothing carries across calls.
 
 import (
+	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/crypto"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/holiman/uint256"
 )
 
@@ -62,7 +62,25 @@ type batch struct {
 	allows  map[common.Address]bool
 }
 
+// batchPresize is the map size hint for a 400-row batch (about 3.5k distinct slots on the
+// 2M plant). Without it every batch regrows its maps from empty. Plant setting
+// settle-presize=1; off keeps the original behaviour for the baseline.
+var batchPresize = settingFile("settle-presize") == "1"
+
 func newBatch(state contract.StateDB, addr common.Address) *batch {
+	if batchPresize {
+		return &batch{
+			state:   state,
+			addr:    addr,
+			kh:      crypto.NewKeccakState(),
+			cells:   make(map[common.Hash]*cell, 4096),
+			slots:   make(map[slotRef]*cell, 4096),
+			indexed: make(map[indexRef]common.Address, 2048),
+			handled: make(map[uint256.Int]*cell, 512),
+			holders: make(map[common.Address]common.Address, 1024),
+			allows:  make(map[common.Address]bool, 16),
+		}
+	}
 	return &batch{
 		state:   state,
 		addr:    addr,

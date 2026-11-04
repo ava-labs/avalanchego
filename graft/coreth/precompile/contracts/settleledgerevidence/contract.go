@@ -6,11 +6,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/holiman/uint256"
 )
 
@@ -77,8 +77,8 @@ var SettleLedgerPrecompile = func() contract.StatefulPrecompiledContract {
 	c, err := contract.NewStatefulPrecompileContract(nil, []*contract.StatefulPrecompileFunction{
 		contract.NewStatefulPrecompileFunction(selSettle, runSettleRows),
 		contract.NewStatefulPrecompileFunction(selPacked, runSettlePacked),
-		contract.NewStatefulPrecompileFunction(selSetTok, setter(tokenAtKey)),
-		contract.NewStatefulPrecompileFunction(selSetPty, setter(partyAtKey)),
+		contract.NewStatefulPrecompileFunction(selSetTok, setter(tokenAtKey, v2SetTokenAt)),
+		contract.NewStatefulPrecompileFunction(selSetPty, setter(partyAtKey, v2SetPartyAt)),
 		contract.NewStatefulPrecompileFunction(selSetCash, runSetCashToken),
 		contract.NewStatefulPrecompileFunction(selShadow, reader(shadowKey)),
 		contract.NewStatefulPrecompileFunction(selHeld, reader(heldKey)),
@@ -327,6 +327,9 @@ func runSettlePacked(
 	if readOnly {
 		return nil, remaining, vm.ErrWriteProtection
 	}
+	if keyspaceV2 {
+		return runSettlePacked2(evm, addr, body, n, remaining)
+	}
 	b := newBatch(evm.GetStateDB(), addr)
 	cash := common.Address(b.get(cashKey()).Bytes20())
 	rows := make([]row, n)
@@ -353,7 +356,7 @@ func be(b []byte) uint64 {
 	return v
 }
 
-func setter(key func(uint64) common.Hash) contract.RunStatefulPrecompileFunc {
+func setter(key func(uint64) common.Hash, v2 func(contract.StateDB, common.Address, uint64, common.Address)) contract.RunStatefulPrecompileFunc {
 	return func(
 		evm contract.AccessibleState, _, addr common.Address, input []byte, suppliedGas uint64, readOnly bool,
 	) ([]byte, uint64, error) {
@@ -370,6 +373,9 @@ func setter(key func(uint64) common.Hash) contract.RunStatefulPrecompileFunc {
 		i := new(big.Int).SetBytes(input[0:32]).Uint64()
 		v := new(big.Int).SetBytes(input[44:64])
 		ledger{state: evm.GetStateDB(), addr: addr}.set(key(i), v)
+		if keyspaceV2 {
+			v2(evm.GetStateDB(), addr, i, common.BytesToAddress(input[44:64]))
+		}
 		return nil, remaining, nil
 	}
 }
@@ -388,6 +394,9 @@ func runSetCashToken(
 		return nil, remaining, vm.ErrExecutionReverted
 	}
 	ledger{state: evm.GetStateDB(), addr: addr}.set(cashKey(), new(big.Int).SetBytes(input[12:32]))
+	if keyspaceV2 {
+		v2SetCashToken(evm.GetStateDB(), addr, common.BytesToAddress(input[12:32]))
+	}
 	return nil, remaining, nil
 }
 
@@ -745,6 +754,9 @@ func runCreditPacked(
 	if err != nil {
 		return nil, 0, err
 	}
+	if keyspaceV2 {
+		return runCreditPacked2(evm, addr, &amt, body, n, remaining)
+	}
 
 	b := newBatch(evm.GetStateDB(), addr)
 	for i := uint64(0); i < n; i++ {
@@ -783,6 +795,9 @@ func runBind(
 	party := common.BytesToAddress(input[12:32])
 	holder := common.BytesToAddress(input[44:64])
 	l.set(bindingKey(party), new(big.Int).SetBytes(holder[:]))
+	if keyspaceV2 {
+		v2Bind(evm.GetStateDB(), addr, party, holder)
+	}
 	return nil, remaining, nil
 }
 
@@ -803,5 +818,8 @@ func runSetHolderAllowed(
 	holder := common.BytesToAddress(input[12:32])
 	allowed := new(big.Int).SetBytes(input[32:64])
 	l.set(allowedKey(holder), allowed)
+	if keyspaceV2 {
+		v2SetAllowed(evm.GetStateDB(), addr, holder, allowed.Sign() != 0)
+	}
 	return nil, remaining, nil
 }

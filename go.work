@@ -5,6 +5,9 @@ use (
 	./graft/coreth
 	./graft/evm
 	./graft/subnet-evm
+	// EXPERIMENTAL (SAE plant, settle-bulk): libevm branch containerman17/sae-bulk-slots
+	// (StateDB.GetStates/SetStates) checked out next to this tree. Not a go.mod replace.
+	../libevm-bulk
 )
 
 // Force genproto >= v0.0.0-20230526161137-0005af68ea54 to avoid ambiguous import
