@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 
 	stdecdsa "crypto/ecdsa"
+
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
@@ -276,13 +277,12 @@ func (k *PrivateKey) UnmarshalJSON(b []byte) error {
 }
 
 func (k *PrivateKey) UnmarshalText(text []byte) error {
-	str := string(text)
-	if !strings.HasPrefix(str, PrivateKeyPrefix) {
+	str, ok := strings.CutPrefix(string(text), PrivateKeyPrefix)
+	if !ok {
 		return errMissingKeyPrefix
 	}
 
-	strNoPrefix := str[len(PrivateKeyPrefix):]
-	keyBytes, err := cb58.Decode(strNoPrefix, PrivateKeyLen)
+	keyBytes, err := cb58.Decode(str, PrivateKeyLen)
 	if err != nil {
 		return err
 	}
