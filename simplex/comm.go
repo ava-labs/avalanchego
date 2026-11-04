@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/utils/set"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
+	simplexcommon "github.com/ava-labs/avalanchego/graft/simplex/common"
 )
 
 var (

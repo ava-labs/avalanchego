@@ -7,7 +7,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/ava-labs/simplex/testutil/long_running"
+	"github.com/ava-labs/avalanchego/graft/simplex/testutil/long_running"
 )
 
 func TestLongRunningSimple(t *testing.T) {

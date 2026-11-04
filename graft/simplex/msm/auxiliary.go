@@ -10,8 +10,8 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/ava-labs/simplex/avalanchego"
-	"github.com/ava-labs/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"go.uber.org/zap"
 )
 
