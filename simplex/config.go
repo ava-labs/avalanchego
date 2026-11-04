@@ -4,9 +4,8 @@
 package simplex
 
 import (
-	"github.com/ava-labs/avalanchego/graft/simplex/common"
-
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
