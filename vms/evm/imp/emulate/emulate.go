@@ -9,7 +9,7 @@ package emulate
 
 import (
 	subnet "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
-	cchain "github.com/ava-labs/avalanchego/vms/evm/cchain/libevm"
+	cchain "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
 )
 
 // CChain executes `fn` as if running in a `coreth` node.

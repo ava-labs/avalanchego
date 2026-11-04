@@ -20,7 +20,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/vms/evm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/dynamic"
 )
 
 func TestHeaderRLP(t *testing.T) {

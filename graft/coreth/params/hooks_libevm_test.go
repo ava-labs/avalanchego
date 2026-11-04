@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/avalanchego/vms/evm/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 )
 
 func TestRulesExtra_MinimumGasConsumption(t *testing.T) {
