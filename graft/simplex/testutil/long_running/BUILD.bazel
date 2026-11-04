@@ -1,0 +1,18 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "long_running",
+    srcs = [
+        "block_builder.go",
+        "network.go",
+        "node.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/simplex/testutil/long_running",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/simplex/common",
+        "//graft/simplex/simplex",
+        "//graft/simplex/testutil",
+        "@com_github_stretchr_testify//require",
+    ],
+)

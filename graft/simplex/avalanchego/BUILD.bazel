@@ -1,0 +1,16 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "avalanchego",
+    srcs = ["misc.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/simplex/avalanchego",
+    visibility = ["//visibility:public"],
+)
+
+graft_go_test(
+    name = "avalanchego_test",
+    srcs = ["misc_test.go"],
+    embed = [":avalanchego"],
+    deps = ["@com_github_stretchr_testify//require"],
+)
