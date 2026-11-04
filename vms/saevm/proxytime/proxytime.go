@@ -150,19 +150,6 @@ func (tm *Time[D]) isFuture(sec uint64, num D) bool {
 	return num > tm.fraction
 }
 
-// ConvertMilliseconds returns `ms` as a number of seconds and a fraction of a
-// second, denominated in `rate` and rounded down if `rate` is not a multiple of
-// 1000.
-func ConvertMilliseconds[D Duration](rate D, ms uint64) (sec uint64, _ FractionalSecond[D]) {
-	sec = ms / 1000
-	ms %= 1000
-	frac := FractionalSecond[D]{
-		Denominator: rate,
-	}
-	frac.Numerator, _, _ = intmath.MulDiv(D(ms), rate, 1000) // overflow is impossible as ms < 1000
-	return sec, frac
-}
-
 // SetRate changes the unit rate at which time passes. The requisite integer
 // division may result in rounding up of the fractional-second component of
 // time. Rounding up instead of down achieves monotonicity of the clock.

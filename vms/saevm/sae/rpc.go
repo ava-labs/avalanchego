@@ -43,6 +43,7 @@ func (c chain) XDB() saetypes.ExecutionResults { return c.xdb }
 func (c chain) Mempool() *txgossip.Set         { return c.mempool }
 func (c chain) Peers() *p2p.Peers              { return c.network.Peers }
 func (c chain) LastAccepted() *blocks.Block    { return c.last.accepted.Load() }
+func (c chain) LastExecuted() *blocks.Block    { return c.Executor.LastExecuted() }
 func (c chain) LastSettled() *blocks.Block     { return c.last.settled.Load() }
 
 func (c chain) ConsensusCriticalBlock(h common.Hash) (*blocks.Block, bool) {

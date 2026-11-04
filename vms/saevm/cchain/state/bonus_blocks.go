@@ -17,8 +17,8 @@ var (
 	bonusBlocksJSON []byte
 
 	// bonusBlocks is the set of mainnet block heights which were accepted
-	// without applying their shared memory operations. This behavior was
-	// canonicalized by Coreth and so MUST be replicated. These blocks only
+	// without applying their shared memory operations. This behavior is
+	// canonical and so MUST be replicated. These blocks only
 	// included Import transactions.
 	bonusBlocks set.Set[uint64]
 )

@@ -105,8 +105,8 @@ var (
 
 // verifyWhenBootstrapping skips verification in its entirety. It is expected
 // for blocks to be verified by hash in the bootstrapping engine. This supports
-// hooks, such as Coreth and Subnet-EVM, that are unable to fully verify blocks
-// during bootstrapping.
+// hooks, such as the C-Chain's, that are unable to fully verify blocks during
+// bootstrapping.
 func (vm *VM) verifyWhenBootstrapping(b, parent *blocks.Block) error {
 	header := b.Header()
 	lastSettled, err := lastToSettle(vm.hooks, header, parent, vm.config.Now(), vm.log())
@@ -115,12 +115,15 @@ func (vm *VM) verifyWhenBootstrapping(b, parent *blocks.Block) error {
 	}
 
 	// Sanity checks to ensure the in-memory settled block matches the expected
-	// settled block.
-	if got, want := lastSettled.PostExecutionStateRoot(), b.SettledStateRoot(); got != want {
-		return fmt.Errorf("%w: got %#x ; want %#x", errSettledRootMismatch, got, want)
-	}
-	if got, want := lastSettled.NumberU64(), vm.hooks.SettledBy(header).Height; got != want {
-		return fmt.Errorf("%w: got %d ; want %d", errSettledHeightMismatch, got, want)
+	// settled block. [blocks.Block.MarkExecuted] performs the equivalent checks
+	// for a synchronous block once the roots are available.
+	if !b.Synchronous() {
+		if got, want := lastSettled.PostExecutionStateRoot(), b.SettledStateRoot(); got != want {
+			return fmt.Errorf("%w: got %#x ; want %#x", errSettledRootMismatch, got, want)
+		}
+		if got, want := lastSettled.NumberU64(), vm.hooks.SettledBy(header).Height; got != want {
+			return fmt.Errorf("%w: got %d ; want %d", errSettledHeightMismatch, got, want)
+		}
 	}
 	if err := b.SetAncestors(parent, lastSettled); err != nil {
 		return err

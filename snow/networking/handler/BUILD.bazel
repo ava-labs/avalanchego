@@ -19,7 +19,7 @@ go_library(
         "//api/health",
         "//ids",
         "//message",
-        "//network/p2p",
+        "//network/p2p/peertracker",
         "//proto/pb/p2p",
         "//snow",
         "//snow/engine/common",
@@ -55,7 +55,7 @@ go_test(
     deps = [
         "//ids",
         "//message",
-        "//network/p2p",
+        "//network/p2p/peertracker",
         "//proto/pb/p2p",
         "//snow",
         "//snow/consensus/snowball",

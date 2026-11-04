@@ -46,6 +46,8 @@ func (rec *recovery) newCanonicalBlock(num uint64, parent *blocks.Block) (*block
 	return blocks.New(ethB, parent, nil, rec.hooks, rec.snowCtx.Log)
 }
 
+var errGenesisStateUnavailable = errors.New("genesis has no available post-execution state")
+
 // lastCommittedBlock returns the highest settled block whose post-execution
 // state is available on disk. This is required because its post-execution state
 // is the basis for the worst-case checks needed for block verifications.
@@ -78,8 +80,8 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 	// disk. Therefore, the state can only lag behind the block read.
 	// Additionally, we assume any block has been written atomically, so
 	// if the last settled height was found, the underlying block is present.
-	// At minimum, [NewVM] requires a genesis block to be written (which is
-	// synchronous by definition).
+	// [NewVM] requires a settled block's state to be available, so the search
+	// always finds one between the last settled block and genesis.
 	//
 	// There's no reasonable cap on how far back to search, since the distance
 	// between the settler and settled block is unbounded, and node crashes
@@ -104,8 +106,8 @@ func (rec *recovery) lastCommittedBlock() (_ *blocks.Block, retErr error) {
 			return b, nil
 		}
 
-		if b.Synchronous() {
-			return nil, fmt.Errorf("last synchronous block %d has no available post-execution state", height)
+		if height == 0 {
+			return nil, errGenesisStateUnavailable
 		}
 	}
 }
@@ -120,6 +122,7 @@ func recoverExecutor(
 	ctx context.Context,
 	db ethdb.Database,
 	xdb saetypes.ExecutionResults,
+	lastSettled *atomic.Pointer[blocks.Block],
 	chainConfig *params.ChainConfig,
 	snowCtx *snow.Context,
 	hooks hook.Points,
@@ -155,13 +158,21 @@ func recoverExecutor(
 
 	consensusCritical := newSyncMap[common.Hash, *blocks.Block](
 		func(b *blocks.Block) {
-			tracker.Track(b.SettledStateRoot())
+			// A synchronous block settles its own post-execution root, which
+			// the [saexec.Executor] already tracks. The root MAY not exist yet,
+			// making a track here a noop, but the untrack below would still
+			// release a reference.
+			if !b.Synchronous() {
+				tracker.Track(b.SettledStateRoot())
+			}
 			// The post-execution root is tracked by the [saexec.Executor]
 			// as soon as it's known. In the case of database recovery,
 			// this occurred in [recovery.executeAllAccepted].
 		},
 		func(b *blocks.Block) {
-			tracker.Untrack(b.SettledStateRoot())
+			if !b.Synchronous() {
+				tracker.Untrack(b.SettledStateRoot())
+			}
 			if b.Executed() { // i.e. deleted due to settlement not rejection
 				tracker.Untrack(b.PostExecutionStateRoot())
 			}
@@ -170,6 +181,7 @@ func recoverExecutor(
 
 	exec, err := saexec.New(
 		lastCommitted,
+		lastSettled,
 		headerSource(consensusCritical, rec.db),
 		rec.chainConfig,
 		rec.db,
@@ -204,8 +216,8 @@ func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Bloc
 		)
 
 		if lastAcceptedHash == (common.Hash{}) {
-			// SAE writes this hash on [VM.AcceptBlock], so the set of accepted,
-			// asynchronous blocks MUST be empty.
+			// SAE writes this hash on [VM.AcceptBlock], so no block after the
+			// genesis has been accepted.
 			return
 		}
 
@@ -220,8 +232,11 @@ func (rec *recovery) canonicalAfter(parent *blocks.Block) iter.Seq2[*blocks.Bloc
 }
 
 func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Executor) error {
-	after := exec.LastExecuted()
-	last := after
+	var (
+		after    = exec.LastExecuted()
+		last     = after
+		executed []*blocks.Block
+	)
 	for b, err := range rec.canonicalAfter(after) {
 		if err != nil {
 			return err
@@ -229,9 +244,16 @@ func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Execut
 		if err := exec.Enqueue(ctx, b); err != nil {
 			return err
 		}
+		executed = append(executed, b)
 		last = b
 	}
-	if err := last.WaitUntilExecuted(ctx); err != nil {
+	// The [saexec.Executor] settles a synchronous block after executing it, so
+	// waiting for execution alone would race with that settlement.
+	wait := last.WaitUntilExecuted
+	if last.Synchronous() {
+		wait = last.WaitUntilSettled
+	}
+	if err := wait(ctx); err != nil {
 		return err
 	}
 
@@ -243,8 +265,8 @@ func (rec *recovery) executeAllAccepted(ctx context.Context, exec *saexec.Execut
 
 	// Consensus only requires post-execution state after and including the
 	// last-settled block.
-	keepFrom := rec.hooks.SettledBy(last.Header()).Height
-	for b := last; b.NumberU64() > after.NumberU64(); b = b.ParentBlock() {
+	keepFrom := hook.SettledHeight(rec.hooks, last.Header())
+	for _, b := range executed {
 		if b.NumberU64() < keepFrom {
 			exec.Tracker.Untrack(b.PostExecutionStateRoot())
 		}
@@ -267,8 +289,8 @@ func (rec *recovery) populateConsensusCriticalBlocks(exec *saexec.Executor, bMap
 	// extend appends to the chain all the blocks in settler's ancestry up to
 	// and including the block that it settled.
 	extend := func(settler *blocks.Block) error {
-		end := rec.hooks.SettledBy(settler.Header()).Height
-		for b := lastOf(chain); b.Height() > end && !b.Synchronous(); b = lastOf(chain) {
+		end := hook.SettledHeight(rec.hooks, settler.Header())
+		for b := lastOf(chain); b.Height() > end; b = lastOf(chain) {
 			parent, err := rec.newCanonicalBlock(b.Height()-1, nil)
 			if err != nil {
 				return err

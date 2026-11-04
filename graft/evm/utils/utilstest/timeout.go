@@ -36,14 +36,3 @@ func WaitErrWithTimeout(t *testing.T, ch <-chan error, timeout time.Duration) er
 		return nil
 	}
 }
-
-// WaitSignalWithTimeout waits for a signal from ch or fails on timeout with msg.
-func WaitSignalWithTimeout(t *testing.T, ch <-chan struct{}, timeout time.Duration, msg string) {
-	t.Helper()
-	select {
-	case <-ch:
-		return
-	case <-time.After(timeout):
-		t.Fatal(msg)
-	}
-}

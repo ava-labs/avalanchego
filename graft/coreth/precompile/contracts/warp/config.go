@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/log"
 
@@ -21,18 +20,12 @@ import (
 
 const (
 	WarpDefaultQuorumNumerator uint64 = 67
-	WarpQuorumNumeratorMinimum uint64 = 33
 	WarpQuorumDenominator      uint64 = 100
 )
 
-var (
-	_ precompileconfig.Config     = (*Config)(nil)
-	_ precompileconfig.Predicater = (*Config)(nil)
-	_ precompileconfig.Accepter   = (*Config)(nil)
-)
+var _ precompileconfig.Predicater = (*Config)(nil)
 
 var (
-	ErrInvalidQuorumRatio         = errors.New("invalid warp quorum ratio")
 	errOverflowSignersGasCost     = errors.New("overflow calculating warp signers gas cost")
 	errInvalidPredicateBytes      = errors.New("cannot unpack predicate bytes")
 	errInvalidWarpMsg             = errors.New("cannot unpack warp message")
@@ -41,99 +34,16 @@ var (
 	errInvalidAddressedPayload    = errors.New("cannot unpack addressed payload")
 	errInvalidBlockHashPayload    = errors.New("cannot unpack block hash payload")
 	errCannotGetNumSigners        = errors.New("cannot fetch num signers from warp message")
-	errWarpCannotBeActivated      = errors.New("warp cannot be activated before Durango")
 	errFailedVerification         = errors.New("cannot verify warp signature")
 	errCannotRetrieveValidatorSet = errors.New("cannot retrieve validator set")
 )
 
-// Config implements the precompileconfig.Config interface and
-// adds specific configuration for Warp.
+// Config configures how Warp predicates are verified. The zero value uses the
+// default quorum.
 type Config struct {
-	precompileconfig.Upgrade
-	QuorumNumerator              uint64 `json:"quorumNumerator"`
-	RequirePrimaryNetworkSigners bool   `json:"requirePrimaryNetworkSigners"`
-}
-
-// NewConfig returns a config for a network upgrade at [blockTimestamp] that enables
-// Warp with the given quorum numerator.
-func NewConfig(blockTimestamp *uint64, quorumNumerator uint64, requirePrimaryNetworkSigners bool) *Config {
-	return &Config{
-		Upgrade:                      precompileconfig.Upgrade{BlockTimestamp: blockTimestamp},
-		QuorumNumerator:              quorumNumerator,
-		RequirePrimaryNetworkSigners: requirePrimaryNetworkSigners,
-	}
-}
-
-// NewDefaultConfig returns a config for a network upgrade at [blockTimestamp] that enables
-// Warp with the default quorum numerator (0 denotes using the default).
-func NewDefaultConfig(blockTimestamp *uint64) *Config {
-	return NewConfig(blockTimestamp, 0, false)
-}
-
-// NewDisableConfig returns config for a network upgrade at [blockTimestamp]
-// that disables Warp.
-func NewDisableConfig(blockTimestamp *uint64) *Config {
-	return &Config{
-		Upgrade: precompileconfig.Upgrade{
-			BlockTimestamp: blockTimestamp,
-			Disable:        true,
-		},
-	}
-}
-
-// Key returns the key for the Warp precompileconfig.
-// This should be the same key as used in the precompile module.
-func (*Config) Key() string { return ConfigKey }
-
-// Verify tries to verify Config and returns an error accordingly.
-func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
-	if c.Timestamp() != nil {
-		// If Warp attempts to activate before Durango, fail verification
-		timestamp := *c.Timestamp()
-		if !chainConfig.IsDurango(timestamp) {
-			return errWarpCannotBeActivated
-		}
-	}
-
-	if c.QuorumNumerator > WarpQuorumDenominator {
-		return fmt.Errorf("%w: cannot specify numerator (%d) > denominator (%d)", ErrInvalidQuorumRatio, c.QuorumNumerator, WarpQuorumDenominator)
-	}
-	// If a non-default quorum numerator is specified and it is less than the minimum, return an error
-	if c.QuorumNumerator != 0 && c.QuorumNumerator < WarpQuorumNumeratorMinimum {
-		return fmt.Errorf("%w: cannot specify numerator (%d) < min numerator (%d)", ErrInvalidQuorumRatio, c.QuorumNumerator, WarpQuorumNumeratorMinimum)
-	}
-	return nil
-}
-
-// Equal returns true if [s] is a [*Config] and it has been configured identical to [c].
-func (c *Config) Equal(s precompileconfig.Config) bool {
-	// typecast before comparison
-	other, ok := (s).(*Config)
-	if !ok {
-		return false
-	}
-	equals := c.Upgrade.Equal(&other.Upgrade)
-	return equals && c.QuorumNumerator == other.QuorumNumerator
-}
-
-func (*Config) Accept(acceptCtx *precompileconfig.AcceptContext, blockHash common.Hash, blockNumber uint64, txHash common.Hash, logIndex int, _ []common.Hash, logData []byte) error {
-	unsignedMessage, err := UnpackSendWarpEventDataToMessage(logData)
-	if err != nil {
-		return fmt.Errorf("failed to parse warp log data into unsigned message (TxHash: %s, LogIndex: %d): %w", txHash, logIndex, err)
-	}
-	log.Debug(
-		"Accepted warp unsigned message",
-		"blockHash", blockHash,
-		"blockNumber", blockNumber,
-		"txHash", txHash,
-		"logIndex", logIndex,
-		"logData", common.Bytes2Hex(logData),
-		"warpMessageID", unsignedMessage.ID(),
-	)
-	if err := acceptCtx.Warp.AddMessage(unsignedMessage); err != nil {
-		return fmt.Errorf("failed to add warp message during accept (TxHash: %s, LogIndex: %d): %w", txHash, logIndex, err)
-	}
-	return nil
+	// QuorumNumerator of 0 uses [WarpDefaultQuorumNumerator].
+	QuorumNumerator              uint64
+	RequirePrimaryNetworkSigners bool
 }
 
 // PredicateGas returns the amount of gas necessary to verify the predicate

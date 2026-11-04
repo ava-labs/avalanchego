@@ -7,8 +7,8 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/evm/emulate",
     visibility = ["//visibility:public"],
     deps = [
-        "//graft/coreth/plugin/evm",
         "//graft/subnet-evm/plugin/evm",
+        "//vms/saevm/cchain/libevm",
     ],
 )
 

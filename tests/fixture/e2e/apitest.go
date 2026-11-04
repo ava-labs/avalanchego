@@ -20,5 +20,4 @@ func ExecuteAPITest(apiTest APITestFunction) {
 	keychain := env.NewKeychain()
 	wallet := NewWallet(tc, keychain, env.GetRandomNodeURI())
 	apiTest(tc, *wallet, keychain.Keys[0].Address())
-	_ = CheckBootstrapIsPossible(tc, env.GetNetwork())
 }

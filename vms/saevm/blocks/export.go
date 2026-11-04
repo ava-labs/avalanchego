@@ -34,6 +34,13 @@ func (b *Block) SettledStateRoot() common.Hash {
 	return b.b.Root()
 }
 
+// SettledReceiptsRoot returns the root of the receipts of every block settled
+// by b, in height order. It is a convenience wrapper for calling
+// [types.Block.ReceiptHash] on the wrapped [types.Block].
+func (b *Block) SettledReceiptsRoot() common.Hash {
+	return b.b.ReceiptHash()
+}
+
 // PreciseTime returns the [hook.Points.BlockTime] of `b`.
 func (b *Block) PreciseTime() time.Time {
 	return b.hooks.BlockTime(b.Header())

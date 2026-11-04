@@ -1,0 +1,69 @@
+name: Bazel Monitored Tests
+
+# This workflow runs the test matrix supplied by either monitored caller in bazel.yml.
+# The callers have constant names and decide whether to run their tests.
+# GitHub does not expand skipped matrices, so conditions on the callers keep skipped job names readable.
+on:
+  workflow_call:
+    inputs:
+      test_matrix:
+        description: 'JSON matrix with the task, runner choice, and network owner for each suite'
+        required: true
+        type: string
+      job_suffix:
+        description: 'Suffix for monitoring job IDs and artifact names'
+        required: false
+        type: string
+        default: ''
+      runner:
+        required: true
+        type: string
+      e2e_runner:
+        required: false
+        type: string
+        default: ''
+      timeout_minutes:
+        required: true
+        type: number
+      enable_remote_cache:
+        required: true
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  BAZEL_CI_ENFORCE_DEPENDENCY_LIST: 1
+  BAZEL_REMOTE_CACHE_ENABLED: ${{ inputs.enable_remote_cache }}
+  BAZEL_REMOTE_CACHE_URL: ${{ secrets.BAZEL_REMOTE_CACHE_URL || '' }}
+  BAZEL_REMOTE_CACHE_AUTH_HEADER: ${{ secrets.BAZEL_REMOTE_CACHE_AUTH_HEADER || '' }}
+
+jobs:
+  monitored:
+    # A + suffix identifies jobs that use the higher-capacity E2E runner.
+    name: ${{ matrix.name }}${{ matrix.runner == 'e2e_runner' && '+' || '' }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(inputs.test_matrix) }}
+    runs-on: ${{ matrix.runner == 'e2e_runner' && inputs.e2e_runner || inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Run ${{ matrix.name }} with Bazel-built runtime dependencies
+        uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh ${{ matrix.task }}
+          setup_bazel: 'true'
+          # Load-contract binding generation invokes Go outside Bazel.
+          setup_go_module_cache: ${{ matrix.name == 'load' }}
+          artifact_prefix: bazel-${{ matrix.name }}${{ inputs.job_suffix }}
+          job: bazel-${{ matrix.name }}${{ inputs.job_suffix }}
+          filter_by_owner: ${{ matrix.network_owner || '' }}
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}

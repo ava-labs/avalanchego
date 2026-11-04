@@ -361,7 +361,7 @@ var (
 				assertFeeEvent(t, logs, allowlisttest.TestEnabledAddr, zeroFeeConfig, testFeeConfig)
 			},
 		},
-		// from https://github.com/ava-labs/avalanchego/graft/subnet-evm/issues/487
+		// from https://github.com/ava-labs/subnet-evm/issues/487
 		{
 			Name:       "setFeeConfig_regression_test_should_fail_before_Durango",
 			Caller:     allowlisttest.TestEnabledAddr,

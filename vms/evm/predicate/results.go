@@ -62,7 +62,7 @@ func ParseBlockResults(b []byte) (BlockResults, error) {
 	var encodedResults encodedBlockResults
 	_, err := resultsCodec.Unmarshal(b, &encodedResults)
 	if err != nil {
-		return BlockResults{}, fmt.Errorf("failed to unmarshal predicate results: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal predicate results: %w", err)
 	}
 
 	// Convert encoded representation into in-memory representation

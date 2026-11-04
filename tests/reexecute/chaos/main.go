@@ -25,10 +25,10 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/reexecute"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
 )
 
 var (
@@ -58,11 +58,11 @@ var (
 )
 
 func init() {
-	evm.RegisterAllLibEVMExtras()
+	libevm.RegisterExtras()
 
 	flag.StringVar(&blockDirArg, "block-dir", blockDirArg, "Block DB directory to read from during re-execution.")
 	flag.StringVar(&currentStateDirArg, "current-state-dir", currentStateDirArg, "Current state directory including VM DB and Chain Data Directory for re-execution.")
-	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (exclusive).")
+	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (inclusive).")
 	flag.Uint64Var(&endBlockArg, "end-block", 200, "End block to end execution (inclusive).")
 	flag.DurationVar(&minWaitTimeArg, "min-wait-time", 20*time.Second, "Minimum amount of time to wait before crashing.")
 	flag.DurationVar(&maxWaitTimeArg, "max-wait-time", 30*time.Second, "Maximum amount of time to wait before crashing.")
@@ -84,7 +84,7 @@ func init() {
 func main() {
 	tc := tests.NewTestContext(tests.NewDefaultLogger("chaos-test"))
 	tc.SetDefaultContextParent(context.Background())
-	tc.RecoverAndExit()
+	defer tc.RecoverAndExit()
 
 	run(
 		tc,
@@ -223,7 +223,7 @@ func openDB(dbDir string, maxAttempts int) (database.Database, error) {
 
 		attempt += 1
 		if attempt == maxAttempts {
-			return nil, fmt.Errorf("failed to reopen db after %d attempts: %w", maxAttempts, err)
+			return nil, fmt.Errorf("reopening db after %d attempts: %w", maxAttempts, err)
 		}
 
 		backoff := time.Duration(attempt) * 500 * time.Millisecond
@@ -242,7 +242,6 @@ func createReexecutionCmd(
 	cmd := exec.Command("go",
 		"run",
 		"github.com/ava-labs/avalanchego/tests/reexecute/c",
-		"--config=firewood",
 		"--block-dir="+blockDir,
 		"--current-state-dir="+currentStateDir,
 		"--start-block="+strconv.Itoa(int(startBlock)),

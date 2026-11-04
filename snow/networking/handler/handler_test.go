@@ -14,7 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -57,7 +57,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 	)
 	require.NoError(err)
 
-	peerTracker, err := p2p.NewPeerTracker(
+	peerTracker, err := peertracker.New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
@@ -167,7 +167,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 	)
 	require.NoError(err)
 
-	peerTracker, err := p2p.NewPeerTracker(
+	peerTracker, err := peertracker.New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
@@ -276,7 +276,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 	)
 	require.NoError(err)
 
-	peerTracker, err := p2p.NewPeerTracker(
+	peerTracker, err := peertracker.New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
@@ -369,7 +369,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 	)
 	require.NoError(err)
 
-	peerTracker, err := p2p.NewPeerTracker(
+	peerTracker, err := peertracker.New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
@@ -557,7 +557,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			)
 			require.NoError(err)
 
-			peerTracker, err := p2p.NewPeerTracker(
+			peerTracker, err := peertracker.New(
 				logging.NoLog{},
 				"",
 				prometheus.NewRegistry(),
@@ -596,7 +596,7 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 			engine.ContextF = func() *snow.ConsensusContext {
 				return ctx
 			}
-			engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID, uint64) error {
+			engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, uint64) error {
 				close(messageReceived)
 				return nil
 			}
@@ -643,7 +643,7 @@ func TestHandlerStartError(t *testing.T) {
 	)
 	require.NoError(err)
 
-	peerTracker, err := p2p.NewPeerTracker(
+	peerTracker, err := peertracker.New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),

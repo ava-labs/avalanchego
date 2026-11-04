@@ -22,7 +22,7 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
-	ginkgo.It("should ensure that a given Node ID (i.e. staking keypair) can be used at most once on a network", func() {
+	ginkgo.It("should ensure that a given Node ID (i.e. staking keypair) can be used at most once on a network", ginkgo.Label(e2e.SkipSharedNetworkBootstrapCheckLabel), func() {
 		network := e2e.GetEnv(tc).GetNetwork()
 
 		if network.DefaultRuntimeConfig.Kube != nil {
@@ -61,7 +61,7 @@ var _ = ginkgo.Describe("Duplicate node handling", func() {
 		tc.By("checking that the second new node is connected to its peers")
 		checkConnectedPeers(tc, network.Nodes, node2)
 
-		// A bootstrap check was already performed by the second node.
+		// The second node already checked bootstrap on the shared network.
 	})
 })
 

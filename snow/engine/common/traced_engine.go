@@ -246,17 +246,16 @@ func (e *tracedEngine) PushQuery(ctx context.Context, nodeID ids.NodeID, request
 	return e.engine.PushQuery(ctx, nodeID, requestID, container, requestedHeight)
 }
 
-func (e *tracedEngine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredID ids.ID, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) error {
+func (e *tracedEngine) Chits(ctx context.Context, nodeID ids.NodeID, requestID uint32, preferredIDAtHeight ids.ID, acceptedID ids.ID, acceptedHeight uint64) error {
 	ctx, span := e.tracer.Start(ctx, "tracedEngine.Chits", oteltrace.WithAttributes(
 		attribute.Stringer("nodeID", nodeID),
 		attribute.Int64("requestID", int64(requestID)),
-		attribute.Stringer("preferredID", preferredID),
 		attribute.Stringer("preferredIDAtHeight", preferredIDAtHeight),
 		attribute.Stringer("acceptedID", acceptedID),
 	))
 	defer span.End()
 
-	return e.engine.Chits(ctx, nodeID, requestID, preferredID, preferredIDAtHeight, acceptedID, acceptedHeight)
+	return e.engine.Chits(ctx, nodeID, requestID, preferredIDAtHeight, acceptedID, acceptedHeight)
 }
 
 func (e *tracedEngine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID uint32) error {

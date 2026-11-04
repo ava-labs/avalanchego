@@ -80,7 +80,7 @@ func TestEthTxGossip(t *testing.T) {
 		validatorSet,
 	)
 	require.NoError(err)
-	client := network.NewClient(p2p.TxGossipHandlerID, validatorSet)
+	client := network.NewClient(p2p.TxGossipHandlerID)
 
 	// we only accept gossip requests from validators
 	requestingNodeID := ids.GenerateTestNodeID()

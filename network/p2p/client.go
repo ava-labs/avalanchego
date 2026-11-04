@@ -36,25 +36,6 @@ type Client struct {
 	handlerPrefix []byte
 	router        *router
 	sender        common.AppSender
-	// nodeSampler is used to select nodes to route Client.AppRequestAny to
-	nodeSampler NodeSampler
-}
-
-// AppRequestAny issues an AppRequest to an arbitrary node decided by Client.
-// If a specific node needs to be requested, use AppRequest instead.
-// See AppRequest for more docs.
-func (c *Client) AppRequestAny(
-	ctx context.Context,
-	appRequestBytes []byte,
-	onResponse AppResponseCallback,
-) error {
-	sampled := c.nodeSampler.Sample(ctx, 1)
-	if len(sampled) != 1 {
-		return ErrNoPeers
-	}
-
-	nodeIDs := set.Of(sampled...)
-	return c.AppRequest(ctx, nodeIDs, appRequestBytes, onResponse)
 }
 
 // AppRequest issues an arbitrary request to a node.

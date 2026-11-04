@@ -48,49 +48,56 @@ curl -sX POST --data '{
   "jsonrpc": "2.0",
   "result": {
     "acps": {
-      "23": {
+      "194": {
         "supportWeight": "0",
         "supporters": [],
         "objectWeight": "0",
         "objectors": [],
         "abstainWeight": "161147778098286584"
       },
-      "24": {
+      "224": {
         "supportWeight": "0",
         "supporters": [],
         "objectWeight": "0",
         "objectors": [],
         "abstainWeight": "161147778098286584"
       },
-      "25": {
+      "236": {
         "supportWeight": "0",
         "supporters": [],
         "objectWeight": "0",
         "objectors": [],
         "abstainWeight": "161147778098286584"
       },
-      "30": {
+      "247": {
         "supportWeight": "0",
         "supporters": [],
         "objectWeight": "0",
         "objectors": [],
         "abstainWeight": "161147778098286584"
       },
-      "31": {
+      "267": {
         "supportWeight": "0",
         "supporters": [],
         "objectWeight": "0",
         "objectors": [],
         "abstainWeight": "161147778098286584"
       },
-      "41": {
+      "273": {
         "supportWeight": "0",
         "supporters": [],
         "objectWeight": "0",
         "objectors": [],
         "abstainWeight": "161147778098286584"
       },
-      "62": {
+      "283": {
+        "supportWeight": "0",
+        "supporters": [],
+        "objectWeight": "0",
+        "objectors": [],
+        "abstainWeight": "161147778098286584"
+      },
+      "285": {
         "supportWeight": "0",
         "supporters": [],
         "objectWeight": "0",
@@ -368,14 +375,14 @@ curl -X POST --data '{
 {
   "jsonrpc": "2.0",
   "result": {
-    "version": "avalanche/1.9.1",
+    "version": "avalanchego/1.15.1",
     "databaseVersion": "v1.4.5",
-    "rpcProtocolVersion": "18",
-    "gitCommit": "79cd09ba728e1cecef40acd60702f0a2d41ea404",
+    "rpcProtocolVersion": "46",
+    "gitCommit": "fdb2c1b9b02ef357b5867d5ababb6acc83837a01",
     "vmVersions": {
-      "avm": "v1.9.1",
-      "evm": "v0.11.1",
-      "platform": "v1.9.1"
+      "avm": "avalanchego/1.15.1",
+      "evm": "v1.15.1",
+      "platform": "avalanchego/1.15.1"
     }
   },
   "id": 1
@@ -461,7 +468,8 @@ This endpoint set is for a specific node, it is unavailable on the [public serve
 
 ```
 info.getVMs() -> {
-  vms: map[string][]string
+  vms: map[string][]string,
+  fxs: map[string]string
 }
 ```
 
@@ -485,10 +493,12 @@ curl -X POST --data '{
     "vms": {
       "jvYyfQTxGMJLuGWa55kdP2p2zSUYsQ5Raupu4TW34ZAUBAbtq": ["avm"],
       "mgj786NP7uDwBCcq6YwThhaN8FLyybkCa4zBWTQbNgmK6k9A6": ["evm"],
-      "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT": ["nftfx"],
-      "rWhpuQPF1kb72esV2momhMuTYGkEb1oL29pt2EBXWmSy4kxnT": ["platform"],
-      "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy": ["propertyfx"],
-      "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ": ["secp256k1fx"]
+      "rWhpuQPF1kb72esV2momhMuTYGkEb1oL29pt2EBXWmSy4kxnT": ["platform"]
+    },
+    "fxs": {
+      "qd2U4HDWUvMrVUeTcCHp6xH3Qpnn1XbU5MDdnBoiifFqvgXwT": "nftfx",
+      "rXJsCSEYXg2TehWxCEEGj6JU2PWKTkd6cBdNLjoe2SpsKD9cy": "propertyfx",
+      "spdxUxVJQbX85MGxMHbKw1sHxMnSqJ3QBzDyDYEP3h6TLuxqQ": "secp256k1fx"
     }
   },
   "id": 1
@@ -512,10 +522,14 @@ info.peers({
     publicIP: string,
     nodeID: string,
     version: string,
+    upgradeTime: int,
     lastSent: string,
     lastReceived: string,
     benched: string[],
     observedUptime: int,
+    trackedSubnets: string[],
+    supportedACPs: int[],
+    objectedACPs: int[],
   }
 }
 ```
@@ -525,10 +539,14 @@ info.peers({
 - `publicIP` is the public IP of the peer.
 - `nodeID` is the prefixed Node ID of the peer.
 - `version` shows which version the peer runs on.
+- `upgradeTime` is the Unix time, in seconds, that the peer reports for its latest network upgrade. If that upgrade is not scheduled, the value is `253399622400`.
 - `lastSent` is the timestamp of last message sent to the peer.
 - `lastReceived` is the timestamp of last message received from the peer.
 - `benched` shows chain IDs that the peer is currently benched on.
 - `observedUptime` is this node's primary network uptime, observed by the peer.
+- `trackedSubnets` shows the subnet IDs that the peer tracks. It always includes the Primary Network ID.
+- `supportedACPs` shows the ACPs that the peer supports. It includes only the ACPs that `info.acps` reports.
+- `objectedACPs` shows the ACPs that the peer objects to. It includes only the ACPs that `info.acps` reports.
 
 **Example Call**:
 
@@ -550,44 +568,55 @@ curl -X POST --data '{
   "jsonrpc": "2.0",
   "id": 1,
   "result": {
-    "numPeers": 3,
+    "numPeers": "3",
     "peers": [
       {
         "ip": "206.189.137.87:9651",
         "publicIP": "206.189.137.87:9651",
         "nodeID": "NodeID-8PYXX47kqLDe2wD4oPbvRRchcnSzMA4J4",
-        "version": "avalanche/1.9.4",
+        "version": "avalanchego/1.15.1",
+        "upgradeTime": 1790089200,
         "lastSent": "2020-06-01T15:23:02Z",
         "lastReceived": "2020-06-01T15:22:57Z",
-        "benched": [],
         "observedUptime": "99",
-        "trackedSubnets": [],
+        "trackedSubnets": [
+          "11111111111111111111111111111111LpoYY"
+        ],
+        "supportedACPs": [],
+        "objectedACPs": [],
         "benched": []
       },
       {
         "ip": "158.255.67.151:9651",
         "publicIP": "158.255.67.151:9651",
         "nodeID": "NodeID-C14fr1n8EYNKyDfYixJ3rxSAVqTY3a8BP",
-        "version": "avalanche/1.9.4",
+        "version": "avalanchego/1.15.1",
+        "upgradeTime": 1790089200,
         "lastSent": "2020-06-01T15:23:02Z",
         "lastReceived": "2020-06-01T15:22:34Z",
-        "benched": [],
         "observedUptime": "75",
         "trackedSubnets": [
+          "11111111111111111111111111111111LpoYY",
           "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"
         ],
+        "supportedACPs": [],
+        "objectedACPs": [],
         "benched": []
       },
       {
         "ip": "83.42.13.44:9651",
         "publicIP": "83.42.13.44:9651",
         "nodeID": "NodeID-LPbcSMGJ4yocxYxvS2kBJ6umWeeFbctYZ",
-        "version": "avalanche/1.9.3",
+        "version": "avalanchego/1.15.0",
+        "upgradeTime": 1790089200,
         "lastSent": "2020-06-01T15:23:02Z",
         "lastReceived": "2020-06-01T15:22:55Z",
-        "benched": [],
         "observedUptime": "95",
-        "trackedSubnets": [],
+        "trackedSubnets": [
+          "11111111111111111111111111111111LpoYY"
+        ],
+        "supportedACPs": [],
+        "objectedACPs": [],
         "benched": []
       }
     ]
@@ -631,32 +660,6 @@ curl -X POST --data '{
   "result": {
     "rewardingStakePercentage": "100.0000",
     "weightedAveragePercentage": "99.0000"
-  }
-}
-```
-
-#### Example Avalanche L1 Call
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"info.uptime",
-    "params" :{
-        "subnetID":"29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"
-    }
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
-```
-
-#### Example Avalanche L1 Response
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "rewardingStakePercentage": "74.0741",
-    "weightedAveragePercentage": "72.4074"
   }
 }
 ```

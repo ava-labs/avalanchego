@@ -39,9 +39,6 @@ trap 'rm -f "${package_list_file}"' EXIT
 packages=()
 while IFS= read -r package; do
   case "${package}" in
-    "${coreth_prefix}/tests"|"${coreth_prefix}/tests/"*)
-      continue
-      ;;
     "${evm_prefix}"|"${evm_prefix}/"*)
       ;;
     "${subnet_evm_prefix}/tests"|"${subnet_evm_prefix}/tests/"*)
@@ -49,7 +46,7 @@ while IFS= read -r package; do
       ;;
     "${coreth_prefix}"|"${coreth_prefix}/"*|"${subnet_evm_prefix}"|"${subnet_evm_prefix}/"*)
       ;;
-    */mocks*|*proto*|*/tests/e2e*|*/tests/load/c*|*/tests/upgrade*|*/tests/fixture/bootstrapmonitor/e2e*|*/tests/reexecute*)
+    */mocks*|*proto*|*/tests/e2e*|*/tests/upgrade*|*/tests/fixture/bootstrapmonitor/e2e*|*/tests/reexecute*)
       continue
       ;;
   esac

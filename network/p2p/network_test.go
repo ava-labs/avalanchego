@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/version"
 )
 
 const (
@@ -65,7 +64,7 @@ func TestMessageRouting(t *testing.T) {
 	)
 	require.NoError(err)
 	require.NoError(network.AddHandler(1, testHandler))
-	client := network.NewClient(1, PeerSampler{Peers: &Peers{}})
+	client := network.NewClient(1)
 
 	require.NoError(client.AppGossip(
 		ctx,
@@ -102,7 +101,7 @@ func TestClientPrefixesMessages(t *testing.T) {
 	)
 	require.NoError(err)
 	require.NoError(network.Connected(ctx, ids.EmptyNodeID, nil))
-	client := network.NewClient(handlerID, PeerSampler{Peers: peers})
+	client := network.NewClient(handlerID)
 
 	want := []byte("message")
 
@@ -113,15 +112,6 @@ func TestClientPrefixesMessages(t *testing.T) {
 		func(context.Context, ids.NodeID, []byte, error) {},
 	))
 	gotAppRequest := <-sender.SentAppRequest
-	require.Equal(handlerPrefix, gotAppRequest[0])
-	require.Equal(want, gotAppRequest[1:])
-
-	require.NoError(client.AppRequestAny(
-		ctx,
-		want,
-		func(context.Context, ids.NodeID, []byte, error) {},
-	))
-	gotAppRequest = <-sender.SentAppRequest
 	require.Equal(handlerPrefix, gotAppRequest[0])
 	require.Equal(want, gotAppRequest[1:])
 
@@ -152,7 +142,7 @@ func TestAppRequestResponse(t *testing.T) {
 		"",
 	)
 	require.NoError(err)
-	client := network.NewClient(handlerID, PeerSampler{Peers: &Peers{}})
+	client := network.NewClient(handlerID)
 
 	wantResponse := []byte("response")
 	wantNodeID := ids.GenerateTestNodeID()
@@ -196,7 +186,7 @@ func TestAppRequestCancelledContext(t *testing.T) {
 		"",
 	)
 	require.NoError(err)
-	client := network.NewClient(handlerID, PeerSampler{Peers: &Peers{}})
+	client := network.NewClient(handlerID)
 
 	wantResponse := []byte("response")
 	wantNodeID := ids.GenerateTestNodeID()
@@ -238,7 +228,7 @@ func TestAppRequestFailed(t *testing.T) {
 		"",
 	)
 	require.NoError(err)
-	client := network.NewClient(handlerID, PeerSampler{Peers: &Peers{}})
+	client := network.NewClient(handlerID)
 
 	wantNodeID := ids.GenerateTestNodeID()
 	done := make(chan struct{})
@@ -473,7 +463,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 		"",
 	)
 	require.NoError(err)
-	client := network.NewClient(0x1, PeerSampler{Peers: &Peers{}})
+	client := network.NewClient(0x1)
 
 	noOpCallback := func(context.Context, ids.NodeID, []byte, error) {}
 	// create a request that never gets a response
@@ -583,141 +573,6 @@ func TestPeersSample(t *testing.T) {
 	}
 }
 
-func TestAppRequestAnyWithPeerSampling(t *testing.T) {
-	tests := []struct {
-		name     string
-		peers    []ids.NodeID
-		expected error
-	}{
-		{
-			name:     "no peers",
-			expected: ErrNoPeers,
-		},
-		{
-			name:  "has peers",
-			peers: []ids.NodeID{ids.GenerateTestNodeID()},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			sent := set.Set[ids.NodeID]{}
-			sender := &enginetest.Sender{
-				SendAppRequestF: func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ []byte) error {
-					sent = nodeIDs
-					return nil
-				},
-			}
-
-			peers := &Peers{}
-			n, err := NewNetwork(
-				logging.NoLog{},
-				sender,
-				prometheus.NewRegistry(),
-				"",
-				peers,
-			)
-			require.NoError(err)
-			for _, peer := range tt.peers {
-				require.NoError(n.Connected(t.Context(), peer, &version.Application{}))
-			}
-
-			client := n.NewClient(1, PeerSampler{Peers: peers})
-
-			err = client.AppRequestAny(t.Context(), []byte("foobar"), nil)
-			require.ErrorIs(err, tt.expected)
-			require.Subset(tt.peers, sent.List())
-		})
-	}
-}
-
-func TestAppRequestAnyWithValidatorSampling(t *testing.T) {
-	nodeID0 := ids.GenerateTestNodeID()
-	nodeID1 := ids.GenerateTestNodeID()
-
-	tests := []struct {
-		name        string
-		peers       []ids.NodeID
-		validators  []ids.NodeID
-		expected    []ids.NodeID
-		expectedErr error
-	}{
-		{
-			name:       "validator connected",
-			peers:      []ids.NodeID{nodeID0, nodeID1},
-			validators: []ids.NodeID{nodeID1},
-			expected:   []ids.NodeID{nodeID1},
-		},
-		{
-			name:        "validator disconnected",
-			peers:       []ids.NodeID{nodeID0},
-			validators:  []ids.NodeID{nodeID1},
-			expectedErr: ErrNoPeers,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput)
-			for _, nodeID := range tt.validators {
-				validatorSet[nodeID] = &validators.GetValidatorOutput{
-					NodeID: nodeID,
-					Weight: 1,
-				}
-			}
-
-			state := &validatorstest.State{
-				GetCurrentHeightF: func(context.Context) (uint64, error) {
-					return 0, nil
-				},
-				GetValidatorSetF: func(
-					context.Context,
-					uint64,
-					ids.ID,
-				) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-					return validatorSet, nil
-				},
-			}
-
-			validators := NewValidators(logging.NoLog{}, ids.Empty, state, 0)
-
-			done := make(chan struct{})
-			sender := &enginetest.Sender{
-				SendAppRequestF: func(_ context.Context, nodeIDs set.Set[ids.NodeID], _ uint32, _ []byte) error {
-					require.Subset(tt.expected, nodeIDs.List())
-					close(done)
-					return nil
-				},
-			}
-			network, err := NewNetwork(
-				logging.NoLog{},
-				sender,
-				prometheus.NewRegistry(),
-				"",
-				validators,
-			)
-			require.NoError(err)
-			ctx := t.Context()
-			for _, peer := range tt.peers {
-				require.NoError(network.Connected(ctx, peer, nil))
-			}
-
-			client := network.NewClient(0, validators)
-
-			if err = client.AppRequestAny(ctx, []byte("request"), nil); err != nil {
-				close(done)
-			}
-
-			require.ErrorIs(err, tt.expectedErr)
-			<-done
-		})
-	}
-}
-
 // Tests that a given protocol can have more than one client
 func TestMultipleClients(t *testing.T) {
 	require := require.New(t)
@@ -729,8 +584,8 @@ func TestMultipleClients(t *testing.T) {
 		"",
 	)
 	require.NoError(err)
-	_ = n.NewClient(0, PeerSampler{Peers: &Peers{}})
-	_ = n.NewClient(0, PeerSampler{Peers: &Peers{}})
+	_ = n.NewClient(0)
+	_ = n.NewClient(0)
 }
 
 func TestNetworkValidators_ConnectAndDisconnect(t *testing.T) {

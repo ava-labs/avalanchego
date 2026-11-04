@@ -19,6 +19,7 @@ go_library(
         "//graft/evm/sync/types",
         "//ids",
         "//network/p2p",
+        "//network/p2p/peertracker",
         "//vms/evm/sync/hashdb",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",

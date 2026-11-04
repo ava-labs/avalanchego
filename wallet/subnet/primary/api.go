@@ -7,8 +7,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ava-labs/libevm/ethclient"
-
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain"
@@ -187,7 +186,7 @@ func FetchPState(
 }
 
 type EthState struct {
-	Client   *ethclient.Client
+	Client   *evmclient.Client
 	Accounts map[ethcommon.Address]*c.Account
 }
 
@@ -201,7 +200,7 @@ func FetchEthState(
 		uri,
 		constants.ChainAliasPrefix,
 	)
-	client, err := ethclient.Dial(path)
+	client, err := evmclient.Dial(ctx, path)
 	if err != nil {
 		return nil, err
 	}

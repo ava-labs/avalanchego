@@ -75,10 +75,8 @@ func New(snowCtx *snow.Context, db database.Database) (*State, error) {
 	s := &State{
 		snowCtx: snowCtx,
 		db:      db,
-		// Coreth previously wrapped db in a versiondb before using
-		// [prefixdb.New]. To maintain byte compatibility with the existing
-		// trie, we must use [prefixdb.NewNested] rather than [prefixdb.New] and
-		// not compress the prefix.
+		// The use of [prefixdb.NewNested] rather than [prefixdb.New] is part of
+		// the on-disk format and MUST NOT change.
 		trieDB: triedb.NewDatabase(
 			saetypes.NewEthDB(prefixdb.NewNested(triePrefix, db)),
 			&triedb.Config{
@@ -153,9 +151,9 @@ func (s *State) Apply(height uint64, txs []*tx.Tx) error {
 	)
 	for _, t := range txs {
 		if isBonus {
-			// To provide consistent API behavior with databases made by Coreth,
-			// we report the first height a transaction was accepted at as the
-			// canonical height.
+			// To keep API behavior consistent with existing databases, we report
+			// the first height a transaction was accepted at as the canonical
+			// height.
 			txID := t.ID()
 			has, err := s.db.Has(txKey(txID))
 			if err != nil {

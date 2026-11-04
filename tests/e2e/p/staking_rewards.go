@@ -327,8 +327,6 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		tc.By("stopping alpha to free up resources for a bootstrap check", func() {
 			require.NoError(alphaNode.Stop(tc.DefaultContext()))
 		})
-
-		_ = e2e.CheckBootstrapIsPossible(tc, network)
 	})
 })
 

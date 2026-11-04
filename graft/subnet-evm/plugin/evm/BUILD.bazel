@@ -202,7 +202,6 @@ graft_go_test(
         "//utils/timer/mockable",
         "//version",
         "//vms/components/chain",
-        "//vms/evm/acp176",
         "//vms/evm/acp226",
         "//vms/evm/blackhole",
         "//vms/evm/database",

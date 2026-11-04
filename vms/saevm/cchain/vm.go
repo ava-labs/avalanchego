@@ -159,9 +159,8 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("creating network: %w", err)
 	}
 
-	// [prefixdb.NewNested] is used because coreth used to be run as a plugin.
-	// This meant that the database's prefix was not compacted, because the
-	// provided database was wrapped by the rpcchainvm.
+	// The use of [prefixdb.NewNested] rather than [prefixdb.New] is part of the
+	// on-disk format and MUST NOT change.
 	ethDB := types.NewEthDB(prefixdb.NewNested(ethDBPrefix, avaDB))
 
 	if err := genesis.verifyAndWriteBlock(ethDB); err != nil {
@@ -256,7 +255,7 @@ func (vm *VM) Initialize(
 			if err != nil {
 				return fmt.Errorf("creating SAE handlers: %w", err)
 			}
-			service, err := newService(snowCtx, vm.gossipSet, pushGossiper, vm.state)
+			service, err := newService(snowCtx, vm.gossipSet, pushGossiper, vm.state, vm.VM)
 			if err != nil {
 				return fmt.Errorf("creating avax service: %w", err)
 			}

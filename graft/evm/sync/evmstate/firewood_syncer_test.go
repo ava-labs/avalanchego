@@ -29,7 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker/peertrackertest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
@@ -163,7 +163,7 @@ func createSyncers(t *testing.T, clientState, serverState state.Database, root c
 	require.NoError(t, err, "NewCodeSyncer()")
 
 	// Create the firewood syncer.
-	proofClient := p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, proofHandler)
+	proofClient := peertrackertest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, proofHandler)
 	firewoodSyncer, err := NewFirewoodSyncer(
 		syncer.Config{},
 		dbFromState(t, clientState),

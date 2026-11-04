@@ -13,6 +13,7 @@ import (
 	"math/rand/v2"
 	"path/filepath"
 	"slices"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -106,6 +107,7 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 	require.NoError(t, err, "saedb.NewTracker()")
 	exec, err := saexec.New(
 		genesis,
+		new(atomic.Pointer[blocks.Block]),
 		src.AsHeaderSource(),
 		config,
 		db,
@@ -435,7 +437,15 @@ func TestP2PIntegration(t *testing.T) {
 			var gossiper gossip.Gossiper
 			switch tt.dir {
 			case pull:
-				gossiper = gossip.NewPullGossiper(logger, Marshaller{}, recv.Set, client, metrics, 1)
+				gossiper = gossip.NewPullGossiper(
+					logger,
+					Marshaller{},
+					recv.Set,
+					&stubPeers{[]ids.NodeID{sendID}},
+					client,
+					metrics,
+					1,
+				)
 
 			case push:
 				branch := gossip.BranchingFactor{Peers: 1}

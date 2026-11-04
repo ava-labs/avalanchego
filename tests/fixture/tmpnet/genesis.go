@@ -149,7 +149,7 @@ func NewTestGenesis(
 	chainID := big.NewInt(int64(networkID))
 	// Define C-Chain genesis
 	cChainGenesis := &core.Genesis{
-		Config:     &params.ChainConfig{ChainID: chainID},      // The rest of the config is set in coreth on VM initialization
+		Config:     &params.ChainConfig{ChainID: chainID},      // The rest of the config is set by the C-Chain VM on initialization
 		Difficulty: big.NewInt(0),                              // Difficulty is a mandatory field
 		Timestamp:  uint64(upgrade.InitiallyActiveTime.Unix()), // This time enables Avalanche upgrades by default
 		GasLimit:   defaultGasLimit,

@@ -5,9 +5,6 @@
 
 version: '3'
 
-env:
-  AVALANCHEGO_BUILD_PATH: '{{.AVALANCHEGO_BUILD_PATH | default (printf "%s/avalanchego/build" .TASKFILE_DIR) }}'
-
 vars:
   # Task entrypoints run through the repo's nix wrapper so they use the pinned
   # dev-shell toolchain when nix is available, without nesting nix shells.
@@ -15,10 +12,6 @@ vars:
 
 tasks:
   default: '{{.NIX_RUN}} ./scripts/run_task.sh --list'
-
-  build-test:
-    desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
-    cmd: '{{.NIX_RUN}} ./scripts/build_test.sh'
 
   check-clean-branch:
     desc: Checks that the git working tree is clean
@@ -57,10 +50,6 @@ tasks:
     cmds:
       - cmd: '{{.NIX_RUN}} go mod tidy'
       - task: check-clean-branch
-
-  coverage:
-    desc: Display test coverage statistics from coverage.out file
-    cmd: '{{.NIX_RUN}} ./scripts/coverage.sh'
 
   generate-bindings:
     desc: Generates Go bindings from Solidity contracts (searches for all compile.go files)

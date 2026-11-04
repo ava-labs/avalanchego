@@ -21,7 +21,7 @@ To run an EVM load test, execute the following commands:
 nix develop
 
 # Start load test with monitoring
-task test-load -- --start-metrics-collector --start-logs-collector
+task bazel-test-load -- --start-metrics-collector --start-logs-collector
 ```
 
 This command will create a temporary Avalanche network and perform any test setup prior
@@ -115,7 +115,7 @@ updated by the generator/wallets. The server is configured to be targeted by
 ### Load Test Flags
 
 - `--load-timeout`: Maximum duration to run the load test (default: unlimited)
-- `--firewood`: Whether to use Firewood in Coreth (default: false)
+- `--firewood`: Whether to use Firewood on the C-Chain (default: false)
 - `--num-workers`: The number of workers to use for the load test (default: 5)
 
 ### Network Configuration (`tmpnet` Flags)

@@ -52,17 +52,6 @@ func (c *Client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (
 	return uint64(res.Height), err
 }
 
-// GetBalance returns the balance of addrs.
-//
-// Deprecated: GetUTXOs should be used instead.
-func (c *Client) GetBalance(ctx context.Context, addrs []ids.ShortID, options ...rpc.Option) (*GetBalanceResponse, error) {
-	res := &GetBalanceResponse{}
-	err := c.Requester.SendRequest(ctx, "platform.getBalance", &GetBalanceRequest{
-		Addresses: ids.ShortIDsToStrings(addrs),
-	}, res, options...)
-	return res, err
-}
-
 // GetUTXOs returns the byte representation of the UTXOs controlled by addrs.
 func (c *Client) GetUTXOs(
 	ctx context.Context,
@@ -401,44 +390,6 @@ func (c *Client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Op
 		options...,
 	)
 	return res, err
-}
-
-// GetStake returns the amount of nAVAX that addrs have cumulatively staked on
-// the Primary Network.
-//
-// Deprecated: Stake should be calculated using GetTx and GetCurrentValidators.
-func (c *Client) GetStake(
-	ctx context.Context,
-	addrs []ids.ShortID,
-	validatorsOnly bool,
-	options ...rpc.Option,
-) (map[ids.ID]uint64, [][]byte, error) {
-	res := &GetStakeReply{}
-	err := c.Requester.SendRequest(ctx, "platform.getStake", &GetStakeArgs{
-		JSONAddresses: api.JSONAddresses{
-			Addresses: ids.ShortIDsToStrings(addrs),
-		},
-		ValidatorsOnly: validatorsOnly,
-		Encoding:       formatting.Hex,
-	}, res, options...)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	staked := make(map[ids.ID]uint64, len(res.Stakeds))
-	for assetID, amount := range res.Stakeds {
-		staked[assetID] = uint64(amount)
-	}
-
-	outputs := make([][]byte, len(res.Outputs))
-	for i, outputStr := range res.Outputs {
-		output, err := formatting.Decode(res.Encoding, outputStr)
-		if err != nil {
-			return nil, nil, err
-		}
-		outputs[i] = output
-	}
-	return staked, outputs, err
 }
 
 // GetMinStake returns the minimum staking amount in nAVAX for validators and

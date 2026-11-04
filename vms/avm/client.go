@@ -5,21 +5,17 @@ package avm
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
-
-var ErrRejected = errors.New("rejected")
 
 type Client struct {
 	Requester rpc.EndpointRequester
@@ -82,18 +78,6 @@ func (c *Client) IssueTx(ctx context.Context, txBytes []byte, options ...rpc.Opt
 		Encoding: formatting.Hex,
 	}, res, options...)
 	return res.TxID, err
-}
-
-// GetTxStatus returns the status of [txID]
-//
-// Deprecated: GetTxStatus only returns Accepted or Unknown, GetTx should be
-// used instead to determine if the tx was accepted.
-func (c *Client) GetTxStatus(ctx context.Context, txID ids.ID, options ...rpc.Option) (choices.Status, error) {
-	res := &GetTxStatusReply{}
-	err := c.Requester.SendRequest(ctx, "avm.getTxStatus", &api.JSONTxID{
-		TxID: txID,
-	}, res, options...)
-	return res.Status, err
 }
 
 // GetTx returns the byte representation of txID.
@@ -172,45 +156,6 @@ func (c *Client) GetAssetDescription(ctx context.Context, assetID string, option
 	return res, err
 }
 
-// GetBalance returns the balance of assetID held by addr.
-//
-// If includePartial is set, balance includes partial owned (i.e. in a multisig)
-// funds.
-//
-// Deprecated: GetUTXOs should be used instead.
-func (c *Client) GetBalance(
-	ctx context.Context,
-	addr ids.ShortID,
-	assetID string,
-	includePartial bool,
-	options ...rpc.Option,
-) (*GetBalanceReply, error) {
-	res := &GetBalanceReply{}
-	err := c.Requester.SendRequest(ctx, "avm.getBalance", &GetBalanceArgs{
-		Address:        addr.String(),
-		AssetID:        assetID,
-		IncludePartial: includePartial,
-	}, res, options...)
-	return res, err
-}
-
-// GetAllBalances returns all asset balances for addr.
-//
-// Deprecated: GetUTXOs should be used instead.
-func (c *Client) GetAllBalances(
-	ctx context.Context,
-	addr ids.ShortID,
-	includePartial bool,
-	options ...rpc.Option,
-) ([]Balance, error) {
-	res := &GetAllBalancesReply{}
-	err := c.Requester.SendRequest(ctx, "avm.getAllBalances", &GetAllBalancesArgs{
-		JSONAddress:    api.JSONAddress{Address: addr.String()},
-		IncludePartial: includePartial,
-	}, res, options...)
-	return res.Balances, err
-}
-
 // GetTxFee returns the cost to issue certain transactions.
 func (c *Client) GetTxFee(ctx context.Context, options ...rpc.Option) (uint64, uint64, error) {
 	res := &GetTxFeeReply{}
@@ -218,21 +163,15 @@ func (c *Client) GetTxFee(ctx context.Context, options ...rpc.Option) (uint64, u
 	return uint64(res.TxFee), uint64(res.CreateAssetTxFee), err
 }
 
+// AwaitTxAccepted polls [Client.GetTx] every freq until txID is accepted or
+// ctx is cancelled.
 func (c *Client) AwaitTxAccepted(ctx context.Context, txID ids.ID, freq time.Duration, options ...rpc.Option) error {
 	ticker := time.NewTicker(freq)
 	defer ticker.Stop()
 
 	for {
-		status, err := c.GetTxStatus(ctx, txID, options...)
-		if err != nil {
-			return err
-		}
-
-		switch status {
-		case choices.Accepted:
+		if _, err := c.GetTx(ctx, txID, options...); err == nil {
 			return nil
-		case choices.Rejected:
-			return ErrRejected
 		}
 
 		select {

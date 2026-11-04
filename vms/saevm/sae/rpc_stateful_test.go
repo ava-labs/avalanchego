@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/libevm/eth/tracers"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/ava-labs/libevm/eth/tracers/native"
-	"github.com/ava-labs/libevm/ethclient/gethclient"
 	"github.com/ava-labs/libevm/libevm/ethapi"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
@@ -764,8 +763,6 @@ func TestStatefulRPCs(t *testing.T) {
 	storageKey := escrow.StorageKeyForBalance(recipient)
 	storageKeyHex := storageKey.Hex()
 
-	gc := gethclient.New(sut.wsClient)
-
 	wantStorageValue := big.NewInt(escrowDepositVal)
 	wantStorageBytes := uint256.NewInt(escrowDepositVal).PaddedBytes(32)
 
@@ -811,7 +808,7 @@ func TestStatefulRPCs(t *testing.T) {
 			})
 
 			t.Run("eth_getProof", func(t *testing.T) {
-				got, err := gc.GetProof(ctx, escrowAddr, []string{storageKeyHex}, blockNum)
+				got, err := sut.GetProof(ctx, escrowAddr, []string{storageKeyHex}, blockNum)
 				require.NoError(t, err, "GetProof()")
 				require.NotNil(t, got, "GetProof() result")
 
@@ -947,7 +944,6 @@ func TestStatefulRPCsEveryHeight(t *testing.T) {
 // the latest block: eth_estimateGas and eth_createAccessList.
 func TestStatefulRPCsLatestOnly(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
-	gc := gethclient.New(sut.wsClient)
 
 	escrowAddr := sut.deployEscrow(t)
 
@@ -972,7 +968,7 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 	})
 
 	t.Run("eth_createAccessList", func(t *testing.T) {
-		accessList, gas, errMsg, err := gc.CreateAccessList(ctx, callMsg)
+		accessList, gas, errMsg, err := sut.CreateAccessList(ctx, callMsg)
 		require.NoError(t, err, "CreateAccessList()")
 		require.Empty(t, errMsg, "CreateAccessList() error message")
 
@@ -992,7 +988,6 @@ func TestStatefulRPCsLatestOnly(t *testing.T) {
 // mempool's size-based minimum, even when execution uses less gas.
 func TestSizeMinimumGas(t *testing.T) {
 	ctx, sut := newSUT(t, 1)
-	gc := gethclient.New(sut.wsClient)
 
 	// Execution uses ~54k gas but the mempool requires ~420k because of the
 	// tx size.
@@ -1034,12 +1029,12 @@ func TestSizeMinimumGas(t *testing.T) {
 	})
 
 	t.Run("eth_createAccessList", func(t *testing.T) {
-		accessList, gas, vmErr, err := gc.CreateAccessList(ctx, msg)
+		accessList, gas, vmErr, err := sut.CreateAccessList(ctx, msg)
 		require.NoError(t, err, "CreateAccessList()")
 		require.Empty(t, vmErr, "CreateAccessList() execution error")
 		below := send(t, gas, *accessList)
 
-		_, _, _, err = gc.CreateAccessList(ctx, below)
+		_, _, _, err = sut.CreateAccessList(ctx, below)
 		require.ErrorContains(t, err, errBelow, "CreateAccessList() with gas %d", below.Gas) //nolint:forbidigo // RPC error
 	})
 }

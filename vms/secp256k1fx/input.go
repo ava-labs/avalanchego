@@ -7,7 +7,6 @@ import (
 	"errors"
 
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -24,11 +23,6 @@ type Input struct {
 	// This input will be spent with a list of signatures.
 	// SignatureList[i] is the signature of OwnerList[i]
 	SigIndices []uint32 `serialize:"true" json:"signatureIndices"`
-}
-
-func (in *Input) Cost() (uint64, error) {
-	numSigs := uint64(len(in.SigIndices))
-	return math.Mul(numSigs, CostPerSignature)
 }
 
 // Verify this input is syntactically valid

@@ -342,7 +342,7 @@ message PushQuery {
   uint64 deadline = 3;
   // Container being gossiped
   bytes container = 4;
-  // Requesting peer's last accepted height
+  // The height that the requesting peer is asking for the preference at
   uint64 requested_height = 6;
 }
 
@@ -359,7 +359,7 @@ message PullQuery {
   uint64 deadline = 3;
   // Container id being gossiped
   bytes container_id = 4;
-  // Requesting peer's last accepted height
+  // The height that the requesting peer is asking for the preference at
   uint64 requested_height = 6;
 }
 
@@ -371,7 +371,7 @@ message Chits {
   // Request ID of the original PushQuery/PullQuery request
   uint32 request_id = 2;
   // ID of the currently preferred block
-  bytes preferred_id = 3;
+  bytes preferred_id = 3; // TODO: remove this field in the future as we don't need it anymore.
   // ID of the last accepted block
   bytes accepted_id = 4;
   // ID of the currently preferred block at the requested height

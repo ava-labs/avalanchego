@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/types"
@@ -20,6 +19,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
+
+// ContractAddress is the address of the warp precompile contract
+var ContractAddress = common.HexToAddress("0x0200000000000000000000000000000000000005")
 
 const addWarpMessageBaseGasCost uint64 = 20_000 // Cost of producing and serving a BLS Signature
 
@@ -150,18 +152,6 @@ func getBlockchainID(accessibleState contract.AccessibleState, caller common.Add
 	return packedOutput, remainingGas, nil
 }
 
-// UnpackGetVerifiedWarpBlockHashInput attempts to unpack [input] into the uint32 type argument
-// assumes that [input] does not include selector (omits first 4 func signature bytes)
-func UnpackGetVerifiedWarpBlockHashInput(input []byte) (uint32, error) {
-	// We don't use strict mode here because it was disabled with Durango.
-	// Since Warp will be deployed after Durango, we don't need to validate padding length.
-	var unpacked uint32
-	if err := WarpABI.UnpackInputIntoInterface(&unpacked, "getVerifiedWarpBlockHash", input); err != nil {
-		return 0, err
-	}
-	return unpacked, nil
-}
-
 // PackGetVerifiedWarpBlockHash packs [index] of type uint32 into the appropriate arguments for getVerifiedWarpBlockHash.
 // the packed bytes include selector (first 4 func signature bytes).
 // This function is mostly used for tests.
@@ -176,15 +166,6 @@ func PackGetVerifiedWarpBlockHashOutput(outputStruct GetVerifiedWarpBlockHashOut
 		outputStruct.WarpBlockHash,
 		outputStruct.Valid,
 	)
-}
-
-// UnpackGetVerifiedWarpBlockHashOutput attempts to unpack [output] as GetVerifiedWarpBlockHashOutput
-// assumes that [output] does not include selector (omits first 4 func signature bytes)
-func UnpackGetVerifiedWarpBlockHashOutput(output []byte) (GetVerifiedWarpBlockHashOutput, error) {
-	outputStruct := GetVerifiedWarpBlockHashOutput{}
-	err := WarpABI.UnpackIntoInterface(&outputStruct, "getVerifiedWarpBlockHash", output)
-
-	return outputStruct, err
 }
 
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
@@ -220,15 +201,6 @@ func PackGetVerifiedWarpMessageOutput(outputStruct GetVerifiedWarpMessageOutput)
 	)
 }
 
-// UnpackGetVerifiedWarpMessageOutput attempts to unpack [output] as GetVerifiedWarpMessageOutput
-// assumes that [output] does not include selector (omits first 4 func signature bytes)
-func UnpackGetVerifiedWarpMessageOutput(output []byte) (GetVerifiedWarpMessageOutput, error) {
-	outputStruct := GetVerifiedWarpMessageOutput{}
-	err := WarpABI.UnpackIntoInterface(&outputStruct, "getVerifiedWarpMessage", output)
-
-	return outputStruct, err
-}
-
 // getVerifiedWarpMessage retrieves the pre-verified warp message from the predicate storage slots and returns
 // the expected ABI encoding of the message to the caller.
 //
@@ -258,17 +230,6 @@ func PackSendWarpMessage(payloadData []byte) ([]byte, error) {
 // to conform the ABI outputs.
 func PackSendWarpMessageOutput(messageID common.Hash) ([]byte, error) {
 	return WarpABI.PackOutput("sendWarpMessage", messageID)
-}
-
-// UnpackSendWarpMessageOutput attempts to unpack given [output] into the common.Hash type output
-// assumes that [output] does not include selector (omits first 4 func signature bytes)
-func UnpackSendWarpMessageOutput(output []byte) (common.Hash, error) {
-	res, err := WarpABI.Unpack("sendWarpMessage", output)
-	if err != nil {
-		return common.Hash{}, err
-	}
-	unpacked := *abi.ConvertType(res[0], new(common.Hash)).(*common.Hash)
-	return unpacked, nil
 }
 
 // sendWarpMessage constructs an Avalanche Warp Message containing an AddressedPayload and emits a log to signal validators that they should

@@ -88,29 +88,10 @@ This performs the following steps:
 2. Copy the current state as of the default task's initial height into `$EXECUTION_DATA_DIR/current-state` (state as of height 100) using the VM's default config (hashdb full)
 3. Build and execute a Golang Benchmark a single time to execute the default block range (block range [101, 250k])
 
-The final output displays the top-level metrics from the benchmark run, which is simply mgas/s for the C-Chain:
+The final output logs the top-level metrics from the benchmark run, which is simply mgas/s for the C-Chain:
 
 ```
-[09-02|16:25:21.481] INFO vm-executor c/vm_reexecute_test.go:383 executing block {"height": 250000, "eta": "0s"}
-[09-02|16:25:21.483] INFO vm-executor c/vm_reexecute_test.go:401 finished executing sequence
-[09-02|16:25:21.485] INFO c-chain-reexecution c/vm_reexecute_test.go:194 shutting down VM
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/txpool/legacypool/legacypool.go:449 Transaction pool stopped
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:966 Closing quit channel
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:969 Stopping Acceptor
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:972 Acceptor queue drained                   t="4.359µs"
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:975 Shutting down sender cacher
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:979 Closing scope
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:983 Waiting for background processes to complete
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:1002 Shutting down state manager
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:1007 State manager shut down                  t=198ns
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:1012 Blockchain stopped
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> eth/backend.go:404 Stopped shutdownTracker
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> eth/backend.go:407 Closed chaindb
-[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> eth/backend.go:409 Stopped EventMux
-[09-02|16:25:21.485] INFO c-chain-reexecution c/vm_reexecute_test.go:181 shutting down DB
-BenchmarkReexecuteRange/[101,250000]-Config-archive-6         	       1	        85.29 mgas/s
-PASS
-ok  	github.com/ava-labs/avalanchego/tests/reexecute/c	313.560s
+INFO c-chain-reexecution BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-dev {"result": "85.29 mgas/s"}
 ```
 
 ## How to Create and Use a Re-Execution Snapshot
@@ -285,7 +266,7 @@ LIBEVM_REF=v1.2.3 ./scripts/run_polyrepo.sh
 Use `with-dependencies` to specify custom versions. Either or both can be provided:
 
 ```bash
-gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
+gh workflow run "C-Chain Re-exec / native" \
   -f test=firewood-101-250k \
   -f with-dependencies="firewood=abc123,libevm=v1.2.3" \
   -f runner=blacksmith-4vcpu-ubuntu-2404
@@ -322,9 +303,9 @@ For a realistic view, run the default C-Chain benchmark in the [Quick Start](#qu
 
 ## CI
 
-Benchmarks are run via [c-chain-benchmark-gh-native](../../../.github/workflows/c-chain-reexecution-benchmark-gh-native.yml) and [c-chain-reexecution-benchmark-container](../../../.github/workflows/c-chain-reexecution-benchmark-container.yml).
+Benchmarks are run via [C-Chain Re-exec / native](../../../.github/workflows/c-chain-reexecution-benchmark-gh-native.yml) and [C-Chain Re-exec / container](../../../.github/workflows/c-chain-reexecution-benchmark-container.yml).
 
-To run on our GitHub [Actions Runner Controller](https://github.com/actions/actions-runner-controller) installation, we need to specify a container and add an extra installation step. Unfortunately, once the YAML has been updated to include this field at all, there is no way to populate it dynamically to skip the extra layer of containerization. To support both ARC and GH Native jobs (including Blacksmith runners) without this unnecessary layer, we separate this into two separate workflows with their own triggers.
+To run on our GitHub [Actions Runner Controller](https://github.com/actions/actions-runner-controller) installation, we need to specify a container and add an extra installation step. Unfortunately, once the YAML has been updated to include this field at all, there is no way to populate it dynamically to skip the extra layer of containerization. To support both ARC and native jobs (including Blacksmith runners) without this unnecessary layer, we separate this into two separate workflows with their own triggers.
 
 The runner options are:
 - native GH runner options (ex. `ubuntu-latest`, more information [here](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners))
@@ -343,7 +324,7 @@ The workflows support two approaches:
 1. **Test-based**: Specify a predefined `test` name (e.g., `"test": "firewood-101-250k"`)
 2. **Custom parameters**: Leave `test` empty and provide `config`, `start-block`, `end-block`, `block-dir-src`, `current-state-dir-src`
 
-For example, to add a Firewood benchmark to execute the block range [101, 250K] on a daily basis, add the following entry under the `schedule` include array in the [GH Native JSON file](../../../.github/workflows/c-chain-reexecution-benchmark-gh-native.json).
+For example, to add a Firewood benchmark to execute the block range [101, 250K] on a daily basis, add the following entry under the `schedule` include array in the [native JSON file](../../../.github/workflows/c-chain-reexecution-benchmark-gh-native.json).
 
 ```json
 {
@@ -360,7 +341,7 @@ To trigger runs conveniently, you can use the [GitHub CLI](https://cli.github.co
 ### Using a Predefined Test
 
 ```bash
-gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
+gh workflow run "C-Chain Re-exec / native" \
   -f test=firewood-101-250k \
   -f runner=blacksmith-4vcpu-ubuntu-2404 \
   -f timeout-minutes=60
@@ -371,7 +352,7 @@ gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
 Use `with-dependencies` to specify `firewood=<ref>` and/or `libevm=<ref>`:
 
 ```bash
-gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
+gh workflow run "C-Chain Re-exec / native" \
   -f test=firewood-101-250k \
   -f with-dependencies="firewood=abc123def,libevm=v1.2.3" \
   -f runner=blacksmith-4vcpu-ubuntu-2404 \
@@ -381,7 +362,7 @@ gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
 ### Using Custom Parameters
 
 ```bash
-gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
+gh workflow run "C-Chain Re-exec / native" \
   -f block-dir-src=cchain-mainnet-blocks-1m-ldb \
   -f current-state-dir-src=cchain-current-state-hashdb-full-100 \
   -f start-block=101 \
@@ -394,7 +375,7 @@ gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
 ### Pushing Post-Execution State to S3
 
 ```bash
-gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
+gh workflow run "C-Chain Re-exec / native" \
   -f test=hashdb-101-250k \
   -f runner=blacksmith-4vcpu-ubuntu-2404 \
   -f push-post-state=s3://avalanchego-bootstrap-testing/cchain-current-state-new/ \

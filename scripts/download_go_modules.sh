@@ -8,7 +8,8 @@ readonly REPO_ROOT
 # Download each module outside workspace mode. Some CI tasks run from a graft
 # module or disable workspace mode, which can select dependency versions that
 # differ from the workspace build list. Do not treat a repository-local module
-# cache as a repository module when validating an offline cache.
+# cache as a repository module when checking dependency completeness with
+# module downloads disabled.
 GO_MOD_CACHE="$(go env GOMODCACHE)"
 if [[ -d "${GO_MOD_CACHE}" ]]; then
   GO_MOD_CACHE="$(cd "${GO_MOD_CACHE}" && pwd -P)"

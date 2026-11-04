@@ -6,12 +6,10 @@ package tx
 import (
 	"errors"
 	"fmt"
-	"math/big"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
@@ -19,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -241,9 +240,7 @@ func (i *Import) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) 
 			continue
 		}
 
-		coinID := common.Hash(out.AssetID)
-		amount := new(big.Int).SetUint64(out.Amount)
-		statedb.AddBalanceMultiCoin(out.Address, coinID, amount)
+		statedb.AddAssetBalance(out.Address, common.Hash(out.AssetID), uint256.NewInt(out.Amount))
 	}
 	return nil
 }

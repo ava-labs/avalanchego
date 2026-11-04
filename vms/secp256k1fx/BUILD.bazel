@@ -31,7 +31,6 @@ go_library(
         "//utils/formatting/address",
         "//utils/hashing",
         "//utils/logging",
-        "//utils/math",
         "//utils/set",
         "//utils/timer/mockable",
         "//vms/components/verify",

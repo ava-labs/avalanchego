@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 )
 
 var _ Network = (*testNetwork)(nil)
@@ -26,10 +27,6 @@ type testNetwork struct {
 
 func (*testNetwork) P2PNetwork() *p2p.Network {
 	panic("P2PNetwork unimplemented")
-}
-
-func (*testNetwork) Sample(context.Context, int) []ids.NodeID {
-	panic("Sample unimplemented")
 }
 
 func (t *testNetwork) SendSyncedAppRequestAny(_ context.Context, _ []byte) ([]byte, ids.NodeID, error) {
@@ -87,6 +84,10 @@ func (t *testNetwork) testResponses(callback func(), responses ...[]byte) {
 	t.response = responses
 	t.callback = callback
 	t.numCalls = 0
+}
+
+func (*testNetwork) PeerTracker() *peertracker.PeerTracker {
+	panic("PeerTracker unimplemented")
 }
 
 func (*testNetwork) RegisterResponse(ids.NodeID, float64) {}

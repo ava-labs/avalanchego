@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -24,8 +25,8 @@ import (
 )
 
 // NewSelfNetwork returns a single-node [p2p.Network] that loops requests back
-// to its own handlers, and a [p2p.PeerTracker] that selects that node.
-func NewSelfNetwork(t *testing.T, ctx context.Context, nodeID ids.NodeID) (*p2p.Network, *p2p.PeerTracker) {
+// to its own handlers, and a [peertracker.PeerTracker] that selects that node.
+func NewSelfNetwork(t *testing.T, ctx context.Context, nodeID ids.NodeID) (*p2p.Network, *peertracker.PeerTracker) {
 	t.Helper()
 
 	log := loggingtest.New(t, logging.Debug)
@@ -65,7 +66,7 @@ func NewSelfNetwork(t *testing.T, ctx context.Context, nodeID ids.NodeID) (*p2p.
 
 	require.NoError(t, net.Connected(ctx, nodeID, version.Current))
 
-	tracker, err := p2p.NewPeerTracker(log, "synctest_peer_tracker", prometheus.NewRegistry(), nil, nil)
+	tracker, err := peertracker.New(log, "synctest_peer_tracker", prometheus.NewRegistry(), nil, nil)
 	require.NoError(t, err)
 	tracker.Connected(nodeID, version.Current)
 

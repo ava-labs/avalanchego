@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -69,9 +70,11 @@ type SyncedNetworkClient interface {
 type Network interface {
 	validators.Connector
 	common.AppHandler
-	p2p.NodeSampler
 
 	SyncedNetworkClient
+
+	// PeerTracker returns the tracker to build a [peertracker.Client] with.
+	PeerTracker() *peertracker.PeerTracker
 
 	// SendAppRequestAny sends request to an arbitrary peer.
 	// Returns the ID of the chosen peer, and an error if no peer is available.
@@ -106,7 +109,7 @@ type network struct {
 	appSender                  common.AppSender                   // avalanchego AppSender for sending messages
 	codec                      codec.Manager                      // Codec used for parsing messages
 	appRequestHandler          message.RequestHandler             // maps request type => handler
-	peers                      *p2p.PeerTracker                   // tracking of peers & bandwidth
+	peers                      *peertracker.PeerTracker           // tracking of peers & bandwidth
 
 	// Set to true when Shutdown is called, after which all operations on this
 	// struct are no-ops.
@@ -146,7 +149,7 @@ func NewNetwork(
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize p2p network: %w", err)
 	}
-	peers, err := p2p.NewPeerTracker(
+	peers, err := peertracker.New(
 		ctx.Log,
 		"sync_peer_tracker",
 		registerer,
@@ -166,25 +169,6 @@ func NewNetwork(
 		peers:                      peers,
 		p2pValidators:              p2pValidators,
 	}, nil
-}
-
-// Sample returns a random sample of connected peers.
-// `limit` is ignored, and one peer will be returned.
-// The peer returned may not be a validator - to sample validators,
-// use [p2p.Validators.Sample] instead.
-func (n *network) Sample(_ context.Context, limit int) []ids.NodeID {
-	if limit <= 0 {
-		return nil
-	}
-	if limit > 1 {
-		log.Warn("Sample called with limit > 1, but only 1 peer will be returned", "limit", limit)
-	}
-
-	node, ok := n.peers.SelectPeer()
-	if !ok {
-		return nil
-	}
-	return []ids.NodeID{node}
 }
 
 // SendAppRequestAny synchronously sends request to an arbitrary peer.
@@ -282,6 +266,9 @@ func (n *network) sendAppRequest(ctx context.Context, nodeID ids.NodeID, request
 			"error", err,
 		)
 
+		// The request never reached nodeID, so balance the registration above.
+		// Nothing else will, since the handler is gone.
+		n.peers.RegisterFailure(nodeID)
 		n.activeAppRequests.Release(1)
 		delete(n.outstandingRequestHandlers, requestID)
 		return err
@@ -434,7 +421,7 @@ func (n *network) Connected(ctx context.Context, nodeID ids.NodeID, nodeVersion 
 		return nil
 	}
 
-	// [p2p.PeerTracker] filters out self via the ignoredNodes set passed at construction.
+	// [peertracker.PeerTracker] filters out self via the ignoredNodes set passed at construction.
 	n.peers.Connected(nodeID, nodeVersion)
 
 	return n.sdkNetwork.Connected(ctx, nodeID, nodeVersion)
@@ -482,6 +469,10 @@ func (n *network) Size() uint32 {
 	defer n.lock.RUnlock()
 
 	return uint32(n.peers.Size())
+}
+
+func (n *network) PeerTracker() *peertracker.PeerTracker {
+	return n.peers
 }
 
 func (n *network) RegisterResponse(nodeID ids.NodeID, bandwidth float64) {

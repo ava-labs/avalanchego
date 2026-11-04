@@ -200,7 +200,5 @@ var _ = e2e.DescribePChain("[Auto-Renewed Validators] [Reward Eligibility]", gin
 		tc.By("checking stake was returned", func() {
 			require.Equal(tc, fundedKeyBalanceBeforeExit+validatorWeight, balanceOf(tc, f.randomWalletNodeURI, f.validatorFundingKey))
 		})
-
-		_ = e2e.CheckBootstrapIsPossible(tc, env.GetNetwork())
 	})
 })

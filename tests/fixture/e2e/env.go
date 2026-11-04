@@ -46,6 +46,9 @@ type TestEnvironment struct {
 	RootNetworkDir string
 	// The directory where the test network configuration is stored
 	NetworkDir string
+	// This directory contains state that Ginkgo processes share.
+	// Suite cleanup removes this directory.
+	SuiteStateDir string
 	// Pre-funded key for this ginkgo process
 	PreFundedKey *secp256k1.PrivateKey
 	// The duration to wait before shutting down private networks. A
@@ -64,6 +67,7 @@ func GetEnv(tc tests.TestContext) *TestEnvironment {
 	return &TestEnvironment{
 		RootNetworkDir:              env.RootNetworkDir,
 		NetworkDir:                  env.NetworkDir,
+		SuiteStateDir:               env.SuiteStateDir,
 		PreFundedKey:                env.PreFundedKey,
 		PrivateNetworkShutdownDelay: env.PrivateNetworkShutdownDelay,
 		testContext:                 tc,

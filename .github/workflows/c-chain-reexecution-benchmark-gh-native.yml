@@ -1,4 +1,4 @@
-name: C-Chain Re-Execution Benchmark GH Native
+name: C-Chain Re-exec / native
 
 on:
   pull_request:
@@ -42,6 +42,7 @@ on:
 
 jobs:
   define-matrix:
+    name: define-matrix
     runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.define-matrix.outputs.matrix }}
@@ -85,6 +86,9 @@ jobs:
           fi
 
   c-chain-reexecution:
+    # Keep PR check names short. GitHub can hide a job duration when its name is long.
+    # Scheduled runs include the runner because the same test can run on more than one runner.
+    name: ${{ github.event_name == 'schedule' && format('{0} / {1}', matrix.test, matrix.runner) || matrix.test }}
     needs: define-matrix
     strategy:
       fail-fast: false
