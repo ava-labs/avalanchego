@@ -43,7 +43,6 @@ go_test(
         "//codec",
         "//database",
         "//database/memdb",
-        "//graft/coreth/params",
         "//graft/coreth/precompile/contracts/warp",
         "//ids",
         "//snow/engine/common",
