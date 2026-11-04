@@ -864,10 +864,8 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 	const restakingCapacity uint64 = 2_000_000
 
-	env := newEnvironment(t, upgradetest.Latest)
-
 	validatorConfig := autoRenewedValidatorConfig{
-		weight:                   env.config.MinValidatorStake,
+		weight:                   defaultMinValidatorStake,
 		delegateeReward:          5_000_000,
 		accruedValidationRewards: 1_000_000,
 		accruedDelegateeRewards:  500_000,
@@ -970,6 +968,9 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Each subtest gets its own env because the commit state is applied
+			// to env.state to check the reward UTXO index.
+			env := newEnvironment(t, upgradetest.Latest)
 			cfg := tt.config(env)
 
 			stakerTx := newAddAutoRenewedValidatorTx(t, env, cfg.weight, cfg.delegationRewardShares, cfg.autoCompoundRewardShares)
@@ -985,6 +986,7 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 			onCommitState, onAbortState, err := executeProposalTx(t, env, diff, rewardTx)
 			require.NoError(t, err)
 
+			wantValidator := tt.want(cfg, staker.PotentialReward)
 			assertRewardAutoRenewedValidator(
 				t,
 				diff,
@@ -992,8 +994,19 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 				rewardTx,
 				onCommitState,
 				onAbortState,
-				tt.want(cfg, staker.PotentialReward),
+				wantValidator,
 			)
+
+			// The reward UTXO index is only readable from state.State, so apply
+			// the commit state to check it.
+			require.NoError(t, diff.Apply(env.state))
+			require.NoError(t, onCommitState.Apply(env.state))
+
+			rewardUTXOs, err := env.state.GetRewardUTXOs(rewardTx.ID())
+			require.NoError(t, err)
+			require.Len(t, rewardUTXOs, 2)
+			require.Equal(t, wantValidator.commitReward.validation, rewardUTXOs[0].Out.(*secp256k1fx.TransferOutput).Amount())
+			require.Equal(t, wantValidator.commitReward.delegatee, rewardUTXOs[1].Out.(*secp256k1fx.TransferOutput).Amount())
 		})
 	}
 }
@@ -1091,4 +1104,14 @@ func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 	stakingInfo, err = abortState.GetStakingInfo(constants.PrimaryNetworkID, nodeID)
 	require.NoError(t, err)
 	require.Zero(t, stakingInfo.DelegateeReward)
+
+	// The reward UTXO index is only readable from state.State, so apply the
+	// commit state to check it.
+	require.NoError(t, diff.Apply(env.state))
+	require.NoError(t, commitState.Apply(env.state))
+
+	rewardUTXOs, err := env.state.GetRewardUTXOs(delegatorTx.ID())
+	require.NoError(t, err)
+	require.Len(t, rewardUTXOs, 1)
+	require.Equal(t, wantDelegatorReward, rewardUTXOs[0].Out.(*secp256k1fx.TransferOutput).Amount())
 }
