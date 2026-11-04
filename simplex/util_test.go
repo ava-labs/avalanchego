@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/common"
-	"github.com/ava-labs/avalanchego/graft/simplex/wal"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/wal"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -65,8 +65,6 @@ type newBlockConfig struct {
 	prev *Block
 	// If round is 0, it will be set to one higher than the prev's round
 	round uint64
-	// genesis nodes
-	numNodes uint64
 }
 
 func newTestBlock(config newBlockConfig) *Block {

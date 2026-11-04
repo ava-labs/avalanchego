@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -20,8 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
-	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	simplexcommon "github.com/ava-labs/avalanchego/graft/simplex/common"
+	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
 
 var _ common.Engine = (*Engine)(nil)
