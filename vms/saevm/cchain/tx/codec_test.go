@@ -67,10 +67,10 @@ func TestIDAndBytesCached(t *testing.T) {
 			// The first iteration populates the cache and the second reads
 			// from it.
 			for range 2 {
-				assert.Equalf(t, golden.id, tx.ID(), "%T.ID()", tx)
+				require.Equalf(t, golden.id, tx.ID(), "%T.ID()", tx)
 				got, err := tx.Bytes()
 				require.NoErrorf(t, err, "%T.Bytes()", tx)
-				assert.Equalf(t, golden.bytes, got, "%T.Bytes()", tx)
+				require.Equalf(t, golden.bytes, got, "%T.Bytes()", tx)
 			}
 		})
 	}
@@ -110,9 +110,9 @@ func TestIDAndBytesConcurrent(t *testing.T) {
 			wg.Wait()
 
 			for i := range numGoroutines {
-				assert.Equalf(t, golden.id, gotIDs[i], "%T.ID()", tx)
+				require.Equalf(t, golden.id, gotIDs[i], "%T.ID()", tx)
 				require.NoErrorf(t, errs[i], "%T.Bytes()", tx)
-				assert.Equalf(t, golden.bytes, gotBytes[i], "%T.Bytes()", tx)
+				require.Equalf(t, golden.bytes, gotBytes[i], "%T.Bytes()", tx)
 			}
 		})
 	}
@@ -122,7 +122,7 @@ func TestIDAndBytesConcurrent(t *testing.T) {
 // the zero ID.
 func TestIDAndBytesInvalid(t *testing.T) {
 	tx := &Tx{}
-	assert.Equalf(t, ids.ID{}, tx.ID(), "%T.ID()", tx)
+	require.Equalf(t, ids.ID{}, tx.ID(), "%T.ID()", tx)
 	_, err := tx.Bytes()
 	require.ErrorIsf(t, err, codec.ErrMarshalNil, "%T.Bytes()", tx)
 }

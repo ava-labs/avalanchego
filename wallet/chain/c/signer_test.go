@@ -7,7 +7,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -98,9 +97,9 @@ func TestSignRefreshesIDAndBytes(t *testing.T) {
 				require.NoErrorf(t, err, "%T.Bytes()", uncached)
 				got, err := stx.Bytes()
 				require.NoErrorf(t, err, "%T.Bytes()", stx)
-				assert.Equalf(t, want, got, "%T.Bytes()", stx)
-				assert.Equalf(t, uncached.ID(), stx.ID(), "%T.ID()", stx)
-				assert.NotEqualf(t, before, stx.ID(), "%T.ID() did not change after signing", stx)
+				require.Equalf(t, want, got, "%T.Bytes()", stx)
+				require.Equalf(t, uncached.ID(), stx.ID(), "%T.ID()", stx)
+				require.NotEqualf(t, before, stx.ID(), "%T.ID() did not change after signing", stx)
 			}
 		})
 	}
