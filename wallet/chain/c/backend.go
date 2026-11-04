@@ -134,7 +134,8 @@ func (b *backend) Balance(_ context.Context, addr ethcommon.Address) (*big.Int, 
 	if !exists {
 		return nil, database.ErrNotFound
 	}
-	return account.Balance, nil
+
+	return new(big.Int).Set(account.Balance), nil
 }
 
 func (b *backend) Nonce(_ context.Context, addr ethcommon.Address) (uint64, error) {
