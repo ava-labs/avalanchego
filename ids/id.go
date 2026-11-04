@@ -39,7 +39,7 @@ func ToID(bytes []byte) (ID, error) {
 
 // FromString is the inverse of ID.String()
 func FromString(idStr string) (ID, error) {
-	bytes, err := cb58.Decode(idStr)
+	bytes, err := cb58.Decode(idStr, IDLen)
 	if err != nil {
 		return ID{}, err
 	}
@@ -77,7 +77,7 @@ func (id *ID) UnmarshalJSON(b []byte) error {
 	}
 
 	// Parse CB58 formatted string to bytes
-	bytes, err := cb58.Decode(str[1:lastIndex])
+	bytes, err := cb58.Decode(str[1:lastIndex], IDLen)
 	if err != nil {
 		return fmt.Errorf("couldn't decode ID to bytes: %w", err)
 	}

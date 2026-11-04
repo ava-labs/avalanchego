@@ -122,7 +122,7 @@ A signed message rides into the receiver chain inside a transaction's access lis
 ```mermaid
 flowchart TD
     tx["Transaction<br/>access list"]:::ext
-    fal["predicate.FromAccessList"]:::evm
+    fal["RulesExtra.WarpMessages"]:::evm
     bctx["block.Context<br/>(P-Chain height)"]:::plat
     bits["set.Bits of<br/>failed indices"]:::pkg
     res["BlockResults"]:::pkg
@@ -130,11 +130,11 @@ flowchart TD
     gvm["getVerifiedWarpMessage"]:::evm
 
     subgraph VB["VerifyBlock"]
-        vp["Precompile VerifyPredicate<br/>(one goroutine per predicate)"]:::evm
+        vp["Warp VerifyPredicate<br/>(one goroutine per message)"]:::evm
     end
 
     tx --> fal
-    fal -->|"predicates keyed by<br/>precompile address"| vp
+    fal -->|"Warp messages in<br/>access-list order"| vp
     bctx -->|"pins the source chain's<br/>validator set"| vp
     vp --> bits --> res
     res -->|"encoded into the header"| hdr

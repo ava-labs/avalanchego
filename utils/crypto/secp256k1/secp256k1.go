@@ -288,7 +288,7 @@ func (k *PrivateKey) unmarshalText(text string) error {
 	}
 
 	strNoPrefix := text[len(PrivateKeyPrefix):]
-	keyBytes, err := cb58.Decode(strNoPrefix)
+	keyBytes, err := cb58.Decode(strNoPrefix, PrivateKeyLen)
 	if err != nil {
 		return err
 	}
