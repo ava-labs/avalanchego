@@ -16,9 +16,15 @@ import (
 )
 
 const (
-	LOG_LEVEL      = "log_level"
-	INFO_LOG_LEVEL = "info"
+	logLevelEnv   = "LOG_LEVEL"
+	debugLogLevel = "debug"
 )
+
+// debugOutputEnabled reports whether debug entries should be written to the log outputs.
+// Debug entries are always delivered to hooks registered via Intercept, regardless of this setting.
+func debugOutputEnabled() bool {
+	return strings.EqualFold(os.Getenv(logLevelEnv), debugLogLevel)
+}
 
 type TestLogger struct {
 	*zap.Logger
@@ -127,35 +133,33 @@ func MakeLoggerWithFile(t *testing.T, fileWriter zapcore.WriteSyncer, writeStdou
 	config.EncodeTime = zapcore.TimeEncoderOfLayout("[01-02|15:04:05.000]")
 	config.ConsoleSeparator = " "
 
+	// The level stays at debug so that hooks registered via Intercept observe debug entries.
+	// Unless debug output is enabled, debug entries are dropped at encoding time instead.
 	atomicLevel := zap.NewAtomicLevelAt(zapcore.DebugLevel)
+
+	newEncoder := func() zapcore.Encoder {
+		encoder := zapcore.NewConsoleEncoder(config)
+		if debugOutputEnabled() {
+			return encoder
+		}
+		return &DebugSwallowingEncoder{
+			consoleEncoder: encoder,
+			ObjectEncoder:  encoder,
+			pool:           buffer.NewPool(),
+		}
+	}
 
 	var cores []zapcore.Core
 
 	// Stdout core only if explicitly enabled
 	if writeStdout {
-		stdoutEncoder := zapcore.NewConsoleEncoder(config)
-		if strings.ToLower(os.Getenv("LOG_LEVEL")) == "info" {
-			stdoutEncoder = &DebugSwallowingEncoder{
-				consoleEncoder: stdoutEncoder,
-				ObjectEncoder:  stdoutEncoder,
-				pool:           buffer.NewPool(),
-			}
-		}
-		stdoutCore := zapcore.NewCore(stdoutEncoder, zapcore.AddSync(os.Stdout), atomicLevel)
+		stdoutCore := zapcore.NewCore(newEncoder(), zapcore.AddSync(os.Stdout), atomicLevel)
 		cores = append(cores, stdoutCore)
 	}
 
 	// File core only if provided
 	if fileWriter != nil {
-		fileEncoder := zapcore.NewConsoleEncoder(config)
-		if strings.ToLower(os.Getenv(LOG_LEVEL)) == INFO_LOG_LEVEL {
-			fileEncoder = &DebugSwallowingEncoder{
-				consoleEncoder: fileEncoder,
-				ObjectEncoder:  fileEncoder,
-				pool:           buffer.NewPool(),
-			}
-		}
-		fileCore := zapcore.NewCore(fileEncoder, fileWriter, atomicLevel)
+		fileCore := zapcore.NewCore(newEncoder(), fileWriter, atomicLevel)
 		cores = append(cores, fileCore)
 	}
 
@@ -195,10 +199,12 @@ type DebugSwallowingEncoder struct {
 }
 
 func (dse *DebugSwallowingEncoder) Clone() zapcore.Encoder {
+	// Fields added via With are written to ObjectEncoder, so it must be the same clone that encodes entries.
+	clone := dse.consoleEncoder.Clone()
 	return &DebugSwallowingEncoder{
 		pool:           dse.pool,
-		ObjectEncoder:  dse.ObjectEncoder,
-		consoleEncoder: dse.consoleEncoder.Clone(),
+		ObjectEncoder:  clone,
+		consoleEncoder: clone,
 	}
 }
 
