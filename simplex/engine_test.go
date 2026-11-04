@@ -23,8 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 
-	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	simplexcommon "github.com/ava-labs/avalanchego/graft/simplex/common"
+	simplexparams "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
 
 // TestSimplexEngineHandlesSimplexMessages tests that the Simplex engine can handle
