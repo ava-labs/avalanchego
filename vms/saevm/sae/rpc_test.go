@@ -348,16 +348,16 @@ func TestTxPoolNamespace(t *testing.T) {
 	sut.mustSendTx(t, queuedTx, pendingTx)
 	sut.waitUntilTxsPending(t, pendingTx)
 
-	// TODO: This formatting is copied from libevm, consider exposing it somehow
-	// or removing the dependency on the exact format.
-	txToSummary := func(tx *types.Transaction) string {
-		return fmt.Sprintf("%s: %d wei + %d gas × %d wei",
-			tx.To(),
-			tx.Value().Uint64(),
-			tx.Gas(),
-			tx.GasPrice(),
-		)
-	}
+	// libevm owns the txpool_inspect format, so let it summarise the expected
+	// pool contents instead of duplicating its formatting here.
+	wantInspect := ethapi.NewTxPoolAPI(txPoolContent{
+		pending: map[common.Address][]*types.Transaction{
+			addresses[pendingAccount]: {pendingTx},
+		},
+		queued: map[common.Address][]*types.Transaction{
+			addresses[queuedAccount]: {queuedTx},
+		},
+	}).Inspect()
 
 	sut.testRPC(ctx, t, []rpcTest{
 		{
@@ -397,18 +397,7 @@ func TestTxPoolNamespace(t *testing.T) {
 		},
 		{
 			method: "txpool_inspect",
-			want: map[string]map[string]map[string]string{
-				"pending": {
-					addresses[pendingAccount].Hex(): {
-						"0": txToSummary(pendingTx),
-					},
-				},
-				"queued": {
-					addresses[queuedAccount].Hex(): {
-						"1": txToSummary(queuedTx),
-					},
-				},
-			},
+			want:   wantInspect,
 		},
 		{
 			method: "txpool_status",
@@ -418,6 +407,18 @@ func TestTxPoolNamespace(t *testing.T) {
 			},
 		},
 	}...)
+}
+
+// txPoolContent implements the subset of [ethapi.Backend] required by
+// [ethapi.TxPoolAPI.Inspect], returning fixed pool contents.
+type txPoolContent struct {
+	ethapi.Backend // nil; calling any other method panics
+	pending        map[common.Address][]*types.Transaction
+	queued         map[common.Address][]*types.Transaction
+}
+
+func (c txPoolContent) TxPoolContent() (map[common.Address][]*types.Transaction, map[common.Address][]*types.Transaction) {
+	return c.pending, c.queued
 }
 
 func TestFilterAPIs(t *testing.T) {
