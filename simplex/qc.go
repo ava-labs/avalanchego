@@ -11,7 +11,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
