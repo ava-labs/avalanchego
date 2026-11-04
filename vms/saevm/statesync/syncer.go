@@ -16,13 +16,13 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -64,8 +64,8 @@ func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
 		return false
 	}
 
-	if s.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
-		s.snowCtx.Log.Warn("State sync is not supported with Firewood scheme")
+	if !s.cfg.DBConfig.IsHashDB() {
+		s.snowCtx.Log.Warn("State sync is only supported with the hash scheme", zap.String("scheme", s.cfg.DBConfig.Scheme))
 		return false
 	}
 

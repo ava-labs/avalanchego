@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/plantstore"
 
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 )
@@ -42,6 +43,14 @@ func TestNewTracker(t *testing.T) {
 		{
 			name: "firewood",
 			with: func(c *Config) { c.Scheme = customrawdb.FirewoodScheme },
+		},
+		{
+			name: "null",
+			with: func(c *Config) { c.Scheme = plantstore.NullScheme },
+		},
+		{
+			name: "ours",
+			with: func(c *Config) { c.Scheme = plantstore.OursScheme },
 		},
 		{
 			name:    "zero_commit_interval",

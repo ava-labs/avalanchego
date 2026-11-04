@@ -32,15 +32,27 @@ func init() {
 //
 // If db is backed by a firewood [TrieDB], interceptor wraps db in a
 // [stateAccessor], whose tries are [accountTrie] and [storageTrie] rather than
-// the normal [trie.StateTrie]. Otherwise db is returned unchanged.
+// the normal [trie.StateTrie]. If it is backed by a [StateWrapper], the backend
+// wraps db itself. Otherwise db is returned unchanged.
 func interceptor(db state.Database) state.Database {
-	if tdb, ok := db.TrieDB().Backend().(*TrieDB); ok {
+	switch tdb := db.TrieDB().Backend().(type) {
+	case *TrieDB:
 		return &stateAccessor{
 			Database: db,
 			triedb:   tdb,
 		}
+	case StateWrapper:
+		return tdb.WrapState(db)
 	}
 	return db
+}
+
+// StateWrapper is a trie database backend that serves its own [state.Trie]s.
+// libevm accepts a single [state.DatabaseInterceptor], registered by this
+// package, so other flat-key backends (the plant's null and ours stores) hook
+// in through it: [interceptor] returns WrapState(db) for such a backend.
+type StateWrapper interface {
+	WrapState(state.Database) state.Database
 }
 
 type stateAccessor struct {

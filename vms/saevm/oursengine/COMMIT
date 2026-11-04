@@ -1,0 +1,3 @@
+Copied from github.com/containerman17/faster-firewood-node at commit 178dcfce2be5596453ae67638f1c455fa5347023 (branch fwpar):
+packages asmevm (+secp, pure Go only), base, cblock, chunkfile, dist, era, internal/zdict,
+store, tier0, trie (+keccaksimd); tests, testdata and cmd/ dropped, import paths rewritten.
