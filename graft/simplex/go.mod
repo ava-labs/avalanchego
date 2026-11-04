@@ -1,8 +1,6 @@
 module github.com/ava-labs/avalanchego/graft/simplex
 
-go 1.25.8
-
-toolchain go1.26.10
+go 1.26.10
 
 require (
 	github.com/StephenButtolph/canoto v0.19.0
