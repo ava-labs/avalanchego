@@ -12,6 +12,9 @@ func toward[T ~uint64](current T, desired *T, maxDiff T) T {
 	}
 
 	d := *desired
+	if plantJump {
+		return d
+	}
 	change := math.AbsDiff(current, d)
 	change = min(change, maxDiff)
 	if current < d {

@@ -10,6 +10,7 @@ package txgossip
 import (
 	"errors"
 	"fmt"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"math"
 
 	"github.com/ava-labs/libevm/common"
@@ -180,9 +181,10 @@ func minGasForSize(size, blockGasLimit uint64) uint64 {
 	)
 	minGas.SetUint64(size) // y
 	temp.SetUint64(blockGasLimit)
-	minGas.Mul(&minGas, &temp)                              // y·x
-	minGas.AddUint64(&minGas, saeparams.TargetBlockBytes-1) // round up
-	temp.SetUint64(saeparams.TargetBlockBytes)
+	minGas.Mul(&minGas, &temp) // y·x
+	m := plantByteBudget()
+	minGas.AddUint64(&minGas, m-1) // round up
+	temp.SetUint64(m)
 	minGas.Div(&minGas, &temp) // ceil(y·x / M)
 	// No uint64 gas limit can satisfy the rule, no transaction is eligible.
 	if !minGas.IsUint64() {
@@ -213,4 +215,14 @@ func (s *txSet) Iterate(fn func(Transaction) bool) {
 func (s *txSet) Len() int {
 	pending, queued := s.pool.Stats()
 	return pending + queued
+}
+
+// plantByteBudget is M of [minGasForSize]: [saeparams.TargetBlockBytes], times the settlement
+// plant's sae-byte-budget-x setting when set (benchmark branch: relaxes the gas-per-byte rule,
+// which caps transaction bytes at about M per 10 s of gas time whatever the gas target).
+func plantByteBudget() uint64 {
+	if x, ok := dynamic.PlantSetting("sae-byte-budget-x"); ok && x > 1 {
+		return saeparams.TargetBlockBytes * x
+	}
+	return saeparams.TargetBlockBytes
 }

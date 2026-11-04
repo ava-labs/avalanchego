@@ -9,9 +9,6 @@ import (
 	"fmt"
 	settleledger "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/settleledgerevidence"
 	"math/big"
-	"os"
-	"strconv"
-	"strings"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
@@ -28,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
@@ -132,8 +128,10 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 							utils.TimeToNewUint64(u.DurangoTime),
 						),
 					},
-					{ // the settlement plant's precompile, active from genesis
-						Config: settleledger.NewConfig(utils.PointerTo(uint64(0))),
+					{ // the settlement plant's precompile, active right after genesis (genesis
+						// itself stays the pre-transition chain's); the first block sets up its
+						// account (hooks.StartExecutingBlock)
+						Config: settleledger.NewConfig(utils.PointerTo(g.Timestamp + 1)),
 					},
 				},
 			},
@@ -295,16 +293,10 @@ func (g *genesis) block() (*types.Block, error) {
 	if c.IsGranite(g.Timestamp) {
 		headerExtra.TimeMilliseconds = new(g.Timestamp * 1000)
 		headerExtra.MinDelayExcess = new(acp226.InitialDelayExcess)
-		if ms, ok := plantSetting("sae-min-delay-ms"); ok { // the plant's block delay from genesis
-			headerExtra.MinDelayExcess = new(acp226.DelayExcess(dynamic.DesiredDelayExponent(ms)))
-		}
 	}
 
 	if c.IsHelicon(g.Timestamp) {
 		headerExtra.TargetExponent = new(dynamic.InitialTargetExponent)
-		if t, ok := plantSetting("sae-gas-target"); ok { // the plant's gas target from genesis
-			headerExtra.TargetExponent = new(dynamic.DesiredTargetExponent(gas.Gas(t)))
-		}
 		headerExtra.MinPriceExponent = new(dynamic.InitialPriceExponent)
 
 		// The genesis block is synchronous, so the markers must be zero to
@@ -333,17 +325,6 @@ func (g *genesis) root() (_ common.Hash, retErr error) {
 		retErr = errors.Join(retErr, tdb.Close())
 	}()
 	return g.writeState(db, tdb)
-}
-
-// plantSetting reads a number from the settlement plant's settings directory (benchmark
-// branch only: every node of the local network reads the same files).
-func plantSetting(name string) (uint64, bool) {
-	b, err := os.ReadFile("/opt/settlement/chainconf/" + name)
-	if err != nil {
-		return 0, false
-	}
-	v, err := strconv.ParseUint(strings.TrimSpace(string(b)), 10, 64)
-	return v, err == nil
 }
 
 // activatePrecompile marks the precompile's account as non-empty by setting
@@ -403,7 +384,6 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 	if c := corethparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
 		activatePrecompile(statedb, warp.ContractAddress)
 	}
-	activatePrecompile(statedb, settleledger.ContractAddress)
 
 	const deleteEmptyObjects = true
 	root, err := statedb.Commit(genesisNumber, deleteEmptyObjects)

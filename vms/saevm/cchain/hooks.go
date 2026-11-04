@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	settleledger "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/settleledgerevidence"
 	"iter"
 	"math/big"
 	"slices"
@@ -254,6 +255,9 @@ func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, 
 	config := corethparams.GetExtra(h.chainConfig)
 	if isFirstDurangoBlock := corethparams.GetRulesExtra(rules).IsDurango && !config.IsDurango(parent.Time); isFirstDurangoBlock {
 		activatePrecompile(statedb, corethwarp.ContractAddress)
+	}
+	if parent.Number.Sign() == 0 { // the settlement plant's precompile account (active after genesis)
+		activatePrecompile(statedb, settleledger.ContractAddress)
 	}
 	return nil
 }
