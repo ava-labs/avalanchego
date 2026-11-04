@@ -29,7 +29,7 @@ func CheckTxIndices(t *testing.T, expectedTail *uint64, indexedFrom uint64, inde
 				stored = *rawdb.ReadTxIndexTail(db)
 				return tailValue == stored
 			},
-			30*time.Second, 500*time.Millisecond, "expected tail to be %d eventually", tailValue)
+			30*time.Second, 10*time.Millisecond, "expected tail to be %d eventually", tailValue)
 	}
 
 	for i := uint64(0); i <= head; i++ {

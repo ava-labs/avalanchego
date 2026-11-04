@@ -300,7 +300,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	// initialise [syncerVM] with blank genesis state
 	// Match the server's state-sync-commit-interval so parsed summaries are acceptable.
 	stateSyncEnabledJSON := fmt.Sprintf(
-		`"state-sync-enabled":true, "state-sync-min-blocks": %d, "tx-lookup-limit": %d, "state-sync-commit-interval": %d`,
+		`"state-sync-enabled":true, "state-sync-min-blocks": %d, "transaction-history": %d, "state-sync-commit-interval": %d`,
 		test.stateSyncMinBlocks, 4, test.syncableInterval,
 	)
 	syncerVM := newVM(t, testVMConfig{
@@ -554,6 +554,9 @@ func generateAndAcceptBlocks(t *testing.T, vm *VM, numBlocks int, gen func(int, 
 		require.NoError(t, vmBlock.Accept(t.Context()))
 
 		if accepted != nil {
+			// Accept only enqueues the block; wait for the acceptor to
+			// write its tx indices before the callback checks them.
+			vm.blockChain.DrainAcceptorQueue()
 			accepted(block)
 		}
 	}
