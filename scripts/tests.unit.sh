@@ -19,7 +19,6 @@ fi
 
 readonly coreth_prefix="github.com/ava-labs/avalanchego/graft/coreth"
 readonly evm_prefix="github.com/ava-labs/avalanchego/graft/evm"
-readonly simplex_prefix="github.com/ava-labs/avalanchego/graft/simplex"
 readonly subnet_evm_prefix="github.com/ava-labs/avalanchego/graft/subnet-evm"
 
 package_list_file="$(mktemp)"
