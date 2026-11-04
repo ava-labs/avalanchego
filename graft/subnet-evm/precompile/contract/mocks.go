@@ -13,10 +13,10 @@ import (
 	big "math/big"
 	reflect "reflect"
 
+	predicate "github.com/ava-labs/avalanchego/graft/evm/predicate"
 	precompileconfig "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	snow "github.com/ava-labs/avalanchego/snow"
 	set "github.com/ava-labs/avalanchego/utils/set"
-	predicate "github.com/ava-labs/avalanchego/graft/evm/predicate"
 	common "github.com/ava-labs/libevm/common"
 	types "github.com/ava-labs/libevm/core/types"
 	stateconf "github.com/ava-labs/libevm/libevm/stateconf"
