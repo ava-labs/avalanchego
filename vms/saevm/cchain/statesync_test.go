@@ -292,25 +292,19 @@ func TestStateSyncDisabled(t *testing.T) {
 // TestStateSyncDBFailure checks that a database failure is surfaced to the
 // engine. Only ethdb.Database fails, so this doesn't cover Firewood writes.
 func TestStateSyncDBFailure(t *testing.T) {
-	tests := []struct {
-		name string
-		opts []sutOption
-	}{
-		{name: "hashdb"},
-		{name: "firewood", opts: []sutOption{withFirewood()}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
 			const commitInterval = 4
 
 			key := txtest.NewKey(t)
 			ethW := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
 			timeOpt, _ := withVMTime(testStartTime)
-			sharedOpts := slices.Concat(tt.opts, []sutOption{
+			sharedOpts := []sutOption{
+				withScheme(scheme),
 				timeOpt,
 				withMaxAllocFor(key.EthAddress(), ethW.Addresses()[0]),
 				withCommitInterval(commitInterval),
-			})
+			}
 			srcCtx, src := newSUT(t, sharedOpts...)
 			w := newWallet(key, src.ctx, src.Client)
 

@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
@@ -346,7 +347,7 @@ func TestBootstrappedSynchronousRPCs(t *testing.T) {
 		},
 		{
 			name:  "firewood",
-			opts:  []sutOption{withFirewood()},
+			opts:  []sutOption{withScheme(customrawdb.FirewoodScheme)},
 			calls: fixture.RPCCalls,
 		},
 	}
