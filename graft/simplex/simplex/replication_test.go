@@ -393,11 +393,14 @@ func TestReplicationStartsBeforeCurrentRound(t *testing.T) {
 	require.Equal(t, startSeq, normalNode3.Storage.NumBlocks())
 	require.Equal(t, uint64(0), laggingNode.Storage.NumBlocks())
 
-	net.StartInstances()
-	defer net.StopInstances()
+	// Start the lagging node alone so that no messages from the other nodes advance it past its restored round.
+	laggingNode.Start()
+	require.Equal(t, uint64(2), laggingNode.E.Metadata().Round)
 
-	laggingNodeMd := laggingNode.E.Metadata()
-	require.Equal(t, uint64(2), laggingNodeMd.Round)
+	normalNode3.Start()
+	normalNode2.Start()
+	normalNode1.Start()
+	defer net.StopInstances()
 
 	net.TriggerLeaderBlockBuilder(startSeq)
 	for i := uint64(0); i <= startSeq; i++ {
