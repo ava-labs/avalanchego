@@ -6,6 +6,7 @@ package tx_test
 import (
 	"encoding/json"
 	"math"
+	"sync"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -53,6 +54,77 @@ func TestBytes(t *testing.T) {
 			assert.Equalf(t, golden.bytes, got, "%T.Bytes()", golden.tx)
 		})
 	}
+}
+
+// TestIDAndBytesCached verifies that [Tx.ID] and [Tx.Bytes] return the same
+// values before and after they are cached.
+func TestIDAndBytesCached(t *testing.T) {
+	for _, golden := range goldens {
+		t.Run(golden.name, func(t *testing.T) {
+			tx, err := Parse(golden.bytes)
+			require.NoError(t, err, "Parse()")
+
+			// The first iteration populates the cache and the second reads
+			// from it.
+			for range 2 {
+				assert.Equalf(t, golden.id, tx.ID(), "%T.ID()", tx)
+				got, err := tx.Bytes()
+				require.NoErrorf(t, err, "%T.Bytes()", tx)
+				assert.Equalf(t, golden.bytes, got, "%T.Bytes()", tx)
+			}
+		})
+	}
+}
+
+// TestIDAndBytesConcurrent verifies that the ID and bytes of a tx can be
+// calculated concurrently, as the txpool, gossip, and the block builder share
+// txs across goroutines. It is only meaningful with the race detector.
+func TestIDAndBytesConcurrent(t *testing.T) {
+	const numGoroutines = 8
+	for _, golden := range goldens {
+		t.Run(golden.name, func(t *testing.T) {
+			tx, err := Parse(golden.bytes)
+			require.NoError(t, err, "Parse()")
+
+			var (
+				start    = make(chan struct{})
+				wg       sync.WaitGroup
+				gotIDs   [numGoroutines]ids.ID
+				gotBytes [numGoroutines][]byte
+				errs     [numGoroutines]error
+			)
+			for i := range numGoroutines {
+				wg.Go(func() {
+					<-start
+					// Alternate which method populates the cache.
+					if i%2 == 0 {
+						gotIDs[i] = tx.ID()
+						gotBytes[i], errs[i] = tx.Bytes()
+					} else {
+						gotBytes[i], errs[i] = tx.Bytes()
+						gotIDs[i] = tx.ID()
+					}
+				})
+			}
+			close(start)
+			wg.Wait()
+
+			for i := range numGoroutines {
+				assert.Equalf(t, golden.id, gotIDs[i], "%T.ID()", tx)
+				require.NoErrorf(t, errs[i], "%T.Bytes()", tx)
+				assert.Equalf(t, golden.bytes, gotBytes[i], "%T.Bytes()", tx)
+			}
+		})
+	}
+}
+
+// TestIDAndBytesInvalid verifies that a tx that can not be marshalled reports
+// the zero ID.
+func TestIDAndBytesInvalid(t *testing.T) {
+	tx := &Tx{}
+	assert.Equalf(t, ids.ID{}, tx.ID(), "%T.ID()", tx)
+	_, err := tx.Bytes()
+	require.ErrorIsf(t, err, codec.ErrMarshalNil, "%T.Bytes()", tx)
 }
 
 func TestParse(t *testing.T) {

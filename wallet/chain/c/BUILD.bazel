@@ -41,12 +41,21 @@ go_library(
 
 go_test(
     name = "c_test",
-    srcs = ["builder_test.go"],
+    srcs = [
+        "builder_test.go",
+        "signer_test.go",
+    ],
     embed = [":c"],
     deps = [
+        "//database",
+        "//ids",
         "//utils/math",
+        "//vms/components/avax",
         "//vms/components/gas",
         "//vms/saevm/cchain/tx",
+        "//vms/saevm/cchain/tx/txtest",
+        "//vms/secp256k1fx",
+        "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
 )
