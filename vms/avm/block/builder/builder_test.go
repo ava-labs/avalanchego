@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor/executormock"
@@ -307,6 +308,92 @@ func TestBuilderBuildBlock(t *testing.T) {
 				require.NoError(t, mempool.Add(tx2))
 
 				// To marshal the tx/block
+				codec := codecmock.NewManager(ctrl)
+				codec.EXPECT().Marshal(gomock.Any(), gomock.Any()).Return([]byte{1, 2, 3}, nil).AnyTimes()
+				codec.EXPECT().Size(gomock.Any(), gomock.Any()).Return(2, nil).AnyTimes()
+
+				return New(
+					&txexecutor.Backend{
+						Codec: codec,
+						Ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+					manager,
+					&mockable.Clock{},
+					mempool,
+				)
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "tx conflicts with processing ancestor",
+			builderFunc: func(ctrl *gomock.Controller) Builder {
+				preferredID := ids.GenerateTestID()
+				preferredTimestamp := time.Now()
+				preferredBlock := block.NewMockBlock(ctrl)
+				preferredBlock.EXPECT().Height().Return(uint64(1337))
+				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
+
+				preferredState := statemock.NewChain(ctrl)
+				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
+				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
+
+				// The manager treats inputID1 as already imported by a processing
+				// ancestor, so VerifyUniqueInputs fails for any set containing it. Therefore
+				// tx1 should be dropped and only tx2 included when the block is built.
+				inputID1 := ids.GenerateTestID()
+				unsignedTx1 := txsmock.NewUnsignedTx(ctrl)
+				unsignedTx1.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
+				unsignedTx1.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
+					func(visitor txs.Visitor) error {
+						visitor.(*txexecutor.Executor).Inputs.Add(inputID1)
+						return nil
+					},
+				)
+				unsignedTx1.EXPECT().SetBytes(gomock.Any()).AnyTimes()
+				unsignedTx1.EXPECT().InputIDs().Return(nil)
+				tx1 := &txs.Tx{Unsigned: unsignedTx1}
+				tx1.SetBytes(nil, []byte{1})
+
+				inputID2 := ids.GenerateTestID()
+				unsignedTx2 := txsmock.NewUnsignedTx(ctrl)
+				unsignedTx2.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
+				unsignedTx2.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
+					func(visitor txs.Visitor) error {
+						visitor.(*txexecutor.Executor).Inputs.Add(inputID2)
+						return nil
+					},
+				)
+				unsignedTx2.EXPECT().InputIDs().Return(nil)
+				tx2 := &txs.Tx{Unsigned: unsignedTx2}
+
+				manager := executormock.NewManager(ctrl)
+				manager.EXPECT().Preferred().Return(preferredID)
+				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
+				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
+				// A processing ancestor already imported inputID1.
+				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).DoAndReturn(
+					func(_ ids.ID, inputs set.Set[ids.ID]) error {
+						if inputs.Contains(inputID1) {
+							return blkexecutor.ErrConflictingParentTxs // This should make TX1 fail
+						}
+						return nil
+					},
+				).AnyTimes()
+				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(
+					func(block *block.StandardBlock) snowman.Block {
+						require.Equal(t, []*txs.Tx{tx2}, block.Transactions) // Only TX2 was included
+						return nil
+					},
+				)
+
+				mempool, err := mempool.New("", prometheus.NewRegistry())
+				require.NoError(t, err)
+				require.NoError(t, mempool.Add(tx1))
+				require.NoError(t, mempool.Add(tx2))
+
+				// To marshal the block
 				codec := codecmock.NewManager(ctrl)
 				codec.EXPECT().Marshal(gomock.Any(), gomock.Any()).Return([]byte{1, 2, 3}, nil).AnyTimes()
 				codec.EXPECT().Size(gomock.Any(), gomock.Any()).Return(2, nil).AnyTimes()
