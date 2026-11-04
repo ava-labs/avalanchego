@@ -7,10 +7,7 @@ package(default_visibility = [
 
 go_library(
     name = "precompileconfig",
-    srcs = [
-        "config.go",
-        "upgradeable.go",
-    ],
+    srcs = ["config.go"],
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig",
     deps = [
         "//graft/evm/precompileconfig",

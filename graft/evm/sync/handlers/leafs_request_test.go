@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
@@ -663,4 +664,58 @@ func requireRangeProofIsValid(t *testing.T, request message.LeafsRequest, respon
 	more, err := trie.VerifyRangeProof(request.Root, start, response.Keys, response.Vals, proof)
 	require.NoError(t, err)
 	require.Equal(t, expectMore, more)
+}
+func TestLeafsRequestHandler_MidTrieRootDropped(t *testing.T) {
+	const seed = 1
+	t.Logf("seed: %d", seed)
+	r := rand.New(rand.NewSource(seed))
+
+	memdb := rawdb.NewMemoryDatabase()
+	db := state.NewDatabase(memdb)
+	trieDB := db.TrieDB()
+
+	root, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 1000)
+
+	// peer-supplied "root" that is actually a mid-trie node
+	midTrieRoot := findMidTrieNodeAtOddDepth(t, trieDB, root)
+
+	testHandlerStats := &statstest.TestHandlerStats{}
+	handler := NewLeafsRequestHandler(trieDB, nil, message.Codec, testHandlerStats)
+
+	request := message.LeafsRequest{
+		Root:  midTrieRoot,
+		Start: bytes.Repeat([]byte{0x00}, common.HashLength),
+		End:   bytes.Repeat([]byte{0xff}, common.HashLength),
+		Limit: maxLeavesLimit,
+	}
+
+	// The mid-trie root should be dropped.
+	response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+	require.NoError(t, err)
+	require.Nil(t, response)
+	require.Equal(t, uint32(1), testHandlerStats.TrieErrorCount)
+}
+
+func findMidTrieNodeAtOddDepth(t *testing.T, trieDB *triedb.Database, root common.Hash) common.Hash {
+	t.Helper()
+
+	tr, err := trie.New(trie.TrieID(root), trieDB)
+	require.NoError(t, err)
+
+	nodeIt, err := tr.NodeIterator(nil)
+	require.NoError(t, err)
+
+	for nodeIt.Next(true) {
+		hash := nodeIt.Hash()
+		if hash == (common.Hash{}) || nodeIt.Leaf() {
+			continue
+		}
+		if len(nodeIt.Path())%2 == 1 {
+			return hash
+		}
+	}
+	require.NoError(t, nodeIt.Error())
+
+	t.Fatal("no internal node at odd nibble depth found - try different seed")
+	return common.Hash{}
 }

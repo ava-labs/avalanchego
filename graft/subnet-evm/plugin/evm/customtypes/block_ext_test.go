@@ -111,9 +111,9 @@ func exportedFieldsPointToDifferentMemory[T interface {
 }](t *testing.T, original, cpy *T) {
 	t.Helper()
 
-	v := reflect.ValueOf(*original)
+	v := reflect.ValueOf(original).Elem()
 	typ := v.Type()
-	cp := reflect.ValueOf(*cpy)
+	cp := reflect.ValueOf(cpy).Elem()
 	for i := range v.NumField() {
 		field := typ.Field(i)
 		if !field.IsExported() {

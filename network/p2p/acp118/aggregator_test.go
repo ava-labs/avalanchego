@@ -8,12 +8,14 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -670,4 +672,60 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			require.Equal(new(big.Int).SetUint64(uint64(tt.wantTotalStake)), gotTotalStake)
 		})
 	}
+}
+
+// TestSignatureAggregator_LateResponseDoesNotBlock verifies that a response
+// delivered after AggregateSignatures has returned does not block the goroutine
+// that delivers it. In a node, that goroutine is a chain handler async worker,
+// so blocking it would stall the chain's app message handling.
+func TestSignatureAggregator_LateResponseDoesNotBlock(t *testing.T) {
+	require := require.New(t)
+
+	// Record each outgoing request instead of delivering it, so the test
+	// controls when the responses arrive.
+	sentRequests := make(map[ids.NodeID]uint32)
+	sender := &enginetest.Sender{
+		SendAppRequestF: func(_ context.Context, nodeIDs set.Set[ids.NodeID], requestID uint32, _ []byte) error {
+			for nodeID := range nodeIDs {
+				sentRequests[nodeID] = requestID
+			}
+			return nil
+		},
+	}
+	network, err := p2p.NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	require.NoError(err)
+	aggregator := NewSignatureAggregator(logging.NoLog{}, network.NewClient(0))
+
+	sk, err := localsigner.New()
+	require.NoError(err)
+	nodeID := ids.GenerateTestNodeID()
+
+	unsignedMsg, err := warp.NewUnsignedMessage(1, ids.GenerateTestID(), []byte("payload"))
+	require.NoError(err)
+	msg := &warp.Message{
+		UnsignedMessage: *unsignedMsg,
+		Signature:       &warp.BitSetSignature{},
+	}
+
+	// Cancel the context up front so AggregateSignatures returns early, as it
+	// does when the RPC client disconnects or quorum is reached.
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	_, _, _, err = aggregator.AggregateSignatures(
+		ctx,
+		msg,
+		nil,
+		[]*validators.Warp{{PublicKey: sk.PublicKey(), Weight: 1, NodeIDs: []ids.NodeID{nodeID}}},
+		1,
+		1,
+	)
+	require.NoError(err)
+
+	requestID, ok := sentRequests[nodeID]
+	require.True(ok)
+
+	// AggregateSignatures has returned, so nothing is reading the results buffer anymore.
+	// A timeout that gets delivered after should not block.
+	require.NoError(network.AppRequestFailed(t.Context(), nodeID, requestID, common.ErrTimeout))
 }

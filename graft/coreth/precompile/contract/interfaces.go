@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
+	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
@@ -26,16 +27,18 @@ type StatefulPrecompiledContract interface {
 
 // StateDB is the interface for accessing EVM state
 type StateDB interface {
-	GetBalanceMultiCoin(common.Address, common.Hash) *big.Int
-	AddBalanceMultiCoin(common.Address, common.Hash, *big.Int)
-	SubBalanceMultiCoin(common.Address, common.Hash, *big.Int)
+	GetAssetBalance(common.Address, common.Hash) *uint256.Int
+	AddAssetBalance(common.Address, common.Hash, *uint256.Int)
+	SubAssetBalance(common.Address, common.Hash, *uint256.Int)
 
 	CreateAccount(common.Address)
 	Exist(common.Address) bool
 
 	AddLog(*ethtypes.Log)
 	Logs() []*ethtypes.Log
-	GetPredicate(address common.Address, index int) (predicate.Predicate, bool)
+	// GetWarpMessage returns the index-th Warp message in the current
+	// transaction's access list. It returns false if there is no such message.
+	GetWarpMessage(index int) (predicate.Predicate, bool)
 
 	TxHash() common.Hash
 
@@ -60,7 +63,7 @@ type ConfigurationBlockContext interface {
 
 type BlockContext interface {
 	ConfigurationBlockContext
-	// GetPredicateResults returns the result of verifying the predicates of the
-	// given transaction, precompile address pair.
-	GetPredicateResults(txHash common.Hash, precompileAddress common.Address) set.Bits
+	// GetWarpMessageResults returns the result of verifying the Warp messages
+	// of the given transaction.
+	GetWarpMessageResults(txHash common.Hash) set.Bits
 }

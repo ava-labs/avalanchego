@@ -17,6 +17,8 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/event"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
@@ -33,7 +35,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 )
 
 // TestIssueTxRejectsInvalidTransaction asserts that [Client.IssueTx] surfaces
@@ -133,6 +137,49 @@ func TestAwaitTxAccepted(t *testing.T) {
 	})
 }
 
+// TestIssueAfterAwaitTxAccepted asserts that once [Client.AwaitTxAccepted]
+// returns, the next tx from the same account is accepted by the txpool.
+func TestIssueAfterAwaitTxAccepted(t *testing.T) {
+	sk := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(sk.EthAddress()))
+	w := newWallet(sk, sut.ctx, sut.Client)
+
+	// A tx is indexed shortly before its block is marked as executed. Issuing
+	// many txs makes it likely that a regression issues one in that window.
+	for i := range 30 {
+		stx := w.newMinimalTx(t)
+		require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx(txs[%d])", sut.Client, i)
+		sut.buildVerifyAccept(ctx, t)
+		require.NoErrorf(t, sut.AwaitTxAccepted(ctx, stx.ID(), time.Millisecond), "%T.AwaitTxAccepted(txs[%d])", sut.Client, i)
+	}
+}
+
+// withoutEvents is a [txpool.Backend] that never sends post-execution events.
+type withoutEvents struct {
+	*sae.VM
+}
+
+func (withoutEvents) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription {
+	return new(event.FeedOf[core.ChainHeadEvent]).Subscribe(ch)
+}
+
+// TestTxpoolVerifiesLastExecutedState asserts that the txpool verifies against
+// the last executed state even when it never receives post-execution events.
+// APIs such as eth_getTransactionCount report a block as executed before the
+// pool receives its event.
+func TestTxpoolVerifiesLastExecutedState(t *testing.T) {
+	sk := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(sk.EthAddress()))
+	w := newWallet(sk, sut.ctx, sut.Client)
+
+	pool, err := txpool.New(sut.ctx, sut.chainConfig, txpool.NewPending(), withoutEvents{sut.VM.VM}, 1)
+	require.NoError(t, err, "txpool.New()")
+	t.Cleanup(pool.Close)
+
+	sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
+	require.NoErrorf(t, pool.Add(w.newMinimalTx(t)), "%T.Add()", pool)
+}
+
 // TestGetAllUTXOs asserts that [Client.GetAllUTXOs] yields each seeded UTXO
 // exactly once.
 func TestGetAllUTXOs(t *testing.T) {
@@ -200,8 +247,13 @@ func TestRPCExtras(t *testing.T) {
 		"settledGasNumerator":   hexutil.EncodeUint64(*extra.SettledGasNumerator),
 		"settledExcess":         hexutil.EncodeUint64(*extra.SettledExcess),
 	}
-	numHeaderExtras := reflect.TypeFor[customtypes.HeaderExtra]().NumField()
-	require.Lenf(t, wantHeaderExtras, numHeaderExtras, "%T field count", customtypes.HeaderExtra{})
+	var numHeaderExtras int
+	for _, f := range reflect.VisibleFields(reflect.TypeFor[customtypes.HeaderExtra]()) {
+		if f.IsExported() {
+			numHeaderExtras++
+		}
+	}
+	require.Lenf(t, wantHeaderExtras, numHeaderExtras, "%T exported field count", extra)
 
 	var (
 		wantBlockExtras = maps.Clone(wantHeaderExtras)

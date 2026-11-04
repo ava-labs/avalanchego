@@ -769,7 +769,10 @@ func (s *Syncer[_, _]) setError(err error) {
 	s.errLock.Lock()
 	defer s.errLock.Unlock()
 
-	s.config.Log.Error("sync errored", zap.Error(err))
+	if s.fatalError != nil {
+		return
+	}
+
 	s.fatalError = err
 	// Call in goroutine because we might be holding [s.workLock]
 	go func() {

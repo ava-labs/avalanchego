@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 
+	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -50,7 +51,7 @@ func (s *StateUpgrade) Equal(other *StateUpgrade) bool {
 	if s == nil || other == nil {
 		return s == other
 	}
-	return utils.Uint64PtrEqual(s.BlockTimestamp, other.BlockTimestamp) &&
+	return avalancheutils.PtrEqual(s.BlockTimestamp, other.BlockTimestamp) &&
 		maps.EqualFunc(s.StateUpgradeAccounts, other.StateUpgradeAccounts, StateUpgradeAccount.equal)
 }
 

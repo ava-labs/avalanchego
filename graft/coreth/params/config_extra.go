@@ -3,25 +3,23 @@
 
 package params
 
-import "github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+import (
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 
-const (
-	// TODO: Value to pass to geth's Rules by default where the appropriate
-	// context is not available in the avalanche code. (similar to context.TODO())
-	IsMergeTODO = true
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
-func GetExtra(c *ChainConfig) *extras.ChainConfig {
+func GetExtra(c *ethparams.ChainConfig) *cparams.ChainConfig {
 	ex := payloads.ChainConfig.Get(c)
 	if ex == nil {
-		ex = &extras.ChainConfig{}
+		ex = &cparams.ChainConfig{}
 		payloads.ChainConfig.Set(c, ex)
 	}
 	return ex
 }
 
 // WithExtra sets the extra payload on `c` and returns the modified argument.
-func WithExtra(c *ChainConfig, extra *extras.ChainConfig) *ChainConfig {
+func WithExtra(c *ethparams.ChainConfig, extra *cparams.ChainConfig) *ethparams.ChainConfig {
 	payloads.ChainConfig.Set(c, extra)
 	return c
 }

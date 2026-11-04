@@ -7,15 +7,16 @@ import (
 	"context"
 	"time"
 
-	"github.com/ava-labs/simplex"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	simplexcommon "github.com/ava-labs/simplex/common"
 )
 
-var _ simplex.BlockBuilder = (*BlockBuilder)(nil)
+var _ simplexcommon.BlockBuilder = (*BlockBuilder)(nil)
 
 type BlockBuilder struct {
 	log          logging.Logger
@@ -30,7 +31,7 @@ const (
 
 // BuildBlock continuously tries to build a block until the context is cancelled. If there are no blocks to be built, it will wait for an event from the VM.
 // It returns false if the context was cancelled, otherwise it returns the built block and true.
-func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.ProtocolMetadata, blacklist simplex.Blacklist) (simplex.VerifiedBlock, bool) {
+func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplexcommon.ProtocolMetadata, blacklist simplexcommon.Blacklist) (simplexcommon.VerifiedBlock, bool) {
 	for curWait := initBackoff; ; curWait = backoff(ctx, curWait) {
 		if ctx.Err() != nil {
 			b.log.Debug("Context cancelled, stopping block building", zap.Error(ctx.Err()))
@@ -47,11 +48,7 @@ func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.Protocol
 			b.log.Info("Error building block", zap.Error(err))
 			continue
 		}
-		simplexBlock, err := newBlock(metadata, blacklist, vmBlock, b.blockTracker)
-		if err != nil {
-			b.log.Error("Error creating simplex block from built block", zap.Error(err))
-			return nil, false
-		}
+		simplexBlock := newBlock(metadata, blacklist, vmBlock, b.blockTracker)
 		curWait = initBackoff // Reset backoff after a successful block build
 		verifiedBlock, err := simplexBlock.Verify(ctx)
 		if err != nil {

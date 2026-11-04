@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/simplex"
+	"github.com/ava-labs/simplex/common"
 	"github.com/ava-labs/simplex/wal"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -69,19 +69,18 @@ type newBlockConfig struct {
 	numNodes uint64
 }
 
-func newTestBlock(t *testing.T, config newBlockConfig) *Block {
+func newTestBlock(config newBlockConfig) *Block {
 	if config.prev == nil {
 		vm := newTestVM()
 		block := &Block{
-			blacklist: simplex.NewBlacklist(uint16(config.numNodes)),
+			blacklist: common.NewBlacklist(uint16(config.numNodes), common.GenesisMaxBlacklistedRounds),
 			vmBlock: &wrappedBlock{
 				Block: snowmantest.Genesis,
 				vm:    vm,
 			},
 			metadata: genesisMetadata,
 		}
-		bytes, err := block.Bytes()
-		require.NoError(t, err)
+		bytes := block.Bytes()
 
 		digest := computeDigest(bytes)
 		block.digest = digest
@@ -102,7 +101,7 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 			vm:    config.prev.vmBlock.(*wrappedBlock).vm,
 		},
 		blockTracker: config.prev.blockTracker,
-		metadata: simplex.ProtocolMetadata{
+		metadata: common.ProtocolMetadata{
 			Version: 1,
 			Epoch:   1,
 			Round:   config.round,
@@ -111,8 +110,7 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 		},
 	}
 
-	bytes, err := block.Bytes()
-	require.NoError(t, err)
+	bytes := block.Bytes()
 
 	digest := computeDigest(bytes)
 	block.digest = digest
@@ -254,21 +252,21 @@ func generateTestNodes(t testing.TB, num uint64, opts ...testNodeConfigOption) [
 
 // newTestFinalization creates a new finalization over the BlockHeader, by collecting a
 // quorum of signatures from the provided configs.
-func newTestFinalization(t *testing.T, configs []*Config, bh simplex.BlockHeader) simplex.Finalization {
-	quorum := simplex.Quorum(len(configs))
-	finalizedVotes := make([]*simplex.FinalizeVote, 0, quorum)
+func newTestFinalization(t *testing.T, configs []*Config, bh common.BlockHeader) common.Finalization {
+	quorum := common.Quorum(len(configs))
+	finalizedVotes := make([]*common.FinalizeVote, 0, quorum)
 
 	for _, config := range configs[:quorum] {
-		vote := simplex.ToBeSignedFinalization{
+		vote := common.ToBeSignedFinalization{
 			BlockHeader: bh,
 		}
 		signer, _, err := NewBLSAuth(config)
 		require.NoError(t, err)
 		sig, err := vote.Sign(&signer)
 		require.NoError(t, err)
-		finalizedVotes = append(finalizedVotes, &simplex.FinalizeVote{
+		finalizedVotes = append(finalizedVotes, &common.FinalizeVote{
 			Finalization: vote,
-			Signature: simplex.Signature{
+			Signature: common.Signature{
 				Signer: config.Ctx.NodeID[:],
 				Value:  sig,
 			},
@@ -279,7 +277,7 @@ func newTestFinalization(t *testing.T, configs []*Config, bh simplex.BlockHeader
 	require.NoError(t, err)
 	sigAgg := &SignatureAggregator{verifier: &verifier}
 
-	finalization, err := simplex.NewFinalization(configs[0].Log, sigAgg, finalizedVotes)
+	finalization, err := common.NewFinalization(sigAgg, finalizedVotes)
 	require.NoError(t, err)
 	return finalization
 }
