@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -67,7 +66,7 @@ func MessagesFromAccessList(isDurango bool, list types.AccessList) []predicate.P
 func VerifyBlock(
 	snowContext *snow.Context,
 	blockContext *block.Context, // MAY be nil
-	rules corethparams.RulesExtra,
+	isDurango bool,
 	txs []*types.Transaction,
 ) (predicate.BlockResults, error) {
 	type result = lazyEntry[common.Hash, predicate.PrecompileResults]
@@ -81,7 +80,7 @@ func VerifyBlock(
 	)
 	eg.SetLimit(runtime.GOMAXPROCS(0))
 	for _, tx := range txs {
-		messages := MessagesFromAccessList(rules.IsDurango, tx.AccessList())
+		messages := MessagesFromAccessList(isDurango, tx.AccessList())
 		if len(messages) == 0 {
 			continue
 		}
