@@ -195,7 +195,7 @@ func TestCancelSync(t *testing.T) {
 }
 
 // TestSyncErrorRecovers checks that any error in the sync process gracefully
-// errors and is recoverable. Only the [ethdb.Database] fails, so this doesn't
+// errors and is recoverable. Only the ethdb.Database fails, so this doesn't
 // cover Firewood writes.
 func TestSyncErrorRecovers(t *testing.T) {
 	for _, scheme := range schemes {
@@ -354,6 +354,7 @@ func TestSyncAfterAbandonedSync(t *testing.T) {
 			restarted := newSUT(t, withDiskOf(client))
 			saetest.ConnectTo[saetest.Peer](t, restarted, sourceVM)
 			require.NoErrorf(t, restarted.syncTo(ctx, t, summary), "%T.syncTo(%v)", restarted, summary)
+			restarted.requireSyncedTo(t, summaryRoot)
 		})
 	}
 }

@@ -59,11 +59,11 @@ type Network struct {
 // syncHandlerIDs each get their own [peertracker.PeerTracker], because bandwidth
 // scales with response size and so is only comparable within one protocol.
 var syncHandlerIDs = map[string]uint64{
-	"leaf":        p2p.EVMLeafRequestHandlerID,
-	"code":        p2p.EVMCodeRequestHandlerID,
-	"block":       p2p.EVMBlockRequestHandlerID,
-	"cchain_leaf": p2p.EVMAtomicLeafRequestHandlerID,
-	"firewood":    p2p.FirewoodProofHandlerID,
+	"leaf":           p2p.EVMLeafRequestHandlerID,
+	"code":           p2p.EVMCodeRequestHandlerID,
+	"block":          p2p.EVMBlockRequestHandlerID,
+	"cchain_leaf":    p2p.EVMAtomicLeafRequestHandlerID,
+	"firewood_proof": p2p.FirewoodProofHandlerID,
 }
 
 // SyncClient returns a client for the sync protocol served under handlerID,

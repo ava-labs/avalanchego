@@ -258,6 +258,12 @@ func (s *sut) syncer() *Syncer {
 	)
 }
 
+// openTrieDB opens the trie database configured for the SUT's disk. The triedb
+// MUST be closed.
+func (s *sut) openTrieDB() *triedb.Database {
+	return triedb.NewDatabase(s.db, s.cfg.syncConfig.DBConfig.TrieDBConfig(s.snowCtx.ChainDataDir, s.snowCtx.Log))
+}
+
 // syncTo emulates the behavior any user would follow, by checking the summary,
 // state syncing, and marking as done. Any error in the latter two steps will be
 // returned.
@@ -277,12 +283,13 @@ func (s *sut) syncTo(ctx context.Context, t *testing.T, summary *Summary) error 
 func (s *sut) requireSyncedTo(t *testing.T, root ethcommon.Hash) {
 	t.Helper()
 
+	tdb := s.openTrieDB()
+	defer func() {
+		require.NoError(t, tdb.Close(), "triedb.Close()")
+	}()
+
 	switch s.cfg.syncConfig.DBConfig.Scheme {
 	case customrawdb.FirewoodScheme:
-		tdb := triedb.NewDatabase(s.db, s.cfg.syncConfig.DBConfig.TrieDBConfig(s.snowCtx.ChainDataDir, s.snowCtx.Log))
-		defer func() {
-			require.NoError(t, tdb.Close(), "triedb.Close()")
-		}()
 		fw, ok := tdb.Backend().(*firewood.TrieDB)
 		require.Truef(t, ok, "%T.Backend() is %T", tdb, tdb.Backend())
 		require.Equal(t, root, ethcommon.Hash(fw.Firewood.Root()), "Firewood root")
@@ -292,8 +299,8 @@ func (s *sut) requireSyncedTo(t *testing.T, root ethcommon.Hash) {
 			NoBuild:   true, // i.e. MUST be loaded from disk
 		}
 		snap, err := snapshot.New(conf, s.db, triedb.NewDatabase(s.db, nil), root)
-		defer snap.Release()
 		require.NoErrorf(t, err, "snapshot.New(NoBuild, ..., %#x)", root)
+		snap.Release()
 	}
 }
 
@@ -315,7 +322,7 @@ func newVM(t *testing.T, opts ...sutOption) *vmSUT {
 	ctx := t.Context()
 
 	// The VM opens its own handle, so this one MUST be closed first.
-	tdb := triedb.NewDatabase(s.db, s.cfg.syncConfig.DBConfig.TrieDBConfig(s.snowCtx.ChainDataDir, s.snowCtx.Log))
+	tdb := s.openTrieDB()
 	chainConfig := setupGenesis(t, s.genesis, s.db, tdb)
 	require.NoError(t, tdb.Close(), "triedb.Close()")
 

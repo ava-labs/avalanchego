@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/sync/evmstate"
@@ -33,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 
+	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	fwsyncer "github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 	graftsnap "github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
 	syncblock "github.com/ava-labs/avalanchego/vms/evm/sync/block"
@@ -137,21 +137,15 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		return fmt.Errorf("creating code syncer: %w", err)
 	}
 
-	return s.syncEVM(ctx, hdr.Root, codeSyncer)
-}
-
-// syncEVM fetches the state trie at root for the configured scheme,
-// concurrently with all code referenced by it via codeSyncer.
-func (s *Syncer) syncEVM(ctx context.Context, root common.Hash, codeSyncer *code.Syncer) error {
 	eg, egCtx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
 		return codeSyncer.Sync(egCtx)
 	})
 	eg.Go(func() error {
 		if s.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
-			return s.syncFirewood(egCtx, root, codeSyncer)
+			return s.syncFirewood(egCtx, hdr.Root, codeSyncer)
 		}
-		return s.syncHashDB(egCtx, root, codeSyncer)
+		return s.syncHashDB(egCtx, hdr.Root, codeSyncer)
 	})
 	return eg.Wait()
 }
@@ -174,8 +168,8 @@ func (s *Syncer) syncFirewood(ctx context.Context, root common.Hash, codeSyncer 
 		return fmt.Errorf("creating firewood proof client: %w", err)
 	}
 
-	reg := prometheus.NewRegistry()
-	if err := s.snowCtx.Metrics.Register("syncer_firewood", reg); err != nil {
+	reg, err := apimetrics.MakeAndRegister(s.snowCtx.Metrics, "syncer_firewood")
+	if err != nil {
 		return fmt.Errorf("registering firewood sync metrics: %w", err)
 	}
 	syncer, err := fwsyncer.NewEVM(

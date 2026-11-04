@@ -290,7 +290,7 @@ func TestStateSyncDisabled(t *testing.T) {
 }
 
 // TestStateSyncDBFailure checks that a database failure is surfaced to the
-// engine. Only the database fails, so this doesn't cover Firewood writes.
+// engine. Only ethdb.Database fails, so this doesn't cover Firewood writes.
 func TestStateSyncDBFailure(t *testing.T) {
 	tests := []struct {
 		name string
@@ -318,8 +318,7 @@ func TestStateSyncDBFailure(t *testing.T) {
 
 			for numOps := 0; ; numOps++ {
 				flaky := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
-				dir := t.TempDir()
-				dstOpts := slices.Concat(sharedOpts, []sutOption{withState(snow.StateSyncing), withDB(flaky), withChainDataDir(dir)})
+				dstOpts := slices.Concat(sharedOpts, []sutOption{withState(snow.StateSyncing), withDB(flaky), withChainDataDir(t.TempDir())})
 				ctx, dst := newSUT(t, dstOpts...)
 				saetest.ConnectTo(t, dst, src)
 
