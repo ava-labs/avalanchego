@@ -4,6 +4,8 @@
 package evm
 
 import (
+	"context"
+	"math/big"
 	"testing"
 	"time"
 
@@ -12,8 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+
+	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 func TestCalculateBlockBuildingDelay(t *testing.T) {
@@ -138,6 +143,50 @@ func TestCalculateBlockBuildingDelay(t *testing.T) {
 			require.Equal(t, tt.expectedTimeToWait, timeToWait)
 		})
 	}
+}
+
+// TestWaitForEventWaitsForWallClock checks that WaitForEvent keeps waiting
+// while the clock is short of the minimum block delay, even after the timer it
+// waited on has fired. The clock is stopped 1ms short, as if the wall clock had
+// advanced more slowly than the monotonic timer.
+func TestWaitForEventWaitsForWallClock(t *testing.T) {
+	fork := upgradetest.Granite
+	tvm := newVM(t, testVMConfig{
+		fork:        &fork,
+		genesisJSON: genesisJSONSubnetEVM,
+	})
+	defer func() {
+		require.NoError(t, tvm.vm.Shutdown(t.Context()))
+	}()
+
+	newTx := func(nonce uint64) *types.Transaction {
+		return newSignedLegacyTx(t, tvm.vm.chainConfig, testKeys[0].ToECDSA(), nonce, &common.Address{}, big.NewInt(0), 21_000, big.NewInt(testMinGasPrice), nil)
+	}
+
+	tvm.vm.clock.Set(time.Unix(1714339200, 0))
+	blk, err := IssueTxsAndSetPreference([]*types.Transaction{newTx(0)}, tvm.vm)
+	require.NoError(t, err)
+	require.NoError(t, blk.Accept(t.Context()))
+
+	nextBuildTime := minNextBlockTime(tvm.vm.blockChain.CurrentHeader())
+	tvm.vm.clock.Set(nextBuildTime.Add(-time.Millisecond))
+	for i, err := range tvm.vm.txPool.AddRemotesSync([]*types.Transaction{newTx(1)}) {
+		require.NoError(t, err, "tx %d", i)
+	}
+
+	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
+	defer cancel()
+	_, err = tvm.vm.WaitForEvent(ctx)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+
+	tvm.vm.clock.Set(nextBuildTime)
+	msg, err := tvm.vm.WaitForEvent(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, commonEng.PendingTxs, msg)
+
+	blk, err = tvm.vm.BuildBlock(t.Context())
+	require.NoError(t, err)
+	require.NoError(t, blk.Verify(t.Context()))
 }
 
 func createGraniteTestHeader(parentHash common.Hash, timeMilliseconds uint64, minDelayExcess acp226.DelayExcess) *types.Header {

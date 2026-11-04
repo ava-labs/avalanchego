@@ -143,12 +143,24 @@ func (b *blockBuilder) waitForEvent(ctx context.Context, currentHeader *types.He
 	b.ctx.Log.Debug("Last time we built a block was too recent, waiting",
 		zap.Duration("timeUntilNextBuild", timeUntilNextBuild),
 	)
-	select {
-	case <-ctx.Done():
-		return 0, ctx.Err()
-	case <-time.After(timeUntilNextBuild):
-		return commonEng.PendingTxs, nil
+	// The delay is measured on the wall clock, but [time.After] waits on the
+	// monotonic clock, and the two can run at slightly different rates (e.g.
+	// while NTP slews the wall clock). The wall clock can then still be short of
+	// the next build time when the timer fires, and a block built right away
+	// would fail the minimum block delay check, so check it again.
+	for timeUntilNextBuild > 0 {
+		select {
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-time.After(timeUntilNextBuild):
+		}
+		timeUntilNextBuild = b.calculateBlockBuildingDelay(
+			lastBuildTime,
+			lastBuildParentHash,
+			currentHeader,
+		)
 	}
+	return commonEng.PendingTxs, nil
 }
 
 // waitForNeedToBuild waits until needToBuild returns true.
