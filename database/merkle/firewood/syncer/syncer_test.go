@@ -85,7 +85,6 @@ func testSync(t *testing.T, clientKeys int, serverKeys int) {
 	defer func() {
 		// Allow unreachable proofs to release their database leases before closing.
 		runtime.GC()
-		// Use asserts so cleanup failures do not mask an underlying test error.
 		assert.NoError(t, serverDB.Close(ctx))
 		assert.NoError(t, clientDB.Close(ctx))
 	}()
@@ -153,7 +152,6 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	defer func() {
 		// Allow unreachable proofs to release their database leases before closing.
 		runtime.GC()
-		// Use asserts so cleanup failures do not mask an underlying test error.
 		assert.NoError(t, serverDB.Close(t.Context()))
 		assert.NoError(t, clientDB.Close(t.Context()))
 	}()
