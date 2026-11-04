@@ -348,17 +348,6 @@ func TestTxPoolNamespace(t *testing.T) {
 	sut.mustSendTx(t, queuedTx, pendingTx)
 	sut.waitUntilTxsPending(t, pendingTx)
 
-	// libevm owns the txpool_inspect format, so let it summarise the expected
-	// pool contents instead of duplicating its formatting here.
-	wantInspect := ethapi.NewTxPoolAPI(txPoolContent{
-		pending: map[common.Address][]*types.Transaction{
-			addresses[pendingAccount]: {pendingTx},
-		},
-		queued: map[common.Address][]*types.Transaction{
-			addresses[queuedAccount]: {queuedTx},
-		},
-	}).Inspect()
-
 	sut.testRPC(ctx, t, []rpcTest{
 		{
 			method: "txpool_content",
@@ -397,7 +386,16 @@ func TestTxPoolNamespace(t *testing.T) {
 		},
 		{
 			method: "txpool_inspect",
-			want:   wantInspect,
+			// libevm owns the txpool_inspect format, so let it summarise the
+			// expected pool contents instead of duplicating its formatting here.
+			want: ethapi.NewTxPoolAPI(txPoolContent{
+				pending: map[common.Address][]*types.Transaction{
+					addresses[pendingAccount]: {pendingTx},
+				},
+				queued: map[common.Address][]*types.Transaction{
+					addresses[queuedAccount]: {queuedTx},
+				},
+			}).Inspect(),
 		},
 		{
 			method: "txpool_status",
