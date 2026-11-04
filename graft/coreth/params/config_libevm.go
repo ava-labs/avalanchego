@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/libevm/libevm"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/cchain/cparams"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )

@@ -30,9 +30,9 @@ go_library(
         "//vms/avm",
         "//vms/components/avax",
         "//vms/components/gas",
+        "//vms/evm/cchain",
+        "//vms/evm/cchain/tx",
         "//vms/evm/evmclient",
-        "//vms/saevm/cchain",
-        "//vms/saevm/cchain/tx",
         "//vms/secp256k1fx",
         "//wallet/subnet/primary/common",
         "@com_github_ava_labs_libevm//common",
@@ -46,7 +46,7 @@ go_test(
     deps = [
         "//utils/math",
         "//vms/components/gas",
-        "//vms/saevm/cchain/tx",
+        "//vms/evm/cchain/tx",
         "@com_github_stretchr_testify//require",
     ],
 )

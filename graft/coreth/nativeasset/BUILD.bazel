@@ -26,9 +26,9 @@ graft_go_test(
     deps = [
         ":nativeasset",
         "//graft/coreth/params",
-        "//vms/saevm/cchain/cparams",
-        "//vms/saevm/cchain/libevm",
-        "//vms/saevm/cchain/libevm/extstate",
+        "//vms/evm/cchain/cparams",
+        "//vms/evm/cchain/libevm",
+        "//vms/evm/cchain/libevm/extstate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",
