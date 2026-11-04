@@ -67,6 +67,32 @@ func TestParse(t *testing.T) {
 	}
 }
 
+// BenchmarkID and BenchmarkBytes use parsed txs, because that is how txs
+// reach the txpool, the block builder, and block execution.
+func BenchmarkID(b *testing.B) {
+	for _, golden := range goldens {
+		b.Run(golden.name, func(b *testing.B) {
+			tx, err := Parse(golden.bytes)
+			require.NoError(b, err, "Parse()")
+			for b.Loop() {
+				_ = tx.ID()
+			}
+		})
+	}
+}
+
+func BenchmarkBytes(b *testing.B) {
+	for _, golden := range goldens {
+		b.Run(golden.name, func(b *testing.B) {
+			tx, err := Parse(golden.bytes)
+			require.NoError(b, err, "Parse()")
+			for b.Loop() {
+				_, _ = tx.Bytes()
+			}
+		})
+	}
+}
+
 // fuzz seeds f with [goldens], specifies simple alphabets used to bias the
 // fuzzer, and fuzzes the test.
 func fuzz(f *testing.F, ff func(t *testing.T, tx *Tx)) {
