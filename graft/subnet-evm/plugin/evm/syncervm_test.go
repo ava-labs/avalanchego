@@ -318,8 +318,22 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	require.NoError(err)
 	require.True(enabled)
 
+	// The engine fails every request that the server does not respond to, so
+	// the syncer can retry it. Record which requests the server responded to so
+	// that [syncerVM]'s SendAppRequest can fail the others.
+	var (
+		respondedLock sync.Mutex
+		responded     set.Set[uint32]
+	)
+	markResponded := func(requestID uint32) {
+		respondedLock.Lock()
+		defer respondedLock.Unlock()
+		responded.Add(requestID)
+	}
+
 	// override [serverVM]'s SendAppResponse function to trigger AppResponse on [syncerVM]
 	serverVM.appSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
+		markResponded(requestID)
 		if test.responseIntercept == nil {
 			go func() {
 				assert.NoError(t, syncerVM.vm.AppResponse(ctx, nodeID, requestID, response), "syncerVM AppResponse()")
@@ -328,6 +342,16 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 			go test.responseIntercept(syncerVM.vm, nodeID, requestID, response)
 		}
 
+		return nil
+	}
+
+	// override [serverVM]'s SendAppError function to trigger AppRequestFailed on [syncerVM]
+	serverVM.appSender.SendAppErrorF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
+		markResponded(requestID)
+		appErr := &commonEng.AppError{Code: errorCode, Message: errorMessage}
+		go func() {
+			assert.NoError(t, syncerVM.vm.AppRequestFailed(ctx, nodeID, requestID, appErr), "syncerVM AppRequestFailed()")
+		}()
 		return nil
 	}
 
@@ -345,6 +369,18 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		nodeID, hasItem := nodeSet.Pop()
 		assert.True(t, hasItem, "expected nodeSet to contain at least 1 nodeID")
 		assert.NoError(t, serverVM.vm.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request), "serverVM AppRequest()")
+
+		respondedLock.Lock()
+		defer respondedLock.Unlock()
+		if responded.Contains(requestID) {
+			responded.Remove(requestID)
+			return nil
+		}
+		// The server dropped the request, e.g. because it ran out of time to
+		// serve it, so the engine would time it out.
+		go func() {
+			assert.NoError(t, syncerVM.vm.AppRequestFailed(ctx, nodeID, requestID, commonEng.ErrTimeout), "syncerVM AppRequestFailed()")
+		}()
 		return nil
 	}
 
