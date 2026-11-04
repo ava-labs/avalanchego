@@ -820,9 +820,8 @@ func TestValidatorSetsMetadataFromSnowman(t *testing.T) {
 		lastNonSimplexBlock: lastBlock,
 	}
 
-	network.addNodeWithConfig(validatorID.NodeID[:], config).sync()
-
-	block, _ := network.acceptNewBlock()
+	node := network.addNodeWithConfig(validatorID.NodeID[:], config).sync()
+	block := node.storage.WaitForBlockCommit(numNonSimplexBlocks)
 	require.Equal(t, numNonSimplexBlocks, block.BlockHeader().Epoch)
 	require.Equal(t, uint64(1), block.BlockHeader().Round)
 	require.Equal(t, numNonSimplexBlocks, block.BlockHeader().Seq)
