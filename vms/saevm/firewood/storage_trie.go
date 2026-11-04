@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/trie/trienode"
 
-	_ "github.com/ava-labs/firewood-go-ethhash/ffi" // comment resolution
+	_ "github.com/ava-labs/firewood-go/ffi" // comment resolution
 )
 
 var _ state.Trie = (*storageTrie)(nil)

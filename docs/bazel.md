@@ -27,7 +27,7 @@ avalanchego monorepo.
   - [Patched Dependencies](#patched-dependencies)
     - [Patching strategies](#patching-strategies)
     - [libevm (secp256k1)](#libevm-secp256k1)
-    - [firewood-go-ethhash FFI](#firewood-go-ethhash-ffi)
+    - [firewood-go FFI](#firewood-go-ffi)
     - [blst (BLS Signatures)](#blst-bls-signatures)
     - [gnark-crypto (BLS12-381 for KZG)](#gnark-crypto-bls12-381-for-kzg)
   - [Protocol Buffers](#protocol-buffers)
@@ -376,7 +376,7 @@ files are warranted: `cc_library` targets with platform-specific
 | Dependency | Issue | Solution |
 |------------|-------|----------|
 | `ava-labs/libevm` | Missing C sources for secp256k1 | Custom BUILD files + gazelle directive excludes secp256k1 dir |
-| `firewood-go-ethhash/ffi` | Pre-built static libraries | Custom BUILD files with `cc_import` |
+| `firewood-go/ffi` | Pre-built static libraries | Custom BUILD files with `cc_import` |
 | `supranational/blst` | Complex CGO with assembly | Custom BUILD files (gazelle disabled) |
 | `consensys/gnark-crypto` | Assembly cross-package includes | `no-sandbox` on bls12-381 `fp` and `fr` targets |
 
@@ -389,7 +389,7 @@ sources.
 secp256k1 directory from generation. See `Patch Maintenance` below
 for how to edit these.
 
-#### firewood-go-ethhash FFI
+#### firewood-go FFI
 
 **Problem:** Pre-built static libraries with `-L` paths that don't work
 in Bazel's sandbox.

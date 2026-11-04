@@ -6,7 +6,7 @@ package firewood
 import (
 	"fmt"
 
-	"github.com/ava-labs/firewood-go-ethhash/ffi"
+	"github.com/ava-labs/firewood-go/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/log"

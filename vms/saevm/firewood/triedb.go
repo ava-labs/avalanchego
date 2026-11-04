@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/firewood-go-ethhash/ffi"
+	"github.com/ava-labs/firewood-go/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -145,7 +145,7 @@ func New(config Config) (*TrieDB, error) {
 		ffi.WithReadCacheStrategy(ffi.CacheAllReads), // Based on benchmarking, highest cache hit rate
 		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
 		ffi.WithRevisions(uint(revInMemory)), // #nosec G115 -- checked in [Config.validate]
-		ffi.WithDeferredPersistenceCommitCount(config.DeferredCommitInterval),
+		ffi.WithMaxPersistenceGap(config.DeferredCommitInterval),
 		ffi.WithExpensiveMetrics(),
 	}
 	if config.Archive {
