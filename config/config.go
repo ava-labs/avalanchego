@@ -1571,3 +1571,26 @@ func providedFlags(v *viper.Viper) map[string]interface{} {
 	}
 	return customSettings
 }
+
+// sensitiveFlags are flags whose values contain private key material and must
+// never be logged.
+var sensitiveFlags = set.Of(
+	HTTPSKeyContentKey,
+	StakingTLSKeyContentKey,
+	StakingSignerKeyContentKey,
+)
+
+const redactedFlagValue = "[redacted]"
+
+// RedactSensitiveFlags returns a copy of [flags] with the values of [sensitiveFlags]
+// replaced by [redactedFlagValue]. [flags] is not modified.
+func RedactSensitiveFlags(flags map[string]interface{}) map[string]interface{} {
+	redacted := make(map[string]interface{}, len(flags))
+	for k, v := range flags {
+		if sensitiveFlags.Contains(k) {
+			v = redactedFlagValue
+		}
+		redacted[k] = v
+	}
+	return redacted
+}

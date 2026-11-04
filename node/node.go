@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
+	avagoconfig "github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
@@ -161,7 +162,7 @@ func New(
 		zap.Stringer("nodeID", n.ID),
 		zap.Stringer("stakingKeyType", tlsCert.PublicKeyAlgorithm),
 		zap.Reflect("nodePOP", pop),
-		zap.Reflect("providedFlags", n.Config.ProvidedFlags),
+		zap.Reflect("providedFlags", avagoconfig.RedactSensitiveFlags(n.Config.ProvidedFlags)),
 		zap.Reflect("config", n.Config),
 	)
 
