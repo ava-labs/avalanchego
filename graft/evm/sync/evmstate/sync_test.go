@@ -24,6 +24,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
@@ -35,11 +36,10 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
-	leafproto "github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
-	vmssynctest "github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
+	leafproto "github.com/ava-labs/avalanchego/vms/saevm/statesync/syncers/hashdb"
+	vmssynctest "github.com/ava-labs/avalanchego/vms/saevm/statesync/syncers/synctest"
 )
 
 const testRequestSize = 1024

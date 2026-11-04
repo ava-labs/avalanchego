@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/syncers/hashdb"
 )
 
 // RegisterSyncHandler allows the [State] to serve its data to state-syncing

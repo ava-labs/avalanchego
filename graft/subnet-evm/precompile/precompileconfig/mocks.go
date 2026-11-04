@@ -14,7 +14,7 @@ import (
 
 	precompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	commontype "github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
-	predicate "github.com/ava-labs/avalanchego/vms/evm/predicate"
+	predicate "github.com/ava-labs/avalanchego/graft/evm/predicate"
 	common "github.com/ava-labs/libevm/common"
 	gomock "go.uber.org/mock/gomock"
 )
