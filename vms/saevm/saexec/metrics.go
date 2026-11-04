@@ -59,6 +59,10 @@ type metrics struct {
 	// The target exactly matches between simulation and execution, so only
 	// one value is reported.
 	gasTarget prometheus.Gauge
+
+	// settlement plant (benchmark branch): the execute duration split into the transactions
+	// (Execute: EVM and state reads) and the end-of-block commit (root and store write)
+	plantTxsSeconds, plantCommitSeconds prometheus.Counter
 }
 
 func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics, error) {
@@ -125,12 +129,22 @@ func newMetrics(reg prometheus.Registerer, lastExecuted *blocks.Block) (*metrics
 			Name: "gas_target",
 			Help: "ACP-176 gas target in force as of the latest executed block.",
 		}),
+		plantTxsSeconds: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "plant_txs_seconds_total",
+			Help: "Wall time in Execute (transactions, EVM, state reads, Finalise).",
+		}),
+		plantCommitSeconds: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "plant_commit_seconds_total",
+			Help: "Wall time in the end-of-block StateDB.Commit (root and store write).",
+		}),
 	}
 
 	// Seed the gauges from the last executed block.
 	m.setExecuted(lastExecuted)
 
 	return m, errors.Join(
+		reg.Register(m.plantTxsSeconds),
+		reg.Register(m.plantCommitSeconds),
 		reg.Register(m.lastExecutedHeight),
 		reg.Register(m.queueDuration),
 		reg.Register(m.executeBlockDuration),

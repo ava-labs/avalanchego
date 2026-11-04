@@ -156,6 +156,7 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	stateDB.StartPrefetcher(triePrefetcherNamespace, prefetch.WithConcurrentWorkers(triePrefetcherParallelism))
 	defer stateDB.StopPrefetcher()
 
+	txs0 := time.Now()
 	result, err := Execute(
 		b,
 		stateDB,
@@ -169,6 +170,7 @@ func (e *Executor) execute(b *blocks.Block, log logging.Logger) error {
 	if err != nil {
 		return err
 	}
+	e.metrics.plantTxsSeconds.Add(time.Since(txs0).Seconds())
 	return e.afterExecution(b, stateDB, result)
 }
 
@@ -452,7 +454,9 @@ func (e *Executor) afterExecution(b *blocks.Block, stateDB *state.StateDB, r *Ex
 
 	e.chainContext.recent.Put(b.NumberU64(), b.Header())
 
+	c0 := time.Now()
 	root, err := stateDB.Commit(b.NumberU64(), true)
+	e.metrics.plantCommitSeconds.Add(time.Since(c0).Seconds())
 	if err != nil {
 		return fmt.Errorf("%T.Commit() at end of block %d: %w", stateDB, b.NumberU64(), err)
 	}
