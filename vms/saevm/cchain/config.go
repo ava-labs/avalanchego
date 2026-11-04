@@ -170,6 +170,9 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 			break
 		}
 	}
+	if v, ok := dynamic.PlantSetting("sae-commit-interval"); ok { // Firewood: max unpersisted revisions
+		c.CommitInterval = v
+	}
 
 	var unrecognized []string
 	for key := range keys {
