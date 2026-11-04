@@ -30,6 +30,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+// Scheme is the name of the Firewood state scheme.
+const Scheme = "firewood"
+
 var (
 	_ triedb.DBConstructor = Config{}.BackendConstructor
 	_ triedb.HashDB        = (*TrieDB)(nil)

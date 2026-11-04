@@ -194,7 +194,7 @@ func testStateSyncToggleEnabledToDisabled(t *testing.T, scheme string) {
 		}
 		// Verify the snapshot disk layer matches the last block root
 		lastRoot := syncDisabledVM.blockChain.CurrentBlock().Root
-		if test.stateScheme != customrawdb.FirewoodScheme {
+		if test.stateScheme != firewood.Scheme {
 			require.NoError(t, syncDisabledVM.blockChain.Snapshots().Verify(lastRoot))
 		}
 		syncDisabledVM.blockChain.DrainAcceptorQueue()
@@ -273,7 +273,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		root                        common.Hash
 		fundedAccounts, allAccounts map[*utilstest.Key]*types.StateAccount
 	)
-	if test.stateScheme == customrawdb.FirewoodScheme {
+	if test.stateScheme == firewood.Scheme {
 		tdb, ok := serverVM.vm.Blockchain().TrieDB().Backend().(*firewood.TrieDB)
 		require.Truef(ok, "expected TrieDB backend to be *firewood.TrieDB, got %T", serverVM.vm.Blockchain().TrieDB().Backend())
 		tdb.SetHashAndHeight(common.Hash{}, 0) // must be set for FillAccountsWithStorageAndCode to work
