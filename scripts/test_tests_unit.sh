@@ -47,6 +47,9 @@ case "\${1-}" in
           github.com/ava-labs/avalanchego/graft/evm/unit \
           github.com/ava-labs/avalanchego/graft/evm/tests/e2e
         ;;
+      "${repo_root}/graft/simplex")
+        :
+        ;;
       "${repo_root}/graft/subnet-evm")
         printf '%s\n' \
           github.com/ava-labs/avalanchego/graft/subnet-evm/unit \
