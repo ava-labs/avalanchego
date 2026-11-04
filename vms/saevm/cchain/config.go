@@ -305,6 +305,10 @@ func (c config) desired() desiredParams {
 		e := dynamic.DesiredTargetExponent(gas.Gas(v))
 		d.targetExponent = &e
 	}
+	if v, ok := dynamic.PlantSetting("sae-min-price"); ok {
+		e := dynamic.DesiredPriceExponent(gas.Price(v))
+		d.priceExponent = &e
+	}
 	if v, ok := dynamic.PlantSetting("sae-min-delay-ms"); ok {
 		e := dynamic.DesiredDelayExponent(v)
 		d.delayExponent = &e
