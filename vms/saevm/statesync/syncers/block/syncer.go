@@ -91,7 +91,7 @@ func (s *Syncer) Sync(ctx context.Context) error {
 			continue
 		}
 
-		maxBlocks := uint16(min(toFetch, maxBlocksPerResponse))
+		maxBlocks := uint16(min(toFetch, maxBlocksPerResponse)) //#nosec G115 -- bounded by maxBlocksPerResponse
 		blocks, err := s.getBlocks(ctx, nextHash, nextHeight, maxBlocks)
 		if err != nil {
 			return fmt.Errorf("getting blocks at %d (%s): %w", nextHeight, nextHash, err)

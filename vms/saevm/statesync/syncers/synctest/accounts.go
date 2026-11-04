@@ -55,10 +55,10 @@ type accountRow struct{ key, full, slim []byte }
 func accountLeaf(t *testing.T, i int, nonce uint64) accountRow {
 	t.Helper()
 	key := make([]byte, common.HashLength)
-	binary.BigEndian.PutUint64(key, uint64(i+1))
+	binary.BigEndian.PutUint64(key, uint64(i+1)) //#nosec G115 -- i is a non-negative test index
 	slim := types.SlimAccountRLP(types.StateAccount{
 		Nonce:    nonce,
-		Balance:  uint256.NewInt(uint64(i+1) * 1000),
+		Balance:  uint256.NewInt(uint64(i+1) * 1000), //#nosec G115 -- i is a non-negative test index
 		Root:     types.EmptyRootHash,
 		CodeHash: types.EmptyCodeHash.Bytes(),
 	})

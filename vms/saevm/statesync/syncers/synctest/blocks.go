@@ -69,7 +69,7 @@ func MakeChain(tb testing.TB, n int, opts ...ChainOption) []*types.Block {
 func makeTxs(n int, height uint64) []*types.Transaction {
 	txs := make([]*types.Transaction, n)
 	for i := range txs {
-		nonce := height*uint64(n) + uint64(i)
+		nonce := height*uint64(n) + uint64(i) //#nosec G115 -- i is a non-negative loop index
 		txs[i] = types.NewTransaction(nonce, common.Address{}, big.NewInt(1), 21_000, big.NewInt(1), nil)
 	}
 	return txs

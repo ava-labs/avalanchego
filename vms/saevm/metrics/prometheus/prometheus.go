@@ -137,7 +137,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 			Type: dto.MetricType_SUMMARY.Enum(),
 			Metric: []*dto.Metric{{
 				Summary: &dto.Summary{
-					SampleCount: new(uint64(snapshot.Count())),
+					SampleCount: new(uint64(snapshot.Count())), //#nosec G115 -- metric counts are non-negative
 					SampleSum:   new(float64(snapshot.Sum())),
 					Quantile:    dtoQuantiles,
 				},
@@ -170,7 +170,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 			Type: dto.MetricType_SUMMARY.Enum(),
 			Metric: []*dto.Metric{{
 				Summary: &dto.Summary{
-					SampleCount: new(uint64(snapshot.Count())),
+					SampleCount: new(uint64(snapshot.Count())), //#nosec G115 -- metric counts are non-negative
 					SampleSum:   new(float64(snapshot.Sum())),
 					Quantile:    dtoQuantiles,
 				},
@@ -193,7 +193,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 			Type: dto.MetricType_SUMMARY.Enum(),
 			Metric: []*dto.Metric{{
 				Summary: &dto.Summary{
-					SampleCount: new(uint64(count)),
+					SampleCount: new(uint64(count)), //#nosec G115 -- count is non-negative
 					SampleSum:   new(float64(count) * snapshot.Mean()),
 					Quantile:    dtoQuantiles,
 				},
