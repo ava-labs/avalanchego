@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
@@ -155,6 +157,18 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	}
 	if err := json.Unmarshal(b, &c); err != nil {
 		return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
+	}
+	// settlement plant (benchmark branch): the state scheme from <node data dir>/sae-state-scheme,
+	// else from the plant's settings directory, so one local network can mix backends
+	for _, f := range []string{
+		filepath.Join(snowCtx.ChainDataDir, "..", "..", "sae-state-scheme"),
+		"/opt/settlement/chainconf/sae-state-scheme",
+	} {
+		if v, err := os.ReadFile(f); err == nil {
+			c.StateScheme = strings.TrimSpace(string(v))
+			snowCtx.Log.Warn("plant state scheme", zap.String("scheme", c.StateScheme), zap.String("from", f))
+			break
+		}
 	}
 
 	var unrecognized []string
