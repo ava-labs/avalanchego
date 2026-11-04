@@ -19,6 +19,7 @@ go_library(
         "//api/server",
         "//chains",
         "//chains/atomic",
+        "//config",
         "//config/node",
         "//database",
         "//database/factory",
