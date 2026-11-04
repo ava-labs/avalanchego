@@ -12,8 +12,7 @@ on:
   merge_group:
     types: [checks_requested]
 
-permissions:
-  contents: read
+permissions: {}
 
 # Cancel ongoing workflow runs if a new one is started
 concurrency:
@@ -22,6 +21,7 @@ concurrency:
 
 jobs:
   go-required:
+    permissions: {}
     if: ${{ always() }}
     needs: tests
     runs-on: ubuntu-24.04
@@ -47,5 +47,7 @@ jobs:
           fi
 
   tests:
+    permissions:
+      contents: read
     uses: ./.github/workflows/go.yml
     secrets: inherit

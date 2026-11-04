@@ -56,12 +56,13 @@ runs:
 
     - name: Build and validate ${{ inputs.format }} packages
       shell: bash
-      run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-${{ inputs.format }}s
+      run: ./scripts/run_task.sh --taskfile .github/packaging/Taskfile.yml test-build-${INPUTS_FORMAT}s
       env:
         PACKAGING_TAG: ${{ steps.setup.outputs.tag }}
         PACKAGE_ARCH: ${{ inputs.package-arch }}
         GPG_KEY_FILE: ${{ steps.setup.outputs.gpg-key-file }}
         GPG_KEY_PASSPHRASE: ${{ inputs.gpg-passphrase }}
+        INPUTS_FORMAT: ${{ inputs.format }}
 
     - name: Upload packages as artifacts
       if: inputs.release == 'true'

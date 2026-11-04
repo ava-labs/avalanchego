@@ -2,8 +2,14 @@ name: Mark stale issues and pull requests
 on:
   schedule:
     - cron: '0 0 * * 0' # Run every day at midnight UTC on Sunday
+permissions: {}
+
 jobs:
   stale:
+    permissions:
+      actions: write
+      issues: write
+      pull-requests: write
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/stale@v10

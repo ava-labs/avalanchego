@@ -5,11 +5,12 @@ on:
     - cron: "0 0 * * *" # Once a day at midnight UTC
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   fuzz:
+    permissions:
+      contents: read
     name: fuzz (${{ matrix.shard }})
     runs-on: ubuntu-24.04
     strategy:
@@ -27,6 +28,8 @@ jobs:
     steps:
       - name: Git checkout
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Set up Go
         uses: ./.github/actions/setup-go-for-project
       - name: Run fuzz tests

@@ -10,8 +10,7 @@ on:
   schedule:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC
 
-permissions:
-  contents: read
+permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,6 +18,8 @@ concurrency:
 
 jobs:
   full:
+    permissions:
+      contents: read
     name: ${{ matrix.platform_name }}
     strategy:
       fail-fast: false

@@ -26,7 +26,7 @@ runs:
 
     - id: cache-paths
       shell: bash
-      run: |
+      run: | # zizmor: ignore[github-env] path built from the repo .bazelversion file
         repository_cache_dir="$HOME/.cache/bazel-repository-cache"
         go_mod_cache_dir="$HOME/.cache/bazel-go-repository-modcache"
         bazelisk_home="$HOME/.cache/bazelisk/$(<.bazelversion)"

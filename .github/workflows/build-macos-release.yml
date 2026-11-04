@@ -14,6 +14,8 @@ on:
       - "*"
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
+permissions: {}
+
 jobs:
   # This workflow contains a single job called "build"
   build-mac:
@@ -30,6 +32,8 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-go-for-project
       - run: go version
 
@@ -52,8 +56,10 @@ jobs:
         if: "${{ github.event.inputs.tag != '' }}"
         id: get_tag_from_workflow
         run: |
-          echo "TAG=${{ github.event.inputs.tag }}" >> "$GITHUB_ENV"
+          echo "TAG=${GITHUB_EVENT_INPUTS_TAG}" >> "$GITHUB_ENV"
         shell: bash
+        env:
+          GITHUB_EVENT_INPUTS_TAG: ${{ github.event.inputs.tag }}
 
       - name: Create avalanchego zip file
         run: 7z a "avalanchego-macos-${TAG}.zip" build/avalanchego
@@ -78,12 +84,12 @@ jobs:
           aws-region: us-east-1
 
       - name: Upload avalanchego to S3
-        run: aws s3 cp avalanchego-macos-${{ env.TAG }}.zip "s3://${BUCKET}/macos/"
+        run: aws s3 cp avalanchego-macos-${TAG}.zip "s3://${BUCKET}/macos/"
         env:
           BUCKET: ${{ secrets.BUCKET }}
 
       - name: Upload subnet-evm to S3
-        run: aws s3 cp subnet-evm-macos-${{ env.TAG }}.zip "s3://${BUCKET}/macos/"
+        run: aws s3 cp subnet-evm-macos-${TAG}.zip "s3://${BUCKET}/macos/"
         env:
           BUCKET: ${{ secrets.BUCKET }}
 

@@ -16,13 +16,19 @@ env:
   REGISTRY: us-central1-docker.pkg.dev
   REPOSITORY: molten-verve-216720/avalanche-repository
 
+permissions: {}
+
 jobs:
   antithesis:
+    permissions:
+      contents: read
     runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Login to GAR
         uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
