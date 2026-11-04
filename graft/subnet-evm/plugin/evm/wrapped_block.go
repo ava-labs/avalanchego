@@ -191,7 +191,7 @@ func (b *wrappedBlock) ShouldVerifyWithContext(context.Context) (bool, error) {
 	// Check if any transaction includes a Warp message, requiring the
 	// ProposerVMBlockCtx.
 	for _, tx := range b.ethBlock.Transactions() {
-		if len(warp.MessagesFromAccessList(rules.WarpConfig != nil, tx.AccessList())) > 0 {
+		if len(warp.MessagesFromAccessList(tx.AccessList())) > 0 {
 			log.Debug("Block verification requires proposerVM context", "block", b.ID(), "height", b.Height())
 			return true, nil
 		}

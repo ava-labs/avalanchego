@@ -30,7 +30,9 @@ func New(vm *state.StateDB) *StateDB {
 }
 
 func (s *StateDB) Prepare(rules params.Rules, sender, coinbase common.Address, dst *common.Address, precompiles []common.Address, list types.AccessList) {
-	s.warpMessages = warp.MessagesFromAccessList(params.GetRulesExtra(rules).WarpConfig != nil, list)
+	if params.GetRulesExtra(rules).WarpConfig != nil {
+		s.warpMessages = warp.MessagesFromAccessList(list)
+	}
 	s.StateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)
 }
 

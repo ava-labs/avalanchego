@@ -66,8 +66,11 @@ func CheckTxPredicates(
 		)
 	}
 
-	rulesExtra := params.GetRulesExtra(rules)
-	warpMessages := warp.MessagesFromAccessList(rulesExtra.WarpConfig != nil, accessList)
+	warpConfig := params.GetRulesExtra(rules).WarpConfig
+	if warpConfig == nil {
+		return nil, nil
+	}
+	warpMessages := warp.MessagesFromAccessList(accessList)
 	if len(warpMessages) == 0 {
 		return nil, nil
 	}
@@ -78,7 +81,7 @@ func CheckTxPredicates(
 
 	bitset := set.NewBits()
 	for i, msg := range warpMessages {
-		if err := rulesExtra.WarpConfig.VerifyPredicate(predicateContext, msg); err != nil {
+		if err := warpConfig.VerifyPredicate(predicateContext, msg); err != nil {
 			bitset.Add(i)
 		}
 	}

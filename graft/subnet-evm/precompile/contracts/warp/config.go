@@ -138,12 +138,9 @@ func (*Config) Accept(acceptCtx *precompileconfig.AcceptContext, blockHash commo
 	return nil
 }
 
-// MessagesFromAccessList returns the Warp messages in list, in order. It
-// returns nil if Warp is not enabled.
-func MessagesFromAccessList(isEnabled bool, list types.AccessList) []predicate.Predicate {
-	if !isEnabled {
-		return nil
-	}
+// MessagesFromAccessList returns the Warp messages in list, in order. Callers
+// MUST only call it while Warp is enabled.
+func MessagesFromAccessList(list types.AccessList) []predicate.Predicate {
 	var messages []predicate.Predicate
 	for _, tuple := range list {
 		if tuple.Address == ContractAddress {
