@@ -17,9 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/handlers"
 	"github.com/ava-labs/avalanchego/utils"
@@ -37,7 +35,7 @@ type codeSyncerTest struct {
 	err               error
 }
 
-func testCodeSyncer(t *testing.T, test codeSyncerTest, c codec.Manager) {
+func testCodeSyncer(t *testing.T, test codeSyncerTest) {
 	// Set up serverDB
 	serverDB := memorydb.New()
 
@@ -49,8 +47,8 @@ func testCodeSyncer(t *testing.T, test codeSyncerTest, c codec.Manager) {
 	}
 
 	// Set up mockClient
-	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB, c, handlerstats.NewNoopHandlerStats())
-	mockClient := client.NewTestClient(c, nil, codeRequestHandler, nil)
+	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB, message.Codec, handlerstats.NewNoopHandlerStats())
+	mockClient := client.NewTestClient(message.Codec, nil, codeRequestHandler, nil)
 	mockClient.GetCodeIntercept = test.getCodeIntercept
 
 	clientDB := test.clientDB
@@ -100,11 +98,9 @@ func TestCodeSyncerSingleCodeHash(t *testing.T) {
 	t.Parallel()
 	codeBytes := utils.RandomBytes(100)
 	codeHash := crypto.Keccak256Hash(codeBytes)
-	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-		testCodeSyncer(t, codeSyncerTest{
-			codeRequestHashes: [][]common.Hash{{codeHash}},
-			codeByteSlices:    [][]byte{codeBytes},
-		}, c)
+	testCodeSyncer(t, codeSyncerTest{
+		codeRequestHashes: [][]common.Hash{{codeHash}},
+		codeByteSlices:    [][]byte{codeBytes},
 	})
 }
 
@@ -120,12 +116,10 @@ func TestCodeSyncerManyCodeHashes(t *testing.T) {
 		codeByteSlices = append(codeByteSlices, codeBytes)
 	}
 
-	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-		testCodeSyncer(t, codeSyncerTest{
-			queueCapacity:     10,
-			codeRequestHashes: [][]common.Hash{codeHashes[0:100], codeHashes[100:2000], codeHashes[2000:2005], codeHashes[2005:]},
-			codeByteSlices:    codeByteSlices,
-		}, c)
+	testCodeSyncer(t, codeSyncerTest{
+		queueCapacity:     10,
+		codeRequestHashes: [][]common.Hash{codeHashes[0:100], codeHashes[100:2000], codeHashes[2000:2005], codeHashes[2005:]},
+		codeByteSlices:    codeByteSlices,
 	})
 }
 
@@ -134,15 +128,13 @@ func TestCodeSyncerRequestErrors(t *testing.T) {
 	codeBytes := utils.RandomBytes(100)
 	codeHash := crypto.Keccak256Hash(codeBytes)
 	errDummy := errors.New("dummy error")
-	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-		testCodeSyncer(t, codeSyncerTest{
-			codeRequestHashes: [][]common.Hash{{codeHash}},
-			codeByteSlices:    [][]byte{codeBytes},
-			getCodeIntercept: func([]common.Hash, [][]byte) ([][]byte, error) {
-				return nil, errDummy
-			},
-			err: errDummy,
-		}, c)
+	testCodeSyncer(t, codeSyncerTest{
+		codeRequestHashes: [][]common.Hash{{codeHash}},
+		codeByteSlices:    [][]byte{codeBytes},
+		getCodeIntercept: func([]common.Hash, [][]byte) ([][]byte, error) {
+			return nil, errDummy
+		},
+		err: errDummy,
 	})
 }
 
@@ -150,14 +142,12 @@ func TestCodeSyncerAddsInProgressCodeHashes(t *testing.T) {
 	t.Parallel()
 	codeBytes := utils.RandomBytes(100)
 	codeHash := crypto.Keccak256Hash(codeBytes)
-	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-		clientDB := rawdb.NewMemoryDatabase()
-		require.NoError(t, customrawdb.WriteCodeToFetch(clientDB, codeHash))
-		testCodeSyncer(t, codeSyncerTest{
-			clientDB:          clientDB,
-			codeRequestHashes: nil,
-			codeByteSlices:    [][]byte{codeBytes},
-		}, c)
+	clientDB := rawdb.NewMemoryDatabase()
+	require.NoError(t, customrawdb.WriteCodeToFetch(clientDB, codeHash))
+	testCodeSyncer(t, codeSyncerTest{
+		clientDB:          clientDB,
+		codeRequestHashes: nil,
+		codeByteSlices:    [][]byte{codeBytes},
 	})
 }
 
@@ -169,60 +159,58 @@ func TestCodeSyncerAddsInProgressCodeHashes(t *testing.T) {
 func TestCodeSyncerCleansMarkerRewrittenMidCleanup(t *testing.T) {
 	t.Parallel()
 
-	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-		codeBytes := utils.RandomBytes(100)
-		codeHash := crypto.Keccak256Hash(codeBytes)
+	codeBytes := utils.RandomBytes(100)
+	codeHash := crypto.Keccak256Hash(codeBytes)
 
-		// probeHash is a synchronization barrier. Its code is on disk so
-		// dequeueing it does not affect codeHash's marker.
-		probeBytes := utils.RandomBytes(100)
-		probeHash := crypto.Keccak256Hash(probeBytes)
+	// probeHash is a synchronization barrier. Its code is on disk so
+	// dequeueing it does not affect codeHash's marker.
+	probeBytes := utils.RandomBytes(100)
+	probeHash := crypto.Keccak256Hash(probeBytes)
 
-		rawDB := rawdb.NewMemoryDatabase()
-		clientDB := newBlockingBatchDB(rawDB)
+	rawDB := rawdb.NewMemoryDatabase()
+	clientDB := newBlockingBatchDB(rawDB)
 
-		rawdb.WriteCode(rawDB, codeHash, codeBytes)
-		require.NoError(t, customrawdb.WriteCodeToFetch(rawDB, codeHash))
-		rawdb.WriteCode(rawDB, probeHash, probeBytes)
+	rawdb.WriteCode(rawDB, codeHash, codeBytes)
+	require.NoError(t, customrawdb.WriteCodeToFetch(rawDB, codeHash))
+	rawdb.WriteCode(rawDB, probeHash, probeBytes)
 
-		serverDB := memorydb.New()
-		rawdb.WriteCode(serverDB, codeHash, codeBytes)
-		rawdb.WriteCode(serverDB, probeHash, probeBytes)
-		handler := handlers.NewCodeRequestHandler(serverDB, c, handlerstats.NewNoopHandlerStats())
-		mockClient := client.NewTestClient(c, nil, handler, nil)
+	serverDB := memorydb.New()
+	rawdb.WriteCode(serverDB, codeHash, codeBytes)
+	rawdb.WriteCode(serverDB, probeHash, probeBytes)
+	handler := handlers.NewCodeRequestHandler(serverDB, message.Codec, handlerstats.NewNoopHandlerStats())
+	mockClient := client.NewTestClient(message.Codec, nil, handler, nil)
 
-		ch := make(chan common.Hash)
-		codeSyncer, err := NewSyncer(mockClient, clientDB, ch, WithNumWorkers(2))
-		require.NoError(t, err)
+	ch := make(chan common.Hash)
+	codeSyncer, err := NewSyncer(mockClient, clientDB, ch, WithNumWorkers(2))
+	require.NoError(t, err)
 
-		syncErrCh := make(chan error, 1)
-		go func() { syncErrCh <- codeSyncer.Sync(t.Context()) }()
+	syncErrCh := make(chan error, 1)
+	go func() { syncErrCh <- codeSyncer.Sync(t.Context()) }()
 
-		// A worker takes codeHash, commits the marker delete, then pauses
-		// inside the wrapped Batch.Write.
-		ch <- codeHash
-		<-clientDB.blocked
+	// A worker takes codeHash, commits the marker delete, then pauses
+	// inside the wrapped Batch.Write.
+	ch <- codeHash
+	<-clientDB.blocked
 
-		// Rewrite the marker (modelling a concurrent [Queue.AddCode]) and enqueue
-		// a duplicate for a sibling worker.
-		require.NoError(t, customrawdb.WriteCodeToFetch(rawDB, codeHash))
-		ch <- codeHash
+	// Rewrite the marker (modelling a concurrent [Queue.AddCode]) and enqueue
+	// a duplicate for a sibling worker.
+	require.NoError(t, customrawdb.WriteCodeToFetch(rawDB, codeHash))
+	ch <- codeHash
 
-		// Barrier! This send returns only after the sibling has processed
-		// the duplicate and is back at the channel receive, so its decision
-		// is committed before we release the paused worker.
-		ch <- probeHash
+	// Barrier! This send returns only after the sibling has processed
+	// the duplicate and is back at the channel receive, so its decision
+	// is committed before we release the paused worker.
+	ch <- probeHash
 
-		close(clientDB.release)
-		close(ch)
+	close(clientDB.release)
+	close(ch)
 
-		require.NoError(t, <-syncErrCh)
+	require.NoError(t, <-syncErrCh)
 
-		it := customrawdb.NewCodeToFetchIterator(rawDB)
-		defer it.Release()
-		require.False(t, it.Next(), "stale code-to-fetch marker remained after sync")
-		require.NoError(t, it.Error())
-	})
+	it := customrawdb.NewCodeToFetchIterator(rawDB)
+	defer it.Release()
+	require.False(t, it.Next(), "stale code-to-fetch marker remained after sync")
+	require.NoError(t, it.Error())
 }
 
 // blockingBatchDB pauses inside the first Batch.Write after the commit
@@ -280,62 +268,60 @@ func TestCodeSyncerDuplicateAddCodeNoMarkerLeak(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-				codeBytes := utils.RandomBytes(100)
-				codeHash := crypto.Keccak256Hash(codeBytes)
+			codeBytes := utils.RandomBytes(100)
+			codeHash := crypto.Keccak256Hash(codeBytes)
 
-				clientDB := rawdb.NewMemoryDatabase()
-				if tt.preWriteCode {
-					rawdb.WriteCode(clientDB, codeHash, codeBytes)
-				}
+			clientDB := rawdb.NewMemoryDatabase()
+			if tt.preWriteCode {
+				rawdb.WriteCode(clientDB, codeHash, codeBytes)
+			}
 
-				serverDB := memorydb.New()
-				rawdb.WriteCode(serverDB, codeHash, codeBytes)
-				handler := handlers.NewCodeRequestHandler(serverDB, c, handlerstats.NewNoopHandlerStats())
-				mockClient := client.NewTestClient(c, nil, handler, nil)
+			serverDB := memorydb.New()
+			rawdb.WriteCode(serverDB, codeHash, codeBytes)
+			handler := handlers.NewCodeRequestHandler(serverDB, message.Codec, handlerstats.NewNoopHandlerStats())
+			mockClient := client.NewTestClient(message.Codec, nil, handler, nil)
 
-				codeQueue, err := NewQueue(clientDB)
-				require.NoError(t, err)
+			codeQueue, err := NewQueue(clientDB)
+			require.NoError(t, err)
 
-				const (
-					numWorkers   = 8
-					numProducers = 8
-					iterations   = 50_000
-				)
-				codeSyncer, err := NewSyncer(mockClient, clientDB, codeQueue.CodeHashes(), WithNumWorkers(numWorkers))
-				require.NoError(t, err)
+			const (
+				numWorkers   = 8
+				numProducers = 8
+				iterations   = 50_000
+			)
+			codeSyncer, err := NewSyncer(mockClient, clientDB, codeQueue.CodeHashes(), WithNumWorkers(numWorkers))
+			require.NoError(t, err)
 
-				// Run the syncer in a goroutine so the main test can drive
-				// producers and Finalize from the foreground.
-				syncErrCh := make(chan error, 1)
-				go func() {
-					syncErrCh <- codeSyncer.Sync(t.Context())
-				}()
+			// Run the syncer in a goroutine so the main test can drive
+			// producers and Finalize from the foreground.
+			syncErrCh := make(chan error, 1)
+			go func() {
+				syncErrCh <- codeSyncer.Sync(t.Context())
+			}()
 
-				// Tight-loop AddCode from many producers maximises the chance
-				// of landing inside a worker's marker-cleanup window.
-				var producers errgroup.Group
-				for range numProducers {
-					producers.Go(func() error {
-						for range iterations {
-							if err := codeQueue.AddCode([]common.Hash{codeHash}); err != nil {
-								return err
-							}
+			// Tight-loop AddCode from many producers maximises the chance
+			// of landing inside a worker's marker-cleanup window.
+			var producers errgroup.Group
+			for range numProducers {
+				producers.Go(func() error {
+					for range iterations {
+						if err := codeQueue.AddCode([]common.Hash{codeHash}); err != nil {
+							return err
 						}
-						return nil
-					})
-				}
-				require.NoError(t, producers.Wait())
-				codeQueue.DoneAdding()
-				require.NoError(t, <-syncErrCh)
+					}
+					return nil
+				})
+			}
+			require.NoError(t, producers.Wait())
+			codeQueue.DoneAdding()
+			require.NoError(t, <-syncErrCh)
 
-				require.Equal(t, codeBytes, rawdb.ReadCode(clientDB, codeHash))
+			require.Equal(t, codeBytes, rawdb.ReadCode(clientDB, codeHash))
 
-				it := customrawdb.NewCodeToFetchIterator(clientDB)
-				defer it.Release()
-				require.False(t, it.Next(), "stale code-to-fetch marker remained after sync")
-				require.NoError(t, it.Error())
-			})
+			it := customrawdb.NewCodeToFetchIterator(clientDB)
+			defer it.Release()
+			require.False(t, it.Next(), "stale code-to-fetch marker remained after sync")
+			require.NoError(t, it.Error())
 		})
 	}
 }
@@ -352,16 +338,14 @@ func TestCodeSyncerAddsMoreInProgressThanQueueSize(t *testing.T) {
 		codeByteSlices = append(codeByteSlices, codeBytes)
 	}
 
-	messagetest.ForEachCodec(t, func(c codec.Manager, _ message.LeafsRequestType) {
-		db := rawdb.NewMemoryDatabase()
-		for _, codeHash := range codeHashes {
-			require.NoError(t, customrawdb.WriteCodeToFetch(db, codeHash))
-		}
+	db := rawdb.NewMemoryDatabase()
+	for _, codeHash := range codeHashes {
+		require.NoError(t, customrawdb.WriteCodeToFetch(db, codeHash))
+	}
 
-		testCodeSyncer(t, codeSyncerTest{
-			clientDB:          db,
-			codeRequestHashes: nil,
-			codeByteSlices:    codeByteSlices,
-		}, c)
+	testCodeSyncer(t, codeSyncerTest{
+		clientDB:          db,
+		codeRequestHashes: nil,
+		codeByteSlices:    codeByteSlices,
 	})
 }
