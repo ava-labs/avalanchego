@@ -54,8 +54,8 @@ jobs:
         with:
           run: ./scripts/run_task.sh ${{ matrix.task }}
           setup_bazel: 'true'
-          # Load-contract binding generation invokes Go outside Bazel.
-          setup_go_module_cache: ${{ matrix.name == 'load' }}
+          # Load-contract binding generation and the merkle sync harness invoke Go outside Bazel.
+          setup_go_module_cache: ${{ matrix.name == 'load' || startsWith(matrix.name, 'merkle-sync') }}
           artifact_prefix: bazel-${{ matrix.name }}${{ inputs.job_suffix }}
           job: bazel-${{ matrix.name }}${{ inputs.job_suffix }}
           filter_by_owner: ${{ matrix.network_owner || '' }}
