@@ -25,8 +25,8 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
@@ -173,24 +173,24 @@ func TestRecover(t *testing.T) {
 		{
 			name:      "archival_firewood",
 			numBlocks: 10,
-			scheme:    customrawdb.FirewoodScheme,
+			scheme:    firewood.Scheme,
 			archival:  true,
 		},
 		{
 			name:      "non_archival_firewood_before_first_trie_commit",
 			numBlocks: 2, // no new blocks settled yet
-			scheme:    customrawdb.FirewoodScheme,
+			scheme:    firewood.Scheme,
 		},
 
 		{
 			name:      "non_archival_firewood_commit_interval_exactly",
 			numBlocks: commitInterval,
-			scheme:    customrawdb.FirewoodScheme,
+			scheme:    firewood.Scheme,
 		},
 		{
 			name:      "non_archival_firewood_beyond_revision_window",
 			numBlocks: 3 * commitInterval, // evicts the oldest revisions from the in-memory window
-			scheme:    customrawdb.FirewoodScheme,
+			scheme:    firewood.Scheme,
 		},
 	}
 	for _, tt := range tests {
@@ -235,7 +235,7 @@ func TestRecover(t *testing.T) {
 			// Firewood nodes have a rolling buffer of available recent states,
 			// so it doesn't need to be managed directly.
 			// Archival nodes store all states.
-			if !tt.archival && tt.scheme != customrawdb.FirewoodScheme {
+			if !tt.archival && tt.scheme != firewood.Scheme {
 				// For non-archival, HashDB nodes, states outside
 				// [lastSettled, lastExecuted] MUST NOT be accessible, except at
 				// CommitTrieDBEvery boundaries where the settled state was
