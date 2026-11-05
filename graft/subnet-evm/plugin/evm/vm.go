@@ -86,7 +86,7 @@ import (
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheUtils "github.com/ava-labs/avalanchego/utils"
 	avajson "github.com/ava-labs/avalanchego/utils/json"
-	avalanchegoprometheus "github.com/ava-labs/avalanchego/vms/saevm/metrics/prometheus"
+	avalanchegoprometheus "github.com/ava-labs/avalanchego/vms/evm/metrics/prometheus"
 	ethparams "github.com/ava-labs/libevm/params"
 	avalancheRPC "github.com/gorilla/rpc/v2"
 )

@@ -26,11 +26,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
-	"github.com/ava-labs/avalanchego/vms/saevm/statesync/syncers/code"
-	"github.com/ava-labs/avalanchego/vms/saevm/statesync/syncers/hashdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/code"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/hashdb"
 
 	graftsnap "github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
-	syncblock "github.com/ava-labs/avalanchego/vms/saevm/statesync/syncers/block"
+	syncblock "github.com/ava-labs/avalanchego/vms/saevm/statesync/block"
 )
 
 // A Syncer can fully state-sync an EVM database, sufficient for execution with

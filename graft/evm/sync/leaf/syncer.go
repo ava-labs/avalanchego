@@ -14,7 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/vms/saevm/statesync/syncers/hashdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/hashdb"
 )
 
 var (

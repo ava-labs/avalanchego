@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 
-	syncblocks "github.com/ava-labs/avalanchego/vms/saevm/statesync/syncers/block"
+	syncblocks "github.com/ava-labs/avalanchego/vms/saevm/statesync/block"
 )
 
 // Config provides all user-configurable information for the [Handler].

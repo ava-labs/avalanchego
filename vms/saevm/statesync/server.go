@@ -13,9 +13,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/saevm/statesync/syncers/block"
-	"github.com/ava-labs/avalanchego/vms/saevm/statesync/syncers/code"
-	"github.com/ava-labs/avalanchego/vms/saevm/statesync/syncers/hashdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/block"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/code"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/hashdb"
 )
 
 // RegisterHandlers registers the handlers for the state sync protocol.

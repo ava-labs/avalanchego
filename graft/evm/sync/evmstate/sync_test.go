@@ -38,8 +38,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
-	leafproto "github.com/ava-labs/avalanchego/vms/saevm/statesync/syncers/hashdb"
-	vmssynctest "github.com/ava-labs/avalanchego/vms/saevm/statesync/syncers/synctest"
+	leafproto "github.com/ava-labs/avalanchego/vms/saevm/statesync/hashdb"
+	vmssynctest "github.com/ava-labs/avalanchego/vms/saevm/statesync/statesynctest"
 )
 
 const testRequestSize = 1024

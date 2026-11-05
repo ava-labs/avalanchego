@@ -45,7 +45,7 @@ import (
 
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
-	evmprometheus "github.com/ava-labs/avalanchego/vms/saevm/metrics/prometheus"
+	evmprometheus "github.com/ava-labs/avalanchego/vms/evm/metrics/prometheus"
 	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
 	ethmetrics "github.com/ava-labs/libevm/metrics"
 )
