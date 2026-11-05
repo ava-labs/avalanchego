@@ -12,7 +12,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams",
     visibility = ["//visibility:public"],
     deps = [
-        "//graft/coreth/precompile/precompileconfig",
+        "//graft/evm/precompileconfig",
         "//snow",
         "//upgrade",
         "//utils",

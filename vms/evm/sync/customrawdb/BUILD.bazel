@@ -4,7 +4,6 @@ load("//.bazel:defs.bzl", "go_test")
 go_library(
     name = "customrawdb",
     srcs = [
-        "db.go",
         "markers.go",
         "sync_progress.go",
     ],
@@ -24,7 +23,6 @@ go_library(
 go_test(
     name = "customrawdb_test",
     srcs = [
-        "db_test.go",
         "markers_test.go",
         "sync_progress_test.go",
     ],

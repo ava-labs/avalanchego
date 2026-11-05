@@ -6,7 +6,7 @@ package syncer
 import (
 	"errors"
 
-	"github.com/ava-labs/firewood-go-ethhash/ffi"
+	"github.com/ava-labs/firewood-go/ffi"
 
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,15 +17,15 @@ var (
 	_ sync.Marshaler[struct{}]    = changeProofMarshaler{}
 )
 
-type rangeProofMarshaler struct{}
+type rangeProofMarshaler struct{ db *ffi.Database }
 
 func (rangeProofMarshaler) Marshal(r *RangeProof) ([]byte, error) {
-	return r.rp.MarshalBinary()
+	return r.rp.Marshal()
 }
 
-func (rangeProofMarshaler) Unmarshal(data []byte) (*RangeProof, error) {
-	proof := new(ffi.RangeProof)
-	if err := proof.UnmarshalBinary(data); err != nil {
+func (m rangeProofMarshaler) Unmarshal(data []byte) (*RangeProof, error) {
+	proof, err := m.db.UnmarshalRangeProof(data)
+	if err != nil {
 		return nil, err
 	}
 	return &RangeProof{

@@ -33,7 +33,6 @@ import (
 	"go.uber.org/goleak"
 	"google.golang.org/protobuf/proto"
 
-	// Imported for [saexec.Execute] comment resolution.
 	_ "github.com/ava-labs/avalanchego/vms/saevm/saexec"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -41,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -58,7 +56,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
@@ -69,7 +66,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -272,7 +271,7 @@ func withCommitInterval(n uint64) sutOption {
 // withFirewood selects Firewood as the trie database
 func withFirewood() sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.StateScheme = customrawdb.FirewoodScheme
+		c.vmConfig.StateScheme = firewood.Scheme
 	})
 }
 
@@ -2298,7 +2297,7 @@ func TestRecoverFirewoodAcrossSynchronousTransition(t *testing.T) {
 	require.NoErrorf(t, sut.Shutdown(ctx), "%T.Shutdown()", sut.VM)
 
 	// Simulates a crash rolling Firewood back before it persisted anything.
-	firewoodDir := filepath.Join(dataDir, firewood.Directory)
+	firewoodDir := filepath.Join(dataDir, saedb.FirewoodDirectory)
 	require.NoError(t, os.RemoveAll(firewoodDir), "removing Firewood directory")
 
 	// Shutdown persists the settled asynchronous root, which will then be the

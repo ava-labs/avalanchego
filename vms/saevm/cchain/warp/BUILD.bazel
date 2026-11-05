@@ -15,7 +15,7 @@ go_library(
         "//database",
         "//database/prefixdb",
         "//graft/coreth/precompile/contracts/warp",
-        "//graft/coreth/precompile/precompileconfig",
+        "//graft/evm/precompileconfig",
         "//ids",
         "//network/p2p/acp118",
         "//snow",

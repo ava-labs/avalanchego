@@ -4,7 +4,6 @@
 package params
 
 import (
-	"fmt"
 	"maps"
 	"math/big"
 	"slices"
@@ -12,26 +11,20 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
-	"github.com/ava-labs/libevm/libevm/legacy"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
-	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	ethparams "github.com/ava-labs/libevm/params"
 )
-
-// invalidateDelegateTime is the Unix timestamp for August 2nd, 2025, midnight Eastern Time
-// (August 2nd, 2025, 04:00 UTC)
-const InvalidateDelegateUnix = 1754107200
 
 // P256VerifyAddress is the address of the p256 signature verification precompile
 var P256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
@@ -76,7 +69,7 @@ func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
 //
 // TODO(JonathanOppenheimer): Charge Warp messages directly once the shared
 // predicate gas helper is replaced.
-var warpPredicaters = map[common.Address]evmprecompileconfig.Predicater{
+var warpPredicaters = map[common.Address]precompileconfig.Predicater{
 	warp.ContractAddress: &warp.Config{},
 }
 
@@ -88,7 +81,7 @@ func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, e
 	if !r.IsDurango {
 		return 0, false, nil
 	}
-	gas, err := evmprecompileconfig.AccessListGasWithPredicates(cparams.Rules(r), warpPredicaters, accessList)
+	gas, err := precompileconfig.AccessListGasWithPredicates(cparams.Rules(r), warpPredicaters, accessList)
 	return gas, true, err
 }
 
@@ -154,8 +147,14 @@ func (r RulesExtra) precompileOverrideBuiltin(addr common.Address) (libevm.Preco
 }
 
 func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.PrecompiledContract {
-	run := func(env vm.PrecompileEnvironment, input []byte, suppliedGas uint64) ([]byte, uint64, error) {
+	return vm.NewStatefulPrecompile(func(env vm.PrecompileEnvironment, input []byte) ([]byte, error) {
 		rules := *GetRulesExtra(env.Rules())
+
+		if call := env.IncomingCallType(); (call == vm.DelegateCall || call == vm.CallCode) && rules.IsGranite {
+			env.UseGas(env.Gas()) // A revert would otherwise refund the remaining gas.
+			return nil, vm.ErrExecutionReverted
+		}
+
 		accessibleState := accessibleState{
 			env: env,
 			blockContext: &precompileBlockContext{
@@ -165,19 +164,8 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 			},
 		}
 
-		switch call := env.IncomingCallType(); {
-		case call != vm.DelegateCall && call != vm.CallCode: // Others always allowed
-		case rules.IsGranite:
-			return nil, 0, vm.ErrExecutionReverted
-		case env.BlockTime() >= InvalidateDelegateUnix:
-			env.InvalidateExecution(fmt.Errorf("precompile cannot be called with %s", call))
-		default:
-			// Otherwise, we allow the precompile to be called
-		}
-
-		return contract.Run(accessibleState, env.Addresses().EVMSemantic.Caller, env.Addresses().EVMSemantic.Self, input, suppliedGas, env.ReadOnly())
-	}
-	return vm.NewStatefulPrecompile(legacy.PrecompiledStatefulContract(run).Upgrade())
+		return contract.Run(accessibleState, env.Addresses().EVMSemantic.Caller, env.Addresses().EVMSemantic.Self, input, env.ReadOnly())
+	})
 }
 
 func (r RulesExtra) PrecompileOverride(addr common.Address) (libevm.PrecompiledContract, bool) {
