@@ -590,13 +590,12 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require.NotZero(delReward, "expected delegator balance to increase because of reward")
 
 	require.Less(delegateeReward, delReward, "the delegator's reward should be greater than the delegatee's because the delegatee's share is 25%")
-	require.Equal(delPotentialReward, delReward+delegateeReward, "expected total reward to be %d but is %d", delPotentialReward, delReward+vdrReward)
+	require.Equal(delPotentialReward, delReward+delegateeReward)
 }
 
 func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, upgradetest.Cortina)
-	dummyHeight := uint64(1)
 
 	const vdrRewardAmt = uint64(2000000)
 	vdrTx, delTx, vdrRewardsOwner, delRewardsOwner := addCurrentValidatorAndDelegator(t, env, vdrRewardAmt)
@@ -614,14 +613,11 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	delOnCommitState, _, err := executeProposalTx(t, env, diff, tx)
 	require.NoError(err)
 
-	// Create Validator Diffs
-	require.NoError(delOnCommitState.Apply(env.state))
-
+	// Create Validator Diffs on top of the unapplied delegator commit diff
 	tx = newRewardValidatorTx(t, vdrTx.ID())
-	diff, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	vdrOnCommitState, vdrOnAbortState, err := executeProposalTx(t, env, delOnCommitState, tx)
 	require.NoError(err)
-	vdrOnCommitState, vdrOnAbortState, err := executeProposalTx(t, env, diff, tx)
-	require.NoError(err)
+	require.NoError(delOnCommitState.Apply(env.state))
 
 	// aborted validator tx should still distribute accrued delegator rewards
 	uVdrTx := vdrTx.Unsigned.(*platform.AddValidatorTx)
@@ -631,7 +627,6 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 	// Commit Validator Diff
 	require.NoError(vdrOnCommitState.Apply(env.state))
 
-	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
 	// Since the tx was committed, the delegator and the delegatee should be rewarded.
