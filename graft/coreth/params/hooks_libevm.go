@@ -152,7 +152,7 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 		rules := *GetRulesExtra(env.Rules())
 
 		if call := env.IncomingCallType(); (call == vm.DelegateCall || call == vm.CallCode) && rules.IsGranite {
-			env.UseGas(env.Gas()) //  // A revert would otherwise refund the remaining gas.
+			env.UseGas(env.Gas()) // A revert would otherwise refund the remaining gas.
 			return nil, vm.ErrExecutionReverted
 		}
 
