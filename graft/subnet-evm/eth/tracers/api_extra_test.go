@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/ethapi"
@@ -27,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -38,7 +38,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-var schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}
+var schemes = []string{rawdb.HashScheme, firewood.Scheme}
 
 func TestTraceBlockPrecompileActivation(t *testing.T) {
 	for _, scheme := range schemes {

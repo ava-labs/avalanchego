@@ -22,9 +22,9 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
@@ -64,7 +64,7 @@ func (s *Syncer) ShouldAcceptSummary(summary *Summary) bool {
 		return false
 	}
 
-	if s.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
+	if s.cfg.DBConfig.Scheme == firewood.Scheme {
 		s.snowCtx.Log.Warn("State sync is not supported with Firewood scheme")
 		return false
 	}

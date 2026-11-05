@@ -54,11 +54,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
@@ -343,7 +343,7 @@ func withDB(db database.Database) sutOption {
 // HashDB.
 func withFirewood() sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.DBConfig.Scheme = customrawdb.FirewoodScheme
+		c.vmConfig.DBConfig.Scheme = firewood.Scheme
 	})
 }
 
