@@ -36,10 +36,10 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/statesynctest"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	leafproto "github.com/ava-labs/avalanchego/vms/saevm/statesync/hashdb"
-	vmssynctest "github.com/ava-labs/avalanchego/vms/saevm/statesync/statesynctest"
 )
 
 const testRequestSize = 1024
@@ -626,7 +626,7 @@ func TestSyncOverProtoLeafProtocol(t *testing.T) {
 	require.Truef(t, ok, "%T is not an ethdb.Database", clientDB.DiskDB())
 
 	log := loggingtest.New(t, logging.Debug)
-	net, tracker := vmssynctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
+	net, tracker := statesynctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
 	require.NoError(t, leafproto.RegisterHandler(log, net, p2p.EVMLeafRequestHandlerID, serverDB.TrieDB(), common.HashLength))
 
 	codeQueue, err := code.NewQueue(clientEthDB)
