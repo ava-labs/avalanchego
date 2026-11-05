@@ -196,7 +196,18 @@ func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceC
 
 func (*hooks) SettledBy(h *types.Header) hook.Settled {
 	he := customtypes.GetHeaderExtra(h)
-	return saeheader.Settled(he.SettledHeight, he.SettledGasUnix, he.SettledGasNumerator, he.SettledExcess)
+	if he.SettledHeight == nil ||
+		he.SettledGasUnix == nil ||
+		he.SettledGasNumerator == nil ||
+		he.SettledExcess == nil {
+		return hook.Settled{}
+	}
+	return hook.Settled{
+		Height:       *he.SettledHeight,
+		GasUnix:      *he.SettledGasUnix,
+		GasNumerator: gas.Gas(*he.SettledGasNumerator),
+		Excess:       gas.Gas(*he.SettledExcess),
+	}
 }
 
 func (*hooks) BlockTime(h *types.Header) time.Time {
