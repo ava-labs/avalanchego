@@ -21,9 +21,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
@@ -180,7 +180,7 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	}
 	ci := saeCfg.DBConfig.CommitInterval
 	if constants.ProductionNetworkIDs.Contains(snowCtx.NetworkID) &&
-		c.StateScheme != customrawdb.FirewoodScheme &&
+		c.StateScheme != firewood.Scheme &&
 		ci != saedb.DefaultCommitInterval {
 		return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
 	}

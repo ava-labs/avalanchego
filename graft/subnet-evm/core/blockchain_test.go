@@ -51,6 +51,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -78,7 +79,7 @@ var (
 	}
 
 	// Firewood should only be included for snapshot disabled tests.
-	schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}
+	schemes = []string{rawdb.HashScheme, firewood.Scheme}
 )
 
 func newGwei(n int64) *big.Int {
@@ -472,7 +473,7 @@ func TestFirewoodGenesisPersisted(t *testing.T) {
 			Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
 			Alloc:  types.GenesisAlloc{addr: {Balance: big.NewInt(1000000)}},
 		}
-		config = DefaultCacheConfigWithScheme(customrawdb.FirewoodScheme)
+		config = DefaultCacheConfigWithScheme(firewood.Scheme)
 	)
 	config.Pruning = false
 	config.CommitInterval = 16 // Firewood defers persistence when this is not 1
@@ -803,7 +804,7 @@ func testUngracefulAsyncShutdown(t *testing.T, scheme string, snapshotEnabled bo
 // TestCanonicalHashMarker tests all the canonical hash markers are updated/deleted
 // correctly in case reorg is called.
 func TestCanonicalHashMarker(t *testing.T) {
-	for _, scheme := range []string{rawdb.HashScheme, rawdb.PathScheme, customrawdb.FirewoodScheme} {
+	for _, scheme := range []string{rawdb.HashScheme, rawdb.PathScheme, firewood.Scheme} {
 		t.Run(scheme, func(t *testing.T) {
 			testCanonicalHashMarker(t, scheme)
 		})
