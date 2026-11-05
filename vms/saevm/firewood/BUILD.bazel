@@ -17,7 +17,7 @@ go_library(
         "//graft/evm/firewood",
         "//utils/linked",
         "//utils/logging",
-        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
+        "@com_github_ava_labs_firewood_go_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",
