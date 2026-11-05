@@ -330,14 +330,15 @@ func TestBuilderBuildBlock(t *testing.T) {
 			name: "tx conflicts with processing ancestor",
 			builderFunc: func(ctrl *gomock.Controller) Builder {
 				preferredID := ids.GenerateTestID()
-				preferredTimestamp := time.Now()
-				preferredBlock := block.NewMockBlock(ctrl)
-				preferredBlock.EXPECT().Height().Return(uint64(1337))
-				preferredBlock.EXPECT().Timestamp().Return(preferredTimestamp)
+				preferredBlock := &block.StandardBlock{
+					BlockID: preferredID,
+				}
 
-				preferredState := statemock.NewChain(ctrl)
-				preferredState.EXPECT().GetLastAccepted().Return(preferredID)
-				preferredState.EXPECT().GetTimestamp().Return(preferredTimestamp)
+				baseDB := versiondb.New(memdb.New())
+				parser, err := block.NewParser(nil)
+				require.NoError(t, err)
+				preferredState, err := state.New(baseDB, parser, prometheus.NewRegistry(), trackChecksums)
+				require.NoError(t, err)
 
 				// The manager treats inputID1 as already imported by a processing
 				// ancestor, so VerifyUniqueInputs fails for any set containing it. Therefore
@@ -372,15 +373,11 @@ func TestBuilderBuildBlock(t *testing.T) {
 				manager.EXPECT().Preferred().Return(preferredID)
 				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
 				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
-				// A processing ancestor already imported inputID1.
-				manager.EXPECT().VerifyUniqueInputs(preferredID, gomock.Any()).DoAndReturn(
-					func(_ ids.ID, inputs set.Set[ids.ID]) error {
-						if inputs.Contains(inputID1) {
-							return blkexecutor.ErrConflictingParentTxs // This should make TX1 fail
-						}
-						return nil
-					},
-				).AnyTimes()
+
+				// inputID1 conflicts with ancestors
+				manager.EXPECT().VerifyUniqueInputs(preferredID, set.Of(inputID1)).Return(blkexecutor.ErrConflictingParentTxs)
+				manager.EXPECT().VerifyUniqueInputs(preferredID, set.Of(inputID2)).Return(nil)
+
 				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(
 					func(block *block.StandardBlock) snowman.Block {
 						require.Equal(t, []*txs.Tx{tx2}, block.Transactions) // Only TX2 was included
@@ -396,7 +393,6 @@ func TestBuilderBuildBlock(t *testing.T) {
 				// To marshal the block
 				codec := codecmock.NewManager(ctrl)
 				codec.EXPECT().Marshal(gomock.Any(), gomock.Any()).Return([]byte{1, 2, 3}, nil).AnyTimes()
-				codec.EXPECT().Size(gomock.Any(), gomock.Any()).Return(2, nil).AnyTimes()
 
 				return New(
 					&txexecutor.Backend{
