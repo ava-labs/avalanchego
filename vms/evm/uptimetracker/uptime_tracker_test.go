@@ -613,10 +613,11 @@ func TestUptimeTracker_RemoveDisconnectedValidator(t *testing.T) {
 	t.Run("restart", func(t *testing.T) {
 		uptimeTracker, err = New(validatorState, subnetID, db, clock)
 		require.NoError(t, err, "New()")
-		require.NoErrorf(t, uptimeTracker.Sync(t.Context()), "%T.Sync()", uptimeTracker)
 
 		_, _, err = uptimeTracker.GetUptime(removedValidationID)
 		require.ErrorIsf(t, err, ErrValidationIDNotFound, "%T.GetUptime() of removed validator", uptimeTracker)
+
+		require.NoErrorf(t, uptimeTracker.Sync(t.Context()), "%T.Sync()", uptimeTracker)
 
 		uptime, lastUpdated, err := uptimeTracker.GetUptime(remainingValidationID)
 		require.NoErrorf(t, err, "%T.GetUptime() of remaining validator", uptimeTracker)
