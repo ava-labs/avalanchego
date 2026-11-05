@@ -156,7 +156,6 @@ func (u *UptimeTracker) update(
 		if _, ok := currentValidatorSet[validationID]; !ok {
 			u.state.deleteValidator(validationID)
 		}
-
 	}
 
 	for validationID, newValidator := range currentValidatorSet {
