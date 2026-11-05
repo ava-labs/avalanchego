@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ava-labs/simplex/testutil"
+	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
 	"github.com/stretchr/testify/require"
 )
 

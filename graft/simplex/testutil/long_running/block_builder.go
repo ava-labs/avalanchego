@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/ava-labs/simplex/common"
-	"github.com/ava-labs/simplex/testutil"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
 )
 
 var _ common.BlockBuilder = (*LongRunningBlockBuilder)(nil)
