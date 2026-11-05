@@ -81,10 +81,10 @@ func (points) EndOfBlockOps(*types.Block) ([]hook.Op, error) {
 	return nil, nil
 }
 
-func emptySeq[T any](func(T) bool) {}
+func noTxs(func(noTx) bool) {}
 
 func (points) PotentialEndOfBlockOps(context.Context, *types.Header, common.Hash, saetypes.BlockSource) iter.Seq[noTx] {
-	return emptySeq[noTx]
+	return noTxs
 }
 
 func (p points) BuildBlock(
@@ -111,7 +111,7 @@ type blockBuilder struct {
 }
 
 func (blockBuilder) PotentialEndOfBlockOps(context.Context, *types.Header, common.Hash, saetypes.BlockSource) iter.Seq[noTx] {
-	return emptySeq[noTx]
+	return noTxs
 }
 
 func (b blockBuilder) BuildBlock(
