@@ -57,87 +57,87 @@ type atomicTxExecutor struct {
 }
 
 func (*atomicTxExecutor) AddValidatorTx(*platform.AddValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) AddSubnetValidatorTx(*platform.AddSubnetValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) AddDelegatorTx(*platform.AddDelegatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) CreateChainTx(*platform.CreateChainTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) CreateSubnetTx(*platform.CreateSubnetTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) AdvanceTimeTx(*platform.AdvanceTimeTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) RewardValidatorTx(*platform.RewardValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) RemoveSubnetValidatorTx(*platform.RemoveSubnetValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) TransformSubnetTx(*platform.TransformSubnetTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) AddPermissionlessValidatorTx(*platform.AddPermissionlessValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) AddPermissionlessDelegatorTx(*platform.AddPermissionlessDelegatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) TransferSubnetOwnershipTx(*platform.TransferSubnetOwnershipTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) BaseTx(*platform.BaseTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) ConvertSubnetToL1Tx(*platform.ConvertSubnetToL1Tx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) RegisterL1ValidatorTx(*platform.RegisterL1ValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) SetL1ValidatorWeightTx(*platform.SetL1ValidatorWeightTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) IncreaseL1ValidatorBalanceTx(*platform.IncreaseL1ValidatorBalanceTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) DisableL1ValidatorTx(*platform.DisableL1ValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) AddAutoRenewedValidatorTx(*platform.AddAutoRenewedValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) SetAutoRenewedValidatorConfigTx(*platform.SetAutoRenewedValidatorConfigTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (*atomicTxExecutor) RewardAutoRenewedValidatorTx(*platform.RewardAutoRenewedValidatorTx) error {
-	return ErrWrongTxType
+	return errWrongTxType
 }
 
 func (e *atomicTxExecutor) ImportTx(*platform.ImportTx) error {
