@@ -24,9 +24,9 @@ GO_OVERRIDES = {
         "build_gen": "off",
         "patches": ["//.bazel/patches:com_github_supranational_blst.patch"],
     },
-    "github.com/ava-labs/firewood-go-ethhash/ffi": {
+    "github.com/ava-labs/firewood-go/ffi": {
         "build_gen": "off",
-        "patches": ["//.bazel/patches:com_github_ava_labs_firewood_go_ethhash_ffi.patch"],
+        "patches": ["//.bazel/patches:com_github_ava_labs_firewood_go_ffi.patch"],
     },
     "github.com/consensys/gnark-crypto": {
         "patches": ["//.bazel/patches:com_github_consensys_gnark_crypto_asm_includes.patch"],
@@ -60,7 +60,7 @@ use_repo(
     "com_connectrpc_grpcreflect",
     "com_github_antithesishq_antithesis_sdk_go",
     "com_github_arr4n_shed",
-    "com_github_ava_labs_firewood_go_ethhash_ffi",
+    "com_github_ava_labs_firewood_go_ffi",
     "com_github_ava_labs_libevm",
     "com_github_ava_labs_simplex",
     "com_github_btcsuite_btcd_btcutil",

@@ -19,7 +19,6 @@ go_library(
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/contracts/warp",
-        "//graft/coreth/precompile/precompileconfig",
         "//graft/evm/precompileconfig",
         "//snow",
         "//utils/set",
@@ -29,7 +28,6 @@ go_library(
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//libevm",
-        "@com_github_ava_labs_libevm//libevm/legacy",
         "@com_github_ava_labs_libevm//params",
     ],
 )

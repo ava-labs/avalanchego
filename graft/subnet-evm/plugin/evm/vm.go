@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/firewood-go-ethhash/ffi"
+	"github.com/ava-labs/firewood-go/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -78,7 +78,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
@@ -406,7 +405,7 @@ func (vm *VM) Initialize(
 	vm.ethConfig.SkipTxIndexing = vm.config.SkipTxIndexing
 	vm.ethConfig.StateScheme = vm.config.StateScheme
 
-	if vm.ethConfig.StateScheme == customrawdb.FirewoodScheme {
+	if vm.ethConfig.StateScheme == firewood.Scheme {
 		log.Warn("Firewood state scheme is enabled")
 		log.Warn("This is untested in production, use at your own risk")
 		// Firewood does not support iterators, so the snapshot cannot be constructed
@@ -579,8 +578,8 @@ func (vm *VM) initializeMetrics() error {
 		return err
 	}
 
-	if vm.config.StateScheme == customrawdb.FirewoodScheme {
-		if err := vm.ctx.Metrics.Register(customrawdb.FirewoodScheme, ffi.Gatherer{}); err != nil {
+	if vm.config.StateScheme == firewood.Scheme {
+		if err := vm.ctx.Metrics.Register(firewood.Scheme, ffi.Gatherer{}); err != nil {
 			return fmt.Errorf("registering firewood metrics: %w", err)
 		}
 	}
@@ -670,10 +669,10 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		}
 		leafHandlers[stateLeafRequestConfig.LeafType] = stateLeafRequestConfig.Handler
 		leafMetricsNames[stateLeafRequestConfig.LeafType] = stateLeafRequestConfig.MetricName
-	case customrawdb.FirewoodScheme:
+	case firewood.Scheme:
 		tdb, ok := vm.eth.BlockChain().TrieDB().Backend().(*firewood.TrieDB)
 		if !ok {
-			return fmt.Errorf("expected a %T with %s scheme, got %T", tdb, customrawdb.FirewoodScheme, vm.eth.BlockChain().TrieDB().Backend())
+			return fmt.Errorf("expected a %T with %s scheme, got %T", tdb, firewood.Scheme, vm.eth.BlockChain().TrieDB().Backend())
 		}
 		n := vm.Network.P2PNetwork()
 		syncServerMetrics := prometheus.NewRegistry()

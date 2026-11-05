@@ -43,6 +43,7 @@ graft_go_test(
     ],
     embed = [":tracers"],
     deps = [
+        "//graft/evm/firewood",
         "//graft/evm/rpc",
         "//graft/subnet-evm/consensus",
         "//graft/subnet-evm/consensus/dummy",
@@ -53,7 +54,6 @@ graft_go_test(
         "//graft/subnet-evm/plugin/evm/customtypes",
         "//graft/subnet-evm/precompile/contracts/txallowlist",
         "//graft/subnet-evm/tests",
-        "//vms/evm/sync/customrawdb",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//common/math",
