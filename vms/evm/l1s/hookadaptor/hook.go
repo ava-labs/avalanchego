@@ -19,10 +19,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/evm/gastime"
+	"github.com/ava-labs/avalanchego/vms/evm/hook"
 
-	saetypes "github.com/ava-labs/avalanchego/vms/saevm/types"
+	saetypes "github.com/ava-labs/avalanchego/vms/evm/types"
 )
 
 // Points is a subset of [hook.PointsG] that doesn't expose any end-of-block
