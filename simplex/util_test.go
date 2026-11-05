@@ -73,7 +73,7 @@ func newTestBlock(config newBlockConfig) *Block {
 	if config.prev == nil {
 		vm := newTestVM()
 		block := &Block{
-			blacklist: common.NewBlacklist(uint16(config.numNodes), common.GenesisMaxBlacklistedRounds),
+			blacklist: common.NewBlacklist(common.GenesisMaxBlacklistedRounds),
 			vmBlock: &wrappedBlock{
 				Block: snowmantest.Genesis,
 				vm:    vm,
