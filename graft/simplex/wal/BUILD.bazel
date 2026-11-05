@@ -1,0 +1,36 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "wal",
+    srcs = [
+        "gc.go",
+        "memwal.go",
+        "record.go",
+        "wal.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/simplex/wal",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/simplex/common",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+graft_go_test(
+    name = "wal_test",
+    srcs = [
+        "gc_test.go",
+        "leak_test.go",
+        "memwal_test.go",
+        "record_test.go",
+        "wal_test.go",
+    ],
+    embed = [":wal"],
+    deps = [
+        "//graft/simplex/common",
+        "//graft/simplex/testutil",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
+    ],
+)
