@@ -60,6 +60,11 @@ on:
         required: false
         type: number
         default: 30
+      image_timeout_minutes:
+        description: 'Timeout for the multi-platform image job'
+        required: false
+        type: number
+        default: 30
 
 env:
   BAZEL_CI_ENFORCE_DEPENDENCY_LIST: 1
@@ -84,6 +89,28 @@ jobs:
       - uses: ./.github/actions/setup-bazel
         with:
           is-setup-job: 'true'
+          setup-image-inputs: 'true'
+          docker-username: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_USERNAME || '' }}
+          docker-password: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_PASSWORD || '' }}
+
+  build-image-avalanchego:
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.image_timeout_minutes }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-bazel
+        with:
+          setup-image-inputs: 'true'
+          docker-username: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_USERNAME || '' }}
+          docker-password: ${{ github.ref == 'refs/heads/master' && secrets.DOCKER_PASSWORD || '' }}
+      - name: Test multi-platform AvalancheGo image with Bazel
+        if: ${{ runner.os == 'Linux' }}
+        uses: ./.github/actions/run-docker-with-disk-space
+        with:
+          setup-qemu: 'true'
+          preserve-docker-images: 'true'
+          run: ./scripts/run_task.sh bazel-test-image-avalanchego
 
   unit:
     needs: setup

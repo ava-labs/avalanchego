@@ -14,6 +14,10 @@ inputs:
     description: 'Test-only override for the post-cleanup free-disk measurement in GB'
     required: false
     default: ''
+  remove-docker-images:
+    description: 'Whether cleanup may remove Docker images; disable after preparing image inputs'
+    required: false
+    default: 'true'
   diagnostic-groups:
     description: 'Space-separated extra disk diagnostic groups to log when the runner starts below threshold (for example: bazel or docker). Generic root-disk diagnostics are always included.'
     required: false
@@ -49,7 +53,7 @@ runs:
         # shell, rather than from the runner's Go toolchain. Reclaim the runner
         # tool cache when disk pressure requires cleanup.
         tool-cache: true
-        docker-images: true
+        docker-images: ${{ inputs.remove-docker-images == 'true' }}
 
     - name: Re-check runner disk space
       if: ${{ always() && steps.initial-check.outputs.below_threshold == 'true' }}

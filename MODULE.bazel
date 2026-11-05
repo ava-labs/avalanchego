@@ -8,6 +8,23 @@ bazel_dep(name = "gazelle", version = "0.54.0", repo_name = "bazel_gazelle")
 bazel_dep(name = "platforms", version = "1.1.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.2")
 bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.4")
+bazel_dep(name = "rules_distroless", version = "0.9.4")
+bazel_dep(name = "rules_img", version = "0.3.19")
+bazel_dep(name = "rules_cc", version = "0.2.8")
+
+register_toolchains(
+    "//bazel/toolchains:ubuntu_aarch64_toolchain",
+    "//bazel/toolchains:ubuntu_x86_64_toolchain",
+)
+
+# Temporary until a BCR release contains apt.install(mergedusr = True).
+# Use a pinned archive so CI can cache it and disable dependency downloads.
+archive_override(
+    module_name = "rules_distroless",
+    integrity = "sha256-9dFC6tHiNx2zP1VpG2q0B3RKusVuuSzndDF2yZJ+dwU=",
+    strip_prefix = "rules_distroless-a9e2012bf5935f7a8fa9c17a768abbbbd135f2a3",
+    urls = ["https://github.com/bazel-contrib/rules_distroless/archive/a9e2012bf5935f7a8fa9c17a768abbbbd135f2a3.tar.gz"],
+)
 
 # Go SDK - reads version from go.mod (ensured consistent with all go.mod files)
 go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
@@ -16,6 +33,100 @@ go_sdk.from_file(go_mod = "//:go.mod")
 # Go dependencies from go.work (aggregates all go.mod files)
 go_deps = use_extension("@bazel_gazelle//:extensions.bzl", "go_deps")
 go_deps.from_file(go_work = "//:go.work")
+
+# Locked Ubuntu Noble packages for host-native builders. Each builder uses
+# its native compiler and the Ubuntu cross compiler for the other architecture.
+apt = use_extension("@rules_distroless//apt:extensions.bzl", "apt")
+apt.sources_list(
+    architectures = [
+        "amd64",
+        "arm64",
+    ],
+    components = [
+        "main",
+        "universe",
+    ],
+    suites = [
+        "noble",
+        "noble-security",
+        "noble-updates",
+    ],
+    types = ["deb"],
+    uris = ["https://snapshot.ubuntu.com/ubuntu/20261024T000000Z"],
+)
+apt.install(
+    dependency_set = "noble_builder_amd64",
+    mergedusr = True,
+    packages = [
+        "ca-certificates:amd64",
+        "g++:amd64",
+        "gcc:amd64",
+        "gcc-aarch64-linux-gnu:amd64",
+        "git:amd64",
+        "libc6-dev:amd64",
+        "libc6-dev-arm64-cross:amd64",
+        "patch:amd64",
+        "unzip:amd64",
+        "zip:amd64",
+    ],
+    suites = [
+        "noble",
+        "noble-security",
+        "noble-updates",
+    ],
+)
+apt.install(
+    dependency_set = "noble_builder_arm64",
+    mergedusr = True,
+    packages = [
+        "ca-certificates:arm64",
+        "g++:arm64",
+        "gcc:arm64",
+        "gcc-x86-64-linux-gnu:arm64",
+        "git:arm64",
+        "libc6-dev:arm64",
+        "libc6-dev-amd64-cross:arm64",
+        "patch:arm64",
+        "unzip:arm64",
+        "zip:arm64",
+    ],
+    suites = [
+        "noble",
+        "noble-security",
+        "noble-updates",
+    ],
+)
+use_repo(apt, "noble_builder_amd64", "noble_builder_arm64")
+
+# The inner Bazel is pinned to .bazelversion. Use the full Bazel distribution,
+# which includes its JRE, instead of downloading a launcher at container run
+# time.
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+
+http_file(
+    name = "bazel_8_8_0_linux_amd64",
+    executable = True,
+    sha256 = "ca189f994f632c91c275443b8571652e3ea190fc2437a5798121ba7e5a9a2f29",
+    urls = ["https://github.com/bazelbuild/bazel/releases/download/8.8.0/bazel-8.8.0-linux-x86_64"],
+)
+
+http_file(
+    name = "bazel_8_8_0_linux_arm64",
+    executable = True,
+    sha256 = "861bc2fb6adb9db2e1daa409d4503605475d374ff63c25fe96b3330063151fd5",
+    urls = ["https://github.com/bazelbuild/bazel/releases/download/8.8.0/bazel-8.8.0-linux-arm64"],
+)
+
+images = use_extension("@rules_img//img:extensions.bzl", "images")
+images.settings(hub_repo = "enabled")
+images.pull(
+    name = "ubuntu_24_04",
+    digest = "sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852",
+    registry = "index.docker.io",
+    repository = "library/ubuntu",
+    tag = "24.04",
+)
+use_repo(images, "rules_img_images.bzl")
 
 # Patches for external dependencies that need custom BUILD files or fixes.
 # See docs/bazel.md "Patched Dependencies" for details on each override.

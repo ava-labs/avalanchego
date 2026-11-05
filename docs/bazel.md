@@ -1064,6 +1064,13 @@ Those commands can still read cached modules. A missing module causes a failure
 instead of a download. These controls do not block all network access; see
 [download restrictions](./go-toolchains-and-caches.md#download-restrictions).
 
+[Bazel image validation](./bazel-multiarch-image-validation.md#ci-caches) uses
+separate input caches for its inner builder and Docker images. Linux setup and
+image jobs opt in through `setup-bazel`'s `setup-image-inputs` input. Preparation
+completes these caches on misses or inexact hits before validation begins.
+The inner builder receives the download restrictions explicitly because it does
+not inherit the host's `~/.bazelrc`. Validation fails if prepared inputs are missing.
+
 The checked-in list has two parts:
 
 - `bazel_ci_target_patterns` lists target patterns for the Bazel CI workflows.
