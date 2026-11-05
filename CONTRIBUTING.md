@@ -93,8 +93,8 @@ nix develop
 
 This is explicit and works well when you want the full pinned environment for a session.
 
-You do not need to run `nix develop` for every task. Named tasks in the root `Taskfile.yml` use
-`./scripts/nix_run.sh`, which enters the repo's nix dev shell automatically when needed. The
+You do not need to run `nix develop` for every task. Named tasks in the root `Taskfile.yml` and
+in the files it includes from `taskfiles/` use `./scripts/nix_run.sh`, which enters the repo's nix dev shell automatically when needed. The
 main exception is bare `task`, which only lists available tasks.
 
 For zsh users, `nix develop` can be disruptive. It starts a `bash` shell that lacks the
@@ -205,8 +205,8 @@ Common ways to run `task` in this repo include:
 
 - `task` with no arguments lists available tasks.
 - `task <name>` runs the named task.
-- Named tasks in the root [`Taskfile.yml`](./Taskfile.yml) use
-  [`./scripts/nix_run.sh`](./scripts/nix_run.sh) to ensure access to nix dependencies without
+- Named tasks in the root [`Taskfile.yml`](./Taskfile.yml) and in the files it includes from
+  [`taskfiles/`](./taskfiles) use [`./scripts/nix_run.sh`](./scripts/nix_run.sh) to ensure access to nix dependencies without
   requiring invocation from a nix shell. This enables zsh users to keep their normal
   interactive shell configuration while still using the nix dependencies for task execution.
 

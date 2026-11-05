@@ -1,54 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Hash unit-test inputs so a master run can save results when those inputs
-# change, including embedded files outside testdata directories.
-# Examples:
-#   ./scripts/workflow-hash-go-unit-inputs.sh
-#   ./scripts/workflow-hash-go-unit-inputs.sh /path/to/test-module
-# With an explicit root, hash only that module (used by the focused test).
-REPO_ROOT="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-if [[ $# -gt 0 ]]; then
-  MODULES=("${REPO_ROOT}")
-else
-  MODULES=("${REPO_ROOT}" "${REPO_ROOT}/graft/coreth" "${REPO_ROOT}/graft/evm" "${REPO_ROOT}/graft/subnet-evm")
-fi
-
-PACKAGE_JSON="$(mktemp)"
-INPUT_PATHS="$(mktemp)"
-EMBED_LIST="$(mktemp)"
-trap 'rm -f "${PACKAGE_JSON}" "${INPUT_PATHS}" "${EMBED_LIST}"' EXIT
-
-# Include test configuration as well as source, metadata, and fixtures.
-# Go safely reruns tests when flags change, but our exact-hit validator rejects
-# uncached results. Configuration changes must therefore select a new archive.
-# Hash contents rather than the commit so unrelated changes keep exact hits.
-git -C "${REPO_ROOT}" ls-files -z -- \
-  '*.go' '**/*.go' go.mod go.sum go.work go.work.sum '**/go.mod' '**/go.sum' \
-  'testdata/**' '**/testdata/**' \
-  Taskfile.yml .github/workflows/go-unit.yml \
-  .github/actions/setup-go-for-project/action.yml \
-  scripts/tests.unit.sh scripts/constants.sh scripts/run_task.sh scripts/nix_run.sh \
-  scripts/normalize_testdata_mtimes.sh scripts/workflow-hash-go-unit-inputs.sh \
-  scripts/workflow-prepare-go-unit-cache.sh > "${INPUT_PATHS}"
-
-# go list reports production and test-only embedded files, regardless of
-# extension or whether they live inside a testdata directory.
-for module in "${MODULES[@]}"; do
-  (cd "${module}" && go list -json -test ./...) > "${PACKAGE_JSON}"
-  jq -r '.Dir as $dir | (.EmbedFiles[]?, .TestEmbedFiles[]?, .XTestEmbedFiles[]?) | [$dir, .] | @tsv' \
-    < "${PACKAGE_JSON}" > "${EMBED_LIST}"
-  while IFS=$'\t' read -r directory name; do
-    file="${directory}/${name}"
-    printf '%s\0' "${file#"${REPO_ROOT}/"}" >> "${INPUT_PATHS}"
-  done < "${EMBED_LIST}"
-done
-
-# Include paths as well as file contents so a rename changes the key.
-# Git's --stdin-paths accepts newline-delimited paths, so this assumes repo
-# paths do not contain newlines.
-sorted_paths() { sort -zu "${INPUT_PATHS}" | tr '\0' '\n'; }
-paste -d' ' \
-  <(sorted_paths) \
-  <(sorted_paths | git -C "${REPO_ROOT}" hash-object --stdin-paths) |
-  git hash-object --stdin
+# Unit-cache policy. E2E-only configuration must not invalidate this archive.
+repo_root="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+exec "$(dirname "${BASH_SOURCE[0]}")/workflow-hash-go-cache-inputs.sh" "${repo_root}" \
+  taskfiles/go-unit.yml .github/workflows/go-unit.yml \
+  scripts/tests.unit.sh scripts/normalize_testdata_mtimes.sh \
+  scripts/workflow-prepare-go-unit-cache.sh scripts/workflow-hash-go-unit-inputs.sh

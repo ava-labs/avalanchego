@@ -1,0 +1,22 @@
+name: Validate Go E2E build cache
+description: Check an exact cache hit before E2E builds can add compiled output
+
+inputs:
+  mode:
+    description: Build mode to validate (race or no-race)
+    required: true
+  setup_go_module_cache:
+    description: 'Prepare Go modules unless an earlier step already prepared them'
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/install-nix
+      with:
+        setup_go_module_cache: ${{ inputs.setup_go_module_cache }}
+    - name: Check cached Go E2E compilation
+      shell: nix develop --command bash -e {0}
+      run: ./scripts/workflow-check-go-e2e-cache.sh "$CACHE_MODE"
+      env:
+        CACHE_MODE: ${{ inputs.mode }}
