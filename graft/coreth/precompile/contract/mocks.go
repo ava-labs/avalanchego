@@ -13,7 +13,7 @@ import (
 	big "math/big"
 	reflect "reflect"
 
-	precompileconfig "github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	precompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	snow "github.com/ava-labs/avalanchego/snow"
 	set "github.com/ava-labs/avalanchego/utils/set"
 	common "github.com/ava-labs/libevm/common"
