@@ -24,8 +24,8 @@ CI runs one job per state scheme:
 ```
 
 The CI entrypoints differ from the local `e2e` task in that they use a race-built Bazel avalanchego
-binary. They are wired up as the `e2e-merkle-sync-hash` and `e2e-merkle-sync-firewood` jobs in
-`.github/workflows/bazel.yml` so a regression in either sync path is attributable on its own.
+binary. They run as the `merkle-sync-hash` and `merkle-sync-firewood` entries of the `monitored`
+matrix in `.github/workflows/bazel.yml` so a regression in either sync path is attributable on its own.
 
 ## What this validates
 
