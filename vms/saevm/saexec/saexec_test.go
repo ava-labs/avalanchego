@@ -41,10 +41,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/proxytime"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
@@ -1148,7 +1148,7 @@ func TestRecoveryStateAvailability(t *testing.T) {
 		},
 		{
 			name:           "firewood_archival",
-			scheme:         customrawdb.FirewoodScheme,
+			scheme:         firewood.Scheme,
 			archival:       true,
 			commitInterval: defaultCommitInterval,
 			expectAvailable: func(height uint64) availability {
@@ -1162,7 +1162,7 @@ func TestRecoveryStateAvailability(t *testing.T) {
 		},
 		{
 			name:           "firewood_archival_with_history",
-			scheme:         customrawdb.FirewoodScheme,
+			scheme:         firewood.Scheme,
 			archival:       true,
 			commitInterval: 1,
 			expectAvailable: func(height uint64) availability {
@@ -1174,7 +1174,7 @@ func TestRecoveryStateAvailability(t *testing.T) {
 		},
 		{
 			name:           "firewood",
-			scheme:         customrawdb.FirewoodScheme,
+			scheme:         firewood.Scheme,
 			archival:       false,
 			commitInterval: defaultCommitInterval,
 			expectAvailable: func(height uint64) availability {

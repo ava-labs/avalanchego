@@ -95,7 +95,6 @@ go_library(
         "//vms/evm/blackhole",
         "//vms/evm/database",
         "//vms/evm/metrics/prometheus",
-        "//vms/evm/sync/customrawdb",
         "//vms/evm/uptimetracker",
         "@com_github_ava_labs_firewood_go_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",

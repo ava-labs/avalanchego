@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/graft/evm/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
@@ -67,7 +66,7 @@ func MakePreState(db ethdb.Database, accounts types.GenesisAlloc, snapshotter bo
 		tconf.DBOverride = hashdb.Defaults.BackendConstructor
 	case rawdb.PathScheme:
 		tconf.DBOverride = pathdb.Defaults.BackendConstructor
-	case customrawdb.FirewoodScheme:
+	case firewood.Scheme:
 		cfg := firewood.DefaultConfig(tempdir)
 		tconf.DBOverride = cfg.BackendConstructor
 	default:

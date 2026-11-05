@@ -26,9 +26,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 )
@@ -100,7 +100,7 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "state_scheme",
 			json: `{"state-scheme":"firewood"}`,
-			want: with(func(c *config) { c.StateScheme = customrawdb.FirewoodScheme }),
+			want: with(func(c *config) { c.StateScheme = firewood.Scheme }),
 		},
 		{
 			name:      "state/commit_interval",
@@ -119,7 +119,7 @@ func TestParseConfig(t *testing.T) {
 			json:      `{"state-scheme":"firewood","commit-interval":256}`,
 			networkID: constants.MainnetID,
 			want: with(func(c *config) {
-				c.StateScheme = customrawdb.FirewoodScheme
+				c.StateScheme = firewood.Scheme
 				c.CommitInterval = 256
 			}),
 		},
@@ -291,7 +291,7 @@ func TestParseConfig(t *testing.T) {
 				GasTarget:                    new(gas.Gas(1500)),
 				MinDelayTarget:               new(uint64(3000)),
 				Pruning:                      false,
-				StateScheme:                  customrawdb.FirewoodScheme,
+				StateScheme:                  firewood.Scheme,
 				CommitInterval:               256,
 				TrieCleanCache:               256,
 				SnapshotCache:                128,
@@ -357,7 +357,7 @@ func TestConfigStateSyncInterval(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := defaultConfig()
-			c.StateScheme = customrawdb.FirewoodScheme
+			c.StateScheme = firewood.Scheme
 			c.CommitInterval = tt.commitInterval
 
 			got := c.stateSyncConfig(tt.networkID).DBConfig.CommitInterval
