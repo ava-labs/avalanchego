@@ -44,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/evm/prefetch"
@@ -79,13 +78,12 @@ type environment struct {
 	blobs    int
 	size     uint64
 
-	rules            params.Rules
-	predicateContext *precompileconfig.PredicateContext
-	// predicateResults contains the results of checking the predicates for each transaction in the miner.
-	// The results are accumulated as transactions are executed by the miner and set on the BlockContext.
-	// If a transaction is dropped, its results must explicitly be removed from predicateResults in the same
-	// way that the gas pool and state is reset.
-	predicateResults warpmsg.BlockResults
+	rules     params.Rules
+	verifyCtx *warpmsg.VerifyContext
+	// warpResults holds the Warp verification results of each transaction the
+	// miner has applied. A dropped transaction's results MUST be removed, the
+	// same way the gas pool and state are reset.
+	warpResults warpmsg.BlockResults
 
 	start time.Time // Time that block building began
 }
@@ -135,7 +133,7 @@ func (w *worker) setEtherbase(addr common.Address) {
 }
 
 // commitNewWork generates several new sealing tasks based on the parent block.
-func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateContext) (*types.Block, error) {
+func (w *worker) commitNewWork(verifyCtx *warpmsg.VerifyContext) (*types.Block, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	var (
@@ -211,7 +209,7 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 		return nil, fmt.Errorf("failed to prepare header for mining: %w", err)
 	}
 
-	env, err := w.createCurrentEnvironment(predicateContext, parent, header, feeConfig, tstart)
+	env, err := w.createCurrentEnvironment(verifyCtx, parent, header, feeConfig, tstart)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new current environment: %w", err)
 	}
@@ -281,7 +279,7 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 	return w.commit(env)
 }
 
-func (w *worker) createCurrentEnvironment(predicateContext *precompileconfig.PredicateContext, parent *types.Header, header *types.Header, feeConfig commontype.FeeConfig, tstart time.Time) (*environment, error) {
+func (w *worker) createCurrentEnvironment(verifyCtx *warpmsg.VerifyContext, parent *types.Header, header *types.Header, feeConfig commontype.FeeConfig, tstart time.Time) (*environment, error) {
 	currentState, err := w.chain.StateAt(parent.Root)
 	if err != nil {
 		return nil, err
@@ -295,16 +293,15 @@ func (w *worker) createCurrentEnvironment(predicateContext *precompileconfig.Pre
 	numPrefetchers := w.chain.CacheConfig().TriePrefetcherParallelism
 	currentState.StartPrefetcher("miner", prefetch.WithConcurrentWorkers(numPrefetchers))
 	return &environment{
-		signer:           types.MakeSigner(w.chainConfig, header.Number, header.Time),
-		state:            currentState,
-		parent:           parent,
-		header:           header,
-		tcount:           0,
-		gasPool:          new(core.GasPool).AddGas(capacity),
-		rules:            w.chainConfig.Rules(header.Number, params.IsMergeTODO, header.Time),
-		predicateContext: predicateContext,
-		predicateResults: warpmsg.BlockResults{},
-		start:            tstart,
+		signer:    types.MakeSigner(w.chainConfig, header.Number, header.Time),
+		state:     currentState,
+		parent:    parent,
+		header:    header,
+		tcount:    0,
+		gasPool:   new(core.GasPool).AddGas(capacity),
+		rules:     w.chainConfig.Rules(header.Number, params.IsMergeTODO, header.Time),
+		verifyCtx: verifyCtx,
+		start:     tstart,
 	}, nil
 }
 
@@ -356,18 +353,20 @@ func (w *worker) applyTransaction(env *environment, tx *types.Transaction, coinb
 
 	rulesExtra := params.GetRulesExtra(env.rules)
 	if rulesExtra.IsDurango {
-		results, err := core.CheckTxPredicates(env.rules, env.predicateContext, tx)
+		results, ok, err := core.VerifyTxWarpMessages(env.rules, env.verifyCtx, tx)
 		if err != nil {
 			log.Debug("Transaction predicate failed verification in miner", "tx", tx.Hash(), "err", err)
 			return nil, err
 		}
-		env.predicateResults.Set(tx.Hash(), results)
-
-		predicateResultsBytes, err := env.predicateResults.Bytes()
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal predicate results: %w", err)
+		if ok {
+			env.warpResults.Set(tx.Hash(), results)
 		}
-		blockContext = core.NewEVMBlockContextWithPredicateResults(env.header, w.chain, &coinbase, predicateResultsBytes)
+
+		resultsBytes, err := env.warpResults.Bytes()
+		if err != nil {
+			return nil, fmt.Errorf("marshaling Warp results: %w", err)
+		}
+		blockContext = core.NewEVMBlockContextWithWarpResults(env.header, w.chain, &coinbase, resultsBytes)
 	} else {
 		blockContext = core.NewEVMBlockContext(env.header, w.chain, &coinbase)
 	}
@@ -376,7 +375,7 @@ func (w *worker) applyTransaction(env *environment, tx *types.Transaction, coinb
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		env.gasPool.SetGas(gp)
-		env.predicateResults.Set(tx.Hash(), nil) // Delete results by setting to nil
+		delete(env.warpResults, tx.Hash())
 	}
 	return receipt, err
 }
@@ -490,11 +489,11 @@ func (w *worker) commitTransactions(env *environment, plainTxs, blobTxs *transac
 // and commits new work if consensus engine is running.
 func (w *worker) commit(env *environment) (*types.Block, error) {
 	if params.GetRulesExtra(env.rules).IsDurango {
-		predicateResultsBytes, err := env.predicateResults.Bytes()
+		resultsBytes, err := env.warpResults.Bytes()
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal predicate results: %w", err)
+			return nil, fmt.Errorf("marshaling Warp results: %w", err)
 		}
-		env.header.Extra = append(env.header.Extra, predicateResultsBytes...)
+		env.header.Extra = append(env.header.Extra, resultsBytes...)
 	}
 	// Deep copy receipts here to avoid interaction between different tasks.
 	receipts := copyReceipts(env.receipts)

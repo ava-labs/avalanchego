@@ -62,7 +62,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/extension"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -80,6 +79,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
 	subnetevmlog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
@@ -983,12 +983,12 @@ func (vm *VM) buildBlockWithContext(_ context.Context, proposerVMBlockCtx *block
 	} else {
 		log.Debug("Building block without context")
 	}
-	predicateCtx := &precompileconfig.PredicateContext{
+	verifyCtx := &warpmsg.VerifyContext{
 		SnowCtx:            vm.ctx,
 		ProposerVMBlockCtx: proposerVMBlockCtx,
 	}
 
-	block, err := vm.miner.GenerateBlock(predicateCtx)
+	block, err := vm.miner.GenerateBlock(verifyCtx)
 	vm.builder.handleGenerateBlock(vm.blockChain.CurrentHeader().ParentHash)
 	if err != nil {
 		return nil, err
@@ -1012,7 +1012,7 @@ func (vm *VM) buildBlockWithContext(_ context.Context, proposerVMBlockCtx *block
 	// We call verify without writes here to avoid generating a reference
 	// to the blk state root in the triedb when we are going to call verify
 	// again from the consensus engine with writes enabled.
-	if err := blk.verify(predicateCtx, false /*=writes*/); err != nil {
+	if err := blk.verify(verifyCtx, false /*=writes*/); err != nil {
 		return nil, fmt.Errorf("block failed verification due to: %w", err)
 	}
 

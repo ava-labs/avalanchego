@@ -10,7 +10,7 @@ var (
 	ErrInvalidAddressedPayload = errInvalidAddressedPayload
 	ErrInvalidBlockHashPayload = errInvalidBlockHashPayload
 	ErrInvalidIndexInput       = errInvalidIndexInput
-	ErrInvalidPredicateBytes   = errInvalidPredicateBytes
+	ErrInvalidPacked           = errInvalidPacked
 	ErrInvalidSendInput        = errInvalidSendInput
 	ErrInvalidWarpMsg          = errInvalidWarpMsg
 	ErrInvalidWarpMsgPayload   = errInvalidWarpMsgPayload
@@ -26,6 +26,6 @@ func (g GasConfig) SendWarpMessageCost(bytes int) uint64 {
 	return g.SendWarpMessageBase + uint64(bytes)*g.PerWarpMessageByte
 }
 
-func (g GasConfig) PredicateGasCost(chunks int, signers int) uint64 {
+func (g GasConfig) MessageGasCost(chunks int, signers int) uint64 {
 	return g.VerifyPredicateBase + uint64(chunks)*g.PerWarpMessageChunk + uint64(signers)*g.PerWarpSigner
 }

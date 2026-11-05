@@ -79,22 +79,21 @@ func (r RulesExtra) WarpMessages(list types.AccessList) []warpmsg.Packed {
 	if !r.IsDurango {
 		return nil
 	}
-	return warpmsg.FromAccessList(list, warp.ContractAddress)
+	return warpmsg.FromAccessList(list)
 }
 
 // AccessListGas computes the intrinsic gas for an access list. Once Warp is
-// active, it calculates gas per-tuple, charging Warp predicates by
-// [warp.PredicateGas]. Otherwise, it returns override=false to use the
+// active, it calculates gas per-tuple, charging Warp messages by
+// [warp.MessageGas]. Otherwise, it returns override=false to use the
 // default calculation.
 func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
 	if !r.IsDurango {
 		return 0, false, nil
 	}
-	gas, err := precompileconfig.AccessListGas(
+	gas, err := warpmsg.AccessListGas(
 		accessList,
-		warp.ContractAddress,
 		func(msg warpmsg.Packed) (uint64, error) {
-			return warp.PredicateGas(msg, cparams.Rules(r))
+			return warp.MessageGas(msg, cparams.Rules(r))
 		},
 	)
 	return gas, true, err
@@ -167,9 +166,9 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 		accessibleState := accessibleState{
 			env: env,
 			blockContext: &precompileBlockContext{
-				number:           env.BlockNumber(),
-				time:             env.BlockTime(),
-				predicateResults: customtypes.PredicateResults(env.BlockHeader(), rules),
+				number:      env.BlockNumber(),
+				time:        env.BlockTime(),
+				warpResults: customtypes.PredicateResults(env.BlockHeader(), rules),
 			},
 		}
 
@@ -194,7 +193,7 @@ func (r RulesExtra) PrecompileOverride(addr common.Address) (libevm.PrecompiledC
 	}
 
 	// Warp is the only stateful precompile, and is active from Durango.
-	if !r.IsDurango || addr != warp.ContractAddress {
+	if !r.IsDurango || addr != warpmsg.ContractAddress {
 		return nil, false
 	}
 	return makePrecompile(warp.WarpPrecompile), true
@@ -235,9 +234,9 @@ func (a accessibleState) GetPrecompileEnv() vm.PrecompileEnvironment {
 }
 
 type precompileBlockContext struct {
-	number           *big.Int
-	time             uint64
-	predicateResults warpmsg.BlockResults
+	number      *big.Int
+	time        uint64
+	warpResults warpmsg.BlockResults
 }
 
 func (p *precompileBlockContext) Number() *big.Int {
@@ -249,5 +248,5 @@ func (p *precompileBlockContext) Timestamp() uint64 {
 }
 
 func (p *precompileBlockContext) GetWarpMessageResults(txHash common.Hash) set.Bits {
-	return p.predicateResults.Get(txHash, warp.ContractAddress)
+	return p.warpResults.Get(txHash)
 }

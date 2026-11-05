@@ -40,17 +40,14 @@ func init() {
 	}
 }
 
-type (
-	// TxResults maps each precompile address to the verification bitset for
-	// one transaction.
-	TxResults map[common.Address]set.Bits
+// BlockResults maps each transaction hash in a block to the indexes of its
+// Warp messages that failed verification. A transaction without Warp messages
+// has no entry.
+type BlockResults map[common.Hash]set.Bits
 
-	// BlockResults maps each transaction hash in a block to its TxResults.
-	BlockResults map[common.Hash]TxResults
-
-	// encodedBlockResults is used to serialize and deserialize BlockResults.
-	encodedBlockResults map[common.Hash]map[common.Address][]byte
-)
+// encodedBlockResults is the serialized form of BlockResults. Each
+// transaction's bitset is keyed by [ContractAddress].
+type encodedBlockResults map[common.Hash]map[common.Address][]byte
 
 // ParseBlockResults parses bytes into BlockResults.
 func ParseBlockResults(b []byte) (BlockResults, error) {
@@ -60,53 +57,40 @@ func ParseBlockResults(b []byte) (BlockResults, error) {
 		return nil, fmt.Errorf("unmarshaling block results: %w", err)
 	}
 
-	// Convert encoded representation into in-memory representation
 	results := make(BlockResults, len(encodedResults))
 	for txHash, addrToBytes := range encodedResults {
-		decoded := make(TxResults, len(addrToBytes))
-		for addr, bs := range addrToBytes {
-			decoded[addr] = set.BitsFromBytes(bs)
+		if bs, ok := addrToBytes[ContractAddress]; ok {
+			results[txHash] = set.BitsFromBytes(bs)
 		}
-		results[txHash] = decoded
 	}
-
 	return results, nil
 }
 
-// Get returns the results for txHash from precompile address.
-func (b *BlockResults) Get(txHash common.Hash, address common.Address) set.Bits {
-	if result, ok := (*b)[txHash][address]; ok {
+// Get returns the results for txHash.
+func (b BlockResults) Get(txHash common.Hash) set.Bits {
+	if result, ok := b[txHash]; ok {
 		return result
 	}
 	return set.NewBits()
 }
 
-// Set sets the results for the given txHash. Results are overwritten,
-// not merged.
-func (b *BlockResults) Set(txHash common.Hash, txResults TxResults) {
-	if len(txResults) == 0 {
-		delete(*b, txHash)
-		return
-	}
-
+// Set sets the results for txHash, overwriting any previous results.
+func (b *BlockResults) Set(txHash common.Hash, results set.Bits) {
 	if *b == nil {
-		*b = make(map[common.Hash]TxResults)
+		*b = make(BlockResults)
 	}
-	(*b)[txHash] = txResults
+	(*b)[txHash] = results
 }
 
 // Bytes marshals the results.
-func (b *BlockResults) Bytes() ([]byte, error) {
-	// Convert to results representation before marshaling to avoid serializing
-	// set.Bits directly, which is not supported by the codec.
-	results := make(encodedBlockResults, len(*b))
-	for txHash, addrToBits := range *b {
-		encoded := make(map[common.Address][]byte, len(addrToBits))
-		for addr, bits := range addrToBits {
-			encoded[addr] = bits.Bytes()
+func (b BlockResults) Bytes() ([]byte, error) {
+	// Convert to the encoded representation before marshaling to avoid
+	// serializing set.Bits directly, which is not supported by the codec.
+	results := make(encodedBlockResults, len(b))
+	for txHash, bits := range b {
+		results[txHash] = map[common.Address][]byte{
+			ContractAddress: bits.Bytes(),
 		}
-		results[txHash] = encoded
 	}
-
 	return resultsCodec.Marshal(version, results)
 }

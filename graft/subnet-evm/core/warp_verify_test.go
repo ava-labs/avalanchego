@@ -9,12 +9,12 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -28,7 +28,7 @@ import (
 
 // newWarpMessages returns a Warp message signed by the validators in the
 // returned context, and the same message with an invalid signature.
-func newWarpMessages(t *testing.T) (*precompileconfig.PredicateContext, warpmsg.Packed, warpmsg.Packed) {
+func newWarpMessages(t *testing.T) (*warpmsg.VerifyContext, warpmsg.Packed, warpmsg.Packed) {
 	t.Helper()
 
 	addressedCall, err := payload.NewAddressedCall([]byte{1}, []byte{2})
@@ -39,11 +39,11 @@ func newWarpMessages(t *testing.T) (*precompileconfig.PredicateContext, warpmsg.
 	vdrs := warptest.NewValidators(t, warptest.WithMinimum(2))
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	warptest.SetValidators(t, snowCtx, vdrs)
-	predicateContext := &precompileconfig.PredicateContext{
+	verifyCtx := &warpmsg.VerifyContext{
 		SnowCtx:            snowCtx,
 		ProposerVMBlockCtx: &block.Context{},
 	}
-	return predicateContext,
+	return verifyCtx,
 		warpmsg.Pack(vdrs.Sign(t, msg).Bytes()),
 		warpmsg.Pack(warptest.IncorrectlySign(t, msg).Bytes())
 }
@@ -55,107 +55,108 @@ func newRules() params.Rules {
 	return rules
 }
 
-func TestCheckBlockPredicates(t *testing.T) {
-	predicateContext, validMsg, invalidMsg := newWarpMessages(t)
+func TestVerifyBlockWarpMessages(t *testing.T) {
+	verifyCtx, validMsg, invalidMsg := newWarpMessages(t)
 	rules := newRules()
 	var (
 		validTx = types.NewTx(&types.DynamicFeeTx{
 			AccessList: types.AccessList{
-				{Address: warp.ContractAddress, StorageKeys: validMsg},
+				{Address: warpmsg.ContractAddress, StorageKeys: validMsg},
 			},
 			Gas: math.MaxUint64,
 		})
 		invalidTx = types.NewTx(&types.DynamicFeeTx{
 			AccessList: types.AccessList{
-				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
+				{Address: warpmsg.ContractAddress, StorageKeys: invalidMsg},
 			},
 			Gas: math.MaxUint64,
 		})
 	)
 	tests := []struct {
-		name                string
-		nilPredicateContext bool
-		txs                 []*types.Transaction
-		want                warpmsg.BlockResults
-		wantErr             error
+		name         string
+		nilVerifyCtx bool
+		txs          []*types.Transaction
+		want         warpmsg.BlockResults
+		wantErr      error
 	}{
 		{
-			name:                "nil_predicate_context",
-			nilPredicateContext: true,
-			txs:                 []*types.Transaction{validTx},
-			wantErr:             ErrMissingPredicateContext,
+			name:         "nil_verify_context",
+			nilVerifyCtx: true,
+			txs:          []*types.Transaction{validTx},
+			wantErr:      ErrMissingVerifyContext,
 		},
 		{
 			name: "one_tx_valid",
 			txs:  []*types.Transaction{validTx},
 			want: warpmsg.BlockResults{
-				validTx.Hash(): {warp.ContractAddress: set.NewBits()},
+				validTx.Hash(): set.NewBits(),
 			},
 		},
 		{
 			name: "one_tx_invalid",
 			txs:  []*types.Transaction{invalidTx},
 			want: warpmsg.BlockResults{
-				invalidTx.Hash(): {warp.ContractAddress: set.NewBits(0)},
+				invalidTx.Hash(): set.NewBits(0),
 			},
 		},
 		{
 			name: "multiple_txs",
 			txs:  []*types.Transaction{validTx, invalidTx},
 			want: warpmsg.BlockResults{
-				validTx.Hash():   {warp.ContractAddress: set.NewBits()},
-				invalidTx.Hash(): {warp.ContractAddress: set.NewBits(0)},
+				validTx.Hash():   set.NewBits(),
+				invalidTx.Hash(): set.NewBits(0),
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx := predicateContext
-			if tt.nilPredicateContext {
+			ctx := verifyCtx
+			if tt.nilVerifyCtx {
 				ctx = nil
 			}
-			got, err := CheckBlockPredicates(rules, ctx, tt.txs)
-			require.ErrorIs(t, err, tt.wantErr, "CheckBlockPredicates()")
-			require.Equal(t, tt.want, got, "CheckBlockPredicates()")
+			got, err := VerifyBlockWarpMessages(rules, ctx, tt.txs)
+			require.ErrorIs(t, err, tt.wantErr, "VerifyBlockWarpMessages()")
+			require.Equal(t, tt.want, got, "VerifyBlockWarpMessages()")
 		})
 	}
 }
 
-func TestCheckTxPredicates(t *testing.T) {
-	predicateContext, validMsg, invalidMsg := newWarpMessages(t)
+func TestVerifyTxWarpMessages(t *testing.T) {
+	verifyCtx, validMsg, invalidMsg := newWarpMessages(t)
 	tests := []struct {
-		name                string
-		warpDisabled        bool
-		nilBlockContext     bool
-		nilPredicateContext bool
-		insufficientGas     bool
-		accessList          types.AccessList
-		want                warpmsg.TxResults
-		wantErr             error
+		name            string
+		warpDisabled    bool
+		nilBlockContext bool
+		nilVerifyCtx    bool
+		insufficientGas bool
+		accessList      types.AccessList
+		want            set.Bits
+		wantOK          bool
+		wantErr         error
 	}{
 		{
 			name:            "insufficient_intrinsic_gas",
 			insufficientGas: true,
 			accessList: types.AccessList{
-				{Address: warp.ContractAddress, StorageKeys: validMsg},
+				{Address: warpmsg.ContractAddress, StorageKeys: validMsg},
 			},
 			wantErr: ErrIntrinsicGas,
 		},
 		{
-			name:                "warp_disabled",
-			warpDisabled:        true,
-			nilPredicateContext: true,
+			name:         "warp_disabled",
+			warpDisabled: true,
+			nilVerifyCtx: true,
 			accessList: types.AccessList{
-				{Address: warp.ContractAddress, StorageKeys: validMsg},
+				{Address: warpmsg.ContractAddress, StorageKeys: validMsg},
 			},
 		},
 		{
-			name:                "no_warp_messages",
-			nilPredicateContext: true,
+			name:         "no_warp_messages",
+			nilVerifyCtx: true,
 		},
 		{
-			name:                "filtered_access_list",
-			nilPredicateContext: true,
+			name:         "filtered_access_list",
+			nilVerifyCtx: true,
 			accessList: types.AccessList{
 				{Address: common.Address{1}, StorageKeys: invalidMsg},
 			},
@@ -164,58 +165,54 @@ func TestCheckTxPredicates(t *testing.T) {
 			name:            "nil_block_context",
 			nilBlockContext: true,
 			accessList: types.AccessList{
-				{Address: warp.ContractAddress, StorageKeys: validMsg},
+				{Address: warpmsg.ContractAddress, StorageKeys: validMsg},
 			},
-			wantErr: ErrMissingPredicateContext,
+			wantErr: ErrMissingVerifyContext,
 		},
 		{
-			name:                "nil_predicate_context",
-			nilPredicateContext: true,
+			name:         "nil_verify_context",
+			nilVerifyCtx: true,
 			accessList: types.AccessList{
-				{Address: warp.ContractAddress, StorageKeys: validMsg},
+				{Address: warpmsg.ContractAddress, StorageKeys: validMsg},
 			},
-			wantErr: ErrMissingPredicateContext,
+			wantErr: ErrMissingVerifyContext,
 		},
 		{
 			name: "one_valid",
 			accessList: types.AccessList{
-				{Address: warp.ContractAddress, StorageKeys: validMsg},
+				{Address: warpmsg.ContractAddress, StorageKeys: validMsg},
 			},
-			want: warpmsg.TxResults{
-				warp.ContractAddress: set.NewBits(),
-			},
+			want:   set.NewBits(),
+			wantOK: true,
 		},
 		{
 			name: "one_invalid",
 			accessList: types.AccessList{
-				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
+				{Address: warpmsg.ContractAddress, StorageKeys: invalidMsg},
 			},
-			want: warpmsg.TxResults{
-				warp.ContractAddress: set.NewBits(0),
-			},
+			want:   set.NewBits(0),
+			wantOK: true,
 		},
 		{
 			name: "two_invalid",
 			accessList: types.AccessList{
-				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
-				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
+				{Address: warpmsg.ContractAddress, StorageKeys: invalidMsg},
+				{Address: warpmsg.ContractAddress, StorageKeys: invalidMsg},
 			},
-			want: warpmsg.TxResults{
-				warp.ContractAddress: set.NewBits(0, 1),
-			},
+			want:   set.NewBits(0, 1),
+			wantOK: true,
 		},
 		{
 			name: "mixed_with_other_addresses",
 			accessList: types.AccessList{
-				{Address: warp.ContractAddress, StorageKeys: validMsg},
+				{Address: warpmsg.ContractAddress, StorageKeys: validMsg},
 				{Address: common.Address{1}, StorageKeys: invalidMsg},
-				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
-				{Address: warp.ContractAddress, StorageKeys: invalidMsg},
-				{Address: warp.ContractAddress, StorageKeys: validMsg},
+				{Address: warpmsg.ContractAddress, StorageKeys: invalidMsg},
+				{Address: warpmsg.ContractAddress, StorageKeys: invalidMsg},
+				{Address: warpmsg.ContractAddress, StorageKeys: validMsg},
 			},
-			want: warpmsg.TxResults{
-				warp.ContractAddress: set.NewBits(1, 2),
-			},
+			want:   set.NewBits(1, 2),
+			wantOK: true,
 		},
 	}
 	for _, tt := range tests {
@@ -225,12 +222,12 @@ func TestCheckTxPredicates(t *testing.T) {
 				params.GetRulesExtra(rules).WarpConfig = nil
 			}
 
-			c := *predicateContext
+			c := *verifyCtx
 			ctx := &c
 			if tt.nilBlockContext {
 				ctx.ProposerVMBlockCtx = nil
 			}
-			if tt.nilPredicateContext {
+			if tt.nilVerifyCtx {
 				ctx = nil
 			}
 
@@ -242,9 +239,10 @@ func TestCheckTxPredicates(t *testing.T) {
 				AccessList: tt.accessList,
 				Gas:        gas,
 			})
-			got, err := CheckTxPredicates(rules, ctx, tx)
-			require.ErrorIs(t, err, tt.wantErr, "CheckTxPredicates()")
-			require.Equal(t, tt.want, got, "CheckTxPredicates()")
+			got, gotOK, err := VerifyTxWarpMessages(rules, ctx, tx)
+			require.ErrorIs(t, err, tt.wantErr, "VerifyTxWarpMessages()")
+			assert.Equal(t, tt.want, got, "VerifyTxWarpMessages()")
+			assert.Equal(t, tt.wantOK, gotOK, "VerifyTxWarpMessages() ok")
 		})
 	}
 }
