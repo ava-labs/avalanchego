@@ -4,6 +4,7 @@ use (
 	.
 	./graft/coreth
 	./graft/evm
+	./graft/simplex
 	./graft/subnet-evm
 )
 
