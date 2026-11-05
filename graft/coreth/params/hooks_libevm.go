@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/legacy"
@@ -71,23 +72,31 @@ func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
 	return true
 }
 
-// warpPredicaters charges for Warp predicates, which are the only predicates.
-//
-// TODO(JonathanOppenheimer): Charge Warp messages directly once the shared
-// predicate gas helper is replaced.
-var warpPredicaters = map[common.Address]precompileconfig.Predicater{
-	warp.ContractAddress: &warp.Config{},
+// WarpMessages returns the storage keys of each Warp precompile entry in list,
+// in order. Each entry is one Warp message, including entries without storage
+// keys. It returns nil before Durango, when Warp is not active.
+func (r RulesExtra) WarpMessages(list types.AccessList) []predicate.Predicate {
+	if !r.IsDurango {
+		return nil
+	}
+	return predicate.FromAccessList(list, warp.ContractAddress)
 }
 
 // AccessListGas computes the intrinsic gas for an access list. Once Warp is
 // active, it calculates gas per-tuple, charging Warp predicates by
-// [warp.Config.PredicateGas]. Otherwise, it returns override=false to use the
+// [warp.PredicateGas]. Otherwise, it returns override=false to use the
 // default calculation.
 func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
 	if !r.IsDurango {
 		return 0, false, nil
 	}
-	gas, err := precompileconfig.AccessListGasWithPredicates(cparams.Rules(r), warpPredicaters, accessList)
+	gas, err := precompileconfig.AccessListGas(
+		accessList,
+		warp.ContractAddress,
+		func(msg predicate.Predicate) (uint64, error) {
+			return warp.PredicateGas(msg, cparams.Rules(r))
+		},
+	)
 	return gas, true, err
 }
 
