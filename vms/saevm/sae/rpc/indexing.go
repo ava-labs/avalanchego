@@ -8,6 +8,8 @@ import (
 	"io"
 	"math"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/lru"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/bloombits"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -47,6 +49,44 @@ func (b bloomOverrider) OverrideHeaderBloom(header *types.Header) types.Bloom {
 		header.Hash(),
 		header.Number.Uint64(),
 	))
+}
+
+// bloomCacheSize is the number of Bloom filters that a [cachedBloomOverrider]
+// keeps, each of them [types.BloomByteLength] bytes.
+const bloomCacheSize = 2048
+
+// A cachedBloomOverrider is a [bloomOverrider] for log queries, which check the
+// same recent blocks repeatedly. A [bloomIndexer] SHOULD NOT use it because it
+// reads every block of a section once, evicting the blocks worth keeping.
+type cachedBloomOverrider struct {
+	chain Chain
+	cache *lru.Cache[common.Hash, types.Bloom]
+}
+
+func newCachedBloomOverrider(chain Chain) cachedBloomOverrider {
+	return cachedBloomOverrider{
+		chain: chain,
+		cache: lru.NewCache[common.Hash, types.Bloom](bloomCacheSize),
+	}
+}
+
+var _ filters.BloomOverrider = cachedBloomOverrider{}
+
+// OverrideHeaderBloom is equivalent to [bloomOverrider.OverrideHeaderBloom].
+func (b cachedBloomOverrider) OverrideHeaderBloom(header *types.Header) types.Bloom {
+	hash := header.Hash()
+	if bloom, ok := b.cache.Get(hash); ok {
+		return bloom
+	}
+	receipts := rawdb.ReadRawReceipts(b.chain.DB(), hash, header.Number.Uint64())
+	bloom := types.CreateBloom(receipts)
+	// Receipts are written when a block is executed, so nil receipts only mean
+	// that the Bloom filter isn't known yet. A block without logs has non-nil
+	// receipts.
+	if receipts != nil {
+		b.cache.Add(hash, bloom)
+	}
+	return bloom
 }
 
 // bloomIndexer provides the [bloomIndexer.BloomStatus] and
