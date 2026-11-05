@@ -269,7 +269,7 @@ func stateBeforeTransactions(hooks hook.Points, rules params.Rules, stateDB *sta
 	stateDB.Finalise(rules.IsEIP158)
 
 	if err := hooks.StartExecutingBlock(rules, stateDB, parent, b); err != nil {
-		return fmt.Errorf("start-executing-block hook: %v", err)
+		return fmt.Errorf("%w: start-executing-block hook: %v", errFatal, err)
 	}
 	return nil
 }
@@ -432,7 +432,7 @@ func Execute(
 	}
 
 	if err := hooks.FinishExecutingBlock(stateDB, b.EthBlock(), res.Receipts); err != nil {
-		return nil, fmt.Errorf("finish-executing-block hook: %v", err)
+		return nil, fmt.Errorf("%w: finish-executing-block hook: %v", errFatal, err)
 	}
 
 	// This captures MOST read errors. For the subset of DB errors through

@@ -28,7 +28,64 @@ The subsections below are organized by concept, not by package. Package-level do
 
 ### The VM
 
-> **TODO:** The VM itself (`sae`): block building, P2P, RPC/HTTP APIs, health checks, recovery, and the adaptor to consensus (`adaptor`). Cover both the SAE lifecycle hooks (`hook`) and the libevm hooks; they are similar and tightly coupled, so make clear how they differ and when each is used.
+> **TODO:** The VM itself (`sae`): block building, P2P, RPC/HTTP APIs, health checks, recovery, and the adaptor to consensus (`adaptor`).
+
+#### Hooks
+
+Chains customize SAE through two sets of hooks:
+
+- **SAE hooks** (`hook`) run at fixed points in a block's lifecycle.
+- **libevm hooks** (`params.RulesHooks` and `vm.Hooks`) run inside the EVM.
+  - Almost all of them run only during execution.
+  - `AccessListGas` also runs while building, because intrinsic gas is checked then.
+
+Every hook runs at one of five points, and reads only what that point provides.
+
+- **Setup**
+  - Runs once, when the VM starts.
+  - Hooks: `ExecutionResultsDB`.
+  - Reads its data directory.
+- **Consensus**
+  - Runs while building a block, and again while verifying it by rebuilding.
+  - Hooks: `BuildHeader`, `PotentialEndOfBlockOps`, `BuildBlock`, `BlockRebuilderFrom`, `AdmitTransaction` and libevm's `AccessListGas`.
+  - Reads the parent header and the P-Chain context.
+  - `AdmitTransaction` also reads the settled view: the settled block's header, rules and read-only post-state.
+- **Pure**
+  - Runs at any time.
+  - Hooks: `BlockTime`, `GasConfigAfter`, `SettledBy`, `EndOfBlockOps` and `VerifyBlockSyntax`.
+  - Reads only the header or block it is given.
+- **Execution**
+  - Runs during canonical execution, and during historical re-execution for RPC and tracing.
+  - Hooks: `StartExecutingBlock`, `FinishExecutingBlock` and the other libevm hooks.
+  - Reads the parent's post-state and the block.
+- **Post-execution**
+  - Runs only during canonical execution, before the state is committed.
+  - Hooks: `AfterExecutingBlock`.
+  - Reads the block and its receipts.
+
+Consensus accepts a block before it executes, so implementers MUST follow these rules.
+
+1. **Execution never rejects a transaction.**
+   - A transaction error during execution stops every node.
+   - Reject transactions in `AdmitTransaction` instead.
+   - The chain's libevm `CanExecuteTransaction` MUST allow every transaction.
+   - On the C-Chain, Granite reverts delegate calls into stateful precompiles before they can invalidate a transaction. The synchronous VM never accepted a block with an invalidated transaction.
+2. **Start and finish hooks never fail.**
+   - An error from `StartExecutingBlock` or `FinishExecutingBlock` stops execution.
+   - Put every check that can fail in config parsing or block verification.
+3. **Execution hooks share no per-block state.**
+   - One hooks instance serves canonical execution and historical re-execution at the same time.
+   - Re-execution that stops mid-block runs `StartExecutingBlock` without `FinishExecutingBlock`, so neither may rely on the other.
+4. **Admission lags module changes.**
+   - `AdmitTransaction` sees modules as of the settled block.
+   - A module activation or role change reaches admission only once its block settles, at least τ later.
+5. **Later hooks keep the header SAE relies on.**
+   - After `BuildHeader`, no hook may change the parent hash, number, time, block time or gas configuration.
+   - No hook may change the values SAE sets: the state root, gas limit, base fee and gas used.
+   - `hookstest.Conformance` checks this in tests.
+6. **Only an account's own transactions debit it.**
+   - Nothing else may lower an externally owned account's balance, change its nonce or give it code.
+   - Worst-case accounting and the replay of unsettled blocks rely on this to bound balances and nonces.
 
 ### Block lifecycle
 
