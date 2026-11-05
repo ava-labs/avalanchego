@@ -17,9 +17,9 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/precompile/contract",
     deps = [
         "//graft/evm/precompileconfig",
+        "//graft/evm/predicate",
         "//snow",
         "//utils/set",
-        "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//accounts/abi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",

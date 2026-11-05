@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )

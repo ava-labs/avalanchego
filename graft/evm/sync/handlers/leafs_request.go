@@ -23,7 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/syncutils"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/hashdb"
 )
 
 var _ LeafRequestHandler = (*leafsRequestHandler)(nil)
