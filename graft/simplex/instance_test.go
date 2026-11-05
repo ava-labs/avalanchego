@@ -227,9 +227,19 @@ func TestHonestLeaderBuildsOnFutureDatedParent(t *testing.T) {
 
 	pChain := newTestPChain(validators)
 	network := newNetwork(t, pChain)
+	// Round 1's leader proposes as soon as it starts, and its proposal isn't re-sent to nodes added after it.
+	// Without the Byzantine validator, round 1 needs every honest vote, so add its leader last.
+	round1Leader := simplex.LeaderForRound(network.epochValidatorSet.NodeIDs(), 1)
 	var nodes []*node
 	for _, v := range honest {
-		nodes = append(nodes, network.addNode(v.NodeID[:]))
+		if !round1Leader.Equals(v.NodeID[:]) {
+			nodes = append(nodes, network.addNode(v.NodeID[:]))
+		}
+	}
+	for _, v := range honest {
+		if round1Leader.Equals(v.NodeID[:]) {
+			nodes = append(nodes, network.addNode(v.NodeID[:]))
+		}
 	}
 	network.sync()
 
@@ -820,9 +830,8 @@ func TestValidatorSetsMetadataFromSnowman(t *testing.T) {
 		lastNonSimplexBlock: lastBlock,
 	}
 
-	network.addNodeWithConfig(validatorID.NodeID[:], config).sync()
-
-	block, _ := network.acceptNewBlock()
+	node := network.addNodeWithConfig(validatorID.NodeID[:], config).sync()
+	block := node.storage.WaitForBlockCommit(numNonSimplexBlocks)
 	require.Equal(t, numNonSimplexBlocks, block.BlockHeader().Epoch)
 	require.Equal(t, uint64(1), block.BlockHeader().Round)
 	require.Equal(t, numNonSimplexBlocks, block.BlockHeader().Seq)

@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"github.com/StephenButtolph/canoto"
-	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
@@ -36,7 +36,7 @@ func TestBlockSerialization(t *testing.T) {
 			Seq:     1,
 			Prev:    genesisBlock.digest,
 		},
-		blacklist: common.NewBlacklist(3, common.GenesisMaxBlacklistedRounds),
+		blacklist: common.NewBlacklist(common.GenesisMaxBlacklistedRounds),
 	}
 
 	// Serialize the block

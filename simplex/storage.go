@@ -12,11 +12,11 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/common"
-	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -215,7 +215,7 @@ func getGenesisBlock(ctx context.Context, config *Config, blockTracker *blockTra
 		blockTracker: blockTracker,
 		vmBlock:      snowmanGenesis,
 		// TODO: Set maxBlacklistRounds in config
-		blacklist: common.NewBlacklist(uint16(len(config.Params.InitialValidators)), simplex.DefaultMaxBlacklistedRounds),
+		blacklist: common.NewBlacklist(simplex.DefaultMaxBlacklistedRounds),
 	}
 
 	// set the digest
