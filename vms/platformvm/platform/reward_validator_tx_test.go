@@ -20,7 +20,7 @@ func TestRewardValidatorTxSyntacticVerify(t *testing.T) {
 		{
 			name: "missing_tx_id",
 			tx:   &RewardValidatorTx{},
-			want: errMissingTxID,
+			want: ErrMissingTxID,
 		},
 		{
 			name: "valid",

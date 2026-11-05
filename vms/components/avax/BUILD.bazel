@@ -48,6 +48,7 @@ go_test(
     name = "avax_test",
     srcs = [
         "asset_test.go",
+        "base_tx_test.go",
         "mocks_generate_test.go",
         "transferables_test.go",
         "utxo_fetching_test.go",
@@ -62,6 +63,7 @@ go_test(
         "//database",
         "//database/memdb",
         "//ids",
+        "//snow",
         "//utils",
         "//utils/set",
         "//vms/secp256k1fx",
