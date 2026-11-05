@@ -22,8 +22,9 @@ type ExporterConfig struct {
 	// Endpoint to send metrics to. If empty, the default endpoint will be used.
 	Endpoint string `json:"endpoint"`
 
-	// Headers to send with metrics
-	Headers map[string]string `json:"headers"`
+	// Headers to send with metrics.
+	// Header values may contain credentials, so they are excluded from JSON.
+	Headers map[string]string `json:"-"`
 
 	// If true, don't use TLS
 	Insecure bool `json:"insecure"`
