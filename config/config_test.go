@@ -1388,6 +1388,8 @@ func TestRedactSensitiveFlags(t *testing.T) {
 		HTTPSKeyContentKey:         "httpsKey",
 		StakingTLSKeyContentKey:    "stakingTLSKey",
 		StakingSignerKeyContentKey: "signerKey",
+		TracingHeadersKey:          "tracingApi",
+		ConfigContentKey:           "ConfigContent",
 		NetworkNameKey:             "fuji",
 	}
 
@@ -1397,6 +1399,8 @@ func TestRedactSensitiveFlags(t *testing.T) {
 			HTTPSKeyContentKey:         redactedFlagValue,
 			StakingTLSKeyContentKey:    redactedFlagValue,
 			StakingSignerKeyContentKey: redactedFlagValue,
+			ConfigContentKey:           redactedFlagValue,
+			TracingHeadersKey:          redactedFlagValue,
 			NetworkNameKey:             "fuji",
 		},
 		redacted,
@@ -1406,4 +1410,6 @@ func TestRedactSensitiveFlags(t *testing.T) {
 	require.Equal("httpsKey", flags[HTTPSKeyContentKey])
 	require.Equal("stakingTLSKey", flags[StakingTLSKeyContentKey])
 	require.Equal("signerKey", flags[StakingSignerKeyContentKey])
+	require.Equal("ConfigContent", flags[ConfigContentKey])
+	require.Equal("tracingApi", flags[TracingHeadersKey])
 }
