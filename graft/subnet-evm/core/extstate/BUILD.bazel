@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//graft/evm/firewood",
         "//graft/subnet-evm/params",
+        "//graft/subnet-evm/precompile/contracts/warp",
         "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/state",

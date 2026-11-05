@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
@@ -135,6 +136,18 @@ func (*Config) Accept(acceptCtx *precompileconfig.AcceptContext, blockHash commo
 		return fmt.Errorf("failed to add warp message during accept (TxHash: %s, LogIndex: %d): %w", txHash, logIndex, err)
 	}
 	return nil
+}
+
+// MessagesFromAccessList returns the Warp messages in list, in order. Callers
+// MUST only call it while Warp is enabled.
+func MessagesFromAccessList(list types.AccessList) []predicate.Predicate {
+	var messages []predicate.Predicate
+	for _, tuple := range list {
+		if tuple.Address == ContractAddress {
+			messages = append(messages, tuple.StorageKeys)
+		}
+	}
+	return messages
 }
 
 // PredicateGas returns the amount of gas necessary to verify the predicate

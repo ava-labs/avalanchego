@@ -20,6 +20,7 @@ go_library(
     deps = [
         "//graft/evm/utils",
         "//graft/subnet-evm/commontype",
+        "//graft/subnet-evm/precompile/contracts/warp",
         "//graft/subnet-evm/precompile/modules",
         "//graft/subnet-evm/precompile/precompileconfig",
         "//snow",

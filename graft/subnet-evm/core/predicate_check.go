@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
@@ -65,18 +66,12 @@ func CheckTxPredicates(
 		)
 	}
 
-	rulesExtra := params.GetRulesExtra(rules)
-	// Short circuit early if there are no precompile predicates to verify
-	if !rulesExtra.PredicatersExist() {
+	warpConfig := params.GetRulesExtra(rules).WarpConfig
+	if warpConfig == nil {
 		return nil, nil
 	}
-
-	// Prepare the predicate storage slots from the transaction's access list
-	predicateArguments := predicate.FromAccessList(rulesExtra, accessList)
-
-	// If there are no predicates to verify, return early and skip requiring the
-	// proposervm block context to be populated.
-	if len(predicateArguments) == 0 {
+	warpMessages := warp.MessagesFromAccessList(accessList)
+	if len(warpMessages) == 0 {
 		return nil, nil
 	}
 
@@ -84,27 +79,15 @@ func CheckTxPredicates(
 		return nil, ErrMissingPredicateContext
 	}
 
-	var (
-		txHash           = tx.Hash()
-		predicateResults = make(predicate.PrecompileResults, len(predicateArguments))
-	)
-	for address, predicates := range predicateArguments {
-		// Since address is only added to predicateArguments when there's a
-		// valid predicate in the ruleset there's no need to check if the
-		// predicate exists here.
-		predicaterContract := rulesExtra.Predicaters[address]
-		bitset := set.NewBits()
-		for i, predicate := range predicates {
-			if err := predicaterContract.VerifyPredicate(predicateContext, predicate); err != nil {
-				bitset.Add(i)
-			}
+	bitset := set.NewBits()
+	for i, msg := range warpMessages {
+		if err := warpConfig.VerifyPredicate(predicateContext, msg); err != nil {
+			bitset.Add(i)
 		}
-		log.Debug("predicate verify",
-			"tx", txHash,
-			"address", address,
-			"res", bitset.String(),
-		)
-		predicateResults[address] = bitset
 	}
-	return predicateResults, nil
+	log.Debug("warp message verify",
+		"tx", tx.Hash(),
+		"res", bitset.String(),
+	)
+	return predicate.PrecompileResults{warp.ContractAddress: bitset}, nil
 }
