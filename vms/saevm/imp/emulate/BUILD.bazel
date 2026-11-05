@@ -17,8 +17,8 @@ go_test(
     srcs = ["emulate_test.go"],
     embed = [":emulate"],
     deps = [
-        "//graft/coreth/plugin/evm/customtypes",
         "//graft/subnet-evm/plugin/evm/customtypes",
+        "//vms/saevm/cchain/libevm/customtypes",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_stretchr_testify//require",
     ],
