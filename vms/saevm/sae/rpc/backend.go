@@ -41,7 +41,6 @@ type backend struct {
 	*txgossip.Set
 	chainIndexer
 	bloomOverrider
-	replaySlots chan struct{}
 	*bloomIndexer
 }
 
