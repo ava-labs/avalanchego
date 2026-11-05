@@ -1,0 +1,50 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "msm",
+    srcs = [
+        "approvals.go",
+        "auxiliary.go",
+        "block.canoto.go",
+        "block.go",
+        "build_decision.go",
+        "encoding.canoto.go",
+        "encoding.go",
+        "msm.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/simplex/msm",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/simplex/avalanchego",
+        "//graft/simplex/common",
+        "@com_github_stephenbuttolph_canoto//:canoto",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+graft_go_test(
+    name = "msm_test",
+    srcs = [
+        "approvals_test.go",
+        "auxiliary_test.go",
+        "block_test.go",
+        "build_decision_test.go",
+        "encoding_test.go",
+        "fake_node_test.go",
+        "fuzz_test.go",
+        "leak_test.go",
+        "msm_test.go",
+        "util_test.go",
+    ],
+    embed = [":msm"],
+    deps = [
+        "//graft/simplex/avalanchego",
+        "//graft/simplex/common",
+        "//graft/simplex/simplex",
+        "//graft/simplex/testutil",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
+        "@org_uber_go_zap//:zap",
+    ],
+)

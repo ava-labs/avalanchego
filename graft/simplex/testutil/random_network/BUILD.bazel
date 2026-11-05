@@ -1,0 +1,43 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "random_network",
+    srcs = [
+        "block.go",
+        "config.go",
+        "logging.go",
+        "mempool.go",
+        "network.go",
+        "node.go",
+        "storage.go",
+        "tx.go",
+        "utils.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/simplex/testutil/random_network",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/simplex/common",
+        "//graft/simplex/simplex",
+        "//graft/simplex/testutil",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//:zap",
+        "@org_uber_go_zap//zapcore",
+    ],
+)
+
+graft_go_test(
+    name = "random_network_test",
+    srcs = [
+        "logging_test.go",
+        "mempool_test.go",
+        "tx_test.go",
+    ],
+    embed = [":random_network"],
+    deps = [
+        "//graft/simplex/common",
+        "//graft/simplex/simplex",
+        "//graft/simplex/testutil",
+        "@com_github_stretchr_testify//require",
+    ],
+)
