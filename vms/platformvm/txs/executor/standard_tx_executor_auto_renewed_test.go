@@ -11,11 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -23,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
-	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -39,11 +36,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
 	require.NoError(t, err)
 
-	sk, err := localsigner.New()
-	require.NoError(t, err)
-
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(t, err)
+	sk, pop := newSignerWithPoP(t)
 
 	nodeID := ids.GenerateTestNodeID()
 	period := 2 * env.config.MinStakeDuration
@@ -239,11 +232,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sk, got := localsigner.New()
-			require.NoError(t, got)
-
-			pop, got := signer.NewProofOfPossession(sk)
-			require.NoError(t, got)
+			_, pop := newSignerWithPoP(t)
 
 			tx, got := wallet.IssueAddAutoRenewedValidatorTx(
 				ids.GenerateTestNodeID(),
@@ -307,20 +296,13 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			env := newEnvironment(t, upgradetest.Latest)
-			// Charge a non-zero fee so the config tx is funded with a real input
-			// and change output, letting us assert UTXO consumption/production below.
-			env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
 
 			var (
 				wallet        = newWallet(t, env, walletConfig{})
 				feeCalculator = state.PickFeeCalculator(env.config, env.state)
 			)
 
-			sk, err := localsigner.New()
-			require.NoError(t, err)
-
-			pop, err := signer.NewProofOfPossession(sk)
-			require.NoError(t, err)
+			_, pop := newSignerWithPoP(t)
 
 			nodeID := ids.GenerateTestNodeID()
 
@@ -424,11 +406,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 	require.NotEmpty(t, validators)
 	fixedStakerTxID := validators[0].TxID
 
-	sk, err := localsigner.New()
-	require.NoError(t, err)
-
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(t, err)
+	_, pop := newSignerWithPoP(t)
 
 	nodeID := ids.GenerateTestNodeID()
 

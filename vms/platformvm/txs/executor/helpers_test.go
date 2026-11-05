@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -215,7 +216,7 @@ func defaultConfig(f upgradetest.Fork) *config.Internal {
 		genesistest.DefaultValidatorEndTime,
 	)
 
-	return &config.Internal{
+	c := &config.Internal{
 		Chains:                  chains.TestManager,
 		UptimeLockedCalculator:  uptime.NewLockedCalculator(),
 		Validators:              validators.NewManager(),
@@ -234,6 +235,13 @@ func defaultConfig(f upgradetest.Fork) *config.Internal {
 		},
 		UpgradeConfig: upgrades,
 	}
+	// Charge non-zero fees from Etna, so that txs are funded with real inputs
+	// and outputs. Before Etna, [state.PickFeeCalculator] charges no fee.
+	if f >= upgradetest.Etna {
+		c.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
+		c.ValidatorFeeConfig = genesis.LocalParams.ValidatorFeeConfig
+	}
+	return c
 }
 
 func defaultClock(f upgradetest.Fork) *mockable.Clock {
@@ -330,14 +338,15 @@ func deleteUTXOsOwnedBy(t testing.TB, env *environment, diff *state.Diff, key *s
 	}
 }
 
-func newProofOfPossession(t testing.TB) *signer.ProofOfPossession {
+// newSignerWithPoP returns a new BLS signer and its proof of possession.
+func newSignerWithPoP(t testing.TB) (*localsigner.LocalSigner, *signer.ProofOfPossession) {
 	t.Helper()
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)
 	pop, err := signer.NewProofOfPossession(sk)
 	require.NoError(t, err)
-	return pop
+	return sk, pop
 }
 
 func newAdvanceTimeTx(t testing.TB, timestamp time.Time) *platform.Tx {
@@ -392,13 +401,16 @@ func requireBaseTxApplied(
 	require.NoError(err)
 
 	// The inputs were consumed
+	require.NotEmpty(ins)
 	for _, in := range ins {
 		_, err := diff.GetUTXO(in.InputID())
 		require.ErrorIs(err, database.ErrNotFound)
 	}
 
 	// The outputs were produced
-	for _, wantUTXO := range tx.UTXOs() {
+	wantUTXOs := tx.UTXOs()
+	require.NotEmpty(wantUTXOs)
+	for _, wantUTXO := range wantUTXOs {
 		gotUTXO, err := diff.GetUTXO(wantUTXO.InputID())
 		require.NoError(err)
 		require.Equal(wantUTXO, gotUTXO)
