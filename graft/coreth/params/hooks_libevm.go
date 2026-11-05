@@ -18,14 +18,13 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 
-	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -76,7 +75,7 @@ func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
 //
 // TODO(JonathanOppenheimer): Charge Warp messages directly once the shared
 // predicate gas helper is replaced.
-var warpPredicaters = map[common.Address]evmprecompileconfig.Predicater{
+var warpPredicaters = map[common.Address]precompileconfig.Predicater{
 	warp.ContractAddress: &warp.Config{},
 }
 
@@ -88,7 +87,7 @@ func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, e
 	if !r.IsDurango {
 		return 0, false, nil
 	}
-	gas, err := evmprecompileconfig.AccessListGasWithPredicates(cparams.Rules(r), warpPredicaters, accessList)
+	gas, err := precompileconfig.AccessListGasWithPredicates(cparams.Rules(r), warpPredicaters, accessList)
 	return gas, true, err
 }
 
