@@ -36,10 +36,10 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/vms/saevm/statesync/statesynctest"
+	"github.com/ava-labs/avalanchego/vms/evm/statesync/statesynctest"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
-	leafproto "github.com/ava-labs/avalanchego/vms/saevm/statesync/hashdb"
+	leafproto "github.com/ava-labs/avalanchego/vms/evm/statesync/hashdb"
 )
 
 const testRequestSize = 1024
