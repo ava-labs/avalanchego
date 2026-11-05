@@ -287,7 +287,7 @@ func nextStakerToRemove(t testing.TB, diff *state.Diff) *state.Staker {
 }
 
 func TestRewardValidatorTxErrors(t *testing.T) {
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgradetest.Latest)
 	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 	require.NoError(t, err)
 	stakerToRemove := nextStakerToRemove(t, diff)
@@ -348,7 +348,7 @@ func TestRewardValidatorTx(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, upgradetest.ApricotPhase5)
+			env := newEnvironment(t, upgradetest.Latest)
 
 			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
@@ -378,8 +378,6 @@ func TestRewardValidatorTx(t *testing.T) {
 			require.NoError(err)
 
 			require.NoError(gotState.Apply(env.state))
-			dummyHeight := uint64(1)
-			env.state.SetHeight(dummyHeight)
 			require.NoError(env.state.Commit())
 
 			gotBalance, err := avax.GetBalance(env.state, stakeOwners)
@@ -455,8 +453,6 @@ func addCurrentValidatorAndDelegator(
 	diff.AddTx(delTx, status.Committed)
 	diff.SetTimestamp(vdrStaker.EndTime)
 	require.NoError(diff.Apply(env.state))
-	dummyHeight := uint64(1)
-	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
 	return vdrTx, delTx, vdrRewardsOwner, delRewardsOwner
@@ -465,7 +461,6 @@ func addCurrentValidatorAndDelegator(
 func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, upgradetest.ApricotPhase5)
-	dummyHeight := uint64(1)
 
 	vdrTx, delTx, vdrRewardsOwner, delRewardsOwner := addCurrentValidatorAndDelegator(t, env, 0)
 	vdrNodeID := vdrTx.Unsigned.(*platform.AddValidatorTx).NodeID()
@@ -488,7 +483,6 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 
 	require.NoError(onCommitState.Apply(env.state))
 
-	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
 	// Since the tx was committed, the delegator and the delegatee should be rewarded.
@@ -515,7 +509,6 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, upgradetest.Cortina)
-	dummyHeight := uint64(1)
 
 	const vdrRewardAmt = uint64(2000000)
 	vdrTx, delTx, vdrRewardsOwner, delRewardsOwner := addCurrentValidatorAndDelegator(t, env, vdrRewardAmt)
@@ -570,7 +563,6 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	// Commit Validator Diff
 	require.NoError(onCommitState.Apply(env.state))
 
-	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
 	// Since the tx was committed, the delegator and the delegatee should be rewarded.
@@ -652,7 +644,6 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
 	env := newEnvironment(t, upgradetest.ApricotPhase5)
-	dummyHeight := uint64(1)
 
 	initialSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(err)
@@ -673,7 +664,6 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 
 	require.NoError(onAbortState.Apply(env.state))
 
-	env.state.SetHeight(dummyHeight)
 	require.NoError(env.state.Commit())
 
 	// If tx is aborted, delegator and delegatee shouldn't get reward
