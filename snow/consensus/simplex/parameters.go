@@ -17,6 +17,7 @@ var (
 	ErrInvalidParameters = errors.New("simplex parameters must be valid")
 
 	errDuplicateNodeID = errors.New("duplicate nodeID")
+	errEmptyNodeID     = errors.New("empty nodeID")
 )
 
 type ValidatorInfo struct {
@@ -51,6 +52,9 @@ func (p Parameters) Verify() error {
 
 	nodeIDs := set.NewSet[ids.NodeID](len(p.InitialValidators))
 	for _, validator := range p.InitialValidators {
+		if validator.NodeID == ids.EmptyNodeID {
+			return fmt.Errorf("%w: initialValidators has %w", ErrInvalidParameters, errEmptyNodeID)
+		}
 		if nodeIDs.Contains(validator.NodeID) {
 			return fmt.Errorf("%w: initialValidators has %w: %s", ErrInvalidParameters, errDuplicateNodeID, validator.NodeID)
 		}

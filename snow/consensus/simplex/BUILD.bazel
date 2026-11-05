@@ -22,5 +22,6 @@ go_test(
         "//utils/crypto/bls",
         "//utils/crypto/bls/signer/localsigner",
         "@com_github_stretchr_testify//require",
+        "@com_github_supranational_blst//bindings/go",
     ],
 )

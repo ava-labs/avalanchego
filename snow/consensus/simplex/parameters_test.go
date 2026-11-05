@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+
+	blst "github.com/supranational/blst/bindings/go"
 )
 
 func newTestPublicKey(t *testing.T) []byte {
@@ -102,6 +104,18 @@ func TestParametersVerify(t *testing.T) {
 			expectedError: errDuplicateNodeID,
 		},
 		{
+			name: "empty NodeID",
+			params: Parameters{
+				MaxNetworkDelay:    time.Second,
+				MaxRebroadcastWait: time.Second,
+				InitialValidators: []ValidatorInfo{
+					{PublicKey: newTestPublicKey(t)},
+					{NodeID: nodeID, PublicKey: newTestPublicKey(t)},
+				},
+			},
+			expectedError: errEmptyNodeID,
+		},
+		{
 			name: "missing public key",
 			params: Parameters{
 				MaxNetworkDelay:    time.Second,
@@ -129,7 +143,7 @@ func TestParametersVerify(t *testing.T) {
 				MaxNetworkDelay:    time.Second,
 				MaxRebroadcastWait: time.Second,
 				InitialValidators: []ValidatorInfo{
-					{NodeID: nodeID, PublicKey: append([]byte{0xc0}, make([]byte, bls.PublicKeyLen-1)...)},
+					{NodeID: nodeID, PublicKey: blst.P1Generator().Mult(make([]byte, blst.BLST_SCALAR_BYTES)).Compress()},
 				},
 			},
 			expectedError: ErrInvalidParameters,
