@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/google/go-cmp/cmp"
 	"github.com/holiman/uint256"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
@@ -66,7 +65,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
@@ -97,7 +95,6 @@ type SUT struct {
 	clientOnce func()
 
 	ctx            *snow.Context
-	db             database.Database
 	memory         *atomic.Memory
 	sharedMemoryDB database.Database
 
@@ -435,7 +432,6 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 
 	sut := &SUT{
 		VM:             vm,
-		db:             db,
 		ctx:            snowCtx,
 		memory:         memory,
 		sharedMemoryDB: sharedMemoryDB,
@@ -493,25 +489,6 @@ func (s *SUT) SetState(ctx context.Context, state snow.State) error {
 		s.clientOnce()
 	}
 	return nil
-}
-
-// hooks returns a new [hooks] instance that behaves equivalently to those
-// provided to the sae VM.
-func (s *SUT) hooks(tb testing.TB) *hooks {
-	tb.Helper()
-
-	m, err := newMetrics(prometheus.NewRegistry())
-	require.NoErrorf(tb, err, "newMetrics()")
-	return newHooks(
-		s.ctx,
-		s.state,
-		s.chainConfig,
-		s.pending,
-		warp.NewStorage(s.db),
-		s.now,
-		desiredParams{},
-		m,
-	)
 }
 
 // appRequest sends request, from the SUT's p2pclient, to the SUT's p2p handler
