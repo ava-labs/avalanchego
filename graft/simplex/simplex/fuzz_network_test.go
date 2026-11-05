@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/simplex/testutil/random_network"
+	"github.com/ava-labs/avalanchego/graft/simplex/testutil/random_network"
 )
 
 func TestNetworkSimpleFuzz(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
+	simplexcommon "github.com/ava-labs/avalanchego/graft/simplex/common"
 )
 
 var _ simplexcommon.BlockBuilder = (*BlockBuilder)(nil)
