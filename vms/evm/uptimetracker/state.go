@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -160,6 +161,34 @@ func (s *state) deleteValidator(validationID ids.ID) {
 	s.dirtyValidationIDs.Add(v.validationID)
 }
 
+// setValidators replaces the validator set with current and marks every
+// changed validator for persistence.
+func (s *state) setValidators(current map[ids.ID]*validators.GetCurrentValidatorOutput) {
+	for validationID := range s.validators {
+		if _, ok := current[validationID]; !ok {
+			s.deleteValidator(validationID)
+		}
+	}
+
+	for validationID, newValidator := range current {
+		if s.hasValidationID(validationID) {
+			s.updateValidator(validationID, newValidator.IsActive)
+			continue
+		}
+
+		s.addNewValidator(&validator{
+			NodeID:        newValidator.NodeID,
+			validationID:  validationID,
+			IsActive:      newValidator.IsActive,
+			StartTime:     newValidator.StartTime,
+			UpDuration:    0,
+			LastUpdated:   newValidator.StartTime,
+			IsL1Validator: newValidator.IsL1Validator,
+			Weight:        newValidator.Weight,
+		})
+	}
+}
+
 func (s *state) writeModifications() error {
 	batch := s.db.NewBatch()
 
@@ -209,6 +238,12 @@ func (s *state) getValidatorByNodeID(nodeID ids.NodeID) (*validator, bool) {
 	// we are guaranteed to have this validator
 	v := s.validators[validationID]
 	return v, true
+}
+
+// isInactiveValidator returns true if nodeID is a validator that is not active.
+func (s *state) isInactiveValidator(nodeID ids.NodeID) bool {
+	v, ok := s.getValidatorByNodeID(nodeID)
+	return ok && !v.IsActive
 }
 
 func (s *state) hasValidationID(validationID ids.ID) bool {

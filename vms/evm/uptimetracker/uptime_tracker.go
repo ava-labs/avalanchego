@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
@@ -30,11 +29,7 @@ type UptimeTracker struct {
 	height uint64
 	state  *state
 	synced bool
-
-	connectedPeers set.Set[ids.NodeID]
-	// online is the set of nodes reported as connected to the uptime manager.
-	// This includes all connected peers that are not inactive validators.
-	online set.Set[ids.NodeID]
+	online *onlineTracker
 }
 
 // New returns a new instance of UptimeTracker
@@ -49,12 +44,17 @@ func New(
 		return nil, fmt.Errorf("failed to initialize state: %w", err)
 	}
 
+	manager := uptime.NewManager(s, clock)
 	return &UptimeTracker{
 		validatorState: validatorState,
 		subnetID:       subnetID,
-		manager:        uptime.NewManager(s, clock),
+		manager:        manager,
 		synced:         false,
 		state:          s,
+		online: &onlineTracker{
+			manager: manager,
+			state:   s,
+		},
 	}, nil
 }
 
@@ -94,8 +94,7 @@ func (u *UptimeTracker) Connect(nodeID ids.NodeID) error {
 	u.lock.Lock()
 	defer u.lock.Unlock()
 
-	u.connectedPeers.Add(nodeID)
-	return u.updateManager(nodeID)
+	return u.online.connect(nodeID)
 }
 
 // Disconnect marks a node as disconnected. Disconnected nodes are treated as
@@ -104,8 +103,7 @@ func (u *UptimeTracker) Disconnect(nodeID ids.NodeID) error {
 	u.lock.Lock()
 	defer u.lock.Unlock()
 
-	u.connectedPeers.Remove(nodeID)
-	return u.updateManager(nodeID)
+	return u.online.disconnect(nodeID)
 }
 
 // Sync updates the validator set and writes our state. Sync starts tracking
@@ -152,66 +150,12 @@ func (u *UptimeTracker) update(
 		return nil
 	}
 
-	for validationID := range u.state.validators {
-		if _, ok := currentValidatorSet[validationID]; !ok {
-			u.state.deleteValidator(validationID)
-		}
-	}
-
-	for validationID, newValidator := range currentValidatorSet {
-		if u.state.hasValidationID(validationID) {
-			u.state.updateValidator(validationID, newValidator.IsActive)
-			continue
-		}
-
-		u.state.addNewValidator(&validator{
-			NodeID:        newValidator.NodeID,
-			validationID:  validationID,
-			IsActive:      newValidator.IsActive,
-			StartTime:     newValidator.StartTime,
-			UpDuration:    0,
-			LastUpdated:   newValidator.StartTime,
-			IsL1Validator: newValidator.IsL1Validator,
-			Weight:        newValidator.Weight,
-		})
-	}
-
-	// The validator state changed, so any node's online status may have
-	// changed. Only connected nodes can be online.
-	for nodeID := range u.connectedPeers {
-		if err := u.updateManager(nodeID); err != nil {
-			return err
-		}
+	u.state.setValidators(currentValidatorSet)
+	if err := u.online.reconcileAll(); err != nil {
+		return err
 	}
 
 	u.height = height
-	return nil
-}
-
-// shouldBeOnline returns whether nodeID should be earning uptime
-func (u *UptimeTracker) shouldBeOnline(nodeID ids.NodeID) bool {
-	if !u.connectedPeers.Contains(nodeID) {
-		return false
-	}
-
-	v, ok := u.state.getValidatorByNodeID(nodeID)
-	return !ok || v.IsActive
-}
-
-// updateManager reports nodeID to the uptime manager as connected or disconnected
-// if its online status differs from what was last reported. It MUST be called
-// after any change to connectedPeers or to the validator state of nodeID.
-func (u *UptimeTracker) updateManager(nodeID ids.NodeID) error {
-	shouldBeOnline := u.shouldBeOnline(nodeID)
-	isOnline := u.online.Contains(nodeID)
-	switch {
-	case shouldBeOnline && !isOnline:
-		u.online.Add(nodeID)
-		return u.manager.Connect(nodeID)
-	case !shouldBeOnline && isOnline:
-		u.online.Remove(nodeID)
-		return u.manager.Disconnect(nodeID)
-	}
 	return nil
 }
 
