@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/firewood-go-ethhash/ffi"
+	"github.com/ava-labs/firewood-go/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -155,7 +155,7 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
 		ffi.WithRevisions(config.RevisionsInMemory),
 		ffi.WithReadCacheStrategy(config.CacheStrategy),
-		ffi.WithDeferredPersistenceCommitCount(commitCount),
+		ffi.WithMaxPersistenceGap(commitCount),
 	}
 	if config.Archive {
 		options = append(options, ffi.WithRootStore())
