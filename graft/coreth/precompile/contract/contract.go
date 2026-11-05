@@ -13,7 +13,7 @@ const (
 	SelectorLen = 4
 )
 
-type RunStatefulPrecompileFunc func(accessibleState AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error)
+type RunStatefulPrecompileFunc func(accessibleState AccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error)
 
 // StatefulPrecompileFunction defines a function implemented by a stateful precompile
 type StatefulPrecompileFunction struct {
@@ -58,17 +58,19 @@ func NewStatefulPrecompileContract(fallback RunStatefulPrecompileFunc, functions
 	return contract, nil
 }
 
+var _ StatefulPrecompiledContract = (*statefulPrecompileWithFunctionSelectors)(nil)
+
 // Run selects the function using the 4 byte function selector at the start of the input and executes the underlying function on the
 // given arguments.
-func (s *statefulPrecompileWithFunctionSelectors) Run(accessibleState AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func (s *statefulPrecompileWithFunctionSelectors) Run(accessibleState AccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
 	// If there is no input data present, call the fallback function if present.
 	if len(input) == 0 && s.fallback != nil {
-		return s.fallback(accessibleState, caller, addr, nil, suppliedGas, readOnly)
+		return s.fallback(accessibleState, caller, addr, nil, readOnly)
 	}
 
 	// Otherwise, an unexpected input size will result in an error.
 	if len(input) < SelectorLen {
-		return nil, suppliedGas, fmt.Errorf("missing function selector to precompile - input length (%d)", len(input))
+		return nil, fmt.Errorf("missing function selector to precompile - input length (%d)", len(input))
 	}
 
 	// Use the function selector to grab the correct function
@@ -76,8 +78,8 @@ func (s *statefulPrecompileWithFunctionSelectors) Run(accessibleState Accessible
 	functionInput := input[SelectorLen:]
 	function, ok := s.functions[string(selector)]
 	if !ok {
-		return nil, suppliedGas, fmt.Errorf("invalid function selector %#x", selector)
+		return nil, fmt.Errorf("invalid function selector %#x", selector)
 	}
 
-	return function.execute(accessibleState, caller, addr, functionInput, suppliedGas, readOnly)
+	return function.execute(accessibleState, caller, addr, functionInput, readOnly)
 }

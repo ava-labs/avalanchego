@@ -25,9 +25,18 @@ import (
 	"github.com/ava-labs/libevm/trie/triestate"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/libevm/triedb/database"
+
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+
+	saefirewood "github.com/ava-labs/avalanchego/vms/saevm/firewood" // also registers firewood metrics
 )
 
-const Directory = "firewood"
+const (
+	// Scheme is the name of the Firewood state scheme.
+	Scheme = saefirewood.Scheme
+
+	directory = saedb.FirewoodDirectory
+)
 
 var (
 	_ triedb.DBConstructor = TrieDBConfig{}.BackendConstructor
@@ -145,7 +154,7 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 	if err := validateDir(config.DatabaseDir); err != nil {
 		return nil, err
 	}
-	path := filepath.Join(config.DatabaseDir, Directory)
+	path := filepath.Join(config.DatabaseDir, directory)
 
 	// The Firewood constructor will check that commitCount is nonzero.
 	minDeferredPersistenceCommitCount := uint64(config.RevisionsInMemory - 1)
