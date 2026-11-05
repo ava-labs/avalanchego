@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/contracts/warp/warptest"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
@@ -145,8 +145,8 @@ func TestVerifyBlock(t *testing.T) {
 		vdrs = warptest.NewValidators(t, warptest.WithMinimum(2))
 
 		msg, _           = newAddressedCall(t)
-		validPredicate   = predicate.New(vdrs.Sign(t, msg).Bytes())
-		invalidPredicate = predicate.New(warptest.IncorrectlySign(t, msg).Bytes())
+		validPredicate   = warpmsg.Pack(vdrs.Sign(t, msg).Bytes())
+		invalidPredicate = warpmsg.Pack(warptest.IncorrectlySign(t, msg).Bytes())
 
 		validTx = types.NewTx(&types.DynamicFeeTx{
 			AccessList: types.AccessList{
@@ -178,7 +178,7 @@ func TestVerifyBlock(t *testing.T) {
 		isDurango    bool
 		blockContext *block.Context
 		txs          []*types.Transaction
-		want         predicate.BlockResults
+		want         warpmsg.BlockResults
 		wantErr      error
 	}{
 		{
@@ -236,7 +236,7 @@ func TestVerifyBlock(t *testing.T) {
 			txs: []*types.Transaction{
 				validTx,
 			},
-			want: predicate.BlockResults{
+			want: warpmsg.BlockResults{
 				validTx.Hash(): {
 					corethwarp.ContractAddress: set.NewBits(),
 				},
@@ -249,7 +249,7 @@ func TestVerifyBlock(t *testing.T) {
 			txs: []*types.Transaction{
 				invalidTx,
 			},
-			want: predicate.BlockResults{
+			want: warpmsg.BlockResults{
 				invalidTx.Hash(): {
 					corethwarp.ContractAddress: set.NewBits(0),
 				},
@@ -262,7 +262,7 @@ func TestVerifyBlock(t *testing.T) {
 			txs: []*types.Transaction{
 				twoInvalidTx,
 			},
-			want: predicate.BlockResults{
+			want: warpmsg.BlockResults{
 				twoInvalidTx.Hash(): {
 					corethwarp.ContractAddress: set.NewBits(0, 1),
 				},
@@ -275,7 +275,7 @@ func TestVerifyBlock(t *testing.T) {
 			txs: []*types.Transaction{
 				mixedTx,
 			},
-			want: predicate.BlockResults{
+			want: warpmsg.BlockResults{
 				mixedTx.Hash(): {
 					corethwarp.ContractAddress: set.NewBits(1, 2),
 				},
@@ -289,7 +289,7 @@ func TestVerifyBlock(t *testing.T) {
 				validTx,
 				invalidTx,
 			},
-			want: predicate.BlockResults{
+			want: warpmsg.BlockResults{
 				validTx.Hash(): {
 					corethwarp.ContractAddress: set.NewBits(),
 				},
@@ -322,7 +322,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 	blockContext := &block.Context{}
 
 	msg, _ := newAddressedCall(b)
-	pred := predicate.New(vdrs.Sign(b, msg).Bytes())
+	pred := warpmsg.Pack(vdrs.Sign(b, msg).Bytes())
 	for _, numTxs := range []int{1, 10, 100} {
 		for _, predicatesPerTx := range []int{1, 10, 100} {
 			b.Run(fmt.Sprintf("txs=%d/predicates_per_tx=%d", numTxs, predicatesPerTx), func(b *testing.B) {
@@ -350,7 +350,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 				require.NoError(b, err, "VerifyBlock()")
 				require.Len(b, results, numTxs, "VerifyBlock() results length")
 
-				wantTxResults := predicate.PrecompileResults{
+				wantTxResults := warpmsg.TxResults{
 					corethwarp.ContractAddress: set.NewBits(),
 				}
 				for txHash, txResults := range results {

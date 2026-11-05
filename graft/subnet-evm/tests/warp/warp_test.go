@@ -36,7 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 
@@ -498,7 +498,7 @@ func (w *warpTest) deliverAddressedCallToReceivingSubnet() {
 		AccessList: types.AccessList{
 			{
 				Address:     warp.ContractAddress,
-				StorageKeys: predicate.New(w.addressedCallSignedMessage.Bytes()),
+				StorageKeys: warpmsg.Pack(w.addressedCallSignedMessage.Bytes()),
 			},
 		},
 	})
@@ -556,7 +556,7 @@ func (w *warpTest) deliverBlockHashPayload() {
 		AccessList: types.AccessList{
 			{
 				Address:     warp.ContractAddress,
-				StorageKeys: predicate.New(w.blockPayloadSignedMessage.Bytes()),
+				StorageKeys: warpmsg.Pack(w.blockPayloadSignedMessage.Bytes()),
 			},
 		},
 	})
@@ -740,7 +740,7 @@ func (w *warpTest) warpLoad() {
 			AccessList: types.AccessList{
 				{
 					Address:     warp.ContractAddress,
-					StorageKeys: predicate.New(signedWarpMessageBytes),
+					StorageKeys: warpmsg.Pack(signedWarpMessageBytes),
 				},
 			},
 		})

@@ -18,7 +18,7 @@ go_library(
     deps = [
         "//graft/coreth/precompile/contract",
         "//graft/evm/precompileconfig",
-        "//vms/evm/predicate",
+        "//vms/evm/warpmsg",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
         "@com_github_ava_labs_libevm//common",
@@ -55,7 +55,7 @@ graft_go_test(
         "//utils/crypto/bls/signer/localsigner",
         "//utils/math",
         "//utils/set",
-        "//vms/evm/predicate",
+        "//vms/evm/warpmsg",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
         "//vms/saevm/cchain/cparams",

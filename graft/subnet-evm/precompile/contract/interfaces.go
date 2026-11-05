@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -46,7 +46,7 @@ type StateDB interface {
 	AddLog(*ethtypes.Log)
 	// GetWarpMessage returns the index-th Warp message in the current
 	// transaction's access list. It returns false if there is no such message.
-	GetWarpMessage(index int) (predicate.Predicate, bool)
+	GetWarpMessage(index int) (warpmsg.Packed, bool)
 
 	TxHash() common.Hash
 

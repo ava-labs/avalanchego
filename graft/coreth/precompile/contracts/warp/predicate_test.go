@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 
@@ -177,9 +177,9 @@ func createWarpMessage(numKeys int) *avalancheWarp.Message {
 
 // createPredicate constructs a warp message using createWarpMessage with numKeys signers
 // and packs it into predicate encoding.
-func createPredicate(numKeys int) predicate.Predicate {
+func createPredicate(numKeys int) warpmsg.Packed {
 	warpMsg := createWarpMessage(numKeys)
-	return predicate.New(warpMsg.Bytes())
+	return warpmsg.Pack(warpMsg.Bytes())
 }
 
 // validatorRange specifies a range of validators to include from [start, end), a staking weight
@@ -232,7 +232,7 @@ func createSnowCtx(tb testing.TB, validatorRanges []validatorRange) *snow.Contex
 func createValidPredicateTest(
 	snowCtx *snow.Context,
 	numKeys int,
-	predicate predicate.Predicate,
+	predicate warpmsg.Packed,
 	rules cparams.Rules,
 ) precompiletest.PredicateTest {
 	gasCost := CurrentGasConfig(rules)
@@ -293,7 +293,7 @@ func TestInvalidWarpMessage(t *testing.T) {
 	warpMsg := createWarpMessage(1)
 	warpMsgBytes := warpMsg.Bytes()
 	warpMsgBytes = append(warpMsgBytes, byte(0x01)) // Invalidate warp message packing
-	pred := predicate.New(warpMsgBytes)
+	pred := warpmsg.Pack(warpMsgBytes)
 
 	test := precompiletest.PredicateTest{
 		PredicateContext: &precompileconfig.PredicateContext{
@@ -337,7 +337,7 @@ func TestInvalidAddressedPayload(t *testing.T) {
 	warpMsg, err := avalancheWarp.NewMessage(unsignedMsg, warpSignature)
 	require.NoError(t, err)
 	warpMsgBytes := warpMsg.Bytes()
-	pred := predicate.New(warpMsgBytes)
+	pred := warpmsg.Pack(warpMsgBytes)
 
 	test := precompiletest.PredicateTest{
 		PredicateContext: &precompileconfig.PredicateContext{
@@ -383,7 +383,7 @@ func TestInvalidBitSet(t *testing.T) {
 			publicKey: true,
 		},
 	})
-	pred := predicate.New(msg.Bytes())
+	pred := warpmsg.Pack(msg.Bytes())
 	test := precompiletest.PredicateTest{
 		PredicateContext: &precompileconfig.PredicateContext{
 			SnowCtx: snowCtx,
@@ -470,7 +470,7 @@ func TestWarpMultiplePredicates(t *testing.T) {
 
 		for _, valid := range validMessageIndices {
 			var (
-				pred        predicate.Predicate
+				pred        warpmsg.Packed
 				expectedGas uint64
 				expectedErr error
 			)

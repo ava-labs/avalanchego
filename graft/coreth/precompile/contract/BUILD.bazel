@@ -19,7 +19,7 @@ go_library(
         "//graft/evm/precompileconfig",
         "//snow",
         "//utils/set",
-        "//vms/evm/predicate",
+        "//vms/evm/warpmsg",
         "@com_github_ava_labs_libevm//accounts/abi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",

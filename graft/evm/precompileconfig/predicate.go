@@ -14,7 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 )
 
 // PredicateContext is the context that Warp messages are verified within.
@@ -36,14 +36,14 @@ type Rules interface {
 func AccessListGas(
 	accessList libevm.AccessList,
 	warpAddress common.Address,
-	warpGas func(predicate.Predicate) (uint64, error),
+	warpGas func(warpmsg.Packed) (uint64, error),
 ) (uint64, error) {
 	var gas uint64
 	for _, tuple := range accessList {
 		var tupleGas uint64
 		if tuple.Address == warpAddress {
 			var err error
-			tupleGas, err = warpGas(predicate.Predicate(tuple.StorageKeys))
+			tupleGas, err = warpGas(warpmsg.Packed(tuple.StorageKeys))
 			if err != nil {
 				return 0, err
 			}

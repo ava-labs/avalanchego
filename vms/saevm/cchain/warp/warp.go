@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -47,14 +47,8 @@ var errNoBlockContext = errors.New("no block context")
 
 // MessagesFromAccessList returns the Warp messages in list, in order. Callers
 // MUST only call it after Durango.
-func MessagesFromAccessList(list types.AccessList) []predicate.Predicate {
-	var messages []predicate.Predicate
-	for _, tuple := range list {
-		if tuple.Address == corethwarp.ContractAddress {
-			messages = append(messages, tuple.StorageKeys)
-		}
-	}
-	return messages
+func MessagesFromAccessList(list types.AccessList) []warpmsg.Packed {
+	return warpmsg.FromAccessList(list, corethwarp.ContractAddress)
 }
 
 // VerifyBlock verifies the Warp messages of every transaction in the block.
@@ -63,12 +57,12 @@ func VerifyBlock(
 	blockContext *block.Context, // MAY be nil
 	isDurango bool,
 	txs []*types.Transaction,
-) (predicate.BlockResults, error) {
+) (warpmsg.BlockResults, error) {
 	if !isDurango {
 		return nil, nil
 	}
 
-	type result = lazyEntry[common.Hash, predicate.PrecompileResults]
+	type result = lazyEntry[common.Hash, warpmsg.TxResults]
 	var (
 		results = make([]result, 0, len(txs))
 		eg      = &errgroup.Group{}
@@ -131,9 +125,9 @@ func collect[K comparable, V any](entries []lazyEntry[K, V]) map[K]V {
 // The results MUST be collected after eg.Wait has returned.
 func verifyTx(
 	pc *precompileconfig.PredicateContext,
-	messages []predicate.Predicate,
+	messages []warpmsg.Packed,
 	eg *errgroup.Group,
-) lazy[predicate.PrecompileResults] {
+) lazy[warpmsg.TxResults] {
 	failures := make([]bool, len(messages))
 	for i, msg := range messages {
 		eg.Go(func() error {
@@ -143,13 +137,13 @@ func verifyTx(
 			return nil
 		})
 	}
-	return func() predicate.PrecompileResults {
+	return func() warpmsg.TxResults {
 		r := set.NewBits()
 		for i, failed := range failures {
 			if failed {
 				r.Add(i)
 			}
 		}
-		return predicate.PrecompileResults{corethwarp.ContractAddress: r}
+		return warpmsg.TxResults{corethwarp.ContractAddress: r}
 	}
 }

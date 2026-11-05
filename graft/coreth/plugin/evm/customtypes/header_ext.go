@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
@@ -54,7 +54,7 @@ type HeaderExtra struct {
 	SettledGasNumerator *uint64
 	SettledExcess       *uint64
 
-	predicateResults atomic.Pointer[predicate.BlockResults]
+	predicateResults atomic.Pointer[warpmsg.BlockResults]
 }
 
 // HeaderTimeMilliseconds returns the header timestamp in milliseconds.

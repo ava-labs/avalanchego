@@ -17,7 +17,7 @@ go_library(
         "//graft/coreth/precompile/contracts/warp",
         "//graft/evm/precompileconfig",
         "//snow/snowtest",
-        "//vms/evm/predicate",
+        "//vms/evm/warpmsg",
         "//vms/saevm/cchain/cparams",
         "//vms/saevm/cchain/libevm/extstate",
         "@com_github_ava_labs_libevm//common",

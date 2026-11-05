@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/evm/contracts/warp/warptest"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/warpmsg"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
@@ -187,7 +187,7 @@ func warpAccessList(msgs ...*avalanchewarp.Message) types.AccessList {
 	for i, msg := range msgs {
 		al[i] = types.AccessTuple{
 			Address:     corethwarp.ContractAddress,
-			StorageKeys: predicate.New(msg.Bytes()),
+			StorageKeys: warpmsg.Pack(msg.Bytes()),
 		}
 	}
 	return al
