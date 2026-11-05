@@ -26,13 +26,15 @@ type UptimeTracker struct {
 	subnetID       ids.ID
 	manager        uptime.Manager
 
-	lock                sync.Mutex
-	height              uint64
-	state               *state
-	synced              bool
-	connectedValidators set.Set[ids.NodeID]
-	// Deactivated validators are treated as being offline
-	deactivatedValidators set.Set[ids.NodeID]
+	lock   sync.Mutex
+	height uint64
+	state  *state
+	synced bool
+
+	connectedPeers set.Set[ids.NodeID]
+	// online is the set of nodes reported as connected to the uptime manager.
+	// This includes all connected peers that are not inactive validators.
+	online set.Set[ids.NodeID]
 }
 
 // New returns a new instance of UptimeTracker
@@ -86,32 +88,24 @@ func (u *UptimeTracker) GetUptime(validationID ids.ID) (
 	return uptime, lastUpdated, nil
 }
 
-// Connect starts tracking a node. Nodes that are activated and connected will
-// be treated as online.
+// Connect tracks the node to earn uptime as long as it is not an inactive
+// validator.
 func (u *UptimeTracker) Connect(nodeID ids.NodeID) error {
 	u.lock.Lock()
 	defer u.lock.Unlock()
 
-	u.connectedValidators.Add(nodeID)
-	if u.deactivatedValidators.Contains(nodeID) {
-		return nil
-	}
-
-	return u.manager.Connect(nodeID)
+	u.connectedPeers.Add(nodeID)
+	return u.updateManager(nodeID)
 }
 
-// Disconnect stops tracking a node. Disconnected nodes are treated as being
-// offline.
+// Disconnect marks a node as disconnected. Disconnected nodes are treated as
+// offline and stop earning uptime.
 func (u *UptimeTracker) Disconnect(nodeID ids.NodeID) error {
 	u.lock.Lock()
 	defer u.lock.Unlock()
 
-	u.connectedValidators.Remove(nodeID)
-	if u.deactivatedValidators.Contains(nodeID) {
-		return nil
-	}
-
-	return u.manager.Disconnect(nodeID)
+	u.connectedPeers.Remove(nodeID)
+	return u.updateManager(nodeID)
 }
 
 // Sync updates the validator set and writes our state. Sync starts tracking
@@ -158,52 +152,18 @@ func (u *UptimeTracker) update(
 		return nil
 	}
 
-	newValidators := currentValidatorSet
-
-	for validationID, validator := range u.state.validators {
-		// This validator is still in the latest update
-		if _, ok := newValidators[validationID]; ok {
-			continue
+	for validationID := range u.state.validators {
+		if _, ok := currentValidatorSet[validationID]; !ok {
+			u.state.deleteValidator(validationID)
 		}
-
-		u.state.deleteValidator(validationID)
-		u.deactivatedValidators.Remove(validator.NodeID)
 	}
 
-	// Add or update validators
-	for validationID, newValidator := range newValidators {
-		if ok := u.state.hasValidationID(validationID); ok {
-			// Check if there was a status change
-			if !u.state.updateValidator(validationID, newValidator.IsActive) {
-				continue
-			}
-
-			// If there was a status change we need to activate/deactivate the
-			// validator
-			if newValidator.IsActive {
-				// This validator is now active and is treated as online
-				if err := u.activate(newValidator.NodeID); err != nil {
-					return fmt.Errorf(
-						"failed to activate validator %s: %w",
-						newValidator.NodeID,
-						err,
-					)
-				}
-				continue
-			}
-
-			// This validator is no longer active and is treated as offline
-			if err := u.deactivate(newValidator.NodeID); err != nil {
-				return fmt.Errorf(
-					"failed to deactivate validator %s: %w",
-					newValidator.NodeID,
-					err,
-				)
-			}
+	for validationID, newValidator := range currentValidatorSet {
+		if u.state.hasValidationID(validationID) {
+			u.state.updateValidator(validationID, newValidator.IsActive)
 			continue
 		}
 
-		// This is a new validator
 		u.state.addNewValidator(&validator{
 			NodeID:        newValidator.NodeID,
 			validationID:  validationID,
@@ -214,18 +174,13 @@ func (u *UptimeTracker) update(
 			IsL1Validator: newValidator.IsL1Validator,
 			Weight:        newValidator.Weight,
 		})
+	}
 
-		if newValidator.IsActive {
-			continue
-		}
-
-		// This validator is not active and is treated is offline
-		if err := u.deactivate(newValidator.NodeID); err != nil {
-			return fmt.Errorf(
-				"failed to deactivate validator %s: %w",
-				newValidator.NodeID,
-				err,
-			)
+	// The validator state changed, so any node's online status may have
+	// changed. Only connected nodes can be online.
+	for nodeID := range u.connectedPeers {
+		if err := u.updateManager(nodeID); err != nil {
+			return err
 		}
 	}
 
@@ -233,18 +188,31 @@ func (u *UptimeTracker) update(
 	return nil
 }
 
-// activate treats nodeID as online
-func (u *UptimeTracker) activate(nodeID ids.NodeID) error {
-	u.deactivatedValidators.Remove(nodeID)
+// shouldBeOnline returns whether nodeID should be earning uptime
+func (u *UptimeTracker) shouldBeOnline(nodeID ids.NodeID) bool {
+	if !u.connectedPeers.Contains(nodeID) {
+		return false
+	}
 
-	return u.manager.Connect(nodeID)
+	v, ok := u.state.getValidatorByNodeID(nodeID)
+	return !ok || v.IsActive
 }
 
-// deactivate treats nodeID as offline
-func (u *UptimeTracker) deactivate(nodeID ids.NodeID) error {
-	u.deactivatedValidators.Add(nodeID)
-
-	return u.manager.Disconnect(nodeID)
+// updateManager reports nodeID to the uptime manager as connected or disconnected
+// if its online status differs from what was last reported. It MUST be called
+// after any change to connectedPeers or to the validator state of nodeID.
+func (u *UptimeTracker) updateManager(nodeID ids.NodeID) error {
+	shouldBeOnline := u.shouldBeOnline(nodeID)
+	isOnline := u.online.Contains(nodeID)
+	switch {
+	case shouldBeOnline && !isOnline:
+		u.online.Add(nodeID)
+		return u.manager.Connect(nodeID)
+	case !shouldBeOnline && isOnline:
+		u.online.Remove(nodeID)
+		return u.manager.Disconnect(nodeID)
+	}
+	return nil
 }
 
 // Shutdown stops tracking uptimes and writes our state.

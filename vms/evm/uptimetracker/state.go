@@ -139,16 +139,14 @@ func (s *state) addNewValidator(vdr *validator) {
 // updateValidator sets the isActive state of the validator with the given
 // validationID -- this function assumes that a validator with the given
 // validationID exists.
-func (s *state) updateValidator(validationID ids.ID, isActive bool) bool {
+func (s *state) updateValidator(validationID ids.ID, isActive bool) {
 	v := s.validators[validationID]
-
 	if v.IsActive == isActive {
-		return false
+		return
 	}
 
 	v.IsActive = isActive
 	s.dirtyValidationIDs.Add(validationID)
-	return true
 }
 
 // deleteValidator deletes the validator with the given validationID -- this
