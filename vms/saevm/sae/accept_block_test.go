@@ -6,6 +6,7 @@ package sae
 import (
 	"math/rand/v2"
 	"os"
+	"os/exec"
 	"runtime"
 	"testing"
 	"time"
@@ -21,19 +22,18 @@ import (
 )
 
 func TestAcceptBlock(t *testing.T) {
-	// TODO(JonathanOppenheimer): determine whether this test is actually flaky
-	// or whether there's a bug in the test. This test is enabled in Bazel and
-	// disabled in go test.
-	if os.Getenv("SAEVM_TEST_FLAKY") == "" {
-		t.Skip("FLAKY: set SAEVM_TEST_FLAKY to run")
+	// [blocks.InMemoryBlockCount] is global to the process, and blocks from other
+	// tests can stay in memory indefinitely, so this test needs its own process.
+	const subprocessEnv = "SAEVM_TEST_ACCEPT_BLOCK_SUBPROCESS"
+	if os.Getenv(subprocessEnv) == "" {
+		cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestAcceptBlock$") //#nosec G204,G702 -- Runs this same test binary
+		cmd.Env = append(os.Environ(), subprocessEnv+"=1")
+		out, err := cmd.CombinedOutput()
+		require.NoErrorf(t, err, "%s", out)
+		return
 	}
 
-	// We use a generous timeout because GC finalizers from previous tests take
-	// a long time to run in resource constrained environments.
-	require.EventuallyWithT(t, func(t *assert.CollectT) {
-		runtime.GC()
-		require.Zero(t, blocks.InMemoryBlockCount(), "initial in-memory block count")
-	}, 5*time.Second, 50*time.Millisecond)
+	require.Zero(t, blocks.InMemoryBlockCount(), "initial in-memory block count")
 
 	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
 
@@ -72,9 +72,12 @@ func TestAcceptBlock(t *testing.T) {
 			}
 		}
 
-		assert.EventuallyWithT(t, func(t *assert.CollectT) {
+		// The count only drops after a GC cycle and the cleanups that it queues.
+		// We use a generous timeout because, in resource constrained environments,
+		// [runtime.GC] alone can take hundreds of milliseconds.
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			runtime.GC()
 			require.Equal(t, int64(wantInMemory.Len()), blocks.InMemoryBlockCount(), "in-memory block count")
-		}, 100*time.Millisecond, time.Millisecond)
+		}, 5*time.Second, time.Millisecond)
 	}
 }
