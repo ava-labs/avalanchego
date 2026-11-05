@@ -6,12 +6,21 @@ go_library(
     srcs = ["parameters.go"],
     importpath = "github.com/ava-labs/avalanchego/snow/consensus/simplex",
     visibility = ["//visibility:public"],
-    deps = ["//ids"],
+    deps = [
+        "//ids",
+        "//utils/crypto/bls",
+        "//utils/set",
+    ],
 )
 
 go_test(
     name = "simplex_test",
     srcs = ["parameters_test.go"],
     embed = [":simplex"],
-    deps = ["@com_github_stretchr_testify//require"],
+    deps = [
+        "//ids",
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/signer/localsigner",
+        "@com_github_stretchr_testify//require",
+    ],
 )
