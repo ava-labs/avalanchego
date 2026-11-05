@@ -1209,6 +1209,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 		GasPrice: big.NewInt(1),
 	})
 	require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, tracedTx), "%T.SendTransaction(%#x)", sut.ethclient, tracedTx.Hash())
+	sut.waitForPendingEthTxs(ctx, t, tracedTx)
 
 	// Export gives us observable external state.
 	var (
