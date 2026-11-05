@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
@@ -23,78 +24,12 @@ import (
 	"github.com/ava-labs/avalanchego/wallet/chain/p/builder"
 )
 
-func TestNewExportTx(t *testing.T) {
-	env := newEnvironment(t, upgradetest.Banff)
-	env.ctx.Lock.Lock()
-	defer env.ctx.Lock.Unlock()
-
-	tests := []struct {
-		description        string
-		destinationChainID ids.ID
-		timestamp          time.Time
-	}{
-		{
-			description:        "P->X export",
-			destinationChainID: env.ctx.XChainID,
-			timestamp:          genesistest.DefaultValidatorStartTime,
-		},
-		{
-			description:        "P->C export",
-			destinationChainID: env.ctx.CChainID,
-			timestamp:          env.config.UpgradeConfig.ApricotPhase5Time,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
-			require := require.New(t)
-
-			wallet := newWallet(t, env, walletConfig{})
-
-			tx, err := wallet.IssueExportTx(
-				tt.destinationChainID,
-				[]*avax.TransferableOutput{{
-					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
-					Out: &secp256k1fx.TransferOutput{
-						Amt: genesistest.DefaultInitialBalance - defaultTxFee,
-						OutputOwners: secp256k1fx.OutputOwners{
-							Threshold: 1,
-							Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-						},
-					},
-				}},
-			)
-			require.NoError(err)
-
-			stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
-			require.NoError(err)
-
-			stateDiff.SetTimestamp(tt.timestamp)
-
-			feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
-			_, _, _, err = StandardTx(
-				&env.backend,
-				feeCalculator,
-				tx,
-				stateDiff,
-			)
-			require.NoError(err)
-		})
-	}
-}
-
 var fundedSharedMemoryCalls byte
 
-func TestNewImportTx(t *testing.T) {
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
-
-	type test struct {
-		description   string
-		sourceChainID ids.ID
-		sharedMemory  atomic.SharedMemory
-		timestamp     time.Time
-		expectedErr   error
-	}
+// TestStandardExecutorImportTx verifies the successful execution of an
+// [platform.ImportTx].
+func TestStandardExecutorImportTx(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
 
 	sourceKey, err := secp256k1.NewPrivateKey()
 	require.NoError(t, err)
@@ -102,131 +37,138 @@ func TestNewImportTx(t *testing.T) {
 	customAssetID := ids.GenerateTestID()
 	// generate a constant random source generator.
 	randSrc := rand.NewSource(0)
-	tests := []test{
+
+	tests := []struct {
+		name          string
+		sourceChainID ids.ID
+		assets        map[ids.ID]uint64
+		timestamp     time.Time
+	}{
 		{
-			description:   "can't pay fee",
+			name:          "can_barely_pay_fee",
 			sourceChainID: env.ctx.XChainID,
-			sharedMemory: fundedSharedMemory(
-				t,
-				env,
-				sourceKey,
-				env.ctx.XChainID,
-				map[ids.ID]uint64{},
-				randSrc,
-			),
-			expectedErr: builder.ErrInsufficientFunds,
+			assets: map[ids.ID]uint64{
+				env.ctx.AVAXAssetID: 1,
+			},
 		},
 		{
-			description:   "can barely pay fee",
-			sourceChainID: env.ctx.XChainID,
-			sharedMemory: fundedSharedMemory(
-				t,
-				env,
-				sourceKey,
-				env.ctx.XChainID,
-				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: 1,
-				},
-				randSrc,
-			),
-			expectedErr: nil,
-		},
-		{
-			description:   "attempting to import from C-chain",
+			name:          "import_from_c_chain",
 			sourceChainID: env.ctx.CChainID,
-			sharedMemory: fundedSharedMemory(
-				t,
-				env,
-				sourceKey,
-				env.ctx.CChainID,
-				map[ids.ID]uint64{
-					env.ctx.AVAXAssetID: 1,
-				},
-				randSrc,
-			),
-			timestamp:   env.config.UpgradeConfig.ApricotPhase5Time,
-			expectedErr: nil,
+			assets: map[ids.ID]uint64{
+				env.ctx.AVAXAssetID: 1,
+			},
+			timestamp: env.config.UpgradeConfig.ApricotPhase5Time,
 		},
 		{
-			description:   "attempting to import non-avax from X-chain",
+			name:          "import_non_avax_from_x_chain",
 			sourceChainID: env.ctx.XChainID,
-			sharedMemory: fundedSharedMemory(
-				t,
-				env,
-				sourceKey,
-				env.ctx.XChainID,
-				map[ids.ID]uint64{
-					customAssetID: 1,
-				},
-				randSrc,
-			),
-			timestamp:   env.config.UpgradeConfig.ApricotPhase5Time,
-			expectedErr: nil,
+			assets: map[ids.ID]uint64{
+				customAssetID: 1,
+			},
+			timestamp: env.config.UpgradeConfig.ApricotPhase5Time,
 		},
 	}
 
-	to := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
-	}
 	for _, tt := range tests {
-		t.Run(tt.description, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env.msm.SharedMemory = tt.sharedMemory
+			env.msm.SharedMemory = fundedSharedMemory(
+				t,
+				env,
+				sourceKey,
+				tt.sourceChainID,
+				tt.assets,
+				randSrc,
+			)
 
 			wallet := newWallet(t, env, walletConfig{
 				keys:     []*secp256k1.PrivateKey{sourceKey},
 				chainIDs: []ids.ID{tt.sourceChainID},
 			})
 
-			tx, err := wallet.IssueImportTx(
+			stx, err := wallet.IssueImportTx(
 				tt.sourceChainID,
-				to,
+				newOwner(),
 			)
-			require.ErrorIs(err, tt.expectedErr)
-			if tt.expectedErr != nil {
-				return
-			}
+			require.NoError(err)
 
-			unsignedTx := tx.Unsigned.(*platform.ImportTx)
-			require.NotEmpty(unsignedTx.ImportedInputs)
-			numInputs := len(unsignedTx.Ins) + len(unsignedTx.ImportedInputs)
-			require.Equal(len(tx.Creds), numInputs, "should have the same number of credentials as inputs")
+			tx := stx.Unsigned.(*platform.ImportTx)
+			require.NotEmpty(tx.ImportedInputs)
+			numInputs := len(tx.Ins) + len(tx.ImportedInputs)
+			require.Equal(len(stx.Creds), numInputs, "should have the same number of credentials as inputs")
 
 			totalIn := uint64(0)
-			for _, in := range unsignedTx.Ins {
+			for _, in := range tx.Ins {
 				totalIn += in.Input().Amount()
 			}
-			for _, in := range unsignedTx.ImportedInputs {
+			for _, in := range tx.ImportedInputs {
 				totalIn += in.Input().Amount()
 			}
 			totalOut := uint64(0)
-			for _, out := range unsignedTx.Outs {
+			for _, out := range tx.Outs {
 				totalOut += out.Out.Amount()
 			}
-
 			require.Equal(totalIn, totalOut)
 
-			stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
 			require.NoError(err)
 
-			stateDiff.SetTimestamp(tt.timestamp)
+			diff.SetTimestamp(tt.timestamp)
 
-			feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
-			_, _, _, err = StandardTx(
+			feeCalculator := state.PickFeeCalculator(env.config, diff)
+			inputs, atomicRequests, _, err := StandardTx(
 				&env.backend,
 				feeCalculator,
-				tx,
-				stateDiff,
+				stx,
+				diff,
 			)
 			require.NoError(err)
+
+			requireBaseTxApplied(t, env, diff, feeCalculator, stx)
+
+			// assert the imported utxos are consumed from the source chain's
+			// shared memory
+			wantInputs := set.NewSet[ids.ID](len(tx.ImportedInputs))
+			for _, in := range tx.ImportedInputs {
+				wantInputs.Add(in.InputID())
+			}
+			require.Equal(wantInputs, inputs)
+			require.Len(atomicRequests[tt.sourceChainID].RemoveRequests, len(tx.ImportedInputs))
 		})
 	}
 }
 
+// TestNewImportTxInsufficientFunds verifies that the wallet can't build an
+// [platform.ImportTx] when there is nothing to import.
+func TestNewImportTxInsufficientFunds(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
+
+	sourceKey, err := secp256k1.NewPrivateKey()
+	require.NoError(t, err)
+
+	env.msm.SharedMemory = fundedSharedMemory(
+		t,
+		env,
+		sourceKey,
+		env.ctx.XChainID,
+		map[ids.ID]uint64{},
+		rand.NewSource(0),
+	)
+
+	wallet := newWallet(t, env, walletConfig{
+		keys:     []*secp256k1.PrivateKey{sourceKey},
+		chainIDs: []ids.ID{env.ctx.XChainID},
+	})
+	_, err = wallet.IssueImportTx(
+		env.ctx.XChainID,
+		newOwner(),
+	)
+	require.ErrorIs(t, err, builder.ErrInsufficientFunds)
+}
+
 // Returns a shared memory where GetDatabase returns a database
-// where [recipientKey] has a balance of [amt]
+// where recipientKey has a balance of [amt]
 func fundedSharedMemory(
 	t *testing.T,
 	env *environment,
@@ -277,4 +219,69 @@ func fundedSharedMemory(
 	}
 
 	return sm
+}
+
+// TestStandardExecutorExportTx verifies the successful execution of an
+// [platform.ExportTx].
+func TestStandardExecutorExportTx(t *testing.T) {
+	env := newEnvironment(t, upgradetest.Latest)
+
+	tests := []struct {
+		name               string
+		destinationChainID ids.ID
+		timestamp          time.Time
+	}{
+		{
+			name:               "p_to_x_export",
+			destinationChainID: env.ctx.XChainID,
+			timestamp:          genesistest.DefaultValidatorStartTime,
+		},
+		{
+			name:               "p_to_c_export",
+			destinationChainID: env.ctx.CChainID,
+			timestamp:          env.config.UpgradeConfig.ApricotPhase5Time,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			// The tx spends AVAX, so issue each tx from a fresh wallet to keep
+			// the wallet's UTXO view consistent with env.state.
+			wallet := newWallet(t, env, walletConfig{})
+			stx, err := wallet.IssueExportTx(
+				tt.destinationChainID,
+				[]*avax.TransferableOutput{{
+					Asset: avax.Asset{ID: env.ctx.AVAXAssetID},
+					Out: &secp256k1fx.TransferOutput{
+						Amt:          genesistest.DefaultInitialBalance - defaultTxFee,
+						OutputOwners: *newOwner(),
+					},
+				}},
+			)
+			require.NoError(err)
+
+			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(err)
+
+			diff.SetTimestamp(tt.timestamp)
+
+			feeCalculator := state.PickFeeCalculator(env.config, diff)
+			_, atomicRequests, _, err := StandardTx(
+				&env.backend,
+				feeCalculator,
+				stx,
+				diff,
+			)
+			require.NoError(err)
+
+			requireBaseTxApplied(t, env, diff, feeCalculator, stx)
+
+			// assert the exported outputs are put into the destination chain's
+			// shared memory
+			tx := stx.Unsigned.(*platform.ExportTx)
+			require.Len(atomicRequests[tt.destinationChainID].PutRequests, len(tx.ExportedOutputs))
+		})
+	}
 }

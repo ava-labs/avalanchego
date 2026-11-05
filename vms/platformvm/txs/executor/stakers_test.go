@@ -45,8 +45,6 @@ func TestGetMaxWeight(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			env := newEnvironment(t, upgradetest.Latest)
-			env.ctx.Lock.Lock()
-			defer env.ctx.Lock.Unlock()
 
 			staker, err := GetValidator(env.state, constants.PrimaryNetworkID, genesistest.DefaultNodeIDs[0])
 			require.NoError(t, err)

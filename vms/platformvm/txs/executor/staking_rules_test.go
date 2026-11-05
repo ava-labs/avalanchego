@@ -22,12 +22,12 @@ import (
 
 func TestGetValidatorRules(t *testing.T) {
 	type test struct {
-		name      string
-		subnetID  ids.ID
-		backend   *Backend
-		setup     func(*state.State)
-		wantRules *addValidatorRules
-		wantErr   error
+		name        string
+		subnetID    ids.ID
+		backend     *Backend
+		updateState func(*state.Diff)
+		wantRules   *addValidatorRules
+		wantErr     error
 	}
 
 	var (
@@ -106,7 +106,7 @@ func TestGetValidatorRules(t *testing.T) {
 			name:     "subnet",
 			subnetID: subnetID,
 			backend:  nil,
-			setup: func(s *state.State) {
+			updateState: func(diff *state.Diff) {
 				tx := &platform.Tx{
 					Unsigned: &platform.TransformSubnetTx{
 						AssetID:           customAssetID,
@@ -120,7 +120,7 @@ func TestGetValidatorRules(t *testing.T) {
 						Subnet:            subnetID,
 					},
 				}
-				s.AddSubnetTransformation(tx)
+				diff.AddSubnetTransformation(tx)
 			},
 			wantRules: &addValidatorRules{
 				assetID:           customAssetID,
@@ -137,12 +137,13 @@ func TestGetValidatorRules(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			s := statetest.New(t, statetest.Config{})
-			if tt.setup != nil {
-				tt.setup(s)
+			diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(err)
+			if tt.updateState != nil {
+				tt.updateState(diff)
 			}
 
-			gotRules, gotErr := getValidatorRules(tt.backend, s, tt.subnetID)
+			gotRules, gotErr := getValidatorRules(tt.backend, diff, tt.subnetID)
 			if tt.wantErr != nil {
 				require.ErrorIs(gotErr, tt.wantErr)
 				return
@@ -155,12 +156,12 @@ func TestGetValidatorRules(t *testing.T) {
 
 func TestGetDelegatorRules(t *testing.T) {
 	type test struct {
-		name      string
-		subnetID  ids.ID
-		backend   *Backend
-		setup     func(*state.State)
-		wantRules *addDelegatorRules
-		wantErr   error
+		name        string
+		subnetID    ids.ID
+		backend     *Backend
+		updateState func(*state.Diff)
+		wantRules   *addDelegatorRules
+		wantErr     error
 	}
 	var (
 		minDelegatorStake       uint64 = 1
@@ -236,7 +237,7 @@ func TestGetDelegatorRules(t *testing.T) {
 			name:     "subnet",
 			subnetID: subnetID,
 			backend:  nil,
-			setup: func(s *state.State) {
+			updateState: func(diff *state.Diff) {
 				tx := &platform.Tx{
 					Unsigned: &platform.TransformSubnetTx{
 						AssetID:                  customAssetID,
@@ -252,7 +253,7 @@ func TestGetDelegatorRules(t *testing.T) {
 						Subnet:                   subnetID,
 					},
 				}
-				s.AddSubnetTransformation(tx)
+				diff.AddSubnetTransformation(tx)
 			},
 			wantRules: &addDelegatorRules{
 				assetID:                  customAssetID,
@@ -268,12 +269,13 @@ func TestGetDelegatorRules(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			s := statetest.New(t, statetest.Config{})
-			if tt.setup != nil {
-				tt.setup(s)
+			diff, err := state.NewDiffOn(statetest.New(t, statetest.Config{}), state.StakerAdditionAfterDeletionForbidden)
+			require.NoError(err)
+			if tt.updateState != nil {
+				tt.updateState(diff)
 			}
 
-			gotRules, gotErr := getDelegatorRules(tt.backend, s, tt.subnetID)
+			gotRules, gotErr := getDelegatorRules(tt.backend, diff, tt.subnetID)
 			if tt.wantErr != nil {
 				require.ErrorIs(gotErr, tt.wantErr)
 				return
