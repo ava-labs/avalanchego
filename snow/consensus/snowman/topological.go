@@ -158,7 +158,7 @@ func (ts *Topological) Add(blk Block) error {
 	}
 
 	ts.metrics.Verified(height)
-	ts.metrics.Issued(blkID, ts.pollNumber)
+	ts.metrics.Issued(blkID, height, ts.pollNumber)
 
 	parentNode, ok := ts.blocks[parentID]
 	if !ok {
@@ -324,21 +324,25 @@ func (ts *Topological) HealthCheck(context.Context) (interface{}, error) {
 		errs = append(errs, err)
 	}
 
-	maxTimeProcessing := ts.metrics.MeasureAndGetOldestDuration()
+	oldestBlkID, oldestBlkHeight, maxTimeProcessing := ts.metrics.MeasureAndGetOldestProcessing()
 	if maxTimeProcessing > ts.params.MaxItemProcessingTime {
-		err := fmt.Errorf("%w: %s > %s",
+		err := fmt.Errorf("%w: %s > %s for block %s (height=%d)",
 			errBlockProcessingTooLong,
 			maxTimeProcessing,
 			ts.params.MaxItemProcessingTime,
+			oldestBlkID,
+			oldestBlkHeight,
 		)
 		errs = append(errs, err)
 	}
 
 	return map[string]interface{}{
-		"processingBlocks":       numProcessingBlks,
-		"longestProcessingBlock": maxTimeProcessing.String(), // .String() is needed here to ensure a human readable format
-		"lastAcceptedID":         ts.lastAcceptedID,
-		"lastAcceptedHeight":     ts.lastAcceptedHeight,
+		"processingBlocks":             numProcessingBlks,
+		"longestProcessingBlock":       maxTimeProcessing.String(), // .String() is needed here to ensure a human readable format
+		"longestProcessingBlockID":     oldestBlkID,
+		"longestProcessingBlockHeight": oldestBlkHeight,
+		"lastAcceptedID":               ts.lastAcceptedID,
+		"lastAcceptedHeight":           ts.lastAcceptedHeight,
 	}, errors.Join(errs...)
 }
 

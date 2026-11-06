@@ -88,6 +88,8 @@ curl  -H 'Content-Type: application/json' --data '{
                             "lastAcceptedHeight": 31273749,
                             "lastAcceptedID": "2Y4gZGzQnu8UjnHod8j1BLewHFVEbzhULPNzqrSWEHkHNqDrYL",
                             "longestProcessingBlock": "0s",
+                            "longestProcessingBlockHeight": 0,
+                            "longestProcessingBlockID": "11111111111111111111111111111111LpoYY",
                             "processingBlocks": 0
                         },
                         "vm": null
@@ -106,6 +108,8 @@ curl  -H 'Content-Type: application/json' --data '{
                             "lastAcceptedHeight": 142517,
                             "lastAcceptedID": "2e1FEPCBEkG2Q7WgyZh1v4nt3DXj1HDbDthyhxdq2Ltg3shSYq",
                             "longestProcessingBlock": "0s",
+                            "longestProcessingBlockHeight": 0,
+                            "longestProcessingBlockID": "11111111111111111111111111111111LpoYY",
                             "processingBlocks": 0
                         },
                         "vm": null
@@ -124,6 +128,8 @@ curl  -H 'Content-Type: application/json' --data '{
                             "lastAcceptedHeight": 24464,
                             "lastAcceptedID": "XuFCsGaSw9cn7Vuz5e2fip4KvP46Xu53S8uDRxaC2QJmyYc3w",
                             "longestProcessingBlock": "0s",
+                            "longestProcessingBlockHeight": 0,
+                            "longestProcessingBlockID": "11111111111111111111111111111111LpoYY",
                             "processingBlocks": 0
                         },
                         "vm": null
