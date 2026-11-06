@@ -1,7 +1,6 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//.bazel:defs.bzl", "go_test")
 
-# gazelle:exclude accept_block_test.go
 # gazelle:exclude worstcase_test.go
 
 go_library(
@@ -74,6 +73,7 @@ go_library(
 go_test(
     name = "sae_test",
     srcs = [
+        "accept_block_test.go",
         "always_test.go",
         "health_test.go",
         "http_test.go",
@@ -160,7 +160,6 @@ go_test(
 go_test(
     name = "flaky_tests",
     srcs = [
-        "accept_block_test.go",
         "always_test.go",
         "networked_test.go",
         "recovery_test.go",
@@ -173,7 +172,7 @@ go_test(
         "vm_test.go",
         "worstcase_test.go",
     ],
-    args = ["-test.run=TestAcceptBlock|TestSubscriptions|TestWorstCase"],
+    args = ["-test.run=TestSubscriptions|TestWorstCase"],
     embed = [":sae"],
     env = {"EVM_TEST_FLAKY": "1"},
     flaky = True,
