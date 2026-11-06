@@ -1859,6 +1859,11 @@ func (n *Node) shutdown() {
 		}
 
 		time.Sleep(n.Config.ShutdownWait)
+
+		// Stop health checks before shutting down their components.
+		// The API serves the last health results until it stops including a
+		// failing shuttingDown check.
+		n.health.Stop()
 	}
 
 	if n.StakingSigner != nil {

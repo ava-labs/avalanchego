@@ -82,15 +82,20 @@ go_test(
     name = "node_test",
     srcs = [
         "beacon_manager_test.go",
+        "node_test.go",
         "overridden_manager_test.go",
     ],
     embed = [":node"],
     deps = [
+        "//config",
         "//ids",
         "//message",
         "//snow/validators",
         "//utils/constants",
+        "//utils/logging",
         "//version",
+        "//vms/saevm/cchain/libevm",
         "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
     ],
 )
