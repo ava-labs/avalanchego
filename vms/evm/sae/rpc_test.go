@@ -880,6 +880,36 @@ func TestGetLogs(t *testing.T) {
 // TestGetLogsRange checks how the requested block range is resolved and
 // bounded by [saerpc.Config.MaxBlocksPerRequest], including while the
 // last-accepted block is still executing.
+func TestOverrideHeaderBloomBeforeExecution(t *testing.T) {
+	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
+	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
+	ctx, sut := newSUT(t, 1, precompileOpt)
+	defer unblock()
+
+	b := sut.runConsensusLoop(t,
+		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+			To:       &blockingPrecompile,
+			Gas:      params.TxGas,
+			GasPrice: big.NewInt(1),
+		}),
+		sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+			Gas:      1e6,
+			GasPrice: big.NewInt(1),
+			Data:     saetest.LogTopOfStackAfter(saetest.Ops(vm.PUSH0)), // contract creation, so this runs and emits a log
+		}),
+	)
+
+	overrider := sut.rawVM.GethRPCBackends()
+	require.Emptyf(t, overrider.OverrideHeaderBloom(b.Header()), "%T.OverrideHeaderBloom() before execution", overrider)
+
+	unblock()
+	require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+
+	got := overrider.OverrideHeaderBloom(b.Header())
+	require.NotEmptyf(t, got, "%T.OverrideHeaderBloom() after execution", overrider)
+	require.Equalf(t, types.CreateBloom(b.Receipts()), got, "%T.OverrideHeaderBloom() after execution", overrider)
+}
+
 func TestGetLogsRange(t *testing.T) {
 	const maxBlocksPerRequest = 2
 
