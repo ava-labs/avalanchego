@@ -48,7 +48,6 @@ type StateDB interface {
 type Environment interface {
 	vm.PrecompileEnvironment
 	Caller() common.Address
-	Self() common.Address
 	SnowContext() *snow.Context
 	ExtraRules() precompileconfig.Rules
 	WarpMessageResults(txHash common.Hash) set.Bits

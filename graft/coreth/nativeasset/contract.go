@@ -81,8 +81,8 @@ func (*NativeAssetBalance) Run(env contract.Environment, input []byte) ([]byte, 
 		return nil, vm.ErrExecutionReverted
 	}
 
-	sbd := env.ReadOnlyState().(contract.StateDB)
-	res := sbd.GetAssetBalance(address, assetID).Bytes32()
+	stateDB := env.ReadOnlyState().(contract.StateDB)
+	res := stateDB.GetAssetBalance(address, assetID).Bytes32()
 	return res[:], nil
 }
 

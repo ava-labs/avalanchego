@@ -55,14 +55,14 @@ type PrecompileTest struct {
 	Rules cparams.Rules
 }
 
-func (test PrecompileTest) Run(t *testing.T, address common.Address, precompile contract.StatefulPrecompiledContract) {
+func (test PrecompileTest) Run(t *testing.T, precompile contract.StatefulPrecompiledContract) {
 	input := test.Input
 	if test.InputFn != nil {
 		input = test.InputFn(t)
 	}
 
 	state := newTestStateDB(t, test.WarpMessages)
-	env := test.setup(t, address, state)
+	env := test.setup(t, state)
 
 	if input != nil {
 		ret, err := precompile.Run(env, input)
@@ -76,7 +76,7 @@ func (test PrecompileTest) Run(t *testing.T, address common.Address, precompile 
 	}
 }
 
-func (test PrecompileTest) Bench(b *testing.B, address common.Address, precompile contract.StatefulPrecompiledContract) {
+func (test PrecompileTest) Bench(b *testing.B, precompile contract.StatefulPrecompiledContract) {
 	input := test.Input
 	if test.InputFn != nil {
 		input = test.InputFn(b)
@@ -86,7 +86,7 @@ func (test PrecompileTest) Bench(b *testing.B, address common.Address, precompil
 	}
 
 	state := newTestStateDB(b, test.WarpMessages)
-	env := test.setup(b, address, state)
+	env := test.setup(b, state)
 
 	ret, err := precompile.Run(env, input)
 	require.ErrorIs(b, err, test.ExpectedErr)
@@ -137,7 +137,7 @@ func (test PrecompileTest) Bench(b *testing.B, address common.Address, precompil
 	}
 }
 
-func (test PrecompileTest) setup(t testing.TB, address common.Address, state *testStateDB) *testEnv {
+func (test PrecompileTest) setup(t testing.TB, state *testStateDB) *testEnv {
 	t.Helper()
 
 	return &testEnv{
@@ -145,29 +145,28 @@ func (test PrecompileTest) setup(t testing.TB, address common.Address, state *te
 		readOnly:     test.ReadOnly,
 		state:        state,
 		caller:       test.Caller,
-		self:         address,
 		snowContext:  snowtest.Context(t, snowtest.CChainID),
 		rules:        test.Rules,
 		warpFailures: set.NewBits(test.WarpMessageFailures...),
 	}
 }
 
-func RunPrecompileTests(t *testing.T, address common.Address, precompile contract.StatefulPrecompiledContract, tests []PrecompileTest) {
+func RunPrecompileTests(t *testing.T, precompile contract.StatefulPrecompiledContract, tests []PrecompileTest) {
 	t.Helper()
 
 	for _, test := range tests {
 		t.Run(test.Name, func(t *testing.T) {
-			test.Run(t, address, precompile)
+			test.Run(t, precompile)
 		})
 	}
 }
 
-func RunPrecompileBenchmarks(b *testing.B, address common.Address, precompile contract.StatefulPrecompiledContract, tests []PrecompileTest) {
+func RunPrecompileBenchmarks(b *testing.B, precompile contract.StatefulPrecompiledContract, tests []PrecompileTest) {
 	b.Helper()
 
 	for _, test := range tests {
 		b.Run(test.Name, func(b *testing.B) {
-			test.Bench(b, address, precompile)
+			test.Bench(b, precompile)
 		})
 	}
 }
@@ -181,7 +180,7 @@ type testEnv struct {
 	gas          uint64
 	readOnly     bool
 	state        *testStateDB
-	caller, self common.Address
+	caller       common.Address
 	snowContext  *snow.Context
 	rules        cparams.Rules
 	warpFailures set.Bits
@@ -204,7 +203,6 @@ func (e *testEnv) StateDB() vm.StateDB                { return e.state }
 func (e *testEnv) ReadOnlyState() libevm.StateReader  { return e.state }
 func (*testEnv) BlockNumber() *big.Int                { return new(big.Int) }
 func (e *testEnv) Caller() common.Address             { return e.caller }
-func (e *testEnv) Self() common.Address               { return e.self }
 func (e *testEnv) SnowContext() *snow.Context         { return e.snowContext }
 func (e *testEnv) ExtraRules() precompileconfig.Rules { return e.rules }
 

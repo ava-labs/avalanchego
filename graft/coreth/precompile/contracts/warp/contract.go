@@ -196,8 +196,6 @@ func PackGetVerifiedWarpMessageOutput(outputStruct GetVerifiedWarpMessageOutput)
 
 // getVerifiedWarpMessage retrieves the pre-verified warp message from the predicate storage slots and returns
 // the expected ABI encoding of the message to the caller.
-//
-
 func getVerifiedWarpMessage(env contract.Environment, input []byte) ([]byte, error) {
 	return handleWarpMessage(env, input, addressedPayloadHandler{})
 }
@@ -227,8 +225,6 @@ func PackSendWarpMessageOutput(messageID common.Hash) ([]byte, error) {
 
 // sendWarpMessage constructs an Avalanche Warp Message containing an AddressedPayload and emits a log to signal validators that they should
 // be willing to sign this message.
-//
-
 func sendWarpMessage(env contract.Environment, input []byte) ([]byte, error) {
 	warpGasConfig := CurrentGasConfig(env.ExtraRules())
 	if err := contract.DeductGas(env, warpGasConfig.SendWarpMessageBase); err != nil {
