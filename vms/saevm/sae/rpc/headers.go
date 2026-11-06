@@ -133,6 +133,11 @@ func (w *headerWriter) Write(b []byte) (int, error) {
 // parseErrorCodes returns the number of times each JSON-RPC error code occurs
 // in body, which holds either a single response or a batch. Malformed input is
 // ignored.
+//
+// TODO(SayanKar): a response has either an error or a result, and the libevm
+// RPC server encodes the error first, so decoding a single response could stop
+// at whichever comes first instead of scanning a potentially large result, if
+// decoding large responses significantly increases latency.
 func parseErrorCodes(body []byte) map[int]int {
 	type response struct {
 		Error *struct {
