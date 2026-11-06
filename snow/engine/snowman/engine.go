@@ -264,6 +264,7 @@ func (e *Engine) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, b
 			)
 			// We assume that [blk] is useless because it doesn't match what we
 			// expected.
+			e.metrics.numUselessPutBytes.Add(float64(len(blkBytes)))
 			return e.GetFailed(ctx, nodeID, requestID)
 		}
 
