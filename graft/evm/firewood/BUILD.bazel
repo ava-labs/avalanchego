@@ -16,8 +16,8 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/evm/firewood",
     visibility = ["//visibility:public"],
     deps = [
-        "//vms/saevm/firewood",
-        "//vms/saevm/saedb",
+        "//vms/evm/firewood",
+        "//vms/evm/saedb",
         "@com_github_ava_labs_firewood_go_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",

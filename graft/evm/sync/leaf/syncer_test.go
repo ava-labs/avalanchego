@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/vms/saevm/statesync/hashdb"
+	"github.com/ava-labs/avalanchego/vms/evm/statesync/hashdb"
 )
 
 var (
