@@ -265,9 +265,7 @@ func (s *SUT) Balance(tb testing.TB, addr common.Address) uint256.Int {
 func (s *SUT) WaitForPendingTxs(ctx context.Context, tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
 
-	if len(txs) > 0 {
-		txgossiptest.WaitUntilPending(tb, ctx, s.vm.GethRPCBackends(), txs...)
-	}
+	txgossiptest.WaitUntilPending(tb, ctx, s.vm.GethRPCBackends(), txs...)
 	if s.beforeWaitForEvent != nil {
 		s.beforeWaitForEvent()
 	}
