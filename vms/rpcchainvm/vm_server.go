@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -182,15 +183,7 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 	}
 	vm.connCloser.Add(dbClientConn)
 
-	// TODO: Allow the logger to be configured by the client
-	vm.log = logging.NewLogger(
-		fmt.Sprintf("<%s Chain>", chainID),
-		logging.NewWrappedCore(
-			logging.Info,
-			originalStderr,
-			logging.Colors.ConsoleEncoder(),
-		),
-	)
+	vm.log = newLogger(chainID, req, originalStderr)
 
 	vm.db = corruptabledb.New(
 		rpcdb.NewClient(rpcdbpb.NewDatabaseClient(dbClientConn)),
@@ -280,6 +273,18 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		Bytes:                blk.Bytes(),
 		Timestamp:            grpcutils.TimestampFromTime(blk.Timestamp()),
 	}, nil
+}
+
+func newLogger(chainID ids.ID, req *vmpb.InitializeRequest, w io.WriteCloser) logging.Logger {
+	format := logFormatFromProto(req.LogFormat)
+	return logging.NewLogger(
+		fmt.Sprintf("<%s Chain>", chainID),
+		logging.NewWrappedCore(
+			logLevelFromProto(req.LogLevel),
+			w,
+			format.ConsoleEncoder(),
+		),
+	)
 }
 
 func (vm *VMServer) SetState(ctx context.Context, stateReq *vmpb.SetStateRequest) (*vmpb.SetStateResponse, error) {
