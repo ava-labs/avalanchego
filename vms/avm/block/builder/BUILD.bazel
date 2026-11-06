@@ -37,6 +37,7 @@ go_test(
         "//utils/constants",
         "//utils/crypto/secp256k1",
         "//utils/logging",
+        "//utils/set",
         "//utils/timer/mockable",
         "//vms/avm/block",
         "//vms/avm/block/executor",
