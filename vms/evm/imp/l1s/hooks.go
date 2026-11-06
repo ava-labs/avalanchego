@@ -37,9 +37,9 @@ import (
 // C-Chain's minimum target (see `dynamic.MinTarget` in the cchain package).
 const minTargetPerSecond gas.Gas = 1_000_000
 
-var _ hook.PointsG[hook.Transaction] = (*hooks)(nil)
+var _ hookadaptor.Points = (*hooks)(nil)
 
-// hooks are the L1-specific [hook.PointsG].
+// hooks are the L1-specific [hookadaptor.Points].
 type hooks struct {
 	builder
 }
@@ -53,7 +53,7 @@ func newHooks(ctx *snow.Context, now func() time.Time) *hooks {
 	}
 }
 
-func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[hook.Transaction], error) {
+func (h *hooks) BlockRebuilderFrom(b *types.Block) (hookadaptor.BlockBuilder, error) {
 	now := blockTime(b.Header())
 	return &builder{
 		ctx: h.ctx,
@@ -115,12 +115,6 @@ func (*hooks) VerifyBlockSyntax(*types.Block) error {
 	return nil
 }
 
-// EndOfBlockOps returns no operations, as L1s have no transactions outside of
-// the EVM.
-func (*hooks) EndOfBlockOps(*types.Block) ([]hook.Op, error) {
-	return nil, nil
-}
-
 func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
 	// TODO: Enforce the transaction allowlist precompile.
 	return nil
@@ -140,7 +134,7 @@ func (*hooks) AfterExecutingBlock(*types.Block, types.Receipts) error {
 	return nil
 }
 
-var _ hook.BlockBuilder[hook.Transaction] = (*builder)(nil)
+var _ hookadaptor.BlockBuilder = (*builder)(nil)
 
 type builder struct {
 	ctx *snow.Context
@@ -179,12 +173,6 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	), nil
 }
 
-// PotentialEndOfBlockOps returns no transactions, as L1s have no transactions
-// outside of the EVM.
-func (*builder) PotentialEndOfBlockOps(context.Context, *types.Header, common.Hash, saetypes.BlockSource) iter.Seq[hook.Transaction] {
-	return func(func(hook.Transaction) bool) {}
-}
-
 var errEmptyBlock = errors.New("empty block")
 
 func (*builder) BuildBlock(
@@ -192,7 +180,6 @@ func (*builder) BuildBlock(
 	_ *block.Context,
 	txs []*types.Transaction,
 	receipts []*types.Receipt,
-	_ []hook.Transaction,
 	settled hook.Settled,
 ) (*types.Block, error) {
 	if len(txs) == 0 {
