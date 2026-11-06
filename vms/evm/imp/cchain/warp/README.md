@@ -1,6 +1,6 @@
 # Warp (C-Chain)
 
-This package handles the parsing, verification, and storage of [Avalanche Warp Messages](../../../../platformvm/warp/README.md) for the C-Chain, which implements [Continuous Execution (originally Streaming Asynchronous Execution, SAE)](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution).
+This package handles the parsing, verification, and storage of [Avalanche Warp Messages](../../../../platformvm/warp/README.md) for the C-Chain, which implements [Continuous Execution](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution).
 
 A warp message is a payload attested by the validator set of a source chain: each validator signs the message with the BLS key it registered on the P-Chain, and the individual signatures are aggregated into a single multi-signature. Because every validator's BLS public key and stake weight are readable from the P-Chain, any chain can verify that a stake-weight quorum of the source chain endorsed a message — without additional trust assumptions or messaging infrastructure. (Newer documentation also calls this Avalanche Interchain Messaging, ICM.)
 
