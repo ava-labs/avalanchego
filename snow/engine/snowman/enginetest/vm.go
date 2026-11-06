@@ -46,11 +46,11 @@ func NewVM(t *testing.T, chain []*snowmantest.Block) *VM {
 		acceptedByHeight: make(map[uint64]*snowmantest.Block, len(chain)+1),
 	}
 	vm.byBytes[string(snowmantest.Genesis.Bytes())] = snowmantest.Genesis
-	vm.markAccepted(snowmantest.Genesis)
+	vm.recordAccepted(snowmantest.Genesis)
 	for _, blk := range chain {
 		vm.byBytes[string(blk.Bytes())] = blk
 		if blk.Status == snowtest.Accepted {
-			vm.markAccepted(blk)
+			vm.recordAccepted(blk)
 		}
 	}
 
@@ -109,7 +109,18 @@ func (vm *VM) wrap(blk *snowmantest.Block) snowman.Block {
 	return &block{Block: blk, vm: vm}
 }
 
-func (vm *VM) markAccepted(blk *snowmantest.Block) {
+// markAccepted accepts blk, which must directly follow the last accepted block.
+func (vm *VM) markAccepted(blk *snowmantest.Block) error {
+	if vm.lastAccepted != nil && blk.Height() != vm.lastAccepted.Height()+1 {
+		return errors.New("accepted blocks must be contiguous")
+	}
+	vm.recordAccepted(blk)
+	return nil
+}
+
+// recordAccepted records blk as accepted without checking its height. It lets
+// a test seed a VM whose accepted blocks have gaps.
+func (vm *VM) recordAccepted(blk *snowmantest.Block) {
 	delete(vm.verified, blk.ID())
 	vm.accepted[blk.ID()] = blk
 	vm.acceptedByHeight[blk.Height()] = blk
@@ -147,8 +158,7 @@ func (b *block) Accept(ctx context.Context) error {
 	if err := b.Block.Accept(ctx); err != nil {
 		return err
 	}
-	b.vm.markAccepted(b.Block)
-	return nil
+	return b.vm.markAccepted(b.Block)
 }
 
 func (b *block) Reject(ctx context.Context) error {
