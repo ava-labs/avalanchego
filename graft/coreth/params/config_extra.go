@@ -4,7 +4,7 @@
 package params
 
 import (
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )

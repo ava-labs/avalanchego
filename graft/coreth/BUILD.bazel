@@ -10,7 +10,7 @@ package(default_visibility = [
 package_group(
     name = "external_consumers",
     packages = [
-        "//vms/saevm/cchain/...",
-        "//vms/saevm/imp/emulate",
+        "//vms/evm/imp/cchain/...",
+        "//vms/evm/imp/emulate",
     ],
 )
