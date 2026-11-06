@@ -201,10 +201,6 @@ func (e *environment) Caller() common.Address {
 	return e.Addresses().EVMSemantic.Caller
 }
 
-func (e *environment) Self() common.Address {
-	return e.Addresses().EVMSemantic.Self
-}
-
 func (e *environment) ExtraRules() precompileconfig.Rules {
 	return e.rules
 }

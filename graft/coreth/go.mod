@@ -84,7 +84,6 @@ require (
 	go.opentelemetry.io/otel/sdk v1.45.0 // indirect
 	go.opentelemetry.io/otel/trace v1.45.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.11.0 // indirect
-	go.uber.org/mock v0.5.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
@@ -112,7 +111,6 @@ require (
 tool (
 	github.com/ava-labs/libevm/rlp/rlpgen
 	github.com/fjl/gencodec
-	go.uber.org/mock/mockgen
 )
 
 replace (
