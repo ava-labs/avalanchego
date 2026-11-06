@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/message"
-	"github.com/ava-labs/avalanchego/vms/saevm/statesync/hashdb"
+	"github.com/ava-labs/avalanchego/vms/evm/statesync/hashdb"
 )
 
 type stubLeafClient struct {

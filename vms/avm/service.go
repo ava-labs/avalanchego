@@ -7,24 +7,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -203,41 +197,6 @@ func (s *Service) IssueTx(_ *http.Request, args *api.FormattedTx, reply *api.JSO
 
 	reply.TxID, err = s.vm.issueTxFromRPC(tx)
 	return err
-}
-
-// GetTxStatusReply defines the GetTxStatus replies returned from the API
-type GetTxStatusReply struct {
-	Status choices.Status `json:"status"`
-}
-
-// GetTxStatus returns the status of the specified transaction
-//
-// Deprecated: GetTxStatus only returns Accepted or Unknown, GetTx should be
-// used instead to determine if the tx was accepted.
-func (s *Service) GetTxStatus(_ *http.Request, args *api.JSONTxID, reply *GetTxStatusReply) error {
-	s.vm.ctx.Log.Debug("deprecated API called",
-		zap.String("service", "avm"),
-		zap.String("method", "getTxStatus"),
-		zap.Stringer("txID", args.TxID),
-	)
-
-	if args.TxID == ids.Empty {
-		return errNilTxID
-	}
-
-	s.vm.ctx.Lock.Lock()
-	defer s.vm.ctx.Lock.Unlock()
-
-	_, err := s.vm.state.GetTx(args.TxID)
-	switch err {
-	case nil:
-		reply.Status = choices.Accepted
-	case database.ErrNotFound:
-		reply.Status = choices.Unknown
-	default:
-		return err
-	}
-	return nil
 }
 
 // GetTx returns the specified transaction
@@ -428,160 +387,6 @@ func (s *Service) GetAssetDescription(_ *http.Request, args *GetAssetDescription
 	reply.Name = createAssetTx.Name
 	reply.Symbol = createAssetTx.Symbol
 	reply.Denomination = avajson.Uint8(createAssetTx.Denomination)
-
-	return nil
-}
-
-// GetBalanceArgs are arguments for passing into GetBalance requests
-type GetBalanceArgs struct {
-	Address        string `json:"address"`
-	AssetID        string `json:"assetID"`
-	IncludePartial bool   `json:"includePartial"`
-}
-
-// GetBalanceReply defines the GetBalance replies returned from the API
-type GetBalanceReply struct {
-	Balance avajson.Uint64 `json:"balance"`
-	UTXOIDs []avax.UTXOID  `json:"utxoIDs"`
-}
-
-// GetBalance returns the balance of an asset held by an address.
-// If ![args.IncludePartial], returns only the balance held solely
-// (1 out of 1 multisig) by the address and with a locktime in the past.
-// Otherwise, returned balance includes assets held only partially by the
-// address, and includes balances with locktime in the future.
-func (s *Service) GetBalance(_ *http.Request, args *GetBalanceArgs, reply *GetBalanceReply) error {
-	s.vm.ctx.Log.Debug("deprecated API called",
-		zap.String("service", "avm"),
-		zap.String("method", "getBalance"),
-		logging.UserString("address", args.Address),
-		logging.UserString("assetID", args.AssetID),
-	)
-
-	addr, err := avax.ParseServiceAddress(s.vm, args.Address)
-	if err != nil {
-		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
-	}
-
-	assetID, err := s.vm.lookupAssetID(args.AssetID)
-	if err != nil {
-		return err
-	}
-
-	addrSet := set.Of(addr)
-
-	s.vm.ctx.Lock.Lock()
-	defer s.vm.ctx.Lock.Unlock()
-
-	utxos, err := avax.GetAllUTXOs(s.vm.state, addrSet)
-	if err != nil {
-		return fmt.Errorf("problem retrieving UTXOs: %w", err)
-	}
-
-	now := s.vm.clock.Unix()
-	reply.UTXOIDs = make([]avax.UTXOID, 0, len(utxos))
-	for _, utxo := range utxos {
-		if utxo.AssetID() != assetID {
-			continue
-		}
-		// TODO make this not specific to *secp256k1fx.TransferOutput
-		transferable, ok := utxo.Out.(*secp256k1fx.TransferOutput)
-		if !ok {
-			continue
-		}
-		owners := transferable.OutputOwners
-		if !args.IncludePartial && (len(owners.Addrs) != 1 || owners.Locktime > now) {
-			continue
-		}
-		amt, err := safemath.Add(transferable.Amount(), uint64(reply.Balance))
-		if err != nil {
-			return err
-		}
-		reply.Balance = avajson.Uint64(amt)
-		reply.UTXOIDs = append(reply.UTXOIDs, utxo.UTXOID)
-	}
-
-	return nil
-}
-
-type Balance struct {
-	AssetID string         `json:"asset"`
-	Balance avajson.Uint64 `json:"balance"`
-}
-
-type GetAllBalancesArgs struct {
-	api.JSONAddress
-	IncludePartial bool `json:"includePartial"`
-}
-
-// GetAllBalancesReply is the response from a call to GetAllBalances
-type GetAllBalancesReply struct {
-	Balances []Balance `json:"balances"`
-}
-
-// GetAllBalances returns a map where:
-//
-// Key: ID of an asset such that [args.Address] has a non-zero balance of the asset
-// Value: The balance of the asset held by the address
-//
-// If ![args.IncludePartial], returns only unlocked balance/UTXOs with a 1-out-of-1 multisig.
-// Otherwise, returned balance/UTXOs includes assets held only partially by the
-// address, and includes balances with locktime in the future.
-func (s *Service) GetAllBalances(_ *http.Request, args *GetAllBalancesArgs, reply *GetAllBalancesReply) error {
-	s.vm.ctx.Log.Debug("deprecated API called",
-		zap.String("service", "avm"),
-		zap.String("method", "getAllBalances"),
-		logging.UserString("address", args.Address),
-	)
-
-	address, err := avax.ParseServiceAddress(s.vm, args.Address)
-	if err != nil {
-		return fmt.Errorf("problem parsing address '%s': %w", args.Address, err)
-	}
-	addrSet := set.Of(address)
-
-	s.vm.ctx.Lock.Lock()
-	defer s.vm.ctx.Lock.Unlock()
-
-	utxos, err := avax.GetAllUTXOs(s.vm.state, addrSet)
-	if err != nil {
-		return fmt.Errorf("couldn't get address's UTXOs: %w", err)
-	}
-
-	now := s.vm.clock.Unix()
-	assetIDs := set.Set[ids.ID]{}       // IDs of assets the address has a non-zero balance of
-	balances := make(map[ids.ID]uint64) // key: ID (as bytes). value: balance of that asset
-	for _, utxo := range utxos {
-		// TODO make this not specific to *secp256k1fx.TransferOutput
-		transferable, ok := utxo.Out.(*secp256k1fx.TransferOutput)
-		if !ok {
-			continue
-		}
-		owners := transferable.OutputOwners
-		if !args.IncludePartial && (len(owners.Addrs) != 1 || owners.Locktime > now) {
-			continue
-		}
-		assetID := utxo.AssetID()
-		assetIDs.Add(assetID)
-		balance := balances[assetID] // 0 if key doesn't exist
-		balance, err := safemath.Add(transferable.Amount(), balance)
-		if err != nil {
-			balances[assetID] = math.MaxUint64
-		} else {
-			balances[assetID] = balance
-		}
-	}
-
-	reply.Balances = make([]Balance, assetIDs.Len())
-	i := 0
-	for assetID := range assetIDs {
-		alias := s.vm.PrimaryAliasOrDefault(assetID)
-		reply.Balances[i] = Balance{
-			AssetID: alias,
-			Balance: avajson.Uint64(balances[assetID]),
-		}
-		i++
-	}
 
 	return nil
 }

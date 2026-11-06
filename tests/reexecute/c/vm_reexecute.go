@@ -34,7 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
 )
 
 var (
@@ -136,7 +136,7 @@ func init() {
 func main() {
 	tc := tests.NewTestContext(tests.NewDefaultLogger("c-chain-reexecution"))
 	// SIGINT and SIGTERM cancel the context so the VM shuts down cleanly;
-	// otherwise saevm rebuilds its snapshot from scratch on the next start.
+	// otherwise the C-Chain rebuilds its snapshot from scratch on the next start.
 	tc.SetDefaultContextParent(tests.DefaultNotifyContext(0, tc.DeferCleanup))
 	defer tc.RecoverAndExit()
 
