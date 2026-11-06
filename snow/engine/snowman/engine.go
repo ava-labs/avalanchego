@@ -236,10 +236,12 @@ func (e *Engine) Put(ctx context.Context, nodeID ids.NodeID, requestID uint32, b
 		// because GetFailed doesn't utilize the assumption that we actually
 		// sent a Get message, we can safely call GetFailed here to potentially
 		// abandon the request.
+		e.metrics.numUselessPutBytes.Add(float64(len(blkBytes)))
 		return e.GetFailed(ctx, nodeID, requestID)
 	}
 
 	if e.isBlockTooFarAhead(blk, nodeID, requestID) {
+		e.metrics.numUselessPutBytes.Add(float64(len(blkBytes)))
 		return e.GetFailed(ctx, nodeID, requestID)
 	}
 
@@ -295,18 +297,18 @@ func (e *Engine) isBlockTooFarAhead(blk snowman.Block, nodeID ids.NodeID, reques
 	_, lastAcceptedHeight := e.Consensus.LastAccepted()
 	maxAllowedBlockIngestionHeight, err := math.Add(lastAcceptedHeight, maxAllowedBlockAcceptedHeightDistanceIngestion)
 	if err != nil {
-		e.Ctx.Log.Debug("Overflow when calculating max allowed block ingestion height",
+		e.Ctx.Log.Debug("overflow calculating max allowed block ingestion height",
 			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight), zap.Error(err))
 		return false
 	}
 
-	if blk.Height() > maxAllowedBlockIngestionHeight {
+	if h := blk.Height(); h > maxAllowedBlockIngestionHeight {
 		e.Ctx.Log.Debug("skipping block ingestion",
 			zap.String("reason", "block height too far ahead of last accepted height"),
 			zap.Stringer("nodeID", nodeID),
 			zap.Uint32("requestID", requestID),
 			zap.Stringer("blkID", blk.ID()),
-			zap.Uint64("blkHeight", blk.Height()),
+			zap.Uint64("blkHeight", h),
 			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
 			zap.Uint64("maxAllowedBlockIngestionHeight", maxAllowedBlockIngestionHeight),
 		)
@@ -375,11 +377,13 @@ func (e *Engine) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uin
 				zap.Error(err),
 			)
 		}
+		e.metrics.numUselessPushQueryBytes.Add(float64(len(blkBytes)))
 		return nil
 	}
 
 	if e.isBlockTooFarAhead(blk, nodeID, requestID) {
-		return e.executeDeferredWork(ctx)
+		e.metrics.numUselessPushQueryBytes.Add(float64(len(blkBytes)))
+		return nil
 	}
 
 	if !e.shouldIssueBlock(blk) {
