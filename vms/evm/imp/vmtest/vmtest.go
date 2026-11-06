@@ -53,6 +53,9 @@ type Config struct {
 	HTTPPrefix       string
 	SkipRPCTransport bool
 	// BeforeWaitForEvent, if non-nil, is called before each [VM.WaitForEvent].
+	//
+	// TODO(JonathanOppenheimer): Remove this hook once ACP-226 handling is
+	// unified across the imp VMs.
 	BeforeWaitForEvent func()
 }
 
