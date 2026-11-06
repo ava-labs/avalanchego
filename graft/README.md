@@ -51,7 +51,7 @@ creation of an initial branch from master is assumed before the first
 step, and the commit of all changes and creation of a new branch from
 the current branch before beginning a subsequent step.
 
- - [ ] Add tasks for subtree merge and import rewrite to graft/Taskfile.yml (as per the example of existing tasks)
+ - [ ] Add tasks for subtree merge and import rewrite (see graft/scripts/)
    - These tasks are intended to simplify the repeated invocation that
      will be required when a repo is being developed in parallel with
      migration.

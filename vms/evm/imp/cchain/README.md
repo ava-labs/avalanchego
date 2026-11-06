@@ -1,13 +1,13 @@
 # C-Chain VM (`cchain`)
 
-`cchain` is the C-Chain VM. It is a thin chain-specific harness around [saevm](../../), the generic EVM framework that implements [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution). `saevm` does the heavy lifting of block execution, settlement, gas accounting, and EVM gossip. `cchain` adds what makes the chain *the C-Chain*, transactions for moving assets between Primary Network chains, Warp messaging, and validator-voted chain parameters.
+`cchain` is the C-Chain VM. It is a thin chain-specific harness around the [generic EVM framework](../../) that implements [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution). The EVM framework does the heavy lifting of block execution, settlement, gas accounting, and EVM gossip. `cchain` adds what makes the chain *the C-Chain*, transactions for moving assets between Primary Network chains, Warp messaging, and validator-voted chain parameters.
 
 ## Architecture
 
 The C-Chain is composed of three major components:
 
 1. **AvalancheGo** — [networking](../../../../network), [consensus](../../../../snow), validator-set management, and the external API surface.
-2. **SAE** — the generic EVM implementation.
+2. **EVM** — the generic EVM implementation ([`vms/evm`](../../)).
 3. **C-Chain** (this package) — the wrapper that adds C-Chain-specific behavior.
 
 ```mermaid
@@ -18,7 +18,7 @@ flowchart TB
         apiserver["API Server"]
     end
 
-    subgraph sae["SAE"]
+    subgraph evm["EVM"]
         execution["Execution"]
         p2pn["P2P Network"]
         rpc["/rpc"]
@@ -53,7 +53,7 @@ flowchart TB
     mempool --> db
 ```
 
-Hooks are the seam through which SAE calls into C-Chain-specific code. SAE invokes them throughout a block's lifecycle, most notably:
+Hooks are the seam through which the EVM calls into C-Chain-specific code. The EVM invokes them throughout a block's lifecycle, most notably:
 
 - **Build** — construct custom header fields and embed cross-chain transactions into the block body.
 - **Verify** — enforce validation rules on header fields, embedded transactions, and Warp predicates.

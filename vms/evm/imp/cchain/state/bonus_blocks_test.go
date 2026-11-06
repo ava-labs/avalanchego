@@ -59,7 +59,7 @@ func TestBonusBlocks(t *testing.T) {
 	const (
 		url = "https://api.avax.network/ext/bc/C/rpc"
 		// envVar must be set to run the test.
-		envVar = "SAEVM_TEST_MAINNET_API"
+		envVar = "EVM_TEST_MAINNET_API"
 	)
 	if os.Getenv(envVar) == "" {
 		t.Skipf("set %s to run: this test queries %s", envVar, url)
