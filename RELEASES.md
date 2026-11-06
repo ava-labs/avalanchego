@@ -6,6 +6,13 @@
 
 ### APIs
 
+- Removed:
+  - `platform.getBalance`
+  - `platform.getStake`
+  - `avm.getBalance`
+  - `avm.getAllBalances`
+  - `avm.getTxStatus`
+
 ### Configs
 
 ### Fixes
