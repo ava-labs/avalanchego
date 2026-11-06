@@ -25,6 +25,8 @@ type chainContext struct {
 
 func (c *chainContext) GetHeader(h common.Hash, n uint64) *types.Header {
 	if hdr, ok := c.recent.Get(n); ok && hdr.Hash() == h {
+		// The cache retains hdr and may serve it again, so we MUST return an
+		// independent copy to prevent a caller from mutating the cached header.
 		return types.CopyHeader(hdr)
 	}
 	// eth_call on historical state will miss the cache but we still need to

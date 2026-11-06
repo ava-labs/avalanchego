@@ -221,12 +221,13 @@ func (s *Syncer) WriteSynced(summary *Summary) error {
 }
 
 func (s *Syncer) writeExecutionResults(lastSettled *types.Block, lastAccepted *types.Header) (retErr error) {
+	settledHeader := lastSettled.Header()
 	// Synchronous blocks MUST NOT persist their execution results.
-	if hook.Synchronous(s.hooks, lastSettled.Header()) {
+	if hook.Synchronous(s.hooks, settledHeader) {
 		return nil
 	}
 
-	gt, err := hook.SettledGasTime(s.hooks, lastSettled.Header(), lastAccepted)
+	gt, err := hook.SettledGasTime(s.hooks, settledHeader, lastAccepted)
 	if err != nil {
 		return fmt.Errorf("couldn't calculate settled gas time: %w", err)
 	}
