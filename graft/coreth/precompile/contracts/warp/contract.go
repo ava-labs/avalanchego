@@ -138,13 +138,12 @@ func PackGetBlockchainIDOutput(blockchainID common.Hash) ([]byte, error) {
 // getBlockchainID returns the snow Chain Context ChainID of this blockchain.
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
-func getBlockchainID(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	env := accessibleState.GetPrecompileEnv()
-	warpGasConfig := CurrentGasConfig(accessibleState.GetRules())
+func getBlockchainID(env contract.Environment, input []byte) ([]byte, error) {
+	warpGasConfig := CurrentGasConfig(env.ExtraRules())
 	if err := contract.DeductGas(env, warpGasConfig.GetBlockchainID); err != nil {
 		return nil, err
 	}
-	return PackGetBlockchainIDOutput(common.Hash(accessibleState.GetSnowContext().ChainID))
+	return PackGetBlockchainIDOutput(common.Hash(env.SnowContext().ChainID))
 }
 
 // PackGetVerifiedWarpBlockHash packs [index] of type uint32 into the appropriate arguments for getVerifiedWarpBlockHash.
@@ -163,9 +162,8 @@ func PackGetVerifiedWarpBlockHashOutput(outputStruct GetVerifiedWarpBlockHashOut
 	)
 }
 
-//nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
-func getVerifiedWarpBlockHash(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	return handleWarpMessage(accessibleState, input, blockHashHandler{})
+func getVerifiedWarpBlockHash(env contract.Environment, input []byte) ([]byte, error) {
+	return handleWarpMessage(env, input, blockHashHandler{})
 }
 
 // UnpackGetVerifiedWarpMessageInput attempts to unpack [input] into the uint32 type argument
@@ -199,9 +197,9 @@ func PackGetVerifiedWarpMessageOutput(outputStruct GetVerifiedWarpMessageOutput)
 // getVerifiedWarpMessage retrieves the pre-verified warp message from the predicate storage slots and returns
 // the expected ABI encoding of the message to the caller.
 //
-//nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
-func getVerifiedWarpMessage(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	return handleWarpMessage(accessibleState, input, addressedPayloadHandler{})
+
+func getVerifiedWarpMessage(env contract.Environment, input []byte) ([]byte, error) {
+	return handleWarpMessage(env, input, addressedPayloadHandler{})
 }
 
 // UnpackSendWarpMessageInput attempts to unpack [input] as []byte
@@ -230,10 +228,9 @@ func PackSendWarpMessageOutput(messageID common.Hash) ([]byte, error) {
 // sendWarpMessage constructs an Avalanche Warp Message containing an AddressedPayload and emits a log to signal validators that they should
 // be willing to sign this message.
 //
-//nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
-func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
-	env := accessibleState.GetPrecompileEnv()
-	warpGasConfig := CurrentGasConfig(accessibleState.GetRules())
+
+func sendWarpMessage(env contract.Environment, input []byte) ([]byte, error) {
+	warpGasConfig := CurrentGasConfig(env.ExtraRules())
 	if err := contract.DeductGas(env, warpGasConfig.SendWarpMessageBase); err != nil {
 		return nil, err
 	}
@@ -246,7 +243,7 @@ func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Add
 	if err := contract.DeductGas(env, payloadGas); err != nil {
 		return nil, err
 	}
-	if readOnly {
+	if env.ReadOnly() {
 		return nil, vm.ErrWriteProtection
 	}
 	// unpack the arguments
@@ -256,8 +253,8 @@ func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Add
 	}
 
 	var (
-		sourceChainID = accessibleState.GetSnowContext().ChainID
-		sourceAddress = caller
+		sourceChainID = env.SnowContext().ChainID
+		sourceAddress = env.Caller()
 	)
 
 	addressedPayload, err := payload.NewAddressedCall(
@@ -268,7 +265,7 @@ func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Add
 		return nil, err
 	}
 	unsignedWarpMessage, err := warp.NewUnsignedMessage(
-		accessibleState.GetSnowContext().NetworkID,
+		env.SnowContext().NetworkID,
 		sourceChainID,
 		addressedPayload.Bytes(),
 	)
@@ -285,11 +282,11 @@ func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Add
 	if err != nil {
 		return nil, err
 	}
-	accessibleState.GetStateDB().AddLog(&types.Log{
+	env.StateDB().AddLog(&types.Log{
 		Address:     ContractAddress,
 		Topics:      topics,
 		Data:        data,
-		BlockNumber: accessibleState.GetBlockContext().Number().Uint64(),
+		BlockNumber: env.BlockNumber().Uint64(),
 	})
 
 	return PackSendWarpMessageOutput(common.Hash(unsignedWarpMessage.ID()))

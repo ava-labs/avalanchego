@@ -3,17 +3,13 @@
 
 package contract
 
-import (
-	"fmt"
-
-	"github.com/ava-labs/libevm/common"
-)
+import "fmt"
 
 const (
 	SelectorLen = 4
 )
 
-type RunStatefulPrecompileFunc func(accessibleState AccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error)
+type RunStatefulPrecompileFunc func(env Environment, input []byte) ([]byte, error)
 
 // StatefulPrecompileFunction defines a function implemented by a stateful precompile
 type StatefulPrecompileFunction struct {
@@ -62,10 +58,10 @@ var _ StatefulPrecompiledContract = (*statefulPrecompileWithFunctionSelectors)(n
 
 // Run selects the function using the 4 byte function selector at the start of the input and executes the underlying function on the
 // given arguments.
-func (s *statefulPrecompileWithFunctionSelectors) Run(accessibleState AccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error) {
+func (s *statefulPrecompileWithFunctionSelectors) Run(env Environment, input []byte) ([]byte, error) {
 	// If there is no input data present, call the fallback function if present.
 	if len(input) == 0 && s.fallback != nil {
-		return s.fallback(accessibleState, caller, addr, nil, readOnly)
+		return s.fallback(env, nil)
 	}
 
 	// Otherwise, an unexpected input size will result in an error.
@@ -81,5 +77,5 @@ func (s *statefulPrecompileWithFunctionSelectors) Run(accessibleState Accessible
 		return nil, fmt.Errorf("invalid function selector %#x", selector)
 	}
 
-	return function.execute(accessibleState, caller, addr, functionInput, readOnly)
+	return function.execute(env, functionInput)
 }
