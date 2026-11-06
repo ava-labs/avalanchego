@@ -523,27 +523,13 @@ func (s *SUT) addUTXOs(tb testing.TB, readerChainID, writerChainID ids.ID, utxos
 	require.NoErrorf(tb, err, "%T.Apply()", writerMemory)
 }
 
-// assertAccount asserts addr's nonce and balance at the last-executed state.
-func (s *SUT) assertAccount(tb testing.TB, addr common.Address, wantNonce uint64, wantBalance uint256.Int) {
-	tb.Helper()
-
-	state, err := s.LastExecutedState()
-	require.NoErrorf(tb, err, "%T.LastExecutedState()", s.VM)
-
-	gotNonce := state.GetNonce(addr)
-	assert.Equalf(tb, wantNonce, gotNonce, "nonce of %s", addr)
-
-	gotBalance := *state.GetBalance(addr)
-	assert.Equalf(tb, wantBalance, gotBalance, "balance of %s", addr)
-}
-
 // issueAndExecute submits t through [Client.IssueTx] and drives the consensus
 // loop to produce, accept, and execute the next block, which is returned.
 func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx) *blocks.Block {
 	tb.Helper()
 
 	require.NoErrorf(tb, s.IssueTx(ctx, t), "%T.IssueTx()", s.Client)
-	blk := s.runConsensusLoop(ctx, tb)
+	blk := s.RunConsensusLoop(ctx, tb)
 	s.waitForTxPoolEviction(ctx, tb, t)
 	return blk
 }
@@ -583,36 +569,6 @@ func (s *SUT) assertTxAccepted(ctx context.Context, tb testing.TB, want *tx.Tx, 
 	assert.Equalf(tb, wantHeight, gotHeight, "%T.GetTx() block height", s.Client)
 }
 
-// runConsensusLoop builds a block on top of the last-accepted block, drives it
-// through verify+accept, and waits until it has been executed.
-func (s *SUT) runConsensusLoop(ctx context.Context, tb testing.TB, opts ...vmtest.BlockOption) *blocks.Block {
-	tb.Helper()
-
-	blk := s.BuildVerifyAccept(ctx, tb, opts...)
-	require.NoErrorf(tb, blk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", blk)
-	return blk
-}
-
-// blockAtHeight returns the accepted block at the given height.
-func (s *SUT) blockAtHeight(ctx context.Context, tb testing.TB, height uint64) *blocks.Block {
-	tb.Helper()
-
-	id, err := s.GetBlockIDAtHeight(ctx, height)
-	require.NoErrorf(tb, err, "%T.GetBlockIDAtHeight(%d)", s.VM, height)
-	blk, err := s.GetBlock(ctx, id)
-	require.NoErrorf(tb, err, "%T.GetBlock(%s)", s.VM, id)
-	return blk
-}
-
-// lastAcceptedHeight returns the height of the last-accepted block.
-func (s *SUT) lastAcceptedHeight(ctx context.Context, tb testing.TB) uint64 {
-	tb.Helper()
-
-	blk, err := s.GetBlock(ctx, s.LastAcceptedID(ctx, tb))
-	require.NoErrorf(tb, err, "%T.GetBlock(last accepted)", s.VM)
-	return blk.Height()
-}
-
 // unblockWaitForEvent advances the [withVMTime] clock to ensure that
 // [VM.WaitForEvent] will not throttle for ACP-226 delays.
 func (s *SUT) unblockWaitForEvent() {
@@ -638,37 +594,12 @@ func (s *SUT) acceptSynchronousBlocks(ctx context.Context, tb testing.TB, blks [
 	}
 }
 
-// verifyTampered re-seals valid with a mutated header and returns the
-// VerifyBlock error, exercising rebuild-and-compare against the tampered
-// field(s). tamper receives the full header so callers can mutate both
-// [types.Header] fields (e.g. Time) and the header extra.
-func (s *SUT) verifyTampered(ctx context.Context, tb testing.TB, valid *blocks.Block, tamper func(*types.Header)) error {
-	tb.Helper()
-
-	hdr := valid.Header()
-	tamper(hdr)
-
-	buf, err := rlp.EncodeToBytes(valid.EthBlock().WithSeal(hdr))
-	require.NoErrorf(tb, err, "rlp.EncodeToBytes(tampered block)")
-	parsed, err := s.ParseBlock(ctx, buf)
-	require.NoErrorf(tb, err, "%T.ParseBlock(tampered block)", s.VM)
-	return s.VerifyBlock(ctx, nil, parsed)
-}
-
 // tamperExtra adapts a header-extra mutator into the [types.Header] mutator that
-// [SUT.verifyTampered] expects.
+// [vmtest.SUT.VerifyTampered] expects.
 func tamperExtra(mut func(*customtypes.HeaderExtra)) func(*types.Header) {
 	return func(hdr *types.Header) {
 		mut(customtypes.GetHeaderExtra(hdr))
 	}
-}
-
-// acceptAndExecute accepts blk and blocks until it has been executed.
-func (s *SUT) acceptAndExecute(ctx context.Context, tb testing.TB, blk *blocks.Block) {
-	tb.Helper()
-
-	require.NoErrorf(tb, s.AcceptBlock(ctx, blk), "%T.AcceptBlock()", s.VM)
-	require.NoErrorf(tb, blk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", blk)
 }
 
 // wallet builds and signs cross-chain transactions on behalf of a single key.
@@ -869,7 +800,7 @@ func TestExport(t *testing.T) {
 		nonce        = 1
 		amountBurned = exportedAmount + txFee
 	)
-	sut.assertAccount(t, sender, nonce, addNAVAX(t, initialBalance, -amountBurned))
+	sut.AssertAccount(t, sender, nonce, addNAVAX(t, initialBalance, -amountBurned))
 	sut.assertUTXOsExist(t, destinationChain, sut.ctx.ChainID, txtest.ExportedUTXOs(signedExport.ID(), export)...)
 }
 
@@ -898,7 +829,7 @@ func TestImport(t *testing.T) {
 		nonce        = 0
 		amountMinted = utxoAmount - txFee
 	)
-	sut.assertAccount(t, receiver, nonce, tx.ScaleAVAX(amountMinted))
+	sut.AssertAccount(t, receiver, nonce, tx.ScaleAVAX(amountMinted))
 	sut.assertUTXOsMissing(t, sut.ctx.ChainID, sourceChain, utxo)
 }
 
@@ -1109,7 +1040,7 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 	sut.WaitForPendingEthTxs(ctx, t, txs...)
 
 	preBalance := sut.Balance(t, sender)
-	blk := sut.runConsensusLoop(ctx, t)
+	blk := sut.RunConsensusLoop(ctx, t)
 	require.Lenf(t, blk.Receipts(), len(tests), "%T.Receipts()", blk)
 
 	receiptByTx := make(map[common.Hash]*types.Receipt, len(blk.Receipts()))
@@ -1184,7 +1115,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 	sut.WaitForPendingEthTxs(ctx, t, txs...)
 
 	preBurn := sut.Balance(t, blackhole.Address)
-	blk := sut.runConsensusLoop(ctx, t)
+	blk := sut.RunConsensusLoop(ctx, t)
 	require.Zerof(t, big.NewInt(1).Cmp(blk.EthBlock().BaseFee()), "%T base fee", blk)
 	receipts := blk.Receipts()
 	require.Lenf(t, receipts, len(txs), "%T.Receipts()", blk)
@@ -1384,7 +1315,7 @@ func TestVerifyBlockRejectsTamperedHeader(t *testing.T) {
 			require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
 			valid := sut.BuildVerify(ctx, t, sut.LastAcceptedID(ctx, t))
 
-			err := sut.verifyTampered(ctx, t, valid, tamperExtra(func(e *customtypes.HeaderExtra) {
+			err := sut.VerifyTampered(ctx, t, valid, tamperExtra(func(e *customtypes.HeaderExtra) {
 				tt.tamper(t, e)
 			}))
 			require.ErrorContainsf(t, err, "hash mismatch", "%T.VerifyBlock(malformed block)", sut.VM)
@@ -1768,7 +1699,7 @@ func TestGasRefundsDisabled(t *testing.T) {
 	require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction()", sut.EthClient())
 	sut.WaitForPendingEthTxs(ctx, t, tx)
 
-	blk := sut.runConsensusLoop(ctx, t)
+	blk := sut.RunConsensusLoop(ctx, t)
 	require.Lenf(t, blk.Receipts(), 1, "%T.Receipts()", blk)
 
 	receipt := blk.Receipts()[0]
@@ -1790,7 +1721,7 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 	child := sut.BuildVerify(ctx, t, sut.LastAcceptedID(ctx, t))
 
 	earlyMS := uint64(earliestBuildTime(parent).UnixMilli()) - 1
-	err := sut.verifyTampered(ctx, t, child, func(hdr *types.Header) {
+	err := sut.VerifyTampered(ctx, t, child, func(hdr *types.Header) {
 		hdr.Time = earlyMS / 1000
 		tamperExtra(func(e *customtypes.HeaderExtra) {
 			e.TimeMilliseconds = &earlyMS

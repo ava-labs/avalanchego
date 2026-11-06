@@ -154,7 +154,7 @@ func TestSendWarpMessage(t *testing.T) {
 	sut.assertWarpSigningRefusal(ctx, t, sentMsg, warp.UnknownMessageErrCode)
 	sut.assertWarpSigningRefusal(ctx, t, hashMsg, warp.NotAcceptedErrCode)
 
-	sut.acceptAndExecute(ctx, t, built)
+	sut.AcceptAndExecute(ctx, t, built)
 	sut.signAndVerifyWarpMessage(ctx, t, sentMsg)
 	sut.signAndVerifyWarpMessage(ctx, t, hashMsg)
 }
@@ -344,7 +344,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 			}
 
 			sut.WaitForPendingEthTxs(ctx, t, tx)
-			built := sut.runConsensusLoop(ctx, t, vmtest.WithBlockContext(&block.Context{}))
+			built := sut.RunConsensusLoop(ctx, t, vmtest.WithBlockContext(&block.Context{}))
 			receipts := built.Receipts()
 			require.Lenf(t, receipts, 1, "%T.Receipts()", built)
 			receipt := receipts[0]

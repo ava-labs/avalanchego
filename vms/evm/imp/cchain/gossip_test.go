@@ -56,7 +56,7 @@ func TestPushGossip(t *testing.T) {
 	require.NoErrorf(t, api.IssueTx(apiCtx, stx), "%T.IssueTx()", api.Client)
 	api.assertTxBloomContains(t, stx.ID())
 
-	blk := vdr.runConsensusLoop(vdrCtx, t)
+	blk := vdr.RunConsensusLoop(vdrCtx, t)
 	assertBlockIncludes(t, blk, nil, []*tx.Tx{stx})
 }
 
@@ -83,7 +83,7 @@ func TestPullGossip(t *testing.T) {
 
 	// Because vdrB isn't connected to api, vdrB can only learn about the
 	// transaction by pulling it from vdrA.
-	blk := vdrB.runConsensusLoop(vdrBCtx, t)
+	blk := vdrB.RunConsensusLoop(vdrBCtx, t)
 	assertBlockIncludes(t, blk, nil, []*tx.Tx{stx})
 }
 
@@ -118,6 +118,6 @@ func TestPushGossipAfterPullGossip(t *testing.T) {
 	vdrB.assertTxBloomEmpty(t)
 	require.NoErrorf(t, vdrA.IssueTx(vdrACtx, stx), "%T.IssueTx()", vdrA.VM)
 
-	blk := vdrB.runConsensusLoop(vdrBCtx, t)
+	blk := vdrB.RunConsensusLoop(vdrBCtx, t)
 	assertBlockIncludes(t, blk, nil, []*tx.Tx{stx})
 }

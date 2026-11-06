@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -148,57 +149,6 @@ func New(ctx context.Context, tb testing.TB, vm VM, snowCtx *snow.Context, cfg C
 	return sut, nil
 }
 
-// Balance returns the balance of addr at the last-executed state.
-func (s *SUT) Balance(tb testing.TB, addr common.Address) uint256.Int {
-	tb.Helper()
-
-	state, err := s.vm.LastExecutedState()
-	require.NoErrorf(tb, err, "%T.LastExecutedState()", s.vm)
-	return *state.GetBalance(addr)
-}
-
-// BuildVerifyAccept builds, verifies, and accepts a block on top of the
-// last-accepted block.
-func (s *SUT) BuildVerifyAccept(ctx context.Context, tb testing.TB, opts ...BlockOption) *blocks.Block {
-	tb.Helper()
-
-	lastAccepted := s.LastAcceptedID(ctx, tb)
-	blk := s.BuildVerify(ctx, tb, lastAccepted, opts...)
-	require.NoErrorf(tb, s.vm.AcceptBlock(ctx, blk), "%T.AcceptBlock()", s.vm)
-	return blk
-}
-
-// LastAcceptedID returns the ID of the last-accepted block.
-func (s *SUT) LastAcceptedID(ctx context.Context, tb testing.TB) ids.ID {
-	tb.Helper()
-
-	id, err := s.vm.LastAccepted(ctx)
-	require.NoErrorf(tb, err, "%T.LastAccepted()", s.vm)
-	return id
-}
-
-// WaitForPendingTxs waits for [VM.WaitForEvent] to report pending txs.
-func (s *SUT) WaitForPendingTxs(ctx context.Context, tb testing.TB) {
-	tb.Helper()
-
-	if s.beforeWaitForEvent != nil {
-		s.beforeWaitForEvent()
-	}
-	e, err := s.vm.WaitForEvent(ctx)
-	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.vm)
-	assert.Equalf(tb, snowcommon.PendingTxs, e, "%T.WaitForEvent() event", s.vm)
-}
-
-// WaitForPendingEthTxs blocks until every tx is pending in the source the block
-// builder draws from, so the built block includes them all rather than racing
-// promotion. The geth RPC backend's [GetPoolTransactions] resolves the same
-// [txpool.Pool.Pending] set used by [txgossip.Set.TransactionsByPriority]
-// during block building.
-func (s *SUT) WaitForPendingEthTxs(ctx context.Context, tb testing.TB, txs ...*types.Transaction) {
-	tb.Helper()
-	txgossiptest.WaitUntilPending(tb, ctx, s.vm.GethRPCBackends(), txs...)
-}
-
 type (
 	blockConfig struct {
 		context *block.Context
@@ -240,4 +190,119 @@ func (s *SUT) ParseVerifyAccept(ctx context.Context, tb testing.TB, blk *blocks.
 	require.NoErrorf(tb, s.vm.VerifyBlock(ctx, nil, parsed), "%T.VerifyBlock(height %d)", s.vm, blk.Height())
 	require.NoErrorf(tb, s.vm.AcceptBlock(ctx, parsed), "%T.AcceptBlock(height %d)", s.vm, blk.Height())
 	return parsed
+}
+
+// BuildVerifyAccept builds, verifies, and accepts a block on top of the
+// last-accepted block.
+func (s *SUT) BuildVerifyAccept(ctx context.Context, tb testing.TB, opts ...BlockOption) *blocks.Block {
+	tb.Helper()
+
+	lastAccepted := s.LastAcceptedID(ctx, tb)
+	blk := s.BuildVerify(ctx, tb, lastAccepted, opts...)
+	require.NoErrorf(tb, s.vm.AcceptBlock(ctx, blk), "%T.AcceptBlock()", s.vm)
+	return blk
+}
+
+// AcceptAndExecute accepts blk and blocks until it has been executed.
+func (s *SUT) AcceptAndExecute(ctx context.Context, tb testing.TB, blk *blocks.Block) {
+	tb.Helper()
+
+	require.NoErrorf(tb, s.vm.AcceptBlock(ctx, blk), "%T.AcceptBlock()", s.vm)
+	require.NoErrorf(tb, blk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", blk)
+}
+
+// RunConsensusLoop builds a block on top of the last-accepted block, drives it
+// through verify+accept, and waits until it has been executed.
+func (s *SUT) RunConsensusLoop(ctx context.Context, tb testing.TB, opts ...BlockOption) *blocks.Block {
+	tb.Helper()
+
+	blk := s.BuildVerifyAccept(ctx, tb, opts...)
+	require.NoErrorf(tb, blk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", blk)
+	return blk
+}
+
+// LastAcceptedID returns the ID of the last-accepted block.
+func (s *SUT) LastAcceptedID(ctx context.Context, tb testing.TB) ids.ID {
+	tb.Helper()
+
+	id, err := s.vm.LastAccepted(ctx)
+	require.NoErrorf(tb, err, "%T.LastAccepted()", s.vm)
+	return id
+}
+
+// LastAcceptedHeight returns the height of the last-accepted block.
+func (s *SUT) LastAcceptedHeight(ctx context.Context, tb testing.TB) uint64 {
+	tb.Helper()
+
+	blk, err := s.vm.GetBlock(ctx, s.LastAcceptedID(ctx, tb))
+	require.NoErrorf(tb, err, "%T.GetBlock(last accepted)", s.vm)
+	return blk.Height()
+}
+
+// BlockAtHeight returns the accepted block at the given height.
+func (s *SUT) BlockAtHeight(ctx context.Context, tb testing.TB, height uint64) *blocks.Block {
+	tb.Helper()
+
+	id, err := s.vm.GetBlockIDAtHeight(ctx, height)
+	require.NoErrorf(tb, err, "%T.GetBlockIDAtHeight(%d)", s.vm, height)
+	blk, err := s.vm.GetBlock(ctx, id)
+	require.NoErrorf(tb, err, "%T.GetBlock(%s)", s.vm, id)
+	return blk
+}
+
+// Balance returns the balance of addr at the last-executed state.
+func (s *SUT) Balance(tb testing.TB, addr common.Address) uint256.Int {
+	tb.Helper()
+
+	state, err := s.vm.LastExecutedState()
+	require.NoErrorf(tb, err, "%T.LastExecutedState()", s.vm)
+	return *state.GetBalance(addr)
+}
+
+// WaitForPendingTxs waits for [VM.WaitForEvent] to report pending txs.
+func (s *SUT) WaitForPendingTxs(ctx context.Context, tb testing.TB) {
+	tb.Helper()
+
+	if s.beforeWaitForEvent != nil {
+		s.beforeWaitForEvent()
+	}
+	e, err := s.vm.WaitForEvent(ctx)
+	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.vm)
+	assert.Equalf(tb, snowcommon.PendingTxs, e, "%T.WaitForEvent() event", s.vm)
+}
+
+// WaitForPendingEthTxs blocks until every tx is pending in the tx pool, so that
+// the next built block includes all of them.
+func (s *SUT) WaitForPendingEthTxs(ctx context.Context, tb testing.TB, txs ...*types.Transaction) {
+	tb.Helper()
+	txgossiptest.WaitUntilPending(tb, ctx, s.vm.GethRPCBackends(), txs...)
+}
+
+// AssertAccount asserts addr's nonce and balance at the last-executed state.
+func (s *SUT) AssertAccount(tb testing.TB, addr common.Address, wantNonce uint64, wantBalance uint256.Int) {
+	tb.Helper()
+
+	state, err := s.vm.LastExecutedState()
+	require.NoErrorf(tb, err, "%T.LastExecutedState()", s.vm)
+
+	gotNonce := state.GetNonce(addr)
+	assert.Equalf(tb, wantNonce, gotNonce, "nonce of %s", addr)
+
+	gotBalance := *state.GetBalance(addr)
+	assert.Equalf(tb, wantBalance, gotBalance, "balance of %s", addr)
+}
+
+// VerifyTampered applies tamper to a copy of valid's header, re-seals the block,
+// and returns the error from verifying it.
+func (s *SUT) VerifyTampered(ctx context.Context, tb testing.TB, valid *blocks.Block, tamper func(*types.Header)) error {
+	tb.Helper()
+
+	hdr := valid.Header()
+	tamper(hdr)
+
+	buf, err := rlp.EncodeToBytes(valid.EthBlock().WithSeal(hdr))
+	require.NoErrorf(tb, err, "rlp.EncodeToBytes(tampered block)")
+	parsed, err := s.vm.ParseBlock(ctx, buf)
+	require.NoErrorf(tb, err, "%T.ParseBlock(tampered block)", s.vm)
+	return s.vm.VerifyBlock(ctx, nil, parsed)
 }

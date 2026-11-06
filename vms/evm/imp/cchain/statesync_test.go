@@ -107,9 +107,9 @@ func (s *SUT) bootstrapFrom(ctx context.Context, t *testing.T, src *SUT, fromHei
 
 	require.NoErrorf(t, s.SetState(ctx, snow.Bootstrapping), "%T.SetState(Bootstrapping)", s.VM)
 
-	head := src.lastAcceptedHeight(ctx, t)
+	head := src.LastAcceptedHeight(ctx, t)
 	for height := fromHeight + 1; height <= head; height++ {
-		s.ParseVerifyAccept(ctx, t, src.blockAtHeight(ctx, t, height))
+		s.ParseVerifyAccept(ctx, t, src.BlockAtHeight(ctx, t, height))
 	}
 
 	require.NoErrorf(t, s.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", s.VM)
@@ -123,9 +123,9 @@ func (s *SUT) assertChainsMatch(ctx context.Context, t *testing.T, other *SUT) {
 
 	require.Equalf(t, other.LastAcceptedID(ctx, t), s.LastAcceptedID(ctx, t), "%T.LastAccepted()", s.VM)
 
-	head := s.lastAcceptedHeight(ctx, t)
-	headBlk := s.blockAtHeight(ctx, t, head)
-	otherHeadBlk := other.blockAtHeight(ctx, t, head)
+	head := s.LastAcceptedHeight(ctx, t)
+	headBlk := s.BlockAtHeight(ctx, t, head)
+	otherHeadBlk := other.BlockAtHeight(ctx, t, head)
 	require.NoErrorf(t, headBlk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(height %d)", headBlk, head)
 	require.NoErrorf(t, otherHeadBlk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(height %d)", otherHeadBlk, head)
 
