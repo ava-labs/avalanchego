@@ -1960,7 +1960,7 @@ func hexBigU(n uint64) *hexutil.Big {
 	return (*hexutil.Big)(new(big.Int).SetUint64(n))
 }
 
-func TestGasUsedHeader(t *testing.T) {
+func TestResponseHeaders(t *testing.T) {
 	echoReverter := common.Address{'e', 'c', 'h', 'o'}
 	invalidJumper := common.Address{'i', 'n', 'v', 'a', 'l', 'i', 'd'}
 	blocking := common.Address{'b', 'l', 'o', 'c', 'k'}
@@ -2011,6 +2011,8 @@ func TestGasUsedHeader(t *testing.T) {
 		balanceOfGas = "23675"
 		revertGas    = "21035"
 		batchGas     = "44710" // balanceOfGas + revertGas
+
+		batchWithErrorsGas = "65745" // balanceOfGas + 2*revertGas
 	)
 
 	type request struct {
@@ -2024,30 +2026,33 @@ func TestGasUsedHeader(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
-		body any
-		want string // empty if the header must be absent
+		name           string
+		body           any
+		wantGas        []string // nil if the header must be absent
+		wantErrorCodes []string // nil if the header must be absent
 	}{
 		{
-			name: "eth_call",
-			body: newReq("eth_call", balanceOf, latest),
-			want: balanceOfGas,
+			name:    "eth_call",
+			body:    newReq("eth_call", balanceOf, latest),
+			wantGas: []string{balanceOfGas},
 		},
 		{
-			name: "eth_call_default_block",
-			body: newReq("eth_call", balanceOf),
-			want: balanceOfGas,
+			name:    "eth_call_default_block",
+			body:    newReq("eth_call", balanceOf),
+			wantGas: []string{balanceOfGas},
 		},
 		{
-			name: "eth_call_revert",
-			body: newReq("eth_call", revert, latest),
-			want: revertGas,
+			name:           "eth_call_revert",
+			body:           newReq("eth_call", revert, latest),
+			wantGas:        []string{revertGas},
+			wantErrorCodes: []string{"3;count=1"},
 		},
 		{
 			// The call fails without reverting, so it uses all of its gas.
-			name: "eth_call_invalid_jump",
-			body: newReq("eth_call", ethapi.TransactionArgs{To: &invalidJumper}, latest),
-			want: strconv.FormatUint(gasCap, 10),
+			name:           "eth_call_invalid_jump",
+			body:           newReq("eth_call", ethapi.TransactionArgs{To: &invalidJumper}, latest),
+			wantGas:        []string{strconv.FormatUint(gasCap, 10)},
+			wantErrorCodes: []string{"-32000;count=1"},
 		},
 		{
 			name: "batch",
@@ -2056,27 +2061,41 @@ func TestGasUsedHeader(t *testing.T) {
 				newReq("eth_call", revert, latest),
 				newReq("eth_blockNumber"),
 			},
-			want: batchGas,
+			wantGas:        []string{batchGas},
+			wantErrorCodes: []string{"3;count=1"},
+		},
+		{
+			name: "batch_with_errors",
+			body: []request{
+				newReq("eth_call", revert, latest),
+				newReq("eth_call", balanceOf, latest),
+				newReq("eth_unknownMethod"),
+				newReq("eth_call", revert, latest),
+			},
+			wantGas:        []string{batchWithErrorsGas},
+			wantErrorCodes: []string{"-32601;count=1, 3;count=2"},
 		},
 		{
 			// Without an ID, the call runs but no response is written.
-			name: "notification",
-			body: request{JSONRPC: "2.0", Method: "eth_call", Params: []any{balanceOf, latest}},
-			want: balanceOfGas,
+			name:    "notification",
+			body:    request{JSONRPC: "2.0", Method: "eth_call", Params: []any{balanceOf, latest}},
+			wantGas: []string{balanceOfGas},
 		},
 		{
 			name: "no_calls",
 			body: newReq("eth_blockNumber"),
 		},
 		{
-			name: "unknown_block",
-			body: newReq("eth_call", balanceOf, common.Hash{1}),
+			name:           "unknown_block",
+			body:           newReq("eth_call", balanceOf, common.Hash{1}),
+			wantErrorCodes: []string{"-32000;count=1"},
 		},
 		{
 			// The timeout response is written while the call is still running,
 			// so its gas is never reported.
-			name: "eth_call_timeout",
-			body: newReq("eth_call", ethapi.TransactionArgs{To: &blocking}, latest),
+			name:           "eth_call_timeout",
+			body:           newReq("eth_call", ethapi.TransactionArgs{To: &blocking}, latest),
+			wantErrorCodes: []string{"-32002;count=1"},
 		},
 		{
 			name: "batch_with_timeout",
@@ -2084,7 +2103,8 @@ func TestGasUsedHeader(t *testing.T) {
 				newReq("eth_call", balanceOf, latest),
 				newReq("eth_call", ethapi.TransactionArgs{To: &blocking}, latest),
 			},
-			want: balanceOfGas,
+			wantGas:        []string{balanceOfGas},
+			wantErrorCodes: []string{"-32002;count=1"},
 		},
 	}
 
@@ -2098,12 +2118,8 @@ func TestGasUsedHeader(t *testing.T) {
 			defer resp.Body.Close()
 
 			require.Equal(t, http.StatusOK, resp.StatusCode, "status code")
-			got := resp.Header.Values(saerpc.GasUsedHeader)
-			if tt.want == "" {
-				require.Emptyf(t, got, "%q header", saerpc.GasUsedHeader)
-				return
-			}
-			require.Equalf(t, []string{tt.want}, got, "%q header", saerpc.GasUsedHeader)
+			require.Equalf(t, tt.wantGas, resp.Header.Values(saerpc.GasUsedHeader), "%q header", saerpc.GasUsedHeader)
+			require.Equalf(t, tt.wantErrorCodes, resp.Header.Values(saerpc.ErrorCodesHeader), "%q header", saerpc.ErrorCodesHeader)
 		})
 	}
 }
