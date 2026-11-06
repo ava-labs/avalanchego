@@ -105,10 +105,14 @@ func (h *HeaderExtra) EncodeRLP(eth *ethtypes.Header, w io.Writer) error {
 	b := rlp.NewEncoderBuffer(w)
 	list := b.List()
 	for _, p := range f.Required {
-		writeRLPField(b, p)
+		if err := writeRLPField(b, p); err != nil {
+			return err
+		}
 	}
 	for _, p := range f.Optional[:last+1] {
-		writeRLPField(b, p)
+		if err := writeRLPField(b, p); err != nil {
+			return err
+		}
 	}
 	b.ListEnd(list)
 	return b.Flush()
@@ -116,7 +120,7 @@ func (h *HeaderExtra) EncodeRLP(eth *ethtypes.Header, w io.Writer) error {
 
 // writeRLPField writes the field `p` points to. A nil optional field is
 // written as an empty string.
-func writeRLPField(b rlp.EncoderBuffer, p any) {
+func writeRLPField(b rlp.EncoderBuffer, p any) error {
 	switch p := p.(type) {
 	case *common.Hash:
 		b.WriteBytes(p[:])
@@ -131,9 +135,12 @@ func writeRLPField(b rlp.EncoderBuffer, p any) {
 	case *uint64:
 		b.WriteUint64(*p)
 	case **big.Int:
-		if *p == nil {
+		switch {
+		case *p == nil:
 			b.WriteBytes(nil)
-		} else {
+		case (*p).Sign() < 0:
+			return rlp.ErrNegativeBigInt
+		default:
 			b.WriteBigInt(*p)
 		}
 	case **common.Hash:
@@ -153,6 +160,7 @@ func writeRLPField(b rlp.EncoderBuffer, p any) {
 	default:
 		panic(fmt.Sprintf("unexpected header field type %T", p))
 	}
+	return nil
 }
 
 func writeOptionalUint[T ~uint64](b rlp.EncoderBuffer, p **T) {
@@ -163,7 +171,10 @@ func writeOptionalUint[T ~uint64](b rlp.EncoderBuffer, p **T) {
 	}
 }
 
-var errTooFewHeaderFields = errors.New("rlp: too few elements for header")
+var (
+	errTooFewHeaderFields   = errors.New("rlp: too few elements for header")
+	errMissingRequiredField = errors.New("missing required field")
+)
 
 // DecodeRLP implements [ethtypes.HeaderHooks].
 func (h *HeaderExtra) DecodeRLP(eth *ethtypes.Header, s *rlp.Stream) error {
@@ -192,8 +203,12 @@ func (f *headerRLPFields) decode(s *rlp.Stream) error {
 			return err
 		}
 	}
-	for _, p := range f.Optional {
+	for i, p := range f.Optional {
 		if !s.MoreDataInList() {
+			// A reused receiver MUST NOT keep fields this header omits.
+			for _, p := range f.Optional[i:] {
+				reflect.ValueOf(p).Elem().SetZero()
+			}
 			break
 		}
 		if err := readRLPField(s, p); err != nil {
@@ -232,11 +247,7 @@ func readRLPField(s *rlp.Stream, p any) error {
 		if err != nil {
 			return err
 		}
-		if *p == nil {
-			*p = v
-		} else {
-			(*p).Set(v)
-		}
+		*p = v
 	case **common.Hash:
 		v := *p
 		if v == nil {
@@ -280,7 +291,7 @@ func (h *HeaderExtra) EncodeJSON(eth *ethtypes.Header) ([]byte, error) {
 		return nil, err
 	}
 	m := make(map[string]any)
-	h.PostRPCMarshal(eth, m)
+	h.marshalFields(m, true)
 	extra, err := json.Marshal(m)
 	if err != nil {
 		return nil, err
@@ -292,13 +303,23 @@ func (h *HeaderExtra) EncodeJSON(eth *ethtypes.Header) ([]byte, error) {
 
 // DecodeJSON implements [ethtypes.HeaderHooks].
 func (h *HeaderExtra) DecodeJSON(eth *ethtypes.Header, b []byte) error {
-	if err := new(ethtypes.NOOPHeaderHooks).DecodeJSON(eth, b); err != nil {
+	// The upstream decoder keeps absent fields, so decode into a fresh header
+	// rather than over a reused one.
+	fresh := new(ethtypes.Header)
+	if err := new(ethtypes.NOOPHeaderHooks).DecodeJSON(fresh, b); err != nil {
 		return err
 	}
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(b, &m); err != nil {
 		return err
 	}
+	for _, key := range []string{"miner", "extDataHash"} {
+		if raw, ok := m[key]; !ok || string(raw) == "null" {
+			return fmt.Errorf("%w %q for Header", errMissingRequiredField, key)
+		}
+	}
+	*eth = *fresh
+	WithHeaderExtra(eth, h)
 	*h = HeaderExtra{}
 	v := reflect.ValueOf(h).Elem()
 	for i := range v.NumField() {
@@ -356,6 +377,12 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 // PostRPCMarshal implements [ethtypes.HeaderHooks]: it adds the extra fields
 // that are set to the RPC representation of the header.
 func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
+	h.marshalFields(m, false)
+}
+
+// marshalFields adds the tagged fields to `m`, writing unset ones as null if
+// `withNull` is set and omitting them otherwise.
+func (h *HeaderExtra) marshalFields(m map[string]any, withNull bool) {
 	v := reflect.ValueOf(h).Elem()
 	for i := range v.NumField() {
 		f, key := v.Field(i), v.Type().Field(i).Tag.Get("json")
@@ -364,6 +391,9 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 		case f.Kind() != reflect.Pointer:
 			m[key] = f.Interface()
 		case f.IsNil():
+			if withNull {
+				m[key] = nil
+			}
 		case f.Type() == reflect.TypeFor[*big.Int]():
 			m[key] = (*hexutil.Big)(f.Interface().(*big.Int))
 		default:

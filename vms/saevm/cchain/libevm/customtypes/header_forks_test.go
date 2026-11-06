@@ -286,17 +286,85 @@ func TestHeaderDecodeJSONNullExtra(t *testing.T) {
 	encoded = append(encoded[:len(encoded)-1], `,"blockGasCost":null,"settledHeight":null}`...)
 
 	// Stale fields on a reused header MUST be reset, not kept.
-	decoded := WithHeaderExtra(new(types.Header), &HeaderExtra{SettledExcess: new(uint64)})
+	decoded := WithHeaderExtra(&types.Header{BaseFee: big.NewInt(16)}, &HeaderExtra{SettledExcess: new(uint64)})
 	require.NoError(t, json.Unmarshal(encoded, decoded), "json.Unmarshal(null extras)")
+	require.Equal(t, header, decoded, "reused header after decode")
 	require.Equal(t, extra, GetHeaderExtra(decoded), "null extras decode as nil")
 }
+
+// Decoding a shorter header into a receiver that held a longer one MUST reset
+// the fields the shorter one omits.
+func TestHeaderDecodeRLPReusedReceiver(t *testing.T) {
+	t.Parallel()
+
+	full, fullExtra := headerWithNonZeroFields()
+	fullRLP, err := rlp.EncodeToBytes(WithHeaderExtra(full, fullExtra))
+	require.NoError(t, err, "rlp.EncodeToBytes(full header)")
+	legacy, legacyExtra := legacyHeader()
+	legacyRLP, err := rlp.EncodeToBytes(WithHeaderExtra(legacy, legacyExtra))
+	require.NoError(t, err, "rlp.EncodeToBytes(legacy header)")
+
+	decoded := new(types.Header)
+	require.NoError(t, rlp.DecodeBytes(fullRLP, decoded), "rlp.DecodeBytes(full header)")
+	require.NoError(t, rlp.DecodeBytes(legacyRLP, decoded), "rlp.DecodeBytes(legacy header, reused receiver)")
+	require.Equal(t, legacy, decoded, "reused header after legacy decode")
+	require.Equal(t, legacyExtra, GetHeaderExtra(decoded), "HeaderExtra after legacy decode")
+}
+
+func TestHeaderEncodeRLPNegativeBigInt(t *testing.T) {
+	t.Parallel()
+
+	header, extra := legacyHeader()
+	header.Number = big.NewInt(-1)
+	_, err := rlp.EncodeToBytes(WithHeaderExtra(header, extra))
+	require.ErrorIs(t, err, rlp.ErrNegativeBigInt, "rlp.EncodeToBytes(header with negative Number)")
+}
+
+func TestHeaderDecodeJSONRequiredFields(t *testing.T) {
+	t.Parallel()
+
+	header, extra := legacyHeader()
+	encoded, err := json.Marshal(WithHeaderExtra(header, extra))
+	require.NoError(t, err, "json.Marshal(header)")
+
+	for _, key := range []string{"miner", "extDataHash"} {
+		for _, raw := range []json.RawMessage{nil, json.RawMessage("null")} {
+			var m map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(encoded, &m), "json.Unmarshal(header JSON)")
+			if raw == nil {
+				delete(m, key)
+			} else {
+				m[key] = raw
+			}
+			b, err := json.Marshal(m)
+			require.NoError(t, err, "json.Marshal(map)")
+			err = json.Unmarshal(b, new(types.Header))
+			require.ErrorIsf(t, err, errMissingRequiredField, "json.Unmarshal(header JSON with %q = %s)", key, raw)
+		}
+	}
+}
+
+// TestHeaderJSONGolden pins [ethtypes.Header.MarshalJSON] to the shape coreth's
+// generated codec produced, which newHeads subscribers receive: every unset
+// field is present as null. withdrawalsRoot is the one key that codec did not
+// emit; it comes from the upstream header and is always null on the C-Chain.
+func TestHeaderJSONGolden(t *testing.T) {
+	t.Parallel()
+
+	header, extra := legacyHeader()
+	got, err := json.Marshal(WithHeaderExtra(header, extra))
+	require.NoError(t, err, "json.Marshal(legacy header)")
+	require.JSONEq(t, legacyHeaderJSON, string(got), "legacy header JSON")
+}
+
+const legacyHeaderJSON = `{"baseFeePerGas": null, "blobGasUsed": null, "blockGasCost": null, "difficulty": "0x1", "excessBlobGas": null, "extDataGasUsed": null, "extDataHash": "0x1500000000000000000000000000000000000000000000000000000000000000", "extraData": "0x0d0e", "gasLimit": "0x7a1200", "gasUsed": "0x5208", "hash": "0x4da4a4a88e665d575a23776ce571d70be5100d2cfe2e574bea0c66c2f86964eb", "logsBloom": "0x07000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "minDelayExcess": null, "minPriceExponent": null, "miner": "0x0300000000000000000000000000000000000000", "mixHash": "0x0e00000000000000000000000000000000000000000000000000000000000000", "nonce": "0x0f00000000000000", "number": "0x9", "parentBeaconBlockRoot": null, "parentHash": "0x0100000000000000000000000000000000000000000000000000000000000000", "receiptsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421", "settledExcess": null, "settledGasNumerator": null, "settledGasUnix": null, "settledHeight": null, "sha3Uncles": "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347", "stateRoot": "0x0400000000000000000000000000000000000000000000000000000000000000", "targetExponent": null, "timestamp": "0x5f5e1000", "timestampMilliseconds": null, "transactionsRoot": "0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421", "withdrawalsRoot": null}`
 
 func TestHeaderRLPFieldUnexpectedType(t *testing.T) {
 	t.Parallel()
 
 	p := new(int32)
 	require.PanicsWithValue(t, "unexpected header field type *int32", func() {
-		writeRLPField(rlp.NewEncoderBuffer(nil), p)
+		_ = writeRLPField(rlp.NewEncoderBuffer(nil), p)
 	}, "writeRLPField(*int32)")
 	require.PanicsWithValue(t, "unexpected header field type *int32", func() {
 		_ = readRLPField(rlp.NewStream(nil, 0), p)
