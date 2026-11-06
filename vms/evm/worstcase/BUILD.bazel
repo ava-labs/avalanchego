@@ -1,0 +1,59 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "worstcase",
+    srcs = ["state.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/worstcase",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vms/components/gas",
+        "//vms/evm/blocks",
+        "//vms/evm/gastime",
+        "//vms/evm/hook",
+        "//vms/evm/params",
+        "//vms/evm/saedb",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/txpool",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)
+
+go_test(
+    name = "worstcase_test",
+    srcs = [
+        "state_benchmark_test.go",
+        "state_test.go",
+    ],
+    embed = [":worstcase"],
+    deps = [
+        "//vms/components/gas",
+        "//vms/evm/blocks",
+        "//vms/evm/blocks/blockstest",
+        "//vms/evm/gastime",
+        "//vms/evm/hook",
+        "//vms/evm/hook/hookstest",
+        "//vms/evm/saedb",
+        "//vms/evm/saetest",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/state/snapshot",
+        "@com_github_ava_labs_libevm//core/txpool",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//libevm/ethtest",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_google_go_cmp//cmp",
+        "@com_github_google_go_cmp//cmp/cmpopts",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

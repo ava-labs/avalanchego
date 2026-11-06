@@ -26,9 +26,9 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/libevm/triedb/database"
 
-	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
+	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 
-	saefirewood "github.com/ava-labs/avalanchego/vms/saevm/firewood" // also registers firewood metrics
+	saefirewood "github.com/ava-labs/avalanchego/vms/evm/firewood" // also registers firewood metrics
 )
 
 const (

@@ -42,8 +42,8 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/avalanchego/vms/saevm/imp/blackhole"
-	"github.com/ava-labs/avalanchego/vms/saevm/imp/database"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/database"
 
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
