@@ -168,8 +168,8 @@ func TestSubscriptions(t *testing.T) {
 	// not receive the tx.
 	//
 	// Fixed by: https://github.com/ethereum/go-ethereum/pull/33990
-	if os.Getenv("SAEVM_TEST_FLAKY") == "" {
-		t.Skip("FLAKY: set SAEVM_TEST_FLAKY to run")
+	if os.Getenv("EVM_TEST_FLAKY") == "" {
+		t.Skip("FLAKY: set EVM_TEST_FLAKY to run")
 	}
 
 	ctx, sut := newSUT(t, 1)

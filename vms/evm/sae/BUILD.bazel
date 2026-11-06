@@ -175,7 +175,7 @@ go_test(
     ],
     args = ["-test.run=TestAcceptBlock|TestSubscriptions|TestWorstCase"],
     embed = [":sae"],
-    env = {"SAEVM_TEST_FLAKY": "1"},
+    env = {"EVM_TEST_FLAKY": "1"},
     flaky = True,
     deps = [
         "//database",

@@ -1,9 +1,9 @@
-# saevm
+# EVM
 
-`saevm` is the reference implementation of Continuous Execution of EVM blocks, as described in [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution).
+This package is the reference implementation of Continuous Execution of EVM blocks, as described in [ACP-194](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution).
 Continuous Execution was originally called Streaming Asynchronous Execution (SAE), and the packages and this document still use that name.
 
-The C-Chain is built on `saevm`; see the [C-Chain README](./imp/cchain/README.md).
+The C-Chain is built on this EVM; see the [C-Chain README](./imp/cchain/README.md).
 
 ## Table of contents
 
