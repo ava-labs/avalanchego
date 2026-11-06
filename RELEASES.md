@@ -1,8 +1,16 @@
 # Release Notes
 
-## [v1.15.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.3)
+## [v1.15.4](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.4)
 
 ### Features
+
+### APIs
+
+### Configs
+
+### Fixes
+
+## [v1.15.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.3)
 
 ### APIs
 

@@ -22,9 +22,9 @@ import (
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/graft/evm/prefetch"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/prefetch"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"

@@ -13,8 +13,8 @@ import (
 	reflect "reflect"
 
 	precompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
+	predicate "github.com/ava-labs/avalanchego/graft/evm/predicate"
 	commontype "github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
-	predicate "github.com/ava-labs/avalanchego/vms/evm/predicate"
 	common "github.com/ava-labs/libevm/common"
 	gomock "go.uber.org/mock/gomock"
 )

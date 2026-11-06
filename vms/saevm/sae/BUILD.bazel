@@ -179,6 +179,7 @@ go_test(
     deps = [
         "//database",
         "//database/memdb",
+        "//graft/evm/customrawdb",
         "//ids",
         "//snow",
         "//snow/consensus/snowman",
@@ -192,7 +193,6 @@ go_test(
         "//utils/units",
         "//version",
         "//vms/evm/evmclient",
-        "//vms/evm/sync/customrawdb",
         "//vms/saevm/adaptor",
         "//vms/saevm/blocks",
         "//vms/saevm/blocks/blockstest",
