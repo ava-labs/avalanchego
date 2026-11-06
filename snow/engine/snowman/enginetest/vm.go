@@ -124,9 +124,7 @@ func (vm *VM) recordAccepted(blk *snowmantest.Block) {
 	delete(vm.verified, blk.ID())
 	vm.accepted[blk.ID()] = blk
 	vm.acceptedByHeight[blk.Height()] = blk
-	if vm.lastAccepted == nil || blk.Height() > vm.lastAccepted.Height() {
-		vm.lastAccepted = blk
-	}
+	vm.lastAccepted = blk
 }
 
 // block is a [snowmantest.Block] whose verification and decision update the
