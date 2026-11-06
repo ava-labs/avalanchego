@@ -5,7 +5,7 @@ go 1.26.10
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
-	github.com/ava-labs/avalanchego v1.15.3
+	github.com/ava-labs/avalanchego v1.15.4
 	github.com/ava-labs/firewood-go/ffi v0.9.0
 	github.com/ava-labs/libevm v1.13.15-0.20261028200218-d398bc4dbe41
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc

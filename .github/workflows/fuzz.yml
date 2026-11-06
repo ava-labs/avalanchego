@@ -21,7 +21,6 @@ jobs:
           - utils
           - x/archivedb
           - vms/platformvm
-          - vms/evm
           - vms/saevm
           - simplex
           - graft
