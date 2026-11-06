@@ -21,7 +21,7 @@ jobs:
     # security updates to maximize the chance that shipped binaries remain usable
     # on older supported macOS versions. CI validation can track newer macOS
     # releases independently.
-    runs-on: macos-14
+    runs-on: macos-15
     permissions:
       id-token: write
       contents: read

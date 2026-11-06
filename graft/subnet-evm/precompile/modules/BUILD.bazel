@@ -16,7 +16,7 @@ go_library(
     deps = [
         "//graft/evm/utils",
         "//graft/subnet-evm/precompile/contract",
-        "//vms/evm/blackhole",
+        "//vms/saevm/imp/blackhole",
         "@com_github_ava_labs_libevm//common",
     ],
 )
@@ -26,7 +26,7 @@ graft_go_test(
     srcs = ["registerer_test.go"],
     embed = [":modules"],
     deps = [
-        "//vms/evm/blackhole",
+        "//vms/saevm/imp/blackhole",
         "@com_github_ava_labs_libevm//common",
         "@com_github_stretchr_testify//require",
     ],

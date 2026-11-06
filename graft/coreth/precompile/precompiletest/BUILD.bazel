@@ -15,8 +15,8 @@ go_library(
     deps = [
         "//graft/coreth/precompile/contract",
         "//graft/evm/precompileconfig",
+        "//graft/evm/predicate",
         "//snow/snowtest",
-        "//vms/evm/predicate",
         "//vms/saevm/cchain/cparams",
         "//vms/saevm/cchain/libevm/extstate",
         "@com_github_ava_labs_libevm//common",

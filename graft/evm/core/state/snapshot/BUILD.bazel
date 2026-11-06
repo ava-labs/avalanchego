@@ -21,8 +21,8 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/evm/customrawdb",
         "//graft/evm/utils",
-        "//vms/evm/sync/customrawdb",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state/snapshot",
@@ -54,10 +54,10 @@ graft_go_test(
     embed = [":snapshot"],
     deps = [
         "//database",
+        "//graft/evm/customrawdb",
         "//graft/evm/triedb/hashdb",
         "//graft/evm/triedb/pathdb",
         "//graft/evm/utils",
-        "//vms/evm/sync/customrawdb",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",
