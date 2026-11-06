@@ -533,9 +533,11 @@ instance.
 [Top](#table-of-contents)
 
 Collection of logs and metrics is enabled for CI jobs that use
-tmpnet. Each job will execute a step including the script
-`notify-metrics-availability.sh` that emits a link to grafana
-parameterized to show results for the job.
+tmpnet. Before the monitored command starts, each job emits a link to
+grafana parameterized to show results for the job from that point up
+to the time the link is viewed. Once the command has finished, a
+second link is emitted that is bounded by the start and end of the
+command. Both links are written to the job log and the job summary.
 
 Additional links to grafana parameterized to show results for
 individual network will appear in the logs displaying the start of

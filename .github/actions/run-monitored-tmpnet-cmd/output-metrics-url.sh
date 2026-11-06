@@ -6,13 +6,21 @@
 
 set -euo pipefail
 
-# Timestamps are in seconds
-from_timestamp="$(date '+%s')"
-monitoring_period=900 # 15 minutes
-to_timestamp="$((from_timestamp + monitoring_period))"
+# Timestamps are in seconds. METRICS_START_TIMESTAMP should be set to the time
+# the monitored work started. If METRICS_END_TIMESTAMP is not set, the link
+# displays metrics up to the time it is viewed so that it can be shared while
+# the monitored work is still running.
+from_timestamp="${METRICS_START_TIMESTAMP:-$(date '+%s')}"
+if [[ -n "${METRICS_END_TIMESTAMP:-}" ]]; then
+  # Pad the end of the range to include metrics scraped just before the end.
+  end_padding=60
+  to="$((METRICS_END_TIMESTAMP + end_padding))000"
+else
+  to="now"
+fi
 
-# Grafana expects microseconds, so pad timestamps with 3 zeros
-metrics_url="${GRAFANA_URL}&var-filter=gh_job_id%7C%3D%7C${GH_JOB_ID}&from=${from_timestamp}000&to=${to_timestamp}000"
+# Grafana expects milliseconds, so pad timestamps with 3 zeros
+metrics_url="${GRAFANA_URL}&var-filter=gh_job_id%7C%3D%7C${GH_JOB_ID}&from=${from_timestamp}000&to=${to}"
 
 # Optionally ensure that the link displays metrics only for the shared
 # network rather than mixing it with the results for private networks.
