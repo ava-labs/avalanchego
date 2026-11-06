@@ -233,12 +233,12 @@ func (m *metrics) Rejected(blkID ids.ID, pollNumber uint64, blockSize int) {
 	m.latRejected.Observe(float64(duration))
 }
 
-func (m *metrics) MeasureAndGetOldestDuration() time.Duration {
-	_, oldestOp, exists := m.processingBlocks.Oldest()
+func (m *metrics) MeasureAndGetOldest() (ids.ID, time.Duration) {
+	blkID, oldestOp, exists := m.processingBlocks.Oldest()
 	if !exists {
-		return 0
+		return ids.Empty, 0
 	}
-	return time.Since(oldestOp.time)
+	return blkID, time.Since(oldestOp.time)
 }
 
 func (m *metrics) SuccessfulPoll() {
