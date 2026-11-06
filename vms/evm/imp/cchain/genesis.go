@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/dynamic"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -81,7 +80,7 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 	u := ctx.NetworkUpgrades
 	extraCfg := cparams.FromUpgrades(u)
 	extraCfg.SnowCtx = ctx
-	g.Config = corethparams.WithExtra(
+	g.Config = cparams.WithExtra(
 		&ethparams.ChainConfig{
 			ChainID:             chainID,
 			HomesteadBlock:      big.NewInt(0),
@@ -238,7 +237,7 @@ func (g *genesis) block() (*types.Block, error) {
 		h.GasLimit = ethparams.GenesisGasLimit
 	}
 
-	c := corethparams.GetExtra(g.Config)
+	c := cparams.GetExtra(g.Config)
 	if c.IsApricotPhase3(g.Timestamp) { // Also called London
 		h.BaseFee = g.BaseFee
 		if h.BaseFee == nil {
@@ -347,7 +346,7 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 	// the genesis timestamp is already after the Warp activation, then the
 	// state needs to reflect that or the precompile would never be marked as
 	// active.
-	if c := corethparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
+	if c := cparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
 		activatePrecompile(statedb, warp.ContractAddress)
 	}
 

@@ -24,7 +24,6 @@ go_test(
     name = "vm_test",
     srcs = ["hooks_test.go"],
     deps = [
-        "//graft/coreth/params",
         "//vms/evm/imp/cchain/cchaintest",
         "//vms/evm/imp/cchain/cparams",
         "//vms/evm/imp/cchain/libevm",
