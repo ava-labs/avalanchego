@@ -11,12 +11,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/simplex/avalanchego"
-	"github.com/ava-labs/simplex/common"
-	metadata "github.com/ava-labs/simplex/msm"
-	"github.com/ava-labs/simplex/nonvalidator"
-	"github.com/ava-labs/simplex/simplex"
-	"github.com/ava-labs/simplex/wal"
+	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
+	"github.com/ava-labs/avalanchego/graft/simplex/nonvalidator"
+	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
+	"github.com/ava-labs/avalanchego/graft/simplex/wal"
 	"go.uber.org/zap"
 )
 

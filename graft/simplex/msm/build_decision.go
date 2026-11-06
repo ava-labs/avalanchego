@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"go.uber.org/zap"
 )
 

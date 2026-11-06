@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/simplex/common"
-	"github.com/ava-labs/simplex/simplex"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
 
-	"github.com/ava-labs/simplex/testutil"
+	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
 )
 
 // TestReplication tests the replication process of a node that

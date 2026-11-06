@@ -7,7 +7,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/ava-labs/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
 )
 
 // EmptyBlockBuilder is a BlockBuilder that builds an empty block if the given shouldBuildEmptyBlock function returns true.
