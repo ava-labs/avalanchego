@@ -32,27 +32,12 @@ func uint256FromBig(b *big.Int) (*uint256.Int, error) {
 type syncMap[K comparable, V any] struct {
 	m  map[K]V
 	mu sync.RWMutex
-
-	onStore  func(V)
-	onDelete func(V)
 }
 
-// newSyncMap creates a concurrent-safe map. onStore is called when
-// [syncMap.Store] adds a new key, and onDelete is called when [syncMap.Delete]
-// removes an existing key. Storing an existing key and deleting a missing key
-// are no-ops. A nil onStore or onDelete is treated as a no-op.
-func newSyncMap[K comparable, V any](onStore func(V), onDelete func(V)) *syncMap[K, V] {
-	if onStore == nil {
-		onStore = func(V) {}
-	}
-	if onDelete == nil {
-		onDelete = func(V) {}
-	}
-
+// newSyncMap creates a concurrent-safe map. Storing an existing key is a no-op.
+func newSyncMap[K comparable, V any]() *syncMap[K, V] {
 	return &syncMap[K, V]{
-		m:        make(map[K]V),
-		onStore:  onStore,
-		onDelete: onDelete,
+		m: make(map[K]V),
 	}
 }
 
@@ -69,7 +54,6 @@ func (m *syncMap[K, V]) Store(k K, v V) {
 	defer m.mu.Unlock()
 
 	if _, ok := m.m[k]; !ok {
-		m.onStore(v)
 		m.m[k] = v
 	}
 }
@@ -78,8 +62,5 @@ func (m *syncMap[K, V]) Delete(k K) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if v, ok := m.m[k]; ok {
-		m.onDelete(v)
-		delete(m.m, k)
-	}
+	delete(m.m, k)
 }

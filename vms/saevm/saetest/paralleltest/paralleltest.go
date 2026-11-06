@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/libevm/libevm/precompiles/parallel"
 	"github.com/ava-labs/libevm/params"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -81,15 +80,11 @@ func NewExecutor[CommonData, Prefetch any, R parallel.PrecompileResult, Aggregat
 	src := blocks.Source(chain.GetBlock).AsHeaderSource()
 	dbConfig := saedb.Config{CommitInterval: 4096}
 
-	tr, err := saedb.NewTracker(db, dbConfig, genesis.Hash(), tb.TempDir(), logger)
-	require.NoError(tb, err, "saedb.NewTracker()")
-
-	exec, err := saexec.New(genesis, new(atomic.Pointer[blocks.Block]), src, config, db, xdb, tr, hooks, logger, prometheus.NewRegistry())
+	exec, err := saexec.New(genesis, new(atomic.Pointer[blocks.Block]), src, config, db, xdb, dbConfig, tb.TempDir(), hooks, logger, prometheus.NewRegistry())
 	require.NoError(tb, err, "saexec.New()")
 
 	tb.Cleanup(func() {
 		require.NoErrorf(tb, exec.Close(), "%T.Close()", exec)
-		assert.NoErrorf(tb, tr.Close(exec.LastExecuted().PostExecutionStateRoot()), "%T.Close()", tr)
 		par.Close()
 	})
 

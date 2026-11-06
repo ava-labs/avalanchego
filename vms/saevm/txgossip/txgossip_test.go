@@ -103,8 +103,6 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 	chain := blockstest.NewChainBuilder(genesis)
 	src := blocks.Source(chain.GetBlock)
 
-	tr, err := saedb.NewTracker(db, saedb.Config{CommitInterval: saedb.DefaultCommitInterval}, genesis.EthBlock().Root(), t.TempDir(), logger)
-	require.NoError(t, err, "saedb.NewTracker()")
 	exec, err := saexec.New(
 		genesis,
 		new(atomic.Pointer[blocks.Block]),
@@ -112,7 +110,8 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 		config,
 		db,
 		xdb,
-		tr,
+		saedb.Config{CommitInterval: saedb.DefaultCommitInterval},
+		t.TempDir(),
 		hookstest.NewStub(gasTarget),
 		logger,
 		prometheus.NewRegistry(),
@@ -120,7 +119,6 @@ func newSUT(t *testing.T, numAccounts uint) SUT {
 	require.NoError(t, err, "saexec.New()")
 	t.Cleanup(func() {
 		require.NoErrorf(t, exec.Close(), "%T.Close()", exec)
-		require.NoErrorf(t, tr.Close(exec.LastExecuted().PostExecutionStateRoot()), "%T.Close()", tr)
 	})
 
 	bc := NewBlockChain(exec, src.AsEthBlockSource())

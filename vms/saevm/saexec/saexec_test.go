@@ -70,12 +70,12 @@ func TestMain(m *testing.M) {
 // SUT is the system under test, primarily the [Executor].
 type SUT struct {
 	*Executor
-	saedbConfig  saedb.Config
-	chain        *blockstest.ChainBuilder
-	wallet       *saetest.Wallet
-	logger       *loggingtest.Logger
-	db           ethdb.Database
-	chainDataDir string
+	saedbConfig saedb.Config
+	chain       *blockstest.ChainBuilder
+	wallet      *saetest.Wallet
+	logger      *loggingtest.Logger
+	db          ethdb.Database
+	dataDir     string
 
 	// [closeOnce] ensures that [Executor.Close] is only called once, so tests can
 	// explicitly close the [Executor] without worrying about the cleanup calling it again.
@@ -101,7 +101,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	logger := loggingtest.New(tb, logging.Warn)
 	ctx := logger.CancelOnError(tb.Context())
-	chainDataDir := tb.TempDir()
+	dataDir := tb.TempDir()
 
 	sutCfg := options.ApplyTo(&sutConfig{
 		hooks:          defaultHooks(),
@@ -118,7 +118,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	db := rawdb.NewMemoryDatabase()
 	xdb := saetest.NewExecutionResultsDB()
 
-	tdbCfg := saedbConfig.TrieDBConfig(chainDataDir, logger)
+	tdbCfg := saedbConfig.TrieDBConfig(dataDir, logger)
 
 	wallet := saetest.NewUNSAFEWallet(tb, 1, types.LatestSigner(config))
 	alloc := saetest.MaxAllocFor(wallet.Addresses()...)
@@ -135,32 +135,32 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 		blockstest.WithLogger(logger),
 		blockstest.WithHooks(sutCfg.hooks),
 	)
-	chain := blockstest.NewChainBuilder(genesis, blockOpts)
+	// Tests that do not model settlement still need a valid shutdown root.
+	chain := blockstest.NewChainBuilder(genesis, blockOpts, blockstest.WithEthBlockOptions(
+		blockstest.ModifyHeader(func(h *types.Header) {
+			h.Root = genesis.PostExecutionStateRoot()
+		}),
+	))
 	src := blocks.Source(chain.GetBlock)
 
-	tr, err := saedb.NewTracker(db, saedbConfig, genesis.EthBlock().Root(), chainDataDir, logger)
-	require.NoError(tb, err, "saedb.NewTracker()")
-	e, err := New(genesis, new(atomic.Pointer[blocks.Block]), src.AsHeaderSource(), config, db, xdb, tr, sutCfg.hooks, logger, prometheus.NewRegistry())
+	lastSettled := new(atomic.Pointer[blocks.Block])
+	lastSettled.Store(genesis)
+	e, err := New(genesis, lastSettled, src.AsHeaderSource(), config, db, xdb, saedbConfig, dataDir, sutCfg.hooks, logger, prometheus.NewRegistry())
 	require.NoError(tb, err, "New()")
 
-	closeOnce := sync.OnceValue(func() error {
-		return errors.Join(
-			e.Close(),
-			tr.Close(e.LastExecuted().PostExecutionStateRoot()),
-		)
-	})
+	closeOnce := sync.OnceValue(e.Close)
 	tb.Cleanup(func() {
-		require.NoErrorf(tb, closeOnce(), "%T.Close() then %T.Close()", e, tr)
+		require.NoErrorf(tb, closeOnce(), "%T.Close()", e)
 	})
 	return ctx, &SUT{
-		Executor:     e,
-		saedbConfig:  saedbConfig,
-		chain:        chain,
-		wallet:       wallet,
-		logger:       logger,
-		db:           db,
-		chainDataDir: chainDataDir,
-		closeOnce:    closeOnce,
+		Executor:    e,
+		saedbConfig: saedbConfig,
+		chain:       chain,
+		wallet:      wallet,
+		logger:      logger,
+		db:          db,
+		dataDir:     dataDir,
+		closeOnce:   closeOnce,
 	}
 }
 
@@ -1036,80 +1036,6 @@ func missingTrieNodeError(root common.Hash) testerr.Want {
 	})
 }
 
-// TestHashDBStateRootAvailability checks that untracking a state prunes it from
-// memory unless the snapshot still retains it, and that tracked states remain
-// available. This is not needed for Firewood, which prunes automatically, nor
-// any archival node, which never prunes.
-func TestHashDBStateRootAvailability(t *testing.T) {
-	t.Skip("FLAKY: This test relies on *blocks.Block.MarkExecuted, but this returns before tracking changes")
-	// Blocks form three contiguous sections by height, distinguished by whether
-	// their states are untracked below and whether they fall inside the
-	// snapshot's retention window of the last [core.TriesInMemory] states.
-	const (
-		numPruned      = 10                               // untracked, outside the window
-		numRetained    = 10                               // untracked, inside the window
-		numTracked     = core.TriesInMemory - numRetained // tracked, inside the window
-		numBlocks      = numPruned + numRetained + numTracked
-		commitInterval = 2 * numBlocks // guarantee no states are committed
-	)
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.commitInterval = commitInterval
-	}))
-	e, chain := sut.Executor, sut.chain
-
-	for range numBlocks {
-		b := chain.NewBlock(t, types.Transactions{
-			sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
-				To:       &common.Address{},
-				Gas:      params.TxGas,
-				GasPrice: big.NewInt(1),
-			}),
-		})
-		require.NoError(t, e.Enqueue(ctx, b), "%T.Enqueue()", e)
-	}
-
-	final := chain.Last()
-	require.NoErrorf(t, final.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted() on last-enqueued block", final)
-
-	checkStates := func(t *testing.T, e *Executor, expectReferenced func(height uint64) bool) {
-		t.Helper()
-
-		for _, b := range chain.AllBlocks() {
-			root := b.PostExecutionStateRoot()
-
-			var want testerr.Want
-			switch {
-			case saedb.ShouldCommitTrieDB(b.NumberU64(), sut.saedbConfig.CommitInterval):
-				// on disk
-			case expectReferenced(b.NumberU64()):
-				// still referenced
-			default:
-				// don't expect the state to be available
-				want = missingTrieNodeError(root)
-			}
-
-			_, err := e.StateDB(root)
-			if diff := testerr.Diff(err, want); diff != "" {
-				t.Errorf("%T.StateDB([post-execution root of block %d]) %s", e, b.NumberU64(), diff)
-			}
-		}
-	}
-
-	t.Run("all states", func(t *testing.T) {
-		// We haven't dropped any states.
-		checkStates(t, e, func(uint64) bool { return true })
-	})
-
-	t.Run("remove in memory state", func(t *testing.T) {
-		for _, b := range chain.AllExceptGenesis()[:numPruned+numRetained] {
-			e.Untrack(b.PostExecutionStateRoot())
-		}
-		checkStates(t, e, func(height uint64) bool {
-			return height > numPruned
-		})
-	})
-}
-
 // TestRecoveryStateAvailability checks that each configuration of the TrieDB
 // matches the expected state availability to avoid leaks and accurately
 // execute subsequent blocks.
@@ -1154,8 +1080,11 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			expectAvailable: func(height uint64) availability {
 				// The commitInterval is the MAXIMUM number of blocks before
 				// a state is persisted. The genesis is persisted separately.
-				if height == 0 || height == numBlocks {
+				if height == 0 || height == numBlocks-1 {
 					return available
+				}
+				if height == numBlocks {
+					return unavailable
 				}
 				return unknown
 			},
@@ -1166,7 +1095,7 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			archival:       true,
 			commitInterval: 1,
 			expectAvailable: func(height uint64) availability {
-				if height <= numBlocks {
+				if height < numBlocks {
 					return available
 				}
 				return unavailable
@@ -1179,7 +1108,7 @@ func TestRecoveryStateAvailability(t *testing.T) {
 			commitInterval: defaultCommitInterval,
 			expectAvailable: func(height uint64) availability {
 				// Only the state committed at shutdown should be available.
-				if height == numBlocks {
+				if height == numBlocks-1 {
 					return available
 				}
 				return unavailable
@@ -1195,7 +1124,7 @@ func TestRecoveryStateAvailability(t *testing.T) {
 				case saedb.ShouldCommitTrieDB(height+1, defaultCommitInterval):
 					// in this test, each block settles the previous
 					return available
-				case height == numBlocks:
+				case height == numBlocks-1:
 					// state committed at shutdown
 					return available
 				case height == 0:
@@ -1239,13 +1168,14 @@ func TestRecoveryStateAvailability(t *testing.T) {
 				// Restart the chain to remove the TrieDB cache.
 				src := blocks.Source(chain.GetBlock)
 				log := loggingtest.New(t, logging.Debug)
-				tr, err := saedb.NewTracker(sut.db, sut.saedbConfig, chain.Last().PostExecutionStateRoot(), sut.chainDataDir, log)
-				require.NoError(t, err, "saedb.NewTracker()")
-				e, err := New(chain.Last(), new(atomic.Pointer[blocks.Block]), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, tr, defaultHooks(), log, prometheus.NewRegistry())
+
+				// Shutdown persists the settled parent, leaving the last block
+				// to be re-executed after recovery.
+				lastSettled := chain.Last().ParentBlock()
+				e, err := New(lastSettled, new(atomic.Pointer[blocks.Block]), src.AsHeaderSource(), sut.chainConfig, sut.db, sut.xdb, sut.saedbConfig, sut.dataDir, defaultHooks(), log, prometheus.NewRegistry())
 				require.NoError(t, err, "New()")
 				t.Cleanup(func() {
 					require.NoErrorf(t, e.Close(), "%T.Close()", e)
-					require.NoErrorf(t, tr.Close(chain.Last().PostExecutionStateRoot()), "%T.Close()", tr)
 				})
 
 				for _, b := range chain.AllBlocks() {
