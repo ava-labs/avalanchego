@@ -27,13 +27,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/rpc"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/statesync"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
 	"github.com/ava-labs/avalanchego/vms/saevm/types"
@@ -295,8 +295,9 @@ func (vm *VM) Initialize(
 		{
 			tdb, snaps := vm.VM.EVMState()
 			// Firewood can only be opened once, but a HashDB shouldn't share a cache with execution.
-			if saeConfig.DBConfig.Scheme != customrawdb.FirewoodScheme {
-				tdb = triedb.NewDatabase(ethDB, tdbConfig)
+			if saeConfig.DBConfig.Scheme != firewood.Scheme {
+				// The triedb shouldn't share a cache with execution.
+				tdb := triedb.NewDatabase(ethDB, tdbConfig)
 				vm.onClose = append(vm.onClose, func(context.Context) error {
 					return tdb.Close()
 				})

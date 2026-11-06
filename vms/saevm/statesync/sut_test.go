@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -118,7 +117,7 @@ func withLastSynchronous(height uint64) sutOption {
 }
 
 // schemes are the trie database schemes under test.
-var schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}
+var schemes = []string{rawdb.HashScheme, firewood.Scheme}
 
 func withScheme(scheme string) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -289,7 +288,7 @@ func (s *sut) requireSyncedTo(t *testing.T, root ethcommon.Hash) {
 	}()
 
 	switch s.cfg.syncConfig.DBConfig.Scheme {
-	case customrawdb.FirewoodScheme:
+	case firewood.Scheme:
 		fw, ok := tdb.Backend().(*firewood.TrieDB)
 		require.Truef(t, ok, "%T.Backend() is %T", tdb, tdb.Backend())
 		require.Equal(t, root, ethcommon.Hash(fw.Firewood.Root()), "Firewood root")

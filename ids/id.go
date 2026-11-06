@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
-	"fmt"
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/cb58"
@@ -39,7 +38,7 @@ func ToID(bytes []byte) (ID, error) {
 
 // FromString is the inverse of ID.String()
 func FromString(idStr string) (ID, error) {
-	bytes, err := cb58.Decode(idStr)
+	bytes, err := cb58.Decode(idStr, IDLen)
 	if err != nil {
 		return ID{}, err
 	}
@@ -64,29 +63,24 @@ func (id ID) MarshalJSON() ([]byte, error) {
 }
 
 func (id *ID) UnmarshalJSON(b []byte) error {
-	str := string(b)
-	if str == nullStr { // If "null", do nothing
+	if string(b) == nullStr { // If "null", do nothing
 		return nil
-	} else if len(str) < 2 {
+	} else if len(b) < 2 {
 		return errMissingQuotes
 	}
 
-	lastIndex := len(str) - 1
-	if str[0] != '"' || str[lastIndex] != '"' {
+	lastIndex := len(b) - 1
+	if b[0] != '"' || b[lastIndex] != '"' {
 		return errMissingQuotes
 	}
 
-	// Parse CB58 formatted string to bytes
-	bytes, err := cb58.Decode(str[1:lastIndex])
-	if err != nil {
-		return fmt.Errorf("couldn't decode ID to bytes: %w", err)
-	}
-	*id, err = ToID(bytes)
-	return err
+	return id.UnmarshalText(b[1:lastIndex])
 }
 
 func (id *ID) UnmarshalText(text []byte) error {
-	return id.UnmarshalJSON(text)
+	var err error
+	*id, err = FromString(string(text))
+	return err
 }
 
 // Prefix this id to create a more selective id. This can be used to store

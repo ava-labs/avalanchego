@@ -14,10 +14,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/block"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/block"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/code"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/hashdb"
 
 	fwsyncer "github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 )

@@ -26,9 +26,9 @@ import (
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 
-	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
+	evmdb "github.com/ava-labs/avalanchego/vms/saevm/imp/database"
 )
 
 func TestNewTracker(t *testing.T) {
@@ -44,7 +44,7 @@ func TestNewTracker(t *testing.T) {
 		},
 		{
 			name: "firewood",
-			with: func(c *Config) { c.Scheme = customrawdb.FirewoodScheme },
+			with: func(c *Config) { c.Scheme = firewood.Scheme },
 		},
 		{
 			name:    "zero_commit_interval",

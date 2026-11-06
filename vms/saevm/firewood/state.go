@@ -9,21 +9,20 @@ package firewood
 import (
 	"fmt"
 
+	"github.com/ava-labs/firewood-go/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"go.uber.org/zap"
 
 	_ "github.com/ava-labs/libevm/trie" // comment resolution
-
-	// Need metrics registration from init function.
-	// TODO(alarso16): Move metrics initialization after deletion of graft.
-	graft "github.com/ava-labs/avalanchego/graft/evm/firewood"
 )
 
 var _ state.Database = (*stateAccessor)(nil)
 
 func init() {
-	var _ *graft.TrieDB // protect import for metrics registration
+	if err := ffi.StartMetrics(); err != nil {
+		panic(fmt.Sprintf("starting firewood metrics: %v", err))
+	}
 	state.RegisterDatabaseInterceptor(interceptor)
 }
 

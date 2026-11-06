@@ -23,19 +23,18 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/code"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/network"
 	"github.com/ava-labs/avalanchego/vms/saevm/sae"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/code"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/hashdb"
 
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	fwsyncer "github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 	graftsnap "github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
-	syncblock "github.com/ava-labs/avalanchego/vms/evm/sync/block"
+	syncblock "github.com/ava-labs/avalanchego/vms/saevm/statesync/block"
 )
 
 // A Syncer can fully state-sync an EVM database, sufficient for execution with
@@ -142,7 +141,7 @@ func (s *Syncer) Sync(ctx context.Context, summary *Summary) error {
 		return codeSyncer.Sync(egCtx)
 	})
 	eg.Go(func() error {
-		if s.cfg.DBConfig.Scheme == customrawdb.FirewoodScheme {
+		if s.cfg.DBConfig.Scheme == firewood.Scheme {
 			return s.syncFirewood(egCtx, hdr.Root, codeSyncer)
 		}
 		return s.syncHashDB(egCtx, hdr.Root, codeSyncer)

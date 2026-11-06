@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/block/executor/executormock"
@@ -310,6 +311,88 @@ func TestBuilderBuildBlock(t *testing.T) {
 				codec := codecmock.NewManager(ctrl)
 				codec.EXPECT().Marshal(gomock.Any(), gomock.Any()).Return([]byte{1, 2, 3}, nil).AnyTimes()
 				codec.EXPECT().Size(gomock.Any(), gomock.Any()).Return(2, nil).AnyTimes()
+
+				return New(
+					&txexecutor.Backend{
+						Codec: codec,
+						Ctx: &snow.Context{
+							Log: logging.NoLog{},
+						},
+					},
+					manager,
+					&mockable.Clock{},
+					mempool,
+				)
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "tx conflicts with processing ancestor",
+			builderFunc: func(ctrl *gomock.Controller) Builder {
+				preferredID := ids.GenerateTestID()
+				preferredBlock := &block.StandardBlock{
+					BlockID: preferredID,
+				}
+
+				baseDB := versiondb.New(memdb.New())
+				parser, err := block.NewParser(nil)
+				require.NoError(t, err)
+				preferredState, err := state.New(baseDB, parser, prometheus.NewRegistry(), trackChecksums)
+				require.NoError(t, err)
+
+				// The manager treats inputID1 as already imported by a processing
+				// ancestor, so VerifyUniqueInputs fails for any set containing it. Therefore
+				// tx1 should be dropped and only tx2 included when the block is built.
+				inputID1 := ids.GenerateTestID()
+				unsignedTx1 := txsmock.NewUnsignedTx(ctrl)
+				unsignedTx1.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
+				unsignedTx1.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
+					func(visitor txs.Visitor) error {
+						visitor.(*txexecutor.Executor).Inputs.Add(inputID1)
+						return nil
+					},
+				)
+				unsignedTx1.EXPECT().SetBytes(gomock.Any()).AnyTimes()
+				unsignedTx1.EXPECT().InputIDs().Return(nil)
+				tx1 := &txs.Tx{Unsigned: unsignedTx1}
+				tx1.SetBytes(nil, []byte{1})
+
+				inputID2 := ids.GenerateTestID()
+				unsignedTx2 := txsmock.NewUnsignedTx(ctrl)
+				unsignedTx2.EXPECT().Visit(gomock.Any()).Return(nil)  // Pass semantic verification
+				unsignedTx2.EXPECT().Visit(gomock.Any()).DoAndReturn( // Pass execution
+					func(visitor txs.Visitor) error {
+						visitor.(*txexecutor.Executor).Inputs.Add(inputID2)
+						return nil
+					},
+				)
+				unsignedTx2.EXPECT().InputIDs().Return(nil)
+				tx2 := &txs.Tx{Unsigned: unsignedTx2}
+
+				manager := executormock.NewManager(ctrl)
+				manager.EXPECT().Preferred().Return(preferredID)
+				manager.EXPECT().GetStatelessBlock(preferredID).Return(preferredBlock, nil)
+				manager.EXPECT().GetState(preferredID).Return(preferredState, true)
+
+				// inputID1 conflicts with ancestors
+				manager.EXPECT().VerifyUniqueInputs(preferredID, set.Of(inputID1)).Return(blkexecutor.ErrConflictingParentTxs)
+				manager.EXPECT().VerifyUniqueInputs(preferredID, set.Of(inputID2)).Return(nil)
+
+				manager.EXPECT().NewBlock(gomock.Any()).DoAndReturn(
+					func(block *block.StandardBlock) snowman.Block {
+						require.Equal(t, []*txs.Tx{tx2}, block.Transactions) // Only TX2 was included
+						return nil
+					},
+				)
+
+				mempool, err := mempool.New("", prometheus.NewRegistry())
+				require.NoError(t, err)
+				require.NoError(t, mempool.Add(tx1))
+				require.NoError(t, mempool.Add(tx2))
+
+				// To marshal the block
+				codec := codecmock.NewManager(ctrl)
+				codec.EXPECT().Marshal(gomock.Any(), gomock.Any()).Return([]byte{1, 2, 3}, nil).AnyTimes()
 
 				return New(
 					&txexecutor.Backend{

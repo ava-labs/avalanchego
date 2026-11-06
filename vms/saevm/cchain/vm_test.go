@@ -34,7 +34,6 @@ import (
 	"go.uber.org/goleak"
 	"google.golang.org/protobuf/proto"
 
-	// Imported for [saexec.Execute] comment resolution.
 	_ "github.com/ava-labs/avalanchego/vms/saevm/saexec"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -42,7 +41,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -57,9 +55,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
@@ -70,7 +66,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -271,7 +270,7 @@ func withCommitInterval(n uint64) sutOption {
 }
 
 // schemes are the triedb schemes supported.
-var schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}
+var schemes = []string{rawdb.HashScheme, firewood.Scheme}
 
 // withScheme selects the triedb scheme. Defaults to HashDB.
 func withScheme(scheme string) sutOption {
@@ -1104,7 +1103,7 @@ func TestStatefulRPCsReconstructExtraState(t *testing.T) {
 		},
 		{
 			name: "firewood_commit_interval",
-			opts: []sutOption{withScheme(customrawdb.FirewoodScheme), withArchival(), withCommitInterval(commitInterval)},
+			opts: []sutOption{withScheme(firewood.Scheme), withArchival(), withCommitInterval(commitInterval)},
 		},
 	}
 
@@ -1214,6 +1213,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 		GasPrice: big.NewInt(1),
 	})
 	require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, tracedTx), "%T.SendTransaction(%#x)", sut.ethclient, tracedTx.Hash())
+	sut.waitForPendingEthTxs(ctx, t, tracedTx)
 
 	// Export gives us observable external state.
 	var (
@@ -2287,7 +2287,7 @@ func TestWaitForEventInitializing(t *testing.T) {
 func TestRecoverFirewoodAcrossSynchronousTransition(t *testing.T) {
 	fixture, opts, clock := synchronousFixture(t)
 	dataDir := t.TempDir()
-	opts = append(opts, withScheme(customrawdb.FirewoodScheme), withDB(memdb.New()), withChainDataDir(dataDir))
+	opts = append(opts, withScheme(firewood.Scheme), withDB(memdb.New()), withChainDataDir(dataDir))
 
 	ctx, sut := newSUT(t, opts...)
 	sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
@@ -2302,7 +2302,7 @@ func TestRecoverFirewoodAcrossSynchronousTransition(t *testing.T) {
 	require.NoErrorf(t, sut.Shutdown(ctx), "%T.Shutdown()", sut.VM)
 
 	// Simulates a crash rolling Firewood back before it persisted anything.
-	firewoodDir := filepath.Join(dataDir, firewood.Directory)
+	firewoodDir := filepath.Join(dataDir, saedb.FirewoodDirectory)
 	require.NoError(t, os.RemoveAll(firewoodDir), "removing Firewood directory")
 
 	// Shutdown persists the settled asynchronous root, which will then be the

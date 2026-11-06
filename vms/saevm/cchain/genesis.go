@@ -21,9 +21,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 
@@ -156,11 +156,10 @@ func (g *genesis) verifyAndWriteBlock(db ethdb.Database) error {
 	}
 
 	hash := block.Hash()
-	if prev := rawdb.ReadCanonicalHash(db, genesisNumber); prev == (common.Hash{}) {
-		if err := writeGenesisBlock(db, block, g.Config); err != nil {
-			return fmt.Errorf("writing block: %w", err)
-		}
-	} else if prev != hash {
+	switch prev := rawdb.ReadCanonicalHash(db, genesisNumber); {
+	case prev == (common.Hash{}):
+		return writeGenesisBlock(db, block, g.Config)
+	case prev != hash:
 		return &core.GenesisMismatchError{
 			Stored: prev,
 			New:    hash,

@@ -13,17 +13,16 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -139,12 +138,6 @@ func TestFromReceipts(t *testing.T) {
 			require.Equal(t, test.want, msgs, "FromReceipts()")
 		})
 	}
-}
-
-// newRules returns rules with Durango, and therefore Warp, active iff
-// isDurango.
-func newRules(isDurango bool) corethparams.RulesExtra {
-	return corethparams.RulesExtra{IsDurango: isDurango}
 }
 
 func TestVerifyBlock(t *testing.T) {
@@ -310,9 +303,8 @@ func TestVerifyBlock(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			snowContext := snowtest.Context(t, snowtest.CChainID)
 			warptest.SetValidators(t, snowContext, vdrs)
-			rules := newRules(test.isDurango)
 
-			got, err := VerifyBlock(snowContext, test.blockContext, rules, test.txs)
+			got, err := VerifyBlock(snowContext, test.blockContext, test.isDurango, test.txs)
 			require.ErrorIs(t, err, test.wantErr, "VerifyBlock()")
 			require.Equal(t, test.want, got, "VerifyBlock()")
 		})
@@ -324,7 +316,6 @@ func BenchmarkVerifyBlock(b *testing.B) {
 	// number of signers is held fixed.
 	const numSigners = 10
 
-	rules := newRules(true)
 	vdrs := warptest.NewValidators(b, warptest.WithMinimum(numSigners))
 	snowContext := snowtest.Context(b, snowtest.CChainID)
 	warptest.SetValidators(b, snowContext, vdrs)
@@ -355,7 +346,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 
 				// Confirm the predicates verify before timing, so the benchmark
 				// measures the success path rather than an early failure.
-				results, err := VerifyBlock(snowContext, blockContext, rules, txs)
+				results, err := VerifyBlock(snowContext, blockContext, true /*isDurango*/, txs)
 				require.NoError(b, err, "VerifyBlock()")
 				require.Len(b, results, numTxs, "VerifyBlock() results length")
 
@@ -367,7 +358,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 				}
 
 				for b.Loop() {
-					_, _ = VerifyBlock(snowContext, blockContext, rules, txs)
+					_, _ = VerifyBlock(snowContext, blockContext, true /*isDurango*/, txs)
 				}
 
 				predicates := numTxs * predicatesPerTx

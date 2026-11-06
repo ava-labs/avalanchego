@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
+	"slices"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -119,7 +121,7 @@ func (b *blockBuilderG[_]) rebuild(
 		ctx,
 		bCtx,
 		parent,
-		func(txpool.PendingFilter) []*txgossip.LazyTransaction { return txs },
+		func(txpool.PendingFilter) iter.Seq[*txgossip.LazyTransaction] { return slices.Values(txs) },
 		rebuilder,
 		saeparams.MaxBlockBytes,
 	)
@@ -142,7 +144,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	ctx context.Context,
 	bCtx *block.Context,
 	parent *blocks.Block,
-	pendingTxs func(txpool.PendingFilter) []*txgossip.LazyTransaction,
+	pendingTxs func(txpool.PendingFilter) iter.Seq[*txgossip.LazyTransaction],
 	builder hook.BlockBuilder[T],
 	blockByteBudget uint64,
 ) (*blocks.Block, error) {
@@ -249,13 +251,12 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	hdr.BaseFee = state.BaseFee().ToBig()
 
 	var (
-		candidates = pendingTxs(txpool.PendingFilter{
-			BaseFee: state.BaseFee(),
-		})
 		included      []*types.Transaction
 		includedBytes uint64
 	)
-	for _, ltx := range candidates {
+	for ltx := range pendingTxs(txpool.PendingFilter{
+		BaseFee: state.BaseFee(),
+	}) {
 		// If we don't have enough gas remaining in the block for the minimum
 		// gas amount, we are done including transactions.
 		if remainingGas := state.GasLimit() - state.GasUsed(); remainingGas < params.TxGas {

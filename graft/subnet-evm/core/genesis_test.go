@@ -44,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
@@ -72,7 +71,7 @@ func TestGenesisBlockForTesting(t *testing.T) {
 }
 
 func TestSetupGenesis(t *testing.T) {
-	for _, scheme := range []string{rawdb.HashScheme, rawdb.PathScheme, customrawdb.FirewoodScheme} {
+	for _, scheme := range []string{rawdb.HashScheme, rawdb.PathScheme, firewood.Scheme} {
 		t.Run(scheme, func(t *testing.T) {
 			testSetupGenesis(t, scheme)
 		})
@@ -369,7 +368,7 @@ func newDbConfig(t *testing.T, scheme string) *triedb.Config {
 		return triedb.HashDefaults
 	case rawdb.PathScheme:
 		return &triedb.Config{DBOverride: pathdb.Defaults.BackendConstructor}
-	case customrawdb.FirewoodScheme:
+	case firewood.Scheme:
 		fwCfg := firewood.DefaultConfig(t.TempDir())
 		return &triedb.Config{DBOverride: fwCfg.BackendConstructor}
 	default:

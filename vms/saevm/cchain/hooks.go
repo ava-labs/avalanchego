@@ -24,14 +24,13 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
@@ -40,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/saevm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -538,8 +538,7 @@ func (b *builder) BuildBlock(
 	}
 
 	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
-	rulesExtra := (*corethparams.RulesExtra)(corethparams.GetRulesExtra(rules))
-	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, rulesExtra, ethTxs)
+	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, corethparams.GetRulesExtra(rules).IsDurango, ethTxs)
 	if err != nil {
 		return nil, fmt.Errorf("verifying warp messages: %w", err)
 	}

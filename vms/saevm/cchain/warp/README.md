@@ -58,7 +58,7 @@ flowchart TD
 | Style | Meaning |
 |---|---|
 | Blue | This package |
-| Orange | EVM side: [warp precompile](../../../../graft/coreth/precompile/contracts/warp/README.md) and [predicate handling](../../../evm/predicate/README.md) |
+| Orange | EVM side: [warp precompile](../../../../graft/coreth/precompile/contracts/warp/README.md) and [predicate handling](../../../../graft/evm/predicate/README.md) |
 | Purple | AvalancheGo platform: [ACP-118 handler](../../../../network/p2p/acp118/handler.go), BLS signer |
 | Gray | External actors |
 
@@ -117,12 +117,12 @@ The two `Storage`-backed kinds are indistinguishable to the `Verifier`: precompi
 
 ### Inbound messages are predicates
 
-A signed message rides into the receiver chain inside a transaction's access list — a *predicate* (see the [predicate encoding](../../../evm/predicate/README.md)). Verifying it means checking the multi-signature against the source chain's validator set, which changes over time; the proposervm block context supplies the P-Chain height that pins it.
+A signed message rides into the receiver chain inside a transaction's access list — a *predicate* (see the [predicate encoding](../../../../graft/evm/predicate/README.md)). Verifying it means checking the multi-signature against the source chain's validator set, which changes over time; the proposervm block context supplies the P-Chain height that pins it.
 
 ```mermaid
 flowchart TD
     tx["Transaction<br/>access list"]:::ext
-    fal["predicate.FromAccessList"]:::evm
+    fal["RulesExtra.WarpMessages"]:::evm
     bctx["block.Context<br/>(P-Chain height)"]:::plat
     bits["set.Bits of<br/>failed indices"]:::pkg
     res["BlockResults"]:::pkg
@@ -130,11 +130,11 @@ flowchart TD
     gvm["getVerifiedWarpMessage"]:::evm
 
     subgraph VB["VerifyBlock"]
-        vp["Precompile VerifyPredicate<br/>(one goroutine per predicate)"]:::evm
+        vp["Warp VerifyPredicate<br/>(one goroutine per message)"]:::evm
     end
 
     tx --> fal
-    fal -->|"predicates keyed by<br/>precompile address"| vp
+    fal -->|"Warp messages in<br/>access-list order"| vp
     bctx -->|"pins the source chain's<br/>validator set"| vp
     vp --> bits --> res
     res -->|"encoded into the header"| hdr
@@ -181,4 +181,4 @@ Signing protocol:
 EVM side:
 
 - [coreth warp precompile](../../../../graft/coreth/precompile/contracts/warp/README.md) - `sendWarpMessage`, `getVerifiedWarpMessage`, predicate verification
-- [`vms/evm/predicate`](../../../evm/predicate/README.md) - access-list predicate encoding and results
+- [`graft/evm/predicate`](../../../../graft/evm/predicate/README.md) - access-list predicate encoding and results
