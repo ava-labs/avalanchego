@@ -8,6 +8,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -19,6 +21,10 @@ import (
 // ErrUnknownParent is returned by a block's Verify when its parent is neither
 // accepted nor verified.
 var ErrUnknownParent = errors.New("unknown parent")
+
+// ErrNotContiguous is returned by a block's Accept when the block is not the
+// child of the last accepted block.
+var ErrNotContiguous = errors.New("accepted blocks must be contiguous")
 
 // VM is a fake [block.ChainVM]
 type VM struct {
@@ -50,6 +56,7 @@ func NewVM(t *testing.T, chain []*snowmantest.Block) *VM {
 	for _, blk := range chain {
 		vm.byBytes[string(blk.Bytes())] = blk
 		if blk.Status == snowtest.Accepted {
+			require.Greater(t, blk.Height(), vm.lastAccepted.Height(), "accepted blocks must ascend")
 			vm.recordAccepted(blk)
 		}
 	}
@@ -109,12 +116,14 @@ func (vm *VM) wrap(blk *snowmantest.Block) snowman.Block {
 	return &block{Block: blk, vm: vm}
 }
 
-// markAccepted accepts blk, which must directly follow the last accepted block.
-func (vm *VM) markAccepted(blk *snowmantest.Block) error {
-	if vm.lastAccepted != nil && blk.Height() != vm.lastAccepted.Height()+1 {
-		return errors.New("accepted blocks must be contiguous")
+// checkContiguous returns [ErrNotContiguous] unless blk is the child of the last
+// accepted block.
+func (vm *VM) checkContiguous(blk *snowmantest.Block) error {
+	if last := vm.lastAccepted; last != nil {
+		if blk.Parent() != last.ID() || blk.Height() != last.Height()+1 {
+			return ErrNotContiguous
+		}
 	}
-	vm.recordAccepted(blk)
 	return nil
 }
 
@@ -153,10 +162,14 @@ func (b *block) Verify(ctx context.Context) error {
 }
 
 func (b *block) Accept(ctx context.Context) error {
+	if err := b.vm.checkContiguous(b.Block); err != nil {
+		return err
+	}
 	if err := b.Block.Accept(ctx); err != nil {
 		return err
 	}
-	return b.vm.markAccepted(b.Block)
+	b.vm.recordAccepted(b.Block)
+	return nil
 }
 
 func (b *block) Reject(ctx context.Context) error {
