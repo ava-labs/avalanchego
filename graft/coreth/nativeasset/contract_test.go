@@ -16,9 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
+	"github.com/ava-labs/avalanchego/vms/evm/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/evm/cchain/libevm/extstate"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 	ethparams "github.com/ava-labs/libevm/params"

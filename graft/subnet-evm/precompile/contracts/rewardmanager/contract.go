@@ -13,7 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
-	"github.com/ava-labs/avalanchego/vms/saevm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/libevm/common"

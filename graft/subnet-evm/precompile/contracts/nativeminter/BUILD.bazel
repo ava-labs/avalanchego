@@ -54,7 +54,7 @@ graft_go_test(
         "//graft/subnet-evm/precompile/contracts/utilstest",
         "//graft/subnet-evm/precompile/precompileconfig",
         "//graft/subnet-evm/precompile/precompiletest",
-        "//vms/saevm/imp/blackhole",
+        "//vms/evm/imp/blackhole",
         "@com_github_ava_labs_libevm//accounts/abi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/math",
