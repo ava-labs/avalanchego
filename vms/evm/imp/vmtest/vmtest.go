@@ -97,11 +97,6 @@ func New(ctx context.Context, tb testing.TB, vm VM, snowCtx *snow.Context, cfg C
 		require.NoErrorf(tb, vm.Shutdown(ctx), "%T.Shutdown()", vm)
 	})
 
-	// This is called immediately after initialization by avalanchego, so we
-	// should test this behavior specifically.
-	handlers, err := vm.CreateHandlers(ctx)
-	require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
-
 	// Avalanchego marks the local node as connected so that p2p protocols don't
 	// need to treat our node as a special case.
 	require.NoErrorf(tb, vm.Connected(ctx, snowCtx.NodeID, version.Current), "%T.Connected(%s)", vm, snowCtx.NodeID)
@@ -115,6 +110,9 @@ func New(ctx context.Context, tb testing.TB, vm VM, snowCtx *snow.Context, cfg C
 	}
 
 	if !cfg.SkipRPCTransport {
+		handlers, err := vm.CreateHandlers(ctx)
+		require.NoErrorf(tb, err, "%T.CreateHandlers()", vm)
+
 		mux := http.NewServeMux()
 		for path, h := range handlers {
 			mux.Handle(cfg.HTTPPrefix+path, h)
