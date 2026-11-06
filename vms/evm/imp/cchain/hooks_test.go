@@ -187,7 +187,7 @@ func TestTargetExponent(t *testing.T) {
 		{
 			name:    "no_field_fortuna_parses_extra",
 			header:  &types.Header{Time: fortunaTime, Number: big.NewInt(1)},
-			wantErr: customtypes.ErrInsufficientFeeState,
+			wantErr: cparams.ErrInsufficientFeeState,
 		},
 	}
 

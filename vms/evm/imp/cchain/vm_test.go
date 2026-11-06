@@ -61,6 +61,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/synchronoustest"
@@ -73,7 +74,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/txgossip/txgossiptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
@@ -1397,7 +1397,7 @@ func TestParseBlock(t *testing.T) {
 	w := newWallet(key, sut.ctx, nil)
 	stx := w.newMinimalTx(t)
 
-	ap1Time := *corethparams.GetExtra(sut.chainConfig).ApricotPhase1Timestamp
+	ap1Time := *cparams.GetExtra(sut.chainConfig).ApricotPhase1Timestamp
 
 	const (
 		preAP1WithDataHeight    = 1
