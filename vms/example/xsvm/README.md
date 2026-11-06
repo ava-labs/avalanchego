@@ -264,12 +264,12 @@ This starts a two-node network with two L1s, `xsvm-a` and `xsvm-b`, each running
 Collect the chain IDs, node URIs, and the pre-funded key from the network directory:
 
 ```bash
-N=$(ls -dt ~/.tmpnet/networks/*-avalanchego-e2e | head -1)
-A=$(jq -r '.Chains[0].ChainID' $N/subnets/xsvm-a.json)
-B=$(jq -r '.Chains[0].ChainID' $N/subnets/xsvm-b.json)
-K=$(jq -r '.Chains[0].PreFundedKey' $N/subnets/xsvm-a.json)
-AN=$(jq -r '.ValidatorIDs[0]' $N/subnets/xsvm-a.json); AU=$(jq -r .uri $N/$AN/process.json)
-BN=$(jq -r '.ValidatorIDs[0]' $N/subnets/xsvm-b.json); BU=$(jq -r .uri $N/$BN/process.json)
+NETWORK_DIR=$(ls -dt ~/.tmpnet/networks/*-avalanchego-e2e | head -1)
+CHAIN_A_ID=$(jq -r '.Chains[0].ChainID' $NETWORK_DIR/subnets/xsvm-a.json)
+CHAIN_B_ID=$(jq -r '.Chains[0].ChainID' $NETWORK_DIR/subnets/xsvm-b.json)
+PREFUNDED_KEY=$(jq -r '.Chains[0].PreFundedKey' $NETWORK_DIR/subnets/xsvm-a.json)
+NODE_A_ID=$(jq -r '.ValidatorIDs[0]' $NETWORK_DIR/subnets/xsvm-a.json); NODE_A_URI=$(jq -r .uri $NETWORK_DIR/$NODE_A_ID/process.json)
+NODE_B_ID=$(jq -r '.ValidatorIDs[0]' $NETWORK_DIR/subnets/xsvm-b.json); NODE_B_URI=$(jq -r .uri $NETWORK_DIR/$NODE_B_ID/process.json)
 ```
 
 Each L1 is validated by a different node, so issue transactions against the node that validates the chain.
@@ -279,7 +279,7 @@ Each L1 is validated by a different node, so issue transactions against the node
 The genesis funds a random key rather than the CLI's default key, so pass it with `--private-key`.
 
 ```bash
-build/xsvm issue export --uri $AU --source-chain-id $A --destination-chain-id $B --amount 1000 --private-key $K
+build/xsvm issue export --uri $NODE_A_URI --source-chain-id $CHAIN_A_ID --destination-chain-id $CHAIN_B_ID --amount 1000 --private-key $PREFUNDED_KEY
 ```
 
 Save the TxID from the `issued tx <TxID>` line printed by the export command. The exported amount is credited to `--to`, which defaults to the XSVM CLI's default address.
@@ -289,8 +289,8 @@ Save the TxID from the `issued tx <TxID>` line printed by the export command. Th
 > Note: The import tx requires **snowman++** consensus to be activated on the importing chain. A chain requires ~3 blocks to be produced for snowman++ to start. The import hangs until enough blocks exist.
 
 ```bash
-for i in 1 2 3; do build/xsvm issue transfer --uri $BU --chain-id $B --amount 1000 --private-key $K; done
-build/xsvm issue import --uri $BU --source-chain-id $A --destination-chain-id $B --tx-id <exportTxID> --source-uris $AU
+for i in 1 2 3; do build/xsvm issue transfer --uri $NODE_B_URI --chain-id $CHAIN_B_ID --amount 1000 --private-key $PREFUNDED_KEY; done
+build/xsvm issue import --uri $NODE_B_URI --source-chain-id $CHAIN_A_ID --destination-chain-id $CHAIN_B_ID --tx-id <exportTxID> --source-uris $NODE_A_URI
 ```
 
 The import is signed by the default key, which matches the default `--to` of the export.
@@ -300,11 +300,11 @@ The import is signed by the default key, which matches the default `--to` of the
 To check proper execution, use the `xsvm account` command to check balances. Chain A's asset should now be credited on L1 B:
 
 ```bash
-build/xsvm account --uri $BU --chain-id $B --asset-id $A
+build/xsvm account --uri $NODE_B_URI --chain-id $CHAIN_B_ID --asset-id $CHAIN_A_ID
 ```
 
 ### Stop the network
 
 ```bash
-./scripts/run_tmpnetctl.sh stop-network --network-dir=$N
+./scripts/run_tmpnetctl.sh stop-network --network-dir=$NETWORK_DIR
 ```
