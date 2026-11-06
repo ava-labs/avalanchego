@@ -70,8 +70,7 @@ func UnpackNativeAssetBalanceInput(input []byte) (common.Address, common.Hash, e
 // Run returns the balance of an asset held by an address, as a 32-byte word.
 // The input is the address followed by the asset ID, as packed by
 // [PackNativeAssetBalanceInput]. Malformed input reverts.
-func (*NativeAssetBalance) Run(accessibleState contract.AccessibleState, _ common.Address, _ common.Address, input []byte, _ bool) ([]byte, error) {
-	env := accessibleState.GetPrecompileEnv()
+func (*NativeAssetBalance) Run(env contract.Environment, input []byte) ([]byte, error) {
 	if err := contract.DeductGas(env, AssetBalanceCost); err != nil {
 		return nil, err
 	}
@@ -82,7 +81,8 @@ func (*NativeAssetBalance) Run(accessibleState contract.AccessibleState, _ commo
 		return nil, vm.ErrExecutionReverted
 	}
 
-	res := accessibleState.GetStateDB().GetAssetBalance(address, assetID).Bytes32()
+	stateDB := env.ReadOnlyState().(contract.StateDB)
+	res := stateDB.GetAssetBalance(address, assetID).Bytes32()
 	return res[:], nil
 }
 
@@ -121,13 +121,12 @@ func UnpackNativeAssetCallInput(input []byte) (common.Address, common.Hash, *uin
 // is packed by [PackNativeAssetCallInput]. The transfer is undone if the call
 // fails. If the call fails other than by reverting, all remaining gas is
 // consumed. Read-only calls and malformed input revert.
-func (*NativeAssetCall) Run(accessibleState contract.AccessibleState, caller common.Address, _ common.Address, input []byte, readOnly bool) ([]byte, error) {
-	env := accessibleState.GetPrecompileEnv()
+func (*NativeAssetCall) Run(env contract.Environment, input []byte) ([]byte, error) {
 	if err := contract.DeductGas(env, AssetCallCost); err != nil {
 		return nil, err
 	}
 
-	if readOnly {
+	if env.ReadOnly() {
 		return nil, vm.ErrExecutionReverted
 	}
 
@@ -137,8 +136,8 @@ func (*NativeAssetCall) Run(accessibleState contract.AccessibleState, caller com
 		return nil, vm.ErrExecutionReverted
 	}
 
-	stateDB := accessibleState.GetStateDB()
-	if !assetAmount.IsZero() && stateDB.GetAssetBalance(caller, assetID).Cmp(assetAmount) < 0 {
+	stateDB := env.StateDB().(contract.StateDB)
+	if !assetAmount.IsZero() && stateDB.GetAssetBalance(env.Caller(), assetID).Cmp(assetAmount) < 0 {
 		return nil, vm.ErrInsufficientBalance
 	}
 
@@ -152,7 +151,7 @@ func (*NativeAssetCall) Run(accessibleState contract.AccessibleState, caller com
 	}
 
 	// Send `assetAmount` of `assetID` to `to` address
-	stateDB.SubAssetBalance(caller, assetID, assetAmount)
+	stateDB.SubAssetBalance(env.Caller(), assetID, assetAmount)
 	stateDB.AddAssetBalance(to, assetID, assetAmount)
 
 	legacy := []vm.CallOption{
@@ -177,6 +176,6 @@ var _ contract.StatefulPrecompiledContract = (*DeprecatedContract)(nil)
 type DeprecatedContract struct{}
 
 // Run always reverts without charging gas.
-func (*DeprecatedContract) Run(contract.AccessibleState, common.Address, common.Address, []byte, bool) ([]byte, error) {
+func (*DeprecatedContract) Run(contract.Environment, []byte) ([]byte, error) {
 	return nil, vm.ErrExecutionReverted
 }

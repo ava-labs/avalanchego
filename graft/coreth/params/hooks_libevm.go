@@ -4,7 +4,6 @@
 package params
 
 import (
-	"math/big"
 	"slices"
 
 	"github.com/ava-labs/libevm/common"
@@ -164,76 +163,52 @@ func (r RulesExtra) currentPrecompiles() map[common.Address]vm.PrecompiledContra
 	return nil
 }
 
+// makePrecompile adapts a [contract.StatefulPrecompiledContract] to a [libevm.PrecompiledContract]
 func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.PrecompiledContract {
-	return vm.NewStatefulPrecompile(func(env vm.PrecompileEnvironment, input []byte) ([]byte, error) {
-		rules := *GetRulesExtra(env.Rules())
-
-		if call := env.IncomingCallType(); (call == vm.DelegateCall || call == vm.CallCode) && rules.IsGranite {
-			env.UseGas(env.Gas()) // A revert would otherwise refund the remaining gas.
-			return nil, vm.ErrExecutionReverted
+	return vm.NewStatefulPrecompile(func(vmEnv vm.PrecompileEnvironment, input []byte) ([]byte, error) {
+		contractEnv, err := newEnvironment(vmEnv)
+		if err != nil {
+			return nil, err
 		}
-
-		accessibleState := accessibleState{
-			env: env,
-			blockContext: &precompileBlockContext{
-				number:           env.BlockNumber(),
-				time:             env.BlockTime(),
-				predicateResults: customtypes.PredicateResults(env.BlockHeader(), rules),
-			},
-		}
-
-		return contract.Run(accessibleState, env.Addresses().EVMSemantic.Caller, env.Addresses().EVMSemantic.Self, input, env.ReadOnly())
+		return contract.Run(contractEnv, input)
 	})
 }
 
-type accessibleState struct {
-	env          vm.PrecompileEnvironment
-	blockContext *precompileBlockContext
-}
+var _ contract.Environment = (*environment)(nil)
 
-func (a accessibleState) GetStateDB() contract.StateDB {
-	// TODO the contracts should be refactored to call `env.ReadOnlyState`
-	// or `env.StateDB` based on the env.ReadOnly() flag
-	var state libevm.StateReader
-	if a.env.ReadOnly() {
-		state = a.env.ReadOnlyState()
-	} else {
-		state = a.env.StateDB()
-	}
-	return state.(contract.StateDB)
-}
-
-func (a accessibleState) GetBlockContext() contract.BlockContext {
-	return a.blockContext
-}
-
-func (a accessibleState) GetRules() precompileconfig.Rules {
-	chainConfigExtra := GetExtra(a.GetPrecompileEnv().ChainConfig())
-	return chainConfigExtra.Rules(a.GetBlockContext().Timestamp())
-}
-
-func (a accessibleState) GetSnowContext() *snow.Context {
-	return GetExtra(a.env.ChainConfig()).SnowCtx
-}
-
-func (a accessibleState) GetPrecompileEnv() vm.PrecompileEnvironment {
-	return a.env
-}
-
-type precompileBlockContext struct {
-	number           *big.Int
-	time             uint64
+type environment struct {
+	vm.PrecompileEnvironment
 	predicateResults predicate.BlockResults
+	rules            *cparams.Rules
 }
 
-func (p *precompileBlockContext) Number() *big.Int {
-	return p.number
+func newEnvironment(env vm.PrecompileEnvironment) (*environment, error) {
+	rules := GetRulesExtra(env.Rules())
+
+	if call := env.IncomingCallType(); (call == vm.DelegateCall || call == vm.CallCode) && rules.IsGranite {
+		env.UseGas(env.Gas()) // A revert would otherwise refund the remaining gas.
+		return nil, vm.ErrExecutionReverted
+	}
+
+	return &environment{
+		PrecompileEnvironment: env,
+		predicateResults:      customtypes.PredicateResults(env.BlockHeader(), *rules),
+		rules:                 rules,
+	}, nil
 }
 
-func (p *precompileBlockContext) Timestamp() uint64 {
-	return p.time
+func (e *environment) Caller() common.Address {
+	return e.Addresses().EVMSemantic.Caller
 }
 
-func (p *precompileBlockContext) GetWarpMessageResults(txHash common.Hash) set.Bits {
-	return p.predicateResults.Get(txHash, warp.ContractAddress)
+func (e *environment) ExtraRules() precompileconfig.Rules {
+	return e.rules
+}
+
+func (e *environment) SnowContext() *snow.Context {
+	return GetExtra(e.ChainConfig()).SnowCtx
+}
+
+func (e *environment) WarpMessageResults(txHash common.Hash) set.Bits {
+	return e.predicateResults.Get(txHash, warp.ContractAddress)
 }
