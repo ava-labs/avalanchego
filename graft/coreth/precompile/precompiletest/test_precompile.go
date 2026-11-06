@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
 )
@@ -39,8 +40,9 @@ type PrecompileTest struct {
 	ReadOnly bool
 	// WarpMessages that the precompile should have access to.
 	WarpMessages []predicate.Predicate
-	// SetupBlockContext sets the expected calls on MockBlockContext for the test execution.
-	SetupBlockContext func(*contract.MockBlockContext)
+	// WarpMessageFailures is a list of indices of Warp messages that failed
+	// predicate verification.
+	WarpMessageFailures []int
 	// AfterHook is called after the precompile is called.
 	AfterHook func(t testing.TB, state contract.StateDB)
 	// ExpectedRes is the expected raw byte result returned by the precompile
@@ -143,11 +145,8 @@ func (test PrecompileTest) setup(t testing.TB, address common.Address, state *te
 
 	blockContext := contract.NewMockBlockContext(ctrl)
 	blockContext.EXPECT().Timestamp().Return(uint64(time.Now().Unix())).AnyTimes()
-	if test.SetupBlockContext != nil {
-		test.SetupBlockContext(blockContext)
-	} else {
-		blockContext.EXPECT().Number().Return(big.NewInt(0)).AnyTimes()
-	}
+	blockContext.EXPECT().Number().Return(big.NewInt(0)).AnyTimes()
+	blockContext.EXPECT().GetWarpMessageResults(common.Hash{}).Return(set.NewBits(test.WarpMessageFailures...)).AnyTimes()
 	snowContext := snowtest.Context(t, snowtest.CChainID)
 
 	accessibleState := contract.NewMockAccessibleState(ctrl)
