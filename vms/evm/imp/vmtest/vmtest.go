@@ -259,23 +259,21 @@ func (s *SUT) Balance(tb testing.TB, addr common.Address) uint256.Int {
 	return *state.GetBalance(addr)
 }
 
-// WaitForPendingTxs waits for [VM.WaitForEvent] to report pending txs.
-func (s *SUT) WaitForPendingTxs(ctx context.Context, tb testing.TB) {
+// WaitForPendingTxs waits for [VM.WaitForEvent] to report pending txs. Any txs
+// provided are first waited on to be in the tx pool, so that the next built
+// block includes all of them rather than racing promotion.
+func (s *SUT) WaitForPendingTxs(ctx context.Context, tb testing.TB, txs ...*types.Transaction) {
 	tb.Helper()
 
+	if len(txs) > 0 {
+		txgossiptest.WaitUntilPending(tb, ctx, s.vm.GethRPCBackends(), txs...)
+	}
 	if s.beforeWaitForEvent != nil {
 		s.beforeWaitForEvent()
 	}
 	e, err := s.vm.WaitForEvent(ctx)
 	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.vm)
 	assert.Equalf(tb, snowcommon.PendingTxs, e, "%T.WaitForEvent() event", s.vm)
-}
-
-// WaitForPendingEthTxs blocks until every tx is pending in the tx pool, so that
-// the next built block includes all of them.
-func (s *SUT) WaitForPendingEthTxs(ctx context.Context, tb testing.TB, txs ...*types.Transaction) {
-	tb.Helper()
-	txgossiptest.WaitUntilPending(tb, ctx, s.vm.GethRPCBackends(), txs...)
 }
 
 // AssertAccount asserts addr's nonce and balance at the last-executed state.

@@ -400,7 +400,7 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 		clock:          cfg.clock,
 		logger:         log,
 	}
-	vmSUT, err := vmtest.New(ctx, tb, vm, snowCtx, vmtest.Config{
+	sut.SUT, err = vmtest.New(ctx, tb, vm, snowCtx, vmtest.Config{
 		DB:                 chainDB,
 		Genesis:            genesisBytes,
 		Config:             configBytes,
@@ -413,7 +413,6 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 	if err != nil {
 		return nil, err
 	}
-	sut.SUT = vmSUT
 	if !cfg.skipRPCTransport {
 		sut.Client = NewClient(sut.URL)
 	}
@@ -959,7 +958,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 		GasPrice: big.NewInt(1),
 	})
 	require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, tracedTx), "%T.SendTransaction(%#x)", sut.EthClient(), tracedTx.Hash())
-	sut.WaitForPendingEthTxs(ctx, t, tracedTx)
+	sut.WaitForPendingTxs(ctx, t, tracedTx)
 
 	// Export gives us observable external state.
 	var (
@@ -1037,7 +1036,7 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 	}
 
 	// Ensure every tx is pending so the builder includes them all in one block.
-	sut.WaitForPendingEthTxs(ctx, t, txs...)
+	sut.WaitForPendingTxs(ctx, t, txs...)
 
 	preBalance := sut.Balance(t, sender)
 	blk := sut.RunConsensusLoop(ctx, t)
@@ -1112,7 +1111,7 @@ func TestFeesBurnedToBlackhole(t *testing.T) {
 		})
 		require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, txs[i]), "%T.SendTransaction()", sut.EthClient())
 	}
-	sut.WaitForPendingEthTxs(ctx, t, txs...)
+	sut.WaitForPendingTxs(ctx, t, txs...)
 
 	preBurn := sut.Balance(t, blackhole.Address)
 	blk := sut.RunConsensusLoop(ctx, t)
@@ -1697,7 +1696,7 @@ func TestGasRefundsDisabled(t *testing.T) {
 		GasFeeCap: big.NewInt(1),
 	})
 	require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction()", sut.EthClient())
-	sut.WaitForPendingEthTxs(ctx, t, tx)
+	sut.WaitForPendingTxs(ctx, t, tx)
 
 	blk := sut.RunConsensusLoop(ctx, t)
 	require.Lenf(t, blk.Receipts(), 1, "%T.Receipts()", blk)

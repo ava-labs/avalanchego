@@ -343,7 +343,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 				return
 			}
 
-			sut.WaitForPendingEthTxs(ctx, t, tx)
+			sut.WaitForPendingTxs(ctx, t, tx)
 			built := sut.RunConsensusLoop(ctx, t, vmtest.WithBlockContext(&block.Context{}))
 			receipts := built.Receipts()
 			require.Lenf(t, receipts, 1, "%T.Receipts()", built)

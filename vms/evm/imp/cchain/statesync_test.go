@@ -33,7 +33,7 @@ func (s *SUT) acceptBlockWith(ctx context.Context, tb testing.TB, stx *tx.Tx, et
 	tb.Helper()
 
 	require.NoErrorf(tb, s.EthClient().SendTransaction(ctx, ethTx), "%T.SendTransaction()", s.EthClient())
-	s.WaitForPendingEthTxs(ctx, tb, ethTx)
+	s.WaitForPendingTxs(ctx, tb, ethTx)
 	blk := s.issueAndExecute(ctx, tb, stx)
 	assertBlockIncludes(tb, blk, types.Transactions{ethTx}, []*tx.Tx{stx})
 
