@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 
-	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
+	evmdb "github.com/ava-labs/avalanchego/vms/saevm/imp/database"
 )
 
 func NewEthDB(db database.Database) ethdb.Database {

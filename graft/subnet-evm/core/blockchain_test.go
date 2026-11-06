@@ -45,11 +45,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/pruner"
+	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/upgrade/legacy"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	ethparams "github.com/ava-labs/libevm/params"

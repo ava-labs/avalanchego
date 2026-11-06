@@ -28,7 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 
-	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
+	evmdb "github.com/ava-labs/avalanchego/vms/saevm/imp/database"
 )
 
 func TestNewTracker(t *testing.T) {
