@@ -210,6 +210,7 @@ func (*hooks) SettledBy(h *types.Header) hook.Settled {
 	}
 }
 
+// BlockTime returns the canonical wall-clock time of a block.
 func (*hooks) BlockTime(h *types.Header) time.Time {
 	return blockTime(h)
 }
