@@ -139,6 +139,12 @@ func (w *headerWriter) Write(b []byte) (int, error) {
 // at whichever comes first instead of scanning a potentially large result, if
 // decoding large responses significantly increases latency.
 func parseErrorCodes(body []byte) map[int]int {
+	// Most responses have no error, so they skip decoding. A result that
+	// happens to contain the key is still decoded in full.
+	if !bytes.Contains(body, []byte(`"error"`)) {
+		return nil
+	}
+
 	type response struct {
 		Error *struct {
 			Code int `json:"code"`
