@@ -85,8 +85,8 @@ import (
 
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
+	saevm "github.com/ava-labs/avalanchego/vms/evm/imp/cchain"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
-	saevm "github.com/ava-labs/avalanchego/vms/saevm/cchain"
 )
 
 const (
