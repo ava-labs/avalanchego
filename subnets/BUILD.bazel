@@ -30,6 +30,7 @@ go_test(
         "//ids",
         "//snow/consensus/simplex",
         "//snow/consensus/snowball",
+        "//utils/crypto/bls/signer/localsigner",
         "//utils/set",
         "@com_github_stretchr_testify//require",
     ],
