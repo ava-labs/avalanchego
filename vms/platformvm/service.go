@@ -8,9 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
-	"slices"
 	"time"
 
 	"go.uber.org/zap"
@@ -31,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
@@ -40,16 +37,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/types"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 const (
 	// Max number of addresses that can be passed in as argument to GetUTXOs
 	maxGetUTXOsAddrs = 1024
-
-	// Max number of addresses that can be passed in as argument to GetStake
-	maxGetStakeAddrs = 256
 
 	// Max number of items allowed in a page
 	maxPageSize = 1024
@@ -112,14 +105,6 @@ func (s *Service) GetProposedHeight(r *http.Request, _ *struct{}, reply *api.Get
 	proposerHeight, err := s.vm.GetMinimumHeight(ctx)
 	reply.Height = avajson.Uint64(proposerHeight)
 	return err
-}
-
-func newJSONBalanceMap(balanceMap map[ids.ID]uint64) map[ids.ID]avajson.Uint64 {
-	jsonBalanceMap := make(map[ids.ID]avajson.Uint64, len(balanceMap))
-	for assetID, amount := range balanceMap {
-		jsonBalanceMap[assetID] = avajson.Uint64(amount)
-	}
-	return jsonBalanceMap
 }
 
 // Index is an address and an associated UTXO.
@@ -1879,52 +1864,6 @@ func (s *Service) getAPIOwner(owner *secp256k1fx.OutputOwners) (*platformapi.Own
 		apiOwner.Addresses = append(apiOwner.Addresses, addrStr)
 	}
 	return apiOwner, nil
-}
-
-// Takes in a staker and a set of addresses
-// Returns:
-// 1) The total amount staked by addresses in [addrs]
-// 2) The staked outputs
-func getStakeHelper(tx *platform.Tx, addrs set.Set[ids.ShortID], totalAmountStaked map[ids.ID]uint64) []avax.TransferableOutput {
-	staker, ok := tx.Unsigned.(platform.PermissionlessStaker)
-	if !ok {
-		return nil
-	}
-
-	stake := staker.Stake()
-	stakedOuts := make([]avax.TransferableOutput, 0, len(stake))
-	// Go through all of the staked outputs
-	for _, output := range stake {
-		out := output.Out
-		if lockedOut, ok := out.(*stakeable.LockOut); ok {
-			// This output can only be used for staking until [stakeOnlyUntil]
-			out = lockedOut.TransferableOut
-		}
-		secpOut, ok := out.(*secp256k1fx.TransferOutput)
-		if !ok {
-			continue
-		}
-
-		// Check whether this output is owned by one of the given addresses
-		contains := slices.ContainsFunc(secpOut.Addrs, addrs.Contains)
-		if !contains {
-			// This output isn't owned by one of the given addresses. Ignore.
-			continue
-		}
-
-		assetID := output.AssetID()
-		newAmount, err := safemath.Add(totalAmountStaked[assetID], secpOut.Amt)
-		if err != nil {
-			newAmount = math.MaxUint64
-		}
-		totalAmountStaked[assetID] = newAmount
-
-		stakedOuts = append(
-			stakedOuts,
-			*output,
-		)
-	}
-	return stakedOuts
 }
 
 func toPlatformStaker(staker *state.Staker) platformapi.Staker {
