@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
@@ -273,9 +272,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 
 	// Invalid predicate packing by corrupting a valid predicate
 	invalidPackedPredicate := predicate.Predicate{{}}
-
-	noFailures := set.NewBits()
-	require.Empty(tb, noFailures.Bytes())
 
 	gasConfig := CurrentGasConfig(rules)
 	return []precompiletest.PrecompileTest{
@@ -535,9 +531,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 
 	// Invalid predicate packing by corrupting a valid predicate
 	invalidPackedPredicate := predicate.Predicate{{}}
-
-	noFailures := set.NewBits()
-	require.Empty(tb, noFailures.Bytes())
 
 	gasConfig := CurrentGasConfig(rules)
 	return []precompiletest.PrecompileTest{
