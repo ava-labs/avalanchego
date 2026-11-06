@@ -13,8 +13,6 @@ func GoleakOptions() []goleak.Option {
 		// ChainIndexer.Close() may check if the event loop is active before it
 		// is marked as active.
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core.(*ChainIndexer).eventLoop"),
-		// diskLayer.Release() doesn't properly stop generation.
-		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core/state/snapshot.(*diskLayer).generate"),
 		// TxPool.Close() doesn't wait for its loop() method to signal
 		// termination.
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/core/txpool.(*TxPool).loop.func2"),

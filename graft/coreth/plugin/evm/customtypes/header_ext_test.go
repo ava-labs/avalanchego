@@ -18,8 +18,8 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 )
 
@@ -77,7 +77,7 @@ func TestHeaderWithNonZeroFields(t *testing.T) {
 
 	header, extra := headerWithNonZeroFields()
 	t.Run("Header", func(t *testing.T) { allFieldsSet(t, header, "extra") })
-	t.Run("HeaderExtra", func(t *testing.T) { allFieldsSet(t, extra) })
+	t.Run("HeaderExtra", func(t *testing.T) { allFieldsSet(t, extra, "predicateResults") })
 }
 
 // headerWithNonZeroFields returns a [Header] and a [HeaderExtra],

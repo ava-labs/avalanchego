@@ -169,4 +169,4 @@ The VM must also implement `CreateHandlers()` which can return a map of extensio
 
 ## VM implementations
 
-- [TransitionVM](./transitionvm/README.md) — a wrapper VM that swaps the underlying VM at a configured time. The C-Chain uses it to migrate from Coreth to SAEVM at the Helicon upgrade.
+- [TransitionVM](./transitionvm/README.md) — a wrapper VM that swaps the underlying VM at a configured time.

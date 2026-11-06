@@ -24,6 +24,19 @@ func NewSelfClient(t *testing.T, ctx context.Context, nodeID ids.NodeID, handler
 	return NewClient(t, ctx, nodeID, handler, nodeID, handler)
 }
 
+// NewSelfNetwork returns a network for nodeID whose only peer is itself, with
+// connHandlers receiving its connection events.
+func NewSelfNetwork(
+	t *testing.T,
+	ctx context.Context,
+	nodeID ids.NodeID,
+	handler p2p.Handler,
+	connHandlers ...p2p.ConnectionHandler,
+) *p2p.Network {
+	peers := map[ids.NodeID]p2p.Handler{nodeID: handler}
+	return newClientNetwork(t, ctx, nodeID, handler, peers, connHandlers...)
+}
+
 // NewClient generates a client-server pair and returns the client used to
 // communicate with a server with the specified handler
 func NewClient(
@@ -53,17 +66,36 @@ func NewClientWithPeers(
 	clientHandler p2p.Handler,
 	peers map[ids.NodeID]p2p.Handler,
 ) *p2p.Client {
+	network := newClientNetwork(t, ctx, clientNodeID, clientHandler, peers)
+	return network.NewClient(0)
+}
+
+// newClientNetwork returns a network for clientNodeID with every peer reachable.
+// clientConnHandlers receive connection events on that network only.
+func newClientNetwork(
+	t *testing.T,
+	ctx context.Context,
+	clientNodeID ids.NodeID,
+	clientHandler p2p.Handler,
+	peers map[ids.NodeID]p2p.Handler,
+	clientConnHandlers ...p2p.ConnectionHandler,
+) *p2p.Network {
 	peers[clientNodeID] = clientHandler
 
 	peerSenders := make(map[ids.NodeID]*enginetest.Sender)
 	peerNetworks := make(map[ids.NodeID]*p2p.Network)
 	for nodeID := range peers {
 		peerSenders[nodeID] = &enginetest.Sender{}
+		var handlers []p2p.ConnectionHandler
+		if nodeID == clientNodeID {
+			handlers = clientConnHandlers
+		}
 		peerNetwork, err := p2p.NewNetwork(
 			logging.NoLog{},
 			peerSenders[nodeID],
 			prometheus.NewRegistry(),
 			"",
+			handlers...,
 		)
 		require.NoError(t, err)
 		peerNetworks[nodeID] = peerNetwork
@@ -129,10 +161,5 @@ func NewClientWithPeers(
 		require.NoError(t, peerNetworks[nodeID].AddHandler(0, peers[nodeID]))
 	}
 
-	peerSampler := p2p.PeerSampler{Peers: &p2p.Peers{}}
-	for nodeID := range peers {
-		peerSampler.Peers.Connected(nodeID, nil)
-	}
-
-	return peerNetworks[clientNodeID].NewClient(0, peerSampler)
+	return peerNetworks[clientNodeID]
 }

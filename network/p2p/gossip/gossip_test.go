@@ -38,6 +38,7 @@ func TestGossiperShutdown(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		nil,
 		Metrics{},
 		0,
 	)
@@ -238,16 +239,14 @@ func TestGossiperGossip(t *testing.T) {
 				require.NoError(requestBloomSet.Add(item))
 			}
 
-			requestClient := requestNetwork.NewClient(
-				0x0,
-				p2p.PeerSampler{Peers: peers},
-			)
+			requestClient := requestNetwork.NewClient(0x0)
 
 			require.NoError(err)
 			gossiper := NewPullGossiper[tx](
 				logging.NoLog{},
 				marshaller,
 				requestBloomSet,
+				p2p.PeerSampler{Peers: peers},
 				requestClient,
 				metrics,
 				1,
@@ -582,7 +581,7 @@ func TestPushGossiper(t *testing.T) {
 				validators,
 			)
 			require.NoError(err)
-			client := network.NewClient(0, p2p.PeerSampler{Peers: &p2p.Peers{}})
+			client := network.NewClient(0)
 			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
 			require.NoError(err)
 			marshaller := marshaller{}

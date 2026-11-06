@@ -1,17 +1,18 @@
-name: Go Full Test Jobs
+name: Go Full Unit Test Jobs
 
-# Reusable workflow for running Go tests with configurable race/shuffle
+# Run Go unit tests with optional test-result reuse.
 on:
   workflow_call:
     inputs:
-      platform_name:
-        required: true
-        type: string
       runner:
         required: true
         type: string
-      run_race_shuffle_unit_tests:
-        description: 'Run unit tests with race detection and shuffled test order'
+      test_task:
+        description: 'Unit-test task: test-unit or test-unit-race-shuffle'
+        required: true
+        type: string
+      reuse_test_results:
+        description: 'Reuse Go cached results for unit tests'
         required: false
         type: boolean
         default: false
@@ -23,10 +24,101 @@ jobs:
   unit:
     runs-on: ${{ inputs.runner }}
     steps:
+      - id: test-config
+        name: Determine unit-test configuration
+        shell: bash
+        env:
+          TEST_TASK: ${{ inputs.test_task }}
+          REUSE_TEST_RESULTS: ${{ inputs.reuse_test_results }}
+        run: |
+          set -euo pipefail
+          case "$TEST_TASK:$REUSE_TEST_RESULTS" in
+            test-unit:true)
+              cache_mode=build-and-test-results
+              clear_test_results=false
+              ;;
+            test-unit:false|test-unit-race-shuffle:false)
+              cache_mode=build-only
+              clear_test_results=true
+              ;;
+            *)
+              echo "Unsupported unit-test configuration: task=$TEST_TASK reuse=$REUSE_TEST_RESULTS" >&2
+              exit 1
+              ;;
+          esac
+          {
+            echo "test-task=$TEST_TASK"
+            echo "cache-mode=$cache_mode"
+            echo "clear-test-results=$clear_test_results"
+          } >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
+      - id: setup-go
+        uses: ./.github/actions/setup-go-for-project
+      - id: cache-policy
+        uses: ./.github/actions/cache-policy
+        with:
+          request-cache-save: 'true'
+      # Git assigns fresh fixture mtimes on each checkout. Normalize them before
+      # restoring GOCACHE so Go can reuse test results from another runner.
+      - name: Normalize testdata modification times
+        shell: bash
+        run: ./scripts/run_task.sh normalize-testdata-mtimes
+      - id: cache-key
+        name: Determine Go unit-test cache key
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Separate scheduled build entries from entries whose test results
+          # must be complete on an exact restore. Runner labels distinguish OS versions.
+          cache_mode=${{ steps.test-config.outputs.cache-mode }}
+          go_build_cache_path="$(go env GOCACHE)"
+          cache_key_platform_prefix="go-unit-${{ inputs.runner }}-${{ runner.arch }}-"
+          cache_key_prefix="${cache_key_platform_prefix}${cache_mode}-"
+          cache_key="${cache_key_prefix}$(./scripts/workflow-hash-go-unit-inputs.sh)"
+          {
+            echo "go-build-cache-path=${go_build_cache_path}"
+            echo "cache-key=${cache_key}"
+            echo "cache-key-prefix=${cache_key_prefix}"
+            echo "cache-key-platform-prefix=${cache_key_platform_prefix}"
+          } >> "$GITHUB_OUTPUT"
+      - id: unit-cache
+        name: Restore Go unit-test cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ steps.cache-key.outputs.go-build-cache-path }}
+          key: ${{ steps.cache-key.outputs.cache-key }}
+          restore-keys: |
+            ${{ steps.cache-key.outputs.cache-key-prefix }}
+            ${{ steps.cache-key.outputs.cache-key-platform-prefix }}
+      # Preserve reusable test results on fallbacks with unchanged fixtures.
+      # All tests run when test-result reuse is disabled.
+      - name: Prepare restored Go unit cache
+        shell: bash
+        env:
+          FIXTURE_HASH: ${{ hashFiles('**/testdata/**') }}
+          CLEAR_TEST_RESULTS: ${{ steps.test-config.outputs.clear-test-results }}
+          MATCHED_KEY: ${{ steps.unit-cache.outputs.cache-matched-key }}
+        run: ./scripts/workflow-prepare-go-unit-cache.sh "$FIXTURE_HASH" "$CLEAR_TEST_RESULTS" "$MATCHED_KEY"
       - name: Run unit tests
         shell: bash
-        run: ./scripts/run_task.sh ${{ inputs.run_race_shuffle_unit_tests && 'test-unit-race-shuffle' || 'test-unit' }}
+        run: |
+          set -o pipefail
+          ./scripts/run_task.sh "$TEST_TASK" 2>&1 | tee "$RUNNER_TEMP/go-unit-test.log"
         env:
+          TEST_TASK: ${{ steps.test-config.outputs.test-task }}
           TIMEOUT: 900s
+      - name: Check exact-hit test-result reuse
+        if: ${{ steps.test-config.outputs.clear-test-results == 'false' && steps.unit-cache.outputs.cache-hit == 'true' }}
+        shell: bash
+        run: ./scripts/workflow-validate-go-unit-cache.sh "$RUNNER_TEMP/go-unit-test.log"
+      # Expire scheduled test results before saving; retain compiled output.
+      - name: Clear scheduled test results before saving
+        if: ${{ steps.test-config.outputs.clear-test-results == 'true' && steps.cache-policy.outputs.cache-save-allowed == 'true' && steps.unit-cache.outputs.cache-hit != 'true' }}
+        shell: bash
+        run: go clean -testcache
+      - name: Save Go unit-test cache
+        if: ${{ steps.cache-policy.outputs.cache-save-allowed == 'true' && steps.unit-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ steps.cache-key.outputs.go-build-cache-path }}
+          key: ${{ steps.cache-key.outputs.cache-key }}

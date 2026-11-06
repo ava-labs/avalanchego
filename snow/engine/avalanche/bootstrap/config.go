@@ -5,7 +5,7 @@ package bootstrap
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap/queue"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
@@ -22,7 +22,7 @@ type Config struct {
 	Sender         common.Sender
 
 	// PeerTracker manages the set of nodes that we fetch the next block from.
-	PeerTracker *p2p.PeerTracker
+	PeerTracker *peertracker.PeerTracker
 
 	// This node will only consider the first [AncestorsMaxContainersReceived]
 	// containers in an ancestors message it receives.

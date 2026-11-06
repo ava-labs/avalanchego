@@ -7,14 +7,14 @@ import (
 	"context"
 	"sync"
 
-	"github.com/ava-labs/firewood-go-ethhash/ffi"
+	"github.com/ava-labs/firewood-go/ffi"
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/database/merkle/firewood/syncer"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/code"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 
 	merklesync "github.com/ava-labs/avalanchego/database/merkle/sync"
 )
@@ -32,7 +32,13 @@ type FirewoodSyncer struct {
 	finalizeOnce func()
 }
 
-func NewFirewoodSyncer(config syncer.Config, db *ffi.Database, target common.Hash, codeQueue *code.Queue, client *p2p.Client) (*FirewoodSyncer, error) {
+func NewFirewoodSyncer(
+	config syncer.Config,
+	db *ffi.Database,
+	target common.Hash,
+	codeQueue *code.Queue,
+	client *peertracker.Client,
+) (*FirewoodSyncer, error) {
 	s, err := syncer.NewEVM(
 		config,
 		db,

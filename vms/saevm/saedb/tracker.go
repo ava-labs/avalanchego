@@ -19,14 +19,16 @@ import (
 	"github.com/ava-labs/libevm/triedb/hashdb"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
-
-	graftfw "github.com/ava-labs/avalanchego/graft/evm/firewood"
 )
 
 const (
+	// FirewoodDirectory is the subdirectory to data directory provided in
+	// [Config.TrieDBConfig] where the Firewood database will be stored.
+	FirewoodDirectory = "firewood"
+
 	// DefaultCommitInterval is the recommended number of blocks between commits
 	// of the state trie to disk.
 	DefaultCommitInterval = 4096
@@ -65,6 +67,7 @@ type Config struct {
 	Archival          bool   // if true, state will be persisted regularly for RPC support
 	CommitInterval    uint64 // MUST be set to a non-zero value
 	AllowMissingTries bool   // allow switching from archival to pruning on a DB that ran archival
+	StateHistory      uint64 // Number of recent states to guarantee. Minimum of [core.TriesInMemory].
 
 	// only configurable for tests
 	maxCapBytes       common.StorageSize
@@ -88,7 +91,7 @@ func (c Config) Verify() error {
 		return fmt.Errorf("%w: SnapshotCacheMiB (%d)", errCacheTooLarge, c.SnapshotCacheMiB)
 	}
 	switch c.Scheme {
-	case "", customrawdb.FirewoodScheme, rawdb.HashScheme:
+	case "", firewood.Scheme, rawdb.HashScheme:
 	default:
 		return fmt.Errorf("%w: %q", errUnknownScheme, c.Scheme)
 	}
@@ -102,16 +105,16 @@ func (c Config) Verify() error {
 // All [triedb.Database] MUST be closed.
 func (c Config) TrieDBConfig(dataDir string, log logging.Logger) *triedb.Config {
 	switch c.Scheme {
-	case customrawdb.FirewoodScheme:
+	case firewood.Scheme:
 		if c.TrieCacheMiB == 0 {
 			// Firewood doesn't allow memory-only operation
 			c.TrieCacheMiB = DefaultTrieCacheSizeMiB
 		}
 		return &triedb.Config{
 			DBOverride: firewood.Config{
-				Path:                   filepath.Join(dataDir, graftfw.Directory),
+				Path:                   filepath.Join(dataDir, FirewoodDirectory),
 				CacheSizeBytes:         uint(c.TrieCacheMiB) * mibToBytes,
-				RevisionsInMemory:      uint(2 * c.CommitInterval),
+				StateHistory:           c.stateHistory(),
 				DeferredCommitInterval: c.CommitInterval,
 				Archive:                c.Archival,
 				Log:                    log,
@@ -132,11 +135,19 @@ func (c Config) TrieDBConfig(dataDir string, log logging.Logger) *triedb.Config 
 	}
 }
 
+// stateHistory returns the number of recent states to retain in memory. This
+// MUST be >= [core.TriesInMemory], because snapshot generation resumes at the
+// root of its disk layer, which is never more than [core.TriesInMemory] blocks
+// behind.
+func (c Config) stateHistory() uint64 {
+	return max(core.TriesInMemory, c.StateHistory)
+}
+
 func (c Config) snapConfig() *snapshot.Config {
 	if c.SnapshotCacheMiB <= 0 {
 		return nil
 	}
-	if c.Scheme == customrawdb.FirewoodScheme {
+	if c.Scheme == firewood.Scheme {
 		// Firewood already has efficient value lookups, so the snapshot
 		// provides unnecessary overhead.
 		return nil
@@ -174,8 +185,8 @@ type Tracker struct {
 
 	// recent is a ring of the post-execution roots of the most recently
 	// executed blocks, each holding a reference that keeps its trie in memory
-	// for the snapshot generator. Unused when the snapshot is disabled.
-	recent     [core.TriesInMemory]common.Hash
+	// for the snapshot generator. Of length returned by [Config.stateHistory].
+	recent     []common.Hash
 	recentNext int
 
 	config Config
@@ -207,6 +218,7 @@ func NewTracker(db ethdb.Database, c Config, lastExecuted common.Hash, dataDir s
 		cache:  cache,
 		config: c,
 		log:    log,
+		recent: make([]common.Hash, c.stateHistory()),
 	}, nil
 }
 
@@ -244,7 +256,7 @@ func (t *Tracker) Track(root common.Hash) {
 // executionRoot, settling the state at settledRoot. It MAY call
 // [triedb.Database.Commit], based on the following priorities:
 //
-// 1. If [Config.Scheme] is [customrawdb.FirewoodScheme], the settled root is committed.
+// 1. If [Config.Scheme] is [firewood.Scheme], the settled root is committed.
 // 2. If [Config.Archival] is true, then `executionRoot` will be committed.
 // 3. If [ShouldCommitTrieDB] based on `height`, `settledRoot` is committed.
 // 4. If there is sufficient memory pressure in HashDB, flushes the oldest trie nodes to disk.
@@ -261,7 +273,7 @@ func (t *Tracker) BlockExecuted(settledRoot, executionRoot common.Hash, height u
 		because string
 	)
 	switch {
-	case t.config.Scheme == customrawdb.FirewoodScheme:
+	case t.config.Scheme == firewood.Scheme:
 		// Firewood prunes all but the last state on disk after shutdown.
 		// Persisting the execution root would make VM recovery (re-execution
 		// since last settled) impossible, as Firewood can only build off the
@@ -288,14 +300,9 @@ func (t *Tracker) BlockExecuted(settledRoot, executionRoot common.Hash, height u
 	return nil
 }
 
-// retain holds a reference to `root` until [core.TriesInMemory] later roots
-// have been retained. This is necessary because snapshot generation resumes at
-// the root of its disk layer, which is never more than [core.TriesInMemory]
-// blocks behind. If [Tracker.snaps] is nil then retain is a no-op.
+// retain holds a reference to `root` until [Config.stateHistory] later roots
+// have been retained.
 func (t *Tracker) retain(root common.Hash) {
-	if t.snaps == nil {
-		return
-	}
 	t.Track(root)
 	if toEvict := t.recent[t.recentNext]; toEvict != (common.Hash{}) {
 		t.Untrack(toEvict)

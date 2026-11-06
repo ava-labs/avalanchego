@@ -105,8 +105,8 @@ var (
 
 // verifyWhenBootstrapping skips verification in its entirety. It is expected
 // for blocks to be verified by hash in the bootstrapping engine. This supports
-// hooks, such as Coreth and Subnet-EVM, that are unable to fully verify blocks
-// during bootstrapping.
+// hooks, such as the C-Chain's, that are unable to fully verify blocks during
+// bootstrapping.
 func (vm *VM) verifyWhenBootstrapping(b, parent *blocks.Block) error {
 	header := b.Header()
 	lastSettled, err := lastToSettle(vm.hooks, header, parent, vm.config.Now(), vm.log())

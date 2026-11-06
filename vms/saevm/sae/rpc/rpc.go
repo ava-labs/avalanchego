@@ -72,6 +72,7 @@ type Config struct {
 	CallTimeout           time.Duration // per call or batch; 0 = no limit
 	GasCap                uint64
 	BatchRequestLimit     uint64 // 0 = no limit
+	MaxBlocksPerRequest   uint64 // maximum number of blocks per eth_getLogs request; 0 = no limit
 
 	// Transaction submission
 	TxFeeCap            float64 // 0 = no cap
@@ -148,7 +149,7 @@ func New(chain Chain, config Config) (*Provider, error) {
 	}
 
 	filter := filters.NewFilterAPI(
-		filters.NewFilterSystem(back, filters.Config{}),
+		filters.NewFilterSystem(filterBackend{back}, filters.Config{}),
 		false, /*isLightClient*/
 	)
 	srv, err := back.server(filter)

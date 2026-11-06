@@ -1,4 +1,4 @@
-name: Go Smoke Test Jobs
+name: Go Smoke Unit Test Jobs
 
 # Reusable workflow for running the Go unit-test smoke suite.
 on:

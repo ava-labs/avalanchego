@@ -11,20 +11,27 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/statesynctest"
 )
 
 func sync(t *testing.T, srcSUT, dstSUT *SUT) error {
 	src := srcSUT.State
 	dst := dstSUT.State
 
-	net, tracker := synctest.NewSelfNetwork(t, t.Context(), src.snowCtx.NodeID)
+	net, tracker := statesynctest.NewSelfNetwork(t, t.Context(), src.snowCtx.NodeID)
 	require.NoError(t, RegisterSyncHandler(net, src), "RegisterSyncHandler()")
 
-	syncer := NewSyncer(net, tracker, dst, src.currentRoot, src.CurrentHeight())
+	syncer := NewSyncer(
+		peertracker.NewClient(net, p2p.EVMAtomicLeafRequestHandlerID, tracker),
+		dst,
+		src.currentRoot,
+		src.CurrentHeight(),
+	)
 	return syncer.Sync(t.Context())
 }
 

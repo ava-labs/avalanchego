@@ -14,7 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
+	"github.com/ava-labs/avalanchego/vms/saevm/statesync/hashdb"
 )
 
 // RegisterSyncHandler allows the [State] to serve its data to state-syncing
@@ -36,16 +37,14 @@ type Syncer struct {
 	targetHeight uint64
 }
 
-// NewSyncer creates a new cross-chain trie syncer. The [State] MUST NOT be
-// altered concurrently with the syncer.
-func NewSyncer(n *p2p.Network, pt *p2p.PeerTracker, state *State, root common.Hash, height uint64) *Syncer {
+// NewSyncer creates a cross-chain trie syncer over a client bound to
+// [p2p.EVMAtomicLeafRequestHandlerID]. The [State] MUST NOT be altered concurrently.
+func NewSyncer(client *peertracker.Client, state *State, root common.Hash, height uint64) *Syncer {
 	return &Syncer{
 		fetcher: hashdb.NewClient(
 			state.snowCtx.Log,
-			n,
-			p2p.EVMAtomicLeafRequestHandlerID,
+			client,
 			keyLength,
-			pt,
 		),
 		targetRoot:   root,
 		targetHeight: height,

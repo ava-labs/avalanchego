@@ -43,9 +43,9 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/ethapi"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
 var errFirewoodNotSupported = errors.New("firewood triedb scheme does not yet support this operation")
@@ -393,5 +393,5 @@ func (api *DebugAPI) GetAccessibleState(from, to rpc.BlockNumber) (uint64, error
 }
 
 func (api *DebugAPI) isFirewood() bool {
-	return api.eth.blockchain.CacheConfig().StateScheme == customrawdb.FirewoodScheme
+	return api.eth.blockchain.CacheConfig().StateScheme == firewood.Scheme
 }

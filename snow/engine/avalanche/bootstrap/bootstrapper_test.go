@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/choices"
 	"github.com/ava-labs/avalanchego/snow/consensus/avalanche"
@@ -92,7 +92,7 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *enginetest.Sender, *vertextes
 	avaGetHandler, err := getter.New(manager, sender, ctx.Log, time.Second, 2000, prometheus.NewRegistry())
 	require.NoError(err)
 
-	p2pTracker, err := p2p.NewPeerTracker(
+	p2pTracker, err := peertracker.New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
@@ -736,7 +736,7 @@ func TestBootstrapperLateAncestorsDoesNotReLinearize(t *testing.T) {
 	require.NoError(err)
 	txBlocked, err := queue.New(prefixdb.New([]byte("tx"), db), "tx", prometheus.NewRegistry())
 	require.NoError(err)
-	peerTracker, err := p2p.NewPeerTracker(logging.NoLog{}, "", prometheus.NewRegistry(), nil, version.Current)
+	peerTracker, err := peertracker.New(logging.NoLog{}, "", prometheus.NewRegistry(), nil, version.Current)
 	require.NoError(err)
 
 	bs, err := New(

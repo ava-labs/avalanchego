@@ -12,15 +12,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/acp176"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
+	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
@@ -186,31 +185,16 @@ func TestTargetExponent(t *testing.T) {
 			want:   dynamic.InitialTargetExponent,
 		},
 		{
-			name: "no_field_fortuna_legacy_state",
-			header: &types.Header{
-				Time:   fortunaTime,
-				Number: big.NewInt(1),
-				Extra:  (&acp176.State{TargetExcess: 5_000}).Bytes(),
-			},
-			want: 5_000,
-		},
-		{
-			name: "no_field_fortuna_invalid_extra",
-			header: &types.Header{
-				Time:   fortunaTime,
-				Number: big.NewInt(1),
-				Extra:  []byte{0x01},
-			},
-			wantErr: acp176.ErrStateInsufficientLength,
+			name:    "no_field_fortuna_parses_extra",
+			header:  &types.Header{Time: fortunaTime, Number: big.NewInt(1)},
+			wantErr: customtypes.ErrInsufficientFeeState,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fortuna := &extras.ChainConfig{
-				NetworkUpgrades: extras.NetworkUpgrades{
-					FortunaTimestamp: new(uint64(fortunaTime)),
-				},
+			fortuna := &cparams.ChainConfig{
+				FortunaTimestamp: new(uint64(fortunaTime)),
 			}
 			got, err := targetExponent(fortuna, tt.header)
 			require.ErrorIs(t, err, tt.wantErr, "targetExponent()")

@@ -58,7 +58,7 @@ flowchart TD
 | Style | Meaning |
 |---|---|
 | Blue | This package |
-| Orange | EVM side: [warp precompile](../../../../graft/coreth/precompile/contracts/warp/README.md) and [predicate handling](../../../evm/predicate/README.md) |
+| Orange | EVM side: [warp precompile](../../../../graft/coreth/precompile/contracts/warp/README.md) and [predicate handling](../../../../graft/evm/predicate/README.md) |
 | Purple | AvalancheGo platform: [ACP-118 handler](../../../../network/p2p/acp118/handler.go), BLS signer |
 | Gray | External actors |
 
@@ -117,12 +117,12 @@ The two `Storage`-backed kinds are indistinguishable to the `Verifier`: precompi
 
 ### Inbound messages are predicates
 
-A signed message rides into the receiver chain inside a transaction's access list — a *predicate* (see the [predicate encoding](../../../evm/predicate/README.md)). Verifying it means checking the multi-signature against the source chain's validator set, which changes over time; the proposervm block context supplies the P-Chain height that pins it.
+A signed message rides into the receiver chain inside a transaction's access list — a *predicate* (see the [predicate encoding](../../../../graft/evm/predicate/README.md)). Verifying it means checking the multi-signature against the source chain's validator set, which changes over time; the proposervm block context supplies the P-Chain height that pins it.
 
 ```mermaid
 flowchart TD
     tx["Transaction<br/>access list"]:::ext
-    fal["predicate.FromAccessList"]:::evm
+    fal["RulesExtra.WarpMessages"]:::evm
     bctx["block.Context<br/>(P-Chain height)"]:::plat
     bits["set.Bits of<br/>failed indices"]:::pkg
     res["BlockResults"]:::pkg
@@ -130,11 +130,11 @@ flowchart TD
     gvm["getVerifiedWarpMessage"]:::evm
 
     subgraph VB["VerifyBlock"]
-        vp["Precompile VerifyPredicate<br/>(one goroutine per predicate)"]:::evm
+        vp["Warp VerifyPredicate<br/>(one goroutine per message)"]:::evm
     end
 
     tx --> fal
-    fal -->|"predicates keyed by<br/>precompile address"| vp
+    fal -->|"Warp messages in<br/>access-list order"| vp
     bctx -->|"pins the source chain's<br/>validator set"| vp
     vp --> bits --> res
     res -->|"encoded into the header"| hdr
@@ -157,10 +157,10 @@ The results — which predicates failed, per transaction — are encoded into th
 
 ## Maintenance notes
 
-- **Database compatibility.** `Storage`'s on-disk layout must remain byte-compatible with coreth's warp database: the C-Chain transitions from coreth to this VM on the same database, and breaking the layout silently orphans every previously persisted message. This constraint only expires once the transition is far enough in the past that those messages no longer matter.
+- **Database compatibility.** `Storage`'s on-disk layout MUST NOT change: breaking it silently orphans every previously persisted message.
 - **Off-chain messages are memory-only on purpose.** They are operator-supplied configuration, not chain data, so the persisted set stays exactly what the precompile emitted — and an off-chain message is removed by simply not supplying it on the next construction.
 - **Predicate results are encoded in the header so warp messages are never verified during bootstrapping.** Verification needs the source chain's validator set, which isn't guaranteed to be available then — bootstrapping nodes must be able to rely on the recorded results instead of re-checking signatures.
-- **VM wiring.** Harvested messages are persisted in `(*hooks).AfterExecutingBlock`, the predicate results are encoded into the header in `(*builder).BuildBlock` (both in [`../hooks.go`](../hooks.go)), and the ACP-118 handler is registered with a `Backend` implementation at VM initialization. Persisting in `AfterExecutingBlock` preserves coreth's guarantee that only messages from accepted blocks are signable, because SAE executes blocks only after acceptance.
+- **VM wiring.** Harvested messages are persisted in `(*hooks).AfterExecutingBlock`, the predicate results are encoded into the header in `(*builder).BuildBlock` (both in [`../hooks.go`](../hooks.go)), and the ACP-118 handler is registered with a `Backend` implementation at VM initialization. Persisting in `AfterExecutingBlock` guarantees that only messages from accepted blocks are signable, because SAE executes blocks only after acceptance.
 
 ## References
 
@@ -181,4 +181,4 @@ Signing protocol:
 EVM side:
 
 - [coreth warp precompile](../../../../graft/coreth/precompile/contracts/warp/README.md) - `sendWarpMessage`, `getVerifiedWarpMessage`, predicate verification
-- [`vms/evm/predicate`](../../../evm/predicate/README.md) - access-list predicate encoding and results
+- [`graft/evm/predicate`](../../../../graft/evm/predicate/README.md) - access-list predicate encoding and results

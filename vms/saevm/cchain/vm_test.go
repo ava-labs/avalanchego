@@ -33,7 +33,6 @@ import (
 	"go.uber.org/goleak"
 	"google.golang.org/protobuf/proto"
 
-	// Imported for [saexec.Execute] comment resolution.
 	_ "github.com/ava-labs/avalanchego/vms/saevm/saexec"
 
 	"github.com/ava-labs/avalanchego/chains/atomic"
@@ -41,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow"
@@ -56,9 +54,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
@@ -69,12 +65,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
+	"github.com/ava-labs/avalanchego/vms/saevm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/saevm/saedb"
 	"github.com/ava-labs/avalanchego/vms/saevm/saetest"
 	"github.com/ava-labs/avalanchego/vms/saevm/txgossip/txgossiptest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	cparams "github.com/ava-labs/avalanchego/graft/coreth/params"
+	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/saevm/params"
@@ -272,7 +271,7 @@ func withCommitInterval(n uint64) sutOption {
 // withFirewood selects Firewood as the trie database
 func withFirewood() sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.StateScheme = customrawdb.FirewoodScheme
+		c.vmConfig.StateScheme = firewood.Scheme
 	})
 }
 
@@ -645,13 +644,13 @@ func (s *SUT) issueAndExecute(ctx context.Context, tb testing.TB, t *tx.Tx) *blo
 
 	require.NoErrorf(tb, s.IssueTx(ctx, t), "%T.IssueTx()", s.Client)
 	blk := s.runConsensusLoop(ctx, tb)
-	s.waitForTxPoolStateUpdate(ctx, tb, t)
+	s.waitForTxPoolEviction(ctx, tb, t)
 	return blk
 }
 
-// waitForTxPoolStateUpdate blocks until the txpool's verification state has
-// been updated to reflect t's executed block.
-func (s *SUT) waitForTxPoolStateUpdate(ctx context.Context, tb testing.TB, t *tx.Tx) {
+// waitForTxPoolEviction blocks until the txpool has evicted t after its block
+// was executed.
+func (s *SUT) waitForTxPoolEviction(ctx context.Context, tb testing.TB, t *tx.Tx) {
 	tb.Helper()
 
 	// Bound the wait so buggy code that never advances the pool fails fast with
@@ -662,9 +661,6 @@ func (s *SUT) waitForTxPoolStateUpdate(ctx context.Context, tb testing.TB, t *tx
 	ticker := time.NewTicker(time.Millisecond)
 	defer ticker.Stop()
 
-	// The pool updates the verification state atomically with evicting the
-	// included tx, so observing the eviction guarantees the state has been
-	// updated.
 	for s.pending.Has(t.ID()) {
 		select {
 		case <-ctx.Done():
@@ -1213,6 +1209,7 @@ func TestDebugTraceDoesNotApplyAtomicState(t *testing.T) {
 		GasPrice: big.NewInt(1),
 	})
 	require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, tracedTx), "%T.SendTransaction(%#x)", sut.ethclient, tracedTx.Hash())
+	sut.waitForPendingEthTxs(ctx, t, tracedTx)
 
 	// Export gives us observable external state.
 	var (
@@ -1400,7 +1397,7 @@ func TestParseBlock(t *testing.T) {
 	w := newWallet(key, sut.ctx, nil)
 	stx := w.newMinimalTx(t)
 
-	ap1Time := *cparams.GetExtra(sut.chainConfig).ApricotPhase1BlockTimestamp
+	ap1Time := *corethparams.GetExtra(sut.chainConfig).ApricotPhase1Timestamp
 
 	const (
 		preAP1WithDataHeight    = 1
@@ -2301,7 +2298,7 @@ func TestRecoverFirewoodAcrossSynchronousTransition(t *testing.T) {
 	require.NoErrorf(t, sut.Shutdown(ctx), "%T.Shutdown()", sut.VM)
 
 	// Simulates a crash rolling Firewood back before it persisted anything.
-	firewoodDir := filepath.Join(dataDir, firewood.Directory)
+	firewoodDir := filepath.Join(dataDir, saedb.FirewoodDirectory)
 	require.NoError(t, os.RemoveAll(firewoodDir), "removing Firewood directory")
 
 	// Shutdown persists the settled asynchronous root, which will then be the

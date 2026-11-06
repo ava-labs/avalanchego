@@ -63,7 +63,7 @@ Hooks are the seam through which SAE calls into C-Chain-specific code. SAE invok
 
 ### Block format changes
 
-`cchain` modifies the standard Ethereum block format. The C-Chain transitioned to this VM from coreth on the same database and block format, so historical blocks must keep parsing and hashing identically and vestigial fields cannot be removed.
+`cchain` modifies the standard Ethereum block format. Historical blocks must keep parsing and hashing identically, so vestigial fields cannot be removed.
 
 #### Block header changes
 
@@ -156,7 +156,7 @@ The C-Chain participates in cross-subnet [Warp messaging](../../platformvm/warp)
 
 - A custom precompile that lets EVM contracts emit and consume Warp messages.
 - Incoming Warp messages encoded in the access list, so the hook implementation can verify them prior to EVM execution.
-- [Predicate verification](../../evm/predicate) results encoded into the block header's `extra`.
+- [Predicate verification](../../../graft/evm/predicate) results encoded into the block header's `extra`.
 - The [ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request) p2p protocol for collecting BLS signatures from peer validators on outbound messages.
 
 The [warp](warp/README.md) package documents the full message lifecycle, what makes a message signable, and the storage compatibility constraints.

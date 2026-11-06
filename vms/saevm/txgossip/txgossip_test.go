@@ -305,7 +305,7 @@ func TestExecutorIntegration(t *testing.T) {
 		txs  types.Transactions
 		last *LazyTransaction
 	)
-	for _, ltx := range s.TransactionsByPriority(txpool.PendingFilter{}) {
+	for ltx := range s.TransactionsByPriority(txpool.PendingFilter{}) {
 		tx, ok := ltx.Resolve()
 		require.True(t, ok, "%T.Resolve() `ok` on tx returned by %T.TransactionsByPriority()", ltx, s)
 		txs = append(txs, tx)
@@ -437,7 +437,15 @@ func TestP2PIntegration(t *testing.T) {
 			var gossiper gossip.Gossiper
 			switch tt.dir {
 			case pull:
-				gossiper = gossip.NewPullGossiper(logger, Marshaller{}, recv.Set, client, metrics, 1)
+				gossiper = gossip.NewPullGossiper(
+					logger,
+					Marshaller{},
+					recv.Set,
+					&stubPeers{[]ids.NodeID{sendID}},
+					client,
+					metrics,
+					1,
+				)
 
 			case push:
 				branch := gossip.BranchingFactor{Peers: 1}
@@ -566,19 +574,17 @@ func FuzzEffectiveGasTip(f *testing.F) {
 			require.NoErrorf(t, err, "%T.EffectiveGasTip(...)", tx)
 		}
 
-		ltx := &LazyTransaction{
-			LazyTransaction: &txpool.LazyTransaction{
-				GasFeeCap: feeCap,
-				GasTipCap: tipCap,
-			},
+		ltx := &txpool.LazyTransaction{
+			GasFeeCap: feeCap,
+			GasTipCap: tipCap,
 		}
-		got := ltx.effectiveGasTip(baseFee)
+		got := effectiveGasTip(ltx, baseFee)
 
 		if got.ToBig().Cmp(want) != 0 {
 			t.Logf("Fee cap: %v", feeCap)
 			t.Logf("Tip cap: %v", tipCap)
 			t.Logf("Base fee: %v", baseFee)
-			t.Errorf("%T.effectiveGasTip(...) got %v; want %v", ltx, got, want)
+			t.Errorf("effectiveGasTip(...) got %v; want %v", got, want)
 		}
 	})
 }

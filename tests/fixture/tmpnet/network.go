@@ -277,23 +277,6 @@ func (n *Network) EnsureDefaultConfig(ctx context.Context, log logging.Logger) e
 		n.PreFundedKeys = keys
 	}
 
-	// Ensure primary chains are configured
-	if n.PrimaryChainConfigs == nil {
-		n.PrimaryChainConfigs = map[string]ConfigMap{}
-	}
-	defaultChainConfigs := DefaultChainConfigs()
-	for alias, defaultChainConfig := range defaultChainConfigs {
-		if _, ok := n.PrimaryChainConfigs[alias]; !ok {
-			n.PrimaryChainConfigs[alias] = ConfigMap{}
-		}
-		primaryChainConfig := n.PrimaryChainConfigs[alias]
-		for key, value := range defaultChainConfig {
-			if _, ok := primaryChainConfig[key]; !ok {
-				primaryChainConfig[key] = value
-			}
-		}
-	}
-
 	emptyRuntime := NodeRuntimeConfig{}
 	if n.DefaultRuntimeConfig == emptyRuntime {
 		return stacktrace.Wrap(errMissingRuntimeConfig)

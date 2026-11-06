@@ -54,11 +54,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/saevm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks"
 	"github.com/ava-labs/avalanchego/vms/saevm/blocks/blockstest"
 	"github.com/ava-labs/avalanchego/vms/saevm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/saevm/firewood"
 	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook"
 	"github.com/ava-labs/avalanchego/vms/saevm/hook/hookstest"
@@ -310,8 +310,6 @@ func withVMTime(tb testing.TB, startTime time.Time) (sutOption, *saetest.Clock) 
 	tb.Helper()
 	c := saetest.NewClock(startTime, time.Nanosecond)
 	opt := options.Func[sutConfig](func(cfg *sutConfig) {
-		// TODO(StephenButtolph) unify the time functions provided in the config
-		// and the hooks.
 		cfg.hooks.Now = c.Now
 		cfg.vmConfig.Now = c.Now
 	})
@@ -345,7 +343,7 @@ func withDB(db database.Database) sutOption {
 // HashDB.
 func withFirewood() sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.DBConfig.Scheme = customrawdb.FirewoodScheme
+		c.vmConfig.DBConfig.Scheme = firewood.Scheme
 	})
 }
 

@@ -68,7 +68,7 @@ jobs:
           run: ./scripts/run_task.sh test-build-image
           working_directory: ./graft/subnet-evm
 
-  check-contract-bindings:
+  checks:
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
@@ -76,67 +76,74 @@ jobs:
         shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
+      # The dev shell provides the generators and restores the Go module cache.
       - uses: ./.github/actions/install-nix
-      - run: ./scripts/run_task.sh check-generate-load-contract-bindings
 
-  check-generated-canoto:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
-      - shell: bash
+      - id: contract-bindings
+        name: Check generated contract bindings
+        continue-on-error: true
+        run: ./scripts/run_task.sh check-generate-load-contract-bindings
+      - name: Restore clean checkout after contract bindings check
+        if: ${{ !cancelled() }}
+        run: git reset --hard HEAD && git clean -ffd
+
+      - id: canoto
+        name: Check generated Canoto code
+        continue-on-error: true
         run: ./scripts/run_task.sh check-generate-canoto
+      - name: Restore clean checkout after Canoto check
+        if: ${{ !cancelled() }}
+        run: git reset --hard HEAD && git clean -ffd
 
-  check-generated-mocks:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/setup-go-for-project
-      - shell: bash
+      - id: mocks
+        name: Check generated mocks
+        continue-on-error: true
         run: ./scripts/run_task.sh check-generate-mocks
+      - name: Restore clean checkout after mocks check
+        if: ${{ !cancelled() }}
+        run: git reset --hard HEAD && git clean -ffd
 
-  check-generated-protobuf:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    defaults:
-      run:
-        shell: nix develop --command bash -x {0}
-    steps:
-      - uses: actions/checkout@v5
-      # Use the dev shell instead of bufbuild/buf-action to ensure the dev shell provides the expected versions
-      - uses: ./.github/actions/install-nix
-      - run: ./scripts/run_task.sh check-generate-protobuf
+      - id: protobuf
+        name: Check generated protobuf
+        continue-on-error: true
+        run: ./scripts/run_task.sh check-generate-protobuf
+      - name: Restore clean checkout after protobuf check
+        if: ${{ !cancelled() }}
+        run: git reset --hard HEAD && git clean -ffd
 
-  check-go-mod-tidy:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      # Prepare Bazel's separate Go module cache before Go setup disables GOPROXY.
-      - uses: ./.github/actions/setup-bazel
-      - uses: ./.github/actions/setup-go-for-project
-      - shell: bash
-        run: ./scripts/run_task.sh check-go-mod-tidy
-
-  check-links:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 # v1.2.5
+      - id: links
+        name: Check links
+        continue-on-error: true
+        uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 # v1.2.5
         with:
           fail_level: any
 
-  check-tauseconds:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - name: Check for TauSeconds misuse with time.Add()
+      - id: tauseconds
+        name: Check for TauSeconds misuse with time.Add()
+        continue-on-error: true
         run: |
           if grep -rn '\.Add([^)]*TauSeconds' --include='*.go' .; then
             echo "ERROR: Use params.Tau (time.Duration) with time.Add(), not TauSeconds (int)"
             echo "TauSeconds would be interpreted as nanoseconds, not seconds"
+            exit 1
+          fi
+
+      - name: Fail if any check failed
+        if: ${{ !cancelled() }}
+        env:
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: |
+          failed_checks="$(
+            jq -r '
+              to_entries[]
+              | select(.value.outcome == "failure")
+              | .key
+            ' <<<"$STEPS_JSON"
+          )"
+
+          if [[ -n "$failed_checks" ]]; then
+            echo 'Failed checks:'
+            sed 's/^/  /' <<<"$failed_checks"
             exit 1
           fi
 
@@ -178,37 +185,18 @@ jobs:
       - uses: ./.github/actions/ensure-disk-space
         with:
           diagnostic-groups: docker
-      - uses: ./.github/actions/install-nix
+      - id: install-nix
+        uses: ./.github/actions/install-nix
       - name: Run e2e tests
         run: ./scripts/run_task.sh test-bootstrap-monitor-e2e
       - name: Log Docker disk diagnostics
-        if: failure()
-        shell: bash
+        if: ${{ failure() && steps.install-nix.outcome == 'success' }}
         run: ./scripts/run_task.sh log-ci-disk-state-docker
       - name: Collect kind diagnostics
-        if: failure()
+        if: ${{ failure() && steps.install-nix.outcome == 'success' }}
         uses: ./.github/actions/collect-kind-diagnostics
         with:
           artifact_name: bootstrap-monitor-kind-diagnostics
-
-  e2e-existing-network:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - name: Run e2e tests with existing network
-        uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/run_task.sh test-e2e-existing-ci
-          artifact_prefix: e2e-existing-network
-          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
-          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_url: ${{ secrets.LOKI_URL || '' }}
-          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-kube:
     needs: setup-cache-linux-amd64
@@ -221,96 +209,6 @@ jobs:
           runtime: kube
           artifact_prefix: e2e-kube
           filter_by_owner: avalanchego-e2e
-          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
-          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_url: ${{ secrets.LOKI_URL || '' }}
-          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-
-  e2e-load-subnet-evm:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Git checkout
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - name: Run E2E Load Tests
-        uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/run_task.sh test-e2e-load-ci
-          working_directory: ./graft/subnet-evm
-          artifact_prefix: load
-          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
-          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_url: ${{ secrets.LOKI_URL || '' }}
-          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-
-  e2e-post-latest:
-    needs: setup-cache-linux-amd64
-    # The default free runners lack the resources for parallel execution, so a beefier
-    # runner is required.
-    runs-on: ubuntu-24.04-amd64-4-core
-    steps:
-      - uses: actions/checkout@v5
-      - name: Run e2e tests
-        uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/run_task.sh test-e2e-ci-post-latest
-          artifact_prefix: e2e-post-latest
-          filter_by_owner: avalanchego-e2e
-          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
-          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_url: ${{ secrets.LOKI_URL || '' }}
-          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-
-  e2e-schedule-latest:
-    needs: setup-cache-linux-amd64
-    # The default free runners lack the resources for parallel execution, so a beefier
-    # runner is required.
-    runs-on: ubuntu-24.04-amd64-4-core
-    steps:
-      - uses: actions/checkout@v5
-      - name: Run e2e tests
-        uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/run_task.sh test-e2e-ci-schedule-latest
-          artifact_prefix: e2e-schedule-latest
-          filter_by_owner: avalanchego-e2e
-          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
-          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_url: ${{ secrets.LOKI_URL || '' }}
-          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-
-  e2e-warp-subnet-evm:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Git checkout
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - name: Run Warp E2E Tests
-        uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/run_task.sh test-e2e-warp-ci
-          working_directory: ./graft/subnet-evm
-          artifact_prefix: warp
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
@@ -394,23 +292,6 @@ jobs:
       - name: Check go.mod and go.sum are up-to-date
         run: ./scripts/run_task.sh check-go-mod-tidy
 
-  load:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/run_task.sh test-load-ci
-          artifact_prefix: load
-          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
-          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_url: ${{ secrets.LOKI_URL || '' }}
-          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   # Re-enable once images are built by Bazel and can be cached; otherwise, this job is too expensive for what it evaluates.
   # load_kube_kind:
   #   name: Run load test on kind cluster
@@ -442,16 +323,16 @@ jobs:
       - uses: ./.github/actions/ensure-disk-space
         with:
           diagnostic-groups: docker
-      - uses: ./.github/actions/install-nix
+      - id: install-nix
+        uses: ./.github/actions/install-nix
       # TODO(marun) Extend testing of robustness beyond deploying a suitable test environment
       - name: Deploy kind with chaos mesh
         run: ./scripts/run_task.sh test-robustness
       - name: Log Docker disk diagnostics
-        if: failure()
-        shell: bash
+        if: ${{ failure() && steps.install-nix.outcome == 'success' }}
         run: ./scripts/run_task.sh log-ci-disk-state-docker
       - name: Collect kind diagnostics
-        if: failure()
+        if: ${{ failure() && steps.install-nix.outcome == 'success' }}
         uses: ./.github/actions/collect-kind-diagnostics
         with:
           artifact_name: robustness-kind-diagnostics
@@ -473,25 +354,7 @@ jobs:
     needs: setup-cache-linux-amd64
     uses: ./.github/workflows/go-unit.yml
     with:
-      platform_name: linux-amd64
       runner: ubuntu-24.04
+      test_task: test-unit
+      reuse_test_results: true
     secrets: inherit
-
-  upgrade:
-    needs: setup-cache-linux-amd64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v5
-      - name: Run e2e tests
-        uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/run_task.sh test-upgrade
-          artifact_prefix: upgrade
-          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
-          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_url: ${{ secrets.LOKI_URL || '' }}
-          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}

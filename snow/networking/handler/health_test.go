@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -74,7 +74,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 				},
 			)
 
-			p2pTracker, err := p2p.NewPeerTracker(
+			p2pTracker, err := peertracker.New(
 				logging.NoLog{},
 				"",
 				prometheus.NewRegistry(),

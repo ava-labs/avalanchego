@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/trie"
+	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
@@ -789,4 +790,65 @@ func mustNewLeafsRequest(
 	request, err := message.NewLeafsRequest(leafReqType, root, account, start, end, limit, nodeType)
 	require.NoError(t, err)
 	return request
+}
+
+func TestLeafsRequestHandler_MidTrieRootDropped(t *testing.T) {
+	const seed = 1
+	t.Logf("seed: %d", seed)
+	r := rand.New(rand.NewSource(seed))
+
+	memdb := rawdb.NewMemoryDatabase()
+	db := state.NewDatabase(memdb)
+	trieDB := db.TrieDB()
+
+	root, _, _ := synctest.GenerateIndependentTrie(t, r, trieDB, 1000, common.HashLength)
+
+	// peer-supplied "root" that is actually a mid-trie node
+	midTrieRoot := findMidTrieNodeAtOddDepth(t, trieDB, root)
+
+	messagetest.ForEachCodec(t, func(c codec.Manager, leafReqType message.LeafsRequestType) {
+		testHandlerStats := &statstest.TestHandlerStats{}
+		handler := NewLeafsRequestHandler(trieDB, message.StateTrieKeyLength, nil, c, testHandlerStats)
+
+		request, err := message.NewLeafsRequest(
+			leafReqType,
+			midTrieRoot,
+			common.Hash{},
+			bytes.Repeat([]byte{0x00}, common.HashLength),
+			bytes.Repeat([]byte{0xff}, common.HashLength),
+			maxLeavesLimit,
+			message.StateTrieNode,
+		)
+		require.NoError(t, err)
+
+		// The mid-trie root should be dropped.
+		response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
+		require.NoError(t, err)
+		require.Nil(t, response)
+		require.Equal(t, uint32(1), testHandlerStats.TrieErrorCount)
+	})
+}
+
+func findMidTrieNodeAtOddDepth(t *testing.T, trieDB *triedb.Database, root common.Hash) common.Hash {
+	t.Helper()
+
+	tr, err := trie.New(trie.TrieID(root), trieDB)
+	require.NoError(t, err)
+
+	nodeIt, err := tr.NodeIterator(nil)
+	require.NoError(t, err)
+
+	for nodeIt.Next(true) {
+		hash := nodeIt.Hash()
+		if hash == (common.Hash{}) || nodeIt.Leaf() {
+			continue
+		}
+		if len(nodeIt.Path())%2 == 1 {
+			return hash
+		}
+	}
+	require.NoError(t, nodeIt.Error())
+
+	t.Fatal("no internal node at odd nibble depth found - try different seed")
+	return common.Hash{}
 }

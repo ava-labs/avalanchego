@@ -13,15 +13,13 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/saevm/cchain/warp/warptest"
 
@@ -142,20 +140,6 @@ func TestFromReceipts(t *testing.T) {
 	}
 }
 
-// newRules returns rules with the warp precompile registered at each of the
-// given addresses.
-func newRules(contracts ...common.Address) *extras.Rules {
-	contract := corethwarp.NewDefaultConfig(new(uint64))
-
-	predicaters := make(map[common.Address]precompileconfig.Predicater, len(contracts))
-	for _, addr := range contracts {
-		predicaters[addr] = contract
-	}
-	return &extras.Rules{
-		Predicaters: predicaters,
-	}
-}
-
 func TestVerifyBlock(t *testing.T) {
 	var (
 		vdrs = warptest.NewValidators(t, warptest.WithMinimum(2))
@@ -191,28 +175,28 @@ func TestVerifyBlock(t *testing.T) {
 	)
 	tests := []struct {
 		name         string
-		contracts    []common.Address
+		isDurango    bool
 		blockContext *block.Context
 		txs          []*types.Transaction
 		want         predicate.BlockResults
 		wantErr      error
 	}{
 		{
-			name:         "no_predicaters",
+			name:         "pre_durango",
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				validTx,
 			},
 		},
 		{
-			name: "no_predicaters_no_context",
+			name: "pre_durango_no_context",
 			txs: []*types.Transaction{
 				validTx,
 			},
 		},
 		{
 			name:         "no_predicates",
-			contracts:    []common.Address{corethwarp.ContractAddress},
+			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				types.NewTx(&types.DynamicFeeTx{}),
@@ -220,14 +204,14 @@ func TestVerifyBlock(t *testing.T) {
 		},
 		{
 			name:      "no_predicates_no_context",
-			contracts: []common.Address{corethwarp.ContractAddress},
+			isDurango: true,
 			txs: []*types.Transaction{
 				types.NewTx(&types.DynamicFeeTx{}),
 			},
 		},
 		{
 			name:         "filtered_predicates",
-			contracts:    []common.Address{corethwarp.ContractAddress},
+			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				types.NewTx(&types.DynamicFeeTx{
@@ -239,7 +223,7 @@ func TestVerifyBlock(t *testing.T) {
 		},
 		{
 			name:      "missing_block_context",
-			contracts: []common.Address{corethwarp.ContractAddress},
+			isDurango: true,
 			txs: []*types.Transaction{
 				validTx,
 			},
@@ -247,7 +231,7 @@ func TestVerifyBlock(t *testing.T) {
 		},
 		{
 			name:         "one_tx_one_address_one_predicate",
-			contracts:    []common.Address{corethwarp.ContractAddress},
+			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				validTx,
@@ -260,7 +244,7 @@ func TestVerifyBlock(t *testing.T) {
 		},
 		{
 			name:         "one_tx_one_address_one_invalid_predicate",
-			contracts:    []common.Address{corethwarp.ContractAddress},
+			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				invalidTx,
@@ -273,7 +257,7 @@ func TestVerifyBlock(t *testing.T) {
 		},
 		{
 			name:         "one_address_multiple_invalid_predicates",
-			contracts:    []common.Address{corethwarp.ContractAddress},
+			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				twoInvalidTx,
@@ -286,7 +270,7 @@ func TestVerifyBlock(t *testing.T) {
 		},
 		{
 			name:         "one_address_mixed_predicates",
-			contracts:    []common.Address{corethwarp.ContractAddress},
+			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				mixedTx,
@@ -299,7 +283,7 @@ func TestVerifyBlock(t *testing.T) {
 		},
 		{
 			name:         "multiple_txs",
-			contracts:    []common.Address{corethwarp.ContractAddress},
+			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				validTx,
@@ -319,9 +303,8 @@ func TestVerifyBlock(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			snowContext := snowtest.Context(t, snowtest.CChainID)
 			warptest.SetValidators(t, snowContext, vdrs)
-			rules := newRules(test.contracts...)
 
-			got, err := VerifyBlock(snowContext, test.blockContext, rules, test.txs)
+			got, err := VerifyBlock(snowContext, test.blockContext, test.isDurango, test.txs)
 			require.ErrorIs(t, err, test.wantErr, "VerifyBlock()")
 			require.Equal(t, test.want, got, "VerifyBlock()")
 		})
@@ -333,7 +316,6 @@ func BenchmarkVerifyBlock(b *testing.B) {
 	// number of signers is held fixed.
 	const numSigners = 10
 
-	rules := newRules(corethwarp.ContractAddress)
 	vdrs := warptest.NewValidators(b, warptest.WithMinimum(numSigners))
 	snowContext := snowtest.Context(b, snowtest.CChainID)
 	warptest.SetValidators(b, snowContext, vdrs)
@@ -364,7 +346,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 
 				// Confirm the predicates verify before timing, so the benchmark
 				// measures the success path rather than an early failure.
-				results, err := VerifyBlock(snowContext, blockContext, rules, txs)
+				results, err := VerifyBlock(snowContext, blockContext, true /*isDurango*/, txs)
 				require.NoError(b, err, "VerifyBlock()")
 				require.Len(b, results, numTxs, "VerifyBlock() results length")
 
@@ -376,7 +358,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 				}
 
 				for b.Loop() {
-					_, _ = VerifyBlock(snowContext, blockContext, rules, txs)
+					_, _ = VerifyBlock(snowContext, blockContext, true /*isDurango*/, txs)
 				}
 
 				predicates := numTxs * predicatesPerTx

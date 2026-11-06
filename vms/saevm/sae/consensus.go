@@ -194,6 +194,11 @@ func (vm *VM) SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subsc
 	return vm.exec.SubscribeChainHeadEvent(ch)
 }
 
+// LastExecuted returns the last-executed block.
+func (vm *VM) LastExecuted() *blocks.Block {
+	return vm.exec.LastExecuted()
+}
+
 // LastExecutedState returns a [libevm.StateReader] backed by the post-execution
 // state of the last-executed block.
 func (vm *VM) LastExecutedState() (libevm.StateReader, error) {

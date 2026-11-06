@@ -90,7 +90,7 @@ func init() {
 
 	flag.StringVar(&blockDirArg, "block-dir", blockDirArg, "Block DB directory to read from during re-execution.")
 	flag.StringVar(&currentStateDirArg, "current-state-dir", currentStateDirArg, "Current state directory including VM DB and Chain Data Directory for re-execution.")
-	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (exclusive).")
+	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (inclusive).")
 	flag.Uint64Var(&endBlockArg, "end-block", 200, "End block to end execution (inclusive).")
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 
