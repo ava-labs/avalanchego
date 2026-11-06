@@ -43,7 +43,7 @@ go_library(
         "//utils/set",
         "//utils/units",
         "//vms/components/avax",
-        "//vms/evm/cchain",
+        "//vms/evm/imp/cchain",
         "//vms/example/xsvm/genesis",
         "//vms/platformvm",
         "//vms/platformvm/api",

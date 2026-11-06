@@ -20,8 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )

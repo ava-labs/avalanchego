@@ -18,8 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/vms/evm/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/evm/cchain/libevm/extstate"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
 )
 
 // PrecompileTest is a test case for a precompile

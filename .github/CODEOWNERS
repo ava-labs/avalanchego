@@ -11,4 +11,4 @@
 /graft/evm @ava-labs/platform-evm
 /graft/subnet-evm @ava-labs/platform-evm
 /vms/evm @ARR4N @StephenButtolph
-/vms/evm/cchain @StephenButtolph
+/vms/evm/imp/cchain @StephenButtolph

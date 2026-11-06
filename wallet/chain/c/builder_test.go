@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/cchain/tx"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )

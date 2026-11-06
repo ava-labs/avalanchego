@@ -57,7 +57,7 @@ graft_go_test(
         "//utils/crypto/bls/signer/localsigner",
         "//utils/math",
         "//utils/set",
-        "//vms/evm/cchain/cparams",
+        "//vms/evm/imp/cchain/cparams",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
         "@com_github_ava_labs_libevm//common",

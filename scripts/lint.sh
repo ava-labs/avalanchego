@@ -60,7 +60,7 @@ _addlicense_flags=${ADDLICENSE_FLAGS:-"--verify --debug"}
 
 # Directory carrying its own (BUSL) license header, checked separately from the
 # rest of the repository.
-SAE_L1_DIR='./vms/evm/l1s'
+SAE_L1_DIR='./vms/evm/imp/l1s'
 
 # Checks the license headers of all Go files matched by the extra `find`
 # arguments passed after the config file.
