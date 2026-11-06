@@ -1,0 +1,20 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "hookadaptor",
+    srcs = ["hook.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/hookadaptor",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//snow/engine/snowman/block",
+        "//vms/components/gas",
+        "//vms/evm/gastime",
+        "//vms/evm/hook",
+        "//vms/evm/types",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//params",
+    ],
+)

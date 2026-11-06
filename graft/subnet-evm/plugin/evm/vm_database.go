@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/saevm/imp/database"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/database"
 
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
 )

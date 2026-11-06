@@ -1,0 +1,2109 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package sae
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"maps"
+	"math"
+	"math/big"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"reflect"
+	"runtime/debug"
+	"slices"
+	"strconv"
+	"testing"
+	"time"
+
+	"github.com/arr4n/shed/testerr"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/crypto"
+	"github.com/ava-labs/libevm/libevm"
+	"github.com/ava-labs/libevm/libevm/ethapi"
+	"github.com/ava-labs/libevm/libevm/hookstest"
+	"github.com/ava-labs/libevm/libevm/options"
+	"github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/rpc"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/holiman/uint256"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	// Added for comment resolution.
+	_ "github.com/ava-labs/libevm/core/txpool"
+	_ "github.com/ava-labs/libevm/eth/filters"
+
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/avalanchego/vms/evm/blocks"
+	"github.com/ava-labs/avalanchego/vms/evm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/evm/saetest"
+	"github.com/ava-labs/avalanchego/vms/evm/saetest/escrow"
+
+	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
+	saerpc "github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
+	ethereum "github.com/ava-labs/libevm"
+)
+
+var zeroAddr common.Address
+
+type rpcTest struct {
+	method       string
+	name         string
+	args         []any
+	want         any // untyped nil means no return value.
+	wantErr      testerr.Want
+	parallel     bool
+	eventually   bool
+	extraCmpOpts []cmp.Option
+}
+
+// withCmpOpts appends opts to the [rpcTest.extraCmpOpts] of every test, for
+// tables whose rows compare their results the same way. A row MAY carry its own
+// options too.
+func withCmpOpts(tests []rpcTest, opts ...cmp.Option) []rpcTest {
+	for i := range tests {
+		test := &tests[i]
+		test.extraCmpOpts = append(test.extraCmpOpts, opts...)
+	}
+	return tests
+}
+
+func (s *SUT) testRPC(ctx context.Context, t *testing.T, tcs ...rpcTest) {
+	t.Helper()
+	opts := []cmp.Option{
+		cmputils.NilSlicesAreEmpty[hexutil.Bytes](),
+		cmputils.IfIn[params.ChainConfig](cmp.Options{
+			cmputils.BigInts(),
+			cmpopts.IgnoreUnexported(params.ChainConfig{}),
+		}),
+		cmputils.Headers(),
+		cmputils.HexutilBigs(),
+		cmputils.TransactionsByHash(),
+		cmputils.Receipts(),
+	}
+
+	for _, tc := range tcs {
+		test := func(t require.TestingT) {
+			if tc.want == nil { // Reminder: only applies to untyped nil
+				tc.want = struct{ json.RawMessage }{} // struct avoids nil vs empty
+			}
+
+			got := reflect.New(reflect.TypeOf(tc.want))
+			err := s.CallContext(ctx, got.Interface(), tc.method, tc.args...)
+			if diff := testerr.Diff(err, tc.wantErr); diff != "" {
+				t.Errorf("CallContext(...) %s", diff)
+				t.FailNow()
+			}
+			opts := append(opts, tc.extraCmpOpts...)
+			if diff := cmp.Diff(tc.want, got.Elem().Interface(), opts...); diff != "" {
+				t.Errorf("Unmarshalled %T diff (-want +got):\n%s", got.Elem().Interface(), diff)
+			}
+		}
+
+		name := tc.name
+		if name == "" {
+			name = tc.method
+		}
+		t.Run(name, func(t *testing.T) {
+			if tc.parallel {
+				t.Parallel()
+			}
+			t.Logf("%T.CallContext(ctx, %T, %q, %v...)", s.Client.RPC, &tc.want, tc.method, tc.args)
+			if tc.eventually {
+				require.EventuallyWithT(t, func(c *assert.CollectT) {
+					test(c)
+				}, time.Second, 10*time.Millisecond)
+			} else {
+				test(t)
+			}
+		})
+	}
+}
+
+// testRPCGetter allows testing of RPC methods for which the return types are
+// difficult to unmarshal but there exists a helper such as [ethclient.Client].
+// [SUT.testRPC] SHOULD be preferred.
+func testRPCGetter[
+	Arg any,
+	T interface {
+		// Only add extra types if JSON unmarshalling from RPC methods directly
+		// into the type will fail.
+		*types.Block
+	},
+](ctx context.Context, t *testing.T, underlyingRPCMethod string, get func(context.Context, Arg) (T, error), arg Arg, want T) {
+	t.Helper()
+	opts := []cmp.Option{
+		cmputils.Blocks(),
+		cmputils.Headers(),
+		cmpopts.EquateEmpty(),
+	}
+
+	t.Run(underlyingRPCMethod, func(t *testing.T) {
+		got, err := get(ctx, arg)
+		t.Logf("%s(%v)", underlyingRPCMethod, arg)
+		require.NoErrorf(t, err, "%s(%v)", underlyingRPCMethod, arg)
+		if diff := cmp.Diff(want, got, opts...); diff != "" {
+			t.Errorf("%s(%v) diff (-want +got):\n%s", underlyingRPCMethod, arg, diff)
+		}
+	})
+}
+
+func TestSubscriptions(t *testing.T) {
+	// TODO(JonathanOppenheimer): [filters.FilterAPI.NewPendingTransactions]
+	// subscribes to the [txpool.TxPool] asynchronously. If the goroutine is not
+	// scheduled before the first transaction is issued, the subscription will
+	// not receive the tx.
+	//
+	// Fixed by: https://github.com/ethereum/go-ethereum/pull/33990
+	if os.Getenv("EVM_TEST_FLAKY") == "" {
+		t.Skip("FLAKY: set EVM_TEST_FLAKY to run")
+	}
+
+	ctx, sut := newSUT(t, 1)
+
+	var (
+		newTxs   = make(chan common.Hash, 1)
+		newHeads = make(chan *types.Header, 1)
+		newLogs  = make(chan types.Log, 1)
+	)
+	{
+		sub, err := sut.EthSubscribe(ctx, newTxs, "newPendingTransactions")
+		require.NoError(t, err, "EthSubscribe(newPendingTransactions)")
+		t.Cleanup(sub.Unsubscribe)
+	}
+	{
+		sub, err := sut.SubscribeNewHead(ctx, newHeads)
+		require.NoError(t, err, "SubscribeNewHead()")
+		t.Cleanup(sub.Unsubscribe)
+	}
+	{
+		sub, err := sut.SubscribeFilterLogs(ctx, ethereum.FilterQuery{}, newLogs)
+		require.NoError(t, err, "SubscribeFilterLogs()")
+		t.Cleanup(sub.Unsubscribe)
+	}
+	{
+		pendingLogs := make(chan types.Log, 1)
+		pendingBlock := big.NewInt(int64(rpc.PendingBlockNumber))
+		sub, err := sut.SubscribeFilterLogs(
+			ctx,
+			ethereum.FilterQuery{
+				FromBlock: pendingBlock,
+				ToBlock:   pendingBlock,
+			},
+			pendingLogs,
+		)
+		require.NoError(t, err, "SubscribeFilterLogs(pending)")
+		t.Cleanup(sub.Unsubscribe)
+		defer func() {
+			t.Helper()
+
+			select {
+			case l := <-pendingLogs:
+				t.Fatalf("unexpected pending log %+v", l)
+			default:
+			}
+		}()
+	}
+
+	mustSendTx := func(tx *types.Transaction) {
+		t.Helper()
+
+		sut.mustSendTx(t, tx)
+		require.Equal(t, tx.Hash(), <-newTxs, "tx hash from newPendingTransactions subscription")
+	}
+
+	runConsensusLoop := func(wantLogs ...types.Log) {
+		t.Helper()
+
+		b := sut.runConsensusLoop(t)
+		require.Equal(t, b.Hash(), (<-newHeads).Hash(), "header hash from newHeads subscription")
+
+		for _, want := range wantLogs {
+			want.BlockNumber = b.NumberU64()
+			want.BlockHash = b.Hash()
+			require.Equal(t, want, <-newLogs, "log from subscription")
+		}
+	}
+
+	const senderIndex = 0
+	deployTx := sut.wallet.SetNonceAndSign(t, senderIndex, &types.LegacyTx{
+		Data:     escrow.CreationCode(),
+		GasPrice: big.NewInt(1),
+		Gas:      3e6,
+	})
+	mustSendTx(deployTx)
+	runConsensusLoop()
+
+	sender := sut.wallet.Addresses()[senderIndex]
+	contractAddr := crypto.CreateAddress(sender, deployTx.Nonce())
+	amount := uint256.NewInt(100)
+	depositTx := sut.wallet.SetNonceAndSign(t, senderIndex, &types.LegacyTx{
+		To:       &contractAddr,
+		Value:    amount.ToBig(),
+		Data:     escrow.CallDataToDeposit(sender),
+		GasPrice: big.NewInt(1),
+		Gas:      1e6,
+	})
+	mustSendTx(depositTx)
+
+	wantLog := escrow.DepositEvent(sender, amount)
+	wantLog.Address = contractAddr
+	wantLog.TxHash = depositTx.Hash()
+	runConsensusLoop(*wantLog)
+}
+
+func TestWeb3Namespace(t *testing.T) {
+	var (
+		preImage hexutil.Bytes = []byte("test")
+		digest                 = hexutil.Bytes(crypto.Keccak256(preImage))
+	)
+
+	ctx, sut := newSUT(t, 1)
+	sut.testRPC(ctx, t, []rpcTest{
+		{
+			method: "web3_clientVersion",
+			want:   version.GetVersions().String(),
+		},
+		{
+			method: "web3_sha3",
+			args:   []any{preImage},
+			want:   digest,
+		},
+	}...)
+}
+
+func TestNetNamespace(t *testing.T) {
+	testRPCMethodsWithPeers := func(sut *SUT, wantPeerCount hexutil.Uint) {
+		t.Helper()
+		sut.testRPC(sut.context(t), t, []rpcTest{
+			{
+				method: "net_listening",
+				want:   true,
+			},
+			{
+				method: "net_peerCount",
+				want:   wantPeerCount,
+			},
+			{
+				method: "net_version",
+				want:   saetest.ChainConfig().ChainID.String(),
+			},
+		}...)
+	}
+
+	_, sut := newSUT(t, 1) // No peers
+	testRPCMethodsWithPeers(sut, 0)
+
+	const (
+		numValidators    = 1
+		numNonValidators = 2
+	)
+	n := newNetworkedSUTs(t, numValidators, numNonValidators)
+	for _, sut := range n.validators {
+		testRPCMethodsWithPeers(sut, numValidators+numNonValidators-1)
+	}
+	for _, sut := range n.nonValidators {
+		testRPCMethodsWithPeers(sut, numValidators)
+	}
+}
+
+func TestTxPoolNamespace(t *testing.T) {
+	ctx, sut := newSUT(t, 2)
+
+	addresses := sut.wallet.Addresses()
+	makeTx := func(i int) *types.Transaction {
+		t.Helper()
+		return sut.wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
+			To:        &addresses[i],
+			Gas:       params.TxGas + uint64(i), //#nosec G115 -- Won't overflow
+			GasFeeCap: big.NewInt(int64(i + 1)),
+			Value:     big.NewInt(int64(i + 10)),
+		})
+	}
+
+	const (
+		pendingAccount = 0
+		queuedAccount  = 1
+	)
+	pendingTx := makeTx(pendingAccount)
+	pendingRPCTx := ethapi.NewRPCPendingTransaction(pendingTx, nil, saetest.ChainConfig())
+
+	_ = makeTx(queuedAccount) // skip the nonce to gap the mempool
+	queuedTx := makeTx(queuedAccount)
+	queuedRPCTx := ethapi.NewRPCPendingTransaction(queuedTx, nil, saetest.ChainConfig())
+
+	sut.mustSendTx(t, queuedTx, pendingTx)
+	sut.waitUntilTxsPending(t, pendingTx)
+
+	// TODO: This formatting is copied from libevm, consider exposing it somehow
+	// or removing the dependency on the exact format.
+	txToSummary := func(tx *types.Transaction) string {
+		return fmt.Sprintf("%s: %d wei + %d gas × %d wei",
+			tx.To(),
+			tx.Value().Uint64(),
+			tx.Gas(),
+			tx.GasPrice(),
+		)
+	}
+
+	sut.testRPC(ctx, t, []rpcTest{
+		{
+			method: "txpool_content",
+			want: map[string]map[string]map[string]*ethapi.RPCTransaction{
+				"pending": {
+					addresses[pendingAccount].Hex(): {
+						"0": pendingRPCTx,
+					},
+				},
+				"queued": {
+					addresses[queuedAccount].Hex(): {
+						"1": queuedRPCTx,
+					},
+				},
+			},
+		},
+		{
+			method: "txpool_contentFrom",
+			args:   []any{addresses[pendingAccount]},
+			want: map[string]map[string]*ethapi.RPCTransaction{
+				"pending": {
+					"0": pendingRPCTx,
+				},
+				"queued": {},
+			},
+		},
+		{
+			method: "txpool_contentFrom",
+			args:   []any{addresses[queuedAccount]},
+			want: map[string]map[string]*ethapi.RPCTransaction{
+				"pending": {},
+				"queued": {
+					"1": queuedRPCTx,
+				},
+			},
+		},
+		{
+			method: "txpool_inspect",
+			want: map[string]map[string]map[string]string{
+				"pending": {
+					addresses[pendingAccount].Hex(): {
+						"0": txToSummary(pendingTx),
+					},
+				},
+				"queued": {
+					addresses[queuedAccount].Hex(): {
+						"1": txToSummary(queuedTx),
+					},
+				},
+			},
+		},
+		{
+			method: "txpool_status",
+			want: map[string]hexutil.Uint{
+				"pending": 1,
+				"queued":  1,
+			},
+		},
+	}...)
+}
+
+func TestFilterAPIs(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+	precompile := common.Address{'f', 'i', 'l', 't'}
+	stub := &hookstest.Stub{
+		PrecompileOverrides: map[common.Address]libevm.PrecompiledContract{
+			precompile: vm.NewStatefulPrecompile(func(env vm.PrecompileEnvironment, _ []byte) ([]byte, error) {
+				env.StateDB().AddLog(&types.Log{
+					Address: env.Addresses().EVMSemantic.Self,
+					Topics:  []common.Hash{},
+				})
+				return nil, nil
+			}),
+		},
+	}
+	stub.Register(t)
+
+	createFilter := func(t *testing.T, method string, args ...any) string {
+		t.Helper()
+		var filterID string
+		require.NoErrorf(t, sut.CallContext(ctx, &filterID, method, args...), "%T.Client.CallContext(..., %q, %v...)", sut.Client, method, args)
+		require.NotEmptyf(t, filterID, "Resulted populated by %T.Client.CallContext(..., %q, %v...)", sut.Client, method, args)
+		return filterID
+	}
+
+	var (
+		txFilterID    = createFilter(t, "eth_newPendingTransactionFilter")
+		blockFilterID = createFilter(t, "eth_newBlockFilter")
+		logFilterID   = createFilter(t, "eth_newFilter", map[string]any{
+			"address": precompile,
+		})
+	)
+
+	defer func() {
+		for _, id := range []string{txFilterID, blockFilterID, logFilterID} {
+			sut.testRPC(ctx, t, rpcTest{
+				method: "eth_uninstallFilter",
+				args:   []any{id},
+				want:   true,
+			})
+		}
+	}()
+
+	sut.testRPC(ctx, t, []rpcTest{
+		{
+			method: "eth_getFilterChanges",
+			args:   []any{txFilterID},
+			want:   []common.Hash{},
+		},
+		{
+			method: "eth_getFilterChanges",
+			args:   []any{blockFilterID},
+			want:   []common.Hash{},
+		},
+		{
+			method: "eth_getFilterChanges",
+			args:   []any{logFilterID},
+			want:   []types.Log{},
+		},
+		{
+			method: "eth_getFilterLogs",
+			args:   []any{logFilterID},
+			want:   []types.Log{},
+		},
+	}...)
+
+	tx := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		To:       &precompile,
+		GasPrice: big.NewInt(1),
+		Gas:      1e6,
+	})
+	sut.sendTxsAndWaitUntilPending(t, tx)
+	sut.testRPC(ctx, t, rpcTest{
+		method:     "eth_getFilterChanges",
+		args:       []any{txFilterID},
+		want:       []common.Hash{tx.Hash()},
+		eventually: true,
+	})
+
+	b := sut.runConsensusLoop(t)
+	wantLog := types.Log{
+		Address:     precompile,
+		Topics:      []common.Hash{},
+		BlockNumber: b.NumberU64(),
+		BlockHash:   b.Hash(),
+		TxHash:      tx.Hash(),
+	}
+	// getFilterChanges gets accumulated changes, so a second call with
+	// the same ID returns empty, as there are no new changes.
+	sut.testRPC(ctx, t, []rpcTest{
+		// blockFilterID: new block hash available since last poll
+		{
+			method:     "eth_getFilterChanges",
+			args:       []any{blockFilterID},
+			want:       []common.Hash{b.Hash()},
+			eventually: true,
+		},
+		{
+			method: "eth_getFilterChanges",
+			args:   []any{blockFilterID},
+			want:   []common.Hash{},
+		},
+
+		// logFilterID: new log from block execution available since last poll
+		{
+			method:     "eth_getFilterChanges",
+			args:       []any{logFilterID},
+			want:       []types.Log{wantLog},
+			eventually: true,
+		},
+		{
+			method: "eth_getFilterChanges",
+			args:   []any{logFilterID},
+			want:   []types.Log{},
+		},
+		// getFilterLogs returns all matching logs regardless of prior polling
+		// because it is based on block-range criteria, not "changes".
+		{
+			method: "eth_getFilterLogs",
+			args:   []any{logFilterID},
+			want:   []types.Log{wantLog},
+		},
+	}...)
+}
+
+func TestEthSyncing(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+	// Avalanchego does not expose APIs until after the node has fully synced,
+	// so eth_syncing always returns false (not syncing).
+	sut.testRPC(ctx, t, rpcTest{
+		method: "eth_syncing",
+		want:   false,
+	})
+}
+
+func TestChainID(t *testing.T) {
+	for id := range uint64(2) {
+		ctx, sut := newSUT(t, 0, options.Func[sutConfig](func(c *sutConfig) {
+			c.genesis.Config = &params.ChainConfig{
+				ChainID: new(big.Int).SetUint64(id),
+			}
+		}))
+		sut.testRPC(ctx, t, rpcTest{
+			method: "eth_chainId",
+			want:   hexutil.Uint64(id),
+		})
+	}
+}
+
+func TestEthGetters(t *testing.T) {
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
+	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
+	ctx, sut := newSUT(t, 1, timeOpt, precompileOpt, withAllAPIs())
+	t.Cleanup(unblock)
+
+	t.Run("unknown_hashes", func(t *testing.T) {
+		sut.testGetByUnknownHash(ctx, t)
+	})
+	t.Run("unknown_numbers", func(t *testing.T) {
+		sut.testGetByUnknownNumber(ctx, t)
+	})
+
+	genesis := sut.lastAcceptedBlock(t)
+
+	createTx := func(t *testing.T, to common.Address) *types.Transaction {
+		t.Helper()
+		return sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &to,
+			Gas:       params.TxGas,
+			GasFeeCap: big.NewInt(1),
+		})
+	}
+
+	// TODO(arr4n) abstract the construction of blocks at all stages as it's
+	// copy-pasta'd elsewhere.
+
+	// Once a block is settled, its ancestors are only accessible from the
+	// database.
+	onDisk := sut.runConsensusLoop(t, createTx(t, zeroAddr))
+
+	settled := sut.runConsensusLoop(t, createTx(t, zeroAddr))
+	vmTime.AdvanceToSettle(ctx, t, settled)
+
+	executed := sut.runConsensusLoop(t, createTx(t, zeroAddr))
+	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
+
+	pending := sut.runConsensusLoop(t, createTx(t, blockingPrecompile))
+
+	for _, b := range []*blocks.Block{genesis, onDisk, settled, executed, pending} {
+		t.Run(fmt.Sprintf("block_num_%d", b.Height()), func(t *testing.T) {
+			ethB := b.EthBlock()
+			sut.testGetByHash(ctx, t, ethB)
+			sut.testGetByNumber(ctx, t, ethB, rpc.BlockNumber(b.Number().Int64()))
+		})
+	}
+
+	t.Run("named_blocks", func(t *testing.T) {
+		// [ethclient.Client.BlockByNumber] isn't compatible with pending blocks as
+		// the geth RPC server strips fields that the client then expects to find.
+		sut.testRPC(ctx, t, rpcTest{
+			method: "eth_getHeaderByNumber",
+			args:   []any{rpc.PendingBlockNumber},
+			want:   pending.Header(),
+		})
+
+		tests := []struct {
+			num  rpc.BlockNumber
+			want *blocks.Block
+		}{
+			{rpc.LatestBlockNumber, executed},
+			{rpc.SafeBlockNumber, settled},
+			{rpc.FinalizedBlockNumber, settled},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.num.String(), func(t *testing.T) {
+				sut.testGetByNumber(ctx, t, tt.want.EthBlock(), tt.num)
+			})
+		}
+
+		sut.testRPC(ctx, t, rpcTest{
+			method: "eth_blockNumber",
+			want:   hexutil.Uint64(executed.Height()),
+		})
+	})
+}
+
+func TestMempoolTxGetters(t *testing.T) {
+	ctx, sut := newSUT(t, 1, withAllAPIs())
+
+	// These RPC methods use GetPoolTransaction, which returns any transaction
+	// accepted into the pool regardless of pending/queued status. A
+	// transaction only needs to have been accepted by the pool (i.e.
+	// mustSendTx succeeds) to be returned.
+	pendingTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+	// Skip nonce 1 to create a gap so queuedTx (nonce 2) is accepted into
+	// the pool but not marked as pending.
+	sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+	queuedTx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+	sut.mustSendTx(t, pendingTx, queuedTx)
+	sut.waitUntilTxsPending(t, pendingTx)
+
+	for _, tt := range []struct {
+		name string
+		tx   *types.Transaction
+	}{
+		{"pending", pendingTx},
+		{"queued", queuedTx},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			marshaled, err := tt.tx.MarshalBinary()
+			require.NoErrorf(t, err, "%T.MarshalBinary()", tt.tx)
+
+			sut.testRPC(ctx, t, []rpcTest{
+				{
+					method: "eth_getTransactionByHash",
+					args:   []any{tt.tx.Hash()},
+					want:   tt.tx,
+				},
+				{
+					method: "eth_getRawTransactionByHash",
+					args:   []any{tt.tx.Hash()},
+					want:   hexutil.Bytes(marshaled),
+				},
+				{
+					method: "debug_getRawTransaction",
+					args:   []any{tt.tx.Hash()},
+					want:   hexutil.Bytes(marshaled),
+				},
+			}...)
+		})
+	}
+}
+
+func TestGetLogs(t *testing.T) {
+	// We shorten section size to reduce number of required blocks in the test.
+	const bloomSectionSize = 8
+
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	rng := crypto.NewKeccakState()
+	emitter := common.Address{'l', 'o', 'g'}
+	precompile := vm.NewStatefulPrecompile(func(env vm.PrecompileEnvironment, _ []byte) ([]byte, error) {
+		data := make([]byte, 8)
+		_, _ = rng.Read(data)
+		env.StateDB().AddLog(&types.Log{
+			Address: env.Addresses().EVMSemantic.Self,
+			Data:    data, // Guarantee uniqueness as this is the data under test
+		})
+		return nil, nil
+	})
+
+	ctx, sut := newSUT(t, 1, timeOpt, withBloomSectionSize(bloomSectionSize), withPrecompile(emitter, precompile))
+	genesis := sut.lastAcceptedBlock(t)
+
+	txWithLog := func(t *testing.T) *types.Transaction {
+		t.Helper()
+		return sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+			To:       &emitter,
+			GasPrice: big.NewInt(1),
+			Gas:      1e6,
+		})
+	}
+	txWithoutLog := func(t *testing.T) *types.Transaction {
+		t.Helper()
+		return sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+			To:       &common.Address{},
+			GasPrice: big.NewInt(1),
+			Gas:      params.TxGas,
+		})
+	}
+
+	// Create enough blocks to ensure some are indexed.
+	// Since a block after this will be settled, these are all settled as well,
+	// and therefore moved to disk.
+	indexed := make([]*blocks.Block, bloomSectionSize)
+	for i := range indexed {
+		indexed[i] = sut.runConsensusLoop(t, txWithLog(t))
+	}
+
+	settled := sut.runConsensusLoop(t, txWithLog(t))
+	vmTime.AdvanceToSettle(ctx, t, settled)
+
+	noLogs := sut.runConsensusLoop(t, txWithoutLog(t))
+
+	executed := sut.runConsensusLoop(t, txWithLog(t))
+	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
+
+	// Although the FiltersAPI will work without any blocks indexed, such a
+	// scenario would not test the functionality of the bloom indexer.
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		be := sut.rawVM.GethRPCBackends()
+		_, got := be.BloomStatus()
+		require.Equal(c, uint64(1), got, "%T.BloomStatus() sections", be)
+	}, 5*time.Second, 100*time.Millisecond, "bloom indexer never finished")
+
+	logsFrom := func(bs ...*blocks.Block) []types.Log {
+		var logs []types.Log
+		for _, b := range bs {
+			for _, r := range b.Receipts() {
+				for _, l := range r.Logs {
+					logs = append(logs, *l)
+				}
+			}
+		}
+		return logs
+	}
+
+	ptr := func(h common.Hash) *common.Hash { return &h }
+
+	tests := []struct {
+		name     string
+		query    ethereum.FilterQuery
+		wantLogs []types.Log
+		wantErr  testerr.Want
+	}{
+		{
+			name: "genesis",
+			query: ethereum.FilterQuery{
+				BlockHash: ptr(genesis.Hash()),
+			},
+		},
+		{
+			name: "no_logs",
+			query: ethereum.FilterQuery{
+				BlockHash: ptr(noLogs.Hash()),
+			},
+		},
+		{
+			name: "nonexistent_block",
+			query: ethereum.FilterQuery{
+				BlockHash: &common.Hash{0xde, 0xad},
+			},
+			wantErr: testerr.Contains("unknown block"),
+		},
+		{
+			name: "on_disk",
+			query: ethereum.FilterQuery{
+				BlockHash: ptr(indexed[0].Hash()),
+			},
+			wantLogs: logsFrom(indexed[0]),
+		},
+		{
+			name: "in_memory",
+			query: ethereum.FilterQuery{
+				BlockHash: ptr(executed.Hash()),
+			},
+			wantLogs: logsFrom(executed),
+		},
+		{
+			name: "unindexed",
+			query: ethereum.FilterQuery{
+				FromBlock: settled.Number(),
+				ToBlock:   executed.Number(),
+				Addresses: []common.Address{emitter},
+			},
+			wantLogs: logsFrom(settled, executed),
+		},
+		{
+			name: "unknown_contract",
+			query: ethereum.FilterQuery{
+				FromBlock: settled.Number(),
+				ToBlock:   executed.Number(),
+				Addresses: []common.Address{{0xf0, 0x00}},
+			},
+		},
+		{
+			name: "indexed",
+			query: ethereum.FilterQuery{
+				FromBlock: indexed[0].Number(),
+				ToBlock:   indexed[len(indexed)-1].Number(),
+				Addresses: []common.Address{emitter},
+			},
+			wantLogs: logsFrom(indexed...),
+		},
+		{
+			name: "to_future_block",
+			query: ethereum.FilterQuery{
+				FromBlock: executed.Number(),
+				ToBlock:   new(big.Int).Add(executed.Number(), big.NewInt(10)),
+			},
+			wantLogs: logsFrom(executed),
+		},
+		{
+			name: "future_range",
+			query: ethereum.FilterQuery{
+				FromBlock: new(big.Int).Add(executed.Number(), big.NewInt(1)),
+				ToBlock:   new(big.Int).Add(executed.Number(), big.NewInt(10)),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Logf("%T: %[1]v", tt.query)
+			got, err := sut.FilterLogs(ctx, tt.query)
+			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
+				t.Fatalf("eth_getLogs(...) %s", diff)
+			}
+			if diff := cmp.Diff(tt.wantLogs, got, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("eth_getLogs(...) mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// TestGetLogsRange checks how the requested block range is resolved and
+// bounded by [saerpc.Config.MaxBlocksPerRequest], including while the
+// last-accepted block is still executing.
+func TestGetLogsRange(t *testing.T) {
+	const maxBlocksPerRequest = 2
+
+	blockingPrecompile := common.Address{'b', 'l', 'o', 'c', 'k'}
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	precompileOpt, unblock := withBlockingPrecompile(blockingPrecompile)
+	ctx, sut := newSUT(t, 1, precompileOpt, timeOpt, options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.RPCConfig.MaxBlocksPerRequest = maxBlocksPerRequest
+	}))
+	defer unblock()
+
+	genesis := sut.lastAcceptedBlock(t)
+	settled := sut.runConsensusLoop(t)
+	vmTime.AdvanceToSettle(ctx, t, settled)
+	executed := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		Gas:      1e6,
+		GasPrice: big.NewInt(1),
+		Data:     saetest.LogTopOfStackAfter(saetest.Ops(vm.PUSH0)), // contract creation, so this runs and emits a log
+	}))
+	require.NoErrorf(t, executed.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", executed)
+	executedLogs := []types.Log{*executed.Receipts()[0].Logs[0]}
+
+	unexecuted := sut.runConsensusLoop(t, sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+		To:       &blockingPrecompile,
+		Gas:      params.TxGas,
+		GasPrice: big.NewInt(1),
+	}))
+	future := hexutil.Uint64(unexecuted.Height() + 1)
+
+	num := func(b *blocks.Block) hexutil.Uint64 {
+		return hexutil.Uint64(b.Height())
+	}
+
+	tests := []struct {
+		name     string
+		query    map[string]any
+		wantLogs []types.Log
+		wantErr  testerr.Want
+	}{
+		{
+			name:  "at_limit",
+			query: map[string]any{"fromBlock": num(genesis), "toBlock": num(settled)},
+		},
+		{
+			name:    "over_limit",
+			query:   map[string]any{"fromBlock": num(genesis), "toBlock": num(executed)},
+			wantErr: testerr.Contains("requested too many blocks from 0 to 2, maximum is set to 2"),
+		},
+		{
+			name:    "over_limit_to_latest",
+			query:   map[string]any{"fromBlock": num(genesis)},
+			wantErr: testerr.Contains("requested too many blocks from 0 to 2, maximum is set to 2"),
+		},
+		{
+			name:    "over_limit_to_future_block",
+			query:   map[string]any{"fromBlock": num(genesis), "toBlock": future + 100},
+			wantErr: testerr.Contains("requested too many blocks from 0 to 3, maximum is set to 2"),
+		},
+		{
+			name:     "to_future_block",
+			query:    map[string]any{"fromBlock": num(executed), "toBlock": future + 100},
+			wantLogs: executedLogs,
+		},
+		{
+			name:     "to_unexecuted_block",
+			query:    map[string]any{"fromBlock": num(executed), "toBlock": num(unexecuted)},
+			wantLogs: executedLogs,
+		},
+		{
+			name:    "hash_of_unexecuted_block",
+			query:   map[string]any{"blockHash": unexecuted.Hash()},
+			wantErr: testerr.Contains("unknown block"), // from libevm
+		},
+		{
+			name:  "from_unexecuted_block",
+			query: map[string]any{"fromBlock": num(unexecuted)},
+		},
+		{
+			name:  "from_future_block",
+			query: map[string]any{"fromBlock": future},
+		},
+		{
+			name:  "future_range",
+			query: map[string]any{"fromBlock": future, "toBlock": future + 9},
+		},
+		{
+			name:    "from_greater_than_to",
+			query:   map[string]any{"fromBlock": num(executed), "toBlock": num(settled)},
+			wantErr: testerr.Contains("invalid block range params"), // from libevm
+		},
+		{
+			name:    "with_hash_and_range_libevm_error",
+			query:   map[string]any{"blockHash": settled.Hash(), "fromBlock": future},
+			wantErr: testerr.Contains("cannot specify both BlockHash and FromBlock/ToBlock"), // from libevm
+		},
+		{
+			name:    "from_finalized_matches_settled",
+			query:   map[string]any{"fromBlock": "finalized", "toBlock": num(unexecuted)},
+			wantErr: testerr.Contains("requested too many blocks from 1 to 3, maximum is set to 2"),
+		},
+		{
+			name:    "from_pending",
+			query:   map[string]any{"fromBlock": "pending"},
+			wantErr: testerr.Contains("invalid block range params"), // from libevm
+		},
+		{
+			// libevm always resolves pending to last executed, but the config is NOT set.
+			name:  "pending_resolves_to_last_accepted",
+			query: map[string]any{"fromBlock": "pending", "toBlock": "pending"},
+		},
+		{
+			name:    "future_range_reversed",
+			query:   map[string]any{"fromBlock": future + 9, "toBlock": future},
+			wantErr: testerr.Contains("invalid block range params"), // from libevm
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got []types.Log
+			err := sut.CallContext(ctx, &got, "eth_getLogs", tt.query)
+			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
+				t.Fatalf("eth_getLogs(%v) %s", tt.query, diff)
+			}
+			if err != nil {
+				return
+			}
+
+			// must be an empty array, not null, to match libevm.
+			require.NotNilf(t, got, "eth_getLogs(%v)", tt.query)
+			if diff := cmp.Diff(tt.wantLogs, got, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("eth_getLogs(%v) mismatch (-want +got):\n%s", tt.query, diff)
+			}
+		})
+	}
+}
+
+func TestEthPendingTransactions(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+
+	tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+		Value:     big.NewInt(100),
+	})
+	sut.sendTxsAndWaitUntilPending(t, tx)
+
+	// eth_pendingTransactions filters results to only transactions from
+	// accounts configured in the AccountManager, which is always empty.
+	sut.testRPC(ctx, t, rpcTest{
+		method: "eth_pendingTransactions",
+		want:   []*ethapi.RPCTransaction{},
+	})
+}
+
+func TestGetReceipts(t *testing.T) {
+	timeOpt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 2, timeOpt, withAllAPIs())
+
+	var (
+		txs  []*types.Transaction
+		want []*types.Receipt
+	)
+	// The mempool cannot be relied on to mark a transaction as pending
+	// if there is already a pending transaction with the same account.
+	// To avoid this, we use two different accounts and price the
+	// transactions such that the builder will maintain ordering.
+	for range 3 {
+		tx1 := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+			To:       &zeroAddr,
+			Gas:      params.TxGas,
+			GasPrice: big.NewInt(2), // ensure this tx is first in block
+		})
+		tx2 := sut.wallet.SetNonceAndSign(t, 1, &types.LegacyTx{
+			To:       &zeroAddr,
+			Gas:      params.TxGas,
+			GasPrice: big.NewInt(1),
+		})
+		txs = append(txs, tx1, tx2)
+		want = append(want, []*types.Receipt{
+			{
+				TxHash:            tx1.Hash(),
+				Status:            types.ReceiptStatusSuccessful,
+				GasUsed:           params.TxGas,
+				EffectiveGasPrice: big.NewInt(2),
+				Logs:              []*types.Log{},
+			},
+			{
+				TxHash:            tx2.Hash(),
+				Status:            types.ReceiptStatusSuccessful,
+				GasUsed:           params.TxGas,
+				EffectiveGasPrice: big.NewInt(1),
+				Logs:              []*types.Log{},
+			},
+		}...)
+	}
+
+	slice := func(t *testing.T, from, to int) (*blocks.Block, []*types.Receipt) {
+		t.Helper()
+		b := sut.runConsensusLoop(t, txs[from:to]...)
+		rs := want[from:to]
+
+		var totalGas uint64
+		for i, r := range rs {
+			totalGas += r.GasUsed
+			r.CumulativeGasUsed = totalGas
+			r.BlockHash = b.Hash()
+			r.BlockNumber = b.Number()
+			r.TransactionIndex = uint(i)
+		}
+		return b, rs
+	}
+
+	genesis := sut.lastAcceptedBlock(t)
+
+	onDisk, wantOnDisk := slice(t, 0, 2)
+	settled, wantSettled := slice(t, 2, 4)
+	vmTime.AdvanceToSettle(ctx, t, settled)
+	unsettled, wantUnsettled := slice(t, 4, 6)
+
+	marshalReceipts := func(rs []*types.Receipt) []hexutil.Bytes {
+		raw := make([]hexutil.Bytes, len(rs))
+		for i, r := range rs {
+			buf, err := r.MarshalBinary()
+			require.NoErrorf(t, err, "receipts[%d].MarshalBinary()", i)
+			raw[i] = buf
+		}
+		return raw
+	}
+
+	var tests []rpcTest
+	for _, tc := range []struct {
+		ids  []rpc.BlockNumberOrHash
+		want []*types.Receipt
+	}{
+		{
+			ids: []rpc.BlockNumberOrHash{
+				rpc.BlockNumberOrHashWithHash(onDisk.Hash(), true),
+				rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(onDisk.Height())), //#nosec G115 -- Won't overflow
+			},
+			want: wantOnDisk,
+		},
+		{
+			ids: []rpc.BlockNumberOrHash{
+				rpc.BlockNumberOrHashWithHash(settled.Hash(), true),
+				rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(settled.Height())), //#nosec G115 -- Won't overflow
+				rpc.BlockNumberOrHashWithNumber(rpc.SafeBlockNumber),
+				rpc.BlockNumberOrHashWithNumber(rpc.FinalizedBlockNumber),
+			},
+			want: wantSettled,
+		},
+		{
+			ids: []rpc.BlockNumberOrHash{
+				rpc.BlockNumberOrHashWithHash(unsettled.Hash(), true),
+				rpc.BlockNumberOrHashWithNumber(rpc.BlockNumber(unsettled.Height())), //#nosec G115 -- Won't overflow
+				rpc.BlockNumberOrHashWithNumber(rpc.LatestBlockNumber),
+			},
+			want: wantUnsettled,
+		},
+	} {
+		for _, id := range tc.ids {
+			tests = append(tests, []rpcTest{
+				{
+					method: "eth_getBlockReceipts",
+					args:   []any{id.String()},
+					want:   tc.want,
+				},
+				{
+					method: "debug_getRawReceipts",
+					args:   []any{id.String()},
+					want:   marshalReceipts(tc.want),
+				},
+			}...)
+		}
+	}
+
+	for i, tx := range txs {
+		tests = append(tests, rpcTest{
+			method: "eth_getTransactionReceipt",
+			args:   []any{tx.Hash()},
+			want:   want[i],
+		})
+	}
+
+	tests = append(tests, []rpcTest{
+		{
+			method: "eth_getTransactionReceipt",
+			args:   []any{common.Hash{}},
+			want:   (*types.Receipt)(nil),
+		},
+		{
+			method: "eth_getBlockReceipts",
+			args:   []any{common.Hash{}},
+			want:   ([]*types.Receipt)(nil),
+		},
+		{
+			method: "debug_getRawReceipts",
+			args:   []any{common.Hash{}},
+			want:   []hexutil.Bytes{},
+		},
+		{
+			method: "eth_getBlockReceipts",
+			args:   []any{genesis.Hash()},
+			want:   []*types.Receipt{},
+		},
+		{
+			method: "debug_getRawReceipts",
+			args:   []any{genesis.Hash()},
+			want:   []hexutil.Bytes{},
+		},
+	}...)
+
+	sut.testRPC(ctx, t, tests...)
+}
+
+func TestGetTransactionCount(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+	addr := sut.wallet.Addresses()[0]
+
+	sut.testRPC(ctx, t, rpcTest{
+		method: "eth_getTransactionCount",
+		args:   []any{addr, "pending"},
+		want:   hexutil.Uint64(0),
+	})
+
+	tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+	sut.sendTxsAndWaitUntilPending(t, tx)
+
+	sut.testRPC(ctx, t, rpcTest{
+		method: "eth_getTransactionCount",
+		args:   []any{addr, "pending"},
+		want:   hexutil.Uint64(1),
+	})
+}
+
+// eth_fillTransaction fills defaults (nonce, gas price) without signing,
+// so it succeeds without a keystore.
+func TestFillTransaction(t *testing.T) {
+	const chainID = 42
+	ctx, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
+		cfg := *c.genesis.Config
+		cfg.ChainID = big.NewInt(chainID)
+		c.genesis.Config = &cfg
+	}))
+
+	b := sut.runConsensusLoop(t)
+	require.NoError(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
+
+	to := common.Address{'b', 'o', 'b'}
+	const (
+		gas   = 56_789
+		value = 12_345
+	)
+
+	want := func(t *testing.T, nonce uint64) ethapi.SignTransactionResult {
+		t.Helper()
+
+		// libevm's internal setDefaults fills: nonce from pool, ChainID from config, and
+		// London fee fields from SuggestGasTipCap (MinSuggestedTip=1 wei) and
+		// the last block's base fee. geth sets maxFeePerGas to 2*baseFee + tip
+		// as "slack" to avoid invalidation if the base fee is rising.
+		tip := big.NewInt(1)
+		feeCap := new(big.Int).Add(
+			tip,
+			new(big.Int).Mul(b.Header().BaseFee, big.NewInt(2)),
+		)
+
+		tx := types.NewTx(&types.DynamicFeeTx{
+			ChainID:   big.NewInt(chainID),
+			Nonce:     nonce,
+			To:        &to,
+			GasTipCap: tip,
+			GasFeeCap: feeCap,
+			Gas:       gas,
+			Value:     big.NewInt(value),
+		})
+		raw, err := tx.MarshalBinary()
+		require.NoError(t, err, "tx.MarshalBinary()")
+		return ethapi.SignTransactionResult{Raw: raw, Tx: tx}
+	}
+
+	args := ethapi.TransactionArgs{
+		From:  new(sut.wallet.Addresses()[0]),
+		To:    &to,
+		Gas:   new(hexutil.Uint64(gas)),
+		Value: hexBig(value),
+	}
+
+	sut.testRPC(ctx, t, rpcTest{
+		method: "eth_fillTransaction",
+		args:   []any{args},
+		want:   want(t, 0),
+	})
+
+	// Placing a transaction in the mempool to confirm that the filled nonce is
+	// incremented accordingly.
+	tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+	sut.sendTxsAndWaitUntilPending(t, tx)
+
+	sut.testRPC(ctx, t, rpcTest{
+		method: "eth_fillTransaction",
+		args:   []any{args},
+		want:   want(t, 1),
+	})
+}
+
+// eth_resend replaces a pending transaction with updated gas parameters.
+// Resend re-signs the replacement transaction server-side, which requires a
+// keystore, which SAE does not support, so signing is as far as we can get
+// and we verify that the RPC fails in an expected way.
+func TestResend(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+
+	// Submit a pending tx so Resend can find it in the pool.
+	tx := sut.wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &zeroAddr,
+		Gas:       params.TxGas,
+		GasFeeCap: big.NewInt(1),
+	})
+	sut.sendTxsAndWaitUntilPending(t, tx)
+
+	sut.testRPC(ctx, t, rpcTest{
+		method: "eth_resend",
+		args: []any{
+			ethapi.TransactionArgs{
+				From:                 new(sut.wallet.Addresses()[0]),
+				Nonce:                new(hexutil.Uint64(tx.Nonce())),
+				To:                   tx.To(),
+				Gas:                  new(hexutil.Uint64(tx.Gas())),
+				MaxFeePerGas:         (*hexutil.Big)(tx.GasFeeCap()),
+				MaxPriorityFeePerGas: (*hexutil.Big)(tx.GasTipCap()),
+			},
+			hexBig(2), // arbitrary
+		},
+		wantErr: testerr.Contains("unknown account"),
+	})
+}
+
+// SAE doesn't really support APIs that require a key on the node, as there is
+// no way to add keys. But, we want to ensure the methods error gracefully.
+func TestEthSigningAPIs(t *testing.T) {
+	ctx, sut := newSUT(t, 1)
+
+	wantErr := testerr.Contains("unknown account")
+	txFields := ethapi.TransactionArgs{
+		From:     &zeroAddr,
+		To:       &zeroAddr,
+		Gas:      new(hexutil.Uint64(params.TxGas)),
+		GasPrice: hexBig(1),
+		Value:    hexBig(100),
+		Nonce:    new(hexutil.Uint64),
+	}
+	sut.testRPC(ctx, t, []rpcTest{
+		{
+			method: "eth_sign",
+			args: []any{
+				zeroAddr,
+				hexutil.Bytes("test message"),
+			},
+			wantErr: wantErr,
+		},
+		{
+			method: "eth_signTransaction",
+			args: []any{
+				txFields,
+			},
+			wantErr: wantErr,
+		},
+		{
+			method: "eth_sendTransaction",
+			args: []any{
+				txFields,
+			},
+			wantErr: wantErr,
+		},
+	}...)
+}
+
+func TestRPCTxFeeCap(t *testing.T) {
+	tests := []struct {
+		name     string
+		cap      float64
+		gasPrice *big.Int
+		wantErr  testerr.Want
+	}{
+		{
+			name:     "under_cap",
+			cap:      0.001,
+			gasPrice: big.NewInt(params.Wei), // fee = 21000 wei < 0.001 ETH
+		},
+		{
+			name:     "over_cap",
+			cap:      0.001,
+			gasPrice: big.NewInt(params.Ether), // fee = 21000 ETH > 0.001 ETH
+			wantErr:  testerr.Contains("exceeds the configured cap"),
+		},
+		{
+			name:     "no_cap",
+			cap:      0, // 0 = no cap
+			gasPrice: big.NewInt(params.Ether),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sut := newSUT(t, 1, withTxFeeCap(tt.cap))
+			tx := sut.wallet.SetNonceAndSign(t, 0, &types.LegacyTx{
+				To:       &zeroAddr,
+				Gas:      params.TxGas,
+				GasPrice: tt.gasPrice,
+			})
+			err := sut.Client.SendTransaction(sut.context(t), tx)
+			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
+				t.Fatalf("SendTransaction() %s", diff)
+			}
+		})
+	}
+}
+
+func TestUnprotectedTxs(t *testing.T) {
+	tests := []struct {
+		name                string
+		allowUnprotectedTxs bool
+		wantErr             testerr.Want
+	}{
+		{
+			name:                "rejected_when_disallowed",
+			allowUnprotectedTxs: false,
+			wantErr:             testerr.Contains("only replay-protected (EIP-155) transactions allowed over RPC"),
+		},
+		{
+			name:                "accepted_when_allowed",
+			allowUnprotectedTxs: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, sut := newSUT(t, 1, options.Func[sutConfig](func(c *sutConfig) {
+				c.vmConfig.RPCConfig.AllowUnprotectedTxs = tt.allowUnprotectedTxs
+			}))
+			// HomesteadSigner produces a pre-EIP-155 (replay-unprotected) tx
+			tx := sut.wallet.SignTx(t, types.HomesteadSigner{}, 0, &types.LegacyTx{
+				To:       &zeroAddr,
+				Gas:      params.TxGas,
+				GasPrice: big.NewInt(1),
+			})
+			require.False(t, tx.Protected(), "tx.Protected()")
+
+			err := sut.Client.SendTransaction(sut.context(t), tx)
+			if diff := testerr.Diff(err, tt.wantErr); diff != "" {
+				t.Fatalf("SendTransaction() %s", diff)
+			}
+		})
+	}
+}
+
+func TestDebugRPCs(t *testing.T) {
+	ctx, sut := newSUT(t, 0, withAllAPIs())
+
+	sut.testRPC(ctx, t, []rpcTest{
+		{
+			// SAE does not support rewinding - setHead is a no-op.
+			method: "debug_setHead",
+			args:   []any{hexutil.Uint64(0)},
+			want:   json.RawMessage("null"),
+		},
+		{
+			method: "debug_chaindbCompact",
+			want:   json.RawMessage("null"),
+		},
+		{
+			method:  "debug_chaindbProperty",
+			args:    []any{"leveldb.stats"},
+			wantErr: testerr.Contains("not supported"),
+		},
+		{
+			method: "debug_dbGet",
+			args:   []any{hexutil.Encode([]byte("LastBlock"))},
+			want:   hexutil.Bytes(rawdb.ReadHeadBlockHash(sut.db).Bytes()),
+		},
+		{
+			method:  "debug_dbAncient",
+			args:    []any{"headers", uint64(0)},
+			wantErr: testerr.Contains("not supported"),
+		},
+		{
+			method:  "debug_dbAncients",
+			wantErr: testerr.Contains("not supported"),
+		},
+		{
+			method:  "debug_printBlock",
+			args:    []any{uint64(1)}, // SUT only has genesis, so block 1 doesn't exist.
+			wantErr: testerr.Contains("not found"),
+		},
+	}...)
+
+	// The profiling debug namespace is handled entirely by upstream code
+	// that doesn't depend in any way on SAE. We therefore only need an
+	// integration test, not to exercise every method because such unit
+	// testing is the responsibility of the source.
+	//
+	// Reference: https://geth.ethereum.org/docs/interacting-with-geth/rpc/ns-debug
+	t.Run("debug_setGCPercent", func(t *testing.T) {
+		const firstArg = 100
+		beforeTest := debug.SetGCPercent(firstArg)
+		defer debug.SetGCPercent(beforeTest)
+
+		const m = "debug_setGCPercent"
+		sut.testRPC(ctx, t, []rpcTest{
+			// Invariant: each call returns the input argument of the last.
+			{
+				method: m,
+				args:   []any{42},
+				want:   firstArg,
+			},
+			{
+				method: m,
+				args:   []any{0},
+				want:   42,
+			},
+		}...)
+	})
+}
+
+// encodeRLP returns the value's RLP encoding.
+func encodeRLP(tb testing.TB, v any) hexutil.Bytes {
+	tb.Helper()
+	b, err := rlp.EncodeToBytes(v)
+	require.NoErrorf(tb, err, "rlp.EncodeToBytes(%T)", v)
+	return b
+}
+
+func (s *SUT) testGetByHash(ctx context.Context, t *testing.T, want *types.Block) {
+	t.Helper()
+
+	testRPCGetter(ctx, t, "eth_getBlockByHash", s.BlockByHash, want.Hash(), want)
+
+	s.testRPC(ctx, t, []rpcTest{
+		{
+			method: "eth_getBlockByHash",
+			args:   []any{want.Hash(), false},
+			want:   want.Header(),
+		},
+		{
+			method: "eth_getBlockTransactionCountByHash",
+			args:   []any{want.Hash()},
+			want:   hexutil.Uint(len(want.Transactions())),
+		},
+		{
+			method: "eth_getUncleByBlockHashAndIndex",
+			args:   []any{want.Hash(), hexutil.Uint(0)},
+			want:   (map[string]any)(nil), // SAE never has uncles (no reorgs)
+		},
+		{
+			method: "eth_getUncleCountByBlockHash",
+			args:   []any{want.Hash()},
+			want:   hexutil.Uint(0), // SAE never has uncles (no reorgs)
+		},
+		{
+			method: "debug_getRawBlock",
+			args:   []any{want.Hash()},
+			want:   encodeRLP(t, want),
+		},
+		{
+			method: "debug_getRawHeader",
+			args:   []any{want.Hash()},
+			want:   encodeRLP(t, want.Header()),
+		},
+	}...)
+
+	for i, wantTx := range want.Transactions() {
+		txIdx := hexutil.Uint(i)
+		marshaled, err := wantTx.MarshalBinary()
+		require.NoErrorf(t, err, "%T.MarshalBinary()", wantTx)
+
+		s.testRPC(ctx, t, []rpcTest{
+			{
+				method: "eth_getTransactionByHash",
+				args:   []any{wantTx.Hash()},
+				want:   wantTx,
+			},
+			{
+				method: "eth_getTransactionByBlockHashAndIndex",
+				args:   []any{want.Hash(), txIdx},
+				want:   wantTx,
+			},
+			{
+				method: "eth_getRawTransactionByBlockHashAndIndex",
+				args:   []any{want.Hash(), txIdx},
+				want:   hexutil.Bytes(marshaled),
+			},
+			{
+				method: "eth_getRawTransactionByHash",
+				args:   []any{wantTx.Hash()},
+				want:   hexutil.Bytes(marshaled),
+			},
+			{
+				method: "debug_getRawTransaction",
+				args:   []any{wantTx.Hash()},
+				want:   hexutil.Bytes(marshaled),
+			},
+		}...)
+	}
+
+	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1)
+	s.testRPC(ctx, t, []rpcTest{
+		{
+			method: "eth_getTransactionByBlockHashAndIndex",
+			args:   []any{want.Hash(), outOfBoundsIndex},
+			want:   (*types.Transaction)(nil),
+		},
+		{
+			method: "eth_getRawTransactionByBlockHashAndIndex",
+			args:   []any{want.Hash(), outOfBoundsIndex},
+			want:   hexutil.Bytes(nil),
+		},
+	}...)
+}
+
+func (s *SUT) testGetByUnknownHash(ctx context.Context, t *testing.T) {
+	t.Helper()
+
+	s.testRPC(ctx, t, []rpcTest{
+		{
+			method: "eth_getBlockByHash",
+			args:   []any{common.Hash{}, true},
+			want:   (*types.Block)(nil),
+		},
+		{
+			method: "eth_getHeaderByHash",
+			args:   []any{common.Hash{}},
+			want:   (*types.Header)(nil),
+		},
+		{
+			method: "eth_getBlockTransactionCountByHash",
+			args:   []any{common.Hash{}},
+			want:   (*hexutil.Uint)(nil),
+		},
+		{
+			method: "eth_getTransactionByBlockHashAndIndex",
+			args:   []any{common.Hash{}, hexutil.Uint(0)},
+			want:   (*types.Transaction)(nil),
+		},
+		{
+			method: "eth_getRawTransactionByBlockHashAndIndex",
+			args:   []any{common.Hash{}, hexutil.Uint(0)},
+			want:   hexutil.Bytes(nil),
+		},
+		{
+			method: "eth_getTransactionByHash",
+			args:   []any{common.Hash{}},
+			want:   (*types.Transaction)(nil),
+		},
+		{
+			method: "eth_getRawTransactionByHash",
+			args:   []any{common.Hash{}},
+			want:   hexutil.Bytes(nil),
+		},
+		{
+			method: "debug_getRawTransaction",
+			args:   []any{common.Hash{}},
+			want:   hexutil.Bytes(nil),
+		},
+		{
+			method:  "debug_getRawBlock",
+			args:    []any{common.Hash{}},
+			wantErr: testerr.Contains("not found"),
+		},
+		{
+			method:  "debug_getRawHeader",
+			args:    []any{common.Hash{}},
+			wantErr: testerr.Contains("not found"),
+		},
+	}...)
+}
+
+// testGetByNumber accepts a block-number override to allow testing via named
+// blocks, e.g. [rpc.LatestBlockNumber], not only via the specific number
+// carried by the [types.Block].
+func (s *SUT) testGetByNumber(ctx context.Context, t *testing.T, want *types.Block, n rpc.BlockNumber) {
+	t.Helper()
+	testRPCGetter(ctx, t, "eth_getBlockByNumber", s.BlockByNumber, big.NewInt(n.Int64()), want)
+
+	s.testRPC(ctx, t, []rpcTest{
+		{
+			method: "eth_getBlockByNumber",
+			args:   []any{n, false},
+			want:   want.Header(),
+		},
+		{
+			method: "eth_getBlockTransactionCountByNumber",
+			args:   []any{n},
+			want:   hexutil.Uint(len(want.Transactions())),
+		},
+		{
+			method: "eth_getUncleByBlockNumberAndIndex",
+			args:   []any{n, hexutil.Uint(0)},
+			want:   (map[string]any)(nil), // SAE never has uncles (no reorgs)
+		},
+		{
+			method: "eth_getUncleCountByBlockNumber",
+			args:   []any{n},
+			want:   hexutil.Uint(0), // SAE never has uncles (no reorgs)
+		},
+		{
+			method: "debug_getRawBlock",
+			args:   []any{n},
+			want:   encodeRLP(t, want),
+		},
+		{
+			method: "debug_getRawHeader",
+			args:   []any{n},
+			want:   encodeRLP(t, want.Header()),
+		},
+	}...)
+
+	for i, wantTx := range want.Transactions() {
+		txIdx := hexutil.Uint(i)
+		marshaled, err := wantTx.MarshalBinary()
+		require.NoErrorf(t, err, "%T.MarshalBinary()", wantTx)
+
+		s.testRPC(ctx, t, []rpcTest{
+			{
+				method: "eth_getTransactionByBlockNumberAndIndex",
+				args:   []any{n, txIdx},
+				want:   wantTx,
+			},
+			{
+				method: "eth_getRawTransactionByBlockNumberAndIndex",
+				args:   []any{n, txIdx},
+				want:   hexutil.Bytes(marshaled),
+			},
+		}...)
+	}
+
+	outOfBoundsIndex := hexutil.Uint(len(want.Transactions()) + 1)
+	s.testRPC(ctx, t, []rpcTest{
+		{
+			method: "eth_getTransactionByBlockNumberAndIndex",
+			args:   []any{n, outOfBoundsIndex},
+			want:   (*types.Transaction)(nil),
+		},
+		{
+			method: "eth_getRawTransactionByBlockNumberAndIndex",
+			args:   []any{n, outOfBoundsIndex},
+			want:   hexutil.Bytes(nil),
+		},
+	}...)
+}
+
+func (s *SUT) testGetByUnknownNumber(ctx context.Context, t *testing.T) {
+	t.Helper()
+
+	const n rpc.BlockNumber = math.MaxInt64
+	s.testRPC(ctx, t, []rpcTest{
+		{
+			method: "eth_getBlockByNumber",
+			args:   []any{n, true},
+			want:   (*types.Block)(nil),
+		},
+		{
+			method: "eth_getHeaderByNumber",
+			args:   []any{n},
+			want:   (*types.Header)(nil),
+		},
+		{
+			method: "eth_getBlockTransactionCountByNumber",
+			args:   []any{n},
+			want:   (*hexutil.Uint)(nil),
+		},
+		{
+			method: "eth_getTransactionByBlockNumberAndIndex",
+			args:   []any{n, hexutil.Uint(0)},
+			want:   (*types.Transaction)(nil),
+		},
+		{
+			method: "eth_getRawTransactionByBlockNumberAndIndex",
+			args:   []any{n, hexutil.Uint(0)},
+			want:   hexutil.Bytes(nil),
+		},
+		{
+			method: "debug_getRawBlock",
+			args:   []any{n},
+			want:   hexutil.Bytes(nil),
+		},
+		{
+			method: "debug_getRawHeader",
+			args:   []any{n},
+			want:   hexutil.Bytes(nil),
+		},
+	}...)
+}
+
+func withTxFeeCap(feeCap float64) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.RPCConfig.TxFeeCap = feeCap
+	})
+}
+
+// withAPIs returns a sutOption that serves only the APIs in apis.
+func withAPIs(apis set.Set[saerpc.API]) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.RPCConfig.APIs = apis
+	})
+}
+
+// withAllAPIs returns a sutOption that serves every API, including those
+// excluded from [saerpc.DefaultAPIs].
+func withAllAPIs() sutOption {
+	return withAPIs(saerpc.AllAPIs())
+}
+
+// errCodeMethodNotFound is the JSON-RPC 2.0 code returned for a method the
+// server doesn't serve. libevm's rpc package doesn't export it.
+const errCodeMethodNotFound = -32601
+
+// methodRegistered reports whether sut serves method.
+func methodRegistered(ctx context.Context, tb testing.TB, sut *SUT, method string, args ...any) bool {
+	tb.Helper()
+
+	err := sut.CallContext(ctx, new(json.RawMessage), method, args...)
+	if err == nil {
+		return true
+	}
+	var rpcErr rpc.Error
+	require.ErrorAsf(tb, err, &rpcErr, "%T.CallContext(%q)", sut, method)
+	return rpcErr.ErrorCode() != errCodeMethodNotFound
+}
+
+func TestAPIsServed(t *testing.T) {
+	type call struct {
+		method string
+		args   []any
+	}
+	// A method served by each API and no other.
+	methods := map[saerpc.API]call{
+		saerpc.APIWeb3:         {method: "web3_clientVersion"},
+		saerpc.APINet:          {method: "net_version"},
+		saerpc.APITxPool:       {method: "txpool_status"},
+		saerpc.APIPrice:        {method: "eth_gasPrice"},
+		saerpc.APIChain:        {method: "eth_blockNumber"},
+		saerpc.APITx:           {method: "eth_getTransactionCount"},
+		saerpc.APISubscription: {method: "eth_subscribe", args: []any{"newHeads"}},
+		saerpc.APIFilter:       {method: "eth_uninstallFilter"},
+		saerpc.APILogs:         {method: "eth_getLogs"},
+		saerpc.APIAvalanche:    {method: "eth_callDetailed"},
+		saerpc.APIDB:           {method: "debug_dbGet"},
+		saerpc.APIProfile:      {method: "debug_gcStats"},
+		saerpc.APITrace:        {method: "debug_traceBlockByNumber"},
+	}
+	require.Equal(t, saerpc.AllAPIs(), set.Of(slices.Collect(maps.Keys(methods))...), "every API has a method")
+
+	configs := map[string]set.Set[saerpc.API]{
+		"all":     saerpc.AllAPIs(),
+		"default": saerpc.DefaultAPIs(),
+	}
+	for api := range methods {
+		configs["only_"+string(api)] = set.Of(api)
+	}
+	for name, apis := range configs {
+		t.Run(name, func(t *testing.T) {
+			ctx, sut := newSUT(t, 0, withAPIs(apis))
+			for api, c := range methods {
+				assert.Equalf(t, apis.Contains(api), methodRegistered(ctx, t, sut, c.method, c.args...), "%s served with %v enabled", c.method, apis)
+			}
+		})
+	}
+}
+
+func TestResolveBlockNumberOrHash(t *testing.T) {
+	opt, vmTime := withVMTime(t, time.Unix(saeparams.TauSeconds, 0))
+	ctx, sut := newSUT(t, 0, opt)
+
+	settled := sut.runConsensusLoop(t)
+	vmTime.AdvanceToSettle(ctx, t, settled)
+
+	for range 2 {
+		b := sut.runConsensusLoop(t)
+		vmTime.AdvanceToSettle(ctx, t, b)
+	}
+	_, ok := sut.rawVM.consensusCritical.Load(settled.Hash())
+	require.False(t, ok, "settled block still in VM memory")
+
+	accepted := sut.runConsensusLoop(t)
+	require.NoError(t, sut.SetPreference(ctx, accepted.ID()), "SetPreference()")
+
+	b, err := sut.BuildBlock(ctx)
+	require.NoError(t, err, "BuildBlock()")
+	// Blocks are added to the VM memory with [VM.VerifyBlock] but only become
+	// canonical (and on disk) with [VM.AcceptBlock].
+	require.NoErrorf(t, b.Verify(ctx), "%T.Verify()", b)
+	nonCanonical := unwrap(t, b)
+
+	tests := []struct {
+		name     string
+		nOrH     rpc.BlockNumberOrHash
+		wantNum  uint64
+		wantHash common.Hash
+		wantErr  error
+	}{
+		{
+			name:    "neither_num_nor_hash",
+			wantErr: blocks.ErrNeitherNumberNorHash,
+		},
+		{
+			name: "both_num_and_hash",
+			nOrH: rpc.BlockNumberOrHash{
+				BlockNumber: new(rpc.LatestBlockNumber),
+				BlockHash:   &common.Hash{},
+			},
+			wantErr: blocks.ErrBothNumberAndHash,
+		},
+		{
+			name:     "named_block",
+			nOrH:     rpc.BlockNumberOrHashWithNumber(rpc.PendingBlockNumber),
+			wantNum:  accepted.NumberU64(),
+			wantHash: accepted.Hash(),
+		},
+		{
+			name: "canonical_hash_in_memory",
+			nOrH: rpc.BlockNumberOrHash{
+				BlockHash: new(accepted.Hash()),
+			},
+			wantNum:  accepted.NumberU64(),
+			wantHash: accepted.Hash(),
+		},
+		{
+			name: "canonical_hash_on_disk",
+			nOrH: rpc.BlockNumberOrHash{
+				BlockHash: new(settled.Hash()),
+			},
+			wantNum:  settled.NumberU64(),
+			wantHash: settled.Hash(),
+		},
+		{
+			name: "non_canonical_when_canonical_not_required",
+			nOrH: rpc.BlockNumberOrHash{
+				BlockHash: new(nonCanonical.Hash()),
+			},
+			wantNum:  nonCanonical.NumberU64(),
+			wantHash: nonCanonical.Hash(),
+		},
+		{
+			name: "non_canonical_when_canonical_required",
+			nOrH: rpc.BlockNumberOrHash{
+				BlockHash:        new(nonCanonical.Hash()),
+				RequireCanonical: true,
+			},
+			wantErr: blocks.ErrNonCanonicalBlock,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			chain := sut.rawVM.chain()
+			gotNum, gotHash, err := blocks.ResolveRPCNumberOrHash(chain, tt.nOrH)
+			t.Logf("blocks.ResolveRPCNumberOrHash(%T, %+v)", chain, tt.nOrH) // avoids having to repeat in failure messages
+			require.ErrorIs(t, err, tt.wantErr)
+			assert.Equal(t, tt.wantNum, gotNum)
+			assert.Equal(t, tt.wantHash, gotHash)
+		})
+	}
+}
+
+func hexBig(n int64) *hexutil.Big {
+	return (*hexutil.Big)(big.NewInt(n))
+}
+
+func hexBigU(n uint64) *hexutil.Big {
+	return (*hexutil.Big)(new(big.Int).SetUint64(n))
+}
+
+func TestGasUsedHeader(t *testing.T) {
+	echoReverter := common.Address{'e', 'c', 'h', 'o'}
+	invalidJumper := common.Address{'i', 'n', 'v', 'a', 'l', 'i', 'd'}
+	blocking := common.Address{'b', 'l', 'o', 'c', 'k'}
+	const gasCap = 100e6
+	precompileOpt, unblock := withBlockingPrecompile(blocking)
+	ctx, sut := newSUT(t, 1, precompileOpt, options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.RPCConfig.CallTimeout = time.Second
+		c.vmConfig.RPCConfig.GasCap = gasCap
+		c.genesis.Alloc[echoReverter] = types.Account{
+			Code: saetest.Ops(
+				vm.CALLDATASIZE, vm.PUSH0, vm.PUSH0, vm.CALLDATACOPY,
+				vm.CALLDATASIZE, vm.PUSH0, vm.REVERT,
+			),
+			Balance: new(big.Int),
+		}
+		c.genesis.Alloc[invalidJumper] = types.Account{
+			// Jumping back to PC=0 is invalid because it's not a [vm.JUMPDEST]
+			Code:    saetest.Ops(vm.PUSH0, vm.JUMP),
+			Balance: new(big.Int),
+		}
+	}))
+
+	recipient := common.Address{'r', 'e', 'c', 'v'}
+	escrowAddr := sut.deployEscrow(t)
+	sut.depositToEscrow(t, escrowAddr, recipient, common.Big1)
+
+	// [dialRPC] isn't used because an [rpc.Client] doesn't expose response
+	// headers, and over HTTP it fails to send a notification because it expects
+	// a response body.
+	handlers, err := sut.CreateHandlers(ctx)
+	require.NoErrorf(t, err, "%T.CreateHandlers()", sut)
+	server := httptest.NewServer(handlers[rpcHTTPExtensionPath])
+	t.Cleanup(server.Close)
+
+	// MUST occur before the server is closed, which waits for blocked calls.
+	defer unblock()
+
+	latest := rpc.LatestBlockNumber.String()
+	balanceOf := ethapi.TransactionArgs{
+		To:   &escrowAddr,
+		Data: new(hexutil.Bytes(escrow.CallDataForBalance(recipient))),
+	}
+	revert := ethapi.TransactionArgs{
+		To:   &echoReverter,
+		Data: new(hexutil.Bytes{42}),
+	}
+	const (
+		balanceOfGas = "23675"
+		revertGas    = "21035"
+		batchGas     = "44710" // balanceOfGas + revertGas
+	)
+
+	type request struct {
+		JSONRPC string `json:"jsonrpc"`
+		ID      int    `json:"id,omitempty"`
+		Method  string `json:"method"`
+		Params  []any  `json:"params"`
+	}
+	newReq := func(method string, params ...any) request {
+		return request{JSONRPC: "2.0", ID: 1, Method: method, Params: params}
+	}
+
+	tests := []struct {
+		name string
+		body any
+		want string // empty if the header must be absent
+	}{
+		{
+			name: "eth_call",
+			body: newReq("eth_call", balanceOf, latest),
+			want: balanceOfGas,
+		},
+		{
+			name: "eth_call_default_block",
+			body: newReq("eth_call", balanceOf),
+			want: balanceOfGas,
+		},
+		{
+			name: "eth_call_revert",
+			body: newReq("eth_call", revert, latest),
+			want: revertGas,
+		},
+		{
+			// The call fails without reverting, so it uses all of its gas.
+			name: "eth_call_invalid_jump",
+			body: newReq("eth_call", ethapi.TransactionArgs{To: &invalidJumper}, latest),
+			want: strconv.FormatUint(gasCap, 10),
+		},
+		{
+			name: "batch",
+			body: []request{
+				newReq("eth_call", balanceOf, latest),
+				newReq("eth_call", revert, latest),
+				newReq("eth_blockNumber"),
+			},
+			want: batchGas,
+		},
+		{
+			// Without an ID, the call runs but no response is written.
+			name: "notification",
+			body: request{JSONRPC: "2.0", Method: "eth_call", Params: []any{balanceOf, latest}},
+			want: balanceOfGas,
+		},
+		{
+			name: "no_calls",
+			body: newReq("eth_blockNumber"),
+		},
+		{
+			name: "unknown_block",
+			body: newReq("eth_call", balanceOf, common.Hash{1}),
+		},
+		{
+			// The timeout response is written while the call is still running,
+			// so its gas is never reported.
+			name: "eth_call_timeout",
+			body: newReq("eth_call", ethapi.TransactionArgs{To: &blocking}, latest),
+		},
+		{
+			name: "batch_with_timeout",
+			body: []request{
+				newReq("eth_call", balanceOf, latest),
+				newReq("eth_call", ethapi.TransactionArgs{To: &blocking}, latest),
+			},
+			want: balanceOfGas,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, server.URL, bytes.NewReader(marshalJSON(t, tt.body)))
+			require.NoError(t, err, "http.NewRequestWithContext()")
+			req.Header.Set("Content-Type", "application/json")
+			resp, err := server.Client().Do(req)
+			require.NoErrorf(t, err, "%T.Do()", server.Client())
+			defer resp.Body.Close()
+
+			require.Equal(t, http.StatusOK, resp.StatusCode, "status code")
+			got := resp.Header.Values(saerpc.GasUsedHeader)
+			if tt.want == "" {
+				require.Emptyf(t, got, "%q header", saerpc.GasUsedHeader)
+				return
+			}
+			require.Equalf(t, []string{tt.want}, got, "%q header", saerpc.GasUsedHeader)
+		})
+	}
+}
