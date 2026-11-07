@@ -32,6 +32,7 @@ go_library(
         "//vms/evm/gastime",
         "//vms/evm/hook",
         "//vms/evm/imp/blackhole",
+        "//vms/evm/imp/l1s/hookadaptor",
         "//vms/evm/imp/saeheader",
         "//vms/evm/network",
         "//vms/evm/sae",
