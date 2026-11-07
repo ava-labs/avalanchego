@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/hookadaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
 	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
@@ -90,7 +91,7 @@ func (vm *VM) Initialize(
 
 	// TODO: Support state sync, which requires the [sae.VM] to be created
 	// after the node has finished state syncing.
-	vm.VM, err = sae.NewVM(ctx, newHooks(snowCtx, vm.now), saeConfig, snowCtx, genesis.Config, ethDB, vm.Network)
+	vm.VM, err = sae.NewVM(ctx, hookadaptor.Convert(newHooks(snowCtx, vm.now)), saeConfig, snowCtx, genesis.Config, ethDB, vm.Network)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
