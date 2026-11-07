@@ -74,12 +74,19 @@ func (id *ID) UnmarshalJSON(b []byte) error {
 		return errMissingQuotes
 	}
 
-	return id.UnmarshalText(b[1:lastIndex])
+	return id.UnmarshalText([]byte(str[1:lastIndex]))
 }
 
+// UnmarshalText decodes a CB58-formatted string, as produced by
+// [ID.MarshalText], into an ID. Unlike UnmarshalJSON, text MUST NOT be
+// quoted: this is called directly (not via UnmarshalJSON) when decoding an ID
+// used as a JSON object key, per [encoding.TextUnmarshaler].
 func (id *ID) UnmarshalText(text []byte) error {
-	var err error
-	*id, err = FromString(string(text))
+	bytes, err := cb58.Decode(string(text))
+	if err != nil {
+		return fmt.Errorf("couldn't decode ID to bytes: %w", err)
+	}
+	*id, err = ToID(bytes)
 	return err
 }
 
