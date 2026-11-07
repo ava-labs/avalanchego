@@ -61,6 +61,11 @@ const (
 	GossipRequestOp
 	// Simplex
 	SimplexOp
+
+	// NumOps is the number of defined ops. It is not itself a valid [Op] and
+	// MUST remain the last entry in this block so that callers can size
+	// per-op lookup tables with it.
+	NumOps
 )
 
 var (

@@ -112,9 +112,7 @@ func (m *messageQueue) Push(ctx context.Context, msg Message) {
 	m.nodeToUnprocessedMsgs[msg.NodeID]++
 
 	// Update metrics
-	m.metrics.count.With(prometheus.Labels{
-		opLabel: msg.Op.String(),
-	}).Inc()
+	m.metrics.countOf(msg.Op).Inc()
 	m.metrics.nodesWithMessages.Set(float64(len(m.nodeToUnprocessedMsgs)))
 
 	// Signal a waiting thread
@@ -159,9 +157,7 @@ func (m *messageQueue) Pop() (context.Context, Message, bool) {
 			if m.nodeToUnprocessedMsgs[nodeID] == 0 {
 				delete(m.nodeToUnprocessedMsgs, nodeID)
 			}
-			m.metrics.count.With(prometheus.Labels{
-				opLabel: msg.Op.String(),
-			}).Dec()
+			m.metrics.countOf(msg.Op).Dec()
 			m.metrics.nodesWithMessages.Set(float64(len(m.nodeToUnprocessedMsgs)))
 			return ctx, msg, true
 		}
