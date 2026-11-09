@@ -61,6 +61,13 @@ func NewLoadGenerator(
 	}, nil
 }
 
+// Run executes the test on every wallet in a loop until ctx is cancelled or,
+// if loadTimeout is non-zero, until loadTimeout elapses.
+//
+// The load timeout only stops new iterations from starting. A test that is in
+// flight when it fires runs to completion under testTimeout, so Run may
+// overrun loadTimeout by at most testTimeout. Cancelling ctx still cancels
+// in-flight tests.
 func (l LoadGenerator) Run(
 	ctx context.Context,
 	log logging.Logger,
@@ -69,9 +76,11 @@ func (l LoadGenerator) Run(
 ) {
 	eg := &errgroup.Group{}
 
+	// loadCtx only gates new iterations; see Run's doc comment.
+	loadCtx := ctx
 	if loadTimeout != 0 {
-		childCtx, cancel := context.WithTimeout(ctx, loadTimeout)
-		ctx = childCtx
+		var cancel context.CancelFunc
+		loadCtx, cancel = context.WithTimeout(ctx, loadTimeout)
 		defer cancel()
 	}
 
@@ -79,7 +88,7 @@ func (l LoadGenerator) Run(
 		eg.Go(func() error {
 			for {
 				select {
-				case <-ctx.Done():
+				case <-loadCtx.Done():
 					return nil
 				default:
 				}
