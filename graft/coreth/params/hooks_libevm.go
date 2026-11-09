@@ -163,7 +163,7 @@ func (r RulesExtra) currentPrecompiles() map[common.Address]vm.PrecompiledContra
 	return nil
 }
 
-// makePrecompile adapts a [contract.StatefulPrecompiledContract] to a [libevm.PrecompiledContract]
+// makePrecompile adapts a [contract.StatefulPrecompiledContract] to a [libevm.PrecompiledContract].
 func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.PrecompiledContract {
 	return vm.NewStatefulPrecompile(func(vmEnv vm.PrecompileEnvironment, input []byte) ([]byte, error) {
 		contractEnv, err := newEnvironment(vmEnv)

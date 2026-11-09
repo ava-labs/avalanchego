@@ -51,15 +51,12 @@ type PrecompileTest struct {
 	ExpectedRes []byte
 	// ExpectedErr is the expected error returned by the precompile
 	ExpectedErr error
-	// Rules is the rules to use for the precompile's block context
+	// Rules is the rules to use for the precompile
 	Rules cparams.Rules
 }
 
 func (test PrecompileTest) Run(t *testing.T, precompile contract.StatefulPrecompiledContract) {
-	input := test.Input
-	if test.InputFn != nil {
-		input = test.InputFn(t)
-	}
+	input := test.input(t)
 
 	state := newTestStateDB(t, test.WarpMessages)
 	env := test.setup(t, state)
@@ -77,10 +74,7 @@ func (test PrecompileTest) Run(t *testing.T, precompile contract.StatefulPrecomp
 }
 
 func (test PrecompileTest) Bench(b *testing.B, precompile contract.StatefulPrecompiledContract) {
-	input := test.Input
-	if test.InputFn != nil {
-		input = test.InputFn(b)
-	}
+	input := test.input(b)
 	if input == nil {
 		b.Skip("Skipping precompile benchmark due to nil input (used for configuration tests)")
 	}
@@ -135,6 +129,14 @@ func (test PrecompileTest) Bench(b *testing.B, precompile contract.StatefulPreco
 	if test.AfterHook != nil {
 		test.AfterHook(b, state)
 	}
+}
+
+func (test PrecompileTest) input(tb testing.TB) []byte {
+	tb.Helper()
+	if test.InputFn != nil {
+		return test.InputFn(tb)
+	}
+	return test.Input
 }
 
 func (test PrecompileTest) setup(t testing.TB, state *testStateDB) *testEnv {

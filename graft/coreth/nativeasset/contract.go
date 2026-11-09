@@ -136,8 +136,9 @@ func (*NativeAssetCall) Run(env contract.Environment, input []byte) ([]byte, err
 		return nil, vm.ErrExecutionReverted
 	}
 
+	caller := env.Caller()
 	stateDB := env.StateDB().(contract.StateDB)
-	if !assetAmount.IsZero() && stateDB.GetAssetBalance(env.Caller(), assetID).Cmp(assetAmount) < 0 {
+	if !assetAmount.IsZero() && stateDB.GetAssetBalance(caller, assetID).Cmp(assetAmount) < 0 {
 		return nil, vm.ErrInsufficientBalance
 	}
 
@@ -151,7 +152,7 @@ func (*NativeAssetCall) Run(env contract.Environment, input []byte) ([]byte, err
 	}
 
 	// Send `assetAmount` of `assetID` to `to` address
-	stateDB.SubAssetBalance(env.Caller(), assetID, assetAmount)
+	stateDB.SubAssetBalance(caller, assetID, assetAmount)
 	stateDB.AddAssetBalance(to, assetID, assetAmount)
 
 	legacy := []vm.CallOption{

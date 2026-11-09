@@ -136,9 +136,7 @@ func PackGetBlockchainIDOutput(blockchainID common.Hash) ([]byte, error) {
 }
 
 // getBlockchainID returns the snow Chain Context ChainID of this blockchain.
-//
-//nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
-func getBlockchainID(env contract.Environment, input []byte) ([]byte, error) {
+func getBlockchainID(env contract.Environment, _ []byte) ([]byte, error) {
 	warpGasConfig := CurrentGasConfig(env.ExtraRules())
 	if err := contract.DeductGas(env, warpGasConfig.GetBlockchainID); err != nil {
 		return nil, err

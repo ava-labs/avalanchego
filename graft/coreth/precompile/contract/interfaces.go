@@ -44,11 +44,14 @@ type StateDB interface {
 	RevertToSnapshot(int)
 }
 
-// Environment defines the interface exposed to stateful precompile contracts
+// Environment wraps [vm.PrecompileEnvironment] with Avalanche-specific details.
 type Environment interface {
 	vm.PrecompileEnvironment
 	Caller() common.Address
 	SnowContext() *snow.Context
+	// ExtraRules returns any registered rules on [params.Rules].
 	ExtraRules() precompileconfig.Rules
+	// WarpMessageResults returns the result of verifying the Warp messages
+	// of the given transaction.
 	WarpMessageResults(txHash common.Hash) set.Bits
 }
