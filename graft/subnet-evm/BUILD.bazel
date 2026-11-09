@@ -12,5 +12,6 @@ package_group(
     packages = [
         "//vms/evm/imp/emulate",
         "//vms/evm/imp/l1s",
+        "//vms/evm/imp/l1s/libevm",
     ],
 )
