@@ -3519,24 +3519,6 @@ func newChain(length int) []*snowmantest.Block {
 	return chain
 }
 
-// newNodeAndEmptyPeer registers a node and a peer on [network]. Neither holds
-// any block of [chain], so the only way the node learns about a block is from
-// the message that carries it.
-func newNodeAndEmptyPeer(
-	t *testing.T,
-	network *snowmanenginetest.Network,
-	chain []*snowmantest.Block,
-) (*Engine, ids.NodeID) {
-	nodeID := ids.GenerateTestNodeID()
-	peerID := ids.GenerateTestNodeID()
-
-	peerVM := snowmanenginetest.NewVM(t, chain)
-	newFakeEngine(t, network, peerID, peerVM, nodeID)
-
-	nodeVM := snowmanenginetest.NewVM(t, chain)
-	return newFakeEngine(t, network, nodeID, nodeVM, peerID), peerID
-}
-
 // TestEngineStopsBufferingBlocksTooFarAhead tests that the engine queues only
 // blocks within [maxAllowedBlockAcceptedHeightDistanceIngestion] of its last
 // accepted block, however many blocks a peer pushes.
@@ -3558,7 +3540,16 @@ func TestEngineStopsBufferingBlocksTooFarAhead(t *testing.T) {
 
 			chain := newChain(test.numBlocks)
 			network := snowmanenginetest.NewNetwork(t)
-			node, peerID := newNodeAndEmptyPeer(t, network, chain)
+			nodeID := ids.GenerateTestNodeID()
+			peerID := ids.GenerateTestNodeID()
+
+			// Neither the node nor the peer holds any block of [chain], so the only way
+			// the node learns about a block is from the message that carries it.
+			peerVM := snowmanenginetest.NewVM(t, chain)
+			newFakeEngine(t, network, peerID, peerVM, nodeID)
+
+			nodeVM := snowmanenginetest.NewVM(t, chain)
+			node := newFakeEngine(t, network, nodeID, nodeVM, peerID)
 
 			_, lastAcceptedHeight := node.Consensus.LastAccepted()
 			highestAllowed := lastAcceptedHeight + heightLimit
@@ -3690,7 +3681,16 @@ func TestEngineRejectsFetchedBlockTooFarAhead(t *testing.T) {
 	tooFar := chain[heightLimit]
 
 	network := snowmanenginetest.NewNetwork(t)
-	node, peerID := newNodeAndEmptyPeer(t, network, chain)
+	nodeID := ids.GenerateTestNodeID()
+	peerID := ids.GenerateTestNodeID()
+
+	// Neither the node nor the peer holds any block of [chain], so the only way
+	// the node learns about a block is from the message that carries it.
+	peerVM := snowmanenginetest.NewVM(t, chain)
+	newFakeEngine(t, network, peerID, peerVM, nodeID)
+
+	nodeVM := snowmanenginetest.NewVM(t, chain)
+	node := newFakeEngine(t, network, nodeID, nodeVM, peerID)
 
 	// The node sees its only validator as disconnected, so it issues every
 	// block it is pushed without polling for it, and ends up with
