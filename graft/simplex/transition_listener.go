@@ -4,6 +4,8 @@
 package simplex
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 
@@ -84,10 +86,16 @@ func (a *epochTransitionListener) handleTransitionBlock(block *ParsedBlock) erro
 		return err
 	}
 
+	currentEpoch := block.BlockHeader().Epoch
+	currentValidators, err := a.getValidatorsForEpoch(currentEpoch)
+	if err != nil {
+		return err
+	}
+
 	if isSufficient {
 		// no more auxiliary info to send, maybe send our approval
 		lastAuxInfoDigest := auxInfoHistory.LastHistoryDigest()
-		return a.maybeSendApprovals(block, nextEpochValidatorSet, lastAuxInfoDigest)
+		return a.maybeSendApprovals(block, currentValidators, lastAuxInfoDigest)
 	}
 
 	// we need more auxiliary information, attempt to generate
@@ -102,27 +110,41 @@ func (a *epochTransitionListener) handleTransitionBlock(block *ParsedBlock) erro
 
 	auxInfoMessage := &common.Message{
 		AuxiliaryInfo: &common.AuxiliaryInfo{
-			Epoch:   block.BlockHeader().Epoch,
+			Epoch:   currentEpoch,
 			Version: auxInfoHistory.OldestVersionID,
 			Data:    generatedAuxInfo,
 		},
 	}
 
-	a.sendToValidators(nextEpochValidatorSet, auxInfoMessage)
+	a.sendToValidators(currentValidators, auxInfoMessage)
 	return nil
 }
 
+func (a *epochTransitionListener) getValidatorsForEpoch(epoch uint64) (common.Nodes, error) {
+	epochSealingBlock, finalization, err := a.getBlock(epoch, common.Digest{})
+	if err != nil {
+		return nil, err
+	}
+
+	sealingBlockInfo := epochSealingBlock.SealingBlockInfo()
+	if sealingBlockInfo == nil || finalization == nil {
+		return nil, fmt.Errorf("expected a finalized sealing block at seq %d", epoch)
+	}
+
+	return sealingBlockInfo.ValidatorSet, nil
+}
+
 // sendToValidators sends the message individually to every validator in the set except ourselves.
-func (a *epochTransitionListener) sendToValidators(validators metadata.NodeBLSMappings, msg *common.Message) {
-	for _, validator := range validators {
-		if validator.NodeID == a.myNodeID {
+func (a *epochTransitionListener) sendToValidators(validators common.Nodes, msg *common.Message) {
+	for _, validator := range validators.NodeIDs() {
+		if validator.Equals(a.myNodeID[:]) {
 			continue
 		}
-		a.sender.Send(msg, common.NodeID(validator.NodeID[:]))
+		a.sender.Send(msg, validator)
 	}
 }
 
-func (a *epochTransitionListener) maybeSendApprovals(block *ParsedBlock, nextEpochValidatorSet metadata.NodeBLSMappings, auxInfoDigest common.Digest) error {
+func (a *epochTransitionListener) maybeSendApprovals(block *ParsedBlock, currentValidators common.Nodes, auxInfoDigest common.Digest) error {
 	nextEpochPChainReference := block.Metadata.SimplexEpochInfo.NextPChainReferenceHeight
 
 	sig, err := metadata.SignApproval(a.signer, nextEpochPChainReference, auxInfoDigest)
@@ -141,7 +163,7 @@ func (a *epochTransitionListener) maybeSendApprovals(block *ParsedBlock, nextEpo
 		EpochTransitionApproval: &approval,
 	}
 
-	a.sendToValidators(nextEpochValidatorSet, &approvalMessage)
+	a.sendToValidators(currentValidators, &approvalMessage)
 
 	// Validators also record their own approval locally so the next block they build
 	// includes it. Non-validators have no block builder, so handleApproval is nil.
