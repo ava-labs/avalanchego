@@ -21,9 +21,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 

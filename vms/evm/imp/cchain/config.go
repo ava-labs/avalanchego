@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/firewood"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
 	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
