@@ -16,6 +16,10 @@ import (
 const (
 	recordSizeLen     = 4
 	recordChecksumLen = 8
+
+	// RecordOverhead is the number of bytes a record occupies on disk in
+	// addition to its payload.
+	RecordOverhead = recordSizeLen + recordChecksumLen
 )
 
 var (
@@ -25,7 +29,7 @@ var (
 
 // recordSize returns the number of bytes [payload] occupies on disk once written as a record.
 func recordSize(payload []byte) int {
-	return recordSizeLen + len(payload) + recordChecksumLen
+	return len(payload) + RecordOverhead
 }
 
 // writeRecord writes a length-prefixed and check-summed record to the writer.
