@@ -19,7 +19,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -33,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/statesync"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/txpool"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
 	"github.com/ava-labs/avalanchego/vms/evm/types"
@@ -41,6 +39,7 @@ import (
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	avadb "github.com/ava-labs/avalanchego/database"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	saewarp "github.com/ava-labs/avalanchego/vms/evm/imp/warp"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -62,7 +61,7 @@ type VM struct {
 
 	chainConfig *ethparams.ChainConfig
 	state       *state.State
-	metrics     *metrics
+	metrics     *sae.MinBlockDelayMetric
 	pending     *txpool.Pending
 
 	// TODO(alarso16): Remove from VM - only referenced in tests.
@@ -78,10 +77,7 @@ type VM struct {
 	closed  bool
 }
 
-var (
-	ethDBPrefix      = []byte("ethdb")
-	errAlreadyClosed = errors.New("already closed")
-)
+var errAlreadyClosed = errors.New("already closed")
 
 // Initialize initializes the VM.
 func (vm *VM) Initialize(
@@ -114,7 +110,7 @@ func (vm *VM) Initialize(
 		zap.Reflect("config", userConfig),
 	)
 
-	warpMessages, err := userConfig.WarpMessages()
+	warpMessages, err := saewarp.ParseOffChainMessages(userConfig.WarpOffChainMessages)
 	if err != nil {
 		return fmt.Errorf("parsing warp messages: %w", err)
 	}
@@ -137,13 +133,13 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("making metrics: %w", err)
 	}
-	vm.metrics, err = newMetrics(reg)
+	vm.metrics, err = sae.NewMinBlockDelayMetric(reg)
 	if err != nil {
 		return fmt.Errorf("registering cchain metrics: %w", err)
 	}
 
 	vm.pending = txpool.NewPending()
-	warpStorage := warp.NewStorage(avaDB, warpMessages...)
+	warpStorage := saewarp.NewStorage(avaDB, warpMessages...)
 	hooks := newHooks(
 		snowCtx,
 		vm.state,
@@ -159,9 +155,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("creating network: %w", err)
 	}
 
-	// The use of [prefixdb.NewNested] rather than [prefixdb.New] is part of the
-	// on-disk format and MUST NOT change.
-	ethDB := types.NewEthDB(prefixdb.NewNested(ethDBPrefix, avaDB))
+	ethDB := types.NewChainEthDB(avaDB)
 
 	if err := genesis.verifyAndWriteBlock(ethDB); err != nil {
 		return fmt.Errorf("writing genesis block: %w", err)
@@ -286,7 +280,8 @@ func (vm *VM) Initialize(
 				gossipWG.Wait()
 				return nil
 			})
-			if err := registerWarpHandler(vm.VM, vm.Network, warpStorage, snowCtx.WarpSigner); err != nil {
+			warpVerifier := saewarp.NewVerifier(vm.VM, warpStorage, nil)
+			if err := saewarp.RegisterHandler(vm.Network, warpVerifier, snowCtx.WarpSigner); err != nil {
 				return fmt.Errorf("registering warp signature handler: %w", err)
 			}
 		}

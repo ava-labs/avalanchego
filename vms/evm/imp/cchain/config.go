@@ -5,7 +5,6 @@ package cchain
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
 	"slices"
@@ -28,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 	"github.com/ava-labs/avalanchego/vms/evm/statesync"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 // duration is a [time.Duration] that JSON-unmarshals from a duration string
@@ -172,10 +170,7 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	}
 
 	saeCfg := c.saeConfig(nil)
-	if err := saeCfg.RPCConfig.Verify(); err != nil {
-		return config{}, err
-	}
-	if err := saeCfg.DBConfig.Verify(); err != nil {
+	if err := saeCfg.Verify(); err != nil {
 		return config{}, err
 	}
 	ci := saeCfg.DBConfig.CommitInterval
@@ -213,36 +208,25 @@ func jsonKeys[T any]() set.Set[string] {
 // saeConfig translates the operator-supplied [config] into the [sae.Config]
 // consumed by [sae.NewVM].
 func (c config) saeConfig(now func() time.Time) sae.Config {
-	mempoolConfig := legacypool.DefaultConfig
-	mempoolConfig.NoLocals = !c.LocalTxsEnabled
-	mempoolConfig.AccountSlots = c.TxPoolAccountSlots
-	mempoolConfig.GlobalSlots = c.TxPoolGlobalSlots
-	return sae.Config{
-		MempoolConfig: mempoolConfig,
-		DBConfig: saedb.Config{
-			Archival:          !c.Pruning,
-			Scheme:            c.StateScheme,
-			TrieCacheMiB:      c.TrieCleanCache,
-			CommitInterval:    c.CommitInterval,
-			SnapshotCacheMiB:  c.SnapshotCache,
-			AllowMissingTries: c.AllowMissingTries,
-			StateHistory:      c.StateHistory,
-		},
-		RPCConfig: rpc.Config{
-			APIs:                c.APIs,
-			AllowUnprotectedTxs: c.AllowUnprotectedTxs,
-			BatchRequestLimit:   c.BatchRequestLimit,
-			CallTimeout:         c.APIMaxDuration.Duration,
-			MaxBlocksPerRequest: c.MaxBlocksPerRequest,
-			// GasCap and TxFeeCap are set to reasonable values for mainnet
-			// C-Chain. They are left unconfigurable to minimize the size of the
-			// user config.
-			GasCap:                       50_000_000,
-			TxFeeCap:                     100,
-			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,
-		},
-		Now: now,
-	}
+	config := sae.DefaultConfig()
+	config.MempoolConfig.NoLocals = !c.LocalTxsEnabled
+	config.MempoolConfig.AccountSlots = c.TxPoolAccountSlots
+	config.MempoolConfig.GlobalSlots = c.TxPoolGlobalSlots
+	config.DBConfig.Archival = !c.Pruning
+	config.DBConfig.Scheme = c.StateScheme
+	config.DBConfig.TrieCacheMiB = c.TrieCleanCache
+	config.DBConfig.CommitInterval = c.CommitInterval
+	config.DBConfig.SnapshotCacheMiB = c.SnapshotCache
+	config.DBConfig.AllowMissingTries = c.AllowMissingTries
+	config.DBConfig.StateHistory = c.StateHistory
+	config.RPCConfig.APIs = c.APIs
+	config.RPCConfig.AllowUnprotectedTxs = c.AllowUnprotectedTxs
+	config.RPCConfig.BatchRequestLimit = c.BatchRequestLimit
+	config.RPCConfig.CallTimeout = c.APIMaxDuration.Duration
+	config.RPCConfig.MaxBlocksPerRequest = c.MaxBlocksPerRequest
+	config.RPCConfig.ResolvePendingToLastExecuted = c.ResolvePendingToLastExecuted
+	config.Now = now
+	return config
 }
 
 func (c config) stateSyncConfig(networkID uint32) statesync.Config {
@@ -263,22 +247,6 @@ func (c config) networkOptions() []network.Option {
 	return []network.Option{
 		network.WithAllowedTrackedPeers(c.StateSyncIDs),
 	}
-}
-
-var errParsingWarpMessage = errors.New("parsing warp message")
-
-// WarpMessages parses and returns the messages encoded in
-// [config.WarpOffChainMessages].
-func (c config) WarpMessages() ([]*warp.UnsignedMessage, error) {
-	msgs := make([]*warp.UnsignedMessage, len(c.WarpOffChainMessages))
-	for i, bytes := range c.WarpOffChainMessages {
-		msg, err := warp.ParseUnsignedMessage(bytes)
-		if err != nil {
-			return nil, fmt.Errorf("%w: at index %d: %w", errParsingWarpMessage, i, err)
-		}
-		msgs[i] = msg
-	}
-	return msgs, nil
 }
 
 // desiredParams bundles this node's votes for the dynamic consensus

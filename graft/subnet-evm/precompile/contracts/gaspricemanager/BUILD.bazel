@@ -30,6 +30,7 @@ graft_go_test(
     srcs = [
         "config_test.go",
         "contract_test.go",
+        "export_test.go",
     ],
     embed = [":gaspricemanager"],
     deps = [

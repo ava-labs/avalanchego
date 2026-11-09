@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp/warptest"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"

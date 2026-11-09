@@ -37,7 +37,8 @@ type Stub struct {
 	Ops                     []Op
 	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
 	VerifyBlockSyntaxFn     func(*types.Block) error
-	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
+	CanExecuteTransactionFn func(params.Rules, common.Address, *common.Address, libevm.StateReader) error
+	RequiresAdmissionCheck  func(params.Rules) bool
 	StartExecutingBlockFn   func(params.Rules, *state.StateDB, *types.Header, *types.Block) error
 	FinishExecutingBlockFn  func(*state.StateDB, *types.Block, types.Receipts) error
 	GasPriceConfig          gastime.GasPriceConfig
@@ -125,6 +126,12 @@ func (s *Stub) BuildHeader(parent *types.Header) (*types.Header, error) {
 		Extra:      e.MarshalCanoto(),
 	}
 	return hdr, nil
+}
+
+// FinalizeHeader is a no-op: every header field the stub's hooks read is
+// stamped by [Stub.BuildHeader] or [Stub.BuildBlock].
+func (*Stub) FinalizeHeader(*types.Header, *types.Header, libevm.StateReader) error {
+	return nil
 }
 
 // PotentialEndOfBlockOps ignores its arguments and returns [Stub.Ops] as a
@@ -246,11 +253,20 @@ func (s *Stub) VerifyBlockSyntax(b *types.Block) error {
 
 // CanExecuteTransaction proxies to [Stub.CanExecuteTransactionFn] if non-nil,
 // otherwise it allows all transactions.
-func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr libevm.StateReader) error {
+func (s *Stub) CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, sr libevm.StateReader) error {
 	if fn := s.CanExecuteTransactionFn; fn != nil {
-		return fn(from, to, sr)
+		return fn(rules, from, to, sr)
 	}
 	return nil
+}
+
+// RequiresTransactionAdmissionCheck proxies to [Stub.RequiresAdmissionCheck]
+// if non-nil, otherwise it reports that no admission check is required.
+func (s *Stub) RequiresTransactionAdmissionCheck(rules params.Rules) bool {
+	if fn := s.RequiresAdmissionCheck; fn != nil {
+		return fn(rules)
+	}
+	return false
 }
 
 // StartExecutingBlock proxies to [Stub.StartExecutingBlockFn] if non-nil,

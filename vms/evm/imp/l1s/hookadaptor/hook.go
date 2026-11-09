@@ -36,7 +36,8 @@ type Points interface {
 	BlockTime(h *types.Header) time.Time
 	SettledBy(*types.Header) hook.Settled
 	VerifyBlockSyntax(*types.Block) error
-	CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error
+	CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, state libevm.StateReader) error
+	RequiresTransactionAdmissionCheck(rules params.Rules) bool
 	StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error
 	FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
 	AfterExecutingBlock(*types.Block, types.Receipts) error
@@ -46,6 +47,7 @@ type Points interface {
 // end-of-block operations.
 type BlockBuilder interface {
 	BuildHeader(parent *types.Header) (*types.Header, error)
+	FinalizeHeader(hdr, settled *types.Header, settledState libevm.StateReader) error
 	BuildBlock(
 		header *types.Header,
 		blockCtx *block.Context,

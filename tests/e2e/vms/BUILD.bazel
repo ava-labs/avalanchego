@@ -9,7 +9,6 @@ go_library(
         "//api/connectclient",
         "//connectproto/pb/xsvm",
         "//connectproto/pb/xsvm/xsvmconnect",
-        "//ids",
         "//tests/fixture/e2e",
         "//tests/fixture/subnet",
         "//tests/fixture/tmpnet",

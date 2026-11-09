@@ -51,6 +51,11 @@ func TestBadTxAllowListBlock(t *testing.T) {
 				FeeConfig: params.DefaultFeeConfig,
 				NetworkUpgrades: extras.NetworkUpgrades{
 					SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+					DurangoTimestamp:   utils.PointerTo[uint64](1),
+					EtnaTimestamp:      utils.PointerTo[uint64](1),
+					FortunaTimestamp:   utils.PointerTo[uint64](1),
+					GraniteTimestamp:   utils.PointerTo[uint64](1),
+					HeliconTimestamp:   utils.PointerTo[uint64](1),
 				},
 				GenesisPrecompiles: extras.Precompiles{
 					txallowlist.ConfigKey: txallowlist.NewConfig(utils.PointerTo[uint64](0), nil, nil, nil),
@@ -70,8 +75,9 @@ func TestBadTxAllowListBlock(t *testing.T) {
 			},
 			GasLimit: params.GetExtra(config).FeeConfig.GasLimit.Uint64(),
 		}
-		blockchain, _ = NewBlockChain(db, DefaultCacheConfig, gspec, dummy.NewCoinbaseFaker(), vm.Config{}, common.Hash{}, false)
 	)
+	blockchain, err := NewBlockChain(db, DefaultCacheConfig, gspec, dummy.NewCoinbaseFaker(), vm.Config{}, common.Hash{}, false)
+	require.NoError(t, err, "NewBlockChain()")
 	defer blockchain.Stop()
 
 	mkDynamicTx := func(nonce uint64, to common.Address, gasLimit uint64, gasTipCap, gasFeeCap *big.Int) *types.Transaction {
@@ -86,7 +92,6 @@ func TestBadTxAllowListBlock(t *testing.T) {
 		return tx
 	}
 
-	defer blockchain.Stop()
 	for i, tt := range []struct {
 		txs  []*types.Transaction
 		want error

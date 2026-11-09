@@ -27,9 +27,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/evm/cmputils"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/vmtest"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 

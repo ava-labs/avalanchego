@@ -19,6 +19,7 @@ go_library(
     deps = [
         "//graft/evm/acp226",
         "//graft/evm/predicate",
+        "//vms/components/gas",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//core/types",
@@ -42,7 +43,9 @@ graft_go_test(
         "//graft/evm/utils",
         "//graft/subnet-evm/internal/blocktest",
         "//graft/subnet-evm/params",
+        "//vms/components/gas",
         "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
         "@com_github_ava_labs_libevm//common/math",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//crypto",

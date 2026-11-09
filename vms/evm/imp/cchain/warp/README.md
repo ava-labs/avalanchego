@@ -4,7 +4,7 @@ This package handles the parsing, verification, and storage of [Avalanche Warp M
 
 A warp message is a payload attested by the validator set of a source chain: each validator signs the message with the BLS key it registered on the P-Chain, and the individual signatures are aggregated into a single multi-signature. Because every validator's BLS public key and stake weight are readable from the P-Chain, any chain can verify that a stake-weight quorum of the source chain endorsed a message — without additional trust assumptions or messaging infrastructure. (Newer documentation also calls this Avalanche Interchain Messaging, ICM.)
 
-This package provides the pieces the VM needs to participate in that protocol: `FromReceipts` and `Storage` capture and persist the messages a block emits, `Verifier` decides what this node is willing to sign, and `VerifyBlock` checks the signed messages that transactions deliver. The rest of the lifecycle — the precompile that creates messages, the p2p protocol that collects signatures, the predicate machinery that carries signed messages in transactions — lives outside this package. This README shows how the pieces fit together.
+This package and the [shared SAE warp package](../../warp) provide the pieces the VM needs to participate in that protocol: `FromReceipts` and the shared `Storage` capture and persist the messages a block emits, the shared `Verifier` decides what this node is willing to sign, and `VerifyBlock` checks the signed messages that transactions deliver. The rest of the lifecycle — the precompile that creates messages, the p2p protocol that collects signatures, the predicate machinery that carries signed messages in transactions — lives outside this package. This README shows how the pieces fit together.
 
 ## Message lifecycle
 
@@ -57,7 +57,7 @@ flowchart TD
 
 | Style | Meaning |
 |---|---|
-| Blue | This package |
+| Blue | This package or the shared SAE warp package |
 | Orange | EVM side: [warp precompile](../../../../../graft/coreth/precompile/contracts/warp/README.md) and [predicate handling](../../../../../graft/evm/predicate/README.md) |
 | Purple | AvalancheGo platform: [ACP-118 handler](../../../../../network/p2p/acp118/handler.go), BLS signer |
 | Gray | External actors |

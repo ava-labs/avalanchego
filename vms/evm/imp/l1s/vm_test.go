@@ -27,6 +27,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -96,6 +98,9 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	snowCtx := snowtest.Context(tb, ids.GenerateTestID())
 	snowCtx.ChainDataDir = tb.TempDir()
 	snowCtx.NetworkUpgrades = upgradetest.GetConfig(upgradetest.Latest)
+	snowCtx.ValidatorState.(*validatorstest.State).GetCurrentValidatorSetF = func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+		return map[ids.ID]*validators.GetCurrentValidatorOutput{}, 0, nil
+	}
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
 
