@@ -483,6 +483,41 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			wantUptime:      0, // never connected
 			wantLastUpdated: time.Time{}.Add(80 * time.Second),
 		},
+		{
+			name: "connected node re-registered as inactive validator",
+			steps: []testStep{
+				{
+					connectedValidators: []ids.NodeID{
+						{1},
+					},
+					validators: []validators.GetCurrentValidatorOutput{
+						{
+							ValidationID: ids.ID{1},
+							NodeID:       ids.NodeID{1},
+							StartTime:    uint64(time.Time{}.Unix()),
+							IsActive:     false,
+						},
+					},
+				},
+				{
+					timestamp: time.Time{}.Add(10 * time.Second),
+				},
+				{
+					timestamp: time.Time{}.Add(30 * time.Second),
+					validators: []validators.GetCurrentValidatorOutput{
+						{
+							ValidationID: ids.ID{2},
+							NodeID:       ids.NodeID{1},
+							StartTime:    uint64(time.Time{}.Add(20 * time.Second).Unix()),
+							IsActive:     false,
+						},
+					},
+				},
+			},
+			validationID:    ids.ID{2},
+			wantUptime:      0,
+			wantLastUpdated: time.Time{}.Add(30 * time.Second),
+		},
 	}
 
 	for _, tt := range tests {

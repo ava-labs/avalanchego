@@ -24,6 +24,7 @@ var ErrValidationIDNotFound = errors.New("validationID not found")
 type UptimeTracker struct {
 	validatorState validators.State
 	subnetID       ids.ID
+	clock          *mockable.Clock
 	manager        uptime.Manager
 
 	lock   sync.Mutex
@@ -52,6 +53,7 @@ func New(
 	return &UptimeTracker{
 		validatorState: validatorState,
 		subnetID:       subnetID,
+		clock:          clock,
 		manager:        uptime.NewManager(s, clock),
 		synced:         false,
 		state:          s,
@@ -124,7 +126,7 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 
 	// Update validator set if we're behind
 	if !u.synced || u.height < height {
-		u.updateState(height, currentValidatorSet)
+		u.updateState(currentValidatorSet)
 		u.height = height
 	}
 
@@ -156,10 +158,7 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 	return u.state.writeModifications()
 }
 
-func (u *UptimeTracker) updateState(
-	height uint64,
-	currentValidatorSet map[ids.ID]*validators.GetCurrentValidatorOutput,
-) {
+func (u *UptimeTracker) updateState(currentValidatorSet map[ids.ID]*validators.GetCurrentValidatorOutput) {
 	for validationID := range u.state.validators {
 		if _, ok := currentValidatorSet[validationID]; !ok {
 			u.state.deleteValidator(validationID)
@@ -172,13 +171,19 @@ func (u *UptimeTracker) updateState(
 			continue
 		}
 
+		// An inactive validator could not have earned uptime before now,
+		// even if it was previously connected.
+		lastUpdated := newValidator.StartTime
+		if !newValidator.IsActive {
+			lastUpdated = uint64(u.clock.UnixTime().Unix())
+		}
 		u.state.addNewValidator(&validator{
 			NodeID:        newValidator.NodeID,
 			validationID:  validationID,
 			IsActive:      newValidator.IsActive,
 			StartTime:     newValidator.StartTime,
 			UpDuration:    0,
-			LastUpdated:   newValidator.StartTime,
+			LastUpdated:   lastUpdated,
 			IsL1Validator: newValidator.IsL1Validator,
 			Weight:        newValidator.Weight,
 		})
