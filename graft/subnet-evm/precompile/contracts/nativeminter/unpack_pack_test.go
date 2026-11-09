@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
-	"github.com/ava-labs/avalanchego/vms/saevm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 )
 
 var mintSignature = contract.CalculateFunctionSelector("mintNativeCoin(address,uint256)") // address, amount

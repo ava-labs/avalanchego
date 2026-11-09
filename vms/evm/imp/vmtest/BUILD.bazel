@@ -1,0 +1,31 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "vmtest",
+    testonly = True,
+    srcs = ["vmtest.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/vmtest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//version",
+        "//vms/evm/adaptor",
+        "//vms/evm/blocks",
+        "//vms/evm/evmclient",
+        "//vms/evm/sae/rpc",
+        "//vms/evm/saetest",
+        "//vms/evm/txgossip/txgossiptest",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//libevm/options",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
