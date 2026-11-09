@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -37,11 +36,6 @@ import (
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	ethcore "github.com/ava-labs/libevm/core"
 )
-
-func TestMain(m *testing.M) {
-	evm.RegisterAllLibEVMExtras()
-	m.Run()
-}
 
 func errIsType[T error]() testerr.Want {
 	return testerr.As(func(T) string { return "" })
