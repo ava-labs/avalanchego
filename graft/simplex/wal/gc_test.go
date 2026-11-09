@@ -114,7 +114,7 @@ func TestGarbageCollectedWALRotatesBySize(t *testing.T) {
 	// WAL rotates when the total number of records exceed maxWALSize.
 	// Each WAL is expected to contain 2 records, so 6 records should result in 3 WALs.
 	const (
-		maxWALSize = 100
+		maxWALSize = 120
 		recordSize = 40
 		numRecords = 6
 	)
@@ -130,7 +130,8 @@ func TestGarbageCollectedWALRotatesBySize(t *testing.T) {
 		require.NoError(t, gcw.Append(records[i]))
 	}
 
-	// Each WAL fits two 40-byte records: 40+40=80 <= 100, but 80+40=120 > 100
+	// Each 40-byte payload takes 52 bytes on disk (4-byte length + 8-byte checksum).
+	// Each WAL fits two records: 52+52=104 <= 120, but 104+52=156 > 120
 	// forces a rotation. So 6 records land in 3 WALs.
 	require.Equal(t, 3, *newWALCount)
 
@@ -167,7 +168,7 @@ func TestGarbageCollectedWALRotatesOnOversizedPayload(t *testing.T) {
 func TestGarbageCollectedWALGarbageCollectsRotatedWALs(t *testing.T) {
 	// Verifies a WAL is removed only once its highest round drops below the cutoff.
 	const (
-		maxWALSize = 100
+		maxWALSize = 120
 		recordSize = 40
 		numRecords = 6
 	)
@@ -279,7 +280,7 @@ func TestGarbageCollectedWALAppendAfterRotationAndGC(t *testing.T) {
 	// Verifies that appends resume  correctly (and keep rotating)
 	// after the WAL has been fully garbage collected down to empty.
 	const (
-		maxWALSize = 100
+		maxWALSize = 120
 		recordSize = 40
 	)
 
