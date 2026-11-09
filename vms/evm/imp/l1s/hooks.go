@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -31,10 +32,6 @@ import (
 
 	saetypes "github.com/ava-labs/avalanchego/vms/evm/types"
 )
-
-// minTargetPerSecond is the minimum gas target per second. It matches the
-// C-Chain's minimum target (see `dynamic.MinTarget` in the cchain package).
-const minTargetPerSecond gas.Gas = 1_000_000
 
 var _ hookadaptor.Points = (*hooks)(nil)
 
@@ -77,8 +74,9 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 
 func (*hooks) GasConfigAfter(*types.Header) (gas.Gas, gastime.GasPriceConfig) {
 	// TODO: Derive the gas target and price config from the ACP-224 fee
-	// config.
-	return minTargetPerSecond, gastime.GasPriceConfig{
+	// config. Until then, use its default target.
+	target := gas.Gas(commontype.DefaultGasPriceConfig().TargetGas)
+	return target, gastime.GasPriceConfig{
 		TargetToExcessScaling: gastime.DefaultTargetToExcessScaling,
 		MinPrice:              gastime.DefaultMinPrice,
 	}

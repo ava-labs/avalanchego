@@ -51,8 +51,6 @@ var _ saetest.Peer = (*SUT)(nil)
 type SUT struct {
 	*VM
 	*vmtest.SUT
-
-	ctx *snow.Context
 }
 
 type (
@@ -117,18 +115,10 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	sut := &SUT{
 		VM:  vm,
 		SUT: vmSUT,
-		ctx: snowCtx,
 	}
 
 	appSender.Start(tb, sut)
 	return ctx, sut
-}
-
-// hooks returns a new [hooks] instance that behaves equivalently to those
-// provided to the sae VM.
-func (s *SUT) hooks(tb testing.TB) *hooks {
-	tb.Helper()
-	return newHooks(s.ctx, s.now)
 }
 
 // TestTransfer builds blocks on one SUT and verifies them on another, which
@@ -144,7 +134,7 @@ func TestTransfer(t *testing.T) {
 
 	recipient := common.Address{1}
 	const value = 42
-	transfer := func() *blocks.Block {
+	transfer := func() (built, parsed *blocks.Block) {
 		t.Helper()
 
 		tx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
@@ -160,22 +150,75 @@ func TestTransfer(t *testing.T) {
 		// Advancing the clock ensures that the verifier can't rely on it
 		// matching the builder's.
 		clock.Advance(time.Second)
-		parsed := verifier.ParseVerifyAccept(ctx, t, blk)
+		parsed = verifier.ParseVerifyAccept(ctx, t, blk)
 		for _, b := range []*blocks.Block{blk, parsed} {
 			require.NoErrorf(t, b.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", b)
 		}
-		return blk
+		return blk, parsed
 	}
 
-	first := transfer()
+	first, _ := transfer()
 	for _, sut := range []*SUT{builder, verifier} {
 		assert.Equal(t, *uint256.NewInt(value), sut.Balance(t, recipient), "balance(recipient) after first transfer")
 	}
 
 	clock.AdvanceToSettle(ctx, t, first)
-	second := transfer()
+	built, parsed := transfer()
 	for _, sut := range []*SUT{builder, verifier} {
 		assert.Equal(t, *uint256.NewInt(2 * value), sut.Balance(t, recipient), "balance(recipient) after second transfer")
-		assert.Equal(t, first.Height(), sut.hooks(t).SettledBy(second.Header()).Height, "SettledBy(second).Height")
+	}
+	for _, b := range []*blocks.Block{built, parsed} {
+		settled := b.LastSettled()
+		require.NotNilf(t, settled, "%T.LastSettled()", b)
+		assert.Equal(t, first.Height(), settled.Height(), "%T.LastSettled().Height()", b)
+	}
+}
+
+// TestMinGasConsumptionFloor asserts that the L1 VM charges the ACP-194 gas
+// floor of max(actualGasUsed, ceil(gasLimit/2)).
+func TestMinGasConsumptionFloor(t *testing.T) {
+	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSignerForChainID(big.NewInt(testChainID)))
+	sender := wallet.Addresses()[0]
+	ctx, sut := newSUT(t, withMaxAllocFor(sender))
+
+	const highLimit = 100_000
+	tests := []struct {
+		name        string
+		gasLimit    uint64
+		wantGasUsed uint64
+	}{
+		{
+			name:        "low_usage_charged_floor",
+			gasLimit:    highLimit,
+			wantGasUsed: highLimit / 2,
+		},
+		{
+			name:        "usage_above_floor_charged_actual",
+			gasLimit:    ethparams.TxGas,
+			wantGasUsed: ethparams.TxGas,
+		},
+	}
+
+	txs := make([]*types.Transaction, len(tests))
+	for i, tt := range tests {
+		txs[i] = wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{1},
+			Gas:       tt.gasLimit,
+			GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
+		})
+		require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, txs[i]), "%T.SendTransaction(%s)", sut.EthClient(), tt.name)
+	}
+	sut.WaitForPendingTxs(ctx, t, txs...)
+
+	blk := sut.BuildVerifyAccept(ctx, t)
+	require.NoErrorf(t, blk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", blk)
+	receipts := blk.Receipts()
+	require.Lenf(t, receipts, len(tests), "%T.Receipts()", blk)
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, txs[i].Hash(), receipts[i].TxHash, "receipt TxHash")
+			assert.Equal(t, tt.wantGasUsed, receipts[i].GasUsed, "receipt GasUsed")
+		})
 	}
 }

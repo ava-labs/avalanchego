@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/evm/hook"
 
 	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -67,9 +68,12 @@ func (r RulesExtra) ShouldRefundGas() bool {
 	return !r.IsSubnetEVM
 }
 
-// MinimumGasConsumption is a no-op.
-func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
-	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
+// MinimumGasConsumption returns the ACP-194 gas-charged floor (ceil(limit/2)).
+func (r RulesExtra) MinimumGasConsumption(limit uint64) uint64 {
+	if r.IsIgloo {
+		return hook.MinimumGasConsumption(limit)
+	}
+	return (ethparams.NOOPHooks{}).MinimumGasConsumption(limit)
 }
 
 // ShouldCreditBaseFeeToCoinbase is unused, as subnet-evm never calls libevm's

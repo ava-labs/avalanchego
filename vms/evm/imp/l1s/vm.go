@@ -56,15 +56,16 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("parsing genesis: %w", err)
 	}
 
-	// [prefixdb.NewNested] is used because subnet-evm is run as a plugin.
-	// This means that the database's prefix is not compacted, because the
-	// provided database is wrapped by the rpcchainvm.
+	// When run as a plugin, the rpcchainvm wraps the provided database, so
+	// [prefixdb.New] and [prefixdb.NewNested] are equivalent. Using
+	// [prefixdb.NewNested] keeps the database format unchanged if this VM is
+	// ever run in-process, where [prefixdb.New] would compress the prefixes.
 	ethDB := types.NewEthDB(prefixdb.NewNested(ethDBPrefix, avaDB))
 	if err := genesis.verifyAndWriteBlock(ethDB); err != nil {
 		return fmt.Errorf("writing genesis block: %w", err)
 	}
 
-	// TODO: Allow local transactions to be enabled by the user config.
+	// TODO: Allow the mempool to be configured by the user config.
 	mempoolConfig := legacypool.DefaultConfig
 	mempoolConfig.NoLocals = true
 	saeConfig := sae.Config{
