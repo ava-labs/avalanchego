@@ -19,12 +19,12 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
 )
 
-func withUpgrade(tb testing.TB, u extras.UpgradeConfig) sutOption {
+func withUpgrades(tb testing.TB, u extras.UpgradeConfig) sutOption {
 	tb.Helper()
 	b, err := json.Marshal(u)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", u)
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.upgrade = b
+		c.upgrades = b
 	})
 }
 
@@ -46,7 +46,7 @@ func TestGetChainConfig(t *testing.T) {
 		}},
 	}
 
-	ctx, sut := newSUT(t, withUpgrade(t, upgrades))
+	ctx, sut := newSUT(t, withUpgrades(t, upgrades))
 
 	var got params.ChainConfigWithUpgradesJSON
 	client := sut.EthClient().RPC

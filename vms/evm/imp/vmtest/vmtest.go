@@ -47,7 +47,7 @@ type VM interface {
 type Config struct {
 	DB               database.Database
 	Genesis          []byte
-	Upgrade          []byte
+	Upgrades         []byte
 	Config           []byte
 	Sender           *saetest.Sender
 	State            snow.State
@@ -87,7 +87,7 @@ func New(ctx context.Context, tb testing.TB, vm VM, snowCtx *snow.Context, cfg C
 		snowCtx,
 		cfg.DB,
 		cfg.Genesis,
-		cfg.Upgrade,
+		cfg.Upgrades,
 		cfg.Config,
 		nil, // fxs
 		cfg.Sender,

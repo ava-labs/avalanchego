@@ -55,9 +55,9 @@ type SUT struct {
 
 type (
 	sutConfig struct {
-		genesis core.Genesis
-		upgrade []byte
-		clock   *saetest.Clock
+		genesis  core.Genesis
+		upgrades []byte
+		clock    *saetest.Clock
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -107,11 +107,11 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	ctx := log.CancelOnError(tb.Context())
 	vmSUT, err := vmtest.New(ctx, tb, vm, snowCtx, vmtest.Config{
-		DB:      memdb.New(),
-		Genesis: genesisBytes,
-		Upgrade: cfg.upgrade,
-		Sender:  appSender,
-		State:   snow.NormalOp,
+		DB:       memdb.New(),
+		Genesis:  genesisBytes,
+		Upgrades: cfg.upgrades,
+		Sender:   appSender,
+		State:    snow.NormalOp,
 	})
 	require.NoError(tb, err, "vmtest.New()")
 	sut := &SUT{
