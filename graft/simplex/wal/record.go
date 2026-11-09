@@ -23,6 +23,11 @@ var (
 	ErrPayloadTooLarge = errors.New("payload too large for record length field")
 )
 
+// recordSize returns the number of bytes [payload] occupies on disk once written as a record.
+func recordSize(payload []byte) int {
+	return recordSizeLen + len(payload) + recordChecksumLen
+}
+
 // writeRecord writes a length-prefixed and check-summed record to the writer.
 func writeRecord(w io.Writer, payload []byte) error {
 	if uint64(len(payload)) > math.MaxUint32 {
