@@ -1874,12 +1874,10 @@ func (n *Node) shutdown() {
 		n.chainManager.Shutdown()
 	}
 
-	// Stop the health checkers after stopping chains so that shutdown does not
-	// hang if VMs are holding the consensus lock.
+	// Health checks stop after the chains, not before, because Stop waits for
+	// running checks and chain checks take the chain's context lock. A chain
+	// that times out during shutdown can still hold that lock and block Stop.
 	if n.health != nil {
-		// Stop health checks before shutting down their components. The last
-		// polled health check results continue being reported on the api
-		// with a failing shutting down health check.
 		n.health.Stop()
 	}
 

@@ -69,7 +69,7 @@ func TestTimeoutScheduler(t *testing.T) {
 				testCase.advanceTime(testCase.clock)
 			}
 
-			ts := NewTimeoutScheduler(onTimeout, ps, nil)
+			ts := NewTimeoutScheduler(onTimeout, ps)
 			ts.newTimer = newTimer
 
 			for i := 0; i < testCase.expectedInvocationCount; i++ {
@@ -94,7 +94,7 @@ func TestTimeoutSchedulerConcurrentRegister(*testing.T) {
 
 	preemptChan := make(<-chan struct{})
 
-	ts := NewTimeoutScheduler(wg.Done, preemptChan, nil)
+	ts := NewTimeoutScheduler(wg.Done, preemptChan)
 	ts.newTimer = newTimer
 
 	ts.RegisterTimeout(time.Hour) // First timeout is registered
@@ -107,34 +107,6 @@ func TestTimeoutSchedulerConcurrentRegister(*testing.T) {
 	wg.Wait()
 }
 
-func TestTimeoutSchedulerShutdown(t *testing.T) {
-	for _, tt := range []struct {
-		name    string
-		preempt bool
-	}{
-		{name: "pending"},
-		{name: "preempted", preempt: true},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			synctest.Test(t, func(t *testing.T) {
-				var called atomic.Bool
-				preemption := make(chan struct{})
-				shutdown := make(chan struct{})
-				ts := NewTimeoutScheduler(func() { called.Store(true) }, preemption, shutdown)
-				ts.RegisterTimeout(time.Hour)
-
-				close(shutdown)
-				if tt.preempt {
-					close(preemption)
-				}
-				synctest.Wait()
-
-				require.False(t, called.Load(), "timeout fired after shutdown")
-			})
-		})
-	}
-}
-
 func makeMockedTimer(clock chan time.Time) func(time.Duration) *time.Timer {
 	return func(time.Duration) *time.Timer {
 		// We use a duration of 0 to not leave a lingering timer
@@ -144,4 +116,27 @@ func makeMockedTimer(clock chan time.Time) func(time.Duration) *time.Timer {
 		timer.C = clock
 		return timer
 	}
+}
+
+// TestTimeoutSchedulerStop tests that the timeout is not called if it fires
+// after the timeoutScheduler has stopped.
+func TestTimeoutSchedulerStop(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var called atomic.Bool
+		ts := NewTimeoutScheduler(func() { called.Store(true) }, nil)
+		ts.RegisterTimeout(time.Hour)
+
+		ts.Stop()
+		time.Sleep(2 * time.Hour)
+
+		require.False(t, called.Load(), "timeout fired after Stop")
+	})
+}
+
+// TestTimeoutSchedulerStopTwice tests that Stop is idempotent
+func TestTimeoutSchedulerStopTwice(*testing.T) {
+	ts := NewTimeoutScheduler(func() {}, nil)
+
+	ts.Stop()
+	ts.Stop()
 }

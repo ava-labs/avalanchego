@@ -36,27 +36,26 @@ func (ps *PreemptionSignal) Preempt() {
 // timeoutScheduler schedules timeouts to be dispatched in the future.
 // Only a single timeout can be pending to be scheduled at any given time.
 // Once a preemption signal is closed, all timeouts are immediately dispatched.
-// Once shutdown is closed, pending timeouts are dropped.
 type timeoutScheduler struct {
 	newTimer            func(duration time.Duration) *time.Timer
 	onTimeout           func()
 	preemptionSignal    <-chan struct{}
-	shutdown            <-chan struct{}
 	pendingTimeoutToken chan struct{}
+	stop                chan struct{}
+	stopOnce            sync.Once
 }
 
 // NewTimeoutScheduler constructs a new timeout scheduler with the given function to be invoked upon a timeout,
 // unless the preemptionSignal is closed and in which case it invokes the function immediately.
-// Closing shutdown drops any pending timeout without invoking the function.
-func NewTimeoutScheduler(onTimeout func(), preemptionSignal <-chan struct{}, shutdown <-chan struct{}) *timeoutScheduler {
+func NewTimeoutScheduler(onTimeout func(), preemptionSignal <-chan struct{}) *timeoutScheduler {
 	pendingTimout := make(chan struct{}, 1)
 	pendingTimout <- struct{}{}
 	return &timeoutScheduler{
 		preemptionSignal:    preemptionSignal,
-		shutdown:            shutdown,
 		newTimer:            time.NewTimer,
 		onTimeout:           onTimeout,
 		pendingTimeoutToken: pendingTimout,
+		stop:                make(chan struct{}),
 	}
 }
 
@@ -80,14 +79,8 @@ func (th *timeoutScheduler) scheduleTimeout(d time.Duration) {
 	select {
 	case <-timer.C:
 	case <-th.preemptionSignal:
-	case <-th.shutdown:
-	}
-
-	// select picks at random among ready cases, so check shutdown again.
-	select {
-	case <-th.shutdown:
+	case <-th.stop:
 		return
-	default:
 	}
 
 	// Relinquish the pendingTimeoutToken.
@@ -99,6 +92,14 @@ func (th *timeoutScheduler) scheduleTimeout(d time.Duration) {
 	th.pendingTimeoutToken <- struct{}{}
 
 	th.onTimeout()
+}
+
+// Stop drops any pending timeout. Like [time.Timer.Stop], it does not wait for
+// a timeout that is already firing.
+func (th *timeoutScheduler) Stop() {
+	th.stopOnce.Do(func() {
+		close(th.stop)
+	})
 }
 
 func (th *timeoutScheduler) acquirePendingTimeoutToken() bool {
@@ -116,8 +117,14 @@ type TimeoutRegistrar interface {
 	//
 	// If there is already a pending timeout message, this call is a no-op.
 	// However, it is guaranteed that the timeout will fire at least once after
-	// calling this function, unless the registrar shuts down first.
+	// calling this function, unless [TimeoutRegistrar.Stop] is called. A call to
+	// Stop that races with a firing timeout may still let it fire.
 	//
 	// If the subnet has been bootstrapped, the timeout will fire immediately via calling Preempt().
 	RegisterTimeout(time.Duration)
+
+	// Stop drops any pending timeouts. Like [time.Timer.Stop], it does not wait
+	// for a timeout that is already firing, so the timeout must check if
+	// it should still act.
+	Stop()
 }
