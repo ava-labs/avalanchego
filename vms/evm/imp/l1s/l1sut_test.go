@@ -325,7 +325,7 @@ func newTestGenesis(fork upgradetest.Fork, keychain *saetest.KeyChain) *core.Gen
 	}
 }
 
-func withFork(fork upgradetest.Fork) l1SUTOption { //nolint:unparam // Helicon and Latest currently both equal 15 but caller-controlled by design
+func withFork(fork upgradetest.Fork) l1SUTOption { //nolint:unparam // Igloo is currently Latest but caller-controlled by design
 	return options.Func[l1SUTConfig](func(c *l1SUTConfig) {
 		c.fork = fork
 	})
@@ -646,17 +646,17 @@ func (s *l1SUT) requireDeployFailed(t *testing.T, tx *types.Transaction) {
 	require.Emptyf(t, code, "failed deploy must leave no code at %s", receipt.ContractAddress)
 }
 
-// postHeliconStartTime returns a deterministic clock anchor at
-// `HeliconTimestamp + Tau`, suitable for tests that need (a) Helicon and
+// postIglooStartTime returns a deterministic clock anchor at
+// `IglooTimestamp + Tau`, suitable for tests that need (a) Igloo and
 // all preceding upgrades to be active in the worst-case state and (b) at
 // least one settlement window of headroom for subsequent
 // `sut.advanceTime` arithmetic.
-func postHeliconStartTime(t *testing.T) time.Time {
+func postIglooStartTime(t *testing.T) time.Time {
 	t.Helper()
 
-	networkUpgrades := extras.GetNetworkUpgrades(upgradetest.GetConfig(upgradetest.Helicon))
-	require.NotNil(t, networkUpgrades.HeliconTimestamp)
-	return time.Unix(int64(*networkUpgrades.HeliconTimestamp), 0).Add(saeparams.Tau) // #nosec G115 -- upgrade timestamp is far below MaxInt64
+	networkUpgrades := extras.GetNetworkUpgrades(upgradetest.GetConfig(upgradetest.Igloo))
+	require.NotNil(t, networkUpgrades.IglooTimestamp)
+	return time.Unix(int64(*networkUpgrades.IglooTimestamp), 0).Add(saeparams.Tau) // #nosec G115 -- upgrade timestamp is far below MaxInt64
 }
 
 // TestStateUpgradeAppliedAtActivationSAE exercises the `StateUpgrades` arm of
@@ -676,7 +676,7 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 	)
 
 	var (
-		now            = postHeliconStartTime(t)
+		now            = postIglooStartTime(t)
 		activationTime = now.Add(saeparams.Tau)
 		activationTS   = uint64(activationTime.Unix()) // #nosec G115 -- known positive test timestamp
 
@@ -692,7 +692,7 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Helicon),
+		withFork(upgradetest.Igloo),
 		withNumAccounts(2),
 		withNow(now),
 		withUpgradeConfig(func(_ []common.Address) []byte {
@@ -758,22 +758,22 @@ func newSnowCtx(t *testing.T, upgrades upgrade.Config) *snow.Context {
 }
 
 func TestRestartRejectsActivatedNetworkUpgradeChange(t *testing.T) {
-	initialHelicon := uint64(upgrade.InitiallyActiveTime.Unix() + 2) // #nosec G115 -- known positive test timestamp
+	initialIgloo := uint64(upgrade.InitiallyActiveTime.Unix() + 2) // #nosec G115 -- known positive test timestamp
 	upgradeBytes := func(timestamp uint64) []byte {
 		return mustMarshalJSON(t, extras.UpgradeConfig{
 			NetworkUpgradeOverrides: &extras.NetworkUpgrades{
-				HeliconTimestamp: new(timestamp),
+				IglooTimestamp: new(timestamp),
 			},
 		})
 	}
 
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Helicon),
+		withFork(upgradetest.Igloo),
 		withNumAccounts(2),
-		withNow(time.Unix(int64(initialHelicon+100), 0)), // #nosec G115 -- test timestamp is far below MaxInt64
+		withNow(time.Unix(int64(initialIgloo+100), 0)), // #nosec G115 -- test timestamp is far below MaxInt64
 		withUpgradeConfig(func([]common.Address) []byte {
-			return upgradeBytes(initialHelicon)
+			return upgradeBytes(initialIgloo)
 		}),
 	)
 	sut.sendTransferTx(t, 0, 1, big.NewInt(1))
@@ -804,7 +804,7 @@ func TestRestartRejectsActivatedNetworkUpgradeChange(t *testing.T) {
 		sut.baseDB,
 		&clockTime,
 		sut.genesisBytes,
-		upgradeBytes(initialHelicon+1),
+		upgradeBytes(initialIgloo+1),
 		sut.configBytes,
 	)
 	if shutdown != nil {

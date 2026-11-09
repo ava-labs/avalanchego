@@ -20,7 +20,7 @@ import (
 )
 
 func TestLegacyFeeManagerRetirement(t *testing.T) {
-	helicon := uint64(upgradetest.GetConfig(upgradetest.Helicon).HeliconTime.Unix()) // #nosec G115 -- known positive test timestamp
+	igloo := uint64(upgradetest.GetConfig(upgradetest.Igloo).IglooTime.Unix()) // #nosec G115 -- known positive test timestamp
 	chainConfig := params.Copy(params.TestSubnetEVMChainConfig)
 	extra := params.GetExtra(&chainConfig)
 	extra.GenesisPrecompiles = extras.Precompiles{
@@ -36,14 +36,14 @@ func TestLegacyFeeManagerRetirement(t *testing.T) {
 	require.NoError(t, err, "json.Marshal(genesis)")
 
 	tvm, err := tryNewVM(t, testVMConfig{
-		fork:        utils.PointerTo(upgradetest.Helicon),
+		fork:        utils.PointerTo(upgradetest.Igloo),
 		genesisJSON: string(genesisJSON),
 	})
 	require.NoError(t, err, "tryNewVM()")
 
 	got := params.GetExtra(tvm.vm.ChainConfig()).PrecompileUpgrades
 	want := []extras.PrecompileUpgrade{
-		{Config: feemanager.NewDisableConfig(utils.PointerTo(helicon))},
+		{Config: feemanager.NewDisableConfig(utils.PointerTo(igloo))},
 	}
 	require.Equal(t, want, got, "feeManager retirement upgrades")
 }

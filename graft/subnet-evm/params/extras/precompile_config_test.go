@@ -28,6 +28,7 @@ func TestVerifyWithChainConfig(t *testing.T) {
 	c := *TestChainConfig
 	config := &c
 	config.SnowCtx = utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
+	config.SnowCtx.NetworkUpgrades = upgradetest.GetConfig(upgradetest.Helicon)
 	config.GenesisPrecompiles = Precompiles{
 		txallowlist.ConfigKey: txallowlist.NewConfig(utils.PointerTo[uint64](2), nil, nil, nil),
 	}
@@ -74,6 +75,7 @@ func TestVerifyWithChainConfigAtNilTimestamp(t *testing.T) {
 	c := *TestChainConfig
 	config := &c
 	config.SnowCtx = utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
+	config.SnowCtx.NetworkUpgrades = upgradetest.GetConfig(upgradetest.Helicon)
 	config.PrecompileUpgrades = []PrecompileUpgrade{
 		// this does NOT enable the precompile, so it should be upgradeable.
 		{Config: txallowlist.NewConfig(nil, nil, nil, nil)},
@@ -192,14 +194,10 @@ func TestVerifyPrecompileUpgrades(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			// Use TestGraniteChainConfig + a snowCtx pinned to the
-			// Granite upgrade-config so Helicon is unscheduled both in
-			// the chain config and in the network upgrades. Otherwise
-			// the feeManager-keyed cases below would fail.
-			c := *TestGraniteChainConfig
+			c := *TestChainConfig
 			config := &c
 			config.SnowCtx = utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
-			config.SnowCtx.NetworkUpgrades = upgradetest.GetConfig(upgradetest.Granite)
+			config.SnowCtx.NetworkUpgrades = upgradetest.GetConfig(upgradetest.Helicon)
 			config.PrecompileUpgrades = tt.upgrades
 
 			err := config.Verify()
@@ -238,12 +236,10 @@ func TestVerifyPrecompiles(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			// See the matching loop in TestVerifyPrecompileUpgrades for
-			// why we pin the snowCtx upgrade-config to Granite.
-			c := *TestGraniteChainConfig
+			c := *TestChainConfig
 			config := &c
 			config.SnowCtx = utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
-			config.SnowCtx.NetworkUpgrades = upgradetest.GetConfig(upgradetest.Granite)
+			config.SnowCtx.NetworkUpgrades = upgradetest.GetConfig(upgradetest.Helicon)
 			config.GenesisPrecompiles = tt.precompiles
 
 			err := config.Verify()

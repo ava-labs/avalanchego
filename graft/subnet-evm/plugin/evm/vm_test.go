@@ -2801,7 +2801,7 @@ func TestStandaloneDB(t *testing.T) {
 
 func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	// The legacy feeManager precompile is rejected when scheduled at
-	// or after Helicon (see feemanager.Config.Verify)
+	// or after Igloo (see retirement.ReconcileForIgloo)
 	graniteFork := upgradetest.Granite
 
 	// Setup chain params

@@ -558,12 +558,12 @@ func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte, a
 		configExtra.Override(overrides)
 	}
 
-	// Apply parse-time `feeManager` retirement at Helicon: reject
-	// post-Helicon upgrades, normalize a stale genesis activation,
+	// Apply parse-time `feeManager` retirement at Igloo: reject
+	// post-Igloo upgrades, normalize a stale genesis activation,
 	// and inject the synthetic disable that wipes pre-existing
-	// storage at the Helicon block.
-	if heliconTS, ok := configExtra.NetworkUpgrades.ScheduledHeliconTimestamp(); ok {
-		if err := retirement.ReconcileForHelicon(configExtra, g.Timestamp, heliconTS); err != nil {
+	// storage at the Igloo block.
+	if iglooTS, ok := configExtra.NetworkUpgrades.ScheduledIglooTimestamp(); ok {
+		if err := retirement.ReconcileForIgloo(configExtra, g.Timestamp, iglooTS); err != nil {
 			return nil, err
 		}
 	}

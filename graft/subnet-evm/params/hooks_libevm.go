@@ -64,19 +64,19 @@ func (r RulesExtra) CanCreateContract(ac *libevm.AddressContext, gas uint64, sta
 // from `core.StateTransition.TransitionDb` against the rules+state of the block
 // being executed. A non-nil return makes the entire block invalid at execution.
 //
-// In the SAE port (post-Helicon), an invalid block at execution time is a
+// In the SAE port (post-Igloo), an invalid block at execution time is a
 // fatal halt of the executor, but worst-case admission cannot reliably predict
 // state-dependent precompile checks. To avoid the halt, we short-circuit this
-// hook post-Helicon and let the SAE worst-case path enforce the same check via
+// hook post-Igloo and let the SAE worst-case path enforce the same check via
 // [EnforceTxAllowList]
 // against the last-settled rules+state pair (see
 // `vms/evm/imp/l1s.(*hooks).CanExecuteTransaction`).
 //
-// Pre-Helicon (synchronous chain), this stays strict because there is no
+// Pre-Igloo (synchronous chain), this stays strict because there is no
 // admission/execution gap.
 func (r RulesExtra) CanExecuteTransaction(from common.Address, _ *common.Address, state libevm.StateReader) error {
 	rules := (extras.Rules)(r)
-	if rules.IsHelicon {
+	if rules.IsIgloo {
 		return nil
 	}
 	return r.EnforceTxAllowList(from, state)
@@ -86,7 +86,7 @@ func (r RulesExtra) CanExecuteTransaction(from common.Address, _ *common.Address
 // rules and the provided state. It exists so SAE consumers can re-use the same
 // check outside the libevm hook. SAE uses it against the last-settled state,
 // and the legacy executor and transaction pool use it to remain strict after
-// Helicon without changing SAE execution semantics.
+// Igloo without changing SAE execution semantics.
 //
 // The receiver's rules MUST correspond to the same block as `state` so that
 // `IsPrecompileEnabled` agrees with whether txallowlist storage is populated

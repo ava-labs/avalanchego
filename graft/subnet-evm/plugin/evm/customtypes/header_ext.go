@@ -50,7 +50,7 @@ type HeaderExtra struct {
 	SettledGasNumerator *uint64
 	SettledExcess       *uint64
 
-	// TargetExcess is populated by the SAE block builder after Helicon and is
+	// TargetExcess is populated by the SAE block builder after Igloo and is
 	// ignored on legacy chains.
 	TargetExcess *gas.Gas
 
@@ -361,7 +361,7 @@ type HeaderSerializable struct {
 	SettledGasNumerator *uint64 `json:"settledGasNumerator" rlp:"optional"`
 	SettledExcess       *uint64 `json:"settledExcess"       rlp:"optional"`
 
-	// TargetExcess was added by Helicon (SAE) and is ignored in legacy headers.
+	// TargetExcess was added by Igloo (SAE) and is ignored in legacy headers.
 	TargetExcess *uint64 `json:"targetExcess" rlp:"optional"`
 
 	// The GasConfig* group carries the effective ACP-224 price configuration

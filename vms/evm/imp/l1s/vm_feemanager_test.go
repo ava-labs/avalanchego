@@ -22,13 +22,13 @@ import (
 	legacyparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
-// TestFeeManagerTransitionAtHelicon drives the SAE end-to-end:
+// TestFeeManagerTransitionAtIgloo drives the SAE end-to-end:
 // genesis-active feeManager with admin role + non-zero InitialFeeConfig,
-// build a block past Helicon, assert storage at 0x02..03 is wiped and
+// build a block past Igloo, assert storage at 0x02..03 is wiped and
 // the precompile is no longer reported as enabled.
-func TestFeeManagerForceDisabledAtHeliconActivation(t *testing.T) {
+func TestFeeManagerForceDisabledAtIglooActivation(t *testing.T) {
 	const adminIdx = 0
-	now := postHeliconStartTime(t)
+	now := postIglooStartTime(t)
 
 	initialFeeConfig := commontype.FeeConfig{
 		GasLimit:                 big.NewInt(8_000_000),
@@ -43,7 +43,7 @@ func TestFeeManagerForceDisabledAtHeliconActivation(t *testing.T) {
 
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Helicon),
+		withFork(upgradetest.Igloo),
 		withNumAccounts(2),
 		withNow(now),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
@@ -60,7 +60,7 @@ func TestFeeManagerForceDisabledAtHeliconActivation(t *testing.T) {
 
 	admin := sut.ethWallet.Addresses()[adminIdx]
 
-	// Pre-Helicon: genesis state has the admin role + stored fee config.
+	// Pre-Igloo: genesis state has the admin role + stored fee config.
 	require.Equal(t, allowlist.AdminRole,
 		feeManagerStatusAt(t, sut, admin, rpc.LatestBlockNumber),
 		"admin role must be present in genesis state")
@@ -68,20 +68,20 @@ func TestFeeManagerForceDisabledAtHeliconActivation(t *testing.T) {
 		feeManagerStoredFeeConfigAt(t, sut, rpc.LatestBlockNumber),
 		"stored fee config must reflect InitialFeeConfig at block 0")
 
-	// Build a block past Helicon. Activator fires the synthetic Disable
+	// Build a block past Igloo. Activator fires the synthetic Disable
 	// upgrade, SelfDestruct + Finalise wipe 0x02..03.
 	settleTx := sut.sendTransferTx(t, adminIdx, 1, common.Big1)
 	block := sut.buildAcceptExecuteBlock(t)
 	require.Len(t, block.Transactions(), 1)
 	require.Equal(t, settleTx.Hash(), block.Transactions()[0].Hash())
 
-	// Post-Helicon: storage wiped + chain config no longer reports
+	// Post-Igloo: storage wiped + chain config no longer reports
 	// feeManager as enabled.
 	require.False(t, sut.isPrecompileEnabledAtLatest(feemanager.ContractAddress),
-		"feeManager must be disabled per chain config after Helicon")
+		"feeManager must be disabled per chain config after Igloo")
 	require.Equal(t, allowlist.NoRole,
 		feeManagerStatusAt(t, sut, admin, rpc.LatestBlockNumber),
-		"admin role must be cleared after the Helicon disable")
+		"admin role must be cleared after the Igloo disable")
 	require.Equal(t, zeroFeeConfig(),
 		feeManagerStoredFeeConfigAt(t, sut, rpc.LatestBlockNumber),
 		"stored fee config must be zeroed after SelfDestruct")

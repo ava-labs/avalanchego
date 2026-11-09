@@ -76,8 +76,8 @@ func withWarpEnabled() l1SUTOption {
 func TestSendWarpMessage(t *testing.T) {
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Helicon),
-		withNow(postHeliconStartTime(t)),
+		withFork(upgradetest.Igloo),
+		withNow(postIglooStartTime(t)),
 		withWarpEnabled(),
 	)
 
@@ -129,8 +129,8 @@ func TestSendWarpMessage(t *testing.T) {
 func TestPredicateVerification(t *testing.T) {
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Helicon),
-		withNow(postHeliconStartTime(t)),
+		withFork(upgradetest.Igloo),
+		withNow(postIglooStartTime(t)),
 		withWarpEnabled(),
 	)
 

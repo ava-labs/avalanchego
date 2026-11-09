@@ -28,17 +28,17 @@ import (
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
 )
 
-func TestBuildHeaderHeliconOverride(t *testing.T) {
-	networkUpgrades := upgradetest.GetConfig(upgradetest.Helicon)
-	heliconTime := networkUpgrades.HeliconTime.Add(time.Hour)
+func TestBuildHeaderIglooOverride(t *testing.T) {
+	networkUpgrades := upgradetest.GetConfig(upgradetest.Igloo)
+	iglooTime := networkUpgrades.IglooTime.Add(time.Hour)
 	snowCtx := newSnowCtx(t, networkUpgrades)
-	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgradetest.Helicon])
+	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgradetest.Igloo])
 	legacyparams.GetExtra(&chainCfg).Override(&extras.NetworkUpgrades{
-		HeliconTimestamp: new(uint64(heliconTime.Unix())), //#nosec G115 -- known positive test timestamp
+		IglooTimestamp: new(uint64(iglooTime.Unix())), //#nosec G115 -- known positive test timestamp
 	})
 	parent := &types.Header{
 		Number: new(big.Int),
-		Time:   uint64(heliconTime.Add(-10 * time.Second).Unix()), //#nosec G115 -- known positive test timestamp
+		Time:   uint64(iglooTime.Add(-10 * time.Second).Unix()), //#nosec G115 -- known positive test timestamp
 	}
 
 	tests := []struct {
@@ -48,12 +48,12 @@ func TestBuildHeaderHeliconOverride(t *testing.T) {
 	}{
 		{
 			name:    "before_override",
-			now:     heliconTime.Add(-time.Second),
-			wantErr: errHeliconUnactivated,
+			now:     iglooTime.Add(-time.Second),
+			wantErr: errIglooUnactivated,
 		},
 		{
 			name: "at_override",
-			now:  heliconTime,
+			now:  iglooTime,
 		},
 	}
 	for _, test := range tests {
@@ -97,7 +97,7 @@ func TestGasConfigAfterGenesisCanonicalTarget(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgradetest.Helicon])
+			chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgradetest.Igloo])
 			config := &commontype.GasPriceConfig{
 				TargetGas:    uint64(test.storedTarget),
 				MinGasPrice:  1,
@@ -137,7 +137,7 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 		rebuilderCoinbase = common.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 	)
 
-	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgradetest.Helicon])
+	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgradetest.Igloo])
 	legacyparams.GetExtra(&chainCfg).AllowFeeRecipients = true // route through customCoinbase branch in resolveCoinbase
 
 	parent := &types.Header{Number: big.NewInt(1), Time: parentTimeMS / 1000}
@@ -213,8 +213,8 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	)
 	forgedCoinbase := common.HexToAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
 
-	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgradetest.Helicon])
-	// Vanilla Helicon: AllowFeeRecipients=false, no rewardmanager precompile
+	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgradetest.Igloo])
+	// Vanilla Igloo: AllowFeeRecipients=false, no rewardmanager precompile
 	// => deterministic branch in resolveCoinbase MUST stamp BlackholeAddr.
 
 	parent := &types.Header{Number: big.NewInt(1), Time: parentTimeMS / 1000}

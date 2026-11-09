@@ -104,10 +104,10 @@ func settleRewardManagerMutation(t *testing.T, sut *l1SUT, fromIdx int) {
 func TestRewardManagerDefaultBurnSAE(t *testing.T) {
 	const fromIdx = 0
 
-	now := postHeliconStartTime(t)
+	now := postIglooStartTime(t)
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Helicon),
+		withFork(upgradetest.Igloo),
 		withNumAccounts(1),
 		withNow(now),
 	)
@@ -132,11 +132,11 @@ func TestRewardManagerGenesisAllowFeeRecipientsSAE(t *testing.T) {
 	const fromIdx = 0
 
 	validator := common.HexToAddress("0x00000000000000000000000000000000ABcDef01")
-	now := postHeliconStartTime(t)
+	now := postIglooStartTime(t)
 
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Helicon),
+		withFork(upgradetest.Igloo),
 		withNumAccounts(1),
 		withNow(now),
 		withFeeRecipient(validator),
@@ -187,11 +187,11 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 
 	validator := common.HexToAddress("0x00000000000000000000000000000000ABcDef01")
 	rewardAddr := common.HexToAddress("0x00000000000000000000000000000000DeadBeef")
-	now := postHeliconStartTime(t)
+	now := postIglooStartTime(t)
 
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Helicon),
+		withFork(upgradetest.Igloo),
 		withNumAccounts(2),
 		withNow(now),
 		withFeeRecipient(validator),
@@ -290,7 +290,7 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 // arbitrary address in the pinned arms.
 //
 // Two pinned arms exercised here:
-//   - vanilla Helicon (`AllowFeeRecipients=false`, no rewardmanager) =>
+//   - vanilla Igloo (`AllowFeeRecipients=false`, no rewardmanager) =>
 //     deterministic [BlackholeAddr]; any other Coinbase is forged.
 //   - rewardmanager active with stored `allowFeeRecipients == false` =>
 //     deterministic stored reward address; any other Coinbase is forged.
@@ -337,9 +337,9 @@ func TestRewardManagerForgedCoinbaseFailsVerifyBlock(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			now := postHeliconStartTime(t)
+			now := postIglooStartTime(t)
 			opts := append([]l1SUTOption{
-				withFork(upgradetest.Helicon),
+				withFork(upgradetest.Igloo),
 				withNumAccounts(1),
 				withNow(now),
 			}, test.opts...)

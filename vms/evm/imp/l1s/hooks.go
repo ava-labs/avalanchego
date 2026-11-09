@@ -229,7 +229,7 @@ func (*hooks) VerifyBlockSyntax(b *types.Block) error {
 // CanExecuteTransaction enforces the txallowlist sender check against the
 // caller-supplied `rules`+`state` pair (worst-case: last-settled; mempool
 // admission: last-executed), bypassing the libevm hook which is
-// short-circuited post-Helicon to avoid fatal-halt on stale-state divergence
+// short-circuited post-Igloo to avoid fatal-halt on stale-state divergence
 // (see [legacyparams.RulesExtra.CanExecuteTransaction]). Libevm extras
 // MUST be registered first.
 //
@@ -332,7 +332,7 @@ type builder struct {
 }
 
 var (
-	errHeliconUnactivated = errors.New("helicon is not activated")
+	errIglooUnactivated   = errors.New("igloo is not activated")
 	errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
 )
 
@@ -353,8 +353,8 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
 	configExtra := legacyparams.GetExtra(b.chainConfig)
 	nowUnix := uint64(now.Unix()) //#nosec G115 -- block times are known non-negative
-	if !configExtra.IsHelicon(nowUnix) {
-		return nil, errHeliconUnactivated
+	if !configExtra.IsIgloo(nowUnix) {
+		return nil, errIglooUnactivated
 	}
 	if earliest := earliestBlockTime(parent); now.Before(earliest) {
 		return nil, fmt.Errorf("%w: block time %s is before the minimum %s",

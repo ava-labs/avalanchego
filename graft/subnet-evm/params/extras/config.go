@@ -76,7 +76,7 @@ var (
 		c.NetworkUpgrades.IglooTimestamp = utils.PointerTo[uint64](0)
 	})
 
-	TestChainConfig = copyConfig(TestIglooChainConfig)
+	TestChainConfig = copyConfig(TestHeliconChainConfig)
 )
 
 func copyConfig(c *ChainConfig) *ChainConfig {
@@ -114,10 +114,10 @@ type ChainConfig struct {
 
 	AvalancheContext `json:"-"` // Avalanche specific context set during VM initialization. Not serialized.
 
-	// FeeConfig configures the legacy pre-Helicon dynamic fee algorithm.
+	// FeeConfig configures the legacy pre-Igloo dynamic fee algorithm.
 	//
-	// Deprecated: ACP-176 and ACP-224 own post-Helicon gas pricing. This field
-	// remains required for pre-Helicon compatibility and JSON round trips.
+	// Deprecated: ACP-176 and ACP-224 own post-Igloo gas pricing. This field
+	// remains required for pre-Igloo compatibility and JSON round trips.
 	FeeConfig          commontype.FeeConfig `json:"feeConfig"`
 	AllowFeeRecipients bool                 `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 	GenesisPrecompiles Precompiles          `json:"-"`                            // Config for enabling precompiles from genesis. JSON encode/decode will be handled by the custom marshaler/unmarshaler.

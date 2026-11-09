@@ -15,11 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 )
 
-func TestReconcileForHelicon(t *testing.T) {
+func TestReconcileForIgloo(t *testing.T) {
 	const (
-		helicon     = uint64(100)
-		preHelicon  = helicon - 5
-		postHelicon = helicon + 5
+		igloo     = uint64(100)
+		preIgloo  = igloo - 5
+		postIgloo = igloo + 5
 	)
 
 	fmEnable := func(timestamp uint64) extras.PrecompileUpgrade {
@@ -52,33 +52,33 @@ func TestReconcileForHelicon(t *testing.T) {
 	}{
 		{name: "no fee manager"},
 		{
-			name:         "genesis activation is disabled at Helicon",
+			name:         "genesis activation is disabled at Igloo",
 			genesis:      fmGenesis(utils.PointerTo[uint64](0)),
 			wantGenesis:  fmGenesis(utils.PointerTo[uint64](0)),
-			wantUpgrades: []extras.PrecompileUpgrade{fmDisable(helicon)},
+			wantUpgrades: []extras.PrecompileUpgrade{fmDisable(igloo)},
 		},
 		{
-			name:         "upgrade activation is disabled at Helicon",
-			upgrades:     []extras.PrecompileUpgrade{fmEnable(preHelicon)},
-			wantUpgrades: []extras.PrecompileUpgrade{fmEnable(preHelicon), fmDisable(helicon)},
+			name:         "upgrade activation is disabled at Igloo",
+			upgrades:     []extras.PrecompileUpgrade{fmEnable(preIgloo)},
+			wantUpgrades: []extras.PrecompileUpgrade{fmEnable(preIgloo), fmDisable(igloo)},
 		},
 		{
 			name:         "existing disable is preserved",
 			genesis:      fmGenesis(utils.PointerTo[uint64](0)),
-			upgrades:     []extras.PrecompileUpgrade{fmDisable(preHelicon)},
+			upgrades:     []extras.PrecompileUpgrade{fmDisable(preIgloo)},
 			wantGenesis:  fmGenesis(utils.PointerTo[uint64](0)),
-			wantUpgrades: []extras.PrecompileUpgrade{fmDisable(preHelicon)},
+			wantUpgrades: []extras.PrecompileUpgrade{fmDisable(preIgloo)},
 		},
 		{
-			name:     "upgrade at Helicon is rejected",
-			upgrades: []extras.PrecompileUpgrade{fmEnable(helicon)},
-			wantErr:  retirement.ErrFeeManagerEnabledAfterHelicon,
+			name:     "upgrade at Igloo is rejected",
+			upgrades: []extras.PrecompileUpgrade{fmEnable(igloo)},
+			wantErr:  retirement.ErrFeeManagerEnabledAfterIgloo,
 		},
 		{
 			name:             "stale genesis activation is removed",
-			genesisTimestamp: preHelicon,
+			genesisTimestamp: preIgloo,
 			genesis: extras.Precompiles{
-				feemanager.ConfigKey:   feemanager.NewConfig(utils.PointerTo(postHelicon), nil, nil, nil, nil),
+				feemanager.ConfigKey:   feemanager.NewConfig(utils.PointerTo(postIgloo), nil, nil, nil, nil),
 				nativeminter.ConfigKey: mintGenesis,
 			},
 			wantGenesis: extras.Precompiles{nativeminter.ConfigKey: mintGenesis},
@@ -86,19 +86,19 @@ func TestReconcileForHelicon(t *testing.T) {
 		{
 			name:        "synthetic disable preserves global upgrade order",
 			genesis:     fmGenesis(utils.PointerTo[uint64](0)),
-			upgrades:    []extras.PrecompileUpgrade{mintEnable(preHelicon), mintDisable(postHelicon)},
+			upgrades:    []extras.PrecompileUpgrade{mintEnable(preIgloo), mintDisable(postIgloo)},
 			wantGenesis: fmGenesis(utils.PointerTo[uint64](0)),
 			wantUpgrades: []extras.PrecompileUpgrade{
-				mintEnable(preHelicon),
-				fmDisable(helicon),
-				mintDisable(postHelicon),
+				mintEnable(preIgloo),
+				fmDisable(igloo),
+				mintDisable(postIgloo),
 			},
 		},
 		{
-			name:             "post-Helicon genesis is rejected",
-			genesisTimestamp: helicon,
+			name:             "post-Igloo genesis is rejected",
+			genesisTimestamp: igloo,
 			genesis:          fmGenesis(nil),
-			wantErr:          retirement.ErrFeeManagerEnabledAfterHelicon,
+			wantErr:          retirement.ErrFeeManagerEnabledAfterIgloo,
 		},
 	}
 
@@ -110,13 +110,13 @@ func TestReconcileForHelicon(t *testing.T) {
 					PrecompileUpgrades: test.upgrades,
 				},
 			}
-			err := retirement.ReconcileForHelicon(&got, test.genesisTimestamp, helicon)
-			require.ErrorIs(t, err, test.wantErr, "ReconcileForHelicon()")
+			err := retirement.ReconcileForIgloo(&got, test.genesisTimestamp, igloo)
+			require.ErrorIs(t, err, test.wantErr, "ReconcileForIgloo()")
 			if err != nil {
 				return
 			}
-			require.Equal(t, test.wantGenesis, got.GenesisPrecompiles, "ReconcileForHelicon() genesis precompiles")
-			require.Equal(t, test.wantUpgrades, got.PrecompileUpgrades, "ReconcileForHelicon() precompile upgrades")
+			require.Equal(t, test.wantGenesis, got.GenesisPrecompiles, "ReconcileForIgloo() genesis precompiles")
+			require.Equal(t, test.wantUpgrades, got.PrecompileUpgrades, "ReconcileForIgloo() precompile upgrades")
 		})
 	}
 }

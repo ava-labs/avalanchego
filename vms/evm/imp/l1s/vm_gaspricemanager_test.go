@@ -96,10 +96,10 @@ func TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE(t *testing.T) {
 	const pinnedMinPrice uint64 = 25_000_000_000
 	cfg := staticPricingConfig(pinnedMinPrice)
 
-	now := postHeliconStartTime(t)
+	now := postIglooStartTime(t)
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Helicon),
+		withFork(upgradetest.Igloo),
 		withNumAccounts(2),
 		withNow(now),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
@@ -166,10 +166,10 @@ func TestGasPriceManagerSetGasPriceConfigSettlementLagSAE(t *testing.T) {
 	)
 	initialCfg := staticPricingConfig(oldMinPrice)
 
-	now := postHeliconStartTime(t)
+	now := postIglooStartTime(t)
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Helicon),
+		withFork(upgradetest.Igloo),
 		withNumAccounts(2),
 		withNow(now),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
@@ -256,10 +256,10 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 
 	buildChain := func(t *testing.T, cfg commontype.GasPriceConfig) []*blocks.Block {
 		t.Helper()
-		now := postHeliconStartTime(t)
+		now := postIglooStartTime(t)
 		sut := newL1SUT(
 			t,
-			withFork(upgradetest.Helicon),
+			withFork(upgradetest.Igloo),
 			withNumAccounts(2),
 			withNow(now),
 			withGasTarget(desiredGasTarget),
@@ -364,10 +364,10 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 		TimeToDouble: 60,
 	}
 
-	now := postHeliconStartTime(t)
+	now := postIglooStartTime(t)
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Helicon),
+		withFork(upgradetest.Igloo),
 		withNumAccounts(2),
 		withNow(now),
 		withGasTarget(desiredTarget),
@@ -470,7 +470,7 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 		defaultBaseFeeU = uint256.NewInt(uint64(gastime.DefaultMinPrice))
 	)
 
-	now := postHeliconStartTime(t)
+	now := postIglooStartTime(t)
 	midChainActivation := now.Add(saeparams.Tau)
 
 	pinnedGenesisPrecompiles := func(addresses []common.Address) extras.Precompiles {
@@ -562,7 +562,7 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sut := newL1SUT(
 				t,
-				withFork(upgradetest.Helicon),
+				withFork(upgradetest.Igloo),
 				withNumAccounts(2),
 				withNow(now),
 				withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
@@ -631,10 +631,10 @@ func TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE(t *testing.T) {
 	const pinnedMinPrice uint64 = 25_000_000_000
 	cfg := staticPricingConfig(pinnedMinPrice)
 
-	now := postHeliconStartTime(t)
+	now := postIglooStartTime(t)
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Helicon),
+		withFork(upgradetest.Igloo),
 		withNumAccounts(2),
 		withNow(now),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {

@@ -46,13 +46,13 @@ func TestDeployerAllowListPrecompileUpgradesSAE(t *testing.T) {
 		nonAdminIdx = 1
 	)
 
-	now := postHeliconStartTime(t)
+	now := postIglooStartTime(t)
 	disableTime := now.Add(saeparams.Tau)
 	reenableTime := disableTime.Add(2 * saeparams.Tau)
 
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Helicon),
+		withFork(upgradetest.Igloo),
 		withNumAccounts(2),
 		withNow(now),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {

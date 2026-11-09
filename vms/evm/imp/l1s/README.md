@@ -50,8 +50,8 @@ reproduce:
 
 The legacy `customtypes.HeaderExtra` type carries the SAE settlement marker,
 ACP-176 target state, ACP-226 minimum-delay excess, and ACP-224 gas
-configuration. These optional tail fields are populated only from Helicon
-onward so pre-Helicon RLP encodings remain unchanged. Each settlement or gas
+configuration. These optional tail fields are populated only from Igloo
+onward so pre-Igloo RLP encodings remain unchanged. Each settlement or gas
 configuration group must be either complete or absent.
 
 When `gaspricemanager` is active, the builder reads its configuration from
@@ -70,12 +70,12 @@ last-accepted block, with genesis used only for an empty database.
 
 ## Compatibility rules
 
-The legacy `feeManager` precompile is retired at Helicon in both the legacy and
-SAE parsers. Configurations at or after Helicon are rejected or removed when
+The legacy `feeManager` precompile is retired at Igloo in both the legacy and
+SAE parsers. Configurations at or after Igloo are rejected or removed when
 immutable legacy genesis requires it. If the precompile is active before
-Helicon, a synthetic disable upgrade wipes its state at the transition. Legacy
-`FeeConfig` is defaulted and validated for pre-Helicon compatibility; ACP-176
-and ACP-224 own pricing after Helicon.
+Igloo, a synthetic disable upgrade wipes its state at the transition. Legacy
+`FeeConfig` is defaulted and validated for pre-Igloo compatibility; ACP-176
+and ACP-224 own pricing after Igloo.
 
 Reward routing follows libevm semantics after London: coinbase receives the
 effective tip and the base fee is burned. The legacy VM credited the full

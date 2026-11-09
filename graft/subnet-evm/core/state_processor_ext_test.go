@@ -56,6 +56,7 @@ func TestBadTxAllowListBlock(t *testing.T) {
 					FortunaTimestamp:   utils.PointerTo[uint64](1),
 					GraniteTimestamp:   utils.PointerTo[uint64](1),
 					HeliconTimestamp:   utils.PointerTo[uint64](1),
+					IglooTimestamp:     utils.PointerTo[uint64](1),
 				},
 				GenesisPrecompiles: extras.Precompiles{
 					txallowlist.ConfigKey: txallowlist.NewConfig(utils.PointerTo[uint64](0), nil, nil, nil),
