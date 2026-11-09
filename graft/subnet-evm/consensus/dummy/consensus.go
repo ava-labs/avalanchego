@@ -178,9 +178,6 @@ func (eng *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header *
 	if uncle {
 		return errUnclesUnsupported
 	}
-	if err := customheader.VerifyNoSAEHeaderFields(header); err != nil {
-		return err
-	}
 
 	// Verify the extra data is well-formed.
 	config := params.GetExtra(chain.Config())
