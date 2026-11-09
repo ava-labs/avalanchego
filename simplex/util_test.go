@@ -115,6 +115,44 @@ func newTestBlock(config newBlockConfig) *Block {
 	return block
 }
 
+// testValidators returns the validator set of the config, sorted the way the epoch sorts it,
+// so that signer bitmask indices line up with the aggregator and the deserializer.
+func testValidators(config *Config) common.Nodes {
+	nodes := make(common.Nodes, 0, len(config.Params.InitialValidators))
+	for _, vd := range config.Params.InitialValidators {
+		nodes = append(nodes, common.Node{
+			Id:     common.NodeIDFromAvalancheID(vd.NodeID),
+			PK:     vd.PublicKey,
+			Weight: 1,
+		})
+	}
+	common.SortNodes(nodes)
+	return nodes
+}
+
+func newTestSignatureAggregator(config *Config) *SignatureAggregator {
+	return newSignatureAggregator(config.Ctx.NetworkID, config.Ctx.ChainID, testValidators(config))
+}
+
+func newTestQCDeserializer(config *Config) *QCDeserializer {
+	return &QCDeserializer{
+		networkID: config.Ctx.NetworkID,
+		chainID:   config.Ctx.ChainID,
+		nodes:     testValidators(config).NodeIDs(),
+	}
+}
+
+// publicKeyOf returns the compressed BLS public key of the config's own node.
+func publicKeyOf(t testing.TB, config *Config) []byte {
+	for _, vd := range config.Params.InitialValidators {
+		if vd.NodeID == config.Ctx.NodeID {
+			return vd.PublicKey
+		}
+	}
+	require.FailNow(t, "node is not in the validator set")
+	return nil
+}
+
 func newEngineConfig(t *testing.T, numNodes uint64) *Config {
 	return newNetworkConfigs(t, numNodes)[0]
 }
@@ -271,9 +309,7 @@ func newTestFinalization(t *testing.T, configs []*Config, bh common.BlockHeader)
 		})
 	}
 
-	_, verifier, err := NewBLSAuth(configs[0])
-	require.NoError(t, err)
-	sigAgg := &SignatureAggregator{verifier: &verifier}
+	sigAgg := newTestSignatureAggregator(configs[0])
 
 	finalization, err := common.NewFinalization(sigAgg, finalizedVotes)
 	require.NoError(t, err)

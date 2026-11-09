@@ -20,13 +20,13 @@ func NewEmptyNotarizationRecord(emptyNotarization *EmptyNotarization) []byte {
 	return NewQuorumRecord(emptyNotarization.QC.Bytes(), emptyNotarization.Vote.Bytes(), EmptyNotarizationRecordType)
 }
 
-func EmptyNotarizationFromRecord(record []byte, qd QCDeserializer) (EmptyNotarization, error) {
+func EmptyNotarizationFromRecord(record []byte, qd QCDeserializer, nodes NodeIDs) (EmptyNotarization, error) {
 	qcBytes, emptyVote, err := ParseEmptyNotarizationRecord(record)
 	if err != nil {
 		return EmptyNotarization{}, err
 	}
 
-	qc, err := qd.DeserializeQuorumCertificate(qcBytes)
+	qc, err := qd.DeserializeQuorumCertificate(qcBytes, nodes)
 	if err != nil {
 		return EmptyNotarization{}, err
 	}

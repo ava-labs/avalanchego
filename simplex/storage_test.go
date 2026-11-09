@@ -56,15 +56,11 @@ func TestStorageNew(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := newEngineConfig(t, 1)
-			_, verifier, err := NewBLSAuth(config)
-			require.NoError(t, err)
-			qc := QCDeserializer{
-				verifier: &verifier,
-			}
+			qc := newTestQCDeserializer(config)
 
 			config.VM = tt.vm
 			config.DB = tt.db
-			s, err := newStorage(ctx, config, &qc, nil)
+			s, err := newStorage(ctx, config, qc, nil)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedBlocks, s.NumBlocks())
 		})
@@ -80,11 +76,7 @@ func TestStorageRetrieve(t *testing.T) {
 	ctx := t.Context()
 	config := newEngineConfig(t, uint64(numNodes))
 	config.VM = vm
-	_, verifier, err := NewBLSAuth(config)
-	require.NoError(t, err)
-	qc := QCDeserializer{
-		verifier: &verifier,
-	}
+	qc := newTestQCDeserializer(config)
 
 	tests := []struct {
 		name                 string
@@ -113,7 +105,7 @@ func TestStorageRetrieve(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s, err := newStorage(ctx, config, &qc, genesis.blockTracker)
+			s, err := newStorage(ctx, config, qc, genesis.blockTracker)
 			require.NoError(t, err)
 
 			block, finalization, err := s.Retrieve(tt.seq)
@@ -139,11 +131,7 @@ func TestStorageIndexFails(t *testing.T) {
 	configs := newNetworkConfigs(t, numNodes)
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
 
-	_, verifier, err := NewBLSAuth(configs[0])
-	require.NoError(t, err)
-	qc := QCDeserializer{
-		verifier: &verifier,
-	}
+	qc := newTestQCDeserializer(configs[0])
 
 	tests := []struct {
 		name          string
@@ -194,7 +182,7 @@ func TestStorageIndexFails(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s, err := newStorage(ctx, configs[0], &qc, genesis.blockTracker)
+			s, err := newStorage(ctx, configs[0], qc, genesis.blockTracker)
 			require.NoError(t, err)
 
 			err = s.Index(ctx, tt.block, tt.finalization)
@@ -228,13 +216,9 @@ func TestIndexMismatchedChild(t *testing.T) {
 	configs := newNetworkConfigs(t, numNodes)
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
 
-	_, verifier, err := NewBLSAuth(configs[0])
-	require.NoError(t, err)
-	qc := QCDeserializer{
-		verifier: &verifier,
-	}
+	qc := newTestQCDeserializer(configs[0])
 
-	s, err := newStorage(ctx, configs[0], &qc, genesis.blockTracker)
+	s, err := newStorage(ctx, configs[0], qc, genesis.blockTracker)
 	require.NoError(t, err)
 
 	_, err = child1.Verify(ctx)
@@ -260,12 +244,10 @@ func TestStorageIndexSuccess(t *testing.T) {
 	genesis := newTestBlock(newBlockConfig{})
 	configs := newNetworkConfigs(t, numNodes)
 
-	_, verifier, err := NewBLSAuth(configs[0])
-	require.NoError(t, err)
-	qc := QCDeserializer{verifier: &verifier}
+	qc := newTestQCDeserializer(configs[0])
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
 
-	s, err := newStorage(ctx, configs[0], &qc, genesis.blockTracker)
+	s, err := newStorage(ctx, configs[0], qc, genesis.blockTracker)
 	require.NoError(t, err)
 
 	numBlocks := 10

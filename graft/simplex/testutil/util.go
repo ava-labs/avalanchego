@@ -120,7 +120,7 @@ type testQCDeserializer struct {
 	t *testing.T
 }
 
-func (t *testQCDeserializer) DeserializeQuorumCertificate(bytes []byte) (common.QuorumCertificate, error) {
+func (t *testQCDeserializer) DeserializeQuorumCertificate(bytes []byte, _ common.NodeIDs) (common.QuorumCertificate, error) {
 	qc, err := DeserializeTestQC(bytes)
 	require.NoError(t.t, err)
 	return qc, nil

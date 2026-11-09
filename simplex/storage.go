@@ -294,7 +294,7 @@ func (c *canotoFinalization) toFinalization(d *QCDeserializer) (common.Finalizat
 		return common.Finalization{}, err
 	}
 
-	qc, err := d.DeserializeQuorumCertificate(c.QC)
+	qc, err := d.deserialize(c.QC)
 	if err != nil {
 		return common.Finalization{}, err
 	}

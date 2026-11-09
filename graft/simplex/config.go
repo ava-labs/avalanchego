@@ -91,5 +91,5 @@ type CryptoOps interface {
 	// CreateSignatureAggregator creates a new signature aggregator for the given nodes.
 	CreateSignatureAggregator([]common.Node) common.SignatureAggregator
 	// DeserializeQuorumCertificate deserializes the given bytes into a QuorumCertificate.
-	DeserializeQuorumCertificate(bytes []byte) (common.QuorumCertificate, error)
+	DeserializeQuorumCertificate(bytes []byte, nodes common.NodeIDs) (common.QuorumCertificate, error)
 }

@@ -54,13 +54,13 @@ func (qr *QuorumRecord) Bytes() []byte {
 	return buff
 }
 
-func FinalizationFromRecord(record []byte, qd QCDeserializer) (Finalization, error) {
+func FinalizationFromRecord(record []byte, qd QCDeserializer, nodes NodeIDs) (Finalization, error) {
 	qcBytes, finalization, err := parseFinalizationRecord(record)
 	if err != nil {
 		return Finalization{}, err
 	}
 
-	qc, err := qd.DeserializeQuorumCertificate(qcBytes)
+	qc, err := qd.DeserializeQuorumCertificate(qcBytes, nodes)
 	if err != nil {
 		return Finalization{}, err
 	}
@@ -120,13 +120,13 @@ func ParseNotarizationRecord(r []byte) ([]byte, ToBeSignedVote, error) {
 	return nr.QC, vote, nil
 }
 
-func NotarizationFromRecord(record []byte, qd QCDeserializer) (Notarization, error) {
+func NotarizationFromRecord(record []byte, qd QCDeserializer, nodes NodeIDs) (Notarization, error) {
 	qcBytes, vote, err := ParseNotarizationRecord(record)
 	if err != nil {
 		return Notarization{}, err
 	}
 
-	qc, err := qd.DeserializeQuorumCertificate(qcBytes)
+	qc, err := qd.DeserializeQuorumCertificate(qcBytes, nodes)
 	if err != nil {
 		return Notarization{}, err
 	}
