@@ -67,8 +67,6 @@ func (w *WriteAheadLog) Delete() error {
 	return os.Remove(w.file.Name())
 }
 
-// ReadAll returns all records in the WAL, truncating any corrupted tail.
-// The file is closed before returning and reopened on demand by Append.
 func (w *WriteAheadLog) ReadAll() (_ [][]byte, err error) {
 	if err := w.maybeOpenFile(); err != nil {
 		return nil, err
