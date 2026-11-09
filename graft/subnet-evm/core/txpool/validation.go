@@ -34,6 +34,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/libevm/common"
 	ethcore "github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/state"
@@ -276,9 +278,11 @@ func ValidateTransactionWithState(tx *types.Transaction, signer types.Signer, op
 	}
 
 	// If the tx allow list is enabled, return an error if the from address is not allow listed.
-	rulesExtra := params.RulesExtra(*params.GetRulesExtra(opts.Rules))
-	if err := rulesExtra.EnforceTxAllowList(from, opts.State); err != nil {
-		return err
+	if params.GetRulesExtra(opts.Rules).IsPrecompileEnabled(txallowlist.ContractAddress) {
+		txAllowListRole := txallowlist.GetTxAllowListStatus(opts.State, from)
+		if !txAllowListRole.IsEnabled() {
+			return fmt.Errorf("%w: %s", vmerrors.ErrSenderAddressNotAllowListed, from)
+		}
 	}
 
 	return nil
