@@ -16,9 +16,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/config"
-	nodeconfig "github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	nodeconfig "github.com/ava-labs/avalanchego/config/node"
 )
 
 var (
