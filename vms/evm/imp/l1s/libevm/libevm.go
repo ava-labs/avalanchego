@@ -17,6 +17,8 @@ import (
 // and `package main`, to avoid polluting other packages that transitively
 // depend on this one but don't need registration.
 func RegisterExtras() {
+	// TODO: Register the precompile modules (e.g. by importing
+	// `precompile/registry`) once the VM supports precompiles.
 	core.RegisterExtras()
 	customtypes.Register()
 	params.RegisterExtras()
