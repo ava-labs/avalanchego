@@ -271,6 +271,10 @@ tasks:
     desc: Builds avalanchego with race detection enabled
     cmd: '{{.NIX_RUN}} ./scripts/build.sh -r'
 
+  build-l1s:
+    desc: Builds l1s plugin
+    cmd: '{{.NIX_RUN}} ./scripts/build_l1s.sh'
+
   build-subnet-evm:
     desc: Builds subnet-evm plugin
     cmd: '{{.NIX_RUN}} ./graft/subnet-evm/scripts/build.sh'
