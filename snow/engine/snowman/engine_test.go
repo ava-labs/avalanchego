@@ -3507,18 +3507,6 @@ func newFakeEngine(
 	return e
 }
 
-// newChain builds a contiguous chain of [length] blocks ascending in height, so
-// chain[i] is the parent of chain[i+1] - the same orientation as
-// [snowmantest.BuildChain]. Its oldest block names a parent that nobody holds,
-// so walking the chain never bottoms out on a block we have accepted.
-//
-// Tests that need a malformed chain rewrite the heights in place afterwards.
-func newChain(length int) []*snowmantest.Block {
-	chain := snowmantest.BuildDescendants(snowmantest.Genesis, length)
-	chain[0].ParentV = ids.GenerateTestID()
-	return chain
-}
-
 // TestEngineStopsBufferingBlocksTooFarAhead tests that the engine queues only
 // blocks within [maxAllowedBlockAcceptedHeightDistanceIngestion] of its last
 // accepted block, however many blocks a peer pushes.
@@ -3538,7 +3526,8 @@ func TestEngineStopsBufferingBlocksTooFarAhead(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			chain := newChain(test.numBlocks)
+			chain := snowmantest.BuildDescendants(snowmantest.Genesis, test.numBlocks)
+			chain[0].ParentV = ids.GenerateTestID()
 			network := snowmanenginetest.NewNetwork(t)
 			nodeID := ids.GenerateTestNodeID()
 			peerID := ids.GenerateTestNodeID()
