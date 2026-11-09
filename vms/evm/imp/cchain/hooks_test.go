@@ -12,14 +12,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
 )
 
@@ -33,7 +32,7 @@ func TestDelayExponent(t *testing.T) {
 			name: "header_carries_excess",
 			header: customtypes.WithHeaderExtra(
 				&types.Header{},
-				&customtypes.HeaderExtra{MinDelayExcess: new(acp226.DelayExcess(42))},
+				&customtypes.HeaderExtra{MinDelayExcess: new(dynamic.DelayExponent(42))},
 			),
 			want: dynamic.DelayExponent(42),
 		},

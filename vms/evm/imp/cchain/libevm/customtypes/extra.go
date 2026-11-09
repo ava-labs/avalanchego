@@ -27,7 +27,7 @@ const (
 // parsed, nil is returned. The same rules MUST be supplied for each call to a
 // given header.
 func PredicateResults(h *ethtypes.Header, rules cparams.Rules) predicate.BlockResults {
-	predicateBytes := PredicateBytesFromExtra(rules, h.Extra)
+	predicateBytes := predicateBytesFromExtra(rules, h.Extra)
 	if len(predicateBytes) == 0 {
 		return nil
 	}
@@ -45,10 +45,16 @@ func PredicateResults(h *ethtypes.Header, rules cparams.Rules) predicate.BlockRe
 
 var ErrInsufficientFeeState = errors.New("insufficient length for ACP-176 fee state")
 
-// PredicateBytesFromExtra returns the predicate result bytes from the header's
+// predicateBytesFromExtra returns the predicate result bytes from the header's
 // extra data. If the extra data is not long enough, an empty slice is returned.
-func PredicateBytesFromExtra(rules cparams.Rules, extra []byte) []byte {
-	offset := predicateBytesOffset(rules)
+func predicateBytesFromExtra(rules cparams.Rules, extra []byte) []byte {
+	offset := ap3WindowSize
+	switch {
+	case rules.IsHelicon:
+		offset = 0
+	case rules.IsFortuna:
+		offset = acp176StateSize
+	}
 	// Prior to Durango, the VM enforces the extra data is smaller than or equal
 	// to `offset`.
 	// After Durango, the VM pre-verifies the extra data past `offset` is valid.
@@ -56,17 +62,6 @@ func PredicateBytesFromExtra(rules cparams.Rules, extra []byte) []byte {
 		return nil
 	}
 	return extra[offset:]
-}
-
-func predicateBytesOffset(rules cparams.Rules) int {
-	switch {
-	case rules.IsHelicon:
-		return 0
-	case rules.IsFortuna:
-		return acp176StateSize
-	default:
-		return ap3WindowSize
-	}
 }
 
 // TargetExponentFromExtra returns the target exponent stored as the last field

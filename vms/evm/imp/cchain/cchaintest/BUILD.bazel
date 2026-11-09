@@ -11,9 +11,9 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/params",
-        "//graft/coreth/plugin/evm/customtypes",
         "//upgrade/upgradetest",
         "//vms/evm/imp/cchain/cparams",
+        "//vms/evm/imp/cchain/libevm/customtypes",
         "//vms/evm/imp/cchain/tx",
         "//vms/evm/saetest",
         "@com_github_ava_labs_libevm//common",

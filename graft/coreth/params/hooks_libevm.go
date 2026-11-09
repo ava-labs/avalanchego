@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
@@ -21,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/customtypes"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )

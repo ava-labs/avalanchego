@@ -16,7 +16,6 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/params",
     deps = [
         "//graft/coreth/nativeasset",
-        "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/contracts/warp",
         "//graft/evm/precompileconfig",
@@ -25,6 +24,7 @@ go_library(
         "//utils/set",
         "//vms/evm/hook",
         "//vms/evm/imp/cchain/cparams",
+        "//vms/evm/imp/cchain/libevm/customtypes",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/vm",
         "@com_github_ava_labs_libevm//libevm",
