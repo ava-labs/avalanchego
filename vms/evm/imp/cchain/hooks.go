@@ -35,11 +35,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
