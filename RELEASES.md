@@ -1,8 +1,23 @@
 # Release Notes
 
-## [v1.15.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.3)
+## [v1.15.4](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.4)
 
 ### Features
+
+### APIs
+
+- Removed:
+  - `platform.getBalance`
+  - `platform.getStake`
+  - `avm.getBalance`
+  - `avm.getAllBalances`
+  - `avm.getTxStatus`
+
+### Configs
+
+### Fixes
+
+## [v1.15.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.3)
 
 ### APIs
 

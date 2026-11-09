@@ -172,7 +172,7 @@ func (c *Client) Block(
 	resp := new(BlockReply)
 	err := c.Req.SendRequest(
 		ctx,
-		"xsvm.lastAccepted",
+		"xsvm.block",
 		&BlockArgs{
 			BlockID: blkID,
 		},

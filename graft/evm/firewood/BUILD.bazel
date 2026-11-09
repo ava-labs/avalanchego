@@ -6,7 +6,6 @@ go_library(
     srcs = [
         "account_trie.go",
         "base_trie.go",
-        "metrics.go",
         "reconstructed_state.go",
         "reconstructed_trie.go",
         "reconstructed_triedb.go",
@@ -17,6 +16,8 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/evm/firewood",
     visibility = ["//visibility:public"],
     deps = [
+        "//vms/evm/firewood",
+        "//vms/evm/saedb",
         "@com_github_ava_labs_firewood_go_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",

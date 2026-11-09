@@ -24,7 +24,7 @@ go_library(
         "//graft/subnet-evm/node",
         "//graft/subnet-evm/params",
         "//utils/timer/mockable",
-        "//vms/evm/blackhole",
+        "//vms/evm/imp/blackhole",
         "@com_github_ava_labs_libevm//:libevm",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",

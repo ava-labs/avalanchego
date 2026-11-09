@@ -8,10 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
-	"math"
 	"net/http"
-	"slices"
 	"time"
 
 	"go.uber.org/zap"
@@ -25,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -33,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/stakeable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
@@ -42,16 +37,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/types"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 	platformapi "github.com/ava-labs/avalanchego/vms/platformvm/api"
 )
 
 const (
 	// Max number of addresses that can be passed in as argument to GetUTXOs
 	maxGetUTXOsAddrs = 1024
-
-	// Max number of addresses that can be passed in as argument to GetStake
-	maxGetStakeAddrs = 256
 
 	// Max number of items allowed in a page
 	maxPageSize = 1024
@@ -114,146 +105,6 @@ func (s *Service) GetProposedHeight(r *http.Request, _ *struct{}, reply *api.Get
 	proposerHeight, err := s.vm.GetMinimumHeight(ctx)
 	reply.Height = avajson.Uint64(proposerHeight)
 	return err
-}
-
-type GetBalanceRequest struct {
-	Addresses []string `json:"addresses"`
-}
-
-// Note: We explicitly duplicate AVAX out of the maps to ensure backwards
-// compatibility.
-type GetBalanceResponse struct {
-	// Balance, in nAVAX, of the address
-	Balance             avajson.Uint64            `json:"balance"`
-	Unlocked            avajson.Uint64            `json:"unlocked"`
-	LockedStakeable     avajson.Uint64            `json:"lockedStakeable"`
-	LockedNotStakeable  avajson.Uint64            `json:"lockedNotStakeable"`
-	Balances            map[ids.ID]avajson.Uint64 `json:"balances"`
-	Unlockeds           map[ids.ID]avajson.Uint64 `json:"unlockeds"`
-	LockedStakeables    map[ids.ID]avajson.Uint64 `json:"lockedStakeables"`
-	LockedNotStakeables map[ids.ID]avajson.Uint64 `json:"lockedNotStakeables"`
-	UTXOIDs             []*avax.UTXOID            `json:"utxoIDs"`
-}
-
-// GetBalance gets the balance of an address
-func (s *Service) GetBalance(_ *http.Request, args *GetBalanceRequest, response *GetBalanceResponse) error {
-	s.vm.ctx.Log.Debug("deprecated API called",
-		zap.String("service", "platform"),
-		zap.String("method", "getBalance"),
-		logging.UserStrings("addresses", args.Addresses),
-	)
-
-	addrs, err := avax.ParseServiceAddresses(s.addrManager, args.Addresses)
-	if err != nil {
-		return err
-	}
-
-	s.vm.ctx.Lock.Lock()
-	defer s.vm.ctx.Lock.Unlock()
-
-	utxos, err := avax.GetAllUTXOs(s.vm.state, addrs)
-	if err != nil {
-		return fmt.Errorf("couldn't get UTXO set of %v: %w", args.Addresses, err)
-	}
-
-	currentTime := s.vm.clock.Unix()
-
-	unlockeds := map[ids.ID]uint64{}
-	lockedStakeables := map[ids.ID]uint64{}
-	lockedNotStakeables := map[ids.ID]uint64{}
-
-utxoFor:
-	for _, utxo := range utxos {
-		assetID := utxo.AssetID()
-		switch out := utxo.Out.(type) {
-		case *secp256k1fx.TransferOutput:
-			if out.Locktime <= currentTime {
-				newBalance, err := safemath.Add(unlockeds[assetID], out.Amount())
-				if err != nil {
-					unlockeds[assetID] = math.MaxUint64
-				} else {
-					unlockeds[assetID] = newBalance
-				}
-			} else {
-				newBalance, err := safemath.Add(lockedNotStakeables[assetID], out.Amount())
-				if err != nil {
-					lockedNotStakeables[assetID] = math.MaxUint64
-				} else {
-					lockedNotStakeables[assetID] = newBalance
-				}
-			}
-		case *stakeable.LockOut:
-			innerOut, ok := out.TransferableOut.(*secp256k1fx.TransferOutput)
-			switch {
-			case !ok:
-				s.vm.ctx.Log.Warn("unexpected output type in UTXO",
-					zap.String("type", fmt.Sprintf("%T", out.TransferableOut)),
-				)
-				continue utxoFor
-			case innerOut.Locktime > currentTime:
-				newBalance, err := safemath.Add(lockedNotStakeables[assetID], out.Amount())
-				if err != nil {
-					lockedNotStakeables[assetID] = math.MaxUint64
-				} else {
-					lockedNotStakeables[assetID] = newBalance
-				}
-			case out.Locktime <= currentTime:
-				newBalance, err := safemath.Add(unlockeds[assetID], out.Amount())
-				if err != nil {
-					unlockeds[assetID] = math.MaxUint64
-				} else {
-					unlockeds[assetID] = newBalance
-				}
-			default:
-				newBalance, err := safemath.Add(lockedStakeables[assetID], out.Amount())
-				if err != nil {
-					lockedStakeables[assetID] = math.MaxUint64
-				} else {
-					lockedStakeables[assetID] = newBalance
-				}
-			}
-		default:
-			continue utxoFor
-		}
-
-		response.UTXOIDs = append(response.UTXOIDs, &utxo.UTXOID)
-	}
-
-	balances := maps.Clone(lockedStakeables)
-	for assetID, amount := range lockedNotStakeables {
-		newBalance, err := safemath.Add(balances[assetID], amount)
-		if err != nil {
-			balances[assetID] = math.MaxUint64
-		} else {
-			balances[assetID] = newBalance
-		}
-	}
-	for assetID, amount := range unlockeds {
-		newBalance, err := safemath.Add(balances[assetID], amount)
-		if err != nil {
-			balances[assetID] = math.MaxUint64
-		} else {
-			balances[assetID] = newBalance
-		}
-	}
-
-	response.Balances = newJSONBalanceMap(balances)
-	response.Unlockeds = newJSONBalanceMap(unlockeds)
-	response.LockedStakeables = newJSONBalanceMap(lockedStakeables)
-	response.LockedNotStakeables = newJSONBalanceMap(lockedNotStakeables)
-	response.Balance = response.Balances[s.vm.ctx.AVAXAssetID]
-	response.Unlocked = response.Unlockeds[s.vm.ctx.AVAXAssetID]
-	response.LockedStakeable = response.LockedStakeables[s.vm.ctx.AVAXAssetID]
-	response.LockedNotStakeable = response.LockedNotStakeables[s.vm.ctx.AVAXAssetID]
-	return nil
-}
-
-func newJSONBalanceMap(balanceMap map[ids.ID]uint64) map[ids.ID]avajson.Uint64 {
-	jsonBalanceMap := make(map[ids.ID]avajson.Uint64, len(balanceMap))
-	for assetID, amount := range balanceMap {
-		jsonBalanceMap[assetID] = avajson.Uint64(amount)
-	}
-	return jsonBalanceMap
 }
 
 // Index is an address and an associated UTXO.
@@ -1556,113 +1407,6 @@ func (s *Service) GetTxStatus(_ *http.Request, args *GetTxStatusArgs, response *
 	return nil
 }
 
-type GetStakeArgs struct {
-	api.JSONAddresses
-	ValidatorsOnly bool                `json:"validatorsOnly"`
-	Encoding       formatting.Encoding `json:"encoding"`
-}
-
-// GetStakeReply is the response from calling GetStake.
-type GetStakeReply struct {
-	Staked  avajson.Uint64            `json:"staked"`
-	Stakeds map[ids.ID]avajson.Uint64 `json:"stakeds"`
-	// String representation of staked outputs
-	// Each is of type avax.TransferableOutput
-	Outputs []string `json:"stakedOutputs"`
-	// Encoding of [Outputs]
-	Encoding formatting.Encoding `json:"encoding"`
-}
-
-// GetStake returns the amount of nAVAX that [args.Addresses] have cumulatively
-// staked on the Primary Network.
-//
-// This method assumes that each stake output has only owner
-// This method assumes only AVAX can be staked
-// This method only concerns itself with the Primary Network, not subnets
-// TODO: Improve the performance of this method by maintaining this data
-// in a data structure rather than re-calculating it by iterating over stakers
-func (s *Service) GetStake(_ *http.Request, args *GetStakeArgs, response *GetStakeReply) error {
-	s.vm.ctx.Log.Debug("deprecated API called",
-		zap.String("service", "platform"),
-		zap.String("method", "getStake"),
-	)
-
-	if len(args.Addresses) > maxGetStakeAddrs {
-		return fmt.Errorf("%d addresses provided but this method can take at most %d", len(args.Addresses), maxGetStakeAddrs)
-	}
-
-	addrs, err := avax.ParseServiceAddresses(s.addrManager, args.Addresses)
-	if err != nil {
-		return err
-	}
-
-	s.vm.ctx.Lock.Lock()
-	defer s.vm.ctx.Lock.Unlock()
-
-	currentStakerIterator, err := s.vm.state.GetCurrentStakerIterator()
-	if err != nil {
-		return err
-	}
-	defer currentStakerIterator.Release()
-
-	var (
-		totalAmountStaked = make(map[ids.ID]uint64)
-		stakedOuts        []avax.TransferableOutput
-	)
-	for currentStakerIterator.Next() { // Iterates over current stakers
-		staker := currentStakerIterator.Value()
-
-		if args.ValidatorsOnly && !staker.Priority.IsValidator() {
-			continue
-		}
-
-		tx, _, err := s.vm.state.GetTx(staker.TxID)
-		if err != nil {
-			return err
-		}
-
-		stakedOuts = append(stakedOuts, getStakeHelper(tx, addrs, totalAmountStaked)...)
-	}
-
-	pendingStakerIterator, err := s.vm.state.GetPendingStakerIterator()
-	if err != nil {
-		return err
-	}
-	defer pendingStakerIterator.Release()
-
-	for pendingStakerIterator.Next() { // Iterates over pending stakers
-		staker := pendingStakerIterator.Value()
-
-		if args.ValidatorsOnly && !staker.Priority.IsValidator() {
-			continue
-		}
-
-		tx, _, err := s.vm.state.GetTx(staker.TxID)
-		if err != nil {
-			return err
-		}
-
-		stakedOuts = append(stakedOuts, getStakeHelper(tx, addrs, totalAmountStaked)...)
-	}
-
-	response.Stakeds = newJSONBalanceMap(totalAmountStaked)
-	response.Staked = response.Stakeds[s.vm.ctx.AVAXAssetID]
-	response.Outputs = make([]string, len(stakedOuts))
-	for i, output := range stakedOuts {
-		bytes, err := platform.Codec.Marshal(platform.CodecVersion, output)
-		if err != nil {
-			return fmt.Errorf("couldn't serialize output %s: %w", output.ID, err)
-		}
-		response.Outputs[i], err = formatting.Encode(args.Encoding, bytes)
-		if err != nil {
-			return fmt.Errorf("couldn't encode output %s as %s: %w", output.ID, args.Encoding, err)
-		}
-	}
-	response.Encoding = args.Encoding
-
-	return nil
-}
-
 // GetMinStakeArgs are the arguments for calling GetMinStake.
 type GetMinStakeArgs struct {
 	SubnetID ids.ID `json:"subnetID"`
@@ -2120,52 +1864,6 @@ func (s *Service) getAPIOwner(owner *secp256k1fx.OutputOwners) (*platformapi.Own
 		apiOwner.Addresses = append(apiOwner.Addresses, addrStr)
 	}
 	return apiOwner, nil
-}
-
-// Takes in a staker and a set of addresses
-// Returns:
-// 1) The total amount staked by addresses in [addrs]
-// 2) The staked outputs
-func getStakeHelper(tx *platform.Tx, addrs set.Set[ids.ShortID], totalAmountStaked map[ids.ID]uint64) []avax.TransferableOutput {
-	staker, ok := tx.Unsigned.(platform.PermissionlessStaker)
-	if !ok {
-		return nil
-	}
-
-	stake := staker.Stake()
-	stakedOuts := make([]avax.TransferableOutput, 0, len(stake))
-	// Go through all of the staked outputs
-	for _, output := range stake {
-		out := output.Out
-		if lockedOut, ok := out.(*stakeable.LockOut); ok {
-			// This output can only be used for staking until [stakeOnlyUntil]
-			out = lockedOut.TransferableOut
-		}
-		secpOut, ok := out.(*secp256k1fx.TransferOutput)
-		if !ok {
-			continue
-		}
-
-		// Check whether this output is owned by one of the given addresses
-		contains := slices.ContainsFunc(secpOut.Addrs, addrs.Contains)
-		if !contains {
-			// This output isn't owned by one of the given addresses. Ignore.
-			continue
-		}
-
-		assetID := output.AssetID()
-		newAmount, err := safemath.Add(totalAmountStaked[assetID], secpOut.Amt)
-		if err != nil {
-			newAmount = math.MaxUint64
-		}
-		totalAmountStaked[assetID] = newAmount
-
-		stakedOuts = append(
-			stakedOuts,
-			*output,
-		)
-	}
-	return stakedOuts
 }
 
 func toPlatformStaker(staker *state.Staker) platformapi.Staker {

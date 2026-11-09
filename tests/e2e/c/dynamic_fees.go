@@ -20,9 +20,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
-	"github.com/ava-labs/avalanchego/vms/saevm/gastime"
-	"github.com/ava-labs/avalanchego/vms/saevm/worstcase"
+	"github.com/ava-labs/avalanchego/vms/evm/gastime"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/worstcase"
 )
 
 // This test uses the compiled bytecode for `consume_gas.sol` as well as its ABI
