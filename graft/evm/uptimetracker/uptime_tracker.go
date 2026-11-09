@@ -123,8 +123,9 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 	}
 
 	// Update validator set if we're behind
-	if err := u.update(height, currentValidatorSet); err != nil {
-		return fmt.Errorf("failed to update validator set: %w", err)
+	if !u.synced || u.height < height {
+		u.updateState(height, currentValidatorSet)
+		u.height = height
 	}
 
 	if !u.synced {
@@ -155,15 +156,10 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 	return u.state.writeModifications()
 }
 
-func (u *UptimeTracker) update(
+func (u *UptimeTracker) updateState(
 	height uint64,
 	currentValidatorSet map[ids.ID]*validators.GetCurrentValidatorOutput,
-) error {
-	// We are behind and need to update our local state
-	if u.synced && u.height >= height {
-		return nil
-	}
-
+) {
 	for validationID := range u.state.validators {
 		if _, ok := currentValidatorSet[validationID]; !ok {
 			u.state.deleteValidator(validationID)
@@ -187,9 +183,6 @@ func (u *UptimeTracker) update(
 			Weight:        newValidator.Weight,
 		})
 	}
-
-	u.height = height
-	return nil
 }
 
 // shouldBeOnline returns whether nodeID should be earning uptime
