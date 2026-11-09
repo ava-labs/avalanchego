@@ -21,6 +21,7 @@ const (
 var (
 	ErrInvalidCRC      = errors.New("invalid CRC checksum")
 	ErrPayloadTooLarge = errors.New("payload too large for record length field")
+	ErrRecordTooLong   = errors.New("record is longer than the remaining bytes")
 )
 
 // writeRecord writes a length-prefixed and check-summed record to the writer.
@@ -64,7 +65,7 @@ func readRecord(r io.Reader, maxSize int64) ([]byte, int64, error) {
 	// and understate the size of the record or of the allocation below.
 	recordLen := int64(recordSizeLen) + int64(payloadLen) + int64(recordChecksumLen)
 	if recordLen > maxSize {
-		return nil, 0, fmt.Errorf("record indicates payload is %d bytes long, but only %d bytes remain", payloadLen, maxSize)
+		return nil, 0, fmt.Errorf("%w: record indicates payload is %d bytes long, but only %d bytes remain", ErrRecordTooLong, payloadLen, maxSize)
 	}
 
 	payloadAndChecksum := make([]byte, int64(payloadLen)+int64(recordChecksumLen))
