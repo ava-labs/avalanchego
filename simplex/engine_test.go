@@ -17,9 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 
@@ -537,9 +535,7 @@ func buildQCWithBytes(t testing.TB, configs []*Config, msg []byte) []byte {
 		})
 	}
 
-	_, verifier, err := NewBLSAuth(configs[0])
-	require.NoError(t, err)
-	agg := SignatureAggregator{verifier: &verifier}
+	agg := newTestSignatureAggregator(configs[0])
 
 	qc, err := agg.Aggregate(sigs)
 	require.NoError(t, err)
@@ -915,23 +911,8 @@ func createSimplexEngineConfig(t *testing.T, reuseKeys keyReuseOption) []*Config
 }
 
 func createVerifierForFuzz(config *Config) BLSVerifier {
-	verifier := BLSVerifier{
-		nodeID2PK: make(map[ids.NodeID]*bls.PublicKey),
+	return BLSVerifier{
 		networkID: config.Ctx.NetworkID,
 		chainID:   config.Ctx.ChainID,
 	}
-
-	nodeIDs := make([]ids.NodeID, 0, len(config.Params.InitialValidators))
-	for _, node := range config.Params.InitialValidators {
-		verifier.nodeID2PK[node.NodeID] = cachedBLSKey.PublicKey()
-		nodeIDs = append(nodeIDs, node.NodeID)
-	}
-	utils.Sort(nodeIDs)
-	verifier.canonicalNodeIDs = nodeIDs
-	verifier.canonicalNodeIDIndices = make(map[ids.NodeID]int, len(nodeIDs))
-	for i, nodeID := range nodeIDs {
-		verifier.canonicalNodeIDIndices[nodeID] = i
-	}
-
-	return verifier
 }

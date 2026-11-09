@@ -3,13 +3,14 @@
 
 package simplex
 
+//go:generate go tool canoto $GOFILE
+
 import (
 	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 )
 
@@ -37,12 +38,8 @@ type BLSSigner struct {
 }
 
 type BLSVerifier struct {
-	nodeID2PK map[ids.NodeID]*bls.PublicKey
 	networkID uint32
 	chainID   ids.ID
-
-	canonicalNodeIDs       []ids.NodeID
-	canonicalNodeIDIndices map[ids.NodeID]int
 }
 
 func NewBLSAuth(config *Config) (BLSSigner, BLSVerifier, error) {
@@ -76,9 +73,11 @@ func (s *BLSSigner) Sign(message []byte) (common.SignatureBytes, error) {
 }
 
 type encodedSimplexSignedPayload struct {
-	NetworkID uint32 `serialize:"true"`
-	ChainID   ids.ID `serialize:"true"`
-	Message   []byte `serialize:"true"`
+	NetworkID uint32 `canoto:"uint,1"`
+	ChainID   ids.ID `canoto:"fixed bytes,2"`
+	Message   []byte `canoto:"bytes,3"`
+
+	canotoData canotoData_encodedSimplexSignedPayload
 }
 
 func encodeMessageToSign(message []byte, chainID ids.ID, networkID uint32) ([]byte, error) {
@@ -87,19 +86,13 @@ func encodeMessageToSign(message []byte, chainID ids.ID, networkID uint32) ([]by
 		ChainID:   chainID,
 		NetworkID: networkID,
 	}
-	return Codec.Marshal(CodecVersion, &encodedSimplexMessage)
+	return encodedSimplexMessage.MarshalCanoto(), nil
 }
 
 func (v BLSVerifier) VerifySignature(message []byte, signature common.SignatureBytes, signer common.PublicKeyBytes) error {
-	// TODO: update BLSVerify to just use signer. No need to convert to NodeID anymore.
-	key, err := ids.ToNodeID(signer)
+	pk, err := bls.PublicKeyFromCompressedBytes(signer)
 	if err != nil {
-		return fmt.Errorf("%w: %w", errInvalidNodeID, err)
-	}
-
-	pk, exists := v.nodeID2PK[key]
-	if !exists {
-		return fmt.Errorf("%w: signer %x", errSignerNotFound, key)
+		return fmt.Errorf("%w: %w", errInvalidPK, err)
 	}
 
 	sig, err := bls.SignatureFromBytes(signature)
@@ -121,26 +114,8 @@ func (v BLSVerifier) VerifySignature(message []byte, signature common.SignatureB
 
 func createVerifier(config *Config) (BLSVerifier, error) {
 	verifier := BLSVerifier{
-		nodeID2PK: make(map[ids.NodeID]*bls.PublicKey),
 		networkID: config.Ctx.NetworkID,
 		chainID:   config.Ctx.ChainID,
 	}
-
-	nodeIDs := make([]ids.NodeID, 0, len(config.Params.InitialValidators))
-	for _, node := range config.Params.InitialValidators {
-		pk, err := bls.PublicKeyFromCompressedBytes(node.PublicKey)
-		if err != nil {
-			return BLSVerifier{}, fmt.Errorf("failed to parse public key for node %s: %w", node.NodeID, err)
-		}
-		verifier.nodeID2PK[node.NodeID] = pk
-		nodeIDs = append(nodeIDs, node.NodeID)
-	}
-	utils.Sort(nodeIDs)
-	verifier.canonicalNodeIDs = nodeIDs
-	verifier.canonicalNodeIDIndices = make(map[ids.NodeID]int, len(nodeIDs))
-	for i, nodeID := range nodeIDs {
-		verifier.canonicalNodeIDIndices[nodeID] = i
-	}
-
 	return verifier, nil
 }

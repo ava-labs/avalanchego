@@ -184,7 +184,7 @@ func TestEpochLeaderFailoverReceivesEmptyVotesEarly(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, createEmptyVote(emptyBlockMd, nodes[0]).Vote, emptyVote)
 
-		emptyNotarization, err := EmptyNotarizationFromRecord(rawEmptyNotarization, e.QCDeserializer)
+		emptyNotarization, err := EmptyNotarizationFromRecord(rawEmptyNotarization, e.QCDeserializer, nil)
 		require.NoError(t, err)
 		require.Equal(t, emptyVoteFrom1.Vote, emptyNotarization.Vote)
 		require.Equal(t, uint64(3), emptyNotarization.Vote.Round)
@@ -284,7 +284,7 @@ func TestEpochLeaderFailover(t *testing.T) {
 		for _, raw := range walContent {
 			if ev, err := ParseEmptyVoteRecord(raw); err == nil {
 				emptyVote, foundVote = ev, true
-			} else if en, err := EmptyNotarizationFromRecord(raw, e.QCDeserializer); err == nil {
+			} else if en, err := EmptyNotarizationFromRecord(raw, e.QCDeserializer, nil); err == nil {
 				emptyNotarization, foundNotarization = en, true
 			}
 		}
@@ -634,7 +634,7 @@ func TestEpochLeaderFailoverAfterProposal(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, createEmptyVote(md, nodes[0]).Vote, emptyVote)
 
-		emptyNotarization, err := EmptyNotarizationFromRecord(rawEmptyNotarization, e.QCDeserializer)
+		emptyNotarization, err := EmptyNotarizationFromRecord(rawEmptyNotarization, e.QCDeserializer, nil)
 		require.NoError(t, err)
 		require.Equal(t, emptyVoteFrom1.Vote, emptyNotarization.Vote)
 		require.Equal(t, uint64(3), emptyNotarization.Vote.Round)
@@ -722,7 +722,7 @@ func TestEpochLeaderFailoverTwice(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, createEmptyVote(md, nodes[0]).Vote, emptyVote)
 
-			emptyNotarization, err := EmptyNotarizationFromRecord(rawEmptyNotarization, e.QCDeserializer)
+			emptyNotarization, err := EmptyNotarizationFromRecord(rawEmptyNotarization, e.QCDeserializer, nil)
 			require.NoError(t, err)
 			require.Equal(t, emptyVoteFrom1.Vote, emptyNotarization.Vote)
 			require.Equal(t, uint64(3), emptyNotarization.Vote.Round)

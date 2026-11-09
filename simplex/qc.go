@@ -7,6 +7,7 @@ package simplex
 
 import (
 	"bytes"
+	"encoding/base64"
 	"errors"
 	"fmt"
 
@@ -22,8 +23,9 @@ var (
 	_ common.SignatureAggregator = (*SignatureAggregator)(nil)
 
 	errFailedToParseQC       = errors.New("failed to parse quorum certificate")
-	errUnexpectedSigners     = errors.New("unexpected number of signers in quorum certificate")
+	errUnexpectedSigners     = errors.New("unexpected number/weight of signers in quorum certificate")
 	errSignatureAggregation  = errors.New("signature aggregation failed")
+	errInvalidPK             = errors.New("failed parsing public key")
 	errEncodingMessageToSign = errors.New("failed to encode message to sign")
 	errDuplicateSigner       = errors.New("duplicate signer in quorum certificate")
 	errInvalidBitSet         = errors.New("bitset is invalid")
@@ -32,9 +34,14 @@ var (
 
 // QC represents a quorum certificate in the Simplex consensus protocol.
 type QC struct {
-	verifier *BLSVerifier
-	sig      *bls.Signature
-	signers  []ids.NodeID
+	chainID   ids.ID
+	networkID uint32
+
+	sig        *bls.Signature
+	signerMask set.Bits
+	signers    common.NodeIDs
+
+	serializedQC []byte
 }
 
 // CanotoQC is the Canoto representation of a quorum certificate
@@ -45,56 +52,96 @@ type canotoQC struct {
 	canotoData canotoData_canotoQC
 }
 
-// Signers returns the list of signers for the quorum certificate.
-func (qc *QC) Signers() []common.NodeID {
-	signers := make([]common.NodeID, len(qc.signers))
-	for i, signer := range qc.signers {
-		signers[i] = common.NodeIDFromAvalancheID(signer)
+func newQC(
+	networkID uint32,
+	chainID ids.ID,
+	signers common.NodeIDs,
+	signerMask set.Bits,
+	sig *bls.Signature,
+) *QC {
+	qc := &QC{
+		networkID:  networkID,
+		chainID:    chainID,
+		signers:    signers,
+		signerMask: signerMask,
+		sig:        sig,
 	}
 
-	return signers
+	serializedQC := canotoQC{
+		Sig:     [bls.SignatureLen]byte(sig.Compress()),
+		Signers: signerMask.Bytes(),
+	}
+
+	qc.serializedQC = serializedQC.MarshalCanoto()
+
+	return qc
 }
 
-func (*QC) Size() int {
-	// TODO: implement size
-	return 0
+// Signers returns the list of signers for the quorum certificate.
+func (qc *QC) Signers() []common.NodeID {
+	return qc.signers
+}
+
+// Bytes serializes the quorum certificate into bytes.
+func (qc *QC) Bytes() []byte {
+	return qc.serializedQC
+}
+
+// Size returns the size of the serialized quorum certificate in bytes.
+func (qc *QC) Size() int {
+	return len(qc.serializedQC)
 }
 
 // Verify checks if the quorum certificate is valid by verifying the aggregated signature against the signers' public keys.
-// TODO: We updated the verify function to pass in the eligble signers, since sometimes the eligible signers are not knwon
-// when the QC is created. See https://github.com/ava-labs/simplex/issues/407. In a future, pr update the Verify function to
-// use this param properly.
-func (qc *QC) Verify(msg []byte, _ common.Nodes) error {
-	quorum := common.Quorum(len(qc.verifier.nodeID2PK))
-	if len(qc.signers) != quorum {
-		return fmt.Errorf("%w: expected %d signers but got %d", errUnexpectedSigners, quorum, len(qc.signers))
+func (qc *QC) Verify(msg []byte, nodes common.Nodes) error {
+	signers, err := nodesFromBitmask(qc.signerMask, nodes.NodeIDs())
+	if err != nil {
+		return fmt.Errorf("%w: %w", errInvalidBitSet, err)
 	}
 
-	uniqueSigners := set.NewSet[ids.NodeID](len(qc.signers))
-	pks := make([]*bls.PublicKey, 0, len(qc.signers))
+	totalWeight := sumWeights(nodes)
+	quorumWeight := common.Quorum(totalWeight)
 
-	// ensure signers are not double counted and are in the membership set
-	for _, signer := range qc.signers {
-		if uniqueSigners.Contains(signer) {
-			return fmt.Errorf("%w: %x", errDuplicateSigner, signer)
-		}
+	nodesByNodeID := nodesByNodeID(nodes)
 
-		pk, exists := qc.verifier.nodeID2PK[signer]
+	// Ensure that the signers are in the membership set and calculate their total weight.
+	weightOfSigners, err := computeWeightOfSigners(signers, nodesByNodeID)
+	if err != nil {
+		return err
+	}
+
+	stakeOrNodes := stakeOrNodes(nodes, totalWeight)
+
+	if weightOfSigners < quorumWeight {
+		return fmt.Errorf("%w: expected signatures from %d %s but got %d out of %d", errUnexpectedSigners, quorumWeight, stakeOrNodes, weightOfSigners, totalWeight)
+	}
+
+	pks := make([]*bls.PublicKey, 0, len(signers))
+
+	for _, signer := range signers {
+		node, exists := nodesByNodeID[signer]
 		if !exists {
+			// This should never happen because we already checked that the signers are in the membership set above,
+			// but we anyway need to lookup the node to get its public key,
+			// so there is no harm in making sure the node is not the zero value.
 			return fmt.Errorf("%w: %x", errSignerNotFound, signer)
 		}
 
-		uniqueSigners.Add(signer)
+		pkBytes := node.PK
+		pk, err := bls.PublicKeyFromCompressedBytes(pkBytes)
+		if err != nil {
+			return fmt.Errorf("%w: %w (%s)", errInvalidPK, err, base64.StdEncoding.EncodeToString(pkBytes))
+		}
+
 		pks = append(pks, pk)
 	}
 
-	// aggregate the public keys
 	aggPK, err := bls.AggregatePublicKeys(pks)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errSignatureAggregation, err)
 	}
 
-	message2Verify, err := encodeMessageToSign(msg, qc.verifier.chainID, qc.verifier.networkID)
+	message2Verify, err := encodeMessageToSign(msg, qc.chainID, qc.networkID)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errEncodingMessageToSign, err)
 	}
@@ -106,38 +153,52 @@ func (qc *QC) Verify(msg []byte, _ common.Nodes) error {
 	return nil
 }
 
-// Bytes serializes the quorum certificate into bytes.
-func (qc *QC) Bytes() []byte {
-	sigBytes := bls.SignatureToBytes(qc.sig)
-	signers := qc.createSignersBitSet()
-
-	canotoQC := &canotoQC{
-		Sig:     [bls.SignatureLen]byte(sigBytes),
-		Signers: signers,
+func computeWeightOfSigners(signers common.NodeIDs, nodesByNodeID map[common.NodeID]common.Node) (uint64, error) {
+	var weightOfSigners uint64
+	for _, signer := range signers {
+		node, exists := nodesByNodeID[signer]
+		if !exists {
+			return 0, fmt.Errorf("%w: %x", errSignerNotFound, signer)
+		}
+		weightOfSigners += node.Weight
 	}
-
-	return canotoQC.MarshalCanoto()
+	return weightOfSigners, nil
 }
 
-func (qc *QC) createSignersBitSet() []byte {
-	bitset := set.NewBits()
-	for _, signer := range qc.signers {
-		// index should always exist, since we deserialized the signers from the same verifier
-		index := qc.verifier.canonicalNodeIDIndices[signer]
-		bitset.Add(index)
-	}
+func stakeOrNodes(nodes common.Nodes, totalWeight uint64) string {
+	stakeOrNodes := "nodes"
 
-	return bitset.Bytes()
+	if uint64(len(nodes)) < totalWeight {
+		stakeOrNodes = "stake"
+	}
+	return stakeOrNodes
+}
+
+func nodesByNodeID(nodes common.Nodes) map[common.NodeID]common.Node {
+	nodesByNodeID := make(map[common.NodeID]common.Node, len(nodes))
+	for _, node := range nodes {
+		nodesByNodeID[node.Id] = node
+	}
+	return nodesByNodeID
 }
 
 type QCDeserializer struct {
-	verifier *BLSVerifier
+	networkID uint32
+	chainID   ids.ID
+	// nodes is the sorted validator set that deserialize decodes signer bitmasks against.
+	// It is used by the paths that have no epoch of their own (p2p inbound and storage).
+	nodes common.NodeIDs
+}
+
+// deserialize deserializes a quorum certificate against the deserializer's own validator set.
+func (d *QCDeserializer) deserialize(qcBytes []byte) (common.QuorumCertificate, error) {
+	return d.DeserializeQuorumCertificate(qcBytes, d.nodes)
 }
 
 // DeserializeQuorumCertificate deserializes a quorum certificate from bytes.
-func (d *QCDeserializer) DeserializeQuorumCertificate(bytes []byte) (common.QuorumCertificate, error) {
+func (d *QCDeserializer) DeserializeQuorumCertificate(qcBytes []byte, nodes common.NodeIDs) (common.QuorumCertificate, error) {
 	var canotoQC canotoQC
-	if err := canotoQC.UnmarshalCanoto(bytes); err != nil {
+	if err := canotoQC.UnmarshalCanoto(qcBytes); err != nil {
 		return nil, fmt.Errorf("%w: %w", errFailedToParseQC, err)
 	}
 
@@ -146,51 +207,81 @@ func (d *QCDeserializer) DeserializeQuorumCertificate(bytes []byte) (common.Quor
 		return nil, fmt.Errorf("%w: %w", errFailedToParseSignature, err)
 	}
 
-	signers, err := d.signersFromBytes(canotoQC.Signers)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errInvalidBitSet, err)
+	signerIndices := set.BitsFromBytes(canotoQC.Signers)
+
+	// Check the encoding of the bitmask is canonical.
+	if !bytes.Equal(signerIndices.Bytes(), canotoQC.Signers) {
+		return nil, errInvalidBitSet
 	}
 
-	return &QC{
-		sig:      sig,
-		signers:  signers,
-		verifier: d.verifier,
-	}, nil
+	signers, err := nodesFromBitmask(signerIndices, nodes)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errFailedToFilterSigners, err)
+	}
+
+	return newQC(d.networkID, d.chainID, signers, signerIndices, sig), nil
 }
 
 // SignatureAggregator aggregates signatures into a quorum certificate.
 type SignatureAggregator struct {
-	verifier *BLSVerifier
+	networkID        uint32
+	chainID          ids.ID
+	nodes            []common.Node
+	nodeIDsToWeights map[common.NodeID]uint64
+	nodeIDToIndex    map[common.NodeID]int
+	quorumWeight     uint64
+	totalWeight      uint64
+}
+
+func newSignatureAggregator(networkID uint32, chainID ids.ID, nodes []common.Node) *SignatureAggregator {
+	totalWeight := sumWeights(nodes)
+	quorumWeight := common.Quorum(totalWeight)
+	return &SignatureAggregator{
+		networkID:        networkID,
+		chainID:          chainID,
+		nodes:            nodes,
+		quorumWeight:     quorumWeight,
+		totalWeight:      totalWeight,
+		nodeIDsToWeights: nodeIDsToWeights(nodes),
+		nodeIDToIndex:    nodeIDsToIndex(nodes),
+	}
 }
 
 // Aggregate aggregates the provided signatures into a quorum certificate.
-// It requires at least a quorum of signatures to succeed.
+// It requires signatures from at least a quorum of validator nodes to succeed.
 // If any signature is from a signer not in the membership set, it returns an error.
 func (a *SignatureAggregator) Aggregate(signatures []common.Signature) (common.QuorumCertificate, error) {
-	quorumSize := common.Quorum(len(a.verifier.nodeID2PK))
-	if len(signatures) < quorumSize {
-		return nil, fmt.Errorf("%w: expected %d signatures but got %d", errUnexpectedSigners, quorumSize, len(signatures))
-	}
-	signatures = signatures[:quorumSize]
+	// Drop duplicate signatures from the same signer, so no signer is counted twice.
+	signatures = deduplicateSignatures(signatures)
+	signers := signersFromSignatures(signatures)
 
-	signers := make([]ids.NodeID, 0, quorumSize)
-	sigs := make([]*bls.Signature, 0, quorumSize)
+	stakeOrNodes := stakeOrNodes(a.nodes, a.quorumWeight)
+
+	// Ensure that the signatures are from a quorum of signers.
+	weightOfNodesThatSigned := a.weightOfNodes(signers)
+	if weightOfNodesThatSigned < a.quorumWeight {
+		return nil, fmt.Errorf("%w: expected signatures from %d %s but got %d out of %d", errUnexpectedSigners, a.quorumWeight, stakeOrNodes, weightOfNodesThatSigned, a.totalWeight)
+	}
+
+	sigs := make([]*bls.Signature, 0, len(signatures))
+	signerMask := set.NewBits()
+
 	for _, signature := range signatures {
 		signer := signature.Signer
-		id, err := signer.ToAvalancheID()
-		if err != nil {
-			return nil, fmt.Errorf("%w: %w", errInvalidNodeID, err)
-		}
 
-		if _, exists := a.verifier.nodeID2PK[id]; !exists {
+		// Ensure that every node that has signed is in the membership set.
+		index, exists := a.nodeIDToIndex[signer]
+		if !exists {
 			return nil, fmt.Errorf("%w: %x", errSignerNotFound, signer)
 		}
+
+		signerMask.Add(index)
+
 		sig, err := bls.SignatureFromBytes(signature.Value)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", errFailedToParseSignature, err)
 		}
 
-		signers = append(signers, id)
 		sigs = append(sigs, sig)
 	}
 
@@ -199,84 +290,150 @@ func (a *SignatureAggregator) Aggregate(signatures []common.Signature) (common.Q
 		return nil, fmt.Errorf("%w: %w", errSignatureAggregation, err)
 	}
 
-	return &QC{
-		verifier: a.verifier,
-		signers:  signers,
-		sig:      aggregatedSig,
-	}, nil
+	return newQC(a.networkID, a.chainID, signers, signerMask, aggregatedSig), nil
 }
 
-func (*SignatureAggregator) AboveByzantineThreshold([]common.NodeID) bool {
-	// TODO(yacovm): https://github.com/ava-labs/avalanchego/issues/6335
-	return false
+func (a *SignatureAggregator) AboveByzantineThreshold(nodes []common.NodeID) bool {
+	return 2*a.weightOfNodes(deduplicateNodeIDs(nodes)) > a.totalWeight
 }
 
 // AppendSignatures appends signatures to an existing signature.
 // If the existing signature is empty, it just aggregates the given signatures.
-func (*SignatureAggregator) AppendSignatures(common.SignatureBytes, ...common.SignatureBytes) (common.SignatureBytes, error) {
-	// TODO(yacovm): https://github.com/ava-labs/avalanchego/issues/6335
-	return nil, nil
+func (*SignatureAggregator) AppendSignatures(existingSignature common.SignatureBytes, additionalSignatures ...common.SignatureBytes) (common.SignatureBytes, error) {
+	totalSignatureCount := len(additionalSignatures)
+	if len(existingSignature) > 0 {
+		totalSignatureCount++
+	}
+	sigs := make([]*bls.Signature, 0, totalSignatureCount)
+
+	if len(existingSignature) > 0 {
+		sig, err := bls.SignatureFromBytes(existingSignature)
+		if err != nil {
+			return nil, fmt.Errorf("%w: failed parsing existing signature %w (%s)",
+				errFailedToParseSignature, err, base64.StdEncoding.EncodeToString(existingSignature))
+		}
+		sigs = append(sigs, sig)
+	}
+
+	for i, sigBytes := range additionalSignatures {
+		sig, err := bls.SignatureFromBytes(sigBytes)
+		if err != nil {
+			return nil, fmt.Errorf("%w: failed parsing additional signature %d %w (%s)",
+				errFailedToParseSignature, i, err, base64.StdEncoding.EncodeToString(sigBytes))
+		}
+		sigs = append(sigs, sig)
+	}
+
+	aggregatedSig, err := bls.AggregateSignatures(sigs)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errSignatureAggregation, err)
+	}
+
+	return bls.SignatureToBytes(aggregatedSig), nil
 }
 
 // IsQuorum checks if the provided nodes are a quorum of the membership set.
-// For now, this is calculated using one node = one vote, but in the future we can adjust
-// this calculation to cross reference validator weights if we want to support PoS.
 func (a *SignatureAggregator) IsQuorum(nodes []common.NodeID) bool {
-	uniqueNodes := set.NewSet[ids.NodeID](len(nodes))
+	// First thing, de-duplicate the nodes, since we don't want to double count any signers.
+	uniqueNodes := deduplicateNodeIDs(nodes)
+	weightOfSignerParties := a.weightOfNodes(uniqueNodes)
+	return weightOfSignerParties >= a.quorumWeight
+}
+
+func deduplicateNodeIDs(nodes []common.NodeID) []common.NodeID {
+	res := make([]common.NodeID, 0, len(nodes))
+	uniqueNodes := set.NewSet[common.NodeID](len(nodes))
 	for _, node := range nodes {
-		nodeID, err := node.ToAvalancheID()
-		if err != nil {
-			return false
+		if uniqueNodes.Contains(node) {
+			continue
 		}
-		if _, exists := a.verifier.nodeID2PK[nodeID]; !exists {
-			return false
-		}
-		uniqueNodes.Add(nodeID)
+		uniqueNodes.Add(node)
+		res = append(res, node)
 	}
-
-	quorumSize := common.Quorum(len(a.verifier.nodeID2PK))
-
-	return len(uniqueNodes) >= quorumSize
+	return res
 }
 
-func (d *QCDeserializer) signersFromBytes(signerBytes []byte) ([]ids.NodeID, error) {
-	signerIndices := set.BitsFromBytes(signerBytes)
-	if !bytes.Equal(signerIndices.Bytes(), signerBytes) {
-		return nil, errInvalidBitSet
+func (a *SignatureAggregator) weightOfNodes(nodes []common.NodeID) uint64 {
+	var weight uint64
+	for _, signer := range nodes {
+		weight += a.nodeIDsToWeights[signer]
 	}
-
-	signers, err := filterNodes(signerIndices, d.verifier.canonicalNodeIDs)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errFailedToFilterSigners, err)
-	}
-	return signers, nil
+	return weight
 }
 
-// filterNodes returns the nodeIDs in nodeIDs whose
+// nodesFromBitmask returns the nodeIDs in nodeIDs whose
 // bit is set to 1 in indices.
 //
 // Returns an error if indices references an unknown node.
-func filterNodes(
-	indices set.Bits,
-	nodeIDs []ids.NodeID,
-) ([]ids.NodeID, error) {
+func nodesFromBitmask(
+	bitmask set.Bits,
+	nodeIDs common.NodeIDs,
+) (common.NodeIDs, error) {
 	// Verify that all alleged signers exist
-	if indices.BitLen() > len(nodeIDs) {
+	if bitmask.BitLen() > len(nodeIDs) {
 		return nil, fmt.Errorf(
-			"%w: NumIndices (%d) >= NumFilteredValidators (%d)",
+			"%w: highest signer index (%d) >= number of validators (%d)",
 			errNodeNotFound,
-			indices.BitLen()-1, // -1 to convert from length to index
+			bitmask.BitLen()-1, // -1 to convert from length to index
 			len(nodeIDs),
 		)
 	}
 
-	filteredNodes := make([]ids.NodeID, 0, len(nodeIDs))
+	result := make(common.NodeIDs, 0, len(nodeIDs))
 	for i, nodeID := range nodeIDs {
-		if !indices.Contains(i) {
+		if !bitmask.Contains(i) {
 			continue
 		}
 
-		filteredNodes = append(filteredNodes, nodeID)
+		result = append(result, nodeID)
 	}
-	return filteredNodes, nil
+	return result, nil
+}
+
+func sumWeights(nodes []common.Node) uint64 {
+	var sum uint64
+	for _, node := range nodes {
+		sum += node.Weight
+	}
+	return sum
+}
+
+func nodeIDsToWeights(nodes []common.Node) map[common.NodeID]uint64 {
+	var res = make(map[common.NodeID]uint64, len(nodes))
+	for _, node := range nodes {
+		res[node.Id] = node.Weight
+	}
+	return res
+}
+
+func nodeIDsToIndex(nodes []common.Node) map[common.NodeID]int {
+	var res = make(map[common.NodeID]int, len(nodes))
+	for i, node := range nodes {
+		res[node.Id] = i
+	}
+	return res
+}
+
+// deduplicateSignatures returns the signatures with at most one signature per signer,
+// keeping the first signature seen for each signer and preserving order.
+func deduplicateSignatures(signatures []common.Signature) []common.Signature {
+	var res []common.Signature
+	uniqueSigners := set.NewSet[common.NodeID](len(signatures))
+	for _, signature := range signatures {
+		signer := signature.Signer
+		if uniqueSigners.Contains(signer) {
+			continue
+		}
+		uniqueSigners.Add(signer)
+		res = append(res, signature)
+	}
+	return res
+}
+
+func signersFromSignatures(signatures []common.Signature) []common.NodeID {
+	res := make([]common.NodeID, 0, len(signatures))
+	for _, signature := range signatures {
+		res = append(res, signature.Signer)
+	}
+	return res
 }

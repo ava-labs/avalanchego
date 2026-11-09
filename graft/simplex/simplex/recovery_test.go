@@ -400,7 +400,7 @@ func TestWalWritesFinalization(t *testing.T) {
 	require.Len(t, records, 5)
 	recordType := binary.BigEndian.Uint16(records[4])
 	require.Equal(t, FinalizationRecordType, recordType)
-	_, err = FinalizationFromRecord(records[4], e.QCDeserializer)
+	_, err = FinalizationFromRecord(records[4], e.QCDeserializer, nil)
 	_, expectedFinalizationRecord := testutil.NewFinalizationRecord(t, sigAggregrator, secondBlock, nodes[0:quorum])
 	require.NoError(t, err)
 	require.Equal(t, expectedFinalizationRecord, records[4])
