@@ -23,8 +23,6 @@ import (
 )
 
 var (
-	_ logging.Factory = (*failingLogFactory)(nil)
-
 	errStopInitialization = errors.New("stop initialization")
 )
 
@@ -54,7 +52,7 @@ type secretFlag struct {
 	secret string // substring of [arg] that must not appear in the output
 }
 
-func newTestNodeConfig(t *testing.T) (nodeconfig.Config, []secretFlag) {
+func newTestNodeConfig(t *testing.T) (nodeconfig.Config, []secretFlag, map[string]string) {
 	require := require.New(t)
 
 	signer, err := localsigner.New()
@@ -73,6 +71,10 @@ func newTestNodeConfig(t *testing.T) (nodeconfig.Config, []secretFlag) {
 		{flag: config.ConfigContentKey, arg: configContent, secret: configContent},
 	}
 
+	nonSecrets := map[string]string{
+		config.HTTPPortKey: "19650",
+	}
+
 	args := []string{
 		"--" + config.NetworkNameKey + "=local",
 		"--" + config.StakingEphemeralCertEnabledKey + "=true",
@@ -82,19 +84,22 @@ func newTestNodeConfig(t *testing.T) (nodeconfig.Config, []secretFlag) {
 	for _, s := range secrets {
 		args = append(args, "--"+s.flag+"="+s.arg)
 	}
+	for flag, arg := range nonSecrets {
+		args = append(args, "--"+flag+"="+arg)
+	}
 
 	v, err := config.BuildViper(config.BuildFlagSet(), args)
 	require.NoError(err)
 	nodeConfig, err := config.GetNodeConfig(v)
 	require.NoError(err)
-	return nodeConfig, secrets
+	return nodeConfig, secrets, nonSecrets
 }
 
 // Checks that no secret value ends up in the log New writes.
 func TestNewDoesNotLogSecrets(t *testing.T) {
 	require := require.New(t)
 
-	nodeConfig, secrets := newTestNodeConfig(t)
+	nodeConfig, secrets, nonSecrets := newTestNodeConfig(t)
 
 	var buf bytes.Buffer
 	logger := logging.NewLogger(
@@ -111,13 +116,16 @@ func TestNewDoesNotLogSecrets(t *testing.T) {
 	for _, s := range secrets {
 		require.NotContains(logged, s.secret, s.flag)
 	}
+	for flag, arg := range nonSecrets {
+		require.Contains(logged, arg, flag)
+	}
 }
 
 // Checks that admin.getConfig does not leak secrets through the HTTP service.
 func TestAdminGetConfigDoesNotLeakSecrets(t *testing.T) {
 	require := require.New(t)
 
-	nodeConfig, secrets := newTestNodeConfig(t)
+	nodeConfig, secrets, nonSecrets := newTestNodeConfig(t)
 
 	service, err := admin.NewService(admin.Config{
 		Log:        logging.NoLog{},
@@ -137,5 +145,8 @@ func TestAdminGetConfigDoesNotLeakSecrets(t *testing.T) {
 	require.Contains(resp, "traceConfig")
 	for _, s := range secrets {
 		require.NotContains(resp, s.secret, s.flag)
+	}
+	for flag, arg := range nonSecrets {
+		require.Contains(resp, arg, flag)
 	}
 }
