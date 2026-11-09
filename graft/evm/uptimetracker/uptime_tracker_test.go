@@ -723,8 +723,9 @@ func TestUptimeTracker_ReregisterConnectedDeactivatedValidator(t *testing.T) {
 }
 
 // TestUptimeTracker_RestartWithInactiveValidator ensures that a validator that
-// was inactive before a restart, and is still inactive after it, continues to
-// be treated as offline when its node connects.
+// was inactive before a restart, and is still inactive after it, is not
+// credited with uptime for the downtime between shutdown and restart, and
+// continues to be treated as offline when its node connects.
 func TestUptimeTracker_RestartWithInactiveValidator(t *testing.T) {
 	var (
 		validationID = ids.GenerateTestID()
@@ -753,12 +754,15 @@ func TestUptimeTracker_RestartWithInactiveValidator(t *testing.T) {
 	require.NoErrorf(t, uptimeTracker.Sync(t.Context()), "%T.Sync()", uptimeTracker)
 	require.NoErrorf(t, uptimeTracker.Shutdown(), "%T.Shutdown()", uptimeTracker)
 
+	// The node is down for an hour before restarting.
+	restart := start.Add(time.Hour)
+	clock.Set(restart)
 	uptimeTracker, err = New(validatorState, subnetID, db, clock)
 	require.NoError(t, err, "New() after restart")
 	require.NoErrorf(t, uptimeTracker.Sync(t.Context()), "%T.Sync() after restart", uptimeTracker)
 	require.NoErrorf(t, uptimeTracker.Connect(nodeID), "%T.Connect(%s)", uptimeTracker, nodeID)
 
-	clock.Set(start.Add(10 * time.Second))
+	clock.Set(restart.Add(10 * time.Second))
 	uptime, _, err := uptimeTracker.GetUptime(validationID)
 	require.NoErrorf(t, err, "%T.GetUptime()", uptimeTracker)
 	require.Zerof(t, uptime, "%T.GetUptime() of inactive validator", uptimeTracker)

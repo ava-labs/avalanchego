@@ -95,7 +95,7 @@ func (u *UptimeTracker) Connect(nodeID ids.NodeID) error {
 	defer u.lock.Unlock()
 
 	u.connectedPeers.Add(nodeID)
-	return u.updateManager(nodeID)
+	return u.reconcile(nodeID)
 }
 
 // Disconnect marks a node as disconnected. Disconnected nodes are treated as
@@ -105,7 +105,7 @@ func (u *UptimeTracker) Disconnect(nodeID ids.NodeID) error {
 	defer u.lock.Unlock()
 
 	u.connectedPeers.Remove(nodeID)
-	return u.updateManager(nodeID)
+	return u.reconcile(nodeID)
 }
 
 // Sync updates the validator set and writes our state. Sync starts tracking
@@ -127,20 +127,32 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 		return fmt.Errorf("failed to update validator set: %w", err)
 	}
 
-	// Initialize uptimes if this is the first time Sync has been called
 	if !u.synced {
-		if err := u.manager.StartTracking(u.state.getNodeIDs()); err != nil {
+		// StartTracking credits the given nodes with uptime for the period
+		// that was not observed, but inactive validators were likely offline
+		// during this time.
+		withUptime := make([]ids.NodeID, 0, len(u.state.validators))
+		for _, v := range u.state.validators {
+			if v.IsActive {
+				withUptime = append(withUptime, v.NodeID)
+			}
+		}
+		if err := u.manager.StartTracking(withUptime); err != nil {
 			return fmt.Errorf("failed to start tracking validators: %w", err)
 		}
 
 		u.synced = true
 	}
 
-	if err := u.state.writeModifications(); err != nil {
-		return fmt.Errorf("failed to write state: %w", err)
+	// The validator state changed, so any node's online status may have
+	// changed. Only connected nodes can be online.
+	for nodeID := range u.connectedPeers {
+		if err := u.reconcile(nodeID); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return u.state.writeModifications()
 }
 
 func (u *UptimeTracker) update(
@@ -176,14 +188,6 @@ func (u *UptimeTracker) update(
 		})
 	}
 
-	// The validator state changed, so any node's online status may have
-	// changed. Only connected nodes can be online.
-	for nodeID := range u.connectedPeers {
-		if err := u.updateManager(nodeID); err != nil {
-			return err
-		}
-	}
-
 	u.height = height
 	return nil
 }
@@ -198,10 +202,10 @@ func (u *UptimeTracker) shouldBeOnline(nodeID ids.NodeID) bool {
 	return !ok || v.IsActive
 }
 
-// updateManager reports nodeID to the uptime manager as connected or disconnected
+// reconcile reports nodeID to the uptime manager as connected or disconnected
 // if its online status differs from what was last reported. It MUST be called
 // after any change to connectedPeers or to the validator state of nodeID.
-func (u *UptimeTracker) updateManager(nodeID ids.NodeID) error {
+func (u *UptimeTracker) reconcile(nodeID ids.NodeID) error {
 	shouldBeOnline := u.shouldBeOnline(nodeID)
 	isOnline := u.online.Contains(nodeID)
 	switch {
