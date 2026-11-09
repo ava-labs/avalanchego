@@ -45,6 +45,7 @@ import (
 
 var _ hookadaptor.Points = (*hooks)(nil)
 
+// hooks are the L1-specific [hookadaptor.Points].
 type hooks struct {
 	builder
 	warpStorage *saewarp.Storage
@@ -156,17 +157,18 @@ func targetExcess(hdr *types.Header) gas.Gas {
 // SettledBy returns the settlement marker encoded in the header by
 // [builder.BuildBlock], or the zero value (indicating synchronous,
 // pre-SAE execution) when any of the quartet is missing.
-func (*hooks) SettledBy(hdr *types.Header) hook.Settled {
-	he := customtypes.GetHeaderExtra(hdr)
+func (*hooks) SettledBy(h *types.Header) hook.Settled {
+	he := customtypes.GetHeaderExtra(h)
 	return hook.NewSettled(he.SettledHeight, he.SettledGasUnix, he.SettledGasNumerator, he.SettledExcess)
 }
 
-func (*hooks) BlockTime(hdr *types.Header) time.Time {
-	return blockTime(hdr)
+// BlockTime returns the canonical wall-clock time of a block.
+func (*hooks) BlockTime(h *types.Header) time.Time {
+	return blockTime(h)
 }
 
-func blockTime(hdr *types.Header) time.Time {
-	return saeheader.Time(hdr.Time, customtypes.HeaderTimeMilliseconds(hdr))
+func blockTime(h *types.Header) time.Time {
+	return saeheader.Time(h.Time, customtypes.HeaderTimeMilliseconds(h))
 }
 
 var (
@@ -349,6 +351,8 @@ func earliestBlockTime(parent *types.Header) time.Time {
 	return blockTime(parent).Add(dynamic.DelayExponent(*e.MinDelayExcess).DelayDuration())
 }
 
+// See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
+// the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
 	configExtra := legacyparams.GetExtra(b.chainConfig)

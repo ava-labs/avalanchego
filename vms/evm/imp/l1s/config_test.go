@@ -170,7 +170,7 @@ func TestConfig_SAEConfig(t *testing.T) {
 // runtime (or worse, divide by) MUST fail at chain-config parse time.
 func TestParseConfig_ValidatesSAEConfig(t *testing.T) {
 	_, err := parseConfig([]byte(`{"commit-interval":0}`))
-	require.ErrorIs(t, err, saedb.ErrZeroCommitInterval, "parseConfig()")
+	require.ErrorIs(t, err, saedb.Config{}.Verify(), "parseConfig()")
 }
 
 func TestParseConfig_RejectsTrailingData(t *testing.T) {

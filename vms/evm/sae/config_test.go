@@ -45,7 +45,7 @@ func TestConfigVerify(t *testing.T) {
 		{
 			name:    "invalid_db",
 			config:  invalidDB,
-			wantErr: saedb.ErrZeroCommitInterval,
+			wantErr: invalidDB.DBConfig.Verify(),
 		},
 		{
 			name:    "invalid_rpc",

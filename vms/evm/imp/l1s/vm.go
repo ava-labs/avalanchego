@@ -2,11 +2,7 @@
 // Copyright (C) 2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package l1s implements the Subnet-EVM compatible L1 VM atop [sae.VM]. It
-// composes the L1 block-building hooks (precompile and state upgrades,
-// allowlist admission, reward routing, and the header-encoded ACP-224 runtime
-// gas config), the shared SAE warp service extended with validator-uptime
-// attestations, and the legacy-compatible JSON-RPC surface.
+// Package l1s implements the Subnet-EVM compatible L1 VM atop [sae.VM].
 package l1s
 
 import (

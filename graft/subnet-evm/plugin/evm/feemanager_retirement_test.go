@@ -35,11 +35,10 @@ func TestLegacyFeeManagerRetirement(t *testing.T) {
 	genesisJSON, err := json.Marshal(genesis)
 	require.NoError(t, err, "json.Marshal(genesis)")
 
-	tvm, err := tryNewVM(t, testVMConfig{
+	tvm := newVM(t, testVMConfig{
 		fork:        utils.PointerTo(upgradetest.Igloo),
 		genesisJSON: string(genesisJSON),
 	})
-	require.NoError(t, err, "tryNewVM()")
 
 	got := params.GetExtra(tvm.vm.ChainConfig()).PrecompileUpgrades
 	want := []extras.PrecompileUpgrade{

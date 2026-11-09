@@ -49,7 +49,7 @@ func TestNewTracker(t *testing.T) {
 		{
 			name:    "zero_commit_interval",
 			with:    func(c *Config) { c.CommitInterval = 0 },
-			wantErr: ErrZeroCommitInterval,
+			wantErr: errZeroCommitInterval,
 		},
 		{
 			name: "with_snapshot",

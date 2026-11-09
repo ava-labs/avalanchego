@@ -150,21 +150,21 @@ func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 	eligibleIdx := make([]int, 0, len(txs))
 	for i, tx := range txs {
 		minGas := minGasForSize(tx.Size(), blockGasLimit)
-		if tx.Gas() < minGas {
-			errs[i] = fmt.Errorf("%w: tx size %d bytes must specify gas limit at least %d when the block gas limit is %d",
-				errInsufficientGasPerByte, tx.Size(), minGas, blockGasLimit)
+		if tx.Gas() >= minGas {
+			// The admitter runs after the pure-arithmetic gas check because it
+			// may recover the sender and open state.
+			if s.admitter != nil {
+				if err := s.admitter.Admit(tx); err != nil {
+					errs[i] = err
+					continue
+				}
+			}
+			eligibleTxs = append(eligibleTxs, tx)
+			eligibleIdx = append(eligibleIdx, i)
 			continue
 		}
-		// The admitter runs after the pure-arithmetic gas check because it
-		// may recover the sender and open state.
-		if s.admitter != nil {
-			if err := s.admitter.Admit(tx); err != nil {
-				errs[i] = err
-				continue
-			}
-		}
-		eligibleTxs = append(eligibleTxs, tx)
-		eligibleIdx = append(eligibleIdx, i)
+		errs[i] = fmt.Errorf("%w: tx size %d bytes must specify gas limit at least %d when the block gas limit is %d",
+			errInsufficientGasPerByte, tx.Size(), minGas, blockGasLimit)
 	}
 
 	if len(eligibleTxs) == 0 {

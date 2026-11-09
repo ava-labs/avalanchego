@@ -75,17 +75,14 @@ type Config struct {
 }
 
 var (
-	// ErrZeroCommitInterval is returned by [Config.Verify] when the
-	// commit interval is zero.
-	ErrZeroCommitInterval = errors.New("commit interval must be non-zero")
-
-	errCacheTooLarge = fmt.Errorf("cache size exceeds maximum of %d MiB", maxCacheMiB)
-	errUnknownScheme = errors.New("unknown trie database scheme")
+	errZeroCommitInterval = errors.New("commit interval must be non-zero")
+	errCacheTooLarge      = fmt.Errorf("cache size exceeds maximum of %d MiB", maxCacheMiB)
+	errUnknownScheme      = errors.New("unknown trie database scheme")
 )
 
 func (c Config) Verify() error {
 	if c.CommitInterval == 0 {
-		return ErrZeroCommitInterval
+		return errZeroCommitInterval
 	}
 	if c.TrieCacheMiB > maxCacheMiB {
 		return fmt.Errorf("%w: TrieCacheMiB (%d)", errCacheTooLarge, c.TrieCacheMiB)
