@@ -18,10 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
@@ -60,45 +58,9 @@ func (r RulesExtra) CanCreateContract(ac *libevm.AddressContext, gas uint64, sta
 	return gas, nil
 }
 
-// CanExecuteTransaction is the libevm `RulesAllowlistHooks` entry point, fired
-// from `core.StateTransition.TransitionDb` against the rules+state of the block
-// being executed. A non-nil return makes the entire block invalid at execution.
-//
-// In the SAE port (post-Igloo), an invalid block at execution time is a
-// fatal halt of the executor, but worst-case admission cannot reliably predict
-// state-dependent precompile checks. To avoid the halt, we short-circuit this
-// hook post-Igloo and let the SAE worst-case path enforce the same check via
-// [EnforceTxAllowList]
-// against the last-settled rules+state pair (see
-// `vms/evm/imp/l1s.(*hooks).CanExecuteTransaction`).
-//
-// Pre-Igloo (synchronous chain), this stays strict because there is no
-// admission/execution gap.
-func (r RulesExtra) CanExecuteTransaction(from common.Address, _ *common.Address, state libevm.StateReader) error {
-	rules := (extras.Rules)(r)
-	if rules.IsIgloo {
-		return nil
-	}
-	return r.EnforceTxAllowList(from, state)
-}
-
-// EnforceTxAllowList performs the txallowlist sender check using the receiver's
-// rules and the provided state. It exists so SAE consumers can re-use the same
-// check outside the libevm hook. SAE uses it against the last-settled state,
-// and the legacy executor and transaction pool use it to remain strict after
-// Igloo without changing SAE execution semantics.
-//
-// The receiver's rules MUST correspond to the same block as `state` so that
-// `IsPrecompileEnabled` agrees with whether txallowlist storage is populated
-// for that block.
-func (r RulesExtra) EnforceTxAllowList(from common.Address, state libevm.StateReader) error {
-	rules := (extras.Rules)(r)
-	if rules.IsPrecompileEnabled(txallowlist.ContractAddress) {
-		txAllowListRole := txallowlist.GetTxAllowListStatus(state, from)
-		if !txAllowListRole.IsEnabled() {
-			return fmt.Errorf("%w: %s", vmerrors.ErrSenderAddressNotAllowListed, from)
-		}
-	}
+func (RulesExtra) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
+	// TODO: Migrate call for txallowlist precompile to here from core/state_transition.go
+	// when that is used from libevm.
 	return nil
 }
 

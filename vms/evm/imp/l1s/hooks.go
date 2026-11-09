@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
@@ -228,23 +229,20 @@ func (*hooks) VerifyBlockSyntax(b *types.Block) error {
 	return nil
 }
 
-// CanExecuteTransaction enforces the txallowlist sender check against the
-// caller-supplied `rules`+`state` pair (worst-case: last-settled; mempool
-// admission: last-executed), bypassing the libevm hook which is
-// short-circuited post-Igloo to avoid fatal-halt on stale-state divergence
-// (see [legacyparams.RulesExtra.CanExecuteTransaction]). Libevm extras
-// MUST be registered first.
+// CanExecuteTransaction rejects transactions from senders excluded by the
+// tx allow list, as of the provided rules and state.
 //
-// Deployer allowlist is intentionally NOT enforced here: its libevm hook
-// ([legacyparams.RulesExtra.CanCreateContract]) runs INSIDE the EVM and
-// surfaces failures as a frame-local revert rather than invalidating the
-// block, so SAE has no halt risk to guard against. It also covers nested
-// CREATE/CREATE2 frames invisible to admission here. Trade-off: deploy txs
-// from non-allow-listed senders are mined with status=failed instead of
-// being rejected at ingress.
+// The deployer allow list is not checked. It is enforced during execution, so
+// a disallowed deployment is included and fails instead of being rejected.
 func (*hooks) CanExecuteTransaction(rules ethparams.Rules, from common.Address, _ *common.Address, state libevm.StateReader) error {
 	extra := legacyparams.GetRulesExtra(rules)
-	return legacyparams.RulesExtra(*extra).EnforceTxAllowList(from, state)
+	if !extra.IsPrecompileEnabled(txallowlist.ContractAddress) {
+		return nil
+	}
+	if role := txallowlist.GetTxAllowListStatus(state, from); !role.IsEnabled() {
+		return fmt.Errorf("%w: %s", vmerrors.ErrSenderAddressNotAllowListed, from)
+	}
+	return nil
 }
 
 func (*hooks) RequiresTransactionAdmissionCheck(rules ethparams.Rules) bool {
