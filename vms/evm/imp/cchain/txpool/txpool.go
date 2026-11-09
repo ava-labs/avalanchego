@@ -28,8 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/setmap"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 )
 
 // Backend that the [Txpool] depends on for current chain state.
