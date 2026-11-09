@@ -153,10 +153,6 @@ func (gcw *GarbageCollectedWAL) ReadAll() ([][]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error reading entries from WAL %d: %v", i, err)
 		}
-		if err := wal.Close(); err != nil {
-			return nil, fmt.Errorf("error closing WAL %d: %v", i, err)
-		}
-
 		allEntries = append(allEntries, entries...)
 	}
 
