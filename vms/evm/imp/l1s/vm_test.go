@@ -56,6 +56,7 @@ type SUT struct {
 type (
 	sutConfig struct {
 		genesis core.Genesis
+		upgrade []byte
 		clock   *saetest.Clock
 	}
 	sutOption = options.Option[sutConfig]
@@ -108,6 +109,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	vmSUT, err := vmtest.New(ctx, tb, vm, snowCtx, vmtest.Config{
 		DB:      memdb.New(),
 		Genesis: genesisBytes,
+		Upgrade: cfg.upgrade,
 		Sender:  appSender,
 		State:   snow.NormalOp,
 	})

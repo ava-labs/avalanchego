@@ -5,7 +5,6 @@ package params
 
 import (
 	"encoding/json"
-	"errors"
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
@@ -14,8 +13,6 @@ import (
 )
 
 const (
-	maxJSONLen = 64 * 1024 * 1024 // 64MB
-
 	// TODO: Value to pass to geth's Rules by default where the appropriate
 	// context is not available in the avalanche code. (similar to context.TODO())
 	IsMergeTODO = true
@@ -103,73 +100,28 @@ func WithExtra(c *ChainConfig, extra *extras.ChainConfig) *ChainConfig {
 	return c
 }
 
+// A ChainConfigWithUpgradesJSON is a decoded eth_getChainConfig response,
+// including the upgrades that [ChainConfig] doesn't unmarshal.
 type ChainConfigWithUpgradesJSON struct {
 	ChainConfig
-	UpgradeConfig extras.UpgradeConfig `json:"upgrades,omitempty"`
+	UpgradeConfig extras.UpgradeConfig
 }
 
-// MarshalJSON implements json.Marshaler. This is a workaround for the fact that
-// the embedded ChainConfig struct has a MarshalJSON method, which prevents
-// the default JSON marshalling from working for UpgradeConfig.
-// TODO: consider removing this method by allowing external tag for the embedded
-// ChainConfig struct.
-func (cu ChainConfigWithUpgradesJSON) MarshalJSON() ([]byte, error) {
-	// embed the ChainConfig struct into the response
-	chainConfigJSON, err := json.Marshal(&cu.ChainConfig)
-	if err != nil {
-		return nil, err
-	}
-	if len(chainConfigJSON) > maxJSONLen {
-		return nil, errors.New("value too large")
-	}
-
-	type upgrades struct {
-		UpgradeConfig extras.UpgradeConfig `json:"upgrades"`
-	}
-
-	upgradeJSON, err := json.Marshal(upgrades{cu.UpgradeConfig})
-	if err != nil {
-		return nil, err
-	}
-	if len(upgradeJSON) > maxJSONLen {
-		return nil, errors.New("value too large")
-	}
-
-	// merge the two JSON objects
-	mergedJSON := make([]byte, 0, len(chainConfigJSON)+len(upgradeJSON)+1)
-	mergedJSON = append(mergedJSON, chainConfigJSON[:len(chainConfigJSON)-1]...)
-	mergedJSON = append(mergedJSON, ',')
-	mergedJSON = append(mergedJSON, upgradeJSON[1:]...)
-	return mergedJSON, nil
-}
-
+// UnmarshalJSON decodes input into the chain config and its upgrades.
 func (cu *ChainConfigWithUpgradesJSON) UnmarshalJSON(input []byte) error {
 	var cc ChainConfig
 	if err := json.Unmarshal(input, &cc); err != nil {
 		return err
 	}
-
-	type upgrades struct {
+	var u struct {
 		UpgradeConfig extras.UpgradeConfig `json:"upgrades"`
 	}
-
-	var u upgrades
 	if err := json.Unmarshal(input, &u); err != nil {
 		return err
 	}
 	cu.ChainConfig = cc
 	cu.UpgradeConfig = u.UpgradeConfig
 	return nil
-}
-
-// ToWithUpgradesJSON converts the ChainConfig to ChainConfigWithUpgradesJSON with upgrades explicitly displayed.
-// ChainConfig does not include upgrades in its JSON output.
-// This is a workaround for showing upgrades in the JSON output.
-func ToWithUpgradesJSON(c *ChainConfig) *ChainConfigWithUpgradesJSON {
-	return &ChainConfigWithUpgradesJSON{
-		ChainConfig:   *c,
-		UpgradeConfig: GetExtra(c).UpgradeConfig,
-	}
 }
 
 func SetNetworkUpgradeDefaults(c *ChainConfig) {

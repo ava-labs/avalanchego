@@ -267,8 +267,8 @@ func TestActivePrecompiles(t *testing.T) {
 }
 
 func TestChainConfigMarshalWithUpgrades(t *testing.T) {
-	config := ChainConfigWithUpgradesJSON{
-		ChainConfig: *WithExtra(
+	newConfig := func(u extras.UpgradeConfig) *ChainConfig {
+		return WithExtra(
 			&ChainConfig{
 				ChainID:             big.NewInt(1),
 				HomesteadBlock:      big.NewInt(0),
@@ -282,25 +282,25 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 				MuirGlacierBlock:    big.NewInt(0),
 			},
 			&extras.ChainConfig{
-				FeeConfig:          DefaultFeeConfig,
-				AllowFeeRecipients: false,
+				FeeConfig: DefaultFeeConfig,
 				NetworkUpgrades: extras.NetworkUpgrades{
 					SubnetEVMTimestamp: utils.PointerTo[uint64](0),
 					DurangoTimestamp:   utils.PointerTo[uint64](0),
 				},
 				GenesisPrecompiles: extras.Precompiles{},
+				UpgradeConfig:      u,
 			},
-		),
-		UpgradeConfig: extras.UpgradeConfig{
-			PrecompileUpgrades: []extras.PrecompileUpgrade{
-				{
-					Config: txallowlist.NewConfig(utils.PointerTo[uint64](100), nil, nil, nil),
-				},
+		)
+	}
+	config := newConfig(extras.UpgradeConfig{
+		PrecompileUpgrades: []extras.PrecompileUpgrade{
+			{
+				Config: txallowlist.NewConfig(utils.PointerTo[uint64](100), nil, nil, nil),
 			},
 		},
-	}
-	result, err := json.Marshal(&config)
-	require.NoError(t, err)
+	})
+	result, err := json.Marshal(config)
+	require.NoError(t, err, "json.Marshal()")
 	expectedJSON := `{
 		"chainId": 1,
 		"feeConfig": {
@@ -336,8 +336,8 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 	}`
 	require.JSONEq(t, expectedJSON, string(result))
 
-	var unmarshalled ChainConfigWithUpgradesJSON
-	err = json.Unmarshal(result, &unmarshalled)
-	require.NoError(t, err)
-	require.Equal(t, config, unmarshalled)
+	// Upgrades are read from their own database key, not the chain config.
+	var unmarshalled ChainConfig
+	require.NoError(t, json.Unmarshal(result, &unmarshalled), "json.Unmarshal()")
+	require.Equal(t, newConfig(extras.UpgradeConfig{}), &unmarshalled)
 }

@@ -243,6 +243,17 @@ func (c *ChainConfig) MarshalJSON() ([]byte, error) {
 		raw[key] = conf
 	}
 
+	// Always written, so that a missing key identifies a config stored by an
+	// older node.
+	//
+	// TODO(#6357): Unmarshal the upgrades and drop their separate database key
+	// once every node has rewritten its stored chain config.
+	upgrades, err := json.Marshal(c.UpgradeConfig)
+	if err != nil {
+		return nil, err
+	}
+	raw["upgrades"] = upgrades
+
 	return json.Marshal(raw)
 }
 
