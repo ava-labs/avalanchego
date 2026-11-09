@@ -117,7 +117,7 @@ type ChainConfig struct {
 	FeeConfig          commontype.FeeConfig `json:"feeConfig"`                    // Set the configuration for the dynamic fee algorithm
 	AllowFeeRecipients bool                 `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 	GenesisPrecompiles Precompiles          `json:"-"`                            // Config for enabling precompiles from genesis. JSON encode/decode will be handled by the custom marshaler/unmarshaler.
-	UpgradeConfig      `json:"-"`           // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
+	UpgradeConfig      `json:"-"`           // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Marshalled as "upgrades" by the custom marshaler, but not unmarshalled.
 	InitialMinDelayMS  uint64               `json:"initialMinDelayMS,omitempty"` // ACP-226 minimum block delay of the genesis block, in milliseconds. Requires Granite at genesis. Zero uses the ACP-226 default.
 }
 

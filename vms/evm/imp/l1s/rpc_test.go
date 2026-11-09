@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
 )
@@ -47,10 +48,8 @@ func TestGetChainConfig(t *testing.T) {
 
 	ctx, sut := newSUT(t, withUpgrade(t, upgrades))
 
-	var got struct {
-		Upgrades extras.UpgradeConfig `json:"upgrades"`
-	}
+	var got params.ChainConfigWithUpgradesJSON
 	client := sut.EthClient().RPC
 	require.NoErrorf(t, client.CallContext(ctx, &got, "eth_getChainConfig"), "%T.CallContext(eth_getChainConfig)", client)
-	require.Equal(t, upgrades, got.Upgrades, "eth_getChainConfig upgrades")
+	require.Equal(t, upgrades, got.UpgradeConfig, "eth_getChainConfig upgrades")
 }
