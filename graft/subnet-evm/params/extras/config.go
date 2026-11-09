@@ -114,11 +114,7 @@ type ChainConfig struct {
 
 	AvalancheContext `json:"-"` // Avalanche specific context set during VM initialization. Not serialized.
 
-	// FeeConfig configures the legacy pre-Igloo dynamic fee algorithm.
-	//
-	// Deprecated: ACP-176 and ACP-224 own post-Igloo gas pricing. This field
-	// remains required for pre-Igloo compatibility and JSON round trips.
-	FeeConfig          commontype.FeeConfig `json:"feeConfig"`
+	FeeConfig          commontype.FeeConfig `json:"feeConfig"`                    // Set the configuration for the dynamic fee algorithm
 	AllowFeeRecipients bool                 `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 	GenesisPrecompiles Precompiles          `json:"-"`                            // Config for enabling precompiles from genesis. JSON encode/decode will be handled by the custom marshaler/unmarshaler.
 	UpgradeConfig      `json:"-"`           // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
