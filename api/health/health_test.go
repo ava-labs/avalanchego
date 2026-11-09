@@ -47,6 +47,40 @@ func awaitLiveness(t *testing.T, r Reporter, liveness bool) {
 	}, awaitTimeout, awaitFreq)
 }
 
+func stop(t *testing.T, h Health) {
+	t.Helper()
+
+	require.NoError(t, h.Stop(t.Context()))
+}
+
+// TestStopWithHungCheck tests that Stop returns the context error when a check
+// does not return, and that a later Stop with a live context drains.
+func TestStopWithHungCheck(t *testing.T) {
+	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
+	require.NoError(t, err)
+
+	var (
+		started     = make(chan struct{})
+		startedOnce sync.Once
+		release     = make(chan struct{})
+	)
+	require.NoError(t, h.RegisterHealthCheck("hung", CheckerFunc(func(context.Context) (interface{}, error) {
+		startedOnce.Do(func() { close(started) })
+		<-release
+		return "", nil
+	})))
+
+	h.Start(t.Context(), checkFreq)
+	<-started
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
+	defer cancel()
+	require.ErrorIs(t, h.Stop(ctx), context.DeadlineExceeded)
+
+	close(release)
+	stop(t, h)
+}
+
 func TestDuplicatedRegistrations(t *testing.T) {
 	require := require.New(t)
 
@@ -126,7 +160,7 @@ func TestPassingChecks(t *testing.T) {
 	require.NoError(h.RegisterLivenessCheck("check", check))
 
 	h.Start(t.Context(), checkFreq)
-	defer h.Stop()
+	defer stop(t, h)
 
 	{
 		awaitReadiness(t, h, true)
@@ -190,7 +224,7 @@ func TestPassingThenFailingChecks(t *testing.T) {
 	require.NoError(h.RegisterLivenessCheck("check", check))
 
 	h.Start(t.Context(), checkFreq)
-	defer h.Stop()
+	defer stop(t, h)
 
 	awaitReadiness(t, h, true)
 	awaitHealthy(t, h, true)
@@ -241,7 +275,7 @@ func TestDeadlockRegression(t *testing.T) {
 	})
 
 	h.Start(t.Context(), time.Nanosecond)
-	defer h.Stop()
+	defer stop(t, h)
 
 	for i := 0; i < 100; i++ {
 		lock.Lock()
@@ -351,7 +385,7 @@ func TestTags(t *testing.T) {
 	}
 
 	// stop the health check
-	h.Stop()
+	stop(t, h)
 
 	{
 		// now we'll add a new check which is unhealthy by default (notYetRunResult)

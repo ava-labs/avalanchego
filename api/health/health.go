@@ -5,6 +5,7 @@ package health
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -40,8 +41,12 @@ type Health interface {
 	Start(ctx context.Context, freq time.Duration)
 
 	// Stop running periodic health checks. Stop should only be called after
-	// Start. Once Stop returns, no more health checks will be executed.
-	Stop()
+	// Start. Once Stop returns nil, no more health checks will be executed.
+	//
+	// Stop waits for checks that are running. If ctx is done first, Stop
+	// returns the error from ctx and a check that never returns keeps its
+	// goroutine.
+	Stop(ctx context.Context) error
 }
 
 // Registerer defines how to register new components to check the health of.
@@ -132,8 +137,10 @@ func (h *health) Start(ctx context.Context, freq time.Duration) {
 	h.liveness.Start(ctx, freq)
 }
 
-func (h *health) Stop() {
-	h.readiness.Stop()
-	h.health.Stop()
-	h.liveness.Stop()
+func (h *health) Stop(ctx context.Context) error {
+	return errors.Join(
+		h.readiness.Stop(ctx),
+		h.health.Stop(ctx),
+		h.liveness.Stop(ctx),
+	)
 }

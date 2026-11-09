@@ -1874,11 +1874,8 @@ func (n *Node) shutdown() {
 		n.chainManager.Shutdown()
 	}
 
-	// Health checks stop after the chains, not before, because Stop waits for
-	// running checks and chain checks take the chain's context lock. A chain
-	// that times out during shutdown can still hold that lock and block Stop.
 	if n.health != nil {
-		n.health.Stop()
+		n.stopHealth()
 	}
 
 	if n.benchlistManager != nil {
@@ -1933,6 +1930,19 @@ func (n *Node) shutdown() {
 	}
 
 	n.Log.Info("finished node shutdown")
+}
+
+// stopHealth bounds the wait for running health checks because a chain check
+// blocks on the chain's context lock, which a hung VM can still hold.
+func (n *Node) stopHealth() {
+	const timeout = 10 * time.Second
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if err := n.health.Stop(ctx); err != nil {
+		n.Log.Warn("health checks did not stop", zap.Error(err))
+	}
 }
 
 func (n *Node) ExitCode() int {

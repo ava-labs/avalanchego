@@ -193,11 +193,25 @@ func (w *worker) Start(ctx context.Context, freq time.Duration) {
 	})
 }
 
-func (w *worker) Stop() {
+func (w *worker) Stop(ctx context.Context) error {
 	w.closeOnce.Do(func() {
 		close(w.closer)
-		w.wg.Wait()
 	})
+
+	// A WaitGroup cannot be waited on with a context, so a goroutine waits
+	// for it. It exits once the running checks return.
+	done := make(chan struct{})
+	go func() {
+		w.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (w *worker) runChecks(ctx context.Context) {
