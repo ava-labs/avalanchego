@@ -1327,6 +1327,49 @@ func testEmptyBlock(t *testing.T, scheme string) {
 	require.ErrorIs(t, verifyErr, errEmptyBlock)
 }
 
+// TestSAEHeaderFieldsParseButFailVerify asserts that SAE header fields MUST NOT
+// prevent a block from being parsed, but MUST cause verification to fail.
+func TestSAEHeaderFieldsParseButFailVerify(t *testing.T) {
+	tvm := newVM(t, testVMConfig{genesisJSON: genesisJSONSubnetEVM})
+	t.Cleanup(func() {
+		require.NoError(t, tvm.vm.Shutdown(t.Context()), "VM.Shutdown()")
+	})
+
+	tx := types.NewTransaction(0, testEthAddrs[1], firstTxAmount, 21_000, big.NewInt(testMinGasPrice), nil)
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
+	require.NoError(t, err, "types.SignTx()")
+	require.NoError(t, tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})[0], "TxPool.AddRemotesSync()")
+
+	_, err = tvm.vm.WaitForEvent(t.Context())
+	require.NoError(t, err, "VM.WaitForEvent()")
+	blk, err := tvm.vm.BuildBlock(t.Context())
+	require.NoError(t, err, "VM.BuildBlock()")
+	ethBlock := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
+
+	tests := []struct {
+		name string
+		set  func(*customtypes.HeaderExtra)
+	}{
+		{name: "target", set: func(extra *customtypes.HeaderExtra) { extra.TargetExcess = utils.PointerTo(gas.Gas(1)) }},
+		{name: "settled", set: func(extra *customtypes.HeaderExtra) { extra.SettledHeight = utils.PointerTo[uint64](1) }},
+		{name: "gas_config", set: func(extra *customtypes.HeaderExtra) { extra.GasConfigMinGasPrice = utils.PointerTo[uint64](1) }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			header := types.CopyHeader(ethBlock.Header())
+			extra := *customtypes.GetHeaderExtra(header)
+			test.set(&extra)
+			customtypes.SetHeaderExtra(header, &extra)
+			wrapped, err := wrapBlock(ethBlock.WithSeal(header), tvm.vm)
+			require.NoError(t, err, "wrapBlock()")
+
+			parsed, err := tvm.vm.ParseBlock(t.Context(), wrapped.Bytes())
+			require.NoError(t, err, "VM.ParseBlock()")
+			require.ErrorContains(t, parsed.Verify(t.Context()), "remote SAE header field should be nil", "Block.Verify()")
+		})
+	}
+}
+
 // Regression test to ensure that a VM that verifies block B, C, then
 // D (preferring block B) reorgs when C and then D are accepted.
 //
