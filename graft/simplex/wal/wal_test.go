@@ -5,6 +5,9 @@ package wal
 
 import (
 	"encoding/binary"
+	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -247,4 +250,25 @@ func TestReadWriteAfterTruncate(t *testing.T) {
 		[][]byte{r},
 		readRecords,
 	)
+}
+
+// TestIsCorruptedRecord ensures only errors describing bad bytes on disk cause
+// the WAL to be truncated, while other read errors are surfaced.
+func TestIsCorruptedRecord(t *testing.T) {
+	for _, testCase := range []struct {
+		name      string
+		err       error
+		corrupted bool
+	}{
+		{name: "invalid CRC", err: ErrInvalidCRC, corrupted: true},
+		{name: "record too long", err: fmt.Errorf("%w: details", ErrRecordTooLong), corrupted: true},
+		{name: "unexpected EOF", err: io.ErrUnexpectedEOF, corrupted: true},
+		{name: "EOF", err: io.EOF, corrupted: true},
+		{name: "I/O error", err: errors.New("input/output error"), corrupted: false},
+		{name: "nil", err: nil, corrupted: false},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			require.Equal(t, testCase.corrupted, isCorruptedRecord(testCase.err))
+		})
+	}
 }
