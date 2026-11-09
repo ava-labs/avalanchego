@@ -207,14 +207,14 @@ func (a *SignatureAggregator) Aggregate(signatures []common.Signature) (common.Q
 }
 
 func (*SignatureAggregator) AboveByzantineThreshold([]common.NodeID) bool {
-	// TODO: implement
+	// TODO(yacovm): https://github.com/ava-labs/avalanchego/issues/6335
 	return false
 }
 
 // AppendSignatures appends signatures to an existing signature.
 // If the existing signature is empty, it just aggregates the given signatures.
 func (*SignatureAggregator) AppendSignatures(common.SignatureBytes, ...common.SignatureBytes) (common.SignatureBytes, error) {
-	// TODO: implement
+	// TODO(yacovm): https://github.com/ava-labs/avalanchego/issues/6335
 	return nil, nil
 }
 
