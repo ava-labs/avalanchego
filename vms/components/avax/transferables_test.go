@@ -147,7 +147,7 @@ func TestTransferableOutputSerialization(t *testing.T) {
 func TestTransferableInputVerifyNil(t *testing.T) {
 	ti := (*TransferableInput)(nil)
 	err := ti.Verify()
-	require.ErrorIs(t, err, ErrNilTransferableInput)
+	require.ErrorIs(t, err, errNilTransferableInput)
 }
 
 func TestTransferableInputVerifyNilFx(t *testing.T) {

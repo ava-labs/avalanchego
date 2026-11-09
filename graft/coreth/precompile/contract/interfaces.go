@@ -9,13 +9,12 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
-	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -23,29 +22,23 @@ import (
 // StatefulPrecompiledContract is the interface for executing a precompiled contract
 type StatefulPrecompiledContract interface {
 	// Run executes the precompiled contract.
-	Run(accessibleState AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error)
+	Run(accessibleState AccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error)
 }
 
 // StateDB is the interface for accessing EVM state
 type StateDB interface {
-	GetState(common.Address, common.Hash, ...stateconf.StateDBStateOption) common.Hash
-	SetState(common.Address, common.Hash, common.Hash, ...stateconf.StateDBStateOption)
-
-	SetNonce(common.Address, uint64)
-	GetNonce(common.Address) uint64
-
-	GetBalance(common.Address) *uint256.Int
-	AddBalance(common.Address, *uint256.Int)
-	GetBalanceMultiCoin(common.Address, common.Hash) *big.Int
-	AddBalanceMultiCoin(common.Address, common.Hash, *big.Int)
-	SubBalanceMultiCoin(common.Address, common.Hash, *big.Int)
+	GetAssetBalance(common.Address, common.Hash) *uint256.Int
+	AddAssetBalance(common.Address, common.Hash, *uint256.Int)
+	SubAssetBalance(common.Address, common.Hash, *uint256.Int)
 
 	CreateAccount(common.Address)
 	Exist(common.Address) bool
 
 	AddLog(*ethtypes.Log)
 	Logs() []*ethtypes.Log
-	GetPredicate(address common.Address, index int) (predicate.Predicate, bool)
+	// GetWarpMessage returns the index-th Warp message in the current
+	// transaction's access list. It returns false if there is no such message.
+	GetWarpMessage(index int) (predicate.Predicate, bool)
 
 	TxHash() common.Hash
 
@@ -70,17 +63,7 @@ type ConfigurationBlockContext interface {
 
 type BlockContext interface {
 	ConfigurationBlockContext
-	// GetPredicateResults returns the result of verifying the predicates of the
-	// given transaction, precompile address pair.
-	GetPredicateResults(txHash common.Hash, precompileAddress common.Address) set.Bits
-}
-
-type Configurator interface {
-	MakeConfig() precompileconfig.Config
-	Configure(
-		chainConfig precompileconfig.ChainConfig,
-		precompileconfig precompileconfig.Config,
-		state StateDB,
-		blockContext ConfigurationBlockContext,
-	) error
+	// GetWarpMessageResults returns the result of verifying the Warp messages
+	// of the given transaction.
+	GetWarpMessageResults(txHash common.Hash) set.Bits
 }

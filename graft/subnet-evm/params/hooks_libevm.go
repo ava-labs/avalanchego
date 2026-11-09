@@ -14,15 +14,17 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/legacy"
 
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/hook"
 
 	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -66,9 +68,12 @@ func (r RulesExtra) ShouldRefundGas() bool {
 	return !r.IsSubnetEVM
 }
 
-// MinimumGasConsumption is a no-op.
-func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
-	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
+// MinimumGasConsumption returns the ACP-194 gas-charged floor (ceil(limit/2)).
+func (r RulesExtra) MinimumGasConsumption(limit uint64) uint64 {
+	if r.IsIgloo {
+		return hook.MinimumGasConsumption(limit)
+	}
+	return (ethparams.NOOPHooks{}).MinimumGasConsumption(limit)
 }
 
 // ShouldCreditBaseFeeToCoinbase is unused, as subnet-evm never calls libevm's
@@ -118,23 +123,13 @@ func (r RulesExtra) precompileOverrideBuiltin(addr common.Address) (libevm.Preco
 
 func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.PrecompiledContract {
 	run := func(env vm.PrecompileEnvironment, input []byte, suppliedGas uint64) ([]byte, uint64, error) {
-		header, err := env.BlockHeader()
-		if err != nil {
-			panic(err) // Should never happen
-		}
-		var predicateResults predicate.BlockResults
-		if predicateResultsBytes := customheader.PredicateBytesFromExtra(header.Extra); len(predicateResultsBytes) > 0 {
-			predicateResults, err = predicate.ParseBlockResults(predicateResultsBytes)
-			if err != nil {
-				panic(err) // Should never happen, as results are already validated in block validation
-			}
-		}
+		header := env.BlockHeader()
 		accessibleState := accessibleState{
 			env: env,
 			blockContext: &precompileBlockContext{
 				number:           env.BlockNumber(),
 				time:             env.BlockTime(),
-				predicateResults: predicateResults,
+				predicateResults: customtypes.PredicateResults(header, customheader.PredicateBytesFromExtra(header.Extra)),
 			},
 		}
 

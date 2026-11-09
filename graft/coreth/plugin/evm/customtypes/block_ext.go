@@ -7,13 +7,12 @@ import (
 	"encoding/json"
 	"math/big"
 	"slices"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/rlp"
 
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -144,13 +143,6 @@ func CalcExtDataHash(extdata []byte) common.Hash {
 		return EmptyExtDataHash
 	}
 	return ethtypes.RLPHash(extdata)
-}
-
-func BlockTime(eth *ethtypes.Header) time.Time {
-	if t := GetHeaderExtra(eth).TimeMilliseconds; t != nil {
-		return time.UnixMilli(int64(*t))
-	}
-	return time.Unix(int64(eth.Time), 0)
 }
 
 // TODO(JonathanOppenheimer): take options instead of the positional

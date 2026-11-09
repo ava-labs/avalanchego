@@ -17,9 +17,9 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 )
 
 func TestCopyHeader(t *testing.T) {
@@ -68,9 +68,9 @@ func exportedFieldsPointToDifferentMemory[T interface {
 }](t *testing.T, original, cpy *T) {
 	t.Helper()
 
-	v := reflect.ValueOf(*original)
+	v := reflect.ValueOf(original).Elem()
 	typ := v.Type()
-	cp := reflect.ValueOf(*cpy)
+	cp := reflect.ValueOf(cpy).Elem()
 	for i := range v.NumField() {
 		field := typ.Field(i)
 		if !field.IsExported() {

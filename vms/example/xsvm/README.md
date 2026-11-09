@@ -1,8 +1,8 @@
 # Cross Subnet Virtual Machine (XSVM)
 
-Cross Subnet Asset Transfers README Overview
+Cross-L1 Asset Transfers README Overview
 
-[Background](#avalanche-subnets-and-custom-vms)
+[Background](#avalanche-l1s-and-custom-vms)
 
 [Introduction](#introduction)
 
@@ -10,19 +10,19 @@ Cross Subnet Asset Transfers README Overview
 
 [Running](#running-the-vm)
 
-[Demo](#cross-subnet-transaction-example)
+[Demo](#cross-l1-transaction-example)
 
-## Avalanche Subnets and Custom VMs
+## Avalanche L1s and Custom VMs
 
-Avalanche is a network composed of multiple sub-networks (called [subnets][Subnet]) that each contain any number of blockchains. Each blockchain is an instance of a [Virtual Machine (VM)](https://build.avax.network/docs/quick-start/virtual-machines), much like an object in an object-oriented language is an instance of a class. That is, the VM defines the behavior of the blockchain where it is instantiated. For example, [Coreth (EVM)][Coreth] is a VM that is instantiated by the [C-Chain]. Likewise, one could deploy another instance of the EVM as their own blockchain (to take this to its logical conclusion).
+Avalanche is a network composed of the Primary Network and any number of [L1s][L1], each of which runs its own blockchains. Each blockchain is an instance of a [Virtual Machine (VM)](https://build.avax.network/docs/quick-start/virtual-machines), much like an object in an object-oriented language is an instance of a class. That is, the VM defines the behavior of the blockchain where it is instantiated. For example, the [EVM] is a VM that is instantiated by the [C-Chain]. Likewise, one could deploy another instance of the EVM as their own blockchain (to take this to its logical conclusion).
 
 ## Introduction
 
-Just as [Coreth] powers the [C-Chain], XSVM can be used to power its own blockchain in an Avalanche [Subnet]. Instead of providing a place to execute Solidity smart contracts, however, XSVM enables asset transfers for assets originating on its own chain or other XSVM chains on other subnets.
+Just as the [EVM] powers the [C-Chain], XSVM can be used to power its own blockchain as an Avalanche [L1]. Instead of providing a place to execute Solidity smart contracts, however, XSVM enables asset transfers for assets originating on its own chain or other XSVM chains on other L1s.
 
 ## How it Works
 
-XSVM utilizes AvalancheGo's [interchain messaging] package to create and authenticate Subnet Messages.
+XSVM utilizes AvalancheGo's [interchain messaging] package to create and authenticate Warp messages.
 
 ### Transfer
 
@@ -30,7 +30,7 @@ If you want to send an asset to someone, you can use a `tx.Transfer` to send to 
 
 ### Export
 
-If you want to send this chain's native asset to a different subnet, you can use a `tx.Export` to send to any address on a destination chain. You may also use a `tx.Export` to return the destination chain's native asset.
+If you want to send this chain's native asset to a different L1, you can use a `tx.Export` to send to any address on a destination chain. You may also use a `tx.Export` to return the destination chain's native asset.
 
 ### Import
 
@@ -60,13 +60,13 @@ Usage:
   xsvm [command]
 
 Available Commands:
-  account     Displays the state of the requested account
-  chain       Manages XS chains
-  completion  Generate the autocompletion script for the specified shell
-  help        Help about any command
-  issue       Issues transactions
-  version     Prints out the version
-  versionjson Prints out the version in json format
+  account      Displays the state of the requested account
+  chain        Manages XS chains
+  completion   Generate the autocompletion script for the specified shell
+  help         Help about any command
+  issue        Issues transactions
+  version      Prints out the version
+  version-json Prints out the version in json format
 
 Flags:
   -h, --help   help for xsvm
@@ -74,56 +74,9 @@ Flags:
 Use "xsvm [command] --help" for more information about a command.
 ```
 
-### [Golang SDK](https://github.com/ava-labs/avalanchego/blob/master/vms/example/xsvm/api/client.go)
+### Golang SDK
 
-```golang
-// Client defines xsvm client operations.
-type Client interface {
-  Network(
-    ctx context.Context,
-    options ...rpc.Option,
-  ) (uint32, ids.ID, ids.ID, error)
-  Genesis(
-    ctx context.Context,
-    options ...rpc.Option,
-  ) (*genesis.Genesis, error)
-  Nonce(
-    ctx context.Context,
-    address ids.ShortID,
-    options ...rpc.Option,
-  ) (uint64, error)
-  Balance(
-    ctx context.Context,
-    address ids.ShortID,
-    assetID ids.ID,
-    options ...rpc.Option,
-  ) (uint64, error)
-  Loan(
-    ctx context.Context,
-    chainID ids.ID,
-    options ...rpc.Option,
-  ) (uint64, error)
-  IssueTx(
-    ctx context.Context,
-    tx *tx.Tx,
-    options ...rpc.Option,
-  ) (ids.ID, error)
-  LastAccepted(
-    ctx context.Context,
-    options ...rpc.Option,
-  ) (ids.ID, *block.Stateless, error)
-  Block(
-    ctx context.Context,
-    blkID ids.ID,
-    options ...rpc.Option,
-   (*block.Stateless, error)
-  Message(
-    ctx context.Context,
-    txID ids.ID,
-    options ...rpc.Option,
-  ) (*warp.UnsignedMessage, []byte, error)
-}
-```
+The `Client` in [`api/client.go`](./api/client.go) has one method per endpoint below: `Network`, `Genesis`, `Nonce`, `Balance`, `Loan`, `IssueTx`, `LastAccepted`, `Block` and `Message`.
 
 ### Public Endpoints
 
@@ -278,92 +231,80 @@ To build the VM, run `./scripts/build_xsvm.sh`.
 
 ### Deploying Your Own Network
 
-Anyone can deploy their own instance of the XSVM as a subnet on Avalanche. All you need to do is compile it, create a genesis, and send a few txs to the
-P-Chain.
+Anyone can deploy their own instance of the XSVM as an L1 on Avalanche. All you need to do is compile it, create a genesis, and register the L1 on the P-Chain.
 
-You can do this by following the [subnet tutorial] or by using the [subnet-cli].
+You can do this by following the [L1 tutorial].
 
 [interchain messaging]: https://github.com/ava-labs/avalanchego/tree/master/vms/platformvm/warp/README.md
-[subnet tutorial]: https://build.avax.network/docs/tooling/create-avalanche-l1
-[Coreth]: https://github.com/ava-labs/avalanchego/tree/master/graft/coreth
+[L1 tutorial]: https://build.avax.network/docs/tooling/create-avalanche-l1
+[EVM]: https://github.com/ava-labs/avalanchego/tree/master/vms/evm
 [C-Chain]: https://build.avax.network/docs/quick-start/primary-network#c-chain
-[Subnet]: https://build.avax.network/docs/avalanche-l1s
+[L1]: https://build.avax.network/docs/avalanche-l1s
 
-## Cross Subnet Transaction Example
+## Cross-L1 Transaction Example
 
-The following example shows how to interact with the XSVM to send and receive native assets across subnets.
-
-### Overview of Steps
-
-1. Create & deploy Subnet A
-2. Create  & deploy Subnet B
-3. Issue an **export** Tx on Subnet A
-4. Issue an **import** Tx on Subnet B
-5. Confirm Txs processed correctly
-
-> **Note:**  This demo requires [avalanche-cli](https://github.com/ava-labs/avalanche-cli) version > 1.0.5, [xsvm](https://github.com/ava-labs/xsvm) version > 1.0.2 and [avalanche-network-runner](https://github.com/ava-labs/avalanche-network-runner) v1.3.5.
-
-### Create and Deploy Subnet A, Subnet B
-
-Using the avalanche-cli, this step deploys two subnets running the XSVM. Subnet A will act as the sender in this demo, and Subnet B will act as the receiver.
-
-Steps
-
-Build the [XSVM](https://github.com/ava-labs/xsvm)
-
-### Create a genesis file
+The following example starts a local [tmpnet](../../../tests/fixture/tmpnet/README.md) network with two XSVM L1s and moves an asset from one to the other. The same flow runs automatically as the XSVM e2e test ([`tests/e2e/vms/xsvm.go`](../../../tests/e2e/vms/xsvm.go)):
 
 ```bash
-xsvm chain genesis --encoding binary > xsvm.genesis
+./scripts/build.sh        # builds build/avalanchego
+./scripts/build_xsvm.sh   # builds build/xsvm and registers it as a plugin
+E2E_SERIAL=1 ./scripts/tests.e2e.sh --ginkgo.focus-file=xsvm.go
 ```
 
-### Create Subnet A and Subnet B
+To run the steps by hand instead, start a network and issue the transactions yourself.
+
+### Start the network
 
 ```bash
-avalanche subnet create subnetA --custom --genesis <path_to_genesis> --vm <path_to_vm_binary>
-avalanche subnet create subnetB --custom --genesis <path_to_genesis> --vm <path_to_vm_binary>
+E2E_SERIAL=1 ./scripts/tests.e2e.sh --start-network
 ```
 
-### Deploy Subnet A and Subnet B
+This starts a two-node network with two L1s, `xsvm-a` and `xsvm-b`, each running the XSVM, and leaves it running. Nodes listen on random local ports.
+
+Collect the chain IDs, node URIs, and the pre-funded key from the network directory:
 
 ```bash
-avalanche subnet deploy subnetA --local
-avalanche subnet deploy subnetB --local
+NETWORK_DIR=$(ls -dt ~/.tmpnet/networks/*-avalanchego-e2e | head -1)
+CHAIN_A_ID=$(jq -r '.Chains[0].ChainID' $NETWORK_DIR/subnets/xsvm-a.json)
+CHAIN_B_ID=$(jq -r '.Chains[0].ChainID' $NETWORK_DIR/subnets/xsvm-b.json)
+PREFUNDED_KEY=$(jq -r '.Chains[0].PreFundedKey' $NETWORK_DIR/subnets/xsvm-a.json)
+NODE_A_ID=$(jq -r '.ValidatorIDs[0]' $NETWORK_DIR/subnets/xsvm-a.json); NODE_A_URI=$(jq -r .uri $NETWORK_DIR/$NODE_A_ID/process.json)
+NODE_B_ID=$(jq -r '.ValidatorIDs[0]' $NETWORK_DIR/subnets/xsvm-b.json); NODE_B_URI=$(jq -r .uri $NETWORK_DIR/$NODE_B_ID/process.json)
 ```
 
-### Issue Export Tx from Subnet A
+Each L1 is validated by a different node, so issue transactions against the node that validates the chain.
 
-The SubnetID and ChainIDs are stored in the sidecar.json files in your avalanche-cli directory. Typically this is located at $HOME/.avalanche/subnets/
+### Issue Export Tx from L1 A
+
+The genesis funds a random key rather than the CLI's default key, so pass it with `--private-key`.
 
 ```bash
-xsvm issue export --source-chain-id <SubnetA.BlockchainID> --amount <export_amount> --destination-chain-id <SubnetB.BlockchainID>
+build/xsvm issue export --uri $NODE_A_URI --source-chain-id $CHAIN_A_ID --destination-chain-id $CHAIN_B_ID --amount 1000 --private-key $PREFUNDED_KEY
 ```
 
-Save the TxID printed out by running the export command.
+Save the TxID from the `issued tx <TxID>` line printed by the export command. The exported amount is credited to `--to`, which defaults to the XSVM CLI's default address.
 
-### Issue Import Tx from Subnet B
+### Issue Import Tx on L1 B
 
-> Note: The import tx requires **snowman++** consensus to be activated on the importing chain. A chain requires ~3 blocks to be produced for snowman++ to start.
-> Run `xsvm issue transfer --chain-id <SubnetB.BlockchainID> --amount 1000`  to issue simple Txs on SubnetB
+> Note: The import tx requires **snowman++** consensus to be activated on the importing chain. A chain requires ~3 blocks to be produced for snowman++ to start. The import hangs until enough blocks exist.
 
 ```bash
-xsvm issue import --source-chain-id <SubnetA.BlockchainID> --destination-chain-id <SubnetB.BlockchainID> --tx-id <exportTxID> --source-uris <source_uris>
+for i in 1 2 3; do build/xsvm issue transfer --uri $NODE_B_URI --chain-id $CHAIN_B_ID --amount 1000 --private-key $PREFUNDED_KEY; done
+build/xsvm issue import --uri $NODE_B_URI --source-chain-id $CHAIN_A_ID --destination-chain-id $CHAIN_B_ID --tx-id <exportTxID> --source-uris $NODE_A_URI
 ```
 
-> The <source_uris> can be found by running `avalanche network status`. The default URIs are
-"http://localhost:9650,http://localhost:9652,http://localhost:9654,http://localhost:9656,http://localhost:9658"
+The import is signed by the default key, which matches the default `--to` of the export.
 
-**Account Values**
-To check proper execution, use the `xsvm account` command to check balances.
+### Account Values
 
-Verify the balance on SubnetA decreased by your export amount using
+To check proper execution, use the `xsvm account` command to check balances. Chain A's asset should now be credited on L1 B:
 
 ```bash
-xsvm account --chain-id <SubnetA.BlockchainID>
+build/xsvm account --uri $NODE_B_URI --chain-id $CHAIN_B_ID --asset-id $CHAIN_A_ID
 ```
 
-Now verify chain A's assets were successfully imported to SubnetB
+### Stop the network
 
 ```bash
-xsvm account --chain-id <SubnetB.BlockchainID> --asset-id <SubnetA.BlockchainID>
+./scripts/run_tmpnetctl.sh stop-network --network-dir=$NETWORK_DIR
 ```

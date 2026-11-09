@@ -84,18 +84,9 @@ func (s *LocalSigner) ToFile(keyPath string) error {
 		return fmt.Errorf("could not create path for signing key at %s: %w", keyPath, err)
 	}
 
-	if err := os.WriteFile(
-		keyPath,
-		s.ToBytes(),
-		perms.ReadWrite,
-	); err != nil {
+	if err := perms.WriteFile(keyPath, s.ToBytes(), perms.ReadOnly); err != nil {
 		return fmt.Errorf("could not write new signing key to %s: %w", keyPath, err)
 	}
-
-	if err := os.Chmod(keyPath, perms.ReadOnly); err != nil {
-		return fmt.Errorf("could not restrict permissions on new signing key at %s: %w", keyPath, err)
-	}
-
 	return nil
 }
 

@@ -4,17 +4,16 @@
 package syncer
 
 import (
-	"bytes"
 	"context"
 	"errors"
 
-	"github.com/ava-labs/firewood-go-ethhash/ffi"
+	"github.com/ava-labs/firewood-go/ffi"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 )
@@ -37,16 +36,28 @@ type Config struct {
 	Registerer            prometheus.Registerer
 }
 
-func New(config Config, db *ffi.Database, targetRoot ids.ID, proofClient *p2p.Client) (*sync.Syncer[*RangeProof, struct{}], error) {
+func New(
+	config Config,
+	db *ffi.Database,
+	targetRoot ids.ID,
+	proofClient *peertracker.Client,
+) (*sync.Syncer[*RangeProof, struct{}], error) {
 	return newWithDB(
 		config,
+		db,
 		&database{db},
 		targetRoot,
 		proofClient,
 	)
 }
 
-func newWithDB(config Config, db sync.DB[*RangeProof, struct{}], targetRoot ids.ID, proofClient *p2p.Client) (*sync.Syncer[*RangeProof, struct{}], error) {
+func newWithDB(
+	config Config,
+	firewoodDB *ffi.Database,
+	db sync.DB[*RangeProof, struct{}],
+	targetRoot ids.ID,
+	proofClient *peertracker.Client,
+) (*sync.Syncer[*RangeProof, struct{}], error) {
 	if config.Registerer == nil {
 		config.Registerer = prometheus.NewRegistry()
 	}
@@ -59,7 +70,7 @@ func newWithDB(config Config, db sync.DB[*RangeProof, struct{}], targetRoot ids.
 	return sync.NewSyncer(
 		db,
 		sync.Config[*RangeProof, struct{}]{
-			RangeProofMarshaler:   rangeProofMarshaler{},
+			RangeProofMarshaler:   rangeProofMarshaler{db: firewoodDB},
 			ChangeProofMarshaler:  changeProofMarshaler{},
 			EmptyRoot:             ids.ID(types.EmptyRootHash),
 			ProofClient:           proofClient,
@@ -111,17 +122,7 @@ func (db *database) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[
 		return maybe.Nothing[[]byte](), nil
 	}
 
-	nextKey := nextKeyRange.StartKey()
-	if err := nextKeyRange.Free(); err != nil {
-		return maybe.Nothing[[]byte](), err
-	}
-
-	// TODO: This will eventually be handled by `FindNextKey`.
-	if (end.HasValue() && bytes.Compare(nextKey, end.Value()) > 0) || (start.HasValue() && bytes.Equal(nextKey, start.Value())) {
-		return maybe.Nothing[[]byte](), nil
-	}
-
-	return maybe.Some(nextKey), nil
+	return maybe.Some(nextKeyRange.StartKey), nil
 }
 
 // TODO: Use change proofs to optimize syncing.

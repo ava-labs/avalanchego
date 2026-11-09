@@ -21,6 +21,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/eth",
     deps = [
         "//graft/evm/core/state/pruner",
+        "//graft/evm/customrawdb",
         "//graft/evm/firewood",
         "//graft/evm/rpc",
         "//graft/subnet-evm/commontype",
@@ -40,8 +41,7 @@ go_library(
         "//graft/subnet-evm/params",
         "//utils/timer/mockable",
         "//version",
-        "//vms/evm/sync/customrawdb",
-        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
+        "@com_github_ava_labs_firewood_go_ffi//:ffi",
         "@com_github_ava_labs_libevm//accounts",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/bitutil",

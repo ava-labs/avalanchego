@@ -15,20 +15,20 @@ module github.com/ava-labs/avalanchego
 //
 // - If updating between minor versions (e.g. 1.25.x -> 1.26.x):
 //   - Consider updating the version of golangci-lint (see tools/external/go.mod)
-go 1.26.8
+go 1.26.10
 
 require (
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/grpcreflect v1.3.0
-	github.com/StephenButtolph/canoto v0.18.0
+	github.com/StephenButtolph/canoto v0.19.0
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/arr4n/shed v0.0.0-20260908170710-35e123a98127
-	github.com/ava-labs/avalanchego/graft/coreth v1.15.2
-	github.com/ava-labs/avalanchego/graft/evm v1.15.2
-	github.com/ava-labs/avalanchego/graft/subnet-evm v1.15.2
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.8.0
-	github.com/ava-labs/libevm v1.13.15-0.20261009144421-d51262991849
-	github.com/ava-labs/simplex v0.0.0-20260429081342-03ce910391ad
+	github.com/ava-labs/avalanchego/graft/coreth v1.15.4
+	github.com/ava-labs/avalanchego/graft/evm v1.15.4
+	github.com/ava-labs/avalanchego/graft/subnet-evm v1.15.4
+	github.com/ava-labs/firewood-go/ffi v0.9.0
+	github.com/ava-labs/libevm v1.13.15-0.20261028200218-d398bc4dbe41
+	github.com/ava-labs/simplex v0.0.0-20261026143351-90995e07e797
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
@@ -193,7 +193,7 @@ require (
 	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.41.0 // indirect
+	golang.org/x/text v0.41.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20260803160001-6ac0973c030d // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

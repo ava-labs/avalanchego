@@ -282,6 +282,37 @@ func TestSemanticVerifierBaseTx(t *testing.T) {
 			err: secp256k1fx.ErrMismatchedAmounts,
 		},
 		{
+			name: "output as input",
+			stateFunc: func(ctrl *gomock.Controller) state.Chain {
+				state := statemock.NewChain(ctrl)
+
+				state.EXPECT().GetUTXO(utxoID.InputID()).Return(&utxo, nil)
+				state.EXPECT().GetTx(asset.ID).Return(&createAssetTx, nil)
+
+				return state
+			},
+			txFunc: func(require *require.Assertions) *txs.Tx {
+				input := input
+				input.In = &output
+
+				baseTx := baseTx
+				baseTx.Ins = []*avax.TransferableInput{
+					&input,
+				}
+				tx := &txs.Tx{
+					Unsigned: &baseTx,
+				}
+				require.NoError(tx.SignSECP256K1Fx(
+					codec,
+					[][]*secp256k1.PrivateKey{
+						{keys[0]},
+					},
+				))
+				return tx
+			},
+			err: secp256k1fx.ErrWrongInputType,
+		},
+		{
 			name: "not allowed output feature extension",
 			stateFunc: func(ctrl *gomock.Controller) state.Chain {
 				state := statemock.NewChain(ctrl)

@@ -33,7 +33,7 @@ func ToShortID(bytes []byte) (ShortID, error) {
 
 // ShortFromString is the inverse of ShortID.String()
 func ShortFromString(idStr string) (ShortID, error) {
-	bytes, err := cb58.Decode(idStr)
+	bytes, err := cb58.Decode(idStr, ShortIDLen)
 	if err != nil {
 		return ShortID{}, err
 	}
@@ -68,29 +68,24 @@ func (id ShortID) MarshalJSON() ([]byte, error) {
 }
 
 func (id *ShortID) UnmarshalJSON(b []byte) error {
-	str := string(b)
-	if str == nullStr { // If "null", do nothing
+	if string(b) == nullStr { // If "null", do nothing
 		return nil
-	} else if len(str) < 2 {
+	} else if len(b) < 2 {
 		return errMissingQuotes
 	}
 
-	lastIndex := len(str) - 1
-	if str[0] != '"' || str[lastIndex] != '"' {
+	lastIndex := len(b) - 1
+	if b[0] != '"' || b[lastIndex] != '"' {
 		return errMissingQuotes
 	}
 
-	// Parse CB58 formatted string to bytes
-	bytes, err := cb58.Decode(str[1:lastIndex])
-	if err != nil {
-		return fmt.Errorf("couldn't decode ID to bytes: %w", err)
-	}
-	*id, err = ToShortID(bytes)
-	return err
+	return id.UnmarshalText(b[1:lastIndex])
 }
 
 func (id *ShortID) UnmarshalText(text []byte) error {
-	return id.UnmarshalJSON(text)
+	var err error
+	*id, err = ShortFromString(string(text))
+	return err
 }
 
 // Bytes returns the 20 byte hash as a slice. It is assumed this slice is not

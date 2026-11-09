@@ -50,7 +50,7 @@ func TestEncodeDecode(t *testing.T) {
 		// Make sure the string repr. is what we expected
 		require.Equal(test.str, strResult)
 		// Decode the string
-		bytesResult, err := Decode(strResult)
+		bytesResult, err := Decode(strResult, len(test.bytes))
 		require.NoError(err)
 		// Make sure we got the same bytes back
 		require.True(bytes.Equal(test.bytes, bytesResult))
@@ -66,7 +66,7 @@ func FuzzEncodeDecode(f *testing.F) {
 		require.NoError(err)
 
 		// Decode string to bytes
-		gotData, err := Decode(dataStr)
+		gotData, err := Decode(dataStr, len(data))
 		require.NoError(err)
 
 		require.Equal(data, gotData)

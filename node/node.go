@@ -78,6 +78,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/registry"
@@ -86,7 +87,6 @@ import (
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
-	saevm "github.com/ava-labs/avalanchego/vms/saevm/cchain"
 )
 
 const (
@@ -416,6 +416,17 @@ type Node struct {
  ******************************************************************************
  */
 
+// listen creates a TCP listener on the given address.
+//
+// See [net.Listen] for more details.
+func listen(ctx context.Context, address string) (net.Listener, error) {
+	var lc net.ListenConfig
+	// Harden against the public exploit of CVE-2026-98432 in case the node is
+	// running on a vulnerable operating system.
+	lc.SetMultipathTCP(false)
+	return lc.Listen(ctx, constants.NetworkType, address)
+}
+
 // Initialize the networking layer.
 // Assumes [n.vdrs], [n.CPUTracker], and [n.CPUTargeter] have been initialized.
 func (n *Node) initNetworking(reg prometheus.Registerer) error {
@@ -437,7 +448,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
 	// 2: https://github.com/golang/go/issues/56998
 	listenAddress := net.JoinHostPort(n.Config.ListenHost, strconv.FormatUint(uint64(n.Config.ListenPort), 10))
-	listener, err := net.Listen(constants.NetworkType, listenAddress)
+	listener, err := listen(context.TODO(), listenAddress)
 	if err != nil {
 		return err
 	}
@@ -971,7 +982,7 @@ func (n *Node) initAPIServer() error {
 	}
 
 	listenAddress := net.JoinHostPort(n.Config.HTTPHost, strconv.FormatUint(uint64(n.Config.HTTPPort), 10))
-	listener, err := net.Listen("tcp", listenAddress)
+	listener, err := listen(context.TODO(), listenAddress)
 	if err != nil {
 		return err
 	}
@@ -1226,7 +1237,7 @@ func (n *Node) initVMs() error {
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 			},
 		}),
-		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &saevm.Factory{}),
+		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &cchain.Factory{}),
 	)
 	if err != nil {
 		return err
@@ -1354,6 +1365,7 @@ func (n *Node) initProfiler() {
 		filepath.Join(n.Config.ProfilerConfig.Dir, "continuous"),
 		n.Config.ProfilerConfig.Freq,
 		n.Config.ProfilerConfig.MaxNumFiles,
+		n.Config.ProfilerConfig.MutexProfileFraction,
 	)
 	go n.Log.RecoverAndPanic(func() {
 		err := n.profiler.Dispatch()

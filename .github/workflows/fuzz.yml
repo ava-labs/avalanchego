@@ -22,7 +22,6 @@ jobs:
           - x/archivedb
           - vms/platformvm
           - vms/evm
-          - vms/saevm
           - simplex
           - graft
     steps:

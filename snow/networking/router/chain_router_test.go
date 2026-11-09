@@ -15,7 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
-	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -100,7 +100,7 @@ func TestShutdown(t *testing.T) {
 	)
 	require.NoError(err)
 
-	p2pTracker, err := p2p.NewPeerTracker(
+	p2pTracker, err := peertracker.New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
@@ -227,7 +227,7 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 	)
 	require.NoError(err)
 
-	p2pTracker, err := p2p.NewPeerTracker(
+	p2pTracker, err := peertracker.New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
@@ -361,7 +361,7 @@ func TestShutdownTimesOut(t *testing.T) {
 	)
 	require.NoError(err)
 
-	p2pTracker, err := p2p.NewPeerTracker(
+	p2pTracker, err := peertracker.New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
@@ -531,7 +531,7 @@ func TestRouterTimeout(t *testing.T) {
 	)
 	require.NoError(err)
 
-	p2pTracker, err := p2p.NewPeerTracker(
+	p2pTracker, err := peertracker.New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
@@ -1064,7 +1064,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 	)
 	require.NoError(err)
 
-	p2pTracker, err := p2p.NewPeerTracker(
+	p2pTracker, err := peertracker.New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
@@ -1231,7 +1231,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 	)
 	require.NoError(err)
 
-	p2pTracker, err := p2p.NewPeerTracker(
+	p2pTracker, err := peertracker.New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),
@@ -1579,7 +1579,7 @@ func TestBenchedPeerEarlyFailureThenTimeoutOrResponse(t *testing.T) {
 				engine.AncestorsF = func(context.Context, ids.NodeID, uint32, [][]byte) error { close(unwantedCall); return nil }
 				engine.PutF = func(context.Context, ids.NodeID, uint32, []byte) error { close(unwantedCall); return nil }
 				engine.AppResponseF = func(context.Context, ids.NodeID, uint32, []byte) error { close(unwantedCall); return nil }
-				engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, ids.ID, uint64) error {
+				engine.ChitsF = func(context.Context, ids.NodeID, uint32, ids.ID, ids.ID, uint64) error {
 					close(unwantedCall)
 					return nil
 				}
@@ -1700,7 +1700,7 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 	)
 	require.NoError(t, err)
 
-	p2pTracker, err := p2p.NewPeerTracker(
+	p2pTracker, err := peertracker.New(
 		logging.NoLog{},
 		"",
 		prometheus.NewRegistry(),

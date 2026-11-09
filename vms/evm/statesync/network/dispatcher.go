@@ -1,0 +1,124 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package network
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/ava-labs/libevm/libevm/options"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/proto"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
+	"github.com/ava-labs/avalanchego/utils/logging"
+)
+
+var (
+	errSendRequest       = errors.New("send request")
+	errHandlerFailed     = errors.New("handler request failed")
+	errMarshalRequest    = errors.New("marshal request")
+	errUnmarshalResponse = errors.New("unmarshal response")
+)
+
+// ProtoMessage constrains a message to its pointer type, so a generic holder can
+// allocate one with new instead of taking a constructor.
+type ProtoMessage[T any] interface {
+	proto.Message
+	*T
+}
+
+// Dispatcher is a typed synchronous client bound to one handler ID.
+// Use one instance per RPC type.
+type Dispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any] struct {
+	log    logging.Logger
+	client *peertracker.Client
+	policy retryPolicy
+}
+
+// NewDispatcher returns a [Dispatcher] that sends through client.
+func NewDispatcher[Req proto.Message, In any, Resp ProtoMessage[In], Out any](
+	log logging.Logger,
+	client *peertracker.Client,
+	opts ...RetryOption,
+) *Dispatcher[Req, In, Resp, Out] {
+	return &Dispatcher[Req, In, Resp, Out]{
+		// Tagged once, so every retry line names the RPC without each caller repeating it.
+		log:    log.With(zap.Uint64("handlerID", client.HandlerID())),
+		client: client,
+		policy: *options.ApplyTo(defaultRetryPolicy(), opts...),
+	}
+}
+
+// Send retries req until a peer sends a response that parse accepts or ctx ends.
+func (d *Dispatcher[Req, In, Resp, Out]) Send(
+	ctx context.Context,
+	req Req,
+	parse func(Resp) (Out, error),
+) (Out, error) {
+	requestBytes, err := proto.Marshal(req)
+	if err != nil {
+		var zero Out
+		return zero, fmt.Errorf("%w: %w", errMarshalRequest, err)
+	}
+	return doRetry(ctx, d.log, d.policy, func(ctx context.Context) (Out, error) {
+		return d.sendBytes(ctx, requestBytes, parse)
+	})
+}
+
+func (d *Dispatcher[Req, In, Resp, Out]) sendBytes(
+	ctx context.Context,
+	requestBytes []byte,
+	parse func(Resp) (Out, error),
+) (Out, error) {
+	var zero Out
+	if err := ctx.Err(); err != nil {
+		return zero, err
+	}
+
+	type result struct {
+		out Out
+		err error
+	}
+	// Buffered so a reply landing after ctx ends never blocks the handler.
+	resultCh := make(chan result, 1)
+	onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, appErr error) bool {
+		out, err := decode[In, Resp](responseBytes, appErr, parse)
+		resultCh <- result{out: out, err: err}
+		// Everything decode rejects is the peer's doing: a handler error, a
+		// malformed reply, or a proof the caller would not accept.
+		return err == nil
+	}
+
+	if err := d.client.AppRequestAny(ctx, requestBytes, onResponse); err != nil {
+		return zero, fmt.Errorf("%w: %w", errSendRequest, err)
+	}
+
+	select {
+	case r := <-resultCh:
+		return r.out, r.err
+	case <-ctx.Done():
+		return zero, ctx.Err()
+	}
+}
+
+// decode turns a reply into Resp and applies the caller's verdict. It runs on
+// the handler goroutine, so a rejection de-scores the peer that served it.
+func decode[In any, Resp ProtoMessage[In], Out any](
+	responseBytes []byte,
+	appErr error,
+	parse func(Resp) (Out, error),
+) (Out, error) {
+	var zero Out
+	if appErr != nil {
+		return zero, fmt.Errorf("%w: %w", errHandlerFailed, appErr)
+	}
+	resp := Resp(new(In))
+	if err := proto.Unmarshal(responseBytes, resp); err != nil {
+		return zero, fmt.Errorf("%w: %w", errUnmarshalResponse, err)
+	}
+	return parse(resp)
+}

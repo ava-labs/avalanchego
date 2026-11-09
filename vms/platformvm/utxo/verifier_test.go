@@ -278,6 +278,66 @@ func TestVerifySpendUTXOs(t *testing.T) {
 			expectedErr:     errLocktimeMismatch,
 		},
 		{
+			description: "output as input",
+			utxos: []*avax.UTXO{{
+				Out: &secp256k1fx.TransferOutput{},
+			}},
+			ins: []*avax.TransferableInput{{
+				In: &secp256k1fx.TransferOutput{},
+			}},
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+			},
+			expectedErr: secp256k1fx.ErrWrongInputType,
+		},
+		{
+			description: "locked output as input",
+			utxos: []*avax.UTXO{{
+				Out: &secp256k1fx.TransferOutput{},
+			}},
+			ins: []*avax.TransferableInput{{
+				In: &stakeable.LockOut{
+					TransferableOut: &secp256k1fx.TransferOutput{},
+				},
+			}},
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+			},
+			expectedErr: secp256k1fx.ErrWrongInputType,
+		},
+		{
+			description: "locked input wrapping output",
+			utxos: []*avax.UTXO{{
+				Out: &secp256k1fx.TransferOutput{},
+			}},
+			ins: []*avax.TransferableInput{{
+				In: &stakeable.LockIn{
+					TransferableIn: &secp256k1fx.TransferOutput{},
+				},
+			}},
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+			},
+			expectedErr: secp256k1fx.ErrWrongInputType,
+		},
+		{
+			description: "locked input wrapping locked output",
+			utxos: []*avax.UTXO{{
+				Out: &secp256k1fx.TransferOutput{},
+			}},
+			ins: []*avax.TransferableInput{{
+				In: &stakeable.LockIn{
+					TransferableIn: &stakeable.LockOut{
+						TransferableOut: &secp256k1fx.TransferOutput{},
+					},
+				},
+			}},
+			creds: []verify.Verifiable{
+				&secp256k1fx.Credential{},
+			},
+			expectedErr: secp256k1fx.ErrWrongInputType,
+		},
+		{
 			description: "one input, no outputs, positive fee",
 			utxos: []*avax.UTXO{{
 				Asset: avax.Asset{ID: h.ctx.AVAXAssetID},

@@ -62,23 +62,6 @@ func TestClient_AppRequest(t *testing.T) {
 				return client.AppRequest(ctx, set.Of(ids.EmptyNodeID), []byte("foo"), onResponse)
 			},
 		},
-		{
-			name:        "AppRequestAny - response",
-			appResponse: []byte("foobar"),
-			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
-				return client.AppRequestAny(ctx, []byte("foo"), onResponse)
-			},
-		},
-		{
-			name: "AppRequestAny - error",
-			appErr: &common.AppError{
-				Code:    123,
-				Message: "foobar",
-			},
-			appRequestF: func(ctx context.Context, client *p2p.Client, onResponse p2p.AppResponseCallback) error {
-				return client.AppRequestAny(ctx, []byte("foo"), onResponse)
-			},
-		},
 	}
 
 	for _, tt := range tests {

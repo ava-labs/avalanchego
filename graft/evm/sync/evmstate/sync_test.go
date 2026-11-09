@@ -24,6 +24,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 	"github.com/ava-labs/avalanchego/graft/evm/message/messagetest"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/client"
@@ -32,13 +33,13 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/statesync/statesynctest"
 
 	handlerstats "github.com/ava-labs/avalanchego/graft/evm/sync/handlers/stats"
-	leafproto "github.com/ava-labs/avalanchego/vms/evm/sync/hashdb"
-	vmssynctest "github.com/ava-labs/avalanchego/vms/evm/sync/synctest"
+	leafproto "github.com/ava-labs/avalanchego/vms/evm/statesync/hashdb"
 )
 
 const testRequestSize = 1024
@@ -625,7 +626,7 @@ func TestSyncOverProtoLeafProtocol(t *testing.T) {
 	require.Truef(t, ok, "%T is not an ethdb.Database", clientDB.DiskDB())
 
 	log := loggingtest.New(t, logging.Debug)
-	net, tracker := vmssynctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
+	net, tracker := statesynctest.NewSelfNetwork(t, ctx, ids.GenerateTestNodeID())
 	require.NoError(t, leafproto.RegisterHandler(log, net, p2p.EVMLeafRequestHandlerID, serverDB.TrieDB(), common.HashLength))
 
 	codeQueue, err := code.NewQueue(clientEthDB)
@@ -633,7 +634,11 @@ func TestSyncOverProtoLeafProtocol(t *testing.T) {
 
 	stateSyncer, err := NewSyncer(
 		log,
-		leafproto.NewClient(log, net, p2p.EVMLeafRequestHandlerID, common.HashLength, tracker),
+		leafproto.NewClient(
+			log,
+			peertracker.NewClient(net, p2p.EVMLeafRequestHandlerID, tracker),
+			common.HashLength,
+		),
 		clientEthDB,
 		root,
 		codeQueue,

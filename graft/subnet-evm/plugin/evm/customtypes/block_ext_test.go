@@ -13,9 +13,9 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/blocktest"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 
 func TestBlockGetters(t *testing.T) {
@@ -111,9 +111,9 @@ func exportedFieldsPointToDifferentMemory[T interface {
 }](t *testing.T, original, cpy *T) {
 	t.Helper()
 
-	v := reflect.ValueOf(*original)
+	v := reflect.ValueOf(original).Elem()
 	typ := v.Type()
-	cp := reflect.ValueOf(*cpy)
+	cp := reflect.ValueOf(cpy).Elem()
 	for i := range v.NumField() {
 		field := typ.Field(i)
 		if !field.IsExported() {

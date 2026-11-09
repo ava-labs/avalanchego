@@ -116,7 +116,7 @@ func initComposeConfig(
 	if err != nil {
 		return fmt.Errorf("failed to marshal compose project: %w", err)
 	}
-	composePath := filepath.Join(targetPath, "docker-compose.yml")
+	composePath := filepath.Join(targetPath, "docker-compose.yaml")
 	if err := os.WriteFile(composePath, bytes, perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write genesis: %w", err)
 	}
@@ -145,14 +145,6 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		bootstrapIP  string
 		bootstrapIDs string
 	)
-
-	if network.PrimaryChainConfigs == nil {
-		network.PrimaryChainConfigs = make(map[string]tmpnet.ConfigMap)
-	}
-	if network.PrimaryChainConfigs["C"] == nil {
-		network.PrimaryChainConfigs["C"] = make(tmpnet.ConfigMap)
-	}
-	network.PrimaryChainConfigs["C"]["log-json-format"] = true
 
 	chainConfigContent, err := network.GetChainConfigContent()
 	if err != nil {

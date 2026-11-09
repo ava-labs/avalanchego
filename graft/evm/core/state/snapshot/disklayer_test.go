@@ -31,7 +31,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
@@ -538,7 +538,7 @@ func TestDiskSeek(t *testing.T) {
 		pos    byte
 		expkey byte
 	}
-	var cases = []testcase{
+	cases := []testcase{
 		{0xff, 0x55}, // this should exit immediately without checking key
 		{0x01, 0x02},
 		{0xfe, 0xfe},
