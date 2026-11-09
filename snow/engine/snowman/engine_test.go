@@ -3445,14 +3445,14 @@ func TestEngineAbandonsBlocksTooFarAhead(t *testing.T) {
 			// The up-to-date node records whenever it is asked for [missingParent].
 			// That request is the proof that the lagging node chose to fetch rather than abandon.
 			var parentRequested bool
-			network.Register(upToDateNodeID, &getObserver{
-				Handler: upToDateEngine,
-				onGet: func(blkID ids.ID) {
+			network.Register(upToDateNodeID, snowmanenginetest.WithGetInterceptor(upToDateEngine,
+				func(_ context.Context, _ ids.NodeID, _ uint32, blkID ids.ID) error {
 					if blkID == missingParent.ID() {
 						parentRequested = true
 					}
+					return nil
 				},
-			})
+			))
 			network.Register(laggingNodeID, laggingEngine)
 
 			require.NoError(upToDateEngine.Start(t.Context(), 0))
@@ -3612,15 +3612,15 @@ func TestEngineRecoversFromIngestionCap(t *testing.T) {
 	peer, err := New(peerCfg)
 	require.NoError(err)
 	var requestedHeights []uint64
-	network.Register(peerID, &queryObserver{
-		Handler: peer,
-		onQuery: func(requestedHeight uint64) {
+	network.Register(peerID, snowmanenginetest.WithQueryInterceptor(peer,
+		func(_ context.Context, _ ids.NodeID, _ uint32, requestedHeight uint64) error {
 			// The node must never poll for a block it would refuse to ingest.
 			_, lastAcceptedHeight := node.Consensus.LastAccepted()
 			require.LessOrEqual(requestedHeight, lastAcceptedHeight+heightLimit)
 			requestedHeights = append(requestedHeights, requestedHeight)
+			return nil
 		},
-	})
+	))
 	require.NoError(peer.Start(t.Context(), 0))
 
 	// While the peer pushes the chain to the node, the node sees its only
@@ -3748,17 +3748,17 @@ func TestEngineQueriesNextHeightWhenIngestionLimitOverflows(t *testing.T) {
 	peer, err := New(peerCfg)
 	require.NoError(err)
 	var numQueries int
-	network.Register(peerID, &queryObserver{
-		Handler: peer,
-		onQuery: func(requestedHeight uint64) {
+	network.Register(peerID, snowmanenginetest.WithQueryInterceptor(peer,
+		func(_ context.Context, _ ids.NodeID, _ uint32, requestedHeight uint64) error {
 			// Every poll must ask about the height after [child], the node's preference.
 			preferred, preferredHeight := node.Consensus.Preference()
 			require.Equal(child.ID(), preferred)
 			require.Equal(math.MaxUint64-uint64(99), preferredHeight)
 			require.Equal(child.Height()+1, requestedHeight)
 			numQueries++
+			return nil
 		},
-	})
+	))
 	require.NoError(peer.Start(t.Context(), 0))
 
 	// Issuing [child] makes it the preference and the node polls the peer about it.
@@ -3780,33 +3780,4 @@ func acceptedCopies(blks []*snowmantest.Block) []*snowmantest.Block {
 		copies[i] = &blkCopy
 	}
 	return copies
-}
-
-// getObserver forwards a node's messages to the wrapped handler and reports
-// the block ID of every Get request to [onGet] first.
-type getObserver struct {
-	common.Handler
-	onGet func(blkID ids.ID)
-}
-
-func (o *getObserver) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
-	o.onGet(blkID)
-	return o.Handler.Get(ctx, nodeID, requestID, blkID)
-}
-
-// queryObserver forwards a node's messages to the wrapped handler and reports
-// the requested height of every query to [onQuery] first.
-type queryObserver struct {
-	common.Handler
-	onQuery func(requestedHeight uint64)
-}
-
-func (o *queryObserver) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID, requestedHeight uint64) error {
-	o.onQuery(requestedHeight)
-	return o.Handler.PullQuery(ctx, nodeID, requestID, blkID, requestedHeight)
-}
-
-func (o *queryObserver) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkBytes []byte, requestedHeight uint64) error {
-	o.onQuery(requestedHeight)
-	return o.Handler.PushQuery(ctx, nodeID, requestID, blkBytes, requestedHeight)
 }

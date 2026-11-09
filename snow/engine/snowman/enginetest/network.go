@@ -225,6 +225,91 @@ func (s *Sender) SendChits(_ context.Context, nodeID ids.NodeID, requestID uint3
 	})
 }
 
+// WithQueryInterceptor wraps h so that f runs before every PullQuery and PushQuery
+// that h receives. If f returns an error, the query is not forwarded to h.
+func WithQueryInterceptor(h common.Handler, f queryInterceptor) common.Handler {
+	return &handlerInterceptor{
+		Handler: h,
+		interceptPullQuery: func(ctx context.Context, nodeID ids.NodeID, requestID uint32, _ ids.ID, requestedHeight uint64) error {
+			return f(ctx, nodeID, requestID, requestedHeight)
+		},
+		interceptPushQuery: func(ctx context.Context, nodeID ids.NodeID, requestID uint32, _ []byte, requestedHeight uint64) error {
+			return f(ctx, nodeID, requestID, requestedHeight)
+		},
+	}
+}
+
+func WithGetInterceptor(h common.Handler, f getInterceptor) common.Handler {
+	return &handlerInterceptor{
+		Handler:      h,
+		interceptGet: f,
+	}
+}
+
+type handlerInterceptor struct {
+	common.Handler
+	interceptPullQuery pullQueryInterceptor
+	interceptPushQuery pushQueryInterceptor
+	interceptGet       getInterceptor
+}
+
+func (h *handlerInterceptor) PullQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, containerID ids.ID, requestedHeight uint64) error {
+	if h.interceptPullQuery != nil {
+		if err := h.interceptPullQuery(ctx, nodeID, requestID, containerID, requestedHeight); err != nil {
+			return err
+		}
+	}
+	return h.Handler.PullQuery(ctx, nodeID, requestID, containerID, requestedHeight)
+}
+
+func (h *handlerInterceptor) PushQuery(ctx context.Context, nodeID ids.NodeID, requestID uint32, container []byte, requestedHeight uint64) error {
+	if h.interceptPushQuery != nil {
+		if err := h.interceptPushQuery(ctx, nodeID, requestID, container, requestedHeight); err != nil {
+			return err
+		}
+	}
+	return h.Handler.PushQuery(ctx, nodeID, requestID, container, requestedHeight)
+}
+
+func (h *handlerInterceptor) Get(ctx context.Context, nodeID ids.NodeID, requestID uint32, blkID ids.ID) error {
+	if h.interceptGet != nil {
+		if err := h.interceptGet(ctx, nodeID, requestID, blkID); err != nil {
+			return err
+		}
+	}
+	return h.Handler.Get(ctx, nodeID, requestID, blkID)
+}
+
+type queryInterceptor func(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	requestID uint32,
+	requestedHeight uint64,
+) error
+
+type pullQueryInterceptor func(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	requestID uint32,
+	containerID ids.ID,
+	requestedHeight uint64,
+) error
+
+type pushQueryInterceptor func(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	requestID uint32,
+	container []byte,
+	requestedHeight uint64,
+) error
+
+type getInterceptor func(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	requestID uint32,
+	blkID ids.ID,
+) error
+
 func sortedNodeIDs(nodeIDs set.Set[ids.NodeID]) []ids.NodeID {
 	sorted := nodeIDs.List()
 	slices.SortFunc(sorted, ids.NodeID.Compare)
