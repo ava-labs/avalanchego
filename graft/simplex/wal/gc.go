@@ -80,7 +80,7 @@ func loadGarbageCollectedWAL(wal DeletableWAL, reader Reader) (garbageCollectedW
 	var size int
 
 	for _, entry := range entries {
-		size += len(entry)
+		size += recordSize(entry)
 		round, err := reader.Round(entry)
 		if err != nil {
 			data := base64.StdEncoding.EncodeToString(entry)
@@ -118,11 +118,11 @@ func (gcw *GarbageCollectedWAL) Append(payload []byte) error {
 		gcw.wals = append(gcw.wals, garbageCollectedWAL{
 			DeletableWAL: newWAL,
 			round:        round,
-			size:         len(payload),
+			size:         recordSize(payload),
 		})
 	} else {
 		// We're still using the last WAL, so we need to update its size
-		gcw.wals[len(gcw.wals)-1].size += len(payload)
+		gcw.wals[len(gcw.wals)-1].size += recordSize(payload)
 	}
 
 	last := len(gcw.wals) - 1
@@ -133,6 +133,8 @@ func (gcw *GarbageCollectedWAL) Append(payload []byte) error {
 	return gcw.wals[last].Append(payload)
 }
 
+// shouldWeCreateNewWAL returns true if there is no WAL yet, or if appending
+// [payload] to the last WAL would exceed the max WAL size.
 func (gcw *GarbageCollectedWAL) shouldWeCreateNewWAL(payload []byte) bool {
 	var shouldCreateNewWAL bool
 
@@ -140,7 +142,7 @@ func (gcw *GarbageCollectedWAL) shouldWeCreateNewWAL(payload []byte) bool {
 		shouldCreateNewWAL = true
 	} else {
 		lastWALSize := gcw.wals[len(gcw.wals)-1].size
-		shouldCreateNewWAL = lastWALSize+len(payload) > gcw.maxWalSize
+		shouldCreateNewWAL = lastWALSize+recordSize(payload) > gcw.maxWalSize
 	}
 	return shouldCreateNewWAL
 }
