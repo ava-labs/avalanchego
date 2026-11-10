@@ -337,7 +337,6 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 	}`
 	require.JSONEq(t, expectedJSON, string(result))
 
-	// Upgrades are read from their own database key, not the chain config.
 	var unmarshalled ChainConfigWithUpgradesJSON
 	require.NoError(t, json.Unmarshal(result, &unmarshalled), "json.Unmarshal()")
 	want := ChainConfigWithUpgradesJSON{
