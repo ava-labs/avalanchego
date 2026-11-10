@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -569,13 +570,13 @@ func TestShutdownPreventsRestart(t *testing.T) {
 				require.NoError(t, err)
 
 				var (
-					frontierRequests int
+					frontierRequests atomic.Int32
 					frontierReqID    uint32
 					acceptedReqID    uint32
 					ancestorsReqID   uint32
 				)
 				sender.SendGetAcceptedFrontierF = func(_ context.Context, _ set.Set[ids.NodeID], reqID uint32) {
-					frontierRequests++
+					frontierRequests.Add(1)
 					frontierReqID = reqID
 				}
 				sender.SendGetAcceptedF = func(_ context.Context, _ set.Set[ids.NodeID], reqID uint32, _ []ids.ID) {
@@ -600,11 +601,11 @@ func TestShutdownPreventsRestart(t *testing.T) {
 					require.NoError(t, bs.Shutdown(t.Context()))
 				}
 
-				before := frontierRequests
+				before := frontierRequests.Load()
 				time.Sleep(2 * bootstrappingDelay)
 				synctest.Wait()
 
-				require.Equal(t, tt.wantRestart, frontierRequests > before)
+				require.Equal(t, tt.wantRestart, frontierRequests.Load() > before)
 			})
 		})
 	}
