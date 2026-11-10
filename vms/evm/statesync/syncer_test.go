@@ -196,7 +196,7 @@ func TestCancelSync(t *testing.T) {
 
 // TestSyncErrorRecovers checks that any error in the sync process gracefully
 // errors and is recoverable. Only the ethdb.Database fails, so this doesn't
-// cover Firewood writes.
+// cover Firewood disk writes.
 func TestSyncErrorRecovers(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {

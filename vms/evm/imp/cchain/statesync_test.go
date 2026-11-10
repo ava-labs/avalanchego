@@ -290,7 +290,8 @@ func TestStateSyncDisabled(t *testing.T) {
 }
 
 // TestStateSyncDBFailure checks that a database failure is surfaced to the
-// engine. Only ethdb.Database fails, so this doesn't cover Firewood writes.
+// engine. Only ethdb.Database fails, so this doesn't cover Firewood disk
+// writes.
 func TestStateSyncDBFailure(t *testing.T) {
 	for _, scheme := range schemes {
 		t.Run(scheme, func(t *testing.T) {

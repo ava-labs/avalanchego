@@ -38,7 +38,10 @@ import (
 )
 
 // A Syncer can fully state-sync an EVM database, sufficient for execution with
-// an [sae.VM].
+// an [sae.VM]. Each method MUST only be called once, in the following order:
+//   - [Syncer.ShouldAcceptSummary]
+//   - [Syncer.Sync]
+//   - [Syncer.WriteSynced]
 type Syncer struct {
 	cfg   Config
 	hooks hook.Points
@@ -49,7 +52,7 @@ type Syncer struct {
 	blockParser syncblock.Parser
 }
 
-// Syncer returns a [Syncer] using the same data as the [Handler].
+// NewSyncer returns a [Syncer].
 func NewSyncer(cfg Config, hooks hook.Points, snowCtx *snow.Context, network *network.Network, db ethdb.Database) *Syncer {
 	return &Syncer{
 		cfg:         cfg,
@@ -159,7 +162,7 @@ func (s *Syncer) syncFirewood(ctx context.Context, root common.Hash, codeSyncer 
 	}()
 	fw, ok := tdb.Backend().(*firewood.TrieDB)
 	if !ok {
-		return fmt.Errorf("unexpected Firewood backend %T", tdb.Backend())
+		return fmt.Errorf("expected Firewood backend, got %T", tdb.Backend())
 	}
 
 	c, err := s.network.SyncClient(p2p.FirewoodProofHandlerID)
