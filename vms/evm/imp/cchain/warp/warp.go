@@ -47,12 +47,8 @@ var errNoBlockContext = errors.New("no block context")
 
 var warpConfig = &corethwarp.Config{}
 
-// MessagesFromAccessList returns the Warp messages in list, in order. It returns
-// nil before Durango.
-func MessagesFromAccessList(isDurango bool, list types.AccessList) []predicate.Predicate {
-	if !isDurango {
-		return nil
-	}
+// MessagesFromAccessList returns the Warp messages in list, in order.
+func MessagesFromAccessList(list types.AccessList) []predicate.Predicate {
 	var messages []predicate.Predicate
 	for _, tuple := range list {
 		if tuple.Address == corethwarp.ContractAddress {
@@ -62,11 +58,11 @@ func MessagesFromAccessList(isDurango bool, list types.AccessList) []predicate.P
 	return messages
 }
 
-// VerifyBlock verifies the Warp messages of every transaction in the block.
+// VerifyBlock verifies the Warp messages of every transaction in a post-Durango
+// block.
 func VerifyBlock(
 	snowContext *snow.Context,
 	blockContext *block.Context, // MAY be nil
-	isDurango bool,
 	txs []*types.Transaction,
 ) (predicate.BlockResults, error) {
 	type result = lazyEntry[common.Hash, predicate.PrecompileResults]
@@ -80,7 +76,7 @@ func VerifyBlock(
 	)
 	eg.SetLimit(runtime.GOMAXPROCS(0))
 	for _, tx := range txs {
-		messages := MessagesFromAccessList(isDurango, tx.AccessList())
+		messages := MessagesFromAccessList(tx.AccessList())
 		if len(messages) == 0 {
 			continue
 		}

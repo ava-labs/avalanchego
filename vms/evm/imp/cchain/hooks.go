@@ -531,8 +531,8 @@ func (b *builder) BuildBlock(
 		return nil, fmt.Errorf("marshalling txs: %w", err)
 	}
 
-	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
-	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, corethparams.GetRulesExtra(rules).IsDurango, ethTxs)
+	// SAE blocks are post-Helicon, and therefore post-Durango.
+	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, ethTxs)
 	if err != nil {
 		return nil, fmt.Errorf("verifying warp messages: %w", err)
 	}
