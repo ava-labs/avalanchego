@@ -358,18 +358,12 @@ type builder struct {
 	desired      desiredParams
 }
 
-var (
-	errHeliconUnactivated = errors.New("helicon is not activated")
-	errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
-)
+var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
 
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
-	if !b.ctx.NetworkUpgrades.IsHeliconActivated(now) {
-		return nil, errHeliconUnactivated
-	}
 
 	de := delayExponent(parent)
 	parentTime := blockTime(parent)

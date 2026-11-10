@@ -1880,50 +1880,6 @@ func TestEmptyBlocksDisallowed(t *testing.T) {
 	})
 }
 
-// TestPreHeliconBlocksDisallowed verifies blocks cannot be built or verified
-// before Helicon activates, but can still be parsed.
-func TestPreHeliconBlocksDisallowed(t *testing.T) {
-	key := txtest.NewKey(t)
-	// Schedule Helicon after the other upgrades so a pre-Helicon timestamp is
-	// representable without deactivating the rest of the schedule.
-	heliconTime := upgrade.InitiallyActiveTime.Add(5 * time.Second)
-	preHeliconTime := heliconTime.Add(-time.Second)
-	timeOpt, clock := withVMTime(preHeliconTime)
-	ctx, sut := newSUT(t,
-		withMaxAllocFor(key.EthAddress()),
-		withUpgradeTime(upgradetest.Helicon, heliconTime),
-		timeOpt,
-	)
-
-	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
-	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
-	sut.WaitForPendingTxs(ctx, t)
-
-	t.Run("build", func(t *testing.T) {
-		_, err := sut.BuildBlock(ctx, nil)
-		require.ErrorIsf(t, err, errHeliconUnactivated, "%T.BuildBlock() should not build before Helicon", sut.VM)
-	})
-
-	t.Run("verify", func(t *testing.T) {
-		clock.Set(heliconTime)
-		valid := sut.BuildVerify(ctx, t, sut.LastAcceptedID(ctx, t))
-
-		hdr := valid.Header()
-		preHeliconMS := uint64(preHeliconTime.UnixMilli())
-		hdr.Time = preHeliconMS / 1000
-		customtypes.GetHeaderExtra(hdr).TimeMilliseconds = &preHeliconMS
-
-		rewound := valid.EthBlock().WithSeal(hdr)
-		buf, err := rlp.EncodeToBytes(rewound)
-		require.NoErrorf(t, err, "rlp.EncodeToBytes(rewound block)")
-		parsed, err := sut.ParseBlock(ctx, buf)
-		require.NoErrorf(t, err, "%T.ParseBlock(rewound block)", sut.VM)
-
-		err = sut.VerifyBlock(ctx, nil, parsed)
-		require.ErrorIsf(t, err, errHeliconUnactivated, "%T.VerifyBlock() should not allow pre-Helicon blocks", sut.VM)
-	})
-}
-
 // TestWarpPrecompileActivation verifies that executing the first post-Durango
 // block marks the warp precompile's account as non-empty when the genesis
 // predates Durango.
