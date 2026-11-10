@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
 )
 
 // TestShutdownLeaksNoGoroutines tests that Node does not start any goroutines

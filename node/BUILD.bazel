@@ -94,7 +94,7 @@ go_test(
         "//utils/constants",
         "//utils/logging",
         "//version",
-        "//vms/saevm/cchain/libevm",
+        "//vms/evm/imp/cchain/libevm",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_goleak//:goleak",
     ],
