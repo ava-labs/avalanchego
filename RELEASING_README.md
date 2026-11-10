@@ -128,40 +128,12 @@ The `require` directives at this commit reference `$VERSION`, which is not tagge
 
 ### 4. Test the Release Candidate
 
-Deploy `$VERSION_RC` by bumping image tags in [`devops-argocd`](https://github.com/ava-labs/devops-argocd).
+Deploy `$VERSION_RC` to Ava Labs-operated nodes by setting their image tags to `$VERSION_RC` in the infrastructure deployment repository. Update the API and validator image tags for:
 
-#### Primary Network Canaries
+- **Primary Network canaries** on both Fuji and Mainnet.
+- **Echo and Dispatch**, which are Fuji chains that run the public `avaplatform/subnet-evm` image. Echo is an L1 and Dispatch is a Subnet, so together they cover both validator models.
 
-Set the canary image tags to `$VERSION_RC` on both Fuji and Mainnet (e.g. [#17347](https://github.com/ava-labs/devops-argocd/pull/17347) and [#17348](https://github.com/ava-labs/devops-argocd/pull/17348)):
-
-- Fuji: [`base/network/testnet/avalanchego/base-canary/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/network/testnet/avalanchego/base-canary/cornice.yaml)
-- Mainnet: [`base/network/mainnet/avalanchego/base-canary/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/network/mainnet/avalanchego/base-canary/cornice.yaml)
-
-```yaml
-########## Canary version. ##########
-- name: api.image.tag
-  value: "$VERSION_RC"
-- name: validator.image.tag
-  value: "$VERSION_RC"
-########## End of Canary version ##########
-```
-
-#### Echo and Dispatch
-
-Echo and Dispatch are Fuji chains that deploy the public `avaplatform/subnet-evm` image. Echo is an L1 and Dispatch is a subnet, so between them they cover both validator models. Set their `api.image.tag` and `validator.image.tag` to `$VERSION_RC`:
-
-- Echo: [`base/subnet/testnet/echo/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/echo/avalanchego/base/cornice.yaml)
-- Dispatch: [`base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml)
-
-Once merged, monitor the deployments:
-
-- **Dispatch**: [Logs][dispatch-logs] | [Dashboard][dispatch-dashboard]
-- **Echo**: [Logs][echo-logs] | [Dashboard][echo-dashboard]
-
-[dispatch-logs]: https://avalabs.grafana.net/explore?schemaVersion=1&orgId=1&panes=%7B%22subnet-logs%22%3A%7B%22datasource%22%3A%22grafanacloud-logs%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22%7Bcluster%3D%5C%22subnets-testnet%5C%22%2Cservice_name%3D%5C%22avago%5C%22%2Csubnet%3D%5C%22dispatch%5C%22%7D%22%2C%22queryType%22%3A%22range%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D
-[dispatch-dashboard]: https://avalabs.grafana.net/d/12154d054f846686fc46ad306e451c30/dispatch-testnet-subnets
-[echo-logs]: https://avalabs.grafana.net/explore?schemaVersion=1&orgId=1&panes=%7B%22subnet-logs%22%3A%7B%22datasource%22%3A%22grafanacloud-logs%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22%7Bcluster%3D%5C%22subnets-testnet%5C%22%2Cservice_name%3D%5C%22avago%5C%22%2Csubnet%3D%5C%22echo%5C%22%7D%22%2C%22queryType%22%3A%22range%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D
-[echo-dashboard]: https://avalabs.grafana.net/d/87d80a2c2c15b54189eac1ae9c0241e4/echo-testnet-subnets
+After the deployments roll out, watch the Grafana logs and dashboards for each chain. Look for crashes, stalled block production, and new errors or warnings compared to the previous version.
 
 #### Fixing Issues Found in the Release Candidate
 
