@@ -1,5 +1,2 @@
 params/config_test.go
 params/config.go
-plugin/evm/customtypes/block_test.go
-plugin/evm/customtypes/rlp_fuzzer_test.go
-plugin/evm/customtypes/types_test.go

@@ -5,21 +5,25 @@ package customtypes
 
 import (
 	"encoding/json"
-	"math/big"
 	"slices"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/rlp"
-
-	"github.com/ava-labs/avalanchego/graft/evm/acp226"
+	"github.com/ava-labs/libevm/trie"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
-// SetBlockExtra sets the [BlockBodyExtra] `extra` in the [Block] `b`.
-func SetBlockExtra(b *ethtypes.Block, extra *BlockBodyExtra) {
+// GetBlockExtra returns the [BlockBodyExtra] carried by `b`.
+func GetBlockExtra(b *ethtypes.Block) *BlockBodyExtra {
+	return extras.Block.Get(b)
+}
+
+// WithBlockExtra sets `extra` on `b` and returns `b`.
+func WithBlockExtra(b *ethtypes.Block, extra *BlockBodyExtra) *ethtypes.Block {
 	extras.Block.Set(b, extra)
+	return b
 }
 
 // BlockBodyExtra is a struct containing extra fields used by Avalanche
@@ -29,12 +33,7 @@ type BlockBodyExtra struct {
 	ExtData *[]byte
 }
 
-// Copy deep copies the [BlockBodyExtra] `b` and returns it.
-// It is notably used in the following functions:
-// - [ethtypes.Block.Body]
-// - [ethtypes.Block.WithSeal]
-// - [ethtypes.Block.WithBody]
-// - [ethtypes.Block.WithWithdrawals]
+// Copy deep-copies b; it implements [ethtypes.BlockBodyPayload].
 func (b *BlockBodyExtra) Copy() *BlockBodyExtra {
 	cpy := *b
 	if b.ExtData != nil {
@@ -44,7 +43,7 @@ func (b *BlockBodyExtra) Copy() *BlockBodyExtra {
 	return &cpy
 }
 
-// BodyRLPFieldPointersForEncoding returns the fields that should be encoded
+// BodyRLPFieldsForEncoding returns the fields that should be encoded
 // for the [Body] and [BlockBodyExtra].
 // Note the following fields are added (+) and removed (-) compared to geth:
 // - (-) [ethtypes.Body] `Withdrawals` field
@@ -94,30 +93,14 @@ func (b *BlockBodyExtra) PostRPCUnmarshal(_ *ethtypes.Block, raw json.RawMessage
 }
 
 func BlockExtData(b *ethtypes.Block) []byte {
-	if data := extras.Block.Get(b).ExtData; data != nil {
+	if data := GetBlockExtra(b).ExtData; data != nil {
 		return *data
 	}
 	return nil
 }
 
 func BlockVersion(b *ethtypes.Block) uint32 {
-	return extras.Block.Get(b).Version
-}
-
-func BlockExtDataGasUsed(b *ethtypes.Block) *big.Int {
-	used := GetHeaderExtra(b.Header()).ExtDataGasUsed
-	if used == nil {
-		return nil
-	}
-	return new(big.Int).Set(used)
-}
-
-func BlockGasCost(b *ethtypes.Block) *big.Int {
-	cost := GetHeaderExtra(b.Header()).BlockGasCost
-	if cost == nil {
-		return nil
-	}
-	return new(big.Int).Set(cost)
+	return GetBlockExtra(b).Version
 }
 
 func BlockTimeMilliseconds(b *ethtypes.Block) *uint64 {
@@ -129,41 +112,22 @@ func BlockTimeMilliseconds(b *ethtypes.Block) *uint64 {
 	return &cp
 }
 
-func BlockMinDelayExcess(b *ethtypes.Block) *acp226.DelayExcess {
-	e := GetHeaderExtra(b.Header()).MinDelayExcess
-	if e == nil {
-		return nil
-	}
-	cp := *e
-	return &cp
-}
-
+// CalcExtDataHash returns the hash a header commits to for its block's ext
+// data; nil and empty ext data hash identically.
 func CalcExtDataHash(extdata []byte) common.Hash {
-	if len(extdata) == 0 {
-		return EmptyExtDataHash
-	}
 	return ethtypes.RLPHash(extdata)
 }
 
-// TODO(JonathanOppenheimer): take options instead of the positional
-// arguments, most of which are frequently nil/zero at call sites.
-//
-// Note: this code will get deleted but we may bring a simiar helper into
-// SAE.
-func NewBlockWithExtData(
-	header *ethtypes.Header, txs []*ethtypes.Transaction, uncles []*ethtypes.Header, receipts []*ethtypes.Receipt,
-	hasher ethtypes.TrieHasher, extdata []byte, recalc bool,
+// EmptyExtDataHash is [CalcExtDataHash] of no ext data.
+var EmptyExtDataHash = CalcExtDataHash(nil)
+
+// NewBlock builds a block whose header commits to `extdata` via
+// [HeaderExtra.ExtDataHash] and whose body carries it. The block keeps
+// `extdata` rather than copying it, so the caller MUST NOT modify it after.
+func NewBlock(
+	header *ethtypes.Header, txs []*ethtypes.Transaction, receipts []*ethtypes.Receipt, extdata []byte,
 ) *ethtypes.Block {
-	if recalc {
-		headerExtra := GetHeaderExtra(header)
-		headerExtra.ExtDataHash = CalcExtDataHash(extdata)
-	}
-	block := ethtypes.NewBlock(header, txs, uncles, receipts, hasher)
-	extdataCopy := make([]byte, len(extdata))
-	copy(extdataCopy, extdata)
-	extra := &BlockBodyExtra{
-		ExtData: &extdataCopy,
-	}
-	extras.Block.Set(block, extra)
-	return block
+	GetHeaderExtra(header).ExtDataHash = CalcExtDataHash(extdata)
+	block := ethtypes.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil))
+	return WithBlockExtra(block, &BlockBodyExtra{ExtData: &extdata})
 }

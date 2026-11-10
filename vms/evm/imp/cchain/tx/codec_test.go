@@ -17,10 +17,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
@@ -250,16 +250,13 @@ func TestFromBlock(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			block := customtypes.NewBlockWithExtData(
+			block := customtypes.NewBlock(
 				&types.Header{
 					Time: test.time,
 				},
 				nil, // txs
-				nil, // uncles
 				nil, // receipts
-				nil, // hasher, unused without txs
 				test.extData,
-				true, // update [customtypes.HeaderExtra.ExtDataHash]
 			)
 			got, err := FromBlock(config, block)
 			require.ErrorIs(t, err, test.wantErr, "FromBlock()")

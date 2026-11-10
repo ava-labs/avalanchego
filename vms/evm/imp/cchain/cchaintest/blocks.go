@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 )
@@ -125,11 +125,10 @@ func NewTestBlock(tb testing.TB, opts ...BlockOption) *types.Block {
 	)
 
 	block := types.NewBlock(header, props.ethTxs, nil /* uncles */, nil /* receipts */, saetest.TrieHasher())
-	customtypes.SetBlockExtra(block, &customtypes.BlockBodyExtra{
+	return customtypes.WithBlockExtra(block, &customtypes.BlockBodyExtra{
 		Version: props.version,
 		ExtData: &extData,
 	})
-	return block
 }
 
 // NewBlock returns a block whose ExtData encodes txs and whose header is
