@@ -10,11 +10,9 @@ import (
 	saetypes "github.com/ava-labs/avalanchego/vms/evm/types"
 )
 
-// NewBlockDBExecutionResults opens a [blockdb]-backed execution-results
-// database in `dataDir`. It is the canonical implementation of
-// [Points.ExecutionResultsDB]; the method remains an injection seam for tests
-// and future chains.
-func NewBlockDBExecutionResults(dataDir string, log logging.Logger) (saetypes.ExecutionResults, error) {
+// NewExecutionResults opens a [blockdb]-backed execution-results database in
+// `dataDir`.
+func NewExecutionResults(dataDir string, log logging.Logger) (saetypes.ExecutionResults, error) {
 	db, err := blockdb.New(
 		blockdb.DefaultConfig().WithDir(dataDir),
 		log,

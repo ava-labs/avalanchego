@@ -132,7 +132,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 }
 
 func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error) {
-	return hook.NewBlockDBExecutionResults(dataDir, h.ctx.Log)
+	return hook.NewExecutionResults(dataDir, h.ctx.Log)
 }
 
 // priceExponent returns h's ACP-283 price exponent, defaulting to

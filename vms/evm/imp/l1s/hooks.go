@@ -93,7 +93,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hookadaptor.BlockBuilder, er
 }
 
 func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error) {
-	return hook.NewBlockDBExecutionResults(dataDir, h.ctx.Log)
+	return hook.NewExecutionResults(dataDir, h.ctx.Log)
 }
 
 // GasConfigAfter derives the gas target and price config in effect after `h`
