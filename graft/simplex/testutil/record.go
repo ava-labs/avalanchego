@@ -15,7 +15,7 @@ func NewEmptyNotarization(nodes []common.NodeID, round uint64) *common.EmptyNota
 	var qc TestQC
 
 	for i, node := range nodes {
-		qc = append(qc, common.Signature{Signer: node, Value: []byte{byte(i)}})
+		qc.Signatures = append(qc.Signatures, Signature{Signer: NewNodeID(node), Value: []byte{byte(i)}})
 	}
 
 	return &common.EmptyNotarization{
@@ -27,14 +27,14 @@ func NewEmptyNotarization(nodes []common.NodeID, round uint64) *common.EmptyNota
 }
 
 func NewNotarization(logger common.Logger, signatureAggregator common.SignatureAggregator, block common.VerifiedBlock, ids []common.NodeID) (common.Notarization, error) {
-	votesForCurrentRound := make(map[string]*common.Vote)
+	votesForCurrentRound := make(map[common.NodeID]*common.Vote)
 	for _, id := range ids {
 		vote, err := NewTestVote(block, id)
 		if err != nil {
 			return common.Notarization{}, err
 		}
 
-		votesForCurrentRound[string(id)] = vote
+		votesForCurrentRound[id] = vote
 	}
 
 	notarization, err := common.NewNotarization(logger, signatureAggregator, votesForCurrentRound, block.BlockHeader())

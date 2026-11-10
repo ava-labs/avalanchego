@@ -31,7 +31,7 @@ var testSimplexMessage = simplexcommon.Message{
 			},
 		},
 		Signature: simplexcommon.Signature{
-			Signer: []byte("dummy_node_id"),
+			Signer: simplexcommon.NodeIDFromAvalancheID(ids.GenerateTestNodeID()),
 			Value:  []byte("dummy_signature"),
 		},
 	},
@@ -53,7 +53,7 @@ func TestCommSendMessage(t *testing.T) {
 	sender := config.Sender.(*sendermock.ExternalSender)
 	sender.EXPECT().Send(outboundMsg, expectedSendConfig, comm.subnetID, gomock.Any())
 
-	comm.Send(&testSimplexMessage, destinationNodeID[:])
+	comm.Send(&testSimplexMessage, simplexcommon.NodeIDFromAvalancheID(destinationNodeID))
 }
 
 // TestCommBroadcast tests the Broadcast method sends to all nodes in the subnet
@@ -68,10 +68,10 @@ func TestCommBroadcast(t *testing.T) {
 	require.NoError(t, err)
 	nodes := make([]ids.NodeID, 0, len(comm.Validators()))
 	for _, node := range comm.Validators() {
-		if node.Id.Equals(config.Ctx.NodeID[:]) {
+		if node.Id.Equals(simplexcommon.NodeIDFromAvalancheID(config.Ctx.NodeID)) {
 			continue // skip the sending node
 		}
-		nodes = append(nodes, ids.NodeID(node.Id))
+		nodes = append(nodes, ids.NodeID(node.Id.ShortID))
 	}
 
 	expectedSendConfig := common.SendConfig{

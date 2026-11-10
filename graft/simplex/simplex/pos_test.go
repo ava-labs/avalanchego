@@ -4,13 +4,13 @@
 package simplex_test
 
 import (
-	"bytes"
 	"testing"
 	"time"
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,21 +22,21 @@ func TestPoS(t *testing.T) {
 		4: 1,
 	}
 
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 
 	posSigAggregatorCreator := func(_ []common.Node) common.SignatureAggregator {
 		return &testutil.TestSignatureAggregator{
 			IsQuorumFunc: func(signatures []common.NodeID) bool {
 				var totalWeight uint64
 				for _, signer := range signatures {
-					totalWeight += weights[int(signer[0])]
+					totalWeight += weights[int(signer.ShortID[0])]
 				}
 				return totalWeight > 6
 			},
 			AboveByzantineThresholdFunc: func(signatures []common.NodeID) bool {
 				var totalWeight uint64
 				for _, signer := range signatures {
-					totalWeight += weights[int(signer[0])]
+					totalWeight += weights[int(signer.ShortID[0])]
 				}
 				return totalWeight > 3
 			},
@@ -107,7 +107,7 @@ func TestPoS(t *testing.T) {
 
 	net.TriggerLeaderBlockBuilder(10)
 	for _, n := range net.Instances {
-		if bytes.Equal(n.E.ID, nodes[0]) || bytes.Equal(n.E.ID, nodes[3]) {
+		if n.E.ID == nodes[0] || n.E.ID == nodes[3] {
 			continue
 		}
 		n.Storage.WaitForBlockCommit(8)
@@ -121,7 +121,7 @@ func TestPoS(t *testing.T) {
 
 	for net.Instances[1].E.Metadata().Round != 14 && net.Instances[2].E.Metadata().Round != 14 {
 		for _, n := range net.Instances {
-			if bytes.Equal(n.E.ID, nodes[0]) || bytes.Equal(n.E.ID, nodes[3]) {
+			if n.E.ID == nodes[0] || n.E.ID == nodes[3] {
 				continue
 			}
 			n.BlockShouldBeBuilt()
@@ -133,7 +133,7 @@ func TestPoS(t *testing.T) {
 
 	net.TriggerLeaderBlockBuilder(14)
 	for _, n := range net.Instances {
-		if bytes.Equal(n.E.ID, nodes[0]) || bytes.Equal(n.E.ID, nodes[3]) {
+		if n.E.ID == nodes[0] || n.E.ID == nodes[3] {
 			continue
 		}
 		n.Storage.WaitForBlockCommit(9)
@@ -152,7 +152,7 @@ func TestPoS(t *testing.T) {
 
 	for len(timedOut) < 3 {
 		for i, n := range net.Instances {
-			if bytes.Equal(n.E.ID, nodes[2]) {
+			if n.E.ID == nodes[2] {
 				continue
 			}
 			n.BlockShouldBeBuilt()

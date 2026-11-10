@@ -159,14 +159,14 @@ func buildEpochChain(tb testing.TB, logger common.Logger) ([]*StateMachineBlock,
 	node3 := [20]byte{3}
 
 	validatorSet1 := NodeBLSMappings{
-		{NodeID: node1, BLSKey: []byte{1}, Weight: 1},
-		{NodeID: node2, BLSKey: []byte{2}, Weight: 1},
-		{NodeID: node3, BLSKey: []byte{3}, Weight: 1},
+		{NodeID: NodeID{ShortID: node1}, BLSKey: []byte{1}, Weight: 1},
+		{NodeID: NodeID{ShortID: node2}, BLSKey: []byte{2}, Weight: 1},
+		{NodeID: NodeID{ShortID: node3}, BLSKey: []byte{3}, Weight: 1},
 	}
 	validatorSet2 := NodeBLSMappings{
-		{NodeID: node1, BLSKey: []byte{1}, Weight: 1},
-		{NodeID: node2, BLSKey: []byte{4}, Weight: 1},
-		{NodeID: node3, BLSKey: []byte{5}, Weight: 1},
+		{NodeID: NodeID{ShortID: node1}, BLSKey: []byte{1}, Weight: 1},
+		{NodeID: NodeID{ShortID: node2}, BLSKey: []byte{4}, Weight: 1},
+		{NodeID: NodeID{ShortID: node3}, BLSKey: []byte{5}, Weight: 1},
 	}
 
 	pChainHeight1 := uint64(100)
@@ -260,20 +260,20 @@ func buildEpochChain(tb testing.TB, logger common.Logger) ([]*StateMachineBlock,
 	var auxInfoDigest common.Digest
 
 	// block4 & block5: collecting-approvals blocks (1/3 then 2/3, not enough to seal).
-	sm.HandleApproval(&common.ValidatorSetApproval{NodeID: node1, PChainHeight: pChainHeight2, AuxInfoDigest: auxInfoDigest, Signature: signApproval(pChainHeight2, auxInfoDigest)})
+	sm.HandleApproval(&common.ValidatorSetApproval{NodeID: common.NodeID{ShortID: node1}, PChainHeight: pChainHeight2, AuxInfoDigest: auxInfoDigest, Signature: signApproval(pChainHeight2, auxInfoDigest)})
 	currentTime = startTime.Add(time.Second + 4*time.Millisecond)
 	tc.blockBuilder.Block = nextInner(4)
 	block4 := build(4, 3, 1, block3)
 	addBlock(4, block4, nil)
 
-	sm.HandleApproval(&common.ValidatorSetApproval{NodeID: node2, PChainHeight: pChainHeight2, AuxInfoDigest: auxInfoDigest, Signature: signApproval(pChainHeight2, auxInfoDigest)})
+	sm.HandleApproval(&common.ValidatorSetApproval{NodeID: common.NodeID{ShortID: node2}, PChainHeight: pChainHeight2, AuxInfoDigest: auxInfoDigest, Signature: signApproval(pChainHeight2, auxInfoDigest)})
 	currentTime = startTime.Add(time.Second + 5*time.Millisecond)
 	tc.blockBuilder.Block = nextInner(5)
 	block5 := build(5, 4, 1, block4)
 	addBlock(5, block5, nil)
 
 	// block6: the sealing block (3/3 approvals). Its successor is in stateBuildBlockEpochSealed.
-	sm.HandleApproval(&common.ValidatorSetApproval{NodeID: node3, PChainHeight: pChainHeight2, AuxInfoDigest: auxInfoDigest, Signature: signApproval(pChainHeight2, auxInfoDigest)})
+	sm.HandleApproval(&common.ValidatorSetApproval{NodeID: common.NodeID{ShortID: node3}, PChainHeight: pChainHeight2, AuxInfoDigest: auxInfoDigest, Signature: signApproval(pChainHeight2, auxInfoDigest)})
 	currentTime = startTime.Add(time.Second + 6*time.Millisecond)
 	tc.blockBuilder.Block = nextInner(6)
 	block6 := build(6, 5, 1, block5)

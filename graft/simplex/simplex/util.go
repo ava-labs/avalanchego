@@ -38,19 +38,19 @@ func RetrieveLastIndexFromStorage(s common.Storage) (*common.VerifiedFinalizedBl
 }
 
 func hasSomeNodeSignedTwice(nodeIDs []common.NodeID) (common.NodeID, bool) {
-	seen := make(map[string]struct{}, len(nodeIDs))
+	seen := make(map[common.NodeID]struct{}, len(nodeIDs))
 
 	for _, nodeID := range nodeIDs {
-		if _, alreadySeen := seen[string(nodeID)]; alreadySeen {
+		if _, alreadySeen := seen[nodeID]; alreadySeen {
 			return nodeID, true
 		}
-		seen[string(nodeID)] = struct{}{}
+		seen[nodeID] = struct{}{}
 	}
 
 	return common.NodeID{}, false
 }
 
-func VerifyQC(qc common.QuorumCertificate, isQuorum func(signers []common.NodeID) bool, eligibleSigners map[string][]byte, messageToVerify verifiableMessage, nodes common.Nodes) error {
+func VerifyQC(qc common.QuorumCertificate, isQuorum func(signers []common.NodeID) bool, eligibleSigners map[common.NodeID][]byte, messageToVerify verifiableMessage, nodes common.Nodes) error {
 	if qc == nil {
 		return fmt.Errorf("nil QuorumCertificate")
 	}
@@ -67,7 +67,7 @@ func VerifyQC(qc common.QuorumCertificate, isQuorum func(signers []common.NodeID
 
 	// Check QuorumCertificate was signed by only eligible nodes
 	for _, signer := range qc.Signers() {
-		if _, exists := eligibleSigners[string(signer)]; !exists {
+		if _, exists := eligibleSigners[signer]; !exists {
 			return fmt.Errorf("quorum certificate contains an unknown signer (%s)", signer)
 		}
 	}

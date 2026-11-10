@@ -4,13 +4,11 @@
 package metadata
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"fmt"
 	"slices"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"go.uber.org/zap"
 )
@@ -92,18 +90,18 @@ type auxInfoStore struct {
 	logger common.Logger
 
 	lock     sync.Mutex
-	sentInfo map[avalanchego.NodeID]common.AuxiliaryInfo
+	sentInfo map[common.NodeID]common.AuxiliaryInfo
 }
 
 func newAuxInfoStore(app AuxiliaryInfoGenVerifier, logger common.Logger) *auxInfoStore {
 	return &auxInfoStore{
 		app:      app,
-		sentInfo: make(map[avalanchego.NodeID]common.AuxiliaryInfo),
+		sentInfo: make(map[common.NodeID]common.AuxiliaryInfo),
 		logger:   logger,
 	}
 }
 
-func (a *auxInfoStore) HandleAuxiliaryMessage(info common.AuxiliaryInfo, from avalanchego.NodeID) {
+func (a *auxInfoStore) HandleAuxiliaryMessage(info common.AuxiliaryInfo, from common.NodeID) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
@@ -117,12 +115,12 @@ func (a *auxInfoStore) collectAuxInfo(history AuxInfoHistory, validators NodeBLS
 	defer a.lock.Unlock()
 
 	// Iterate in node ID order so the returned entries are deterministic.
-	nodeIDs := make([]avalanchego.NodeID, 0, len(a.sentInfo))
+	nodeIDs := make([]common.NodeID, 0, len(a.sentInfo))
 	for nodeID := range a.sentInfo {
 		nodeIDs = append(nodeIDs, nodeID)
 	}
-	slices.SortFunc(nodeIDs, func(x, y avalanchego.NodeID) int {
-		return bytes.Compare(x[:], y[:])
+	slices.SortFunc(nodeIDs, func(x, y common.NodeID) int {
+		return x.Compare(y)
 	})
 
 	var legalAppends []common.AuxiliaryInfo

@@ -19,7 +19,7 @@ var (
 
 type epochMetadata struct {
 	nodes                common.Nodes
-	eligibleSigners      map[string][]byte
+	eligibleSigners      map[common.NodeID][]byte
 	epoch                uint64
 	signatureAggregator  common.SignatureAggregator
 	prevSealingBlockHash common.Digest
@@ -37,9 +37,9 @@ func newEpochMetadata(epoch uint64, sealingMetadata *common.SealingBlockInfo, si
 	nodes := slices.Clone(sealingMetadata.ValidatorSet)
 	common.SortNodes(nodes)
 
-	lookup := make(map[string][]byte, len(nodes))
+	lookup := make(map[common.NodeID][]byte, len(nodes))
 	for _, node := range nodes {
-		lookup[string(node.Id)] = []byte{}
+		lookup[node.Id] = []byte{}
 	}
 
 	return &epochMetadata{
@@ -148,7 +148,7 @@ type epochDigestCounter struct {
 
 	// sealingBlockResponses stores the highest sealing block each validator has sent us keyed by NodeID.
 	// Once we have collected a threshold of messages for a finalization, the sealing block for that epoch is validated.
-	sealingBlockResponses map[string]sealingBlockResponse
+	sealingBlockResponses map[common.NodeID]sealingBlockResponse
 
 	// latestValidatorSetRetriever is used to calculate the threshold of votes needed to validate an epoch
 	latestValidatorSetRetriever LatestValidatorSetRetriever
@@ -164,7 +164,7 @@ type sealingBlockResponse struct {
 
 func newEpochReplicator(logger common.Logger, validatorSetRetriever LatestValidatorSetRetriever, sac common.SignatureAggregatorCreator) *epochDigestCounter {
 	return &epochDigestCounter{
-		sealingBlockResponses:       make(map[string]sealingBlockResponse),
+		sealingBlockResponses:       make(map[common.NodeID]sealingBlockResponse),
 		logger:                      logger,
 		latestValidatorSetRetriever: validatorSetRetriever,
 		signatureAggregatorCreator:  sac,
@@ -190,17 +190,17 @@ func (e *epochDigestCounter) maybeObserveThresholdResponses(sealingBlockInfo *co
 
 	// the sequence number is the epoch the sealing block creates
 	response := sealingBlockResponse{epoch: bh.Seq, digest: bh.Digest}
-	if stored, ok := e.sealingBlockResponses[string(from)]; ok && stored.epoch > response.epoch {
+	if stored, ok := e.sealingBlockResponses[from]; ok && stored.epoch > response.epoch {
 		e.logger.Debug("Ignoring sealing block for a lower epoch than already collected from this node", zap.Stringer("From", from), zap.Uint64("Stored Epoch", stored.epoch), zap.Uint64("Epoch", response.epoch))
 		return false
 	}
-	e.sealingBlockResponses[string(from)] = response
+	e.sealingBlockResponses[from] = response
 
 	// check if we have a threshold of responses
 	var nodes common.NodeIDs
-	nodesByID := make(map[string]common.Node)
+	nodesByID := make(map[common.NodeID]common.Node)
 	for _, node := range validators {
-		nodesByID[string(node.Id)] = node
+		nodesByID[node.Id] = node
 	}
 
 	signatureAggregator := e.signatureAggregatorCreator(validators)

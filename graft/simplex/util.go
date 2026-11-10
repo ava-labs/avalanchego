@@ -88,7 +88,7 @@ func validatorSetToNodes(validatorSet metadata.NodeBLSMappings) common.Nodes {
 	for i := range validatorSet {
 		vdr := &validatorSet[i]
 		nodes = append(nodes, common.Node{
-			Id:     vdr.NodeID[:],
+			Id:     vdr.NodeID.ToNodeID(),
 			Weight: vdr.Weight,
 			PK:     vdr.BLSKey,
 		})

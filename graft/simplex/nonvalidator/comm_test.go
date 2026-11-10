@@ -4,7 +4,6 @@
 package nonvalidator
 
 import (
-	"bytes"
 	"sync"
 	"testing"
 
@@ -111,7 +110,7 @@ func (e *testEpochs) stop() {
 // originating from the non-validator is delivered to the addressed epoch, while
 // a response from an epoch is delivered back to the non-validator.
 func handleMessage(epochs *testEpochs, nv *NonValidator, mi *messageInfo) {
-	if !bytes.Equal(mi.from, nv.ID) {
+	if mi.from != nv.ID {
 		// a response from an epoch: deliver it to the non-validator.
 		require.NoError(epochs.t, nv.HandleMessage(mi.msg, mi.from))
 		return
@@ -119,7 +118,7 @@ func handleMessage(epochs *testEpochs, nv *NonValidator, mi *messageInfo) {
 
 	// a request from the non-validator: route it to the addressed epoch.
 	for _, epoch := range epochs.epochs {
-		if bytes.Equal(epoch.ID, mi.to) {
+		if epoch.ID == mi.to {
 			require.NoError(epochs.t, epoch.HandleMessage(mi.msg, mi.from))
 			return
 		}
@@ -137,7 +136,7 @@ func (r *routerComm) Send(msg *common.Message, destination common.NodeID) {
 // Enqueues a copy of the message addressed to every other node in the network.
 func (r *routerComm) Broadcast(msg *common.Message) {
 	for _, n := range r.nodes {
-		if bytes.Equal(n.Id, r.ID) {
+		if n.Id == r.ID {
 			continue
 		}
 

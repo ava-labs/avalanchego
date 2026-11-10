@@ -8,16 +8,17 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
 )
 
 const listenerEpoch = 10
 
 var listenerValidators = common.Nodes{
-	{Id: common.NodeID{1}, Weight: 1},
-	{Id: common.NodeID{2}, Weight: 1},
-	{Id: common.NodeID{3}, Weight: 1},
-	{Id: common.NodeID{4}, Weight: 1},
+	{Id: common.NodeID{ShortID: ids.ShortID{1}}, Weight: 1},
+	{Id: common.NodeID{ShortID: ids.ShortID{2}}, Weight: 1},
+	{Id: common.NodeID{ShortID: ids.ShortID{3}}, Weight: 1},
+	{Id: common.NodeID{ShortID: ids.ShortID{4}}, Weight: 1},
 }
 
 type sentMessage struct {
@@ -127,7 +128,7 @@ func TestFutureEpochListenerRequestsSealingBlock(t *testing.T) {
 // TestFutureEpochListenerThreshold asserts onSealingBlock fires once per sealing block after f+1
 // validators of the latest set report it, and never for a sealing block at or below our epoch.
 func TestFutureEpochListenerThreshold(t *testing.T) {
-	nonValidator := common.NodeID{9}
+	nonValidator := common.NodeID{ShortID: ids.ShortID{9}}
 
 	tests := []struct {
 		name string
