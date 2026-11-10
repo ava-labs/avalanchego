@@ -328,7 +328,7 @@ func TestMultipleBlocks(t *testing.T) {
 			require.NoErrorf(t, state.ApplyTx(tx), "ApplyTx()")
 		}
 
-		got, err := state.FinishBlock()
+		got, err := state.FinishBlock(header)
 		require.NoError(t, err, "FinishBlock()")
 		target, c := sut.hooks.GasConfigAfter(header)
 		require.NoError(t, wantLatestEndTime.AfterBlock(gas.Gas(state.GasUsed()), target, c), "AfterBlock()")
@@ -627,7 +627,7 @@ func TestStartBlockQueueFull(t *testing.T) {
 		})
 		require.NoError(t, err, "Apply()")
 
-		_, err = state.FinishBlock()
+		_, err = state.FinishBlock(h)
 		require.NoError(t, err, "FinishBlock()")
 
 		lastHash = h.Hash()
@@ -658,7 +658,7 @@ func TestStartBlockQueueFullDueToTargetChanges(t *testing.T) {
 	})
 	require.NoError(t, err, "Apply()")
 
-	_, err = state.FinishBlock()
+	_, err = state.FinishBlock(h)
 	require.NoError(t, err, "FinishBlock()")
 
 	err = state.StartBlock(&types.Header{

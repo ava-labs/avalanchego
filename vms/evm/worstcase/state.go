@@ -341,12 +341,14 @@ func (s *State) GasUsed() uint64 {
 }
 
 // FinishBlock advances the [gastime.Time] in preparation for the next block.
+// `h` MUST be the header passed to [State.StartBlock], optionally with
+// additional fields populated since.
 //
 // The returned bounds assume that every non-nil error from [State.ApplyTx]
 // resulted in said transaction being included, which is reflected in the
 // indexing of tx-sender balances.
-func (s *State) FinishBlock() (*blocks.WorstCaseBounds, error) {
-	target, gasCfg := s.hooks.GasConfigAfter(s.curr)
+func (s *State) FinishBlock(h *types.Header) (*blocks.WorstCaseBounds, error) {
+	target, gasCfg := s.hooks.GasConfigAfter(h)
 	if err := s.clock.AfterBlock(s.blockSize, target, gasCfg); err != nil {
 		return nil, fmt.Errorf("finishing block gas time update: %w", err)
 	}
