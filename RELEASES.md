@@ -17,6 +17,8 @@
 
 ### Fixes
 
+- Fixed node shutdown leaving health check and bootstrapper timeout goroutines running. Shutdown now stops them, and waits up to 10 seconds for the health check goroutines to finish.
+
 ## [v1.15.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.3)
 
 ### APIs
