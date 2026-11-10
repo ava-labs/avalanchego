@@ -1174,13 +1174,14 @@ func TestInstanceBlacklistConfigurationRollsOverAcrossEpochs(t *testing.T) {
 
 	// Inspect the chain: every block moves the max blacklisted rounds of its parent, possibly from the previous epoch,
 	// by a single orbit (as many rounds as there are validators) towards the configuration of the node that built it,
-	// unless it is already within a single orbit of it. The first ever blacklist starts from GenesisMaxBlacklistedRounds.
+	// unless it is already within a single orbit of it, in which case it adopts that configuration.
+	// The first ever blacklist starts from GenesisMaxBlacklistedRounds.
 	// The epoch number is the sequence of the sealing block that started it.
-	validatorsOfEpoch := func(epoch uint64) common.NodeIDs {
+	validatorsOfEpoch := func(epoch uint64) metadata.NodeBLSMappings {
 		if epoch == secondEpoch {
-			return threeValidators.NodeIDs()
+			return threeValidators
 		}
-		return twoValidators.NodeIDs()
+		return twoValidators
 	}
 	rounds := uint16(common.GenesisMaxBlacklistedRounds)
 	var epochSizes []uint16
@@ -1193,16 +1194,8 @@ func TestInstanceBlacklistConfigurationRollsOverAcrossEpochs(t *testing.T) {
 			epochSizes = append(epochSizes, nodeCount)
 		}
 
-		leader := simplex.LeaderForRound(validators, block.BlockHeader().Round)
-		target := maxBlacklistedRoundsByNode[string(leader)]
-		switch {
-		case rounds < nodeCount:
-			rounds = nodeCount
-		case target >= rounds+nodeCount:
-			rounds += nodeCount
-		case target+nodeCount <= rounds:
-			rounds = max(rounds-nodeCount, nodeCount)
-		}
+		leader := simplex.LeaderForRound(validators.NodeIDs(), block.BlockHeader().Round)
+		rounds = nextMaxBlacklistedRounds(rounds, maxBlacklistedRoundsByNode[string(leader)], validators.Nodes())
 		require.Equal(t, rounds, blacklist.MaxBlacklistedRounds(), "block %d built by %s", seq, leader)
 	}
 
@@ -1238,7 +1231,6 @@ func TestInstanceMaxBlacklistedRoundsRollingRestart(t *testing.T) {
 
 	// targets holds the max blacklisted rounds each block's builder was configured with when it built the block.
 	// The first simplex block is built while the nodes sync, with the initial configuration.
-	nodeCount := uint16(len(genesisSet))
 	targets := map[uint64]uint16{1: initialRounds}
 	acceptNewBlocks := func(count int) {
 		for range count {
@@ -1268,15 +1260,7 @@ func TestInstanceMaxBlacklistedRoundsRollingRestart(t *testing.T) {
 		block := nodes[0].storage.WaitForBlockCommit(seq)
 		blacklist := block.Blacklist()
 		actual := blacklist.MaxBlacklistedRounds()
-
-		switch target := targets[seq]; {
-		case prevMaxRounds < target:
-			require.Equal(t, prevMaxRounds+nodeCount, actual, "block %d", seq)
-		case prevMaxRounds > target:
-			require.Equal(t, prevMaxRounds-nodeCount, actual, "block %d", seq)
-		default:
-			require.Equal(t, prevMaxRounds, actual, "block %d", seq)
-		}
+		require.Equal(t, nextMaxBlacklistedRounds(prevMaxRounds, targets[seq], genesisSet.Nodes()), actual, "block %d", seq)
 		prevMaxRounds = actual
 		highest = max(highest, actual)
 	}
@@ -1284,6 +1268,14 @@ func TestInstanceMaxBlacklistedRoundsRollingRestart(t *testing.T) {
 	// The chain reached the increased configuration, and ended up with the decreased one.
 	require.Equal(t, uint16(increasedRounds), highest)
 	require.Equal(t, uint16(decreasedRounds), prevMaxRounds)
+}
+
+// nextMaxBlacklistedRounds returns the max blacklisted rounds of a block whose parent has [prev] max blacklisted rounds.
+// The block belongs to an epoch run by [validators], and its builder is configured with [target] max blacklisted rounds.
+func nextMaxBlacklistedRounds(prev, target uint16, validators common.Nodes) uint16 {
+	parent := common.NewBlacklist(prev)
+	next := parent.Next(validators, 0, target, nil, nil)
+	return next.MaxBlacklistedRounds()
 }
 
 // TestInstanceMaxBlacklistedRoundsDifferAtGenesis runs a network whose validators are configured with different
