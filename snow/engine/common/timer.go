@@ -94,8 +94,8 @@ func (th *timeoutScheduler) scheduleTimeout(d time.Duration) {
 	th.onTimeout()
 }
 
-// Stop drops any pending timeout. Like [time.Timer.Stop], it does not wait for
-// a timeout that is already firing.
+// Stop releases the goroutines and timers of pending timeouts. It does not
+// guarantee that no timeout fires afterwards: see [TimeoutRegistrar.Stop].
 func (th *timeoutScheduler) Stop() {
 	th.stopOnce.Do(func() {
 		close(th.stop)
@@ -117,14 +117,12 @@ type TimeoutRegistrar interface {
 	//
 	// If there is already a pending timeout message, this call is a no-op.
 	// However, it is guaranteed that the timeout will fire at least once after
-	// calling this function, unless [TimeoutRegistrar.Stop] is called. A call to
-	// Stop that races with a firing timeout may still let it fire.
+	// calling this function, unless [TimeoutRegistrar.Stop] is called.
 	//
 	// If the subnet has been bootstrapped, the timeout will fire immediately via calling Preempt().
 	RegisterTimeout(time.Duration)
 
-	// Stop drops any pending timeouts. Like [time.Timer.Stop], it does not wait
-	// for a timeout that is already firing, so the timeout must check if
-	// it should still act.
+	// Stop releases the resources of pending timeouts. A timeout may still fire
+	// after Stop returns, so the timeout must check if it should still act.
 	Stop()
 }

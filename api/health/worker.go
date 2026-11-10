@@ -198,8 +198,7 @@ func (w *worker) Stop(ctx context.Context) error {
 		close(w.closer)
 	})
 
-	// A WaitGroup cannot be waited on with a context, so a goroutine waits
-	// for it. It exits once the running checks return.
+	// Make a best-effort to stop health checks within the context
 	done := make(chan struct{})
 	go func() {
 		w.wg.Wait()
@@ -210,7 +209,7 @@ func (w *worker) Stop(ctx context.Context) error {
 	case <-done:
 		return nil
 	case <-ctx.Done():
-		return ctx.Err()
+		return fmt.Errorf("%s checks still running: %w", w.name, ctx.Err())
 	}
 }
 

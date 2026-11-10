@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -47,12 +48,6 @@ func awaitLiveness(t *testing.T, r Reporter, liveness bool) {
 	}, awaitTimeout, awaitFreq)
 }
 
-func stop(t *testing.T, h Health) {
-	t.Helper()
-
-	require.NoError(t, h.Stop(t.Context()))
-}
-
 // TestStopWithHungCheck tests that Stop returns the context error when a check
 // does not return, and that a later Stop with a live context drains.
 func TestStopWithHungCheck(t *testing.T) {
@@ -60,25 +55,24 @@ func TestStopWithHungCheck(t *testing.T) {
 	require.NoError(t, err)
 
 	var (
-		started     = make(chan struct{})
-		startedOnce sync.Once
-		release     = make(chan struct{})
+		started atomic.Bool
+		release = make(chan struct{})
 	)
-	require.NoError(t, h.RegisterHealthCheck("hung", CheckerFunc(func(context.Context) (interface{}, error) {
-		startedOnce.Do(func() { close(started) })
+	require.NoError(t, h.RegisterHealthCheck("hung", CheckerFunc(func(context.Context) (any, error) {
+		started.Store(true)
 		<-release
 		return "", nil
 	})))
 
 	h.Start(t.Context(), checkFreq)
-	<-started
+	require.Eventually(t, started.Load, awaitTimeout, awaitFreq)
 
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
-	defer cancel()
-	require.ErrorIs(t, h.Stop(ctx), context.DeadlineExceeded)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	require.ErrorIs(t, h.Stop(ctx), context.Canceled)
 
 	close(release)
-	stop(t, h)
+	require.NoError(t, h.Stop(t.Context()))
 }
 
 func TestDuplicatedRegistrations(t *testing.T) {
@@ -160,7 +154,9 @@ func TestPassingChecks(t *testing.T) {
 	require.NoError(h.RegisterLivenessCheck("check", check))
 
 	h.Start(t.Context(), checkFreq)
-	defer stop(t, h)
+	defer func() {
+		require.NoError(h.Stop(t.Context()))
+	}()
 
 	{
 		awaitReadiness(t, h, true)
@@ -224,7 +220,9 @@ func TestPassingThenFailingChecks(t *testing.T) {
 	require.NoError(h.RegisterLivenessCheck("check", check))
 
 	h.Start(t.Context(), checkFreq)
-	defer stop(t, h)
+	defer func() {
+		require.NoError(h.Stop(t.Context()))
+	}()
 
 	awaitReadiness(t, h, true)
 	awaitHealthy(t, h, true)
@@ -275,7 +273,9 @@ func TestDeadlockRegression(t *testing.T) {
 	})
 
 	h.Start(t.Context(), time.Nanosecond)
-	defer stop(t, h)
+	defer func() {
+		require.NoError(h.Stop(t.Context()))
+	}()
 
 	for i := 0; i < 100; i++ {
 		lock.Lock()
@@ -385,7 +385,7 @@ func TestTags(t *testing.T) {
 	}
 
 	// stop the health check
-	stop(t, h)
+	require.NoError(h.Stop(t.Context()))
 
 	{
 		// now we'll add a new check which is unhealthy by default (notYetRunResult)

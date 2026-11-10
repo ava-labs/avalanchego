@@ -125,6 +125,7 @@ func TestTimeoutSchedulerStop(t *testing.T) {
 		var called atomic.Bool
 		ts := NewTimeoutScheduler(func() { called.Store(true) }, nil)
 		ts.RegisterTimeout(time.Hour)
+		synctest.Wait()
 
 		ts.Stop()
 		time.Sleep(2 * time.Hour)

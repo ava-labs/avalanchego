@@ -5,11 +5,11 @@ package health
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -40,12 +40,9 @@ type Health interface {
 	// Repeated calls to Start will be no-ops.
 	Start(ctx context.Context, freq time.Duration)
 
-	// Stop running periodic health checks. Stop should only be called after
-	// Start. Once Stop returns nil, no more health checks will be executed.
-	//
-	// Stop waits for checks that are running. If ctx is done first, Stop
-	// returns the error from ctx and a check that never returns keeps its
-	// goroutine.
+	// Stop blocks until running health checks have finished. If ctx is done
+	// first, Stop returns the error from ctx and checks may keep running. Stop
+	// should only be called after Start.
 	Stop(ctx context.Context) error
 }
 
@@ -138,9 +135,12 @@ func (h *health) Start(ctx context.Context, freq time.Duration) {
 }
 
 func (h *health) Stop(ctx context.Context) error {
-	return errors.Join(
-		h.readiness.Stop(ctx),
-		h.health.Stop(ctx),
-		h.liveness.Stop(ctx),
-	)
+	// Stop workers async so that a single worker does not block other
+	// workers from stopping.
+	var eg errgroup.Group
+	for _, w := range []*worker{h.readiness, h.health, h.liveness} {
+		eg.Go(func() error { return w.Stop(ctx) })
+	}
+
+	return eg.Wait()
 }

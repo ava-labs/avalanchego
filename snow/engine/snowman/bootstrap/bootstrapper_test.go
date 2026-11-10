@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -538,6 +539,48 @@ func TestRestartBootstrapping(t *testing.T) {
 
 	require.NoError(bs.startSyncing(t.Context(), blocksToIDs(blks[4:5])))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+}
+
+// TestShutdownDropsPendingTimeout tests that the bootstrapper does not restart
+// bootstrapping after Shutdown, even if its restart timeout is still pending.
+func TestShutdownDropsPendingTimeout(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		config, peerID, sender, vm, _ := newConfig(t)
+
+		// Other chains in the subnet never finish, so the bootstrapper waits
+		// for a timeout to restart instead of finishing.
+		config.BootstrapTracker.(*enginetest.BootstrapTracker).BootstrappedF = func(ids.ID) {}
+
+		blks := snowmantest.BuildChain(3)
+		initializeVMWithBlockchain(vm, blks)
+
+		bs, err := New(config, func(context.Context, uint32) error { return nil })
+		require.NoError(t, err)
+
+		require.NoError(t, bs.Start(t.Context(), 0))
+
+		requestIDs := map[ids.ID]uint32{}
+		sender.SendGetAncestorsF = func(_ context.Context, nodeID ids.NodeID, reqID uint32, blkID ids.ID) {
+			require.Equal(t, peerID, nodeID)
+			requestIDs[blkID] = reqID
+		}
+		require.NoError(t, bs.startSyncing(t.Context(), blocksToIDs(blks[1:3])))
+		require.NoError(t, bs.Ancestors(t.Context(), peerID, requestIDs[blks[2].ID()], blocksToBytes(blks[1:3])))
+		require.NoError(t, bs.startSyncing(t.Context(), blocksToIDs(blks[2:3])))
+		require.True(t, bs.awaitingTimeout)
+
+		vm.ShutdownF = func(context.Context) error { return nil }
+		require.NoError(t, bs.Shutdown(t.Context()))
+
+		var restarted bool
+		sender.SendGetAcceptedFrontierF = func(context.Context, set.Set[ids.NodeID], uint32) {
+			restarted = true
+		}
+		time.Sleep(2 * bootstrappingDelay)
+		synctest.Wait()
+
+		require.False(t, restarted)
+	})
 }
 
 func TestBootstrapOldBlockAfterStateSync(t *testing.T) {
