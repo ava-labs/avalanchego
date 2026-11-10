@@ -15,13 +15,8 @@ import (
 
 	legacyclient "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/client"
 	avagovalidators "github.com/ava-labs/avalanchego/snow/validators"
+	l1validators "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/validators"
 )
-
-// UptimeSource is the slice of `*uptimetracker.UptimeTracker` consumed by
-// [ValidatorsAPI]; the concrete tracker satisfies it without an adapter.
-type UptimeSource interface {
-	GetUptime(validationID ids.ID) (time.Duration, time.Time, error)
-}
 
 // The `validators.getCurrentValidators` wire types are the legacy plugin's,
 // aliased so the compiler enforces wire identity for existing tooling. When
@@ -43,15 +38,13 @@ type (
 // under the `validators` namespace via `graft/evm/utils/rpc.NewHandler`
 // (or any compatible gorilla-rpc helper).
 //
-// `connected` is typically `*sae.VM.ValidatorPeers`; `uptime` is
-// `*uptimetracker.UptimeTracker` (or any implementer of
-// `UptimeSource`). The accessors hold no internal lock - SAE-side
+// `connected` is typically `*sae.VM.ValidatorPeers`. The accessors hold no internal lock - SAE-side
 // resources serialise themselves - unlike the legacy VM
 // wrapper which RLocks the VM around each call.
 func NewValidatorsAPI(
 	validatorState avagovalidators.State,
 	subnetID ids.ID,
-	uptime UptimeSource,
+	uptime *l1validators.Uptime,
 	connected *p2p.Validators,
 ) *ValidatorsAPI {
 	return &ValidatorsAPI{
@@ -68,7 +61,7 @@ func NewValidatorsAPI(
 type ValidatorsAPI struct {
 	validatorState avagovalidators.State
 	subnetID       ids.ID
-	uptime         UptimeSource
+	uptime         *l1validators.Uptime
 	connected      *p2p.Validators
 }
 

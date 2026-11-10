@@ -11,5 +11,6 @@ go_library(
         "//network/p2p",
         "//snow/validators",
         "//utils/set",
+        "//vms/evm/imp/l1s/validators",
     ],
 )

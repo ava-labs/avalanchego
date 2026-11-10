@@ -5,7 +5,7 @@
 package warp
 
 import (
-	"errors"
+	"context"
 	"testing"
 	"time"
 
@@ -15,26 +15,53 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/messages"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
+	l1validators "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/validators"
 	saewarp "github.com/ava-labs/avalanchego/vms/evm/imp/warp"
 )
 
-// stubUptime is a minimal [UptimeSource] mapping validation IDs to uptimes.
-// Unknown validation IDs return [errStubUptimeUnknown].
-type stubUptime map[ids.ID]time.Duration
+// newUptime returns an [l1validators.Uptime] tracking a single validator with
+// `validationID` that has been connected for `uptime`.
+func newUptime(tb testing.TB, validationID ids.ID, uptime time.Duration) *l1validators.Uptime {
+	tb.Helper()
 
-var errStubUptimeUnknown = errors.New("stub uptime: unknown validation id")
+	var (
+		nodeID    = ids.GenerateTestNodeID()
+		startTime = time.Unix(0, 0)
+		clock     = &mockable.Clock{}
+	)
+	clock.Set(startTime)
 
-func (s stubUptime) GetUptime(validationID ids.ID) (time.Duration, time.Time, error) {
-	d, ok := s[validationID]
-	if !ok {
-		return 0, time.Time{}, errStubUptimeUnknown
+	state := &validatorstest.State{
+		GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+			return map[ids.ID]*validators.GetCurrentValidatorOutput{
+				validationID: {
+					ValidationID: validationID,
+					NodeID:       nodeID,
+					StartTime:    uint64(startTime.Unix()), // #nosec G115 -- known positive test timestamp
+					IsActive:     true,
+				},
+			}, 0, nil
+		},
 	}
-	return d, time.Time{}, nil
+	u, err := l1validators.New(state, ids.GenerateTestID(), memdb.New(), clock, logging.NoLog{})
+	require.NoError(tb, err, "validators.New()")
+	tb.Cleanup(func() {
+		require.NoError(tb, u.Shutdown(), "Uptime.Shutdown()")
+	})
+	require.NoError(tb, u.Dispatch(), "Uptime.Dispatch()")
+	require.NoError(tb, u.Connect(nodeID), "Uptime.Connect()")
+
+	clock.Set(startTime.Add(uptime))
+	return u
 }
 
 func newAddressedCall(tb testing.TB, sourceAddress, data []byte) *payload.AddressedCall {
@@ -60,7 +87,7 @@ func TestUptimeVerifier(t *testing.T) {
 	validationID := ids.GenerateTestID()
 	tests := []struct {
 		name   string
-		uptime UptimeSource
+		uptime *l1validators.Uptime
 		call   *payload.AddressedCall
 		want   *common.AppError
 	}{
@@ -86,25 +113,21 @@ func TestUptimeVerifier(t *testing.T) {
 			},
 		},
 		{
-			name: "uptime_sufficient",
-			uptime: stubUptime{
-				validationID: 60 * time.Second,
-			},
-			call: newUptimeCall(t, validationID, 60),
+			name:   "uptime_sufficient",
+			uptime: newUptime(t, validationID, 60*time.Second),
+			call:   newUptimeCall(t, validationID, 60),
 		},
 		{
-			name: "uptime_insufficient",
-			uptime: stubUptime{
-				validationID: 60 * time.Second,
-			},
-			call: newUptimeCall(t, validationID, 61),
+			name:   "uptime_insufficient",
+			uptime: newUptime(t, validationID, 60*time.Second),
+			call:   newUptimeCall(t, validationID, 61),
 			want: &common.AppError{
 				Code: VerifyErrCode,
 			},
 		},
 		{
 			name:   "unknown_validation_id",
-			uptime: stubUptime{},
+			uptime: newUptime(t, ids.GenerateTestID(), time.Minute),
 			call:   newUptimeCall(t, validationID, 1),
 			want: &common.AppError{
 				Code: VerifyErrCode,
@@ -128,8 +151,6 @@ func TestNewVerifier(t *testing.T) {
 	m, err := warp.NewUnsignedMessage(constants.UnitTestID, ids.GenerateTestID(), call.Bytes())
 	require.NoError(t, err, "warp.NewUnsignedMessage()")
 
-	v := NewVerifier(nil, saewarp.NewStorage(memdb.New()), stubUptime{
-		validationID: 60 * time.Second,
-	})
+	v := NewVerifier(nil, saewarp.NewStorage(memdb.New()), newUptime(t, validationID, 60*time.Second))
 	require.Nil(t, v.Verify(t.Context(), m, nil), "Verify() of a sufficient uptime message")
 }

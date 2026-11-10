@@ -74,8 +74,7 @@ func New(
 	return &Uptime{tracker: tracker, log: log}, nil
 }
 
-// GetUptime forwards to the tracker, satisfying the warp and
-// validators-API `UptimeSource` interfaces.
+// GetUptime forwards to the tracker.
 func (m *Uptime) GetUptime(validationID ids.ID) (time.Duration, time.Time, error) {
 	return m.tracker.GetUptime(validationID)
 }

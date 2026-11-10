@@ -6,13 +6,12 @@ package warp
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/messages"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
+	l1validators "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/validators"
 	saewarp "github.com/ava-labs/avalanchego/vms/evm/imp/warp"
 )
 
@@ -25,22 +24,11 @@ const (
 	VerifyErrCode = saewarp.NotAcceptedErrCode
 )
 
-// UptimeSource is the slice of `*uptimetracker.UptimeTracker` consumed
-// by the warp [UptimeVerifier] for `*messages.ValidatorUptime` messages.
-// Pulled out as a one-method interface so the verifier does not bind
-// to the concrete tracker type and so tests can inject stubs without
-// constructing a full tracker. The exported signature matches
-// `*uptimetracker.UptimeTracker.GetUptime` exactly: the concrete
-// tracker satisfies it without an adapter.
-type UptimeSource interface {
-	GetUptime(validationID ids.ID) (time.Duration, time.Time, error)
-}
-
 // NewVerifier returns an ACP-118 message verifier: the shared [saewarp]
 // verifier extended with the L1 VM's validator-uptime attestation handling.
 // Pass `nil` for `uptime` if the chain does not yet wire up uptime
 // accounting; uptime messages are then refused with [VerifyErrCode].
-func NewVerifier(blocks saewarp.Backend, storage *saewarp.Storage, uptime UptimeSource) *saewarp.Verifier {
+func NewVerifier(blocks saewarp.Backend, storage *saewarp.Storage, uptime *l1validators.Uptime) *saewarp.Verifier {
 	return saewarp.NewVerifier(blocks, storage, &UptimeVerifier{uptime: uptime})
 }
 
@@ -52,7 +40,7 @@ var _ saewarp.AddressedCallVerifier = (*UptimeVerifier)(nil)
 // source address is empty and the locally-tracked uptime for the validation
 // ID is at least the message's claimed `TotalUptime`.
 type UptimeVerifier struct {
-	uptime UptimeSource
+	uptime *l1validators.Uptime
 }
 
 // VerifyAddressedCall verifies a `*payload.AddressedCall`.
