@@ -12,6 +12,7 @@ import (
 	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
 	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
 )
 
@@ -114,4 +115,30 @@ func TestParseBlockSizeMatchesBytes(t *testing.T) {
 	for _, size := range sizes {
 		require.Equal(t, len(bytes3), size)
 	}
+}
+
+func TestParsedBlockVerifyRejectsNodeIDWithShortAndLongID(t *testing.T) {
+	block := &ParsedBlock{
+		StateMachineBlock: metadata.StateMachineBlock{
+			Metadata: metadata.StateMachineMetadata{
+				SimplexEpochInfo: metadata.SimplexEpochInfo{
+					BlockValidationDescriptor: &metadata.BlockValidationDescriptor{
+						AggregatedMembership: metadata.AggregatedMembership{
+							Members: []metadata.NodeBLSMapping{
+								{NodeID: metadata.NodeID{ShortID: ids.ShortID{1}}, Weight: 1},
+								{NodeID: metadata.NodeID{ShortID: ids.ShortID{2}, LongID: [32]byte{2}}, Weight: 1},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err := block.Verify(t.Context())
+	require.ErrorIs(t, err, errNodeIDWithShortAndLongID)
+
+	verified, err := block.Verify(t.Context(), common.OnlyVMVerifyOpt)
+	require.NoError(t, err)
+	require.Equal(t, block, verified)
 }

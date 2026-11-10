@@ -1,7 +1,6 @@
 package simplex_test
 
 import (
-	"bytes"
 	"context"
 	"testing"
 	"time"
@@ -9,13 +8,14 @@ import (
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
 )
 
 // TestReplicationRequestIndexedBlocks tests replication requests for indexed blocks.
 func TestReplicationRequestIndexedBlocks(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := NewListenerComm(nodes)
 	ctx := context.Background()
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], comm, bb)
@@ -70,7 +70,7 @@ func TestReplicationRequestIndexedBlocks(t *testing.T) {
 func TestReplicationRequestNotarizations(t *testing.T) {
 	// generate 5 blocks & notarizations
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := NewListenerComm(nodes)
 	noop := testutil.NewNoopComm(nodes)
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], noop, bb)
@@ -151,7 +151,7 @@ func TestReplicationRequestNotarizations(t *testing.T) {
 func TestReplicationRequestMixed(t *testing.T) {
 	// generate 5 blocks & notarizations
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := NewListenerComm(nodes)
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], comm, bb)
 	conf.ReplicationEnabled = true
@@ -168,7 +168,7 @@ func TestReplicationRequestMixed(t *testing.T) {
 	// only produce a notarization for blocks we are the leader, otherwise produce an empty notarization
 	for i := range numBlocks {
 		numExpectedRounds++
-		leaderForRound := bytes.Equal(simplex.LeaderForRound(nodes, uint64(i)), e.ID)
+		leaderForRound := simplex.LeaderForRound(nodes, uint64(i)) == e.ID
 		emptyBlock := !leaderForRound
 		if emptyBlock {
 			emptyNotarization := testutil.NewEmptyNotarization(nodes, uint64(i))
@@ -222,7 +222,7 @@ func TestReplicationRequestMixed(t *testing.T) {
 
 func TestReplicationRequestTailingEmptyNotarizations(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := NewListenerComm(nodes)
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], comm, bb)
 	conf.ReplicationEnabled = true
@@ -278,7 +278,7 @@ func TestReplicationRequestTailingEmptyNotarizations(t *testing.T) {
 
 func TestReplicationRequestUnknownSeqsAndRounds(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := NewListenerComm(nodes)
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], comm, bb)
 	conf.ReplicationEnabled = true
@@ -306,7 +306,7 @@ func TestReplicationRequestUnknownSeqsAndRounds(t *testing.T) {
 // from a non-validator node is still served when replication is enabled.
 func TestNonValidatorReplicationRequestServed(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := NewListenerComm(nodes)
 	ctx := context.Background()
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], comm, bb)
@@ -324,7 +324,7 @@ func TestNonValidatorReplicationRequestServed(t *testing.T) {
 	require.NoError(t, e.Start())
 
 	// a node that is not part of the validator set
-	nonValidator := common.NodeID{5}
+	nonValidator := common.NodeID{ShortID: ids.ShortID{5}}
 
 	sequences := []uint64{0, 1, 2, 3}
 	req := &common.Message{
@@ -351,7 +351,7 @@ func TestNonValidatorReplicationRequestServed(t *testing.T) {
 // epoch's state.
 func TestNonValidatorNonReplicationMessageDropped(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := NewListenerComm(nodes)
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], comm, bb)
 	conf.ReplicationEnabled = true
@@ -361,7 +361,7 @@ func TestNonValidatorNonReplicationMessageDropped(t *testing.T) {
 	t.Cleanup(e.Stop)
 	require.NoError(t, e.Start())
 
-	nonValidator := common.NodeID{5}
+	nonValidator := common.NodeID{ShortID: ids.ShortID{5}}
 
 	// an empty notarization from a validator would advance the round; from a
 	// non-validator it must be dropped, leaving the round unchanged.
@@ -375,7 +375,7 @@ func TestNonValidatorNonReplicationMessageDropped(t *testing.T) {
 }
 
 func TestNilReplicationResponse(t *testing.T) {
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	net := testutil.NewControlledNetwork(t, nodes)
 
 	normalNode0 := testutil.NewControlledSimplexNode(t, nodes[0], net, nil)
@@ -394,7 +394,7 @@ func TestNilReplicationResponse(t *testing.T) {
 // This replication response is malformed since it must also include a notarization or
 // finalization.
 func TestMalformedReplicationResponse(t *testing.T) {
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	net := testutil.NewControlledNetwork(t, nodes)
 
 	normalNode0 := testutil.NewControlledSimplexNode(t, nodes[0], net, nil)
@@ -416,7 +416,7 @@ func TestMalformedReplicationResponse(t *testing.T) {
 // rather than being dropped.
 func TestReplicationRequestSeqsAndRoundsTruncated(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := NewListenerComm(nodes)
 	ctx := context.Background()
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], comm, bb)
@@ -528,7 +528,7 @@ func requireEqualQuorumRounds(t *testing.T, expected, actual []common.VerifiedQu
 // so a partial response is not lost.
 func TestReplicationRequestSizeLimited(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := NewListenerComm(nodes)
 	ctx := context.Background()
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], comm, bb)
@@ -586,7 +586,7 @@ func TestReplicationRequestSizeLimited(t *testing.T) {
 // An oversized message would be rejected by the network anyway.
 func TestReplicationRequestSizeLimitedLatestFinalizedSeq(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := NewListenerComm(nodes)
 	ctx := context.Background()
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], comm, bb)
@@ -622,7 +622,7 @@ func TestReplicationRequestSizeLimitedLatestFinalizedSeq(t *testing.T) {
 // is omitted rather than pushing the response over the limit.
 func TestReplicationRequestSizeLimitedBothLatest(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := NewListenerComm(nodes)
 	ctx := context.Background()
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], comm, bb)

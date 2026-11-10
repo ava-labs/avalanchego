@@ -5,10 +5,17 @@ package simplex
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
+	"github.com/ava-labs/avalanchego/ids"
+)
+
+var (
+	errNodeIDWithShortAndLongID = errors.New("node ID has both a short ID and a long ID")
 )
 
 type ParsedBlock struct {
@@ -72,6 +79,16 @@ func (p *ParsedBlock) Verify(ctx context.Context, verifyOpts ...common.VerifyOpt
 			return p, nil
 		}
 		return p, p.InnerBlock.Verify(ctx, p.Metadata.ICMEpochInfo.PChainEpochHeight)
+	}
+
+	// Check if the block has nodeIDs that have both LongID and ShortID. If so, return an error.
+	bvd := p.Metadata.SimplexEpochInfo.BlockValidationDescriptor
+	if bvd != nil {
+		for _, node := range bvd.AggregatedMembership.Members {
+			if node.NodeID.LongID != [32]byte{} && node.NodeID.ShortID != [ids.ShortIDLen]byte{} {
+				return nil, fmt.Errorf("%w: %s", errNodeIDWithShortAndLongID, node.NodeID.ToNodeID())
+			}
+		}
 	}
 
 	if err := p.msm.VerifyBlock(ctx, &p.StateMachineBlock); err != nil {

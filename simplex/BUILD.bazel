@@ -25,7 +25,6 @@ go_library(
         "//codec",
         "//codec/linearcodec",
         "//database",
-        "//graft/simplex/avalanchego",
         "//graft/simplex/common",
         "//graft/simplex/simplex",
         "//ids",

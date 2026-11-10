@@ -6,16 +6,16 @@ package simplex
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	testNodeID    = avalanchego.NodeID{1}
+	testNodeID    = common.NodeID{ShortID: ids.ShortID{1}}
 	stubSignature = common.SignatureBytes("signature")
 )
 
@@ -114,7 +114,7 @@ func newTransitionBlock(t *testing.T, nextPChainRef uint64) *ParsedBlock {
 
 func TestTransitionNotInValidatorSet(t *testing.T) {
 	// the next validator set does not contain our node
-	otherValidator := metadata.NodeBLSMappings{{NodeID: avalanchego.NodeID{2}, Weight: 1}}
+	otherValidator := metadata.NodeBLSMappings{{NodeID: metadata.NewNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 1}}
 	auxApp := &stubAuxInfoApp{sufficient: false, generated: []byte("more aux info")}
 	env := newListenerTestEnv(t, otherValidator, auxApp)
 
@@ -128,9 +128,9 @@ func TestTransitionNotInValidatorSet(t *testing.T) {
 // TestTransitionNotEnoughAuxiliary tests that if we do not have a sufficient amount of auxiliary information
 // we will broadcast our own before sending any approvals.
 func TestTransitionNotEnoughAuxiliary(t *testing.T) {
-	peer1 := avalanchego.NodeID{2}
-	peer2 := avalanchego.NodeID{3}
-	validatorSet := metadata.NodeBLSMappings{{NodeID: testNodeID, Weight: 1}, {NodeID: peer1, Weight: 1}, {NodeID: peer2, Weight: 1}}
+	peer1 := common.NodeID{ShortID: ids.ShortID{2}}
+	peer2 := common.NodeID{ShortID: ids.ShortID{3}}
+	validatorSet := metadata.NodeBLSMappings{{NodeID: metadata.NewNodeID(testNodeID), Weight: 1}, {NodeID: metadata.NewNodeID(peer1), Weight: 1}, {NodeID: metadata.NewNodeID(peer2), Weight: 1}}
 	auxApp := &stubAuxInfoApp{sufficient: false, generated: []byte("more aux info")}
 	env := newListenerTestEnv(t, validatorSet, auxApp)
 
@@ -140,7 +140,7 @@ func TestTransitionNotEnoughAuxiliary(t *testing.T) {
 
 	// the generated auxiliary info is sent to every other validator instead of an approval
 	require.Len(t, env.sender.messages, 2)
-	require.Equal(t, []common.NodeID{common.NodeID(peer1[:]), common.NodeID(peer2[:])}, env.sender.destinations)
+	require.Equal(t, []common.NodeID{peer1, peer2}, env.sender.destinations)
 	for _, msg := range env.sender.messages {
 		require.Nil(t, msg.EpochTransitionApproval)
 		require.NotNil(t, msg.AuxiliaryInfo)
@@ -153,8 +153,8 @@ func TestTransitionNotEnoughAuxiliary(t *testing.T) {
 func TestTransitionSendsApproval(t *testing.T) {
 	const nextPChainRef = uint64(100)
 
-	peer := avalanchego.NodeID{2}
-	validatorSet := metadata.NodeBLSMappings{{NodeID: testNodeID, Weight: 1}, {NodeID: peer, Weight: 1}}
+	peer := common.NodeID{ShortID: ids.ShortID{2}}
+	validatorSet := metadata.NodeBLSMappings{{NodeID: metadata.NewNodeID(testNodeID), Weight: 1}, {NodeID: metadata.NewNodeID(peer), Weight: 1}}
 	env := newListenerTestEnv(t, validatorSet, &stubAuxInfoApp{sufficient: true})
 
 	block := newTransitionBlock(t, nextPChainRef)
@@ -163,7 +163,7 @@ func TestTransitionSendsApproval(t *testing.T) {
 
 	// the approval is sent to the other validator, not to ourselves
 	require.Len(t, env.sender.messages, 1)
-	require.Equal(t, []common.NodeID{common.NodeID(peer[:])}, env.sender.destinations)
+	require.Equal(t, []common.NodeID{peer}, env.sender.destinations)
 	msg := env.sender.messages[0]
 	require.Nil(t, msg.AuxiliaryInfo)
 	require.NotNil(t, msg.EpochTransitionApproval)
@@ -183,7 +183,7 @@ func TestTransitionSendsApproval(t *testing.T) {
 // transition, exactly like a validator does. Non-validators pass a nil handleApproval, so
 // nothing is recorded locally, but the auxiliary info is still sent.
 func TestNonValidatorContributesAuxiliaryInfo(t *testing.T) {
-	validatorSet := metadata.NodeBLSMappings{{NodeID: testNodeID, Weight: 1}, {NodeID: avalanchego.NodeID{2}, Weight: 1}}
+	validatorSet := metadata.NodeBLSMappings{{NodeID: metadata.NewNodeID(testNodeID), Weight: 1}, {NodeID: metadata.NewNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 1}}
 	auxApp := &stubAuxInfoApp{sufficient: false, generated: []byte("non-validator aux")}
 	env := newListenerTestEnv(t, validatorSet, auxApp)
 
@@ -205,7 +205,7 @@ func TestNonValidatorContributesAuxiliaryInfo(t *testing.T) {
 func TestNonValidatorContributesApproval(t *testing.T) {
 	const nextPChainRef = uint64(100)
 
-	validatorSet := metadata.NodeBLSMappings{{NodeID: testNodeID, Weight: 1}, {NodeID: avalanchego.NodeID{2}, Weight: 1}}
+	validatorSet := metadata.NodeBLSMappings{{NodeID: metadata.NewNodeID(testNodeID), Weight: 1}, {NodeID: metadata.NewNodeID(common.NodeID{ShortID: ids.ShortID{2}}), Weight: 1}}
 	env := newListenerTestEnv(t, validatorSet, &stubAuxInfoApp{sufficient: true})
 
 	block := newTransitionBlock(t, nextPChainRef)

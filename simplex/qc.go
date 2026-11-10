@@ -49,7 +49,7 @@ type canotoQC struct {
 func (qc *QC) Signers() []common.NodeID {
 	signers := make([]common.NodeID, len(qc.signers))
 	for i, signer := range qc.signers {
-		signers[i] = signer[:]
+		signers[i] = common.NodeIDFromAvalancheID(signer)
 	}
 
 	return signers
@@ -76,12 +76,12 @@ func (qc *QC) Verify(msg []byte, _ common.Nodes) error {
 	// ensure signers are not double counted and are in the membership set
 	for _, signer := range qc.signers {
 		if uniqueSigners.Contains(signer) {
-			return fmt.Errorf("%w: %x", errDuplicateSigner, signer)
+			return fmt.Errorf("%w: %s", errDuplicateSigner, signer)
 		}
 
 		pk, exists := qc.verifier.nodeID2PK[signer]
 		if !exists {
-			return fmt.Errorf("%w: %x", errSignerNotFound, signer)
+			return fmt.Errorf("%w: %s", errSignerNotFound, signer)
 		}
 
 		uniqueSigners.Add(signer)
@@ -177,13 +177,13 @@ func (a *SignatureAggregator) Aggregate(signatures []common.Signature) (common.Q
 	sigs := make([]*bls.Signature, 0, quorumSize)
 	for _, signature := range signatures {
 		signer := signature.Signer
-		id, err := ids.ToNodeID(signer)
+		id, err := signer.ToAvalancheID()
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", errInvalidNodeID, err)
 		}
 
 		if _, exists := a.verifier.nodeID2PK[id]; !exists {
-			return nil, fmt.Errorf("%w: %x", errSignerNotFound, signer)
+			return nil, fmt.Errorf("%w: %s", errSignerNotFound, signer)
 		}
 		sig, err := bls.SignatureFromBytes(signature.Value)
 		if err != nil {
@@ -225,7 +225,10 @@ func (*SignatureAggregator) AppendSignatures(common.SignatureBytes, ...common.Si
 func (a *SignatureAggregator) IsQuorum(nodes []common.NodeID) bool {
 	uniqueNodes := set.NewSet[ids.NodeID](len(nodes))
 	for _, node := range nodes {
-		nodeID := ids.NodeID(node)
+		nodeID, err := node.ToAvalancheID()
+		if err != nil {
+			return false
+		}
 		if _, exists := a.verifier.nodeID2PK[nodeID]; !exists {
 			return false
 		}

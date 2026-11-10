@@ -7,14 +7,12 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
-	"encoding/asn1"
 	"encoding/binary"
 	"fmt"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
@@ -48,7 +46,7 @@ func (b *testInnerBlock) Verify(context.Context, uint64) error { return nil }
 
 type testInnerBlockDeserializer struct{}
 
-func (ibd *testInnerBlockDeserializer) ParseBlock(_ context.Context, buff []byte) (avalanchego.VMBlock, error) {
+func (ibd *testInnerBlockDeserializer) ParseBlock(_ context.Context, buff []byte) (common.VMBlock, error) {
 	b := &testInnerBlock{}
 	b.Height_ = binary.BigEndian.Uint64(buff[0:8])
 	b.TS = time.UnixMilli(int64(binary.BigEndian.Uint64(buff[8:16])))
@@ -234,11 +232,11 @@ func (c *testCryptoOps) CreateSignatureAggregator(nodes []common.Node) common.Si
 }
 
 func (c *testCryptoOps) DeserializeQuorumCertificate(bytes []byte) (common.QuorumCertificate, error) {
-	var qc []common.Signature
-	if _, err := asn1.Unmarshal(bytes, &qc); err != nil {
+	qc, err := testutil.DeserializeTestQC(bytes)
+	if err != nil {
 		return nil, err
 	}
-	return testutil.TestQC(qc), nil
+	return qc, nil
 }
 
 // testStorage serves reads as independent StateMachineBlock copies, so tests never touch
@@ -316,7 +314,7 @@ func reparseBlock(t *testing.T, vb common.VerifiedBlock) *ParsedBlock {
 	var rawBlock metadata.RawBlock
 	require.NoError(t, rawBlock.UnmarshalCanoto(vb.Bytes()))
 
-	var inner avalanchego.VMBlock
+	var inner common.VMBlock
 	if len(rawBlock.InnerBlockBytes) > 0 {
 		bd := &testInnerBlockDeserializer{}
 		parsed, err := bd.ParseBlock(context.Background(), rawBlock.InnerBlockBytes)
@@ -412,7 +410,7 @@ func (c *instanceComm) Send(msg *common.Message, destination common.NodeID) {
 	}
 
 	for _, n := range c.n.nodesSnapshot() {
-		if !bytes.Equal(n.id, destination) {
+		if n.id != destination {
 			continue
 		}
 
@@ -433,7 +431,7 @@ func (c *instanceComm) Broadcast(msg *common.Message) {
 
 	// every node in the network but ourselves, each with its own re-parsed copy
 	for _, n := range c.n.nodesSnapshot() {
-		if bytes.Equal(n.id, c.id) || c.n.isOffline(n.id) {
+		if n.id == c.id || c.n.isOffline(n.id) {
 			continue
 		}
 
@@ -557,7 +555,7 @@ func newBlockBuilderVM(storage *testStorage, pending *pendingBlockSignal) *block
 	return &blockBuilderVM{storage: storage, pending: pending}
 }
 
-func (vm *blockBuilderVM) BuildBlock(ctx context.Context, pChainHeight uint64) (avalanchego.VMBlock, error) {
+func (vm *blockBuilderVM) BuildBlock(ctx context.Context, pChainHeight uint64) (common.VMBlock, error) {
 	// Claiming the pending block is what gates block building.
 	if !vm.pending.consume(ctx) {
 		return nil, ctx.Err()
@@ -571,7 +569,7 @@ func (vm *blockBuilderVM) BuildBlock(ctx context.Context, pChainHeight uint64) (
 	return &testInnerBlock{Height_: height, TS: time.Now(), Payload: payload}, nil
 }
 
-func (vm *blockBuilderVM) ParseBlock(ctx context.Context, bytes []byte) (avalanchego.VMBlock, error) {
+func (vm *blockBuilderVM) ParseBlock(ctx context.Context, bytes []byte) (common.VMBlock, error) {
 	return vm.bd.ParseBlock(ctx, bytes)
 }
 
@@ -685,7 +683,7 @@ type network struct {
 	lock  sync.Mutex
 	nodes []node
 	// offline nodes stay in the network but neither send nor receive messages.
-	offline map[string]struct{}
+	offline map[common.NodeID]struct{}
 }
 
 func (n *network) nodesSnapshot() []node {
@@ -697,19 +695,19 @@ func (n *network) nodesSnapshot() []node {
 func (n *network) setOffline(id common.NodeID) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	n.offline[string(id)] = struct{}{}
+	n.offline[id] = struct{}{}
 }
 
 func (n *network) setOnline(id common.NodeID) {
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	delete(n.offline, string(id))
+	delete(n.offline, id)
 }
 
 func (n *network) isOffline(id common.NodeID) bool {
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	_, offline := n.offline[string(id)]
+	_, offline := n.offline[id]
 	return offline
 }
 
@@ -721,7 +719,7 @@ func newNetwork(t *testing.T, pChain *testPlatformChain) *network {
 		t:                 t,
 		pChain:            pChain,
 		pending:           newPendingBlockSignal(),
-		offline:           make(map[string]struct{}),
+		offline:           make(map[common.NodeID]struct{}),
 		epochValidatorSet: genesisNodes,
 
 		// Genesis at seq 0. Then first simplex block is built automatically
@@ -737,7 +735,7 @@ type nodeConfig struct {
 	storage *testStorage
 	// wals are pre-existing WALs the instance restores on start.
 	wals                []wal.DeletableWAL
-	lastNonSimplexBlock avalanchego.VMBlock
+	lastNonSimplexBlock common.VMBlock
 	// existingNode indicates whether the node is being added to the network for the first time (false) or is a restart of an existing node (true).
 	existingNode bool
 	// params overrides the shared paramConfig the instance is configured with, when non-nil.
@@ -760,7 +758,7 @@ func (n *network) addNodeWithConfig(id common.NodeID, cfg nodeConfig) *node {
 
 	vm := newBlockBuilderVM(storage, n.pending)
 	wc := &walCreator{t: n.t}
-	var lastNonSimplex avalanchego.VMBlock = genesisBlock
+	var lastNonSimplex common.VMBlock = genesisBlock
 	if cfg.lastNonSimplexBlock != nil {
 		lastNonSimplex = cfg.lastNonSimplexBlock
 	}
@@ -779,7 +777,7 @@ func (n *network) addNodeWithConfig(id common.NodeID, cfg nodeConfig) *node {
 		WalCreator:               wc.createWAL,
 		Storage:                  storage,
 		// the first byte of the node id labels the node's log records
-		Logger:         testutil.MakeLogger(n.t, int(id[0])),
+		Logger:         testutil.MakeLogger(n.t, int(id.ShortID[0])),
 		WALs:           cfg.wals,
 		VM:             vm,
 		ICMETransition: noopICMTransition,
@@ -948,7 +946,7 @@ func newNodeMapping(id int) metadata.NodeBLSMapping {
 	avaID := [20]byte{byte(id)}
 
 	return metadata.NodeBLSMapping{
-		NodeID: avalanchego.NodeID(avaID),
+		NodeID: metadata.NodeID{ShortID: avaID},
 		BLSKey: []byte{avaID[0], byte(id + 1)},
 		Weight: 1,
 	}

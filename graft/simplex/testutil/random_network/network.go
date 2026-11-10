@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -38,7 +39,7 @@ func NewNetwork(config *FuzzConfig, t *testing.T) *Network {
 	numNodes := r.Intn(config.MaxNodes-config.MinNodes+1) + config.MinNodes
 	nodeIds := make([]common.NodeID, numNodes)
 	for i := range numNodes {
-		nodeIds[i] = []byte{byte(i)}
+		nodeIds[i] = common.NodeID{ShortID: ids.ShortID{byte(i)}}
 	}
 
 	nodes := make([]*Node, numNodes)
@@ -294,7 +295,7 @@ func (n *Network) PrintStatus() {
 
 	// prints the number of txs in each node's mempool
 	for _, node := range n.nodes {
-		n.logger.Info("Node Status", zap.Stringer("nodeID", node.E.ID), zap.Int("Short", int(node.E.ID[0])), zap.Uint64("Round", node.E.Metadata().Round), zap.Uint64("Height", node.storage.NumBlocks()))
+		n.logger.Info("Node Status", zap.Stringer("nodeID", node.E.ID), zap.Int("Short", int(node.E.ID.ShortID[0])), zap.Uint64("Round", node.E.Metadata().Round), zap.Uint64("Height", node.storage.NumBlocks()))
 		node.PrintMessageTypesSent()
 	}
 

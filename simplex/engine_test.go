@@ -811,7 +811,7 @@ func buildQCWithBytes(t testing.TB, configs []*Config, msg []byte) []byte {
 		sig, err := signer.Sign(msg)
 		require.NoError(t, err)
 		sigs = append(sigs, simplexcommon.Signature{
-			Signer: config.Ctx.NodeID[:],
+			Signer: simplexcommon.NodeIDFromAvalancheID(config.Ctx.NodeID),
 			Value:  sig,
 		})
 	}

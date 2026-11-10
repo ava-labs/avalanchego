@@ -4,7 +4,6 @@
 package simplex_test
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"reflect"
@@ -16,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,7 +25,7 @@ func rejectReplicationRequests(msg *common.Message, _, _ common.NodeID) bool {
 
 // A node attempts to request blocks to replicate, but fails to receive them
 func TestReplicationRequestTimeout(t *testing.T) {
-	nodes := []common.NodeID{{1}, {2}, {3}, []byte("lagging")}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	numInitialSeqs := uint64(8)
 
 	// node begins replication
@@ -113,7 +113,7 @@ func (m *testTimeoutMessageFilter) receivedReplicationRequest(msg *common.Messag
 }
 
 func TestReplicationRequestTimeoutCancels(t *testing.T) {
-	nodes := []common.NodeID{{1}, {2}, {3}, []byte("lagging")}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	startSeq := uint64(8)
 
 	net := testutil.NewControlledNetwork(t, nodes)
@@ -166,7 +166,7 @@ func TestReplicationRequestTimeoutCancels(t *testing.T) {
 // A node attempts to request blocks to replicate, but fails to
 // receive them multiple times
 func TestReplicationRequestTimeoutMultiple(t *testing.T) {
-	nodes := []common.NodeID{{1}, {2}, {3}, []byte("lagging")}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	startSeq := uint64(8)
 
 	// node begins replication
@@ -251,7 +251,7 @@ func incompleteReplicationResponseFilter(msg *common.Message, _, _ common.NodeID
 // A node attempts to request blocks to replicate, but receives incomplete
 // responses from nodes.
 func TestReplicationRequestIncompleteResponses(t *testing.T) {
-	nodes := []common.NodeID{{1}, {2}, {3}, []byte("lagging")}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	startSeq := uint64(8)
 
 	// node begins replication
@@ -412,7 +412,7 @@ func (c *collectNotarizationComm) removeFinalizationsFromReplicationResponses(ms
 // TestReplicationRequestWithoutFinalization tests that a replication request is not marked as completed
 // if we are expecting a finalization but it is not present in the response.
 func TestReplicationRequestWithoutFinalization(t *testing.T) {
-	nodes := []common.NodeID{{1}, {2}, {3}, []byte("lagging")}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	endDisconnect := uint64(10)
 	net := testutil.NewControlledNetwork(t, nodes)
 
@@ -442,7 +442,7 @@ func TestReplicationRequestWithoutFinalization(t *testing.T) {
 	missedSeqs := uint64(0)
 	// normal nodes continue to make progress
 	for i := uint64(0); i < endDisconnect; i++ {
-		emptyRound := bytes.Equal(simplex.LeaderForRound(nodes, i), nodes[3])
+		emptyRound := simplex.LeaderForRound(nodes, i) == nodes[3]
 		if emptyRound {
 			net.AdvanceWithoutLeader(i, laggingNode.E.ID)
 			missedSeqs++
@@ -510,7 +510,7 @@ func TestReplicationRequestWithoutFinalization(t *testing.T) {
 
 // TestReplicationMalformedQuorumRound tests that a node re-sends a replication request when it receives a malformed quorum round message.
 func TestReplicationMalformedQuorumRound(t *testing.T) {
-	nodes := []common.NodeID{{1}, {2}, {3}, []byte("lagging")}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	startSeq := uint64(8)
 
 	// node begins replication
@@ -612,7 +612,7 @@ func TestReplicationResendsFinalizedBlocksThatFailedVerification(t *testing.T) {
 	// send a block, then simultaneously send a finalization for the block
 	bb := testutil.NewTestBlockBuilder()
 
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	quorum := common.Quorum(len(nodes))
 	sentMessages := make(chan *common.Message, 100)
 
@@ -698,7 +698,7 @@ func TestReplicationResendsFinalizedBlocksThatFailedVerification(t *testing.T) {
 func TestReplicationResendsNotarizedBlocksThatFailedVerification(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	quorum := common.Quorum(len(nodes))
 	sentMessages := make(chan *common.Message, 100)
 
@@ -752,7 +752,7 @@ func TestReplicationResendsNotarizedBlocksThatFailedVerification(t *testing.T) {
 func TestReplicationResendSplitsRequests(t *testing.T) {
 	// ensures that when replication requests time out, the missing sequences
 	// are re-requested split across the nodes that signed the highest observed quorum, just like the initial requests are.
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	startSeq := 2 * uint64(simplex.DefaultMaxRoundWindow)
 
 	net := testutil.NewControlledNetwork(t, nodes)

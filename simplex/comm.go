@@ -47,7 +47,7 @@ func NewComm(config *Config) (*Comm, error) {
 	// grab all the nodes that are validators for the subnet
 	for _, vd := range config.Params.InitialValidators {
 		node := simplexcommon.Node{
-			Id:     vd.NodeID[:],
+			Id:     simplexcommon.NodeIDFromAvalancheID(vd.NodeID),
 			PK:     vd.PublicKey,
 			Weight: uint64(1), // TODO: set equal weights for now
 		}
@@ -97,7 +97,7 @@ func (c *Comm) Send(msg *simplexcommon.Message, destination simplexcommon.NodeID
 		return
 	}
 
-	dest, err := ids.ToNodeID(destination)
+	dest, err := destination.ToAvalancheID()
 	if err != nil {
 		c.logger.Error("Failed to convert destination NodeID", zap.Error(err))
 		return
@@ -128,13 +128,13 @@ func (c *Comm) simplexMessageToOutboundMessage(msg *simplexcommon.Message) (*mes
 func simplexMessageToP2P(chainID ids.ID, msg *simplexcommon.Message) (*p2p.Simplex, error) {
 	switch {
 	case msg.VerifiedBlockMessage != nil:
-		return newBlockProposal(chainID, msg.VerifiedBlockMessage), nil
+		return newBlockProposal(chainID, msg.VerifiedBlockMessage)
 	case msg.VoteMessage != nil:
-		return newVote(chainID, msg.VoteMessage), nil
+		return newVote(chainID, msg.VoteMessage)
 	case msg.EmptyVoteMessage != nil:
-		return newEmptyVote(chainID, msg.EmptyVoteMessage), nil
+		return newEmptyVote(chainID, msg.EmptyVoteMessage)
 	case msg.FinalizeVote != nil:
-		return newFinalizeVote(chainID, msg.FinalizeVote), nil
+		return newFinalizeVote(chainID, msg.FinalizeVote)
 	case msg.Notarization != nil:
 		return newNotarization(chainID, msg.Notarization), nil
 	case msg.EmptyNotarization != nil:
@@ -150,7 +150,7 @@ func simplexMessageToP2P(chainID ids.ID, msg *simplexcommon.Message) (*p2p.Simpl
 	case msg.AuxiliaryInfo != nil:
 		return newAuxiliaryInfo(chainID, msg.AuxiliaryInfo), nil
 	case msg.EpochTransitionApproval != nil:
-		return newEpochTransitionApproval(chainID, msg.EpochTransitionApproval), nil
+		return newEpochTransitionApproval(chainID, msg.EpochTransitionApproval)
 	default:
 		return nil, fmt.Errorf("unknown message type: %+v", msg)
 	}

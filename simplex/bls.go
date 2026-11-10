@@ -99,7 +99,7 @@ func (v BLSVerifier) VerifySignature(message []byte, signature common.SignatureB
 
 	pk, exists := v.nodeID2PK[key]
 	if !exists {
-		return fmt.Errorf("%w: signer %x", errSignerNotFound, key)
+		return fmt.Errorf("%w: signer %s", errSignerNotFound, key)
 	}
 
 	sig, err := bls.SignatureFromBytes(signature)

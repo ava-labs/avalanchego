@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,8 +61,8 @@ func sealingBlock(epoch, seq uint64, members []metadata.NodeBLSMapping) metadata
 
 func testValidatorSet() metadata.NodeBLSMappings {
 	return metadata.NodeBLSMappings{
-		{NodeID: avalanchego.NodeID{1}, BLSKey: []byte{1, 2}, Weight: 1},
-		{NodeID: avalanchego.NodeID{2}, BLSKey: []byte{3, 4}, Weight: 2},
+		{NodeID: metadata.NewNodeID(common.NodeID{ShortID: ids.ShortID{1}}), BLSKey: []byte{1, 2}, Weight: 1},
+		{NodeID: metadata.NewNodeID(common.NodeID{ShortID: ids.ShortID{2}}), BLSKey: []byte{3, 4}, Weight: 2},
 	}
 }
 
