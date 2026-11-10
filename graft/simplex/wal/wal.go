@@ -4,6 +4,7 @@
 package wal
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -88,7 +89,7 @@ func (w *WriteAheadLog) ReadAll() (_ [][]byte, err error) {
 	var payloads [][]byte
 	for bytesToRead > 0 {
 		payload, bytesRead, err := readRecord(w.file, bytesToRead)
-		if err == ErrCorruptedWAL {
+		if errors.Is(err, ErrCorruptedWAL) {
 			return payloads, w.truncateAt(fileInfo.Size() - bytesToRead)
 		}
 		if err != nil {
