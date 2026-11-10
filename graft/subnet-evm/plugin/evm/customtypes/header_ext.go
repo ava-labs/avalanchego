@@ -51,16 +51,13 @@ type HeaderExtra struct {
 	SettledExcess       *uint64
 
 	// TargetExcess is populated by the SAE block builder after Igloo and is
-	// ignored on legacy chains.
+	// ignored on legacy chains. It encodes the gas target, whether chosen by
+	// validators or pinned by the gas price manager precompile.
 	TargetExcess *gas.Gas
 
-	// The GasConfig* group encodes the effective ACP-224 price configuration
-	// derived from gaspricemanager precompile storage in the settled state,
-	// stamped by the SAE block builder's FinalizeHeader when the precompile
-	// is enabled at the settled timestamp. All three MUST be set together;
-	// their absence means ACP-176 defaults apply. Boolean values are encoded as
-	// 0/1. TargetExcess carries both validator-selected and precompile-pinned
-	// targets.
+	// The GasConfig* fields hold the ACP-224 price configuration from the gas
+	// price manager precompile, when it is enabled. They are either all set or
+	// all nil. If nil, the ACP-176 defaults apply. StaticPricing is 0 or 1.
 	GasConfigTargetToExcessScaling *uint64
 	GasConfigMinGasPrice           *uint64
 	GasConfigStaticPricing         *uint64
