@@ -15,74 +15,67 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TestCopyHeader(t *testing.T) {
 	t.Parallel()
 
-	t.Run("empty_header", func(t *testing.T) {
-		t.Parallel()
+	copiedEmpty := func() *types.Header {
+		return &types.Header{Difficulty: new(big.Int), Number: new(big.Int)}
+	}
+	tests := []struct {
+		name         string
+		header, want *types.Header
+	}{
+		{
+			name:   "no_extra_attached",
+			header: &types.Header{},
+			want:   WithHeaderExtra(copiedEmpty(), &HeaderExtra{}),
+		},
+		{
+			name:   "nil_extra",
+			header: WithHeaderExtra(&types.Header{}, nil),
+			want:   WithHeaderExtra(copiedEmpty(), nil),
+		},
+		{
+			name:   "empty_extra",
+			header: WithHeaderExtra(&types.Header{}, &HeaderExtra{}),
+			want:   WithHeaderExtra(copiedEmpty(), &HeaderExtra{}),
+		},
+		{
+			name:   "filled",
+			header: utils.First(headerWithNonZeroFields()),
+			want:   utils.First(headerWithNonZeroFields()),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 
-		empty := &types.Header{}
-
-		headerExtra := &HeaderExtra{}
-		extras.Header.Set(empty, headerExtra)
-
-		cpy := types.CopyHeader(empty)
-
-		want := &types.Header{
-			Difficulty: new(big.Int),
-			Number:     new(big.Int),
-		}
-
-		headerExtra = &HeaderExtra{}
-		extras.Header.Set(want, headerExtra)
-
-		require.Equal(t, want, cpy)
-	})
-
-	t.Run("filled_header", func(t *testing.T) {
-		t.Parallel()
-
-		header, _ := headerWithNonZeroFields() // the header carries the [HeaderExtra] so we can ignore it
-
-		gotHeader := types.CopyHeader(header)
-		gotExtra := GetHeaderExtra(gotHeader)
-
-		wantHeader, wantExtra := headerWithNonZeroFields()
-		require.Equal(t, wantHeader, gotHeader)
-		require.Equal(t, wantExtra, gotExtra)
-
-		exportedFieldsPointToDifferentMemory(t, header, gotHeader)
-		exportedFieldsPointToDifferentMemory(t, GetHeaderExtra(header), gotExtra)
-	})
+			got := types.CopyHeader(test.header)
+			require.Equal(t, test.want, got, "types.CopyHeader()")
+			require.Equal(t, GetHeaderExtra(test.want), GetHeaderExtra(got), "GetHeaderExtra(types.CopyHeader())")
+		})
+	}
 }
 
-func exportedFieldsPointToDifferentMemory[T types.Header | HeaderExtra](t *testing.T, original, cpy *T) {
-	t.Helper()
+// TestCopyHeaderDeepCopiesExtra checks that [HeaderExtra.PostCopy] clones
+// every pointer field, which require.Equal can't tell from aliasing.
+func TestCopyHeaderDeepCopiesExtra(t *testing.T) {
+	t.Parallel()
 
-	v := reflect.ValueOf(original).Elem()
-	typ := v.Type()
-	cp := reflect.ValueOf(cpy).Elem()
-	for i := range v.NumField() {
-		field := typ.Field(i)
-		if !field.IsExported() {
+	header, extra := headerWithNonZeroFields()
+	src := reflect.ValueOf(extra).Elem()
+	got := reflect.ValueOf(GetHeaderExtra(types.CopyHeader(header))).Elem()
+	for i := range src.NumField() {
+		field := src.Type().Field(i)
+		if !field.IsExported() || field.Type.Kind() != reflect.Pointer {
 			continue
 		}
-		switch field.Type.Kind() {
-		case reflect.Pointer, reflect.Slice, reflect.Map:
-		case reflect.Array, reflect.Uint64, reflect.Uint32:
-			continue
-		default:
-			t.Fatalf("field %q has unsupported kind %v", field.Name, field.Type.Kind())
-		}
-
-		t.Run(field.Name, func(t *testing.T) {
-			a, b := v.Field(i), cp.Field(i)
-			require.False(t, a.IsNil(), "original field is nil")
-			require.False(t, b.IsNil(), "copied field is nil")
-			require.NotEqual(t, a.UnsafePointer(), b.UnsafePointer(), "original and copy share memory")
-		})
+		require.False(t, src.Field(i).IsNil(), "headerWithNonZeroFields() leaves %s nil", field.Name)
+		require.NotEqual(t, src.Field(i).UnsafePointer(), got.Field(i).UnsafePointer(), "%s shares memory with the original", field.Name)
 	}
 }
 
@@ -115,15 +108,14 @@ func blockWithNonZeroFields() (*types.Block, *BlockBodyExtra) {
 
 	receipts := []*types.Receipt{{PostState: []byte{11}}}
 
-	block := types.NewBlock(header, txs, uncles, receipts, stubHasher{})
+	block := types.NewBlock(header, txs, uncles, receipts, trie.NewStackTrie(nil))
 	withdrawals := []*types.Withdrawal{{Index: 12}}
 	block = block.WithWithdrawals(withdrawals)
 	extra := &BlockBodyExtra{
 		Version: 13,
 		ExtData: &[]byte{14},
 	}
-	SetBlockExtra(block, extra)
-	return block, extra
+	return WithBlockExtra(block, extra), extra
 }
 
 func TestBlockExtraRLP(t *testing.T) {
@@ -134,27 +126,28 @@ func TestBlockExtraRLP(t *testing.T) {
 	encoded, err := rlp.EncodeToBytes(block)
 	require.NoError(t, err, "rlp.EncodeToBytes(block)")
 
-	// Golden data from the C-Chain codec that predates libevm. WARNING: changing
-	// these values can break backwards compatibility with extreme consequences.
-	const wantHex = "f90446f9020ea00100000000000000000000000000000000000000000000000000000000000000a008539331084089cedbaf7771d0f5f69847f246e0676e4d96091a49c53c89360b940000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000b9010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000808080808080a00000000000000000000000000000000000000000000000000000000000000000880000000000000000a00200000000000000000000000000000000000000000000000000000000000000dedd0105049402000000000000000000000000000000000000000306808080f90211f9020ea00900000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000940000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000b9010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000070880808080a00000000000000000000000000000000000000000000000000000000000000000880000000000000000a00a000000000000000000000000000000000000000000000000000000000000000d0e"
+	// Golden data from coreth's codec. WARNING: changing these values can break
+	// backwards compatibility with extreme consequences.
+	const wantHex = "f90446f9020ea00100000000000000000000000000000000000000000000000000000000000000a008539331084089cedbaf7771d0f5f69847f246e0676e4d96091a49c53c89360b940000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000a04863dd4b78c4e439c248378fe140f4101d3c00a4efa87e474de54245f2aa14fda0be18e0b68619263d822ea3476f100a4eaa0bd7da2632b102a67be20b953fe494b9010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000808080808080a00000000000000000000000000000000000000000000000000000000000000000880000000000000000a00200000000000000000000000000000000000000000000000000000000000000dedd0105049402000000000000000000000000000000000000000306808080f90211f9020ea00900000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000940000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000b9010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000070880808080a00000000000000000000000000000000000000000000000000000000000000000880000000000000000a00a000000000000000000000000000000000000000000000000000000000000000d0e"
 
 	require.Equal(t, wantHex, hex.EncodeToString(encoded), "golden data")
 
 	decoded := new(types.Block)
 	require.NoError(t, rlp.DecodeBytes(encoded, decoded), "rlp.DecodeBytes(block RLP)")
 	require.Equal(t, block.Hash(), decoded.Hash(), "decoded Block.Hash()")
-	require.Equal(t, extra, extras.Block.Get(decoded), "decoded BlockBodyExtra")
+	require.Equal(t, extra, GetBlockExtra(decoded), "decoded BlockBodyExtra")
 }
 
-func TestBlockBodyExtraCopy(t *testing.T) {
+// TestBlockBodyExtraCopiedWithBlock checks that libevm deep-copies the extra
+// when it derives a new block, via [BlockBodyExtra.Copy].
+func TestBlockBodyExtraCopiedWithBlock(t *testing.T) {
 	t.Parallel()
 
-	extra := &BlockBodyExtra{Version: 1, ExtData: &[]byte{2}}
-	cp := extra.Copy()
-	require.Equal(t, extra, cp, "Copy()")
-	require.NotSame(t, extra.ExtData, cp.ExtData, "Copy() shares ExtData")
-	(*cp.ExtData)[0] = 9
-	require.Equal(t, []byte{2}, *extra.ExtData, "Copy() shares ExtData backing array")
+	block, extra := blockWithNonZeroFields()
+	got := GetBlockExtra(block.WithBody(*block.Body()))
+	require.Equal(t, extra, got, "GetBlockExtra(Block.WithBody())")
+	(*got.ExtData)[0]++
+	require.Equal(t, []byte{14}, *extra.ExtData, "Block.WithBody() shares ExtData with the original")
 }
 
 func TestBlockGetters(t *testing.T) {
@@ -185,8 +178,8 @@ func TestBlockGetters(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			block := types.NewBlock(WithHeaderExtra(&types.Header{}, &HeaderExtra{}), nil, nil, nil, stubHasher{})
-			extras.Block.Set(block, test.blockExtra)
+			block := types.NewBlock(WithHeaderExtra(&types.Header{}, &HeaderExtra{}), nil, nil, nil, trie.NewStackTrie(nil))
+			block = WithBlockExtra(block, test.blockExtra)
 
 			require.Equal(t, test.wantExtData, BlockExtData(block), "BlockExtData()")
 			require.Equal(t, test.wantVersion, BlockVersion(block), "BlockVersion()")
@@ -206,7 +199,7 @@ func TestCalcExtDataHash(t *testing.T) {
 	require.Equal(t, types.RLPHash([]byte{1}), CalcExtDataHash([]byte{1}), "CalcExtDataHash(non-empty)")
 }
 
-func TestNewBlockWithExtData(t *testing.T) {
+func TestNewBlock(t *testing.T) {
 	t.Parallel()
 
 	// This transaction is generated beforehand because of its unexported time field being set
@@ -227,8 +220,7 @@ func TestNewBlockWithExtData(t *testing.T) {
 			wantBlock: func() *types.Block {
 				header := WithHeaderExtra(&types.Header{}, &HeaderExtra{ExtDataHash: EmptyExtDataHash})
 				block := types.NewBlock(header, nil, nil, nil, trie.NewStackTrie(nil))
-				extras.Block.Set(block, &BlockBodyExtra{ExtData: &[]byte{}})
-				return block
+				return WithBlockExtra(block, &BlockBodyExtra{ExtData: new([]byte)})
 			},
 		},
 		{
@@ -237,8 +229,7 @@ func TestNewBlockWithExtData(t *testing.T) {
 			wantBlock: func() *types.Block {
 				header := WithHeaderExtra(&types.Header{}, &HeaderExtra{ExtDataHash: EmptyExtDataHash})
 				block := types.NewBlock(header, nil, nil, nil, trie.NewStackTrie(nil))
-				extras.Block.Set(block, &BlockBodyExtra{ExtData: &[]byte{}})
-				return block
+				return WithBlockExtra(block, &BlockBodyExtra{ExtData: new([]byte)})
 			},
 		},
 		{
@@ -256,8 +247,7 @@ func TestNewBlockWithExtData(t *testing.T) {
 					&HeaderExtra{ExtDataHash: CalcExtDataHash([]byte{2})},
 				)
 				block := types.NewBlock(header, nil, nil, nil, trie.NewStackTrie(nil))
-				extras.Block.Set(block, &BlockBodyExtra{ExtData: &[]byte{2}})
-				return block
+				return WithBlockExtra(block, &BlockBodyExtra{ExtData: &[]byte{2}})
 			},
 		},
 		{
@@ -282,8 +272,7 @@ func TestNewBlockWithExtData(t *testing.T) {
 					},
 				)
 				block := types.NewBlock(header, []*types.Transaction{testTx}, nil, []*types.Receipt{{PostState: []byte{7}}}, trie.NewStackTrie(nil))
-				extras.Block.Set(block, &BlockBodyExtra{ExtData: &[]byte{8}})
-				return block
+				return WithBlockExtra(block, &BlockBodyExtra{ExtData: &[]byte{8}})
 			},
 		},
 	}
@@ -292,19 +281,20 @@ func TestNewBlockWithExtData(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			block := NewBlockWithExtData(test.header, test.txs, test.receipts, test.extdata)
-			require.Equal(t, test.wantBlock(), block)
+			block := NewBlock(test.header, test.txs, test.receipts, test.extdata)
+			require.Equal(t, test.wantBlock(), block, "NewBlock()")
 		})
 	}
 }
 
-type stubHasher struct{}
+// TestBlockRPCJSONRoundTrip goes through [types.Block.PostRPCMarshal]
+// and [types.Block.PostRPCUnmarshal], which are what ethapi and ethclient call.
+func TestBlockRPCJSONRoundTrip(t *testing.T) {
+	t.Parallel()
 
-func (stubHasher) Reset()                   {}
-func (stubHasher) Update(_, _ []byte) error { return nil }
-func (stubHasher) Hash() common.Hash        { return common.Hash{} }
-
-func TestBlockBodyExtraRPCJSONRoundTrip(t *testing.T) {
+	newBlock := func() *types.Block {
+		return types.NewBlock(WithHeaderExtra(&types.Header{}, &HeaderExtra{}), nil, nil, nil, trie.NewStackTrie(nil))
+	}
 	tests := []struct {
 		name    string
 		extData *[]byte
@@ -328,20 +318,22 @@ func TestBlockBodyExtraRPCJSONRoundTrip(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			in := &BlockBodyExtra{ExtData: tt.extData}
-			marshalled := map[string]any{}
-			in.PostRPCMarshal(nil, marshalled)
-			raw, err := json.Marshal(marshalled)
-			require.NoError(t, err, "json.Marshal(PostRPCMarshal())")
+			t.Parallel()
 
-			var got BlockBodyExtra
-			require.NoError(t, got.PostRPCUnmarshal(nil, raw), "PostRPCUnmarshal(%s)", raw)
-			require.Equal(t, tt.want, got.ExtData, "PostRPCUnmarshal(%s).ExtData", raw)
+			in := WithBlockExtra(newBlock(), &BlockBodyExtra{ExtData: tt.extData})
+			marshalled := map[string]any{}
+			in.PostRPCMarshal(marshalled)
+			raw, err := json.Marshal(marshalled)
+			require.NoError(t, err, "json.Marshal(Block.PostRPCMarshal())")
+
+			got := newBlock()
+			require.NoError(t, got.PostRPCUnmarshal(raw), "Block.PostRPCUnmarshal(%s)", raw)
+			require.Equal(t, tt.want, GetBlockExtra(got).ExtData, "GetBlockExtra(Block.PostRPCUnmarshal(%s)).ExtData", raw)
 		})
 	}
 
-	err := new(BlockBodyExtra).PostRPCUnmarshal(nil, []byte(`{"blockExtraData":"zz"}`))
-	require.ErrorAs(t, err, new(*json.UnmarshalTypeError), "PostRPCUnmarshal(bad hex)")
+	err := newBlock().PostRPCUnmarshal([]byte(`{"blockExtraData":"zz"}`))
+	require.ErrorAs(t, err, new(*json.UnmarshalTypeError), "Block.PostRPCUnmarshal(bad hex)")
 }
 
 // TestBlockRLPGolden pins the encodings of historical C-Chain block shapes.

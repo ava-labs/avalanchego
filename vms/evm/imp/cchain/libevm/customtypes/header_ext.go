@@ -353,6 +353,10 @@ func (h *HeaderExtra) DecodeJSON(eth *ethtypes.Header, b []byte) error {
 // PostCopy implements [ethtypes.HeaderHooks]: it deep-copies the extra into
 // the copied header.
 func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
+	if h == nil {
+		WithHeaderExtra(dst, nil)
+		return
+	}
 	cp := new(HeaderExtra)
 	src, out := reflect.ValueOf(h).Elem(), reflect.ValueOf(cp).Elem()
 	for i := range src.NumField() {

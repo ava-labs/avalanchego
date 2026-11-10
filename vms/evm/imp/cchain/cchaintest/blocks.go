@@ -125,11 +125,10 @@ func NewTestBlock(tb testing.TB, opts ...BlockOption) *types.Block {
 	)
 
 	block := types.NewBlock(header, props.ethTxs, nil /* uncles */, nil /* receipts */, saetest.TrieHasher())
-	customtypes.SetBlockExtra(block, &customtypes.BlockBodyExtra{
+	return customtypes.WithBlockExtra(block, &customtypes.BlockBodyExtra{
 		Version: props.version,
 		ExtData: &extData,
 	})
-	return block
 }
 
 // NewBlock returns a block whose ExtData encodes txs and whose header is

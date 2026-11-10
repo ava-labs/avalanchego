@@ -250,7 +250,7 @@ func TestFromBlock(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			block := customtypes.NewBlockWithExtData(
+			block := customtypes.NewBlock(
 				&types.Header{
 					Time: test.time,
 				},

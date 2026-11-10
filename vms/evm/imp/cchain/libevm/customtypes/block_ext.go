@@ -15,9 +15,15 @@ import (
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
-// SetBlockExtra sets the [BlockBodyExtra] `extra` in the [Block] `b`.
-func SetBlockExtra(b *ethtypes.Block, extra *BlockBodyExtra) {
+// GetBlockExtra returns the [BlockBodyExtra] carried by `b`.
+func GetBlockExtra(b *ethtypes.Block) *BlockBodyExtra {
+	return extras.Block.Get(b)
+}
+
+// WithBlockExtra sets `extra` on `b` and returns `b`.
+func WithBlockExtra(b *ethtypes.Block, extra *BlockBodyExtra) *ethtypes.Block {
 	extras.Block.Set(b, extra)
+	return b
 }
 
 // BlockBodyExtra is a struct containing extra fields used by Avalanche
@@ -87,14 +93,14 @@ func (b *BlockBodyExtra) PostRPCUnmarshal(_ *ethtypes.Block, raw json.RawMessage
 }
 
 func BlockExtData(b *ethtypes.Block) []byte {
-	if data := extras.Block.Get(b).ExtData; data != nil {
+	if data := GetBlockExtra(b).ExtData; data != nil {
 		return *data
 	}
 	return nil
 }
 
 func BlockVersion(b *ethtypes.Block) uint32 {
-	return extras.Block.Get(b).Version
+	return GetBlockExtra(b).Version
 }
 
 func BlockTimeMilliseconds(b *ethtypes.Block) *uint64 {
@@ -115,14 +121,13 @@ func CalcExtDataHash(extdata []byte) common.Hash {
 // EmptyExtDataHash is [CalcExtDataHash] of no ext data.
 var EmptyExtDataHash = CalcExtDataHash(nil)
 
-// NewBlockWithExtData builds a block whose header commits to `extdata` via
-// [HeaderExtra.ExtDataHash] and whose body carries it.
-func NewBlockWithExtData(
+// NewBlock builds a block whose header commits to `extdata` via
+// [HeaderExtra.ExtDataHash] and whose body carries it. The block keeps
+// `extdata` rather than copying it, so the caller MUST NOT modify it after.
+func NewBlock(
 	header *ethtypes.Header, txs []*ethtypes.Transaction, receipts []*ethtypes.Receipt, extdata []byte,
 ) *ethtypes.Block {
 	GetHeaderExtra(header).ExtDataHash = CalcExtDataHash(extdata)
 	block := ethtypes.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil))
-	extdata = append([]byte{}, extdata...)
-	SetBlockExtra(block, &BlockBodyExtra{ExtData: &extdata})
-	return block
+	return WithBlockExtra(block, &BlockBodyExtra{ExtData: &extdata})
 }

@@ -1863,8 +1863,7 @@ func TestEmptyBlocksDisallowed(t *testing.T) {
 		hdr := valid.Header()
 		customtypes.GetHeaderExtra(hdr).ExtDataHash = customtypes.EmptyExtDataHash
 
-		emptied := valid.EthBlock().WithSeal(hdr)
-		customtypes.SetBlockExtra(emptied, new(customtypes.BlockBodyExtra))
+		emptied := customtypes.WithBlockExtra(valid.EthBlock().WithSeal(hdr), new(customtypes.BlockBodyExtra))
 
 		buf, err := rlp.EncodeToBytes(emptied)
 		require.NoErrorf(t, err, "rlp.EncodeToBytes(emptied block)")

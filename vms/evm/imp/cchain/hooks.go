@@ -553,7 +553,7 @@ func (b *builder) BuildBlock(
 	he.SettledGasNumerator = (*uint64)(&settled.GasNumerator)
 	he.SettledExcess = (*uint64)(&settled.Excess)
 
-	return customtypes.NewBlockWithExtData(header, ethTxs, receipts, extData), nil
+	return customtypes.NewBlock(header, ethTxs, receipts, extData), nil
 }
 
 var _ hook.Transaction = (*hookTx)(nil)

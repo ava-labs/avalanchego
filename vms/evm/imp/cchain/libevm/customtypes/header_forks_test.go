@@ -245,10 +245,10 @@ func TestHeaderRPCMarshal(t *testing.T) {
 			t.Parallel()
 
 			m := make(map[string]any)
-			tt.fork.extra.PostRPCMarshal(tt.fork.header, m)
+			WithHeaderExtra(tt.fork.header, tt.fork.extra).PostRPCMarshal(m)
 			got, err := json.Marshal(m)
-			require.NoError(t, err, "json.Marshal(PostRPCMarshal())")
-			require.JSONEq(t, tt.want, string(got), "PostRPCMarshal()")
+			require.NoError(t, err, "json.Marshal(Header.PostRPCMarshal())")
+			require.JSONEq(t, tt.want, string(got), "Header.PostRPCMarshal()")
 		})
 	}
 }
