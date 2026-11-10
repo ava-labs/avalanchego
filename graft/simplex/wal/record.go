@@ -52,6 +52,10 @@ func readRecord(r io.Reader, maxSize int64) ([]byte, int64, error) {
 	buff := make([]byte, tempSpace)
 	crc := crc64.New(crc64.MakeTable(crc64.ECMA))
 
+	if maxSize < recordSizeLen {
+		return nil, 0, fmt.Errorf("%w: record length prefix requires %d bytes, but only %d bytes remain", ErrCorruptedWAL, recordSizeLen, maxSize)
+	}
+
 	sizeBuff := buff[:recordSizeLen]
 	if _, err := io.ReadFull(r, sizeBuff); err != nil {
 		return nil, 0, err
