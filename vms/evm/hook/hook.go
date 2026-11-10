@@ -80,19 +80,9 @@ type Points interface {
 	// These operations will be performed during both worst-case and actual
 	// execution.
 	EndOfBlockOps(*types.Block) ([]Op, error)
-	// CanExecuteTransaction mirrors [params.RulesAllowlistHooks.CanExecuteTransaction]
-	// so that consumers can share the same check between SAE admission paths
-	// and the libevm hook fired during actual EVM execution.
-	//
-	// Unlike the libevm hook (which is keyed by [params.Rules] via its
-	// receiver), [Points] is one long-lived value per VM, so the rules for the
-	// state being checked MUST be passed explicitly. Implementations MUST
-	// treat the rules and state as a consistent pair, e.g. when gating with
-	// `rules.IsPrecompileEnabled(...)` against contract storage reads. SAE
-	// worst-case calls this with rules computed from the LAST-SETTLED block,
-	// trading strict-as-of-parent enforcement for
-	// strict-as-of-last-settled (a few seconds of leakage after a role
-	// removal).
+	// CanExecuteTransaction returns an error if a transaction from `from` to
+	// `to` is not allowed. `rules` and `state` are of the same block, which
+	// MAY be older than the block that includes the transaction.
 	CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, state libevm.StateReader) error
 	// StartExecutingBlock applies state changes before the block's transactions
 	// run. `rules` are those of the block and `parent` is the parent header. It
