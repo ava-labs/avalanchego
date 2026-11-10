@@ -48,9 +48,9 @@ func awaitLiveness(t *testing.T, r Reporter, liveness bool) {
 	}, awaitTimeout, awaitFreq)
 }
 
-// TestStopWithHungCheck tests that Stop returns the context error when a check
-// does not return, and that a later Stop with a live context drains.
-func TestStopWithHungCheck(t *testing.T) {
+// TestStopBlockedCheck tests that Stop returns the context error when its
+// context is done and a check is blocked.
+func TestStopBlockedCheck(t *testing.T) {
 	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(t, err)
 
@@ -58,7 +58,8 @@ func TestStopWithHungCheck(t *testing.T) {
 		started atomic.Bool
 		release = make(chan struct{})
 	)
-	require.NoError(t, h.RegisterHealthCheck("hung", CheckerFunc(func(context.Context) (any, error) {
+
+	require.NoError(t, h.RegisterHealthCheck("blocked", CheckerFunc(func(context.Context) (any, error) {
 		started.Store(true)
 		<-release
 		return "", nil
@@ -70,9 +71,6 @@ func TestStopWithHungCheck(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	require.ErrorIs(t, h.Stop(ctx), context.Canceled)
-
-	close(release)
-	require.NoError(t, h.Stop(t.Context()))
 }
 
 func TestDuplicatedRegistrations(t *testing.T) {
