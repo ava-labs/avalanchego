@@ -59,6 +59,10 @@ func TestStopBlockedCheck(t *testing.T) {
 		release = make(chan struct{})
 	)
 
+	t.Cleanup(func() {
+		close(release)
+	})
+
 	require.NoError(t, h.RegisterHealthCheck("blocked", CheckerFunc(func(context.Context) (any, error) {
 		started.Store(true)
 		<-release
