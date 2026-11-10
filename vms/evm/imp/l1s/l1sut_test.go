@@ -60,7 +60,7 @@ type l1SUT struct {
 	vm      *VM
 
 	// client serves both the standard Ethereum surface (via the embedded
-	// `*ethclient.Client`) and the L1-specific methods.
+	// `*evmclient.Client`) and the L1-specific methods.
 	client *client.Client
 
 	// Wallet for issuing transactions
@@ -235,7 +235,7 @@ func (s *l1SUT) bootVM(t *testing.T, clockTime *time.Time) {
 	}
 	apiServer := httptest.NewServer(apiMux)
 
-	c, err := client.NewClientWithURL(apiServer.URL)
+	c, err := client.Dial(s.ctx, apiServer.URL)
 	require.NoError(t, err)
 
 	// Mimic the engine: on entering normal operation it points the VM at the

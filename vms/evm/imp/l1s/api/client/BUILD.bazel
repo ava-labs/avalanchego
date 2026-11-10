@@ -6,10 +6,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api/client",
     visibility = ["//visibility:public"],
     deps = [
-        "//ids",
-        "//utils/rpc",
-        "//vms/evm/imp/l1s/api",
-        "@com_github_ava_labs_libevm//ethclient",
-        "@com_github_ava_labs_libevm//rpc",
+        "//vms/evm/evmclient",
+        "//vms/evm/imp/l1s/api/validatorsclient",
     ],
 )

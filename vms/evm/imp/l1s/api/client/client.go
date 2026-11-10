@@ -9,63 +9,35 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ava-labs/libevm/ethclient"
-
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/rpc"
-
-	l1api "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api"
-	libevmrpc "github.com/ava-labs/libevm/rpc"
+	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api/validatorsclient"
 )
 
-// Client talks to a `vms/evm/imp/l1s` chain. The standard Ethereum surface is
-// available via the embedded [ethclient.Client]. L1-specific methods are
-// defined directly on `Client`.
+// Disambiguation of the different client types to allow for embedding all in
+// the same struct.
+type (
+	EVM        = evmclient.Client
+	Validators = validatorsclient.Client
+)
+
+// Client talks to a `vms/evm/imp/l1s` chain. It unions the [evmclient.Client]
+// with the [validatorsclient.Client].
 //
-// Construct with [NewClient] (preferred) or [NewClientWithURL]. Call [Close]
-// when done.
+// Construct with [Dial]. Call [Client.Close] when done.
 type Client struct {
-	*ethclient.Client
-
-	ethRPC              *libevmrpc.Client
-	validatorsRequester rpc.EndpointRequester
+	*EVM
+	*Validators
 }
 
-// NewClient dials the chain reachable at `<uri>/ext/bc/<chain>`.
-func NewClient(uri, chain string) (*Client, error) {
-	return NewClientWithURL(fmt.Sprintf("%s/ext/bc/%s", uri, chain))
-}
-
-// NewClientWithURL dials a chain at an explicit base URL. The `/rpc` and
+// Dial connects to a chain at an explicit base URL. The `/rpc` and
 // `/validators` suffixes are appended internally.
-func NewClientWithURL(url string) (*Client, error) {
-	ethRPC, err := libevmrpc.Dial(url + "/rpc")
+func Dial(ctx context.Context, url string) (*Client, error) {
+	c, err := evmclient.Dial(ctx, url+"/rpc")
 	if err != nil {
 		return nil, fmt.Errorf("dial %s/rpc: %w", url, err)
 	}
 	return &Client{
-		Client:              ethclient.NewClient(ethRPC),
-		ethRPC:              ethRPC,
-		validatorsRequester: rpc.NewEndpointRequester(url + "/validators"),
+		EVM:        c,
+		Validators: validatorsclient.New(url + "/validators"),
 	}, nil
-}
-
-// Close releases the underlying RPC connection.
-func (c *Client) Close() {
-	c.ethRPC.Close()
-}
-
-// GetCurrentValidators returns the configured validator set, optionally
-// filtered to `nodeIDs`, augmented with per-validation uptime and connection
-// status.
-func (c *Client) GetCurrentValidators(ctx context.Context, nodeIDs []ids.NodeID, options ...rpc.Option) ([]l1api.CurrentValidator, error) {
-	res := &l1api.GetCurrentValidatorsResponse{}
-	err := c.validatorsRequester.SendRequest(
-		ctx,
-		"validators.getCurrentValidators",
-		&l1api.GetCurrentValidatorsRequest{NodeIDs: nodeIDs},
-		res,
-		options...,
-	)
-	return res.Validators, err
 }
