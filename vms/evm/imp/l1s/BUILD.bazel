@@ -51,6 +51,7 @@ go_library(
         "//vms/evm/hook",
         "//vms/evm/imp/blackhole",
         "//vms/evm/imp/dynamic",
+        "//vms/evm/imp/executionresults",
         "//vms/evm/imp/l1s/api",
         "//vms/evm/imp/l1s/hookadaptor",
         "//vms/evm/imp/l1s/validators",

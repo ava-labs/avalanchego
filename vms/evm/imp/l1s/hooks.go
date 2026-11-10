@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/executionresults"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/hookadaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
@@ -93,7 +94,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hookadaptor.BlockBuilder, er
 }
 
 func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error) {
-	return hook.NewExecutionResults(dataDir, h.ctx.Log)
+	return executionresults.New(dataDir, h.ctx.Log)
 }
 
 // GasConfigAfter derives the gas target and price config in effect after `h`

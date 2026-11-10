@@ -84,6 +84,7 @@ go_library(
         "//vms/evm/imp/cchain/txpool",
         "//vms/evm/imp/cchain/warp",
         "//vms/evm/imp/dynamic",
+        "//vms/evm/imp/executionresults",
         "//vms/evm/imp/saeheader",
         "//vms/evm/imp/warp",
         "//vms/evm/network",

@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/executionresults"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
 
@@ -132,7 +133,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 }
 
 func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error) {
-	return hook.NewExecutionResults(dataDir, h.ctx.Log)
+	return executionresults.New(dataDir, h.ctx.Log)
 }
 
 // priceExponent returns h's ACP-283 price exponent, defaulting to
