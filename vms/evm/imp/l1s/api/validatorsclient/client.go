@@ -20,8 +20,7 @@ type Client struct {
 	requester rpc.EndpointRequester
 }
 
-// New returns a [Client] for the validators API served at `url`, which is the
-// chain's base URL with the `/validators` suffix.
+// New returns a [Client] for the validators API served at `url`.
 func New(url string) *Client {
 	return &Client{requester: rpc.NewEndpointRequester(url)}
 }
