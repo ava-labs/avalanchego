@@ -10,7 +10,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/saeconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 )
 
@@ -59,7 +63,7 @@ func TestParseConfig_FeeRecipient(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			c, err := parseConfig(test.bytes)
+			c, err := parseConfig(logging.NoLog{}, test.bytes)
 			require.ErrorIs(t, err, test.wantErr)
 			if test.wantErr == nil {
 				require.Equal(t, test.want, c.FeeRecipient)
@@ -76,19 +80,19 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 	defaults := defaultConfig()
 
 	t.Run("nil_bytes_yields_defaults", func(t *testing.T) {
-		c, err := parseConfig(nil)
+		c, err := parseConfig(logging.NoLog{}, nil)
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
 	})
 
 	t.Run("empty_object_yields_defaults", func(t *testing.T) {
-		c, err := parseConfig([]byte(`{}`))
+		c, err := parseConfig(logging.NoLog{}, []byte(`{}`))
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
 	})
 
 	t.Run("partial_override_keeps_other_defaults", func(t *testing.T) {
-		c, err := parseConfig([]byte(`{"tx-pool-price-limit":42,"rpc-gas-cap":1234}`))
+		c, err := parseConfig(logging.NoLog{}, []byte(`{"tx-pool-price-limit":42,"rpc-gas-cap":1234}`))
 		require.NoError(t, err)
 		require.Equal(t, uint64(42), c.TxPoolPriceLimit)
 		require.Equal(t, uint64(1234), c.RPCGasCap)
@@ -97,43 +101,38 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 		require.Equal(t, defaults.TxPoolLifetime, c.TxPoolLifetime)
 	})
 
-	t.Run("unknown_field_rejected", func(t *testing.T) {
-		// Any legacy key that has no SAE counterpart (here
-		// `state-sync-enabled`, but stands in for ~60 others) must
-		// surface as an explicit decoder error rather than silently
-		// no-op.
-		_, err := parseConfig([]byte(`{"state-sync-enabled":true}`))
-		// JSON decoder does not expose a sentinel error for unknown fields,
-		// so we check for the presence of the field name and "unknown field" in the error message.
-		require.Contains(t, err.Error(), "state-sync-enabled")
-		require.Contains(t, err.Error(), "unknown field")
+	t.Run("unknown_field_ignored_with_warning", func(t *testing.T) {
+		// Legacy keys with no SAE counterpart MUST NOT prevent an existing
+		// node config from starting the VM.
+		log := loggingtest.NewRecorder(logging.Warn)
+		c, err := parseConfig(log, []byte(`{"state-sync-enabled":true}`))
+		require.NoError(t, err)
+		require.Equal(t, defaults, c)
+		require.Equal(t, []*loggingtest.Record{{
+			Level:  logging.Warn,
+			Msg:    "ignoring unrecognized config options",
+			Fields: []zap.Field{zap.Strings("options", []string{"state-sync-enabled"})},
+		}}, log.Records)
 	})
 
-	t.Run("duration_accepts_string_and_numeric", func(t *testing.T) {
-		t.Run("string", func(t *testing.T) {
-			c, err := parseConfig([]byte(`{"tx-pool-lifetime":"30m"}`))
-			require.NoError(t, err)
-			require.Equal(t, 30*time.Minute, c.TxPoolLifetime.Duration)
-		})
-		t.Run("numeric_nanoseconds", func(t *testing.T) {
-			c, err := parseConfig([]byte(`{"tx-pool-lifetime":900000000000}`))
-			require.NoError(t, err)
-			require.Equal(t, 15*time.Minute, c.TxPoolLifetime.Duration)
-		})
+	t.Run("duration_string", func(t *testing.T) {
+		c, err := parseConfig(logging.NoLog{}, []byte(`{"tx-pool-lifetime":"30m"}`))
+		require.NoError(t, err)
+		require.Equal(t, 30*time.Minute, c.TxPoolLifetime.Duration)
+	})
+
+	t.Run("duration_numeric_rejected", func(t *testing.T) {
+		_, err := parseConfig(logging.NoLog{}, []byte(`{"tx-pool-lifetime":900000000000}`))
+		var typeErr *json.UnmarshalTypeError
+		require.ErrorAs(t, err, &typeErr)
 	})
 
 	t.Run("marshal_roundtrip", func(t *testing.T) {
 		out, err := json.Marshal(defaults)
 		require.NoError(t, err)
-		c, err := parseConfig(out)
+		c, err := parseConfig(logging.NoLog{}, out)
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
-	})
-
-	t.Run("log_level_and_format", func(t *testing.T) {
-		c, err := parseConfig([]byte(`{"log-level":"debug"}`))
-		require.NoError(t, err)
-		require.Equal(t, "debug", c.LogLevel)
 	})
 }
 
@@ -145,8 +144,8 @@ func TestConfig_SAEConfig(t *testing.T) {
 	c.RPCTxFeeCap = 2
 	c.LocalTxsEnabled = true
 	c.TxPoolPriceLimit = 3
-	c.TxPoolLifetime = duration{42 * time.Second}
-	c.PruningEnabled = false
+	c.TxPoolLifetime = saeconfig.Duration{Duration: 42 * time.Second}
+	c.Pruning = false
 	c.CommitInterval = 8192
 
 	got := c.saeConfig(nil)
@@ -155,7 +154,7 @@ func TestConfig_SAEConfig(t *testing.T) {
 	require.Equal(t, 42*time.Second, got.MempoolConfig.Lifetime)
 	require.Equal(t, uint64(1), got.RPCConfig.GasCap)
 	require.InDelta(t, 2.0, got.RPCConfig.TxFeeCap, 0)
-	require.True(t, got.DBConfig.Archival, "PruningEnabled=false => Archival=true")
+	require.True(t, got.DBConfig.Archival, "Pruning=false => Archival=true")
 	require.Equal(t, uint64(8192), got.DBConfig.CommitInterval)
 
 	// Defaults round-trip to the legacy-equivalent SAE state: pruning on
@@ -169,13 +168,8 @@ func TestConfig_SAEConfig(t *testing.T) {
 // derived SAE configuration: values the SAE core would only reject at
 // runtime (or worse, divide by) MUST fail at chain-config parse time.
 func TestParseConfig_ValidatesSAEConfig(t *testing.T) {
-	_, err := parseConfig([]byte(`{"commit-interval":0}`))
+	_, err := parseConfig(logging.NoLog{}, []byte(`{"commit-interval":0}`))
 	require.ErrorIs(t, err, saedb.Config{}.Verify(), "parseConfig()")
-}
-
-func TestParseConfig_RejectsTrailingData(t *testing.T) {
-	_, err := parseConfig([]byte(`{} {}`))
-	require.ErrorIs(t, err, errTrailingConfigData, "parseConfig()")
 }
 
 func TestParseConfig_RPC(t *testing.T) {
@@ -194,9 +188,9 @@ func TestParseConfig_RPC(t *testing.T) {
 			wantResolveLast: true,
 		},
 		{
-			name:            "numeric_duration",
-			config:          `{"api-max-duration":5000000000,"batch-request-limit":50,"api-resolve-pending-to-last-executed":false}`,
-			wantDuration:    5 * time.Second,
+			name:            "disable_resolve_pending",
+			config:          `{"api-max-duration":"10s","batch-request-limit":50,"api-resolve-pending-to-last-executed":false}`,
+			wantDuration:    10 * time.Second,
 			wantBatchLimit:  50,
 			wantResolveLast: false,
 		},
@@ -204,13 +198,13 @@ func TestParseConfig_RPC(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			config, err := parseConfig([]byte(test.config))
-			require.NoError(t, err, "parseConfig(%q)", test.config)
+			config, err := parseConfig(logging.NoLog{}, []byte(test.config))
+			require.NoError(t, err, "parseConfig(logging.NoLog{}, %q)", test.config)
 
 			rpcConfig := config.saeConfig(nil).RPCConfig
-			require.Equal(t, test.wantDuration, rpcConfig.CallTimeout, "parseConfig(%q)", test.config)
-			require.Equal(t, test.wantBatchLimit, rpcConfig.BatchRequestLimit, "parseConfig(%q)", test.config)
-			require.Equal(t, test.wantResolveLast, rpcConfig.ResolvePendingToLastExecuted, "parseConfig(%q)", test.config)
+			require.Equal(t, test.wantDuration, rpcConfig.CallTimeout, "parseConfig(logging.NoLog{}, %q)", test.config)
+			require.Equal(t, test.wantBatchLimit, rpcConfig.BatchRequestLimit, "parseConfig(logging.NoLog{}, %q)", test.config)
+			require.Equal(t, test.wantResolveLast, rpcConfig.ResolvePendingToLastExecuted, "parseConfig(logging.NoLog{}, %q)", test.config)
 		})
 	}
 }

@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
@@ -36,7 +35,6 @@ import (
 
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	avadb "github.com/ava-labs/avalanchego/database"
-	legacylog "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/log"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	l1api "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api"
 	l1warp "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/warp"
@@ -106,12 +104,9 @@ func (vm *VM) Initialize(
 		return errAlreadyClosed
 	}
 
-	userConfig, err := parseConfig(configBytes)
+	userConfig, err := parseConfig(snowCtx.Log, configBytes)
 	if err != nil {
 		return fmt.Errorf("parsing user config: %w", err)
-	}
-	if err := applyLogLevel(userConfig.LogLevel, snowCtx); err != nil {
-		return err
 	}
 	snowCtx.Log.Info("initializing L1 VM",
 		zap.Reflect("config", userConfig),
@@ -193,32 +188,6 @@ func (vm *VM) Initialize(
 	}
 
 	snowCtx.Log.Info("initialized L1 VM")
-	return nil
-}
-
-// applyLogLevel applies the operator's `log-level` (when set) to both the
-// process-global libevm logger and the chain's avalanchego logger; see
-// [config.LogLevel] for the exact semantics.
-func applyLogLevel(logLevel string, snowCtx *snow.Context) error {
-	if logLevel == "" {
-		return nil
-	}
-	alias, aliasErr := snowCtx.BCLookup.PrimaryAlias(snowCtx.ChainID)
-	if aliasErr != nil {
-		alias = snowCtx.ChainID.String()
-	}
-	// TODO(ceyonur): Add JSON format support
-	if _, err := legacylog.InitLogger(alias, logLevel, false, snowCtx.Log); err != nil {
-		return fmt.Errorf("initializing libevm logger: %w", err)
-	}
-	if avaLevel, levelErr := logging.ToLevel(logLevel); levelErr == nil {
-		snowCtx.Log.SetLevel(avaLevel)
-	} else {
-		snowCtx.Log.Warn("could not map config log-level to avalanchego level; SAE-side logger left at avalanchego-configured level",
-			zap.String("logLevel", logLevel),
-			zap.Error(levelErr),
-		)
-	}
 	return nil
 }
 

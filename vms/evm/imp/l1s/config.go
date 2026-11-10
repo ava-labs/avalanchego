@@ -5,17 +5,12 @@
 package l1s
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
-	"github.com/spf13/cast"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
@@ -23,121 +18,35 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/saeconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
-	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 
 	legacyparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
-// config is the operator-supplied per-chain config for the SAE L1 VM. Field
-// names and JSON tags match the legacy
-// `graft/subnet-evm/plugin/evm/config.Config` schema for the subset this VM
-// supports, so existing operator config blobs keep working for those fields.
-//
-// Unknown fields are REJECTED by [parseConfig] so legacy-only knobs (e.g.
-// gossip tuning, `state-sync-enabled`, `use-standalone-database`,
-// `offline-pruning-*`, `admin-api-enabled`) surface as an obvious error
-// rather than silently no-opping. This is the trade-off for a "narrow but
-// compatible" surface; if a previously-rejected legacy field becomes
-// meaningful in SAE, add it here.
+// config is the operator-supplied per-chain config for the SAE L1 VM. JSON
+// tags match the legacy `graft/subnet-evm/plugin/evm/config.Config` schema for
+// the subset this VM supports, so existing operator config blobs keep working
+// for those fields.
 type config struct {
-	// MinDelayTarget is the minimum delay between blocks (in milliseconds)
-	// that this node will attempt to use when creating blocks. If this
-	// config is not specified, the node will default to use the parent
-	// block's target delay per second.
-	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
-
-	// GasTarget is the target gas per second that this node will attempt
-	// to use when creating blocks. If this config is not specified, the
-	// node will default to use the parent block's target gas per second.
-	GasTarget *gas.Gas `json:"gas-target,omitempty"`
+	saeconfig.Config
 
 	// API resource limits. Mirror the legacy VM where equivalents exist.
-	RPCGasCap                    uint64   `json:"rpc-gas-cap"`
-	RPCTxFeeCap                  float64  `json:"rpc-tx-fee-cap"`
-	APIMaxDuration               duration `json:"api-max-duration"`
-	BatchRequestLimit            uint64   `json:"batch-request-limit"`
-	ResolvePendingToLastExecuted bool     `json:"api-resolve-pending-to-last-executed"`
-
-	// LocalTxsEnabled mirrors the legacy `local-txs-enabled` flag.
-	// When false (default), the legacypool runs with `NoLocals=true`.
-	// The on-disk transaction journal is disabled either way, matching
-	// the legacy plugin.
-	LocalTxsEnabled bool `json:"local-txs-enabled"`
-
-	// PruningEnabled mirrors the legacy `pruning-enabled` flag (defaults
-	// to true). When false, the SAE state DB runs in archival mode
-	// (every state is persisted to disk; `saedb.Config.Archival=true`).
-	PruningEnabled bool `json:"pruning-enabled"`
-
-	// CommitInterval mirrors the legacy `commit-interval` flag: the number
-	// of blocks between persistent commits of the state trie to disk.
-	CommitInterval uint64 `json:"commit-interval"`
+	RPCGasCap   uint64  `json:"rpc-gas-cap"`
+	RPCTxFeeCap float64 `json:"rpc-tx-fee-cap"`
 
 	// Mempool (txpool) settings. JSON tags match legacy `tx-pool-*`.
-	TxPoolPriceLimit   uint64   `json:"tx-pool-price-limit"`
-	TxPoolPriceBump    uint64   `json:"tx-pool-price-bump"`
-	TxPoolAccountSlots uint64   `json:"tx-pool-account-slots"`
-	TxPoolGlobalSlots  uint64   `json:"tx-pool-global-slots"`
-	TxPoolAccountQueue uint64   `json:"tx-pool-account-queue"`
-	TxPoolGlobalQueue  uint64   `json:"tx-pool-global-queue"`
-	TxPoolLifetime     duration `json:"tx-pool-lifetime"`
+	TxPoolPriceLimit   uint64             `json:"tx-pool-price-limit"`
+	TxPoolPriceBump    uint64             `json:"tx-pool-price-bump"`
+	TxPoolAccountQueue uint64             `json:"tx-pool-account-queue"`
+	TxPoolGlobalQueue  uint64             `json:"tx-pool-global-queue"`
+	TxPoolLifetime     saeconfig.Duration `json:"tx-pool-lifetime"`
 
 	// FeeRecipient is the local node's preferred fee recipient when the
 	// network allows fee recipients (`AllowFeeRecipients=true` or
 	// rewardmanager `allowFeeRecipients()`). Must be empty (=> burn) or
 	// a valid hex address; [parseConfig] rejects any other value.
 	FeeRecipient string `json:"feeRecipient"`
-
-	// WarpOffChainMessages encodes off-chain messages (unrelated to any
-	// on-chain event ie. block or AddressedCall) that the node should
-	// be willing to sign.
-	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
-
-	// LogLevel mirrors the legacy `log-level` flag. Accepted values are
-	// the strings parseable by [graft/evm/log.LvlFromString] (trace,
-	// debug, info, warn, error, crit). The default is the empty string,
-	// which leaves the process-global libevm logger untouched.
-	//   1. reinitializes the libevm global logger to write through
-	//      `snowCtx.Log` at this level (libevm-internal logs: EVM
-	//      execution, txpool, libevm RPC, ...);
-	//   2. calls `snowCtx.Log.SetLevel` so SAE/avalanchego-side Go code
-	//      under `vms/evm` and `vms/evm/imp/l1s` (executor, block
-	//      builder, gasprice, ...) follows the same threshold,
-	//      overriding whatever avalanchego configured for the chain.
-	// Values libevm accepts but avalanchego does not (e.g. "crit") are
-	// tolerated for (1) and skipped for (2) with a warning log.
-	LogLevel string `json:"log-level"`
-}
-
-// duration is a JSON-friendly wrapper around [time.Duration] that accepts
-// both numeric (nanoseconds) and string forms ("10m", "1h30s"), matching the
-// legacy `graft/subnet-evm/plugin/evm/config.Duration` shape so existing
-// operator configs round-trip unchanged. The legacy type is deliberately not
-// imported: that package is a deletion target once the legacy plugin
-// retires, and coreth keeps an equivalent local copy for the same reason.
-type duration struct {
-	time.Duration
-}
-
-// UnmarshalJSON accepts either a numeric value (nanoseconds) or a
-// string parseable by [cast.ToDurationE].
-func (d *duration) UnmarshalJSON(data []byte) error {
-	var v interface{}
-	if err := json.Unmarshal(data, &v); err != nil {
-		return err
-	}
-	parsed, err := cast.ToDurationE(v)
-	if err != nil {
-		return err
-	}
-	d.Duration = parsed
-	return nil
-}
-
-// MarshalJSON encodes the duration as a string (e.g. "10m0s").
-func (d duration) MarshalJSON() ([]byte, error) {
-	return json.Marshal(d.Duration.String())
 }
 
 // defaultConfig returns the per-chain defaults. Values mirror the legacy
@@ -145,50 +54,28 @@ func (d duration) MarshalJSON() ([]byte, error) {
 // subset.
 func defaultConfig() config {
 	return config{
-		RPCGasCap:                    50_000_000, // 50M gas limit
-		RPCTxFeeCap:                  100,        // 100 AVAX
-		BatchRequestLimit:            1000,       // matches the legacy VM and libevm
-		ResolvePendingToLastExecuted: true,
-		LocalTxsEnabled:              false, // => NoLocals=true in legacypool
-		PruningEnabled:               true,  // => saedb.Config.Archival=false
-		CommitInterval:               saedb.DefaultCommitInterval,
-		TxPoolPriceLimit:             legacypool.DefaultConfig.PriceLimit,
-		TxPoolPriceBump:              legacypool.DefaultConfig.PriceBump,
-		TxPoolAccountSlots:           legacypool.DefaultConfig.AccountSlots,
-		TxPoolGlobalSlots:            legacypool.DefaultConfig.GlobalSlots,
-		TxPoolAccountQueue:           legacypool.DefaultConfig.AccountQueue,
-		TxPoolGlobalQueue:            legacypool.DefaultConfig.GlobalQueue,
+		Config:             saeconfig.Default(),
+		RPCGasCap:          50_000_000, // 50M gas limit
+		RPCTxFeeCap:        100,        // 100 AVAX
+		TxPoolPriceLimit:   legacypool.DefaultConfig.PriceLimit,
+		TxPoolPriceBump:    legacypool.DefaultConfig.PriceBump,
+		TxPoolAccountQueue: legacypool.DefaultConfig.AccountQueue,
+		TxPoolGlobalQueue:  legacypool.DefaultConfig.GlobalQueue,
 		// The legacy plugin shortens the pool lifetime from legacypool's 3h
 		// default; see graft/subnet-evm/plugin/evm/config/default_config.go.
-		TxPoolLifetime: duration{10 * time.Minute},
+		TxPoolLifetime: saeconfig.Duration{Duration: 10 * time.Minute},
 	}
 }
 
-var (
-	errInvalidFeeRecipient = errors.New("invalid fee recipient")
-	errTrailingConfigData  = errors.New("unexpected trailing config data")
-)
+var errInvalidFeeRecipient = errors.New("invalid fee recipient")
 
 // parseConfig unmarshals operator-supplied per-chain config bytes on top of
-// [defaultConfig], rejecting unknown fields so legacy-only knobs surface as
-// an obvious error, and validates the resulting SAE configuration.
-func parseConfig(b []byte) (config, error) {
+// [defaultConfig], warning about unrecognized options, and validates the
+// resulting SAE configuration.
+func parseConfig(log logging.Logger, b []byte) (config, error) {
 	c := defaultConfig()
-	if len(b) > 0 {
-		dec := json.NewDecoder(bytes.NewReader(b))
-		dec.DisallowUnknownFields()
-		if err := dec.Decode(&c); err != nil {
-			return config{}, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
-		}
-
-		var trailing json.RawMessage
-		switch err := dec.Decode(&trailing); {
-		case errors.Is(err, io.EOF):
-		case err != nil:
-			return config{}, fmt.Errorf("decoding trailing config data: %w", err)
-		default:
-			return config{}, errTrailingConfigData
-		}
+	if err := saeconfig.Parse(log, b, &c); err != nil {
+		return config{}, err
 	}
 
 	if c.FeeRecipient != "" && !common.IsHexAddress(c.FeeRecipient) {
@@ -202,26 +89,17 @@ func parseConfig(b []byte) (config, error) {
 }
 
 // saeConfig translates the operator-supplied [config] into the [sae.Config]
-// consumed by [sae.NewVM]. Legacy `state-scheme` / trie-cache-size knobs
-// have no SAE equivalent in this VM's config today, so the corresponding
-// [saedb.Config] fields take saedb defaults.
+// consumed by [sae.NewVM].
 func (c config) saeConfig(now func() time.Time) sae.Config {
 	config := sae.DefaultConfig()
-	config.MempoolConfig.NoLocals = !c.LocalTxsEnabled
 	config.MempoolConfig.PriceLimit = c.TxPoolPriceLimit
 	config.MempoolConfig.PriceBump = c.TxPoolPriceBump
-	config.MempoolConfig.AccountSlots = c.TxPoolAccountSlots
-	config.MempoolConfig.GlobalSlots = c.TxPoolGlobalSlots
 	config.MempoolConfig.AccountQueue = c.TxPoolAccountQueue
 	config.MempoolConfig.GlobalQueue = c.TxPoolGlobalQueue
 	config.MempoolConfig.Lifetime = c.TxPoolLifetime.Duration
-	config.DBConfig.Archival = !c.PruningEnabled
-	config.DBConfig.CommitInterval = c.CommitInterval
-	config.RPCConfig.CallTimeout = c.APIMaxDuration.Duration
 	config.RPCConfig.GasCap = c.RPCGasCap
-	config.RPCConfig.BatchRequestLimit = c.BatchRequestLimit
 	config.RPCConfig.TxFeeCap = c.RPCTxFeeCap
-	config.RPCConfig.ResolvePendingToLastExecuted = c.ResolvePendingToLastExecuted
+	c.Config.Apply(&config)
 	config.Now = now
 	return config
 }

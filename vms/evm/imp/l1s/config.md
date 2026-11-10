@@ -9,7 +9,7 @@ This document describes the configuration options available for the SAE L1 VM. D
 
 Default values are overridden only if specified in the given config file. It is recommended to only provide values which are different from the default, as that makes the config more resilient to future default changes. Otherwise, if defaults change, your node will remain with the old values, which might adversely affect your node operation.
 
-Field names and JSON tags match the legacy Subnet-EVM plugin's config schema for the subset this VM supports, so existing operator config blobs keep working for those fields. **Unknown fields are rejected**: legacy-only knobs (e.g. gossip tuning, `state-sync-enabled`, `use-standalone-database`, `offline-pruning-*`, `admin-api-enabled`) surface as a startup error rather than silently no-opping. Remove them from the config file before pointing it at this VM. The file must contain exactly one JSON value; trailing non-whitespace data is rejected.
+Field names and JSON tags match the legacy Subnet-EVM plugin's config schema for the subset this VM supports, so existing operator config blobs keep working for those fields. Unrecognized options, such as a typo or a legacy Subnet-EVM option this VM doesn't support, are ignored, and the node logs a warning naming them.
 
 ## Example Configuration
 
@@ -51,7 +51,7 @@ Field names and JSON tags match the legacy Subnet-EVM plugin's config schema for
 | `tx-pool-global-slots` | uint64 | Maximum number of executable transaction slots for all accounts. | `5120` |
 | `tx-pool-account-queue` | uint64 | Maximum number of non-executable transaction slots per account. | `64` |
 | `tx-pool-global-queue` | uint64 | Maximum number of non-executable transaction slots for all accounts. | `1024` |
-| `tx-pool-lifetime` | duration | Maximum time non-executable transactions remain queued, as a duration string (`"10m"`) or nanoseconds. | `"10m"` |
+| `tx-pool-lifetime` | duration | Maximum time non-executable transactions remain queued, as a [Go duration string](https://pkg.go.dev/time#ParseDuration), such as `"10m"`. | `"10m"` |
 
 ## APIs
 
@@ -59,7 +59,7 @@ Field names and JSON tags match the legacy Subnet-EVM plugin's config schema for
 |--------|------|-------------|---------|
 | `rpc-gas-cap` | uint64 | Maximum gas for `eth_call`/`eth_estimateGas`-style RPC execution. | `50000000` |
 | `rpc-tx-fee-cap` | float64 | Cap on transaction fees (in the native token) that can be sent via RPC APIs (`0` = no cap). | `100` |
-| `api-max-duration` | duration | Maximum duration of an `eth_call` or `eth_callDetailed`; non-positive values disable the limit. Accepts a duration string or nanoseconds. | `"0s"` |
+| `api-max-duration` | duration | Maximum duration of an `eth_call` or `eth_callDetailed`; non-positive values disable the limit. Accepts a [Go duration string](https://pkg.go.dev/time#ParseDuration), such as `"30s"`. | `"0s"` |
 | `batch-request-limit` | uint64 | Maximum requests in a JSON-RPC batch (`0` = no limit). | `1000` |
 | `api-resolve-pending-to-last-executed` | bool | Resolve pending-state RPC requests against the last executed block. | `true` |
 
@@ -68,9 +68,3 @@ Field names and JSON tags match the legacy Subnet-EVM plugin's config schema for
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
 | `warp-off-chain-messages` | array of strings | Hex-encoded off-chain Warp messages the node should be willing to sign. These messages do not need to correspond to any on-chain event. | empty array |
-
-## Logging
-
-| Option | Type | Description | Default |
-|--------|------|-------------|---------|
-| `log-level` | string | Log level for both the libevm-internal logger and the chain's AvalancheGo logger: `trace`, `debug`, `info`, `warn`, `error`, or `crit`. Empty leaves the loggers as the node configured them. | `""` |
