@@ -25,6 +25,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -38,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/txpool"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/executionresults"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
@@ -268,7 +268,7 @@ func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) err
 		return fmt.Errorf("applying cross-chain state: %w", err)
 	}
 
-	messages, err := warp.FromReceipts(receipts)
+	messages, err := saewarp.FromReceipts(receipts)
 	if err != nil {
 		return fmt.Errorf("parsing warp messages from receipts: %w", err)
 	}
@@ -527,9 +527,12 @@ func (b *builder) BuildBlock(
 	}
 
 	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
-	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, corethparams.GetRulesExtra(rules).IsDurango, ethTxs)
-	if err != nil {
-		return nil, fmt.Errorf("verifying warp messages: %w", err)
+	var warpValidity predicate.BlockResults
+	if corethparams.GetRulesExtra(rules).IsDurango {
+		warpValidity, err = saewarp.VerifyBlock(b.ctx, blockCtx, &corethwarp.Config{}, ethTxs)
+		if err != nil {
+			return nil, fmt.Errorf("verifying warp messages: %w", err)
+		}
 	}
 
 	// TODO(StephenButtolph): Replace the predicate bytes format with an

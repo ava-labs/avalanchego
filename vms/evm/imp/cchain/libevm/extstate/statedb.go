@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 )
@@ -94,7 +94,10 @@ func (s *StateDB) Prepare(
 	list types.AccessList,
 ) {
 	rulesExtra := corethparams.GetRulesExtra(rules)
-	s.warpMessages = warp.MessagesFromAccessList(corethparams.GetRulesExtra(rules).IsDurango, list)
+	s.warpMessages = nil
+	if rulesExtra.IsDurango {
+		s.warpMessages = warp.MessagesFromAccessList(list)
+	}
 	s.preAP1 = !rulesExtra.IsApricotPhase1
 	s.StateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)
 }

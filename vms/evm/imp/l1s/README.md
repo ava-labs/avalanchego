@@ -32,7 +32,7 @@ L1-specific code is concentrated here:
 - [`hooks.go`](hooks.go) connects L1 rules and precompiles to SAE.
 - [`gas_config.go`](gas_config.go) encodes ACP-224 gas configuration in headers.
 - [`api`](api) exposes the validators service.
-- [`warp`](warp) adds L1 Warp predicates and uptime verification.
+- [`warp`](warp) signs validator-uptime attestations.
 - [`plugin`](plugin) is the standalone VM entrypoint.
 
 Scalar ACP-176 and ACP-226 math belongs to

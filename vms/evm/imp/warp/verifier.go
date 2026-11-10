@@ -1,11 +1,8 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package warp handles the storage and signature-request verification of
-// Avalanche Warp Messages for SAE-based VMs. Chain-specific behaviour —
-// message extraction from receipts, predicate contexts, and additional
-// signable payload types — is injected by the chain packages
-// (vms/evm/imp/cchain/warp and vms/evm/imp/l1s/warp).
+// Package warp handles the parsing, verification, and storage of Avalanche Warp
+// Messages for SAE-based VMs.
 package warp
 
 import (

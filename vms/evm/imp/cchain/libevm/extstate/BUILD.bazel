@@ -15,7 +15,7 @@ go_library(
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/contract",
         "//graft/evm/predicate",
-        "//vms/evm/imp/cchain/warp",
+        "//vms/evm/imp/warp",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",

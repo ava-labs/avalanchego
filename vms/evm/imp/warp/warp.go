@@ -1,8 +1,6 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package warp handles the parsing, verification, and storage of Avalanche Warp
-// Messages.
 package warp
 
 import (
@@ -20,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/set"
 
-	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -29,11 +27,11 @@ func FromReceipts(rs types.Receipts) ([]*avalanchewarp.UnsignedMessage, error) {
 	var messages []*avalanchewarp.UnsignedMessage
 	for _, r := range rs {
 		for _, log := range r.Logs {
-			if log.Address != corethwarp.ContractAddress {
+			if log.Address != warpcontract.ContractAddress {
 				continue
 			}
 
-			m, err := corethwarp.UnpackSendWarpEventDataToMessage(log.Data)
+			m, err := warpcontract.UnpackSendWarpEventDataToMessage(log.Data)
 			if err != nil {
 				return nil, fmt.Errorf("parsing log data into warp message (TxHash: %s, LogIndex: %d): %w", log.TxHash, log.Index, err)
 			}
@@ -43,30 +41,27 @@ func FromReceipts(rs types.Receipts) ([]*avalanchewarp.UnsignedMessage, error) {
 	return messages, nil
 }
 
-var errNoBlockContext = errors.New("no block context")
+// ErrNoBlockContext is returned by [VerifyBlock] when a transaction carries a
+// Warp message but no block context is available to verify it against.
+var ErrNoBlockContext = errors.New("no block context")
 
-var warpConfig = &corethwarp.Config{}
-
-// MessagesFromAccessList returns the Warp messages in list, in order. It returns
-// nil before Durango.
-func MessagesFromAccessList(isDurango bool, list types.AccessList) []predicate.Predicate {
-	if !isDurango {
-		return nil
-	}
+// MessagesFromAccessList returns the Warp messages in list, in order.
+func MessagesFromAccessList(list types.AccessList) []predicate.Predicate {
 	var messages []predicate.Predicate
 	for _, tuple := range list {
-		if tuple.Address == corethwarp.ContractAddress {
+		if tuple.Address == warpcontract.ContractAddress {
 			messages = append(messages, tuple.StorageKeys)
 		}
 	}
 	return messages
 }
 
-// VerifyBlock verifies the Warp messages of every transaction in the block.
+// VerifyBlock verifies the Warp messages of every transaction in the block
+// with config, the Warp precompile's config.
 func VerifyBlock(
 	snowContext *snow.Context,
 	blockContext *block.Context, // MAY be nil
-	isDurango bool,
+	config precompileconfig.Predicater,
 	txs []*types.Transaction,
 ) (predicate.BlockResults, error) {
 	type result = lazyEntry[common.Hash, predicate.PrecompileResults]
@@ -80,7 +75,7 @@ func VerifyBlock(
 	)
 	eg.SetLimit(runtime.GOMAXPROCS(0))
 	for _, tx := range txs {
-		messages := MessagesFromAccessList(isDurango, tx.AccessList())
+		messages := MessagesFromAccessList(tx.AccessList())
 		if len(messages) == 0 {
 			continue
 		}
@@ -91,11 +86,11 @@ func VerifyBlock(
 			// This check exists inside the loop rather than outside so that we
 			// don't require a non-nil block context when there are no Warp
 			// messages to verify.
-			return nil, errNoBlockContext
+			return nil, ErrNoBlockContext
 		}
 		results = append(results, result{
 			key:   tx.Hash(),
-			value: verifyTx(pc, messages, eg),
+			value: verifyTx(config, pc, messages, eg),
 		})
 	}
 	if err := eg.Wait(); err != nil {
@@ -131,6 +126,7 @@ func collect[K comparable, V any](entries []lazyEntry[K, V]) map[K]V {
 //
 // The results MUST be collected after eg.Wait has returned.
 func verifyTx(
+	config precompileconfig.Predicater,
 	pc *precompileconfig.PredicateContext,
 	messages []predicate.Predicate,
 	eg *errgroup.Group,
@@ -140,7 +136,7 @@ func verifyTx(
 		eg.Go(func() error {
 			// TODO(StephenButtolph): Properly report unexpected errors when
 			// cleaning up the coreth precompile code.
-			failures[i] = warpConfig.VerifyPredicate(pc, msg) != nil
+			failures[i] = config.VerifyPredicate(pc, msg) != nil
 			return nil
 		})
 	}
@@ -151,6 +147,6 @@ func verifyTx(
 				r.Add(i)
 			}
 		}
-		return predicate.PrecompileResults{corethwarp.ContractAddress: r}
+		return predicate.PrecompileResults{warpcontract.ContractAddress: r}
 	}
 }

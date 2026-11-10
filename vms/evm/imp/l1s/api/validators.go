@@ -38,9 +38,9 @@ type (
 // under the `validators` namespace via `graft/evm/utils/rpc.NewHandler`
 // (or any compatible gorilla-rpc helper).
 //
-// `connected` is typically `*sae.VM.ValidatorPeers`. The accessors hold no internal lock - SAE-side
-// resources serialise themselves - unlike the legacy VM
-// wrapper which RLocks the VM around each call.
+// `connected` is typically `*sae.VM.ValidatorPeers`. The accessors hold no
+// internal lock - SAE-side resources serialise themselves - unlike the
+// legacy VM wrapper which RLocks the VM around each call.
 func NewValidatorsAPI(
 	validatorState avagovalidators.State,
 	subnetID ids.ID,

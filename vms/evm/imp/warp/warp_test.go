@@ -10,57 +10,25 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/warptest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
-	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	avalanchewarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
-
-func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
-}
-
-func newHash(tb testing.TB) (*avalanchewarp.UnsignedMessage, *payload.Hash) {
-	p, err := payload.NewHash(
-		ids.GenerateTestID(),
-	)
-	require.NoError(tb, err, "payload.NewHash()")
-
-	m, err := avalanchewarp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, p.Bytes())
-	require.NoError(tb, err, "warp.NewUnsignedMessage()")
-	return m, p
-}
-
-func newAddressedCall(tb testing.TB) (*avalanchewarp.UnsignedMessage, *payload.AddressedCall) {
-	p, err := payload.NewAddressedCall(
-		utils.RandomBytes(20),
-		[]byte("test"),
-	)
-	require.NoError(tb, err, "payload.NewAddressedCall()")
-
-	m, err := avalanchewarp.NewUnsignedMessage(constants.UnitTestID, snowtest.XChainID, p.Bytes())
-	require.NoError(tb, err, "warp.NewUnsignedMessage()")
-	return m, p
-}
 
 // newSendWarpMessageLog returns the log emitted by the warp precompile when
 // sending msg.
 func newSendWarpMessageLog(tb testing.TB, msg []byte) *types.Log {
-	topics, data, err := corethwarp.PackSendWarpMessageEvent(common.Address{}, common.Hash{}, msg)
+	topics, data, err := warpcontract.PackSendWarpMessageEvent(common.Address{}, common.Hash{}, msg)
 	require.NoErrorf(tb, err, "warp.PackSendWarpMessageEvent(..., %d bytes)", len(msg))
 	return &types.Log{
-		Address: corethwarp.ContractAddress,
+		Address: warpcontract.ContractAddress,
 		Topics:  topics,
 		Data:    data,
 	}
@@ -150,68 +118,51 @@ func TestVerifyBlock(t *testing.T) {
 
 		validTx = types.NewTx(&types.DynamicFeeTx{
 			AccessList: types.AccessList{
-				{Address: corethwarp.ContractAddress, StorageKeys: validPredicate},
+				{Address: warpcontract.ContractAddress, StorageKeys: validPredicate},
 			},
 		})
 		invalidTx = types.NewTx(&types.DynamicFeeTx{
 			AccessList: types.AccessList{
-				{Address: corethwarp.ContractAddress, StorageKeys: invalidPredicate},
+				{Address: warpcontract.ContractAddress, StorageKeys: invalidPredicate},
 			},
 		})
 		twoInvalidTx = types.NewTx(&types.DynamicFeeTx{
 			AccessList: types.AccessList{
-				{Address: corethwarp.ContractAddress, StorageKeys: invalidPredicate},
-				{Address: corethwarp.ContractAddress, StorageKeys: invalidPredicate},
+				{Address: warpcontract.ContractAddress, StorageKeys: invalidPredicate},
+				{Address: warpcontract.ContractAddress, StorageKeys: invalidPredicate},
 			},
 		})
 		mixedTx = types.NewTx(&types.DynamicFeeTx{
 			AccessList: types.AccessList{
-				{Address: corethwarp.ContractAddress, StorageKeys: validPredicate},
-				{Address: corethwarp.ContractAddress, StorageKeys: invalidPredicate},
-				{Address: corethwarp.ContractAddress, StorageKeys: invalidPredicate},
-				{Address: corethwarp.ContractAddress, StorageKeys: validPredicate},
+				{Address: warpcontract.ContractAddress, StorageKeys: validPredicate},
+				{Address: warpcontract.ContractAddress, StorageKeys: invalidPredicate},
+				{Address: warpcontract.ContractAddress, StorageKeys: invalidPredicate},
+				{Address: warpcontract.ContractAddress, StorageKeys: validPredicate},
 			},
 		})
 	)
 	tests := []struct {
 		name         string
-		isDurango    bool
 		blockContext *block.Context
 		txs          []*types.Transaction
 		want         predicate.BlockResults
 		wantErr      error
 	}{
 		{
-			name:         "pre_durango",
-			blockContext: &block.Context{},
-			txs: []*types.Transaction{
-				validTx,
-			},
-		},
-		{
-			name: "pre_durango_no_context",
-			txs: []*types.Transaction{
-				validTx,
-			},
-		},
-		{
 			name:         "no_predicates",
-			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				types.NewTx(&types.DynamicFeeTx{}),
 			},
 		},
 		{
-			name:      "no_predicates_no_context",
-			isDurango: true,
+			name: "no_predicates_no_context",
 			txs: []*types.Transaction{
 				types.NewTx(&types.DynamicFeeTx{}),
 			},
 		},
 		{
 			name:         "filtered_predicates",
-			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				types.NewTx(&types.DynamicFeeTx{
@@ -222,68 +173,62 @@ func TestVerifyBlock(t *testing.T) {
 			},
 		},
 		{
-			name:      "missing_block_context",
-			isDurango: true,
+			name: "missing_block_context",
 			txs: []*types.Transaction{
 				validTx,
 			},
-			wantErr: errNoBlockContext,
+			wantErr: ErrNoBlockContext,
 		},
 		{
 			name:         "one_tx_one_address_one_predicate",
-			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				validTx,
 			},
 			want: predicate.BlockResults{
 				validTx.Hash(): {
-					corethwarp.ContractAddress: set.NewBits(),
+					warpcontract.ContractAddress: set.NewBits(),
 				},
 			},
 		},
 		{
 			name:         "one_tx_one_address_one_invalid_predicate",
-			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				invalidTx,
 			},
 			want: predicate.BlockResults{
 				invalidTx.Hash(): {
-					corethwarp.ContractAddress: set.NewBits(0),
+					warpcontract.ContractAddress: set.NewBits(0),
 				},
 			},
 		},
 		{
 			name:         "one_address_multiple_invalid_predicates",
-			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				twoInvalidTx,
 			},
 			want: predicate.BlockResults{
 				twoInvalidTx.Hash(): {
-					corethwarp.ContractAddress: set.NewBits(0, 1),
+					warpcontract.ContractAddress: set.NewBits(0, 1),
 				},
 			},
 		},
 		{
 			name:         "one_address_mixed_predicates",
-			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				mixedTx,
 			},
 			want: predicate.BlockResults{
 				mixedTx.Hash(): {
-					corethwarp.ContractAddress: set.NewBits(1, 2),
+					warpcontract.ContractAddress: set.NewBits(1, 2),
 				},
 			},
 		},
 		{
 			name:         "multiple_txs",
-			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				validTx,
@@ -291,10 +236,10 @@ func TestVerifyBlock(t *testing.T) {
 			},
 			want: predicate.BlockResults{
 				validTx.Hash(): {
-					corethwarp.ContractAddress: set.NewBits(),
+					warpcontract.ContractAddress: set.NewBits(),
 				},
 				invalidTx.Hash(): {
-					corethwarp.ContractAddress: set.NewBits(0),
+					warpcontract.ContractAddress: set.NewBits(0),
 				},
 			},
 		},
@@ -304,7 +249,7 @@ func TestVerifyBlock(t *testing.T) {
 			snowContext := snowtest.Context(t, snowtest.CChainID)
 			warptest.SetValidators(t, snowContext, vdrs)
 
-			got, err := VerifyBlock(snowContext, test.blockContext, test.isDurango, test.txs)
+			got, err := VerifyBlock(snowContext, test.blockContext, &warpcontract.Config{}, test.txs)
 			require.ErrorIs(t, err, test.wantErr, "VerifyBlock()")
 			require.Equal(t, test.want, got, "VerifyBlock()")
 		})
@@ -329,7 +274,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 				accessList := make(types.AccessList, predicatesPerTx)
 				for i := range accessList {
 					accessList[i] = types.AccessTuple{
-						Address:     corethwarp.ContractAddress,
+						Address:     warpcontract.ContractAddress,
 						StorageKeys: pred,
 					}
 				}
@@ -346,19 +291,19 @@ func BenchmarkVerifyBlock(b *testing.B) {
 
 				// Confirm the predicates verify before timing, so the benchmark
 				// measures the success path rather than an early failure.
-				results, err := VerifyBlock(snowContext, blockContext, true /*isDurango*/, txs)
+				results, err := VerifyBlock(snowContext, blockContext, &warpcontract.Config{}, txs)
 				require.NoError(b, err, "VerifyBlock()")
 				require.Len(b, results, numTxs, "VerifyBlock() results length")
 
 				wantTxResults := predicate.PrecompileResults{
-					corethwarp.ContractAddress: set.NewBits(),
+					warpcontract.ContractAddress: set.NewBits(),
 				}
 				for txHash, txResults := range results {
 					require.Equalf(b, wantTxResults, txResults, "VerifyBlock()[%s] txResults", txHash)
 				}
 
 				for b.Loop() {
-					_, _ = VerifyBlock(snowContext, blockContext, true /*isDurango*/, txs)
+					_, _ = VerifyBlock(snowContext, blockContext, &warpcontract.Config{}, txs)
 				}
 
 				predicates := numTxs * predicatesPerTx

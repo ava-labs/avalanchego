@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
@@ -24,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -39,7 +39,7 @@ import (
 
 	legacycore "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	legacyparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
-	l1warp "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/warp"
+	legacywarp "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	saewarp "github.com/ava-labs/avalanchego/vms/evm/imp/warp"
 	saetypes "github.com/ava-labs/avalanchego/vms/evm/types"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -299,15 +299,28 @@ func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) err
 		h.metrics.Set(dynamic.DelayExponent(*mde).DelayDuration())
 	}
 
+	// Genesis and state upgrades can place arbitrary code at the Warp address.
+	// Only once the precompile is active are its logs guaranteed to be Warp
+	// messages.
 	rules := h.chainConfig.Rules(b.Number(), legacyparams.IsMergeTODO, b.Time())
-	acceptCtx := &precompileconfig.AcceptContext{
-		SnowCtx: h.ctx,
-		Warp:    h.warpStorage,
+	if _, ok := activeWarpConfig(rules); !ok {
+		return nil
 	}
-	if err := l1warp.HandlePrecompileAccept(rules, acceptCtx, receipts); err != nil {
-		return fmt.Errorf("handling precompile accept for block %s (%d): %w", b.Hash(), b.NumberU64(), err)
+	messages, err := saewarp.FromReceipts(receipts)
+	if err != nil {
+		return fmt.Errorf("parsing warp messages from receipts: %w", err)
+	}
+	if err := h.warpStorage.Add(messages...); err != nil {
+		return fmt.Errorf("storing warp messages from receipts: %w", err)
 	}
 	return nil
+}
+
+// activeWarpConfig returns the Warp precompile config in `rules`, or false if
+// Warp is not active.
+func activeWarpConfig(rules ethparams.Rules) (*legacywarp.Config, bool) {
+	config, ok := legacyparams.GetRulesExtra(rules).Precompiles[legacywarp.ContractAddress].(*legacywarp.Config)
+	return config, ok
 }
 
 var _ hookadaptor.BlockBuilder = (*builder)(nil)
@@ -453,10 +466,13 @@ func (b *builder) BuildBlock(
 	header.Coinbase = b.resolveCoinbase(settledRules, worstCaseState)
 
 	rules := b.chainConfig.Rules(header.Number, legacyparams.IsMergeTODO, header.Time)
-	rulesExtra := legacyparams.GetRulesExtra(rules)
-	warpValidity, err := l1warp.VerifyBlock(b.ctx, blockCtx, rulesExtra, txs)
-	if err != nil {
-		return nil, fmt.Errorf("verifying warp messages: %w", err)
+	var warpValidity predicate.BlockResults
+	if warpConfig, ok := activeWarpConfig(rules); ok {
+		var err error
+		warpValidity, err = saewarp.VerifyBlock(b.ctx, blockCtx, warpConfig, txs)
+		if err != nil {
+			return nil, fmt.Errorf("verifying warp messages: %w", err)
+		}
 	}
 	warpValidityBytes, err := warpValidity.Bytes()
 	if err != nil {

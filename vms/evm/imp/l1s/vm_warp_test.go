@@ -7,11 +7,13 @@ package l1s
 import (
 	"maps"
 	"math/big"
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -25,9 +27,11 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/warptest"
@@ -124,6 +128,64 @@ func TestSendWarpMessage(t *testing.T) {
 	// The messages should be verifiable after the block is executed.
 	sut.verifyWarpMessage(t, unsignedMessage.Bytes(), 0 /* valid message */)
 	sut.verifyWarpMessage(t, blockMessage.Bytes(), 0 /* valid message */)
+}
+
+// TestInactiveWarpAddressLogsNotSigned checks that, while the Warp precompile
+// is inactive, logs emitted from the Warp address MUST NOT become signable
+// messages, even when they are well-formed `SendWarpMessage` events.
+func TestInactiveWarpAddressLogsNotSigned(t *testing.T) {
+	// Claims a source address that never sent it.
+	forgedPayload, err := payload.NewAddressedCall(utils.RandomBytes(20), utils.RandomBytes(32))
+	require.NoError(t, err)
+	forged, err := avalancheWarp.NewUnsignedMessage(constants.UnitTestID, snowtest.CChainID, forgedPayload.Bytes())
+	require.NoError(t, err)
+
+	sut := newL1SUT(
+		t,
+		withFork(upgradetest.Igloo),
+		withNow(postIglooStartTime(t)),
+		withGenesisConfig(func(genesis *core.Genesis, _ []common.Address) {
+			genesis.Alloc[warpcontract.ContractAddress] = types.Account{
+				Balance: big.NewInt(0),
+				Code:    sendWarpMessageLogCode(t, forged),
+			}
+		}),
+	)
+
+	sut.sendWarpTx(t, nil /*txPayload*/, nil /*signedMessage*/)
+	built := sut.buildAndVerifyBlock(t, nil)
+	sut.acceptAndExecuteBlock(t, built)
+
+	receipts := built.Receipts()
+	require.Len(t, receipts, 1)
+	require.Len(t, receipts[0].Logs, 1, "the code at the Warp address must have emitted its log")
+	sut.verifyWarpMessage(t, forged.Bytes(), int32(warp.VerifyErrCode))
+}
+
+// sendWarpMessageLogCode returns EVM code that emits the `SendWarpMessage` log
+// the Warp precompile would emit for msg.
+func sendWarpMessageLogCode(t *testing.T, msg *avalancheWarp.UnsignedMessage) []byte {
+	t.Helper()
+
+	topics, data, err := warpcontract.PackSendWarpMessageEvent(common.Address{}, common.Hash(msg.ID()), msg.Bytes())
+	require.NoError(t, err)
+	require.Len(t, topics, 3)
+
+	push2 := func(v int) []byte {
+		return []byte{byte(vm.PUSH2), byte(v >> 8), byte(v)}
+	}
+	// Copies data, appended after the prefix, into memory and LOG3s it. The
+	// prefix length doesn't depend on dataOffset.
+	prefix := func(dataOffset int) []byte {
+		return slices.Concat(
+			push2(len(data)), push2(dataOffset), []byte{byte(vm.PUSH1), 0, byte(vm.CODECOPY)},
+			[]byte{byte(vm.PUSH32)}, topics[2].Bytes(),
+			[]byte{byte(vm.PUSH32)}, topics[1].Bytes(),
+			[]byte{byte(vm.PUSH32)}, topics[0].Bytes(),
+			push2(len(data)), []byte{byte(vm.PUSH1), 0, byte(vm.LOG3), byte(vm.STOP)},
+		)
+	}
+	return slices.Concat(prefix(len(prefix(0))), data)
 }
 
 func TestPredicateVerification(t *testing.T) {
