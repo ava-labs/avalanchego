@@ -110,12 +110,22 @@ type ChainConfigWithUpgradesJSON struct {
 }
 
 func (cu *ChainConfigWithUpgradesJSON) UnmarshalJSON(input []byte) error {
-	if err := json.Unmarshal(input, &cu.ChainConfig); err != nil {
+	var cc ChainConfig
+	if err := json.Unmarshal(input, &cc); err != nil {
 		return err
 	}
-	return json.Unmarshal(input, &struct {
-		UpgradeConfig *extras.UpgradeConfig `json:"upgrades"`
-	}{&cu.UpgradeConfig})
+
+	type upgrades struct {
+		UpgradeConfig extras.UpgradeConfig `json:"upgrades"`
+	}
+
+	var u upgrades
+	if err := json.Unmarshal(input, &u); err != nil {
+		return err
+	}
+	cu.ChainConfig = cc
+	cu.UpgradeConfig = u.UpgradeConfig
+	return nil
 }
 
 func SetNetworkUpgradeDefaults(c *ChainConfig) {
