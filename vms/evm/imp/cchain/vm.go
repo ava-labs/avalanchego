@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
 	"github.com/ava-labs/avalanchego/vms/evm/firewood"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/statesync"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/txpool"
@@ -57,8 +58,8 @@ type VM struct {
 	pushGossipPeriod time.Duration
 
 	// now is the clock provided to the [sae.VM] and is used for block building.
-	now              func() time.Time
-	lastWaitForEvent utils.Atomic[time.Time]
+	now   func() time.Time
+	pacer *blockdelay.Pacer // created by [VM.Initialize]
 
 	chainConfig *ethparams.ChainConfig
 	state       *state.State
@@ -142,6 +143,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("registering cchain metrics: %w", err)
 	}
 
+	vm.pacer = blockdelay.NewPacer(vm.now)
 	vm.pending = txpool.NewPending()
 	warpStorage := warp.NewStorage(avaDB, warpMessages...)
 	hooks := newHooks(
@@ -401,14 +403,8 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 // may be built.
 func earliestBuildTime(b *blocks.Block) time.Time {
 	h := b.Header()
-	return blockTime(h).Add(delayExponent(h).DelayDuration())
+	return blockdelay.Earliest(blockTime(h), delayExponent(h))
 }
-
-// minWaitForEventDelay is the minimum spacing between consecutive
-// [VM.WaitForEvent] returns. 100ms isn't special here, it was selected as a
-// reasonable frequency for the engine to poll on whether to build a block or
-// not.
-const minWaitForEventDelay = 100 * time.Millisecond
 
 // WaitForEvent waits until the ACP-226 minimum block delay since the preferred
 // block has elapsed, then waits for a transaction to be in the txpool or for
@@ -423,28 +419,16 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 		return vm.Handler.WaitForEvent(ctx)
 	}
 
-	// Throttle to avoid busy looping: the txpools only clear after block
-	// execution, so pending txs can re-signal while their block is processing.
-	//
-	// TODO(JonathanOppenheimer): The txpool should track preference / reorgs so
-	// we don't need this throttle.
-	throttleUntil := vm.lastWaitForEvent.Get().Add(minWaitForEventDelay)
-
 	// Pace block building on the ACP-226 minimum block delay so that the event
 	// sources are consulted when we are actually willing to build.
-	buildTime := earliestBuildTime(vm.VM.GetPreference())
+	return vm.pacer.WaitForEvent(ctx, earliestBuildTime(vm.VM.GetPreference()), vm.awaitEvent)
+}
 
-	until := throttleUntil
-	if buildTime.After(until) {
-		until = buildTime
-	}
-	if err := vm.waitUntil(ctx, until); err != nil {
-		return 0, err
-	}
-
-	// Race the SAE event source against the cross-chain txpool. The winner's
-	// deferred cancel unblocks the loser, whose pending call returns and delivers
-	// its discarded result to the buffered channel, so neither goroutine leaks.
+// awaitEvent races the SAE event source against the cross-chain txpool.
+func (vm *VM) awaitEvent(ctx context.Context) (snowcommon.Message, error) {
+	// The winner's deferred cancel unblocks the loser, whose pending call
+	// returns and delivers its discarded result to the buffered channel, so
+	// neither goroutine leaks.
 	raceCtx, cancel := context.WithCancel(ctx)
 	type result struct {
 		msg snowcommon.Message
@@ -463,25 +447,7 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	}()
 
 	r := <-results
-	if r.err == nil {
-		vm.lastWaitForEvent.Set(vm.now())
-	}
 	return r.msg, r.err
-}
-
-// waitUntil blocks until [VM.now] reaches t, returning early with the
-// cancellation cause if ctx is canceled first.
-func (vm *VM) waitUntil(ctx context.Context, t time.Time) error {
-	timeToWait := t.Sub(vm.now())
-	if timeToWait <= 0 {
-		return nil
-	}
-	select {
-	case <-ctx.Done():
-		return context.Cause(ctx)
-	case <-time.After(timeToWait):
-		return nil
-	}
 }
 
 // Shutdown releases every resource allocated by [VM.Initialize] in reverse

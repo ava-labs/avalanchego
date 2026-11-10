@@ -54,6 +54,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/synchronoustest"
@@ -1730,7 +1731,7 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 			e.TimeMilliseconds = &earlyMS
 		})(hdr)
 	})
-	require.ErrorIsf(t, err, errBelowMinBlockDelay, "%T.VerifyBlock() (block below the ACP-226 minimum delay)", sut.VM)
+	require.ErrorIsf(t, err, blockdelay.ErrBelowMinimum, "%T.VerifyBlock() (block below the ACP-226 minimum delay)", sut.VM)
 }
 
 // waitForEventResult carries a [VM.WaitForEvent] output.
@@ -1842,7 +1843,7 @@ func TestWaitForEventThrottle(t *testing.T) {
 		require.Emptyf(t, done, "%T.WaitForEvent() second call should be blocked on the throttle", sut.VM)
 
 		got := <-done
-		require.Equalf(t, minWaitForEventDelay, time.Since(start), "%T.WaitForEvent() second call throttle delay", sut.VM)
+		require.Equalf(t, blockdelay.MinEventSpacing, time.Since(start), "%T.WaitForEvent() second call throttle delay", sut.VM)
 		require.NoErrorf(t, got.err, "%T.WaitForEvent() second call", sut.VM)
 		require.Equalf(t, snowcommon.PendingTxs, got.msg, "%T.WaitForEvent() second call event", sut.VM)
 	})

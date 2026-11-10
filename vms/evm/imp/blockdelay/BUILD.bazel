@@ -1,0 +1,25 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "blockdelay",
+    srcs = ["blockdelay.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//snow/engine/common",
+        "//utils",
+        "//vms/evm/imp/dynamic",
+    ],
+)
+
+go_test(
+    name = "blockdelay_test",
+    srcs = ["blockdelay_test.go"],
+    embed = [":blockdelay"],
+    deps = [
+        "//snow/engine/common",
+        "//vms/evm/imp/dynamic",
+        "@com_github_stretchr_testify//require",
+    ],
+)

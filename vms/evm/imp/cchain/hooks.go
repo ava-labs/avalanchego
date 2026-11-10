@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
@@ -358,18 +359,14 @@ type builder struct {
 	desired      desiredParams
 }
 
-var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
-
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
 
-	de := delayExponent(parent)
-	parentTime := blockTime(parent)
-	if minTime := parentTime.Add(de.DelayDuration()); now.Before(minTime) {
-		return nil, fmt.Errorf("%w: block time %s is before the minimum %s (parent %s + %s)",
-			errBelowMinBlockDelay, now, minTime, parentTime, de.DelayDuration())
+	de, err := blockdelay.Next(blockTime(parent), delayExponent(parent), now, b.desired.delayExponent)
+	if err != nil {
+		return nil, err
 	}
 
 	nowMS := uint64(now.UnixMilli())
@@ -379,8 +376,8 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting target exponent: %w", err)
 	}
-	// Move each dynamic parameter toward this node's vote (nil = no move).
-	de = de.Toward(b.desired.delayExponent)
+	// Move the remaining dynamic parameters toward this node's vote (nil = no
+	// move). [blockdelay.Next] already moved the delay exponent.
 	te = te.Toward(b.desired.targetExponent)
 	pe := priceExponent(parent).Toward(b.desired.priceExponent)
 	minDelayExcess := acp226.DelayExcess(de)
