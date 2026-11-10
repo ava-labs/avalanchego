@@ -358,9 +358,7 @@ type builder struct {
 	desired      desiredParams
 }
 
-var (
-	errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
-)
+var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
 
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
