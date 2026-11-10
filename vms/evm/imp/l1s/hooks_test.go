@@ -146,14 +146,14 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 		MinDelayExcess:   new(acp226.InitialDelayExcess),
 	})
 	tx := types.NewTx(&types.DynamicFeeTx{Gas: 21_000, Value: big.NewInt(0)})
-	settled := &types.Header{Number: big.NewInt(0), Time: parent.Time}
+	settledRules := chainCfg.Rules(big.NewInt(0), true /*isMerge*/, parent.Time)
 	// Any non-zero marker works; it only needs to match on both sides for the
 	// hash-equality assertion.
 	settledMarker := hook.Settled{Height: 1, GasUnix: parent.Time, GasNumerator: 1, Excess: 1}
 
-	// Builder side: stamp `builderCoinbase` into a real block. The settled
+	// Builder side: stamp `builderCoinbase` into a real block. The worst-case
 	// state reader is nil because neither rewardmanager nor gaspricemanager
-	// is enabled, so FinalizeHeader never reads it.
+	// is enabled, so BuildBlock never reads it.
 	builderPts := newHooks(
 		nil, &chainCfg,
 		func() time.Time { return time.UnixMilli(int64(nowMS)) },
@@ -161,9 +161,8 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	)
 	builderHdr, err := builderPts.builder.BuildHeader(parent)
 	require.NoError(t, err)
-	require.NoError(t, builderPts.builder.FinalizeHeader(builderHdr, settled, nil))
 	builderBlock, err := builderPts.builder.BuildBlock(
-		builderHdr, nil, []*types.Transaction{tx}, nil, settledMarker,
+		builderHdr, nil, []*types.Transaction{tx}, nil, settledMarker, settledRules, nil,
 	)
 	require.NoError(t, err)
 	require.Equal(t, builderCoinbase, builderBlock.Header().Coinbase,
@@ -176,9 +175,8 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	require.NoError(t, err)
 	rebuiltHdr, err := rebuilder.BuildHeader(parent)
 	require.NoError(t, err)
-	require.NoError(t, rebuilder.FinalizeHeader(rebuiltHdr, settled, nil))
 	rebuilt, err := rebuilder.BuildBlock(
-		rebuiltHdr, nil, []*types.Transaction{tx}, nil, settledMarker,
+		rebuiltHdr, nil, []*types.Transaction{tx}, nil, settledMarker, settledRules, nil,
 	)
 	require.NoError(t, err)
 	require.Equal(t, builderCoinbase, rebuilt.Header().Coinbase,
@@ -203,7 +201,7 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 //
 // We simulate the malicious builder by stamping a non-deterministic
 // `Coinbase` into the received block's header BEFORE handing it to
-// `BlockRebuilderFrom`. The rebuilder's `FinalizeHeader` then ignores that
+// `BlockRebuilderFrom`. The rebuilder's `BuildBlock` then ignores that
 // override and stamps the deterministic value. We assert both the
 // resolved address and the resulting hash differ.
 func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
@@ -223,7 +221,7 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 		MinDelayExcess:   new(acp226.InitialDelayExcess),
 	})
 	tx := types.NewTx(&types.DynamicFeeTx{Gas: 21_000, Value: big.NewInt(0)})
-	settled := &types.Header{Number: big.NewInt(0), Time: parent.Time}
+	settledRules := chainCfg.Rules(big.NewInt(0), true /*isMerge*/, parent.Time)
 	settledMarker := hook.Settled{Height: 1, GasUnix: parent.Time, GasNumerator: 1, Excess: 1}
 
 	// "Builder" forges by skipping resolveCoinbase entirely and stamping
@@ -247,9 +245,8 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	require.NoError(t, err)
 	rebuiltHdr, err := rebuilder.BuildHeader(parent)
 	require.NoError(t, err)
-	require.NoError(t, rebuilder.FinalizeHeader(rebuiltHdr, settled, nil))
 	rebuilt, err := rebuilder.BuildBlock(
-		rebuiltHdr, nil, []*types.Transaction{tx}, nil, settledMarker,
+		rebuiltHdr, nil, []*types.Transaction{tx}, nil, settledMarker, settledRules, nil,
 	)
 	require.NoError(t, err)
 

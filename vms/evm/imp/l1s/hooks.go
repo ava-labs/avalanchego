@@ -100,9 +100,9 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 // purely from the header (plus, for the genesis block, the chain config):
 //
 //  1. `hdr` carries a gas-config group (see [stampGasConfig], stamped by
-//     [builder.FinalizeHeader] whenever gaspricemanager is enabled at
+//     [builder.BuildBlock] whenever gaspricemanager is enabled at
 //     the settled timestamp): the group is authoritative for price config.
-//     `TargetExcess` is always the target authority; FinalizeHeader pins it
+//     `TargetExcess` is always the target authority; BuildBlock pins it
 //     to the precompile target when validator target selection is disabled.
 //  2. `hdr` is the genesis block (synchronously executed, so never stamped)
 //     and gaspricemanager is enabled at genesis: the group is derived from
@@ -260,8 +260,8 @@ func (*hooks) RequiresTransactionAdmissionCheck(rules ethparams.Rules) bool {
 // here are committed into the block's post-execution state root.
 //
 // Uses `parent.Time` and `statedb` rooted at `parent.PostExecutionStateRoot()`
-// -- NOT the lagged `settled.Time` / last-settled state used by
-// [builder.FinalizeHeader] and [hooks.CanExecuteTransaction]:
+// -- NOT the lagged last-settled rules and state used by
+// [builder.BuildBlock] and [hooks.CanExecuteTransaction]:
 // `ApplyUpgrades` requires a contiguous (parentTimestamp, blockTimestamp]
 // activation window, and the live `statedb` must carry parent's full
 // post-exec mutations into the upcoming `core.ApplyTransaction` loop. The
@@ -376,8 +376,8 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			ParentHash: parent.Hash(),
 			// `Coinbase` is a placeholder; the final value may depend on
 			// settled-state-as-of-build-time (rewardmanager precompile)
-			// which is not in scope here. [builder.FinalizeHeader]
-			// receives the settled state from SAE and overwrites this field
+			// which is not in scope here. [builder.BuildBlock]
+			// receives the worst-case state from SAE and overwrites this field
 			// before the block is sealed (see [builder.resolveCoinbase]).
 			Coinbase:         blackhole.Address,
 			Difficulty:       big.NewInt(1),
@@ -400,23 +400,33 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	), nil
 }
 
-var errZeroStoredGasPriceConfig = errors.New("gaspricemanager enabled but storage is zero")
+var (
+	errZeroStoredGasPriceConfig = errors.New("gaspricemanager enabled but storage is zero")
+	errEmptyBlock               = errors.New("empty block")
+)
 
-// FinalizeHeader stamps the header fields that depend on the settled block:
+// BuildBlock also stamps the header fields that depend on the settled block:
 // the effective ACP-224 gas-config group (read from gaspricemanager storage
-// in the settled state; see [gasConfigFromStored]) and `header.Coinbase` (see
-// [builder.resolveCoinbase]). Both gates use `settled.Time` (NOT
+// in `worstCaseState`; see [gasConfigFromStored]) and `header.Coinbase` (see
+// [builder.resolveCoinbase]). Both gates use `settledRules` (NOT the rules at
 // `header.Time`): a precompile activation `T` is only reflected in
-// `settledState` once a block with `T <= blockTime` has settled; using
-// header.Time would read an uninitialised slot.
-//
-// The gas-config group MUST be stamped here rather than in
-// [builder.BuildBlock] because SAE's worst-case projection reads it off
-// the header (via [hooks.GasConfigAfter]) before BuildBlock runs.
-func (b *builder) FinalizeHeader(header, settled *types.Header, settledState libevm.StateReader) error {
-	configExtra := legacyparams.GetExtra(b.chainConfig)
-	if configExtra.IsPrecompileEnabled(gaspricemanager.ContractAddress, settled.Time) {
-		stored := gaspricemanager.GetStoredGasPriceConfig(settledState, gaspricemanager.ContractAddress)
+// `worstCaseState` storage once a block with `T <= blockTime` has settled;
+// using header.Time would read an uninitialised slot.
+func (b *builder) BuildBlock(
+	header *types.Header,
+	blockCtx *block.Context,
+	txs []*types.Transaction,
+	receipts []*types.Receipt,
+	settled hook.Settled,
+	settledRules ethparams.Rules,
+	worstCaseState libevm.StateReader,
+) (*types.Block, error) {
+	if len(txs) == 0 {
+		return nil, errEmptyBlock
+	}
+
+	if legacyparams.GetRulesExtra(settledRules).IsPrecompileEnabled(gaspricemanager.ContractAddress) {
+		stored := gaspricemanager.GetStoredGasPriceConfig(worstCaseState, gaspricemanager.ContractAddress)
 		if stored == (commontype.GasPriceConfig{}) {
 			// Activation runs [gaspricemanager.Configure] which always writes
 			// a non-zero config (MinGasPrice > 0), and the only mutator path
@@ -424,7 +434,7 @@ func (b *builder) FinalizeHeader(header, settled *types.Header, settledState lib
 			// Reaching here therefore indicates corrupt or missing storage at
 			// an activated precompile, which would cause silent divergence if
 			// papered over with defaults.
-			return fmt.Errorf("%w: block %d settling %d", errZeroStoredGasPriceConfig, header.Number, settled.Number)
+			return nil, fmt.Errorf("%w: block %d settling %d", errZeroStoredGasPriceConfig, header.Number, settled.Height)
 		}
 		headerExtra := customtypes.GetHeaderExtra(header)
 		if !stored.ValidatorTargetGas {
@@ -433,23 +443,7 @@ func (b *builder) FinalizeHeader(header, settled *types.Header, settledState lib
 		}
 		stampGasConfig(headerExtra, gasConfigFromStored(stored))
 	}
-
-	header.Coinbase = b.resolveCoinbase(settled, settledState)
-	return nil
-}
-
-var errEmptyBlock = errors.New("empty block")
-
-func (b *builder) BuildBlock(
-	header *types.Header,
-	blockCtx *block.Context,
-	txs []*types.Transaction,
-	receipts []*types.Receipt,
-	settled hook.Settled,
-) (*types.Block, error) {
-	if len(txs) == 0 {
-		return nil, errEmptyBlock
-	}
+	header.Coinbase = b.resolveCoinbase(settledRules, worstCaseState)
 
 	rules := b.chainConfig.Rules(header.Number, legacyparams.IsMergeTODO, header.Time)
 	rulesExtra := legacyparams.GetRulesExtra(rules)
@@ -479,24 +473,24 @@ func (b *builder) BuildBlock(
 
 // resolveCoinbase returns the fee recipient for the block being built.
 // Branches, in order:
-//  1. rewardmanager precompile not enabled at `settled.Time`:
+//  1. rewardmanager precompile not enabled under `settledRules`:
 //     the configured coinbase if `AllowFeeRecipients` is true, else burn.
 //  2. precompile enabled, allows fee recipients enabled:
 //     the configured coinbase.
 //  3. otherwise: the address stored in the precompile's reward address slot.
 //
-// Gates use `settled.Time` (not `header.Time`): see
-// [builder.FinalizeHeader].
-func (b *builder) resolveCoinbase(settled *types.Header, settledState libevm.StateReader) common.Address {
-	configExtra := legacyparams.GetExtra(b.chainConfig)
-	if !configExtra.IsPrecompileEnabled(rewardmanager.ContractAddress, settled.Time) {
+// Gates use `settledRules` (not the rules at `header.Time`): see
+// [builder.BuildBlock].
+func (b *builder) resolveCoinbase(settledRules ethparams.Rules, worstCaseState libevm.StateReader) common.Address {
+	if !legacyparams.GetRulesExtra(settledRules).IsPrecompileEnabled(rewardmanager.ContractAddress) {
+		configExtra := legacyparams.GetExtra(b.chainConfig)
 		if configExtra.AllowFeeRecipients {
 			return b.coinbase
 		}
 		return blackhole.Address
 	}
 
-	addr, allowFeeRecipients := rewardmanager.GetStoredRewardAddress(settledState)
+	addr, allowFeeRecipients := rewardmanager.GetStoredRewardAddress(worstCaseState)
 	if allowFeeRecipients {
 		return b.coinbase
 	}

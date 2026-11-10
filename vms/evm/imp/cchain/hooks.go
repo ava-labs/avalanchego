@@ -403,12 +403,6 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	), nil
 }
 
-// FinalizeHeader is a no-op: every header field the C-Chain's hooks read is
-// stamped by [builder.BuildHeader] or [builder.BuildBlock].
-func (*builder) FinalizeHeader(*types.Header, *types.Header, libevm.StateReader) error {
-	return nil
-}
-
 // PotentialEndOfBlockOps returns the cross-chain transactions that should be
 // considered for inclusion in the block being built.
 //
@@ -510,6 +504,8 @@ func (b *builder) BuildBlock(
 	receipts []*types.Receipt,
 	avaxTxs []*hookTx,
 	settled hook.Settled,
+	_ params.Rules,
+	_ libevm.StateReader,
 ) (*types.Block, error) {
 	if len(ethTxs) == 0 && len(avaxTxs) == 0 {
 		return nil, errEmptyBlock

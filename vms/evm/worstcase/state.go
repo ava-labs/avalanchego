@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 
@@ -333,6 +334,13 @@ func (s *State) Apply(o hook.Op) error {
 	s.minOpBurnerBalances = append(s.minOpBurnerBalances, burnerBalances)
 	s.blockSize += o.Gas
 	return nil
+}
+
+// StateReader returns a read-only view of the settled state projected through
+// the current block. Only balances and nonces are projected, using their
+// worst-case values.
+func (s *State) StateReader() libevm.StateReader {
+	return s.db
 }
 
 // GasUsed returns the gas used for the current block.

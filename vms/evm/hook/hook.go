@@ -127,18 +127,6 @@ type BlockBuilder[T Transaction] interface {
 	// SAE always uses this method instead of directly constructing a header, to
 	// ensure any libevm header extras are properly populated.
 	BuildHeader(parent *types.Header) (*types.Header, error)
-	// FinalizeHeader populates header fields on `hdr` that depend on the
-	// settled block. SAE calls this after the last block to settle has been
-	// determined and BEFORE the worst-case projection consumes the header, so
-	// anything [Points.GasConfigAfter] reads from the header MUST be stamped
-	// here (or in [BlockBuilder.BuildHeader]) rather than in
-	// [BlockBuilder.BuildBlock].
-	//
-	// `settledState` is a read-only [libevm.StateReader] rooted at `settled`'s
-	// post-execution state. Implementations SHOULD only read contract storage
-	// from it: account balances and nonces MAY differ from the settled state
-	// due to worst-case projections.
-	FinalizeHeader(hdr, settled *types.Header, settledState libevm.StateReader) error
 	// PotentialEndOfBlockOps returns an iterator of custom transactions that
 	// would be valid to include into a block.
 	//
@@ -157,6 +145,10 @@ type BlockBuilder[T Transaction] interface {
 	// BuildBlock constructs a block with the given components. The header
 	// MAY be modified, but all other arguments are read-only.
 	//
+	// `settledRules` are the rules of the last block to settle.
+	// `worstCaseState` is the settled state with worst-case balance and nonce
+	// projections made through this block.
+	//
 	// SAE always uses this method instead of [types.NewBlock], to ensure any
 	// libevm block extras are properly populated.
 	BuildBlock(
@@ -166,6 +158,8 @@ type BlockBuilder[T Transaction] interface {
 		receipts []*types.Receipt,
 		endOfBlockOps []T,
 		settled Settled,
+		settledRules params.Rules,
+		worstCaseState libevm.StateReader,
 	) (*types.Block, error)
 }
 

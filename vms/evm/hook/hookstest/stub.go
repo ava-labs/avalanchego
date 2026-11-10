@@ -128,12 +128,6 @@ func (s *Stub) BuildHeader(parent *types.Header) (*types.Header, error) {
 	return hdr, nil
 }
 
-// FinalizeHeader is a no-op: every header field the stub's hooks read is
-// stamped by [Stub.BuildHeader] or [Stub.BuildBlock].
-func (*Stub) FinalizeHeader(*types.Header, *types.Header, libevm.StateReader) error {
-	return nil
-}
-
 // PotentialEndOfBlockOps ignores its arguments and returns [Stub.Ops] as a
 // sequence.
 //
@@ -159,6 +153,8 @@ func (*Stub) BuildBlock(
 	receipts []*types.Receipt,
 	ops []Op,
 	settled hook.Settled,
+	_ params.Rules,
+	_ libevm.StateReader,
 ) (*types.Block, error) {
 	return BuildBlock(header, blockCtx, txs, receipts, ops, settled)
 }

@@ -234,19 +234,6 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	}
 
 	hdr.Root = lastSettled.PostExecutionStateRoot()
-	// A fresh StateDB is opened (rather than sharing the worst-case one)
-	// because the hook contract promises a reader rooted at the settled
-	// state; the worst-case StateDB accumulates balance/nonce projections.
-	settledState, err := b.exec.StateDB(hdr.Root)
-	if err != nil {
-		return nil, fmt.Errorf("opening settled state for new block: %v", err)
-	}
-	if err := builder.FinalizeHeader(hdr, lastSettled.Header(), settledState); err != nil {
-		log.Warn("Could not finalize header for new block",
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("finalizing header for new block: %v", err)
-	}
 	if err := state.StartBlock(hdr); err != nil {
 		// A full queue is a normal mode of operation (backpressure working as
 		// intended) so should not be a warning.
@@ -366,7 +353,9 @@ func (b *blockBuilderG[T]) buildWithTxs(
 		return nil, errZeroSettledMarker
 	}
 
-	ethB, err := builder.BuildBlock(hdr, bCtx, included, receipts, includedOps, settled)
+	settledHdr := lastSettled.Header()
+	settledRules := b.exec.ChainConfig().Rules(settledHdr.Number, true /*isMerge*/, settledHdr.Time)
+	ethB, err := builder.BuildBlock(hdr, bCtx, included, receipts, includedOps, settled, settledRules, state.StateReader())
 	if err != nil {
 		return nil, err
 	}

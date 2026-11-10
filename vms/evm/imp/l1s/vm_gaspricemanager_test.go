@@ -81,7 +81,7 @@ func staticPricingConfig(minPrice uint64) commontype.GasPriceConfig {
 // TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE genesis-enables
 // `gaspricemanager` with a static-pricing config pinning `MinGasPrice` and
 // asserts that every subsequent block's `header.BaseFee` equals the pinned
-// value. This locks in the end-to-end runtime path: `FinalizeHeader` reads
+// value. This locks in the end-to-end runtime path: `BuildBlock` reads
 // the gas config from the settled state and stamps it into the header's
 // GasConfig* group, and per-block `GasConfigAfter` calls read it back from
 // the parent header (with the genesis-precompile fallback covering the
@@ -224,7 +224,7 @@ func TestGasPriceManagerSetGasPriceConfigSettlementLagSAE(t *testing.T) {
 // path differs as documented, via two subtests:
 //
 //   - `precompile_target_pinned`: `ValidatorTargetGas=false` makes
-//     `FinalizeHeader` replace `header.TargetExcess` with the exponent derived
+//     `BuildBlock` replace `header.TargetExcess` with the exponent derived
 //     from the precompile-stored `TargetGas`; every block's GasLimit and
 //     post-execution gas-time Target reflect that pin.
 //   - `validator_target_converges`: `ValidatorTargetGas=true` makes the
@@ -600,7 +600,7 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 			_ = sut.buildAcceptExecuteBlock(t)
 			sut.requireTxSucceeded(t, activationTx)
 
-			// Settle past the activation block so `FinalizeHeader` reads the
+			// Settle past the activation block so `BuildBlock` reads the
 			// post-activation gas config from the settled state and stamps
 			// it into subsequent headers' GasConfig* group.
 			_ = settleGasPriceManagerMutation(t, sut)
@@ -619,7 +619,7 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 // gaspricemanager config at genesis, builds a settled block, then restarts
 // the VM against the same backing database and asserts that the next block
 // still carries the pinned `BaseFee`. Locks in the config roundtrip through
-// the header: `FinalizeHeader` stamps the GasConfig* group pre-restart, and
+// the header: `BuildBlock` stamps the GasConfig* group pre-restart, and
 // post-restart `GasConfigAfter` recovers it from the persisted parent header
 // with no auxiliary database state.
 func TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE(t *testing.T) {

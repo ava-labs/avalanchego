@@ -47,13 +47,14 @@ type Points interface {
 // end-of-block operations.
 type BlockBuilder interface {
 	BuildHeader(parent *types.Header) (*types.Header, error)
-	FinalizeHeader(hdr, settled *types.Header, settledState libevm.StateReader) error
 	BuildBlock(
 		header *types.Header,
 		blockCtx *block.Context,
 		txs []*types.Transaction,
 		receipts []*types.Receipt,
 		settled hook.Settled,
+		settledRules params.Rules,
+		worstCaseState libevm.StateReader,
 	) (*types.Block, error)
 }
 
@@ -96,8 +97,10 @@ func (p points) BuildBlock(
 	receipts []*types.Receipt,
 	_ []noTx,
 	settled hook.Settled,
+	settledRules params.Rules,
+	worstCaseState libevm.StateReader,
 ) (*types.Block, error) {
-	return p.Points.BuildBlock(header, blockCtx, txs, receipts, settled)
+	return p.Points.BuildBlock(header, blockCtx, txs, receipts, settled, settledRules, worstCaseState)
 }
 
 func (p points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[noTx], error) {
@@ -123,6 +126,8 @@ func (b blockBuilder) BuildBlock(
 	receipts []*types.Receipt,
 	_ []noTx,
 	settled hook.Settled,
+	settledRules params.Rules,
+	worstCaseState libevm.StateReader,
 ) (*types.Block, error) {
-	return b.BlockBuilder.BuildBlock(header, blockCtx, txs, receipts, settled)
+	return b.BlockBuilder.BuildBlock(header, blockCtx, txs, receipts, settled, settledRules, worstCaseState)
 }
