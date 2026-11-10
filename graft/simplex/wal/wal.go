@@ -4,7 +4,6 @@
 package wal
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -85,7 +84,7 @@ func (w *WriteAheadLog) ReadAll() ([][]byte, error) {
 	var payloads [][]byte
 	for bytesToRead > 0 {
 		payload, bytesRead, err := readRecord(w.file, bytesToRead)
-		if isCorruptedRecord(err) {
+		if err == ErrCorruptedWAL {
 			return payloads, w.truncateAt(fileInfo.Size() - bytesToRead)
 		}
 		if err != nil {
@@ -103,15 +102,6 @@ func (w *WriteAheadLog) ReadAll() ([][]byte, error) {
 	}
 
 	return payloads, nil
-}
-
-// isCorruptedRecord returns true if [err] means the record's bytes on disk are
-// invalid, as opposed to the read itself failing.
-func isCorruptedRecord(err error) bool {
-	return errors.Is(err, ErrInvalidCRC) ||
-		errors.Is(err, ErrRecordTooLong) ||
-		errors.Is(err, io.ErrUnexpectedEOF) ||
-		errors.Is(err, io.EOF)
 }
 
 func (w *WriteAheadLog) truncateAt(offset int64) error {
