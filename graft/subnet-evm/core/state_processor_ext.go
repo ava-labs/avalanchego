@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/modules"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/stateupgrade"
 )
 
 // ApplyPrecompileActivations checks if any of the precompiles specified by the chain config are enabled or disabled by the block
@@ -76,9 +75,9 @@ func ApplyPrecompileActivations(c *params.ChainConfig, parentTimestamp *uint64, 
 func applyStateUpgrades(c *params.ChainConfig, parentTimestamp *uint64, blockContext contract.ConfigurationBlockContext, statedb *state.StateDB) error {
 	// Apply state upgrades
 	configExtra := params.GetExtra(c)
-	for _, upgrade := range configExtra.GetActivatingStateUpgrades(parentTimestamp, blockContext.Timestamp(), configExtra.StateUpgrades) {
+	for _, upgrade := range configExtra.GetActivatingStateUpgrades(parentTimestamp, blockContext.Timestamp()) {
 		log.Info("Applying state upgrade", "blockNumber", blockContext.Number(), "upgrade", upgrade)
-		if err := stateupgrade.Configure(&upgrade, c, statedb, blockContext); err != nil {
+		if err := upgrade.Apply(c, statedb, blockContext.Number()); err != nil {
 			return fmt.Errorf("could not configure state upgrade: %w", err)
 		}
 	}

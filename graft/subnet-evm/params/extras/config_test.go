@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/stateupgrade"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 )
@@ -60,10 +61,10 @@ $`,
 					NetworkUpgradeOverrides: &NetworkUpgrades{
 						SubnetEVMTimestamp: utils.PointerTo[uint64](13),
 					},
-					StateUpgrades: []StateUpgrade{
+					StateUpgrades: []stateupgrade.Block{
 						{
 							BlockTimestamp: utils.PointerTo[uint64](14),
-							StateUpgradeAccounts: map[common.Address]StateUpgradeAccount{
+							Accounts: map[common.Address]stateupgrade.Account{
 								{15}: {
 									Code: []byte{16},
 								},
@@ -154,7 +155,7 @@ func TestChainConfigVerify(t *testing.T) {
 			config: ChainConfig{
 				FeeConfig: validFeeConfig,
 				UpgradeConfig: UpgradeConfig{
-					StateUpgrades: []StateUpgrade{
+					StateUpgrades: []stateupgrade.Block{
 						{BlockTimestamp: nil},
 					},
 				},
