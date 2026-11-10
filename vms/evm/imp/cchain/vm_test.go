@@ -18,6 +18,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm/options"
@@ -254,10 +255,13 @@ func withCommitInterval(n uint64) sutOption {
 	})
 }
 
-// withFirewood selects Firewood as the trie database
-func withFirewood() sutOption {
+// schemes are the triedb schemes supported.
+var schemes = []string{rawdb.HashScheme, firewood.Scheme}
+
+// withScheme selects the triedb scheme. Defaults to HashDB.
+func withScheme(scheme string) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.StateScheme = firewood.Scheme
+		c.vmConfig.StateScheme = scheme
 	})
 }
 
@@ -848,7 +852,7 @@ func TestStatefulRPCsReconstructExtraState(t *testing.T) {
 		},
 		{
 			name: "firewood_commit_interval",
-			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(commitInterval)},
+			opts: []sutOption{withScheme(firewood.Scheme), withArchival(), withCommitInterval(commitInterval)},
 		},
 	}
 
@@ -2032,7 +2036,7 @@ func TestWaitForEventInitializing(t *testing.T) {
 func TestRecoverFirewoodAcrossSynchronousTransition(t *testing.T) {
 	fixture, opts, clock := synchronousFixture(t)
 	dataDir := t.TempDir()
-	opts = append(opts, withFirewood(), withDB(memdb.New()), withChainDataDir(dataDir))
+	opts = append(opts, withScheme(firewood.Scheme), withDB(memdb.New()), withChainDataDir(dataDir))
 
 	ctx, sut := newSUT(t, opts...)
 	sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
