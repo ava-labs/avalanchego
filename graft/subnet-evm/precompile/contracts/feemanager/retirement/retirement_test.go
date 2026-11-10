@@ -11,8 +11,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
+
+	. "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement"
 )
 
 func TestReconcileForIgloo(t *testing.T) {
@@ -72,7 +73,7 @@ func TestReconcileForIgloo(t *testing.T) {
 		{
 			name:     "upgrade at Igloo is rejected",
 			upgrades: []extras.PrecompileUpgrade{fmEnable(igloo)},
-			wantErr:  retirement.ErrFeeManagerEnabledAfterIgloo,
+			wantErr:  ErrFeeManagerEnabledAfterIgloo,
 		},
 		{
 			name:             "stale genesis activation is removed",
@@ -98,7 +99,7 @@ func TestReconcileForIgloo(t *testing.T) {
 			name:             "post-Igloo genesis is rejected",
 			genesisTimestamp: igloo,
 			genesis:          fmGenesis(nil),
-			wantErr:          retirement.ErrFeeManagerEnabledAfterIgloo,
+			wantErr:          ErrFeeManagerEnabledAfterIgloo,
 		},
 	}
 
@@ -110,7 +111,7 @@ func TestReconcileForIgloo(t *testing.T) {
 					PrecompileUpgrades: test.upgrades,
 				},
 			}
-			err := retirement.ReconcileForIgloo(&got, test.genesisTimestamp, igloo)
+			err := ReconcileForIgloo(&got, test.genesisTimestamp, igloo)
 			require.ErrorIs(t, err, test.wantErr, "ReconcileForIgloo()")
 			if err != nil {
 				return
