@@ -94,7 +94,6 @@ func (s *StateDB) Prepare(
 	list types.AccessList,
 ) {
 	rulesExtra := corethparams.GetRulesExtra(rules)
-	s.warpMessages = nil // Warp messages don't exist before Durango.
 	if rulesExtra.IsDurango {
 		s.warpMessages = warp.MessagesFromAccessList(list)
 	}
