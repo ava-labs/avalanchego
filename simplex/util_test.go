@@ -265,7 +265,7 @@ func newTestFinalization(t *testing.T, configs []*Config, bh common.BlockHeader)
 		finalizedVotes = append(finalizedVotes, &common.FinalizeVote{
 			Finalization: vote,
 			Signature: common.Signature{
-				Signer: config.Ctx.NodeID[:],
+				Signer: common.NodeIDFromAvalancheID(config.Ctx.NodeID),
 				Value:  sig,
 			},
 		})

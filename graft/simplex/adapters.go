@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
 	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
@@ -289,7 +288,7 @@ func (bd *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte)
 		return nil, err
 	}
 
-	var innerBlock avalanchego.VMBlock
+	var innerBlock common.VMBlock
 	if len(rawBlock.InnerBlockBytes) > 0 {
 		block, err := bd.vm.ParseBlock(ctx, rawBlock.InnerBlockBytes)
 		if err != nil {

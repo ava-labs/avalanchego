@@ -4,7 +4,6 @@
 package common
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"slices"
@@ -39,7 +38,7 @@ func EmptyNotarizationFromRecord(record []byte, qd QCDeserializer) (EmptyNotariz
 }
 
 // NewNotarization builds a Notarization for a block described by [blockHeader] from [votesForCurrentRound].
-func NewNotarization(logger Logger, signatureAggregator SignatureAggregator, votesForCurrentRound map[string]*Vote, blockHeader BlockHeader) (Notarization, error) {
+func NewNotarization(logger Logger, signatureAggregator SignatureAggregator, votesForCurrentRound map[NodeID]*Vote, blockHeader BlockHeader) (Notarization, error) {
 	voteCount := len(votesForCurrentRound)
 	signatures := make([]Signature, 0, voteCount)
 	logger.Info("Collected Quorum of votes", zap.Uint64("round", blockHeader.Round), zap.Int("votes", voteCount))
@@ -109,5 +108,5 @@ func NewFinalization(signatureAggregator SignatureAggregator, finalizeVotes []*F
 
 // compareSignatures compares two signatures by their Signer field returning -1, 0, 1 if i is less than, equal to, or greater than j.
 func compareSignatures(i, j Signature) int {
-	return bytes.Compare(i.Signer, j.Signer)
+	return i.Signer.Compare(j.Signer)
 }

@@ -5,7 +5,6 @@ package testutil
 
 import (
 	"crypto/rand"
-	"encoding/asn1"
 	"fmt"
 	"testing"
 	"time"
@@ -15,9 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+//go:generate go run github.com/StephenButtolph/canoto/canoto util.go
+
 // DefaultTestNodeEpochConfig returns a default epoch config for a given node.
 func DefaultTestNodeEpochConfig(t *testing.T, nodeID common.NodeID, comm common.Communication, bb common.BlockBuilder) (simplex.EpochConfig, *TestWAL, *InMemStorage) {
-	l := MakeLogger(t, int(nodeID[0]))
+	l := MakeLogger(t, int(nodeID.ShortID[0]))
 	storage := NewInMemStorage()
 	wal := NewTestWAL(t)
 	conf := simplex.EpochConfig{
@@ -116,11 +117,9 @@ type testQCDeserializer struct {
 }
 
 func (t *testQCDeserializer) DeserializeQuorumCertificate(bytes []byte) (common.QuorumCertificate, error) {
-	var qc []common.Signature
-	rest, err := asn1.Unmarshal(bytes, &qc)
+	qc, err := DeserializeTestQC(bytes)
 	require.NoError(t.t, err)
-	require.Empty(t.t, rest)
-	return TestQC(qc), err
+	return qc, nil
 }
 
 type TestSignatureAggregator struct {
@@ -142,7 +141,11 @@ func (t *TestSignatureAggregator) AppendSignatures(existing common.SignatureByte
 }
 
 func (t *TestSignatureAggregator) Aggregate(signatures []common.Signature) (common.QuorumCertificate, error) {
-	return TestQC(signatures), t.Err
+	qc := TestQC{Signatures: make([]Signature, len(signatures))}
+	for i, sig := range signatures {
+		qc.Signatures[i] = Signature{Signer: NewNodeID(sig.Signer), Value: sig.Value}
+	}
+	return qc, t.Err
 }
 
 func (t *TestSignatureAggregator) IsQuorum(signers []common.NodeID) bool {
@@ -167,12 +170,44 @@ func (t *TestSignatureAggregator) AboveByzantineThreshold(signers []common.NodeI
 	return len(signers) >= common.F(t.N)+1
 }
 
-type TestQC []common.Signature
+// NodeID is the serializable form of a [common.NodeID].
+// It cannot be [metadata.NodeID] because msm tests import this package.
+type NodeID struct {
+	ShortID [20]byte `canoto:"fixed bytes,1"`
+	LongID  [32]byte `canoto:"fixed bytes,2"`
+
+	canotoData canotoData_NodeID
+}
+
+// NewNodeID converts a [common.NodeID] to its serializable form.
+func NewNodeID(nodeID common.NodeID) NodeID {
+	return NodeID{ShortID: nodeID.ShortID, LongID: nodeID.LongID}
+}
+
+// ToNodeID converts the serializable form back to a [common.NodeID].
+func (nodeID NodeID) ToNodeID() common.NodeID {
+	return common.NodeID{ShortID: nodeID.ShortID, LongID: nodeID.LongID}
+}
+
+type Signature struct {
+	// Signer is the NodeID of the creator of the signature.
+	Signer NodeID `canoto:"value,1"`
+	// Value is the byte representation of the signature.
+	Value common.SignatureBytes `canoto:"bytes,2"`
+
+	canotoData canotoData_Signature
+}
+
+type TestQC struct {
+	Signatures []Signature `canoto:"repeated value,1"`
+
+	canotoData canotoData_TestQC
+}
 
 func (t TestQC) Signers() []common.NodeID {
-	res := make([]common.NodeID, 0, len(t))
-	for _, sig := range t {
-		res = append(res, sig.Signer)
+	res := make([]common.NodeID, 0, len(t.Signatures))
+	for _, sig := range t.Signatures {
+		res = append(res, sig.Signer.ToNodeID())
 	}
 	return res
 }
@@ -182,11 +217,34 @@ func (t TestQC) Verify([]byte, common.Nodes) error {
 }
 
 func (t TestQC) Bytes() []byte {
-	bytes, err := asn1.Marshal(t)
-	if err != nil {
-		panic(err)
+	// Marshal a copy so the canoto size caches never end up in t itself,
+	// otherwise two equal TestQCs would not be equal in require.Equal once one of them was marshaled.
+	qc := t.withoutCache()
+	return qc.MarshalCanoto()
+}
+
+// withoutCache returns a deep copy of the TestQC whose canoto caches are empty.
+func (t TestQC) withoutCache() TestQC {
+	if len(t.Signatures) == 0 {
+		return TestQC{}
 	}
-	return bytes
+	signatures := make([]Signature, len(t.Signatures))
+	for i, sig := range t.Signatures {
+		signatures[i] = Signature{
+			Signer: NodeID{ShortID: sig.Signer.ShortID, LongID: sig.Signer.LongID},
+			Value:  sig.Value,
+		}
+	}
+	return TestQC{Signatures: signatures}
+}
+
+// DeserializeTestQC parses bytes produced by [TestQC.Bytes].
+func DeserializeTestQC(bytes []byte) (TestQC, error) {
+	var qc TestQC
+	if err := qc.UnmarshalCanoto(bytes); err != nil {
+		return TestQC{}, err
+	}
+	return qc.withoutCache(), nil
 }
 func (t TestQC) Size() int {
 	return len(t.Bytes())
@@ -270,13 +328,13 @@ func WaitForBlockProposerTimeout(t *testing.T, e *simplex.Epoch, startTime *time
 }
 
 func GenerateNodeID(t *testing.T) common.NodeID {
-	b := make([]byte, 32)
+	var nodeID common.NodeID
 
 	// fill with cryptographically secure random data
-	_, err := rand.Read(b)
+	_, err := rand.Read(nodeID.ShortID[:])
 	require.NoError(t, err)
 
-	return common.NodeID(b)
+	return nodeID
 }
 
 // EqualWeights returns the weights of nodeCount nodes that all have a weight of 1.

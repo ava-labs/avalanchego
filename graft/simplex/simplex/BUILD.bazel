@@ -14,8 +14,8 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/simplex/simplex",
     visibility = ["//visibility:public"],
     deps = [
-        "//graft/simplex/avalanchego",
         "//graft/simplex/common",
+        "//utils/constants",
         "@org_uber_go_zap//:zap",
     ],
 )
@@ -45,6 +45,7 @@ graft_go_test(
         "//graft/simplex/testutil",
         "//graft/simplex/testutil/long_running",
         "//graft/simplex/testutil/random_network",
+        "//ids",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_goleak//:goleak",
         "@org_uber_go_zap//:zap",

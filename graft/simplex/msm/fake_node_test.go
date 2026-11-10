@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
 	"github.com/stretchr/testify/require"
@@ -24,12 +23,12 @@ var emptyAuxInfoDigest common.Digest
 func TestFakeNodeEpochChangesDespiteEmptyMempool(t *testing.T) {
 	validatorSetRetriever := validatorSetRetriever{
 		resultMap: map[uint64]NodeBLSMappings{
-			0:   {{BLSKey: []byte{1}, Weight: 1, NodeID: [20]byte{1}}, {BLSKey: []byte{2}, Weight: 1, NodeID: [20]byte{2}}},
-			100: {{BLSKey: []byte{1}, Weight: 1, NodeID: [20]byte{1}}, {BLSKey: []byte{2}, Weight: 1, NodeID: [20]byte{2}}},
-			200: {{BLSKey: []byte{1}, Weight: 1, NodeID: [20]byte{1}}, {BLSKey: []byte{2}, Weight: 2, NodeID: [20]byte{2}},
-				{BLSKey: []byte{3}, Weight: 1, NodeID: [20]byte{3}}},
-			300: {{BLSKey: []byte{1}, Weight: 1, NodeID: [20]byte{1}}, {BLSKey: []byte{2}, Weight: 2, NodeID: [20]byte{2}},
-				{BLSKey: []byte{3}, Weight: 3, NodeID: [20]byte{3}}, {BLSKey: []byte{4}, Weight: 1, NodeID: [20]byte{4}}},
+			0:   {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}}},
+			100: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}}},
+			200: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: NodeID{ShortID: [20]byte{2}}},
+				{BLSKey: []byte{3}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{3}}}},
+			300: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: NodeID{ShortID: [20]byte{2}}},
+				{BLSKey: []byte{3}, Weight: 3, NodeID: NodeID{ShortID: [20]byte{3}}}, {BLSKey: []byte{4}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{4}}}},
 		},
 	}
 
@@ -37,7 +36,7 @@ func TestFakeNodeEpochChangesDespiteEmptyMempool(t *testing.T) {
 	pChainHeight.Store(100)
 	node := newFakeNode(t)
 	myID := [20]byte{1}
-	node.sm.MyNodeID = myID[:]
+	node.sm.MyNodeID = common.NodeID{ShortID: myID}
 	node.sm.AuxiliaryInfoApp = &noopTestAuxInfoApp{}
 	node.sm.GetValidatorSet = validatorSetRetriever.getValidatorSet
 	node.sm.GetPChainHeightForProposing = func() uint64 {
@@ -65,9 +64,9 @@ func TestFakeNodeEpochChangesDespiteEmptyMempool(t *testing.T) {
 			node.tryFinalizeNextBlock()
 		}
 		if flipCoin() {
-			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: [20]byte{1}, PChainHeight: 200, Signature: signApproval(200, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
+			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: common.NodeID{ShortID: [20]byte{1}}, PChainHeight: 200, Signature: signApproval(200, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
 		} else {
-			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: [20]byte{2}, PChainHeight: 200, Signature: signApproval(200, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
+			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: common.NodeID{ShortID: [20]byte{2}}, PChainHeight: 200, Signature: signApproval(200, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
 		}
 
 		if node.isLastBlockSealing() {
@@ -79,12 +78,12 @@ func TestFakeNodeEpochChangesDespiteEmptyMempool(t *testing.T) {
 func TestFakeNode(t *testing.T) {
 	validatorSetRetriever := validatorSetRetriever{
 		resultMap: map[uint64]NodeBLSMappings{
-			0:   {{BLSKey: []byte{1}, Weight: 1, NodeID: [20]byte{1}}, {BLSKey: []byte{2}, Weight: 1, NodeID: [20]byte{2}}},
-			100: {{BLSKey: []byte{1}, Weight: 1, NodeID: [20]byte{1}}, {BLSKey: []byte{2}, Weight: 1, NodeID: [20]byte{2}}},
-			200: {{BLSKey: []byte{1}, Weight: 1, NodeID: [20]byte{1}}, {BLSKey: []byte{2}, Weight: 2, NodeID: [20]byte{2}},
-				{BLSKey: []byte{3}, Weight: 1, NodeID: [20]byte{3}}},
-			300: {{BLSKey: []byte{1}, Weight: 1, NodeID: [20]byte{1}}, {BLSKey: []byte{2}, Weight: 2, NodeID: [20]byte{2}},
-				{BLSKey: []byte{3}, Weight: 3, NodeID: [20]byte{3}}, {BLSKey: []byte{4}, Weight: 1, NodeID: [20]byte{4}}},
+			0:   {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}}},
+			100: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}}},
+			200: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: NodeID{ShortID: [20]byte{2}}},
+				{BLSKey: []byte{3}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{3}}}},
+			300: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: NodeID{ShortID: [20]byte{2}}},
+				{BLSKey: []byte{3}, Weight: 3, NodeID: NodeID{ShortID: [20]byte{3}}}, {BLSKey: []byte{4}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{4}}}},
 		},
 	}
 
@@ -92,7 +91,7 @@ func TestFakeNode(t *testing.T) {
 	pChainHeight.Store(100)
 	node := newFakeNode(t)
 	myID := [20]byte{1}
-	node.sm.MyNodeID = myID[:]
+	node.sm.MyNodeID = common.NodeID{ShortID: myID}
 	node.sm.AuxiliaryInfoApp = &noopTestAuxInfoApp{}
 	node.sm.GetValidatorSet = validatorSetRetriever.getValidatorSet
 	node.sm.GetPChainHeightForProposing = func() uint64 {
@@ -114,9 +113,9 @@ func TestFakeNode(t *testing.T) {
 	for node.Epoch() == epoch {
 		node.act()
 		if flipCoin() {
-			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: [20]byte{1}, PChainHeight: 200, Signature: signApproval(200, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
+			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: common.NodeID{ShortID: [20]byte{1}}, PChainHeight: 200, Signature: signApproval(200, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
 		} else {
-			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: [20]byte{2}, PChainHeight: 200, Signature: signApproval(200, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
+			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: common.NodeID{ShortID: [20]byte{2}}, PChainHeight: 200, Signature: signApproval(200, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
 		}
 	}
 
@@ -131,9 +130,9 @@ func TestFakeNode(t *testing.T) {
 	for node.Epoch() == epoch {
 		node.act()
 		if flipCoin() {
-			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: [20]byte{2}, PChainHeight: 300, Signature: signApproval(300, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
+			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: common.NodeID{ShortID: [20]byte{2}}, PChainHeight: 300, Signature: signApproval(300, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
 		} else {
-			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: [20]byte{3}, PChainHeight: 300, Signature: signApproval(300, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
+			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: common.NodeID{ShortID: [20]byte{3}}, PChainHeight: 300, Signature: signApproval(300, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
 		}
 	}
 
@@ -144,19 +143,19 @@ func TestFakeNode(t *testing.T) {
 func TestFakeNodeEmptyMempool(t *testing.T) {
 	validatorSetRetriever := validatorSetRetriever{
 		resultMap: map[uint64]NodeBLSMappings{
-			0:   {{BLSKey: []byte{1}, Weight: 1, NodeID: [20]byte{1}}, {BLSKey: []byte{2}, Weight: 1, NodeID: [20]byte{2}}},
-			100: {{BLSKey: []byte{1}, Weight: 1, NodeID: [20]byte{1}}, {BLSKey: []byte{2}, Weight: 1, NodeID: [20]byte{2}}},
-			200: {{BLSKey: []byte{1}, Weight: 1, NodeID: [20]byte{1}}, {BLSKey: []byte{2}, Weight: 2, NodeID: [20]byte{2}},
-				{BLSKey: []byte{3}, Weight: 1, NodeID: [20]byte{3}}},
-			300: {{BLSKey: []byte{1}, Weight: 1, NodeID: [20]byte{1}}, {BLSKey: []byte{2}, Weight: 2, NodeID: [20]byte{2}},
-				{BLSKey: []byte{3}, Weight: 3, NodeID: [20]byte{3}}, {BLSKey: []byte{4}, Weight: 1, NodeID: [20]byte{4}}},
+			0:   {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}}},
+			100: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}}},
+			200: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: NodeID{ShortID: [20]byte{2}}},
+				{BLSKey: []byte{3}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{3}}}},
+			300: {{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}}, {BLSKey: []byte{2}, Weight: 2, NodeID: NodeID{ShortID: [20]byte{2}}},
+				{BLSKey: []byte{3}, Weight: 3, NodeID: NodeID{ShortID: [20]byte{3}}}, {BLSKey: []byte{4}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{4}}}},
 		},
 	}
 
 	var pChainHeight uint64 = 100
 	node := newFakeNode(t)
 	myID := [20]byte{1}
-	node.sm.MyNodeID = myID[:]
+	node.sm.MyNodeID = common.NodeID{ShortID: myID}
 	node.sm.AuxiliaryInfoApp = &noopTestAuxInfoApp{}
 	node.sm.MaxBlockBuildingWaitTime = 100 * time.Millisecond
 	node.sm.GetValidatorSet = validatorSetRetriever.getValidatorSet
@@ -182,9 +181,9 @@ func TestFakeNodeEmptyMempool(t *testing.T) {
 	for node.lastFinalizedBlock().Metadata.SimplexEpochInfo.BlockValidationDescriptor == nil {
 		node.act()
 		if flipCoin() {
-			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: [20]byte{1}, PChainHeight: 200, Signature: signApproval(200, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
+			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: common.NodeID{ShortID: [20]byte{1}}, PChainHeight: 200, Signature: signApproval(200, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
 		} else {
-			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: [20]byte{2}, PChainHeight: 200, Signature: signApproval(200, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
+			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: common.NodeID{ShortID: [20]byte{2}}, PChainHeight: 200, Signature: signApproval(200, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
 		}
 	}
 
@@ -211,9 +210,9 @@ func TestFakeNodeEmptyMempool(t *testing.T) {
 	for node.Height() < 30 {
 		node.act()
 		if flipCoin() {
-			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: [20]byte{2}, PChainHeight: 300, Signature: signApproval(300, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
+			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: common.NodeID{ShortID: [20]byte{2}}, PChainHeight: 300, Signature: signApproval(300, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
 		} else {
-			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: [20]byte{3}, PChainHeight: 300, Signature: signApproval(300, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
+			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: common.NodeID{ShortID: [20]byte{3}}, PChainHeight: 300, Signature: signApproval(300, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
 		}
 	}
 
@@ -230,7 +229,7 @@ type innerBlock struct {
 type blockState struct {
 	block      StateMachineBlock
 	finalized  bool
-	innerBlock avalanchego.VMBlock
+	innerBlock common.VMBlock
 }
 
 type fakeNode struct {
@@ -407,7 +406,7 @@ func (fn *fakeNode) buildAndNotarizeBlock() {
 	fn.blocks = append(fn.blocks, blockState{block: *block, innerBlock: vmBlock})
 }
 
-func (fn *fakeNode) buildBlock() (avalanchego.VMBlock, *StateMachineBlock) {
+func (fn *fakeNode) buildBlock() (common.VMBlock, *StateMachineBlock) {
 	parentBlock := fn.getParentBlock()
 
 	lastMD, prevBlockDigest := fn.prepareMetadataAndPrevBlockDigest()
@@ -449,7 +448,7 @@ func (fn *fakeNode) prepareMetadataAndPrevBlockDigest() (*common.ProtocolMetadat
 	return lastMD, lastBlockDigest
 }
 
-func (fn *fakeNode) BuildBlock(ctx context.Context, _ uint64) (avalanchego.VMBlock, error) {
+func (fn *fakeNode) BuildBlock(ctx context.Context, _ uint64) (common.VMBlock, error) {
 	if fn.mempoolEmpty {
 		<-ctx.Done()
 		return nil, ctx.Err()
