@@ -28,7 +28,7 @@ import (
 // Each [admitter.Admit] call resolves the current head via
 // [saexec.Executor.LastExecuted] (a single atomic load), consults a cached
 // [admissionHead] for the per-head rules/signer, and opens a FRESH
-// [state.StateDB] for the precompile read. The cache is rebuilt only when
+// [state.StateDB] for the hook's state reads. The cache is rebuilt only when
 // the head changes.
 type admitter struct {
 	exec   *saexec.Executor
@@ -42,14 +42,11 @@ type admitter struct {
 }
 
 // admissionHead bundles the immutable per-head data used by [admitter.Admit]:
-// the [params.Rules] and [types.Signer] for the head's height/time, plus a
-// cheap `check` flag indicating whether the chain's hooks could possibly
-// reject any tx under those rules.
+// the [params.Rules] and [types.Signer] for the head's height/time.
 type admissionHead struct {
 	hash      common.Hash
 	stateRoot common.Hash
 	rules     params.Rules
-	check     bool // indicates whether the chain's hooks could possibly reject any tx under those rules
 	signer    types.Signer
 }
 
@@ -70,8 +67,7 @@ func newAdmitter(
 var errNoExecutedBlock = errors.New("no last-executed block available")
 
 // Admit gates `tx` via [hook.Points.CanExecuteTransaction] against the
-// last-executed state. Returns nil immediately if no admission precompile
-// is active at the current head.
+// last-executed state.
 //
 // A fresh [state.StateDB] is opened per call because StateDB
 // lazily populates an unsynchronised `stateObjects` map even on reads and
@@ -84,10 +80,6 @@ func (a *admitter) Admit(tx *types.Transaction) error {
 	}
 
 	head := a.headFor(last)
-	if !head.check { // no admission is required
-		return nil
-	}
-
 	// TODO(ceyonur): consider caching the state and using a mutex to protect it
 	state, err := a.exec.StateDB(head.stateRoot)
 	if err != nil {
@@ -125,7 +117,6 @@ func (a *admitter) makeHead(last *blocks.Block) *admissionHead {
 		hash:      last.Hash(),
 		stateRoot: last.PostExecutionStateRoot(),
 		rules:     rules,
-		check:     a.hooks.RequiresTransactionAdmissionCheck(rules),
 		signer:    types.MakeSigner(a.config, header.Number, header.Time),
 	}
 }

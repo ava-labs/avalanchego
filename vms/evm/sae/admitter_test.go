@@ -31,12 +31,6 @@ import (
 // construction.
 type admitterOption func(*hookstest.Stub)
 
-// withRequiresAdmissionCheck installs a stub for
-// [hook.Points.RequiresTransactionAdmissionCheck].
-func withRequiresAdmissionCheck(fn func(params.Rules) bool) admitterOption {
-	return func(s *hookstest.Stub) { s.RequiresAdmissionCheck = fn }
-}
-
 // withCanExecuteTransaction installs a stub for
 // [hook.Points.CanExecuteTransaction].
 func withCanExecuteTransaction(fn func(params.Rules, common.Address, *common.Address, libevm.StateReader) error) admitterOption {
@@ -45,8 +39,8 @@ func withCanExecuteTransaction(fn func(params.Rules, common.Address, *common.Add
 
 // admitterFixture wires a real [saexec.Executor] (sitting on the genesis
 // block) to a [hookstest.Stub] and an [admitter]. Tests pass
-// [admitterOption]s (e.g. [withRequiresAdmissionCheck],
-// [withCanExecuteTransaction]) to drive admission decisions.
+// [admitterOption]s (e.g. [withCanExecuteTransaction]) to drive admission
+// decisions.
 type admitterFixture struct {
 	admit  *admitter
 	wallet *saetest.Wallet
@@ -96,9 +90,8 @@ func (f *admitterFixture) signTx(t *testing.T, from int, to common.Address) *typ
 	})
 }
 
-// TestAdmit cross-products the two hook decisions
-// ([RequiresTransactionAdmissionCheck] x [CanExecuteTransaction]) by
-// stubbing the corresponding [hookstest.Stub] fields directly per row.
+// TestAdmit checks [admitter.Admit] against [CanExecuteTransaction] decisions
+// by stubbing the corresponding [hookstest.Stub] field directly per row.
 func TestAdmit(t *testing.T) {
 	keys := saetest.NewUNSAFEKeyChain(t, 2)
 	addrs := keys.Addresses()
@@ -106,8 +99,7 @@ func TestAdmit(t *testing.T) {
 	blockedErr := errors.New("not allow-listed")
 
 	tests := []struct {
-		name                   string
-		RequiresAdmissionCheck func(params.Rules) bool
+		name string
 		// CanExecuteTransaction MAY assert on its received `from` / `to`
 		// directly (e.g. to selectively block a specific sender) and is
 		// expected to surface its decision via the returned error.
@@ -115,23 +107,13 @@ func TestAdmit(t *testing.T) {
 		wantErr               map[common.Address]error
 	}{
 		{
-			name:                   "no_check_required_hook_skipped",
-			RequiresAdmissionCheck: func(params.Rules) bool { return false },
-			CanExecuteTransaction: func(params.Rules, common.Address, *common.Address, libevm.StateReader) error {
-				t.Fatal("CanExecuteTransaction must not be reached when RequiresAdmissionCheck is false")
-				return nil
-			},
-		},
-		{
-			name:                   "check_required_and_allowed",
-			RequiresAdmissionCheck: func(params.Rules) bool { return true },
+			name: "allowed",
 			CanExecuteTransaction: func(params.Rules, common.Address, *common.Address, libevm.StateReader) error {
 				return nil
 			},
 		},
 		{
-			name:                   "check_required_and_blocked_for_specific_sender",
-			RequiresAdmissionCheck: func(params.Rules) bool { return true },
+			name: "blocked_for_specific_sender",
 			// Reject only when the recovered sender matches `from`. This
 			// proves the hook receives the exact tx sender (not e.g. the
 			// recipient) by acting on it directly.
@@ -150,7 +132,6 @@ func TestAdmit(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := newAdmitterFixture(t, keys,
-				withRequiresAdmissionCheck(tt.RequiresAdmissionCheck),
 				withCanExecuteTransaction(tt.CanExecuteTransaction),
 			)
 

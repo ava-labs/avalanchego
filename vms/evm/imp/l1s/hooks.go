@@ -245,11 +245,6 @@ func (*hooks) CanExecuteTransaction(rules ethparams.Rules, from common.Address, 
 	return nil
 }
 
-func (*hooks) RequiresTransactionAdmissionCheck(rules ethparams.Rules) bool {
-	extra := legacyparams.GetRulesExtra(rules)
-	return extra.IsPrecompileEnabled(txallowlist.ContractAddress)
-}
-
 // StartExecutingBlock activates / deactivates timestamp-scheduled
 // `PrecompileUpgrades` and `StateUpgrades` for the window
 // (parent.Time, block.Time()] by delegating to [legacycore.ApplyUpgrades].

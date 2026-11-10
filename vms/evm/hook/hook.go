@@ -94,12 +94,6 @@ type Points interface {
 	// strict-as-of-last-settled (a few seconds of leakage after a role
 	// removal).
 	CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, state libevm.StateReader) error
-	// RequiresTransactionAdmissionCheck reports whether
-	// [Points.CanExecuteTransaction] could reject any tx under `rules`. It
-	// MUST be a cheap, rules-only check, used to skip sender recovery and
-	// state opening when no admission-relevant precompile is active.
-	// Over-reporting (returning true) is safe; under-reporting is not.
-	RequiresTransactionAdmissionCheck(rules params.Rules) bool
 	// StartExecutingBlock applies state changes before the block's transactions
 	// run. `rules` are those of the block and `parent` is the parent header. It
 	// runs during canonical and historical execution. It MUST NOT change data

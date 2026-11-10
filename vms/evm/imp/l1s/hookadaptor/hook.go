@@ -37,7 +37,6 @@ type Points interface {
 	SettledBy(*types.Header) hook.Settled
 	VerifyBlockSyntax(*types.Block) error
 	CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, state libevm.StateReader) error
-	RequiresTransactionAdmissionCheck(rules params.Rules) bool
 	StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error
 	FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
 	AfterExecutingBlock(*types.Block, types.Receipts) error

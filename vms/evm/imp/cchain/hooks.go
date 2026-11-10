@@ -221,12 +221,6 @@ func (*hooks) CanExecuteTransaction(params.Rules, common.Address, *common.Addres
 	return nil
 }
 
-// RequiresTransactionAdmissionCheck returns false: [hooks.CanExecuteTransaction]
-// never rejects a transaction, so admission paths can skip it entirely.
-func (*hooks) RequiresTransactionAdmissionCheck(params.Rules) bool {
-	return false
-}
-
 func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
 	config := corethparams.GetExtra(h.chainConfig)
 	if isFirstDurangoBlock := corethparams.GetRulesExtra(rules).IsDurango && !config.IsDurango(parent.Time); isFirstDurangoBlock {

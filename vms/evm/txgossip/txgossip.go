@@ -61,8 +61,8 @@ func (Marshaller) UnmarshalGossip(buf []byte) (Transaction, error) {
 
 // An Admitter gates inbound transactions for the mempool.
 //
-// Implementations MUST make [Admitter.Admit] cheap when no relevant check is
-// required (e.g. no admission-relevant precompile is active).
+// Implementations SHOULD keep [Admitter.Admit] cheap, as it runs for every
+// inbound transaction.
 type Admitter interface {
 	// Admit returns nil if `tx` is allowed into the mempool, or an error
 	// describing why it was rejected. Safe for concurrent use.
