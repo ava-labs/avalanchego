@@ -89,7 +89,6 @@ go_test(
         "hooks_test.go",
         "l1sut_test.go",
         "vm_deployerallowlist_test.go",
-        "vm_eth_extras_test.go",
         "vm_feemanager_test.go",
         "vm_gaspricemanager_test.go",
         "vm_nativeminter_test.go",

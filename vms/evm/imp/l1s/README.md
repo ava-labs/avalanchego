@@ -31,7 +31,7 @@ L1-specific code is concentrated here:
 - [`genesis.go`](genesis.go) parses legacy-compatible genesis and upgrade bytes.
 - [`hooks.go`](hooks.go) connects L1 rules and precompiles to SAE.
 - [`gas_config.go`](gas_config.go) encodes ACP-224 gas configuration in headers.
-- [`api`](api) exposes `eth_getActiveRulesAt` and the validators service.
+- [`api`](api) exposes the validators service.
 - [`warp`](warp) adds L1 Warp predicates and uptime verification.
 - [`plugin`](plugin) is the standalone VM entrypoint.
 

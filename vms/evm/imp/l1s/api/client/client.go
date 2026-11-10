@@ -69,12 +69,3 @@ func (c *Client) GetCurrentValidators(ctx context.Context, nodeIDs []ids.NodeID,
 	)
 	return res.Validators, err
 }
-
-// GetActiveRulesAt returns the active eth + avalanche rules and precompile
-// activations at `blockTimestamp`. A nil `blockTimestamp` defaults to the
-// current header time.
-func (c *Client) GetActiveRulesAt(ctx context.Context, blockTimestamp *uint64) (l1api.ActiveRulesResult, error) {
-	var res l1api.ActiveRulesResult
-	err := c.ethRPC.CallContext(ctx, &res, "eth_getActiveRulesAt", blockTimestamp)
-	return res, err
-}

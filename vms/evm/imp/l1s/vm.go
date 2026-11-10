@@ -228,14 +228,8 @@ const (
 )
 
 // newHandlers returns the HTTP handlers exposed by the underlying SAE VM
-// augmented with the L1 VM's legacy-compatible `eth_*` methods and validators
-// service.
+// augmented with the L1 VM's validators service.
 func (vm *VM) newHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	ethExtras := l1api.NewEthExtrasAPI(vm.VM.GethRPCBackends())
-	if err := vm.VM.RPCServer().RegisterName("eth", ethExtras); err != nil {
-		return nil, fmt.Errorf("RPCServer.RegisterName(\"eth\", *EthExtrasAPI): %w", err)
-	}
-
 	m, err := vm.VM.CreateHandlers(ctx)
 	if err != nil {
 		return nil, err
