@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 
@@ -21,6 +22,16 @@ import (
 // ErrBelowMinimum is returned by [Next] for a block built before the minimum
 // block delay since its parent has elapsed.
 var ErrBelowMinimum = errors.New("block time below the ACP-226 minimum block delay")
+
+// Exponent returns the delay exponent stored in a header's ACP-226
+// MinDelayExcess field, defaulting to [dynamic.InitialDelayExponent] for headers
+// that predate the field.
+func Exponent(excess *acp226.DelayExcess) dynamic.DelayExponent {
+	if excess == nil {
+		return dynamic.InitialDelayExponent
+	}
+	return dynamic.DelayExponent(*excess)
+}
 
 // Earliest returns the earliest time at which a child of a block at parentTime
 // with delay exponent parent may be built.

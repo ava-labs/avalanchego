@@ -12,10 +12,35 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
+
+func TestExponent(t *testing.T) {
+	set := acp226.DelayExcess(1_000)
+	tests := []struct {
+		name   string
+		excess *acp226.DelayExcess
+		want   dynamic.DelayExponent
+	}{
+		{
+			name: "unset",
+			want: dynamic.InitialDelayExponent,
+		},
+		{
+			name:   "set",
+			excess: &set,
+			want:   1_000,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, Exponent(tt.excess), "Exponent()")
+		})
+	}
+}
 
 func TestNext(t *testing.T) {
 	const parent = dynamic.InitialDelayExponent

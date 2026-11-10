@@ -7,6 +7,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/evm/acp226",
         "//snow/engine/common",
         "//utils",
         "//vms/evm/imp/dynamic",
@@ -18,6 +19,7 @@ go_test(
     srcs = ["blockdelay_test.go"],
     embed = [":blockdelay"],
     deps = [
+        "//graft/evm/acp226",
         "//snow/engine/common",
         "//vms/evm/imp/dynamic",
         "@com_github_stretchr_testify//require",
