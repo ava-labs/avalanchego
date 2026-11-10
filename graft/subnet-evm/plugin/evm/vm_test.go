@@ -2086,7 +2086,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 
 // Test that the fee manager changes fee configuration
 func TestFeeManagerChangeFee(t *testing.T) {
-	graniteFork := upgradetest.Granite
+	heliconFork := upgradetest.Helicon
 
 	// Setup chain params
 	genesis := &core.Genesis{}
@@ -2114,7 +2114,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
 	tvm := newVM(t, testVMConfig{
-		fork:        &graniteFork,
+		fork:        &heliconFork,
 		genesisJSON: string(genesisJSON),
 	})
 
@@ -2789,7 +2789,7 @@ func TestStandaloneDB(t *testing.T) {
 func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	// The legacy feeManager precompile is rejected when scheduled at
 	// or after Igloo (see retirement.ReconcileForIgloo)
-	graniteFork := upgradetest.Granite
+	heliconFork := upgradetest.Helicon
 
 	// Setup chain params
 	genesis := &core.Genesis{}
@@ -2818,7 +2818,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
 	tvm := newVM(t, testVMConfig{
-		fork:        &graniteFork,
+		fork:        &heliconFork,
 		genesisJSON: string(genesisJSON),
 	})
 
@@ -2842,7 +2842,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 
 	// restart vm and try again
 	restartedTVM, err := restartVM(tvm, testVMConfig{
-		fork:        &graniteFork,
+		fork:        &heliconFork,
 		genesisJSON: string(genesisJSON),
 	})
 	require.NoError(t, err)
