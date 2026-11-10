@@ -128,12 +128,7 @@ The `require` directives at this commit reference `$VERSION`, which is not tagge
 
 ### 4. Test the Release Candidate
 
-Deploy `$VERSION_RC` to Ava Labs-operated nodes by setting their image tags to `$VERSION_RC` in the infrastructure deployment repository. Update the API and validator image tags for:
-
-- **Primary Network canaries** on both Fuji and Mainnet.
-- **Echo and Dispatch**, which are Fuji chains that run the public `avaplatform/subnet-evm` image. Echo is an L1 and Dispatch is a Subnet, so together they cover both validator models.
-
-After the deployments roll out, watch the Grafana logs and dashboards for each chain. Look for crashes, stalled block production, and new errors or warnings compared to the previous version.
+Deploy `$VERSION_RC` to test nodes on Fuji and Mainnet. Monitor the nodes' logs and metrics. Look for crashes, stalled block production, and new errors or warnings compared to the previous version.
 
 #### Fixing Issues Found in the Release Candidate
 
