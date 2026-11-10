@@ -7,7 +7,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
 )
@@ -59,14 +58,14 @@ type Sender interface {
 
 type VM interface {
 	// BuildBlock builds a block given the current context and the P-chain height.
-	BuildBlock(ctx context.Context, pChainHeight uint64) (avalanchego.VMBlock, error)
+	BuildBlock(ctx context.Context, pChainHeight uint64) (common.VMBlock, error)
 
 	// WaitForPendingBlock returns when either the given context is cancelled,
 	// or when the VM signals that a block should be built.
 	WaitForPendingBlock(ctx context.Context)
 
 	// ParseBlock parses the given block bytes into a VMBlock.
-	ParseBlock(context.Context, []byte) (avalanchego.VMBlock, error)
+	ParseBlock(context.Context, []byte) (common.VMBlock, error)
 }
 
 type Storage interface {

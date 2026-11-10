@@ -7,15 +7,15 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/stretchr/testify/require"
 )
 
-func makeNodeID(seed byte) avalanchego.NodeID {
-	var n avalanchego.NodeID
-	n[0] = seed
+func makeNodeID(seed byte) common.NodeID {
+	var n common.NodeID
+	n.ShortID[0] = seed
 	return n
 }
 
@@ -23,7 +23,7 @@ func makeValidators(n int) NodeBLSMappings {
 	vdrs := make(NodeBLSMappings, n)
 	for i := 0; i < n; i++ {
 		vdrs[i] = NodeBLSMapping{
-			NodeID: makeNodeID(byte(i + 1)),
+			NodeID: NewNodeID(makeNodeID(byte(i + 1))),
 			BLSKey: []byte{byte(i + 1)},
 			Weight: 1,
 		}
@@ -40,7 +40,7 @@ func TestAggregatePubKeysForBitmaskRejectsWideBitmask(t *testing.T) {
 	validators := makeValidators(4)
 
 	// Every validator approving is the widest legitimate bitmask.
-	all := avalanchego.BitmaskFromBytes(nil)
+	all := set.BitsFromBytes(nil)
 	for i := range validators {
 		all.Add(i)
 	}
@@ -49,13 +49,13 @@ func TestAggregatePubKeysForBitmaskRejectsWideBitmask(t *testing.T) {
 	require.Equal(t, []byte{1, 2, 3, 4}, aggPK)
 
 	// One bit past the end of the validator set.
-	tooWide := all.Clone()
+	tooWide := set.BitsFromBytes(all.Bytes())
 	tooWide.Add(len(validators))
 	_, err = sm.aggregatePubKeysForBitmask(tooWide.Bytes(), validators)
 	require.ErrorIs(t, err, errApprovalsBitmaskTooWide)
 
 	// A single very high bit, which is the shape that made bitmask operations expensive.
-	huge := avalanchego.BitmaskFromBytes(nil)
+	huge := set.BitsFromBytes(nil)
 	huge.Add(1 << 20)
 	_, err = sm.aggregatePubKeysForBitmask(huge.Bytes(), validators)
 	require.ErrorIs(t, err, errApprovalsBitmaskTooWide)

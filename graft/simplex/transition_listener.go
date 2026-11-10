@@ -4,7 +4,6 @@
 package simplex
 
 import (
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 
 	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
@@ -20,7 +19,7 @@ type epochTransitionListener struct {
 	// individually to the validators of the next epoch.
 	sender Sender
 
-	myNodeID avalanchego.NodeID
+	myNodeID common.NodeID
 
 	// getValidatorSet returns the validator set at a given P-chain height.
 	getValidatorSet metadata.ValidatorSetRetriever
@@ -41,7 +40,7 @@ type epochTransitionListener struct {
 func newEpochTransitionListener(
 	logger common.Logger,
 	sender Sender,
-	myNodeID avalanchego.NodeID,
+	myNodeID common.NodeID,
 	getValidatorSet metadata.ValidatorSetRetriever,
 	getBlock metadata.BlockRetriever,
 	signer common.Signer,
@@ -115,10 +114,10 @@ func (a *epochTransitionListener) handleTransitionBlock(block *ParsedBlock) erro
 // sendToValidators sends the message individually to every validator in the set except ourselves.
 func (a *epochTransitionListener) sendToValidators(validators metadata.NodeBLSMappings, msg *common.Message) {
 	for _, validator := range validators {
-		if validator.NodeID == a.myNodeID {
+		if validator.NodeID.ToNodeID() == a.myNodeID {
 			continue
 		}
-		a.sender.Send(msg, common.NodeID(validator.NodeID[:]))
+		a.sender.Send(msg, validator.NodeID.ToNodeID())
 	}
 }
 

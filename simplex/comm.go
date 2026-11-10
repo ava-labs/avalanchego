@@ -47,7 +47,7 @@ func NewComm(config *Config) (*Comm, error) {
 	// grab all the nodes that are validators for the subnet
 	for _, vd := range config.Params.InitialValidators {
 		node := simplexcommon.Node{
-			Id:     vd.NodeID[:],
+			Id:     simplexcommon.NodeIDFromAvalancheID(vd.NodeID),
 			PK:     vd.PublicKey,
 			Weight: uint64(1), // TODO: set equal weights for now
 		}
@@ -97,7 +97,7 @@ func (c *Comm) Send(msg *simplexcommon.Message, destination simplexcommon.NodeID
 		return
 	}
 
-	dest, err := ids.ToNodeID(destination)
+	dest, err := destination.ToAvalancheID()
 	if err != nil {
 		c.logger.Error("Failed to convert destination NodeID", zap.Error(err))
 		return

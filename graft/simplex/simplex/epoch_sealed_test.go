@@ -12,6 +12,7 @@ import (
 	. "github.com/ava-labs/avalanchego/graft/simplex/common"
 	. "github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -236,7 +237,7 @@ func TestEpochBuildsInRoundAfterSealingBlock(t *testing.T) {
 func setupSealingBlockTest(t *testing.T, epochLeaderRound uint64, markSealing bool) *sealingBlockTestEnv {
 	nodes := make([]NodeID, 10)
 	for i := range nodes {
-		nodes[i] = NodeID{byte(i + 1)}
+		nodes[i] = NodeID{ShortID: ids.ShortID{byte(i + 1)}}
 	}
 
 	// Leadership is round-robin over the (distinct) nodes, so the epoch node leads

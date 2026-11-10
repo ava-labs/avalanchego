@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
 )
 
@@ -319,11 +320,11 @@ func TestHandleMessages(t *testing.T) {
 				tc := newSeededChain(t, testNodes, 2)
 
 				var epoch3Nodes = common.Nodes{
-					{Id: common.NodeID{1}, Weight: 1},
-					{Id: common.NodeID{2}, Weight: 1},
-					{Id: common.NodeID{3}, Weight: 1},
-					{Id: common.NodeID{4}, Weight: 1},
-					{Id: common.NodeID{5}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{1}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{2}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{3}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{4}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{5}}, Weight: 1},
 				}
 
 				// Send the sealing block + finalization that transitions to epoch 3.
@@ -355,11 +356,11 @@ func TestHandleMessages(t *testing.T) {
 			setup: func(t *testing.T) (*testChain, []*messageInfo) {
 				tc := newSeededChain(t, testNodes, 2)
 				epoch3Nodes := common.Nodes{
-					{Id: common.NodeID{1}, Weight: 1},
-					{Id: common.NodeID{2}, Weight: 1},
-					{Id: common.NodeID{3}, Weight: 1},
-					{Id: common.NodeID{4}, Weight: 1},
-					{Id: common.NodeID{5}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{1}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{2}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{3}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{4}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{5}}, Weight: 1},
 				}
 
 				b3 := tc.appendSealing(epoch3Nodes)
@@ -382,11 +383,11 @@ func TestHandleMessages(t *testing.T) {
 			setup: func(t *testing.T) (*testChain, []*messageInfo) {
 				tc := newSeededChain(t, testNodes, 2)
 				epoch3Nodes := common.Nodes{
-					{Id: common.NodeID{1}, Weight: 1},
-					{Id: common.NodeID{2}, Weight: 1},
-					{Id: common.NodeID{3}, Weight: 1},
-					{Id: common.NodeID{4}, Weight: 1},
-					{Id: common.NodeID{5}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{1}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{2}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{3}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{4}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{5}}, Weight: 1},
 				}
 
 				b3 := tc.appendSealing(epoch3Nodes)
@@ -409,11 +410,11 @@ func TestHandleMessages(t *testing.T) {
 			setup: func(t *testing.T) (*testChain, []*messageInfo) {
 				tc := newSeededChain(t, testNodes, 2)
 				epoch3Nodes := common.Nodes{
-					{Id: common.NodeID{1}, Weight: 1},
-					{Id: common.NodeID{2}, Weight: 1},
-					{Id: common.NodeID{3}, Weight: 1},
-					{Id: common.NodeID{4}, Weight: 1},
-					{Id: common.NodeID{5}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{1}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{2}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{3}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{4}}, Weight: 1},
+					{Id: common.NodeID{ShortID: ids.ShortID{5}}, Weight: 1},
 				}
 
 				b3 := tc.appendSealing(epoch3Nodes)
@@ -476,11 +477,11 @@ func TestNonValidatorDropsTelockQuorumRound(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tc := newSeededChain(t, testNodes, 2)
 			epoch3Nodes := common.Nodes{
-				{Id: common.NodeID{1}, Weight: 1},
-				{Id: common.NodeID{2}, Weight: 1},
-				{Id: common.NodeID{3}, Weight: 1},
-				{Id: common.NodeID{4}, Weight: 1},
-				{Id: common.NodeID{5}, Weight: 1},
+				{Id: common.NodeID{ShortID: ids.ShortID{1}}, Weight: 1},
+				{Id: common.NodeID{ShortID: ids.ShortID{2}}, Weight: 1},
+				{Id: common.NodeID{ShortID: ids.ShortID{3}}, Weight: 1},
+				{Id: common.NodeID{ShortID: ids.ShortID{4}}, Weight: 1},
+				{Id: common.NodeID{ShortID: ids.ShortID{5}}, Weight: 1},
 			}
 
 			b3 := tc.appendSealing(epoch3Nodes)
@@ -589,9 +590,9 @@ func TestHandleMessages_DuplicateBlock(t *testing.T) {
 // an indexed sealing block opens the highest known epoch and our ID is in its new
 // validator set.
 func TestNonValidator_CallsTransition(t *testing.T) {
-	newValidatorID := common.NodeID{5}
+	newValidatorID := common.NodeID{ShortID: ids.ShortID{5}}
 	joinedSet := append(slices.Clone(testNodes), common.Node{Id: newValidatorID, Weight: 1})
-	otherSet := append(slices.Clone(testNodes), common.Node{Id: common.NodeID{6}, Weight: 1})
+	otherSet := append(slices.Clone(testNodes), common.Node{Id: common.NodeID{ShortID: ids.ShortID{6}}, Weight: 1})
 
 	// transitionCall records one TransitionToValidator invocation.
 	type transitionCall struct {
@@ -746,7 +747,7 @@ func TestNonValidator_RequestHighestEpochOnStart(t *testing.T) {
 	tc := newSeededChain(t, testNodes, 2)
 	tc.indexEpochs(4, 8)
 
-	myNodeID := common.NodeID{100}
+	myNodeID := common.NodeID{ShortID: ids.ShortID{100}}
 	comm := &routerComm{
 		messageQueue: &messageQueue{},
 		ID:           myNodeID,
@@ -857,7 +858,7 @@ func TestNonValidator_EpochReplication(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tc := tt.setup(t)
-			myNodeID := common.NodeID{16}
+			myNodeID := common.NodeID{ShortID: ids.ShortID{16}}
 			msgQueue := &messageQueue{}
 			nonValidatorComm := &routerComm{
 				nodes:        tc.nodes(),
@@ -901,7 +902,7 @@ func TestNonValidator_ReplicationRequests(t *testing.T) {
 	initialHeight := uint64(2)
 	tc.indexEpochs(5, 10, 20, 30, lastSeq)
 	maxSeqWindow := uint64(50)
-	myNodeID := common.NodeID{255}
+	myNodeID := common.NodeID{ShortID: ids.ShortID{255}}
 	msgQueue := &messageQueue{}
 	nonValidatorComm := &routerComm{
 		nodes:        tc.nodes(),
@@ -984,11 +985,11 @@ func TestNonValidator_ReplicationRequests(t *testing.T) {
 func TestNonValidator_VerifiesFinalizationDuringReplication(t *testing.T) {
 	tc := newSeededChain(t, testNodes, 2)
 	epoch3Nodes := append(testNodes, common.Node{
-		Id:     common.NodeID{byte(10)},
+		Id:     common.NodeID{ShortID: ids.ShortID{byte(10)}},
 		Weight: 1,
 	})
 	epoch4Nodes := append(epoch3Nodes, common.Node{
-		Id:     common.NodeID{byte(11)},
+		Id:     common.NodeID{ShortID: ids.ShortID{byte(11)}},
 		Weight: 1,
 	})
 
@@ -1088,9 +1089,9 @@ func TestNonValidatorRejectsQuorumRoundFromNonValidator(t *testing.T) {
 	// It is completely disjoint from the real validator set, so a block
 	// finalized by it must never be committed by a correct non-validator.
 	attackerSet := common.Nodes{
-		{Id: common.NodeID{200}, Weight: 1},
-		{Id: common.NodeID{201}, Weight: 1},
-		{Id: common.NodeID{202}, Weight: 1},
+		{Id: common.NodeID{ShortID: ids.ShortID{200}}, Weight: 1},
+		{Id: common.NodeID{ShortID: ids.ShortID{201}}, Weight: 1},
+		{Id: common.NodeID{ShortID: ids.ShortID{202}}, Weight: 1},
 	}
 
 	makeZeroBlockQR := func(set common.Nodes) common.QuorumRound {
@@ -1117,7 +1118,7 @@ func TestNonValidatorRejectsQuorumRoundFromNonValidator(t *testing.T) {
 		{
 			name:         "forged epoch vouched for by non-validators",
 			epochSet:     attackerSet,
-			senders:      []common.NodeID{{100}, {101}, {102}},
+			senders:      []common.NodeID{{ShortID: ids.ShortID{100}}, {ShortID: ids.ShortID{101}}, {ShortID: ids.ShortID{102}}},
 			expectCommit: false,
 		},
 		{
@@ -1192,7 +1193,7 @@ func TestNonValidator_EpochReplicationGatesMessages(t *testing.T) {
 			Logger:                     testutil.MakeLogger(t, 1),
 			SignatureAggregatorCreator: tc.signatureAggregatorCreator,
 			MaxSequenceWindow:          simplex.DefaultMaxRoundWindow,
-			ID:                         common.NodeID{100},
+			ID:                         common.NodeID{ShortID: ids.ShortID{100}},
 		},
 	)
 	require.NoError(t, err)
@@ -1262,7 +1263,7 @@ func popRequestedSeqs(t *testing.T, msgQueue *messageQueue) []uint64 {
 func TestNonValidator_EpochReplicationWalksHashChain(t *testing.T) {
 	tc := newSeededChain(t, testNodes, 2)
 	tc.indexEpochs(5, 10, 20)
-	myNodeID := common.NodeID{100}
+	myNodeID := common.NodeID{ShortID: ids.ShortID{100}}
 	msgQueue := &messageQueue{}
 	nv, err := NewNonValidator(
 		Config{
@@ -1301,7 +1302,7 @@ func TestNonValidator_EpochReplicationWalksHashChain(t *testing.T) {
 func TestNonValidator_EpochReplicationIgnoresSealingBlockOffChain(t *testing.T) {
 	tc := newSeededChain(t, testNodes, 2)
 	tc.indexEpochs(5, 10, 20)
-	myNodeID := common.NodeID{100}
+	myNodeID := common.NodeID{ShortID: ids.ShortID{100}}
 	msgQueue := &messageQueue{}
 	nv, err := NewNonValidator(
 		Config{
@@ -1340,7 +1341,7 @@ func TestNonValidator_EpochReplicationIgnoresSealingBlockOffChain(t *testing.T) 
 func TestNonValidator_EpochReplicationRetriesSealingBlock(t *testing.T) {
 	tc := newSeededChain(t, testNodes, 2)
 	tc.indexEpochs(5, 10, 20)
-	myNodeID := common.NodeID{100}
+	myNodeID := common.NodeID{ShortID: ids.ShortID{100}}
 	msgQueue := &messageQueue{}
 	nv, err := NewNonValidator(
 		Config{
@@ -1374,7 +1375,7 @@ func TestNonValidator_EpochReplicationRetriesSealingBlock(t *testing.T) {
 // opened its epoch.
 func TestNonValidator_EpochReplicationRequestsSealingBlock(t *testing.T) {
 	tc := newSeededChain(t, testNodes, 2)
-	myNodeID := common.NodeID{100}
+	myNodeID := common.NodeID{ShortID: ids.ShortID{100}}
 	msgQueue := &messageQueue{}
 	nv, err := NewNonValidator(
 		Config{
@@ -1433,7 +1434,7 @@ func TestNonValidator_EpochReplicationLatestKnownEpoch(t *testing.T) {
 			Logger:                     testutil.MakeLogger(t, 1),
 			SignatureAggregatorCreator: tc.signatureAggregatorCreator,
 			MaxSequenceWindow:          simplex.DefaultMaxRoundWindow,
-			ID:                         common.NodeID{100},
+			ID:                         common.NodeID{ShortID: ids.ShortID{100}},
 		},
 	)
 	require.NoError(t, err)
@@ -1475,7 +1476,7 @@ func TestNonValidator_EpochThenSequenceReplication(t *testing.T) {
 	blockSeq11 := tc.appendBlock()
 	require.NoError(t, tc.Index(context.Background(), blockSeq11, tc.newFinalization(blockSeq11)))
 
-	myNodeID := common.NodeID{100}
+	myNodeID := common.NodeID{ShortID: ids.ShortID{100}}
 	msgQueue := &messageQueue{}
 	storage := tc.CloneUntil(2)
 	nv, err := NewNonValidator(
@@ -1579,10 +1580,10 @@ func TestNilBlockPanicMissingBlock(t *testing.T) {
 // from the leader of that round" and the non-validator silently degrades to replication only.
 func TestNonValidatorAcceptsProposalFromUnsortedValidatorSet(t *testing.T) {
 	unsortedNodes := common.Nodes{
-		{Id: common.NodeID{4}, Weight: 1},
-		{Id: common.NodeID{2}, Weight: 1},
-		{Id: common.NodeID{3}, Weight: 1},
-		{Id: common.NodeID{1}, Weight: 1},
+		{Id: common.NodeID{ShortID: ids.ShortID{4}}, Weight: 1},
+		{Id: common.NodeID{ShortID: ids.ShortID{2}}, Weight: 1},
+		{Id: common.NodeID{ShortID: ids.ShortID{3}}, Weight: 1},
+		{Id: common.NodeID{ShortID: ids.ShortID{1}}, Weight: 1},
 	}
 
 	// The order the validators run with, and therefore the leader the network actually elects.
@@ -1598,7 +1599,7 @@ func TestNonValidatorAcceptsProposalFromUnsortedValidatorSet(t *testing.T) {
 			Logger:                     testutil.MakeLogger(t, 1),
 			SignatureAggregatorCreator: tc.signatureAggregatorCreator,
 			MaxSequenceWindow:          simplex.DefaultMaxRoundWindow,
-			ID:                         common.NodeID{100},
+			ID:                         common.NodeID{ShortID: ids.ShortID{100}},
 			EpochsReplicated:           true,
 		},
 	)
@@ -1639,7 +1640,7 @@ func TestNonValidatorRejectsQuorumRoundWithMismatchedHeader(t *testing.T) {
 			SignatureAggregatorCreator: tc.signatureAggregatorCreator,
 			EpochsReplicated:           true,
 			MaxSequenceWindow:          10,
-			ID:                         common.NodeID{16},
+			ID:                         common.NodeID{ShortID: ids.ShortID{16}},
 			StartTime:                  time.Now(),
 		},
 	)
@@ -1693,7 +1694,7 @@ func TestNonValidatorDropsQuorumRoundPastSequenceWindow(t *testing.T) {
 			Logger:                     testutil.MakeLogger(t, 1),
 			SignatureAggregatorCreator: tc.signatureAggregatorCreator,
 			MaxSequenceWindow:          maxSequenceWindow,
-			ID:                         common.NodeID{16},
+			ID:                         common.NodeID{ShortID: ids.ShortID{16}},
 			StartTime:                  time.Now(),
 			EpochsReplicated:           true,
 		},
@@ -1751,7 +1752,7 @@ func TestNonValidatorIgnoresReplayedQuorumRoundWhileVerifying(t *testing.T) {
 			Logger:                     testutil.MakeLogger(t, 1),
 			SignatureAggregatorCreator: tc.signatureAggregatorCreator,
 			MaxSequenceWindow:          5,
-			ID:                         common.NodeID{16},
+			ID:                         common.NodeID{ShortID: ids.ShortID{16}},
 			StartTime:                  time.Now(),
 		},
 	)
@@ -1765,7 +1766,7 @@ func TestNonValidatorIgnoresReplayedQuorumRoundWhileVerifying(t *testing.T) {
 			&common.Message{ReplicationResponse: &common.ReplicationResponse{
 				Data: []common.QuorumRound{{Block: tb, Finalization: &finalization}},
 			}},
-			common.NodeID{42},
+			common.NodeID{ShortID: ids.ShortID{42}},
 		))
 	}
 	close(release)
@@ -1779,7 +1780,7 @@ func TestNonValidatorIgnoresReplayedQuorumRoundWhileVerifying(t *testing.T) {
 func TestNonValidatorServesReplicationRequest(t *testing.T) {
 	tc := newSeededChain(t, testNodes, 5)
 	msgQueue := &messageQueue{}
-	nvID := common.NodeID{100}
+	nvID := common.NodeID{ShortID: ids.ShortID{100}}
 
 	nv, err := NewNonValidator(
 		Config{
@@ -1829,7 +1830,7 @@ func TestNonValidatorRoutesReplicationRequestsToValidators(t *testing.T) {
 	tc := newSeededChain(t, testNodes, 1)
 	tc.indexEpochs(5, 10)
 
-	myNodeID := common.NodeID{100}
+	myNodeID := common.NodeID{ShortID: ids.ShortID{100}}
 	msgQueue := &messageQueue{}
 	nv, err := NewNonValidator(
 		Config{
@@ -1853,14 +1854,14 @@ func TestNonValidatorRoutesReplicationRequestsToValidators(t *testing.T) {
 
 	// The Byzantine validator builds its response from the genuine sealing block 10, but swaps the finalization's QC
 	// for one signed only by a node that doesn't exist.
-	nonExistentNode := common.NodeID{99}
+	nonExistentNode := common.NodeID{ShortID: ids.ShortID{99}}
 	require.False(t, validators.Contains(nonExistentNode))
 
 	sealingBlock10, genuineFinalization, err := tc.Retrieve(10)
 	require.NoError(t, err)
 	forgedFinalization := common.Finalization{
 		Finalization: genuineFinalization.Finalization, // the header matches the block, so it passes the header check
-		QC:           testutil.TestQC{{Signer: nonExistentNode, Value: []byte("forged")}},
+		QC:           testutil.TestQC{Signatures: []testutil.Signature{{Signer: testutil.NewNodeID(nonExistentNode), Value: []byte("forged")}}},
 	}
 	forgedResponse := &common.Message{ReplicationResponse: &common.ReplicationResponse{
 		Data: []common.QuorumRound{{Block: sealingBlock10.(common.Block), Finalization: &forgedFinalization}},
@@ -1898,15 +1899,15 @@ func TestNonValidatorRoutesReplicationRequestsToValidators(t *testing.T) {
 // nor index the blocks the forged validator set finalizes.
 func TestNonValidatorRejectsEpochForgedByLowStakeValidators(t *testing.T) {
 	honest := common.Nodes{
-		{Id: common.NodeID{1}, Weight: 100},
-		{Id: common.NodeID{2}, Weight: 100},
-		{Id: common.NodeID{3}, Weight: 100},
-		{Id: common.NodeID{4}, Weight: 100},
+		{Id: common.NodeID{ShortID: ids.ShortID{1}}, Weight: 100},
+		{Id: common.NodeID{ShortID: ids.ShortID{2}}, Weight: 100},
+		{Id: common.NodeID{ShortID: ids.ShortID{3}}, Weight: 100},
+		{Id: common.NodeID{ShortID: ids.ShortID{4}}, Weight: 100},
 	}
 	attackers := common.Nodes{
-		{Id: common.NodeID{5}, Weight: 1},
-		{Id: common.NodeID{6}, Weight: 1},
-		{Id: common.NodeID{7}, Weight: 1},
+		{Id: common.NodeID{ShortID: ids.ShortID{5}}, Weight: 1},
+		{Id: common.NodeID{ShortID: ids.ShortID{6}}, Weight: 1},
+		{Id: common.NodeID{ShortID: ids.ShortID{7}}, Weight: 1},
 	}
 	validators := append(slices.Clone(honest), attackers...)
 	require.Len(t, attackers, common.F(len(validators))+1)
@@ -1915,7 +1916,7 @@ func TestNonValidatorRejectsEpochForgedByLowStakeValidators(t *testing.T) {
 	tc := newSeededChain(t, validators, 2)
 	storage := tc.InMemStorage
 
-	nvID := common.NodeID{100}
+	nvID := common.NodeID{ShortID: ids.ShortID{100}}
 	nv, err := NewNonValidator(
 		Config{
 			Storage:                    storage,

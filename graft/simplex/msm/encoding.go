@@ -7,8 +7,9 @@ import (
 	"bytes"
 	"slices"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 //go:generate go run github.com/StephenButtolph/canoto/canoto encoding.go
@@ -194,16 +195,16 @@ func (smm *StateMachineMetadata) NextState() state {
 }
 
 type NodeBLSMapping struct {
-	NodeID avalanchego.NodeID `canoto:"fixed bytes,1"`
-	BLSKey []byte             `canoto:"bytes,2"`
-	Weight uint64             `canoto:"uint,3"`
+	NodeID NodeID `canoto:"value,1"`
+	BLSKey []byte `canoto:"bytes,2"`
+	Weight uint64 `canoto:"uint,3"`
 
 	canotoData canotoData_NodeBLSMapping
 }
 
 func (nbm *NodeBLSMapping) Clone() NodeBLSMapping {
 	var cloned NodeBLSMapping
-	copy(cloned.NodeID[:], nbm.NodeID[:])
+	cloned.NodeID = nbm.NodeID.Clone()
 	cloned.BLSKey = make([]byte, len(nbm.BLSKey))
 	copy(cloned.BLSKey, nbm.BLSKey)
 	cloned.Weight = nbm.Weight
@@ -211,7 +212,7 @@ func (nbm *NodeBLSMapping) Clone() NodeBLSMapping {
 }
 
 func (nbm *NodeBLSMapping) Equals(other *NodeBLSMapping) bool {
-	if !slices.Equal(nbm.NodeID[:], other.NodeID[:]) {
+	if !nbm.NodeID.Equals(other.NodeID) {
 		return false
 	}
 	if !slices.Equal(nbm.BLSKey, other.BLSKey) {
@@ -316,7 +317,7 @@ func (nbms NodeBLSMappings) Nodes() common.Nodes {
 	for i := range nbms {
 		nbm := &nbms[i]
 		nodeWeights[i] = common.Node{
-			Id:     nbm.NodeID[:],
+			Id:     nbm.NodeID.ToNodeID(),
 			Weight: nbm.Weight,
 			PK:     nbm.BLSKey[:],
 		}
@@ -328,28 +329,28 @@ func (nbms NodeBLSMappings) Nodes() common.Nodes {
 func (nbms NodeBLSMappings) NodeIDs() []common.NodeID {
 	nodeIDs := make([]common.NodeID, len(nbms))
 	for i := range nbms {
-		nodeIDs[i] = nbms[i].NodeID[:]
+		nodeIDs[i] = nbms[i].NodeID.ToNodeID()
 	}
 	return nodeIDs
 }
 
 // IndexByNodeID returns a mapping from NodeID to the validator's index in the set,
 // which is the position used by approval bitmasks.
-func (nbms NodeBLSMappings) IndexByNodeID() map[avalanchego.NodeID]int {
-	result := make(map[avalanchego.NodeID]int, len(nbms))
+func (nbms NodeBLSMappings) IndexByNodeID() map[common.NodeID]int {
+	result := make(map[common.NodeID]int, len(nbms))
 	for i := range nbms {
-		result[nbms[i].NodeID] = i
+		result[nbms[i].NodeID.ToNodeID()] = i
 	}
 	return result
 }
 
-func (nbms NodeBLSMappings) SelectSubset(bitmask avalanchego.Bitmask) []common.NodeID {
+func (nbms NodeBLSMappings) SelectSubset(bitmask set.Bits) []common.NodeID {
 	nodeIDs := make([]common.NodeID, 0, len(nbms))
 	for i := range nbms {
 		if !bitmask.Contains(i) {
 			continue
 		}
-		nodeIDs = append(nodeIDs, nbms[i].NodeID[:])
+		nodeIDs = append(nodeIDs, nbms[i].NodeID.ToNodeID())
 	}
 
 	return nodeIDs
@@ -372,11 +373,11 @@ func (nbms NodeBLSMappings) Equal(other NodeBLSMappings) bool {
 	otherClone := other.Clone()
 
 	slices.SortFunc(nbmsClone, func(a, b NodeBLSMapping) int {
-		return slices.Compare(a.NodeID[:], b.NodeID[:])
+		return a.NodeID.Compare(b.NodeID)
 	})
 
 	slices.SortFunc(otherClone, func(a, b NodeBLSMapping) int {
-		return slices.Compare(a.NodeID[:], b.NodeID[:])
+		return a.NodeID.Compare(b.NodeID)
 	})
 
 	for i := range nbmsClone {
@@ -400,7 +401,7 @@ func (vsa ValidatorSetApprovals) Filter(f func(common.ValidatorSetApproval, comm
 }
 
 func (vsa ValidatorSetApprovals) UniqueByNodeID() ValidatorSetApprovals {
-	seen := make(map[avalanchego.NodeID]struct{})
+	seen := make(map[common.NodeID]struct{})
 	result := make(ValidatorSetApprovals, 0, len(vsa))
 	for _, v := range vsa {
 		if _, exists := seen[v.NodeID]; !exists {
@@ -460,4 +461,46 @@ func (ai *AuxiliaryInfoBatch) Equal(a *AuxiliaryInfoBatch) bool {
 		}
 	}
 	return true
+}
+
+type NodeID struct {
+	ShortID ids.ShortID `canoto:"fixed bytes,1"`
+	LongID  [32]byte    `canoto:"fixed bytes,2"`
+
+	canotoData canotoData_NodeID
+}
+
+// NewNodeID converts a [common.NodeID] to its serializable form.
+func NewNodeID(nodeID common.NodeID) NodeID {
+	return NodeID{
+		ShortID: nodeID.ShortID,
+		LongID:  nodeID.LongID,
+	}
+}
+
+// ToNodeID converts the serializable form back to a [common.NodeID].
+func (nodeID NodeID) ToNodeID() common.NodeID {
+	return common.NodeID{
+		ShortID: nodeID.ShortID,
+		LongID:  nodeID.LongID,
+	}
+}
+
+// Equals returns whether both IDs hold the same ShortID and LongID.
+// It must be used instead of == because == also compares the cached serialization data.
+func (nodeID NodeID) Equals(other NodeID) bool {
+	return nodeID.ShortID == other.ShortID && nodeID.LongID == other.LongID
+}
+
+// Compare orders by LongID first and then by ShortID, like [common.NodeID.Compare].
+func (nodeID NodeID) Compare(other NodeID) int {
+	return nodeID.ToNodeID().Compare(other.ToNodeID())
+}
+
+// Clone returns a copy of the NodeID without the cached serialization data.
+func (nodeID NodeID) Clone() NodeID {
+	return NodeID{
+		ShortID: nodeID.ShortID,
+		LongID:  nodeID.LongID,
+	}
 }

@@ -32,6 +32,7 @@ graft_go_test(
         "//graft/simplex/common",
         "//graft/simplex/simplex",
         "//graft/simplex/testutil",
+        "//ids",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_goleak//:goleak",
     ],

@@ -49,7 +49,7 @@ type canotoQC struct {
 func (qc *QC) Signers() []common.NodeID {
 	signers := make([]common.NodeID, len(qc.signers))
 	for i, signer := range qc.signers {
-		signers[i] = signer[:]
+		signers[i] = common.NodeIDFromAvalancheID(signer)
 	}
 
 	return signers
@@ -177,7 +177,7 @@ func (a *SignatureAggregator) Aggregate(signatures []common.Signature) (common.Q
 	sigs := make([]*bls.Signature, 0, quorumSize)
 	for _, signature := range signatures {
 		signer := signature.Signer
-		id, err := ids.ToNodeID(signer)
+		id, err := signer.ToAvalancheID()
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", errInvalidNodeID, err)
 		}
@@ -224,7 +224,10 @@ func (*SignatureAggregator) AppendSignatures(common.SignatureBytes, ...common.Si
 func (a *SignatureAggregator) IsQuorum(nodes []common.NodeID) bool {
 	uniqueNodes := set.NewSet[ids.NodeID](len(nodes))
 	for _, node := range nodes {
-		nodeID := ids.NodeID(node)
+		nodeID, err := node.ToAvalancheID()
+		if err != nil {
+			return false
+		}
 		if _, exists := a.verifier.nodeID2PK[nodeID]; !exists {
 			return false
 		}

@@ -4,7 +4,6 @@
 package testutil
 
 import (
-	"bytes"
 	"sync"
 	"testing"
 	"time"
@@ -18,7 +17,7 @@ type BasicInMemoryNetwork struct {
 	nodes        []common.NodeID
 	nodeWeights  common.Nodes
 	lock         sync.RWMutex
-	disconnected map[string]struct{}
+	disconnected map[common.NodeID]struct{}
 	instances    []*BasicNode
 }
 
@@ -29,7 +28,7 @@ func NewBasicInMemoryNetwork(t *testing.T, nodes common.NodeIDs) *BasicInMemoryN
 		t:            t,
 		nodeWeights:  nodeWeights,
 		nodes:        nodes,
-		disconnected: make(map[string]struct{}),
+		disconnected: make(map[common.NodeID]struct{}),
 		instances:    make([]*BasicNode, 0),
 	}
 }
@@ -72,7 +71,7 @@ func (b *BasicInMemoryNetwork) IsDisconnected(node common.NodeID) bool {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 
-	_, ok := b.disconnected[string(node)]
+	_, ok := b.disconnected[node]
 	return ok
 }
 
@@ -80,14 +79,14 @@ func (b *BasicInMemoryNetwork) Connect(node common.NodeID) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	delete(b.disconnected, string(node))
+	delete(b.disconnected, node)
 }
 
 func (b *BasicInMemoryNetwork) Disconnect(node common.NodeID) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	b.disconnected[string(node)] = struct{}{}
+	b.disconnected[node] = struct{}{}
 }
 
 func (b *BasicInMemoryNetwork) AdvanceTime(increment time.Duration) {
@@ -134,7 +133,7 @@ func (b *BasicInMemoryNetwork) ReplaceNode(node *BasicNode) {
 	defer b.lock.Unlock()
 
 	for i, instance := range b.instances {
-		if bytes.Equal(instance.E.ID, node.E.ID) {
+		if instance.E.ID == node.E.ID {
 			// Replace the instance in the slice
 			b.instances[i] = node
 			return
@@ -148,7 +147,7 @@ func (b *BasicInMemoryNetwork) AddNode(node *BasicNode) {
 
 	allowed := false
 	for _, nodeWeight := range b.nodeWeights {
-		if bytes.Equal(nodeWeight.Id, node.E.ID) {
+		if nodeWeight.Id == node.E.ID {
 			allowed = true
 			break
 		}

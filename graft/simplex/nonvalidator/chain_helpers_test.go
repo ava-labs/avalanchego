@@ -10,14 +10,15 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
 )
 
 var testNodes = common.Nodes{
-	{Id: common.NodeID{1}, Weight: 1},
-	{Id: common.NodeID{2}, Weight: 1},
-	{Id: common.NodeID{3}, Weight: 1},
-	{Id: common.NodeID{4}, Weight: 1},
+	{Id: common.NodeID{ShortID: ids.ShortID{1}}, Weight: 1},
+	{Id: common.NodeID{ShortID: ids.ShortID{2}}, Weight: 1},
+	{Id: common.NodeID{ShortID: ids.ShortID{3}}, Weight: 1},
+	{Id: common.NodeID{ShortID: ids.ShortID{4}}, Weight: 1},
 }
 
 var genesis = testutil.NewTestBlock(common.ProtocolMetadata{
@@ -202,16 +203,16 @@ func countSignatureAggregatorCreator(nodes []common.Node) common.SignatureAggreg
 // weightedSignatureAggregatorCreator creates a SignatureAggregator whose quorum is more than two thirds of the stake,
 // and whose Byzantine threshold is exceeded by more than a third of the stake.
 func weightedSignatureAggregatorCreator(nodes []common.Node) common.SignatureAggregator {
-	weights := make(map[string]uint64, len(nodes))
+	weights := make(map[common.NodeID]uint64, len(nodes))
 	var totalWeight uint64
 	for _, node := range nodes {
-		weights[string(node.Id)] = node.Weight
+		weights[node.Id] = node.Weight
 		totalWeight += node.Weight
 	}
 	signersWeight := func(signers []common.NodeID) uint64 {
 		var weight uint64
 		for _, signer := range signers {
-			weight += weights[string(signer)]
+			weight += weights[signer]
 		}
 		return weight
 	}
@@ -241,7 +242,7 @@ func (tc *testChain) indexEpochs(epochs ...uint64) {
 		require.True(tc.t, ok)
 
 		newNodes := append(validatorSet, common.Node{
-			Id:     common.NodeID{byte(epoch)},
+			Id:     common.NodeID{ShortID: ids.ShortID{byte(epoch)}},
 			Weight: 1,
 		})
 		sealing := tc.appendSealing(newNodes)

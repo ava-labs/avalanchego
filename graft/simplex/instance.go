@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
 	"github.com/ava-labs/avalanchego/graft/simplex/nonvalidator"
@@ -30,7 +29,7 @@ const (
 type Config struct {
 	// LastNonSimplexInnerBlock is the last non-simplex inner block that was persisted to storage.
 	// This is used to determine the current epoch and validator set.
-	LastNonSimplexInnerBlock avalanchego.VMBlock
+	LastNonSimplexInnerBlock common.VMBlock
 	// ParameterConfig is the configuration for the simplex instance.
 	ParameterConfig ParameterConfig
 	// PlatformChain is the interface to the P-chain.
@@ -84,7 +83,7 @@ func NewInstance(config Config) *Instance {
 	transitionListener := newEpochTransitionListener(
 		config.Logger,
 		config.Sender,
-		avalanchego.NodeID(config.ID),
+		config.ID,
 		config.PlatformChain.GetValidatorSet,
 		cs.RetrieveBlock,
 		config.CryptoOps,
@@ -420,12 +419,12 @@ func (i *Instance) handleMessageForEpoch(msg *common.Message, from common.NodeID
 				zap.Stringer("From", from))
 			return nil
 		}
-		i.msm.HandleAuxiliaryInfo(*msg.AuxiliaryInfo, avalanchego.NodeID(from))
+		i.msm.HandleAuxiliaryInfo(*msg.AuxiliaryInfo, from)
 	case msg.EpochTransitionApproval != nil:
-		if !from.Equals(msg.EpochTransitionApproval.NodeID[:]) {
+		if !from.Equals(msg.EpochTransitionApproval.NodeID) {
 			i.Config.Logger.Debug("Dropping approval not sent by its signer",
 				zap.Stringer("from", from),
-				zap.Stringer("signer", common.NodeID(msg.EpochTransitionApproval.NodeID[:])))
+				zap.Stringer("signer", msg.EpochTransitionApproval.NodeID))
 			return nil
 		}
 		i.msm.HandleApproval(msg.EpochTransitionApproval)

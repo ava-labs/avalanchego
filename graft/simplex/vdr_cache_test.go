@@ -9,8 +9,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,7 +33,7 @@ func (c *fetchCountingChain) GetValidatorSet(height uint64) (metadata.NodeBLSMap
 }
 
 func validatorSetForHeight(height uint64) metadata.NodeBLSMappings {
-	return metadata.NodeBLSMappings{{NodeID: avalanchego.NodeID{byte(height)}, BLSKey: []byte{byte(height)}, Weight: height}}
+	return metadata.NodeBLSMappings{{NodeID: metadata.NewNodeID(common.NodeID{ShortID: ids.ShortID{byte(height)}}), BLSKey: []byte{byte(height)}, Weight: height}}
 }
 
 func newTestValidatorCache() (*ValidatorCache, *fetchCountingChain) {
@@ -85,7 +86,7 @@ func TestValidatorCacheReturnedSliceIsIsolated(t *testing.T) {
 		set, err := vc.GetValidatorSet(4)
 		require.NoError(t, err)
 		set[0].Weight = 12345
-		set[0].NodeID = avalanchego.NodeID{0xFF}
+		set[0].NodeID = metadata.NewNodeID(common.NodeID{ShortID: ids.ShortID{0xFF}})
 
 		again, err := vc.GetValidatorSet(4)
 		require.NoError(t, err)

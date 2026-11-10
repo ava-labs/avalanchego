@@ -16,8 +16,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"go.uber.org/zap"
 )
 
@@ -41,12 +41,12 @@ const (
 	maxItemCountPerRequest                = 10 // max number of rounds or sequences that fit in one replication request
 	// DefaultMaxReplicationResponseSize is the max size of a replication response. avalanchego rejects messages larger
 	// than 2 MiB. we cap at 80% (4/5) same as avalanchego (see utils/constants/networking.go)
-	DefaultMaxReplicationResponseSize = avalanchego.MaxContainersLen
+	DefaultMaxReplicationResponseSize = int(4 * constants.DefaultMaxMessageSize / 5)
 )
 
 type EmptyVoteSet struct {
 	timedOut          bool
-	votes             map[string]*common.EmptyVote
+	votes             map[common.NodeID]*common.EmptyVote
 	emptyNotarization *common.EmptyNotarization
 	persisted         bool
 }
@@ -54,9 +54,9 @@ type EmptyVoteSet struct {
 type Round struct {
 	num           uint64
 	block         common.VerifiedBlock
-	votes         map[string]*common.Vote // NodeID --> vote
+	votes         map[common.NodeID]*common.Vote // NodeID --> vote
 	notarization  *common.Notarization
-	finalizeVotes map[string]*common.FinalizeVote // NodeID --> vote
+	finalizeVotes map[common.NodeID]*common.FinalizeVote // NodeID --> vote
 	finalization  *common.Finalization
 }
 
@@ -64,8 +64,8 @@ func NewRound(block common.VerifiedBlock) *Round {
 	return &Round{
 		num:           block.BlockHeader().Round,
 		block:         block,
-		votes:         make(map[string]*common.Vote),
-		finalizeVotes: make(map[string]*common.FinalizeVote),
+		votes:         make(map[common.NodeID]*common.Vote),
+		finalizeVotes: make(map[common.NodeID]*common.FinalizeVote),
 	}
 }
 
@@ -112,7 +112,7 @@ type Epoch struct {
 	validatorNodeIDs               common.NodeIDs
 	validators                     common.Nodes
 	totalWeight                    uint64
-	validatorsToPKs                map[string][]byte
+	validatorsToPKs                map[common.NodeID][]byte
 	rounds                         map[uint64]*Round
 	emptyVotes                     map[uint64]*EmptyVoteSet
 	blockDigestsVotedFor           map[uint64]common.Digest
@@ -171,7 +171,7 @@ func (e *Epoch) HandleMessage(msg *common.Message, from common.NodeID) error {
 		return nil
 	}
 
-	_, known := e.validatorsToPKs[string(from)]
+	_, known := e.validatorsToPKs[from]
 	if !known {
 		e.Logger.Debug("Received message from a non-validator node", zap.Stringer("nodeID", from))
 		switch {
@@ -244,12 +244,12 @@ func (e *Epoch) init() error {
 	e.timeoutHandler = common.NewTimeoutHandler(e.Logger, "emptyVoteRebroadcast", e.StartTime, e.MaxRebroadcastWait, e.emptyVoteTimeoutTaskRunner)
 	e.signatureAggregator = e.SignatureAggregatorCreator(e.validators)
 	e.blockDigestsVotedFor = make(map[uint64]common.Digest)
-	e.validatorsToPKs = make(map[string][]byte, len(e.validatorNodeIDs))
+	e.validatorsToPKs = make(map[common.NodeID][]byte, len(e.validatorNodeIDs))
 	for _, node := range e.validators {
-		e.validatorsToPKs[string(node.Id)] = node.PK
+		e.validatorsToPKs[node.Id] = node.PK
 	}
 	for _, node := range e.validatorNodeIDs {
-		e.futureMessages[string(node)] = make(map[uint64]*messagesForRound)
+		e.futureMessages[node] = make(map[uint64]*messagesForRound)
 	}
 	e.blockBuilder = &EmptyBlockBuilder{
 		ShouldBuildEmptyBlock: e.shouldBuildEmptyBlock,
@@ -529,7 +529,7 @@ func (e *Epoch) loadEmptyVoteRecord(r []byte) error {
 		Vote: vote,
 	}
 
-	emptyVotes.votes[string(e.ID)] = emptyVote
+	emptyVotes.votes[e.ID] = emptyVote
 
 	return nil
 }
@@ -640,7 +640,7 @@ func (e *Epoch) resumeFromWal(highestRoundRecord *walRound) error {
 		if !exists {
 			return fmt.Errorf("round %d not found for empty vote", ev.Round)
 		}
-		emptyVote, exists := round.votes[string(e.ID)]
+		emptyVote, exists := round.votes[e.ID]
 		if !exists {
 			return fmt.Errorf("could not find my own vote for round %d", ev.Round)
 		}
@@ -965,17 +965,17 @@ func (e *Epoch) handleFinalizeVoteMessage(message *common.FinalizeVote, from com
 		return nil
 	}
 
-	round.finalizeVotes[string(from)] = message
+	round.finalizeVotes[from] = message
 	e.deleteFutureFinalizeVote(from, vote.Round)
 
 	return e.maybeCollectFinalization(round)
 }
 
 func (e *Epoch) storeFutureFinalizeVote(message *common.FinalizeVote, from common.NodeID, round uint64) {
-	msgsForRound, exists := e.futureMessages[string(from)][round]
+	msgsForRound, exists := e.futureMessages[from][round]
 	if !exists {
 		msgsForRound = &messagesForRound{}
-		e.futureMessages[string(from)][round] = msgsForRound
+		e.futureMessages[from][round] = msgsForRound
 	}
 
 	// A node only gets to finalize vote once per round.
@@ -989,10 +989,10 @@ func (e *Epoch) storeFutureFinalizeVote(message *common.FinalizeVote, from commo
 }
 
 func (e *Epoch) storeFutureNotarization(message *common.Notarization, from common.NodeID, round uint64) {
-	msgsForRound, exists := e.futureMessages[string(from)][round]
+	msgsForRound, exists := e.futureMessages[from][round]
 	if !exists {
 		msgsForRound = &messagesForRound{}
-		e.futureMessages[string(from)][round] = msgsForRound
+		e.futureMessages[from][round] = msgsForRound
 	}
 	msgsForRound.notarization = message
 }
@@ -1033,7 +1033,7 @@ func (e *Epoch) handleEmptyVoteMessage(message *common.EmptyVote, from common.No
 
 	signature := message.Signature
 
-	pk, exists := e.validatorsToPKs[string(signature.Signer)]
+	pk, exists := e.validatorsToPKs[signature.Signer]
 	if !exists {
 		e.Logger.Debug("Received a finalization from an unknown node", zap.Stringer("NodeID", from))
 		return nil
@@ -1048,7 +1048,7 @@ func (e *Epoch) handleEmptyVoteMessage(message *common.EmptyVote, from common.No
 
 	emptyVotes := e.getOrCreateEmptyVoteSetForRound(round)
 
-	emptyVotes.votes[string(from)] = message
+	emptyVotes.votes[from] = message
 
 	// Future empty votes are replayed by maybeLoadFutureMessages once we reach their round.
 	if e.round < round {
@@ -1141,7 +1141,7 @@ func (e *Epoch) maybeSendNotarizationOrFinalization(to common.NodeID, round uint
 func (e *Epoch) getOrCreateEmptyVoteSetForRound(round uint64) *EmptyVoteSet {
 	emptyVotes, exists := e.emptyVotes[round]
 	if !exists {
-		emptyVotes = &EmptyVoteSet{votes: make(map[string]*common.EmptyVote)}
+		emptyVotes = &EmptyVoteSet{votes: make(map[common.NodeID]*common.EmptyVote)}
 		e.emptyVotes[round] = emptyVotes
 	}
 	return emptyVotes
@@ -1201,14 +1201,14 @@ func (e *Epoch) handleVoteMessage(message *common.Vote, from common.NodeID) erro
 
 	signature := message.Signature
 
-	pk, exists := e.validatorsToPKs[string(signature.Signer)]
+	pk, exists := e.validatorsToPKs[signature.Signer]
 	if !exists {
 		e.Logger.Debug("Received a finalization from an unknown node", zap.Stringer("NodeID", from))
 		return nil
 	}
 
 	// A node only gets to vote once per round. Keeping the origional vote
-	if _, exists := round.votes[string(signature.Signer)]; exists {
+	if _, exists := round.votes[signature.Signer]; exists {
 		e.Logger.Debug("Already received a vote from this node for the round",
 			zap.Stringer("NodeID", signature.Signer), zap.Uint64("round", vote.Round))
 		e.deleteFutureVote(from, vote.Round)
@@ -1220,7 +1220,7 @@ func (e *Epoch) handleVoteMessage(message *common.Vote, from common.NodeID) erro
 		return nil
 	}
 
-	e.rounds[vote.Round].votes[string(signature.Signer)] = message
+	e.rounds[vote.Round].votes[signature.Signer] = message
 	e.deleteFutureVote(from, vote.Round)
 
 	return e.maybeCollectNotarization()
@@ -1232,10 +1232,10 @@ func (e *Epoch) haveWeAlreadyTimedOutOnThisRound(round uint64) bool {
 }
 
 func (e *Epoch) storeFutureVote(message *common.Vote, from common.NodeID, round uint64) {
-	msgsForRound, exists := e.futureMessages[string(from)][round]
+	msgsForRound, exists := e.futureMessages[from][round]
 	if !exists {
 		msgsForRound = &messagesForRound{}
-		e.futureMessages[string(from)][round] = msgsForRound
+		e.futureMessages[from][round] = msgsForRound
 	}
 
 	if msgsForRound.vote != nil {
@@ -1248,7 +1248,7 @@ func (e *Epoch) storeFutureVote(message *common.Vote, from common.NodeID, round 
 }
 
 func (e *Epoch) deleteFutureVote(from common.NodeID, round uint64) {
-	msgsForRound, exists := e.futureMessages[string(from)][round]
+	msgsForRound, exists := e.futureMessages[from][round]
 	if !exists {
 		return
 	}
@@ -1256,7 +1256,7 @@ func (e *Epoch) deleteFutureVote(from common.NodeID, round uint64) {
 }
 
 func (e *Epoch) deleteFutureProposal(from common.NodeID, round uint64) {
-	msgsForRound, exists := e.futureMessages[string(from)][round]
+	msgsForRound, exists := e.futureMessages[from][round]
 	if !exists {
 		return
 	}
@@ -1265,7 +1265,7 @@ func (e *Epoch) deleteFutureProposal(from common.NodeID, round uint64) {
 }
 
 func (e *Epoch) deleteFutureFinalizeVote(from common.NodeID, round uint64) {
-	msgsForRound, exists := e.futureMessages[string(from)][round]
+	msgsForRound, exists := e.futureMessages[from][round]
 	if !exists {
 		return
 	}
@@ -1273,7 +1273,7 @@ func (e *Epoch) deleteFutureFinalizeVote(from common.NodeID, round uint64) {
 }
 
 func (e *Epoch) deleteFutureNotarization(from common.NodeID, round uint64) {
-	msgsForRound, exists := e.futureMessages[string(from)][round]
+	msgsForRound, exists := e.futureMessages[from][round]
 	if !exists {
 		return
 	}
@@ -1281,7 +1281,7 @@ func (e *Epoch) deleteFutureNotarization(from common.NodeID, round uint64) {
 }
 
 func (e *Epoch) isFinalizationVoteValid(signature common.Signature, finalization common.ToBeSignedFinalization, from common.NodeID) bool {
-	pk, exists := e.validatorsToPKs[string(signature.Signer)]
+	pk, exists := e.validatorsToPKs[signature.Signer]
 	if !exists {
 		e.Logger.Debug("Received a finalization from an unknown node", zap.Stringer("NodeID", from))
 		return false
@@ -1455,7 +1455,7 @@ func (e *Epoch) rebroadcastPastFinalizeVotes() error {
 
 		var finalizeVoteMessage *common.Message
 		// Try to re-use finalization we created if possible, else create it.
-		if vote, exists := round.finalizeVotes[string(e.ID)]; exists {
+		if vote, exists := round.finalizeVotes[e.ID]; exists {
 			finalizeVoteMessage = &common.Message{FinalizeVote: vote}
 		} else {
 			_, msg, err := e.maybeConstructFinalizeVoteMessage(round.notarization.Vote.BlockHeader)
@@ -1617,7 +1617,7 @@ func (e *Epoch) maybeAssembleEmptyNotarization() error {
 	return e.persistEmptyNotarization(emptyVotes, true)
 }
 
-func findEmptyVoteThatIsQuorum(votes map[string]*common.EmptyVote, isQuorum func([]common.NodeID) bool) (common.ToBeSignedEmptyVote, []common.Signature, bool) {
+func findEmptyVoteThatIsQuorum(votes map[common.NodeID]*common.EmptyVote, isQuorum func([]common.NodeID) bool) (common.ToBeSignedEmptyVote, []common.Signature, bool) {
 	votesByBytes := make(map[string][]*common.EmptyVote)
 	for _, vote := range votes {
 		key := string(vote.Vote.Bytes())
@@ -1973,10 +1973,10 @@ func (e *Epoch) handleBlockMessage(message *common.BlockMessage, from common.Nod
 	// only store it if it is up to `maxRoundWindow` ahead.
 	if e.isWithinMaxRoundWindow(md.Round) {
 		e.Logger.Debug("Got block of a future round", zap.Uint64("round", md.Round), zap.Uint64("my round", e.round))
-		msgsForRound, exists := e.futureMessages[string(from)][md.Round]
+		msgsForRound, exists := e.futureMessages[from][md.Round]
 		if !exists {
 			msgsForRound = &messagesForRound{}
-			e.futureMessages[string(from)][md.Round] = msgsForRound
+			e.futureMessages[from][md.Round] = msgsForRound
 		}
 
 		// Has this node already sent us a proposal?
@@ -1997,7 +1997,7 @@ func (e *Epoch) handleBlockMessage(message *common.BlockMessage, from common.Nod
 	}
 
 	// If we are already processing a block for this round, reject the block while it is being processed.
-	if msgForRound, exists := e.futureMessages[string(from)][md.Round]; exists && msgForRound.proposalBeingProcessed {
+	if msgForRound, exists := e.futureMessages[from][md.Round]; exists && msgForRound.proposalBeingProcessed {
 		e.Logger.Debug("Got block for a round that is being processed", zap.Uint64("round", md.Round))
 		return nil
 	}
@@ -2026,11 +2026,11 @@ func (e *Epoch) handleBlockMessage(message *common.BlockMessage, from common.Nod
 	)
 
 	// mark in future messages while we are verifying the block
-	msgForRound, exists := e.futureMessages[string(from)][md.Round]
+	msgForRound, exists := e.futureMessages[from][md.Round]
 	if !exists {
 		msgsForRound := &messagesForRound{}
 		msgsForRound.proposalBeingProcessed = true
-		e.futureMessages[string(from)][md.Round] = msgsForRound
+		e.futureMessages[from][md.Round] = msgsForRound
 	} else {
 		msgForRound.proposalBeingProcessed = true
 	}
@@ -2293,7 +2293,7 @@ func (e *Epoch) createBlockVerificationTask(block common.Block, from common.Node
 			e.Logger.Error("programming error: round not found", zap.Uint64("round", md.Round))
 			return common.Digest{}
 		}
-		round.votes[string(vote.Signature.Signer)] = &vote
+		round.votes[vote.Signature.Signer] = &vote
 
 		if err := e.doProposed(verifiedBlock); err != nil {
 			e.Logger.Error("Failed voting on block", zap.Error(err))
@@ -2484,7 +2484,7 @@ func (e *Epoch) createNotarizedBlockVerificationTask(block common.Block, notariz
 
 // verifyBlockMessageVote verifies that the vote corresponds to the block proposed, and that the vote is properly signed.
 func (e *Epoch) verifyBlockMessageVote(from common.NodeID, md common.BlockHeader, vote common.Vote) error {
-	pk, exists := e.validatorsToPKs[string(vote.Signature.Signer)]
+	pk, exists := e.validatorsToPKs[vote.Signature.Signer]
 	if !exists {
 		e.Logger.Debug("Received a finalization from an unknown node", zap.Stringer("NodeID", from))
 		return fmt.Errorf("received a finalization from an unknown node %s", from)
@@ -2850,7 +2850,7 @@ func (e *Epoch) triggerEmptyBlockNotarization(round uint64) {
 	signedEV := common.EmptyVote{Vote: emptyVote, Signature: common.Signature{Signer: e.ID, Value: rawSig}}
 
 	// Add our own empty vote to the set
-	emptyVotes.votes[string(e.ID)] = &signedEV
+	emptyVotes.votes[e.ID] = &signedEV
 
 	e.broadcast(&common.Message{EmptyVoteMessage: &signedEV})
 
@@ -2873,7 +2873,7 @@ func (e *Epoch) emptyVoteTimeoutTaskRunner(_ []string) {
 		return
 	}
 
-	ourVote, voted := roundVotes.votes[string(e.ID)]
+	ourVote, voted := roundVotes.votes[e.ID]
 	if !voted {
 		e.Logger.Debug("Our empty vote not found in the set to rebroadcast, yet expected to rebroadcast", zap.Uint64("round", e.round))
 		return
@@ -3291,45 +3291,45 @@ func (e *Epoch) maybeLoadFutureMessages() error {
 		for from, messagesFromNode := range e.futureMessages {
 			if msgs, exists := messagesFromNode[round]; exists {
 				if msgs.proposal != nil && !msgs.proposalBeingProcessed {
-					if err := e.handleBlockMessage(msgs.proposal, common.NodeID(from)); err != nil {
+					if err := e.handleBlockMessage(msgs.proposal, from); err != nil {
 						return err
 					}
 				}
 				if msgs.finalization != nil {
-					if err := e.handleFinalizationMessage(msgs.finalization, common.NodeID(from)); err != nil {
+					if err := e.handleFinalizationMessage(msgs.finalization, from); err != nil {
 						return err
 					}
 				}
 				if msgs.vote != nil {
-					if err := e.handleVoteMessage(msgs.vote, common.NodeID(from)); err != nil {
+					if err := e.handleVoteMessage(msgs.vote, from); err != nil {
 						return err
 					}
 				}
 				if msgs.notarization != nil {
-					if err := e.handleNotarizationMessage(msgs.notarization, common.NodeID(from)); err != nil {
+					if err := e.handleNotarizationMessage(msgs.notarization, from); err != nil {
 						return err
 					}
 				}
 				if msgs.finalizeVote != nil {
-					if err := e.handleFinalizeVoteMessage(msgs.finalizeVote, common.NodeID(from)); err != nil {
+					if err := e.handleFinalizeVoteMessage(msgs.finalizeVote, from); err != nil {
 						return err
 					}
 				}
 			} else {
 				e.Logger.Debug("No future messages received for this round",
-					zap.Stringer("from", common.NodeID(from)), zap.Uint64("round", round))
+					zap.Stringer("from", from), zap.Uint64("round", round))
 			}
 		}
 
 		emptyVotes, exists := e.emptyVotes[round]
 		if exists {
 			if emptyVotes.emptyNotarization != nil {
-				if err := e.handleEmptyNotarizationMessage(emptyVotes.emptyNotarization, nil); err != nil {
+				if err := e.handleEmptyNotarizationMessage(emptyVotes.emptyNotarization, common.NodeID{}); err != nil {
 					return err
 				}
 			} else {
 				for from, vote := range emptyVotes.votes {
-					if err := e.handleEmptyVoteMessage(vote, common.NodeID(from)); err != nil {
+					if err := e.handleEmptyVoteMessage(vote, from); err != nil {
 						return err
 					}
 				}
@@ -3892,7 +3892,7 @@ func LeaderForRound(nodes []common.NodeID, r uint64) common.NodeID {
 }
 
 // messagesFromNode maps nodeIds to the messages it sent in a given round.
-type messagesFromNode map[string]map[uint64]*messagesForRound
+type messagesFromNode map[common.NodeID]map[uint64]*messagesForRound
 
 type messagesForRound struct {
 	proposalBeingProcessed bool

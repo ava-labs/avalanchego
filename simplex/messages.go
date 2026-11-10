@@ -24,7 +24,7 @@ func newBlockProposal(
 				Vote: &p2p.Vote{
 					BlockHeader: blockHeaderToP2P(vote.Vote.BlockHeader),
 					Signature: &p2p.Signature{
-						Signer: vote.Signature.Signer,
+						Signer: vote.Signature.Signer.ShortID[:],
 						Value:  vote.Signature.Value,
 					},
 				},
@@ -43,7 +43,7 @@ func newVote(
 			Vote: &p2p.Vote{
 				BlockHeader: blockHeaderToP2P(vote.Vote.BlockHeader),
 				Signature: &p2p.Signature{
-					Signer: vote.Signature.Signer,
+					Signer: vote.Signature.Signer.ShortID[:],
 					Value:  vote.Signature.Value,
 				},
 			},
@@ -61,7 +61,7 @@ func newEmptyVote(
 			EmptyVote: &p2p.EmptyVote{
 				Metadata: emptyVoteMetadataToP2P(emptyVote.Vote.EmptyVoteMetadata),
 				Signature: &p2p.Signature{
-					Signer: emptyVote.Signature.Signer,
+					Signer: emptyVote.Signature.Signer.ShortID[:],
 					Value:  emptyVote.Signature.Value,
 				},
 			},
@@ -79,7 +79,7 @@ func newFinalizeVote(
 			FinalizeVote: &p2p.Vote{
 				BlockHeader: blockHeaderToP2P(finalizeVote.Finalization.BlockHeader),
 				Signature: &p2p.Signature{
-					Signer: finalizeVote.Signature.Signer,
+					Signer: finalizeVote.Signature.Signer.ShortID[:],
 					Value:  finalizeVote.Signature.Value,
 				},
 			},

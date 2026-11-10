@@ -16,8 +16,9 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/simplex/msm",
     visibility = ["//visibility:public"],
     deps = [
-        "//graft/simplex/avalanchego",
         "//graft/simplex/common",
+        "//ids",
+        "//utils/set",
         "@com_github_stephenbuttolph_canoto//:canoto",
         "@org_uber_go_zap//:zap",
     ],
@@ -39,10 +40,11 @@ graft_go_test(
     ],
     embed = [":msm"],
     deps = [
-        "//graft/simplex/avalanchego",
         "//graft/simplex/common",
         "//graft/simplex/simplex",
         "//graft/simplex/testutil",
+        "//ids",
+        "//utils/set",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_goleak//:goleak",
         "@org_uber_go_zap//:zap",

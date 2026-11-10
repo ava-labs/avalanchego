@@ -11,12 +11,13 @@ import (
 	. "github.com/ava-labs/avalanchego/graft/simplex/common"
 	. "github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestRetrieveFromStorage(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	block := testutil.NewTestBlock(ProtocolMetadata{Seq: 0}, emptyBlacklist)
 	finalization, _ := testutil.NewFinalizationRecord(t, &testutil.TestSignatureAggregator{N: len(nodes)}, block, nodes[:Quorum(len(nodes))])
 	normalStorage := testutil.NewInMemStorage()
@@ -61,14 +62,14 @@ func (u *unverifiableQC) Verify(Nodes) error {
 func TestVerifyQC(t *testing.T) {
 	var nodeIDs []NodeID
 	var nodes Nodes
-	for _, nodeID := range []NodeID{{1}, {2}, {3}, {4}, {5}} {
+	for _, nodeID := range []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{5}}} {
 		nodes = append(nodes, Node{Id: nodeID})
 		nodeIDs = append(nodeIDs, nodeID)
 	}
 
-	validatorsToPks := make(map[string][]byte)
+	validatorsToPks := make(map[NodeID][]byte)
 	for _, n := range nodes {
-		validatorsToPks[string(n.Id)] = []byte{}
+		validatorsToPks[n.Id] = []byte{}
 	}
 	quorumSize := Quorum(len(nodes))
 	signatureAggregator := &testutil.TestSignatureAggregator{N: len(nodes)}
@@ -102,12 +103,12 @@ func TestVerifyQC(t *testing.T) {
 			name: "signer signed twice",
 			finalization: func() Finalization {
 				block := testutil.NewTestBlock(ProtocolMetadata{}, emptyBlacklist)
-				doubleNodes := []NodeID{{1}, {2}, {3}, {4}, {4}}
+				doubleNodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{4}}}
 				finalization, _ := testutil.NewFinalizationRecord(t, signatureAggregator, block, doubleNodes)
 				return finalization
 			}(),
 			quorumSize:  quorumSize,
-			expectedErr: fmt.Errorf("quorum certificate is signed by the same node (0400000000000000) more than once"),
+			expectedErr: fmt.Errorf("quorum certificate is signed by the same node (0400000000000000000000000000000000000000) more than once"),
 		},
 		{
 			name:         "quorum certificate not in finalization",
@@ -119,11 +120,11 @@ func TestVerifyQC(t *testing.T) {
 			name: "nodes are not eligible signers",
 			finalization: func() Finalization {
 				block := testutil.NewTestBlock(ProtocolMetadata{}, emptyBlacklist)
-				signers := []NodeID{{1}, {2}, {3}, {4}, {6}}
+				signers := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{6}}}
 				finalization, _ := testutil.NewFinalizationRecord(t, signatureAggregator, block, signers)
 				return finalization
 			}(), quorumSize: quorumSize,
-			expectedErr: fmt.Errorf("quorum certificate contains an unknown signer (0600000000000000)"),
+			expectedErr: fmt.Errorf("quorum certificate contains an unknown signer (0600000000000000000000000000000000000000)"),
 		},
 		{
 			name: "invalid QC",
@@ -160,7 +161,7 @@ func TestVerifyQC(t *testing.T) {
 
 func TestGetHighestQuorumRound(t *testing.T) {
 	// Test
-	nodes := []NodeID{{1}, {2}, {3}, {4}, {5}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{5}}}
 	l := testutil.MakeLogger(t, 0)
 	signatureAggregator := &testutil.TestSignatureAggregator{N: len(nodes)}
 
@@ -373,7 +374,7 @@ func TestBatchSequences(t *testing.T) {
 }
 
 func TestNodeIDsFromVotes(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}, {5}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{5}}}
 	votes := make([]*Vote, len(nodes))
 	for i, n := range nodes {
 		votes[i] = &Vote{Signature: Signature{Signer: n}}
