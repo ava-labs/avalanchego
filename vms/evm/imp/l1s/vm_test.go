@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -33,9 +34,12 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/vmtest"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
+	"github.com/ava-labs/avalanchego/vms/evm/txgossip/txgossiptest"
 
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -51,6 +55,8 @@ var _ saetest.Peer = (*SUT)(nil)
 type SUT struct {
 	*VM
 	*vmtest.SUT
+
+	clock *saetest.Clock
 }
 
 type (
@@ -105,17 +111,19 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	appSender := saetest.NewSender(tb, set.Of(snowCtx.NodeID))
 
 	ctx := log.CancelOnError(tb.Context())
-	vmSUT, err := vmtest.New(ctx, tb, vm, snowCtx, vmtest.Config{
-		DB:      memdb.New(),
-		Genesis: genesisBytes,
-		Sender:  appSender,
-		State:   snow.NormalOp,
+	sut := &SUT{
+		VM:    vm,
+		clock: cfg.clock,
+	}
+	sut.SUT, err = vmtest.New(ctx, tb, vm, snowCtx, vmtest.Config{
+		DB:                memdb.New(),
+		Genesis:           genesisBytes,
+		Sender:            appSender,
+		State:             snow.NormalOp,
+		Clock:             cfg.clock,
+		EarliestBuildTime: earliestBuildTime,
 	})
 	require.NoError(tb, err, "vmtest.New()")
-	sut := &SUT{
-		VM:  vm,
-		SUT: vmSUT,
-	}
 
 	appSender.Start(tb, sut)
 	return ctx, sut
@@ -221,4 +229,57 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 			assert.Equal(t, tt.wantGasUsed, receipts[i].GasUsed, "receipt GasUsed")
 		})
 	}
+}
+
+// sendTx sends a transfer from wallet's first account and waits for it to be
+// pending in sut's mempool.
+func sendTx(ctx context.Context, tb testing.TB, sut *SUT, wallet *saetest.Wallet) {
+	tb.Helper()
+
+	tx := wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
+		To:        &common.Address{1},
+		Gas:       ethparams.TxGas,
+		GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
+	})
+	require.NoErrorf(tb, sut.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction()", sut.EthClient())
+	txgossiptest.WaitUntilPending(tb, ctx, sut.GethRPCBackends(), tx)
+}
+
+func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
+	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSignerForChainID(big.NewInt(testChainID)))
+	ctx, sut := newSUT(t, withMaxAllocFor(wallet.Addresses()...))
+
+	sendTx(ctx, t, sut, wallet)
+	parent := sut.BuildVerifyAccept(ctx, t)
+	sendTx(ctx, t, sut, wallet)
+	child := sut.BuildVerify(ctx, t, parent.ID())
+
+	earlyMS := uint64(earliestBuildTime(parent).UnixMilli()) - 1
+	err := sut.VerifyTampered(ctx, t, child, func(hdr *types.Header) {
+		hdr.Time = earlyMS / 1000
+		customtypes.GetHeaderExtra(hdr).TimeMilliseconds = &earlyMS
+	})
+	require.ErrorIsf(t, err, blockdelay.ErrBelowMinimum, "%T.VerifyBlock() (block below the ACP-226 minimum delay)", sut.VM)
+}
+
+func TestWaitForEventWaitsForMinDelay(t *testing.T) {
+	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSignerForChainID(big.NewInt(testChainID)))
+	ctx, sut := newSUT(t, withMaxAllocFor(wallet.Addresses()...))
+
+	sendTx(ctx, t, sut, wallet)
+	parent := sut.BuildVerifyAccept(ctx, t)
+	require.NoErrorf(t, sut.SetPreference(ctx, parent.ID(), nil), "%T.SetPreference()", sut.VM)
+	sendTx(ctx, t, sut, wallet)
+
+	// The clock hasn't moved since parent was built, so the minimum delay
+	// hasn't elapsed and WaitForEvent MUST NOT report the pending tx.
+	waitCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	defer cancel()
+	_, err := sut.VM.WaitForEvent(waitCtx)
+	require.ErrorIsf(t, err, context.DeadlineExceeded, "%T.WaitForEvent() before the minimum delay", sut.VM)
+
+	sut.clock.Set(earliestBuildTime(parent))
+	got, err := sut.VM.WaitForEvent(ctx)
+	require.NoErrorf(t, err, "%T.WaitForEvent() after the minimum delay", sut.VM)
+	require.Equalf(t, snowcommon.PendingTxs, got, "%T.WaitForEvent() after the minimum delay", sut.VM)
 }

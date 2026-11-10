@@ -233,7 +233,7 @@ var testStartTime = upgrade.InitiallyActiveTime.Add(dynamic.InitialDelayExponent
 // withVMTime fixes the SUT's clock at startTime and returns a handle that lets
 // the test move the clock forward (e.g. past Tau to settle a block). It also
 // makes [SUT.WaitForPendingTxs] automatically advance the clock past the
-// ACP-226 min-delay pacing timer; see [SUT.unblockWaitForEvent].
+// ACP-226 min-delay pacing timer; see [vmtest.Config.Clock].
 func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 	c := saetest.NewClock(startTime, time.Millisecond)
 	opt := options.Func[sutConfig](func(cfg *sutConfig) {
@@ -406,14 +406,15 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 		logger:         log,
 	}
 	sut.SUT, err = vmtest.New(ctx, tb, vm, snowCtx, vmtest.Config{
-		DB:                 chainDB,
-		Genesis:            genesisBytes,
-		Config:             configBytes,
-		Sender:             appSender,
-		State:              cfg.state,
-		HTTPPrefix:         cchainHTTPPrefix,
-		SkipRPCTransport:   cfg.skipRPCTransport,
-		BeforeWaitForEvent: sut.unblockWaitForEvent,
+		DB:                chainDB,
+		Genesis:           genesisBytes,
+		Config:            configBytes,
+		Sender:            appSender,
+		State:             cfg.state,
+		HTTPPrefix:        cchainHTTPPrefix,
+		SkipRPCTransport:  cfg.skipRPCTransport,
+		Clock:             cfg.clock,
+		EarliestBuildTime: earliestBuildTime,
 	})
 	if err != nil {
 		return nil, err
@@ -571,14 +572,6 @@ func (s *SUT) assertTxAccepted(ctx context.Context, tb testing.TB, want *tx.Tx, 
 		tb.Errorf("%T.GetTx() (-want +got):\n%s", s.Client, diff)
 	}
 	assert.Equalf(tb, wantHeight, gotHeight, "%T.GetTx() block height", s.Client)
-}
-
-// unblockWaitForEvent advances the [withVMTime] clock to ensure that
-// [VM.WaitForEvent] will not throttle for ACP-226 delays.
-func (s *SUT) unblockWaitForEvent() {
-	if t := earliestBuildTime(s.VM.VM.GetPreference()); s.clock.Now().Before(t) {
-		s.clock.Set(t)
-	}
 }
 
 // acceptSynchronousBlocks drives blks, in order, through parse, verify, and
