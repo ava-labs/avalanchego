@@ -23,8 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/customtypes"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	ethparams "github.com/ava-labs/libevm/params"

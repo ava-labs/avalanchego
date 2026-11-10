@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )

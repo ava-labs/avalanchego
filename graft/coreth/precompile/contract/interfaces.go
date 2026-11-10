@@ -5,8 +5,6 @@
 package contract
 
 import (
-	"math/big"
-
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/holiman/uint256"
@@ -22,7 +20,7 @@ import (
 // StatefulPrecompiledContract is the interface for executing a precompiled contract
 type StatefulPrecompiledContract interface {
 	// Run executes the precompiled contract.
-	Run(accessibleState AccessibleState, caller common.Address, addr common.Address, input []byte, readOnly bool) ([]byte, error)
+	Run(env Environment, input []byte) ([]byte, error)
 }
 
 // StateDB is the interface for accessing EVM state
@@ -46,24 +44,14 @@ type StateDB interface {
 	RevertToSnapshot(int)
 }
 
-// AccessibleState defines the interface exposed to stateful precompile contracts
-type AccessibleState interface {
-	GetStateDB() StateDB
-	GetBlockContext() BlockContext
-	GetSnowContext() *snow.Context
-	GetPrecompileEnv() vm.PrecompileEnvironment
-	GetRules() precompileconfig.Rules
-}
-
-// ConfigurationBlockContext defines the interface required to configure a precompile.
-type ConfigurationBlockContext interface {
-	Number() *big.Int
-	Timestamp() uint64
-}
-
-type BlockContext interface {
-	ConfigurationBlockContext
-	// GetWarpMessageResults returns the result of verifying the Warp messages
+// Environment wraps [vm.PrecompileEnvironment] with Avalanche-specific details.
+type Environment interface {
+	vm.PrecompileEnvironment
+	Caller() common.Address
+	SnowContext() *snow.Context
+	// ExtraRules returns any registered rules on [params.Rules].
+	ExtraRules() precompileconfig.Rules
+	// WarpMessageResults returns the result of verifying the Warp messages
 	// of the given transaction.
-	GetWarpMessageResults(txHash common.Hash) set.Bits
+	WarpMessageResults(txHash common.Hash) set.Bits
 }

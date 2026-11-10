@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 )
 
 // forkHeader is a header shaped like the ones produced by a given C-Chain

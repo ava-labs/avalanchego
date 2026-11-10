@@ -10,7 +10,7 @@ go_library(
         "price.go",
         "target.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/dynamic",
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/dynamic",
     visibility = ["//visibility:public"],
     deps = [
         "//utils/math",
@@ -32,8 +32,3 @@ go_test(
         "@com_github_stretchr_testify//require",
     ],
 )
-
-package(default_visibility = [
-    "//vms/evm/imp/cchain:__subpackages__",
-    "//vms/evm/imp/cchain:external_consumers",
-])
