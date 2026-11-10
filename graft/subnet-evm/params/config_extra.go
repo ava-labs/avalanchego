@@ -123,6 +123,7 @@ func (cu *ChainConfigWithUpgradesJSON) UnmarshalJSON(input []byte) error {
 	if err := json.Unmarshal(input, &u); err != nil {
 		return err
 	}
+	GetExtra(&cc).UpgradeConfig = u.UpgradeConfig
 	cu.ChainConfig = cc
 	cu.UpgradeConfig = u.UpgradeConfig
 	return nil

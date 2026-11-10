@@ -340,7 +340,7 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 	var unmarshalled ChainConfigWithUpgradesJSON
 	require.NoError(t, json.Unmarshal(result, &unmarshalled), "json.Unmarshal()")
 	want := ChainConfigWithUpgradesJSON{
-		ChainConfig:   *newConfig(extras.UpgradeConfig{}),
+		ChainConfig:   *newConfig(upgrades),
 		UpgradeConfig: upgrades,
 	}
 	require.Equal(t, want, unmarshalled)
