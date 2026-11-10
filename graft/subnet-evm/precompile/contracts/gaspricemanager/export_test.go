@@ -3,18 +3,15 @@
 
 package gaspricemanager
 
+// Export identifiers for tests compiled as a separate package.
+
 const (
-	// GetGasPriceConfigGasCost exposes getGasPriceConfigGasCost to external tests.
-	GetGasPriceConfigGasCost = getGasPriceConfigGasCost
-	// GetGasPriceConfigLastChangedAtGasCost exposes getGasPriceConfigLastChangedAtGasCost to external tests.
+	GetGasPriceConfigGasCost              = getGasPriceConfigGasCost
 	GetGasPriceConfigLastChangedAtGasCost = getGasPriceConfigLastChangedAtGasCost
-	// SetGasPriceConfigGasCost exposes setGasPriceConfigGasCost to external tests.
-	SetGasPriceConfigGasCost = setGasPriceConfigGasCost
+	SetGasPriceConfigGasCost              = setGasPriceConfigGasCost
 )
 
 var (
-	// ErrCannotSetGasPriceConfig exposes errCannotSetGasPriceConfig to external tests.
 	ErrCannotSetGasPriceConfig = errCannotSetGasPriceConfig
-	// ErrNilBlockNumber exposes errNilBlockNumber to external tests.
-	ErrNilBlockNumber = errNilBlockNumber
+	ErrNilBlockNumber          = errNilBlockNumber
 )
