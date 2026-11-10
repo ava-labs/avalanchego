@@ -8,8 +8,6 @@ import (
 	"encoding/asn1"
 	"encoding/binary"
 	"fmt"
-
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 )
 
 type Message struct {
@@ -533,7 +531,7 @@ func (ai *AuxiliaryInfo) Clone() AuxiliaryInfo {
 
 // ValidatorSetApproval is an approval from a validator
 type ValidatorSetApproval struct {
-	NodeID        avalanchego.NodeID
+	NodeID        NodeID
 	AuxInfoDigest Digest
 	PChainHeight  uint64
 	Signature     SignatureBytes

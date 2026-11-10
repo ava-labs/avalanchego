@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -220,7 +221,7 @@ func (nws Nodes) NodeIDs() []NodeID {
 
 func (nws Nodes) Contains(nodeID NodeID) bool {
 	for _, nw := range nws {
-		if bytes.Equal(nw.Id, nodeID) {
+		if nw.Id == nodeID {
 			return true
 		}
 	}
@@ -239,7 +240,7 @@ func (nws Nodes) Equal(other Nodes) bool {
 	SortNodes(otherClone)
 
 	for i := range nwsClone {
-		if !bytes.Equal(nwsClone[i].Id, otherClone[i].Id) {
+		if nwsClone[i].Id != otherClone[i].Id {
 			return false
 		}
 		if !bytes.Equal(nwsClone[i].PK, otherClone[i].PK) {
@@ -262,7 +263,7 @@ type Node struct {
 // SortNodes sorts the nodes in place by their byte representations.
 func SortNodes(nodes Nodes) {
 	slices.SortFunc(nodes, func(a, b Node) int {
-		return bytes.Compare(a.Id[:], b.Id[:])
+		return a.Id.Compare(b.Id)
 	})
 }
 
@@ -288,4 +289,31 @@ func OnlyVMVerifyOpt(vc *VerifyConfig) {
 
 type VerifyConfig struct {
 	OnlyVM bool
+}
+
+type VMBlock interface {
+	// Digest returns a succinct representation of this block.
+	Digest() [32]byte
+
+	// Height returns the height of this block in the chain.
+	Height() uint64
+
+	// Time this block was proposed at. This value should be consistent across
+	// all nodes. If this block hasn't been successfully verified, any value can
+	// be returned. If this block is the last accepted block, the timestamp must
+	// be returned correctly. Otherwise, accepted blocks can return any value.
+	Timestamp() time.Time
+
+	// Verify that the state transition this block would make if accepted is
+	// valid. If the state transition is invalid, a non-nil error should be
+	// returned.
+	//
+	// It is guaranteed that the Parent has been successfully verified.
+	//
+	// If nil is returned, it is guaranteed that either Accept or Reject will be
+	// called on this block, unless the VM is shut down.
+	Verify(ctx context.Context, pChainHeight uint64) error
+
+	// Bytes returns the byte representation of this block.
+	Bytes() []byte
 }

@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
 	"github.com/stretchr/testify/require"
@@ -65,7 +64,7 @@ func (i *InnerBlock) Verify(_ context.Context, _ uint64) error {
 	return nil
 }
 
-// fakeVMBlock is a minimal avalanchego.VMBlock implementation for tests.
+// fakeVMBlock is a minimal common.VMBlock implementation for tests.
 type fakeVMBlock struct {
 	height uint64
 }
@@ -152,7 +151,7 @@ func (sv *signatureVerifier) VerifySignature(message []byte, signature common.Si
 }
 
 type signatureAggregator struct {
-	weightByNodeID map[string]uint64
+	weightByNodeID map[common.NodeID]uint64
 	totalWeight    uint64
 }
 
@@ -185,7 +184,7 @@ func (sv *signatureAggregator) AppendSignatures(existing common.SignatureBytes, 
 func (sv *signatureAggregator) IsQuorum(signers []common.NodeID) bool {
 	var sum uint64
 	for _, signer := range signers {
-		sum += sv.weightByNodeID[string(signer)]
+		sum += sv.weightByNodeID[signer]
 	}
 	return sum*3 > sv.totalWeight*2
 }
@@ -193,16 +192,16 @@ func (sv *signatureAggregator) IsQuorum(signers []common.NodeID) bool {
 func (sv *signatureAggregator) AboveByzantineThreshold(signers []common.NodeID) bool {
 	var sum uint64
 	for _, signer := range signers {
-		sum += sv.weightByNodeID[string(signer)]
+		sum += sv.weightByNodeID[signer]
 	}
 	return sum >= (sv.totalWeight/3)+1
 }
 
 func newSignatureAggregatorCreator() common.SignatureAggregatorCreator {
 	return func(weights []common.Node) common.SignatureAggregator {
-		s := &signatureAggregator{weightByNodeID: make(map[string]uint64, len(weights))}
+		s := &signatureAggregator{weightByNodeID: make(map[common.NodeID]uint64, len(weights))}
 		for _, nw := range weights {
-			s.weightByNodeID[string(nw.Id)] = nw.Weight
+			s.weightByNodeID[nw.Id] = nw.Weight
 			s.totalWeight += nw.Weight
 		}
 		return s
@@ -361,11 +360,11 @@ type testConfig struct {
 
 // bb is a test BlockBuilder whose BuildBlock returns a preconfigured block/error.
 type bb struct {
-	Block avalanchego.VMBlock
+	Block common.VMBlock
 	Err   error
 }
 
-func (bb *bb) BuildBlock(context.Context, uint64) (avalanchego.VMBlock, error) {
+func (bb *bb) BuildBlock(context.Context, uint64) (common.VMBlock, error) {
 	return bb.Block, bb.Err
 }
 
@@ -379,7 +378,7 @@ func newStateMachineWithLogger(tb testing.TB, logger common.Logger) (*StateMachi
 	bs := make(blockStore)
 	bs[0] = &outerBlock{block: genesisBlock}
 
-	var myNodeID avalanchego.NodeID
+	var myNodeID common.NodeID
 
 	var testConfig testConfig
 	testConfig.blockStore = bs
@@ -389,8 +388,8 @@ func newStateMachineWithLogger(tb testing.TB, logger common.Logger) (*StateMachi
 
 	smConfig := Config{
 		GenesisValidatorSet: NodeBLSMappings{
-			{BLSKey: []byte{1}, Weight: 1, NodeID: [20]byte{1}},
-			{BLSKey: []byte{2}, Weight: 1, NodeID: [20]byte{2}},
+			{BLSKey: []byte{1}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{1}}},
+			{BLSKey: []byte{2}, Weight: 1, NodeID: NodeID{ShortID: [20]byte{2}}},
 		},
 		LastNonSimplexBlockPChainHeight: 100,
 		GetTime:                         time.Now,
@@ -411,7 +410,7 @@ func newStateMachineWithLogger(tb testing.TB, logger common.Logger) (*StateMachi
 		GetValidatorSet:          testConfig.validatorSetRetriever.getValidatorSet,
 		PChainProgressListener:   &noOpPChainListener{},
 		LastNonSimplexInnerBlock: genesisBlock.InnerBlock,
-		MyNodeID:                 myNodeID[:],
+		MyNodeID:                 myNodeID,
 		AuxiliaryInfoApp: &voteCountingAuxInfoApp{
 			threshold: 2,
 		},
@@ -546,7 +545,7 @@ func (t *voteCountingAuxInfoApp) Generate(common.VersionID, NodeBLSMappings, [][
 	if t.randomTape != nil {
 		return t.randomTape(), nil
 	}
-	var id avalanchego.NodeID
+	var id [20]byte
 	rand.Read(id[:])
 	return id[:], nil
 }

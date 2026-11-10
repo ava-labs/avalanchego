@@ -30,7 +30,7 @@ func TestQCDuplicateSigners(t *testing.T) {
 	signatures := make([]common.Signature, 0, quorum)
 	for range quorum {
 		signatures = append(signatures, common.Signature{
-			Signer: configs[0].Ctx.NodeID[:],
+			Signer: common.NodeIDFromAvalancheID(configs[0].Ctx.NodeID),
 			Value:  sig,
 		})
 	}
@@ -109,9 +109,9 @@ func TestSignatureAggregation(t *testing.T) {
 		{
 			name: "invalid signature bytes",
 			signers: []common.Signature{
-				{Signer: configs[0].Ctx.NodeID[:], Value: []byte("invalid signature")},
-				{Signer: configs[1].Ctx.NodeID[:], Value: []byte("another invalid signature")},
-				{Signer: configs[2].Ctx.NodeID[:], Value: []byte("another invalid signature")},
+				{Signer: common.NodeIDFromAvalancheID(configs[0].Ctx.NodeID), Value: []byte("invalid signature")},
+				{Signer: common.NodeIDFromAvalancheID(configs[1].Ctx.NodeID), Value: []byte("another invalid signature")},
+				{Signer: common.NodeIDFromAvalancheID(configs[2].Ctx.NodeID), Value: []byte("another invalid signature")},
 			},
 			expectError: errFailedToParseSignature,
 		},
@@ -124,7 +124,7 @@ func TestSignatureAggregation(t *testing.T) {
 					require.NoError(t, err)
 					sig, err := signer.Sign(msg)
 					require.NoError(t, err)
-					sigs = append(sigs, common.Signature{Signer: config.Ctx.NodeID[:], Value: sig})
+					sigs = append(sigs, common.Signature{Signer: common.NodeIDFromAvalancheID(config.Ctx.NodeID), Value: sig})
 				}
 				return sigs
 			}(),
@@ -140,7 +140,7 @@ func TestSignatureAggregation(t *testing.T) {
 					if i < 2 {
 						sig, err := signer.Sign(msg)
 						require.NoError(t, err)
-						sigs = append(sigs, common.Signature{Signer: config.Ctx.NodeID[:], Value: sig})
+						sigs = append(sigs, common.Signature{Signer: common.NodeIDFromAvalancheID(config.Ctx.NodeID), Value: sig})
 					}
 				}
 				return sigs
@@ -157,7 +157,7 @@ func TestSignatureAggregation(t *testing.T) {
 					if i < 2 {
 						sig, err := signer.Sign(msg)
 						require.NoError(t, err)
-						sigs = append(sigs, common.Signature{Signer: config.Ctx.NodeID[:], Value: sig})
+						sigs = append(sigs, common.Signature{Signer: common.NodeIDFromAvalancheID(config.Ctx.NodeID), Value: sig})
 					}
 				}
 
@@ -167,7 +167,7 @@ func TestSignatureAggregation(t *testing.T) {
 				require.NoError(t, err)
 				sig, err := signer.Sign(msg)
 				require.NoError(t, err)
-				sigs = append(sigs, common.Signature{Signer: newConfig[0].Ctx.NodeID[:], Value: sig})
+				sigs = append(sigs, common.Signature{Signer: common.NodeIDFromAvalancheID(newConfig[0].Ctx.NodeID), Value: sig})
 
 				return sigs
 			}(),
@@ -215,7 +215,7 @@ func TestQCVerifyWithWrongMessage(t *testing.T) {
 		sig, err := signer.Sign(originalMsg)
 		require.NoError(t, err)
 		sigs = append(sigs, common.Signature{
-			Signer: configs[i].Ctx.NodeID[:],
+			Signer: common.NodeIDFromAvalancheID(configs[i].Ctx.NodeID),
 			Value:  sig,
 		})
 	}
@@ -242,7 +242,7 @@ func TestIsQuorum(t *testing.T) {
 
 	nodeIDs := make([]common.NodeID, len(configs))
 	for i, config := range configs {
-		nodeIDs[i] = config.Ctx.NodeID[:]
+		nodeIDs[i] = common.NodeIDFromAvalancheID(config.Ctx.NodeID)
 	}
 	unknownNodeID := ids.GenerateTestNodeID()
 
@@ -263,7 +263,7 @@ func TestIsQuorum(t *testing.T) {
 		},
 		{
 			name:     "unknown node",
-			nodes:    []common.NodeID{nodeIDs[0], nodeIDs[1], unknownNodeID[:]},
+			nodes:    []common.NodeID{nodeIDs[0], nodeIDs[1], common.NodeIDFromAvalancheID(unknownNodeID)},
 			expected: false,
 		},
 		{

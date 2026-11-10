@@ -14,11 +14,12 @@ import (
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
 )
 
 func TestSimplexRebroadcastFinalizationVotes(t *testing.T) {
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	net := testutil.NewControlledNetwork(t, nodes)
 
 	var allowFinalizeVotes atomic.Bool
@@ -123,7 +124,7 @@ func TestSimplexRebroadcastFinalizationVotes(t *testing.T) {
 }
 
 func TestSimplexMultiNodeSimple(t *testing.T) {
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	net := testutil.NewControlledNetwork(t, nodes)
 	testutil.NewControlledSimplexNode(t, nodes[0], net, nil)
 	testutil.NewControlledSimplexNode(t, nodes[1], net, nil)
@@ -149,7 +150,7 @@ func dontVoteFilter(msg *common.Message, _, _ common.NodeID) bool {
 }
 
 func TestSimplexMultiNodeBlacklist(t *testing.T) {
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	net := testutil.NewControlledNetwork(t, nodes)
 	testEpochConfig := &testutil.TestNodeConfig{
 		ReplicationEnabled: true,
@@ -304,7 +305,7 @@ func onlySendBlockProposalsAndVotes(splitNodes []common.NodeID) testutil.Message
 // TestSplitVotes ensures that nodes who have timeout out, while the rest of the network has
 // progressed due to notarizations, are able to collect the notarizations and continue
 func TestSplitVotes(t *testing.T) {
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	net := testutil.NewControlledNetwork(t, nodes)
 
 	config := func(from common.NodeID) *testutil.TestNodeConfig {
@@ -405,7 +406,7 @@ func onlyAllowEmptyRoundMessages(msg *common.Message, _, _ common.NodeID) bool {
 // removed from the blacklist by all nodes once it has been blacklisted for more than MaxBlacklistedOrbits,
 // even though it is still offline and therefore never redeemed itself.
 func TestSimplexMultiNodeBlacklistExpires(t *testing.T) {
-	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	nodes := []common.NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	net := testutil.NewControlledNetwork(t, nodes)
 
 	// A node may remain blacklisted for a single orbit.

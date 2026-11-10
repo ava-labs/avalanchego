@@ -4,7 +4,6 @@
 package testutil
 
 import (
-	"bytes"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
@@ -63,7 +62,7 @@ func (c *TestComm) Send(msg *common.Message, destination common.NodeID) {
 	// cannot send if either [from] or [destination] is not connected
 	if c.net.IsDisconnected(destination) || c.net.IsDisconnected(c.from) {
 		for _, instance := range c.net.GetInstances() {
-			if bytes.Equal(instance.E.ID, destination) {
+			if instance.E.ID == destination {
 				instance.l.Info("Node is disconnected not sending message")
 			}
 		}
@@ -74,11 +73,11 @@ func (c *TestComm) Send(msg *common.Message, destination common.NodeID) {
 	c.maybeTranslateOutgoingToIncomingMessageTypes(msg)
 
 	for _, instance := range c.net.GetInstances() {
-		if bytes.Equal(instance.E.ID, c.from) {
+		if instance.E.ID == c.from {
 			instance.l.Info("Enqueuing message")
 			continue
 		}
-		if bytes.Equal(instance.E.ID, destination) {
+		if instance.E.ID == destination {
 			instance.enqueue(msg, c.from, destination)
 			return
 		}
@@ -174,7 +173,7 @@ func (c *TestComm) Broadcast(msg *common.Message) {
 			continue
 		}
 		// Skip sending the message to yourself or disconnected nodeWeights
-		if bytes.Equal(c.from, instance.E.ID) || c.net.IsDisconnected(instance.E.ID) || c.net.IsDisconnected(c.from) {
+		if c.from == instance.E.ID || c.net.IsDisconnected(instance.E.ID) || c.net.IsDisconnected(c.from) {
 			continue
 		}
 

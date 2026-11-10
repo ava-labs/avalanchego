@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"go.uber.org/zap"
 )
@@ -17,17 +16,17 @@ type ApprovalStore struct {
 	signatureVerifier common.SignatureVerifier
 	validators        NodeBLSMappings
 	logger            common.Logger
-	nodeIDToPK        map[avalanchego.NodeID][]byte
+	nodeIDToPK        map[common.NodeID][]byte
 	// lock guards approvalsByNode: approvals are handled as they arrive while
 	// the block builder reads them when building a block.
 	lock            sync.RWMutex
-	approvalsByNode map[avalanchego.NodeID]common.ValidatorSetApproval
+	approvalsByNode map[common.NodeID]common.ValidatorSetApproval
 }
 
 func NewApprovalStore(signatureVerifier common.SignatureVerifier, validators NodeBLSMappings, logger common.Logger) *ApprovalStore {
-	pkByNodeID := make(map[avalanchego.NodeID][]byte, len(validators))
+	pkByNodeID := make(map[common.NodeID][]byte, len(validators))
 	for _, vdr := range validators {
-		pkByNodeID[vdr.NodeID] = vdr.BLSKey
+		pkByNodeID[vdr.NodeID.ToNodeID()] = vdr.BLSKey
 	}
 
 	return &ApprovalStore{
@@ -35,7 +34,7 @@ func NewApprovalStore(signatureVerifier common.SignatureVerifier, validators Nod
 		validators:        validators,
 		logger:            logger,
 		nodeIDToPK:        pkByNodeID,
-		approvalsByNode:   make(map[avalanchego.NodeID]common.ValidatorSetApproval, len(validators)),
+		approvalsByNode:   make(map[common.NodeID]common.ValidatorSetApproval, len(validators)),
 	}
 }
 

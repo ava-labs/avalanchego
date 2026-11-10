@@ -19,6 +19,7 @@ import (
 	. "github.com/ava-labs/avalanchego/graft/simplex/common"
 	. "github.com/ava-labs/avalanchego/graft/simplex/simplex"
 	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
+	"github.com/ava-labs/avalanchego/ids"
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zapcore"
@@ -31,7 +32,7 @@ var (
 // newEmptyBlacklist returns the blacklist that a leader of a network of four nodes proposes when it has nothing to report.
 func newEmptyBlacklist() Blacklist {
 	blacklist := NewBlacklist(DefaultMaxBlacklistedRounds)
-	return blacklist.Next(NodeIDs([]NodeID{{1}, {2}, {3}, {4}}).EqualWeightedNodes(), 0, DefaultMaxBlacklistedRounds, nil, nil)
+	return blacklist.Next(NodeIDs([]NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}).EqualWeightedNodes(), 0, DefaultMaxBlacklistedRounds, nil, nil)
 }
 
 // TestFinalizeSameSequence tests that a node only verifies a block after it receives all the empty notarizations the block depends on.
@@ -46,7 +47,7 @@ func newEmptyBlacklist() Blacklist {
 func TestFinalizeSameSequence(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 	ctx := context.Background()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	initialBlock := createBlocks(t, nodes, 1)[0]
 	recordingComm := &recordingComm{Communication: testutil.NewNoopComm(nodes), BroadcastMessages: make(chan *Message, 100), SentMessages: make(chan *Message, 100)}
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], recordingComm, bb)
@@ -155,7 +156,7 @@ func advanceWithFinalizeCheck(t *testing.T, e *Epoch, recordingComm *recordingCo
 }
 
 func TestFinalizeSameSequenceGap(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 
 	for numEmpty := range uint64(5) {
 		for numNotarizations := range uint64(5) {
@@ -295,7 +296,7 @@ func testFinalizeSameSequenceGap(t *testing.T, nodes []NodeID, numEmptyNotarizat
 func TestBlockNotVerifiedIfParentNotNotarized(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 
 	comm := testutil.NewNoopComm(nodes)
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[3], comm, bb)
@@ -360,7 +361,7 @@ func TestBlockNotVerifiedIfParentNotNotarized(t *testing.T) {
 
 func TestEpochHandleNotarizationFutureRound(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	// Create the two blocks ahead of time
 	blocks := createBlocks(t, nodes, 2)
 	firstBlock := blocks[0].VerifiedBlock.(*testutil.TestBlock)
@@ -414,7 +415,7 @@ func TestEpochHandleNotarizationFutureRound(t *testing.T) {
 // there have been empty rounds
 func TestEpochIndexFinalization(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, _, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
@@ -528,7 +529,7 @@ func TestEquivocatedBlock(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			bb := testutil.NewTestBlockBuilder()
-			nodes := []NodeID{{1}, {2}, {3}, {4}}
+			nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 
 			recordingComm := &recordingComm{
 				Communication:     testutil.NewNoopComm(nodes),
@@ -665,7 +666,7 @@ func TestEpochConsecutiveProposalsDoNotGetVerified(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			bb := testutil.NewTestBlockBuilder()
-			nodes := []NodeID{{1}, {2}, {3}, {4}}
+			nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 
 			conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[1], testutil.NewNoopComm(nodes), bb)
 
@@ -728,7 +729,7 @@ func TestEpochConsecutiveProposalsDoNotGetVerified(t *testing.T) {
 // one verified and must not overwhelm the bounded verification queue.
 func TestEpochLeaderEquivocationDoesNotFloodBlockVerification(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[1], testutil.NewNoopComm(nodes), bb)
 
@@ -808,7 +809,7 @@ func TestEpochLeaderEquivocationDoesNotFloodBlockVerification(t *testing.T) {
 // TestReplicationRerequestsRoundWhenVerificationQueueIsFull asserts that a replicated notarized block whose
 // verification cannot be scheduled is re-requested rather than dropped.
 func TestReplicationRerequestsRoundWhenVerificationQueueIsFull(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := &recordingComm{Communication: testutil.NewNoopComm(nodes), SentMessages: make(chan *Message, 100)}
 	conf, _, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[2], comm, testutil.NewTestBlockBuilder())
 	conf.ReplicationEnabled = true
@@ -853,7 +854,7 @@ func TestReplicationRerequestsRoundWhenVerificationQueueIsFull(t *testing.T) {
 // if we receive a finalization for the current round(even if it is not the next seq to commit)
 func TestEpochIncreasesRoundAfterFinalization(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}, {5}, {6}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{5}}, {ShortID: ids.ShortID{6}}}
 
 	conf, _, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[2], testutil.NewNoopComm(nodes), bb)
 	e, err := NewEpoch(conf)
@@ -883,7 +884,7 @@ func TestEpochIncreasesRoundAfterFinalization(t *testing.T) {
 func TestEpochNotarizeTwiceThenFinalize(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 
 	recordedMessages := make(chan *Message, 100)
 	comm := &recordingComm{Communication: testutil.NewNoopComm(nodes), BroadcastMessages: recordedMessages}
@@ -996,7 +997,7 @@ func TestEpochNotarizeTwiceThenFinalize(t *testing.T) {
 
 func TestEpochFinalizeThenNotarize(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	quorum := Quorum(len(nodes))
 
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
@@ -1046,7 +1047,7 @@ func TestEpochFinalizeThenNotarize(t *testing.T) {
 
 func TestEpochSimpleFlow(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
 
 	e, err := NewEpoch(conf)
@@ -1062,7 +1063,7 @@ func TestEpochSimpleFlow(t *testing.T) {
 }
 
 func TestEpochResizesBlacklistOnEpochChange(t *testing.T) {
-	nodes := []NodeID{{1}, {2}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}}
 	// The validators of the new epoch have a total weight of 40, which differs both from
 	// the total weight of the previous epoch (5) and from the number of validators (2).
 	validators := Nodes{{Id: nodes[0], Weight: 10}, {Id: nodes[1], Weight: 30}}
@@ -1142,7 +1143,7 @@ func TestEpochResizesBlacklistOnEpochChange(t *testing.T) {
 // propose in its own round.
 func TestEpochBlacklistCapBypassedByPendingSuspects(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	f := (len(nodes) - 1) / 3
 
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
@@ -1195,7 +1196,7 @@ func TestEpochBlacklistCapBypassedByPendingSuspects(t *testing.T) {
 func TestEpochStartedTwice(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
 
 	e, err := NewEpoch(conf)
@@ -1258,7 +1259,7 @@ func TestEpochInterleavingMessages(t *testing.T) {
 func testEpochInterleavingMessages(t *testing.T, seed int64) {
 	rounds := 10
 	bb := testutil.NewTestBlockBuilder().WithBuiltBuffer(uint64(rounds))
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, _, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
 
 	e, err := NewEpoch(conf)
@@ -1351,7 +1352,7 @@ func TestEpochBlockSentTwice(t *testing.T) {
 	var tooFarMsg, alreadyReceivedMsg bool
 
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[1], testutil.NewNoopComm(nodes), bb)
 
 	l := conf.Logger.(*testutil.TestLogger)
@@ -1449,7 +1450,7 @@ func TestEpochQCSignedByNonExistentNodes(t *testing.T) {
 	}
 
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
 	l := conf.Logger.(*testutil.TestLogger)
 	l.Intercept(func(entry zapcore.Entry) error {
@@ -1474,7 +1475,7 @@ func TestEpochQCSignedByNonExistentNodes(t *testing.T) {
 	sigAggr := e.SignatureAggregatorCreator(conf.Comm.Validators())
 
 	t.Run("notarization with unknown signer isn't taken into account", func(t *testing.T) {
-		notarization, err := testutil.NewNotarization(conf.Logger, sigAggr, block, []NodeID{{2}, {3}, {5}})
+		notarization, err := testutil.NewNotarization(conf.Logger, sigAggr, block, []NodeID{{ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{5}}})
 		require.NoError(t, err)
 
 		err = e.HandleMessage(&Message{
@@ -1488,11 +1489,11 @@ func TestEpochQCSignedByNonExistentNodes(t *testing.T) {
 	})
 
 	t.Run("notarization with double signer isn't taken into account", func(t *testing.T) {
-		notarization, err := testutil.NewNotarization(conf.Logger, sigAggr, block, []NodeID{{2}, {3}})
+		notarization, err := testutil.NewNotarization(conf.Logger, sigAggr, block, []NodeID{{ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}})
 		require.NoError(t, err)
 
 		tqc := notarization.QC.(testutil.TestQC)
-		tqc = append(tqc, Signature{Signer: nodes[2], Value: []byte{0}})
+		tqc.Signatures = append(tqc.Signatures, testutil.Signature{Signer: testutil.NewNodeID(nodes[2]), Value: []byte{0}})
 		notarization.QC = tqc
 
 		err = e.HandleMessage(&Message{
@@ -1505,8 +1506,8 @@ func TestEpochQCSignedByNonExistentNodes(t *testing.T) {
 
 	t.Run("empty notarization with unknown signer isn't taken into account", func(t *testing.T) {
 		var qc testutil.TestQC
-		for i, n := range []NodeID{{2}, {3}, {5}} {
-			qc = append(qc, Signature{Signer: n, Value: []byte{byte(i)}})
+		for i, n := range []NodeID{{ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{5}}} {
+			qc.Signatures = append(qc.Signatures, testutil.Signature{Signer: testutil.NewNodeID(n), Value: []byte{byte(i)}})
 		}
 
 		err = e.HandleMessage(&Message{
@@ -1525,8 +1526,8 @@ func TestEpochQCSignedByNonExistentNodes(t *testing.T) {
 
 	t.Run("empty notarization with double signer isn't taken into account", func(t *testing.T) {
 		var qc testutil.TestQC
-		for i, n := range []NodeID{{2}, {3}, {2}} {
-			qc = append(qc, Signature{Signer: n, Value: []byte{byte(i)}})
+		for i, n := range []NodeID{{ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{2}}} {
+			qc.Signatures = append(qc.Signatures, testutil.Signature{Signer: testutil.NewNodeID(n), Value: []byte{byte(i)}})
 		}
 
 		err = e.HandleMessage(&Message{
@@ -1544,7 +1545,7 @@ func TestEpochQCSignedByNonExistentNodes(t *testing.T) {
 	})
 
 	t.Run("finalization with unknown signer isn't taken into account", func(t *testing.T) {
-		finalization, _ := testutil.NewFinalizationRecord(t, sigAggr, block, []NodeID{{2}, {3}, {5}})
+		finalization, _ := testutil.NewFinalizationRecord(t, sigAggr, block, []NodeID{{ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{5}}})
 
 		err = e.HandleMessage(&Message{
 			Finalization: &finalization,
@@ -1555,7 +1556,7 @@ func TestEpochQCSignedByNonExistentNodes(t *testing.T) {
 	})
 
 	t.Run("finalization with double signer isn't taken into account", func(t *testing.T) {
-		finalization, _ := testutil.NewFinalizationRecord(t, sigAggr, block, []NodeID{{2}, {3}, {3}})
+		finalization, _ := testutil.NewFinalizationRecord(t, sigAggr, block, []NodeID{{ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{3}}})
 
 		err = e.HandleMessage(&Message{
 			Finalization: &finalization,
@@ -1570,7 +1571,7 @@ func TestEpochBlockSentFromNonLeader(t *testing.T) {
 	nonLeaderMessage := false
 
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[1], testutil.NewNoopComm(nodes), bb)
 	l := conf.Logger.(*testutil.TestLogger)
 	l.Intercept(func(entry zapcore.Entry) error {
@@ -1612,7 +1613,7 @@ func TestEpochBlockTooHighRound(t *testing.T) {
 	var rejectedBlock bool
 
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[1], testutil.NewNoopComm(nodes), bb)
 
 	l := conf.Logger.(*testutil.TestLogger)
@@ -1686,7 +1687,7 @@ func TestEpochBlockTooHighRound(t *testing.T) {
 // when we receive a notarization for a block we don't have
 func TestEpochSendsBlockDigestRequest(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	ctx := context.Background()
 	recordedMessages := make(chan *Message, 100)
 	comm := &recordingComm{Communication: testutil.NewNoopComm(nodes), SentMessages: recordedMessages}
@@ -1758,7 +1759,7 @@ func TestEpochSendsBlockDigestRequest(t *testing.T) {
 // with finalizations or notarizations
 func TestMetadataProposedRound(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
 
 	e, err := NewEpoch(conf)
@@ -1776,7 +1777,7 @@ func TestMetadataProposedRound(t *testing.T) {
 func TestEpochVotesForEquivocatedVotes(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	recordedMessages := make(chan *Message, 100)
 	comm := &recordingComm{Communication: testutil.NewNoopComm(nodes), BroadcastMessages: recordedMessages}
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[3], comm, bb)
@@ -1851,7 +1852,7 @@ func TestEpochVotesForEquivocatedVotes(t *testing.T) {
 // that builds off an empty round we don't have, we request those missing empty notarizations.
 func TestEpochRequestsEmptyRoundDependency(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	ctx := context.Background()
 	blocks := createBlocks(t, nodes, 1)
 	recordedMessages := make(chan *Message, 100)
@@ -1935,7 +1936,7 @@ func TestEpochRequestsEmptyRoundDependency(t *testing.T) {
 //	                -- block2 (r2,s1)   finalized
 func TestEpochFinalizeVoteRebroadcastSkipsTimedOutFork(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	ctx := context.Background()
 	broadcastMessages := make(chan *Message, 100)
 	sentMessages := make(chan *Message, 100)
@@ -2046,7 +2047,7 @@ func TestEpochFinalizeVoteRebroadcastSkipsTimedOutFork(t *testing.T) {
 //	                   notarized
 func TestEpochFinalizeVoteRebroadcastForTimedOutAncestor(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	ctx := context.Background()
 	broadcastMessages := make(chan *Message, 100)
 	comm := &recordingComm{Communication: testutil.NewNoopComm(nodes), BroadcastMessages: broadcastMessages}
@@ -2130,7 +2131,7 @@ func TestEpochFinalizeVoteRebroadcastForTimedOutAncestor(t *testing.T) {
 // Otherwise, we may end up signing two finalize vote messages for different blocks for the same sequence.
 func TestEpochFinalizeVoteRebroadcastFollowsFinalizedChain(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	broadcastMessages := make(chan *Message, 100)
 	comm := &recordingComm{Communication: testutil.NewNoopComm(nodes), BroadcastMessages: broadcastMessages}
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[3], comm, bb)
@@ -2193,7 +2194,7 @@ func TestEpochFinalizeVoteRebroadcastFollowsFinalizedChain(t *testing.T) {
 // finalizing at a future sequence must not rebroadcast a finalize vote for block1.
 func TestEpochPruneRestoredForkFromWal(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	ctx := context.Background()
 	quorum := Quorum(len(nodes))
 	broadcastMessages := make(chan *Message, 100)
@@ -2269,7 +2270,7 @@ func TestEpochPruneRestoredForkFromWal(t *testing.T) {
 // not add block1 or sign a finalize vote for it once its verification completes.
 func TestEpochReplicatedNotarizationVerifiedAfterFinalizationIsNotFinalized(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	ctx := context.Background()
 	broadcastMessages := make(chan *Message, 100)
 	comm := &recordingComm{Communication: testutil.NewNoopComm(nodes), BroadcastMessages: broadcastMessages}
@@ -2346,7 +2347,7 @@ func TestReplicatedNotarizationRestart(t *testing.T) {
 	// and then restarts the node. The node must recover from the WAL and start successfully.
 
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[1], testutil.NewNoopComm(nodes), bb)
 	conf.ReplicationEnabled = true
@@ -2397,7 +2398,7 @@ func TestReplicatedNotarizationRestart(t *testing.T) {
 func TestDoubleIncrementOnPersistNotarization(t *testing.T) {
 	// add an empty notarization, then a notarization for a previous round
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[3], testutil.NewNoopComm(nodes), bb)
 	conf.ReplicationEnabled = true
 
@@ -2443,7 +2444,7 @@ func TestDoubleIncrementOnPersistNotarization(t *testing.T) {
 
 func TestFailedNotarizationAppendHaltsEpoch(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := &recordingComm{
 		Communication:     testutil.NewNoopComm(nodes),
 		BroadcastMessages: make(chan *Message, 1000),
@@ -2534,7 +2535,7 @@ func (b *listenerComm) Send(msg *Message, id NodeID) {
 func TestRejectsOldNotarizationAndVotes(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 	ctx := context.Background()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	initialBlock := createBlocks(t, nodes, 1)[0]
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[3], testutil.NewNoopComm(nodes), bb)
 	require.NoError(t, storage.Index(ctx, initialBlock.VerifiedBlock, initialBlock.Finalization))
@@ -2774,7 +2775,7 @@ func (v *rejectingVerifier) VerifySignature(_ []byte, signature SignatureBytes, 
 // fails verification ends up in the notarization we assemble and broadcast.
 func TestEpochVoteSentTwiceKeepsVerifiedVote(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 
 	forged := []byte("forged signature")
 
@@ -2816,7 +2817,7 @@ func TestEpochVoteSentTwiceKeepsVerifiedVote(t *testing.T) {
 			}
 			qc, ok := msg.Notarization.QC.(testutil.TestQC)
 			require.True(t, ok)
-			for _, sig := range qc {
+			for _, sig := range qc.Signatures {
 				require.NotEqual(t, forged, sig.Value,
 					"notarization QC contains a signature that failed verification, signer %x", sig.Signer)
 			}
@@ -2832,7 +2833,7 @@ func TestEpochVoteSentTwiceKeepsVerifiedVote(t *testing.T) {
 // strength of the earlier, identical block header.
 func TestEpochBlockSentTwiceKeepsVerifiedVote(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 
 	forged := []byte("forged signature")
 
@@ -2878,7 +2879,7 @@ func TestEpochBlockSentTwiceKeepsVerifiedVote(t *testing.T) {
 // different block header is dropped, so a later matching proposal is still accepted.
 func TestEpochBlockVoteHeaderMismatch(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[1], testutil.NewNoopComm(nodes), bb)
 
 	var storedFutureBlock, alreadyReceived bool
@@ -2943,7 +2944,7 @@ func TestNotarizedNotFinalizedTipCausesEmptyBlockProposal(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			nodes := []NodeID{{1}, {2}, {3}, {4}}
+			nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 			// Pick the node's ID such that it will be the leader in the next round.
 			nodeID := nodes[len(testCase.finalizedRounds)]
 
@@ -3039,7 +3040,7 @@ func TestNotarizedNotFinalizedTipStuckLeaderCausesEmptyNotarization(t *testing.T
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			nodes := []NodeID{{1}, {2}, {3}, {4}}
+			nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 			bb := testutil.NewTestBlockBuilder()
 			conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
 			conf.MaxProposalWait = 50 * time.Millisecond
@@ -3115,7 +3116,7 @@ func notarizeRoundNotFinalized(t *testing.T, e *Epoch, nodes []NodeID, round uin
 // anything is persisted: no block record and no notarization is written to the WAL, and no block is committed.
 // The genuine quorum round for the same block is then accepted.
 func TestEpochRejectsReplicatedQuorumRoundWithMismatchedHeader(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	blacklist := NewBlacklist(DefaultMaxBlacklistedRounds)
 
 	mutations := []struct {
@@ -3189,7 +3190,7 @@ func TestEpochRejectsReplicatedQuorumRoundWithMismatchedHeader(t *testing.T) {
 // type declaring an epoch other than ours is dropped before reaching its handler,
 // while the same message carrying our epoch is processed.
 func TestEpochDropsConsensusMessagesFromOtherEpochs(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	leader := nodes[0] // leader of round 0
 	quorum := Quorum(len(nodes))
 
@@ -3317,7 +3318,7 @@ func TestEpochDropsConsensusMessagesFromOtherEpochs(t *testing.T) {
 // the legitimate ones drive the epoch forward: the foreign proposal is not voted on,
 // and the block that ends up committed is the one from our epoch.
 func TestEpochDropsConsensusMessagesFromOtherEpochsEndToEnd(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	leader := nodes[0]
 	quorum := Quorum(len(nodes))
 
@@ -3382,7 +3383,7 @@ func TestEpochDropsConsensusMessagesFromOtherEpochsEndToEnd(t *testing.T) {
 // epoch, both for finalized blocks and for empty notarizations, and that the
 // same quorum rounds for our epoch are processed.
 func TestEpochIgnoresReplicatedQuorumRoundsFromOtherEpochs(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	quorum := Quorum(len(nodes))
 
 	bb := testutil.NewTestBlockBuilder()
@@ -3453,7 +3454,7 @@ func TestEpochIgnoresReplicatedQuorumRoundsFromOtherEpochs(t *testing.T) {
 // the round cannot displace that vote by sending a second one.
 func TestEpochVoteSentTwiceKeepsBufferedVote(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 
 	forged := []byte("forged signature")
 
@@ -3519,7 +3520,7 @@ func TestFutureProposalDispatchedOnceAfterReentrantCommit(t *testing.T) {
 	// verified block and fails to store the proposal because the round already exists.
 	nodes := make([]NodeID, 10)
 	for i := range nodes {
-		nodes[i] = NodeID{byte(i + 1)}
+		nodes[i] = NodeID{ShortID: ids.ShortID{byte(i + 1)}}
 	}
 	// The epoch node leads only round 9, so it never proposes any of the blocks used here.
 	epochNode := LeaderForRound(nodes, 9)
@@ -3622,7 +3623,7 @@ func TestFutureProposalDispatchedOnceAfterReentrantCommit(t *testing.T) {
 
 // TestReplicationStatePrunesCommittedSequences tests we prune old sequences from replication state.
 func TestReplicationStatePrunesCommittedSequences(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	sigAggr := &testutil.TestSignatureAggregator{N: len(nodes)}
 	rng, err := NewRandomSource()
 	require.NoError(t, err)
@@ -3653,7 +3654,7 @@ func TestReplicationStatePrunesCommittedSequences(t *testing.T) {
 // TestReplicationRequestsKeepHighestObservedRound asserts a replayed notarization
 // for a lower round does not lower the LatestRound sent in replication requests.
 func TestReplicationRequestsKeepHighestObservedRound(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := &recordingComm{Communication: testutil.NewNoopComm(nodes)}
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], comm, testutil.NewTestBlockBuilder())
 	conf.ReplicationEnabled = true
@@ -3695,7 +3696,7 @@ func TestEpochFinalizeVoteSentTwiceKeepsBufferedVote(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			bb := testutil.NewTestBlockBuilder()
-			nodes := []NodeID{{1}, {2}, {3}, {4}}
+			nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 
 			invalidSig := []byte("invalid signature")
 
@@ -3757,7 +3758,7 @@ func TestEpochFinalizeVoteSentTwiceKeepsBufferedVote(t *testing.T) {
 // round answers a late finalize vote for that round with the latest finalization, even if the round has been pruned from memory.
 func TestEpochRepliesWithFinalizationForStaleFinalizeVote(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := &recordingComm{Communication: testutil.NewNoopComm(nodes), SentMessages: make(chan *Message, 100)}
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], comm, bb)
 	conf.MaxRoundWindow = 5
@@ -3789,7 +3790,7 @@ func TestEpochRepliesWithFinalizationForStaleFinalizeVote(t *testing.T) {
 // an empty blacklist, so the follower must wait for the leader's proposal and vote for it,
 // rather than declare the leader blacklisted and vote for an empty block right away.
 func TestEpochFollowerIgnoresStaleBlacklistOnEpochChange(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	bb := testutil.NewTestBlockBuilder()
 
 	// The sealing block is at round 1, so the new epoch starts at round 2, led by nodes[2].
@@ -3856,7 +3857,7 @@ func TestEpochFollowerIgnoresStaleBlacklistOnEpochChange(t *testing.T) {
 // the leader of that round. The new epoch starts from an empty blacklist, so the node must
 // accuse the leader in the next block it builds.
 func TestEpochLeaderRecordsTimeoutDespiteStaleBlacklistOnEpochChange(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	nodeCount := uint16(len(nodes))
 	bb := testutil.NewTestBlockBuilder()
 
@@ -3938,13 +3939,13 @@ func TestEpochBuildsBlacklistWithValidatorWeights(t *testing.T) {
 	// The communication returns the validators out of order, but with {1} first so that it is
 	// the leader of round 0 in either order. The epoch runs as node {1}.
 	unsorted := Nodes{
-		{Id: NodeID{1}, Weight: 10},
-		{Id: NodeID{4}, Weight: 40},
-		{Id: NodeID{2}, Weight: 30},
-		{Id: NodeID{3}, Weight: 20},
+		{Id: NodeID{ShortID: ids.ShortID{1}}, Weight: 10},
+		{Id: NodeID{ShortID: ids.ShortID{4}}, Weight: 40},
+		{Id: NodeID{ShortID: ids.ShortID{2}}, Weight: 30},
+		{Id: NodeID{ShortID: ids.ShortID{3}}, Weight: 20},
 	}
 	// The node indices follow the sorted order of the validators.
-	sortedNodes := []NodeID{{1}, {2}, {3}, {4}}
+	sortedNodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	sortedWeights := []uint64{10, 30, 20, 40}
 	sortedValidatorNodes := make(Nodes, len(sortedNodes))
 	for i := range sortedNodes {
@@ -4035,7 +4036,7 @@ func TestEpochBuildsBlacklistWithValidatorWeights(t *testing.T) {
 // the same round, since the two quorums may then overlap only in nodes that voted both ways.
 func TestRebroadcastDoesNotFinalizeVoteOnTimedOutRound(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := &recordingComm{
 		Communication:     testutil.NewNoopComm(nodes),
 		BroadcastMessages: make(chan *Message, 1000),
@@ -4095,7 +4096,7 @@ func TestRebroadcastDoesNotFinalizeVoteOnTimedOutRound(t *testing.T) {
 
 // TestReplicationLatestSeqBeyondWindowIsNotStored asserts a LatestSeq beyond the round window is not stored.
 func TestReplicationLatestSeqBeyondWindowIsNotStored(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, _, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[1], testutil.NewNoopComm(nodes), testutil.NewTestBlockBuilder())
 	conf.ReplicationEnabled = true
 	conf.MaxRoundWindow = 2
@@ -4142,7 +4143,7 @@ func TestReplicationLatestSeqBeyondWindowIsNotStored(t *testing.T) {
 // TestReplicationNextSeqNotarizationBeyondWindowIsStored asserts a notarization for the next sequence to commit
 // is stored even when its round is beyond the round window, so the round advances past the empty rounds to process it.
 func TestReplicationNextSeqNotarizationBeyondWindowIsStored(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[3], testutil.NewNoopComm(nodes), testutil.NewTestBlockBuilder())
 	conf.ReplicationEnabled = true
 	conf.MaxRoundWindow = 1
@@ -4169,7 +4170,7 @@ func TestReplicationNextSeqNotarizationBeyondWindowIsStored(t *testing.T) {
 // TestFinalizeAfterNotarizingBeyondMaxRoundWindow asserts that blocks are finalized after the network
 // notarizes more consecutive rounds than MaxRoundWindow without finalizing any.
 func TestFinalizeAfterNotarizingBeyondMaxRoundWindow(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	net := testutil.NewControlledNetwork(t, nodes)
 
 	var allowFinalizeVotes atomic.Bool
@@ -4214,7 +4215,7 @@ func TestFinalizeAfterNotarizingBeyondMaxRoundWindow(t *testing.T) {
 // TestEpochAdvancesFromEmptyNotarizationWhileVerifying asserts that a proposal whose round is empty notarized
 // while it is being verified finishes verifying and does not double increment the round.
 func TestEpochAdvancesFromEmptyNotarizationWhileVerifying(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[3], testutil.NewNoopComm(nodes), testutil.NewTestBlockBuilder())
 
 	e, err := NewEpoch(conf)
@@ -4253,7 +4254,7 @@ func TestEpochAdvancesFromEmptyNotarizationWhileVerifying(t *testing.T) {
 // TestEpochAdvancesFromNotarizationWhileVerifying asserts that a notarization received while the round's proposal
 // is being verified advances the epoch once, and the vote on the proposal does not advance it again.
 func TestEpochAdvancesFromNotarizationWhileVerifying(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[3], testutil.NewNoopComm(nodes), testutil.NewTestBlockBuilder())
 
 	e, err := NewEpoch(conf)
@@ -4284,7 +4285,7 @@ func TestEpochAdvancesFromNotarizationWhileVerifying(t *testing.T) {
 // an unnotarized parent is verified once the parent is finalized through replication.
 func TestReplicatedFinalizationExecutesBlockDependents(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[3], testutil.NewNoopComm(nodes), bb)
 	conf.ReplicationEnabled = true
 
@@ -4343,7 +4344,7 @@ func TestReplicatedFinalizationExecutesBlockDependents(t *testing.T) {
 // schedule the blocks that build on it.
 func TestFailedVerificationDoesNotExecuteBlockDependents(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[3], testutil.NewNoopComm(nodes), bb)
 	conf.ReplicationEnabled = true
 
@@ -4404,7 +4405,7 @@ func TestFailedVerificationDoesNotExecuteBlockDependents(t *testing.T) {
 // at round 6. Epoch 5 also notarized its first block at round 6. Only the latter is verified.
 func TestRestoreFromWALSkipsOlderEpochRecords(t *testing.T) {
 	ctx := context.Background()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	quorum := Quorum(len(nodes))
 	sigAggr := &testutil.TestSignatureAggregator{N: len(nodes)}
 	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), testutil.NewTestBlockBuilder())
@@ -4456,7 +4457,7 @@ func TestRestoreFromWALSkipsOlderEpochRecords(t *testing.T) {
 // for a round whose block is already in the rounds map and which is also empty notarized.
 func TestReplicatedNotarizationForEmptyNotarizedRound(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[3], testutil.NewNoopComm(nodes), bb)
 	conf.ReplicationEnabled = true
 
@@ -4496,7 +4497,7 @@ func TestReplicatedNotarizationForEmptyNotarizedRound(t *testing.T) {
 // next block on it. Telocks are never committed, so the block built on the Telock is finalized but never committed,
 // and the node halts.
 func TestEpochRejectsTelockReplicatedWithEmptyNotarization(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	quorum := Quorum(len(nodes))
 	blacklist := NewBlacklist(DefaultMaxBlacklistedRounds)
 
@@ -4563,7 +4564,7 @@ func TestEpochRejectsTelockReplicatedWithEmptyNotarization(t *testing.T) {
 // so the node builds a second block for it, fails to store it, and halts.
 func TestLateNotarizationForPastRoundHaltsLeader(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	recordingComm := &recordingComm{
 		Communication:     testutil.NewNoopComm(nodes),
 		BroadcastMessages: make(chan *Message, 100),
@@ -4635,7 +4636,7 @@ func TestEpochRejectsProposalWithWrongSeq(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			bb := testutil.NewTestBlockBuilder()
-			nodes := []NodeID{{1}, {2}, {3}, {4}}
+			nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 			conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[3], testutil.NewNoopComm(nodes), bb)
 
 			e, err := NewEpoch(conf)
@@ -4691,7 +4692,7 @@ func TestEpochRejectsProposalWithWrongSeq(t *testing.T) {
 // Verification tasks run one at a time, so C is stored first, and B finds the round already filled.
 // The node must still store the notarization of B and advance to round 1.
 func TestEpochKeepsReplicatedNotarizedBlockWhenLeaderRefillsRound(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	bb := testutil.NewTestBlockBuilder()
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[1], testutil.NewNoopComm(nodes), bb)
 	conf.ReplicationEnabled = true
@@ -4750,7 +4751,7 @@ func TestEpochKeepsReplicatedNotarizedBlockWhenLeaderRefillsRound(t *testing.T) 
 // TestEpochFutureEmptyVotesAssembleOnRoundStart asserts that empty votes received for a future round
 // are kept and assembled into an empty notarization once the epoch reaches that round.
 func TestEpochFutureEmptyVotesAssembleOnRoundStart(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[3], testutil.NewNoopComm(nodes), testutil.NewTestBlockBuilder())
 
 	e, err := NewEpoch(conf)
@@ -4775,7 +4776,7 @@ func TestProposalOnAncientParentIsRejected(t *testing.T) {
 	const finalizedRounds = 40
 
 	bb := testutil.NewTestBlockBuilder()
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	comm := &recordingComm{
 		Communication: testutil.NewNoopComm(nodes),
 		SentMessages:  make(chan *Message, 100),
@@ -4828,7 +4829,7 @@ func TestProposalOnAncientParentIsRejected(t *testing.T) {
 }
 
 func TestNoSecondVoteAfterConflictingCertificate(t *testing.T) {
-	nodes := []NodeID{{1}, {2}, {3}, {4}}
+	nodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}}
 	signers := []NodeID{nodes[0], nodes[2], nodes[3]}
 
 	for _, tc := range []struct {
