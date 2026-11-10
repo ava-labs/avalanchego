@@ -26,3 +26,6 @@ func (t *Timer) RegisterTimeout(delay time.Duration) {
 		require.False(t.T, t.CantRegisterTimout, "Unexpectedly called RegisterTimeout")
 	}
 }
+
+// Stop does nothing because Timer never schedules a timeout.
+func (*Timer) Stop() {}

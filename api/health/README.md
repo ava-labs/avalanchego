@@ -35,4 +35,4 @@ When a health check is added it will always initially report as unhealthy.
 
 Every health check runs in its own goroutine to maximize concurrency. It is guaranteed that no locks from the health checker are held during the execution of the health check.
 
-When the health check worker is stopped, it will finish executing any currently running health checks and then terminate its primary goroutine. After the health check worker is stopped, the health checks will never run again.
+When the health check worker is stopped, it will attempt to finish executing any currently running health checks and then terminate its primary goroutine. After the health check worker is stopped, the health checks will never run again.

@@ -356,18 +356,12 @@ type builder struct {
 	desired      desiredParams
 }
 
-var (
-	errHeliconUnactivated = errors.New("helicon is not activated")
-	errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
-)
+var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
 
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
-	if !b.ctx.NetworkUpgrades.IsHeliconActivated(now) {
-		return nil, errHeliconUnactivated
-	}
 
 	de := delayExponent(parent)
 	parentTime := blockTime(parent)
@@ -528,8 +522,8 @@ func (b *builder) BuildBlock(
 		return nil, fmt.Errorf("marshalling txs: %w", err)
 	}
 
-	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
-	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, corethparams.GetRulesExtra(rules).IsDurango, ethTxs)
+	// SAE blocks are post-Helicon, and therefore post-Durango.
+	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, ethTxs)
 	if err != nil {
 		return nil, fmt.Errorf("verifying warp messages: %w", err)
 	}
