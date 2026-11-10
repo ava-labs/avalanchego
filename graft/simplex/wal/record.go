@@ -26,7 +26,7 @@ const (
 var (
 	ErrInvalidCRC      = errors.New("invalid CRC checksum")
 	ErrPayloadTooLarge = errors.New("payload too large for record length field")
-	ErrRecordTooLong   = errors.New("record is longer than the remaining bytes")
+	ErrCorruptedWAL    = errors.New("corrupted WAL file")
 
 	// maxPayloadSize is the largest WAL record payload. It is above
 	// [constants.DefaultMaxMessageSize] to leave plenty of room for the record metadata.
@@ -79,7 +79,7 @@ func readRecord(r io.Reader, maxSize int64) ([]byte, int64, error) {
 	// and understate the size of the record or of the allocation below.
 	recordLen := int64(recordSizeLen) + int64(payloadLen) + int64(recordChecksumLen)
 	if recordLen > maxSize {
-		return nil, 0, fmt.Errorf("%w: record indicates payload is %d bytes long, but only %d bytes remain", ErrRecordTooLong, payloadLen, maxSize)
+		return nil, 0, fmt.Errorf("%w: record indicates payload is %d bytes long, but only %d bytes remain", ErrCorruptedWAL, payloadLen, maxSize)
 	}
 
 	payloadAndChecksum := make([]byte, int64(payloadLen)+int64(recordChecksumLen))
@@ -94,7 +94,7 @@ func readRecord(r io.Reader, maxSize int64) ([]byte, int64, error) {
 	checksum := payloadAndChecksum[payloadLen:]
 	expectedChecksum := crc.Sum(buff[:0])
 	if !bytes.Equal(checksum, expectedChecksum) {
-		return nil, 0, ErrInvalidCRC
+		return nil, 0, fmt.Errorf("%w: %w", ErrCorruptedWAL, ErrInvalidCRC)
 	}
 	return payload, recordLen, nil
 }
