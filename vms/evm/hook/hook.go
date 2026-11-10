@@ -236,30 +236,6 @@ type Settled struct {
 	Excess       gas.Gas
 }
 
-// NewSettled returns the settlement marker encoded by the given header-extra
-// pointers, or the zero value (indicating synchronous, pre-SAE execution)
-// when any pointer is nil. It is the inverse of [Settled.AsPointers], letting
-// chains with different header-extra types share one [Points.SettledBy]
-// implementation.
-func NewSettled(height, gasUnix, gasNumerator, excess *uint64) Settled {
-	if height == nil || gasUnix == nil || gasNumerator == nil || excess == nil {
-		return Settled{}
-	}
-	return Settled{
-		Height:       *height,
-		GasUnix:      *gasUnix,
-		GasNumerator: gas.Gas(*gasNumerator),
-		Excess:       gas.Gas(*excess),
-	}
-}
-
-// AsPointers returns pointers to copies of s's fields, for stamping into
-// chain-specific header extras in [BlockBuilder.BuildBlock]. It is the
-// inverse of [NewSettled].
-func (s Settled) AsPointers() (height, gasUnix, gasNumerator, excess *uint64) {
-	return &s.Height, &s.GasUnix, (*uint64)(&s.GasNumerator), (*uint64)(&s.Excess)
-}
-
 // Self reports whether Settled represents a self-settling synchronous block.
 func (s Settled) Self() bool {
 	return s == Settled{}

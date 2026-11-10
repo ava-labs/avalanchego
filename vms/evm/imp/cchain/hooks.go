@@ -188,7 +188,18 @@ func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceC
 
 func (*hooks) SettledBy(h *types.Header) hook.Settled {
 	he := customtypes.GetHeaderExtra(h)
-	return hook.NewSettled(he.SettledHeight, he.SettledGasUnix, he.SettledGasNumerator, he.SettledExcess)
+	if he.SettledHeight == nil ||
+		he.SettledGasUnix == nil ||
+		he.SettledGasNumerator == nil ||
+		he.SettledExcess == nil {
+		return hook.Settled{}
+	}
+	return hook.Settled{
+		Height:       *he.SettledHeight,
+		GasUnix:      *he.SettledGasUnix,
+		GasNumerator: gas.Gas(*he.SettledGasNumerator),
+		Excess:       gas.Gas(*he.SettledExcess),
+	}
 }
 
 // BlockTime returns the canonical wall-clock time of a block.
@@ -534,7 +545,10 @@ func (b *builder) BuildBlock(
 
 	// Encode the settled block marker into the header so [hooks.SettledBy] can recover it.
 	he := customtypes.GetHeaderExtra(header)
-	he.SettledHeight, he.SettledGasUnix, he.SettledGasNumerator, he.SettledExcess = settled.AsPointers()
+	he.SettledHeight = &settled.Height
+	he.SettledGasUnix = &settled.GasUnix
+	he.SettledGasNumerator = (*uint64)(&settled.GasNumerator)
+	he.SettledExcess = (*uint64)(&settled.Excess)
 
 	return customtypes.NewBlockWithExtData(
 		header,
