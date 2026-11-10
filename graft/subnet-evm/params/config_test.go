@@ -292,13 +292,14 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 			},
 		)
 	}
-	config := newConfig(extras.UpgradeConfig{
+	upgrades := extras.UpgradeConfig{
 		PrecompileUpgrades: []extras.PrecompileUpgrade{
 			{
 				Config: txallowlist.NewConfig(utils.PointerTo[uint64](100), nil, nil, nil),
 			},
 		},
-	})
+	}
+	config := newConfig(upgrades)
 	result, err := json.Marshal(config)
 	require.NoError(t, err, "json.Marshal()")
 	expectedJSON := `{
@@ -337,7 +338,11 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 	require.JSONEq(t, expectedJSON, string(result))
 
 	// Upgrades are read from their own database key, not the chain config.
-	var unmarshalled ChainConfig
+	var unmarshalled ChainConfigWithUpgradesJSON
 	require.NoError(t, json.Unmarshal(result, &unmarshalled), "json.Unmarshal()")
-	require.Equal(t, newConfig(extras.UpgradeConfig{}), &unmarshalled)
+	want := ChainConfigWithUpgradesJSON{
+		ChainConfig:   *newConfig(extras.UpgradeConfig{}),
+		UpgradeConfig: upgrades,
+	}
+	require.Equal(t, want, unmarshalled)
 }
