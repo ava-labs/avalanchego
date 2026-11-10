@@ -226,10 +226,9 @@ func TestGetWarpMessage(t *testing.T) {
 		msg  = predicate.Predicate{{2}}
 		list = types.AccessList{{Address: warp.ContractAddress, StorageKeys: msg}}
 	)
-	rules := cchaintest.ChainConfig().Rules(common.Big0, true /*isMerge*/, 0)
-
 	tests := []struct {
 		name   string
+		config *params.ChainConfig
 		lists  []types.AccessList // passed to successive [StateDB.Prepare] calls
 		index  int
 		want   predicate.Predicate
@@ -237,23 +236,32 @@ func TestGetWarpMessage(t *testing.T) {
 	}{
 		{
 			name:   "prepared",
+			config: cchaintest.ChainConfig(),
 			lists:  []types.AccessList{list},
 			want:   msg,
 			wantOK: true,
 		},
 		{
-			name:  "negative_index",
-			lists: []types.AccessList{list},
-			index: -1,
+			name:   "pre_durango",
+			config: corethparams.WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &cparams.ChainConfig{}),
+			lists:  []types.AccessList{list},
 		},
 		{
-			name:  "replaced_by_next_prepare",
-			lists: []types.AccessList{list, nil},
+			name:   "negative_index",
+			config: cchaintest.ChainConfig(),
+			lists:  []types.AccessList{list},
+			index:  -1,
+		},
+		{
+			name:   "replaced_by_next_prepare",
+			config: cchaintest.ChainConfig(),
+			lists:  []types.AccessList{list, nil},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := newEmptyStateDB(t)
+			rules := tt.config.Rules(common.Big0, true /*isMerge*/, 0)
 			for _, l := range tt.lists {
 				s.Prepare(rules, common.Address{}, common.Address{}, nil, nil, l)
 			}

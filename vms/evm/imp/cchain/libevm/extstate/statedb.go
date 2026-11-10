@@ -94,7 +94,10 @@ func (s *StateDB) Prepare(
 	list types.AccessList,
 ) {
 	rulesExtra := corethparams.GetRulesExtra(rules)
-	s.warpMessages = warp.MessagesFromAccessList(corethparams.GetRulesExtra(rules).IsDurango, list)
+	s.warpMessages = nil // Warp messages don't exist before Durango.
+	if rulesExtra.IsDurango {
+		s.warpMessages = warp.MessagesFromAccessList(list)
+	}
 	s.preAP1 = !rulesExtra.IsApricotPhase1
 	s.StateDB.Prepare(rules, sender, coinbase, dst, precompiles, list)
 }
