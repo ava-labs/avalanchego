@@ -7,7 +7,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -538,6 +540,75 @@ func TestRestartBootstrapping(t *testing.T) {
 
 	require.NoError(bs.startSyncing(t.Context(), blocksToIDs(blks[4:5])))
 	require.Equal(snow.NormalOp, config.Ctx.State.Get().State)
+}
+
+// TestShutdownPreventsRestart tests that a restart timeout still pending at
+// Shutdown does not restart bootstrapping. The running case is the control: it
+// proves the timeout does restart bootstrapping when nothing shuts down.
+func TestShutdownPreventsRestart(t *testing.T) {
+	tests := []struct {
+		name        string
+		shutdown    bool
+		wantRestart bool
+	}{
+		{name: "running", wantRestart: true},
+		{name: "shutdown", shutdown: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				config, peerID, sender, vm, _ := newConfig(t)
+
+				// Other chains in the subnet never finish, so the bootstrapper
+				// waits for a timeout to restart instead of finishing.
+				config.BootstrapTracker.(*enginetest.BootstrapTracker).BootstrappedF = func(ids.ID) {}
+
+				blks := snowmantest.BuildChain(3)
+				initializeVMWithBlockchain(vm, blks)
+
+				bs, err := New(config, func(context.Context, uint32) error { return nil })
+				require.NoError(t, err)
+
+				var (
+					frontierRequests atomic.Int32
+					frontierReqID    uint32
+					acceptedReqID    uint32
+					ancestorsReqID   uint32
+				)
+				sender.SendGetAcceptedFrontierF = func(_ context.Context, _ set.Set[ids.NodeID], reqID uint32) {
+					frontierRequests.Add(1)
+					frontierReqID = reqID
+				}
+				sender.SendGetAcceptedF = func(_ context.Context, _ set.Set[ids.NodeID], reqID uint32, _ []ids.ID) {
+					acceptedReqID = reqID
+				}
+				sender.SendGetAncestorsF = func(_ context.Context, _ ids.NodeID, reqID uint32, _ ids.ID) {
+					ancestorsReqID = reqID
+				}
+
+				require.NoError(t, bs.Start(t.Context(), 0))
+				require.NoError(t, bs.AcceptedFrontier(t.Context(), peerID, frontierReqID, blks[2].ID()))
+				require.NoError(t, bs.Accepted(t.Context(), peerID, acceptedReqID, set.Of(blks[2].ID())))
+				require.NoError(t, bs.Ancestors(t.Context(), peerID, ancestorsReqID, blocksToBytes(blks[1:3])))
+				// Executing the fetched blocks restarts bootstrapping once. The
+				// second round finds nothing new, so the bootstrapper waits for
+				// the timeout.
+				require.NoError(t, bs.AcceptedFrontier(t.Context(), peerID, frontierReqID, blks[2].ID()))
+				require.NoError(t, bs.Accepted(t.Context(), peerID, acceptedReqID, set.Of(blks[2].ID())))
+
+				if tt.shutdown {
+					vm.ShutdownF = func(context.Context) error { return nil }
+					require.NoError(t, bs.Shutdown(t.Context()))
+				}
+
+				before := frontierRequests.Load()
+				time.Sleep(2 * bootstrappingDelay)
+				synctest.Wait()
+
+				require.Equal(t, tt.wantRestart, frontierRequests.Load() > before)
+			})
+		})
+	}
 }
 
 func TestBootstrapOldBlockAfterStateSync(t *testing.T) {

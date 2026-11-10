@@ -41,6 +41,8 @@ type timeoutScheduler struct {
 	onTimeout           func()
 	preemptionSignal    <-chan struct{}
 	pendingTimeoutToken chan struct{}
+	stop                chan struct{}
+	stopOnce            sync.Once
 }
 
 // NewTimeoutScheduler constructs a new timeout scheduler with the given function to be invoked upon a timeout,
@@ -53,6 +55,7 @@ func NewTimeoutScheduler(onTimeout func(), preemptionSignal <-chan struct{}) *ti
 		newTimer:            time.NewTimer,
 		onTimeout:           onTimeout,
 		pendingTimeoutToken: pendingTimout,
+		stop:                make(chan struct{}),
 	}
 }
 
@@ -76,6 +79,8 @@ func (th *timeoutScheduler) scheduleTimeout(d time.Duration) {
 	select {
 	case <-timer.C:
 	case <-th.preemptionSignal:
+	case <-th.stop:
+		return
 	}
 
 	// Relinquish the pendingTimeoutToken.
@@ -87,6 +92,14 @@ func (th *timeoutScheduler) scheduleTimeout(d time.Duration) {
 	th.pendingTimeoutToken <- struct{}{}
 
 	th.onTimeout()
+}
+
+// Stop releases the goroutines and timers of pending timeouts. It does not
+// guarantee that no timeout fires afterwards: see [TimeoutRegistrar.Stop].
+func (th *timeoutScheduler) Stop() {
+	th.stopOnce.Do(func() {
+		close(th.stop)
+	})
 }
 
 func (th *timeoutScheduler) acquirePendingTimeoutToken() bool {
@@ -104,8 +117,12 @@ type TimeoutRegistrar interface {
 	//
 	// If there is already a pending timeout message, this call is a no-op.
 	// However, it is guaranteed that the timeout will fire at least once after
-	// calling this function.
+	// calling this function, unless [TimeoutRegistrar.Stop] is called.
 	//
 	// If the subnet has been bootstrapped, the timeout will fire immediately via calling Preempt().
 	RegisterTimeout(time.Duration)
+
+	// Stop releases the resources of pending timeouts. A timeout may still fire
+	// after Stop returns, so the timeout must check if it should still act.
+	Stop()
 }

@@ -14,7 +14,6 @@ require (
 	github.com/google/go-cmp v0.7.0
 	github.com/holiman/uint256 v1.2.4
 	github.com/stretchr/testify v1.11.1
-	go.uber.org/mock v0.5.0
 )
 
 require (
@@ -112,7 +111,6 @@ require (
 tool (
 	github.com/ava-labs/libevm/rlp/rlpgen
 	github.com/fjl/gencodec
-	go.uber.org/mock/mockgen
 )
 
 replace (

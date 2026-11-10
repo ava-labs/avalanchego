@@ -94,7 +94,6 @@ func (s *StateDB) Prepare(
 	list types.AccessList,
 ) {
 	rulesExtra := corethparams.GetRulesExtra(rules)
-	s.warpMessages = nil
 	if rulesExtra.IsDurango {
 		s.warpMessages = warp.MessagesFromAccessList(list)
 	}

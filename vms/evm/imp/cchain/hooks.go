@@ -25,7 +25,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
-	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -351,18 +350,12 @@ type builder struct {
 	desired      desiredParams
 }
 
-var (
-	errHeliconUnactivated = errors.New("helicon is not activated")
-	errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
-)
+var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
 
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
-	if !b.ctx.NetworkUpgrades.IsHeliconActivated(now) {
-		return nil, errHeliconUnactivated
-	}
 
 	de := delayExponent(parent)
 	parentTime := blockTime(parent)
@@ -526,13 +519,10 @@ func (b *builder) BuildBlock(
 		return nil, fmt.Errorf("marshalling txs: %w", err)
 	}
 
-	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
-	var warpValidity predicate.BlockResults
-	if corethparams.GetRulesExtra(rules).IsDurango {
-		warpValidity, err = saewarp.VerifyBlock(b.ctx, blockCtx, &corethwarp.Config{}, ethTxs)
-		if err != nil {
-			return nil, fmt.Errorf("verifying warp messages: %w", err)
-		}
+	// SAE blocks are post-Helicon, and therefore post-Durango.
+	warpValidity, err := saewarp.VerifyBlock(b.ctx, blockCtx, &corethwarp.Config{}, ethTxs)
+	if err != nil {
+		return nil, fmt.Errorf("verifying warp messages: %w", err)
 	}
 
 	// TODO(StephenButtolph): Replace the predicate bytes format with an

@@ -1873,6 +1873,11 @@ func (n *Node) shutdown() {
 	if n.chainManager != nil {
 		n.chainManager.Shutdown()
 	}
+
+	if n.health != nil {
+		n.stopHealth(context.TODO())
+	}
+
 	if n.benchlistManager != nil {
 		n.benchlistManager.Shutdown()
 	}
@@ -1925,6 +1930,17 @@ func (n *Node) shutdown() {
 	}
 
 	n.Log.Info("finished node shutdown")
+}
+
+func (n *Node) stopHealth(ctx context.Context) {
+	// Best-effort shutdown because health checks use the context lock
+	// which a slow chain might not release in time.
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	if err := n.health.Stop(ctx); err != nil {
+		n.Log.Warn("health checks did not stop", zap.Error(err))
+	}
 }
 
 func (n *Node) ExitCode() int {
