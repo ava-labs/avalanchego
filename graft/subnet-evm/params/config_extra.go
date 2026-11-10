@@ -100,8 +100,8 @@ func WithExtra(c *ChainConfig, extra *extras.ChainConfig) *ChainConfig {
 	return c
 }
 
-// A ChainConfigWithUpgradesJSON is a decoded eth_getChainConfig response,
-// including the upgrades that [ChainConfig] doesn't unmarshal.
+// A ChainConfigWithUpgradesJSON is used to decode a eth_getChainConfig response,
+// including the upgrades that [extras.ChainConfig] doesn't unmarshal.
 type ChainConfigWithUpgradesJSON struct {
 	ChainConfig
 	UpgradeConfig extras.UpgradeConfig
