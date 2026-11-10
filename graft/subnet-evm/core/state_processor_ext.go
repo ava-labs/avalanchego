@@ -70,23 +70,19 @@ func ApplyPrecompileActivations(c *params.ChainConfig, parentTimestamp *uint64, 
 }
 
 // applyStateUpgrades checks if any of the state upgrades specified by the chain config are activated by the block
-// transition from [parentTimestamp] to the timestamp set in [header]. If this is the case, it calls [Configure]
-// to apply the necessary state transitions for the upgrade.
-func applyStateUpgrades(c *params.ChainConfig, parentTimestamp *uint64, blockContext contract.ConfigurationBlockContext, statedb *state.StateDB) error {
-	// Apply state upgrades
+// transition from [parentTimestamp] to the timestamp set in [header]. If this is the case, it applies the
+// necessary state transitions for the upgrade.
+func applyStateUpgrades(c *params.ChainConfig, parentTimestamp *uint64, blockContext contract.ConfigurationBlockContext, statedb *state.StateDB) {
 	configExtra := params.GetExtra(c)
 	for _, upgrade := range configExtra.GetActivatingStateUpgrades(parentTimestamp, blockContext.Timestamp()) {
 		log.Info("Applying state upgrade", "blockNumber", blockContext.Number(), "upgrade", upgrade)
-		if err := upgrade.Apply(c, statedb, blockContext.Number()); err != nil {
-			return fmt.Errorf("could not configure state upgrade: %w", err)
-		}
+		upgrade.Apply(c, statedb, blockContext.Number())
 	}
-	return nil
 }
 
 // ApplyUpgrades checks if any of the precompile or state upgrades specified by the chain config are activated by the block
-// transition from [parentTimestamp] to the timestamp set in [header]. If this is the case, it calls [Configure]
-// to apply the necessary state transitions for the upgrade.
+// transition from [parentTimestamp] to the timestamp set in [header]. If this is the case, it applies the
+// necessary state transitions for the upgrade.
 // This function is called:
 // - in block processing to update the state when processing a block.
 // - in the miner to apply the state upgrades when producing a block.
@@ -94,7 +90,8 @@ func ApplyUpgrades(c *params.ChainConfig, parentTimestamp *uint64, blockContext 
 	if err := ApplyPrecompileActivations(c, parentTimestamp, blockContext, statedb); err != nil {
 		return err
 	}
-	return applyStateUpgrades(c, parentTimestamp, blockContext, statedb)
+	applyStateUpgrades(c, parentTimestamp, blockContext, statedb)
+	return nil
 }
 
 // BlockContext implements [contract.ConfigurationBlockContext].

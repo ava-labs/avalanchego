@@ -23,7 +23,7 @@ var (
 func (c *ChainConfig) verifyStateUpgrades() error {
 	var previousUpgradeTimestamp *uint64
 	for i, upgrade := range c.StateUpgrades {
-		upgradeTimestamp := upgrade.BlockTimestamp
+		upgradeTimestamp := upgrade.Timestamp
 		if upgradeTimestamp == nil {
 			return fmt.Errorf("%w: StateUpgrade[%d]", errStateUpgradeNilTimestamp, i)
 		}
@@ -48,9 +48,9 @@ func (c *ChainConfig) GetActivatingStateUpgrades(from *uint64, to uint64) []stat
 }
 
 func getActivatingStateUpgrades(from *uint64, to uint64, upgrades []stateupgrade.Block) []stateupgrade.Block {
-	activating := make([]stateupgrade.Block, 0)
+	var activating []stateupgrade.Block
 	for _, upgrade := range upgrades {
-		if IsForkTransition(upgrade.BlockTimestamp, from, to) {
+		if IsForkTransition(upgrade.Timestamp, from, to) {
 			activating = append(activating, upgrade)
 		}
 	}
@@ -60,7 +60,7 @@ func getActivatingStateUpgrades(from *uint64, to uint64, upgrades []stateupgrade
 // checkStateUpgradesCompatible checks if [stateUpgrades] are compatible with [c] at [headTimestamp].
 func (c *ChainConfig) checkStateUpgradesCompatible(stateUpgrades []stateupgrade.Block, lastTimestamp uint64) *ethparams.ConfigCompatError {
 	// All active upgrades (from nil to [lastTimestamp]) must match.
-	activeUpgrades := c.GetActivatingStateUpgrades(nil, lastTimestamp)
+	activeUpgrades := getActivatingStateUpgrades(nil, lastTimestamp, c.StateUpgrades)
 	newUpgrades := getActivatingStateUpgrades(nil, lastTimestamp, stateUpgrades)
 
 	// Check activated upgrades are still present.
@@ -69,7 +69,7 @@ func (c *ChainConfig) checkStateUpgradesCompatible(stateUpgrades []stateupgrade.
 			// missing upgrade
 			return ethparams.NewTimestampCompatError(
 				fmt.Sprintf("missing StateUpgrade[%d]", i),
-				upgrade.BlockTimestamp,
+				upgrade.Timestamp,
 				nil,
 			)
 		}
@@ -77,8 +77,8 @@ func (c *ChainConfig) checkStateUpgradesCompatible(stateUpgrades []stateupgrade.
 		if !upgrade.Equal(&newUpgrades[i]) {
 			return ethparams.NewTimestampCompatError(
 				fmt.Sprintf("StateUpgrade[%d]", i),
-				upgrade.BlockTimestamp,
-				newUpgrades[i].BlockTimestamp,
+				upgrade.Timestamp,
+				newUpgrades[i].Timestamp,
 			)
 		}
 	}
@@ -88,7 +88,7 @@ func (c *ChainConfig) checkStateUpgradesCompatible(stateUpgrades []stateupgrade.
 		return ethparams.NewTimestampCompatError(
 			fmt.Sprintf("cannot retroactively enable StateUpgrade[%d]", len(activeUpgrades)),
 			nil,
-			newUpgrades[len(activeUpgrades)].BlockTimestamp, // this indexes to the first element in newUpgrades after the end of activeUpgrades
+			newUpgrades[len(activeUpgrades)].Timestamp, // this indexes to the first element in newUpgrades after the end of activeUpgrades
 		)
 	}
 
