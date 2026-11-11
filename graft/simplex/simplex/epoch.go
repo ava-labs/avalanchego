@@ -2414,6 +2414,8 @@ func (e *Epoch) createNotarizedBlockVerificationTask(block common.Block, notariz
 		e.lock.Lock()
 		defer e.lock.Unlock()
 
+		prevRound := e.round
+
 		// A higher round was finalized while we were verifying, so this block can no longer be finalized.
 		if e.isBelowHighestFinalizedRound(md.Round) {
 			e.Logger.Debug("Dropping notarized block for a round below a finalized round", zap.Uint64("round", md.Round))
@@ -2471,7 +2473,7 @@ func (e *Epoch) createNotarizedBlockVerificationTask(block common.Block, notariz
 		}
 
 		// If we have advanced a round, and the new round is beyond our replication state, start the new round.
-		if e.round > md.Round && e.round > e.replicationState.GetHighestRound() {
+		if e.round > prevRound && e.round > e.replicationState.GetHighestRound() {
 			if err := e.startRound(); err != nil {
 				e.haltedError = err
 				return md.Digest
