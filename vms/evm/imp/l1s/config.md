@@ -9,7 +9,7 @@ This document describes the configuration options available for the SAE L1 VM. D
 
 Default values are overridden only if specified in the given config file. It is recommended to only provide values which are different from the default, as that makes the config more resilient to future default changes. Otherwise, if defaults change, your node will remain with the old values, which might adversely affect your node operation.
 
-Field names and JSON tags match the legacy Subnet-EVM plugin's config schema for the subset this VM supports, so existing operator config blobs keep working for those fields. Unrecognized options, such as a typo or a legacy Subnet-EVM option this VM doesn't support, are ignored, and the node logs a warning naming them.
+This VM accepts every [C-Chain option](../cchain/config.md) plus the L1-specific options below. `min-price-target` and `state-sync-enabled` are accepted but not yet supported, so they have no effect. Field names and JSON tags of the L1-specific options match the legacy Subnet-EVM plugin's config schema, so existing operator config blobs keep working for those fields. Unrecognized options, such as a typo or a legacy Subnet-EVM option this VM doesn't support, are ignored, and the node logs a warning naming them.
 
 ## Example Configuration
 
@@ -38,7 +38,12 @@ Field names and JSON tags match the legacy Subnet-EVM plugin's config schema for
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
 | `pruning-enabled` | bool | Enable state pruning to save disk space. If disabled, the node runs in archival mode and retains all historical state. When enabled, trie roots are only persisted every `commit-interval` blocks. | `true` |
-| `commit-interval` | uint64 | Interval at which to persist the state trie (blocks). A value of `0` is rejected. | `4096` |
+| `commit-interval` | uint64 | For HashDB, this sets the number of blocks between state-trie writes to disk. For Firewood, it sets the maximum number of revisions that may remain unpersisted at once. Omit this option to use the default; Mainnet and Fuji MUST use the default with HashDB. The node does not accept an explicit 0. | `4096` |
+| `trie-clean-cache` | int | Size of the trie clean cache in MB. | `512` |
+| `snapshot-cache` | int | Size of the snapshot disk layer clean cache in MB. | `256` |
+| `allow-missing-tries` | bool | Suppress warnings about an incomplete trie index. | `false` |
+| `state-scheme` | string | EXPERIMENTAL: specifies the database scheme used to store state data; either `hash` or `firewood`. | `hash` |
+| `state-history` | uint64 | Number of recently executed states to guarantee available in memory. The minimum possible value is the default. | `128` |
 
 ## Transaction Pool
 
@@ -57,6 +62,9 @@ Field names and JSON tags match the legacy Subnet-EVM plugin's config schema for
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
+| `apis` | array of strings | The JSON-RPC APIs this node serves, see the C-Chain's [Available APIs](../cchain/config.md#available-apis). Methods of an API that is not listed are not served. An unrecognised name is a fatal configuration error. | every API enabled by default on the C-Chain |
+| `allow-unprotected-txs` | bool | Allow unprotected transactions (without EIP-155 replay protection). | `false` |
+| `api-max-blocks-per-request` | uint64 | Maximum number of blocks per `eth_getLogs` request (`0` = no limit). | `0` |
 | `rpc-gas-cap` | uint64 | Maximum gas for `eth_call`/`eth_estimateGas`-style RPC execution. | `50000000` |
 | `rpc-tx-fee-cap` | float64 | Cap on transaction fees (in the native token) that can be sent via RPC APIs (`0` = no cap). | `100` |
 | `api-max-duration` | duration | Maximum duration of an `eth_call` or `eth_callDetailed`; non-positive values disable the limit. Accepts a [Go duration string](https://pkg.go.dev/time#ParseDuration), such as `"30s"`. | `"0s"` |

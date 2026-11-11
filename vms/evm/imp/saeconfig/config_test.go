@@ -11,9 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/vms/evm/sae"
+	"github.com/ava-labs/avalanchego/vms/evm/firewood"
+	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 )
 
 // TestParse checks that keys of an embedded [Config] are recognized alongside
@@ -51,9 +53,9 @@ func TestDurationRejectsNumber(t *testing.T) {
 	require.ErrorAs(t, json.Unmarshal([]byte(`5000000000`), &d), &typeErr)
 }
 
-// TestApply checks that every field of [Config] that maps onto [sae.Config]
-// overwrites the corresponding value.
-func TestApply(t *testing.T) {
+// TestSAEConfig checks that every field of [Config] that maps onto [sae.Config]
+// sets the corresponding value.
+func TestSAEConfig(t *testing.T) {
 	c := Config{
 		Pruning:                      false,
 		CommitInterval:               7,
@@ -64,8 +66,7 @@ func TestApply(t *testing.T) {
 		APIMaxDuration:               Duration{11 * time.Second},
 		ResolvePendingToLastExecuted: false,
 	}
-	got := sae.DefaultConfig()
-	c.Apply(&got)
+	got := c.SAEConfig(nil)
 
 	require.False(t, got.MempoolConfig.NoLocals, "MempoolConfig.NoLocals")
 	require.Equal(t, uint64(8), got.MempoolConfig.AccountSlots, "MempoolConfig.AccountSlots")
@@ -75,4 +76,76 @@ func TestApply(t *testing.T) {
 	require.Equal(t, uint64(10), got.RPCConfig.BatchRequestLimit, "RPCConfig.BatchRequestLimit")
 	require.Equal(t, 11*time.Second, got.RPCConfig.CallTimeout, "RPCConfig.CallTimeout")
 	require.False(t, got.RPCConfig.ResolvePendingToLastExecuted, "RPCConfig.ResolvePendingToLastExecuted")
+}
+
+func TestVerifyProductionCommitInterval(t *testing.T) {
+	tests := []struct {
+		name        string
+		networkID   uint32
+		stateScheme string
+		wantErr     error
+	}{
+		{
+			name:      "custom_network",
+			networkID: constants.UnitTestID,
+		},
+		{
+			name:      "mainnet_hash",
+			networkID: constants.MainnetID,
+			wantErr:   errProductionCommitInterval,
+		},
+		{
+			name:        "mainnet_firewood",
+			networkID:   constants.MainnetID,
+			stateScheme: firewood.Scheme,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := Default()
+			c.StateScheme = tt.stateScheme
+			c.CommitInterval = 256
+
+			err := c.Verify(tt.networkID)
+			require.ErrorIs(t, err, tt.wantErr, "%T.Verify(%d)", c, tt.networkID)
+		})
+	}
+}
+
+func TestStateSyncConfigCommitInterval(t *testing.T) {
+	tests := []struct {
+		name           string
+		networkID      uint32
+		commitInterval uint64
+		want           uint64
+	}{
+		{
+			name:           "custom_network",
+			networkID:      constants.UnitTestID,
+			commitInterval: 256,
+			want:           256,
+		},
+		{
+			name:           "mainnet",
+			networkID:      constants.MainnetID,
+			commitInterval: 256,
+			want:           saedb.DefaultCommitInterval,
+		},
+		{
+			name:           "fuji",
+			networkID:      constants.FujiID,
+			commitInterval: 256,
+			want:           saedb.DefaultCommitInterval,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := Default()
+			c.StateScheme = firewood.Scheme
+			c.CommitInterval = tt.commitInterval
+
+			got := c.StateSyncConfig(tt.networkID).DBConfig.CommitInterval
+			require.Equal(t, tt.want, got, "%T.StateSyncConfig(%d).DBConfig.CommitInterval", c, tt.networkID)
+		})
+	}
 }

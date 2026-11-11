@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeconfig"
@@ -63,7 +64,7 @@ func TestParseConfig_FeeRecipient(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			c, err := parseConfig(logging.NoLog{}, test.bytes)
+			c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, test.bytes)
 			require.ErrorIs(t, err, test.wantErr)
 			if test.wantErr == nil {
 				require.Equal(t, test.want, c.FeeRecipient)
@@ -80,19 +81,19 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 	defaults := defaultConfig()
 
 	t.Run("nil_bytes_yields_defaults", func(t *testing.T) {
-		c, err := parseConfig(logging.NoLog{}, nil)
+		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, nil)
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
 	})
 
 	t.Run("empty_object_yields_defaults", func(t *testing.T) {
-		c, err := parseConfig(logging.NoLog{}, []byte(`{}`))
+		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{}`))
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
 	})
 
 	t.Run("partial_override_keeps_other_defaults", func(t *testing.T) {
-		c, err := parseConfig(logging.NoLog{}, []byte(`{"tx-pool-price-limit":42,"rpc-gas-cap":1234}`))
+		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"tx-pool-price-limit":42,"rpc-gas-cap":1234}`))
 		require.NoError(t, err)
 		require.Equal(t, uint64(42), c.TxPoolPriceLimit)
 		require.Equal(t, uint64(1234), c.RPCGasCap)
@@ -105,24 +106,24 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 		// Legacy keys with no SAE counterpart MUST NOT prevent an existing
 		// node config from starting the VM.
 		log := loggingtest.NewRecorder(logging.Warn)
-		c, err := parseConfig(log, []byte(`{"state-sync-enabled":true}`))
+		c, err := parseConfig(&snow.Context{Log: log}, []byte(`{"admin-api-enabled":true}`))
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
 		require.Equal(t, []*loggingtest.Record{{
 			Level:  logging.Warn,
 			Msg:    "ignoring unrecognized config options",
-			Fields: []zap.Field{zap.Strings("options", []string{"state-sync-enabled"})},
+			Fields: []zap.Field{zap.Strings("options", []string{"admin-api-enabled"})},
 		}}, log.Records)
 	})
 
 	t.Run("duration_string", func(t *testing.T) {
-		c, err := parseConfig(logging.NoLog{}, []byte(`{"tx-pool-lifetime":"30m"}`))
+		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"tx-pool-lifetime":"30m"}`))
 		require.NoError(t, err)
 		require.Equal(t, 30*time.Minute, c.TxPoolLifetime.Duration)
 	})
 
 	t.Run("duration_numeric_rejected", func(t *testing.T) {
-		_, err := parseConfig(logging.NoLog{}, []byte(`{"tx-pool-lifetime":900000000000}`))
+		_, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"tx-pool-lifetime":900000000000}`))
 		var typeErr *json.UnmarshalTypeError
 		require.ErrorAs(t, err, &typeErr)
 	})
@@ -130,7 +131,7 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 	t.Run("marshal_roundtrip", func(t *testing.T) {
 		out, err := json.Marshal(defaults)
 		require.NoError(t, err)
-		c, err := parseConfig(logging.NoLog{}, out)
+		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, out)
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
 	})
@@ -168,7 +169,7 @@ func TestConfig_SAEConfig(t *testing.T) {
 // derived SAE configuration: values the SAE core would only reject at
 // runtime (or worse, divide by) MUST fail at chain-config parse time.
 func TestParseConfig_ValidatesSAEConfig(t *testing.T) {
-	_, err := parseConfig(logging.NoLog{}, []byte(`{"commit-interval":0}`))
+	_, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"commit-interval":0}`))
 	require.ErrorIs(t, err, saedb.Config{}.Verify(), "parseConfig()")
 }
 
@@ -198,13 +199,13 @@ func TestParseConfig_RPC(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			config, err := parseConfig(logging.NoLog{}, []byte(test.config))
-			require.NoError(t, err, "parseConfig(logging.NoLog{}, %q)", test.config)
+			config, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(test.config))
+			require.NoError(t, err, "parseConfig(..., %q)", test.config)
 
 			rpcConfig := config.saeConfig(nil).RPCConfig
-			require.Equal(t, test.wantDuration, rpcConfig.CallTimeout, "parseConfig(logging.NoLog{}, %q)", test.config)
-			require.Equal(t, test.wantBatchLimit, rpcConfig.BatchRequestLimit, "parseConfig(logging.NoLog{}, %q)", test.config)
-			require.Equal(t, test.wantResolveLast, rpcConfig.ResolvePendingToLastExecuted, "parseConfig(logging.NoLog{}, %q)", test.config)
+			require.Equal(t, test.wantDuration, rpcConfig.CallTimeout, "parseConfig(..., %q)", test.config)
+			require.Equal(t, test.wantBatchLimit, rpcConfig.BatchRequestLimit, "parseConfig(..., %q)", test.config)
+			require.Equal(t, test.wantResolveLast, rpcConfig.ResolvePendingToLastExecuted, "parseConfig(..., %q)", test.config)
 		})
 	}
 }

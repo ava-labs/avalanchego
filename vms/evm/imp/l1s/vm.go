@@ -104,7 +104,7 @@ func (vm *VM) Initialize(
 		return errAlreadyClosed
 	}
 
-	userConfig, err := parseConfig(snowCtx.Log, configBytes)
+	userConfig, err := parseConfig(snowCtx, configBytes)
 	if err != nil {
 		return fmt.Errorf("parsing user config: %w", err)
 	}
@@ -153,7 +153,7 @@ func (vm *VM) Initialize(
 		chainMetrics,
 	)
 
-	vm.Network, err = network.New(snowCtx, appSender)
+	vm.Network, err = network.New(snowCtx, appSender, userConfig.NetworkOptions()...)
 	if err != nil {
 		return fmt.Errorf("creating network: %w", err)
 	}

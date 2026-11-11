@@ -147,10 +147,10 @@ func (vm *VM) Initialize(
 		vm.pending,
 		warpStorage,
 		vm.now,
-		userConfig.desired(),
+		desired(userConfig),
 		vm.metrics,
 	)
-	vm.Network, err = network.New(snowCtx, appSender, userConfig.networkOptions()...)
+	vm.Network, err = network.New(snowCtx, appSender, userConfig.NetworkOptions()...)
 	if err != nil {
 		return fmt.Errorf("creating network: %w", err)
 	}
@@ -161,7 +161,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("writing genesis block: %w", err)
 	}
 	vm.Handler, err = statesync.New(
-		userConfig.stateSyncConfig(snowCtx.NetworkID),
+		userConfig.StateSyncConfig(snowCtx.NetworkID),
 		ethDB,
 		snowCtx,
 		vm.Network,
@@ -184,7 +184,7 @@ func (vm *VM) Initialize(
 			return errAlreadyClosed
 		}
 
-		saeConfig := userConfig.saeConfig(vm.now)
+		saeConfig := userConfig.SAEConfig(vm.now)
 		tdbConfig := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
 		if err := genesis.setupTrieDB(ethDB, tdbConfig); err != nil {
 			return fmt.Errorf("setting up genesis trie: %w", err)

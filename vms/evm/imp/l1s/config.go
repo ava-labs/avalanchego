@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
@@ -24,10 +25,13 @@ import (
 	legacyparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
-// config is the operator-supplied per-chain config for the SAE L1 VM. JSON
-// tags match the legacy `graft/subnet-evm/plugin/evm/config.Config` schema for
-// the subset this VM supports, so existing operator config blobs keep working
-// for those fields.
+// config is the operator-supplied per-chain config for the SAE L1 VM. It extends
+// the C-Chain config. JSON tags of the added fields match the legacy
+// `graft/subnet-evm/plugin/evm/config.Config` schema, so existing operator
+// config blobs keep working for those fields.
+//
+// TODO: Support [saeconfig.Config.StateSyncEnabled] and
+// [saeconfig.Config.PriceTarget], which are accepted but ignored.
 type config struct {
 	saeconfig.Config
 
@@ -71,18 +75,17 @@ var errInvalidFeeRecipient = errors.New("invalid fee recipient")
 
 // parseConfig unmarshals operator-supplied per-chain config bytes on top of
 // [defaultConfig], warning about unrecognized options, and validates the
-// resulting SAE configuration.
-func parseConfig(log logging.Logger, b []byte) (config, error) {
+// result for the network of snowCtx.
+func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	c := defaultConfig()
-	if err := saeconfig.Parse(log, b, &c); err != nil {
+	if err := saeconfig.Parse(snowCtx.Log, b, &c); err != nil {
 		return config{}, err
 	}
 
 	if c.FeeRecipient != "" && !common.IsHexAddress(c.FeeRecipient) {
 		return config{}, fmt.Errorf("%w: %q is not a valid hex address", errInvalidFeeRecipient, c.FeeRecipient)
 	}
-	saeCfg := c.saeConfig(nil)
-	if err := saeCfg.Verify(); err != nil {
+	if err := c.Verify(snowCtx.NetworkID); err != nil {
 		return config{}, err
 	}
 	return c, nil
@@ -91,7 +94,9 @@ func parseConfig(log logging.Logger, b []byte) (config, error) {
 // saeConfig translates the operator-supplied [config] into the [sae.Config]
 // consumed by [sae.NewVM].
 func (c config) saeConfig(now func() time.Time) sae.Config {
-	config := sae.DefaultConfig()
+	config := c.SAEConfig(now)
+	// The legacy plugin never journals local transactions.
+	config.MempoolConfig.Journal = ""
 	config.MempoolConfig.PriceLimit = c.TxPoolPriceLimit
 	config.MempoolConfig.PriceBump = c.TxPoolPriceBump
 	config.MempoolConfig.AccountQueue = c.TxPoolAccountQueue
@@ -99,8 +104,6 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 	config.MempoolConfig.Lifetime = c.TxPoolLifetime.Duration
 	config.RPCConfig.GasCap = c.RPCGasCap
 	config.RPCConfig.TxFeeCap = c.RPCTxFeeCap
-	c.Config.Apply(&config)
-	config.Now = now
 	return config
 }
 

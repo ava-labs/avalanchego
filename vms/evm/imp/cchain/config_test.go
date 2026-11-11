@@ -28,14 +28,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
-	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 )
 
 func TestParseConfig(t *testing.T) {
 	// with applies mod to defaultConfig() so each override case asserts that its
 	// JSON field overrides the default while the rest are preserved.
-	with := func(mod func(*config)) config {
-		c := defaultConfig()
+	with := func(mod func(*saeconfig.Config)) saeconfig.Config {
+		c := saeconfig.Default()
 		mod(&c)
 		return c
 	}
@@ -45,7 +44,7 @@ func TestParseConfig(t *testing.T) {
 		name         string
 		json         string
 		networkID    uint32
-		want         config
+		want         saeconfig.Config
 		wantWarnings []*loggingtest.Record
 		wantErr      testerr.Want
 	}{
@@ -57,96 +56,81 @@ func TestParseConfig(t *testing.T) {
 		},
 		{
 			name: "defaults/empty_input",
-			want: defaultConfig(),
+			want: saeconfig.Default(),
 		},
 		{
 			name: "defaults/empty_object",
 			json: `{}`,
-			want: defaultConfig(),
+			want: saeconfig.Default(),
 		},
 
 		// Block building
 		{
 			name: "block_building/min_price_target",
 			json: `{"min-price-target":1000}`,
-			want: with(func(c *config) { c.PriceTarget = new(gas.Price(1000)) }),
+			want: with(func(c *saeconfig.Config) { c.PriceTarget = new(gas.Price(1000)) }),
 		},
 		{
 			// An explicit 0 is a vote for the minimum, distinct from an absent
 			// field, which is no vote.
 			name: "block_building/min_price_target_explicit_zero",
 			json: `{"min-price-target":0}`,
-			want: with(func(c *config) { c.PriceTarget = new(gas.Price) }),
+			want: with(func(c *saeconfig.Config) { c.PriceTarget = new(gas.Price) }),
 		},
 		{
 			name: "block_building/gas_target",
 			json: `{"gas-target":1000}`,
-			want: with(func(c *config) { c.GasTarget = new(gas.Gas(1000)) }),
+			want: with(func(c *saeconfig.Config) { c.GasTarget = new(gas.Gas(1000)) }),
 		},
 		{
 			name: "block_building/min_delay_target",
 			json: `{"min-delay-target":2000}`,
-			want: with(func(c *config) { c.MinDelayTarget = new(uint64(2000)) }),
+			want: with(func(c *saeconfig.Config) { c.MinDelayTarget = new(uint64(2000)) }),
 		},
 
 		// State & trie
 		{
 			name: "state/pruning_disabled",
 			json: `{"pruning-enabled":false}`,
-			want: with(func(c *config) { c.Pruning = false }),
+			want: with(func(c *saeconfig.Config) { c.Pruning = false }),
 		},
 		{
 			name: "state_scheme",
 			json: `{"state-scheme":"firewood"}`,
-			want: with(func(c *config) { c.StateScheme = firewood.Scheme }),
+			want: with(func(c *saeconfig.Config) { c.StateScheme = firewood.Scheme }),
 		},
 		{
 			name:      "state/commit_interval",
 			json:      `{"commit-interval":256}`,
 			networkID: constants.UnitTestID,
-			want:      with(func(c *config) { c.CommitInterval = 256 }),
-		},
-		{
-			name:      "state/hash_commit_interval_production_network",
-			json:      `{"commit-interval":256}`,
-			networkID: constants.MainnetID,
-			wantErr:   testerr.Is(errProductionCommitInterval),
-		},
-		{
-			name:      "state/production_firewood",
-			json:      `{"state-scheme":"firewood","commit-interval":256}`,
-			networkID: constants.MainnetID,
-			want: with(func(c *config) {
-				c.StateScheme = firewood.Scheme
-				c.CommitInterval = 256
-			}),
+			want:      with(func(c *saeconfig.Config) { c.CommitInterval = 256 }),
 		},
 		{
 			name: "state/trie_clean_cache",
 			json: `{"trie-clean-cache":256}`,
-			want: with(func(c *config) { c.TrieCleanCache = 256 }),
+			want: with(func(c *saeconfig.Config) { c.TrieCleanCache = 256 }),
 		},
 		{
 			name: "state/snapshot_cache",
 			json: `{"snapshot-cache":128}`,
-			want: with(func(c *config) { c.SnapshotCache = 128 }),
+			want: with(func(c *saeconfig.Config) { c.SnapshotCache = 128 }),
 		},
 		{
 			name: "state/allow_missing_tries",
 			json: `{"allow-missing-tries":true}`,
-			want: with(func(c *config) { c.AllowMissingTries = true }),
+			want: with(func(c *saeconfig.Config) { c.AllowMissingTries = true }),
 		},
 
 		// Transaction pool
 		{
 			name: "tx_pool/local_txs_enabled",
 			json: `{"local-txs-enabled":true}`,
-			want: with(func(c *config) { c.LocalTxsEnabled = true }),
+			want: with(func(c *saeconfig.Config) { c.LocalTxsEnabled = true }),
 		},
 		{
 			name: "tx_pool/slots",
 			json: `{"tx-pool-account-slots":32,"tx-pool-global-slots":9000}`,
-			want: with(func(c *config) {
+			want: with(func(c *saeconfig.Config) {
 				c.TxPoolAccountSlots = 32
 				c.TxPoolGlobalSlots = 9000
 			}),
@@ -156,14 +140,14 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "api/apis",
 			json: `{"apis":["subscription","db","net","web3"]}`,
-			want: with(func(c *config) {
+			want: with(func(c *saeconfig.Config) {
 				c.APIs = set.Of(rpc.APISubscription, rpc.APIDB, rpc.APINet, rpc.APIWeb3)
 			}),
 		},
 		{
 			name: "api/apis_explicit_empty",
 			json: `{"apis":[]}`,
-			want: with(func(c *config) { c.APIs.Clear() }),
+			want: with(func(c *saeconfig.Config) { c.APIs.Clear() }),
 		},
 		{
 			name:    "api/apis_unknown_name",
@@ -173,22 +157,22 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "api/allow_unprotected_txs",
 			json: `{"allow-unprotected-txs":true}`,
-			want: with(func(c *config) { c.AllowUnprotectedTxs = true }),
+			want: with(func(c *saeconfig.Config) { c.AllowUnprotectedTxs = true }),
 		},
 		{
 			name: "api/max_blocks_per_request",
 			json: `{"api-max-blocks-per-request":2000}`,
-			want: with(func(c *config) { c.MaxBlocksPerRequest = 2000 }),
+			want: with(func(c *saeconfig.Config) { c.MaxBlocksPerRequest = 2000 }),
 		},
 		{
 			name: "api/batch_request_limit",
 			json: `{"batch-request-limit":50}`,
-			want: with(func(c *config) { c.BatchRequestLimit = 50 }),
+			want: with(func(c *saeconfig.Config) { c.BatchRequestLimit = 50 }),
 		},
 		{
 			name: "api/batch_request_limit_explicit_zero",
 			json: `{"batch-request-limit":0}`, // 0 disables the batch limit
-			want: with(func(c *config) { c.BatchRequestLimit = 0 }),
+			want: with(func(c *saeconfig.Config) { c.BatchRequestLimit = 0 }),
 		},
 		{
 			name:    "api/batch_request_limit_too_large",
@@ -198,7 +182,7 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "api/api_max_duration",
 			json: `{"api-max-duration":"1m"}`,
-			want: with(func(c *config) { c.APIMaxDuration = saeconfig.Duration{Duration: time.Minute} }),
+			want: with(func(c *saeconfig.Config) { c.APIMaxDuration = saeconfig.Duration{Duration: time.Minute} }),
 		},
 		{
 			name:    "api/api_max_duration_number",
@@ -213,19 +197,19 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "api/enable_map_pending_to_last_executed",
 			json: `{"api-resolve-pending-to-last-executed":true}`,
-			want: with(func(c *config) { c.ResolvePendingToLastExecuted = true }),
+			want: with(func(c *saeconfig.Config) { c.ResolvePendingToLastExecuted = true }),
 		},
 		{
 			name: "api/disable_map_pending_to_last_executed",
 			json: `{"api-resolve-pending-to-last-executed":false}`,
-			want: with(func(c *config) { c.ResolvePendingToLastExecuted = false }),
+			want: with(func(c *saeconfig.Config) { c.ResolvePendingToLastExecuted = false }),
 		},
 
 		// Warp
 		{
 			name: "warp/off_chain_messages",
 			json: `{"warp-off-chain-messages":["0x1234"]}`,
-			want: with(func(c *config) {
+			want: with(func(c *saeconfig.Config) {
 				c.WarpOffChainMessages = []hexutil.Bytes{{0x12, 0x34}}
 			}),
 		},
@@ -234,14 +218,14 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "state_sync_enabled",
 			json: `{"state-sync-enabled":false}`,
-			want: with(func(c *config) { c.StateSyncEnabled = false }),
+			want: with(func(c *saeconfig.Config) { c.StateSyncEnabled = false }),
 		},
 
 		// Internal
 		{
 			name: "internal/state_sync_ids",
 			json: fmt.Sprintf(`{"state-sync-ids":["%s"]}`, nodeID),
-			want: with(func(c *config) {
+			want: with(func(c *saeconfig.Config) {
 				c.StateSyncIDs = set.Of(nodeID)
 			}),
 		},
@@ -250,7 +234,7 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "unrecognized/options",
 			json: `{"rpc-gas-cap":50,"hello austin larson":1,"trie-clean-cache":256}`,
-			want: with(func(c *config) { c.TrieCleanCache = 256 }),
+			want: with(func(c *saeconfig.Config) { c.TrieCleanCache = 256 }),
 			wantWarnings: []*loggingtest.Record{{
 				Level:  logging.Warn,
 				Msg:    "ignoring unrecognized config options",
@@ -281,35 +265,29 @@ func TestParseConfig(t *testing.T) {
 				"api-max-duration":"30s",
 				"state-sync-enabled":false,
 				"warp-off-chain-messages":["0x1234"],
-				"api-resolve-pending-to-last-executed":true,
-				"state-sync-ids":["` + nodeID.String() + `"]
+				"api-resolve-pending-to-last-executed":true
 			}`,
-			want: config{
-				Config: saeconfig.Config{
-					GasTarget:                    new(gas.Gas(1500)),
-					MinDelayTarget:               new(uint64(3000)),
-					Pruning:                      false,
-					CommitInterval:               256,
-					LocalTxsEnabled:              true,
-					TxPoolAccountSlots:           8,
-					TxPoolGlobalSlots:            2048,
-					BatchRequestLimit:            50,
-					APIMaxDuration:               saeconfig.Duration{Duration: 30 * time.Second},
-					ResolvePendingToLastExecuted: true,
-					WarpOffChainMessages:         []hexutil.Bytes{{0x12, 0x34}},
-				},
-				PriceTarget:         new(gas.Price(500)),
-				StateScheme:         firewood.Scheme,
-				TrieCleanCache:      256,
-				SnapshotCache:       128,
-				AllowMissingTries:   true,
-				APIs:                set.Of(rpc.APIChain, rpc.APITrace),
-				AllowUnprotectedTxs: true,
-				MaxBlocksPerRequest: 2000,
-				StateSyncEnabled:    false,
-				internalConfig: internalConfig{
-					StateSyncIDs: set.Of(nodeID),
-				},
+			want: saeconfig.Config{
+				PriceTarget:                  new(gas.Price(500)),
+				GasTarget:                    new(gas.Gas(1500)),
+				MinDelayTarget:               new(uint64(3000)),
+				Pruning:                      false,
+				CommitInterval:               256,
+				TrieCleanCache:               256,
+				SnapshotCache:                128,
+				AllowMissingTries:            true,
+				StateScheme:                  firewood.Scheme,
+				LocalTxsEnabled:              true,
+				TxPoolAccountSlots:           8,
+				TxPoolGlobalSlots:            2048,
+				APIs:                         set.Of(rpc.APIChain, rpc.APITrace),
+				AllowUnprotectedTxs:          true,
+				BatchRequestLimit:            50,
+				APIMaxDuration:               saeconfig.Duration{Duration: 30 * time.Second},
+				MaxBlocksPerRequest:          2000,
+				ResolvePendingToLastExecuted: true,
+				StateSyncEnabled:             false,
+				WarpOffChainMessages:         []hexutil.Bytes{{0x12, 0x34}},
 			},
 		},
 	}
@@ -324,44 +302,6 @@ func TestParseConfig(t *testing.T) {
 			}
 			require.Equal(t, test.want, got, "parseConfig(...)")
 			require.Equal(t, test.wantWarnings, log.Records, "parseConfig(...) logs")
-		})
-	}
-}
-
-func TestConfigStateSyncInterval(t *testing.T) {
-	tests := []struct {
-		name           string
-		networkID      uint32
-		commitInterval uint64
-		want           uint64
-	}{
-		{
-			name:           "custom_network",
-			networkID:      constants.UnitTestID,
-			commitInterval: 256,
-			want:           256,
-		},
-		{
-			name:           "mainnet",
-			networkID:      constants.MainnetID,
-			commitInterval: 256,
-			want:           saedb.DefaultCommitInterval,
-		},
-		{
-			name:           "fuji",
-			networkID:      constants.FujiID,
-			commitInterval: 256,
-			want:           saedb.DefaultCommitInterval,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := defaultConfig()
-			c.StateScheme = firewood.Scheme
-			c.CommitInterval = tt.commitInterval
-
-			got := c.stateSyncConfig(tt.networkID).DBConfig.CommitInterval
-			require.Equal(t, tt.want, got, "%T.stateSyncConfig(%d).DBConfig.CommitInterval", c, tt.networkID)
 		})
 	}
 }

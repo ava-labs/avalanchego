@@ -60,6 +60,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/saeconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/vmtest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
@@ -104,7 +105,7 @@ type (
 		networkID    uint32
 		validators   *warptest.Validators
 		clock        *saetest.Clock
-		vmConfig     config
+		vmConfig     saeconfig.Config
 		db           database.Database
 		chainDataDir string
 		state        snow.State
@@ -354,7 +355,7 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 			networkID:    constants.UnitTestID,
 			validators:   warptest.NewValidators(tb),
 			clock:        saetest.NewClock(testStartTime, time.Millisecond),
-			vmConfig:     defaultConfig(),
+			vmConfig:     saeconfig.Default(),
 			db:           memdb.New(),
 			chainDataDir: tb.TempDir(),
 			state:        snow.NormalOp,
