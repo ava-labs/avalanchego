@@ -19,6 +19,10 @@ Go compiler. See [Bazel's toolchain strategy](./bazel.md#toolchain-strategy).
 Go commands outside Bazel require their own toolchain, supplied through Go setup
 or the Nix development shell in CI.
 
+Both build paths require CGO for dependencies such as BLST, which include C code.
+The Go build scripts enable CGO through `scripts/constants.sh`.
+For Bazel settings, see [CGO configuration](./bazel.md#cgo-configuration).
+
 Executing a prebuilt binary requires no Go compilation. For example, CI downloads
 a Task release instead of building Task from source. A Bazel build is different:
 it can compile targets even when all dependency inputs are already cached.
@@ -46,6 +50,23 @@ separate caches:
 tasks outside Bazel. `setup-go-for-project` and `install-nix` call it.
 Module-cache preparation does not restore compilation results. See
 [CI module-cache guidance](./ci.md#go-module-cache) for cache ownership and controls.
+
+Prepare modules once per job when host Go and Nix Go use the same
+`GOMODCACHE` and dependency inputs. Go E2E jobs prepare modules through
+`setup-go-for-project` before calculating the build-cache key. Their cache
+validation and monitored execution actions pass `setup_go_module_cache: 'false'`
+to reuse that preparation. `setup-go-for-project` sets `GOPROXY=off`.
+Nix commands inherit that restriction. Do not skip preparation if a later command
+uses a different module-cache path or needs additional dependencies.
+
+For `run-monitored-tmpnet-cmd`, `setup_go_module_cache` defaults to `auto`.
+This prepares modules for non-Bazel jobs. Bazel jobs must set it to `true`
+when they also run Go commands outside Bazel. Set it to `false` only when
+required modules are already available. Run `task test-go-e2e-setup` to check
+E2E setup order, input forwarding, and these defaults.
+
+For Nix setup reuse and the `nix_setup_complete` input, see
+[Reuse Nix setup in the same job](./ci.md#reuse-nix-setup-in-the-same-job).
 
 Preparing dependencies for Go tasks outside Bazel does not necessarily prepare
 Gazelle's cache. CI configures different paths for these operations. Gazelle
