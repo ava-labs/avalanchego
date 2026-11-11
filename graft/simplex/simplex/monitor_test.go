@@ -4,6 +4,7 @@
 package simplex
 
 import (
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest"
 )
 
 func TestMonitorDoubleClose(t *testing.T) {
@@ -152,7 +154,11 @@ func (t *testLogger) intercept(hook func(entry zapcore.Entry) error) {
 }
 
 func makeLogger(t *testing.T) *testLogger {
-	logger, err := zap.NewDevelopment()
-	require.NoError(t, err)
+	// Output goes through t.Log (shown only if the test fails) at INFO and above.
+	// A discarding core keeps the level at debug so that hooks registered via intercept observe debug entries.
+	logger := zaptest.NewLogger(t, zaptest.Level(zapcore.InfoLevel)).WithOptions(zap.WrapCore(func(core zapcore.Core) zapcore.Core {
+		discard := zapcore.NewCore(zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()), zapcore.AddSync(io.Discard), zapcore.DebugLevel)
+		return zapcore.NewTee(core, discard)
+	}))
 	return &testLogger{Logger: logger}
 }
