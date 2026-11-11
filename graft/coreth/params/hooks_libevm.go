@@ -38,10 +38,6 @@ func (RulesExtra) CanCreateContract(_ *libevm.AddressContext, gas uint64, _ libe
 	return gas, nil
 }
 
-func (RulesExtra) CanExecuteTransaction(_ common.Address, _ *common.Address, _ libevm.StateReader) error {
-	return nil
-}
-
 func (r RulesExtra) ShouldRefundGas() bool {
 	return !r.IsApricotPhase1
 }

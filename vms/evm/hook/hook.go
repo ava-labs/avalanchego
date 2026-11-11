@@ -81,8 +81,9 @@ type Points interface {
 	// execution.
 	EndOfBlockOps(*types.Block) ([]Op, error)
 	// CanExecuteTransaction returns an error if a transaction from `from` to
-	// `to` is not allowed. `rules` and `state` are of the same block, which
-	// MAY be older than the block that includes the transaction.
+	// `to`, which is nil for contract creation, is not allowed. `rules` and
+	// `state` are of the same block, which MAY be older than the block that
+	// includes the transaction.
 	CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, state libevm.StateReader) error
 	// StartExecutingBlock applies state changes before the block's transactions
 	// run. `rules` are those of the block and `parent` is the parent header. It
