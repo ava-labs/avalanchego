@@ -145,17 +145,18 @@ func parseErrorCodes(body []byte) map[int]int {
 		return nil
 	}
 
+	type errorCode struct {
+		Code int `json:"code"`
+	}
 	type response struct {
-		Error *struct {
-			Code int `json:"code"`
-		} `json:"error"`
+		Error *errorCode `json:"error"`
 	}
 
 	// A single response is decoded as a batch of one. Like the libevm RPC
 	// server, a batch is recognised by its first non-whitespace byte.
 	batch := make([]response, 1)
 	var dst any = &batch[0]
-	if bytes.HasPrefix(bytes.TrimLeft(body, " \t\r\n"), []byte("[")) {
+	if withoutWhitespace := bytes.TrimLeft(body, " \t\r\n"); bytes.HasPrefix(withoutWhitespace, []byte("[")) {
 		dst = &batch
 	}
 	if err := json.Unmarshal(body, dst); err != nil {
