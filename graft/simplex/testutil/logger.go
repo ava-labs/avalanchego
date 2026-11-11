@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 
 	"go.uber.org/zap"
@@ -20,10 +21,46 @@ const (
 	debugLogLevel = "debug"
 )
 
+var (
+	debugEnabled = debugOutputEnabled()
+)
+
 // debugOutputEnabled reports whether debug entries should be written to the log outputs.
 // Debug entries are always delivered to hooks registered via Intercept, regardless of this setting.
 func debugOutputEnabled() bool {
 	return strings.EqualFold(os.Getenv(logLevelEnv), debugLogLevel)
+}
+
+// testWriter forwards log lines to t.Log so that go test only prints them if the test fails.
+type testWriter struct {
+	t      *testing.T
+	lock   sync.Mutex
+	closed bool
+}
+
+func newTestWriter(t *testing.T) *testWriter {
+	tw := &testWriter{t: t}
+	// Goroutines may still log after the test returns, and t.Log panics once the test is done.
+	// So just mark the writer as closed when the test ends, and ignore any further writes.
+	t.Cleanup(func() {
+		tw.lock.Lock()
+		defer tw.lock.Unlock()
+		tw.closed = true
+	})
+	return tw
+}
+
+func (tw *testWriter) Write(p []byte) (int, error) {
+	tw.lock.Lock()
+	defer tw.lock.Unlock()
+	if !tw.closed && len(p) > 0 {
+		tw.t.Log(strings.TrimSuffix(string(p), "\n"))
+	}
+	return len(p), nil
+}
+
+func (*testWriter) Sync() error {
+	return nil
 }
 
 type TestLogger struct {
@@ -139,7 +176,7 @@ func MakeLoggerWithFile(t *testing.T, fileWriter zapcore.WriteSyncer, writeStdou
 
 	newEncoder := func() zapcore.Encoder {
 		encoder := zapcore.NewConsoleEncoder(config)
-		if debugOutputEnabled() {
+		if debugEnabled {
 			return encoder
 		}
 		return &DebugSwallowingEncoder{
@@ -153,7 +190,7 @@ func MakeLoggerWithFile(t *testing.T, fileWriter zapcore.WriteSyncer, writeStdou
 
 	// Stdout core only if explicitly enabled
 	if writeStdout {
-		stdoutCore := zapcore.NewCore(newEncoder(), zapcore.AddSync(os.Stdout), atomicLevel)
+		stdoutCore := zapcore.NewCore(newEncoder(), newTestWriter(t), atomicLevel)
 		cores = append(cores, stdoutCore)
 	}
 
