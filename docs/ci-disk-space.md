@@ -59,6 +59,12 @@ Normal repo entrypoints include:
 - `task log-ci-disk-state-docker`
 - `task log-ci-disk-state-generic`
 
+If a job prepares Docker images before a later disk check, preserve those inputs.
+Set `remove-docker-images: 'false'` on `ensure-disk-space`, or
+`preserve-docker-images: 'true'` on `run-docker-with-disk-space`.
+Bazel image validation uses this option because setup loads its cached images
+before the validation wrapper runs. Other cleanup remains enabled.
+
 ## Conceptual model
 
 ### Why this policy exists
@@ -189,6 +195,7 @@ When changing this policy, preserve these invariants:
 - live measurement decides whether cleanup is needed
 - the threshold check stays focused on `/`
 - cleanup remains conditional rather than unconditional
+- later disk checks preserve Docker images that a job already prepared as inputs
 - the check script remains independently testable
 - diagnostics remain curated and bounded
 - general CI action-pinning policy stays documented in [CI](./ci.md) rather

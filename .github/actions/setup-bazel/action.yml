@@ -6,6 +6,18 @@ inputs:
     description: 'Whether this invocation is the dedicated Bazel setup job'
     required: false
     default: 'false'
+  setup-image-inputs:
+    description: 'Whether to prepare separate Bazel image input caches on Linux'
+    required: false
+    default: 'false'
+  docker-username:
+    description: 'Docker Hub username for image input preparation'
+    required: false
+    default: ''
+  docker-password:
+    description: 'Docker Hub password for image input preparation'
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -74,6 +86,14 @@ runs:
       if: ${{ steps.cache.outputs.cache-hit != 'true' }}
       shell: bash
       run: ./scripts/run_task.sh bazel-cache-ci-build-dependencies
+
+    - name: Prepare Bazel image inputs
+      if: ${{ inputs.setup-image-inputs == 'true' && runner.os == 'Linux' }}
+      uses: ./.github/actions/setup-bazel-image-inputs
+      with:
+        cache-save-allowed: ${{ steps.cache-policy.outputs.cache-save-allowed }}
+        docker-username: ${{ inputs.docker-username }}
+        docker-password: ${{ inputs.docker-password }}
 
     # Disable repository and module downloads so missing inputs cause a failure.
     # This does not block remote-cache access or other network use.
