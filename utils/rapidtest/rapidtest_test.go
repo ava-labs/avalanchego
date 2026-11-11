@@ -4,30 +4,69 @@
 package rapidtest
 
 import (
+	"flag"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestPinSeed(t *testing.T) {
+func TestMaybeSetRapidSeed(t *testing.T) {
+	const (
+		seed    = "-" + seedFlag
+		shuffle = "-" + shuffleFlag
+	)
+
 	tests := []struct {
-		name    string
-		seedSet bool
-		shuffle string
-		wantPin bool
+		name string
+		args []string
+		want string
 	}{
-		{"explicit seed", true, "off", false},
-		{"shuffle on", false, "on", false},
-		{"shuffle seed", false, "12345", false},
-		{"defaults", false, "off", true},
+		{
+			name: "defaults",
+			args: nil,
+			want: FixedSeed,
+		},
+		{
+			name: "explicit_seed",
+			args: []string{seed, "99"},
+			want: "99",
+		},
+		{
+			name: "explicit_seed_equal_to_default",
+			args: []string{seed, ""},
+			want: "",
+		},
+		{
+			name: "explicit_shuffle_off",
+			args: []string{shuffle, "off"},
+			want: FixedSeed,
+		},
+		{
+			name: "shuffle_on",
+			args: []string{shuffle, "on"},
+			want: "",
+		},
+		{
+			name: "shuffle_seed",
+			args: []string{shuffle, "12345"},
+			want: "",
+		},
+		{
+			name: "explicit_seed_and_shuffle_on",
+			args: []string{seed, "99", shuffle, "on"},
+			want: "99",
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			seed, pin := pinSeed(tt.seedSet, tt.shuffle)
-			require.Equal(t, tt.wantPin, pin, "pinSeed(%v, %q) pin", tt.seedSet, tt.shuffle)
-			if tt.wantPin {
-				require.Equal(t, FixedSeed, seed, "pinSeed() seed")
-			}
+			fs := flag.NewFlagSet("", flag.PanicOnError)
+			fs.String(shuffleFlag, "off", "")
+			got := fs.String(seedFlag, "", "")
+
+			require.NoErrorf(t, fs.Parse(tt.args), "%T.Parse(%q)", fs, tt.args)
+			require.NoError(t, maybeSetRapidSeed(fs), "maybeSetRapidSeed()")
+			require.Equalf(t, tt.want, *got, "%q flag value", seedFlag)
 		})
 	}
 }

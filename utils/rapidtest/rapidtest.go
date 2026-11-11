@@ -12,24 +12,27 @@ import (
 // FixedSeed is the seed used when neither -rapid.seed nor -test.shuffle is set.
 const FixedSeed = "1"
 
+const (
+	seedFlag    = "rapid.seed"
+	shuffleFlag = "test.shuffle"
+)
+
 // Main runs the tests with a fixed rapid seed unless -rapid.seed is passed or
 // -test.shuffle is on, in which case the seed is left to rapid. Call it from
 // TestMain.
 func Main(m *testing.M) int {
 	flag.Parse()
-	seedSet := false
-	flag.Visit(func(f *flag.Flag) { seedSet = seedSet || f.Name == "rapid.seed" })
-	if seed, pin := pinSeed(seedSet, flag.Lookup("test.shuffle").Value.String()); pin {
-		if err := flag.Set("rapid.seed", seed); err != nil {
-			panic(err)
-		}
+	if err := maybeSetRapidSeed(flag.CommandLine); err != nil {
+		panic(err)
 	}
 	return m.Run()
 }
 
-func pinSeed(seedSet bool, shuffle string) (seed string, pin bool) {
-	if seedSet || shuffle != "off" {
-		return "", false
+func maybeSetRapidSeed(fs *flag.FlagSet) error {
+	seedSet := false
+	fs.Visit(func(f *flag.Flag) { seedSet = seedSet || f.Name == seedFlag })
+	if seedSet || fs.Lookup(shuffleFlag).Value.String() != "off" {
+		return nil
 	}
-	return FixedSeed, true
+	return fs.Set(seedFlag, FixedSeed)
 }

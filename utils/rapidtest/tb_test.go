@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 )
 
-// failRecorder records failures instead of propagating them to the outer test.
+// failRecorder stands in for the outer test; its embedded [testing.TB] is nil.
 type failRecorder struct {
 	testing.TB
 	failed bool
@@ -25,18 +25,25 @@ type failRecorder struct {
 	logs   []string
 }
 
-func (r *failRecorder) Error(...any) { r.failed = true }
-func (r *failRecorder) Errorf(f string, a ...any) {
+func (*failRecorder) Helper()      {}
+func (*failRecorder) Name() string { return "failRecorder" }
+
+func (r *failRecorder) fail(msg string) {
 	r.failed = true
-	r.errs = append(r.errs, fmt.Sprintf(f, a...))
+	r.errs = append(r.errs, msg)
 }
-func (r *failRecorder) Log(a ...any)            { r.logs = append(r.logs, fmt.Sprint(a...)) }
-func (r *failRecorder) Logf(f string, a ...any) { r.logs = append(r.logs, fmt.Sprintf(f, a...)) }
-func (r *failRecorder) Fatal(...any)            { r.failed = true }
-func (r *failRecorder) Fatalf(string, ...any)   { r.failed = true }
-func (r *failRecorder) Fail()                   { r.failed = true }
-func (r *failRecorder) FailNow()                { r.failed = true }
-func (r *failRecorder) Failed() bool            { return r.failed }
+
+func (r *failRecorder) log(msg string) { r.logs = append(r.logs, msg) }
+
+func (r *failRecorder) Error(a ...any)            { r.fail(fmt.Sprint(a...)) }
+func (r *failRecorder) Errorf(f string, a ...any) { r.fail(fmt.Sprintf(f, a...)) }
+func (r *failRecorder) Fatal(a ...any)            { r.fail(fmt.Sprint(a...)) }
+func (r *failRecorder) Fatalf(f string, a ...any) { r.fail(fmt.Sprintf(f, a...)) }
+func (r *failRecorder) Log(a ...any)              { r.log(fmt.Sprint(a...)) }
+func (r *failRecorder) Logf(f string, a ...any)   { r.log(fmt.Sprintf(f, a...)) }
+func (r *failRecorder) Fail()                     { r.failed = true }
+func (r *failRecorder) FailNow()                  { r.failed = true }
+func (r *failRecorder) Failed() bool              { return r.failed }
 
 // noFailFile stops rapid writing fail files for deliberate failures.
 func noFailFile(t *testing.T) {
@@ -49,68 +56,74 @@ func noFailFile(t *testing.T) {
 func TestNewRoutesFailures(t *testing.T) {
 	t.Run("cleanup_runs_per_check", func(t *testing.T) {
 		var checks, cleaned int
-		rapid.Check(t, func(rt *rapid.T) {
+		Check(t, func(t TB) {
 			checks++
-			New(t, rt).Cleanup(func() { cleaned++ })
+			curr := checks
+			t.Cleanup(func() {
+				require.Equal(t, curr, checks, "New().Cleanup() triggered in different check")
+				cleaned++
+			})
 		})
-		require.Equal(t, checks, cleaned, "New().Cleanup calls")
+		require.Equal(t, checks, cleaned, "New().Cleanup()s triggered")
 	})
 	t.Run("skip_skips_check_only", func(t *testing.T) {
-		var ran int
-		rapid.Check(t, func(rt *rapid.T) {
+		rec := &failRecorder{}
+		var entered, ran int
+		rapid.Check(rec, func(rt *rapid.T) {
+			entered++
 			if rapid.Bool().Draw(rt, "skip") {
-				New(t, rt).SkipNow()
+				New(rec, rt).SkipNow()
 			}
 			ran++
 		})
-		require.Positive(t, ran, "unskipped checks")
-		require.False(t, t.Skipped(), "outer t skipped")
+		assert.Positive(t, ran, "unskipped checks")
+		assert.Less(t, ran, entered, "checks past New().SkipNow()")
+		assert.Falsef(t, rec.failed, "outer %T.Failed()", rec)
 	})
 	t.Run("tempdir_removed_per_check", func(t *testing.T) {
-		var dirs []string
-		rapid.Check(t, func(rt *rapid.T) {
-			dirs = append(dirs, New(t, rt).TempDir())
+		Check(t, func(t TB) {
+			var dir string
+			t.Cleanup(func() {
+				require.NotEmpty(t, dir, "closure over New().TempDir() return value")
+				require.NoDirExists(t, dir, "New().TempDir() in Cleanup() registered before")
+			})
+			dir = t.TempDir()
+			require.DirExists(t, dir, "New().TempDir()")
 		})
-		require.NotEmpty(t, dirs, "TempDir calls")
-		for _, d := range dirs {
-			require.NoDirExists(t, d, "New().TempDir() after check")
-		}
 	})
 	t.Run("cleanup_error_fails_check", func(t *testing.T) {
 		noFailFile(t)
-		rec := &failRecorder{TB: t}
-		rapid.Check(rec, func(rt *rapid.T) {
-			tb := New(t, rt)
-			tb.Cleanup(func() { tb.Errorf("boom") })
+		rec := &failRecorder{}
+		Check(rec, func(t TB) {
+			t.Cleanup(func() { t.Errorf("boom") })
 		})
-		require.True(t, rec.failed, "rapid.Check reported the cleanup error")
+		assert.True(t, rec.failed, "rapid.Check reported the cleanup error")
 		out := strings.Join(rec.errs, "\n")
-		require.Contains(t, out, "[rapid] failed after", "failure marker")
-		require.Contains(t, strings.Join(rec.logs, "\n"), "boom", "cleanup error logged")
-		require.NotContains(t, out, "flaky", "cleanup error must fail the check deterministically")
-		require.False(t, t.Failed(), "outer t untouched")
+		assert.Contains(t, out, "[rapid] failed after", "failure marker")
+		assert.Contains(t, strings.Join(rec.logs, "\n"), "boom", "cleanup error logged")
+		assert.NotContains(t, out, "flaky", "cleanup error must fail the check deterministically")
 	})
 	t.Run("property_failure_survives_cleanups", func(t *testing.T) {
 		noFailFile(t)
-		rec := &failRecorder{TB: t}
-		rapid.Check(rec, func(rt *rapid.T) {
-			tb := New(t, rt)
+		rec := &failRecorder{}
+		Check(rec, func(t TB) {
 			for range 6 {
-				tb.Cleanup(func() {})
+				t.Cleanup(func() {})
 			}
-			rt.Fatalf("property bug")
+			t.Fatalf("property bug")
 		})
-		require.True(t, rec.failed, "rapid.Check reported the property failure")
-		require.Contains(t, strings.Join(rec.errs, "\n"), "property bug", "failure output")
-		require.False(t, t.Failed(), "outer t untouched")
+		assert.True(t, rec.failed, "rapid.Check reported the property failure")
+		out := strings.Join(rec.errs, "\n")
+		assert.Contains(t, out, "[rapid] failed after", "failure marker")
+		assert.Contains(t, out, "property bug", "failure output")
 	})
 	t.Run("log_error_fails_check", func(t *testing.T) {
 		noFailFile(t)
-		rec := &failRecorder{TB: t}
-		rapid.Check(rec, func(rt *rapid.T) {
-			loggingtest.New(New(t, rt), logging.Debug).Error("boom")
+		rec := &failRecorder{}
+		Check(rec, func(t TB) {
+			loggingtest.New(t, logging.Debug).Error("boom")
 		})
-		require.True(t, rec.failed, "rapid.Check reported the logged error")
-		require.False(t, t.Failed(), "outer t untouched")
+		assert.True(t, rec.failed, "rapid.Check reported the logged error")
+		assert.Contains(t, strings.Join(rec.errs, "\n"), "[rapid] failed after", "failure marker")
 	})
 }

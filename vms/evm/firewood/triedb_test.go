@@ -375,47 +375,42 @@ func actions(tb testing.TB, s *SUT) map[string]func(*rapid.T) {
 // stateRootProp compares the state root of arbitrary operation sequences on a
 // Firewood-backed [state.StateDB] against a reference: HashDB, or when
 // reconstructed, a Firewood StateDB opened past the tip.
-func stateRootProp(tb testing.TB, reconstructed bool) func(*rapid.T) {
-	return func(rt *rapid.T) {
-		rtb := rapidtest.New(tb, rt)
+func stateRootProp(reconstructed bool) func(rapidtest.TB) {
+	return func(tb rapidtest.TB) {
 		var s *SUT
 		if reconstructed {
-			s = newSUT(newBackend(rtb, newDB(rtb)), newReconstructedBackend(rtb))
+			s = newSUT(newBackend(tb, newDB(tb)), newReconstructedBackend(tb))
 		} else {
 			s = newSUT(
-				newBackend(rtb, state.NewDatabase(rawdb.NewMemoryDatabase())), // hashdb
-				newBackend(rtb, newDB(rtb)),                                   // firewood
+				newBackend(tb, state.NewDatabase(rawdb.NewMemoryDatabase())), // hashdb
+				newBackend(tb, newDB(tb)),                                    // firewood
 			)
 		}
-		acts := actions(rtb, s)
+		acts := actions(tb, s)
 		if reconstructed {
 			// Commits are not valid on a reconstructed state.
 			delete(acts, actStateDBCommit)
 			delete(acts, actDiskCommit)
 		}
-		rt.Repeat(acts)
-		s.intermediateRoot(rtb) // final flush to tries and verify all pending state
+		tb.Repeat(acts)
+		s.intermediateRoot(tb) // final flush to tries and verify all pending state
 	}
 }
 
 func TestStateRoot(t *testing.T) {
-	rapid.Check(t, stateRootProp(t, false))
+	rapidtest.Check(t, stateRootProp(false))
 }
 
 func TestReconstructedRoot(t *testing.T) {
-	rapid.Check(t, stateRootProp(t, true))
+	rapidtest.Check(t, stateRootProp(true))
 }
 
 func FuzzStateRoot(f *testing.F) {
-	f.Fuzz(func(t *testing.T, b []byte) {
-		rapid.MakeFuzz(stateRootProp(t, false))(t, b)
-	})
+	f.Fuzz(rapidtest.MakeFuzz(stateRootProp(false)))
 }
 
 func FuzzReconstructedRoot(f *testing.F) {
-	f.Fuzz(func(t *testing.T, b []byte) {
-		rapid.MakeFuzz(stateRootProp(t, true))(t, b)
-	})
+	f.Fuzz(rapidtest.MakeFuzz(stateRootProp(true)))
 }
 
 // newReconstructedBackend returns a Firewood backend whose StateDB is opened at
