@@ -2,8 +2,8 @@
 // Copyright (C) 2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package client is the typed Go client for `vms/evm/imp/l1s`.
-package client
+// Package l1sclient is the typed Go client for `vms/evm/imp/l1s`.
+package l1sclient
 
 import (
 	"context"
@@ -12,8 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
-
-	l1api "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api"
 )
 
 // Client talks to a `vms/evm/imp/l1s` chain. It extends [evmclient.Client]
@@ -39,8 +38,8 @@ func New(c *rpc.Client) *Client {
 }
 
 // Uptime returns the uptime of `validationID` as observed by the node.
-func (c *Client) Uptime(ctx context.Context, validationID ids.ID) (*l1api.Uptime, error) {
-	res := &l1api.Uptime{}
+func (c *Client) Uptime(ctx context.Context, validationID ids.ID) (*api.Uptime, error) {
+	res := &api.Uptime{}
 	if err := c.CallContext(ctx, res, "validator_uptime", validationID); err != nil {
 		return nil, err
 	}

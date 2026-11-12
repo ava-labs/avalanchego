@@ -43,7 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api/client"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api/l1sclient"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 
@@ -61,7 +61,7 @@ type l1SUT struct {
 
 	// client serves both the standard Ethereum surface (via the embedded
 	// `*evmclient.Client`) and the L1-specific methods.
-	client *client.Client
+	client *l1sclient.Client
 
 	// Wallet for issuing transactions
 	ethWallet *saetest.Wallet
@@ -234,7 +234,7 @@ func (s *l1SUT) bootVM(t *testing.T, clockTime *time.Time) {
 	}
 	apiServer := httptest.NewServer(apiMux)
 
-	c, err := client.Dial(s.ctx, apiServer.URL+"/rpc")
+	c, err := l1sclient.Dial(s.ctx, apiServer.URL+"/rpc")
 	require.NoError(t, err)
 
 	// Mimic the engine: on entering normal operation it points the VM at the
