@@ -18,7 +18,7 @@ go_test(
     embed = [":emulate"],
     deps = [
         "//graft/subnet-evm/plugin/evm/customtypes",
-        "//vms/evm/imp/cchain/libevmextras/customtypes",
+        "//vms/evm/imp/cchain/libevmextras",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_stretchr_testify//require",
     ],

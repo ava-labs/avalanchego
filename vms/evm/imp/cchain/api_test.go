@@ -33,7 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/evm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/evm/firewood"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
@@ -223,7 +223,7 @@ func TestRPCExtras(t *testing.T) {
 		blockNumber = hexutil.EncodeUint64(blk.NumberU64())
 		eth         = blk.EthBlock()
 		blockHash   = eth.Hash()
-		extra       = customtypes.GetHeaderExtra(blk.Header())
+		extra       = libevmextras.GetHeader(blk.Header())
 	)
 	require.NotNilf(t, extra.ExtDataGasUsed, "%T.ExtDataGasUsed", extra)
 	require.NotNilf(t, extra.BlockGasCost, "%T.BlockGasCost", extra)
@@ -249,7 +249,7 @@ func TestRPCExtras(t *testing.T) {
 		"settledExcess":         hexutil.EncodeUint64(*extra.SettledExcess),
 	}
 	var numHeaderExtras int
-	for _, f := range reflect.VisibleFields(reflect.TypeFor[customtypes.HeaderExtra]()) {
+	for _, f := range reflect.VisibleFields(reflect.TypeFor[libevmextras.Header]()) {
 		if f.IsExported() {
 			numHeaderExtras++
 		}
@@ -258,7 +258,7 @@ func TestRPCExtras(t *testing.T) {
 
 	var (
 		wantBlockExtras = maps.Clone(wantHeaderExtras)
-		extData         = customtypes.BlockExtData(eth)
+		extData         = libevmextras.BlockExtData(eth)
 	)
 	wantBlockExtras["blockExtraData"] = hexutil.Encode(extData)
 

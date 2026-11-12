@@ -55,7 +55,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
@@ -598,9 +597,9 @@ func (s *SUT) acceptSynchronousBlocks(ctx context.Context, tb testing.TB, blks [
 
 // tamperExtra adapts a header-extra mutator into the [types.Header] mutator that
 // [vmtest.SUT.VerifyTampered] expects.
-func tamperExtra(mut func(*customtypes.HeaderExtra)) func(*types.Header) {
+func tamperExtra(mut func(*libevmextras.Header)) func(*types.Header) {
 	return func(hdr *types.Header) {
-		mut(customtypes.GetHeaderExtra(hdr))
+		mut(libevmextras.GetHeader(hdr))
 	}
 }
 
@@ -940,7 +939,7 @@ func assertBlockIncludes(tb testing.TB, blk *blocks.Block, ethTxs types.Transact
 func blockTxs(tb testing.TB, blk *blocks.Block) []*tx.Tx {
 	tb.Helper()
 
-	txs, err := tx.ParseSlice(customtypes.BlockExtData(blk.EthBlock()))
+	txs, err := tx.ParseSlice(libevmextras.BlockExtData(blk.EthBlock()))
 	require.NoErrorf(tb, err, "tx.ParseSlice()")
 	return txs
 }
@@ -1281,12 +1280,12 @@ func TestParseBlock(t *testing.T) {
 func TestVerifyBlockRejectsTamperedHeader(t *testing.T) {
 	tests := []struct {
 		name   string
-		tamper func(t *testing.T, e *customtypes.HeaderExtra)
+		tamper func(t *testing.T, e *libevmextras.Header)
 	}{
 		{
 			name: "mismatched_time",
 			// Bump TimeMilliseconds without touching Header.Time so they disagree.
-			tamper: func(t *testing.T, e *customtypes.HeaderExtra) {
+			tamper: func(t *testing.T, e *libevmextras.Header) {
 				require.NotNil(t, e.TimeMilliseconds, "valid block TimeMilliseconds")
 				mismatched := *e.TimeMilliseconds + 1000
 				e.TimeMilliseconds = &mismatched
@@ -1294,14 +1293,14 @@ func TestVerifyBlockRejectsTamperedHeader(t *testing.T) {
 		},
 		{
 			name: "cheated_min_price_exponent",
-			tamper: func(_ *testing.T, e *customtypes.HeaderExtra) {
+			tamper: func(_ *testing.T, e *libevmextras.Header) {
 				cheated := dynamic.PriceExponent(math.MaxUint64)
 				e.MinPriceExponent = &cheated
 			},
 		},
 		{
 			name: "cheated_target_exponent",
-			tamper: func(_ *testing.T, e *customtypes.HeaderExtra) {
+			tamper: func(_ *testing.T, e *libevmextras.Header) {
 				cheated := dynamic.TargetExponent(math.MaxUint64)
 				e.TargetExponent = &cheated
 			},
@@ -1317,7 +1316,7 @@ func TestVerifyBlockRejectsTamperedHeader(t *testing.T) {
 			require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
 			valid := sut.BuildVerify(ctx, t, sut.LastAcceptedID(ctx, t))
 
-			err := sut.VerifyTampered(ctx, t, valid, tamperExtra(func(e *customtypes.HeaderExtra) {
+			err := sut.VerifyTampered(ctx, t, valid, tamperExtra(func(e *libevmextras.Header) {
 				tt.tamper(t, e)
 			}))
 			require.ErrorContainsf(t, err, "hash mismatch", "%T.VerifyBlock(malformed block)", sut.VM)
@@ -1370,7 +1369,7 @@ func TestVerifyDuringBootstrappingChecksSettledMarker(t *testing.T) {
 		// A tampered SettledHeight is caught by the marker cross-check, since
 		// bootstrapping does not rebuild by hash.
 		hdr := settler.Header()
-		extra := customtypes.GetHeaderExtra(hdr)
+		extra := libevmextras.GetHeader(hdr)
 		require.NotNil(t, extra.SettledHeight, "settler SettledHeight")
 		extra.SettledHeight = new(uint64)
 		tampered := settler.EthBlock().WithSeal(hdr)
@@ -1503,7 +1502,7 @@ func TestBuildBlockPreservesMillisecondTimestamp(t *testing.T) {
 
 	hdr := blk.Header()
 	require.Equal(t, uint64(wantSeconds), hdr.Time, "built block Header.Time (seconds)")
-	require.Equal(t, uint64(wantMilliseconds), customtypes.HeaderTimeMilliseconds(hdr), "built block TimeMilliseconds")
+	require.Equal(t, uint64(wantMilliseconds), libevmextras.HeaderTimeMilliseconds(hdr), "built block TimeMilliseconds")
 }
 
 // TestDynamicPriceExponent verifies that each built block's MinPriceExponent
@@ -1547,7 +1546,7 @@ func TestDynamicPriceExponent(t *testing.T) {
 				blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
 				header := blk.Header()
 
-				he := customtypes.GetHeaderExtra(header)
+				he := libevmextras.GetHeader(header)
 				require.NotNilf(t, he.MinPriceExponent, "block %d %T.MinPriceExponent", header.Number, he)
 				assert.Equalf(t, wantExponent, *he.MinPriceExponent, "block %d %T.MinPriceExponent", header.Number, he)
 
@@ -1601,7 +1600,7 @@ func TestDynamicTargetExponent(t *testing.T) {
 				blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
 				header := blk.Header()
 
-				he := customtypes.GetHeaderExtra(header)
+				he := libevmextras.GetHeader(header)
 				require.NotNilf(t, he.TargetExponent, "block %d %T.TargetExponent", header.Number, he)
 				assert.Equalf(t, wantExponent, *he.TargetExponent, "block %d %T.TargetExponent", header.Number, he)
 
@@ -1658,7 +1657,7 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 
 			for _, wantExponent := range test.want {
 				blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
-				he := customtypes.GetHeaderExtra(blk.Header())
+				he := libevmextras.GetHeader(blk.Header())
 				require.NotNilf(t, he.MinDelayExcess, "block %d %T.MinDelayExcess", blk.Height(), he)
 				got := *he.MinDelayExcess
 				assert.Equalf(t, wantExponent, got, "block %d %T.MinDelayExcess", blk.Height(), he)
@@ -1725,7 +1724,7 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 	earlyMS := uint64(earliestBuildTime(parent).UnixMilli()) - 1
 	err := sut.VerifyTampered(ctx, t, child, func(hdr *types.Header) {
 		hdr.Time = earlyMS / 1000
-		tamperExtra(func(e *customtypes.HeaderExtra) {
+		tamperExtra(func(e *libevmextras.Header) {
 			e.TimeMilliseconds = &earlyMS
 		})(hdr)
 	})
@@ -1864,9 +1863,9 @@ func TestEmptyBlocksDisallowed(t *testing.T) {
 		// In addition to removing the block's extData, we need to update the
 		// header's ExtDataHash to allow parsing.
 		hdr := valid.Header()
-		customtypes.GetHeaderExtra(hdr).ExtDataHash = customtypes.EmptyExtDataHash
+		libevmextras.GetHeader(hdr).ExtDataHash = libevmextras.EmptyExtDataHash
 
-		emptied := customtypes.WithBlockExtra(valid.EthBlock().WithSeal(hdr), new(customtypes.BlockBodyExtra))
+		emptied := libevmextras.WithBlock(valid.EthBlock().WithSeal(hdr), new(libevmextras.BlockBody))
 
 		buf, err := rlp.EncodeToBytes(emptied)
 		require.NoErrorf(t, err, "rlp.EncodeToBytes(emptied block)")

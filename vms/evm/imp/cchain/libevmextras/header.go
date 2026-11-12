@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package customtypes
+package libevmextras
 
 import (
 	"encoding/json"
@@ -22,22 +22,22 @@ import (
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
-// GetHeaderExtra returns the [HeaderExtra] carried by the header.
-func GetHeaderExtra(h *ethtypes.Header) *HeaderExtra {
-	return extras.Header.Get(h)
+// GetHeader returns the [Header] carried by the header.
+func GetHeader(h *ethtypes.Header) *Header {
+	return blockPayloads.Header.Get(h)
 }
 
-// WithHeaderExtra sets the [HeaderExtra] on the header and returns it.
-func WithHeaderExtra(h *ethtypes.Header, extra *HeaderExtra) *ethtypes.Header {
-	extras.Header.Set(h, extra)
+// WithHeader sets the [Header] on the header and returns it.
+func WithHeader(h *ethtypes.Header, extra *Header) *ethtypes.Header {
+	blockPayloads.Header.Set(h, extra)
 	return h
 }
 
-// HeaderExtra holds the Avalanche-specific header fields. Its RLP and JSON
+// Header holds the Avalanche-specific header fields. Its RLP and JSON
 // encodings are merged into those of the upstream [ethtypes.Header] so that
 // every historical C-Chain block hash still verifies. See README.md for how to
 // add a field.
-type HeaderExtra struct {
+type Header struct {
 	ExtDataHash      common.Hash             `json:"extDataHash"`
 	ExtDataGasUsed   *big.Int                `json:"extDataGasUsed"`
 	BlockGasCost     *big.Int                `json:"blockGasCost"`
@@ -57,7 +57,7 @@ type HeaderExtra struct {
 // HeaderTimeMilliseconds returns the header timestamp in milliseconds: the
 // Granite TimeMilliseconds field when set, otherwise the seconds-based Time.
 func HeaderTimeMilliseconds(h *ethtypes.Header) uint64 {
-	if t := GetHeaderExtra(h).TimeMilliseconds; t != nil {
+	if t := GetHeader(h).TimeMilliseconds; t != nil {
 		return *t
 	}
 	return h.Time * 1000
@@ -69,7 +69,7 @@ func HeaderTimeMilliseconds(h *ethtypes.Header) uint64 {
 // every later one is nil too, and encoded as an empty string otherwise.
 //
 // The fields are pointers so that the list also serves decoding.
-func (h *HeaderExtra) rlpFields(eth *ethtypes.Header) headerRLPFields {
+func (h *Header) rlpFields(eth *ethtypes.Header) headerRLPFields {
 	return headerRLPFields{
 		Required: [...]any{
 			&eth.ParentHash, &eth.UncleHash, &eth.Coinbase, &eth.Root, &eth.TxHash, &eth.ReceiptHash,
@@ -94,7 +94,7 @@ type headerRLPFields struct {
 
 // EncodeRLP implements [ethtypes.HeaderHooks]. It writes the fields directly
 // rather than through [rlp.Fields], which encodes each one by reflection.
-func (h *HeaderExtra) EncodeRLP(eth *ethtypes.Header, w io.Writer) error {
+func (h *Header) EncodeRLP(eth *ethtypes.Header, w io.Writer) error {
 	f := h.rlpFields(eth)
 	last := -1
 	for i, p := range f.Optional {
@@ -177,7 +177,7 @@ var (
 )
 
 // DecodeRLP implements [ethtypes.HeaderHooks].
-func (h *HeaderExtra) DecodeRLP(eth *ethtypes.Header, s *rlp.Stream) error {
+func (h *Header) DecodeRLP(eth *ethtypes.Header, s *rlp.Stream) error {
 	// An EOL here is the enclosing list (e.g. uncles) running out of headers
 	// and MUST propagate unchanged so the slice decoder stops.
 	if _, _, err := s.Kind(); err != nil {
@@ -285,7 +285,7 @@ func readOptionalUint[T ~uint64](s *rlp.Stream, p **T) error {
 
 // EncodeJSON implements [ethtypes.HeaderHooks]: the upstream header JSON,
 // including its "hash", with the extra fields added alongside.
-func (h *HeaderExtra) EncodeJSON(eth *ethtypes.Header) ([]byte, error) {
+func (h *Header) EncodeJSON(eth *ethtypes.Header) ([]byte, error) {
 	upstream, err := new(ethtypes.NOOPHeaderHooks).EncodeJSON(eth)
 	if err != nil {
 		return nil, err
@@ -302,7 +302,7 @@ func (h *HeaderExtra) EncodeJSON(eth *ethtypes.Header) ([]byte, error) {
 }
 
 // DecodeJSON implements [ethtypes.HeaderHooks].
-func (h *HeaderExtra) DecodeJSON(eth *ethtypes.Header, b []byte) error {
+func (h *Header) DecodeJSON(eth *ethtypes.Header, b []byte) error {
 	// The upstream decoder keeps absent fields, so decode into a fresh header
 	// rather than over a reused one.
 	fresh := new(ethtypes.Header)
@@ -319,8 +319,8 @@ func (h *HeaderExtra) DecodeJSON(eth *ethtypes.Header, b []byte) error {
 		}
 	}
 	*eth = *fresh
-	WithHeaderExtra(eth, h)
-	*h = HeaderExtra{}
+	WithHeader(eth, h)
+	*h = Header{}
 	v := reflect.ValueOf(h).Elem()
 	for i := range v.NumField() {
 		f, key := v.Field(i), v.Type().Field(i).Tag.Get("json")
@@ -352,12 +352,12 @@ func (h *HeaderExtra) DecodeJSON(eth *ethtypes.Header, b []byte) error {
 
 // PostCopy implements [ethtypes.HeaderHooks]: it deep-copies the extra into
 // the copied header.
-func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
+func (h *Header) PostCopy(dst *ethtypes.Header) {
 	if h == nil {
-		WithHeaderExtra(dst, nil)
+		WithHeader(dst, nil)
 		return
 	}
-	cp := new(HeaderExtra)
+	cp := new(Header)
 	src, out := reflect.ValueOf(h).Elem(), reflect.ValueOf(cp).Elem()
 	for i := range src.NumField() {
 		f := src.Field(i)
@@ -375,18 +375,18 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 			out.Field(i).Set(c)
 		}
 	}
-	WithHeaderExtra(dst, cp)
+	WithHeader(dst, cp)
 }
 
 // PostRPCMarshal implements [ethtypes.HeaderHooks]: it adds the extra fields
 // that are set to the RPC representation of the header.
-func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
+func (h *Header) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	h.marshalFields(m, false)
 }
 
 // marshalFields adds the tagged fields to `m`, writing unset ones as null if
 // `withNull` is set and omitting them otherwise.
-func (h *HeaderExtra) marshalFields(m map[string]any, withNull bool) {
+func (h *Header) marshalFields(m map[string]any, withNull bool) {
 	v := reflect.ValueOf(h).Elem()
 	for i := range v.NumField() {
 		f, key := v.Field(i), v.Type().Field(i).Tag.Get("json")

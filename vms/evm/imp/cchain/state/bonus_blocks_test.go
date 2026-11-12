@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 )
 
@@ -100,8 +99,8 @@ func atomicTxs(tb testing.TB, client *evmclient.Client, heights set.Set[uint64])
 		block, err := client.BlockByNumber(ctx, new(big.Int).SetUint64(height))
 		require.NoErrorf(tb, err, "%T.BlockByNumber(ctx, %d)", client, height)
 
-		t, err := tx.Parse(customtypes.BlockExtData(block))
-		require.NoErrorf(tb, err, "tx.Parse(customtypes.BlockExtData(%d))", height)
+		t, err := tx.Parse(libevmextras.BlockExtData(block))
+		require.NoErrorf(tb, err, "tx.Parse(libevmextras.BlockExtData(%d))", height)
 		txs[height] = t
 	}
 	return txs

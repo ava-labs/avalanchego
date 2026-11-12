@@ -11,15 +11,16 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
+
 	subnet "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
-	cchain "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 )
 
 // setAndGetMillis is an arbitrary function that can be run if and only if
 // emulating either `coreth` or `subnet-evm`. If the respective emulation isn't
 // active then it will cause `libevm` to panic. In addition to the panicking
 // behaviour, it asserts that it is the only active emulation.
-func setAndGetMillis[T *cchain.HeaderExtra | *subnet.HeaderExtra](
+func setAndGetMillis[T *libevmextras.Header | *subnet.HeaderExtra](
 	t *testing.T,
 	active *atomic.Int64,
 	withExtra func(*types.Header, T) *types.Header,
@@ -49,9 +50,9 @@ func TestEmulation(t *testing.T) {
 	var active atomic.Int64
 	onCChain := setAndGetMillis(
 		t, &active,
-		cchain.WithHeaderExtra,
-		&cchain.HeaderExtra{TimeMilliseconds: newUint64(milli)},
-		cchain.BlockTimeMilliseconds,
+		libevmextras.WithHeader,
+		&libevmextras.Header{TimeMilliseconds: newUint64(milli)},
+		libevmextras.BlockTimeMilliseconds,
 		sentinel,
 	)
 	onSubnetEVM := setAndGetMillis(

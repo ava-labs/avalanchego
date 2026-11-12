@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
 )
 
@@ -123,8 +122,8 @@ func (s *StateDB) AddAssetBalance(addr common.Address, assetID common.Hash, amou
 		return
 	}
 
-	if !customtypes.HeldXChainAsset(s.StateDB, addr) {
-		customtypes.MarkHeldXChainAsset(s.StateDB, addr)
+	if !HeldXChainAsset(s.StateDB, addr) {
+		MarkHeldXChainAsset(s.StateDB, addr)
 	}
 	balance := s.GetAssetBalance(addr, assetID)
 	balance.Add(balance, amount)

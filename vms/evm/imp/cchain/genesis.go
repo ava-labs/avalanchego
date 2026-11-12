@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 
 	ethparams "github.com/ava-labs/libevm/params"
@@ -244,7 +243,7 @@ func (g *genesis) block() (*types.Block, error) {
 		}
 	}
 
-	headerExtra := customtypes.GetHeaderExtra(h)
+	headerExtra := libevmextras.GetHeader(h)
 	if c.IsEtna(g.Timestamp) { // Also called Cancun
 		h.BlobGasUsed = new(uint64)
 		h.ExcessBlobGas = new(uint64)

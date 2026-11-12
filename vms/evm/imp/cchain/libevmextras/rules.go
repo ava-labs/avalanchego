@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -219,7 +218,7 @@ func newEnvironment(env vm.PrecompileEnvironment) (*environment, error) {
 
 	return &environment{
 		PrecompileEnvironment: env,
-		predicateResults:      customtypes.PredicateResults(env.BlockHeader(), predicateBytes),
+		predicateResults:      predicateResults(env.BlockHeader(), predicateBytes),
 		rules:                 rules,
 	}, nil
 }

@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package customtypes
+package libevmextras
 
 import (
 	"encoding/hex"
@@ -32,17 +32,17 @@ func TestCopyHeader(t *testing.T) {
 		{
 			name:   "no_extra_attached",
 			header: &types.Header{},
-			want:   WithHeaderExtra(copiedEmpty(), &HeaderExtra{}),
+			want:   WithHeader(copiedEmpty(), &Header{}),
 		},
 		{
 			name:   "nil_extra",
-			header: WithHeaderExtra(&types.Header{}, nil),
-			want:   WithHeaderExtra(copiedEmpty(), nil),
+			header: WithHeader(&types.Header{}, nil),
+			want:   WithHeader(copiedEmpty(), nil),
 		},
 		{
 			name:   "empty_extra",
-			header: WithHeaderExtra(&types.Header{}, &HeaderExtra{}),
-			want:   WithHeaderExtra(copiedEmpty(), &HeaderExtra{}),
+			header: WithHeader(&types.Header{}, &Header{}),
+			want:   WithHeader(copiedEmpty(), &Header{}),
 		},
 		{
 			name:   "filled",
@@ -56,19 +56,19 @@ func TestCopyHeader(t *testing.T) {
 
 			got := types.CopyHeader(test.header)
 			require.Equal(t, test.want, got, "types.CopyHeader()")
-			require.Equal(t, GetHeaderExtra(test.want), GetHeaderExtra(got), "GetHeaderExtra(types.CopyHeader())")
+			require.Equal(t, GetHeader(test.want), GetHeader(got), "GetHeaderExtra(types.CopyHeader())")
 		})
 	}
 }
 
-// TestCopyHeaderDeepCopiesExtra checks that [HeaderExtra.PostCopy] clones
+// TestCopyHeaderDeepCopiesExtra checks that [Header.PostCopy] clones
 // every pointer field, which require.Equal can't tell from aliasing.
 func TestCopyHeaderDeepCopiesExtra(t *testing.T) {
 	t.Parallel()
 
 	header, extra := headerWithNonZeroFields()
 	src := reflect.ValueOf(extra).Elem()
-	got := reflect.ValueOf(GetHeaderExtra(types.CopyHeader(header))).Elem()
+	got := reflect.ValueOf(GetHeader(types.CopyHeader(header))).Elem()
 	for i := range src.NumField() {
 		field := src.Type().Field(i)
 		if !field.IsExported() || field.Type.Kind() != reflect.Pointer {
@@ -80,13 +80,13 @@ func TestCopyHeaderDeepCopiesExtra(t *testing.T) {
 }
 
 // blockWithNonZeroFields returns a block carrying a transaction, an uncle,
-// withdrawals and a [BlockBodyExtra] with every field set.
-func blockWithNonZeroFields() (*types.Block, *BlockBodyExtra) {
-	header := WithHeaderExtra(
+// withdrawals and a [BlockBody] with every field set.
+func blockWithNonZeroFields() (*types.Block, *BlockBody) {
+	header := WithHeader(
 		&types.Header{
 			ParentHash: common.Hash{1},
 		},
-		&HeaderExtra{
+		&Header{
 			ExtDataHash: common.Hash{2},
 		},
 	)
@@ -94,13 +94,13 @@ func blockWithNonZeroFields() (*types.Block, *BlockBodyExtra) {
 	tx := types.NewTransaction(1, common.Address{2}, big.NewInt(3), 4, big.NewInt(5), []byte{6})
 	txs := []*types.Transaction{tx}
 
-	uncle := WithHeaderExtra(
+	uncle := WithHeader(
 		&types.Header{
 			Difficulty: big.NewInt(7),
 			Number:     big.NewInt(8),
 			ParentHash: common.Hash{9},
 		},
-		&HeaderExtra{
+		&Header{
 			ExtDataHash: common.Hash{10},
 		},
 	)
@@ -111,11 +111,11 @@ func blockWithNonZeroFields() (*types.Block, *BlockBodyExtra) {
 	block := types.NewBlock(header, txs, uncles, receipts, trie.NewStackTrie(nil))
 	withdrawals := []*types.Withdrawal{{Index: 12}}
 	block = block.WithWithdrawals(withdrawals)
-	extra := &BlockBodyExtra{
+	extra := &BlockBody{
 		Version: 13,
 		ExtData: &[]byte{14},
 	}
-	return WithBlockExtra(block, extra), extra
+	return WithBlock(block, extra), extra
 }
 
 func TestBlockExtraRLP(t *testing.T) {
@@ -135,16 +135,16 @@ func TestBlockExtraRLP(t *testing.T) {
 	decoded := new(types.Block)
 	require.NoError(t, rlp.DecodeBytes(encoded, decoded), "rlp.DecodeBytes(block RLP)")
 	require.Equal(t, block.Hash(), decoded.Hash(), "decoded Block.Hash()")
-	require.Equal(t, extra, GetBlockExtra(decoded), "decoded BlockBodyExtra")
+	require.Equal(t, extra, GetBlock(decoded), "decoded BlockBodyExtra")
 }
 
 // TestBlockBodyExtraCopiedWithBlock checks that libevm deep-copies the extra
-// when it derives a new block, via [BlockBodyExtra.Copy].
+// when it derives a new block, via [BlockBody.Copy].
 func TestBlockBodyExtraCopiedWithBlock(t *testing.T) {
 	t.Parallel()
 
 	block, extra := blockWithNonZeroFields()
-	got := GetBlockExtra(block.WithBody(*block.Body()))
+	got := GetBlock(block.WithBody(*block.Body()))
 	require.Equal(t, extra, got, "GetBlockExtra(Block.WithBody())")
 	(*got.ExtData)[0]++
 	require.Equal(t, []byte{14}, *extra.ExtData, "Block.WithBody() shares ExtData with the original")
@@ -155,17 +155,17 @@ func TestBlockGetters(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		blockExtra  *BlockBodyExtra
+		blockExtra  *BlockBody
 		wantVersion uint32
 		wantExtData []byte
 	}{
 		{
 			name:       "empty",
-			blockExtra: &BlockBodyExtra{},
+			blockExtra: &BlockBody{},
 		},
 		{
 			name: "fields_set",
-			blockExtra: &BlockBodyExtra{
+			blockExtra: &BlockBody{
 				Version: 3,
 				ExtData: &[]byte{4},
 			},
@@ -178,8 +178,8 @@ func TestBlockGetters(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			block := types.NewBlock(WithHeaderExtra(&types.Header{}, &HeaderExtra{}), nil, nil, nil, trie.NewStackTrie(nil))
-			block = WithBlockExtra(block, test.blockExtra)
+			block := types.NewBlock(WithHeader(&types.Header{}, &Header{}), nil, nil, nil, trie.NewStackTrie(nil))
+			block = WithBlock(block, test.blockExtra)
 
 			require.Equal(t, test.wantExtData, BlockExtData(block), "BlockExtData()")
 			require.Equal(t, test.wantVersion, BlockVersion(block), "BlockVersion()")
@@ -216,45 +216,45 @@ func TestNewBlock(t *testing.T) {
 	}{
 		{
 			name:   "empty",
-			header: WithHeaderExtra(&types.Header{}, &HeaderExtra{}),
+			header: WithHeader(&types.Header{}, &Header{}),
 			wantBlock: func() *types.Block {
-				header := WithHeaderExtra(&types.Header{}, &HeaderExtra{ExtDataHash: EmptyExtDataHash})
+				header := WithHeader(&types.Header{}, &Header{ExtDataHash: EmptyExtDataHash})
 				block := types.NewBlock(header, nil, nil, nil, trie.NewStackTrie(nil))
-				return WithBlockExtra(block, &BlockBodyExtra{ExtData: new([]byte)})
+				return WithBlock(block, &BlockBody{ExtData: new([]byte)})
 			},
 		},
 		{
 			name:   "header_nil_extra",
 			header: &types.Header{},
 			wantBlock: func() *types.Block {
-				header := WithHeaderExtra(&types.Header{}, &HeaderExtra{ExtDataHash: EmptyExtDataHash})
+				header := WithHeader(&types.Header{}, &Header{ExtDataHash: EmptyExtDataHash})
 				block := types.NewBlock(header, nil, nil, nil, trie.NewStackTrie(nil))
-				return WithBlockExtra(block, &BlockBodyExtra{ExtData: new([]byte)})
+				return WithBlock(block, &BlockBody{ExtData: new([]byte)})
 			},
 		},
 		{
 			name: "ext_data_hash_recalculated",
-			header: WithHeaderExtra(
+			header: WithHeader(
 				&types.Header{},
-				&HeaderExtra{
+				&Header{
 					ExtDataHash: common.Hash{1}, // must be overwritten
 				},
 			),
 			extdata: []byte{2},
 			wantBlock: func() *types.Block {
-				header := WithHeaderExtra(
+				header := WithHeader(
 					&types.Header{},
-					&HeaderExtra{ExtDataHash: CalcExtDataHash([]byte{2})},
+					&Header{ExtDataHash: CalcExtDataHash([]byte{2})},
 				)
 				block := types.NewBlock(header, nil, nil, nil, trie.NewStackTrie(nil))
-				return WithBlockExtra(block, &BlockBodyExtra{ExtData: &[]byte{2}})
+				return WithBlock(block, &BlockBody{ExtData: &[]byte{2}})
 			},
 		},
 		{
 			name: "filled",
-			header: WithHeaderExtra(
+			header: WithHeader(
 				&types.Header{GasLimit: 1},
-				&HeaderExtra{
+				&Header{
 					ExtDataGasUsed: big.NewInt(3),
 					BlockGasCost:   big.NewInt(4),
 				},
@@ -263,16 +263,16 @@ func TestNewBlock(t *testing.T) {
 			receipts: []*types.Receipt{{PostState: []byte{7}}},
 			extdata:  []byte{8},
 			wantBlock: func() *types.Block {
-				header := WithHeaderExtra(
+				header := WithHeader(
 					&types.Header{GasLimit: 1},
-					&HeaderExtra{
+					&Header{
 						ExtDataHash:    CalcExtDataHash([]byte{8}),
 						ExtDataGasUsed: big.NewInt(3),
 						BlockGasCost:   big.NewInt(4),
 					},
 				)
 				block := types.NewBlock(header, []*types.Transaction{testTx}, nil, []*types.Receipt{{PostState: []byte{7}}}, trie.NewStackTrie(nil))
-				return WithBlockExtra(block, &BlockBodyExtra{ExtData: &[]byte{8}})
+				return WithBlock(block, &BlockBody{ExtData: &[]byte{8}})
 			},
 		},
 	}
@@ -293,7 +293,7 @@ func TestBlockRPCJSONRoundTrip(t *testing.T) {
 	t.Parallel()
 
 	newBlock := func() *types.Block {
-		return types.NewBlock(WithHeaderExtra(&types.Header{}, &HeaderExtra{}), nil, nil, nil, trie.NewStackTrie(nil))
+		return types.NewBlock(WithHeader(&types.Header{}, &Header{}), nil, nil, nil, trie.NewStackTrie(nil))
 	}
 	tests := []struct {
 		name    string
@@ -320,7 +320,7 @@ func TestBlockRPCJSONRoundTrip(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			in := WithBlockExtra(newBlock(), &BlockBodyExtra{ExtData: tt.extData})
+			in := WithBlock(newBlock(), &BlockBody{ExtData: tt.extData})
 			marshalled := map[string]any{}
 			in.PostRPCMarshal(marshalled)
 			raw, err := json.Marshal(marshalled)
@@ -328,7 +328,7 @@ func TestBlockRPCJSONRoundTrip(t *testing.T) {
 
 			got := newBlock()
 			require.NoError(t, got.PostRPCUnmarshal(raw), "Block.PostRPCUnmarshal(%s)", raw)
-			require.Equal(t, tt.want, GetBlockExtra(got).ExtData, "GetBlockExtra(Block.PostRPCUnmarshal(%s)).ExtData", raw)
+			require.Equal(t, tt.want, GetBlock(got).ExtData, "GetBlockExtra(Block.PostRPCUnmarshal(%s)).ExtData", raw)
 		})
 	}
 
@@ -377,7 +377,7 @@ func TestBlockRLPGolden(t *testing.T) {
 			require.NoError(t, rlp.DecodeBytes(encoded, block), "rlp.DecodeBytes(block)")
 			require.Equal(t, tt.wantHash, block.Hash(), "Block.Hash()")
 
-			extra := GetHeaderExtra(block.Header())
+			extra := GetHeader(block.Header())
 			require.Equal(t, tt.wantExtDataHash, extra.ExtDataHash, "ExtDataHash")
 			require.Equal(t, tt.wantExtDataGasUsed, extra.ExtDataGasUsed, "ExtDataGasUsed")
 			require.Equal(t, tt.wantBlockGasCost, extra.BlockGasCost, "BlockGasCost")

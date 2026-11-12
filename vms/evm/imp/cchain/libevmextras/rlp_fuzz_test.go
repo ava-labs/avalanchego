@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package customtypes
+package libevmextras
 
 import (
 	"testing"
@@ -17,7 +17,7 @@ import (
 func FuzzHeaderRLP(f *testing.F) {
 	forks := forkHeaders()
 	for _, fork := range forks {
-		encoded, err := rlp.EncodeToBytes(WithHeaderExtra(fork.header, fork.extra))
+		encoded, err := rlp.EncodeToBytes(WithHeader(fork.header, fork.extra))
 		require.NoError(f, err, "rlp.EncodeToBytes(%s header)", fork.name)
 		f.Add(encoded)
 	}
@@ -39,7 +39,7 @@ func FuzzHeaderRLP(f *testing.F) {
 		again := new(types.Header)
 		require.NoError(t, rlp.DecodeBytes(encoded, again), "rlp.DecodeBytes(re-encoded header)")
 		require.Equal(t, header, again, "header after second decode")
-		require.Equal(t, GetHeaderExtra(header), GetHeaderExtra(again), "HeaderExtra after second decode")
+		require.Equal(t, GetHeader(header), GetHeader(again), "HeaderExtra after second decode")
 		require.Equal(t, header.Hash(), again.Hash(), "Header.Hash() after second decode")
 	})
 }
@@ -67,6 +67,6 @@ func FuzzBodyRLP(f *testing.F) {
 
 		again := new(types.Body)
 		require.NoError(t, rlp.DecodeBytes(encoded, again), "rlp.DecodeBytes(re-encoded body)")
-		require.Equal(t, extras.Body.Get(body), extras.Body.Get(again), "BlockBodyExtra after second decode")
+		require.Equal(t, blockPayloads.Body.Get(body), blockPayloads.Body.Get(again), "BlockBodyExtra after second decode")
 	})
 }

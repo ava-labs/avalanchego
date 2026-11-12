@@ -12,7 +12,6 @@ go_library(
     deps = [
         "//upgrade/upgradetest",
         "//vms/evm/imp/cchain/libevmextras",
-        "//vms/evm/imp/cchain/libevmextras/customtypes",
         "//vms/evm/imp/cchain/tx",
         "//vms/evm/saetest",
         "@com_github_ava_labs_libevm//common",

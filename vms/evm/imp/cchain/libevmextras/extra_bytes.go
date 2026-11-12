@@ -8,9 +8,32 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
+
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
+
+// predicateResults returns the parsed predicate results from predicateBytes,
+// caching them on h. If predicateBytes is empty, or cannot be parsed, nil is
+// returned. The same predicateBytes MUST be supplied for each call to a given
+// header.
+func predicateResults(h *ethtypes.Header, predicateBytes []byte) predicate.BlockResults {
+	if len(predicateBytes) == 0 {
+		return nil
+	}
+
+	cache := &GetHeader(h).predicateResults
+	if results := cache.Load(); results != nil {
+		return *results
+	}
+
+	// results were already verified for canonical execution
+	results, _ := predicate.ParseBlockResults(predicateBytes)
+	cache.Store(&results)
+	return results
+}
 
 // Sizes of the fee state that prefixes the extra data of pre-Helicon headers.
 const (

@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 )
@@ -109,23 +109,23 @@ func NewTestBlock(tb testing.TB, opts ...BlockOption) *types.Block {
 
 	// By default the header commits the ExtDataHash computed from the block's
 	// own ExtData; a caller-supplied hash overrides this to simulate tampering.
-	extDataHash := customtypes.CalcExtDataHash(extData)
+	extDataHash := libevmextras.CalcExtDataHash(extData)
 	if props.extDataHash != nil {
 		extDataHash = *props.extDataHash
 	}
-	header := customtypes.WithHeaderExtra(
+	header := libevmextras.WithHeader(
 		&types.Header{
 			ParentHash: props.parent,
 			Number:     new(big.Int).SetUint64(props.number),
 			Time:       props.timestamp,
 		},
-		&customtypes.HeaderExtra{
+		&libevmextras.Header{
 			ExtDataHash: extDataHash,
 		},
 	)
 
 	block := types.NewBlock(header, props.ethTxs, nil /* uncles */, nil /* receipts */, saetest.TrieHasher())
-	return customtypes.WithBlockExtra(block, &customtypes.BlockBodyExtra{
+	return libevmextras.WithBlock(block, &libevmextras.BlockBody{
 		Version: props.version,
 		ExtData: &extData,
 	})

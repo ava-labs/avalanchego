@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package customtypes
+package libevmextras
 
 import (
 	"encoding/json"
@@ -21,17 +21,17 @@ import (
 // forkHeader is a header shaped like the ones produced by a given C-Chain
 // upgrade, together with the RLP list fields that follow ExtDataHash on the
 // wire. The wire format is spelled out here independently of
-// [HeaderExtra.rlpFields] because every historical block hash depends on it.
+// [Header.rlpFields] because every historical block hash depends on it.
 type forkHeader struct {
 	name   string
 	header *types.Header
-	extra  *HeaderExtra
+	extra  *Header
 	tail   []any
 }
 
 // legacyHeader returns a pre-Apricot-Phase-3 header: the fifteen go-ethereum
 // fields followed by ExtDataHash, and nothing else.
-func legacyHeader() (*types.Header, *HeaderExtra) {
+func legacyHeader() (*types.Header, *Header) {
 	header := &types.Header{
 		ParentHash:  common.Hash{1},
 		UncleHash:   types.EmptyUncleHash,
@@ -49,16 +49,16 @@ func legacyHeader() (*types.Header, *HeaderExtra) {
 		MixDigest:   common.Hash{14},
 		Nonce:       types.BlockNonce{15},
 	}
-	extra := &HeaderExtra{ExtDataHash: common.Hash{21}}
+	extra := &Header{ExtDataHash: common.Hash{21}}
 	return header, extra
 }
 
 func forkHeaders() []forkHeader {
 	var (
 		forks []forkHeader
-		sets  []func(*types.Header, *HeaderExtra) []any
+		sets  []func(*types.Header, *Header) []any
 	)
-	add := func(name string, set func(*types.Header, *HeaderExtra) []any) {
+	add := func(name string, set func(*types.Header, *Header) []any) {
 		sets = append(sets, set)
 		header, extra := legacyHeader()
 		var tail []any
@@ -68,33 +68,33 @@ func forkHeaders() []forkHeader {
 		forks = append(forks, forkHeader{name: name, header: header, extra: extra, tail: tail})
 	}
 
-	add("pre-AP3", func(*types.Header, *HeaderExtra) []any { return nil })
-	add("AP3 base fee", func(h *types.Header, _ *HeaderExtra) []any {
+	add("pre-AP3", func(*types.Header, *Header) []any { return nil })
+	add("AP3 base fee", func(h *types.Header, _ *Header) []any {
 		h.BaseFee = big.NewInt(25_000_000_000)
 		return []any{h.BaseFee}
 	})
-	add("AP4 ext data gas used and block gas cost", func(_ *types.Header, e *HeaderExtra) []any {
+	add("AP4 ext data gas used and block gas cost", func(_ *types.Header, e *Header) []any {
 		e.ExtDataGasUsed = big.NewInt(22)
 		e.BlockGasCost = new(big.Int).Lsh(big.NewInt(1), 70) // > 64 bits: JSON must use hexutil.Big
 		return []any{e.ExtDataGasUsed, e.BlockGasCost}
 	})
-	add("Etna blob fields", func(h *types.Header, _ *HeaderExtra) []any {
+	add("Etna blob fields", func(h *types.Header, _ *Header) []any {
 		h.BlobGasUsed = new(uint64(0))
 		h.ExcessBlobGas = new(uint64(0))
 		h.ParentBeaconRoot = &common.Hash{}
 		return []any{*h.BlobGasUsed, *h.ExcessBlobGas, *h.ParentBeaconRoot}
 	})
-	add("Granite time milliseconds and min delay excess", func(_ *types.Header, e *HeaderExtra) []any {
+	add("Granite time milliseconds and min delay excess", func(_ *types.Header, e *Header) []any {
 		e.TimeMilliseconds = new(uint64(1_600_000_000_500))
 		e.MinDelayExcess = new(dynamic.DelayExponent(25))
 		return []any{*e.TimeMilliseconds, uint64(*e.MinDelayExcess)}
 	})
-	add("Helicon target and min price exponents", func(_ *types.Header, e *HeaderExtra) []any {
+	add("Helicon target and min price exponents", func(_ *types.Header, e *Header) []any {
 		e.TargetExponent = new(dynamic.TargetExponent(26))
 		e.MinPriceExponent = new(dynamic.PriceExponent(27))
 		return []any{uint64(*e.TargetExponent), uint64(*e.MinPriceExponent)}
 	})
-	add("settled fields", func(_ *types.Header, e *HeaderExtra) []any {
+	add("settled fields", func(_ *types.Header, e *Header) []any {
 		e.SettledHeight = new(uint64(28))
 		e.SettledGasUnix = new(uint64(29))
 		e.SettledGasNumerator = new(uint64(30))
@@ -107,7 +107,7 @@ func forkHeaders() []forkHeader {
 // wantHeaderRLP is the independent specification of the header wire format:
 // an RLP list of the fifteen go-ethereum fields, then ExtDataHash, then the
 // fork-specific trailing fields with nothing after the last one that is set.
-func wantHeaderRLP(t testing.TB, h *types.Header, e *HeaderExtra, tail []any) []byte {
+func wantHeaderRLP(t testing.TB, h *types.Header, e *Header, tail []any) []byte {
 	t.Helper()
 	fields := []any{
 		h.ParentHash, h.UncleHash, h.Coinbase, h.Root, h.TxHash, h.ReceiptHash,
@@ -128,7 +128,7 @@ func TestHeaderRLPByFork(t *testing.T) {
 			t.Parallel()
 
 			want := wantHeaderRLP(t, fork.header, fork.extra, fork.tail)
-			header := WithHeaderExtra(fork.header, fork.extra)
+			header := WithHeader(fork.header, fork.extra)
 
 			got, err := rlp.EncodeToBytes(header)
 			require.NoError(t, err, "rlp.EncodeToBytes(header)")
@@ -145,7 +145,7 @@ func TestHeaderRLPByFork(t *testing.T) {
 			decoded := new(types.Header)
 			require.NoError(t, rlp.DecodeBytes(got, decoded), "rlp.DecodeBytes(header RLP)")
 			require.Equal(t, fork.header, decoded, "decoded header")
-			require.Equal(t, fork.extra, GetHeaderExtra(decoded), "decoded HeaderExtra")
+			require.Equal(t, fork.extra, GetHeader(decoded), "decoded HeaderExtra")
 		})
 	}
 }
@@ -157,13 +157,13 @@ func TestHeaderRLPNilOptionalBeforeSetOptional(t *testing.T) {
 	// BlockGasCost is set, so they decode as zero, not nil.
 	header, extra := legacyHeader()
 	extra.BlockGasCost = big.NewInt(23)
-	got, err := rlp.EncodeToBytes(WithHeaderExtra(header, extra))
+	got, err := rlp.EncodeToBytes(WithHeader(header, extra))
 	require.NoError(t, err, "rlp.EncodeToBytes(header)")
 
 	decoded := new(types.Header)
 	require.NoError(t, rlp.DecodeBytes(got, decoded), "rlp.DecodeBytes(header RLP)")
 	require.Equal(t, big.NewInt(0), decoded.BaseFee, "decoded BaseFee")
-	decodedExtra := GetHeaderExtra(decoded)
+	decodedExtra := GetHeader(decoded)
 	require.Equal(t, big.NewInt(0), decodedExtra.ExtDataGasUsed, "decoded ExtDataGasUsed")
 	require.Equal(t, extra.BlockGasCost, decodedExtra.BlockGasCost, "decoded BlockGasCost")
 }
@@ -245,7 +245,7 @@ func TestHeaderRPCMarshal(t *testing.T) {
 			t.Parallel()
 
 			m := make(map[string]any)
-			WithHeaderExtra(tt.fork.header, tt.fork.extra).PostRPCMarshal(m)
+			WithHeader(tt.fork.header, tt.fork.extra).PostRPCMarshal(m)
 			got, err := json.Marshal(m)
 			require.NoError(t, err, "json.Marshal(Header.PostRPCMarshal())")
 			require.JSONEq(t, tt.want, string(got), "Header.PostRPCMarshal()")
@@ -260,7 +260,7 @@ func TestHeaderJSONHashAndExtras(t *testing.T) {
 		t.Run(fork.name, func(t *testing.T) {
 			t.Parallel()
 
-			header := WithHeaderExtra(fork.header, fork.extra)
+			header := WithHeader(fork.header, fork.extra)
 			encoded, err := json.Marshal(header)
 			require.NoError(t, err, "json.Marshal(header)")
 
@@ -271,7 +271,7 @@ func TestHeaderJSONHashAndExtras(t *testing.T) {
 			decoded := new(types.Header)
 			require.NoError(t, json.Unmarshal(encoded, decoded), "json.Unmarshal(header JSON, *types.Header)")
 			require.Equal(t, fork.header, decoded, "decoded header")
-			require.Equal(t, fork.extra, GetHeaderExtra(decoded), "decoded HeaderExtra")
+			require.Equal(t, fork.extra, GetHeader(decoded), "decoded HeaderExtra")
 		})
 	}
 }
@@ -281,15 +281,15 @@ func TestHeaderDecodeJSONNullExtra(t *testing.T) {
 	t.Parallel()
 
 	header, extra := legacyHeader()
-	encoded, err := json.Marshal(WithHeaderExtra(header, extra))
+	encoded, err := json.Marshal(WithHeader(header, extra))
 	require.NoError(t, err, "json.Marshal(header)")
 	encoded = append(encoded[:len(encoded)-1], `,"blockGasCost":null,"settledHeight":null}`...)
 
 	// Stale fields on a reused header MUST be reset, not kept.
-	decoded := WithHeaderExtra(&types.Header{BaseFee: big.NewInt(16)}, &HeaderExtra{SettledExcess: new(uint64)})
+	decoded := WithHeader(&types.Header{BaseFee: big.NewInt(16)}, &Header{SettledExcess: new(uint64)})
 	require.NoError(t, json.Unmarshal(encoded, decoded), "json.Unmarshal(null extras)")
 	require.Equal(t, header, decoded, "reused header after decode")
-	require.Equal(t, extra, GetHeaderExtra(decoded), "null extras decode as nil")
+	require.Equal(t, extra, GetHeader(decoded), "null extras decode as nil")
 }
 
 // Decoding a shorter header into a receiver that held a longer one MUST reset
@@ -298,17 +298,17 @@ func TestHeaderDecodeRLPReusedReceiver(t *testing.T) {
 	t.Parallel()
 
 	full, fullExtra := headerWithNonZeroFields()
-	fullRLP, err := rlp.EncodeToBytes(WithHeaderExtra(full, fullExtra))
+	fullRLP, err := rlp.EncodeToBytes(WithHeader(full, fullExtra))
 	require.NoError(t, err, "rlp.EncodeToBytes(full header)")
 	legacy, legacyExtra := legacyHeader()
-	legacyRLP, err := rlp.EncodeToBytes(WithHeaderExtra(legacy, legacyExtra))
+	legacyRLP, err := rlp.EncodeToBytes(WithHeader(legacy, legacyExtra))
 	require.NoError(t, err, "rlp.EncodeToBytes(legacy header)")
 
 	decoded := new(types.Header)
 	require.NoError(t, rlp.DecodeBytes(fullRLP, decoded), "rlp.DecodeBytes(full header)")
 	require.NoError(t, rlp.DecodeBytes(legacyRLP, decoded), "rlp.DecodeBytes(legacy header, reused receiver)")
 	require.Equal(t, legacy, decoded, "reused header after legacy decode")
-	require.Equal(t, legacyExtra, GetHeaderExtra(decoded), "HeaderExtra after legacy decode")
+	require.Equal(t, legacyExtra, GetHeader(decoded), "HeaderExtra after legacy decode")
 }
 
 func TestHeaderEncodeRLPNegativeBigInt(t *testing.T) {
@@ -316,7 +316,7 @@ func TestHeaderEncodeRLPNegativeBigInt(t *testing.T) {
 
 	header, extra := legacyHeader()
 	header.Number = big.NewInt(-1)
-	_, err := rlp.EncodeToBytes(WithHeaderExtra(header, extra))
+	_, err := rlp.EncodeToBytes(WithHeader(header, extra))
 	require.ErrorIs(t, err, rlp.ErrNegativeBigInt, "rlp.EncodeToBytes(header with negative Number)")
 }
 
@@ -324,7 +324,7 @@ func TestHeaderDecodeJSONRequiredFields(t *testing.T) {
 	t.Parallel()
 
 	header, extra := legacyHeader()
-	encoded, err := json.Marshal(WithHeaderExtra(header, extra))
+	encoded, err := json.Marshal(WithHeader(header, extra))
 	require.NoError(t, err, "json.Marshal(header)")
 
 	for _, key := range []string{"miner", "extDataHash"} {
@@ -352,7 +352,7 @@ func TestHeaderJSONGolden(t *testing.T) {
 	t.Parallel()
 
 	header, extra := legacyHeader()
-	got, err := json.Marshal(WithHeaderExtra(header, extra))
+	got, err := json.Marshal(WithHeader(header, extra))
 	require.NoError(t, err, "json.Marshal(legacy header)")
 	require.JSONEq(t, legacyHeaderJSON, string(got), "legacy header JSON")
 }

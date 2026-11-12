@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
 
 	. "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
@@ -248,7 +247,7 @@ func TestFromBlock(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			block := customtypes.NewBlock(
+			block := libevmextras.NewBlock(
 				&types.Header{
 					Time: test.time,
 				},

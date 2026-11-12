@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package customtypes
+package libevmextras
 
 import (
 	"encoding/hex"
@@ -36,15 +36,15 @@ func TestHeaderRLP(t *testing.T) {
 	wantHeader, wantExtra := headerWithNonZeroFields()
 	wantHeader.WithdrawalsHash = nil // never on the wire
 	require.Equal(t, wantHeader, decoded, "decoded header")
-	require.Equal(t, wantExtra, GetHeaderExtra(decoded), "decoded HeaderExtra")
+	require.Equal(t, wantExtra, GetHeader(decoded), "decoded HeaderExtra")
 }
 
 func TestHeaderTimeMilliseconds(t *testing.T) {
 	t.Parallel()
 
-	h := WithHeaderExtra(&types.Header{Time: 12}, &HeaderExtra{})
+	h := WithHeader(&types.Header{Time: 12}, &Header{})
 	require.Equal(t, uint64(12_000), HeaderTimeMilliseconds(h), "pre-Granite falls back to Time*1000")
-	GetHeaderExtra(h).TimeMilliseconds = new(uint64(12_345))
+	GetHeader(h).TimeMilliseconds = new(uint64(12_345))
 	require.Equal(t, uint64(12_345), HeaderTimeMilliseconds(h), "Granite TimeMilliseconds wins")
 }
 
@@ -56,14 +56,14 @@ func TestHeaderWithNonZeroFields(t *testing.T) {
 	t.Run("HeaderExtra", func(t *testing.T) { allFieldsSet(t, extra) })
 }
 
-// headerWithNonZeroFields returns a [Header] and a [HeaderExtra],
+// headerWithNonZeroFields returns a [Header] and a [Header],
 // each with all fields set to non-zero values.
-// The [HeaderExtra] extra payload is set in the [Header] via [WithHeaderExtra].
+// The [Header] extra payload is set in the [Header] via [WithHeader].
 //
 // NOTE: They can be used to demonstrate that RLP and JSON round-trip encoding
 // can recover all fields, but not that the encoded format is correct. This is
 // very important as the RLP encoding of a [Header] defines its hash.
-func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
+func headerWithNonZeroFields() (*types.Header, *Header) {
 	header := &types.Header{
 		ParentHash:       common.Hash{1},
 		UncleHash:        common.Hash{2},
@@ -86,7 +86,7 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		ExcessBlobGas:    new(uint64(19)),
 		ParentBeaconRoot: &common.Hash{20},
 	}
-	extra := &HeaderExtra{
+	extra := &Header{
 		ExtDataHash:         common.Hash{21},
 		ExtDataGasUsed:      big.NewInt(22),
 		BlockGasCost:        big.NewInt(23),
@@ -99,12 +99,12 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		SettledGasNumerator: new(uint64(30)),
 		SettledExcess:       new(uint64(31)),
 	}
-	return WithHeaderExtra(header, extra), extra
+	return WithHeader(header, extra), extra
 }
 
 // allFieldsSet checks that a test fixture sets every exported field, so that
 // the round-trip tests using it cover each one.
-func allFieldsSet[T types.Header | HeaderExtra | BlockBodyExtra](t *testing.T, x *T) {
+func allFieldsSet[T types.Header | Header | BlockBody](t *testing.T, x *T) {
 	v := reflect.ValueOf(x).Elem()
 	for i := range v.Type().NumField() {
 		field := v.Type().Field(i)

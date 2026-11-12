@@ -1,4 +1,4 @@
-# customtypes
+# libevmextras header extras
 
 The C-Chain's extra header, body and account payloads, registered with libevm. `HeaderExtra` holds the header fields Avalanche adds to the go-ethereum header. Its RLP encoding defines every C-Chain block hash, so historical encodings MUST NOT change.
 

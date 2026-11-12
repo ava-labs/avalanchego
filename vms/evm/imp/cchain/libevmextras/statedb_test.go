@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 
 	. "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 )
@@ -167,7 +166,7 @@ func TestAssetBalance(t *testing.T) {
 			got := s.GetAssetBalance(addr, assetID)
 			assert.Equalf(t, uint256.NewInt(tt.want), got, "%T.GetAssetBalance(%s, %s)", s, addr, assetID)
 			assert.Equalf(t, tt.wantExist, s.Exist(addr), "%T.Exist(%s)", s, addr)
-			assert.Equal(t, tt.wantHeldXChainAsset, customtypes.HeldXChainAsset(s.StateDB, addr), "customtypes.HeldXChainAsset()")
+			assert.Equal(t, tt.wantHeldXChainAsset, HeldXChainAsset(s.StateDB, addr), "HeldXChainAsset()")
 		})
 	}
 }

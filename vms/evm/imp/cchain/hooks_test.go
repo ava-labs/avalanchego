@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 )
@@ -30,9 +29,9 @@ func TestDelayExponent(t *testing.T) {
 	}{
 		{
 			name: "header_carries_excess",
-			header: customtypes.WithHeaderExtra(
+			header: libevmextras.WithHeader(
 				&types.Header{},
-				&customtypes.HeaderExtra{MinDelayExcess: new(dynamic.DelayExponent(42))},
+				&libevmextras.Header{MinDelayExcess: new(dynamic.DelayExponent(42))},
 			),
 			want: dynamic.DelayExponent(42),
 		},
@@ -129,9 +128,9 @@ func TestTargetExponent(t *testing.T) {
 	}{
 		{
 			name: "header_carries_exponent",
-			header: customtypes.WithHeaderExtra(
+			header: libevmextras.WithHeader(
 				&types.Header{Number: big.NewInt(1)},
-				&customtypes.HeaderExtra{TargetExponent: new(dynamic.TargetExponent(42))},
+				&libevmextras.Header{TargetExponent: new(dynamic.TargetExponent(42))},
 			),
 			want: 42,
 		},

@@ -32,7 +32,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
@@ -94,7 +93,7 @@ func newHooks(
 }
 
 func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], error) {
-	rawTxs, err := tx.ParseSlice(customtypes.BlockExtData(b))
+	rawTxs, err := tx.ParseSlice(libevmextras.BlockExtData(b))
 	if err != nil {
 		return nil, fmt.Errorf("parsing txs: %w", err)
 	}
@@ -109,7 +108,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 	}
 
 	header := b.Header()
-	headerExtra := customtypes.GetHeaderExtra(header)
+	headerExtra := libevmextras.GetHeader(header)
 	now := h.BlockTime(header)
 	return &builder{
 		h.ctx,
@@ -142,7 +141,7 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 // priceExponent returns h's ACP-283 price exponent, defaulting to
 // [dynamic.InitialPriceExponent] when the header does not carry one.
 func priceExponent(h *types.Header) dynamic.PriceExponent {
-	if pe := customtypes.GetHeaderExtra(h).MinPriceExponent; pe != nil {
+	if pe := libevmextras.GetHeader(h).MinPriceExponent; pe != nil {
 		return *pe
 	}
 	return dynamic.InitialPriceExponent
@@ -151,14 +150,14 @@ func priceExponent(h *types.Header) dynamic.PriceExponent {
 // delayExponent returns h's ACP-226 minimum block delay exponent, defaulting to
 // [dynamic.InitialDelayExponent] when the header does not carry one.
 func delayExponent(h *types.Header) dynamic.DelayExponent {
-	if de := customtypes.GetHeaderExtra(h).MinDelayExcess; de != nil {
+	if de := libevmextras.GetHeader(h).MinDelayExcess; de != nil {
 		return *de
 	}
 	return dynamic.InitialDelayExponent
 }
 
 func targetExponent(config *libevmextras.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
-	if te := customtypes.GetHeaderExtra(h).TargetExponent; te != nil {
+	if te := libevmextras.GetHeader(h).TargetExponent; te != nil {
 		return *te, nil
 	}
 	if !config.IsFortuna(h.Time) || h.Number.Sign() == 0 {
@@ -191,7 +190,7 @@ func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceC
 }
 
 func (*hooks) SettledBy(h *types.Header) hook.Settled {
-	he := customtypes.GetHeaderExtra(h)
+	he := libevmextras.GetHeader(h)
 	if he.SettledHeight == nil ||
 		he.SettledGasUnix == nil ||
 		he.SettledGasNumerator == nil ||
@@ -212,7 +211,7 @@ func (*hooks) BlockTime(h *types.Header) time.Time {
 }
 
 func blockTime(h *types.Header) time.Time {
-	return saeheader.Time(h.Time, customtypes.HeaderTimeMilliseconds(h))
+	return saeheader.Time(h.Time, libevmextras.HeaderTimeMilliseconds(h))
 }
 
 func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
@@ -316,20 +315,20 @@ func init() {
 }
 
 func (h *hooks) VerifyBlockSyntax(b *types.Block) error {
-	if version := customtypes.BlockVersion(b); version != 0 {
+	if version := libevmextras.BlockVersion(b); version != 0 {
 		return fmt.Errorf("%w: %d", errInvalidBlockVersion, version)
 	}
 
 	var (
-		extData        = customtypes.BlockExtData(b)
-		calculatedHash = customtypes.CalcExtDataHash(extData)
+		extData        = libevmextras.BlockExtData(b)
+		calculatedHash = libevmextras.CalcExtDataHash(extData)
 		wantHeaderHash = calculatedHash
 	)
 	// For genesis and pre-ApricotPhase1 blocks, the header's ExtDataHash is
 	// expected to be empty with the actual data expected to be committed to in
 	// [extDataHashes].
 	if height := b.NumberU64(); height == 0 || !libevmextras.GetChainConfig(h.chainConfig).IsApricotPhase1(b.Time()) {
-		wantHash := customtypes.EmptyExtDataHash
+		wantHash := libevmextras.EmptyExtDataHash
 		if want, ok := extDataHashes[h.ctx.NetworkID][height]; ok {
 			wantHash = want
 		}
@@ -338,7 +337,7 @@ func (h *hooks) VerifyBlockSyntax(b *types.Block) error {
 		}
 		wantHeaderHash = common.Hash{}
 	}
-	if got := customtypes.GetHeaderExtra(b.Header()).ExtDataHash; got != wantHeaderHash {
+	if got := libevmextras.GetHeader(b.Header()).ExtDataHash; got != wantHeaderHash {
 		return fmt.Errorf("%w: have %x, want %x", errExtDataHashMismatch, got, wantHeaderHash)
 	}
 	return nil
@@ -379,7 +378,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	de = de.Toward(b.desired.delayExponent)
 	te = te.Toward(b.desired.targetExponent)
 	pe := priceExponent(parent).Toward(b.desired.priceExponent)
-	return customtypes.WithHeaderExtra(
+	return libevmextras.WithHeader(
 		&types.Header{
 			ParentHash:       parent.Hash(),
 			Coinbase:         blackhole.Address,
@@ -390,7 +389,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			ExcessBlobGas:    new(uint64),
 			ParentBeaconRoot: new(common.Hash),
 		},
-		&customtypes.HeaderExtra{
+		&libevmextras.Header{
 			// Prior to SAE, ExtDataGasUsed included the gas cost of the
 			// cross-chain transactions. However, with SAE, the gas cost is
 			// included in [types.Header.GasUsed] with [hook.Op.Gas].
@@ -485,7 +484,7 @@ func ancestorInputIDs(h *types.Header, settled common.Hash, source saetypes.Bloc
 			return nil, fmt.Errorf("%w: %s (%d)", errMissingBlock, h.ParentHash, parentNumber)
 		}
 
-		txs, err := tx.ParseSlice(customtypes.BlockExtData(p))
+		txs, err := tx.ParseSlice(libevmextras.BlockExtData(p))
 		if err != nil {
 			return nil, fmt.Errorf("parsing txs: %s (%d): %w", h.ParentHash, parentNumber, err)
 		}
@@ -539,13 +538,13 @@ func (b *builder) BuildBlock(
 	header.Extra = warpValidityBytes
 
 	// Encode the settled block marker into the header so [hooks.SettledBy] can recover it.
-	he := customtypes.GetHeaderExtra(header)
+	he := libevmextras.GetHeader(header)
 	he.SettledHeight = &settled.Height
 	he.SettledGasUnix = &settled.GasUnix
 	he.SettledGasNumerator = (*uint64)(&settled.GasNumerator)
 	he.SettledExcess = (*uint64)(&settled.Excess)
 
-	return customtypes.NewBlock(header, ethTxs, receipts, extData), nil
+	return libevmextras.NewBlock(header, ethTxs, receipts, extData), nil
 }
 
 var _ hook.Transaction = (*hookTx)(nil)
