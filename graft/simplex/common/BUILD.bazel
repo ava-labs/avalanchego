@@ -44,7 +44,6 @@ graft_go_test(
         "sched_test.go",
         "timeout_handler_test.go",
     ],
-    data = glob(["testdata/**"]),
     embed = [":common"],
     deps = [
         "//graft/simplex/testutil",
