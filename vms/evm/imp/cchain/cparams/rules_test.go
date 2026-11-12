@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestRulesExtra_MinimumGasConsumption(t *testing.T) {
+func TestRules_MinimumGasConsumption(t *testing.T) {
 	tests := []struct {
 		name      string
 		isHelicon bool

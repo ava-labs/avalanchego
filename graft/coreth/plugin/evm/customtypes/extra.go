@@ -9,10 +9,10 @@ import (
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
-// PredicateResults returns the parsed predicate results from the header's extra
-// data. If the extra data does not contain predicate results, or cannot be
-// parsed, nil is returned. The same rules MUST be supplied for each call to a
-// given header.
+// PredicateResults returns the parsed predicate results from predicateBytes,
+// caching them on h. If predicateBytes is empty, or cannot be parsed, nil is
+// returned. The same predicateBytes MUST be supplied for each call to a given
+// header.
 func PredicateResults(h *ethtypes.Header, predicateBytes []byte) predicate.BlockResults {
 	if len(predicateBytes) == 0 {
 		return nil

@@ -76,13 +76,18 @@ func (Rules) ShouldCreditBaseFeeToCoinbase() bool {
 	return true
 }
 
-// warpPredicaters charges for Warp predicates, which are the only predicates.
-//
-// TODO(JonathanOppenheimer): Charge Warp messages directly once the shared
-// predicate gas helper is replaced.
-var warpPredicaters = map[common.Address]precompileconfig.Predicater{
-	warp.ContractAddress: &warp.Config{},
-}
+var (
+	// warpPredicaters charges for Warp predicates, which are the only predicates.
+	//
+	// TODO(JonathanOppenheimer): Charge Warp messages directly once the shared
+	// predicate gas helper is replaced.
+	warpPredicaters = map[common.Address]precompileconfig.Predicater{
+		warp.ContractAddress: &warp.Config{},
+	}
+
+	// p256VerifyAddress is the address of the p256 signature verification precompile
+	p256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
+)
 
 // AccessListGas computes the intrinsic gas for an access list. Once Warp is
 // active, it calculates gas per-tuple, charging Warp predicates by
@@ -102,7 +107,7 @@ func (r Rules) ActivePrecompiles(existing []common.Address) []common.Address {
 	addresses := slices.Clone(existing)
 	switch {
 	case r.IsGranite:
-		addresses = append(addresses, P256VerifyAddress)
+		addresses = append(addresses, p256VerifyAddress)
 		fallthrough
 	case r.IsApricotPhase2:
 		addresses = append(addresses,
@@ -138,9 +143,6 @@ func (r Rules) currentPrecompiles() map[common.Address]vm.PrecompiledContract {
 }
 
 var (
-	// P256VerifyAddress is the address of the p256 signature verification precompile
-	P256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
-
 	precompiledContractsApricotPhase2 = map[common.Address]vm.PrecompiledContract{
 		nativeasset.GenesisContractAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
 		nativeasset.NativeAssetBalanceAddr: makePrecompile(&nativeasset.NativeAssetBalance{}),
@@ -177,7 +179,7 @@ var (
 		nativeasset.NativeAssetBalanceAddr: makePrecompile(&nativeasset.DeprecatedContract{}),
 		nativeasset.NativeAssetCallAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
 		warp.ContractAddress:               makePrecompile(warp.WarpPrecompile),
-		P256VerifyAddress:                  &vm.P256Verify{},
+		p256VerifyAddress:                  &vm.P256Verify{},
 	}
 )
 

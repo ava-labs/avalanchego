@@ -88,7 +88,7 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := predicateBytesFromExtra(tt.rules, tt.extra)
-			require.Equal(t, tt.want, got, "PredicateBytesFromExtra()")
+			require.Equal(t, tt.want, got, "predicateBytesFromExtra()")
 		})
 	}
 }
