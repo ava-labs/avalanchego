@@ -438,6 +438,9 @@ message Simplex {
     QuorumCertificate finalization = 8;
     ReplicationRequest replication_request = 9;
     ReplicationResponse replication_response = 10;
+    BlockDigestRequest block_digest_request = 11;
+    AuxiliaryInfo auxiliary_info = 12;
+    ValidatorSetApproval epoch_transition_approval = 13;
   }
 }
 
@@ -503,14 +506,42 @@ message EmptyNotarization {
 message ReplicationRequest {
   repeated uint64 seqs = 1; // sequences we are requesting
   uint64 latest_round = 2; // latest round that we are aware of
+  repeated uint64 rounds = 3; // rounds we are requesting
+  uint64 latest_finalized_seq = 4; // latest finalized sequence that we are aware of
 }
 
 message ReplicationResponse {
   repeated QuorumRound data = 1; // requested seqs. not required to be in particular order
   QuorumRound latest_round = 2; // latest round the responding node is aware of
+  QuorumRound latest_seq = 3; // latest finalized sequence the responding node is aware of
 }
 
-// QuorumRound represents a round that has acheived quorum on either
+// BlockDigestRequest requests the block with the given sequence and digest.
+message BlockDigestRequest {
+  uint64 seq = 1;
+  bytes digest = 2;
+}
+
+// AuxiliaryInfo is application-specific information associated with an epoch
+// change.
+message AuxiliaryInfo {
+  // Epoch this auxiliary info is associated with.
+  uint64 epoch = 1;
+  // Version identifies the application.
+  uint32 version = 2;
+  // Data is opaque application-specific bytes.
+  bytes data = 3;
+}
+
+// ValidatorSetApproval is a validator's approval of an epoch transition.
+message ValidatorSetApproval {
+  bytes node_id = 1;
+  bytes aux_info_digest = 2;
+  uint64 p_chain_height = 3;
+  bytes signature = 4;
+}
+
+// QuorumRound represents a round that has achieved quorum on either
 // (empty notarization), (block & notarization), or (block, finalization certificate)
 message QuorumRound {
   bytes block = 1;

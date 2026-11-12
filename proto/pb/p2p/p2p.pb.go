@@ -2507,6 +2507,9 @@ type Simplex struct {
 	//	*Simplex_Finalization
 	//	*Simplex_ReplicationRequest
 	//	*Simplex_ReplicationResponse
+	//	*Simplex_BlockDigestRequest
+	//	*Simplex_AuxiliaryInfo
+	//	*Simplex_EpochTransitionApproval
 	Message       isSimplex_Message `protobuf_oneof:"message"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2637,6 +2640,33 @@ func (x *Simplex) GetReplicationResponse() *ReplicationResponse {
 	return nil
 }
 
+func (x *Simplex) GetBlockDigestRequest() *BlockDigestRequest {
+	if x != nil {
+		if x, ok := x.Message.(*Simplex_BlockDigestRequest); ok {
+			return x.BlockDigestRequest
+		}
+	}
+	return nil
+}
+
+func (x *Simplex) GetAuxiliaryInfo() *AuxiliaryInfo {
+	if x != nil {
+		if x, ok := x.Message.(*Simplex_AuxiliaryInfo); ok {
+			return x.AuxiliaryInfo
+		}
+	}
+	return nil
+}
+
+func (x *Simplex) GetEpochTransitionApproval() *ValidatorSetApproval {
+	if x != nil {
+		if x, ok := x.Message.(*Simplex_EpochTransitionApproval); ok {
+			return x.EpochTransitionApproval
+		}
+	}
+	return nil
+}
+
 type isSimplex_Message interface {
 	isSimplex_Message()
 }
@@ -2677,6 +2707,18 @@ type Simplex_ReplicationResponse struct {
 	ReplicationResponse *ReplicationResponse `protobuf:"bytes,10,opt,name=replication_response,json=replicationResponse,proto3,oneof"`
 }
 
+type Simplex_BlockDigestRequest struct {
+	BlockDigestRequest *BlockDigestRequest `protobuf:"bytes,11,opt,name=block_digest_request,json=blockDigestRequest,proto3,oneof"`
+}
+
+type Simplex_AuxiliaryInfo struct {
+	AuxiliaryInfo *AuxiliaryInfo `protobuf:"bytes,12,opt,name=auxiliary_info,json=auxiliaryInfo,proto3,oneof"`
+}
+
+type Simplex_EpochTransitionApproval struct {
+	EpochTransitionApproval *ValidatorSetApproval `protobuf:"bytes,13,opt,name=epoch_transition_approval,json=epochTransitionApproval,proto3,oneof"`
+}
+
 func (*Simplex_BlockProposal) isSimplex_Message() {}
 
 func (*Simplex_Vote) isSimplex_Message() {}
@@ -2694,6 +2736,12 @@ func (*Simplex_Finalization) isSimplex_Message() {}
 func (*Simplex_ReplicationRequest) isSimplex_Message() {}
 
 func (*Simplex_ReplicationResponse) isSimplex_Message() {}
+
+func (*Simplex_BlockDigestRequest) isSimplex_Message() {}
+
+func (*Simplex_AuxiliaryInfo) isSimplex_Message() {}
+
+func (*Simplex_EpochTransitionApproval) isSimplex_Message() {}
 
 type BlockProposal struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -3199,11 +3247,13 @@ func (x *EmptyNotarization) GetQuorumCertificate() []byte {
 }
 
 type ReplicationRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Seqs          []uint64               `protobuf:"varint,1,rep,packed,name=seqs,proto3" json:"seqs,omitempty"`                           // sequences we are requesting
-	LatestRound   uint64                 `protobuf:"varint,2,opt,name=latest_round,json=latestRound,proto3" json:"latest_round,omitempty"` // latest round that we are aware of
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Seqs               []uint64               `protobuf:"varint,1,rep,packed,name=seqs,proto3" json:"seqs,omitempty"`                                                  // sequences we are requesting
+	LatestRound        uint64                 `protobuf:"varint,2,opt,name=latest_round,json=latestRound,proto3" json:"latest_round,omitempty"`                        // latest round that we are aware of
+	Rounds             []uint64               `protobuf:"varint,3,rep,packed,name=rounds,proto3" json:"rounds,omitempty"`                                              // rounds we are requesting
+	LatestFinalizedSeq uint64                 `protobuf:"varint,4,opt,name=latest_finalized_seq,json=latestFinalizedSeq,proto3" json:"latest_finalized_seq,omitempty"` // latest finalized sequence that we are aware of
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *ReplicationRequest) Reset() {
@@ -3250,10 +3300,25 @@ func (x *ReplicationRequest) GetLatestRound() uint64 {
 	return 0
 }
 
+func (x *ReplicationRequest) GetRounds() []uint64 {
+	if x != nil {
+		return x.Rounds
+	}
+	return nil
+}
+
+func (x *ReplicationRequest) GetLatestFinalizedSeq() uint64 {
+	if x != nil {
+		return x.LatestFinalizedSeq
+	}
+	return 0
+}
+
 type ReplicationResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Data          []*QuorumRound         `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty"`                                  // requested seqs. not required to be in particular order
 	LatestRound   *QuorumRound           `protobuf:"bytes,2,opt,name=latest_round,json=latestRound,proto3" json:"latest_round,omitempty"` // latest round the responding node is aware of
+	LatestSeq     *QuorumRound           `protobuf:"bytes,3,opt,name=latest_seq,json=latestSeq,proto3" json:"latest_seq,omitempty"`       // latest finalized sequence the responding node is aware of
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3302,7 +3367,201 @@ func (x *ReplicationResponse) GetLatestRound() *QuorumRound {
 	return nil
 }
 
-// QuorumRound represents a round that has acheived quorum on either
+func (x *ReplicationResponse) GetLatestSeq() *QuorumRound {
+	if x != nil {
+		return x.LatestSeq
+	}
+	return nil
+}
+
+// BlockDigestRequest requests the block with the given sequence and digest.
+type BlockDigestRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Seq           uint64                 `protobuf:"varint,1,opt,name=seq,proto3" json:"seq,omitempty"`
+	Digest        []byte                 `protobuf:"bytes,2,opt,name=digest,proto3" json:"digest,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BlockDigestRequest) Reset() {
+	*x = BlockDigestRequest{}
+	mi := &file_p2p_p2p_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BlockDigestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BlockDigestRequest) ProtoMessage() {}
+
+func (x *BlockDigestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_p2p_p2p_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BlockDigestRequest.ProtoReflect.Descriptor instead.
+func (*BlockDigestRequest) Descriptor() ([]byte, []int) {
+	return file_p2p_p2p_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *BlockDigestRequest) GetSeq() uint64 {
+	if x != nil {
+		return x.Seq
+	}
+	return 0
+}
+
+func (x *BlockDigestRequest) GetDigest() []byte {
+	if x != nil {
+		return x.Digest
+	}
+	return nil
+}
+
+// AuxiliaryInfo is application-specific information associated with an epoch
+// change.
+type AuxiliaryInfo struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Epoch this auxiliary info is associated with.
+	Epoch uint64 `protobuf:"varint,1,opt,name=epoch,proto3" json:"epoch,omitempty"`
+	// Version identifies the application.
+	Version uint32 `protobuf:"varint,2,opt,name=version,proto3" json:"version,omitempty"`
+	// Data is opaque application-specific bytes.
+	Data          []byte `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AuxiliaryInfo) Reset() {
+	*x = AuxiliaryInfo{}
+	mi := &file_p2p_p2p_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuxiliaryInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuxiliaryInfo) ProtoMessage() {}
+
+func (x *AuxiliaryInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_p2p_p2p_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AuxiliaryInfo.ProtoReflect.Descriptor instead.
+func (*AuxiliaryInfo) Descriptor() ([]byte, []int) {
+	return file_p2p_p2p_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *AuxiliaryInfo) GetEpoch() uint64 {
+	if x != nil {
+		return x.Epoch
+	}
+	return 0
+}
+
+func (x *AuxiliaryInfo) GetVersion() uint32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *AuxiliaryInfo) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+// ValidatorSetApproval is a validator's approval of an epoch transition.
+type ValidatorSetApproval struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        []byte                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	AuxInfoDigest []byte                 `protobuf:"bytes,2,opt,name=aux_info_digest,json=auxInfoDigest,proto3" json:"aux_info_digest,omitempty"`
+	PChainHeight  uint64                 `protobuf:"varint,3,opt,name=p_chain_height,json=pChainHeight,proto3" json:"p_chain_height,omitempty"`
+	Signature     []byte                 `protobuf:"bytes,4,opt,name=signature,proto3" json:"signature,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidatorSetApproval) Reset() {
+	*x = ValidatorSetApproval{}
+	mi := &file_p2p_p2p_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidatorSetApproval) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidatorSetApproval) ProtoMessage() {}
+
+func (x *ValidatorSetApproval) ProtoReflect() protoreflect.Message {
+	mi := &file_p2p_p2p_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidatorSetApproval.ProtoReflect.Descriptor instead.
+func (*ValidatorSetApproval) Descriptor() ([]byte, []int) {
+	return file_p2p_p2p_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *ValidatorSetApproval) GetNodeId() []byte {
+	if x != nil {
+		return x.NodeId
+	}
+	return nil
+}
+
+func (x *ValidatorSetApproval) GetAuxInfoDigest() []byte {
+	if x != nil {
+		return x.AuxInfoDigest
+	}
+	return nil
+}
+
+func (x *ValidatorSetApproval) GetPChainHeight() uint64 {
+	if x != nil {
+		return x.PChainHeight
+	}
+	return 0
+}
+
+func (x *ValidatorSetApproval) GetSignature() []byte {
+	if x != nil {
+		return x.Signature
+	}
+	return nil
+}
+
+// QuorumRound represents a round that has achieved quorum on either
 // (empty notarization), (block & notarization), or (block, finalization certificate)
 type QuorumRound struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
@@ -3316,7 +3575,7 @@ type QuorumRound struct {
 
 func (x *QuorumRound) Reset() {
 	*x = QuorumRound{}
-	mi := &file_p2p_p2p_proto_msgTypes[40]
+	mi := &file_p2p_p2p_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3328,7 +3587,7 @@ func (x *QuorumRound) String() string {
 func (*QuorumRound) ProtoMessage() {}
 
 func (x *QuorumRound) ProtoReflect() protoreflect.Message {
-	mi := &file_p2p_p2p_proto_msgTypes[40]
+	mi := &file_p2p_p2p_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3341,7 +3600,7 @@ func (x *QuorumRound) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuorumRound.ProtoReflect.Descriptor instead.
 func (*QuorumRound) Descriptor() ([]byte, []int) {
-	return file_p2p_p2p_proto_rawDescGZIP(), []int{40}
+	return file_p2p_p2p_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *QuorumRound) GetBlock() []byte {
@@ -3568,7 +3827,7 @@ const file_p2p_p2p_proto_rawDesc = "" +
 	"\rerror_message\x18\x04 \x01(\tR\ferrorMessage\"C\n" +
 	"\tAppGossip\x12\x19\n" +
 	"\bchain_id\x18\x01 \x01(\fR\achainId\x12\x1b\n" +
-	"\tapp_bytes\x18\x02 \x01(\fR\bappBytes\"\xd0\x04\n" +
+	"\tapp_bytes\x18\x02 \x01(\fR\bappBytes\"\xb3\x06\n" +
 	"\aSimplex\x12\x19\n" +
 	"\bchain_id\x18\x01 \x01(\fR\achainId\x12;\n" +
 	"\x0eblock_proposal\x18\x02 \x01(\v2\x12.p2p.BlockProposalH\x00R\rblockProposal\x12\x1f\n" +
@@ -3581,7 +3840,10 @@ const file_p2p_p2p_proto_rawDesc = "" +
 	"\ffinalization\x18\b \x01(\v2\x16.p2p.QuorumCertificateH\x00R\ffinalization\x12J\n" +
 	"\x13replication_request\x18\t \x01(\v2\x17.p2p.ReplicationRequestH\x00R\x12replicationRequest\x12M\n" +
 	"\x14replication_response\x18\n" +
-	" \x01(\v2\x18.p2p.ReplicationResponseH\x00R\x13replicationResponseB\t\n" +
+	" \x01(\v2\x18.p2p.ReplicationResponseH\x00R\x13replicationResponse\x12K\n" +
+	"\x14block_digest_request\x18\v \x01(\v2\x17.p2p.BlockDigestRequestH\x00R\x12blockDigestRequest\x12;\n" +
+	"\x0eauxiliary_info\x18\f \x01(\v2\x12.p2p.AuxiliaryInfoH\x00R\rauxiliaryInfo\x12W\n" +
+	"\x19epoch_transition_approval\x18\r \x01(\v2\x19.p2p.ValidatorSetApprovalH\x00R\x17epochTransitionApprovalB\t\n" +
 	"\amessage\"D\n" +
 	"\rBlockProposal\x12\x14\n" +
 	"\x05block\x18\x01 \x01(\fR\x05block\x12\x1d\n" +
@@ -3612,13 +3874,29 @@ const file_p2p_p2p_proto_rawDesc = "" +
 	"\x12quorum_certificate\x18\x02 \x01(\fR\x11quorumCertificate\"v\n" +
 	"\x11EmptyNotarization\x122\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x16.p2p.EmptyVoteMetadataR\bmetadata\x12-\n" +
-	"\x12quorum_certificate\x18\x02 \x01(\fR\x11quorumCertificate\"K\n" +
+	"\x12quorum_certificate\x18\x02 \x01(\fR\x11quorumCertificate\"\x95\x01\n" +
 	"\x12ReplicationRequest\x12\x12\n" +
 	"\x04seqs\x18\x01 \x03(\x04R\x04seqs\x12!\n" +
-	"\flatest_round\x18\x02 \x01(\x04R\vlatestRound\"p\n" +
+	"\flatest_round\x18\x02 \x01(\x04R\vlatestRound\x12\x16\n" +
+	"\x06rounds\x18\x03 \x03(\x04R\x06rounds\x120\n" +
+	"\x14latest_finalized_seq\x18\x04 \x01(\x04R\x12latestFinalizedSeq\"\xa1\x01\n" +
 	"\x13ReplicationResponse\x12$\n" +
 	"\x04data\x18\x01 \x03(\v2\x10.p2p.QuorumRoundR\x04data\x123\n" +
-	"\flatest_round\x18\x02 \x01(\v2\x10.p2p.QuorumRoundR\vlatestRound\"\xe2\x01\n" +
+	"\flatest_round\x18\x02 \x01(\v2\x10.p2p.QuorumRoundR\vlatestRound\x12/\n" +
+	"\n" +
+	"latest_seq\x18\x03 \x01(\v2\x10.p2p.QuorumRoundR\tlatestSeq\">\n" +
+	"\x12BlockDigestRequest\x12\x10\n" +
+	"\x03seq\x18\x01 \x01(\x04R\x03seq\x12\x16\n" +
+	"\x06digest\x18\x02 \x01(\fR\x06digest\"S\n" +
+	"\rAuxiliaryInfo\x12\x14\n" +
+	"\x05epoch\x18\x01 \x01(\x04R\x05epoch\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\rR\aversion\x12\x12\n" +
+	"\x04data\x18\x03 \x01(\fR\x04data\"\x9b\x01\n" +
+	"\x14ValidatorSetApproval\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\fR\x06nodeId\x12&\n" +
+	"\x0faux_info_digest\x18\x02 \x01(\fR\rauxInfoDigest\x12$\n" +
+	"\x0ep_chain_height\x18\x03 \x01(\x04R\fpChainHeight\x12\x1c\n" +
+	"\tsignature\x18\x04 \x01(\fR\tsignature\"\xe2\x01\n" +
 	"\vQuorumRound\x12\x14\n" +
 	"\x05block\x18\x01 \x01(\fR\x05block\x12:\n" +
 	"\fnotarization\x18\x02 \x01(\v2\x16.p2p.QuorumCertificateR\fnotarization\x12E\n" +
@@ -3643,7 +3921,7 @@ func file_p2p_p2p_proto_rawDescGZIP() []byte {
 }
 
 var file_p2p_p2p_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_p2p_p2p_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
+var file_p2p_p2p_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
 var file_p2p_p2p_proto_goTypes = []any{
 	(EngineType)(0),                 // 0: p2p.EngineType
 	(*Message)(nil),                 // 1: p2p.Message
@@ -3686,7 +3964,10 @@ var file_p2p_p2p_proto_goTypes = []any{
 	(*EmptyNotarization)(nil),       // 38: p2p.EmptyNotarization
 	(*ReplicationRequest)(nil),      // 39: p2p.ReplicationRequest
 	(*ReplicationResponse)(nil),     // 40: p2p.ReplicationResponse
-	(*QuorumRound)(nil),             // 41: p2p.QuorumRound
+	(*BlockDigestRequest)(nil),      // 41: p2p.BlockDigestRequest
+	(*AuxiliaryInfo)(nil),           // 42: p2p.AuxiliaryInfo
+	(*ValidatorSetApproval)(nil),    // 43: p2p.ValidatorSetApproval
+	(*QuorumRound)(nil),             // 44: p2p.QuorumRound
 }
 var file_p2p_p2p_proto_depIdxs = []int32{
 	2,  // 0: p2p.Message.ping:type_name -> p2p.Ping
@@ -3728,24 +4009,28 @@ var file_p2p_p2p_proto_depIdxs = []int32{
 	37, // 36: p2p.Simplex.finalization:type_name -> p2p.QuorumCertificate
 	39, // 37: p2p.Simplex.replication_request:type_name -> p2p.ReplicationRequest
 	40, // 38: p2p.Simplex.replication_response:type_name -> p2p.ReplicationResponse
-	35, // 39: p2p.BlockProposal.vote:type_name -> p2p.Vote
-	31, // 40: p2p.BlockHeader.metadata:type_name -> p2p.ProtocolMetadata
-	33, // 41: p2p.Vote.block_header:type_name -> p2p.BlockHeader
-	34, // 42: p2p.Vote.signature:type_name -> p2p.Signature
-	32, // 43: p2p.EmptyVote.metadata:type_name -> p2p.EmptyVoteMetadata
-	34, // 44: p2p.EmptyVote.signature:type_name -> p2p.Signature
-	33, // 45: p2p.QuorumCertificate.block_header:type_name -> p2p.BlockHeader
-	32, // 46: p2p.EmptyNotarization.metadata:type_name -> p2p.EmptyVoteMetadata
-	41, // 47: p2p.ReplicationResponse.data:type_name -> p2p.QuorumRound
-	41, // 48: p2p.ReplicationResponse.latest_round:type_name -> p2p.QuorumRound
-	37, // 49: p2p.QuorumRound.notarization:type_name -> p2p.QuorumCertificate
-	38, // 50: p2p.QuorumRound.empty_notarization:type_name -> p2p.EmptyNotarization
-	37, // 51: p2p.QuorumRound.finalization:type_name -> p2p.QuorumCertificate
-	52, // [52:52] is the sub-list for method output_type
-	52, // [52:52] is the sub-list for method input_type
-	52, // [52:52] is the sub-list for extension type_name
-	52, // [52:52] is the sub-list for extension extendee
-	0,  // [0:52] is the sub-list for field type_name
+	41, // 39: p2p.Simplex.block_digest_request:type_name -> p2p.BlockDigestRequest
+	42, // 40: p2p.Simplex.auxiliary_info:type_name -> p2p.AuxiliaryInfo
+	43, // 41: p2p.Simplex.epoch_transition_approval:type_name -> p2p.ValidatorSetApproval
+	35, // 42: p2p.BlockProposal.vote:type_name -> p2p.Vote
+	31, // 43: p2p.BlockHeader.metadata:type_name -> p2p.ProtocolMetadata
+	33, // 44: p2p.Vote.block_header:type_name -> p2p.BlockHeader
+	34, // 45: p2p.Vote.signature:type_name -> p2p.Signature
+	32, // 46: p2p.EmptyVote.metadata:type_name -> p2p.EmptyVoteMetadata
+	34, // 47: p2p.EmptyVote.signature:type_name -> p2p.Signature
+	33, // 48: p2p.QuorumCertificate.block_header:type_name -> p2p.BlockHeader
+	32, // 49: p2p.EmptyNotarization.metadata:type_name -> p2p.EmptyVoteMetadata
+	44, // 50: p2p.ReplicationResponse.data:type_name -> p2p.QuorumRound
+	44, // 51: p2p.ReplicationResponse.latest_round:type_name -> p2p.QuorumRound
+	44, // 52: p2p.ReplicationResponse.latest_seq:type_name -> p2p.QuorumRound
+	37, // 53: p2p.QuorumRound.notarization:type_name -> p2p.QuorumCertificate
+	38, // 54: p2p.QuorumRound.empty_notarization:type_name -> p2p.EmptyNotarization
+	37, // 55: p2p.QuorumRound.finalization:type_name -> p2p.QuorumCertificate
+	56, // [56:56] is the sub-list for method output_type
+	56, // [56:56] is the sub-list for method input_type
+	56, // [56:56] is the sub-list for extension type_name
+	56, // [56:56] is the sub-list for extension extendee
+	0,  // [0:56] is the sub-list for field type_name
 }
 
 func init() { file_p2p_p2p_proto_init() }
@@ -3791,6 +4076,9 @@ func file_p2p_p2p_proto_init() {
 		(*Simplex_Finalization)(nil),
 		(*Simplex_ReplicationRequest)(nil),
 		(*Simplex_ReplicationResponse)(nil),
+		(*Simplex_BlockDigestRequest)(nil),
+		(*Simplex_AuxiliaryInfo)(nil),
+		(*Simplex_EpochTransitionApproval)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -3798,7 +4086,7 @@ func file_p2p_p2p_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_p2p_p2p_proto_rawDesc), len(file_p2p_p2p_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   41,
+			NumMessages:   44,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
@@ -131,16 +132,23 @@ func finalizeVoteFromP2P(finalizeVote *p2p.Vote) (*common.Message, error) {
 func replicationRequestFromP2P(replicationRequest *p2p.ReplicationRequest) *common.Message {
 	return &common.Message{
 		ReplicationRequest: &common.ReplicationRequest{
-			Seqs:        replicationRequest.Seqs,
-			LatestRound: replicationRequest.LatestRound,
+			Seqs:               replicationRequest.Seqs,
+			Rounds:             replicationRequest.Rounds,
+			LatestRound:        replicationRequest.LatestRound,
+			LatestFinalizedSeq: replicationRequest.LatestFinalizedSeq,
 		},
 	}
 }
 
 func replicationResponseFromP2P(ctx context.Context, replicationResponse *p2p.ReplicationResponse, blockDeserializer *blockDeserializer, qcDeserializer *QCDeserializer) (*common.Message, error) {
-	latestRound, err := quorumRoundFromP2P(ctx, replicationResponse.LatestRound, blockDeserializer, qcDeserializer)
+	latestRound, err := maybeQuorumRoundFromP2P(ctx, replicationResponse.LatestRound, blockDeserializer, qcDeserializer)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to convert latest round: %w", err)
+	}
+
+	latestSeq, err := maybeQuorumRoundFromP2P(ctx, replicationResponse.LatestSeq, blockDeserializer, qcDeserializer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert latest seq: %w", err)
 	}
 
 	data := make([]common.QuorumRound, 0, len(replicationResponse.Data))
@@ -155,7 +163,53 @@ func replicationResponseFromP2P(ctx context.Context, replicationResponse *p2p.Re
 	return &common.Message{
 		ReplicationResponse: &common.ReplicationResponse{
 			LatestRound: latestRound,
+			LatestSeq:   latestSeq,
 			Data:        data,
+		},
+	}, nil
+}
+
+func blockDigestRequestFromP2P(blockDigestRequest *p2p.BlockDigestRequest) (*common.Message, error) {
+	digest, err := digestFromP2P(blockDigestRequest.Digest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert digest: %w", err)
+	}
+
+	return &common.Message{
+		BlockDigestRequest: &common.BlockDigestRequest{
+			Seq:    blockDigestRequest.Seq,
+			Digest: digest,
+		},
+	}, nil
+}
+
+func auxiliaryInfoFromP2P(auxInfo *p2p.AuxiliaryInfo) *common.Message {
+	return &common.Message{
+		AuxiliaryInfo: &common.AuxiliaryInfo{
+			Epoch:   auxInfo.Epoch,
+			Version: common.VersionID(auxInfo.Version),
+			Data:    auxInfo.Data,
+		},
+	}
+}
+
+func epochTransitionApprovalFromP2P(approval *p2p.ValidatorSetApproval) (*common.Message, error) {
+	nodeID, err := ids.ToNodeID(approval.NodeId)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errInvalidSigner, err)
+	}
+
+	auxInfoDigest, err := digestFromP2P(approval.AuxInfoDigest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert aux info digest: %w", err)
+	}
+
+	return &common.Message{
+		EpochTransitionApproval: &common.ValidatorSetApproval{
+			NodeID:        avalanchego.NodeID(nodeID),
+			AuxInfoDigest: auxInfoDigest,
+			PChainHeight:  approval.PChainHeight,
+			Signature:     approval.Signature,
 		},
 	}, nil
 }
@@ -338,6 +392,15 @@ func finalizationFromP2P(finalization *p2p.QuorumCertificate, qcDeserializer *QC
 		},
 		QC: qc,
 	}, nil
+}
+
+// maybeQuorumRoundFromP2P is equivalent to quorumRoundFromP2P, but does not
+// error when [qr] is nil.
+func maybeQuorumRoundFromP2P(ctx context.Context, qr *p2p.QuorumRound, blockDeserializer *blockDeserializer, qcDeserializer *QCDeserializer) (*common.QuorumRound, error) {
+	if qr == nil {
+		return nil, nil
+	}
+	return quorumRoundFromP2P(ctx, qr, blockDeserializer, qcDeserializer)
 }
 
 func quorumRoundFromP2P(ctx context.Context, qr *p2p.QuorumRound, blockDeserializer *blockDeserializer, qcDeserializer *QCDeserializer) (*common.QuorumRound, error) {

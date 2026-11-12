@@ -137,6 +137,12 @@ func (c *Comm) simplexMessageToOutboundMessage(msg *simplexcommon.Message) (*mes
 		simplexMsg = newReplicationRequest(c.chainID, msg.ReplicationRequest)
 	case msg.VerifiedReplicationResponse != nil:
 		simplexMsg = newReplicationResponse(c.chainID, msg.VerifiedReplicationResponse)
+	case msg.BlockDigestRequest != nil:
+		simplexMsg = newBlockDigestRequest(c.chainID, msg.BlockDigestRequest)
+	case msg.AuxiliaryInfo != nil:
+		simplexMsg = newAuxiliaryInfo(c.chainID, msg.AuxiliaryInfo)
+	case msg.EpochTransitionApproval != nil:
+		simplexMsg = newEpochTransitionApproval(c.chainID, msg.EpochTransitionApproval)
 	default:
 		return nil, fmt.Errorf("unknown message type: %+v", msg)
 	}

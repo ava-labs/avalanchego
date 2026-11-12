@@ -241,6 +241,12 @@ func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*si
 		return replicationRequestFromP2P(msg.GetReplicationRequest()), nil
 	case msg.GetReplicationResponse() != nil:
 		return replicationResponseFromP2P(ctx, msg.GetReplicationResponse(), e.blockDeserializer, e.quorumDeserializer)
+	case msg.GetBlockDigestRequest() != nil:
+		return blockDigestRequestFromP2P(msg.GetBlockDigestRequest())
+	case msg.GetAuxiliaryInfo() != nil:
+		return auxiliaryInfoFromP2P(msg.GetAuxiliaryInfo()), nil
+	case msg.GetEpochTransitionApproval() != nil:
+		return epochTransitionApprovalFromP2P(msg.GetEpochTransitionApproval())
 	default:
 		return nil, errUnknownMessageType
 	}
