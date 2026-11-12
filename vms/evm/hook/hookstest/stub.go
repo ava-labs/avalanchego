@@ -328,8 +328,8 @@ type Op struct {
 
 // Size returns the op's serialized size
 func (o Op) Size() uint64 {
-	o.CalculateCanotoCache()
-	return o.CachedCanotoSize()
+	o.CacheCanoto()
+	return o.SizeCanoto()
 }
 
 // AsOp converts the op into a representation that SAE can use directly.

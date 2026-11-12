@@ -36,7 +36,7 @@ func TestBlockSerialization(t *testing.T) {
 			Seq:     1,
 			Prev:    genesisBlock.digest,
 		},
-		blacklist: common.NewBlacklist(3, common.GenesisMaxBlacklistedRounds),
+		blacklist: common.NewBlacklist(common.GenesisMaxBlacklistedRounds),
 	}
 
 	// Serialize the block
