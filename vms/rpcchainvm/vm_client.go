@@ -89,6 +89,7 @@ type VMClient struct {
 	pid             int
 	processTracker  resource.ProcessTracker
 	metricsGatherer metrics.MultiGatherer
+	logConfig       logging.Config
 
 	sharedMemory         *gsharedmemory.Server
 	bcLookup             *galiasreader.Server
@@ -110,6 +111,7 @@ func NewClient(
 	processTracker resource.ProcessTracker,
 	metricsGatherer metrics.MultiGatherer,
 	logger logging.Logger,
+	logConfig logging.Config,
 ) *VMClient {
 	return &VMClient{
 		client:          vmpb.NewVMClient(clientConn),
@@ -119,6 +121,7 @@ func NewClient(
 		metricsGatherer: metricsGatherer,
 		conns:           []*grpc.ClientConn{clientConn},
 		logger:          logger,
+		logConfig:       logConfig,
 	}
 }
 
@@ -202,6 +205,8 @@ func (vm *VMClient) Initialize(
 		ConfigBytes:     configBytes,
 		DbServerAddr:    dbServerAddr,
 		ServerAddr:      serverAddr,
+		LogLevel:        logLevelToProto(pluginLogLevel(vm.logConfig)),
+		LogFormat:       logFormatToProto(vm.logConfig.LogFormat),
 	})
 	if err != nil {
 		return err
