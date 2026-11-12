@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/state"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/statesync"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/txpool"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/metrics"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
 	"github.com/ava-labs/avalanchego/vms/evm/types"
@@ -61,7 +62,7 @@ type VM struct {
 
 	chainConfig *ethparams.ChainConfig
 	state       *state.State
-	metrics     *sae.MinBlockDelayMetric
+	metrics     *metrics.Metrics
 	pending     *txpool.Pending
 
 	// TODO(alarso16): Remove from VM - only referenced in tests.
@@ -133,7 +134,7 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("making metrics: %w", err)
 	}
-	vm.metrics, err = sae.NewMinBlockDelayMetric(reg)
+	vm.metrics, err = metrics.New(reg)
 	if err != nil {
 		return fmt.Errorf("registering cchain metrics: %w", err)
 	}

@@ -40,8 +40,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/executionresults"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/metrics"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
-	"github.com/ava-labs/avalanchego/vms/evm/sae"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
@@ -56,7 +56,7 @@ type hooks struct {
 	builder
 	state       *cchainstate.State
 	warpStorage *saewarp.Storage
-	metrics     *sae.MinBlockDelayMetric
+	metrics     *metrics.Metrics
 }
 
 func newHooks(
@@ -67,7 +67,7 @@ func newHooks(
 	warpStorage *saewarp.Storage,
 	now func() time.Time,
 	desired desiredParams,
-	metrics *sae.MinBlockDelayMetric,
+	metrics *metrics.Metrics,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -256,7 +256,7 @@ func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 }
 
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
-	h.metrics.Set(delayExponent(b.Header()).DelayDuration())
+	h.metrics.SetMinBlockDelay(delayExponent(b.Header()).DelayDuration())
 
 	txs, err := tx.FromBlock(h.chainConfig, b)
 	if err != nil {

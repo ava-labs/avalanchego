@@ -34,8 +34,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/executionresults"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/hookadaptor"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/metrics"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
-	"github.com/ava-labs/avalanchego/vms/evm/sae"
 
 	legacycore "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	legacyparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -51,7 +51,7 @@ var _ hookadaptor.Points = (*hooks)(nil)
 type hooks struct {
 	builder
 	warpStorage *saewarp.Storage
-	metrics     *sae.MinBlockDelayMetric
+	metrics     *metrics.Metrics
 }
 
 func newHooks(
@@ -61,7 +61,7 @@ func newHooks(
 	desired desiredParams,
 	warpStorage *saewarp.Storage,
 	configuredCoinbase common.Address,
-	metrics *sae.MinBlockDelayMetric,
+	metrics *metrics.Metrics,
 ) *hooks {
 	return &hooks{
 		builder: builder{
@@ -296,7 +296,7 @@ func (*hooks) FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts)
 // which is exactly the once-per-block semantics warp storage requires.
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
 	if mde := customtypes.GetHeaderExtra(b.Header()).MinDelayExcess; mde != nil {
-		h.metrics.Set(dynamic.DelayExponent(*mde).DelayDuration())
+		h.metrics.SetMinBlockDelay(dynamic.DelayExponent(*mde).DelayDuration())
 	}
 
 	// Genesis and state upgrades can place arbitrary code at the Warp address.

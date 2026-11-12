@@ -6,7 +6,7 @@ package cchain
 import (
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
@@ -17,10 +17,26 @@ func TestMinBlockDelayMetric(t *testing.T) {
 	ctx, sut := newSUT(t, withMaxAllocFor(sk.EthAddress()))
 	w := newWallet(sk, sut.ctx, sut.Client)
 
-	require.Zerof(t, testutil.ToFloat64(sut.metrics), "min block delay before executing any block")
+	require.Zerof(t, gaugeValue(t, sut.ctx.Metrics, "cchain_min_block_delay_seconds"), "min block delay before executing any block")
 
 	blk := sut.issueAndExecute(ctx, t, w.newMinimalTx(t))
 
 	want := delayExponent(blk.Header()).DelayDuration().Seconds()
-	require.Equalf(t, want, testutil.ToFloat64(sut.metrics), "min block delay after executing block %d", blk.NumberU64())
+	require.Equalf(t, want, gaugeValue(t, sut.ctx.Metrics, "cchain_min_block_delay_seconds"), "min block delay after executing block %d", blk.NumberU64())
+}
+
+// gaugeValue returns the value of the unlabeled gauge named name in g.
+func gaugeValue(t *testing.T, g prometheus.Gatherer, name string) float64 {
+	t.Helper()
+
+	families, err := g.Gather()
+	require.NoError(t, err, "Gather()")
+	for _, f := range families {
+		if f.GetName() == name {
+			require.Lenf(t, f.GetMetric(), 1, "%q metrics", name)
+			return f.GetMetric()[0].GetGauge().GetValue()
+		}
+	}
+	require.FailNowf(t, "metric not found", "%q", name)
+	return 0
 }

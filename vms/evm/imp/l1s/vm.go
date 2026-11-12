@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/hookadaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/validators"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/metrics"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
 	"github.com/ava-labs/avalanchego/vms/evm/types"
@@ -137,7 +138,7 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("making metrics: %w", err)
 	}
-	chainMetrics, err := sae.NewMinBlockDelayMetric(reg)
+	chainMetrics, err := metrics.New(reg)
 	if err != nil {
 		return fmt.Errorf("registering L1 VM metrics: %w", err)
 	}

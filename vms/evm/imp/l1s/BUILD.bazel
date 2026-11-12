@@ -56,6 +56,7 @@ go_library(
         "//vms/evm/imp/l1s/hookadaptor",
         "//vms/evm/imp/l1s/validators",
         "//vms/evm/imp/l1s/warp",
+        "//vms/evm/imp/metrics",
         "//vms/evm/imp/saeconfig",
         "//vms/evm/imp/saeheader",
         "//vms/evm/imp/warp",
