@@ -2,37 +2,41 @@
 // See the file LICENSE for licensing terms.
 
 // Package libevm registers the C-Chain's libevm hooks and payloads.
-package libevm
+package libevmextras
 
 import (
+	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/vm"
 )
 
-// RegisterExtras registers all the C-Chain's libevm hooks and payloads.
+// Register registers all the C-Chain's libevm hooks and payloads.
 //
 // It MUST NOT be called more than once and is therefore only allowed in tests
 // and `package main`, to avoid polluting other packages that transitively
 // depend on this one but don't need registration.
-func RegisterExtras() {
-	vm.RegisterExtras()
+func Register() {
 	customtypes.Register()
-	extstate.RegisterExtras()
+	vm.RegisterHooks(vmHooks{})
+	state.RegisterExtras(partitionStateKeysHook{})
 	cparams.RegisterExtras()
 }
 
-// WithTempRegisteredExtras runs `fn` with temporary registration otherwise
-// equivalent to a call to [RegisterExtras], but limited to the life of `fn`.
-func WithTempRegisteredExtras(fn func() error) error {
+// WithTempRegistered runs `fn` with temporary registration otherwise
+// equivalent to a call to [Register], but limited to the life of `fn`.
+func WithTempRegistered(fn func() error) error {
 	return libevm.WithTemporaryExtrasLock(func(lock libevm.ExtrasLock) error {
 		for _, wrap := range []func(libevm.ExtrasLock, func() error) error{
-			vm.WithTempRegisteredExtras,
 			customtypes.WithTempRegisteredExtras,
-			extstate.WithTempRegisteredExtras,
+			func(lock libevm.ExtrasLock, fn func() error) error {
+				return vm.WithTempRegisteredHooks(lock, vmHooks{}, fn)
+			},
+			func(lock libevm.ExtrasLock, fn func() error) error {
+				return state.WithTempRegisteredExtras(lock, partitionStateKeysHook{}, fn)
+			},
 			cparams.WithTempRegisteredExtras,
 		} {
 			inner := fn

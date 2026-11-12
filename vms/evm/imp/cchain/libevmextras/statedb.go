@@ -1,15 +1,12 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package extstate extends [state.StateDB] with the C-Chain's imported X-Chain
-// asset balances and access-list predicates.
-package extstate
+package libevmextras
 
 import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
@@ -21,25 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
 )
 
-// RegisterExtras registers the libevm hook that partitions state slots into
-// storage and imported X-Chain asset balances.
-//
-// Callers SHOULD NOT call it directly, and SHOULD instead use
-// `vms/evm/imp/cchain/libevm.RegisterExtras()`, which registers all
-// C-Chain extras together.
-func RegisterExtras() {
-	state.RegisterExtras(partitionStateKeysHook{})
-}
-
-// WithTempRegisteredExtras runs fn with the state partition hook temporarily
-// registered. Any previous hook is restored after fn returns.
-//
-// Callers SHOULD NOT call it directly, and SHOULD instead use
-// `vms/evm/imp/cchain/libevm.WithTempRegisteredExtras()`, which registers all
-// C-Chain extras together.
-func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
-	return state.WithTempRegisteredExtras(lock, partitionStateKeysHook{}, fn)
-}
+var _ state.StateDBHooks = (*partitionStateKeysHook)(nil)
 
 type partitionStateKeysHook struct{}
 
@@ -77,8 +56,8 @@ type StateDB struct {
 	preAP1 bool
 }
 
-// New returns a [StateDB] that wraps db.
-func New(db *state.StateDB) *StateDB {
+// NewStateDB returns a [StateDB] that wraps db.
+func NewStateDB(db *state.StateDB) *StateDB {
 	return &StateDB{StateDB: db}
 }
 

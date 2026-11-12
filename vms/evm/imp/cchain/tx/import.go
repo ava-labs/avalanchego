@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -234,7 +234,7 @@ func (i *Import) atomicRequests(ids.ID) (ids.ID, *chainsatomic.Requests, error) 
 }
 
 // transferNonAVAX adds the non-AVAX balances to the statedb.
-func (i *Import) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+func (i *Import) transferNonAVAX(avaxAssetID ids.ID, statedb *libevmextras.StateDB) error {
 	for _, out := range i.Outs {
 		if out.AssetID == avaxAssetID {
 			continue

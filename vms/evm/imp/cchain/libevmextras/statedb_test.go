@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package extstate_test
+package libevmextras_test
 
 import (
 	"math/big"
@@ -23,13 +23,12 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
 
-	. "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
+	. "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 )
 
 func TestMain(m *testing.M) {
-	libevm.RegisterExtras()
+	Register()
 	os.Exit(m.Run())
 }
 
@@ -37,7 +36,7 @@ func newEmptyStateDB(tb testing.TB) *StateDB {
 	tb.Helper()
 	s, err := state.New(types.EmptyRootHash, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	require.NoError(tb, err, "state.New()")
-	return New(s)
+	return NewStateDB(s)
 }
 
 func TestStateKeyPartition(t *testing.T) {

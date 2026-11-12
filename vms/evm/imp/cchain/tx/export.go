@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )
@@ -264,7 +264,7 @@ func (e *Export) atomicRequests(txID ids.ID) (ids.ID, *chainsatomic.Requests, er
 var errInsufficientFunds = errors.New("insufficient funds")
 
 // transferNonAVAX subtracts the non-AVAX balances from the statedb.
-func (e *Export) transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+func (e *Export) transferNonAVAX(avaxAssetID ids.ID, statedb *libevmextras.StateDB) error {
 	for _, in := range e.Ins {
 		if in.AssetID == avaxAssetID {
 			continue

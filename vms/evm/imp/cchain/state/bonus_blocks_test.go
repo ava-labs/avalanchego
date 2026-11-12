@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 )
 
@@ -34,7 +34,7 @@ func TestMain(m *testing.M) {
 	if err := json.Unmarshal(bonusBlockConsumersJSON, &bonusBlockConsumers); err != nil {
 		panic(err)
 	}
-	libevm.RegisterExtras()
+	libevmextras.Register()
 	os.Exit(m.Run())
 }
 

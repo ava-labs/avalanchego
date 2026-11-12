@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
@@ -44,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
+	cchainlibevm "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	cchainstate "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/evm/types"
 )
@@ -253,7 +253,7 @@ func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 		return fmt.Errorf("parsing txs: %w", err)
 	}
 
-	extstatedb := extstate.New(statedb)
+	extstatedb := cchainlibevm.NewStateDB(statedb)
 	for i, t := range txs {
 		if err := t.TransferNonAVAX(h.ctx.AVAXAssetID, extstatedb); err != nil {
 			return fmt.Errorf("transferring non-AVAX assets of tx %s (%d): %w", t.ID(), i, err)

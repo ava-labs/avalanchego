@@ -8,7 +8,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/subnet-evm/plugin/evm",
-        "//vms/evm/imp/cchain/libevm",
+        "//vms/evm/imp/cchain/libevmextras",
     ],
 )
 

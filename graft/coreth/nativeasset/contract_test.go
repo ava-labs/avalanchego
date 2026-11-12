@@ -16,8 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -26,7 +25,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	libevm.RegisterExtras()
+	libevmextras.Register()
 	os.Exit(m.Run())
 }
 
@@ -122,7 +121,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				// Set balance to pay for gas fee
 				statedb.SetBalance(userAddr1, u256Hundred)
 				// Initialize multicoin balance and set it back to 0
-				wrappedStateDB := extstate.New(statedb)
+				wrappedStateDB := libevmextras.NewStateDB(statedb)
 				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.SubAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
@@ -147,7 +146,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				// Set balance to pay for gas fee
 				statedb.SetBalance(userAddr1, u256Hundred)
 				// Initialize multicoin balance to 100
-				wrappedStateDB := extstate.New(statedb)
+				wrappedStateDB := libevmextras.NewStateDB(statedb)
 				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
@@ -215,7 +214,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				statedb, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
-				wrappedStateDB := extstate.New(statedb)
+				wrappedStateDB := libevmextras.NewStateDB(statedb)
 				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
@@ -232,7 +231,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			stateDBCheck: func(t *testing.T, statedb *state.StateDB) {
 				user1Balance := statedb.GetBalance(userAddr1)
 				user2Balance := statedb.GetBalance(userAddr2)
-				wrappedStateDB := extstate.New(statedb)
+				wrappedStateDB := libevmextras.NewStateDB(statedb)
 				user1AssetBalance := wrappedStateDB.GetAssetBalance(userAddr1, assetID)
 				user2AssetBalance := wrappedStateDB.GetAssetBalance(userAddr2, assetID)
 
@@ -248,7 +247,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				statedb, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
-				wrappedStateDB := extstate.New(statedb)
+				wrappedStateDB := libevmextras.NewStateDB(statedb)
 				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
@@ -266,7 +265,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				user1Balance := statedb.GetBalance(userAddr1)
 				user2Balance := statedb.GetBalance(userAddr2)
 				nativeAssetCallAddrBalance := statedb.GetBalance(NativeAssetCallAddr)
-				wrappedStateDB := extstate.New(statedb)
+				wrappedStateDB := libevmextras.NewStateDB(statedb)
 				user1AssetBalance := wrappedStateDB.GetAssetBalance(userAddr1, assetID)
 				user2AssetBalance := wrappedStateDB.GetAssetBalance(userAddr2, assetID)
 				expectedBalance := uint256.NewInt(50)
@@ -283,7 +282,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				statedb, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
-				wrappedStateDB := extstate.New(statedb)
+				wrappedStateDB := libevmextras.NewStateDB(statedb)
 				wrappedStateDB.AddAssetBalance(userAddr1, assetID, uint256.NewInt(50))
 				wrappedStateDB.Finalise(true)
 				return statedb
@@ -300,7 +299,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			stateDBCheck: func(t *testing.T, statedb *state.StateDB) {
 				user1Balance := statedb.GetBalance(userAddr1)
 				user2Balance := statedb.GetBalance(userAddr2)
-				wrappedStateDB := extstate.New(statedb)
+				wrappedStateDB := libevmextras.NewStateDB(statedb)
 				user1AssetBalance := wrappedStateDB.GetAssetBalance(userAddr1, assetID)
 				user2AssetBalance := wrappedStateDB.GetAssetBalance(userAddr2, assetID)
 
@@ -315,7 +314,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				statedb, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, uint256.NewInt(50))
-				wrappedStateDB := extstate.New(statedb)
+				wrappedStateDB := libevmextras.NewStateDB(statedb)
 				wrappedStateDB.AddAssetBalance(userAddr1, assetID, uint256.NewInt(50))
 				wrappedStateDB.Finalise(true)
 				return statedb
@@ -332,7 +331,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			stateDBCheck: func(t *testing.T, statedb *state.StateDB) {
 				user1Balance := statedb.GetBalance(userAddr1)
 				user2Balance := statedb.GetBalance(userAddr2)
-				wrappedStateDB := extstate.New(statedb)
+				wrappedStateDB := libevmextras.NewStateDB(statedb)
 				user1AssetBalance := wrappedStateDB.GetAssetBalance(userAddr1, assetID)
 				user2AssetBalance := wrappedStateDB.GetAssetBalance(userAddr2, assetID)
 
@@ -347,7 +346,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				statedb, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
-				wrappedStateDB := extstate.New(statedb)
+				wrappedStateDB := libevmextras.NewStateDB(statedb)
 				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
@@ -367,7 +366,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				statedb, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
-				wrappedStateDB := extstate.New(statedb)
+				wrappedStateDB := libevmextras.NewStateDB(statedb)
 				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
@@ -384,7 +383,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			stateDBCheck: func(t *testing.T, statedb *state.StateDB) {
 				user1Balance := statedb.GetBalance(userAddr1)
 				user2Balance := statedb.GetBalance(userAddr2)
-				wrappedStateDB := extstate.New(statedb)
+				wrappedStateDB := libevmextras.NewStateDB(statedb)
 				user1AssetBalance := wrappedStateDB.GetAssetBalance(userAddr1, assetID)
 				user2AssetBalance := wrappedStateDB.GetAssetBalance(userAddr2, assetID)
 
@@ -399,7 +398,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				statedb, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
-				wrappedStateDB := extstate.New(statedb)
+				wrappedStateDB := libevmextras.NewStateDB(statedb)
 				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
 				return statedb
@@ -419,7 +418,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				statedb, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 				require.NoError(t, err)
 				statedb.SetBalance(userAddr1, u256Hundred)
-				wrappedStateDB := extstate.New(statedb)
+				wrappedStateDB := libevmextras.NewStateDB(statedb)
 				wrappedStateDB.AddAssetBalance(userAddr1, assetID, u256Hundred)
 				wrappedStateDB.Finalise(true)
 				return statedb

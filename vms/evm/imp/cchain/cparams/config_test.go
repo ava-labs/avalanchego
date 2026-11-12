@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 
 	ethparams "github.com/ava-labs/libevm/params"
 
@@ -23,7 +23,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	libevm.RegisterExtras()
+	libevmextras.Register()
 	os.Exit(m.Run())
 }
 

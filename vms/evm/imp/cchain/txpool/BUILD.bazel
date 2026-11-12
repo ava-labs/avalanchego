@@ -45,7 +45,7 @@ go_test(
         "//vms/components/avax",
         "//vms/evm/hook",
         "//vms/evm/imp/cchain/cchaintest",
-        "//vms/evm/imp/cchain/libevm",
+        "//vms/evm/imp/cchain/libevmextras",
         "//vms/evm/imp/cchain/tx",
         "//vms/evm/imp/cchain/tx/txtest",
         "//vms/evm/saetest",

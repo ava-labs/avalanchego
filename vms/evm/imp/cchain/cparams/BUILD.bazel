@@ -48,7 +48,7 @@ go_test(
     deps = [
         "//snow/snowtest",
         "//utils/wrappers",
-        "//vms/evm/imp/cchain/libevm",
+        "//vms/evm/imp/cchain/libevmextras",
         "//vms/evm/imp/dynamic",
         "@com_github_arr4n_shed//testerr",
         "@com_github_ava_labs_libevm//params",

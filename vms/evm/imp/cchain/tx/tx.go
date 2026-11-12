@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	chainsatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -83,7 +83,7 @@ type Unsigned interface {
 
 	// transferNonAVAX transfers the non-AVAX balances requested by this
 	// transaction.
-	transferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error
+	transferNonAVAX(avaxAssetID ids.ID, statedb *libevmextras.StateDB) error
 }
 
 // op contains the state changes of [hook.Op]
@@ -254,7 +254,7 @@ func (t *Tx) AtomicRequests() (chainID ids.ID, r *chainsatomic.Requests, err err
 // transaction.
 //
 // Non-AVAX transfers were only allowed prior to the Banff upgrade.
-func (t *Tx) TransferNonAVAX(avaxAssetID ids.ID, statedb *extstate.StateDB) error {
+func (t *Tx) TransferNonAVAX(avaxAssetID ids.ID, statedb *libevmextras.StateDB) error {
 	return t.Unsigned.transferNonAVAX(avaxAssetID, statedb)
 }
 

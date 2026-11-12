@@ -9,12 +9,12 @@ package emulate
 
 import (
 	subnet "github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
-	cchain "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
+	cchain "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 )
 
 // CChain executes `fn` as if running in a `coreth` node.
 func CChain(fn func() error) error {
-	return cchain.WithTempRegisteredExtras(fn)
+	return cchain.WithTempRegistered(fn)
 }
 
 // SubnetEVM executes `fn` as if running in a `subnet-evm` node.

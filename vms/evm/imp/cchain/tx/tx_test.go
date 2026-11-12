@@ -29,8 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/evm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
@@ -41,7 +40,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	libevm.RegisterExtras()
+	libevmextras.Register()
 	os.Exit(m.Run())
 }
 
@@ -779,25 +778,25 @@ func TestAtomicRequests(t *testing.T) {
 	}
 }
 
-func newEmptyStateDB(t testing.TB) *extstate.StateDB {
+func newEmptyStateDB(t testing.TB) *libevmextras.StateDB {
 	t.Helper()
 
 	db := state.NewDatabase(rawdb.NewMemoryDatabase())
 	sdb, err := state.New(types.EmptyRootHash, db, nil)
 	require.NoError(t, err)
-	return extstate.New(sdb)
+	return libevmextras.NewStateDB(sdb)
 }
 
-func compareStateDBs(want, got *extstate.StateDB) string {
+func compareStateDBs(want, got *libevmextras.StateDB) string {
 	// Finalize the trie structures so that the state DB comparison includes
 	// any changes.
-	for _, v := range []*extstate.StateDB{want, got} {
+	for _, v := range []*libevmextras.StateDB{want, got} {
 		v.Finalise(true)
 		v.IntermediateRoot(true)
 	}
 
 	opts := []cmp.Option{
-		cmpopts.IgnoreUnexported(extstate.StateDB{}),
+		cmpopts.IgnoreUnexported(libevmextras.StateDB{}),
 		cmputils.StateDBs(),
 	}
 	return cmp.Diff(want, got, opts...)

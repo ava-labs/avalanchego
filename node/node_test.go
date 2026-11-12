@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 )
 
 // TestShutdownLeaksNoGoroutines tests that Node does not start any goroutines
@@ -36,7 +36,7 @@ func TestShutdownLeaksNoGoroutines(t *testing.T) {
 
 	// New builds the C-Chain, which needs libevm's extras. libevm takes them
 	// once per process, so the test holds them only while the node runs.
-	err = libevm.WithTempRegisteredExtras(func() error {
+	err = libevmextras.WithTempRegistered(func() error {
 		n, err := New(&cfg, logs, log)
 		if err != nil {
 			return err

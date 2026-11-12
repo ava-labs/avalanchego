@@ -40,11 +40,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	cchainlibevm "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
+	cchainlibevm "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 )
 
 func TestMain(m *testing.M) {
-	cchainlibevm.RegisterExtras()
+	cchainlibevm.Register()
 	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
 }
 

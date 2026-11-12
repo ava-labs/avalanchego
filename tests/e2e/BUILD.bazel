@@ -23,7 +23,7 @@ go_test(
         "//tests/fixture/e2e",
         "//tests/fixture/tmpnet",
         "//utils/perms",
-        "//vms/evm/imp/cchain/libevm",
+        "//vms/evm/imp/cchain/libevmextras",
         "@com_github_onsi_ginkgo_v2//:ginkgo",
         "@com_github_onsi_ginkgo_v2//types",
         "@com_github_stretchr_testify//require",

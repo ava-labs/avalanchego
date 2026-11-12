@@ -56,7 +56,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
@@ -75,7 +75,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	libevm.RegisterExtras()
+	libevmextras.Register()
 	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
 }
 

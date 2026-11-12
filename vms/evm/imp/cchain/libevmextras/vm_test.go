@@ -1,11 +1,10 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package vm_test
+package libevmextras_test
 
 import (
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -18,14 +17,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 )
-
-func TestMain(m *testing.M) {
-	libevm.RegisterExtras()
-	os.Exit(m.Run())
-}
 
 func TestHooksOverrideNewEVMArgs(t *testing.T) {
 	difficulty := big.NewInt(1)
@@ -57,12 +50,12 @@ func TestHooksOverrideNewEVMArgs(t *testing.T) {
 			}
 
 			evm := vm.NewEVM(blockCtx, vm.TxContext{}, sdb, tt.config, vm.Config{})
-			require.IsType(t, &extstate.StateDB{}, evm.StateDB, "vm.NewEVM().StateDB")
+			require.IsType(t, &libevmextras.StateDB{}, evm.StateDB, "vm.NewEVM().StateDB")
 			require.Equal(t, tt.wantRandom, evm.Context.Random, "vm.NewEVM().Context.Random")
 			require.Equal(t, tt.wantDifficulty, evm.Context.Difficulty, "vm.NewEVM().Context.Difficulty")
 
 			evm.Reset(vm.TxContext{}, sdb)
-			require.IsType(t, &extstate.StateDB{}, evm.StateDB, "vm.EVM.Reset() StateDB")
+			require.IsType(t, &libevmextras.StateDB{}, evm.StateDB, "vm.EVM.Reset() StateDB")
 		})
 	}
 }

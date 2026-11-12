@@ -22,7 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
+
+	cchainlibevm "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 )
 
 // PrecompileTest is a test case for a precompile
@@ -215,7 +216,7 @@ func (e *testEnv) WarpMessageResults(common.Hash) set.Bits {
 // testStateDB allows for mocking the Warp messages without calling Prepare on
 // the statedb.
 type testStateDB struct {
-	*extstate.StateDB
+	*cchainlibevm.StateDB
 
 	warpMessages []predicate.Predicate
 }
@@ -225,7 +226,7 @@ func newTestStateDB(t testing.TB, warpMessages []predicate.Predicate) *testState
 	statedb, err := state.New(common.Hash{}, state.NewDatabase(db), nil)
 	require.NoError(t, err)
 	return &testStateDB{
-		StateDB:      extstate.New(statedb),
+		StateDB:      cchainlibevm.NewStateDB(statedb),
 		warpMessages: warpMessages,
 	}
 }
