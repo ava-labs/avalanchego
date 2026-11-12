@@ -9,18 +9,25 @@ import (
 	"errors"
 	"math/rand"
 	"runtime"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/firewood-go/ffi"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
 	"github.com/ava-labs/avalanchego/database/merkle/sync/synctest"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/peertracker/peertrackertest"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+
+	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 func TestMain(m *testing.M) {
@@ -105,7 +112,50 @@ func testSync(t *testing.T, clientKeys int, serverKeys int) {
 	require.NoError(t, err)
 }
 
+func Test_Firewood_Sync_RejectedProofIsRefetched(t *testing.T) {
+	ctx := t.Context()
+	r := rand.New(rand.NewSource(1))
+
+	serverDB, root := generateDB(t, r, 1000)
+	clientDB, _ := generateDB(t, r, 0)
+	defer func() {
+		runtime.GC()
+		assert.NoError(t, serverDB.Close(ctx))
+		assert.NoError(t, clientDB.Close(ctx))
+	}()
+
+	inner := newTestGetProofHandler(t, serverDB)
+	var calls atomic.Int32
+	handler := &p2p.TestHandler{
+		AppRequestF: func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+			if calls.Add(1) == 1 {
+				garbage, err := proto.Marshal(&pb.ProofResponse{
+					Response: &pb.ProofResponse_RangeProof{RangeProof: []byte{0xde, 0xad, 0xbe, 0xef}},
+				})
+				require.NoError(t, err)
+				return garbage, nil
+			}
+			return inner.AppRequest(ctx, nodeID, deadline, requestBytes)
+		},
+	}
+
+	syncer, err := New(
+		Config{SimultaneousWorkLimit: 1},
+		clientDB,
+		root,
+		peertrackertest.NewSelfClient(t, ctx, ids.EmptyNodeID, handler),
+	)
+	require.NoError(t, err)
+	require.NoError(t, syncer.Sync(ctx))
+
+	require.Equal(t, root, ids.ID(clientDB.Root()))
+	require.Equal(t, uint64(1), syncer.metrics.rejected.Load())
+	require.Positive(t, syncer.metrics.accepted.Load())
+}
+
 func Test_Firewood_Sync_UpdateSyncTarget(t *testing.T) {
+	t.Skip("firewood sync has no mid-sync target change until Phase 2 (pivot)")
+
 	tests := []struct {
 		name                    string
 		clientSize              int
@@ -157,15 +207,14 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	}()
 	wantRoot := fillDB(t, r, serverDB, serverKeys)
 
-	var syncer *sync.Syncer[*RangeProof, struct{}]
+	var syncer *Syncer
 	ctx, cancel := context.WithCancelCause(t.Context())
 	defer cancel(nil)
 
 	proofHandler := synctest.NewCounterHandler(newTestGetProofHandler(t, serverDB), func() {
-		err := syncer.UpdateSyncTarget(wantRoot)
-		if err != nil {
-			cancel(err)
-		}
+		// TODO(Phase 2): change the target to wantRoot mid-sync.
+		_ = syncer
+		cancel(errors.New("mid-sync target change is not supported"))
 	}, numRequestsBeforeUpdate)
 	syncer, err := New(
 		Config{},
