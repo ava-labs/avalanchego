@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/hookadaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
@@ -35,7 +36,8 @@ type VM struct {
 	*network.Network // created by [VM.Initialize]
 
 	// now is the clock provided to the [sae.VM] and is used for block building.
-	now func() time.Time
+	now   func() time.Time
+	pacer *blockdelay.Pacer // created by [VM.Initialize]
 }
 
 var ethDBPrefix = []byte("ethdb")
@@ -85,6 +87,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("setting up genesis trie: %w", err)
 	}
 
+	vm.pacer = blockdelay.NewPacer(vm.now)
 	vm.Network, err = network.New(snowCtx, appSender)
 	if err != nil {
 		return fmt.Errorf("creating network: %w", err)
@@ -97,6 +100,19 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
 	return nil
+}
+
+// WaitForEvent waits until the ACP-226 minimum block delay since the preferred
+// block has elapsed, then waits for the SAE VM to produce an event.
+func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
+	return vm.pacer.WaitForEvent(ctx, earliestBuildTime(vm.VM.GetPreference()), vm.VM.WaitForEvent)
+}
+
+// earliestBuildTime returns the earliest wall-clock time at which a child of b
+// may be built.
+func earliestBuildTime(b *blocks.Block) time.Time {
+	h := b.Header()
+	return blockdelay.Earliest(blockTime(h), delayExponent(h))
 }
 
 // Shutdown gracefully closes the VM.

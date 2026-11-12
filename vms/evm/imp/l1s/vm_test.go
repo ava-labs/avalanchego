@@ -10,6 +10,7 @@ import (
 	"maps"
 	"math/big"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -24,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -33,9 +35,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/vmtest"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
+	"github.com/ava-labs/avalanchego/vms/evm/txgossip/txgossiptest"
 
+	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -55,11 +61,21 @@ type SUT struct {
 
 type (
 	sutConfig struct {
-		genesis core.Genesis
-		clock   *saetest.Clock
+		genesis          core.Genesis
+		clock            *saetest.Clock
+		skipRPCTransport bool
 	}
 	sutOption = options.Option[sutConfig]
 )
+
+// withoutRPCTransport skips the SUT's real HTTP/WebSocket transport. Required
+// under testing/synctest, where real sockets never reach a durable block. The
+// resulting SUT has no [SUT.EthClient].
+func withoutRPCTransport() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.skipRPCTransport = true
+	})
+}
 
 func withMaxAllocFor(addrs ...common.Address) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -106,10 +122,13 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	ctx := log.CancelOnError(tb.Context())
 	vmSUT, err := vmtest.New(ctx, tb, vm, snowCtx, vmtest.Config{
-		DB:      memdb.New(),
-		Genesis: genesisBytes,
-		Sender:  appSender,
-		State:   snow.NormalOp,
+		DB:                memdb.New(),
+		Genesis:           genesisBytes,
+		Sender:            appSender,
+		State:             snow.NormalOp,
+		SkipRPCTransport:  cfg.skipRPCTransport,
+		Clock:             cfg.clock,
+		EarliestBuildTime: earliestBuildTime,
 	})
 	require.NoError(tb, err, "vmtest.New()")
 	sut := &SUT{
@@ -221,4 +240,61 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 			assert.Equal(t, tt.wantGasUsed, receipts[i].GasUsed, "receipt GasUsed")
 		})
 	}
+}
+
+// sendTx sends a transfer from wallet's first account directly to sut's
+// backend, so it works without RPC transport, and waits for it to be pending.
+func sendTx(ctx context.Context, tb testing.TB, sut *SUT, wallet *saetest.Wallet) {
+	tb.Helper()
+
+	tx := wallet.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
+		To:        &common.Address{1},
+		Gas:       ethparams.TxGas,
+		GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
+	})
+	backend := sut.GethRPCBackends()
+	require.NoErrorf(tb, backend.SendTx(ctx, tx), "%T.SendTx()", backend)
+	txgossiptest.WaitUntilPending(tb, ctx, backend, tx)
+}
+
+func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
+	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSignerForChainID(big.NewInt(testChainID)))
+	ctx, sut := newSUT(t, withMaxAllocFor(wallet.Addresses()...))
+
+	sendTx(ctx, t, sut, wallet)
+	parent := sut.BuildVerifyAccept(ctx, t)
+	sendTx(ctx, t, sut, wallet)
+	child := sut.BuildVerify(ctx, t, parent.ID())
+
+	earlyMS := uint64(earliestBuildTime(parent).UnixMilli()) - 1
+	err := sut.VerifyTampered(ctx, t, child, func(hdr *types.Header) {
+		hdr.Time = earlyMS / 1000
+		customtypes.GetHeaderExtra(hdr).TimeMilliseconds = &earlyMS
+	})
+	require.ErrorIsf(t, err, blockdelay.ErrBelowMinimum, "%T.VerifyBlock() (block below the ACP-226 minimum delay)", sut.VM)
+}
+
+// TestWaitForEventMinDelayPacing asserts that [VM.WaitForEvent] doesn't report
+// a pending tx until the preferred block's ACP-226 minimum delay has elapsed.
+func TestWaitForEventMinDelayPacing(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// Build an in-process SUT with no real RPC transport: real sockets never
+		// reach a durable block under synctest, so [sendTx] primes the txpool via
+		// the backend rather than through the absent EthClient.
+		//
+		// Do not build/execute blocks: this test is only synctest-teardown-safe
+		// because it runs no blocks (a block can reactivate a goleak-suppressed
+		// libevm shutdown race that deadlocks the bubble).
+		wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSignerForChainID(big.NewInt(testChainID)))
+		timeOpt, _ := withVMTime(upgrade.InitiallyActiveTime)
+		ctx, sut := newSUT(t, withMaxAllocFor(wallet.Addresses()...), timeOpt, withoutRPCTransport())
+
+		sendTx(ctx, t, sut, wallet)
+
+		start := time.Now()
+		got, err := sut.WaitForEvent(ctx)
+		require.NoErrorf(t, err, "%T.WaitForEvent()", sut.VM)
+		require.Equalf(t, snowcommon.PendingTxs, got, "%T.WaitForEvent()", sut.VM)
+		require.Equalf(t, dynamic.InitialDelayExponent.DelayDuration(), time.Since(start), "%T.WaitForEvent() blocking duration", sut.VM)
+	})
 }
