@@ -3561,7 +3561,7 @@ func (x *ValidatorSetApproval) GetSignature() []byte {
 	return nil
 }
 
-// QuorumRound represents a round that has acheived quorum on either
+// QuorumRound represents a round that has achieved quorum on either
 // (empty notarization), (block & notarization), or (block, finalization certificate)
 type QuorumRound struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
