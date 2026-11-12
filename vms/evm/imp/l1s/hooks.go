@@ -151,8 +151,8 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
 	// TODO(JonathanOppenheimer): Move the delay toward this node's desired
 	// delay once the user config supports `min-delay-target` (#6107).
-	de, err := blockdelay.Next(blockTime(parent), delayExponent(parent), now, nil)
-	if err != nil {
+	de := delayExponent(parent)
+	if err := blockdelay.Verify(blockTime(parent), de, now); err != nil {
 		return nil, err
 	}
 	minDelayExcess := acp226.DelayExcess(de)
