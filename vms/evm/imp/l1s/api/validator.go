@@ -7,8 +7,8 @@ package api
 import (
 	"github.com/ava-labs/libevm/common/hexutil"
 
+	"github.com/ava-labs/avalanchego/graft/evm/uptimetracker"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/validators"
 )
 
 // Uptime is a validation's locally observed uptime.
@@ -23,11 +23,11 @@ type Uptime struct {
 // Validator is the JSON-RPC service for validator data that only this node
 // observes.
 type Validator struct {
-	uptime *validators.Uptime
+	uptime *uptimetracker.UptimeTracker
 }
 
 // NewValidator returns a [Validator] reading from `uptime`.
-func NewValidator(uptime *validators.Uptime) *Validator {
+func NewValidator(uptime *uptimetracker.UptimeTracker) *Validator {
 	return &Validator{uptime: uptime}
 }
 

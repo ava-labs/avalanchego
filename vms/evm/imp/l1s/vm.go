@@ -18,6 +18,8 @@ import (
 	// Force-load precompiles to trigger registration.
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry"
 
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/evm/uptimetracker"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
@@ -26,7 +28,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/hookadaptor"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/validators"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/metrics"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
@@ -53,7 +54,12 @@ type VM struct {
 	// [VM.Initialize] if nil.
 	clock *mockable.Clock
 
-	uptime *validators.Uptime
+	uptime *uptimetracker.UptimeTracker
+	// startUptimeSync starts periodically syncing [VM.uptime] with the
+	// validator set. It MUST be called at most once, guaranteed using
+	// [VM.startUptimeSyncOnce].
+	startUptimeSync     func(context.Context) error
+	startUptimeSyncOnce sync.Once
 
 	lastWaitForEvent utils.Atomic[time.Time]
 
@@ -162,13 +168,49 @@ func (vm *VM) Initialize(
 	if vm.clock == nil {
 		vm.clock = &mockable.Clock{}
 	}
-	vm.uptime, err = validators.New(snowCtx.ValidatorState, snowCtx.SubnetID, avaDB, vm.clock, snowCtx.Log)
+	vm.uptime, err = uptimetracker.New(snowCtx.ValidatorState, snowCtx.SubnetID, prefixdb.New(validatorsDBPrefix, avaDB), vm.clock)
 	if err != nil {
 		return fmt.Errorf("creating uptime tracker: %w", err)
 	}
 	vm.onClose = append(vm.onClose, func(context.Context) error {
 		return vm.uptime.Shutdown()
 	})
+	vm.startUptimeSync = func(ctx context.Context) error {
+		vm.closeMu.Lock()
+		defer vm.closeMu.Unlock()
+		if vm.closed {
+			return errAlreadyClosed
+		}
+
+		// Sync before returning so that uptimes are queryable as soon as the
+		// node is in normal operation.
+		if err := vm.uptime.Sync(ctx); err != nil {
+			return fmt.Errorf("syncing uptime tracker: %w", err)
+		}
+
+		syncCtx, cancelSync := context.WithCancel(context.Background())
+		var syncWG sync.WaitGroup
+		syncWG.Go(func() {
+			ticker := time.NewTicker(uptimeSyncPeriod)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-syncCtx.Done():
+					return
+				case <-ticker.C:
+					if err := vm.uptime.Sync(syncCtx); err != nil {
+						snowCtx.Log.Error("syncing uptime tracker", zap.Error(err))
+					}
+				}
+			}
+		})
+		vm.onClose = append(vm.onClose, func(context.Context) error {
+			cancelSync()
+			syncWG.Wait()
+			return nil
+		})
+		return nil
+	}
 
 	warpVerifier := l1warp.NewVerifier(vm.VM, warpStorage, vm.uptime)
 	if err := saewarp.RegisterHandler(vm.Network, warpVerifier, snowCtx.WarpSigner); err != nil {
@@ -183,11 +225,19 @@ func (vm *VM) Initialize(
 	return nil
 }
 
-// validatorNamespace is the JSON-RPC namespace of [l1api.Validator].
-const validatorNamespace = "validator"
+const (
+	// validatorNamespace is the JSON-RPC namespace of [l1api.Validator].
+	validatorNamespace = "validator"
+	// uptimeSyncPeriod is the period between syncs of [VM.uptime] with the
+	// validator set.
+	uptimeSyncPeriod = time.Minute
+)
+
+// validatorsDBPrefix scopes the uptime tracker's state within the VM database.
+var validatorsDBPrefix = []byte("validators")
 
 // Connected forwards to the embedded [network.Network] AFTER notifying the
-// validators manager.
+// uptime tracker.
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, ver *version.Application) error {
 	if err := vm.uptime.Connect(nodeID); err != nil {
 		return err
@@ -196,7 +246,7 @@ func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, ver *version.App
 }
 
 // Disconnected forwards to the embedded [network.Network] AFTER notifying the
-// validators manager.
+// uptime tracker.
 func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	if err := vm.uptime.Disconnect(nodeID); err != nil {
 		return err
@@ -204,10 +254,8 @@ func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	return vm.Network.Disconnected(ctx, nodeID)
 }
 
-// SetState forwards to `*sae.VM.SetState` and, on the first transition
-// to `snow.NormalOp`, hands off to the validators manager (which
-// performs the initial uptime sync and spawns the periodic-sync
-// goroutine; both are no-ops on subsequent calls).
+// SetState forwards to [sae.VM.SetState] and, on the first transition to
+// [snow.NormalOp], starts syncing the uptime tracker with the validator set.
 func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	if err := vm.VM.SetState(ctx, state); err != nil {
 		return err
@@ -215,7 +263,11 @@ func (vm *VM) SetState(ctx context.Context, state snow.State) error {
 	if state != snow.NormalOp {
 		return nil
 	}
-	return vm.uptime.Dispatch()
+	var err error
+	vm.startUptimeSyncOnce.Do(func() {
+		err = vm.startUptimeSync(ctx)
+	})
+	return err
 }
 
 // minWaitForEventDelay is the minimum spacing between consecutive

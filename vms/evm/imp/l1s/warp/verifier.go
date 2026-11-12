@@ -8,11 +8,11 @@ package warp
 import (
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/graft/evm/uptimetracker"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/messages"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
-	l1validators "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/validators"
 	saewarp "github.com/ava-labs/avalanchego/vms/evm/imp/warp"
 )
 
@@ -29,7 +29,7 @@ const (
 // verifier extended with the L1 VM's validator-uptime attestation handling.
 // Pass `nil` for `uptime` if the chain does not yet wire up uptime
 // accounting; uptime messages are then refused with [VerifyErrCode].
-func NewVerifier(blocks saewarp.Backend, storage *saewarp.Storage, uptime *l1validators.Uptime) *saewarp.Verifier {
+func NewVerifier(blocks saewarp.Backend, storage *saewarp.Storage, uptime *uptimetracker.UptimeTracker) *saewarp.Verifier {
 	return saewarp.NewVerifier(
 		blocks,
 		storage,
@@ -45,7 +45,7 @@ var _ saewarp.AddressedCallVerifier = (*UptimeVerifier)(nil)
 // source address is empty and the locally-tracked uptime for the validation
 // ID is at least the message's claimed `TotalUptime`.
 type UptimeVerifier struct {
-	uptime *l1validators.Uptime
+	uptime *uptimetracker.UptimeTracker
 }
 
 // VerifyAddressedCall verifies a `*payload.AddressedCall`.

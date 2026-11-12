@@ -13,6 +13,7 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/graft/evm/uptimetracker"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/messages"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -20,12 +21,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
-	l1validators "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/validators"
 	saewarp "github.com/ava-labs/avalanchego/vms/evm/imp/warp"
 )
 
@@ -33,9 +32,9 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
 }
 
-// newUptime returns an [l1validators.Uptime] tracking a single validator with
+// newUptime returns an [uptimetracker.UptimeTracker] tracking a single validator with
 // `validationID` that has been connected for 60 seconds.
-func newUptime(tb testing.TB, validationID ids.ID) *l1validators.Uptime {
+func newUptime(tb testing.TB, validationID ids.ID) *uptimetracker.UptimeTracker {
 	tb.Helper()
 
 	var (
@@ -56,13 +55,13 @@ func newUptime(tb testing.TB, validationID ids.ID) *l1validators.Uptime {
 			}, 0, nil
 		},
 	}
-	u, err := l1validators.New(state, ids.GenerateTestID(), memdb.New(), clock, logging.NoLog{})
-	require.NoError(tb, err, "validators.New()")
+	u, err := uptimetracker.New(state, ids.GenerateTestID(), memdb.New(), clock)
+	require.NoError(tb, err, "uptimetracker.New()")
 	tb.Cleanup(func() {
-		require.NoError(tb, u.Shutdown(), "Uptime.Shutdown()")
+		require.NoError(tb, u.Shutdown(), "UptimeTracker.Shutdown()")
 	})
-	require.NoError(tb, u.Dispatch(), "Uptime.Dispatch()")
-	require.NoError(tb, u.Connect(nodeID), "Uptime.Connect()")
+	require.NoError(tb, u.Sync(tb.Context()), "UptimeTracker.Sync()")
+	require.NoError(tb, u.Connect(nodeID), "UptimeTracker.Connect()")
 
 	clock.Set(start.Add(60 * time.Second))
 	return u
@@ -91,7 +90,7 @@ func TestUptimeVerifier(t *testing.T) {
 	validationID := ids.GenerateTestID()
 	tests := []struct {
 		name   string
-		uptime *l1validators.Uptime
+		uptime *uptimetracker.UptimeTracker
 		call   *payload.AddressedCall
 		want   *common.AppError
 	}{
