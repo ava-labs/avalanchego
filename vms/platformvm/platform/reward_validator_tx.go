@@ -51,7 +51,10 @@ func (*RewardValidatorTx) Outputs() []*avax.TransferableOutput {
 	return nil
 }
 
-func (*RewardValidatorTx) SyntacticVerify(*snow.Context) error {
+func (tx *RewardValidatorTx) SyntacticVerify(*snow.Context) error {
+	if tx.TxID == ids.Empty {
+		return errMissingTxID
+	}
 	return nil
 }
 
