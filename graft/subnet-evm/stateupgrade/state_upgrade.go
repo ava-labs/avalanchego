@@ -54,10 +54,10 @@ func (a Account) equal(other Account) bool {
 }
 
 // Apply applies the state upgrade to the state.
-func (b *Block) Apply(chainConfig *params.ChainConfig, state *state.StateDB, blockNum *big.Int) {
+func (b *Block) Apply(chainConfig *params.ChainConfig, stateDB *state.StateDB, blockNum *big.Int) {
 	isEIP158 := chainConfig.IsEIP158(blockNum)
-	for account, upgrade := range b.Accounts {
-		upgradeAccount(account, upgrade, state, isEIP158)
+	for addr, acct := range b.Accounts {
+		upgradeAccount(addr, acct, stateDB, isEIP158)
 	}
 }
 

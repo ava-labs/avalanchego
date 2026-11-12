@@ -48,7 +48,7 @@ func (c *ChainConfig) GetActivatingStateUpgrades(from *uint64, to uint64) []stat
 }
 
 func getActivatingStateUpgrades(from *uint64, to uint64, upgrades []stateupgrade.Block) []stateupgrade.Block {
-	activating := make([]stateupgrade.Block, 0)
+	var activating []stateupgrade.Block
 	for _, upgrade := range upgrades {
 		if IsForkTransition(upgrade.Timestamp, from, to) {
 			activating = append(activating, upgrade)
@@ -57,10 +57,10 @@ func getActivatingStateUpgrades(from *uint64, to uint64, upgrades []stateupgrade
 	return activating
 }
 
-// checkStateUpgradesCompatible checks if [stateUpgrades] are compatible with [c] at [headTimestamp].
+// checkStateUpgradesCompatible checks if stateUpgrades are compatible with c at lastTimestamp.
 func (c *ChainConfig) checkStateUpgradesCompatible(stateUpgrades []stateupgrade.Block, lastTimestamp uint64) *ethparams.ConfigCompatError {
 	// All active upgrades (from nil to [lastTimestamp]) must match.
-	activeUpgrades := c.GetActivatingStateUpgrades(nil, lastTimestamp)
+	activeUpgrades := getActivatingStateUpgrades(nil, lastTimestamp, c.StateUpgrades)
 	newUpgrades := getActivatingStateUpgrades(nil, lastTimestamp, stateUpgrades)
 
 	// Check activated upgrades are still present.

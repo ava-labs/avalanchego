@@ -70,10 +70,9 @@ func ApplyPrecompileActivations(c *params.ChainConfig, parentTimestamp *uint64, 
 }
 
 // applyStateUpgrades checks if any of the state upgrades specified by the chain config are activated by the block
-// transition from [parentTimestamp] to the timestamp set in [header]. If this is the case, it applies the
+// transition from parentTimestamp to the timestamp set in blockContext. If this is the case, it applies the
 // necessary state transitions for the upgrade.
 func applyStateUpgrades(c *params.ChainConfig, parentTimestamp *uint64, blockContext contract.ConfigurationBlockContext, statedb *state.StateDB) {
-	// Apply state upgrades
 	configExtra := params.GetExtra(c)
 	for _, upgrade := range configExtra.GetActivatingStateUpgrades(parentTimestamp, blockContext.Timestamp()) {
 		log.Info("Applying state upgrade", "blockNumber", blockContext.Number(), "upgrade", upgrade)
@@ -82,7 +81,7 @@ func applyStateUpgrades(c *params.ChainConfig, parentTimestamp *uint64, blockCon
 }
 
 // ApplyUpgrades checks if any of the precompile or state upgrades specified by the chain config are activated by the block
-// transition from [parentTimestamp] to the timestamp set in [header]. If this is the case, it applies the necessary state
+// transition from parentTimestamp to the timestamp set in header. If this is the case, it applies the necessary state
 // transitions for the upgrade.
 //
 // This function is called:

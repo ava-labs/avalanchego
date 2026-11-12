@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestStateUpgradeEqual(t *testing.T) {
+func TestEqual(t *testing.T) {
 	tests := []struct {
 		name    string
 		upgrade string
@@ -18,63 +18,63 @@ func TestStateUpgradeEqual(t *testing.T) {
 		want    bool
 	}{
 		{
-			name:    "round-trip full entry",
+			name:    "round-trip_full_entry",
 			upgrade: `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"code":"0x1234","storage":{"0x0000000000000000000000000000000000000000000000000000000000000001":"0x0000000000000000000000000000000000000000000000000000000000000002"},"balanceChange":"100"}}}`,
 			want:    true,
 		},
 		{
-			name:    "round-trip empty storage dropped by omitempty",
+			name:    "round-trip_empty_storage_dropped_by_omitempty",
 			upgrade: `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"code":"0x1234","storage":{}}}}`,
 			want:    true,
 		},
 		{
-			name:    "round-trip empty code dropped by omitempty",
+			name:    "round-trip_empty_code_dropped_by_omitempty",
 			upgrade: `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"code":"0x","balanceChange":"0x1"}}}`,
 			want:    true,
 		},
 		{
-			name:    "round-trip decimal zero balance change re-marshaled as hex",
+			name:    "round-trip_decimal_zero_balance_change_re-marshaled_as_hex",
 			upgrade: `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"balanceChange":"0"}}}`,
 			want:    true,
 		},
 		{
-			name:    "hex and decimal balance change compare by value",
+			name:    "hex_and_decimal_balance_change_compare_by_value",
 			upgrade: `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"balanceChange":"100"}}}`,
 			other:   `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"balanceChange":"0x64"}}}`,
 			want:    true,
 		},
 		{
-			name:    "different timestamp",
+			name:    "different_timestamp",
 			upgrade: `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"code":"0x1234"}}}`,
 			other:   `{"blockTimestamp":2,"accounts":{"0x0100000000000000000000000000000000000000":{"code":"0x1234"}}}`,
 			want:    false,
 		},
 		{
-			name:    "different code",
+			name:    "different_code",
 			upgrade: `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"code":"0x1234"}}}`,
 			other:   `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"code":"0x125678"}}}`,
 			want:    false,
 		},
 		{
-			name:    "different storage value",
+			name:    "different_storage_value",
 			upgrade: `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"storage":{"0x0000000000000000000000000000000000000000000000000000000000000001":"0x0000000000000000000000000000000000000000000000000000000000000002"}}}}`,
 			other:   `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"storage":{"0x0000000000000000000000000000000000000000000000000000000000000001":"0x0000000000000000000000000000000000000000000000000000000000000003"}}}}`,
 			want:    false,
 		},
 		{
-			name:    "different balance change",
+			name:    "different_balance_change",
 			upgrade: `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"balanceChange":"1"}}}`,
 			other:   `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"balanceChange":"2"}}}`,
 			want:    false,
 		},
 		{
-			name:    "removed balance change",
+			name:    "removed_balance_change",
 			upgrade: `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"code":"0x1234","balanceChange":"0"}}}`,
 			other:   `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"code":"0x1234"}}}`,
 			want:    false,
 		},
 		{
-			name:    "extra account",
+			name:    "extra_account",
 			upgrade: `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"code":"0x1234"}}}`,
 			other:   `{"blockTimestamp":1,"accounts":{"0x0100000000000000000000000000000000000000":{"code":"0x1234"},"0x0200000000000000000000000000000000000000":{"code":"0xff"}}}`,
 			want:    false,
