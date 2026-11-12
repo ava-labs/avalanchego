@@ -39,6 +39,7 @@ import (
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	saewarp "github.com/ava-labs/avalanchego/vms/evm/imp/warp"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -99,12 +100,12 @@ func TestSendWarpMessage(t *testing.T) {
 	addressedPayload, err := payload.NewAddressedCall(sut.ethWallet.Addresses()[0].Bytes(), payloadData)
 	require.NoError(t, err)
 	unsignedMessage := sut.newUnsignedWarpMessage(t, addressedPayload.Bytes())
-	sut.verifyWarpMessage(t, unsignedMessage.Bytes(), int32(warp.VerifyErrCode))
+	sut.verifyWarpMessage(t, unsignedMessage.Bytes(), int32(warp.SourceAddressErrCode))
 
 	blockHashPayload, err := payload.NewHash(built.ID())
 	require.NoError(t, err)
 	blockMessage := sut.newUnsignedWarpMessage(t, blockHashPayload.Bytes())
-	sut.verifyWarpMessage(t, blockMessage.Bytes(), int32(warp.VerifyErrCode))
+	sut.verifyWarpMessage(t, blockMessage.Bytes(), int32(saewarp.NotAcceptedErrCode))
 
 	sut.acceptAndExecuteBlock(t, built)
 
@@ -159,7 +160,7 @@ func TestInactiveWarpAddressLogsNotSigned(t *testing.T) {
 	receipts := built.Receipts()
 	require.Len(t, receipts, 1)
 	require.Len(t, receipts[0].Logs, 1, "the code at the Warp address must have emitted its log")
-	sut.verifyWarpMessage(t, forged.Bytes(), int32(warp.VerifyErrCode))
+	sut.verifyWarpMessage(t, forged.Bytes(), int32(warp.SourceAddressErrCode))
 }
 
 // sendWarpMessageLogCode returns EVM code that emits the `SendWarpMessage` log

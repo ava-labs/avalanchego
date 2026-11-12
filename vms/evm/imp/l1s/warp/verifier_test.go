@@ -98,21 +98,14 @@ func TestUptimeVerifier(t *testing.T) {
 			name: "non_empty_source_address",
 			call: newAddressedCall(t, utils.RandomBytes(20), []byte("test")),
 			want: &common.AppError{
-				Code: VerifyErrCode,
+				Code: SourceAddressErrCode,
 			},
 		},
 		{
-			name: "unknown_message_type",
+			name: "unparsable_message",
 			call: newAddressedCall(t, nil, []byte("not a known message")),
 			want: &common.AppError{
-				Code: ParseErrCode,
-			},
-		},
-		{
-			name: "no_uptime_source",
-			call: newUptimeCall(t, validationID, 60),
-			want: &common.AppError{
-				Code: VerifyErrCode,
+				Code: ParseMessageErrCode,
 			},
 		},
 		{
@@ -125,7 +118,7 @@ func TestUptimeVerifier(t *testing.T) {
 			uptime: newUptime(t, validationID),
 			call:   newUptimeCall(t, validationID, 61),
 			want: &common.AppError{
-				Code: VerifyErrCode,
+				Code: InsufficientUptimeErrCode,
 			},
 		},
 		{
@@ -133,20 +126,20 @@ func TestUptimeVerifier(t *testing.T) {
 			uptime: newUptime(t, ids.GenerateTestID()),
 			call:   newUptimeCall(t, validationID, 1),
 			want: &common.AppError{
-				Code: VerifyErrCode,
+				Code: GetUptimeErrCode,
 			},
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			v := &UptimeVerifier{uptime: test.uptime}
+			v := &uptimeVerifier{uptime: test.uptime}
 			err := v.VerifyAddressedCall(test.call)
 			require.ErrorIs(t, err, test.want, "VerifyAddressedCall()")
 		})
 	}
 }
 
-// TestNewVerifier checks that [NewVerifier] wires the [UptimeVerifier] into
+// TestNewVerifier checks that [NewVerifier] wires the [uptimeVerifier] into
 // the shared verifier's addressed-call extension point.
 func TestNewVerifier(t *testing.T) {
 	validationID := ids.GenerateTestID()

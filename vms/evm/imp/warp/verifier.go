@@ -67,20 +67,10 @@ type Backend interface {
 
 // An AddressedCallVerifier decides whether this node should sign a
 // [payload.AddressedCall] message that is not already in [Storage] — e.g.
-// the L1 VM's validator-uptime attestations. Implementations MAY reuse this
-// package's error codes when their failures have the same classification.
+// the L1 VM's validator-uptime attestations. Implementations MUST number their
+// error codes from [NextErrCode] so that they are distinct from this package's.
 type AddressedCallVerifier interface {
 	VerifyAddressedCall(*payload.AddressedCall) *common.AppError
-}
-
-var _ AddressedCallVerifier = rejectAddressedCalls{}
-
-// rejectAddressedCalls rejects every [payload.AddressedCall] with
-// [UnknownMessageErrCode].
-type rejectAddressedCalls struct{}
-
-func (rejectAddressedCalls) VerifyAddressedCall(p *payload.AddressedCall) *common.AppError {
-	return unknownMessage(p)
 }
 
 // The error codes are returned by [Verifier.Verify] to identify why a message
@@ -90,6 +80,8 @@ const (
 	ParseErrCode
 	UnknownMessageErrCode
 	NotAcceptedErrCode
+	// NextErrCode is the lowest error code not used by this package.
+	NextErrCode
 )
 
 // Verify verifies that this node should sign m.
@@ -129,6 +121,16 @@ func (v *Verifier) Verify(ctx context.Context, m *warp.UnsignedMessage, _ []byte
 	case *payload.AddressedCall:
 		return v.addressedCall.VerifyAddressedCall(p)
 	}
+	return unknownMessage(p)
+}
+
+var _ AddressedCallVerifier = rejectAddressedCalls{}
+
+// rejectAddressedCalls rejects every [payload.AddressedCall] with
+// [UnknownMessageErrCode].
+type rejectAddressedCalls struct{}
+
+func (rejectAddressedCalls) VerifyAddressedCall(p *payload.AddressedCall) *common.AppError {
 	return unknownMessage(p)
 }
 

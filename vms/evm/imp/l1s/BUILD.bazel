@@ -154,6 +154,7 @@ go_test(
         "//vms/evm/imp/l1s/warp",
         "//vms/evm/imp/saeconfig",
         "//vms/evm/imp/vmtest",
+        "//vms/evm/imp/warp",
         "//vms/evm/imp/warp/warptest",
         "//vms/evm/params",
         "//vms/evm/sae",

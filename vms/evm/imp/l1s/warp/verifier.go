@@ -2,7 +2,8 @@
 // Copyright (C) 2026, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package warp signs L1 validator-uptime attestations.
+// Package warp extends [warp] message verification with validator uptime
+// attestations.
 package warp
 
 import (
@@ -11,52 +12,49 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/uptimetracker"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/warp/messages"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-
-	saewarp "github.com/ava-labs/avalanchego/vms/evm/imp/warp"
 )
 
-// Error codes returned for L1-specific verification outcomes. They
-// share the [saewarp] code space: parse failures reuse
-// [saewarp.ParseErrCode] and verification failures share the value of
-// [saewarp.NotAcceptedErrCode].
+// The error codes are returned by the [warp.Verifier] from [NewVerifier] to
+// identify why a validator uptime attestation was not signed.
 const (
-	ParseErrCode  = saewarp.ParseErrCode
-	VerifyErrCode = saewarp.NotAcceptedErrCode
+	SourceAddressErrCode = warp.NextErrCode + iota
+	ParseMessageErrCode
+	UnknownMessageTypeErrCode
+	GetUptimeErrCode
+	InsufficientUptimeErrCode
 )
 
-// NewVerifier returns an ACP-118 message verifier: the shared [saewarp]
-// verifier extended with the L1 VM's validator-uptime attestation handling.
-// Pass `nil` for `uptime` if the chain does not yet wire up uptime
-// accounting; uptime messages are then refused with [VerifyErrCode].
-func NewVerifier(blocks saewarp.Backend, storage *saewarp.Storage, uptime *uptimetracker.UptimeTracker) *saewarp.Verifier {
-	return saewarp.NewVerifier(
+// NewVerifier returns a [warp.Verifier] that also accepts a
+// [messages.ValidatorUptime] claiming no more uptime than `uptime` tracked.
+//
+// The attestation's source address MUST be empty. A contract's message is
+// signable only once it is in [warp.Storage], which the [warp.Verifier] checks
+// before verifying attestations.
+func NewVerifier(
+	blocks warp.Backend,
+	storage *warp.Storage,
+	uptime *uptimetracker.UptimeTracker,
+) *warp.Verifier {
+	return warp.NewVerifier(
 		blocks,
 		storage,
-		saewarp.WithAddressedCallVerifier(&UptimeVerifier{uptime: uptime}),
+		warp.WithAddressedCallVerifier(&uptimeVerifier{uptime: uptime}),
 	)
 }
 
-var _ saewarp.AddressedCallVerifier = (*UptimeVerifier)(nil)
+var _ warp.AddressedCallVerifier = (*uptimeVerifier)(nil)
 
-// An UptimeVerifier decides whether this node should sign
-// `*payload.AddressedCall` messages carrying a known [messages.Payload]. The
-// only currently-handled type is `*messages.ValidatorUptime`: signed iff the
-// source address is empty and the locally-tracked uptime for the validation
-// ID is at least the message's claimed `TotalUptime`.
-type UptimeVerifier struct {
+// An uptimeVerifier verifies validator uptime attestations.
+type uptimeVerifier struct {
 	uptime *uptimetracker.UptimeTracker
 }
 
-// VerifyAddressedCall verifies a `*payload.AddressedCall`.
-//
-//   - The source address MUST be empty for addressed messages.
-//   - The payload MUST parse as a known `messages.Payload` type. The
-//     only currently-handled type is `*messages.ValidatorUptime`.
-func (v *UptimeVerifier) VerifyAddressedCall(addressedCall *payload.AddressedCall) *common.AppError {
+func (v *uptimeVerifier) VerifyAddressedCall(addressedCall *payload.AddressedCall) *common.AppError {
 	if len(addressedCall.SourceAddress) != 0 {
 		return &common.AppError{
-			Code:    VerifyErrCode,
+			Code:    SourceAddressErrCode,
 			Message: "source address should be empty for addressed messages",
 		}
 	}
@@ -64,7 +62,7 @@ func (v *UptimeVerifier) VerifyAddressedCall(addressedCall *payload.AddressedCal
 	parsed, err := messages.Parse(addressedCall.Payload)
 	if err != nil {
 		return &common.AppError{
-			Code:    ParseErrCode,
+			Code:    ParseMessageErrCode,
 			Message: "failed to parse addressed call message: " + err.Error(),
 		}
 	}
@@ -74,37 +72,28 @@ func (v *UptimeVerifier) VerifyAddressedCall(addressedCall *payload.AddressedCal
 		return v.verifyUptime(p)
 	default:
 		return &common.AppError{
-			Code:    ParseErrCode,
+			Code:    UnknownMessageTypeErrCode,
 			Message: fmt.Sprintf("unknown message type: %T", p),
 		}
 	}
 }
 
-// verifyUptime returns nil iff the locally-tracked uptime for
-// `uptimeMsg.ValidationID` is at least `uptimeMsg.TotalUptime`
-// seconds
-func (v *UptimeVerifier) verifyUptime(uptimeMsg *messages.ValidatorUptime) *common.AppError {
-	if v.uptime == nil {
-		return &common.AppError{
-			Code:    VerifyErrCode,
-			Message: "no uptime source configured",
-		}
-	}
-	currentUptime, _, err := v.uptime.GetUptime(uptimeMsg.ValidationID)
+func (v *uptimeVerifier) verifyUptime(msg *messages.ValidatorUptime) *common.AppError {
+	duration, _, err := v.uptime.GetUptime(msg.ValidationID)
 	if err != nil {
 		return &common.AppError{
-			Code:    VerifyErrCode,
+			Code:    GetUptimeErrCode,
 			Message: "failed to get uptime: " + err.Error(),
 		}
 	}
 
-	currentUptimeSeconds := uint64(currentUptime.Seconds()) //#nosec G115 -- uptime durations are non-negative and bounded by chain age
-	if currentUptimeSeconds < uptimeMsg.TotalUptime {
+	seconds := uint64(duration.Seconds()) //#nosec G115 -- uptime durations are non-negative and bounded by chain age
+	if seconds < msg.TotalUptime {
 		return &common.AppError{
-			Code: VerifyErrCode,
+			Code: InsufficientUptimeErrCode,
 			Message: fmt.Sprintf(
 				"current uptime %d is less than queried uptime %d for validationID %s",
-				currentUptimeSeconds, uptimeMsg.TotalUptime, uptimeMsg.ValidationID,
+				seconds, msg.TotalUptime, msg.ValidationID,
 			),
 		}
 	}
