@@ -25,7 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/utilstest"
-	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 
 	sim "github.com/ava-labs/avalanchego/graft/subnet-evm/ethclient/simulated"
 	rewardmanagerbindings "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager/rewardmanagertest/bindings"

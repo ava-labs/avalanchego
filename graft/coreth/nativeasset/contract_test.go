@@ -15,11 +15,10 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -28,9 +27,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	core.RegisterExtras()
-	customtypes.Register()
-	params.RegisterExtras()
+	libevm.RegisterExtras()
 	os.Exit(m.Run())
 }
 

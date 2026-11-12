@@ -10,6 +10,7 @@ go_library(
     srcs = ["consensus.go"],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/consensus/dummy",
     deps = [
+        "//graft/evm/acp226",
         "//graft/evm/utils",
         "//graft/subnet-evm/consensus",
         "//graft/subnet-evm/params",
@@ -17,7 +18,6 @@ go_library(
         "//graft/subnet-evm/plugin/evm/customheader",
         "//graft/subnet-evm/plugin/evm/customtypes",
         "//graft/subnet-evm/plugin/evm/vmerrors",
-        "//vms/evm/acp226",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",

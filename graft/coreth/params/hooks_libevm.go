@@ -4,34 +4,25 @@
 package params
 
 import (
-	"fmt"
-	"maps"
-	"math/big"
 	"slices"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
-	"github.com/ava-labs/libevm/libevm/legacy"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/saevm/hook"
+	"github.com/ava-labs/avalanchego/vms/evm/hook"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 
-	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	ethparams "github.com/ava-labs/libevm/params"
 )
-
-// invalidateDelegateTime is the Unix timestamp for August 2nd, 2025, midnight Eastern Time
-// (August 2nd, 2025, 04:00 UTC)
-const InvalidateDelegateUnix = 1754107200
 
 // P256VerifyAddress is the address of the p256 signature verification precompile
 var P256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
@@ -45,10 +36,6 @@ func GetRulesExtra(r ethparams.Rules) *cparams.Rules {
 
 func (RulesExtra) CanCreateContract(_ *libevm.AddressContext, gas uint64, _ libevm.StateReader) (uint64, error) {
 	return gas, nil
-}
-
-func (RulesExtra) CanExecuteTransaction(_ common.Address, _ *common.Address, _ libevm.StateReader) error {
-	return nil
 }
 
 func (r RulesExtra) ShouldRefundGas() bool {
@@ -73,14 +60,11 @@ func (RulesExtra) ShouldCreditBaseFeeToCoinbase() bool {
 }
 
 // warpPredicaters charges for Warp predicates, which are the only predicates.
-var warpPredicaters = map[common.Address]evmprecompileconfig.Predicater{
+//
+// TODO(JonathanOppenheimer): Charge Warp messages directly once the shared
+// predicate gas helper is replaced.
+var warpPredicaters = map[common.Address]precompileconfig.Predicater{
 	warp.ContractAddress: &warp.Config{},
-}
-
-// HasPredicate reports whether addr's access-list entries are predicates, which
-// is only the case for the Warp precompile once Durango is active.
-func (r RulesExtra) HasPredicate(addr common.Address) bool {
-	return r.IsDurango && addr == warp.ContractAddress
 }
 
 // AccessListGas computes the intrinsic gas for an access list. Once Warp is
@@ -91,158 +75,136 @@ func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, e
 	if !r.IsDurango {
 		return 0, false, nil
 	}
-	gas, err := evmprecompileconfig.AccessListGasWithPredicates(cparams.Rules(r), warpPredicaters, accessList)
+	gas, err := precompileconfig.AccessListGasWithPredicates(cparams.Rules(r), warpPredicaters, accessList)
 	return gas, true, err
 }
 
-var PrecompiledContractsApricotPhase2 = map[common.Address]vm.PrecompiledContract{
+var precompiledContractsApricotPhase2 = map[common.Address]vm.PrecompiledContract{
 	nativeasset.GenesisContractAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
 	nativeasset.NativeAssetBalanceAddr: makePrecompile(&nativeasset.NativeAssetBalance{}),
 	nativeasset.NativeAssetCallAddr:    makePrecompile(&nativeasset.NativeAssetCall{}),
 }
 
-var PrecompiledContractsApricotPhasePre6 = map[common.Address]vm.PrecompiledContract{
+var precompiledContractsApricotPhasePre6 = map[common.Address]vm.PrecompiledContract{
 	nativeasset.GenesisContractAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
 	nativeasset.NativeAssetBalanceAddr: makePrecompile(&nativeasset.DeprecatedContract{}),
 	nativeasset.NativeAssetCallAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
 }
 
-var PrecompiledContractsApricotPhase6 = map[common.Address]vm.PrecompiledContract{
+var precompiledContractsApricotPhase6 = map[common.Address]vm.PrecompiledContract{
 	nativeasset.GenesisContractAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
 	nativeasset.NativeAssetBalanceAddr: makePrecompile(&nativeasset.NativeAssetBalance{}),
 	nativeasset.NativeAssetCallAddr:    makePrecompile(&nativeasset.NativeAssetCall{}),
 }
 
-var PrecompiledContractsBanff = map[common.Address]vm.PrecompiledContract{
+var precompiledContractsBanff = map[common.Address]vm.PrecompiledContract{
 	nativeasset.GenesisContractAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
 	nativeasset.NativeAssetBalanceAddr: makePrecompile(&nativeasset.DeprecatedContract{}),
 	nativeasset.NativeAssetCallAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
 }
 
-var PrecompiledContractsGranite = map[common.Address]vm.PrecompiledContract{
+var precompiledContractsDurango = map[common.Address]vm.PrecompiledContract{
 	nativeasset.GenesisContractAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
 	nativeasset.NativeAssetBalanceAddr: makePrecompile(&nativeasset.DeprecatedContract{}),
 	nativeasset.NativeAssetCallAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
+	warp.ContractAddress:               makePrecompile(warp.WarpPrecompile),
+}
+
+var precompiledContractsGranite = map[common.Address]vm.PrecompiledContract{
+	nativeasset.GenesisContractAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
+	nativeasset.NativeAssetBalanceAddr: makePrecompile(&nativeasset.DeprecatedContract{}),
+	nativeasset.NativeAssetCallAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
+	warp.ContractAddress:               makePrecompile(warp.WarpPrecompile),
 	P256VerifyAddress:                  &vm.P256Verify{},
 }
 
+// ActivePrecompiles returns the list of precompile addresses that are warmed
+// under EIP-2929.
 func (r RulesExtra) ActivePrecompiles(existing []common.Address) []common.Address {
-	var addresses []common.Address
-	addresses = slices.AppendSeq(addresses, maps.Keys(r.currentPrecompiles()))
-	addresses = append(addresses, existing...)
+	addresses := slices.Clone(existing)
+	switch {
+	case r.IsGranite:
+		addresses = append(addresses, P256VerifyAddress)
+		fallthrough
+	case r.IsApricotPhase2:
+		addresses = append(addresses,
+			nativeasset.GenesisContractAddr,
+			nativeasset.NativeAssetBalanceAddr,
+			nativeasset.NativeAssetCallAddr,
+		)
+	}
 	return addresses
+}
+
+func (r RulesExtra) PrecompileOverride(addr common.Address) (libevm.PrecompiledContract, bool) {
+	precompile, ok := r.currentPrecompiles()[addr]
+	return precompile, ok
 }
 
 func (r RulesExtra) currentPrecompiles() map[common.Address]vm.PrecompiledContract {
 	switch {
 	case r.IsGranite:
-		return PrecompiledContractsGranite
+		return precompiledContractsGranite
+	case r.IsDurango:
+		return precompiledContractsDurango
 	case r.IsBanff:
-		return PrecompiledContractsBanff
+		return precompiledContractsBanff
 	case r.IsApricotPhase6:
-		return PrecompiledContractsApricotPhase6
+		return precompiledContractsApricotPhase6
 	case r.IsApricotPhasePre6:
-		return PrecompiledContractsApricotPhasePre6
+		return precompiledContractsApricotPhasePre6
 	case r.IsApricotPhase2:
-		return PrecompiledContractsApricotPhase2
+		return precompiledContractsApricotPhase2
 	}
 	return nil
 }
 
-// precompileOverrideBuiltin returns the precompile at addr that is scheduled
-// by the active fork, such as the native asset precompiles and P256Verify.
-func (r RulesExtra) precompileOverrideBuiltin(addr common.Address) (libevm.PrecompiledContract, bool) {
-	precompile, ok := r.currentPrecompiles()[addr]
-	return precompile, ok
-}
-
+// makePrecompile adapts a [contract.StatefulPrecompiledContract] to a [libevm.PrecompiledContract].
 func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.PrecompiledContract {
-	run := func(env vm.PrecompileEnvironment, input []byte, suppliedGas uint64) ([]byte, uint64, error) {
-		rules := *GetRulesExtra(env.Rules())
-		accessibleState := accessibleState{
-			env: env,
-			blockContext: &precompileBlockContext{
-				number:           env.BlockNumber(),
-				time:             env.BlockTime(),
-				predicateResults: customtypes.PredicateResults(env.BlockHeader(), rules),
-			},
+	return vm.NewStatefulPrecompile(func(vmEnv vm.PrecompileEnvironment, input []byte) ([]byte, error) {
+		contractEnv, err := newEnvironment(vmEnv)
+		if err != nil {
+			return nil, err
 		}
-
-		switch call := env.IncomingCallType(); {
-		case call != vm.DelegateCall && call != vm.CallCode: // Others always allowed
-		case rules.IsGranite:
-			return nil, 0, vm.ErrExecutionReverted
-		case env.BlockTime() >= InvalidateDelegateUnix:
-			env.InvalidateExecution(fmt.Errorf("precompile cannot be called with %s", call))
-		default:
-			// Otherwise, we allow the precompile to be called
-		}
-
-		return contract.Run(accessibleState, env.Addresses().EVMSemantic.Caller, env.Addresses().EVMSemantic.Self, input, suppliedGas, env.ReadOnly())
-	}
-	return vm.NewStatefulPrecompile(legacy.PrecompiledStatefulContract(run).Upgrade())
+		return contract.Run(contractEnv, input)
+	})
 }
 
-func (r RulesExtra) PrecompileOverride(addr common.Address) (libevm.PrecompiledContract, bool) {
-	if p, ok := r.precompileOverrideBuiltin(addr); ok {
-		return p, true
-	}
+var _ contract.Environment = (*environment)(nil)
 
-	// Warp is the only stateful precompile, and is active from Durango.
-	if !r.IsDurango || addr != warp.ContractAddress {
-		return nil, false
-	}
-	return makePrecompile(warp.WarpPrecompile), true
-}
-
-type accessibleState struct {
-	env          vm.PrecompileEnvironment
-	blockContext *precompileBlockContext
-}
-
-func (a accessibleState) GetStateDB() contract.StateDB {
-	// TODO the contracts should be refactored to call `env.ReadOnlyState`
-	// or `env.StateDB` based on the env.ReadOnly() flag
-	var state libevm.StateReader
-	if a.env.ReadOnly() {
-		state = a.env.ReadOnlyState()
-	} else {
-		state = a.env.StateDB()
-	}
-	return state.(contract.StateDB)
-}
-
-func (a accessibleState) GetBlockContext() contract.BlockContext {
-	return a.blockContext
-}
-
-func (a accessibleState) GetRules() precompileconfig.Rules {
-	chainConfigExtra := GetExtra(a.GetPrecompileEnv().ChainConfig())
-	return chainConfigExtra.Rules(a.GetBlockContext().Timestamp())
-}
-
-func (a accessibleState) GetSnowContext() *snow.Context {
-	return GetExtra(a.env.ChainConfig()).SnowCtx
-}
-
-func (a accessibleState) GetPrecompileEnv() vm.PrecompileEnvironment {
-	return a.env
-}
-
-type precompileBlockContext struct {
-	number           *big.Int
-	time             uint64
+type environment struct {
+	vm.PrecompileEnvironment
 	predicateResults predicate.BlockResults
+	rules            *cparams.Rules
 }
 
-func (p *precompileBlockContext) Number() *big.Int {
-	return p.number
+func newEnvironment(env vm.PrecompileEnvironment) (*environment, error) {
+	rules := GetRulesExtra(env.Rules())
+
+	if call := env.IncomingCallType(); (call == vm.DelegateCall || call == vm.CallCode) && rules.IsGranite {
+		env.UseGas(env.Gas()) // A revert would otherwise refund the remaining gas.
+		return nil, vm.ErrExecutionReverted
+	}
+
+	return &environment{
+		PrecompileEnvironment: env,
+		predicateResults:      customtypes.PredicateResults(env.BlockHeader(), *rules),
+		rules:                 rules,
+	}, nil
 }
 
-func (p *precompileBlockContext) Timestamp() uint64 {
-	return p.time
+func (e *environment) Caller() common.Address {
+	return e.Addresses().EVMSemantic.Caller
 }
 
-func (p *precompileBlockContext) GetPredicateResults(txHash common.Hash, precompileAddress common.Address) set.Bits {
-	return p.predicateResults.Get(txHash, precompileAddress)
+func (e *environment) ExtraRules() precompileconfig.Rules {
+	return e.rules
+}
+
+func (e *environment) SnowContext() *snow.Context {
+	return GetExtra(e.ChainConfig()).SnowCtx
+}
+
+func (e *environment) WarpMessageResults(txHash common.Hash) set.Bits {
+	return e.predicateResults.Get(txHash, warp.ContractAddress)
 }

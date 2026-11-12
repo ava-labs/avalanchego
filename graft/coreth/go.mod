@@ -8,13 +8,12 @@ module github.com/ava-labs/avalanchego/graft/coreth
 go 1.26.10
 
 require (
-	github.com/ava-labs/avalanchego v1.15.3
-	github.com/ava-labs/avalanchego/graft/evm v1.15.3
-	github.com/ava-labs/libevm v1.13.15-0.20261028200218-d398bc4dbe41
+	github.com/ava-labs/avalanchego v1.15.4
+	github.com/ava-labs/avalanchego/graft/evm v1.15.4
+	github.com/ava-labs/libevm v1.13.15-0.20261111112450-a335c2ecf4df
 	github.com/google/go-cmp v0.7.0
 	github.com/holiman/uint256 v1.2.4
 	github.com/stretchr/testify v1.11.1
-	go.uber.org/mock v0.5.0
 )
 
 require (
@@ -112,7 +111,6 @@ require (
 tool (
 	github.com/ava-labs/libevm/rlp/rlpgen
 	github.com/fjl/gencodec
-	go.uber.org/mock/mockgen
 )
 
 replace (

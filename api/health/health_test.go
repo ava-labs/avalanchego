@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -45,6 +46,35 @@ func awaitLiveness(t *testing.T, r Reporter, liveness bool) {
 		_, ok := r.Liveness()
 		return ok == liveness
 	}, awaitTimeout, awaitFreq)
+}
+
+// TestStopBlockedCheck tests that Stop returns the context error when its
+// context is done and a check is blocked.
+func TestStopBlockedCheck(t *testing.T) {
+	h, err := New(logging.NoLog{}, prometheus.NewRegistry())
+	require.NoError(t, err)
+
+	var (
+		started atomic.Bool
+		release = make(chan struct{})
+	)
+
+	t.Cleanup(func() {
+		close(release)
+	})
+
+	require.NoError(t, h.RegisterHealthCheck("blocked", CheckerFunc(func(context.Context) (any, error) {
+		started.Store(true)
+		<-release
+		return "", nil
+	})))
+
+	h.Start(t.Context(), checkFreq)
+	require.Eventually(t, started.Load, awaitTimeout, awaitFreq)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	require.ErrorIs(t, h.Stop(ctx), context.Canceled)
 }
 
 func TestDuplicatedRegistrations(t *testing.T) {
@@ -126,7 +156,9 @@ func TestPassingChecks(t *testing.T) {
 	require.NoError(h.RegisterLivenessCheck("check", check))
 
 	h.Start(t.Context(), checkFreq)
-	defer h.Stop()
+	defer func() {
+		require.NoError(h.Stop(t.Context()))
+	}()
 
 	{
 		awaitReadiness(t, h, true)
@@ -190,7 +222,9 @@ func TestPassingThenFailingChecks(t *testing.T) {
 	require.NoError(h.RegisterLivenessCheck("check", check))
 
 	h.Start(t.Context(), checkFreq)
-	defer h.Stop()
+	defer func() {
+		require.NoError(h.Stop(t.Context()))
+	}()
 
 	awaitReadiness(t, h, true)
 	awaitHealthy(t, h, true)
@@ -241,7 +275,9 @@ func TestDeadlockRegression(t *testing.T) {
 	})
 
 	h.Start(t.Context(), time.Nanosecond)
-	defer h.Stop()
+	defer func() {
+		require.NoError(h.Stop(t.Context()))
+	}()
 
 	for i := 0; i < 100; i++ {
 		lock.Lock()
@@ -351,7 +387,7 @@ func TestTags(t *testing.T) {
 	}
 
 	// stop the health check
-	h.Stop()
+	require.NoError(h.Stop(t.Context()))
 
 	{
 		// now we'll add a new check which is unhealthy by default (notYetRunResult)

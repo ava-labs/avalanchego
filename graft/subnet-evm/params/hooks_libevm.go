@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/legacy"
 
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
@@ -23,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/hook"
 
 	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -57,19 +58,16 @@ func (r RulesExtra) CanCreateContract(ac *libevm.AddressContext, gas uint64, sta
 	return gas, nil
 }
 
-func (RulesExtra) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
-	// TODO: Migrate call for txallowlist precompile to here from core/state_transition.go
-	// when that is used from libevm.
-	return nil
-}
-
 func (r RulesExtra) ShouldRefundGas() bool {
 	return !r.IsSubnetEVM
 }
 
-// MinimumGasConsumption is a no-op.
-func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
-	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
+// MinimumGasConsumption returns the ACP-194 gas-charged floor (ceil(limit/2)).
+func (r RulesExtra) MinimumGasConsumption(limit uint64) uint64 {
+	if r.IsIgloo {
+		return hook.MinimumGasConsumption(limit)
+	}
+	return (ethparams.NOOPHooks{}).MinimumGasConsumption(limit)
 }
 
 // ShouldCreditBaseFeeToCoinbase is unused, as subnet-evm never calls libevm's

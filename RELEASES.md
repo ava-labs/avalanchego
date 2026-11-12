@@ -1,18 +1,37 @@
 # Release Notes
 
-## [v1.15.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.3)
+## [v1.15.4](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.4)
 
 ### Features
 
 ### APIs
 
-- Added a `Gas-Used` header to C-Chain `/rpc` responses with the total gas used by every completed `eth_call` in the request.
 - Added an `Rpc-Error-Codes` header to C-Chain `/rpc` responses with the count of each JSON-RPC error code in the response, e.g. `-32601;count=1, 3;count=2`.
+- Removed:
+  - `platform.getBalance`
+  - `platform.getStake`
+  - `avm.getBalance`
+  - `avm.getAllBalances`
+  - `avm.getTxStatus`
+
+### Configs
+
+### Fixes
+
+- Fixed node shutdown leaving health check and bootstrapper timeout goroutines running. Shutdown now stops them, and waits up to 10 seconds for the health check goroutines to finish.
+
+## [v1.15.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.3)
+
+### APIs
+
+- Added a `Gas-Used` header to C-Chain `/rpc` responses with the total gas used by every completed `eth_call` in the request.
 - `admin.lockProfile` and continuous profiling now write `lock.profile` in the binary pprof format, like the CPU and memory profiles.
 
 ### Configs
 
 - Added `--profile-continuous-mutex-fraction` (default `1`, which keeps the existing behavior) to set the mutex profile fraction used by continuous profiling. Set it to `0` to stop recording mutex contention, or to `n` to sample 1 of every n events.
+- Added the `filter` API to the C-Chain `apis` option. It serves the polling filter methods (`eth_newFilter`, `eth_newBlockFilter`, `eth_newPendingTransactionFilter`, `eth_getFilterChanges`, `eth_getFilterLogs`, `eth_uninstallFilter`), which moved out of `subscription`. It is enabled by default. A config that sets `apis` must add `filter` to keep serving these methods.
+- Added the `logs` API to the C-Chain `apis` option. It serves `eth_getLogs`, which moved out of `subscription`. It is enabled by default. A config that sets `apis` must add `logs` to keep serving `eth_getLogs`.
 
 ### Metrics
 
@@ -22,6 +41,8 @@
 
 - Fixed C-Chain log queries (`eth_getLogs`, `eth_getFilterLogs`) failing with `failed to get logs for block #N` when the range reached an accepted block that had not yet executed. Range queries now stop at the last executed block, and `blockHash` queries for an unexecuted block return `unknown block`.
 - Fixed `admin.stopCPUProfiler` leaving mutex profiling enabled, which kept recording mutex contention until the node restarted.
+- Fixed the C-Chain block builder ordering pending transactions inconsistently. Transactions could be out of effective gas tip order, and a sender's later nonce could come before an earlier one, which left it out of the block.
+- Fixed `UnmarshalText` implementations which prevented usage of jsonv2 (default in Go 1.27).
 
 ## [v1.15.2](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.2)
 

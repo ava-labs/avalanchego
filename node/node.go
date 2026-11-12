@@ -78,6 +78,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/avm"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/registry"
@@ -86,7 +87,6 @@ import (
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
-	saevm "github.com/ava-labs/avalanchego/vms/saevm/cchain"
 )
 
 const (
@@ -416,6 +416,17 @@ type Node struct {
  ******************************************************************************
  */
 
+// listen creates a TCP listener on the given address.
+//
+// See [net.Listen] for more details.
+func listen(ctx context.Context, address string) (net.Listener, error) {
+	var lc net.ListenConfig
+	// Harden against the public exploit of CVE-2026-98432 in case the node is
+	// running on a vulnerable operating system.
+	lc.SetMultipathTCP(false)
+	return lc.Listen(ctx, constants.NetworkType, address)
+}
+
 // Initialize the networking layer.
 // Assumes [n.vdrs], [n.CPUTracker], and [n.CPUTargeter] have been initialized.
 func (n *Node) initNetworking(reg prometheus.Registerer) error {
@@ -437,7 +448,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	// 1: https://apple.stackexchange.com/questions/393715/do-you-want-the-application-main-to-accept-incoming-network-connections-pop
 	// 2: https://github.com/golang/go/issues/56998
 	listenAddress := net.JoinHostPort(n.Config.ListenHost, strconv.FormatUint(uint64(n.Config.ListenPort), 10))
-	listener, err := net.Listen(constants.NetworkType, listenAddress)
+	listener, err := listen(context.TODO(), listenAddress)
 	if err != nil {
 		return err
 	}
@@ -971,7 +982,7 @@ func (n *Node) initAPIServer() error {
 	}
 
 	listenAddress := net.JoinHostPort(n.Config.HTTPHost, strconv.FormatUint(uint64(n.Config.HTTPPort), 10))
-	listener, err := net.Listen("tcp", listenAddress)
+	listener, err := listen(context.TODO(), listenAddress)
 	if err != nil {
 		return err
 	}
@@ -1226,7 +1237,7 @@ func (n *Node) initVMs() error {
 				CreateAssetTxFee: n.Config.CreateAssetTxFee,
 			},
 		}),
-		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &saevm.Factory{}),
+		n.VMManager.RegisterFactory(context.TODO(), constants.EVMID, &cchain.Factory{}),
 	)
 	if err != nil {
 		return err
@@ -1862,6 +1873,11 @@ func (n *Node) shutdown() {
 	if n.chainManager != nil {
 		n.chainManager.Shutdown()
 	}
+
+	if n.health != nil {
+		n.stopHealth(context.TODO())
+	}
+
 	if n.benchlistManager != nil {
 		n.benchlistManager.Shutdown()
 	}
@@ -1914,6 +1930,17 @@ func (n *Node) shutdown() {
 	}
 
 	n.Log.Info("finished node shutdown")
+}
+
+func (n *Node) stopHealth(ctx context.Context) {
+	// Best-effort shutdown because health checks use the context lock
+	// which a slow chain might not release in time.
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	if err := n.health.Stop(ctx); err != nil {
+		n.Log.Warn("health checks did not stop", zap.Error(err))
+	}
 }
 
 func (n *Node) ExitCode() int {
