@@ -121,7 +121,7 @@ func FuzzBlockRecord(f *testing.F) {
 		}
 		require.NoError(t, err)
 
-		require.Equal(t, bh, md2)
+		require.True(t, bh.Equals(&md2))
 		require.Equal(t, payload, payload2)
 	})
 }
