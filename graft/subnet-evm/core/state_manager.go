@@ -30,7 +30,7 @@ package core
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -65,7 +65,7 @@ func NewTrieWriter(db TrieDB, config *CacheConfig) TrieWriter {
 		// PathDB tracks recent all states implicitly, and should not ever be committed explicitly.
 		// Journaling happens at blockchain shutdown.
 		return noopWriter{}
-	case config.StateScheme == customrawdb.FirewoodScheme || !config.Pruning:
+	case config.StateScheme == firewood.Scheme || !config.Pruning:
 		// Firewood tracks recent states via config, so tip buffer is not needed in pruning mode.
 		return &noPruningTrieWriter{
 			TrieDB: db,

@@ -33,6 +33,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/consensus"
@@ -40,7 +41,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/core/txpool"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/gasprice"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/eth/tracers"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/accounts"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/bloombits"
@@ -260,7 +260,7 @@ func (b *EthAPIBackend) StateAndHeaderByNumber(ctx context.Context, number rpc.B
 		return nil, nil, errors.New("header not found")
 	}
 	stateDb, err := b.eth.BlockChain().StateAt(header.Root)
-	if err != nil && b.eth.BlockChain().CacheConfig().StateScheme == customrawdb.FirewoodScheme {
+	if err != nil && b.eth.BlockChain().CacheConfig().StateScheme == firewood.Scheme {
 		// Firewood can reconstruct historical state by walking back to a
 		// persisted revision and re-executing blocks forward, even if the
 		// state is not available in-memory or on disk.
@@ -294,7 +294,7 @@ func (b *EthAPIBackend) StateAndHeaderByNumberOrHash(ctx context.Context, blockN
 			return nil, nil, errors.New("header for hash not found")
 		}
 		stateDb, err := b.eth.BlockChain().StateAt(header.Root)
-		if err != nil && b.eth.BlockChain().CacheConfig().StateScheme == customrawdb.FirewoodScheme {
+		if err != nil && b.eth.BlockChain().CacheConfig().StateScheme == firewood.Scheme {
 			// Firewood can reconstruct historical state by walking back to a
 			// persisted revision and re-executing blocks forward, even if the
 			// state is not available in-memory or on disk.

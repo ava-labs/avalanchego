@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ava-labs/firewood-go-ethhash/ffi"
+	"github.com/ava-labs/firewood-go/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -25,9 +25,18 @@ import (
 	"github.com/ava-labs/libevm/trie/triestate"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/libevm/triedb/database"
+
+	"github.com/ava-labs/avalanchego/vms/evm/saedb"
+
+	saefirewood "github.com/ava-labs/avalanchego/vms/evm/firewood" // also registers firewood metrics
 )
 
-const Directory = "firewood"
+const (
+	// Scheme is the name of the Firewood state scheme.
+	Scheme = saefirewood.Scheme
+
+	directory = saedb.FirewoodDirectory
+)
 
 var (
 	_ triedb.DBConstructor = TrieDBConfig{}.BackendConstructor
@@ -144,7 +153,7 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 	if err := validateDir(config.DatabaseDir); err != nil {
 		return nil, err
 	}
-	path := filepath.Join(config.DatabaseDir, Directory)
+	path := filepath.Join(config.DatabaseDir, directory)
 
 	// The Firewood constructor will check that commitCount is nonzero.
 	minDeferredPersistenceCommitCount := uint64(config.RevisionsInMemory - 1)
@@ -154,7 +163,7 @@ func New(config TrieDBConfig) (*TrieDB, error) {
 		ffi.WithNodeCacheSizeInBytes(config.CacheSizeBytes),
 		ffi.WithRevisions(config.RevisionsInMemory),
 		ffi.WithReadCacheStrategy(config.CacheStrategy),
-		ffi.WithDeferredPersistenceCommitCount(commitCount),
+		ffi.WithMaxPersistenceGap(commitCount),
 	}
 	if config.Archive {
 		options = append(options, ffi.WithRootStore())

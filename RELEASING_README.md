@@ -7,7 +7,7 @@ This document covers the complete release process for AvalancheGo and its integr
 AvalancheGo is a monorepo which contains:
 
 - **AvalancheGo** - The main Avalanche node implementation
-- **Coreth** (in [graft/coreth/](graft/coreth/)) - C-Chain types, params and precompiles used by [SAEVM](vms/saevm/), compiled into AvalancheGo
+- **Coreth** (in [graft/coreth/](graft/coreth/)) - C-Chain types, params and precompiles used by the [C-Chain VM](vms/evm/imp/cchain/), compiled into AvalancheGo
 - **Subnet-EVM** (in [graft/subnet-evm/](graft/subnet-evm/)) - Subnet-EVM plugin, released as a separate binary
 
 For the rationale behind the multi-module tagging process, see [Multi-Module Release Strategy](docs/design/multi-module-release.md).
@@ -38,7 +38,7 @@ If this release schedules or activates a network upgrade, merge a PR to master w
 
 #### Scheduling a Network Upgrade
 
-A release that schedules a new network upgrade increases the minor version (for example, `v1.16.0`). The prep PR from [step 9](#9-prepare-the-next-release) sets master to the next patch version, so change master to `$VERSION`:
+A release that schedules a new network upgrade increases the minor version (for example, `v1.16.0`). The prep PR from [step 8](#8-prepare-the-next-release) sets master to the next patch version, so change master to `$VERSION`:
 
 1. In [`version/constants.go`](version/constants.go), set `Current` to `$VERSION`. Bump the compatibility floor in the same file: `MinimumCompatibleVersion` to this release's minor version and `PrevMinimumCompatibleVersion` to the one before, both with `Patch: 0`:
 
@@ -109,7 +109,7 @@ If this release activates a new network upgrade on Mainnet:
      ]}
    ```
 
-The upgrade test runs the published `DEFAULT_VERSION` binary, which doesn't exist until `$VERSION` is released. [Step 9](#9-prepare-the-next-release) turns it back on.
+The upgrade test runs the published `DEFAULT_VERSION` binary, which doesn't exist until `$VERSION` is released. [Step 8](#8-prepare-the-next-release) turns it back on.
 
 ### 3. Create Release Candidate Tags
 
@@ -245,21 +245,7 @@ Create a release at [github.com/ava-labs/avalanchego/releases/new](https://githu
 1. Check "Set as the latest release"
 1. Publish
 
-### 8. Update the Notify Service
-
-The notify service warns node operators running old versions. In the `uptime` job of [`devops-argocd`'s `analytics-app.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/aws/data/us-east-1/data-k8s/root/analytics/analytics-app.yaml), set `optionalVersion` to `$VERSION` without the leading `v`. For network upgrade (or otherwise critical) releases, set `requiredVersion` too:
-
-```yaml
-- cmd: uptime
-  config:
-    # ...
-    requiredVersion: '1.15.0'
-    optionalVersion: '1.15.1'
-```
-
-Merge the PR after infra team approval ([example](https://github.com/ava-labs/devops-argocd/pull/17216)).
-
-### 9. Prepare the Next Release
+### 8. Prepare the Next Release
 
 Update master so that it describes the next release:
 
