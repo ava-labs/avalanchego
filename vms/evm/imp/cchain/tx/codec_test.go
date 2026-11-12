@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
 
@@ -183,9 +183,9 @@ func TestFromBlock(t *testing.T) {
 		preAP5Time uint64 = 0
 		ap5Time           = preAP5Time + 1
 	)
-	config := cparams.WithExtra(
+	config := libevmextras.WithChainConfig(
 		&params.ChainConfig{},
-		&cparams.ChainConfig{
+		&libevmextras.ChainConfig{
 			ApricotPhase5Timestamp: new(ap5Time),
 		},
 	)

@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -233,7 +233,7 @@ func createValidPredicateTest(
 	snowCtx *snow.Context,
 	numKeys int,
 	predicate predicate.Predicate,
-	rules cparams.Rules,
+	rules libevmextras.Rules,
 ) precompiletest.PredicateTest {
 	gasCost := CurrentGasConfig(rules)
 	return precompiletest.PredicateTest{
@@ -702,7 +702,7 @@ func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
 	})
 }
 
-func makeWarpPredicateTests(tb testing.TB, rules cparams.Rules) []precompiletest.PredicateTest {
+func makeWarpPredicateTests(tb testing.TB, rules libevmextras.Rules) []precompiletest.PredicateTest {
 	allTotalNodes := []int{10, 100, 1_000, 10_000}
 	tests := make([]precompiletest.PredicateTest, len(allTotalNodes))
 	for i, totalNodes := range allTotalNodes {

@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package cparams
+package libevmextras
 
 import (
 	"fmt"
@@ -13,6 +13,25 @@ import (
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
+
+// GetChainConfig returns the registered extra [ChainConfig] on c. The returned value
+// will not be nil.
+func GetChainConfig(c *ethparams.ChainConfig) *ChainConfig {
+	ex := paramsPayloads.ChainConfig.Get(c)
+	if ex == nil {
+		ex = &ChainConfig{}
+		paramsPayloads.ChainConfig.Set(c, ex)
+	}
+	return ex
+}
+
+// WithChainConfig sets the extra payload on c and returns the modified argument.
+func WithChainConfig(c *ethparams.ChainConfig, extra *ChainConfig) *ethparams.ChainConfig {
+	paramsPayloads.ChainConfig.Set(c, extra)
+	return c
+}
+
+var _ ethparams.ChainConfigHooks = (*ChainConfig)(nil)
 
 // ChainConfig defines all Avalanche-specific forks and network changes.
 type ChainConfig struct {

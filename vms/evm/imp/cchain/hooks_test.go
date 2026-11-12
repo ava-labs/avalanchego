@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
@@ -148,13 +148,13 @@ func TestTargetExponent(t *testing.T) {
 		{
 			name:    "no_field_fortuna_parses_extra",
 			header:  &types.Header{Time: fortunaTime, Number: big.NewInt(1)},
-			wantErr: cparams.ErrInsufficientFeeState,
+			wantErr: libevmextras.ErrInsufficientFeeState,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			fortuna := &cparams.ChainConfig{
+			fortuna := &libevmextras.ChainConfig{
 				FortunaTimestamp: new(uint64(fortunaTime)),
 			}
 			got, err := targetExponent(fortuna, tt.header)

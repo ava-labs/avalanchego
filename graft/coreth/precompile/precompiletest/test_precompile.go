@@ -21,9 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
-
-	cchainlibevm "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 )
 
 // PrecompileTest is a test case for a precompile
@@ -53,7 +51,7 @@ type PrecompileTest struct {
 	// ExpectedErr is the expected error returned by the precompile
 	ExpectedErr error
 	// Rules is the rules to use for the precompile
-	Rules cparams.Rules
+	Rules libevmextras.Rules
 }
 
 func (test PrecompileTest) Run(t *testing.T, precompile contract.StatefulPrecompiledContract) {
@@ -185,7 +183,7 @@ type testEnv struct {
 	state        *testStateDB
 	caller       common.Address
 	snowContext  *snow.Context
-	rules        cparams.Rules
+	rules        libevmextras.Rules
 	warpFailures set.Bits
 }
 
@@ -216,7 +214,7 @@ func (e *testEnv) WarpMessageResults(common.Hash) set.Bits {
 // testStateDB allows for mocking the Warp messages without calling Prepare on
 // the statedb.
 type testStateDB struct {
-	*cchainlibevm.StateDB
+	*libevmextras.StateDB
 
 	warpMessages []predicate.Predicate
 }
@@ -226,7 +224,7 @@ func newTestStateDB(t testing.TB, warpMessages []predicate.Predicate) *testState
 	statedb, err := state.New(common.Hash{}, state.NewDatabase(db), nil)
 	require.NoError(t, err)
 	return &testStateDB{
-		StateDB:      cchainlibevm.NewStateDB(statedb),
+		StateDB:      libevmextras.NewStateDB(statedb),
 		warpMessages: warpMessages,
 	}
 }

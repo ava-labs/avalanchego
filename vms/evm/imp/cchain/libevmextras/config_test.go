@@ -1,12 +1,11 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package cparams_test
+package libevmextras_test
 
 import (
 	"encoding/json"
 	"math/big"
-	"os"
 	"testing"
 
 	"github.com/arr4n/shed/testerr"
@@ -15,17 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 
 	ethparams "github.com/ava-labs/libevm/params"
 
-	. "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	. "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 )
-
-func TestMain(m *testing.M) {
-	libevmextras.Register()
-	os.Exit(m.Run())
-}
 
 func TestCheckConfigForkOrder(t *testing.T) {
 	tests := []struct {
@@ -77,7 +70,7 @@ func TestCheckConfigForkOrder(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := WithExtra(
+			c := WithChainConfig(
 				&ethparams.ChainConfig{},
 				&tt.upgrades,
 			)
@@ -98,7 +91,7 @@ func TestCheckConfigForkOrder(t *testing.T) {
 // in [ethparams] and is independent of Avalanche forks.
 func TestCheckCompatible(t *testing.T) {
 	newEthConfig := func(c ChainConfig) *ethparams.ChainConfig {
-		return WithExtra(&ethparams.ChainConfig{}, &c)
+		return WithChainConfig(&ethparams.ChainConfig{}, &c)
 	}
 
 	// checks for non-nil [ethparams.ConfigCompatError] with matching timestamps
@@ -264,7 +257,7 @@ func TestChainConfigJSON(t *testing.T) {
 				config.SnowCtx = snowtest.Context(t, snowtest.CChainID)
 
 				// ChainID is required.
-				ethCfg := WithExtra(&ethparams.ChainConfig{ChainID: big.NewInt(1)}, &config)
+				ethCfg := WithChainConfig(&ethparams.ChainConfig{ChainID: big.NewInt(1)}, &config)
 				got, err := json.Marshal(ethCfg)
 				require.NoError(t, err)
 				require.JSONEq(t, tt.json, string(got))
@@ -274,7 +267,7 @@ func TestChainConfigJSON(t *testing.T) {
 				var got ethparams.ChainConfig
 				require.NoError(t, json.Unmarshal([]byte(tt.json), &got))
 				require.Equal(t, big.NewInt(1), got.ChainID, "ChainID")
-				require.Equal(t, &tt.config, GetExtra(&got), "GetExtra()")
+				require.Equal(t, &tt.config, GetChainConfig(&got), "GetExtra()")
 			})
 		})
 	}

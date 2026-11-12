@@ -5,12 +5,15 @@
 package libevmextras
 
 import (
+	"math/big"
+
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
 
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // Register registers all the C-Chain's libevm hooks and payloads.
@@ -22,7 +25,7 @@ func Register() {
 	customtypes.Register()
 	vm.RegisterHooks(vmHooks{})
 	state.RegisterExtras(partitionStateKeysHook{})
-	cparams.RegisterExtras()
+	registerParams()
 }
 
 // WithTempRegistered runs `fn` with temporary registration otherwise
@@ -37,11 +40,49 @@ func WithTempRegistered(fn func() error) error {
 			func(lock libevm.ExtrasLock, fn func() error) error {
 				return state.WithTempRegisteredExtras(lock, partitionStateKeysHook{}, fn)
 			},
-			cparams.WithTempRegisteredExtras,
+			withTempRegisteredParams,
 		} {
 			inner := fn
 			fn = func() error { return wrap(lock, inner) }
 		}
 		return fn()
 	})
+}
+
+var paramsPayloads ethparams.ExtraPayloads[*ChainConfig, Rules]
+
+// registerParams registers hooks and payloads with libevm. It MUST NOT be
+// called more than once and therefore is called by [Register].
+func registerParams() {
+	paramsPayloads = ethparams.RegisterExtras(paramsExtrasToRegister())
+}
+
+// withTempRegisteredParams runs `fn` with temporary registration otherwise
+// equivalent to a call to [registerParams], but limited to the life of `fn`.
+//
+// It is called by [WithTempRegistered], along with all other
+// temporary-registration functions.
+func withTempRegisteredParams(lock libevm.ExtrasLock, fn func() error) error {
+	old := paramsPayloads
+	defer func() { paramsPayloads = old }()
+
+	return ethparams.WithTempRegisteredExtras(
+		lock, paramsExtrasToRegister(),
+		func(extras ethparams.ExtraPayloads[*ChainConfig, Rules]) error {
+			paramsPayloads = extras
+			return fn()
+		},
+	)
+}
+
+func paramsExtrasToRegister() ethparams.Extras[*ChainConfig, Rules] {
+	return ethparams.Extras[*ChainConfig, Rules]{
+		ReuseJSONRoot: true, // Reuse the root JSON input when unmarshalling the extra payload.
+		NewRules: func(_ *ethparams.ChainConfig, _ *ethparams.Rules, cEx *ChainConfig, _ *big.Int, _ bool, timestamp uint64) Rules {
+			if cEx == nil {
+				return Rules{}
+			}
+			return cEx.Rules(timestamp)
+		},
+	}
 }

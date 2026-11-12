@@ -13,7 +13,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
 )
@@ -71,7 +70,7 @@ func (s *StateDB) Prepare(
 	precompiles []common.Address,
 	list types.AccessList,
 ) {
-	rulesExtra := cparams.GetRulesExtra(rules)
+	rulesExtra := GetRules(rules)
 	if rulesExtra.IsDurango {
 		s.warpMessages = warp.MessagesFromAccessList(list)
 	}

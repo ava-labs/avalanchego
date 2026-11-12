@@ -21,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 
 	. "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
@@ -195,7 +194,7 @@ func TestGetCommittedState(t *testing.T) {
 	}{
 		{
 			name:   "pre_ap1_reads_untransformed_key",
-			config: cparams.WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &cparams.ChainConfig{}),
+			config: WithChainConfig(&params.ChainConfig{ChainID: big.NewInt(1)}, &ChainConfig{}),
 			want:   assetVal,
 		},
 		{

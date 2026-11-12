@@ -19,7 +19,6 @@ go_library(
         "//snow",
         "//snow/snowtest",
         "//utils/set",
-        "//vms/evm/imp/cchain/cparams",
         "//vms/evm/imp/cchain/libevmextras",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",

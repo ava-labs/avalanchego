@@ -35,16 +35,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-
-	cchainlibevm "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 )
 
 func TestMain(m *testing.M) {
-	cchainlibevm.Register()
+	libevmextras.Register()
 	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
 }
 

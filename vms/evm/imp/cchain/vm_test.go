@@ -54,7 +54,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/synchronoustest"
@@ -1150,7 +1149,7 @@ func TestParseBlock(t *testing.T) {
 	w := newWallet(key, sut.ctx, nil)
 	stx := w.newMinimalTx(t)
 
-	ap1Time := *cparams.GetExtra(sut.chainConfig).ApricotPhase1Timestamp
+	ap1Time := *libevmextras.GetChainConfig(sut.chainConfig).ApricotPhase1Timestamp
 
 	const (
 		preAP1WithDataHeight    = 1

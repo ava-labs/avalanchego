@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 )
 
@@ -30,7 +29,7 @@ func TestHooksOverrideNewEVMArgs(t *testing.T) {
 	}{
 		{
 			name:           "pre_shanghai_keeps_difficulty",
-			config:         cparams.WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &cparams.ChainConfig{}),
+			config:         libevmextras.WithChainConfig(&params.ChainConfig{ChainID: big.NewInt(1)}, &libevmextras.ChainConfig{}),
 			wantDifficulty: difficulty,
 		},
 		{

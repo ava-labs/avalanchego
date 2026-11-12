@@ -15,7 +15,6 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
@@ -436,9 +435,9 @@ func TestStatefulPrecompile(t *testing.T) {
 	}
 
 	// nativeasset precompiles are activated at AP2.
-	cfg := cparams.WithExtra(
+	cfg := libevmextras.WithChainConfig(
 		&ethparams.ChainConfig{},
-		&cparams.ChainConfig{
+		&libevmextras.ChainConfig{
 			ApricotPhase2Timestamp: new(uint64),
 		},
 	)

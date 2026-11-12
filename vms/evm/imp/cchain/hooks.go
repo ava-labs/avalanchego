@@ -31,7 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/txpool"
@@ -41,7 +41,6 @@ import (
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	cchainlibevm "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	cchainstate "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/evm/types"
 )
@@ -158,7 +157,7 @@ func delayExponent(h *types.Header) dynamic.DelayExponent {
 	return dynamic.InitialDelayExponent
 }
 
-func targetExponent(config *cparams.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
+func targetExponent(config *libevmextras.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
 	if te := customtypes.GetHeaderExtra(h).TargetExponent; te != nil {
 		return *te, nil
 	}
@@ -168,11 +167,11 @@ func targetExponent(config *cparams.ChainConfig, h *types.Header) (dynamic.Targe
 
 	// Synchronous blocks store the target exponent in their ACP-176 fee state.
 	// Only the last one's is used, as the parent of the first SAE block.
-	return cparams.TargetExponentFromExtra(h.Extra)
+	return libevmextras.TargetExponentFromExtra(h.Extra)
 }
 
 func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	config := cparams.GetExtra(h.chainConfig)
+	config := libevmextras.GetChainConfig(h.chainConfig)
 	te, err := targetExponent(config, header)
 	if err != nil {
 		te = dynamic.InitialTargetExponent
@@ -238,8 +237,8 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 }
 
 func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
-	config := cparams.GetExtra(h.chainConfig)
-	if isFirstDurangoBlock := cparams.GetRulesExtra(rules).IsDurango && !config.IsDurango(parent.Time); isFirstDurangoBlock {
+	config := libevmextras.GetChainConfig(h.chainConfig)
+	if isFirstDurangoBlock := libevmextras.GetRules(rules).IsDurango && !config.IsDurango(parent.Time); isFirstDurangoBlock {
 		activatePrecompile(statedb, corethwarp.ContractAddress)
 	}
 	return nil
@@ -251,7 +250,7 @@ func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 		return fmt.Errorf("parsing txs: %w", err)
 	}
 
-	extstatedb := cchainlibevm.NewStateDB(statedb)
+	extstatedb := libevmextras.NewStateDB(statedb)
 	for i, t := range txs {
 		if err := t.TransferNonAVAX(h.ctx.AVAXAssetID, extstatedb); err != nil {
 			return fmt.Errorf("transferring non-AVAX assets of tx %s (%d): %w", t.ID(), i, err)
@@ -329,7 +328,7 @@ func (h *hooks) VerifyBlockSyntax(b *types.Block) error {
 	// For genesis and pre-ApricotPhase1 blocks, the header's ExtDataHash is
 	// expected to be empty with the actual data expected to be committed to in
 	// [extDataHashes].
-	if height := b.NumberU64(); height == 0 || !cparams.GetExtra(h.chainConfig).IsApricotPhase1(b.Time()) {
+	if height := b.NumberU64(); height == 0 || !libevmextras.GetChainConfig(h.chainConfig).IsApricotPhase1(b.Time()) {
 		wantHash := customtypes.EmptyExtDataHash
 		if want, ok := extDataHashes[h.ctx.NetworkID][height]; ok {
 			wantHash = want
@@ -371,7 +370,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 
 	nowMS := uint64(now.UnixMilli())
 
-	config := cparams.GetExtra(b.chainConfig)
+	config := libevmextras.GetChainConfig(b.chainConfig)
 	te, err := targetExponent(config, parent)
 	if err != nil {
 		return nil, fmt.Errorf("getting target exponent: %w", err)

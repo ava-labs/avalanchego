@@ -22,7 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 
@@ -77,9 +77,9 @@ func parseGenesis(ctx *snow.Context, b []byte) (*genesis, error) {
 	// schedule is configured by ctx.
 	chainID := g.Config.ChainID
 	u := ctx.NetworkUpgrades
-	extraCfg := cparams.FromUpgrades(u)
+	extraCfg := libevmextras.FromUpgrades(u)
 	extraCfg.SnowCtx = ctx
-	g.Config = cparams.WithExtra(
+	g.Config = libevmextras.WithChainConfig(
 		&ethparams.ChainConfig{
 			ChainID:             chainID,
 			HomesteadBlock:      big.NewInt(0),
@@ -236,7 +236,7 @@ func (g *genesis) block() (*types.Block, error) {
 		h.GasLimit = ethparams.GenesisGasLimit
 	}
 
-	c := cparams.GetExtra(g.Config)
+	c := libevmextras.GetChainConfig(g.Config)
 	if c.IsApricotPhase3(g.Timestamp) { // Also called London
 		h.BaseFee = g.BaseFee
 		if h.BaseFee == nil {
@@ -345,7 +345,7 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 	// the genesis timestamp is already after the Warp activation, then the
 	// state needs to reflect that or the precompile would never be marked as
 	// active.
-	if c := cparams.GetExtra(g.Config); c.IsDurango(g.Timestamp) {
+	if c := libevmextras.GetChainConfig(g.Config); c.IsDurango(g.Timestamp) {
 		activatePrecompile(statedb, warp.ContractAddress)
 	}
 

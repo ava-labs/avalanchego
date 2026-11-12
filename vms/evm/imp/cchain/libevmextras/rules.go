@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package cparams
+package libevmextras
 
 import (
 	"slices"
@@ -22,6 +22,11 @@ import (
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
+
+// GetRules returns the registered extra [Rules] on r.
+func GetRules(r ethparams.Rules) *Rules {
+	return paramsPayloads.Rules.GetPointer(&r)
+}
 
 var (
 	_ ethparams.RulesHooks   = Rules{}
@@ -203,7 +208,7 @@ type environment struct {
 }
 
 func newEnvironment(env vm.PrecompileEnvironment) (*environment, error) {
-	rules := GetRulesExtra(env.Rules())
+	rules := GetRules(env.Rules())
 
 	if call := env.IncomingCallType(); (call == vm.DelegateCall || call == vm.CallCode) && rules.IsGranite {
 		env.UseGas(env.Gas()) // A revert would otherwise refund the remaining gas.
@@ -228,7 +233,7 @@ func (e *environment) ExtraRules() precompileconfig.Rules {
 }
 
 func (e *environment) SnowContext() *snow.Context {
-	return GetExtra(e.ChainConfig()).SnowCtx
+	return GetChainConfig(e.ChainConfig()).SnowCtx
 }
 
 func (e *environment) WarpMessageResults(txHash common.Hash) set.Bits {

@@ -11,7 +11,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//upgrade/upgradetest",
-        "//vms/evm/imp/cchain/cparams",
+        "//vms/evm/imp/cchain/libevmextras",
         "//vms/evm/imp/cchain/libevmextras/customtypes",
         "//vms/evm/imp/cchain/tx",
         "//vms/evm/saetest",

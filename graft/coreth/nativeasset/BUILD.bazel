@@ -25,7 +25,6 @@ graft_go_test(
     srcs = ["contract_test.go"],
     deps = [
         ":nativeasset",
-        "//vms/evm/imp/cchain/cparams",
         "//vms/evm/imp/cchain/libevmextras",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",

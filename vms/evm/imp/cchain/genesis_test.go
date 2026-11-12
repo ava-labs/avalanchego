@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/evm/cmputils"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras"
 
 	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -64,7 +64,7 @@ func TestParseGenesis(t *testing.T) {
 			ctx:     mainnetCtx,
 			genesis: avalanchegenesis.MainnetConfig.CChainGenesis,
 			want: &core.Genesis{
-				Config: cparams.WithExtra(
+				Config: libevmextras.WithChainConfig(
 					&ethparams.ChainConfig{
 						ChainID:             mainnetChainID,
 						HomesteadBlock:      big.NewInt(0),
@@ -83,7 +83,7 @@ func TestParseGenesis(t *testing.T) {
 						ShanghaiTime:        new(uint64(1709740800)), // Durango
 						CancunTime:          new(uint64(1734368400)), // Etna
 					},
-					&cparams.ChainConfig{
+					&libevmextras.ChainConfig{
 						ApricotPhase1Timestamp:     new(uint64(1617199200)),
 						ApricotPhase2Timestamp:     new(uint64(1620644400)),
 						ApricotPhase3Timestamp:     new(uint64(1629813600)),
@@ -119,7 +119,7 @@ func TestParseGenesis(t *testing.T) {
 			ctx:     fujiCtx,
 			genesis: avalanchegenesis.FujiConfig.CChainGenesis,
 			want: &core.Genesis{
-				Config: cparams.WithExtra(
+				Config: libevmextras.WithChainConfig(
 					&ethparams.ChainConfig{
 						ChainID:             fujiChainID,
 						HomesteadBlock:      big.NewInt(0),
@@ -138,7 +138,7 @@ func TestParseGenesis(t *testing.T) {
 						ShanghaiTime:        new(uint64(1707840000)), // Durango
 						CancunTime:          new(uint64(1732550400)), // Etna
 					},
-					&cparams.ChainConfig{
+					&libevmextras.ChainConfig{
 						ApricotPhase1Timestamp:     new(uint64(1616767200)),
 						ApricotPhase2Timestamp:     new(uint64(1620223200)),
 						ApricotPhase3Timestamp:     new(uint64(1629140400)),
@@ -174,7 +174,7 @@ func TestParseGenesis(t *testing.T) {
 			ctx:     localCtx,
 			genesis: avalanchegenesis.LocalConfig.CChainGenesis,
 			want: &core.Genesis{
-				Config: cparams.WithExtra(
+				Config: libevmextras.WithChainConfig(
 					&ethparams.ChainConfig{
 						ChainID:             big.NewInt(43112),
 						HomesteadBlock:      big.NewInt(0),
@@ -193,7 +193,7 @@ func TestParseGenesis(t *testing.T) {
 						ShanghaiTime:        initiallyActive, // Durango
 						CancunTime:          initiallyActive, // Etna
 					},
-					&cparams.ChainConfig{
+					&libevmextras.ChainConfig{
 						ApricotPhase1Timestamp:     initiallyActive,
 						ApricotPhase2Timestamp:     initiallyActive,
 						ApricotPhase3Timestamp:     initiallyActive,
@@ -590,8 +590,8 @@ func TestWriteGenesis(t *testing.T) {
 			}
 
 			cmpExtras := []cmp.Option{
-				cmp.Transformer("cparams", cparams.GetExtra),
-				cmpopts.IgnoreFields(cparams.ChainConfig{}, "SnowCtx"), // contains lock
+				cmp.Transformer("cparams", libevmextras.GetChainConfig),
+				cmpopts.IgnoreFields(libevmextras.ChainConfig{}, "SnowCtx"), // contains lock
 			}
 			if diff := cmp.Diff(g.Config, gotConfig, cmpExtras...); diff != "" {
 				t.Errorf("initial stored network upgrades (-want +got)\n%s", diff)
