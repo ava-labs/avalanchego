@@ -15,3 +15,13 @@ func PtrEqual[T comparable](x, y *T) bool {
 	}
 	return *x == *y
 }
+
+// First returns the first of two values, typically a function's first result.
+func First[A, B any](a A, _ B) A {
+	return a
+}
+
+// Second returns the second of two values, typically a function's second result.
+func Second[A, B any](_ A, b B) B {
+	return b
+}

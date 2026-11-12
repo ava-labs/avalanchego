@@ -10,9 +10,9 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest",
     visibility = ["//visibility:public"],
     deps = [
-        "//graft/coreth/plugin/evm/customtypes",
         "//upgrade/upgradetest",
         "//vms/evm/imp/cchain/cparams",
+        "//vms/evm/imp/cchain/libevmextras/customtypes",
         "//vms/evm/imp/cchain/tx",
         "//vms/evm/saetest",
         "@com_github_ava_labs_libevm//common",

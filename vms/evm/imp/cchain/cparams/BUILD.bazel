@@ -18,7 +18,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/coreth/nativeasset",
-        "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/contracts/warp",
         "//graft/evm/precompileconfig",
@@ -29,6 +28,7 @@ go_library(
         "//utils/set",
         "//utils/wrappers",
         "//vms/evm/hook",
+        "//vms/evm/imp/cchain/libevmextras/customtypes",
         "//vms/evm/imp/dynamic",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/vm",

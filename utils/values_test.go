@@ -49,3 +49,9 @@ func TestPtrEqual(t *testing.T) {
 		})
 	}
 }
+
+func TestFirstSecond(t *testing.T) {
+	pair := func() (int, string) { return 1, "two" }
+	require.Equal(t, 1, First(pair()), "First()")
+	require.Equal(t, "two", Second(pair()), "Second()")
+}

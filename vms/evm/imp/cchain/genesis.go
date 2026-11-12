@@ -19,12 +19,11 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 
 	ethparams "github.com/ava-labs/libevm/params"
@@ -257,7 +256,7 @@ func (g *genesis) block() (*types.Block, error) {
 
 	if c.IsGranite(g.Timestamp) {
 		headerExtra.TimeMilliseconds = new(g.Timestamp * 1000)
-		headerExtra.MinDelayExcess = new(acp226.InitialDelayExcess)
+		headerExtra.MinDelayExcess = new(dynamic.InitialDelayExponent)
 	}
 
 	if c.IsHelicon(g.Timestamp) {

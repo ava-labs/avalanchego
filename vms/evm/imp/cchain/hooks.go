@@ -18,13 +18,10 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
-	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
 	_ "embed"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -35,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevmextras/customtypes"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/txpool"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
@@ -124,7 +122,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 		desiredParams{
 			targetExponent: headerExtra.TargetExponent,
 			priceExponent:  headerExtra.MinPriceExponent,
-			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
+			delayExponent:  headerExtra.MinDelayExcess,
 		},
 	}, nil
 }
@@ -155,7 +153,7 @@ func priceExponent(h *types.Header) dynamic.PriceExponent {
 // [dynamic.InitialDelayExponent] when the header does not carry one.
 func delayExponent(h *types.Header) dynamic.DelayExponent {
 	if de := customtypes.GetHeaderExtra(h).MinDelayExcess; de != nil {
-		return dynamic.DelayExponent(*de)
+		return *de
 	}
 	return dynamic.InitialDelayExponent
 }
@@ -382,7 +380,6 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	de = de.Toward(b.desired.delayExponent)
 	te = te.Toward(b.desired.targetExponent)
 	pe := priceExponent(parent).Toward(b.desired.priceExponent)
-	minDelayExcess := acp226.DelayExcess(de)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash:       parent.Hash(),
@@ -402,7 +399,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			// BlockGasCost has been set to 0 since the Granite upgrade.
 			BlockGasCost:     big.NewInt(0),
 			TimeMilliseconds: &nowMS,
-			MinDelayExcess:   &minDelayExcess,
+			MinDelayExcess:   &de,
 			TargetExponent:   &te,
 			MinPriceExponent: &pe,
 		},
@@ -549,15 +546,7 @@ func (b *builder) BuildBlock(
 	he.SettledGasNumerator = (*uint64)(&settled.GasNumerator)
 	he.SettledExcess = (*uint64)(&settled.Excess)
 
-	return customtypes.NewBlockWithExtData(
-		header,
-		ethTxs,
-		nil, // uncles
-		receipts,
-		trie.NewStackTrie(nil),
-		extData,
-		true, // update [customtypes.HeaderExtra.ExtDataHash]
-	), nil
+	return customtypes.NewBlock(header, ethTxs, receipts, extData), nil
 }
 
 var _ hook.Transaction = (*hookTx)(nil)
