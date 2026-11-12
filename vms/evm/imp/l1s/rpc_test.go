@@ -47,5 +47,8 @@ func TestGetChainConfig(t *testing.T) {
 	var got params.ChainConfigWithUpgradesJSON
 	client := sut.EthClient().RPC
 	require.NoErrorf(t, client.CallContext(ctx, &got, "eth_getChainConfig"), "%T.CallContext(eth_getChainConfig)", client)
-	require.Equal(t, upgrades, got.UpgradeConfig, "eth_getChainConfig upgrades")
+
+	want := params.Copy(sut.GethRPCBackends().ChainConfig())
+	params.GetExtra(&want).AvalancheContext = extras.AvalancheContext{} // not serialized
+	require.Equal(t, params.ChainConfigWithUpgradesJSON{ChainConfig: want, UpgradeConfig: upgrades}, got, "eth_getChainConfig")
 }

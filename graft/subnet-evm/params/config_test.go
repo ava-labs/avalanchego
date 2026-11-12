@@ -267,31 +267,6 @@ func TestActivePrecompiles(t *testing.T) {
 }
 
 func TestChainConfigMarshalWithUpgrades(t *testing.T) {
-	newConfig := func(u extras.UpgradeConfig) *ChainConfig {
-		return WithExtra(
-			&ChainConfig{
-				ChainID:             big.NewInt(1),
-				HomesteadBlock:      big.NewInt(0),
-				EIP150Block:         big.NewInt(0),
-				EIP155Block:         big.NewInt(0),
-				EIP158Block:         big.NewInt(0),
-				ByzantiumBlock:      big.NewInt(0),
-				ConstantinopleBlock: big.NewInt(0),
-				PetersburgBlock:     big.NewInt(0),
-				IstanbulBlock:       big.NewInt(0),
-				MuirGlacierBlock:    big.NewInt(0),
-			},
-			&extras.ChainConfig{
-				FeeConfig: DefaultFeeConfig,
-				NetworkUpgrades: extras.NetworkUpgrades{
-					SubnetEVMTimestamp: utils.PointerTo[uint64](0),
-					DurangoTimestamp:   utils.PointerTo[uint64](0),
-				},
-				GenesisPrecompiles: extras.Precompiles{},
-				UpgradeConfig:      u,
-			},
-		)
-	}
 	upgrades := extras.UpgradeConfig{
 		PrecompileUpgrades: []extras.PrecompileUpgrade{
 			{
@@ -299,7 +274,29 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 			},
 		},
 	}
-	config := newConfig(upgrades)
+	config := WithExtra(
+		&ChainConfig{
+			ChainID:             big.NewInt(1),
+			HomesteadBlock:      big.NewInt(0),
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0),
+			ConstantinopleBlock: big.NewInt(0),
+			PetersburgBlock:     big.NewInt(0),
+			IstanbulBlock:       big.NewInt(0),
+			MuirGlacierBlock:    big.NewInt(0),
+		},
+		&extras.ChainConfig{
+			FeeConfig: DefaultFeeConfig,
+			NetworkUpgrades: extras.NetworkUpgrades{
+				SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+				DurangoTimestamp:   utils.PointerTo[uint64](0),
+			},
+			GenesisPrecompiles: extras.Precompiles{},
+			UpgradeConfig:      upgrades,
+		},
+	)
 	result, err := json.Marshal(config)
 	require.NoError(t, err, "json.Marshal()")
 	expectedJSON := `{
@@ -340,7 +337,7 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 	var unmarshalled ChainConfigWithUpgradesJSON
 	require.NoError(t, json.Unmarshal(result, &unmarshalled), "json.Unmarshal()")
 	want := ChainConfigWithUpgradesJSON{
-		ChainConfig:   *newConfig(upgrades),
+		ChainConfig:   *config,
 		UpgradeConfig: upgrades,
 	}
 	require.Equal(t, want, unmarshalled)

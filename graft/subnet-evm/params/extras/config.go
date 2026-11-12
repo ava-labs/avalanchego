@@ -93,6 +93,8 @@ func copyAndSet(c *ChainConfig, set func(*ChainConfig)) *ChainConfig {
 // UpgradeConfig includes the following configs that may be specified in upgradeBytes:
 // - Timestamps that enable avalanche network upgrades,
 // - Enabling or disabling precompiles as network upgrades.
+//
+// TODO(JonathanOppenheimer): Rename to Upgrades to match the "upgrades" JSON key.
 type UpgradeConfig struct {
 	// Config for timestamps that enable network upgrades.
 	NetworkUpgradeOverrides *NetworkUpgrades `json:"networkUpgradeOverrides,omitempty"`
