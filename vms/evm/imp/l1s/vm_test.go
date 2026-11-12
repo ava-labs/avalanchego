@@ -10,6 +10,7 @@ import (
 	"maps"
 	"math/big"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
@@ -35,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/vmtest"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 	"github.com/ava-labs/avalanchego/vms/evm/txgossip/txgossiptest"
@@ -55,17 +57,25 @@ var _ saetest.Peer = (*SUT)(nil)
 type SUT struct {
 	*VM
 	*vmtest.SUT
-
-	clock *saetest.Clock
 }
 
 type (
 	sutConfig struct {
-		genesis core.Genesis
-		clock   *saetest.Clock
+		genesis          core.Genesis
+		clock            *saetest.Clock
+		skipRPCTransport bool
 	}
 	sutOption = options.Option[sutConfig]
 )
+
+// withoutRPCTransport skips the SUT's real HTTP/WebSocket transport. Required
+// under testing/synctest, where real sockets never reach a durable block. The
+// resulting SUT has no [SUT.EthClient].
+func withoutRPCTransport() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.skipRPCTransport = true
+	})
+}
 
 func withMaxAllocFor(addrs ...common.Address) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -111,19 +121,20 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	appSender := saetest.NewSender(tb, set.Of(snowCtx.NodeID))
 
 	ctx := log.CancelOnError(tb.Context())
-	sut := &SUT{
-		VM:    vm,
-		clock: cfg.clock,
-	}
-	sut.SUT, err = vmtest.New(ctx, tb, vm, snowCtx, vmtest.Config{
+	vmSUT, err := vmtest.New(ctx, tb, vm, snowCtx, vmtest.Config{
 		DB:                memdb.New(),
 		Genesis:           genesisBytes,
 		Sender:            appSender,
 		State:             snow.NormalOp,
+		SkipRPCTransport:  cfg.skipRPCTransport,
 		Clock:             cfg.clock,
 		EarliestBuildTime: earliestBuildTime,
 	})
 	require.NoError(tb, err, "vmtest.New()")
+	sut := &SUT{
+		VM:  vm,
+		SUT: vmSUT,
+	}
 
 	appSender.Start(tb, sut)
 	return ctx, sut
@@ -262,24 +273,28 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 	require.ErrorIsf(t, err, blockdelay.ErrBelowMinimum, "%T.VerifyBlock() (block below the ACP-226 minimum delay)", sut.VM)
 }
 
-func TestWaitForEventWaitsForMinDelay(t *testing.T) {
-	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSignerForChainID(big.NewInt(testChainID)))
-	ctx, sut := newSUT(t, withMaxAllocFor(wallet.Addresses()...))
+// TestWaitForEventMinDelayPacing asserts that [VM.WaitForEvent] doesn't report
+// a pending tx until the preferred block's ACP-226 minimum delay has elapsed.
+func TestWaitForEventMinDelayPacing(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		// Do not build/execute blocks: this test is only synctest-teardown-safe
+		// because it runs no blocks (a block can reactivate a goleak-suppressed
+		// libevm shutdown race that deadlocks the bubble).
+		wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSignerForChainID(big.NewInt(testChainID)))
+		timeOpt, _ := withVMTime(upgrade.InitiallyActiveTime)
+		ctx, sut := newSUT(t, withMaxAllocFor(wallet.Addresses()...), timeOpt, withoutRPCTransport())
 
-	sendTx(ctx, t, sut, wallet)
-	parent := sut.BuildVerifyAccept(ctx, t)
-	require.NoErrorf(t, sut.SetPreference(ctx, parent.ID(), nil), "%T.SetPreference()", sut.VM)
-	sendTx(ctx, t, sut, wallet)
+		tx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+			To:        &common.Address{1},
+			Gas:       ethparams.TxGas,
+			GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
+		})
+		require.NoErrorf(t, sut.GethRPCBackends().SendTx(ctx, tx), "%T.SendTx()", sut.GethRPCBackends())
 
-	// The clock hasn't moved since parent was built, so the minimum delay
-	// hasn't elapsed and WaitForEvent MUST NOT report the pending tx.
-	waitCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
-	defer cancel()
-	_, err := sut.VM.WaitForEvent(waitCtx)
-	require.ErrorIsf(t, err, context.DeadlineExceeded, "%T.WaitForEvent() before the minimum delay", sut.VM)
-
-	sut.clock.Set(earliestBuildTime(parent))
-	got, err := sut.VM.WaitForEvent(ctx)
-	require.NoErrorf(t, err, "%T.WaitForEvent() after the minimum delay", sut.VM)
-	require.Equalf(t, snowcommon.PendingTxs, got, "%T.WaitForEvent() after the minimum delay", sut.VM)
+		start := time.Now()
+		got, err := sut.VM.WaitForEvent(ctx)
+		require.NoErrorf(t, err, "%T.WaitForEvent()", sut.VM)
+		require.Equalf(t, snowcommon.PendingTxs, got, "%T.WaitForEvent()", sut.VM)
+		require.Equalf(t, dynamic.InitialDelayExponent.DelayDuration(), time.Since(start), "%T.WaitForEvent() blocking duration", sut.VM)
+	})
 }
