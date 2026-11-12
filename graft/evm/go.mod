@@ -102,3 +102,5 @@ require (
 )
 
 replace github.com/ava-labs/avalanchego => ../../
+
+replace github.com/ava-labs/firewood-go/ffi => ../../../firewood/ffi

@@ -15,8 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/sync/types"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/peertracker"
-
-	merklesync "github.com/ava-labs/avalanchego/database/merkle/sync"
 )
 
 var (
@@ -25,7 +23,7 @@ var (
 )
 
 type FirewoodSyncer struct {
-	s         *merklesync.Syncer[*syncer.RangeProof, struct{}]
+	s         *syncer.Syncer
 	cancel    context.CancelFunc
 	codeQueue *code.Queue
 	// finalizeOnce is initialized in the constructor to make Finalize idempotent.
