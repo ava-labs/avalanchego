@@ -7,6 +7,7 @@ package saeconfig
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"slices"
@@ -28,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 	"github.com/ava-labs/avalanchego/vms/evm/statesync"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 // Duration is a [time.Duration] that JSON-unmarshals from a duration string
@@ -258,6 +260,22 @@ func (c Config) StateSyncConfig(networkID uint32) statesync.Config {
 		DBConfig: saeCfg.DBConfig,
 		Enabled:  c.StateSyncEnabled,
 	}
+}
+
+var errParsingWarpMessage = errors.New("parsing warp message")
+
+// WarpMessages parses and returns the messages encoded in
+// [Config.WarpOffChainMessages].
+func (c Config) WarpMessages() ([]*warp.UnsignedMessage, error) {
+	msgs := make([]*warp.UnsignedMessage, len(c.WarpOffChainMessages))
+	for i, bytes := range c.WarpOffChainMessages {
+		msg, err := warp.ParseUnsignedMessage(bytes)
+		if err != nil {
+			return nil, fmt.Errorf("%w: at index %d: %w", errParsingWarpMessage, i, err)
+		}
+		msgs[i] = msg
+	}
+	return msgs, nil
 }
 
 // NetworkOptions returns the [network.Option]s that c configures.

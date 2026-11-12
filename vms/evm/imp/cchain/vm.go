@@ -111,7 +111,7 @@ func (vm *VM) Initialize(
 		zap.Reflect("config", userConfig),
 	)
 
-	warpMessages, err := saewarp.ParseOffChainMessages(userConfig.WarpOffChainMessages)
+	warpMessages, err := userConfig.WarpMessages()
 	if err != nil {
 		return fmt.Errorf("parsing warp messages: %w", err)
 	}

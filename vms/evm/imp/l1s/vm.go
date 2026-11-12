@@ -129,7 +129,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("setting up genesis trie: %w", err)
 	}
 
-	warpMessages, err := saewarp.ParseOffChainMessages(userConfig.WarpOffChainMessages)
+	warpMessages, err := userConfig.WarpMessages()
 	if err != nil {
 		return err
 	}
