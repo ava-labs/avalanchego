@@ -46,6 +46,9 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 		NewFinalizationMessage(qcBytes),
 		simplexReplicationRequest,
 		NewReplicationResponseMessage(qcBytes),
+		simplexBlockDigestRequest,
+		simplexAuxiliaryInfo,
+		simplexEpochTransitionApproval,
 	}
 
 	for _, msg := range allSimplexMessages {
@@ -356,13 +359,13 @@ func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
 		},
 		// --- ReplicationResponse ---
 		{
-			name: "ReplicationResponse with nil latest_round",
+			name: "ReplicationResponse with nil latest_round and latest_seq (allowed)",
 			msg: &p2p.Simplex{
 				Message: &p2p.Simplex_ReplicationResponse{
 					ReplicationResponse: &p2p.ReplicationResponse{},
 				},
 			},
-			expectedErr: errNilField,
+			expectedErr: nil,
 		},
 		// --- Edge case: invalid digest ---
 		{
@@ -397,6 +400,142 @@ func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
 				},
 			},
 			expectedErr: errInvalidSigner,
+		},
+		// --- ReplicationResponse fields ---
+		{
+			name: "ReplicationResponse with nil data entry",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_ReplicationResponse{
+					ReplicationResponse: &p2p.ReplicationResponse{
+						Data: []*p2p.QuorumRound{nil},
+					},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		{
+			name: "ReplicationResponse with malformed latest_round",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_ReplicationResponse{
+					ReplicationResponse: &p2p.ReplicationResponse{
+						LatestRound: &p2p.QuorumRound{
+							Notarization: &p2p.QuorumCertificate{},
+						},
+					},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		{
+			name: "ReplicationResponse with malformed latest_seq",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_ReplicationResponse{
+					ReplicationResponse: &p2p.ReplicationResponse{
+						LatestSeq: &p2p.QuorumRound{
+							Finalization: &p2p.QuorumCertificate{},
+						},
+					},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		{
+			name: "ReplicationResponse with latest_seq invalid digest",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_ReplicationResponse{
+					ReplicationResponse: &p2p.ReplicationResponse{
+						LatestSeq: &p2p.QuorumRound{
+							Finalization: &p2p.QuorumCertificate{
+								BlockHeader: &p2p.BlockHeader{
+									Metadata: p2pProtocolMetadata,
+									Digest:   []byte{1, 2, 3},
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedErr: errInvalidDigestLength,
+		},
+		// --- BlockDigestRequest ---
+		{
+			name: "BlockDigestRequest with missing digest",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_BlockDigestRequest{
+					BlockDigestRequest: &p2p.BlockDigestRequest{Seq: 1},
+				},
+			},
+			expectedErr: errInvalidDigestLength,
+		},
+		{
+			name: "BlockDigestRequest with invalid digest length",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_BlockDigestRequest{
+					BlockDigestRequest: &p2p.BlockDigestRequest{
+						Seq:    1,
+						Digest: digest[:31],
+					},
+				},
+			},
+			expectedErr: errInvalidDigestLength,
+		},
+		// --- AuxiliaryInfo ---
+		{
+			name: "AuxiliaryInfo with no data (allowed)",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_AuxiliaryInfo{
+					AuxiliaryInfo: &p2p.AuxiliaryInfo{},
+				},
+			},
+			expectedErr: nil,
+		},
+		// --- EpochTransitionApproval ---
+		{
+			name: "EpochTransitionApproval with missing node ID",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_EpochTransitionApproval{
+					EpochTransitionApproval: &p2p.ValidatorSetApproval{
+						AuxInfoDigest: digest[:],
+					},
+				},
+			},
+			expectedErr: errInvalidSigner,
+		},
+		{
+			name: "EpochTransitionApproval with invalid node ID",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_EpochTransitionApproval{
+					EpochTransitionApproval: &p2p.ValidatorSetApproval{
+						NodeId:        []byte{1, 2, 3},
+						AuxInfoDigest: digest[:],
+					},
+				},
+			},
+			expectedErr: errInvalidSigner,
+		},
+		{
+			name: "EpochTransitionApproval with invalid aux info digest",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_EpochTransitionApproval{
+					EpochTransitionApproval: &p2p.ValidatorSetApproval{
+						NodeId:        signer,
+						AuxInfoDigest: []byte{1, 2, 3},
+					},
+				},
+			},
+			expectedErr: errInvalidDigestLength,
+		},
+		{
+			name: "EpochTransitionApproval with no signature (allowed)",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_EpochTransitionApproval{
+					EpochTransitionApproval: &p2p.ValidatorSetApproval{
+						NodeId:        signer,
+						AuxInfoDigest: digest[:],
+					},
+				},
+			},
+			expectedErr: nil,
 		},
 	}
 
@@ -510,8 +649,46 @@ var (
 		ChainId: []byte("chain-1"),
 		Message: &p2p.Simplex_ReplicationRequest{
 			ReplicationRequest: &p2p.ReplicationRequest{
-				Seqs:        []uint64{1, 2, 3},
-				LatestRound: 42,
+				Seqs:               []uint64{1, 2, 3},
+				LatestRound:        42,
+				Rounds:             []uint64{4, 5},
+				LatestFinalizedSeq: 3,
+			},
+		},
+	}
+
+	// BlockDigestRequest
+	simplexBlockDigestRequest = &p2p.Simplex{
+		ChainId: []byte("chain-1"),
+		Message: &p2p.Simplex_BlockDigestRequest{
+			BlockDigestRequest: &p2p.BlockDigestRequest{
+				Seq:    1,
+				Digest: digest[:],
+			},
+		},
+	}
+
+	// AuxiliaryInfo
+	simplexAuxiliaryInfo = &p2p.Simplex{
+		ChainId: []byte("chain-1"),
+		Message: &p2p.Simplex_AuxiliaryInfo{
+			AuxiliaryInfo: &p2p.AuxiliaryInfo{
+				Epoch:   1,
+				Version: 1,
+				Data:    []byte("aux-info"),
+			},
+		},
+	}
+
+	// EpochTransitionApproval
+	simplexEpochTransitionApproval = &p2p.Simplex{
+		ChainId: []byte("chain-1"),
+		Message: &p2p.Simplex_EpochTransitionApproval{
+			EpochTransitionApproval: &p2p.ValidatorSetApproval{
+				NodeId:        signer,
+				AuxInfoDigest: digest[:],
+				PChainHeight:  1,
+				Signature:     []byte("approval-sig"),
 			},
 		},
 	}
