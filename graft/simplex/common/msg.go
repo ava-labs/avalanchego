@@ -75,12 +75,16 @@ func (m *Message) Epoch() (uint64, bool) {
 }
 
 type EmptyVoteMetadata struct {
-	Round uint64
-	Epoch uint64
+	Round uint64 `canoto:"uint,1"`
+	Epoch uint64 `canoto:"uint,2"`
+
+	canotoData canotoData_EmptyVoteMetadata
 }
 
 type ToBeSignedEmptyVote struct {
-	EmptyVoteMetadata
+	EmptyVoteMetadata `canoto:"value,1"`
+
+	canotoData canotoData_ToBeSignedEmptyVote
 }
 
 const emptyVoteLen = 1 + 8 + 8 // Version + Epoch + Round
@@ -126,7 +130,9 @@ func (v *ToBeSignedEmptyVote) Verify(signature SignatureBytes, verifier Signatur
 }
 
 type ToBeSignedVote struct {
-	BlockHeader
+	BlockHeader `canoto:"value,1"`
+
+	canotoData canotoData_ToBeSignedVote
 }
 
 func (v *ToBeSignedVote) Sign(signer Signer) (SignatureBytes, error) {
@@ -144,7 +150,9 @@ func (v *ToBeSignedVote) Verify(signature SignatureBytes, verifier SignatureVeri
 }
 
 type ToBeSignedFinalization struct {
-	BlockHeader
+	BlockHeader `canoto:"value,1"`
+
+	canotoData canotoData_ToBeSignedFinalization
 }
 
 func (f *ToBeSignedFinalization) Sign(signer Signer) (SignatureBytes, error) {
@@ -191,8 +199,10 @@ func verifyContextQC(qc QuorumCertificate, msg []byte, context string, nodes Nod
 
 // Vote represents a signed vote for a block.
 type Vote struct {
-	Vote      ToBeSignedVote
-	Signature Signature
+	Vote      ToBeSignedVote `canoto:"value,1"`
+	Signature Signature      `canoto:"value,2"`
+
+	canotoData canotoData_Vote
 }
 
 func (v *Vote) Signer() NodeID {
@@ -201,8 +211,10 @@ func (v *Vote) Signer() NodeID {
 
 // EmptyVote represents a signed vote for an empty block.
 type EmptyVote struct {
-	Vote      ToBeSignedEmptyVote
-	Signature Signature
+	Vote      ToBeSignedEmptyVote `canoto:"value,1"`
+	Signature Signature           `canoto:"value,2"`
+
+	canotoData canotoData_EmptyVote
 }
 
 func (v *EmptyVote) Signer() NodeID {
@@ -211,8 +223,10 @@ func (v *EmptyVote) Signer() NodeID {
 
 // FinalizeVote represents a vote to finalize a block.
 type FinalizeVote struct {
-	Finalization ToBeSignedFinalization
-	Signature    Signature
+	Finalization ToBeSignedFinalization `canoto:"value,1"`
+	Signature    Signature              `canoto:"value,2"`
+
+	canotoData canotoData_FinalizeVote
 }
 
 func (v *FinalizeVote) Signer() NodeID {
@@ -298,10 +312,12 @@ type QuorumCertificate interface {
 }
 
 type ReplicationRequest struct {
-	Seqs               []uint64 // sequences we are requesting
-	Rounds             []uint64 // rounds we are requesting
-	LatestRound        uint64   // latest round that we are aware of
-	LatestFinalizedSeq uint64   // latest finalized sequence that we are aware of
+	Seqs               []uint64 `canoto:"repeated uint,1"` // sequences we are requesting
+	Rounds             []uint64 `canoto:"repeated uint,2"` // rounds we are requesting
+	LatestRound        uint64   `canoto:"uint,3"`          // latest round that we are aware of
+	LatestFinalizedSeq uint64   `canoto:"uint,4"`          // latest finalized sequence that we are aware of
+
+	canotoData canotoData_ReplicationRequest
 }
 
 type ReplicationResponse struct {
@@ -496,8 +512,10 @@ type VerifiedFinalizedBlock struct {
 }
 
 type BlockDigestRequest struct {
-	Seq    uint64
-	Digest Digest
+	Seq    uint64 `canoto:"uint,1"`
+	Digest Digest `canoto:"fixed bytes,2"`
+
+	canotoData canotoData_BlockDigestRequest
 }
 
 // VersionID is an identifier for applications that care about epoch changes.
@@ -533,8 +551,10 @@ func (ai *AuxiliaryInfo) Clone() AuxiliaryInfo {
 
 // ValidatorSetApproval is an approval from a validator
 type ValidatorSetApproval struct {
-	NodeID        avalanchego.NodeID
-	AuxInfoDigest Digest
-	PChainHeight  uint64
-	Signature     SignatureBytes
+	NodeID        avalanchego.NodeID `canoto:"fixed bytes,1"`
+	AuxInfoDigest Digest             `canoto:"fixed bytes,2"`
+	PChainHeight  uint64             `canoto:"uint,3"`
+	Signature     SignatureBytes     `canoto:"bytes,4"`
+
+	canotoData canotoData_ValidatorSetApproval
 }

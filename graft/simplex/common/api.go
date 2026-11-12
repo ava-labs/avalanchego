@@ -152,12 +152,16 @@ type BlockDeserializer interface {
 	DeserializeBlock(ctx context.Context, bytes []byte) (Block, error)
 }
 
+//go:generate go run github.com/StephenButtolph/canoto/canoto api.go
+
 // Signature encodes a signature and the node that signed it, without the message it was signed on.
 type Signature struct {
 	// Signer is the NodeID of the creator of the signature.
-	Signer NodeID
+	Signer NodeID `canoto:"bytes,1"`
 	// Value is the byte representation of the signature.
-	Value SignatureBytes
+	Value SignatureBytes `canoto:"bytes,2"`
+
+	canotoData canotoData_Signature
 }
 
 // QCDeserializer deserializes QuorumCertificates according to formatting

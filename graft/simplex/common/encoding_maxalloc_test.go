@@ -111,7 +111,7 @@ func TestBlockRecordRoundAndEpochErrors(t *testing.T) {
 }
 
 func TestNotarizationQuorumRecordRoundAndEpochErrors(t *testing.T) {
-	vote := ToBeSignedVote{BlockHeader{ProtocolMetadata: ProtocolMetadata{Version: 1, Round: 99, Seq: 2, Epoch: 3}}}
+	vote := ToBeSignedVote{BlockHeader: BlockHeader{ProtocolMetadata: ProtocolMetadata{Version: 1, Round: 99, Seq: 2, Epoch: 3}}}
 	valid := NewQuorumRecord([]byte{1, 2, 3}, vote.Bytes(), NotarizationRecordType)
 
 	for _, tc := range []struct {

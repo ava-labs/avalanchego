@@ -23,6 +23,1799 @@ const (
 var _ = io.ErrUnexpectedEOF
 
 const (
+	canotoNumber_EmptyVoteMetadata__Round = 1
+	canotoNumber_EmptyVoteMetadata__Epoch = 2
+
+	canotoTag_EmptyVoteMetadata__Round = "\x08" // canoto.Tag(canotoNumber_EmptyVoteMetadata__Round, canoto.Varint)
+	canotoTag_EmptyVoteMetadata__Epoch = "\x10" // canoto.Tag(canotoNumber_EmptyVoteMetadata__Epoch, canoto.Varint)
+)
+
+type canotoData_EmptyVoteMetadata struct {
+	size uint64
+}
+
+// CanotoSpec returns the specification of this canoto message.
+func (*EmptyVoteMetadata) CanotoSpec(...reflect.Type) *canoto.Spec {
+	var zero EmptyVoteMetadata
+	s := &canoto.Spec{
+		Name: "EmptyVoteMetadata",
+		Fields: []canoto.FieldType{
+			{
+				FieldNumber: canotoNumber_EmptyVoteMetadata__Round,
+				Name:        "Round",
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(zero.Round),
+			},
+			{
+				FieldNumber: canotoNumber_EmptyVoteMetadata__Epoch,
+				Name:        "Epoch",
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(zero.Epoch),
+			},
+		},
+	}
+	s.CalculateCanotoCache()
+	return s
+}
+
+// UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
+//
+// During parsing, the canoto cache is saved.
+func (c *EmptyVoteMetadata) UnmarshalCanoto(bytes []byte) error {
+	r := canoto.Reader{
+		B: bytes,
+	}
+	return c.UnmarshalCanotoFrom(r)
+}
+
+// UnmarshalCanotoFrom populates the struct from a [canoto.Reader]. Most users
+// should just use UnmarshalCanoto.
+//
+// During parsing, the canoto cache is saved.
+//
+// This function enables configuration of reader options.
+func (c *EmptyVoteMetadata) UnmarshalCanotoFrom(r canoto.Reader) error {
+	// Zero the struct before unmarshaling.
+	*c = EmptyVoteMetadata{}
+	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
+
+	var minField uint32
+	for canoto.HasNext(&r) {
+		field, wireType, err := canoto.ReadTag(&r)
+		if err != nil {
+			return err
+		}
+		if field < minField {
+			return canoto.ErrInvalidFieldOrder
+		}
+
+		switch field {
+		case canotoNumber_EmptyVoteMetadata__Round:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadUint(&r, &c.Round); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.Round) {
+				return canoto.ErrZeroValue
+			}
+		case canotoNumber_EmptyVoteMetadata__Epoch:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadUint(&r, &c.Epoch); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.Epoch) {
+				return canoto.ErrZeroValue
+			}
+		default:
+			return canoto.ErrUnknownField
+		}
+
+		minField = field + 1
+	}
+	return nil
+}
+
+// ValidCanoto validates that the struct can be correctly marshaled into the
+// Canoto format.
+//
+// Specifically, ValidCanoto ensures:
+// 1. All OneOfs are specified at most once.
+// 2. All strings are valid utf-8.
+// 3. All custom fields are ValidCanoto.
+func (c *EmptyVoteMetadata) ValidCanoto() bool {
+	return true
+}
+
+// CalculateCanotoCache populates size and OneOf caches based on the current
+// values in the struct.
+//
+// It is not safe to copy this struct concurrently.
+func (c *EmptyVoteMetadata) CalculateCanotoCache() {
+	var size uint64
+	if !canoto.IsZero(c.Round) {
+		size += uint64(len(canotoTag_EmptyVoteMetadata__Round)) + canoto.SizeUint(c.Round)
+	}
+	if !canoto.IsZero(c.Epoch) {
+		size += uint64(len(canotoTag_EmptyVoteMetadata__Epoch)) + canoto.SizeUint(c.Epoch)
+	}
+	atomic.StoreUint64(&c.canotoData.size, size)
+}
+
+// CachedCanotoSize returns the previously calculated size of the Canoto
+// representation from CalculateCanotoCache.
+//
+// If CalculateCanotoCache has not yet been called, it will return 0.
+//
+// If the struct has been modified since the last call to CalculateCanotoCache,
+// the returned size may be incorrect.
+func (c *EmptyVoteMetadata) CachedCanotoSize() uint64 {
+	return atomic.LoadUint64(&c.canotoData.size)
+}
+
+// MarshalCanoto returns the Canoto representation of this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *EmptyVoteMetadata) MarshalCanoto() []byte {
+	c.CalculateCanotoCache()
+	w := canoto.Writer{
+		B: make([]byte, 0, c.CachedCanotoSize()),
+	}
+	w = c.MarshalCanotoInto(w)
+	return w.B
+}
+
+// MarshalCanotoInto writes the struct into a [canoto.Writer] and returns the
+// resulting [canoto.Writer]. Most users should just use MarshalCanoto.
+//
+// It is assumed that CalculateCanotoCache has been called since the last
+// modification to this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *EmptyVoteMetadata) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
+	if !canoto.IsZero(c.Round) {
+		canoto.Append(&w, canotoTag_EmptyVoteMetadata__Round)
+		canoto.AppendUint(&w, c.Round)
+	}
+	if !canoto.IsZero(c.Epoch) {
+		canoto.Append(&w, canotoTag_EmptyVoteMetadata__Epoch)
+		canoto.AppendUint(&w, c.Epoch)
+	}
+	return w
+}
+
+const (
+	canotoNumber_ToBeSignedEmptyVote__EmptyVoteMetadata = 1
+
+	canotoTag_ToBeSignedEmptyVote__EmptyVoteMetadata = "\x0a" // canoto.Tag(canotoNumber_ToBeSignedEmptyVote__EmptyVoteMetadata, canoto.Len)
+)
+
+type canotoData_ToBeSignedEmptyVote struct {
+	size uint64
+}
+
+// CanotoSpec returns the specification of this canoto message.
+func (*ToBeSignedEmptyVote) CanotoSpec(types ...reflect.Type) *canoto.Spec {
+	types = append(types, reflect.TypeFor[ToBeSignedEmptyVote]())
+	var zero ToBeSignedEmptyVote
+	s := &canoto.Spec{
+		Name: "ToBeSignedEmptyVote",
+		Fields: []canoto.FieldType{
+			canoto.FieldTypeFromField(
+				/*type inference:*/ (&zero.EmptyVoteMetadata),
+				/*FieldNumber:   */ canotoNumber_ToBeSignedEmptyVote__EmptyVoteMetadata,
+				/*Name:          */ "EmptyVoteMetadata",
+				/*FixedLength:   */ 0,
+				/*Repeated:      */ false,
+				/*OneOf:         */ "",
+				/*Pointer:       */ false,
+				/*types:         */ types,
+			),
+		},
+	}
+	s.CalculateCanotoCache()
+	return s
+}
+
+// UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
+//
+// During parsing, the canoto cache is saved.
+func (c *ToBeSignedEmptyVote) UnmarshalCanoto(bytes []byte) error {
+	r := canoto.Reader{
+		B: bytes,
+	}
+	return c.UnmarshalCanotoFrom(r)
+}
+
+// UnmarshalCanotoFrom populates the struct from a [canoto.Reader]. Most users
+// should just use UnmarshalCanoto.
+//
+// During parsing, the canoto cache is saved.
+//
+// This function enables configuration of reader options.
+func (c *ToBeSignedEmptyVote) UnmarshalCanotoFrom(r canoto.Reader) error {
+	// Zero the struct before unmarshaling.
+	*c = ToBeSignedEmptyVote{}
+	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
+
+	var minField uint32
+	for canoto.HasNext(&r) {
+		field, wireType, err := canoto.ReadTag(&r)
+		if err != nil {
+			return err
+		}
+		if field < minField {
+			return canoto.ErrInvalidFieldOrder
+		}
+
+		switch field {
+		case canotoNumber_ToBeSignedEmptyVote__EmptyVoteMetadata:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			// Read the bytes for the field.
+			originalUnsafe := r.Unsafe
+			r.Unsafe = true
+			var msgBytes []byte
+			if err := canoto.ReadBytes(&r, &msgBytes); err != nil {
+				return err
+			}
+			if len(msgBytes) == 0 {
+				return canoto.ErrZeroValue
+			}
+			r.Unsafe = originalUnsafe
+
+			// Unmarshal the field from the bytes.
+			remainingBytes := r.B
+			r.B = msgBytes
+			if err := (&c.EmptyVoteMetadata).UnmarshalCanotoFrom(r); err != nil {
+				return err
+			}
+			r.B = remainingBytes
+		default:
+			return canoto.ErrUnknownField
+		}
+
+		minField = field + 1
+	}
+	return nil
+}
+
+// ValidCanoto validates that the struct can be correctly marshaled into the
+// Canoto format.
+//
+// Specifically, ValidCanoto ensures:
+// 1. All OneOfs are specified at most once.
+// 2. All strings are valid utf-8.
+// 3. All custom fields are ValidCanoto.
+func (c *ToBeSignedEmptyVote) ValidCanoto() bool {
+	if !(&c.EmptyVoteMetadata).ValidCanoto() {
+		return false
+	}
+	return true
+}
+
+// CalculateCanotoCache populates size and OneOf caches based on the current
+// values in the struct.
+//
+// It is not safe to copy this struct concurrently.
+func (c *ToBeSignedEmptyVote) CalculateCanotoCache() {
+	var size uint64
+	(&c.EmptyVoteMetadata).CalculateCanotoCache()
+	if fieldSize := (&c.EmptyVoteMetadata).CachedCanotoSize(); fieldSize != 0 {
+		size += uint64(len(canotoTag_ToBeSignedEmptyVote__EmptyVoteMetadata)) + canoto.SizeUint(fieldSize) + fieldSize
+	}
+	atomic.StoreUint64(&c.canotoData.size, size)
+}
+
+// CachedCanotoSize returns the previously calculated size of the Canoto
+// representation from CalculateCanotoCache.
+//
+// If CalculateCanotoCache has not yet been called, it will return 0.
+//
+// If the struct has been modified since the last call to CalculateCanotoCache,
+// the returned size may be incorrect.
+func (c *ToBeSignedEmptyVote) CachedCanotoSize() uint64 {
+	return atomic.LoadUint64(&c.canotoData.size)
+}
+
+// MarshalCanoto returns the Canoto representation of this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *ToBeSignedEmptyVote) MarshalCanoto() []byte {
+	c.CalculateCanotoCache()
+	w := canoto.Writer{
+		B: make([]byte, 0, c.CachedCanotoSize()),
+	}
+	w = c.MarshalCanotoInto(w)
+	return w.B
+}
+
+// MarshalCanotoInto writes the struct into a [canoto.Writer] and returns the
+// resulting [canoto.Writer]. Most users should just use MarshalCanoto.
+//
+// It is assumed that CalculateCanotoCache has been called since the last
+// modification to this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *ToBeSignedEmptyVote) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
+	if fieldSize := (&c.EmptyVoteMetadata).CachedCanotoSize(); fieldSize != 0 {
+		canoto.Append(&w, canotoTag_ToBeSignedEmptyVote__EmptyVoteMetadata)
+		canoto.AppendUint(&w, fieldSize)
+		w = (&c.EmptyVoteMetadata).MarshalCanotoInto(w)
+	}
+	return w
+}
+
+const (
+	canotoNumber_ToBeSignedVote__BlockHeader = 1
+
+	canotoTag_ToBeSignedVote__BlockHeader = "\x0a" // canoto.Tag(canotoNumber_ToBeSignedVote__BlockHeader, canoto.Len)
+)
+
+type canotoData_ToBeSignedVote struct {
+	size uint64
+}
+
+// CanotoSpec returns the specification of this canoto message.
+func (*ToBeSignedVote) CanotoSpec(types ...reflect.Type) *canoto.Spec {
+	types = append(types, reflect.TypeFor[ToBeSignedVote]())
+	var zero ToBeSignedVote
+	s := &canoto.Spec{
+		Name: "ToBeSignedVote",
+		Fields: []canoto.FieldType{
+			canoto.FieldTypeFromField(
+				/*type inference:*/ (&zero.BlockHeader),
+				/*FieldNumber:   */ canotoNumber_ToBeSignedVote__BlockHeader,
+				/*Name:          */ "BlockHeader",
+				/*FixedLength:   */ 0,
+				/*Repeated:      */ false,
+				/*OneOf:         */ "",
+				/*Pointer:       */ false,
+				/*types:         */ types,
+			),
+		},
+	}
+	s.CalculateCanotoCache()
+	return s
+}
+
+// UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
+//
+// During parsing, the canoto cache is saved.
+func (c *ToBeSignedVote) UnmarshalCanoto(bytes []byte) error {
+	r := canoto.Reader{
+		B: bytes,
+	}
+	return c.UnmarshalCanotoFrom(r)
+}
+
+// UnmarshalCanotoFrom populates the struct from a [canoto.Reader]. Most users
+// should just use UnmarshalCanoto.
+//
+// During parsing, the canoto cache is saved.
+//
+// This function enables configuration of reader options.
+func (c *ToBeSignedVote) UnmarshalCanotoFrom(r canoto.Reader) error {
+	// Zero the struct before unmarshaling.
+	*c = ToBeSignedVote{}
+	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
+
+	var minField uint32
+	for canoto.HasNext(&r) {
+		field, wireType, err := canoto.ReadTag(&r)
+		if err != nil {
+			return err
+		}
+		if field < minField {
+			return canoto.ErrInvalidFieldOrder
+		}
+
+		switch field {
+		case canotoNumber_ToBeSignedVote__BlockHeader:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			// Read the bytes for the field.
+			originalUnsafe := r.Unsafe
+			r.Unsafe = true
+			var msgBytes []byte
+			if err := canoto.ReadBytes(&r, &msgBytes); err != nil {
+				return err
+			}
+			if len(msgBytes) == 0 {
+				return canoto.ErrZeroValue
+			}
+			r.Unsafe = originalUnsafe
+
+			// Unmarshal the field from the bytes.
+			remainingBytes := r.B
+			r.B = msgBytes
+			if err := (&c.BlockHeader).UnmarshalCanotoFrom(r); err != nil {
+				return err
+			}
+			r.B = remainingBytes
+		default:
+			return canoto.ErrUnknownField
+		}
+
+		minField = field + 1
+	}
+	return nil
+}
+
+// ValidCanoto validates that the struct can be correctly marshaled into the
+// Canoto format.
+//
+// Specifically, ValidCanoto ensures:
+// 1. All OneOfs are specified at most once.
+// 2. All strings are valid utf-8.
+// 3. All custom fields are ValidCanoto.
+func (c *ToBeSignedVote) ValidCanoto() bool {
+	if !(&c.BlockHeader).ValidCanoto() {
+		return false
+	}
+	return true
+}
+
+// CalculateCanotoCache populates size and OneOf caches based on the current
+// values in the struct.
+//
+// It is not safe to copy this struct concurrently.
+func (c *ToBeSignedVote) CalculateCanotoCache() {
+	var size uint64
+	(&c.BlockHeader).CalculateCanotoCache()
+	if fieldSize := (&c.BlockHeader).CachedCanotoSize(); fieldSize != 0 {
+		size += uint64(len(canotoTag_ToBeSignedVote__BlockHeader)) + canoto.SizeUint(fieldSize) + fieldSize
+	}
+	atomic.StoreUint64(&c.canotoData.size, size)
+}
+
+// CachedCanotoSize returns the previously calculated size of the Canoto
+// representation from CalculateCanotoCache.
+//
+// If CalculateCanotoCache has not yet been called, it will return 0.
+//
+// If the struct has been modified since the last call to CalculateCanotoCache,
+// the returned size may be incorrect.
+func (c *ToBeSignedVote) CachedCanotoSize() uint64 {
+	return atomic.LoadUint64(&c.canotoData.size)
+}
+
+// MarshalCanoto returns the Canoto representation of this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *ToBeSignedVote) MarshalCanoto() []byte {
+	c.CalculateCanotoCache()
+	w := canoto.Writer{
+		B: make([]byte, 0, c.CachedCanotoSize()),
+	}
+	w = c.MarshalCanotoInto(w)
+	return w.B
+}
+
+// MarshalCanotoInto writes the struct into a [canoto.Writer] and returns the
+// resulting [canoto.Writer]. Most users should just use MarshalCanoto.
+//
+// It is assumed that CalculateCanotoCache has been called since the last
+// modification to this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *ToBeSignedVote) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
+	if fieldSize := (&c.BlockHeader).CachedCanotoSize(); fieldSize != 0 {
+		canoto.Append(&w, canotoTag_ToBeSignedVote__BlockHeader)
+		canoto.AppendUint(&w, fieldSize)
+		w = (&c.BlockHeader).MarshalCanotoInto(w)
+	}
+	return w
+}
+
+const (
+	canotoNumber_ToBeSignedFinalization__BlockHeader = 1
+
+	canotoTag_ToBeSignedFinalization__BlockHeader = "\x0a" // canoto.Tag(canotoNumber_ToBeSignedFinalization__BlockHeader, canoto.Len)
+)
+
+type canotoData_ToBeSignedFinalization struct {
+	size uint64
+}
+
+// CanotoSpec returns the specification of this canoto message.
+func (*ToBeSignedFinalization) CanotoSpec(types ...reflect.Type) *canoto.Spec {
+	types = append(types, reflect.TypeFor[ToBeSignedFinalization]())
+	var zero ToBeSignedFinalization
+	s := &canoto.Spec{
+		Name: "ToBeSignedFinalization",
+		Fields: []canoto.FieldType{
+			canoto.FieldTypeFromField(
+				/*type inference:*/ (&zero.BlockHeader),
+				/*FieldNumber:   */ canotoNumber_ToBeSignedFinalization__BlockHeader,
+				/*Name:          */ "BlockHeader",
+				/*FixedLength:   */ 0,
+				/*Repeated:      */ false,
+				/*OneOf:         */ "",
+				/*Pointer:       */ false,
+				/*types:         */ types,
+			),
+		},
+	}
+	s.CalculateCanotoCache()
+	return s
+}
+
+// UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
+//
+// During parsing, the canoto cache is saved.
+func (c *ToBeSignedFinalization) UnmarshalCanoto(bytes []byte) error {
+	r := canoto.Reader{
+		B: bytes,
+	}
+	return c.UnmarshalCanotoFrom(r)
+}
+
+// UnmarshalCanotoFrom populates the struct from a [canoto.Reader]. Most users
+// should just use UnmarshalCanoto.
+//
+// During parsing, the canoto cache is saved.
+//
+// This function enables configuration of reader options.
+func (c *ToBeSignedFinalization) UnmarshalCanotoFrom(r canoto.Reader) error {
+	// Zero the struct before unmarshaling.
+	*c = ToBeSignedFinalization{}
+	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
+
+	var minField uint32
+	for canoto.HasNext(&r) {
+		field, wireType, err := canoto.ReadTag(&r)
+		if err != nil {
+			return err
+		}
+		if field < minField {
+			return canoto.ErrInvalidFieldOrder
+		}
+
+		switch field {
+		case canotoNumber_ToBeSignedFinalization__BlockHeader:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			// Read the bytes for the field.
+			originalUnsafe := r.Unsafe
+			r.Unsafe = true
+			var msgBytes []byte
+			if err := canoto.ReadBytes(&r, &msgBytes); err != nil {
+				return err
+			}
+			if len(msgBytes) == 0 {
+				return canoto.ErrZeroValue
+			}
+			r.Unsafe = originalUnsafe
+
+			// Unmarshal the field from the bytes.
+			remainingBytes := r.B
+			r.B = msgBytes
+			if err := (&c.BlockHeader).UnmarshalCanotoFrom(r); err != nil {
+				return err
+			}
+			r.B = remainingBytes
+		default:
+			return canoto.ErrUnknownField
+		}
+
+		minField = field + 1
+	}
+	return nil
+}
+
+// ValidCanoto validates that the struct can be correctly marshaled into the
+// Canoto format.
+//
+// Specifically, ValidCanoto ensures:
+// 1. All OneOfs are specified at most once.
+// 2. All strings are valid utf-8.
+// 3. All custom fields are ValidCanoto.
+func (c *ToBeSignedFinalization) ValidCanoto() bool {
+	if !(&c.BlockHeader).ValidCanoto() {
+		return false
+	}
+	return true
+}
+
+// CalculateCanotoCache populates size and OneOf caches based on the current
+// values in the struct.
+//
+// It is not safe to copy this struct concurrently.
+func (c *ToBeSignedFinalization) CalculateCanotoCache() {
+	var size uint64
+	(&c.BlockHeader).CalculateCanotoCache()
+	if fieldSize := (&c.BlockHeader).CachedCanotoSize(); fieldSize != 0 {
+		size += uint64(len(canotoTag_ToBeSignedFinalization__BlockHeader)) + canoto.SizeUint(fieldSize) + fieldSize
+	}
+	atomic.StoreUint64(&c.canotoData.size, size)
+}
+
+// CachedCanotoSize returns the previously calculated size of the Canoto
+// representation from CalculateCanotoCache.
+//
+// If CalculateCanotoCache has not yet been called, it will return 0.
+//
+// If the struct has been modified since the last call to CalculateCanotoCache,
+// the returned size may be incorrect.
+func (c *ToBeSignedFinalization) CachedCanotoSize() uint64 {
+	return atomic.LoadUint64(&c.canotoData.size)
+}
+
+// MarshalCanoto returns the Canoto representation of this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *ToBeSignedFinalization) MarshalCanoto() []byte {
+	c.CalculateCanotoCache()
+	w := canoto.Writer{
+		B: make([]byte, 0, c.CachedCanotoSize()),
+	}
+	w = c.MarshalCanotoInto(w)
+	return w.B
+}
+
+// MarshalCanotoInto writes the struct into a [canoto.Writer] and returns the
+// resulting [canoto.Writer]. Most users should just use MarshalCanoto.
+//
+// It is assumed that CalculateCanotoCache has been called since the last
+// modification to this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *ToBeSignedFinalization) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
+	if fieldSize := (&c.BlockHeader).CachedCanotoSize(); fieldSize != 0 {
+		canoto.Append(&w, canotoTag_ToBeSignedFinalization__BlockHeader)
+		canoto.AppendUint(&w, fieldSize)
+		w = (&c.BlockHeader).MarshalCanotoInto(w)
+	}
+	return w
+}
+
+const (
+	canotoNumber_Vote__Vote      = 1
+	canotoNumber_Vote__Signature = 2
+
+	canotoTag_Vote__Vote      = "\x0a" // canoto.Tag(canotoNumber_Vote__Vote, canoto.Len)
+	canotoTag_Vote__Signature = "\x12" // canoto.Tag(canotoNumber_Vote__Signature, canoto.Len)
+)
+
+type canotoData_Vote struct {
+	size uint64
+}
+
+// CanotoSpec returns the specification of this canoto message.
+func (*Vote) CanotoSpec(types ...reflect.Type) *canoto.Spec {
+	types = append(types, reflect.TypeFor[Vote]())
+	var zero Vote
+	s := &canoto.Spec{
+		Name: "Vote",
+		Fields: []canoto.FieldType{
+			canoto.FieldTypeFromField(
+				/*type inference:*/ (&zero.Vote),
+				/*FieldNumber:   */ canotoNumber_Vote__Vote,
+				/*Name:          */ "Vote",
+				/*FixedLength:   */ 0,
+				/*Repeated:      */ false,
+				/*OneOf:         */ "",
+				/*Pointer:       */ false,
+				/*types:         */ types,
+			),
+			canoto.FieldTypeFromField(
+				/*type inference:*/ (&zero.Signature),
+				/*FieldNumber:   */ canotoNumber_Vote__Signature,
+				/*Name:          */ "Signature",
+				/*FixedLength:   */ 0,
+				/*Repeated:      */ false,
+				/*OneOf:         */ "",
+				/*Pointer:       */ false,
+				/*types:         */ types,
+			),
+		},
+	}
+	s.CalculateCanotoCache()
+	return s
+}
+
+// UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
+//
+// During parsing, the canoto cache is saved.
+func (c *Vote) UnmarshalCanoto(bytes []byte) error {
+	r := canoto.Reader{
+		B: bytes,
+	}
+	return c.UnmarshalCanotoFrom(r)
+}
+
+// UnmarshalCanotoFrom populates the struct from a [canoto.Reader]. Most users
+// should just use UnmarshalCanoto.
+//
+// During parsing, the canoto cache is saved.
+//
+// This function enables configuration of reader options.
+func (c *Vote) UnmarshalCanotoFrom(r canoto.Reader) error {
+	// Zero the struct before unmarshaling.
+	*c = Vote{}
+	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
+
+	var minField uint32
+	for canoto.HasNext(&r) {
+		field, wireType, err := canoto.ReadTag(&r)
+		if err != nil {
+			return err
+		}
+		if field < minField {
+			return canoto.ErrInvalidFieldOrder
+		}
+
+		switch field {
+		case canotoNumber_Vote__Vote:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			// Read the bytes for the field.
+			originalUnsafe := r.Unsafe
+			r.Unsafe = true
+			var msgBytes []byte
+			if err := canoto.ReadBytes(&r, &msgBytes); err != nil {
+				return err
+			}
+			if len(msgBytes) == 0 {
+				return canoto.ErrZeroValue
+			}
+			r.Unsafe = originalUnsafe
+
+			// Unmarshal the field from the bytes.
+			remainingBytes := r.B
+			r.B = msgBytes
+			if err := (&c.Vote).UnmarshalCanotoFrom(r); err != nil {
+				return err
+			}
+			r.B = remainingBytes
+		case canotoNumber_Vote__Signature:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			// Read the bytes for the field.
+			originalUnsafe := r.Unsafe
+			r.Unsafe = true
+			var msgBytes []byte
+			if err := canoto.ReadBytes(&r, &msgBytes); err != nil {
+				return err
+			}
+			if len(msgBytes) == 0 {
+				return canoto.ErrZeroValue
+			}
+			r.Unsafe = originalUnsafe
+
+			// Unmarshal the field from the bytes.
+			remainingBytes := r.B
+			r.B = msgBytes
+			if err := (&c.Signature).UnmarshalCanotoFrom(r); err != nil {
+				return err
+			}
+			r.B = remainingBytes
+		default:
+			return canoto.ErrUnknownField
+		}
+
+		minField = field + 1
+	}
+	return nil
+}
+
+// ValidCanoto validates that the struct can be correctly marshaled into the
+// Canoto format.
+//
+// Specifically, ValidCanoto ensures:
+// 1. All OneOfs are specified at most once.
+// 2. All strings are valid utf-8.
+// 3. All custom fields are ValidCanoto.
+func (c *Vote) ValidCanoto() bool {
+	if !(&c.Vote).ValidCanoto() {
+		return false
+	}
+	if !(&c.Signature).ValidCanoto() {
+		return false
+	}
+	return true
+}
+
+// CalculateCanotoCache populates size and OneOf caches based on the current
+// values in the struct.
+//
+// It is not safe to copy this struct concurrently.
+func (c *Vote) CalculateCanotoCache() {
+	var size uint64
+	(&c.Vote).CalculateCanotoCache()
+	if fieldSize := (&c.Vote).CachedCanotoSize(); fieldSize != 0 {
+		size += uint64(len(canotoTag_Vote__Vote)) + canoto.SizeUint(fieldSize) + fieldSize
+	}
+	(&c.Signature).CalculateCanotoCache()
+	if fieldSize := (&c.Signature).CachedCanotoSize(); fieldSize != 0 {
+		size += uint64(len(canotoTag_Vote__Signature)) + canoto.SizeUint(fieldSize) + fieldSize
+	}
+	atomic.StoreUint64(&c.canotoData.size, size)
+}
+
+// CachedCanotoSize returns the previously calculated size of the Canoto
+// representation from CalculateCanotoCache.
+//
+// If CalculateCanotoCache has not yet been called, it will return 0.
+//
+// If the struct has been modified since the last call to CalculateCanotoCache,
+// the returned size may be incorrect.
+func (c *Vote) CachedCanotoSize() uint64 {
+	return atomic.LoadUint64(&c.canotoData.size)
+}
+
+// MarshalCanoto returns the Canoto representation of this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *Vote) MarshalCanoto() []byte {
+	c.CalculateCanotoCache()
+	w := canoto.Writer{
+		B: make([]byte, 0, c.CachedCanotoSize()),
+	}
+	w = c.MarshalCanotoInto(w)
+	return w.B
+}
+
+// MarshalCanotoInto writes the struct into a [canoto.Writer] and returns the
+// resulting [canoto.Writer]. Most users should just use MarshalCanoto.
+//
+// It is assumed that CalculateCanotoCache has been called since the last
+// modification to this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *Vote) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
+	if fieldSize := (&c.Vote).CachedCanotoSize(); fieldSize != 0 {
+		canoto.Append(&w, canotoTag_Vote__Vote)
+		canoto.AppendUint(&w, fieldSize)
+		w = (&c.Vote).MarshalCanotoInto(w)
+	}
+	if fieldSize := (&c.Signature).CachedCanotoSize(); fieldSize != 0 {
+		canoto.Append(&w, canotoTag_Vote__Signature)
+		canoto.AppendUint(&w, fieldSize)
+		w = (&c.Signature).MarshalCanotoInto(w)
+	}
+	return w
+}
+
+const (
+	canotoNumber_EmptyVote__Vote      = 1
+	canotoNumber_EmptyVote__Signature = 2
+
+	canotoTag_EmptyVote__Vote      = "\x0a" // canoto.Tag(canotoNumber_EmptyVote__Vote, canoto.Len)
+	canotoTag_EmptyVote__Signature = "\x12" // canoto.Tag(canotoNumber_EmptyVote__Signature, canoto.Len)
+)
+
+type canotoData_EmptyVote struct {
+	size uint64
+}
+
+// CanotoSpec returns the specification of this canoto message.
+func (*EmptyVote) CanotoSpec(types ...reflect.Type) *canoto.Spec {
+	types = append(types, reflect.TypeFor[EmptyVote]())
+	var zero EmptyVote
+	s := &canoto.Spec{
+		Name: "EmptyVote",
+		Fields: []canoto.FieldType{
+			canoto.FieldTypeFromField(
+				/*type inference:*/ (&zero.Vote),
+				/*FieldNumber:   */ canotoNumber_EmptyVote__Vote,
+				/*Name:          */ "Vote",
+				/*FixedLength:   */ 0,
+				/*Repeated:      */ false,
+				/*OneOf:         */ "",
+				/*Pointer:       */ false,
+				/*types:         */ types,
+			),
+			canoto.FieldTypeFromField(
+				/*type inference:*/ (&zero.Signature),
+				/*FieldNumber:   */ canotoNumber_EmptyVote__Signature,
+				/*Name:          */ "Signature",
+				/*FixedLength:   */ 0,
+				/*Repeated:      */ false,
+				/*OneOf:         */ "",
+				/*Pointer:       */ false,
+				/*types:         */ types,
+			),
+		},
+	}
+	s.CalculateCanotoCache()
+	return s
+}
+
+// UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
+//
+// During parsing, the canoto cache is saved.
+func (c *EmptyVote) UnmarshalCanoto(bytes []byte) error {
+	r := canoto.Reader{
+		B: bytes,
+	}
+	return c.UnmarshalCanotoFrom(r)
+}
+
+// UnmarshalCanotoFrom populates the struct from a [canoto.Reader]. Most users
+// should just use UnmarshalCanoto.
+//
+// During parsing, the canoto cache is saved.
+//
+// This function enables configuration of reader options.
+func (c *EmptyVote) UnmarshalCanotoFrom(r canoto.Reader) error {
+	// Zero the struct before unmarshaling.
+	*c = EmptyVote{}
+	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
+
+	var minField uint32
+	for canoto.HasNext(&r) {
+		field, wireType, err := canoto.ReadTag(&r)
+		if err != nil {
+			return err
+		}
+		if field < minField {
+			return canoto.ErrInvalidFieldOrder
+		}
+
+		switch field {
+		case canotoNumber_EmptyVote__Vote:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			// Read the bytes for the field.
+			originalUnsafe := r.Unsafe
+			r.Unsafe = true
+			var msgBytes []byte
+			if err := canoto.ReadBytes(&r, &msgBytes); err != nil {
+				return err
+			}
+			if len(msgBytes) == 0 {
+				return canoto.ErrZeroValue
+			}
+			r.Unsafe = originalUnsafe
+
+			// Unmarshal the field from the bytes.
+			remainingBytes := r.B
+			r.B = msgBytes
+			if err := (&c.Vote).UnmarshalCanotoFrom(r); err != nil {
+				return err
+			}
+			r.B = remainingBytes
+		case canotoNumber_EmptyVote__Signature:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			// Read the bytes for the field.
+			originalUnsafe := r.Unsafe
+			r.Unsafe = true
+			var msgBytes []byte
+			if err := canoto.ReadBytes(&r, &msgBytes); err != nil {
+				return err
+			}
+			if len(msgBytes) == 0 {
+				return canoto.ErrZeroValue
+			}
+			r.Unsafe = originalUnsafe
+
+			// Unmarshal the field from the bytes.
+			remainingBytes := r.B
+			r.B = msgBytes
+			if err := (&c.Signature).UnmarshalCanotoFrom(r); err != nil {
+				return err
+			}
+			r.B = remainingBytes
+		default:
+			return canoto.ErrUnknownField
+		}
+
+		minField = field + 1
+	}
+	return nil
+}
+
+// ValidCanoto validates that the struct can be correctly marshaled into the
+// Canoto format.
+//
+// Specifically, ValidCanoto ensures:
+// 1. All OneOfs are specified at most once.
+// 2. All strings are valid utf-8.
+// 3. All custom fields are ValidCanoto.
+func (c *EmptyVote) ValidCanoto() bool {
+	if !(&c.Vote).ValidCanoto() {
+		return false
+	}
+	if !(&c.Signature).ValidCanoto() {
+		return false
+	}
+	return true
+}
+
+// CalculateCanotoCache populates size and OneOf caches based on the current
+// values in the struct.
+//
+// It is not safe to copy this struct concurrently.
+func (c *EmptyVote) CalculateCanotoCache() {
+	var size uint64
+	(&c.Vote).CalculateCanotoCache()
+	if fieldSize := (&c.Vote).CachedCanotoSize(); fieldSize != 0 {
+		size += uint64(len(canotoTag_EmptyVote__Vote)) + canoto.SizeUint(fieldSize) + fieldSize
+	}
+	(&c.Signature).CalculateCanotoCache()
+	if fieldSize := (&c.Signature).CachedCanotoSize(); fieldSize != 0 {
+		size += uint64(len(canotoTag_EmptyVote__Signature)) + canoto.SizeUint(fieldSize) + fieldSize
+	}
+	atomic.StoreUint64(&c.canotoData.size, size)
+}
+
+// CachedCanotoSize returns the previously calculated size of the Canoto
+// representation from CalculateCanotoCache.
+//
+// If CalculateCanotoCache has not yet been called, it will return 0.
+//
+// If the struct has been modified since the last call to CalculateCanotoCache,
+// the returned size may be incorrect.
+func (c *EmptyVote) CachedCanotoSize() uint64 {
+	return atomic.LoadUint64(&c.canotoData.size)
+}
+
+// MarshalCanoto returns the Canoto representation of this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *EmptyVote) MarshalCanoto() []byte {
+	c.CalculateCanotoCache()
+	w := canoto.Writer{
+		B: make([]byte, 0, c.CachedCanotoSize()),
+	}
+	w = c.MarshalCanotoInto(w)
+	return w.B
+}
+
+// MarshalCanotoInto writes the struct into a [canoto.Writer] and returns the
+// resulting [canoto.Writer]. Most users should just use MarshalCanoto.
+//
+// It is assumed that CalculateCanotoCache has been called since the last
+// modification to this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *EmptyVote) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
+	if fieldSize := (&c.Vote).CachedCanotoSize(); fieldSize != 0 {
+		canoto.Append(&w, canotoTag_EmptyVote__Vote)
+		canoto.AppendUint(&w, fieldSize)
+		w = (&c.Vote).MarshalCanotoInto(w)
+	}
+	if fieldSize := (&c.Signature).CachedCanotoSize(); fieldSize != 0 {
+		canoto.Append(&w, canotoTag_EmptyVote__Signature)
+		canoto.AppendUint(&w, fieldSize)
+		w = (&c.Signature).MarshalCanotoInto(w)
+	}
+	return w
+}
+
+const (
+	canotoNumber_FinalizeVote__Finalization = 1
+	canotoNumber_FinalizeVote__Signature    = 2
+
+	canotoTag_FinalizeVote__Finalization = "\x0a" // canoto.Tag(canotoNumber_FinalizeVote__Finalization, canoto.Len)
+	canotoTag_FinalizeVote__Signature    = "\x12" // canoto.Tag(canotoNumber_FinalizeVote__Signature, canoto.Len)
+)
+
+type canotoData_FinalizeVote struct {
+	size uint64
+}
+
+// CanotoSpec returns the specification of this canoto message.
+func (*FinalizeVote) CanotoSpec(types ...reflect.Type) *canoto.Spec {
+	types = append(types, reflect.TypeFor[FinalizeVote]())
+	var zero FinalizeVote
+	s := &canoto.Spec{
+		Name: "FinalizeVote",
+		Fields: []canoto.FieldType{
+			canoto.FieldTypeFromField(
+				/*type inference:*/ (&zero.Finalization),
+				/*FieldNumber:   */ canotoNumber_FinalizeVote__Finalization,
+				/*Name:          */ "Finalization",
+				/*FixedLength:   */ 0,
+				/*Repeated:      */ false,
+				/*OneOf:         */ "",
+				/*Pointer:       */ false,
+				/*types:         */ types,
+			),
+			canoto.FieldTypeFromField(
+				/*type inference:*/ (&zero.Signature),
+				/*FieldNumber:   */ canotoNumber_FinalizeVote__Signature,
+				/*Name:          */ "Signature",
+				/*FixedLength:   */ 0,
+				/*Repeated:      */ false,
+				/*OneOf:         */ "",
+				/*Pointer:       */ false,
+				/*types:         */ types,
+			),
+		},
+	}
+	s.CalculateCanotoCache()
+	return s
+}
+
+// UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
+//
+// During parsing, the canoto cache is saved.
+func (c *FinalizeVote) UnmarshalCanoto(bytes []byte) error {
+	r := canoto.Reader{
+		B: bytes,
+	}
+	return c.UnmarshalCanotoFrom(r)
+}
+
+// UnmarshalCanotoFrom populates the struct from a [canoto.Reader]. Most users
+// should just use UnmarshalCanoto.
+//
+// During parsing, the canoto cache is saved.
+//
+// This function enables configuration of reader options.
+func (c *FinalizeVote) UnmarshalCanotoFrom(r canoto.Reader) error {
+	// Zero the struct before unmarshaling.
+	*c = FinalizeVote{}
+	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
+
+	var minField uint32
+	for canoto.HasNext(&r) {
+		field, wireType, err := canoto.ReadTag(&r)
+		if err != nil {
+			return err
+		}
+		if field < minField {
+			return canoto.ErrInvalidFieldOrder
+		}
+
+		switch field {
+		case canotoNumber_FinalizeVote__Finalization:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			// Read the bytes for the field.
+			originalUnsafe := r.Unsafe
+			r.Unsafe = true
+			var msgBytes []byte
+			if err := canoto.ReadBytes(&r, &msgBytes); err != nil {
+				return err
+			}
+			if len(msgBytes) == 0 {
+				return canoto.ErrZeroValue
+			}
+			r.Unsafe = originalUnsafe
+
+			// Unmarshal the field from the bytes.
+			remainingBytes := r.B
+			r.B = msgBytes
+			if err := (&c.Finalization).UnmarshalCanotoFrom(r); err != nil {
+				return err
+			}
+			r.B = remainingBytes
+		case canotoNumber_FinalizeVote__Signature:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			// Read the bytes for the field.
+			originalUnsafe := r.Unsafe
+			r.Unsafe = true
+			var msgBytes []byte
+			if err := canoto.ReadBytes(&r, &msgBytes); err != nil {
+				return err
+			}
+			if len(msgBytes) == 0 {
+				return canoto.ErrZeroValue
+			}
+			r.Unsafe = originalUnsafe
+
+			// Unmarshal the field from the bytes.
+			remainingBytes := r.B
+			r.B = msgBytes
+			if err := (&c.Signature).UnmarshalCanotoFrom(r); err != nil {
+				return err
+			}
+			r.B = remainingBytes
+		default:
+			return canoto.ErrUnknownField
+		}
+
+		minField = field + 1
+	}
+	return nil
+}
+
+// ValidCanoto validates that the struct can be correctly marshaled into the
+// Canoto format.
+//
+// Specifically, ValidCanoto ensures:
+// 1. All OneOfs are specified at most once.
+// 2. All strings are valid utf-8.
+// 3. All custom fields are ValidCanoto.
+func (c *FinalizeVote) ValidCanoto() bool {
+	if !(&c.Finalization).ValidCanoto() {
+		return false
+	}
+	if !(&c.Signature).ValidCanoto() {
+		return false
+	}
+	return true
+}
+
+// CalculateCanotoCache populates size and OneOf caches based on the current
+// values in the struct.
+//
+// It is not safe to copy this struct concurrently.
+func (c *FinalizeVote) CalculateCanotoCache() {
+	var size uint64
+	(&c.Finalization).CalculateCanotoCache()
+	if fieldSize := (&c.Finalization).CachedCanotoSize(); fieldSize != 0 {
+		size += uint64(len(canotoTag_FinalizeVote__Finalization)) + canoto.SizeUint(fieldSize) + fieldSize
+	}
+	(&c.Signature).CalculateCanotoCache()
+	if fieldSize := (&c.Signature).CachedCanotoSize(); fieldSize != 0 {
+		size += uint64(len(canotoTag_FinalizeVote__Signature)) + canoto.SizeUint(fieldSize) + fieldSize
+	}
+	atomic.StoreUint64(&c.canotoData.size, size)
+}
+
+// CachedCanotoSize returns the previously calculated size of the Canoto
+// representation from CalculateCanotoCache.
+//
+// If CalculateCanotoCache has not yet been called, it will return 0.
+//
+// If the struct has been modified since the last call to CalculateCanotoCache,
+// the returned size may be incorrect.
+func (c *FinalizeVote) CachedCanotoSize() uint64 {
+	return atomic.LoadUint64(&c.canotoData.size)
+}
+
+// MarshalCanoto returns the Canoto representation of this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *FinalizeVote) MarshalCanoto() []byte {
+	c.CalculateCanotoCache()
+	w := canoto.Writer{
+		B: make([]byte, 0, c.CachedCanotoSize()),
+	}
+	w = c.MarshalCanotoInto(w)
+	return w.B
+}
+
+// MarshalCanotoInto writes the struct into a [canoto.Writer] and returns the
+// resulting [canoto.Writer]. Most users should just use MarshalCanoto.
+//
+// It is assumed that CalculateCanotoCache has been called since the last
+// modification to this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *FinalizeVote) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
+	if fieldSize := (&c.Finalization).CachedCanotoSize(); fieldSize != 0 {
+		canoto.Append(&w, canotoTag_FinalizeVote__Finalization)
+		canoto.AppendUint(&w, fieldSize)
+		w = (&c.Finalization).MarshalCanotoInto(w)
+	}
+	if fieldSize := (&c.Signature).CachedCanotoSize(); fieldSize != 0 {
+		canoto.Append(&w, canotoTag_FinalizeVote__Signature)
+		canoto.AppendUint(&w, fieldSize)
+		w = (&c.Signature).MarshalCanotoInto(w)
+	}
+	return w
+}
+
+const (
+	canotoNumber_ReplicationRequest__Seqs               = 1
+	canotoNumber_ReplicationRequest__Rounds             = 2
+	canotoNumber_ReplicationRequest__LatestRound        = 3
+	canotoNumber_ReplicationRequest__LatestFinalizedSeq = 4
+
+	canotoTag_ReplicationRequest__Seqs               = "\x0a" // canoto.Tag(canotoNumber_ReplicationRequest__Seqs, canoto.Len)
+	canotoTag_ReplicationRequest__Rounds             = "\x12" // canoto.Tag(canotoNumber_ReplicationRequest__Rounds, canoto.Len)
+	canotoTag_ReplicationRequest__LatestRound        = "\x18" // canoto.Tag(canotoNumber_ReplicationRequest__LatestRound, canoto.Varint)
+	canotoTag_ReplicationRequest__LatestFinalizedSeq = "\x20" // canoto.Tag(canotoNumber_ReplicationRequest__LatestFinalizedSeq, canoto.Varint)
+)
+
+type canotoData_ReplicationRequest struct {
+	size       uint64
+	SeqsSize   uint64
+	RoundsSize uint64
+}
+
+// CanotoSpec returns the specification of this canoto message.
+func (*ReplicationRequest) CanotoSpec(...reflect.Type) *canoto.Spec {
+	var zero ReplicationRequest
+	s := &canoto.Spec{
+		Name: "ReplicationRequest",
+		Fields: []canoto.FieldType{
+			{
+				FieldNumber: canotoNumber_ReplicationRequest__Seqs,
+				Name:        "Seqs",
+				Repeated:    true,
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(canoto.MakeEntry(zero.Seqs)),
+			},
+			{
+				FieldNumber: canotoNumber_ReplicationRequest__Rounds,
+				Name:        "Rounds",
+				Repeated:    true,
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(canoto.MakeEntry(zero.Rounds)),
+			},
+			{
+				FieldNumber: canotoNumber_ReplicationRequest__LatestRound,
+				Name:        "LatestRound",
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(zero.LatestRound),
+			},
+			{
+				FieldNumber: canotoNumber_ReplicationRequest__LatestFinalizedSeq,
+				Name:        "LatestFinalizedSeq",
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(zero.LatestFinalizedSeq),
+			},
+		},
+	}
+	s.CalculateCanotoCache()
+	return s
+}
+
+// UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
+//
+// During parsing, the canoto cache is saved.
+func (c *ReplicationRequest) UnmarshalCanoto(bytes []byte) error {
+	r := canoto.Reader{
+		B: bytes,
+	}
+	return c.UnmarshalCanotoFrom(r)
+}
+
+// UnmarshalCanotoFrom populates the struct from a [canoto.Reader]. Most users
+// should just use UnmarshalCanoto.
+//
+// During parsing, the canoto cache is saved.
+//
+// This function enables configuration of reader options.
+func (c *ReplicationRequest) UnmarshalCanotoFrom(r canoto.Reader) error {
+	// Zero the struct before unmarshaling.
+	*c = ReplicationRequest{}
+	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
+
+	var minField uint32
+	for canoto.HasNext(&r) {
+		field, wireType, err := canoto.ReadTag(&r)
+		if err != nil {
+			return err
+		}
+		if field < minField {
+			return canoto.ErrInvalidFieldOrder
+		}
+
+		switch field {
+		case canotoNumber_ReplicationRequest__Seqs:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			// Read the packed field bytes.
+			originalUnsafe := r.Unsafe
+			r.Unsafe = true
+			var msgBytes []byte
+			if err := canoto.ReadBytes(&r, &msgBytes); err != nil {
+				return err
+			}
+			if len(msgBytes) == 0 {
+				return canoto.ErrZeroValue
+			}
+			r.Unsafe = originalUnsafe
+
+			// Read each value from the packed field bytes into the array.
+			remainingBytes := r.B
+			r.B = msgBytes
+			c.Seqs = canoto.MakeSlice(c.Seqs, canoto.CountInts(msgBytes))
+			field := c.Seqs
+			for i := range field {
+				if err := canoto.ReadUint(&r, &field[i]); err != nil {
+					return err
+				}
+			}
+			if canoto.HasNext(&r) {
+				return canoto.ErrInvalidLength
+			}
+			r.B = remainingBytes
+			atomic.StoreUint64(&c.canotoData.SeqsSize, uint64(len(msgBytes)))
+		case canotoNumber_ReplicationRequest__Rounds:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			// Read the packed field bytes.
+			originalUnsafe := r.Unsafe
+			r.Unsafe = true
+			var msgBytes []byte
+			if err := canoto.ReadBytes(&r, &msgBytes); err != nil {
+				return err
+			}
+			if len(msgBytes) == 0 {
+				return canoto.ErrZeroValue
+			}
+			r.Unsafe = originalUnsafe
+
+			// Read each value from the packed field bytes into the array.
+			remainingBytes := r.B
+			r.B = msgBytes
+			c.Rounds = canoto.MakeSlice(c.Rounds, canoto.CountInts(msgBytes))
+			field := c.Rounds
+			for i := range field {
+				if err := canoto.ReadUint(&r, &field[i]); err != nil {
+					return err
+				}
+			}
+			if canoto.HasNext(&r) {
+				return canoto.ErrInvalidLength
+			}
+			r.B = remainingBytes
+			atomic.StoreUint64(&c.canotoData.RoundsSize, uint64(len(msgBytes)))
+		case canotoNumber_ReplicationRequest__LatestRound:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadUint(&r, &c.LatestRound); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.LatestRound) {
+				return canoto.ErrZeroValue
+			}
+		case canotoNumber_ReplicationRequest__LatestFinalizedSeq:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadUint(&r, &c.LatestFinalizedSeq); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.LatestFinalizedSeq) {
+				return canoto.ErrZeroValue
+			}
+		default:
+			return canoto.ErrUnknownField
+		}
+
+		minField = field + 1
+	}
+	return nil
+}
+
+// ValidCanoto validates that the struct can be correctly marshaled into the
+// Canoto format.
+//
+// Specifically, ValidCanoto ensures:
+// 1. All OneOfs are specified at most once.
+// 2. All strings are valid utf-8.
+// 3. All custom fields are ValidCanoto.
+func (c *ReplicationRequest) ValidCanoto() bool {
+	return true
+}
+
+// CalculateCanotoCache populates size and OneOf caches based on the current
+// values in the struct.
+//
+// It is not safe to copy this struct concurrently.
+func (c *ReplicationRequest) CalculateCanotoCache() {
+	var size uint64
+	if len(c.Seqs) != 0 {
+		var fieldSize uint64
+		for _, v := range c.Seqs {
+			fieldSize += canoto.SizeUint(v)
+		}
+		size += uint64(len(canotoTag_ReplicationRequest__Seqs)) + canoto.SizeUint(fieldSize) + fieldSize
+		atomic.StoreUint64(&c.canotoData.SeqsSize, fieldSize)
+	}
+	if len(c.Rounds) != 0 {
+		var fieldSize uint64
+		for _, v := range c.Rounds {
+			fieldSize += canoto.SizeUint(v)
+		}
+		size += uint64(len(canotoTag_ReplicationRequest__Rounds)) + canoto.SizeUint(fieldSize) + fieldSize
+		atomic.StoreUint64(&c.canotoData.RoundsSize, fieldSize)
+	}
+	if !canoto.IsZero(c.LatestRound) {
+		size += uint64(len(canotoTag_ReplicationRequest__LatestRound)) + canoto.SizeUint(c.LatestRound)
+	}
+	if !canoto.IsZero(c.LatestFinalizedSeq) {
+		size += uint64(len(canotoTag_ReplicationRequest__LatestFinalizedSeq)) + canoto.SizeUint(c.LatestFinalizedSeq)
+	}
+	atomic.StoreUint64(&c.canotoData.size, size)
+}
+
+// CachedCanotoSize returns the previously calculated size of the Canoto
+// representation from CalculateCanotoCache.
+//
+// If CalculateCanotoCache has not yet been called, it will return 0.
+//
+// If the struct has been modified since the last call to CalculateCanotoCache,
+// the returned size may be incorrect.
+func (c *ReplicationRequest) CachedCanotoSize() uint64 {
+	return atomic.LoadUint64(&c.canotoData.size)
+}
+
+// MarshalCanoto returns the Canoto representation of this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *ReplicationRequest) MarshalCanoto() []byte {
+	c.CalculateCanotoCache()
+	w := canoto.Writer{
+		B: make([]byte, 0, c.CachedCanotoSize()),
+	}
+	w = c.MarshalCanotoInto(w)
+	return w.B
+}
+
+// MarshalCanotoInto writes the struct into a [canoto.Writer] and returns the
+// resulting [canoto.Writer]. Most users should just use MarshalCanoto.
+//
+// It is assumed that CalculateCanotoCache has been called since the last
+// modification to this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *ReplicationRequest) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
+	if len(c.Seqs) != 0 {
+		canoto.Append(&w, canotoTag_ReplicationRequest__Seqs)
+		canoto.AppendUint(&w, atomic.LoadUint64(&c.canotoData.SeqsSize))
+		for _, v := range c.Seqs {
+			canoto.AppendUint(&w, v)
+		}
+	}
+	if len(c.Rounds) != 0 {
+		canoto.Append(&w, canotoTag_ReplicationRequest__Rounds)
+		canoto.AppendUint(&w, atomic.LoadUint64(&c.canotoData.RoundsSize))
+		for _, v := range c.Rounds {
+			canoto.AppendUint(&w, v)
+		}
+	}
+	if !canoto.IsZero(c.LatestRound) {
+		canoto.Append(&w, canotoTag_ReplicationRequest__LatestRound)
+		canoto.AppendUint(&w, c.LatestRound)
+	}
+	if !canoto.IsZero(c.LatestFinalizedSeq) {
+		canoto.Append(&w, canotoTag_ReplicationRequest__LatestFinalizedSeq)
+		canoto.AppendUint(&w, c.LatestFinalizedSeq)
+	}
+	return w
+}
+
+const (
+	canotoNumber_BlockDigestRequest__Seq    = 1
+	canotoNumber_BlockDigestRequest__Digest = 2
+
+	canotoTag_BlockDigestRequest__Seq    = "\x08" // canoto.Tag(canotoNumber_BlockDigestRequest__Seq, canoto.Varint)
+	canotoTag_BlockDigestRequest__Digest = "\x12" // canoto.Tag(canotoNumber_BlockDigestRequest__Digest, canoto.Len)
+)
+
+type canotoData_BlockDigestRequest struct {
+	size uint64
+}
+
+// CanotoSpec returns the specification of this canoto message.
+func (*BlockDigestRequest) CanotoSpec(...reflect.Type) *canoto.Spec {
+	var zero BlockDigestRequest
+	s := &canoto.Spec{
+		Name: "BlockDigestRequest",
+		Fields: []canoto.FieldType{
+			{
+				FieldNumber: canotoNumber_BlockDigestRequest__Seq,
+				Name:        "Seq",
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(zero.Seq),
+			},
+			{
+				FieldNumber:    canotoNumber_BlockDigestRequest__Digest,
+				Name:           "Digest",
+				OneOf:          "",
+				TypeFixedBytes: uint64(len(zero.Digest)),
+			},
+		},
+	}
+	s.CalculateCanotoCache()
+	return s
+}
+
+// UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
+//
+// During parsing, the canoto cache is saved.
+func (c *BlockDigestRequest) UnmarshalCanoto(bytes []byte) error {
+	r := canoto.Reader{
+		B: bytes,
+	}
+	return c.UnmarshalCanotoFrom(r)
+}
+
+// UnmarshalCanotoFrom populates the struct from a [canoto.Reader]. Most users
+// should just use UnmarshalCanoto.
+//
+// During parsing, the canoto cache is saved.
+//
+// This function enables configuration of reader options.
+func (c *BlockDigestRequest) UnmarshalCanotoFrom(r canoto.Reader) error {
+	// Zero the struct before unmarshaling.
+	*c = BlockDigestRequest{}
+	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
+
+	var minField uint32
+	for canoto.HasNext(&r) {
+		field, wireType, err := canoto.ReadTag(&r)
+		if err != nil {
+			return err
+		}
+		if field < minField {
+			return canoto.ErrInvalidFieldOrder
+		}
+
+		switch field {
+		case canotoNumber_BlockDigestRequest__Seq:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadUint(&r, &c.Seq); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.Seq) {
+				return canoto.ErrZeroValue
+			}
+		case canotoNumber_BlockDigestRequest__Digest:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			const (
+				expectedLength       = len(c.Digest)
+				expectedLengthUint64 = uint64(expectedLength)
+			)
+			var length uint64
+			if err := canoto.ReadUint(&r, &length); err != nil {
+				return err
+			}
+			if length != expectedLengthUint64 {
+				return canoto.ErrInvalidLength
+			}
+			if expectedLength > len(r.B) {
+				return io.ErrUnexpectedEOF
+			}
+
+			copy((&c.Digest)[:], r.B)
+			if canoto.IsZero(c.Digest) {
+				return canoto.ErrZeroValue
+			}
+			r.B = r.B[expectedLength:]
+		default:
+			return canoto.ErrUnknownField
+		}
+
+		minField = field + 1
+	}
+	return nil
+}
+
+// ValidCanoto validates that the struct can be correctly marshaled into the
+// Canoto format.
+//
+// Specifically, ValidCanoto ensures:
+// 1. All OneOfs are specified at most once.
+// 2. All strings are valid utf-8.
+// 3. All custom fields are ValidCanoto.
+func (c *BlockDigestRequest) ValidCanoto() bool {
+	return true
+}
+
+// CalculateCanotoCache populates size and OneOf caches based on the current
+// values in the struct.
+//
+// It is not safe to copy this struct concurrently.
+func (c *BlockDigestRequest) CalculateCanotoCache() {
+	var size uint64
+	if !canoto.IsZero(c.Seq) {
+		size += uint64(len(canotoTag_BlockDigestRequest__Seq)) + canoto.SizeUint(c.Seq)
+	}
+	if !canoto.IsZero(c.Digest) {
+		size += uint64(len(canotoTag_BlockDigestRequest__Digest)) + canoto.SizeBytes((&c.Digest)[:])
+	}
+	atomic.StoreUint64(&c.canotoData.size, size)
+}
+
+// CachedCanotoSize returns the previously calculated size of the Canoto
+// representation from CalculateCanotoCache.
+//
+// If CalculateCanotoCache has not yet been called, it will return 0.
+//
+// If the struct has been modified since the last call to CalculateCanotoCache,
+// the returned size may be incorrect.
+func (c *BlockDigestRequest) CachedCanotoSize() uint64 {
+	return atomic.LoadUint64(&c.canotoData.size)
+}
+
+// MarshalCanoto returns the Canoto representation of this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *BlockDigestRequest) MarshalCanoto() []byte {
+	c.CalculateCanotoCache()
+	w := canoto.Writer{
+		B: make([]byte, 0, c.CachedCanotoSize()),
+	}
+	w = c.MarshalCanotoInto(w)
+	return w.B
+}
+
+// MarshalCanotoInto writes the struct into a [canoto.Writer] and returns the
+// resulting [canoto.Writer]. Most users should just use MarshalCanoto.
+//
+// It is assumed that CalculateCanotoCache has been called since the last
+// modification to this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *BlockDigestRequest) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
+	if !canoto.IsZero(c.Seq) {
+		canoto.Append(&w, canotoTag_BlockDigestRequest__Seq)
+		canoto.AppendUint(&w, c.Seq)
+	}
+	if !canoto.IsZero(c.Digest) {
+		canoto.Append(&w, canotoTag_BlockDigestRequest__Digest)
+		canoto.AppendBytes(&w, (&c.Digest)[:])
+	}
+	return w
+}
+
+const (
 	canotoNumber_AuxiliaryInfo__Epoch   = 1
 	canotoNumber_AuxiliaryInfo__Version = 2
 	canotoNumber_AuxiliaryInfo__Data    = 3
@@ -215,6 +2008,257 @@ func (c *AuxiliaryInfo) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
 	if len(c.Data) != 0 {
 		canoto.Append(&w, canotoTag_AuxiliaryInfo__Data)
 		canoto.AppendBytes(&w, c.Data)
+	}
+	return w
+}
+
+const (
+	canotoNumber_ValidatorSetApproval__NodeID        = 1
+	canotoNumber_ValidatorSetApproval__AuxInfoDigest = 2
+	canotoNumber_ValidatorSetApproval__PChainHeight  = 3
+	canotoNumber_ValidatorSetApproval__Signature     = 4
+
+	canotoTag_ValidatorSetApproval__NodeID        = "\x0a" // canoto.Tag(canotoNumber_ValidatorSetApproval__NodeID, canoto.Len)
+	canotoTag_ValidatorSetApproval__AuxInfoDigest = "\x12" // canoto.Tag(canotoNumber_ValidatorSetApproval__AuxInfoDigest, canoto.Len)
+	canotoTag_ValidatorSetApproval__PChainHeight  = "\x18" // canoto.Tag(canotoNumber_ValidatorSetApproval__PChainHeight, canoto.Varint)
+	canotoTag_ValidatorSetApproval__Signature     = "\x22" // canoto.Tag(canotoNumber_ValidatorSetApproval__Signature, canoto.Len)
+)
+
+type canotoData_ValidatorSetApproval struct {
+	size uint64
+}
+
+// CanotoSpec returns the specification of this canoto message.
+func (*ValidatorSetApproval) CanotoSpec(...reflect.Type) *canoto.Spec {
+	var zero ValidatorSetApproval
+	s := &canoto.Spec{
+		Name: "ValidatorSetApproval",
+		Fields: []canoto.FieldType{
+			{
+				FieldNumber:    canotoNumber_ValidatorSetApproval__NodeID,
+				Name:           "NodeID",
+				OneOf:          "",
+				TypeFixedBytes: uint64(len(zero.NodeID)),
+			},
+			{
+				FieldNumber:    canotoNumber_ValidatorSetApproval__AuxInfoDigest,
+				Name:           "AuxInfoDigest",
+				OneOf:          "",
+				TypeFixedBytes: uint64(len(zero.AuxInfoDigest)),
+			},
+			{
+				FieldNumber: canotoNumber_ValidatorSetApproval__PChainHeight,
+				Name:        "PChainHeight",
+				OneOf:       "",
+				TypeUint:    canoto.SizeOf(zero.PChainHeight),
+			},
+			{
+				FieldNumber: canotoNumber_ValidatorSetApproval__Signature,
+				Name:        "Signature",
+				OneOf:       "",
+				TypeBytes:   true,
+			},
+		},
+	}
+	s.CalculateCanotoCache()
+	return s
+}
+
+// UnmarshalCanoto unmarshals a Canoto-encoded byte slice into the struct.
+//
+// During parsing, the canoto cache is saved.
+func (c *ValidatorSetApproval) UnmarshalCanoto(bytes []byte) error {
+	r := canoto.Reader{
+		B: bytes,
+	}
+	return c.UnmarshalCanotoFrom(r)
+}
+
+// UnmarshalCanotoFrom populates the struct from a [canoto.Reader]. Most users
+// should just use UnmarshalCanoto.
+//
+// During parsing, the canoto cache is saved.
+//
+// This function enables configuration of reader options.
+func (c *ValidatorSetApproval) UnmarshalCanotoFrom(r canoto.Reader) error {
+	// Zero the struct before unmarshaling.
+	*c = ValidatorSetApproval{}
+	atomic.StoreUint64(&c.canotoData.size, uint64(len(r.B)))
+
+	var minField uint32
+	for canoto.HasNext(&r) {
+		field, wireType, err := canoto.ReadTag(&r)
+		if err != nil {
+			return err
+		}
+		if field < minField {
+			return canoto.ErrInvalidFieldOrder
+		}
+
+		switch field {
+		case canotoNumber_ValidatorSetApproval__NodeID:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			const (
+				expectedLength       = len(c.NodeID)
+				expectedLengthUint64 = uint64(expectedLength)
+			)
+			var length uint64
+			if err := canoto.ReadUint(&r, &length); err != nil {
+				return err
+			}
+			if length != expectedLengthUint64 {
+				return canoto.ErrInvalidLength
+			}
+			if expectedLength > len(r.B) {
+				return io.ErrUnexpectedEOF
+			}
+
+			copy((&c.NodeID)[:], r.B)
+			if canoto.IsZero(c.NodeID) {
+				return canoto.ErrZeroValue
+			}
+			r.B = r.B[expectedLength:]
+		case canotoNumber_ValidatorSetApproval__AuxInfoDigest:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			const (
+				expectedLength       = len(c.AuxInfoDigest)
+				expectedLengthUint64 = uint64(expectedLength)
+			)
+			var length uint64
+			if err := canoto.ReadUint(&r, &length); err != nil {
+				return err
+			}
+			if length != expectedLengthUint64 {
+				return canoto.ErrInvalidLength
+			}
+			if expectedLength > len(r.B) {
+				return io.ErrUnexpectedEOF
+			}
+
+			copy((&c.AuxInfoDigest)[:], r.B)
+			if canoto.IsZero(c.AuxInfoDigest) {
+				return canoto.ErrZeroValue
+			}
+			r.B = r.B[expectedLength:]
+		case canotoNumber_ValidatorSetApproval__PChainHeight:
+			if wireType != canoto.Varint {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadUint(&r, &c.PChainHeight); err != nil {
+				return err
+			}
+			if canoto.IsZero(c.PChainHeight) {
+				return canoto.ErrZeroValue
+			}
+		case canotoNumber_ValidatorSetApproval__Signature:
+			if wireType != canoto.Len {
+				return canoto.ErrUnexpectedWireType
+			}
+
+			if err := canoto.ReadBytes(&r, &c.Signature); err != nil {
+				return err
+			}
+			if len(c.Signature) == 0 {
+				return canoto.ErrZeroValue
+			}
+		default:
+			return canoto.ErrUnknownField
+		}
+
+		minField = field + 1
+	}
+	return nil
+}
+
+// ValidCanoto validates that the struct can be correctly marshaled into the
+// Canoto format.
+//
+// Specifically, ValidCanoto ensures:
+// 1. All OneOfs are specified at most once.
+// 2. All strings are valid utf-8.
+// 3. All custom fields are ValidCanoto.
+func (c *ValidatorSetApproval) ValidCanoto() bool {
+	return true
+}
+
+// CalculateCanotoCache populates size and OneOf caches based on the current
+// values in the struct.
+//
+// It is not safe to copy this struct concurrently.
+func (c *ValidatorSetApproval) CalculateCanotoCache() {
+	var size uint64
+	if !canoto.IsZero(c.NodeID) {
+		size += uint64(len(canotoTag_ValidatorSetApproval__NodeID)) + canoto.SizeBytes((&c.NodeID)[:])
+	}
+	if !canoto.IsZero(c.AuxInfoDigest) {
+		size += uint64(len(canotoTag_ValidatorSetApproval__AuxInfoDigest)) + canoto.SizeBytes((&c.AuxInfoDigest)[:])
+	}
+	if !canoto.IsZero(c.PChainHeight) {
+		size += uint64(len(canotoTag_ValidatorSetApproval__PChainHeight)) + canoto.SizeUint(c.PChainHeight)
+	}
+	if len(c.Signature) != 0 {
+		size += uint64(len(canotoTag_ValidatorSetApproval__Signature)) + canoto.SizeBytes(c.Signature)
+	}
+	atomic.StoreUint64(&c.canotoData.size, size)
+}
+
+// CachedCanotoSize returns the previously calculated size of the Canoto
+// representation from CalculateCanotoCache.
+//
+// If CalculateCanotoCache has not yet been called, it will return 0.
+//
+// If the struct has been modified since the last call to CalculateCanotoCache,
+// the returned size may be incorrect.
+func (c *ValidatorSetApproval) CachedCanotoSize() uint64 {
+	return atomic.LoadUint64(&c.canotoData.size)
+}
+
+// MarshalCanoto returns the Canoto representation of this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *ValidatorSetApproval) MarshalCanoto() []byte {
+	c.CalculateCanotoCache()
+	w := canoto.Writer{
+		B: make([]byte, 0, c.CachedCanotoSize()),
+	}
+	w = c.MarshalCanotoInto(w)
+	return w.B
+}
+
+// MarshalCanotoInto writes the struct into a [canoto.Writer] and returns the
+// resulting [canoto.Writer]. Most users should just use MarshalCanoto.
+//
+// It is assumed that CalculateCanotoCache has been called since the last
+// modification to this struct.
+//
+// It is assumed that this struct is ValidCanoto.
+//
+// It is not safe to copy this struct concurrently.
+func (c *ValidatorSetApproval) MarshalCanotoInto(w canoto.Writer) canoto.Writer {
+	if !canoto.IsZero(c.NodeID) {
+		canoto.Append(&w, canotoTag_ValidatorSetApproval__NodeID)
+		canoto.AppendBytes(&w, (&c.NodeID)[:])
+	}
+	if !canoto.IsZero(c.AuxInfoDigest) {
+		canoto.Append(&w, canotoTag_ValidatorSetApproval__AuxInfoDigest)
+		canoto.AppendBytes(&w, (&c.AuxInfoDigest)[:])
+	}
+	if !canoto.IsZero(c.PChainHeight) {
+		canoto.Append(&w, canotoTag_ValidatorSetApproval__PChainHeight)
+		canoto.AppendUint(&w, c.PChainHeight)
+	}
+	if len(c.Signature) != 0 {
+		canoto.Append(&w, canotoTag_ValidatorSetApproval__Signature)
+		canoto.AppendBytes(&w, c.Signature)
 	}
 	return w
 }

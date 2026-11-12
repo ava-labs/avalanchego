@@ -4,6 +4,7 @@ load("//.bazel:defs.bzl", "graft_go_test")
 go_library(
     name = "common",
     srcs = [
+        "api.canoto.go",
         "api.go",
         "blacklist.canoto.go",
         "blacklist.go",
@@ -19,6 +20,8 @@ go_library(
         "random.go",
         "sched.go",
         "timeout_handler.go",
+        "wire.canoto.go",
+        "wire.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/simplex/common",
     visibility = ["//visibility:public"],
@@ -43,10 +46,13 @@ graft_go_test(
         "notarization_test.go",
         "sched_test.go",
         "timeout_handler_test.go",
+        "wire_internal_test.go",
+        "wire_test.go",
     ],
     embed = [":common"],
     deps = [
         "//graft/simplex/testutil",
+        "@com_github_stephenbuttolph_canoto//:canoto",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_goleak//:goleak",
         "@org_uber_go_zap//:zap",

@@ -132,7 +132,7 @@ func TestNotarizationRecord(t *testing.T) {
 	require.NoError(t, err)
 
 	vote := ToBeSignedVote{
-		BlockHeader{
+		BlockHeader: BlockHeader{
 			ProtocolMetadata: ProtocolMetadata{
 				Version: 1,
 				Round:   666,
@@ -165,7 +165,7 @@ func FuzzNotarizationRecord(f *testing.F) {
 		digest := sha256.Sum256(digestPreimage)
 
 		vote := ToBeSignedVote{
-			BlockHeader{
+			BlockHeader: BlockHeader{
 				ProtocolMetadata: ProtocolMetadata{
 					Version: version,
 					Round:   round,
@@ -192,7 +192,7 @@ func FuzzNotarizationRecord(f *testing.F) {
 
 func TestEmptyVote(t *testing.T) {
 	record := NewEmptyVoteRecord(ToBeSignedEmptyVote{
-		EmptyVoteMetadata{
+		EmptyVoteMetadata: EmptyVoteMetadata{
 			Round: 666,
 			Epoch: 4,
 		},
@@ -210,7 +210,7 @@ func TestEmptyVote(t *testing.T) {
 func FuzzEmptyVoteRecordRoundAndEpoch(f *testing.F) {
 	f.Fuzz(func(t *testing.T, round, epoch uint64) {
 		record := NewEmptyVoteRecord(ToBeSignedEmptyVote{
-			EmptyVoteMetadata{Round: round, Epoch: epoch},
+			EmptyVoteMetadata: EmptyVoteMetadata{Round: round, Epoch: epoch},
 		})
 
 		extractedRound, extractedEpoch, err := walRecordRoundAndEpoch(record)
@@ -235,14 +235,14 @@ func FuzzEmptyNotarizationRecordRoundAndEpoch(f *testing.F) {
 func TestWALRecordRoundAndEpoch(t *testing.T) {
 	// Every record carries a distinct round and epoch, so that a field read from the wrong place is caught.
 	emptyVoteRecord := NewEmptyVoteRecord(ToBeSignedEmptyVote{
-		EmptyVoteMetadata{
+		EmptyVoteMetadata: EmptyVoteMetadata{
 			Round: 669,
 			Epoch: 5,
 		},
 	})
 
 	vote := ToBeSignedVote{
-		BlockHeader{
+		BlockHeader: BlockHeader{
 			ProtocolMetadata: ProtocolMetadata{
 				Version: 1,
 				Round:   666,
@@ -271,7 +271,7 @@ func TestWALRecordRoundAndEpoch(t *testing.T) {
 	require.NoError(t, err)
 
 	finalization := ToBeSignedFinalization{
-		BlockHeader{
+		BlockHeader: BlockHeader{
 			ProtocolMetadata: ProtocolMetadata{
 				Version: 1,
 				Round:   670,
@@ -364,8 +364,8 @@ func TestRecordsFromEpoch(t *testing.T) {
 		blockRecord, err := BlockRecord(BlockHeader{ProtocolMetadata: md}, []byte{1, 2, 3})
 		require.NoError(t, err)
 		emptyVote := ToBeSignedEmptyVote{EmptyVoteMetadata: EmptyVoteMetadata{Round: 7, Epoch: epoch}}
-		vote := ToBeSignedVote{BlockHeader{ProtocolMetadata: md}}
-		finalization := ToBeSignedFinalization{BlockHeader{ProtocolMetadata: md}}
+		vote := ToBeSignedVote{BlockHeader: BlockHeader{ProtocolMetadata: md}}
+		finalization := ToBeSignedFinalization{BlockHeader: BlockHeader{ProtocolMetadata: md}}
 		return [][]byte{
 			blockRecord,
 			NewQuorumRecord([]byte{1, 2, 3}, vote.Bytes(), NotarizationRecordType),
