@@ -63,7 +63,7 @@ $`,
 					},
 					StateUpgrades: []stateupgrade.Block{
 						{
-							BlockTimestamp: utils.PointerTo[uint64](14),
+							Timestamp: utils.PointerTo[uint64](14),
 							Accounts: map[common.Address]stateupgrade.Account{
 								{15}: {
 									Code: []byte{16},
@@ -156,7 +156,7 @@ func TestChainConfigVerify(t *testing.T) {
 				FeeConfig: validFeeConfig,
 				UpgradeConfig: UpgradeConfig{
 					StateUpgrades: []stateupgrade.Block{
-						{BlockTimestamp: nil},
+						{Timestamp: nil},
 					},
 				},
 			},

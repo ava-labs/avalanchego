@@ -1,4 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
 
 package(default_visibility = [
     "//graft/subnet-evm:__subpackages__",
@@ -19,4 +20,11 @@ go_library(
         "@com_github_ava_labs_libevm//params",
         "@com_github_holiman_uint256//:uint256",
     ],
+)
+
+graft_go_test(
+    name = "stateupgrade_test",
+    srcs = ["state_upgrade_test.go"],
+    embed = [":stateupgrade"],
+    deps = ["@com_github_stretchr_testify//require"],
 )

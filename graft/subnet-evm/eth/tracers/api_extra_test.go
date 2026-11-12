@@ -335,7 +335,7 @@ func testTraceCallWithOverridesStateUpgrade(t *testing.T, scheme string) {
 	// assumes gap is 10 sec
 	activateStateUpgradeTime := activateStateUpgradeBlock * 10
 	activateStateUpgradeConfig := stateupgrade.Block{
-		BlockTimestamp: &activateStateUpgradeTime,
+		Timestamp: &activateStateUpgradeTime,
 		Accounts: map[common.Address]stateupgrade.Account{
 			accounts[2].addr: {
 				// deplete all balance
