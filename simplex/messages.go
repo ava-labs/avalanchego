@@ -140,8 +140,10 @@ func newReplicationRequest(
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_ReplicationRequest{
 			ReplicationRequest: &p2p.ReplicationRequest{
-				Seqs:        replicationRequest.Seqs,
-				LatestRound: replicationRequest.LatestRound,
+				Seqs:               replicationRequest.Seqs,
+				LatestRound:        replicationRequest.LatestRound,
+				Rounds:             replicationRequest.Rounds,
+				LatestFinalizedSeq: replicationRequest.LatestFinalizedSeq,
 			},
 		},
 	}
@@ -171,12 +173,69 @@ func newReplicationResponse(
 		}
 		latestQR = qr
 	}
+
+	// quorumRoundToP2P returns nil for the genesis finalization, which has no
+	// QC. In that case the field is omitted rather than dropping the response.
+	var latestSeqQR *p2p.QuorumRound
+	if replicationResponse.LatestFinalizedSeq != nil {
+		latestSeqQR = quorumRoundToP2P(replicationResponse.LatestFinalizedSeq)
+	}
+
 	return &p2p.Simplex{
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_ReplicationResponse{
 			ReplicationResponse: &p2p.ReplicationResponse{
 				Data:        qrs,
 				LatestRound: latestQR,
+				LatestSeq:   latestSeqQR,
+			},
+		},
+	}
+}
+
+func newBlockDigestRequest(
+	chainID ids.ID,
+	blockDigestRequest *common.BlockDigestRequest,
+) *p2p.Simplex {
+	return &p2p.Simplex{
+		ChainId: chainID[:],
+		Message: &p2p.Simplex_BlockDigestRequest{
+			BlockDigestRequest: &p2p.BlockDigestRequest{
+				Seq:    blockDigestRequest.Seq,
+				Digest: blockDigestRequest.Digest[:],
+			},
+		},
+	}
+}
+
+func newAuxiliaryInfo(
+	chainID ids.ID,
+	auxInfo *common.AuxiliaryInfo,
+) *p2p.Simplex {
+	return &p2p.Simplex{
+		ChainId: chainID[:],
+		Message: &p2p.Simplex_AuxiliaryInfo{
+			AuxiliaryInfo: &p2p.AuxiliaryInfo{
+				Epoch:   auxInfo.Epoch,
+				Version: uint32(auxInfo.Version),
+				Data:    auxInfo.Data,
+			},
+		},
+	}
+}
+
+func newEpochTransitionApproval(
+	chainID ids.ID,
+	approval *common.ValidatorSetApproval,
+) *p2p.Simplex {
+	return &p2p.Simplex{
+		ChainId: chainID[:],
+		Message: &p2p.Simplex_EpochTransitionApproval{
+			EpochTransitionApproval: &p2p.ValidatorSetApproval{
+				NodeId:        approval.NodeID[:],
+				AuxInfoDigest: approval.AuxInfoDigest[:],
+				PChainHeight:  approval.PChainHeight,
+				Signature:     approval.Signature,
 			},
 		},
 	}
