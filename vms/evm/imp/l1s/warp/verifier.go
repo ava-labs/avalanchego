@@ -30,7 +30,11 @@ const (
 // Pass `nil` for `uptime` if the chain does not yet wire up uptime
 // accounting; uptime messages are then refused with [VerifyErrCode].
 func NewVerifier(blocks saewarp.Backend, storage *saewarp.Storage, uptime *l1validators.Uptime) *saewarp.Verifier {
-	return saewarp.NewVerifier(blocks, storage, &UptimeVerifier{uptime: uptime})
+	return saewarp.NewVerifier(
+		blocks,
+		storage,
+		saewarp.WithAddressedCallVerifier(&UptimeVerifier{uptime: uptime}),
+	)
 }
 
 var _ saewarp.AddressedCallVerifier = (*UptimeVerifier)(nil)

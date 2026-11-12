@@ -10,6 +10,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/libevm/libevm/options"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
@@ -27,14 +29,31 @@ type Verifier struct {
 	addressedCall AddressedCallVerifier
 }
 
-// NewVerifier returns an ACP-118 message verifier. `addressedCall` MAY be nil,
-// in which case [payload.AddressedCall] payloads are rejected with
-// [UnknownMessageErrCode].
-func NewVerifier(backend Backend, storage *Storage, addressedCall AddressedCallVerifier) *Verifier {
+// An Option overrides default [Verifier] behavior.
+type Option = options.Option[verifierConfig]
+
+type verifierConfig struct {
+	addressedCall AddressedCallVerifier
+}
+
+// WithAddressedCallVerifier sets the [AddressedCallVerifier] consulted for
+// [payload.AddressedCall] messages that are not in [Storage]. By default, such
+// messages are rejected with [UnknownMessageErrCode].
+func WithAddressedCallVerifier(v AddressedCallVerifier) Option {
+	return options.Func[verifierConfig](func(c *verifierConfig) {
+		c.addressedCall = v
+	})
+}
+
+// NewVerifier returns an ACP-118 message verifier.
+func NewVerifier(backend Backend, storage *Storage, opts ...Option) *Verifier {
+	cfg := options.ApplyTo(&verifierConfig{
+		addressedCall: rejectAddressedCalls{},
+	}, opts...)
 	return &Verifier{
 		backend:       backend,
 		storage:       storage,
-		addressedCall: addressedCall,
+		addressedCall: cfg.addressedCall,
 	}
 }
 
@@ -52,6 +71,16 @@ type Backend interface {
 // package's error codes when their failures have the same classification.
 type AddressedCallVerifier interface {
 	VerifyAddressedCall(*payload.AddressedCall) *common.AppError
+}
+
+var _ AddressedCallVerifier = rejectAddressedCalls{}
+
+// rejectAddressedCalls rejects every [payload.AddressedCall] with
+// [UnknownMessageErrCode].
+type rejectAddressedCalls struct{}
+
+func (rejectAddressedCalls) VerifyAddressedCall(p *payload.AddressedCall) *common.AppError {
+	return unknownMessage(p)
 }
 
 // The error codes are returned by [Verifier.Verify] to identify why a message
@@ -98,10 +127,12 @@ func (v *Verifier) Verify(ctx context.Context, m *warp.UnsignedMessage, _ []byte
 		}
 		return nil
 	case *payload.AddressedCall:
-		if v.addressedCall != nil {
-			return v.addressedCall.VerifyAddressedCall(p)
-		}
+		return v.addressedCall.VerifyAddressedCall(p)
 	}
+	return unknownMessage(p)
+}
+
+func unknownMessage(p payload.Payload) *common.AppError {
 	return &common.AppError{
 		Code:    UnknownMessageErrCode,
 		Message: fmt.Sprintf("unknown %T message", p),

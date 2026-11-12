@@ -29,6 +29,7 @@ go_library(
         "//vms/platformvm/warp/payload",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//libevm/options",
         "@org_golang_x_sync//errgroup",
     ],
 )

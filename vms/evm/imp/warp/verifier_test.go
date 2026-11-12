@@ -58,7 +58,7 @@ func TestVerifier(t *testing.T) {
 		name           string
 		acceptedBlocks set.Set[ids.ID]
 		storage        *Storage
-		addressedCall  AddressedCallVerifier
+		opts           []Option
 		m              *warp.UnsignedMessage
 		want           *common.AppError
 	}{
@@ -96,16 +96,20 @@ func TestVerifier(t *testing.T) {
 			},
 		},
 		{
-			name:          "addressed_call_accepted_by_extension",
-			storage:       NewStorage(memdb.New()),
-			addressedCall: stubAddressedCallVerifier{},
-			m:             addressedCallMsg,
+			name:    "addressed_call_accepted_by_extension",
+			storage: NewStorage(memdb.New()),
+			opts: []Option{
+				WithAddressedCallVerifier(stubAddressedCallVerifier{}),
+			},
+			m: addressedCallMsg,
 		},
 		{
 			name:    "addressed_call_refused_by_extension",
 			storage: NewStorage(memdb.New()),
-			addressedCall: stubAddressedCallVerifier{
-				err: errRefused,
+			opts: []Option{
+				WithAddressedCallVerifier(stubAddressedCallVerifier{
+					err: errRefused,
+				}),
 			},
 			m:    addressedCallMsg,
 			want: errRefused,
@@ -130,7 +134,7 @@ func TestVerifier(t *testing.T) {
 			v := NewVerifier(
 				backend(test.acceptedBlocks),
 				test.storage,
-				test.addressedCall,
+				test.opts...,
 			)
 			err := v.Verify(t.Context(), test.m, nil)
 			require.ErrorIsf(t, err, test.want, "%T.Verify(...)", v)
