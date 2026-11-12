@@ -19,7 +19,7 @@ import (
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-// ErrBelowMinimum is returned by [Next] for a block built before the minimum
+// ErrBelowMinimum is returned by [Verify] for a block built before the minimum
 // block delay since its parent has elapsed.
 var ErrBelowMinimum = errors.New("block time below the ACP-226 minimum block delay")
 
@@ -39,15 +39,13 @@ func Earliest(parentTime time.Time, parent dynamic.DelayExponent) time.Time {
 	return parentTime.Add(parent.DelayDuration())
 }
 
-// Next returns the delay exponent of a block built at childTime, moved from its
-// parent's exponent toward desired (nil = no move). It returns
-// [ErrBelowMinimum] if childTime is before [Earliest].
-func Next(parentTime time.Time, parent dynamic.DelayExponent, childTime time.Time, desired *dynamic.DelayExponent) (dynamic.DelayExponent, error) {
+// Verify returns [ErrBelowMinimum] if childTime is before [Earliest].
+func Verify(parentTime time.Time, parent dynamic.DelayExponent, childTime time.Time) error {
 	if minTime := Earliest(parentTime, parent); childTime.Before(minTime) {
-		return 0, fmt.Errorf("%w: block time %s is before the minimum %s (parent %s + %s)",
+		return fmt.Errorf("%w: block time %s is before the minimum %s (parent %s + %s)",
 			ErrBelowMinimum, childTime, minTime, parentTime, parent.DelayDuration())
 	}
-	return parent.Toward(desired), nil
+	return nil
 }
 
 // MinEventSpacing is the minimum spacing between consecutive successful

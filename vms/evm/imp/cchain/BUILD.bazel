@@ -141,7 +141,6 @@ go_test(
         "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/contracts/warp",
-        "//graft/evm/acp226",
         "//graft/evm/predicate",
         "//ids",
         "//network/p2p",

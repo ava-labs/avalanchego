@@ -360,8 +360,8 @@ type builder struct {
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
 
-	de, err := blockdelay.Next(blockTime(parent), delayExponent(parent), now, b.desired.delayExponent)
-	if err != nil {
+	de := delayExponent(parent)
+	if err := blockdelay.Verify(blockTime(parent), de, now); err != nil {
 		return nil, err
 	}
 
@@ -372,8 +372,8 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting target exponent: %w", err)
 	}
-	// Move the remaining dynamic parameters toward this node's vote (nil = no
-	// move). [blockdelay.Next] already moved the delay exponent.
+	// Move each dynamic parameter toward this node's vote (nil = no move).
+	de = de.Toward(b.desired.delayExponent)
 	te = te.Toward(b.desired.targetExponent)
 	pe := priceExponent(parent).Toward(b.desired.priceExponent)
 	minDelayExcess := acp226.DelayExcess(de)

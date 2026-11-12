@@ -42,61 +42,35 @@ func TestExponent(t *testing.T) {
 	}
 }
 
-func TestNext(t *testing.T) {
+func TestVerify(t *testing.T) {
 	const parent = dynamic.InitialDelayExponent
 	var (
 		parentTime = time.Unix(1_000, 0)
 		minChild   = parentTime.Add(parent.DelayDuration())
-		higher     = parent + 1_000
-		lower      = parent - 1_000
-		near       = parent + 50
 	)
 	tests := []struct {
 		name      string
 		childTime time.Time
-		desired   *dynamic.DelayExponent
-		want      dynamic.DelayExponent
 		wantErr   error
 	}{
 		{
 			name:      "at_minimum",
 			childTime: minChild,
-			want:      parent,
 		},
 		{
 			name:      "after_minimum",
 			childTime: minChild.Add(time.Hour),
-			want:      parent,
 		},
 		{
 			name:      "below_minimum",
 			childTime: minChild.Add(-time.Millisecond),
 			wantErr:   ErrBelowMinimum,
 		},
-		{
-			name:      "toward_higher_desired",
-			childTime: minChild,
-			desired:   &higher,
-			want:      parent + 200, // ACP-226 caps each step at 200
-		},
-		{
-			name:      "toward_lower_desired",
-			childTime: minChild,
-			desired:   &lower,
-			want:      parent - 200,
-		},
-		{
-			name:      "reaches_desired",
-			childTime: minChild,
-			desired:   &near,
-			want:      near,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Next(parentTime, parent, tt.childTime, tt.desired)
-			require.ErrorIs(t, err, tt.wantErr, "Next()")
-			require.Equal(t, tt.want, got, "Next()")
+			err := Verify(parentTime, parent, tt.childTime)
+			require.ErrorIs(t, err, tt.wantErr, "Verify()")
 		})
 	}
 }
@@ -105,11 +79,9 @@ func TestPacerWaitForEvent(t *testing.T) {
 	errWait := errors.New("wait failed")
 	tests := []struct {
 		name string
-		// prev, if true, makes a call returning prevErr before the one under
-		// test, sincePrev before it.
-		prev       bool
-		prevErr    error
-		sincePrev  time.Duration
+		// prev holds the results of earlier calls, made immediately before the
+		// one under test.
+		prev       []error
 		earliestIn time.Duration
 		want       time.Duration
 	}{
@@ -124,27 +96,19 @@ func TestPacerWaitForEvent(t *testing.T) {
 		},
 		{
 			name:       "throttled",
-			prev:       true,
+			prev:       []error{nil},
 			earliestIn: -time.Second,
 			want:       MinEventSpacing,
 		},
 		{
-			name:       "throttle_partly_elapsed",
-			prev:       true,
-			sincePrev:  60 * time.Millisecond,
-			earliestIn: -time.Second,
-			want:       MinEventSpacing - 60*time.Millisecond,
-		},
-		{
 			name:       "build_time_after_throttle",
-			prev:       true,
+			prev:       []error{nil},
 			earliestIn: time.Second,
 			want:       time.Second,
 		},
 		{
 			name:       "previous_call_failed",
-			prev:       true,
-			prevErr:    errWait,
+			prev:       []error{errWait},
 			earliestIn: -time.Second,
 		},
 	}
@@ -152,12 +116,11 @@ func TestPacerWaitForEvent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				p := NewPacer(time.Now)
-				if tt.prev {
+				for _, prevErr := range tt.prev {
 					_, err := p.WaitForEvent(t.Context(), time.Time{}, func(context.Context) (snowcommon.Message, error) {
-						return snowcommon.PendingTxs, tt.prevErr
+						return snowcommon.PendingTxs, prevErr
 					})
-					require.ErrorIs(t, err, tt.prevErr, "WaitForEvent() previous call")
-					time.Sleep(tt.sincePrev)
+					require.ErrorIs(t, err, prevErr, "WaitForEvent() previous call")
 				}
 
 				start := time.Now()
