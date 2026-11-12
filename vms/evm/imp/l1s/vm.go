@@ -9,7 +9,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"slices"
 	"sync"
 	"time"
@@ -22,7 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/adaptor"
@@ -49,8 +47,6 @@ type VM struct {
 	*sae.VM          // created by [VM.Initialize]
 	*network.Network // created by [VM.Initialize]
 
-	ctx *snow.Context
-
 	// now is the clock provided to the [sae.VM] and is used for block building.
 	now func() time.Time
 	// clock drives the validator uptime tracker. It is allocated by
@@ -58,10 +54,6 @@ type VM struct {
 	clock *mockable.Clock
 
 	uptime *validators.Uptime
-
-	// handlers is built once by [VM.Initialize] and served verbatim by
-	// [VM.CreateHandlers].
-	handlers map[string]http.Handler
 
 	lastWaitForEvent utils.Atomic[time.Time]
 
@@ -165,7 +157,6 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
-	vm.ctx = snowCtx
 	vm.onClose = append(vm.onClose, vm.VM.Shutdown)
 
 	if vm.clock == nil {
@@ -184,40 +175,16 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("registering warp signature handler: %w", err)
 	}
 
-	if vm.handlers, err = vm.newHandlers(ctx); err != nil {
-		return fmt.Errorf("creating HTTP handlers: %w", err)
+	if err := vm.VM.RPCServer().RegisterName(validatorNamespace, l1api.NewValidator(vm.uptime)); err != nil {
+		return fmt.Errorf("registering %q RPC namespace: %w", validatorNamespace, err)
 	}
 
 	snowCtx.Log.Info("initialized L1 VM")
 	return nil
 }
 
-const (
-	validatorsServiceName       = "validators"
-	validatorsHTTPExtensionPath = "/" + validatorsServiceName
-)
-
-// newHandlers returns the HTTP handlers exposed by the underlying SAE VM
-// augmented with the L1 VM's validators service.
-func (vm *VM) newHandlers(ctx context.Context) (map[string]http.Handler, error) {
-	m, err := vm.VM.CreateHandlers(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	service := l1api.NewValidatorsAPI(vm.ctx.ValidatorState, vm.ctx.SubnetID, vm.uptime, vm.Network.ValidatorPeers)
-	handler, err := rpc.NewHandler(validatorsServiceName, service)
-	if err != nil {
-		return nil, fmt.Errorf("rpc.NewHandler(%s, ...): %w", validatorsServiceName, err)
-	}
-	m[validatorsHTTPExtensionPath] = handler
-	return m, nil
-}
-
-// CreateHandlers returns the HTTP handlers built by [VM.Initialize].
-func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
-	return vm.handlers, nil
-}
+// validatorNamespace is the JSON-RPC namespace of [l1api.Validator].
+const validatorNamespace = "validator"
 
 // Connected forwards to the embedded [network.Network] AFTER notifying the
 // validators manager.

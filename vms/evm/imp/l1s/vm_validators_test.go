@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/uptimetracker"
@@ -17,15 +18,6 @@ import (
 
 	l1api "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api"
 )
-
-// getCurrentValidators issues a `validators.getCurrentValidators` JSON-RPC
-// call via the l1SUT's typed validators client.
-func (s *l1SUT) getCurrentValidators(t *testing.T, nodeIDs []ids.NodeID) []l1api.CurrentValidator {
-	t.Helper()
-	validators, err := s.client.GetCurrentValidators(s.ctx, nodeIDs)
-	require.NoError(t, err)
-	return validators
-}
 
 // TestUptimeTracker exercises the SAE-side uptime tracker through
 // `vm.Connected/Disconnected` and a faked `mockable.Clock`.
@@ -98,70 +90,38 @@ func TestUptimeTrackerUnknownValidationID(t *testing.T) {
 	require.ErrorIs(t, err, uptimetracker.ErrValidationIDNotFound)
 }
 
-// TestGetCurrentValidatorsAPI exercises the `validators.getCurrentValidators`
-// JSON-RPC handler end-to-end:
-//   - Unfiltered query returns the configured validator set (one entry).
-//   - `IsConnected` toggles after `vm.Connected/Disconnected`.
-//   - `UptimeSeconds`/`UptimePercentage` reflect the faked clock.
-//   - A `NodeIDs` filter that excludes the only validator returns an empty
-//     list.
-func TestGetCurrentValidatorsAPI(t *testing.T) {
+// TestUptimeAPI asserts that `validator_uptime` reports the tracked uptime and
+// its last-updated time, and errors for an untracked validation ID.
+func TestUptimeAPI(t *testing.T) {
 	var (
 		testNodeID       = ids.GenerateTestNodeID()
 		testValidationID = ids.GenerateTestID()
 		baseTime         = time.Unix(0, 0)
 		startTime        = uint64(baseTime.Unix()) // #nosec G115 -- known positive test timestamp
-		now              = baseTime
 	)
 
 	sut := newL1SUT(
 		t,
 		withFork(upgradetest.Latest),
-		withNow(now),
+		withNow(baseTime),
 		withCurrentValidatorSet(testValidationID, testNodeID, startTime),
 	)
 
-	// (a) Unfiltered, pre-connect: one entry, IsConnected=false.
-	got := sut.getCurrentValidators(t, nil)
-	require.Lenf(t, got, 1, "expected exactly one current validator, got %d", len(got))
-	v := got[0]
-	require.Equal(t, testValidationID, v.ValidationID)
-	require.Equal(t, testNodeID, v.NodeID)
-	require.Equal(t, startTime, v.StartTimestamp)
-	require.Falsef(t, v.IsConnected, "validator should not be reported as connected before vm.Connected")
-
-	// (b) Connect + advance clock 1h: IsConnected=true, uptime 1h.
+	// Connected for 1h then disconnected for 1h, so the uptime and
+	// last-updated time differ.
 	require.NoError(t, sut.vm.Connected(sut.ctx, testNodeID, version.Current))
 	sut.advanceTime(t, 1*time.Hour)
-
-	got = sut.getCurrentValidators(t, nil)
-	require.Len(t, got, 1)
-	v = got[0]
-	require.Truef(t, v.IsConnected, "validator should be reported as connected after vm.Connected")
-	require.Equalf(t, uint64(3600), v.UptimeSeconds, "uptime should be 1h (3600s)")
-	require.Equalf(t, uint64(100), uint64(v.UptimePercentage),
-		"uptime percentage should be 100%% (was connected for the entire window)")
-
-	// (c) Disconnect + advance another hour: IsConnected=false; uptime
-	//     percentage drops to ~50% (1h connected out of 2h tracked).
 	require.NoError(t, sut.vm.Disconnected(sut.ctx, testNodeID))
 	sut.advanceTime(t, 1*time.Hour)
 
-	got = sut.getCurrentValidators(t, nil)
-	require.Len(t, got, 1)
-	v = got[0]
-	require.Falsef(t, v.IsConnected, "validator should not be reported as connected after vm.Disconnected")
-	require.Equalf(t, uint64(3600), v.UptimeSeconds, "uptime must NOT advance while disconnected")
-	require.Equalf(t, uint64(50), uint64(v.UptimePercentage),
-		"uptime percentage should be 50%% (1h connected out of 2h tracked)")
+	got, err := sut.client.Uptime(sut.ctx, testValidationID)
+	require.NoError(t, err)
+	want := &l1api.Uptime{
+		Seconds:     hexutil.Uint64((1 * time.Hour).Seconds()),
+		LastUpdated: hexutil.Uint64(baseTime.Add(2 * time.Hour).Unix()),
+	}
+	require.Equal(t, want, got)
 
-	// (d) Filter that excludes the only validator: empty result.
-	other := ids.GenerateTestNodeID()
-	got = sut.getCurrentValidators(t, []ids.NodeID{other})
-	require.Emptyf(t, got, "filter excluding the only validator should return an empty list")
-
-	// (e) Filter that includes the only validator: still one entry.
-	got = sut.getCurrentValidators(t, []ids.NodeID{testNodeID})
-	require.Len(t, got, 1)
-	require.Equal(t, testNodeID, got[0].NodeID)
+	_, err = sut.client.Uptime(sut.ctx, ids.GenerateTestID())
+	require.ErrorContains(t, err, uptimetracker.ErrValidationIDNotFound.Error()) //nolint:forbidigo // RPC error
 }

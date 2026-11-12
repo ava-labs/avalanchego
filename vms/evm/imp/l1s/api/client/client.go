@@ -7,37 +7,42 @@ package client
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/ava-labs/libevm/rpc"
+
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/evm/evmclient"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api/validatorsclient"
+
+	l1api "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api"
 )
 
-// Disambiguation of the different client types to allow for embedding all in
-// the same struct.
-type (
-	EVM        = evmclient.Client
-	Validators = validatorsclient.Client
-)
-
-// Client talks to a `vms/evm/imp/l1s` chain. It unions the [evmclient.Client]
-// with the [validatorsclient.Client].
+// Client talks to a `vms/evm/imp/l1s` chain. It extends [evmclient.Client]
+// with the L1-specific JSON-RPC methods.
 //
-// Construct with [Dial]. Call [Client.Close] when done.
+// Construct with [Dial] or [New]. Call [Client.Close] when done.
 type Client struct {
-	*EVM
-	*Validators
+	*evmclient.Client
 }
 
-// Dial connects to a chain at an explicit base URL. The `/rpc` and
-// `/validators` suffixes are appended internally.
-func Dial(ctx context.Context, url string) (*Client, error) {
-	c, err := evmclient.Dial(ctx, url+"/rpc")
+// Dial connects a client to the given URL with context.
+func Dial(ctx context.Context, rawurl string) (*Client, error) {
+	c, err := rpc.DialContext(ctx, rawurl)
 	if err != nil {
-		return nil, fmt.Errorf("dial %s/rpc: %w", url, err)
+		return nil, err
 	}
-	return &Client{
-		EVM:        c,
-		Validators: validatorsclient.New(url + "/validators"),
-	}, nil
+	return New(c), nil
+}
+
+// New creates a [Client] that uses the given RPC client.
+func New(c *rpc.Client) *Client {
+	return &Client{evmclient.New(c)}
+}
+
+// Uptime returns the uptime of `validationID` as observed by the node.
+func (c *Client) Uptime(ctx context.Context, validationID ids.ID) (*l1api.Uptime, error) {
+	res := &l1api.Uptime{}
+	if err := c.CallContext(ctx, res, "validator_uptime", validationID); err != nil {
+		return nil, err
+	}
+	return res, nil
 }

@@ -2,15 +2,12 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "api",
-    srcs = ["validators.go"],
+    srcs = ["validator.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api",
     visibility = ["//visibility:public"],
     deps = [
-        "//graft/subnet-evm/plugin/evm/client",
         "//ids",
-        "//network/p2p",
-        "//snow/validators",
-        "//utils/set",
         "//vms/evm/imp/l1s/validators",
+        "@com_github_ava_labs_libevm//common/hexutil",
     ],
 )

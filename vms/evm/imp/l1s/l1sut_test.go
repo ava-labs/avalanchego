@@ -226,16 +226,15 @@ func (s *l1SUT) bootVM(t *testing.T, clockTime *time.Time) {
 	handlers, err := vm.CreateHandlers(s.ctx)
 	require.NoError(t, err)
 
-	// Mount every handler returned by `CreateHandlers` on a single shared
-	// mux so typed JSON-RPC clients can target a single base URL (matching
-	// how AvalancheGo serves these in production).
+	// Mount every handler returned by `CreateHandlers` at its extension path,
+	// matching how AvalancheGo serves these in production.
 	apiMux := http.NewServeMux()
 	for path, handler := range handlers {
 		apiMux.Handle(path, handler)
 	}
 	apiServer := httptest.NewServer(apiMux)
 
-	c, err := client.Dial(s.ctx, apiServer.URL)
+	c, err := client.Dial(s.ctx, apiServer.URL+"/rpc")
 	require.NoError(t, err)
 
 	// Mimic the engine: on entering normal operation it points the VM at the
