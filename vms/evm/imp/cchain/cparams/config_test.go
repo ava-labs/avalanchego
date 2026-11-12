@@ -12,10 +12,12 @@ import (
 	"github.com/arr4n/shed/testerr"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/customtypes"
 
 	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -325,6 +327,34 @@ func TestIsForked(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &ChainConfig{ApricotPhase1Timestamp: tt.ts}
 			require.Equalf(t, tt.isForked, c.IsApricotPhase1(tt.head), "%T.IsApricotPhase1(%d)", c, tt.head)
+		})
+	}
+}
+
+func TestRules_ExtraFormat(t *testing.T) {
+	tests := []struct {
+		name  string
+		rules Rules
+		want  customtypes.ExtraFormat
+	}{
+		{
+			name: "pre_fortuna",
+			want: customtypes.AP3ExtraFormat,
+		},
+		{
+			name:  "fortuna",
+			rules: Rules{IsFortuna: true},
+			want:  customtypes.FortunaExtraFormat,
+		},
+		{
+			name:  "helicon",
+			rules: Rules{IsFortuna: true, IsHelicon: true},
+			want:  customtypes.HeliconExtraFormat,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, tt.rules.ExtraFormat(), "%+v.ExtraFormat()", tt.rules)
 		})
 	}
 }

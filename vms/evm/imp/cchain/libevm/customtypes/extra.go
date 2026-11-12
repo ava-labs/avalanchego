@@ -10,10 +10,23 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
+)
+
+// An ExtraFormat is a layout of a header's Extra field.
+type ExtraFormat uint8
+
+const (
+	// AP3ExtraFormat prefixes the predicate results with the Apricot Phase 3
+	// fee window.
+	AP3ExtraFormat ExtraFormat = iota
+	// FortunaExtraFormat prefixes the predicate results with the ACP-176 fee
+	// state.
+	FortunaExtraFormat
+	// HeliconExtraFormat holds only the predicate results.
+	HeliconExtraFormat
 )
 
 // Sizes of the fee state that prefixes the extra data of pre-Helicon headers.
@@ -22,12 +35,13 @@ const (
 	acp176StateSize = 3 * wrappers.LongLen // capacity, excess, target excess
 )
 
-// PredicateResults returns the parsed predicate results from the header's extra
-// data. If the extra data does not contain predicate results, or cannot be
-// parsed, nil is returned. The same rules MUST be supplied for each call to a
-// given header.
-func PredicateResults(h *ethtypes.Header, rules cparams.Rules) predicate.BlockResults {
-	predicateBytes := predicateBytesFromExtra(rules, h.Extra)
+var ErrInsufficientFeeState = errors.New("insufficient length for ACP-176 fee state")
+
+// PredicateResults returns the predicate results stored in h.Extra, caching
+// them on h. If there are none, or they cannot be parsed, nil is returned. The
+// format MUST be the one in effect at h's timestamp.
+func PredicateResults(h *ethtypes.Header, format ExtraFormat) predicate.BlockResults {
+	predicateBytes := predicateBytesFromExtra(format, h.Extra)
 	if len(predicateBytes) == 0 {
 		return nil
 	}
@@ -43,16 +57,14 @@ func PredicateResults(h *ethtypes.Header, rules cparams.Rules) predicate.BlockRe
 	return results
 }
 
-var ErrInsufficientFeeState = errors.New("insufficient length for ACP-176 fee state")
-
 // predicateBytesFromExtra returns the predicate result bytes from the header's
 // extra data. If the extra data is not long enough, an empty slice is returned.
-func predicateBytesFromExtra(rules cparams.Rules, extra []byte) []byte {
+func predicateBytesFromExtra(format ExtraFormat, extra []byte) []byte {
 	offset := ap3WindowSize
-	switch {
-	case rules.IsHelicon:
+	switch format {
+	case HeliconExtraFormat:
 		offset = 0
-	case rules.IsFortuna:
+	case FortunaExtraFormat:
 		offset = acp176StateSize
 	}
 	// Prior to Durango, the VM enforces the extra data is smaller than or equal

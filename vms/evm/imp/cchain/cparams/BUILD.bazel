@@ -16,6 +16,7 @@ go_library(
         "//snow",
         "//upgrade",
         "//utils",
+        "//vms/evm/imp/cchain/libevm/customtypes",
         "@com_github_ava_labs_libevm//params",
     ],
 )
@@ -28,10 +29,12 @@ go_test(
         "//graft/coreth/params",
         "//snow/snowtest",
         "//vms/evm/imp/cchain/libevm",
+        "//vms/evm/imp/cchain/libevm/customtypes",
         "@com_github_arr4n_shed//testerr",
         "@com_github_ava_labs_libevm//params",
         "@com_github_google_go_cmp//cmp",
         "@com_github_google_go_cmp//cmp/cmpopts",
+        "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
 )

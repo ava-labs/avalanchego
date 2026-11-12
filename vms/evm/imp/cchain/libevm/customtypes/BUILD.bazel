@@ -20,7 +20,6 @@ go_library(
     deps = [
         "//graft/evm/predicate",
         "//utils/wrappers",
-        "//vms/evm/imp/cchain/cparams",
         "//vms/evm/imp/dynamic",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",
@@ -44,9 +43,10 @@ go_test(
     ],
     embed = [":customtypes"],
     deps = [
+        "//graft/evm/predicate",
         "//utils",
+        "//utils/set",
         "//utils/wrappers",
-        "//vms/evm/imp/cchain/cparams",
         "//vms/evm/imp/dynamic",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",

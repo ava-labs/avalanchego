@@ -8,88 +8,92 @@ import (
 	"encoding/binary"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
+
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
-func TestPredicateBytesFromExtra(t *testing.T) {
+func TestPredicateResults(t *testing.T) {
+	results := predicate.BlockResults{
+		common.Hash{1}: {common.Address{2}: set.NewBits(3)},
+	}
+	resultsBytes, err := results.Bytes()
+	require.NoError(t, err, "BlockResults.Bytes()")
+
+	// Non-zero prefixes catch the results being parsed from the wrong offset.
+	ap3Window := bytes.Repeat([]byte{0xff}, ap3WindowSize)
+	feeState := bytes.Repeat([]byte{0xff}, acp176StateSize)
+	cat := func(a, b []byte) []byte { return append(bytes.Clone(a), b...) }
+
 	tests := []struct {
-		name  string
-		rules cparams.Rules
-		extra []byte
-		want  []byte
+		name   string
+		format ExtraFormat
+		extra  []byte
+		want   predicate.BlockResults
 	}{
 		{
-			name: "empty_extra",
+			name:   "ap3_empty_extra",
+			format: AP3ExtraFormat,
 		},
 		{
-			name:  "too_short",
-			extra: make([]byte, ap3WindowSize-1),
+			name:   "ap3_too_short",
+			format: AP3ExtraFormat,
+			extra:  ap3Window[1:],
 		},
 		{
-			name:  "empty_predicate",
-			extra: make([]byte, ap3WindowSize),
+			name:   "ap3_no_results",
+			format: AP3ExtraFormat,
+			extra:  ap3Window,
 		},
 		{
-			name: "non_empty_predicate",
-			extra: []byte{
-				ap3WindowSize: 5,
-			},
-			want: []byte{5},
+			name:   "ap3_results",
+			format: AP3ExtraFormat,
+			extra:  cat(ap3Window, resultsBytes),
+			want:   results,
 		},
 		{
-			name: "fortuna_empty_extra",
-			rules: cparams.Rules{
-				IsFortuna: true,
-			},
+			name:   "fortuna_empty_extra",
+			format: FortunaExtraFormat,
 		},
 		{
-			name: "fortuna_too_short",
-			rules: cparams.Rules{
-				IsFortuna: true,
-			},
-			extra: make([]byte, acp176StateSize-1),
+			name:   "fortuna_no_results",
+			format: FortunaExtraFormat,
+			extra:  feeState,
 		},
 		{
-			name: "fortuna_empty_predicate",
-			rules: cparams.Rules{
-				IsFortuna: true,
-			},
-			extra: make([]byte, acp176StateSize),
+			name:   "fortuna_results",
+			format: FortunaExtraFormat,
+			extra:  cat(feeState, resultsBytes),
+			want:   results,
 		},
 		{
-			name: "fortuna_non_empty_predicate",
-			rules: cparams.Rules{
-				IsFortuna: true,
-			},
-			extra: []byte{
-				acp176StateSize: 5,
-			},
-			want: []byte{5},
+			name:   "helicon_empty_extra",
+			format: HeliconExtraFormat,
 		},
 		{
-			name: "helicon_empty_predicate",
-			rules: cparams.Rules{
-				IsHelicon: true,
-			},
+			name:   "helicon_results",
+			format: HeliconExtraFormat,
+			extra:  resultsBytes,
+			want:   results,
 		},
 		{
-			name: "helicon_non_empty_predicate",
-			rules: cparams.Rules{
-				IsHelicon: true,
-			},
-			extra: []byte{5},
-			want:  []byte{5},
+			name:   "unparseable_results",
+			format: HeliconExtraFormat,
+			extra:  []byte{0xff},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := predicateBytesFromExtra(tt.rules, tt.extra)
-			require.Equal(t, tt.want, got, "predicateBytesFromExtra()")
+			h := &ethtypes.Header{Extra: tt.extra}
+			got := PredicateResults(h, tt.format)
+			require.Equal(t, tt.want, got, "PredicateResults(%v)", tt.format)
 		})
 	}
 }

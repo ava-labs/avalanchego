@@ -192,7 +192,7 @@ func newEnvironment(env vm.PrecompileEnvironment) (*environment, error) {
 
 	return &environment{
 		PrecompileEnvironment: env,
-		predicateResults:      customtypes.PredicateResults(env.BlockHeader(), *rules),
+		predicateResults:      customtypes.PredicateResults(env.BlockHeader(), rules.ExtraFormat()),
 		rules:                 rules,
 	}, nil
 }

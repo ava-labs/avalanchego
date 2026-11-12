@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/customtypes"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -309,4 +310,16 @@ func (r Rules) IsGraniteActivated() bool {
 
 func (r Rules) IsDurangoActivated() bool {
 	return r.IsDurango
+}
+
+// ExtraFormat returns the layout of the Extra field of headers built under r.
+func (r Rules) ExtraFormat() customtypes.ExtraFormat {
+	switch {
+	case r.IsHelicon:
+		return customtypes.HeliconExtraFormat
+	case r.IsFortuna:
+		return customtypes.FortunaExtraFormat
+	default:
+		return customtypes.AP3ExtraFormat
+	}
 }
