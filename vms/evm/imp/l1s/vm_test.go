@@ -242,8 +242,8 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 	}
 }
 
-// sendTx sends a transfer from wallet's first account and waits for it to be
-// pending in sut's mempool.
+// sendTx sends a transfer from wallet's first account directly to sut's
+// backend, so it works without RPC transport, and waits for it to be pending.
 func sendTx(ctx context.Context, tb testing.TB, sut *SUT, wallet *saetest.Wallet) {
 	tb.Helper()
 
@@ -252,8 +252,9 @@ func sendTx(ctx context.Context, tb testing.TB, sut *SUT, wallet *saetest.Wallet
 		Gas:       ethparams.TxGas,
 		GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
 	})
-	require.NoErrorf(tb, sut.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction()", sut.EthClient())
-	txgossiptest.WaitUntilPending(tb, ctx, sut.GethRPCBackends(), tx)
+	backend := sut.GethRPCBackends()
+	require.NoErrorf(tb, backend.SendTx(ctx, tx), "%T.SendTx()", backend)
+	txgossiptest.WaitUntilPending(tb, ctx, backend, tx)
 }
 
 func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
@@ -277,6 +278,10 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 // a pending tx until the preferred block's ACP-226 minimum delay has elapsed.
 func TestWaitForEventMinDelayPacing(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
+		// Build an in-process SUT with no real RPC transport: real sockets never
+		// reach a durable block under synctest, so [sendTx] primes the txpool via
+		// the backend rather than through the absent EthClient.
+		//
 		// Do not build/execute blocks: this test is only synctest-teardown-safe
 		// because it runs no blocks (a block can reactivate a goleak-suppressed
 		// libevm shutdown race that deadlocks the bubble).
@@ -284,15 +289,10 @@ func TestWaitForEventMinDelayPacing(t *testing.T) {
 		timeOpt, _ := withVMTime(upgrade.InitiallyActiveTime)
 		ctx, sut := newSUT(t, withMaxAllocFor(wallet.Addresses()...), timeOpt, withoutRPCTransport())
 
-		tx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
-			To:        &common.Address{1},
-			Gas:       ethparams.TxGas,
-			GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
-		})
-		require.NoErrorf(t, sut.GethRPCBackends().SendTx(ctx, tx), "%T.SendTx()", sut.GethRPCBackends())
+		sendTx(ctx, t, sut, wallet)
 
 		start := time.Now()
-		got, err := sut.VM.WaitForEvent(ctx)
+		got, err := sut.WaitForEvent(ctx)
 		require.NoErrorf(t, err, "%T.WaitForEvent()", sut.VM)
 		require.Equalf(t, snowcommon.PendingTxs, got, "%T.WaitForEvent()", sut.VM)
 		require.Equalf(t, dynamic.InitialDelayExponent.DelayDuration(), time.Since(start), "%T.WaitForEvent() blocking duration", sut.VM)
