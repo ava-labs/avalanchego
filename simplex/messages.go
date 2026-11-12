@@ -154,8 +154,9 @@ func newReplicationResponse(
 	replicationResponse *common.VerifiedReplicationResponse,
 ) *p2p.Simplex {
 	data := replicationResponse.Data
-	latestRound := replicationResponse.LatestRound
 
+	// quorumRoundToP2P returns nil for the genesis finalization, which has no
+	// QC and therefore can't be sent. Such rounds are omitted from the response.
 	qrs := make([]*p2p.QuorumRound, 0, len(data))
 	for _, qr := range data {
 		p2pQR := quorumRoundToP2P(&qr)
@@ -165,32 +166,25 @@ func newReplicationResponse(
 		qrs = append(qrs, p2pQR)
 	}
 
-	var latestQR *p2p.QuorumRound
-	if latestRound != nil {
-		qr := quorumRoundToP2P(latestRound)
-		if qr == nil {
-			return nil
-		}
-		latestQR = qr
-	}
-
-	// quorumRoundToP2P returns nil for the genesis finalization, which has no
-	// QC. In that case the field is omitted rather than dropping the response.
-	var latestSeqQR *p2p.QuorumRound
-	if replicationResponse.LatestFinalizedSeq != nil {
-		latestSeqQR = quorumRoundToP2P(replicationResponse.LatestFinalizedSeq)
-	}
-
 	return &p2p.Simplex{
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_ReplicationResponse{
 			ReplicationResponse: &p2p.ReplicationResponse{
 				Data:        qrs,
-				LatestRound: latestQR,
-				LatestSeq:   latestSeqQR,
+				LatestRound: maybeQuorumRoundToP2P(replicationResponse.LatestRound),
+				LatestSeq:   maybeQuorumRoundToP2P(replicationResponse.LatestFinalizedSeq),
 			},
 		},
 	}
+}
+
+// maybeQuorumRoundToP2P is like quorumRoundToP2P, but returns nil if [qr] is
+// nil.
+func maybeQuorumRoundToP2P(qr *common.VerifiedQuorumRound) *p2p.QuorumRound {
+	if qr == nil {
+		return nil
+	}
+	return quorumRoundToP2P(qr)
 }
 
 func newBlockDigestRequest(
