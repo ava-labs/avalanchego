@@ -21,7 +21,7 @@ type Uptime struct {
 }
 
 // Validator is the JSON-RPC service for validator data that only this node
-// observes. Validator set data is served by the P-Chain.
+// observes.
 type Validator struct {
 	uptime *validators.Uptime
 }
@@ -31,8 +31,7 @@ func NewValidator(uptime *validators.Uptime) *Validator {
 	return &Validator{uptime: uptime}
 }
 
-// Uptime returns the uptime of `validationID`. It errors if the validation is
-// not tracked.
+// Uptime returns the uptime of `validationID`.
 func (v *Validator) Uptime(validationID ids.ID) (*Uptime, error) {
 	upDuration, lastUpdated, err := v.uptime.GetUptime(validationID)
 	if err != nil {
