@@ -1,18 +1,16 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package params
+package cparams
 
 import (
 	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 )
 
-func TestRulesExtra_MinimumGasConsumption(t *testing.T) {
+func TestRules_MinimumGasConsumption(t *testing.T) {
 	tests := []struct {
 		name      string
 		isHelicon bool
@@ -27,7 +25,7 @@ func TestRulesExtra_MinimumGasConsumption(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := RulesExtra(cparams.Rules{IsHelicon: tt.isHelicon})
+			r := Rules{IsHelicon: tt.isHelicon}
 			assert.Equalf(t, tt.want, r.MinimumGasConsumption(tt.limit), "%T.MinimumGasConsumption(%d)", r, tt.limit)
 		})
 	}

@@ -8,30 +8,53 @@ package(default_visibility = [
 
 go_library(
     name = "cparams",
-    srcs = ["config.go"],
+    srcs = [
+        "config.go",
+        "extra.go",
+        "register.go",
+        "rules.go",
+    ],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams",
     visibility = ["//visibility:public"],
     deps = [
+        "//graft/coreth/nativeasset",
+        "//graft/coreth/plugin/evm/customtypes",
+        "//graft/coreth/precompile/contract",
+        "//graft/coreth/precompile/contracts/warp",
         "//graft/evm/precompileconfig",
+        "//graft/evm/predicate",
         "//snow",
         "//upgrade",
         "//utils",
+        "//utils/set",
+        "//utils/wrappers",
+        "//vms/evm/hook",
+        "//vms/evm/imp/dynamic",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//params",
     ],
 )
 
 go_test(
     name = "cparams_test",
-    srcs = ["config_test.go"],
+    srcs = [
+        "config_test.go",
+        "extra_test.go",
+        "rules_test.go",
+    ],
+    embed = [":cparams"],
     deps = [
-        ":cparams",
-        "//graft/coreth/params",
         "//snow/snowtest",
+        "//utils/wrappers",
         "//vms/evm/imp/cchain/libevm",
+        "//vms/evm/imp/dynamic",
         "@com_github_arr4n_shed//testerr",
         "@com_github_ava_labs_libevm//params",
         "@com_github_google_go_cmp//cmp",
         "@com_github_google_go_cmp//cmp/cmpopts",
+        "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
 )

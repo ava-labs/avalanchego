@@ -10,8 +10,8 @@ go_library(
     srcs = ["libevm.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm",
     deps = [
-        "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
+        "//vms/evm/imp/cchain/cparams",
         "//vms/evm/imp/cchain/libevm/extstate",
         "//vms/evm/imp/cchain/libevm/vm",
         "@com_github_ava_labs_libevm//libevm",
