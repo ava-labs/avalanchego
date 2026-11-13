@@ -6,7 +6,6 @@ package types
 import (
 	"context"
 
-	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/evm/message"
 )
 
@@ -39,16 +38,4 @@ type LeafClient interface {
 	// GetLeafs synchronously sends the given request, returning a parsed LeafsResponse or error.
 	// Note: this verifies the response including the range proofs.
 	GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error)
-}
-
-// Extender is an interface that allows for extending the state sync process.
-type Extender interface {
-	// CreateSyncer creates a syncer instance for the given client, database, and summary.
-	CreateSyncer(client LeafClient, verDB *versiondb.Database, summary message.Syncable) (Syncer, error)
-
-	// OnFinishBeforeCommit is called before committing the sync results.
-	OnFinishBeforeCommit(lastAcceptedHeight uint64, summary message.Syncable) error
-
-	// OnFinishAfterCommit is called after committing the sync results.
-	OnFinishAfterCommit(summaryHeight uint64) error
 }

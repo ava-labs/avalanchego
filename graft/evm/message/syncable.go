@@ -37,8 +37,8 @@ type SyncSummaryProvider interface {
 
 type AcceptImplFn func(Syncable) (block.StateSyncMode, error)
 
-// ParseSyncableSummary unmarshals `summaryBytes` into `summary` and returns its ID.
-func ParseSyncableSummary(c codec.Manager, summaryBytes []byte, summary any) (ids.ID, error) {
+// parseSyncableSummary unmarshals `summaryBytes` into `summary` and returns its ID.
+func parseSyncableSummary(c codec.Manager, summaryBytes []byte, summary any) (ids.ID, error) {
 	if _, err := c.Unmarshal(summaryBytes, summary); err != nil {
 		return ids.Empty, fmt.Errorf("%w: %w", errParseSyncableSummary, err)
 	}

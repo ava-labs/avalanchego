@@ -37,7 +37,7 @@ func FillAccountsWithOverlappingStorage(
 ) (common.Hash, map[*utilstest.Key]*types.StateAccount) {
 	storageRoots := make([]common.Hash, 0, numOverlappingStorageRoots)
 	for i := 0; i < numOverlappingStorageRoots; i++ {
-		storageRoot, _, _ := GenerateIndependentTrie(t, r, s.TrieDB(), 16, common.HashLength)
+		storageRoot, _, _ := GenerateIndependentTrie(t, r, s.TrieDB(), 16)
 		storageRoots = append(storageRoots, storageRoot)
 	}
 	storageRootIndex := 0
@@ -59,27 +59,18 @@ func FillAccountsWithOverlappingStorage(
 // Returns the root of the generated trie, the slice of keys inserted into the trie in lexicographical
 // order, and the slice of corresponding values.
 //
-// This is safe for use with HashDB, intended for use creating a storage trie independent of an account,
-// or for an atomic trie.
-func GenerateIndependentTrie(t *testing.T, r *rand.Rand, trieDB *triedb.Database, numKeys int, keySize int) (common.Hash, [][]byte, [][]byte) {
-	require.GreaterOrEqual(t, keySize, wrappers.LongLen+1, "key size must be at least 9 bytes (8 bytes for uint64 and 1 random byte)")
-	return FillIndependentTrie(t, r, 0, numKeys, keySize, trieDB, types.EmptyRootHash)
-}
-
-// FillIndependentTrie fills a given trie with [numKeys] random keys, each of size [keySize]
-// returns inserted keys and values
-//
-// This is safe for use with HashDB.
-func FillIndependentTrie(t *testing.T, r *rand.Rand, start, numKeys int, keySize int, trieDB *triedb.Database, root common.Hash) (common.Hash, [][]byte, [][]byte) {
-	testTrie, err := trie.New(trie.TrieID(root), trieDB)
+// This is safe for use with HashDB, intended for use creating a storage trie
+// independent of an account.
+func GenerateIndependentTrie(t *testing.T, r *rand.Rand, trieDB *triedb.Database, numKeys int) (common.Hash, [][]byte, [][]byte) {
+	testTrie, err := trie.New(trie.TrieID(types.EmptyRootHash), trieDB)
 	require.NoError(t, err)
 
 	keys := make([][]byte, 0, numKeys)
 	values := make([][]byte, 0, numKeys)
 
 	// Generate key-value pairs
-	for i := start; i < numKeys; i++ {
-		key := make([]byte, keySize)
+	for i := 0; i < numKeys; i++ {
+		key := make([]byte, common.HashLength)
 		binary.BigEndian.PutUint64(key[:wrappers.LongLen], uint64(i+1))
 		_, err := r.Read(key[wrappers.LongLen:])
 		require.NoError(t, err)
@@ -96,7 +87,7 @@ func FillIndependentTrie(t *testing.T, r *rand.Rand, start, numKeys int, keySize
 	// Commit the root to [trieDB]
 	nextRoot, nodes, err := testTrie.Commit(false)
 	require.NoError(t, err)
-	require.NoError(t, trieDB.Update(nextRoot, root, 0, trienode.NewWithNodeSet(nodes), nil))
+	require.NoError(t, trieDB.Update(nextRoot, types.EmptyRootHash, 0, trienode.NewWithNodeSet(nodes), nil))
 	require.NoError(t, trieDB.Commit(nextRoot, false))
 
 	return nextRoot, keys, values

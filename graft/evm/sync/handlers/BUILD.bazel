@@ -41,10 +41,8 @@ graft_go_test(
     ],
     embed = [":handlers"],
     deps = [
-        "//codec",
         "//graft/evm/core/state/snapshot",
         "//graft/evm/message",
-        "//graft/evm/message/messagetest",
         "//graft/evm/sync/handlers/stats",
         "//graft/evm/sync/handlers/stats/statstest",
         "//graft/evm/sync/synctest",

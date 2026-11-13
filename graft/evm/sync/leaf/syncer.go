@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	ErrFailedToFetchLeafs = errors.New("failed to fetch leafs")
+	errFailedToFetchLeafs = errors.New("failed to fetch leafs")
 	ErrMoreWithoutKeys    = errors.New("more leaves reported but none returned")
 )
 
@@ -116,7 +116,7 @@ func (c *CallbackSyncer) syncTask(ctx context.Context, task SyncTask) error {
 			Limit:   c.config.RequestSize,
 		})
 		if err != nil {
-			return fmt.Errorf("%w: %w", ErrFailedToFetchLeafs, err)
+			return fmt.Errorf("%w: %w", errFailedToFetchLeafs, err)
 		}
 
 		// The request carries no end key, so bound the response here. The common
