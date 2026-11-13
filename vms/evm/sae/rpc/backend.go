@@ -40,7 +40,7 @@ type backend struct {
 	*gasprice.Estimator
 	*txgossip.Set
 	chainIndexer
-	bloomOverrider
+	cachedBloomOverrider
 	replaySlots chan struct{}
 	*bloomIndexer
 }
