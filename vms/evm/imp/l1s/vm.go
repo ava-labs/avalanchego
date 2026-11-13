@@ -92,7 +92,8 @@ func (vm *VM) Initialize(
 
 	// TODO: Support state sync, which requires the [sae.VM] to be created
 	// after the node has finished state syncing.
-	vm.VM, err = sae.NewVM(ctx, hookadaptor.Convert(newHooks(snowCtx, vm.now)), saeConfig, snowCtx, genesis.Config, ethDB, vm.Network)
+	hooks := hookadaptor.Convert(newHooks(snowCtx, genesis.Config, vm.now))
+	vm.VM, err = sae.NewVM(ctx, hooks, saeConfig, snowCtx, genesis.Config, ethDB, vm.Network)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}

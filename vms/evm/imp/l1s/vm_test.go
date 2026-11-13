@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/options"
@@ -25,6 +26,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/stateupgrade"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -228,4 +231,98 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 			assert.Equal(t, tt.wantGasUsed, receipts[i].GasUsed, "receipt GasUsed")
 		})
 	}
+}
+
+// TestStateUpgradeAppliedasserts that a state upgrade activating in a block is
+// applied before that block's transactions are executed.
+func TestStateUpgradeApplied(t *testing.T) {
+	var (
+		upgradeAddr = common.Address{'t', 'a', 'r', 'g', 'e', 't'}
+		marker      = []byte("upgraded")
+		code        = saetest.LogTopOfStackAfter(saetest.Push(t, marker))
+	)
+
+	// upgradeTime MUST be after genesis.
+	upgradeTime := time.Unix(int64(testGenesisTime)+10, 0) //#nosec G115 -- Won't overflow
+	upgradeUnix := uint64(upgradeTime.Unix())              //#nosec G115 -- Known non-negative
+
+	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSignerForChainID(big.NewInt(testChainID)))
+	timeOpt, _ := withVMTime(upgradeTime)
+	ctx, sut := newSUT(t,
+		withMaxAllocFor(wallet.Addresses()...),
+		timeOpt,
+		options.Func[sutConfig](func(c *sutConfig) {
+			c.upgrades.StateUpgrades = []stateupgrade.Block{{
+				Timestamp: &upgradeUnix,
+				Accounts: map[common.Address]stateupgrade.Account{
+					upgradeAddr: {Code: code},
+				},
+			}}
+		}),
+	)
+
+	tx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &upgradeAddr,
+		Gas:       100_000,
+		GasTipCap: big.NewInt(1),
+		GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
+	})
+	require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction()", sut.EthClient())
+	sut.WaitForPendingTxs(ctx, t, tx)
+
+	blk := sut.BuildVerifyAccept(ctx, t)
+	require.Equal(t, upgradeUnix, blk.Header().Time, "block time MUST activate the state upgrade")
+	require.NoErrorf(t, blk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", blk)
+
+	receipts := blk.Receipts()
+	require.Lenf(t, receipts, 1, "%T.Receipts()", blk)
+	r := receipts[0]
+	require.Equal(t, types.ReceiptStatusSuccessful, r.Status, "receipt status")
+	require.Len(t, r.Logs, 1, "receipt logs")
+	log := r.Logs[0]
+	assert.Equal(t, upgradeAddr, log.Address, "log address")
+	assert.Equal(t, []common.Hash{common.BytesToHash(marker)}, log.Topics, "log topics")
+}
+
+// TestPrecompileActivation asserts that a precompile upgrade activates at the
+// time configured in the upgrade config.
+func TestPrecompileActivation(t *testing.T) {
+	var (
+		recipient = common.Address{'r', 'e', 'c', 'i', 'p', 'i', 'e', 'n', 't'}
+		amount    = uint256.NewInt(42)
+	)
+
+	// upgradeTime MUST be after genesis.
+	upgradeTime := time.Unix(int64(testGenesisTime)+10, 0) //#nosec G115 -- Won't overflow
+	upgradeUnix := uint64(upgradeTime.Unix())              //#nosec G115 -- Known non-negative
+
+	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSignerForChainID(big.NewInt(testChainID)))
+	timeOpt, _ := withVMTime(upgradeTime)
+	ctx, sut := newSUT(t,
+		withMaxAllocFor(wallet.Addresses()...),
+		timeOpt,
+		options.Func[sutConfig](func(c *sutConfig) {
+			c.upgrades.PrecompileUpgrades = []extras.PrecompileUpgrade{{
+				Config: nativeminter.NewConfig(&upgradeUnix, nil, nil, nil, map[common.Address]*math.HexOrDecimal256{
+					recipient: (*math.HexOrDecimal256)(amount.ToBig()),
+				}),
+			}}
+		}),
+	)
+
+	// tx is unrelated, but block can't be empty.
+	tx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &common.Address{1},
+		Gas:       ethparams.TxGas,
+		GasTipCap: big.NewInt(1),
+		GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
+	})
+	require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction()", sut.EthClient())
+	sut.WaitForPendingTxs(ctx, t, tx)
+
+	activating := sut.BuildVerifyAccept(ctx, t)
+	require.NoErrorf(t, activating.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", activating)
+
+	require.Equal(t, upgradeUnix, activating.Header().Time, "block time MUST activate the precompile")
+	assert.Equal(t, *amount, sut.Balance(t, recipient), "balance(recipient) after activating block")
 }
