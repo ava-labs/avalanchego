@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestBagOf(t *testing.T) {
@@ -248,6 +250,30 @@ func TestBagRemove(t *testing.T) {
 	mode, freq = bag.Mode()
 	require.Equal(elt2, mode)
 	require.Equal(1, freq)
+}
+
+func TestBagRemoveClearsThreshold(t *testing.T) {
+	require := require.New(t)
+
+	elt0 := 0
+	elt1 := 1
+
+	bag := Bag[int]{}
+	bag.SetThreshold(2)
+
+	bag.AddCount(elt0, 2)
+	bag.AddCount(elt1, 3)
+	require.Equal(set.Of(elt0, elt1), bag.Threshold())
+
+	// Removing an element must also drop it from the threshold set, otherwise
+	// Threshold reports an element that is no longer in the bag.
+	bag.Remove(elt0)
+	require.Zero(bag.Count(elt0))
+	require.Equal(set.Of(elt1), bag.Threshold())
+
+	bag.Remove(elt1)
+	require.Zero(bag.Count(elt1))
+	require.Empty(bag.Threshold())
 }
 
 func TestBagEquals(t *testing.T) {
