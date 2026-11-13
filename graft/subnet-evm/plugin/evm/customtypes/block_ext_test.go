@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/internal/blocktest"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
 func TestBlockGetters(t *testing.T) {
@@ -133,6 +134,8 @@ func exportedFieldsPointToDifferentMemory[T interface {
 			case *common.Hash:
 				assertDifferentPointers(t, f, fieldCp)
 			case *acp226.DelayExcess:
+				assertDifferentPointers(t, f, fieldCp)
+			case *gas.Gas:
 				assertDifferentPointers(t, f, fieldCp)
 			case *uint64:
 				assertDifferentPointers(t, f, fieldCp)

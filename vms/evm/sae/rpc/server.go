@@ -288,6 +288,12 @@ func (p *Provider) WebsocketHandler(allowedOrigins []string) http.Handler {
 	return p.server.WebsocketHandler(allowedOrigins)
 }
 
+// Server returns the Provider's [rpc.Server], with the JSON-RPC namespace
+// handlers for every enabled [API] registered.
+func (p *Provider) Server() *rpc.Server {
+	return p.server
+}
+
 func (b *backend) server(filter *filters.FilterAPI) (*rpc.Server, error) {
 	// Taken as the default from geth / libevm's `node.DefaultConfig`.
 	const batchResponseMaxSize = 25 * 1000 * 1000 // 25 MB

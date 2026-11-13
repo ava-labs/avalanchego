@@ -36,7 +36,7 @@ type Points interface {
 	BlockTime(h *types.Header) time.Time
 	SettledBy(*types.Header) hook.Settled
 	VerifyBlockSyntax(*types.Block) error
-	CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error
+	CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, state libevm.StateReader) error
 	StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error
 	FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
 	AfterExecutingBlock(*types.Block, types.Receipts) error
@@ -52,6 +52,8 @@ type BlockBuilder interface {
 		txs []*types.Transaction,
 		receipts []*types.Receipt,
 		settled hook.Settled,
+		settledRules params.Rules,
+		worstCaseState libevm.StateReader,
 	) (*types.Block, error)
 }
 
@@ -94,8 +96,10 @@ func (p points) BuildBlock(
 	receipts []*types.Receipt,
 	_ []noTx,
 	settled hook.Settled,
+	settledRules params.Rules,
+	worstCaseState libevm.StateReader,
 ) (*types.Block, error) {
-	return p.Points.BuildBlock(header, blockCtx, txs, receipts, settled)
+	return p.Points.BuildBlock(header, blockCtx, txs, receipts, settled, settledRules, worstCaseState)
 }
 
 func (p points) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[noTx], error) {
@@ -121,6 +125,8 @@ func (b blockBuilder) BuildBlock(
 	receipts []*types.Receipt,
 	_ []noTx,
 	settled hook.Settled,
+	settledRules params.Rules,
+	worstCaseState libevm.StateReader,
 ) (*types.Block, error) {
-	return b.BlockBuilder.BuildBlock(header, blockCtx, txs, receipts, settled)
+	return b.BlockBuilder.BuildBlock(header, blockCtx, txs, receipts, settled, settledRules, worstCaseState)
 }

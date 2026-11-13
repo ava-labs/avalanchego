@@ -80,10 +80,11 @@ type Points interface {
 	// These operations will be performed during both worst-case and actual
 	// execution.
 	EndOfBlockOps(*types.Block) ([]Op, error)
-	// CanExecuteTransaction returns a non-nil error to reject a transaction
-	// sent from `from` to `to`, which is nil for contract creation. It runs
-	// during worst-case execution, reading the worst-case state.
-	CanExecuteTransaction(from common.Address, to *common.Address, _ libevm.StateReader) error
+	// CanExecuteTransaction returns an error if a transaction from `from` to
+	// `to`, which is nil for contract creation, is not allowed. `rules` and
+	// `state` are of the same block, which MAY be older than the block that
+	// includes the transaction.
+	CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, state libevm.StateReader) error
 	// StartExecutingBlock applies state changes before the block's transactions
 	// run. `rules` are those of the block and `parent` is the parent header. It
 	// runs during canonical and historical execution. It MUST NOT change data
@@ -129,6 +130,10 @@ type BlockBuilder[T Transaction] interface {
 	// BuildBlock constructs a block with the given components. The header
 	// MAY be modified, but all other arguments are read-only.
 	//
+	// `settledRules` are the rules of the last block to settle.
+	// `worstCaseState` is the settled state with worst-case balance and nonce
+	// projections made through this block.
+	//
 	// SAE always uses this method instead of [types.NewBlock], to ensure any
 	// libevm block extras are properly populated.
 	BuildBlock(
@@ -138,6 +143,8 @@ type BlockBuilder[T Transaction] interface {
 		receipts []*types.Receipt,
 		endOfBlockOps []T,
 		settled Settled,
+		settledRules params.Rules,
+		worstCaseState libevm.StateReader,
 	) (*types.Block, error)
 }
 

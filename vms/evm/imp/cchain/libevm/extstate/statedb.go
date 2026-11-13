@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp"
 )
 
 // RegisterExtras registers the libevm hook that partitions state slots into

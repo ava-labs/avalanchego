@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 
@@ -47,6 +48,15 @@ type State struct {
 
 	db    *state.StateDB
 	clock *gastime.Time
+	// settled is the header of the block whose post-execution state root
+	// [State.db] is rooted at. It is captured in [NewState] and never
+	// advanced; worst-case never "moves on" from the settled snapshot, it
+	// only projects nonce/balance deltas via [hook.Op] on top.
+	// State-dependent admission checks (e.g. an allowlist precompile) MUST
+	// use rules computed from this header so that
+	// `rules.IsPrecompileEnabled(...)` agrees with what the StateDB actually
+	// holds.
+	settled *types.Header
 	// expectedParentHash is used to sanity check that blocks are provided in
 	// order. The [types.Header] in the `curr` field is modified to reflect
 	// worst-case bounds (which will almost certainly differ from actual values
@@ -83,6 +93,7 @@ func NewState(
 		config:             config,
 		db:                 db,
 		clock:              settled.ExecutedByGasTime(),
+		settled:            settled.Header(),
 		expectedParentHash: settled.Hash(),
 	}, nil
 }
@@ -208,7 +219,11 @@ func (s *State) ApplyTx(tx *types.Transaction) error {
 		return fmt.Errorf("%w: address %v, codehash: %s", core.ErrSenderNoEOA, from.Hex(), codeHash)
 	}
 
-	if err := s.hooks.CanExecuteTransaction(from, tx.To(), s.db); err != nil {
+	// Rules are computed at the LAST-SETTLED block so they pair with [State.db]:
+	// state-dependent precompile checks read storage from `s.db` and gate that
+	// read with `rules.IsPrecompileEnabled(...)`.
+	settledRules := s.config.Rules(s.settled.Number, true /*isMerge*/, s.settled.Time)
+	if err := s.hooks.CanExecuteTransaction(settledRules, from, tx.To(), s.db); err != nil {
 		return fmt.Errorf("transaction blocked by CanExecuteTransaction hook: %w", err)
 	}
 
@@ -321,18 +336,27 @@ func (s *State) Apply(o hook.Op) error {
 	return nil
 }
 
+// StateReader returns a read-only view of the settled state projected through
+// the current block. Only balances and nonces are projected, using their
+// worst-case values.
+func (s *State) StateReader() libevm.StateReader {
+	return s.db
+}
+
 // GasUsed returns the gas used for the current block.
 func (s *State) GasUsed() uint64 {
 	return uint64(s.blockSize)
 }
 
 // FinishBlock advances the [gastime.Time] in preparation for the next block.
+// `h` MUST be the header passed to [State.StartBlock], optionally with
+// additional fields populated since.
 //
 // The returned bounds assume that every non-nil error from [State.ApplyTx]
 // resulted in said transaction being included, which is reflected in the
 // indexing of tx-sender balances.
-func (s *State) FinishBlock() (*blocks.WorstCaseBounds, error) {
-	target, gasCfg := s.hooks.GasConfigAfter(s.curr)
+func (s *State) FinishBlock(h *types.Header) (*blocks.WorstCaseBounds, error) {
+	target, gasCfg := s.hooks.GasConfigAfter(h)
 	if err := s.clock.AfterBlock(s.blockSize, target, gasCfg); err != nil {
 		return nil, fmt.Errorf("finishing block gas time update: %w", err)
 	}

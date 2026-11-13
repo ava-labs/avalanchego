@@ -305,9 +305,9 @@ func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.Predica
 	if err := customheader.VerifyTime(extraConfig, parent, header, b.vm.clock.Time()); err != nil {
 		return err
 	}
-	// Ensure settled block marker fields are unset. The fields belong to SAE
-	// and must never appear on a subnet-evm block.
-	if err := customheader.VerifySettled(header); err != nil {
+	// Ensure SAE header fields are unset. The fields belong to SAE and must
+	// never appear on a subnet-evm block.
+	if err := customheader.VerifyNoSAEFields(header); err != nil {
 		return err
 	}
 

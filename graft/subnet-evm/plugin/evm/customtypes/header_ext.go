@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -48,6 +49,18 @@ type HeaderExtra struct {
 	SettledGasUnix      *uint64
 	SettledGasNumerator *uint64
 	SettledExcess       *uint64
+
+	// TargetExcess is populated by the SAE block builder after Igloo and is
+	// ignored on legacy chains. It encodes the gas target, whether chosen by
+	// validators or pinned by the gas price manager precompile.
+	TargetExcess *gas.Gas
+
+	// The GasConfig* fields hold the ACP-224 price configuration from the gas
+	// price manager precompile, when it is enabled. They are either all set or
+	// all nil. If nil, the ACP-176 defaults apply. StaticPricing is 0 or 1.
+	GasConfigTargetToExcessScaling *uint64
+	GasConfigMinGasPrice           *uint64
+	GasConfigStaticPricing         *uint64
 
 	predicateResults atomic.Pointer[predicate.BlockResults]
 }
@@ -162,6 +175,22 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		v := *h.SettledExcess
 		cp.SettledExcess = &v
 	}
+	if h.TargetExcess != nil {
+		v := *h.TargetExcess
+		cp.TargetExcess = &v
+	}
+	if h.GasConfigTargetToExcessScaling != nil {
+		v := *h.GasConfigTargetToExcessScaling
+		cp.GasConfigTargetToExcessScaling = &v
+	}
+	if h.GasConfigMinGasPrice != nil {
+		v := *h.GasConfigMinGasPrice
+		cp.GasConfigMinGasPrice = &v
+	}
+	if h.GasConfigStaticPricing != nil {
+		v := *h.GasConfigStaticPricing
+		cp.GasConfigStaticPricing = &v
+	}
 	SetHeaderExtra(dst, cp)
 }
 
@@ -186,6 +215,18 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	}
 	if h.SettledExcess != nil {
 		m["settledExcess"] = hexutil.Uint64(*h.SettledExcess)
+	}
+	if h.TargetExcess != nil {
+		m["targetExcess"] = hexutil.Uint64(*h.TargetExcess)
+	}
+	if h.GasConfigTargetToExcessScaling != nil {
+		m["gasConfigTargetToExcessScaling"] = hexutil.Uint64(*h.GasConfigTargetToExcessScaling)
+	}
+	if h.GasConfigMinGasPrice != nil {
+		m["gasConfigMinGasPrice"] = hexutil.Uint64(*h.GasConfigMinGasPrice)
+	}
+	if h.GasConfigStaticPricing != nil {
+		m["gasConfigStaticPricing"] = hexutil.Uint64(*h.GasConfigStaticPricing)
 	}
 }
 
@@ -241,6 +282,10 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.SettledGasUnix = extras.SettledGasUnix
 	h.SettledGasNumerator = extras.SettledGasNumerator
 	h.SettledExcess = extras.SettledExcess
+	h.TargetExcess = (*uint64)(extras.TargetExcess)
+	h.GasConfigTargetToExcessScaling = extras.GasConfigTargetToExcessScaling
+	h.GasConfigMinGasPrice = extras.GasConfigMinGasPrice
+	h.GasConfigStaticPricing = extras.GasConfigStaticPricing
 }
 
 func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
@@ -251,6 +296,10 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.SettledGasUnix = h.SettledGasUnix
 	extras.SettledGasNumerator = h.SettledGasNumerator
 	extras.SettledExcess = h.SettledExcess
+	extras.TargetExcess = (*gas.Gas)(h.TargetExcess)
+	extras.GasConfigTargetToExcessScaling = h.GasConfigTargetToExcessScaling
+	extras.GasConfigMinGasPrice = h.GasConfigMinGasPrice
+	extras.GasConfigStaticPricing = h.GasConfigStaticPricing
 }
 
 // NOTE: both generators currently do not support type aliases.
@@ -308,6 +357,15 @@ type HeaderSerializable struct {
 	SettledGasUnix      *uint64 `json:"settledGasUnix"      rlp:"optional"`
 	SettledGasNumerator *uint64 `json:"settledGasNumerator" rlp:"optional"`
 	SettledExcess       *uint64 `json:"settledExcess"       rlp:"optional"`
+
+	// TargetExcess was added by Igloo (SAE) and is ignored in legacy headers.
+	TargetExcess *uint64 `json:"targetExcess" rlp:"optional"`
+
+	// The GasConfig* group carries the effective ACP-224 price configuration
+	// (see [HeaderExtra]) and is ignored in legacy headers.
+	GasConfigTargetToExcessScaling *uint64 `json:"gasConfigTargetToExcessScaling" rlp:"optional"`
+	GasConfigMinGasPrice           *uint64 `json:"gasConfigMinGasPrice"           rlp:"optional"`
+	GasConfigStaticPricing         *uint64 `json:"gasConfigStaticPricing"         rlp:"optional"`
 }
 
 // field type overrides for gencodec
@@ -329,6 +387,11 @@ type headerMarshaling struct {
 	SettledGasUnix      *hexutil.Uint64
 	SettledGasNumerator *hexutil.Uint64
 	SettledExcess       *hexutil.Uint64
+	TargetExcess        *hexutil.Uint64
+
+	GasConfigTargetToExcessScaling *hexutil.Uint64
+	GasConfigMinGasPrice           *hexutil.Uint64
+	GasConfigStaticPricing         *hexutil.Uint64
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its

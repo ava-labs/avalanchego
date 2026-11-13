@@ -1,0 +1,39 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "warp",
+    srcs = ["verifier.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/warp",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/evm/uptimetracker",
+        "//graft/subnet-evm/warp/messages",
+        "//snow/engine/common",
+        "//vms/evm/imp/warp",
+        "//vms/platformvm/warp/payload",
+    ],
+)
+
+go_test(
+    name = "warp_test",
+    srcs = ["verifier_test.go"],
+    embed = [":warp"],
+    deps = [
+        "//database/memdb",
+        "//graft/evm/uptimetracker",
+        "//graft/subnet-evm/warp/messages",
+        "//ids",
+        "//snow/engine/common",
+        "//snow/validators",
+        "//snow/validators/validatorstest",
+        "//utils",
+        "//utils/constants",
+        "//utils/timer/mockable",
+        "//vms/evm/imp/warp",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
+    ],
+)

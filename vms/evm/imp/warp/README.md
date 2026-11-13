@@ -1,10 +1,10 @@
-# Warp (C-Chain)
+# Warp
 
-This package handles the parsing, verification, and storage of [Avalanche Warp Messages](../../../../platformvm/warp/README.md) for the C-Chain, which implements [Continuous Execution](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution).
+This package handles the parsing, verification, and storage of [Avalanche Warp Messages](../../../platformvm/warp/README.md) for the SAE-based VMs, the C-Chain and L1s, which implement [Continuous Execution](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/194-continuous-execution).
 
 A warp message is a payload attested by the validator set of a source chain: each validator signs the message with the BLS key it registered on the P-Chain, and the individual signatures are aggregated into a single multi-signature. Because every validator's BLS public key and stake weight are readable from the P-Chain, any chain can verify that a stake-weight quorum of the source chain endorsed a message — without additional trust assumptions or messaging infrastructure. (Newer documentation also calls this Avalanche Interchain Messaging, ICM.)
 
-This package provides the pieces the VM needs to participate in that protocol: `FromReceipts` and `Storage` capture and persist the messages a block emits, `Verifier` decides what this node is willing to sign, and `VerifyBlock` checks the signed messages that transactions deliver. The rest of the lifecycle — the precompile that creates messages, the p2p protocol that collects signatures, the predicate machinery that carries signed messages in transactions — lives outside this package. This README shows how the pieces fit together.
+This package provides the pieces a VM needs to participate in that protocol: `FromReceipts` and `Storage` capture and persist the messages a block emits, `Verifier` decides what this node is willing to sign, and `VerifyBlock` checks the signed messages that transactions deliver. The rest of the lifecycle — the precompile that creates messages, the p2p protocol that collects signatures, the predicate machinery that carries signed messages in transactions — lives outside this package. This README shows how the pieces fit together.
 
 ## Message lifecycle
 
@@ -58,8 +58,8 @@ flowchart TD
 | Style | Meaning |
 |---|---|
 | Blue | This package |
-| Orange | EVM side: [warp precompile](../../../../../graft/coreth/precompile/contracts/warp/README.md) and [predicate handling](../../../../../graft/evm/predicate/README.md) |
-| Purple | AvalancheGo platform: [ACP-118 handler](../../../../../network/p2p/acp118/handler.go), BLS signer |
+| Orange | EVM side: warp precompile ([coreth](../../../../graft/coreth/precompile/contracts/warp/README.md), [subnet-evm](../../../../graft/subnet-evm/precompile/contracts/warp/README.md)) and [predicate handling](../../../../graft/evm/predicate/README.md) |
+| Purple | AvalancheGo platform: [ACP-118 handler](../../../../network/p2p/acp118/handler.go), BLS signer |
 | Gray | External actors |
 
 1. **Send** — a contract calls `sendWarpMessage` on the warp precompile, which packs the payload into an unsigned warp message and emits it as a log.
@@ -73,11 +73,12 @@ Every validator of the sender chain runs the full sender-chain stack, which is w
 
 ### What makes a message signable
 
-Three message types can be signed:
+Four message types can be signed:
 
 - **Precompile messages** — `AddressedCall` payloads the Warp contract emitted via `sendWarpMessage`.
 - **Block-hash attestations** — `Hash` payloads attesting that this chain accepted a given block.
 - **Off-chain messages** — messages the operator lists in the chain config for the node to sign, even though they were never emitted on chain.
+- **Validator-uptime attestations** — on L1s, `AddressedCall` payloads the L1's `AddressedCallVerifier` approves against its uptime tracker.
 
 The [`Verifier`](./verifier.go) doesn't track these kinds explicitly; it validates a message by checking two sources in order:
 
@@ -93,6 +94,8 @@ flowchart TD
     e2["ParseErrCode"]:::err
     e3["UnknownMessageErrCode"]:::err
     e4["NotAcceptedErrCode"]:::err
+    ac{"AddressedCallVerifier"}:::pkg
+    e5["its own error code"]:::err
 
     in --> g
     g -->|"found: precompile-emitted<br/>or off-chain message"| ok
@@ -101,7 +104,10 @@ flowchart TD
     p -->|"invalid"| e2
     p -->|"valid"| t
     t -->|"Hash"| a
-    t -->|"other, incl. AddressedCall<br/>missing from storage"| e3
+    t -->|"AddressedCall, if an<br/>AddressedCallVerifier is set"| ac
+    t -->|"other"| e3
+    ac -->|"approved"| ok
+    ac -->|"refused"| e5
     a -->|"accepted"| ok
     a -->|"not accepted"| e4
 
@@ -113,16 +119,16 @@ flowchart TD
 
 Green means the node signs; red is the error code returned to the requester.
 
-The two `Storage`-backed kinds are indistinguishable to the `Verifier`: precompile and off-chain messages both live in `Storage`, so a single `Storage.Get` confirms either one. Only when that lookup misses does the `Verifier` fall back to the block-hash path — parsing the payload and asking the `Backend` whether the named block is accepted. Anything else — a corrupt payload, a non-`Hash` payload, or an `AddressedCall` absent from `Storage` — is refused with an error code that tells the requester why.
+The two `Storage`-backed kinds are indistinguishable to the `Verifier`: precompile and off-chain messages both live in `Storage`, so a single `Storage.Get` confirms either one. Only when that lookup misses does the `Verifier` fall back to the block-hash path — parsing the payload and asking the `Backend` whether the named block is accepted. An `AddressedCall` absent from `Storage` goes to the `AddressedCallVerifier`, which the L1 VM sets to sign uptime attestations. Anything else — a corrupt payload, any other payload type, or an `AddressedCall` with no `AddressedCallVerifier` — is refused with an error code that tells the requester why.
 
 ### Inbound messages are predicates
 
-A signed message rides into the receiver chain inside a transaction's access list — a *predicate* (see the [predicate encoding](../../../../../graft/evm/predicate/README.md)). Verifying it means checking the multi-signature against the source chain's validator set, which changes over time; the proposervm block context supplies the P-Chain height that pins it.
+A signed message rides into the receiver chain inside a transaction's access list — a *predicate* (see the [predicate encoding](../../../../graft/evm/predicate/README.md)). Verifying it means checking the multi-signature against the source chain's validator set, which changes over time; the proposervm block context supplies the P-Chain height that pins it.
 
 ```mermaid
 flowchart TD
     tx["Transaction<br/>access list"]:::ext
-    fal["RulesExtra.WarpMessages"]:::evm
+    fal["MessagesFromAccessList"]:::pkg
     bctx["block.Context<br/>(P-Chain height)"]:::plat
     bits["set.Bits of<br/>failed indices"]:::pkg
     res["BlockResults"]:::pkg
@@ -160,25 +166,26 @@ The results — which predicates failed, per transaction — are encoded into th
 - **Database compatibility.** `Storage`'s on-disk layout MUST NOT change: breaking it silently orphans every previously persisted message.
 - **Off-chain messages are memory-only on purpose.** They are operator-supplied configuration, not chain data, so the persisted set stays exactly what the precompile emitted — and an off-chain message is removed by simply not supplying it on the next construction.
 - **Predicate results are encoded in the header so warp messages are never verified during bootstrapping.** Verification needs the source chain's validator set, which isn't guaranteed to be available then — bootstrapping nodes must be able to rely on the recorded results instead of re-checking signatures.
-- **VM wiring.** Harvested messages are persisted in `(*hooks).AfterExecutingBlock`, the predicate results are encoded into the header in `(*builder).BuildBlock` (both in [`../hooks.go`](../hooks.go)), and the ACP-118 handler is registered with a `Backend` implementation at VM initialization. Persisting in `AfterExecutingBlock` guarantees that only messages from accepted blocks are signable, because SAE executes blocks only after acceptance.
+- **VM wiring.** Harvested messages are persisted in `(*hooks).AfterExecutingBlock`, the predicate results are encoded into the header in `(*builder).BuildBlock`, both in each VM's hooks, and the ACP-118 handler is registered with a `Backend` implementation at VM initialization. Persisting in `AfterExecutingBlock` guarantees that only messages from accepted blocks are signable, because SAE executes blocks only after acceptance.
+- **Callers gate on activation.** This package never checks whether Warp is active. The C-Chain needs no check, because SAE blocks are post-Durango. An L1 persists and verifies them only while its Warp precompile is active, because genesis or state upgrades can place ordinary code at the Warp address, whose logs would otherwise be stored and signed as Warp messages.
 
 ## References
 
 Integration points:
 
-- [`../hooks.go`](../hooks.go) - `AfterExecutingBlock`, `BuildBlock`
+- [`../cchain/hooks.go`](../cchain/hooks.go), [`../l1s/hooks.go`](../l1s/hooks.go) - `AfterExecutingBlock`, `BuildBlock`
 
 Message format:
 
-- [`vms/platformvm/warp`](../../../../platformvm/warp/README.md) - message structure and `BitSetSignature`
-- [`vms/platformvm/warp/payload`](../../../../platformvm/warp/payload/README.md) - `AddressedCall` and `Hash` payloads
+- [`vms/platformvm/warp`](../../../platformvm/warp/README.md) - message structure and `BitSetSignature`
+- [`vms/platformvm/warp/payload`](../../../platformvm/warp/payload/README.md) - `AddressedCall` and `Hash` payloads
 
 Signing protocol:
 
-- [`network/p2p/acp118`](../../../../../network/p2p/acp118/handler.go) - signature request handler and aggregator
+- [`network/p2p/acp118`](../../../../network/p2p/acp118/handler.go) - signature request handler and aggregator
 - [ACP-118](https://github.com/avalanche-foundation/ACPs/tree/main/ACPs/118-warp-signature-request) - protocol specification
 
 EVM side:
 
-- [coreth warp precompile](../../../../../graft/coreth/precompile/contracts/warp/README.md) - `sendWarpMessage`, `getVerifiedWarpMessage`, predicate verification
-- [`graft/evm/predicate`](../../../../../graft/evm/predicate/README.md) - access-list predicate encoding and results
+- [coreth](../../../../graft/coreth/precompile/contracts/warp/README.md) and [subnet-evm](../../../../graft/subnet-evm/precompile/contracts/warp/README.md) warp precompiles - `sendWarpMessage`, `getVerifiedWarpMessage`, predicate verification
+- [`graft/evm/predicate`](../../../../graft/evm/predicate/README.md) - access-list predicate encoding and results

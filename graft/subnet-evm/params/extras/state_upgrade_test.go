@@ -14,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
 
 func TestVerifyStateUpgrades(t *testing.T) {
@@ -65,6 +66,7 @@ func TestVerifyStateUpgrades(t *testing.T) {
 			c := *TestChainConfig
 			config := &c
 			config.SnowCtx = utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
+			config.SnowCtx.NetworkUpgrades = upgradetest.GetConfig(upgradetest.Helicon)
 			config.StateUpgrades = tt.upgrades
 
 			err := config.Verify()

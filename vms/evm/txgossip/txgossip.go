@@ -59,6 +59,16 @@ func (Marshaller) UnmarshalGossip(buf []byte) (Transaction, error) {
 	return tx, nil
 }
 
+// An Admitter gates inbound transactions for the mempool.
+//
+// Implementations SHOULD keep [Admitter.Admit] cheap, as it runs for every
+// inbound transaction.
+type Admitter interface {
+	// Admit returns nil if `tx` is allowed into the mempool, or an error
+	// describing why it was rejected. Safe for concurrent use.
+	Admit(tx *types.Transaction) error
+}
+
 // Set couples a [gossip.BloomSet] with a [txpool.TxPool] that acts as the
 // backing for the set.
 type Set struct {
@@ -73,15 +83,18 @@ type Set struct {
 // transactions to the pool, which SHOULD NOT be populated directly.
 //
 // Transactions are vetted against the gas limit of the next block, derived
-// from exec's last-executed block; see [minGasForSize].
+// from exec's last-executed block (see [minGasForSize]), and gated through
+// `admitter` if non-nil.
 func NewSet(
 	exec *saexec.Executor,
 	pool *txpool.TxPool,
+	admitter Admitter,
 	config gossip.BloomSetConfig,
 ) (*Set, error) {
 	s := &txSet{
-		exec: exec,
-		pool: pool,
+		exec:     exec,
+		pool:     pool,
+		admitter: admitter,
 	}
 	bs, err := gossip.NewBloomSet(s, config)
 	if err != nil {
@@ -103,8 +116,9 @@ func (s *Set) MinGasForSize(size uint64) uint64 {
 var _ gossip.Set[Transaction] = (*txSet)(nil)
 
 type txSet struct {
-	exec *saexec.Executor
-	pool *txpool.TxPool
+	exec     *saexec.Executor
+	pool     *txpool.TxPool
+	admitter Admitter
 }
 
 // blockGasLimit returns the worst-case gas limit of the next block, based on
@@ -137,6 +151,14 @@ func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 	for i, tx := range txs {
 		minGas := minGasForSize(tx.Size(), blockGasLimit)
 		if tx.Gas() >= minGas {
+			// The admitter runs after the pure-arithmetic gas check because it
+			// may recover the sender and open state.
+			if s.admitter != nil {
+				if err := s.admitter.Admit(tx); err != nil {
+					errs[i] = err
+					continue
+				}
+			}
 			eligibleTxs = append(eligibleTxs, tx)
 			eligibleIdx = append(eligibleIdx, i)
 			continue

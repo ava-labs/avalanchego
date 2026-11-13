@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp/warptest"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 )
 

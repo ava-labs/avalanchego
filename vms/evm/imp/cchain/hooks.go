@@ -38,13 +38,15 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/txpool"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/executionresults"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/metrics"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/saeconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
-	"github.com/ava-labs/avalanchego/x/blockdb"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	cchainstate "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/state"
+	saewarp "github.com/ava-labs/avalanchego/vms/evm/imp/warp"
 	saetypes "github.com/ava-labs/avalanchego/vms/evm/types"
 )
 
@@ -53,8 +55,8 @@ var _ hook.PointsG[*hookTx] = (*hooks)(nil)
 type hooks struct {
 	builder
 	state       *cchainstate.State
-	warpStorage *warp.Storage
-	metrics     *metrics
+	warpStorage *saewarp.Storage
+	metrics     *metrics.Metrics
 }
 
 func newHooks(
@@ -62,10 +64,10 @@ func newHooks(
 	state *cchainstate.State,
 	chainConfig *params.ChainConfig,
 	pool *txpool.Pending,
-	warpStorage *warp.Storage,
+	warpStorage *saewarp.Storage,
 	now func() time.Time,
-	desired desiredParams,
-	metrics *metrics,
+	desired saeconfig.Desired,
+	metrics *metrics.Metrics,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
 		for t := range pool.Iter() {
@@ -121,25 +123,16 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 			return now
 		},
 		slices.Values(txs),
-		desiredParams{
-			targetExponent: headerExtra.TargetExponent,
-			priceExponent:  headerExtra.MinPriceExponent,
-			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
+		saeconfig.Desired{
+			TargetExponent: headerExtra.TargetExponent,
+			PriceExponent:  headerExtra.MinPriceExponent,
+			DelayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 		},
 	}, nil
 }
 
 func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, error) {
-	db, err := blockdb.New(
-		blockdb.DefaultConfig().WithDir(dataDir),
-		h.ctx.Log,
-	)
-	if err != nil {
-		return saetypes.ExecutionResults{}, fmt.Errorf("creating execution results db: %w", err)
-	}
-	return saetypes.ExecutionResults{
-		HeightIndex: db,
-	}, nil
+	return executionresults.New(dataDir, h.ctx.Log)
 }
 
 // priceExponent returns h's ACP-283 price exponent, defaulting to
@@ -235,7 +228,7 @@ func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
 	return ops, nil
 }
 
-func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
+func (*hooks) CanExecuteTransaction(params.Rules, common.Address, *common.Address, libevm.StateReader) error {
 	return nil
 }
 
@@ -263,7 +256,7 @@ func (h *hooks) FinishExecutingBlock(statedb *state.StateDB, b *types.Block, _ t
 }
 
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
-	h.metrics.setMinBlockDelay(delayExponent(b.Header()).DelayDuration())
+	h.metrics.SetMinBlockDelay(delayExponent(b.Header()).DelayDuration())
 
 	txs, err := tx.FromBlock(h.chainConfig, b)
 	if err != nil {
@@ -274,7 +267,7 @@ func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) err
 		return fmt.Errorf("applying cross-chain state: %w", err)
 	}
 
-	messages, err := warp.FromReceipts(receipts)
+	messages, err := saewarp.FromReceipts(receipts)
 	if err != nil {
 		return fmt.Errorf("parsing warp messages from receipts: %w", err)
 	}
@@ -354,7 +347,7 @@ type builder struct {
 	chainConfig  *params.ChainConfig
 	now          func() time.Time
 	potentialTxs iter.Seq[*hookTx]
-	desired      desiredParams
+	desired      saeconfig.Desired
 }
 
 var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
@@ -379,9 +372,9 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 		return nil, fmt.Errorf("getting target exponent: %w", err)
 	}
 	// Move each dynamic parameter toward this node's vote (nil = no move).
-	de = de.Toward(b.desired.delayExponent)
-	te = te.Toward(b.desired.targetExponent)
-	pe := priceExponent(parent).Toward(b.desired.priceExponent)
+	de = de.Toward(b.desired.DelayExponent)
+	te = te.Toward(b.desired.TargetExponent)
+	pe := priceExponent(parent).Toward(b.desired.PriceExponent)
 	minDelayExcess := acp226.DelayExcess(de)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
@@ -510,6 +503,8 @@ func (b *builder) BuildBlock(
 	receipts []*types.Receipt,
 	avaxTxs []*hookTx,
 	settled hook.Settled,
+	_ params.Rules,
+	_ libevm.StateReader,
 ) (*types.Block, error) {
 	if len(ethTxs) == 0 && len(avaxTxs) == 0 {
 		return nil, errEmptyBlock
@@ -525,7 +520,7 @@ func (b *builder) BuildBlock(
 	}
 
 	// SAE blocks are post-Helicon, and therefore post-Durango.
-	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, ethTxs)
+	warpValidity, err := saewarp.VerifyBlock(b.ctx, blockCtx, &corethwarp.Config{}, ethTxs)
 	if err != nil {
 		return nil, fmt.Errorf("verifying warp messages: %w", err)
 	}

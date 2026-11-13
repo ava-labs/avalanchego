@@ -26,9 +26,11 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 
+	legacycore "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
@@ -81,7 +83,7 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 		return nil, fmt.Errorf("%w: %d", errNonNilGenesisBlobGasUsed, *g.BlobGasUsed)
 	}
 
-	if err := updateChainConfig(g.Config, upgradeConfig, ctx); err != nil {
+	if err := updateChainConfig(g.Config, g.Timestamp, upgradeConfig, ctx); err != nil {
 		return nil, err
 	}
 
@@ -89,7 +91,7 @@ func parseGenesis(ctx *snow.Context, genesisBytes, upgradeBytes []byte) (*genesi
 }
 
 // updateChainConfig edits cfg in-place.
-func updateChainConfig(cfg *params.ChainConfig, upgradeConfig extras.UpgradeConfig, ctx *snow.Context) error {
+func updateChainConfig(cfg *params.ChainConfig, genesisTimestamp uint64, upgradeConfig extras.UpgradeConfig, ctx *snow.Context) error {
 	extra := l1params.GetExtra(cfg)
 	if extra.FeeConfig == (commontype.FeeConfig{}) {
 		extra.FeeConfig = l1params.DefaultFeeConfig
@@ -99,6 +101,16 @@ func updateChainConfig(cfg *params.ChainConfig, upgradeConfig extras.UpgradeConf
 	extra.UpgradeConfig = upgradeConfig
 	extra.AvalancheContext = extras.AvalancheContext{
 		SnowCtx: ctx,
+	}
+
+	// Retire the legacy `feeManager` precompile at Igloo: reject
+	// post-Igloo upgrades, normalize a stale genesis activation, and inject
+	// the synthetic disable that wipes pre-existing storage at the Igloo
+	// block.
+	if iglooTS, ok := extra.NetworkUpgrades.ScheduledIglooTimestamp(); ok {
+		if err := retirement.ReconcileForIgloo(extra, genesisTimestamp, iglooTS); err != nil {
+			return err
+		}
 	}
 
 	if err := extra.Verify(); err != nil {
@@ -305,7 +317,10 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 		return common.Hash{}, err
 	}
 
-	// TODO(alarso16): Register precompiles.
+	blockContext := legacycore.NewBlockContext(new(big.Int).SetUint64(genesisNumber), g.Timestamp)
+	if err := legacycore.ApplyPrecompileActivations(g.Config, nil, blockContext, statedb); err != nil {
+		return common.Hash{}, fmt.Errorf("configuring genesis precompiles: %w", err)
+	}
 
 	for addr, account := range g.Alloc {
 		statedb.SetBalance(addr, uint256.MustFromBig(account.Balance))

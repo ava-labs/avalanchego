@@ -12,21 +12,26 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 )
 
-// errSettledMarkerSet is returned when a subnet-evm block carries a settled block
-// marker. The marker belongs to SAE and must not appear on subnet-evm blocks.
-var errSettledMarkerSet = errors.New("remote settled block marker should be nil")
+// errSAEFieldSet is returned when a subnet-evm block carries an SAE header
+// field. These fields belong to SAE and must not appear on subnet-evm blocks.
+var errSAEFieldSet = errors.New("remote SAE header field should be nil")
 
-// VerifySettled rejects any subnet-evm block carrying a settled block marker.
-// The Settled* fields belong to SAE. semanticVerify only runs on subnet-evm's own
-// block.Verify, so subnet-evm never verifies an SAE block and these fields must
-// always be absent.
-func VerifySettled(header *types.Header) error {
+// VerifyNoSAEFields rejects any subnet-evm block carrying an SAE header field:
+// the settled block marker, the target excess, or the gas config. These fields
+// belong to SAE. semanticVerify only runs on subnet-evm's own block.Verify, so
+// subnet-evm never verifies an SAE block and these fields must always be
+// absent.
+func VerifyNoSAEFields(header *types.Header) error {
 	extra := customtypes.GetHeaderExtra(header)
 	if extra.SettledHeight != nil ||
 		extra.SettledGasUnix != nil ||
 		extra.SettledGasNumerator != nil ||
-		extra.SettledExcess != nil {
-		return fmt.Errorf("%w: %s", errSettledMarkerSet, header.Hash())
+		extra.SettledExcess != nil ||
+		extra.TargetExcess != nil ||
+		extra.GasConfigTargetToExcessScaling != nil ||
+		extra.GasConfigMinGasPrice != nil ||
+		extra.GasConfigStaticPricing != nil {
+		return fmt.Errorf("%w: %s", errSAEFieldSet, header.Hash())
 	}
 	return nil
 }

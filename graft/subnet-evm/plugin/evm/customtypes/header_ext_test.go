@@ -14,12 +14,14 @@ import (
 	"unsafe"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
 func TestMain(m *testing.M) {
@@ -36,8 +38,8 @@ func TestHeaderRLP(t *testing.T) {
 	// libevm. WARNING: changing these values can break backwards compatibility
 	// with extreme consequences as block-hash calculation may break.
 	const (
-		wantHex     = "f90218a00100000000000000000000000000000000000000000000000000000000000000a00200000000000000000000000000000000000000000000000000000000000000940300000000000000000000000000000000000000a00400000000000000000000000000000000000000000000000000000000000000a00500000000000000000000000000000000000000000000000000000000000000a00600000000000000000000000000000000000000000000000000000000000000b901000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008090a0b0c0da00e00000000000000000000000000000000000000000000000000000000000000880f0000000000000010171213a0140000000000000000000000000000000000000000000000000000000000000018191a1b1c1d"
-		wantHashHex = "8d0071ceed957121ca97f38095a9d6d77012faa3b62f3af545c9cba7e3b4f274"
+		wantHex     = "f9021ca00100000000000000000000000000000000000000000000000000000000000000a00200000000000000000000000000000000000000000000000000000000000000940300000000000000000000000000000000000000a00400000000000000000000000000000000000000000000000000000000000000a00500000000000000000000000000000000000000000000000000000000000000a00600000000000000000000000000000000000000000000000000000000000000b901000700000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008090a0b0c0da00e00000000000000000000000000000000000000000000000000000000000000880f0000000000000010171213a0140000000000000000000000000000000000000000000000000000000000000018191a1b1c1d1e1f2021"
+		wantHashHex = "3a8e2cd0784e652e06f3411075ee4658596df1d8fc105c5b191003b3f356eaab"
 	)
 
 	require.Equal(t, wantHex, hex.EncodeToString(got), "Header RLP")
@@ -53,6 +55,27 @@ func TestHeaderJSON(t *testing.T) {
 	// Note we ignore the returned encoded bytes because we don't
 	// need to compare them to a JSON gold standard.
 	_ = testHeaderEncodeDecode(t, json.Marshal, json.Unmarshal)
+}
+
+func TestHeaderExtraPostRPCMarshal(t *testing.T) {
+	header, extra := headerWithNonZeroFields()
+	got := make(map[string]any)
+	extra.PostRPCMarshal(header, got)
+
+	want := map[string]any{
+		"blockGasCost":                   (*hexutil.Big)(big.NewInt(23)),
+		"timestampMilliseconds":          hexutil.Uint64(24),
+		"minDelayExcess":                 hexutil.Uint64(25),
+		"settledHeight":                  hexutil.Uint64(26),
+		"settledGasUnix":                 hexutil.Uint64(27),
+		"settledGasNumerator":            hexutil.Uint64(28),
+		"settledExcess":                  hexutil.Uint64(29),
+		"targetExcess":                   hexutil.Uint64(30),
+		"gasConfigTargetToExcessScaling": hexutil.Uint64(31),
+		"gasConfigMinGasPrice":           hexutil.Uint64(32),
+		"gasConfigStaticPricing":         hexutil.Uint64(33),
+	}
+	require.Equal(t, want, got, "HeaderExtra.PostRPCMarshal()")
 }
 
 func testHeaderEncodeDecode(
@@ -125,6 +148,11 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		SettledGasUnix:      utils.PointerTo[uint64](27),
 		SettledGasNumerator: utils.PointerTo[uint64](28),
 		SettledExcess:       utils.PointerTo[uint64](29),
+
+		TargetExcess:                   utils.PointerTo(gas.Gas(30)),
+		GasConfigTargetToExcessScaling: utils.PointerTo[uint64](31),
+		GasConfigMinGasPrice:           utils.PointerTo[uint64](32),
+		GasConfigStaticPricing:         utils.PointerTo[uint64](33),
 	}
 	return WithHeaderExtra(header, extra), extra
 }
@@ -176,6 +204,8 @@ func allFieldsSet[T interface {
 				assertNonZero(t, f)
 			case *acp226.DelayExcess:
 				assertNonZero(t, f)
+			case *gas.Gas:
+				assertNonZero(t, f)
 			case []uint8, []*types.Header, types.Transactions, []*types.Transaction, types.Withdrawals, []*types.Withdrawal:
 				require.NotEmpty(t, f)
 			default:
@@ -187,7 +217,7 @@ func allFieldsSet[T interface {
 
 func assertNonZero[T interface {
 	common.Hash | common.Address | types.BlockNonce | uint32 | uint64 | types.Bloom |
-		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header | *acp226.DelayExcess
+		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header | *acp226.DelayExcess | *gas.Gas
 }](t *testing.T, v T) {
 	t.Helper()
 	require.NotZero(t, v)

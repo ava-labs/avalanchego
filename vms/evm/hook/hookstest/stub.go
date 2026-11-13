@@ -37,7 +37,7 @@ type Stub struct {
 	Ops                     []Op
 	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
 	VerifyBlockSyntaxFn     func(*types.Block) error
-	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
+	CanExecuteTransactionFn func(params.Rules, common.Address, *common.Address, libevm.StateReader) error
 	StartExecutingBlockFn   func(params.Rules, *state.StateDB, *types.Header, *types.Block) error
 	FinishExecutingBlockFn  func(*state.StateDB, *types.Block, types.Receipts) error
 	GasPriceConfig          gastime.GasPriceConfig
@@ -152,6 +152,8 @@ func (*Stub) BuildBlock(
 	receipts []*types.Receipt,
 	ops []Op,
 	settled hook.Settled,
+	_ params.Rules,
+	_ libevm.StateReader,
 ) (*types.Block, error) {
 	return BuildBlock(header, blockCtx, txs, receipts, ops, settled)
 }
@@ -246,9 +248,9 @@ func (s *Stub) VerifyBlockSyntax(b *types.Block) error {
 
 // CanExecuteTransaction proxies to [Stub.CanExecuteTransactionFn] if non-nil,
 // otherwise it allows all transactions.
-func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr libevm.StateReader) error {
+func (s *Stub) CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, sr libevm.StateReader) error {
 	if fn := s.CanExecuteTransactionFn; fn != nil {
-		return fn(from, to, sr)
+		return fn(rules, from, to, sr)
 	}
 	return nil
 }

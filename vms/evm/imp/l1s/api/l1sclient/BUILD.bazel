@@ -1,0 +1,40 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "client",
+    srcs = ["client.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api/client",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//vms/evm/evmclient",
+        "//vms/evm/imp/l1s/api",
+        "@com_github_ava_labs_libevm//rpc",
+    ],
+)
+
+go_library(
+    name = "l1client",
+    srcs = ["client.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api/l1client",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//vms/evm/evmclient",
+        "//vms/evm/imp/l1s/api",
+        "@com_github_ava_labs_libevm//rpc",
+    ],
+)
+
+go_library(
+    name = "l1sclient",
+    srcs = ["client.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api/l1sclient",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//vms/evm/evmclient",
+        "//vms/evm/imp/l1s/api",
+        "@com_github_ava_labs_libevm//rpc",
+    ],
+)
