@@ -29,7 +29,7 @@ flowchart TD
     subgraph RC["Receiver chain"]
         tx["Tx with signed message<br/>in its access list"]:::ext
         vb["VerifyBlock"]:::pkg
-        vp["Precompile<br/>VerifyPredicate"]:::evm
+        vp["Precompile<br/>VerifyMessage"]:::evm
         hdr["Predicate results<br/>in block header"]:::evm
         gvm["getVerifiedWarpMessage"]:::evm
     end
@@ -130,7 +130,7 @@ flowchart TD
     gvm["getVerifiedWarpMessage"]:::evm
 
     subgraph VB["VerifyBlock"]
-        vp["Warp VerifyPredicate<br/>(one goroutine per message)"]:::evm
+        vp["Warp VerifyMessage<br/>(one goroutine per message)"]:::evm
     end
 
     tx --> fal
