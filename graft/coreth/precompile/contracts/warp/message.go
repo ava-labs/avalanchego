@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/log"
 
-	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -43,11 +42,9 @@ var (
 // 4. TODO: Lookup of the validator set
 //
 // If the payload of the warp message fails parsing, return a non-nil error invalidating the transaction.
-func MessageGas(packed message.Packed, rules precompileconfig.Rules) (uint64, error) {
-	gasConfig := CurrentGasConfig(rules)
-
-	totalGas := gasConfig.VerifyPredicateBase
-	bytesGasCost, overflow := math.SafeMul(gasConfig.PerWarpMessageChunk, uint64(len(packed)))
+func (g GasConfig) MessageGas(packed message.Packed) (uint64, error) {
+	totalGas := g.VerifyPredicateBase
+	bytesGasCost, overflow := math.SafeMul(g.PerWarpMessageChunk, uint64(len(packed)))
 	if overflow {
 		return 0, fmt.Errorf("overflow calculating gas cost for %d warp message chunks", len(packed))
 	}
@@ -73,7 +70,7 @@ func MessageGas(packed message.Packed, rules precompileconfig.Rules) (uint64, er
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errCannotGetNumSigners, err)
 	}
-	signerGas, overflow := math.SafeMul(uint64(numSigners), gasConfig.PerWarpSigner)
+	signerGas, overflow := math.SafeMul(uint64(numSigners), g.PerWarpSigner)
 	if overflow {
 		return 0, errOverflowSignersGasCost
 	}
