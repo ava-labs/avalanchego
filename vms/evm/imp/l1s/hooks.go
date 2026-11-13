@@ -494,35 +494,16 @@ func (b *builder) BuildBlock(
 	), nil
 }
 
-// resolveCoinbase returns the fee recipient for the block being built.
-// Branches, in order:
-//  1. rewardmanager precompile not enabled under `settledRules`:
-//     the configured coinbase if `AllowFeeRecipients` is true, else burn.
-//  2. precompile enabled, allows fee recipients enabled:
-//     the configured coinbase.
-//  3. otherwise: the address stored in the precompile's reward address slot.
-//
-// Gates use `settledRules` (not the rules at `header.Time`): see
-// [builder.BuildBlock].
-func (b *builder) resolveCoinbase(settledRules ethparams.Rules, worstCaseState libevm.StateReader) common.Address {
-	if !legacyparams.GetRulesExtra(settledRules).IsPrecompileEnabled(rewardmanager.ContractAddress) {
-		configExtra := legacyparams.GetExtra(b.chainConfig)
-		if configExtra.AllowFeeRecipients {
-			return b.customCoinbase()
+// resolveCoinbase returns the fee recipient of the block being built.
+func (b *builder) resolveCoinbase(rules ethparams.Rules, state libevm.StateReader) common.Address {
+	if e := legacyparams.GetRulesExtra(rules); e.IsPrecompileEnabled(rewardmanager.ContractAddress) {
+		if addr, dynamic := rewardmanager.GetStoredRewardAddress(state); !dynamic {
+			return addr
 		}
+	} else if e := legacyparams.GetExtra(b.chainConfig); !e.AllowFeeRecipients {
 		return blackhole.Address
 	}
 
-	addr, allowFeeRecipients := rewardmanager.GetStoredRewardAddress(worstCaseState)
-	if allowFeeRecipients {
-		return b.customCoinbase()
-	}
-	return addr
-}
-
-// customCoinbase returns [builder.coinbase], warning if it burns the fees of a
-// block built by this node.
-func (b *builder) customCoinbase() common.Address {
 	if b.building && b.coinbase == blackhole.Address {
 		b.ctx.Log.Warn(`burning priority fees; set "fee-recipient" to claim them`)
 	}
