@@ -158,6 +158,8 @@ func (b *Bag[T]) Remove(elt T) {
 	count := b.counts[elt]
 	delete(b.counts, elt)
 	b.size -= count
+	// [elt] is no longer in the bag, so it can no longer meet the threshold.
+	b.metThreshold.Remove(elt)
 }
 
 func (b *Bag[T]) PrefixedString(prefix string) string {
