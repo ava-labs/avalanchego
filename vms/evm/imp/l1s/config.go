@@ -20,9 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
 	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
@@ -110,20 +108,6 @@ func (c config) sae() saeconfig.Config {
 // consumed by [sae.NewVM].
 func (c config) saeConfig(now func() time.Time) sae.Config {
 	return c.sae().SAEConfig(now)
-}
-
-// desired returns c's user-facing targets as internal excess votes.
-func (c config) desired() desiredParams {
-	var d desiredParams
-	if c.MinDelayTarget != nil {
-		e := dynamic.DesiredDelayExponent(*c.MinDelayTarget)
-		d.delayExcess = &e
-	}
-	if c.GasTarget != nil {
-		e := gas.Gas(dynamic.DesiredTargetExponent(*c.GasTarget))
-		d.targetExcess = &e
-	}
-	return d
 }
 
 // feeRecipient returns [config.FeeRecipient], warning if it is

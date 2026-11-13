@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/firewood"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
 	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
@@ -284,4 +285,28 @@ func (c Config) NetworkOptions() []network.Option {
 	return []network.Option{
 		network.WithAllowedTrackedPeers(c.StateSyncIDs),
 	}
+}
+
+// Desired is this node's votes for the dynamic consensus parameters. A nil
+// field means no vote.
+type Desired struct {
+	TargetExponent *dynamic.TargetExponent
+	PriceExponent  *dynamic.PriceExponent
+	DelayExponent  *dynamic.DelayExponent
+}
+
+// Desired returns the votes for [Config.GasTarget], [Config.PriceTarget] and
+// [Config.MinDelayTarget].
+func (c Config) Desired() Desired {
+	var d Desired
+	if c.GasTarget != nil {
+		d.TargetExponent = new(dynamic.DesiredTargetExponent(*c.GasTarget))
+	}
+	if c.PriceTarget != nil {
+		d.PriceExponent = new(dynamic.DesiredPriceExponent(*c.PriceTarget))
+	}
+	if c.MinDelayTarget != nil {
+		d.DelayExponent = new(dynamic.DesiredDelayExponent(*c.MinDelayTarget))
+	}
+	return d
 }

@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/executionresults"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/hookadaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/metrics"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/saeconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
 
 	legacycore "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
@@ -58,7 +59,7 @@ func newHooks(
 	ctx *snow.Context,
 	chainConfig *ethparams.ChainConfig,
 	now func() time.Time,
-	desired desiredParams,
+	desired saeconfig.Desired,
 	warpStorage *saewarp.Storage,
 	configuredCoinbase common.Address,
 	metrics *metrics.Metrics,
@@ -85,9 +86,9 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hookadaptor.BlockBuilder, er
 		now: func() time.Time {
 			return h.BlockTime(header)
 		},
-		desired: desiredParams{
-			delayExcess:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
-			targetExcess: headerExtra.TargetExcess,
+		desired: saeconfig.Desired{
+			TargetExponent: (*dynamic.TargetExponent)(headerExtra.TargetExcess),
+			DelayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 		},
 		coinbase: header.Coinbase, // override with received block's Coinbase
 	}, nil
@@ -325,13 +326,6 @@ func activeWarpConfig(rules ethparams.Rules) (*legacywarp.Config, bool) {
 
 var _ hookadaptor.BlockBuilder = (*builder)(nil)
 
-// desiredParams bundles this node's votes for the dynamic consensus
-// parameters. A nil field means no vote.
-type desiredParams struct {
-	delayExcess  *dynamic.DelayExponent
-	targetExcess *gas.Gas
-}
-
 type builder struct {
 	ctx         *snow.Context
 	chainConfig *ethparams.ChainConfig
@@ -339,7 +333,7 @@ type builder struct {
 	now func() time.Time
 	// When fields in desired are set, the block builder will build blocks
 	// that move the network values towards their desired values.
-	desired desiredParams
+	desired saeconfig.Desired
 
 	// coinbase is the fee recipient stamped into `header.Coinbase`
 	// in operator-chosen branches of [builder.resolveCoinbase].
@@ -388,9 +382,9 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	if pmde := customtypes.GetHeaderExtra(parent).MinDelayExcess; pmde != nil {
 		mde = dynamic.DelayExponent(*pmde)
 	}
-	minDelayExcess := acp226.DelayExcess(mde.Toward(b.desired.delayExcess))
+	minDelayExcess := acp226.DelayExcess(mde.Toward(b.desired.DelayExponent))
 
-	te := gas.Gas(dynamic.TargetExponent(targetExcess(parent)).Toward((*dynamic.TargetExponent)(b.desired.targetExcess)))
+	te := gas.Gas(dynamic.TargetExponent(targetExcess(parent)).Toward(b.desired.TargetExponent))
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash: parent.Hash(),

@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/executionresults"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/metrics"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/saeconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
 
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
@@ -65,7 +66,7 @@ func newHooks(
 	pool *txpool.Pending,
 	warpStorage *saewarp.Storage,
 	now func() time.Time,
-	desired desiredParams,
+	desired saeconfig.Desired,
 	metrics *metrics.Metrics,
 ) *hooks {
 	poolTxs := func(yield func(*hookTx) bool) {
@@ -122,10 +123,10 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hook.BlockBuilder[*hookTx], 
 			return now
 		},
 		slices.Values(txs),
-		desiredParams{
-			targetExponent: headerExtra.TargetExponent,
-			priceExponent:  headerExtra.MinPriceExponent,
-			delayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
+		saeconfig.Desired{
+			TargetExponent: headerExtra.TargetExponent,
+			PriceExponent:  headerExtra.MinPriceExponent,
+			DelayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 		},
 	}, nil
 }
@@ -346,7 +347,7 @@ type builder struct {
 	chainConfig  *params.ChainConfig
 	now          func() time.Time
 	potentialTxs iter.Seq[*hookTx]
-	desired      desiredParams
+	desired      saeconfig.Desired
 }
 
 var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
@@ -371,9 +372,9 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 		return nil, fmt.Errorf("getting target exponent: %w", err)
 	}
 	// Move each dynamic parameter toward this node's vote (nil = no move).
-	de = de.Toward(b.desired.delayExponent)
-	te = te.Toward(b.desired.targetExponent)
-	pe := priceExponent(parent).Toward(b.desired.priceExponent)
+	de = de.Toward(b.desired.DelayExponent)
+	te = te.Toward(b.desired.TargetExponent)
+	pe := priceExponent(parent).Toward(b.desired.PriceExponent)
 	minDelayExcess := acp226.DelayExcess(de)
 	return customtypes.WithHeaderExtra(
 		&types.Header{

@@ -13,6 +13,7 @@ go_library(
         "//utils/set",
         "//vms/components/gas",
         "//vms/evm/firewood",
+        "//vms/evm/imp/dynamic",
         "//vms/evm/network",
         "//vms/evm/sae",
         "//vms/evm/sae/rpc",

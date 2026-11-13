@@ -148,7 +148,7 @@ func (vm *VM) Initialize(
 		vm.pending,
 		warpStorage,
 		vm.now,
-		desired(userConfig),
+		userConfig.Desired(),
 		vm.metrics,
 	)
 	vm.Network, err = network.New(snowCtx, appSender, userConfig.NetworkOptions()...)

@@ -157,7 +157,7 @@ func (vm *VM) Initialize(
 		snowCtx,
 		genesis.Config,
 		saeConfig.Now,
-		userConfig.desired(),
+		userConfig.Desired(),
 		warpStorage,
 		userConfig.feeRecipient(genesis.Config, snowCtx.Log),
 		chainMetrics,

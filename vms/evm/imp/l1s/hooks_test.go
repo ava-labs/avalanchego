@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/saeconfig"
 
 	legacyparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
@@ -62,7 +63,7 @@ func TestBuildHeaderIglooOverride(t *testing.T) {
 				snowCtx,
 				&chainCfg,
 				func() time.Time { return test.now },
-				desiredParams{},
+				saeconfig.Desired{},
 				nil,
 				common.Address{},
 				nil,
@@ -117,7 +118,7 @@ func TestGasConfigAfterGenesisCanonicalTarget(t *testing.T) {
 				Time:   saeparams.TauSeconds,
 			}
 
-			got, _ := newHooks(nil, &chainCfg, nil, desiredParams{}, nil, common.Address{}, nil).GasConfigAfter(genesis)
+			got, _ := newHooks(nil, &chainCfg, nil, saeconfig.Desired{}, nil, common.Address{}, nil).GasConfigAfter(genesis)
 			require.Equal(t, test.want, got, "hooks.GasConfigAfter() for stored target %d", test.storedTarget)
 		})
 	}
@@ -157,7 +158,7 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	builderPts := newHooks(
 		nil, &chainCfg,
 		func() time.Time { return time.UnixMilli(int64(nowMS)) },
-		desiredParams{}, nil, builderCoinbase, nil,
+		saeconfig.Desired{}, nil, builderCoinbase, nil,
 	)
 	builderHdr, err := builderPts.builder.BuildHeader(parent)
 	require.NoError(t, err)
@@ -170,7 +171,7 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 
 	// Rebuilder side: a DIFFERENT node (rebuilderCoinbase != builderCoinbase)
 	// rebuilds builderBlock. Its rebuilt block must carry builderCoinbase.
-	rebuilderPts := newHooks(nil, &chainCfg, nil, desiredParams{}, nil, rebuilderCoinbase, nil)
+	rebuilderPts := newHooks(nil, &chainCfg, nil, saeconfig.Desired{}, nil, rebuilderCoinbase, nil)
 	rebuilder, err := rebuilderPts.BlockRebuilderFrom(builderBlock)
 	require.NoError(t, err)
 	rebuiltHdr, err := rebuilder.BuildHeader(parent)
@@ -240,7 +241,7 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	})
 	forgedBlock := types.NewBlockWithHeader(forgedHdr)
 
-	rebuilderPts := newHooks(nil, &chainCfg, nil, desiredParams{}, nil, forgedCoinbase /* same as builder; doesn't matter */, nil)
+	rebuilderPts := newHooks(nil, &chainCfg, nil, saeconfig.Desired{}, nil, forgedCoinbase /* same as builder; doesn't matter */, nil)
 	rebuilder, err := rebuilderPts.BlockRebuilderFrom(forgedBlock)
 	require.NoError(t, err)
 	rebuiltHdr, err := rebuilder.BuildHeader(parent)
