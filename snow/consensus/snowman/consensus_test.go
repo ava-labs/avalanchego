@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"testing/synctest"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -64,6 +66,7 @@ var (
 		ErrorOnAddDecidedBlockTest,
 		RecordPollWithDefaultParameters,
 		RecordPollRegressionCalculateInDegreeIndegreeCalculation,
+		HealthCheckTest,
 	}
 
 	errTest = errors.New("non-nil error")
@@ -1534,4 +1537,89 @@ func RecordPollRegressionCalculateInDegreeIndegreeCalculation(t *testing.T, fact
 	require.Equal(snowtest.Accepted, blk1.Status)
 	require.Equal(snowtest.Accepted, blk2.Status)
 	require.Equal(snowtest.Accepted, blk3.Status)
+}
+
+// Make sure that the health check reports the block that has been processing
+// the longest, and reports empty values when no blocks are processing.
+func HealthCheckTest(t *testing.T, factory Factory) {
+	synctest.Test(t, func(t *testing.T) {
+		require := require.New(t)
+
+		sm := factory.New()
+
+		snowCtx := snowtest.Context(t, snowtest.CChainID)
+		ctx := snowtest.ConsensusContext(snowCtx)
+		params := snowball.DefaultParameters
+		require.NoError(sm.Initialize(
+			ctx,
+			params,
+			snowmantest.GenesisID,
+			snowmantest.GenesisHeight,
+			snowmantest.GenesisTimestamp,
+		))
+
+		// Nothing is processing yet, so the empty values are reported.
+		details, err := sm.HealthCheck(t.Context())
+		require.NoError(err)
+		require.Equal(
+			map[string]interface{}{
+				"processingBlocks":             0,
+				"longestProcessingBlock":       time.Duration(0).String(),
+				"longestProcessingBlockID":     ids.Empty,
+				"longestProcessingBlockHeight": uint64(0),
+				"lastAcceptedID":               snowmantest.GenesisID,
+				"lastAcceptedHeight":           snowmantest.GenesisHeight,
+			},
+			details,
+		)
+
+		// blk1 is newer than blk0, so it shows that the oldest block is
+		// reported.
+		blk0 := snowmantest.BuildChild(snowmantest.Genesis)
+		blk1 := snowmantest.BuildChild(blk0)
+		require.NoError(sm.Add(blk0))
+		require.NoError(sm.Add(blk1))
+
+		elapsed := params.MaxItemProcessingTime + time.Second
+		time.Sleep(elapsed)
+
+		details, err = sm.HealthCheck(t.Context())
+		require.ErrorIs(err, errBlockProcessingTooLong)
+		require.Equal(
+			map[string]interface{}{
+				"processingBlocks":             2,
+				"longestProcessingBlock":       elapsed.String(),
+				"longestProcessingBlockID":     blk0.ID(),
+				"longestProcessingBlockHeight": blk0.Height(),
+				"lastAcceptedID":               snowmantest.GenesisID,
+				"lastAcceptedHeight":           snowmantest.GenesisHeight,
+			},
+			details,
+		)
+
+		// Accept both blocks by voting for blk1 for beta rounds.
+		votes := bag.Bag[ids.ID]{}
+		votes.AddCount(blk1.ID(), params.AlphaConfidence)
+		for range params.Beta {
+			require.NoError(sm.RecordPoll(t.Context(), votes))
+		}
+		require.Equal(snowtest.Accepted, blk0.Status)
+		require.Equal(snowtest.Accepted, blk1.Status)
+
+		// Nothing is processing anymore, so the empty values are reported
+		// again.
+		details, err = sm.HealthCheck(t.Context())
+		require.NoError(err)
+		require.Equal(
+			map[string]interface{}{
+				"processingBlocks":             0,
+				"longestProcessingBlock":       time.Duration(0).String(),
+				"longestProcessingBlockID":     ids.Empty,
+				"longestProcessingBlockHeight": uint64(0),
+				"lastAcceptedID":               blk1.ID(),
+				"lastAcceptedHeight":           blk1.Height(),
+			},
+			details,
+		)
+	})
 }
