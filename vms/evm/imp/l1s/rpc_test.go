@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/stateupgrade"
 )
 
 func withUpgrades(u extras.UpgradeConfig) sutOption {
@@ -34,9 +35,9 @@ func TestGetChainConfig(t *testing.T) {
 			{Config: deployerallowlist.NewConfig(new(enableTime), []common.Address{{1}}, nil, nil)},
 			{Config: deployerallowlist.NewDisableConfig(new(disableTime))},
 		},
-		StateUpgrades: []extras.StateUpgrade{{
-			BlockTimestamp: new(enableTime),
-			StateUpgradeAccounts: map[common.Address]extras.StateUpgradeAccount{
+		StateUpgrades: []stateupgrade.Block{{
+			Timestamp: new(enableTime),
+			Accounts: map[common.Address]stateupgrade.Account{
 				{2}: {BalanceChange: (*math.HexOrDecimal256)(big.NewInt(42))},
 			},
 		}},
