@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
@@ -304,7 +305,7 @@ func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) err
 	// Genesis and state upgrades can place arbitrary code at the Warp address.
 	// Only once the precompile is active are its logs guaranteed to be Warp
 	// messages.
-	rules := h.chainConfig.Rules(b.Number(), legacyparams.IsMergeTODO, b.Time())
+	rules := h.chainConfig.Rules(b.Number(), true /*isMerge*/, b.Time())
 	if _, ok := activeWarpConfig(rules); !ok {
 		return nil
 	}
@@ -442,7 +443,11 @@ func (b *builder) BuildBlock(
 		return nil, errEmptyBlock
 	}
 
-	if legacyparams.GetRulesExtra(settledRules).IsPrecompileEnabled(gaspricemanager.ContractAddress) {
+	settledRulesExtra := legacyparams.GetRulesExtra(settledRules)
+	header.Coinbase = b.resolveCoinbase(settledRulesExtra, worstCaseState)
+
+	headerExtra := customtypes.GetHeaderExtra(header)
+	if settledRulesExtra.IsPrecompileEnabled(gaspricemanager.ContractAddress) {
 		stored := gaspricemanager.GetStoredGasPriceConfig(worstCaseState, gaspricemanager.ContractAddress)
 		if stored == (commontype.GasPriceConfig{}) {
 			// Activation runs [gaspricemanager.Configure] which always writes
@@ -453,16 +458,13 @@ func (b *builder) BuildBlock(
 			// papered over with defaults.
 			return nil, fmt.Errorf("%w: block %d settling %d", errZeroStoredGasPriceConfig, header.Number, settled.Height)
 		}
-		headerExtra := customtypes.GetHeaderExtra(header)
 		if !stored.ValidatorTargetGas {
-			targetExcess := gas.Gas(dynamic.DesiredTargetExponent(gas.Gas(stored.TargetGas)))
-			headerExtra.TargetExcess = &targetExcess
+			headerExtra.TargetExcess = new(gas.Gas(dynamic.DesiredTargetExponent(gas.Gas(stored.TargetGas))))
 		}
 		stampGasConfig(headerExtra, gasConfigFromStored(stored))
 	}
-	header.Coinbase = b.resolveCoinbase(settledRules, worstCaseState)
 
-	rules := b.chainConfig.Rules(header.Number, legacyparams.IsMergeTODO, header.Time)
+	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
 	var warpValidity predicate.BlockResults
 	if warpConfig, ok := activeWarpConfig(rules); ok {
 		var err error
@@ -479,11 +481,10 @@ func (b *builder) BuildBlock(
 
 	// Encode the settled marker into the header so [hooks.SettledBy] can
 	// recover it.
-	he := customtypes.GetHeaderExtra(header)
-	he.SettledHeight = &settled.Height
-	he.SettledGasUnix = &settled.GasUnix
-	he.SettledGasNumerator = (*uint64)(&settled.GasNumerator)
-	he.SettledExcess = (*uint64)(&settled.Excess)
+	headerExtra.SettledHeight = &settled.Height
+	headerExtra.SettledGasUnix = &settled.GasUnix
+	headerExtra.SettledGasNumerator = (*uint64)(&settled.GasNumerator)
+	headerExtra.SettledExcess = (*uint64)(&settled.Excess)
 
 	return types.NewBlock(
 		header,
@@ -495,8 +496,8 @@ func (b *builder) BuildBlock(
 }
 
 // resolveCoinbase returns the fee recipient of the block being built.
-func (b *builder) resolveCoinbase(rules ethparams.Rules, state libevm.StateReader) common.Address {
-	if e := legacyparams.GetRulesExtra(rules); e.IsPrecompileEnabled(rewardmanager.ContractAddress) {
+func (b *builder) resolveCoinbase(rules *extras.Rules, state libevm.StateReader) common.Address {
+	if rules.IsPrecompileEnabled(rewardmanager.ContractAddress) {
 		if addr, dynamic := rewardmanager.GetStoredRewardAddress(state); !dynamic {
 			return addr
 		}
