@@ -111,9 +111,7 @@ go_test(
     embed = [":l1s"],
     deps = [
         "//database",
-        "//database/leveldb",
         "//database/memdb",
-        "//database/pebbledb",
         "//graft/evm/acp226",
         "//graft/evm/customrawdb",
         "//graft/evm/predicate",
@@ -202,6 +200,5 @@ go_test(
         "@com_github_stretchr_testify//require",
         "@org_golang_google_protobuf//proto",
         "@org_uber_go_goleak//:goleak",
-        "@org_uber_go_zap//:zap",
     ],
 )

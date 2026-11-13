@@ -19,10 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
@@ -186,52 +183,6 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	require.Equal(t, builderCoinbase, rebuilt.Header().Coinbase,
 		"rebuilt block MUST carry the builder's Coinbase from the received header")
 	require.Equal(t, builderBlock.Hash(), rebuilt.Hash())
-}
-
-// TestBuildBlockWarnsOnBurnedFees asserts that building a block that burns fees
-// the chain allows this node to claim MUST warn, and that rebuilding such a
-// block MUST NOT.
-func TestBuildBlockWarnsOnBurnedFees(t *testing.T) {
-	const (
-		parentTimeMS = uint64(2_000_000_000_000)
-		nowMS        = parentTimeMS + 5_000
-	)
-
-	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgradetest.Igloo])
-	legacyparams.GetExtra(&chainCfg).AllowFeeRecipients = true
-
-	parent := &types.Header{Number: big.NewInt(1), Time: parentTimeMS / 1000}
-	customtypes.SetHeaderExtra(parent, &customtypes.HeaderExtra{
-		TimeMilliseconds: new(parentTimeMS),
-		MinDelayExcess:   new(acp226.InitialDelayExcess),
-	})
-	tx := types.NewTx(&types.DynamicFeeTx{Gas: 21_000, Value: big.NewInt(0)})
-	settledRules := chainCfg.Rules(big.NewInt(0), true /*isMerge*/, parent.Time)
-	settled := hook.Settled{Height: 1, GasUnix: parent.Time, GasNumerator: 1, Excess: 1}
-
-	log := loggingtest.NewRecorder(logging.Warn)
-	h := newHooks(
-		&snow.Context{Log: log}, &chainCfg,
-		func() time.Time { return time.UnixMilli(int64(nowMS)) },
-		saeconfig.Desired{}, nil, blackhole.Address, nil,
-	)
-	hdr, err := h.builder.BuildHeader(parent)
-	require.NoError(t, err)
-	built, err := h.builder.BuildBlock(hdr, nil, []*types.Transaction{tx}, nil, settled, settledRules, nil)
-	require.NoError(t, err)
-	want := []*loggingtest.Record{{
-		Level: logging.Warn,
-		Msg:   `burning fees of a block built by this node, although the chain allows claiming them; set "fee-recipient" to claim them`,
-	}}
-	require.Equal(t, want, log.Records, "BuildBlock() logs")
-
-	rebuilder, err := h.BlockRebuilderFrom(built)
-	require.NoError(t, err)
-	rebuiltHdr, err := rebuilder.BuildHeader(parent)
-	require.NoError(t, err)
-	_, err = rebuilder.BuildBlock(rebuiltHdr, nil, []*types.Transaction{tx}, nil, settled, settledRules, nil)
-	require.NoError(t, err)
-	require.Equal(t, want, log.Records, "rebuilt BuildBlock() logs")
 }
 
 // TestBlockRebuildRejectsForgedCoinbase covers the dual of

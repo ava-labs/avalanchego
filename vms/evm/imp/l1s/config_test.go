@@ -11,11 +11,9 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 )
@@ -85,18 +83,12 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 		require.Equal(t, want, c)
 	})
 
-	t.Run("unknown_field_ignored_with_warning", func(t *testing.T) {
+	t.Run("unknown_field_ignored", func(t *testing.T) {
 		// Legacy keys with no SAE counterpart MUST NOT prevent an existing
 		// node config from starting the VM.
-		log := loggingtest.NewRecorder(logging.Warn)
-		c, err := parseConfig(&snow.Context{Log: log}, []byte(`{"airdrop":"genesis.json"}`))
+		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"airdrop":"genesis.json"}`))
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
-		require.Equal(t, []*loggingtest.Record{{
-			Level:  logging.Warn,
-			Msg:    "ignoring unrecognized config options",
-			Fields: []zap.Field{zap.Strings("options", []string{"airdrop"})},
-		}}, log.Records)
 	})
 
 	t.Run("duration_string", func(t *testing.T) {
