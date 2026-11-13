@@ -58,12 +58,6 @@ func (r RulesExtra) CanCreateContract(ac *libevm.AddressContext, gas uint64, sta
 	return gas, nil
 }
 
-func (RulesExtra) CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error {
-	// TODO: Migrate call for txallowlist precompile to here from core/state_transition.go
-	// when that is used from libevm.
-	return nil
-}
-
 func (r RulesExtra) ShouldRefundGas() bool {
 	return !r.IsSubnetEVM
 }

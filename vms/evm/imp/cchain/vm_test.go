@@ -55,6 +55,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
@@ -66,7 +67,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
@@ -1034,6 +1034,7 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 		txs[i] = w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 			To:        &common.Address{},
 			Gas:       tt.gasLimit,
+			GasTipCap: big.NewInt(1),
 			GasFeeCap: big.NewInt(1),
 		})
 		require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, txs[i]), "%T.SendTransaction(%s)", sut.EthClient(), tt.name)
@@ -1150,7 +1151,7 @@ func TestParseBlock(t *testing.T) {
 	w := newWallet(key, sut.ctx, nil)
 	stx := w.newMinimalTx(t)
 
-	ap1Time := *corethparams.GetExtra(sut.chainConfig).ApricotPhase1Timestamp
+	ap1Time := *cparams.GetExtra(sut.chainConfig).ApricotPhase1Timestamp
 
 	const (
 		preAP1WithDataHeight    = 1
@@ -1697,6 +1698,7 @@ func TestGasRefundsDisabled(t *testing.T) {
 	tx := w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		To:        &contract,
 		Gas:       wantGasUsed,
+		GasTipCap: big.NewInt(1),
 		GasFeeCap: big.NewInt(1),
 	})
 	require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction()", sut.EthClient())

@@ -215,6 +215,7 @@ func jsonKeys[T any]() set.Set[string] {
 func (c config) saeConfig(now func() time.Time) sae.Config {
 	mempoolConfig := legacypool.DefaultConfig
 	mempoolConfig.NoLocals = !c.LocalTxsEnabled
+	mempoolConfig.Journal = "" // Disable journaling
 	mempoolConfig.AccountSlots = c.TxPoolAccountSlots
 	mempoolConfig.GlobalSlots = c.TxPoolGlobalSlots
 	return sae.Config{

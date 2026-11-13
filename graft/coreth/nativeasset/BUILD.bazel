@@ -25,7 +25,6 @@ graft_go_test(
     srcs = ["contract_test.go"],
     deps = [
         ":nativeasset",
-        "//graft/coreth/params",
         "//vms/evm/imp/cchain/cparams",
         "//vms/evm/imp/cchain/libevm",
         "//vms/evm/imp/cchain/libevm/extstate",

@@ -11,13 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
-
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 )
 
 // ChainConfig returns a new C-Chain config with all network upgrades active.
 func ChainConfig() *params.ChainConfig {
 	c := *saetest.ChainConfig()
 	u := upgradetest.GetConfigWithUpgradeTime(upgradetest.Latest, time.Unix(0, 0))
-	return corethparams.WithExtra(&c, cparams.FromUpgrades(u))
+	return cparams.WithExtra(&c, cparams.FromUpgrades(u))
 }

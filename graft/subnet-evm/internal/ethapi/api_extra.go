@@ -21,8 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 )
 
-func (s *BlockChainAPI) GetChainConfig(context.Context) *params.ChainConfigWithUpgradesJSON {
-	return params.ToWithUpgradesJSON(s.b.ChainConfig())
+func (s *BlockChainAPI) GetChainConfig(context.Context) *params.ChainConfig {
+	return s.b.ChainConfig()
 }
 
 type DetailedExecutionResult struct {

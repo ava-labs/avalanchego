@@ -21,5 +21,7 @@ func GoleakOptions() []goleak.Option {
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).Logs.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).NewHeads.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
 		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*FilterAPI).NewPendingTransactions.func1.deferwrap1.(*Subscription).Unsubscribe.1"),
+		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*Subscription).Unsubscribe.func1"),
+		goleak.IgnoreTopFunction("github.com/ava-labs/libevm/eth/filters.(*EventSystem).subscribe"),
 	}
 }
