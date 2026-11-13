@@ -23,6 +23,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -55,8 +56,9 @@ type SUT struct {
 
 type (
 	sutConfig struct {
-		genesis core.Genesis
-		clock   *saetest.Clock
+		genesis  core.Genesis
+		upgrades extras.UpgradeConfig
+		clock    *saetest.Clock
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -101,15 +103,18 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	genesisBytes, err := json.Marshal(cfg.genesis)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
+	upgradeBytes, err := json.Marshal(cfg.upgrades)
+	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.upgrades)
 
 	appSender := saetest.NewSender(tb, set.Of(snowCtx.NodeID))
 
 	ctx := log.CancelOnError(tb.Context())
 	vmSUT, err := vmtest.New(ctx, tb, vm, snowCtx, vmtest.Config{
-		DB:      memdb.New(),
-		Genesis: genesisBytes,
-		Sender:  appSender,
-		State:   snow.NormalOp,
+		DB:       memdb.New(),
+		Genesis:  genesisBytes,
+		Upgrades: upgradeBytes,
+		Sender:   appSender,
+		State:    snow.NormalOp,
 	})
 	require.NoError(tb, err, "vmtest.New()")
 	sut := &SUT{
