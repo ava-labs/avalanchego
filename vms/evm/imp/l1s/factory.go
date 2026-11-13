@@ -5,6 +5,8 @@
 package l1s
 
 import (
+	"time"
+
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/evm/adaptor"
@@ -18,5 +20,8 @@ type Factory struct{}
 // New creates a new L1 VM.
 func (*Factory) New(log logging.Logger) (any, error) {
 	log.Info("Creating new L1 VM")
-	return adaptor.Convert(New()), nil
+	vm := &VM{
+		now: time.Now,
+	}
+	return adaptor.Convert(vm), nil
 }

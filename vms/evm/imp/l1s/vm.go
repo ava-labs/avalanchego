@@ -68,13 +68,6 @@ type VM struct {
 	closed  bool
 }
 
-// New constructs a new [VM] that uses the wall clock.
-func New() *VM {
-	return &VM{
-		now: time.Now,
-	}
-}
-
 var errAlreadyClosed = errors.New("already closed")
 
 // Initialize initializes the VM.
