@@ -9,9 +9,16 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var ErrInvalidParameters = errors.New("simplex parameters must be valid")
+var (
+	ErrInvalidParameters = errors.New("simplex parameters must be valid")
+
+	errDuplicateNodeID = errors.New("duplicate nodeID")
+	errEmptyNodeID     = errors.New("empty nodeID")
+)
 
 type ValidatorInfo struct {
 	NodeID ids.NodeID `json:"nodeID" yaml:"nodeID"`
@@ -39,10 +46,23 @@ func (p Parameters) Verify() error {
 	if p.MaxRebroadcastWait <= 0 {
 		return fmt.Errorf("%w: maxRebroadcastWait must be positive", ErrInvalidParameters)
 	}
-	// TODO: we need to validate InitialValidators contains only unique nodes with valid keys.
-	// See: https://github.com/ava-labs/avalanchego/issues/5023
 	if len(p.InitialValidators) == 0 {
 		return fmt.Errorf("%w: initialValidators must be non-empty", ErrInvalidParameters)
+	}
+
+	nodeIDs := set.NewSet[ids.NodeID](len(p.InitialValidators))
+	for _, validator := range p.InitialValidators {
+		if validator.NodeID == ids.EmptyNodeID {
+			return fmt.Errorf("%w: initialValidators has %w", ErrInvalidParameters, errEmptyNodeID)
+		}
+		if nodeIDs.Contains(validator.NodeID) {
+			return fmt.Errorf("%w: initialValidators has %w: %s", ErrInvalidParameters, errDuplicateNodeID, validator.NodeID)
+		}
+		nodeIDs.Add(validator.NodeID)
+
+		if _, err := bls.PublicKeyFromCompressedBytes(validator.PublicKey); err != nil {
+			return fmt.Errorf("%w: initialValidators has invalid public key for %s: %w", ErrInvalidParameters, validator.NodeID, err)
+		}
 	}
 	return nil
 }
