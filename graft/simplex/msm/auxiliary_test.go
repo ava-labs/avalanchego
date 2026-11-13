@@ -175,7 +175,7 @@ func batchBlock(batch *AuxiliaryInfoBatch) StateMachineBlock {
 // blockRetrieverFromMap returns a BlockRetriever backed by the given seq -> block mapping,
 // failing the test if a sequence outside the mapping is requested.
 func blockRetrieverFromMap(t *testing.T, blocks map[uint64]StateMachineBlock) BlockRetriever {
-	return func(seq uint64, _ common.Digest) (StateMachineBlock, *common.Finalization, error) {
+	return func(seq uint64, _ common.Digest) (StateMachineBlock, *common.VerifiedFinalization, error) {
 		block, ok := blocks[seq]
 		require.True(t, ok, "requested unexpected block at seq %d", seq)
 		return block, nil, nil
@@ -302,7 +302,7 @@ func TestGetAuxiliaryHistoryRetrievalError(t *testing.T) {
 		PrevAuxInfoSeq: 5,
 	})
 
-	getBlock := func(seq uint64, _ common.Digest) (StateMachineBlock, *common.Finalization, error) {
+	getBlock := func(seq uint64, _ common.Digest) (StateMachineBlock, *common.VerifiedFinalization, error) {
 		return StateMachineBlock{}, nil, fmt.Errorf("no block at seq %d", seq)
 	}
 

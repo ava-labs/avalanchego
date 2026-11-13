@@ -323,6 +323,7 @@ func TestReplicationRequestIncompleteResponses(t *testing.T) {
 }
 
 type collectNotarizationComm struct {
+	t             *testing.T
 	lock          *sync.Mutex
 	notarizations map[uint64]*common.Notarization
 	testutil.TestNetworkCommunication
@@ -330,8 +331,9 @@ type collectNotarizationComm struct {
 	replicationResponses chan struct{}
 }
 
-func newCollectNotarizationComm(nodeID common.NodeID, net *testutil.ControlledInMemoryNetwork, notarizations map[uint64]*common.Notarization, lock *sync.Mutex) *collectNotarizationComm {
+func newCollectNotarizationComm(t *testing.T, nodeID common.NodeID, net *testutil.ControlledInMemoryNetwork, notarizations map[uint64]*common.Notarization, lock *sync.Mutex) *collectNotarizationComm {
 	return &collectNotarizationComm{
+		t:                        t,
 		notarizations:            notarizations,
 		TestNetworkCommunication: testutil.NewTestComm(nodeID, net.BasicInMemoryNetwork, testutil.AllowAllMessages),
 		replicationResponses:     make(chan struct{}, 3),
@@ -368,7 +370,7 @@ func (c *collectNotarizationComm) removeFinalizationsFromReplicationResponses(ms
 			qr := msg.VerifiedReplicationResponse.Data[i]
 			if qr.Finalization != nil && c.notarizations[qr.GetRound()] != nil {
 				qr.Finalization = nil
-				qr.Notarization = c.notarizations[qr.GetRound()]
+				qr.Notarization = testutil.Ptr(testutil.MustVerifyNotarization(c.t, *c.notarizations[qr.GetRound()]))
 			}
 			newData = append(newData, qr)
 		}
@@ -403,11 +405,11 @@ func TestReplicationRequestWithoutFinalization(t *testing.T) {
 	testConfig := func(nodeID common.NodeID) *testutil.TestNodeConfig {
 		return &testutil.TestNodeConfig{
 			ReplicationEnabled: true,
-			Comm:               newCollectNotarizationComm(nodeID, net, notarizations, mapLock),
+			Comm:               newCollectNotarizationComm(t, nodeID, net, notarizations, mapLock),
 		}
 	}
 
-	notarizationComm := newCollectNotarizationComm(nodes[0], net, notarizations, mapLock)
+	notarizationComm := newCollectNotarizationComm(t, nodes[0], net, notarizations, mapLock)
 	testutil.NewControlledSimplexNode(t, nodes[0], net, &testutil.TestNodeConfig{
 		ReplicationEnabled: true,
 		Comm:               notarizationComm,

@@ -140,12 +140,12 @@ func (t *TestSignatureAggregator) AppendSignatures(existing common.SignatureByte
 	return result, nil
 }
 
-func (t *TestSignatureAggregator) Aggregate(signatures []common.Signature) (common.QuorumCertificate, error) {
+func (t *TestSignatureAggregator) Aggregate(signatures []common.Signature) (common.QuorumCertificate, common.VerifiedQuorumCertificate, error) {
 	qc := TestQC{Signatures: make([]Signature, len(signatures))}
 	for i, sig := range signatures {
 		qc.Signatures[i] = Signature{Signer: NewNodeID(sig.Signer), Value: sig.Value}
 	}
-	return qc, t.Err
+	return qc, qc, t.Err
 }
 
 func (t *TestSignatureAggregator) IsQuorum(signers []common.NodeID) bool {
@@ -212,8 +212,43 @@ func (t TestQC) Signers() []common.NodeID {
 	return res
 }
 
-func (t TestQC) Verify([]byte, common.Nodes) error {
-	return nil
+// Verify checks the signers of the QC against nodes, like a real QuorumCertificate does:
+// no node signed twice and every signer is in nodes.
+// Whether the signers are a quorum is not checked, since it depends on the SignatureAggregator
+// that produced the QC, and the signatures themselves are not checked either.
+// A TestQC is both the unverified and the verified form of a quorum certificate.
+func (t TestQC) Verify(_ []byte, nodes common.Nodes) (common.VerifiedQuorumCertificate, error) {
+	signers := t.Signers()
+
+	seen := make(map[common.NodeID]struct{}, len(signers))
+	for _, signer := range signers {
+		if _, ok := seen[signer]; ok {
+			return nil, fmt.Errorf("quorum certificate is signed by the same node (%s) more than once", signer)
+		}
+		seen[signer] = struct{}{}
+	}
+
+	if len(nodes) == 0 {
+		// no validator set to check against
+		return t, nil
+	}
+
+	eligible := make(map[common.NodeID]struct{}, len(nodes))
+	for _, node := range nodes {
+		eligible[node.Id] = struct{}{}
+	}
+
+	for _, signer := range signers {
+		if _, ok := eligible[signer]; !ok {
+			return nil, fmt.Errorf("quorum certificate contains an unknown signer (%s)", signer)
+		}
+	}
+
+	return t, nil
+}
+
+func (t TestQC) UnVerified() common.QuorumCertificate {
+	return t
 }
 
 func (t TestQC) Bytes() []byte {

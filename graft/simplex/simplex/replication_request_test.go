@@ -50,7 +50,7 @@ func TestReplicationRequestIndexedBlocks(t *testing.T) {
 	require.Equal(t, len(sequences), len(resp.Data))
 	for i, data := range resp.Data {
 		require.Equal(t, seqs[i].Finalization, *data.Finalization)
-		require.Equal(t, seqs[i].VerifiedBlock, data.VerifiedBlock)
+		require.Equal(t, seqs[i].VerifiedBlock, data.Block)
 	}
 
 	// request out of scope
@@ -87,8 +87,8 @@ func TestReplicationRequestNotarizations(t *testing.T) {
 		block, notarization := advanceRoundFromNotarization(t, e, bb)
 
 		rounds[i] = common.VerifiedQuorumRound{
-			VerifiedBlock: block,
-			Notarization:  notarization,
+			Block:        block.UnVerifiedBlock(),
+			Notarization: testutil.Ptr(testutil.MustVerifyNotarization(t, *notarization)),
 		}
 	}
 
@@ -120,9 +120,9 @@ func TestReplicationRequestNotarizations(t *testing.T) {
 
 	for _, round := range resp.Data {
 		require.Nil(t, round.EmptyNotarization)
-		notarizedBlock, ok := rounds[round.VerifiedBlock.BlockHeader().Round]
+		notarizedBlock, ok := rounds[round.Block.BlockHeader().Round]
 		require.True(t, ok)
-		require.Equal(t, notarizedBlock.VerifiedBlock, round.VerifiedBlock)
+		require.Equal(t, notarizedBlock.Block, round.Block)
 		require.Equal(t, notarizedBlock.Notarization, round.Notarization)
 	}
 
@@ -140,9 +140,9 @@ func TestReplicationRequestNotarizations(t *testing.T) {
 	resp = msg.VerifiedReplicationResponse
 	for _, round := range resp.Data {
 		require.Nil(t, round.EmptyNotarization)
-		notarizedBlock, ok := rounds[round.VerifiedBlock.BlockHeader().Round]
+		notarizedBlock, ok := rounds[round.Block.BlockHeader().Round]
 		require.True(t, ok)
-		require.Equal(t, notarizedBlock.VerifiedBlock, round.VerifiedBlock)
+		require.Equal(t, notarizedBlock.Block, round.Block)
 		require.Equal(t, notarizedBlock.Notarization, round.Notarization)
 	}
 }
@@ -177,15 +177,15 @@ func TestReplicationRequestMixed(t *testing.T) {
 			}, nodes[1]))
 			wal.AssertNotarization(uint64(i))
 			rounds[i] = common.VerifiedQuorumRound{
-				EmptyNotarization: emptyNotarization,
+				EmptyNotarization: testutil.MustVerifyEmptyNotarization(t, emptyNotarization),
 			}
 			continue
 		}
 		block, notarization := advanceRoundFromNotarization(t, e, bb)
 
 		rounds[i] = common.VerifiedQuorumRound{
-			VerifiedBlock: block,
-			Notarization:  notarization,
+			Block:        block.UnVerifiedBlock(),
+			Notarization: testutil.Ptr(testutil.MustVerifyNotarization(t, *notarization)),
 		}
 
 	}
@@ -214,7 +214,7 @@ func TestReplicationRequestMixed(t *testing.T) {
 	for _, round := range resp.Data {
 		notarizedBlock, ok := rounds[round.GetRound()]
 		require.True(t, ok)
-		require.Equal(t, notarizedBlock.VerifiedBlock, round.VerifiedBlock)
+		require.Equal(t, notarizedBlock.Block, round.Block)
 		require.Equal(t, notarizedBlock.Notarization, round.Notarization)
 		require.Equal(t, notarizedBlock.EmptyNotarization, round.EmptyNotarization)
 	}
@@ -242,7 +242,7 @@ func TestReplicationRequestTailingEmptyNotarizations(t *testing.T) {
 		}, nodes[1]))
 		wal.AssertNotarization(uint64(i))
 		rounds[i] = common.VerifiedQuorumRound{
-			EmptyNotarization: emptyNotarization,
+			EmptyNotarization: testutil.MustVerifyEmptyNotarization(t, emptyNotarization),
 		}
 	}
 
@@ -270,7 +270,7 @@ func TestReplicationRequestTailingEmptyNotarizations(t *testing.T) {
 	for _, round := range resp.Data {
 		notarizedBlock, ok := rounds[round.GetRound()]
 		require.True(t, ok)
-		require.Equal(t, notarizedBlock.VerifiedBlock, round.VerifiedBlock)
+		require.Equal(t, notarizedBlock.Block, round.Block)
 		require.Equal(t, notarizedBlock.Notarization, round.Notarization)
 		require.Equal(t, notarizedBlock.EmptyNotarization, round.EmptyNotarization)
 	}
@@ -342,7 +342,7 @@ func TestNonValidatorReplicationRequestServed(t *testing.T) {
 	require.Equal(t, len(sequences), len(resp.Data))
 	for i, data := range resp.Data {
 		require.Equal(t, seqs[i].Finalization, *data.Finalization)
-		require.Equal(t, seqs[i].VerifiedBlock, data.VerifiedBlock)
+		require.Equal(t, seqs[i].VerifiedBlock, data.Block)
 	}
 }
 
@@ -444,11 +444,12 @@ func TestReplicationRequestSeqsAndRoundsTruncated(t *testing.T) {
 
 		notarization, err := testutil.NewNotarization(conf.Logger, &testutil.TestSignatureAggregator{N: len(nodes)}, data.VerifiedBlock, nodes[:quorom])
 		require.NoError(t, err)
-		require.NoError(t, wal.Append(common.NewQuorumRecord(notarization.QC.Bytes(), notarization.Vote.Bytes(), common.NotarizationRecordType)))
+		verifiedNotarization := testutil.MustVerifyNotarization(t, notarization)
+		require.NoError(t, wal.Append(common.NewQuorumRecord(verifiedNotarization.QC.Bytes(), verifiedNotarization.Vote.Bytes(), common.NotarizationRecordType)))
 
 		notarized = append(notarized, common.VerifiedQuorumRound{
-			VerifiedBlock: data.VerifiedBlock,
-			Notarization:  &notarization,
+			Block:        data.VerifiedBlock.UnVerifiedBlock(),
+			Notarization: testutil.Ptr(testutil.MustVerifyNotarization(t, notarization)),
 		})
 	}
 
@@ -470,8 +471,8 @@ func TestReplicationRequestSeqsAndRoundsTruncated(t *testing.T) {
 	expected := make([]common.VerifiedQuorumRound, 0, conf.MaxRoundWindow+2)
 	for i := uint64(0); i < conf.MaxRoundWindow; i++ {
 		expected = append(expected, common.VerifiedQuorumRound{
-			VerifiedBlock: seqs[i].VerifiedBlock,
-			Finalization:  &seqs[i].Finalization,
+			Block:        seqs[i].VerifiedBlock.UnVerifiedBlock(),
+			Finalization: &seqs[i].Finalization,
 		})
 	}
 	expected = append(expected, notarized[:2]...)
@@ -500,7 +501,7 @@ func requireEqualQuorumRounds(t *testing.T, expected, actual []common.VerifiedQu
 	require.Equal(t, len(expected), len(actual))
 	for i := range expected {
 		exp, act := expected[i], actual[i]
-		require.Equal(t, exp.VerifiedBlock.BlockHeader().Digest, act.VerifiedBlock.BlockHeader().Digest)
+		require.Equal(t, exp.Block.BlockHeader().Digest, act.Block.BlockHeader().Digest)
 
 		if exp.Finalization != nil {
 			require.NotNil(t, act.Finalization)
@@ -545,8 +546,8 @@ func TestReplicationRequestSizeLimited(t *testing.T) {
 	// zero-valued fields), so each one has to be measured separately.
 	roundSize := func(i int) int {
 		return (&common.VerifiedQuorumRound{
-			VerifiedBlock: seqs[i].VerifiedBlock,
-			Finalization:  &seqs[i].Finalization,
+			Block:        seqs[i].VerifiedBlock.UnVerifiedBlock(),
+			Finalization: &seqs[i].Finalization,
 		}).Size()
 	}
 	conf.MaxReplicationResponseSize = roundSize(0) + roundSize(1) + roundSize(2) + roundSize(3)/2
@@ -573,7 +574,7 @@ func TestReplicationRequestSizeLimited(t *testing.T) {
 	require.Len(t, resp.Data, 3)
 	total := 0
 	for i, data := range resp.Data {
-		require.Equal(t, uint64(i), data.VerifiedBlock.BlockHeader().Seq)
+		require.Equal(t, uint64(i), data.Block.BlockHeader().Seq)
 		size := data.Size()
 		require.NoError(t, err)
 		total += size
@@ -644,13 +645,14 @@ func TestReplicationRequestSizeLimitedBothLatest(t *testing.T) {
 		&testutil.TestSignatureAggregator{N: len(nodes)},
 		notarizedBlock, nodes[:common.Quorum(len(nodes))])
 	require.NoError(t, err)
-	require.NoError(t, wal.Append(common.NewQuorumRecord(notarization.QC.Bytes(),
-		notarization.Vote.Bytes(), common.NotarizationRecordType)))
+	verifiedNotarization := testutil.MustVerifyNotarization(t, notarization)
+	require.NoError(t, wal.Append(common.NewQuorumRecord(verifiedNotarization.QC.Bytes(),
+		verifiedNotarization.Vote.Bytes(), common.NotarizationRecordType)))
 
 	// budget exactly one fnalized quorom round, leaving no room for the latest round
 	conf.MaxReplicationResponseSize = (&common.VerifiedQuorumRound{
-		VerifiedBlock: blocks[3].VerifiedBlock,
-		Finalization:  &blocks[3].Finalization,
+		Block:        blocks[3].VerifiedBlock.UnVerifiedBlock(),
+		Finalization: &blocks[3].Finalization,
 	}).Size()
 
 	e, err := simplex.NewEpoch(conf)

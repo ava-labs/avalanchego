@@ -177,11 +177,11 @@ func verifyContext(signature SignatureBytes, verifier SignatureVerifier, msg []b
 	return verifier.VerifySignature(toBeSigned, signature, pk)
 }
 
-func verifyContextQC(qc QuorumCertificate, msg []byte, context string, nodes Nodes) error {
+func verifyContextQC(qc QuorumCertificate, msg []byte, context string, nodes Nodes) (VerifiedQuorumCertificate, error) {
 	sm := SignedMessage{Payload: msg, Context: context}
 	toBeSigned, err := asn1.Marshal(sm)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	return qc.Verify(toBeSigned, nodes)
@@ -224,12 +224,12 @@ type Finalization struct {
 	QC           QuorumCertificate
 }
 
-func (f *Finalization) Verify(nodes Nodes) error {
+func (f *Finalization) Verify(nodes Nodes) (VerifiedQuorumCertificate, error) {
 	context := "ToBeSignedFinalization"
 	return verifyContextQC(f.QC, f.Finalization.Bytes(), context, nodes)
 }
 
-func (f *Finalization) Size() int {
+func (f *VerifiedFinalization) Size() int {
 	size := f.Finalization.Size()
 	// genesis block has an empty finalization and no QC
 	if f.QC != nil {
@@ -239,19 +239,33 @@ func (f *Finalization) Size() int {
 	return size
 }
 
+type VerifiedFinalization struct {
+	Finalization ToBeSignedFinalization
+	QC           VerifiedQuorumCertificate
+}
+
 // Notarization represents a block that has reached a quorum of votes.
 type Notarization struct {
 	Vote ToBeSignedVote
 	QC   QuorumCertificate
 }
 
-func (n *Notarization) Verify(nodes Nodes) error {
+func (n *Notarization) Verify(nodes Nodes) (VerifiedQuorumCertificate, error) {
 	context := "ToBeSignedVote"
 	return verifyContextQC(n.QC, n.Vote.Bytes(), context, nodes)
 }
 
-func (n *Notarization) Size() int {
-	return n.Vote.Size() + n.QC.Size()
+func (n *VerifiedNotarization) Size() int {
+	voteSize := n.Vote.Size()
+	if n.QC != nil {
+		return voteSize + n.QC.Size()
+	}
+	return voteSize
+}
+
+type VerifiedNotarization struct {
+	Vote ToBeSignedVote
+	QC   VerifiedQuorumCertificate
 }
 
 type BlockMessage struct {
@@ -269,12 +283,21 @@ type EmptyNotarization struct {
 	QC   QuorumCertificate
 }
 
-func (en *EmptyNotarization) Verify(nodes Nodes) error {
+func (en *EmptyNotarization) Verify(nodes Nodes) (VerifiedQuorumCertificate, error) {
 	context := "ToBeSignedEmptyVote"
 	return verifyContextQC(en.QC, en.Vote.Bytes(), context, nodes)
 }
-func (en *EmptyNotarization) Size() int {
-	return en.Vote.Size() + en.QC.Size()
+func (en *VerifiedEmptyNotarization) Size() int {
+	voteSize := en.Vote.Size()
+	if en.QC != nil {
+		return voteSize + en.QC.Size()
+	}
+	return voteSize
+}
+
+type VerifiedEmptyNotarization struct {
+	Vote ToBeSignedEmptyVote
+	QC   VerifiedQuorumCertificate
 }
 
 type SignedMessage struct {
@@ -284,14 +307,21 @@ type SignedMessage struct {
 
 // QuorumCertificate is equivalent to a collection of signatures from a quorum of nodes,
 type QuorumCertificate interface {
+	// Verify checks whether this QuorumCertificate is valid for the given message and validator set.
+	// It returns a VerifiedQuorumCertificate if the verification is successful.
+	Verify(msg []byte, nodes Nodes) (VerifiedQuorumCertificate, error)
+}
+
+// VerifiedQuorumCertificate is a QuorumCertificate that has been verified and is guaranteed to be valid.
+type VerifiedQuorumCertificate interface {
 	// Signers returns who participated in creating this QuorumCertificate.
 	Signers() []NodeID
-	// Verify checks whether this QuorumCertificate is valid for the given message and validator set.
-	Verify(msg []byte, nodes Nodes) error
 	// Bytes returns a raw representation of the given QuorumCertificate.
 	Bytes() []byte
 	// Size returns the number of bytes
 	Size() int
+	// UnVerified returns the original QuorumCertificate that was verified to produce this VerifiedQuorumCertificate.
+	UnVerified() QuorumCertificate
 }
 
 type ReplicationRequest struct {
@@ -322,7 +352,7 @@ type QuorumRound struct {
 	EmptyNotarization *EmptyNotarization
 }
 
-// isWellFormed returns an error if the QuorumRound is not in one
+// IsWellFormed returns an error if the QuorumRound is not in one
 // one of these formats
 // (block, notarization), (block, finalization) or (empty notarization)
 func (q *QuorumRound) IsWellFormed() error {
@@ -451,10 +481,74 @@ func (q *QuorumRound) String() string {
 }
 
 type VerifiedQuorumRound struct {
-	VerifiedBlock     VerifiedBlock
-	Notarization      *Notarization
-	Finalization      *Finalization
-	EmptyNotarization *EmptyNotarization
+	Block             Block
+	Notarization      *VerifiedNotarization
+	Finalization      *VerifiedFinalization
+	EmptyNotarization *VerifiedEmptyNotarization
+}
+
+// String returns a string representation of the VerifiedQuorumRound.
+// It is meant as a debugging aid for logs.
+func (q *VerifiedQuorumRound) String() string {
+	if q != nil {
+		err := q.IsWellFormed()
+		if err != nil {
+			return fmt.Sprintf("QuorumRound{Error: %s}", err)
+		} else {
+			return fmt.Sprintf("QuorumRound{Round: %d, Seq: %d, Finalized: %t}", q.GetRound(), q.GetSequence(), q.Finalization != nil)
+		}
+	}
+
+	return "QuorumRound{nil}"
+}
+
+// IsWellFormed returns an error if the QuorumRound is not in one
+// one of these formats
+// (block, notarization), (block, finalization) or (empty notarization)
+func (q *VerifiedQuorumRound) IsWellFormed() error {
+	if q.Block == nil && q.EmptyNotarization == nil {
+		return fmt.Errorf("malformed QuorumRound, empty block and notarization fields")
+	}
+
+	if q.Block != nil && (q.Notarization == nil && q.Finalization == nil) {
+		return fmt.Errorf("malformed QuorumRound, block but no notarization or finalization")
+	}
+
+	if q.Finalization != nil && q.Block == nil {
+		return fmt.Errorf("malformed QuorumRound, finalization but no block")
+	}
+
+	if q.Notarization != nil && q.Block == nil {
+		return fmt.Errorf("malformed QuorumRound, notarization but no block")
+	}
+
+	epochs := make(map[uint64]struct{})
+
+	if q.Finalization != nil {
+		epochs[q.Finalization.Finalization.Epoch] = struct{}{}
+	}
+
+	if q.Notarization != nil {
+		epochs[q.Notarization.Vote.Epoch] = struct{}{}
+	}
+
+	if q.EmptyNotarization != nil {
+		epochs[q.EmptyNotarization.Vote.Epoch] = struct{}{}
+	}
+
+	if len(epochs) > 1 {
+		return fmt.Errorf("malformed QuorumRound, inconsistent epochs")
+	}
+
+	return nil
+}
+
+func (q *VerifiedQuorumRound) GetSequence() uint64 {
+	if q.Block != nil {
+		return q.Block.BlockHeader().Seq
+	}
+
+	return 0
 }
 
 func (q *VerifiedQuorumRound) GetRound() uint64 {
@@ -462,8 +556,8 @@ func (q *VerifiedQuorumRound) GetRound() uint64 {
 		return q.EmptyNotarization.Vote.Round
 	}
 
-	if q.VerifiedBlock != nil {
-		return q.VerifiedBlock.BlockHeader().Round
+	if q.Block != nil {
+		return q.Block.BlockHeader().Round
 	}
 
 	return 0
@@ -472,8 +566,8 @@ func (q *VerifiedQuorumRound) GetRound() uint64 {
 func (q *VerifiedQuorumRound) Size() int {
 	var size int
 
-	if q.VerifiedBlock != nil {
-		size += q.VerifiedBlock.Size()
+	if q.Block != nil {
+		size += q.Block.Size()
 	}
 	if q.Notarization != nil {
 		size += q.Notarization.Size()
@@ -489,7 +583,7 @@ func (q *VerifiedQuorumRound) Size() int {
 
 type VerifiedFinalizedBlock struct {
 	VerifiedBlock VerifiedBlock
-	Finalization  Finalization
+	Finalization  VerifiedFinalization
 }
 
 type BlockDigestRequest struct {

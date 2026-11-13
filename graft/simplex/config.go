@@ -72,13 +72,13 @@ type Storage interface {
 	// GetBlock retrieves the block and finalization at [seq] with the given digest.
 	// If the digest is nil, the block with the given sequence number is returned.
 	// If [seq] the block cannot be found, returns ErrBlockNotFound.
-	GetBlock(seq uint64) (metadata.StateMachineBlock, *common.Finalization, error)
+	GetBlock(seq uint64) (metadata.StateMachineBlock, *common.VerifiedFinalization, error)
 
 	// NumBlocks returns the number of blocks stored in the storage.
 	NumBlocks() uint64
 
 	// Index indexes the given block and finalization in the storage.
-	Index(ctx context.Context, block common.VerifiedBlock, certificate common.Finalization) error
+	Index(ctx context.Context, block common.VerifiedBlock, certificate common.VerifiedFinalization) error
 }
 
 type CryptoOps interface {

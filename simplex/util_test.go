@@ -311,7 +311,7 @@ func newTestFinalization(t *testing.T, configs []*Config, bh common.BlockHeader)
 
 	sigAgg := newTestSignatureAggregator(configs[0])
 
-	finalization, err := common.NewFinalization(sigAgg, finalizedVotes)
+	finalization, err := common.AssembleFinalization(sigAgg, finalizedVotes)
 	require.NoError(t, err)
 	return finalization
 }

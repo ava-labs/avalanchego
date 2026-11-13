@@ -202,8 +202,8 @@ func protocolMetadataToP2P(md common.ProtocolMetadata) *p2p.ProtocolMetadata {
 func quorumRoundToP2P(qr *common.VerifiedQuorumRound) *p2p.QuorumRound {
 	p2pQR := &p2p.QuorumRound{}
 
-	if qr.VerifiedBlock != nil {
-		bytes := qr.VerifiedBlock.Bytes()
+	if qr.Block != nil {
+		bytes := qr.Block.Bytes()
 
 		p2pQR.Block = bytes
 	}

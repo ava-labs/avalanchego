@@ -275,7 +275,7 @@ func newFakeNode(t *testing.T) *fakeNode {
 	fn.sm.BlockBuilder = fn
 	fn.sm.PChainProgressListener = fn
 
-	fn.sm.GetBlock = func(seq uint64, digest common.Digest) (StateMachineBlock, *common.Finalization, error) {
+	fn.sm.GetBlock = func(seq uint64, digest common.Digest) (StateMachineBlock, *common.VerifiedFinalization, error) {
 		if seq == 0 {
 			return genesisBlock, nil, nil
 		}
@@ -286,9 +286,9 @@ func newFakeNode(t *testing.T) *fakeNode {
 				match = md.Seq == seq
 			}
 			if match {
-				var fin *common.Finalization
+				var fin *common.VerifiedFinalization
 				if bs.finalized {
-					fin = &common.Finalization{}
+					fin = &common.VerifiedFinalization{}
 				}
 				return bs.block, fin, nil
 			}

@@ -26,6 +26,10 @@ type TestBlock struct {
 	SealingInfo *common.SealingBlockInfo
 }
 
+func (tb *TestBlock) UnVerifiedBlock() common.Block {
+	return tb
+}
+
 func NewTestBlock(metadata common.ProtocolMetadata, blacklist common.Blacklist) *TestBlock {
 	tb := TestBlock{
 		blacklist: blacklist,

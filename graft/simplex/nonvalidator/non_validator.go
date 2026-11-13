@@ -22,7 +22,7 @@ type finalizedSeq struct {
 	// proposerIDToBlock holds one block per leader that proposed for this sequence.
 	// Rounds that share a sequence can have different leaders, so several proposerIDToBlock may be stored.
 	proposerIDToBlock map[common.NodeID]common.Block
-	finalization      *common.Finalization
+	finalization      *common.VerifiedFinalization
 }
 
 func (f *finalizedSeq) String() string {
@@ -99,6 +99,10 @@ type NonValidator struct {
 	// our tip that have not been validated yet. It holds exactly the missing ones, so no tasks
 	// means every sealing block down to our tip is validated.
 	sealingBlockTimeouts *common.TimeoutHandler[uint64]
+
+	// highestQR is the sealing block with the highest sequence validated while replicating epochs.
+	// It is given to the sequence replicator once epoch replication finishes.
+	highestQR *common.QuorumRound
 }
 
 // NewNonValidator creates a NonValidator with the given `config`.
@@ -232,7 +236,8 @@ func (n *NonValidator) processEpochReplicationQuorumRound(qr *common.QuorumRound
 	case n.epochs.canValidate(block):
 		// The sealing block is in the backwards hash chain, try to validate it
 		if !n.isIndexed(bh.Seq) {
-			n.processSealingBlock(qr, from)
+			n.maybeOpenEpochFromSealingBlock(qr.Block, from)
+			n.maybeSetHighestQR(qr)
 		}
 	case n.highestEpochCollector.maybeObserveThresholdResponses(sealingInfo, bh, from):
 		// The sealing block is from an unknown epoch and we have collected enough votes to validate it
@@ -240,7 +245,8 @@ func (n *NonValidator) processEpochReplicationQuorumRound(qr *common.QuorumRound
 		n.sealingBlockTimeouts.RemoveTask(initialEpochReplicationTask)
 
 		if !n.isIndexed(bh.Seq) {
-			n.processSealingBlock(qr, from)
+			n.maybeOpenEpochFromSealingBlock(qr.Block, from)
+			n.maybeSetHighestQR(qr)
 		}
 	default:
 		// The sealing block cannot be validated, or there is not enough votes for it.
@@ -254,19 +260,62 @@ func (n *NonValidator) processEpochReplicationQuorumRound(qr *common.QuorumRound
 }
 
 // processSealingBlock validates the epoch a sealing block opens and stores its quorum round.
-// The finalization has not been verified yet. Storing tells the replicator a valid sequence exists
-// and its validity is checked when the round is processed.
-// Since the QC is unverified, its signers may be forged, so the sequences up to the sealing block
-// are requested from the validators instead.
 // It assumes block is already authenticated.
 func (n *NonValidator) processSealingBlock(qr *common.QuorumRound, from common.NodeID) {
 	n.maybeOpenEpochFromSealingBlock(qr.Block, from)
-	n.sequenceReplicator.StoreFinalizedQuorumRoundWithSigners(qr, n.Comm.Validators().NodeIDs())
+	n.storeSealingQuorumRound(qr)
+}
+
+// storeSealingQuorumRound verifies the finalization of qr against the validators of the epoch it was
+// finalized in and hands it to the sequence replicator.
+// Since the validators are asked for the sequences, not the signers of the QC, the replicator knows
+// a valid sequence exists and fetches everything up to it.
+func (n *NonValidator) storeSealingQuorumRound(qr *common.QuorumRound) {
+	bh := qr.Block.BlockHeader()
+	if qr.Finalization == nil {
+		return
+	}
+
+	md, ok := n.epochs[bh.Epoch]
+	if !ok {
+		n.Logger.Debug("Cannot verify the finalization of a sealing block, its epoch is unknown",
+			zap.Uint64("Seq", bh.Seq), zap.Uint64("Epoch", bh.Epoch))
+		return
+	}
+
+	qc, err := qr.Finalization.Verify(md.nodes)
+	if err != nil {
+		n.Logger.Debug("Failed verifying the finalization of a sealing block", zap.Uint64("Seq", bh.Seq), zap.Error(err))
+		return
+	}
+
+	verified := &common.VerifiedQuorumRound{
+		Block: qr.Block,
+		Finalization: &common.VerifiedFinalization{
+			Finalization: qr.Finalization.Finalization,
+			QC:           qc,
+		},
+	}
+	n.sequenceReplicator.StoreFinalizedQuorumRoundWithSigners(verified, n.Comm.Validators().NodeIDs())
+}
+
+// maybeSetHighestQR remembers qr if it has the highest sequence among the sealing blocks validated so far.
+// Only one quorum round is held in memory while epochs are replicated.
+func (n *NonValidator) maybeSetHighestQR(qr *common.QuorumRound) {
+	if n.highestQR == nil || qr.Block.BlockHeader().Seq > n.highestQR.Block.BlockHeader().Seq {
+		n.highestQR = qr
+	}
 }
 
 // finishEpochReplication marks epoch replication done. Every epoch from our tip to the highest one a
 // threshold of validators reported is validated, so replication and live messages can be handled.
 func (n *NonValidator) finishEpochReplication() {
+	// Hand the replicator the highest sealing block so it knows how far to fetch.
+	if qr := n.highestQR; qr != nil && !n.isIndexed(qr.Block.BlockHeader().Seq) {
+		n.storeSealingQuorumRound(qr)
+	}
+	n.highestQR = nil
+
 	n.EpochsReplicated = true
 	highestEpoch, validators := n.epochs.highestEpoch()
 	n.Logger.Info("Finished replicating epochs", zap.Uint64("Highest Epoch", highestEpoch))
@@ -376,7 +425,7 @@ func (n *NonValidator) isIndexed(seq uint64) bool {
 
 // newFinalizedBlockTask verifies and indexes the nextSeqToCommit.
 // This task should only get executed when `block` is next to be verified and indexed.
-func (n *NonValidator) newFinalizedBlockTask(block common.Block, finalization *common.Finalization) func() common.Digest {
+func (n *NonValidator) newFinalizedBlockTask(block common.Block, finalization *common.VerifiedFinalization) func() common.Digest {
 	return func() common.Digest {
 		md := block.BlockHeader()
 		n.Logger.Debug("Block verification started", zap.Uint64("sequence", md.Seq))
@@ -509,7 +558,8 @@ func (n *NonValidator) handleFinalization(finalization *common.Finalization, fro
 		return nil
 	}
 
-	if err := simplex.VerifyQC(finalization.QC, epoch.signatureAggregator.IsQuorum, epoch.eligibleSigners, finalization, epoch.nodes); err != nil {
+	qc, err := simplex.VerifyQC(finalization.QC, finalization, epoch.nodes)
+	if err != nil {
 		n.Logger.Debug("Received an invalid finalization",
 			zap.Error(err),
 			zap.Int("round", int(bh.Round)),
@@ -517,10 +567,15 @@ func (n *NonValidator) handleFinalization(finalization *common.Finalization, fro
 		return nil
 	}
 
+	verifiedFinalization := &common.VerifiedFinalization{
+		Finalization: finalization.Finalization,
+		QC:           qc,
+	}
+
 	// Don't store finalization in memory if it's too far ahead
 	if bh.Seq > n.MaxSequenceWindow+n.nextSeqToCommit() {
 		n.Logger.Debug("Received a finalization from a sequence too far ahead", zap.Uint64("Num Blocks", n.nextSeqToCommit()), zap.Uint64("Block Sequence", bh.Seq), zap.Stringer("From", from))
-		n.sequenceReplicator.ReceivedFutureFinalization(finalization, n.nextSeqToCommit())
+		n.sequenceReplicator.ReceivedFutureFinalization(verifiedFinalization, n.nextSeqToCommit())
 		return nil
 	}
 
@@ -560,10 +615,10 @@ func (n *NonValidator) handleFinalization(finalization *common.Finalization, fro
 		}
 	}
 
-	incomplete.finalization = finalization
+	incomplete.finalization = verifiedFinalization
 
 	// Let the replicator know this sequence is finalized.
-	n.sequenceReplicator.ReceivedFutureFinalization(finalization, n.nextSeqToCommit())
+	n.sequenceReplicator.ReceivedFutureFinalization(verifiedFinalization, n.nextSeqToCommit())
 
 	// Blocks arriving from now on are checked against the finalization directly, so the stored ones can be released.
 	blocks := incomplete.proposerIDToBlock
@@ -572,7 +627,7 @@ func (n *NonValidator) handleFinalization(finalization *common.Finalization, fro
 	for _, block := range blocks {
 		if block.BlockHeader().Digest == bh.Digest {
 			n.maybeOpenEpochFromSealingBlock(block, from)
-			return n.scheduleNewFinalizedBlockTask(block, finalization)
+			return n.scheduleNewFinalizedBlockTask(block, verifiedFinalization)
 		}
 	}
 
@@ -580,7 +635,7 @@ func (n *NonValidator) handleFinalization(finalization *common.Finalization, fro
 	return nil
 }
 
-func (n *NonValidator) scheduleNewFinalizedBlockTask(block common.Block, finalization *common.Finalization) error {
+func (n *NonValidator) scheduleNewFinalizedBlockTask(block common.Block, finalization *common.VerifiedFinalization) error {
 	bh := finalization.Finalization.BlockHeader
 	if n.verifier.IsSequenceScheduled(bh.Seq, bh.Epoch) {
 		// Avoid scheduling more than one task.
@@ -677,7 +732,7 @@ func (n *NonValidator) retrieveQuorumRound(seq uint64) (*common.VerifiedQuorumRo
 		n.haltedError = err
 		return nil, err
 	}
-	return &common.VerifiedQuorumRound{VerifiedBlock: block, Finalization: &finalization}, nil
+	return &common.VerifiedQuorumRound{Block: block.UnVerifiedBlock(), Finalization: &finalization}, nil
 }
 
 func (n *NonValidator) processReplicationState() error {
@@ -691,28 +746,14 @@ func (n *NonValidator) processReplicationState() error {
 	// first we check if we can commit the next sequence, it is ok to try and commit the next sequence
 	// directly, since if there are any empty notarizations, `indexFinalization` will
 	// increment the round properly.
-	block, finalization, exists := n.sequenceReplicator.GetFinalizedBlockForSequence(nextSeqToCommit)
+	block, verifiedFinalization, exists := n.sequenceReplicator.GetFinalizedBlockForSequence(nextSeqToCommit)
 	if !exists {
-		return nil
-	}
-
-	// verify the finalization
-	epoch, ok := n.epochs[block.BlockHeader().Epoch]
-	if !ok {
-		return fmt.Errorf("expected epoch to have been validated: %d", block.BlockHeader().Epoch)
-	}
-
-	err := simplex.VerifyQC(finalization.QC, epoch.signatureAggregator.IsQuorum, epoch.eligibleSigners, finalization, epoch.nodes)
-	if err != nil {
-		n.Logger.Debug("Failed verifying QC that was next to commit", zap.Error(err))
-		// We fetch from comm.Nodes instead of the nodes given in the finalization, because this node may give us an adversarial node list.
-		n.sequenceReplicator.ResendFinalizationRequest(block.BlockHeader().Seq, n.Comm.Validators().NodeIDs())
 		return nil
 	}
 
 	n.sequenceReplicator.DeleteSeq(nextSeqToCommit)
 
-	return n.scheduleNewFinalizedBlockTask(block, finalization)
+	return n.scheduleNewFinalizedBlockTask(block, verifiedFinalization)
 }
 
 // processQuorumRound validates qr can be stored in the replication state. We also try and validate
@@ -741,14 +782,29 @@ func (n *NonValidator) processQuorumRound(qr *common.QuorumRound, from common.No
 		return nil
 	}
 
-	err := simplex.VerifyQC(qr.Finalization.QC, epoch.signatureAggregator.IsQuorum, epoch.eligibleSigners, qr.Finalization, epoch.nodes)
+	qc, err := simplex.VerifyQC(qr.Finalization.QC, qr.Finalization, epoch.nodes)
 	if err != nil {
 		return fmt.Errorf("could not verify quorum round QC: %w", err)
 	}
 
+	verifiedQuorumRound := &common.VerifiedQuorumRound{
+		Block: block,
+	}
+
+	if qr.Finalization == nil {
+		n.Logger.Debug("Received a quorum round without a finalization",
+			zap.Uint64("Seq", block.BlockHeader().Seq), zap.Stringer("From", from))
+		return nil
+	}
+
+	verifiedQuorumRound.Finalization = &common.VerifiedFinalization{
+		Finalization: qr.Finalization.Finalization,
+		QC:           qc,
+	}
+
 	// This block could be a sealing block, validate the next epoch if so.
 	n.maybeOpenEpochFromSealingBlock(block, from)
-	n.storeQuorumRound(qr)
+	n.storeQuorumRound(verifiedQuorumRound)
 	return nil
 }
 
@@ -771,7 +827,7 @@ func verifyQuorumRound(qr *common.QuorumRound) error {
 
 // storeQuorumRound updates replication state, and stores qr if its within MaxSequenceWindow.
 // Sealing blocks are always stored, the replicator needs them to know a valid sequence exists.
-func (n *NonValidator) storeQuorumRound(qr *common.QuorumRound) {
+func (n *NonValidator) storeQuorumRound(qr *common.VerifiedQuorumRound) {
 	seq := qr.Block.BlockHeader().Seq
 	nextSeqToCommit := n.nextSeqToCommit()
 

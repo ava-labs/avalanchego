@@ -18,16 +18,16 @@ type seqAndDigest struct {
 	seq    uint64
 }
 
-func seqAndDigestFromBlock(block common.Block) seqAndDigest {
+func seqAndDigestFromBlock(headr common.BlockHeader) seqAndDigest {
 	return seqAndDigest{
-		digest: block.BlockHeader().Digest,
-		seq:    block.BlockHeader().Seq,
+		digest: headr.Digest,
+		seq:    headr.Seq,
 	}
 }
 
 type finalizedQuorumRound struct {
 	block        common.Block
-	finalization *common.Finalization
+	finalization *common.VerifiedFinalization
 }
 
 type ReplicationState struct {
@@ -40,7 +40,7 @@ type ReplicationState struct {
 	seqs map[uint64]*finalizedQuorumRound
 
 	// rounds maps round numbers to QuorumRounds
-	rounds map[uint64]*common.QuorumRound
+	rounds map[uint64]*common.VerifiedQuorumRound
 
 	// digestTimeouts handles timeouts for fetching missing block digests.
 	// When a notarization depends on a block we haven't received yet,
@@ -79,7 +79,7 @@ func NewReplicationState(logger common.Logger, comm Sender, myNodeID common.Node
 		finalizationRequestor: newRequestor(logger, start, lock, maxRoundWindow, comm, true),
 
 		// round replication
-		rounds:         make(map[uint64]*common.QuorumRound),
+		rounds:         make(map[uint64]*common.VerifiedQuorumRound),
 		roundRequestor: newRequestor(logger, start, lock, maxRoundWindow, comm, false),
 
 		sender:    comm,
@@ -132,7 +132,7 @@ func (r *ReplicationState) deleteOldSeqs(nextSequenceToCommit uint64) {
 }
 
 // storeSequence stores a block and finalization into the replication state
-func (r *ReplicationState) storeSequence(block common.Block, finalization *common.Finalization) bool {
+func (r *ReplicationState) storeSequence(block common.Block, finalization *common.VerifiedFinalization) bool {
 	if _, exists := r.seqs[finalization.Finalization.Seq]; exists {
 		return false
 	}
@@ -143,16 +143,16 @@ func (r *ReplicationState) storeSequence(block common.Block, finalization *commo
 	}
 
 	r.finalizationRequestor.removeTask(finalization.Finalization.Seq)
-	r.digestTimeouts.RemoveTask(seqAndDigestFromBlock(block))
+	r.digestTimeouts.RemoveTask(seqAndDigestFromBlock(block.BlockHeader()))
 	return true
 }
 
 // storeRound adds or updates a quorum round in the replication state.
 // If the round already exists, it merges any missing notarizations or empty notarizations
 // from the provided quorum round. Otherwise, it stores the new round as is.
-func (r *ReplicationState) storeRound(qr *common.QuorumRound) {
+func (r *ReplicationState) storeRound(qr *common.VerifiedQuorumRound) {
 	if qr.Block != nil {
-		r.digestTimeouts.RemoveTask(seqAndDigestFromBlock(qr.Block))
+		r.digestTimeouts.RemoveTask(seqAndDigestFromBlock(qr.Block.BlockHeader()))
 	}
 
 	existing, exists := r.rounds[qr.GetRound()]
@@ -172,7 +172,7 @@ func (r *ReplicationState) storeRound(qr *common.QuorumRound) {
 }
 
 // StoreQuorumRound stores the quorum round into the replication state.
-func (r *ReplicationState) StoreQuorumRound(round *common.QuorumRound) {
+func (r *ReplicationState) StoreQuorumRound(round *common.VerifiedQuorumRound) {
 	if !r.enabled.Load() {
 		return
 	}
@@ -200,7 +200,7 @@ func (r *ReplicationState) StoreQuorumRound(round *common.QuorumRound) {
 // StoreFinalizedQuorumRoundWithSigners stores a finalized quorum round like StoreQuorumRound, but requests
 // the sequences up to it from signers instead of from the signers of its QC.
 // It is used when the QC cannot be verified yet, so its signers cannot be trusted.
-func (r *ReplicationState) StoreFinalizedQuorumRoundWithSigners(round *common.QuorumRound, signers []common.NodeID) {
+func (r *ReplicationState) StoreFinalizedQuorumRoundWithSigners(round *common.VerifiedQuorumRound, signers []common.NodeID) {
 	if !r.enabled.Load() {
 		return
 	}
@@ -208,8 +208,9 @@ func (r *ReplicationState) StoreFinalizedQuorumRoundWithSigners(round *common.Qu
 	r.storeFinalizedQuorumRound(round, signers)
 }
 
-func (r *ReplicationState) storeFinalizedQuorumRound(round *common.QuorumRound, signers []common.NodeID) {
-	stored := r.storeSequence(round.Block, round.Finalization)
+func (r *ReplicationState) storeFinalizedQuorumRound(round *common.VerifiedQuorumRound, signers []common.NodeID) {
+	block := round.Block
+	stored := r.storeSequence(block, round.Finalization)
 	if !stored {
 		return
 	}
@@ -220,7 +221,7 @@ func (r *ReplicationState) storeFinalizedQuorumRound(round *common.QuorumRound, 
 }
 
 // receivedFutureFinalization notifies the replication state a finalization was created in a future round.
-func (r *ReplicationState) ReceivedFutureFinalization(finalization *common.Finalization, nextSeqToCommit uint64) {
+func (r *ReplicationState) ReceivedFutureFinalization(finalization *common.VerifiedFinalization, nextSeqToCommit uint64) {
 	if !r.enabled.Load() {
 		return
 	}
@@ -345,7 +346,7 @@ func (r *ReplicationState) Purge(shouldDelete func(block common.Block) bool) {
 	}
 }
 
-func (r *ReplicationState) GetFinalizedBlockForSequence(seq uint64) (common.Block, *common.Finalization, bool) {
+func (r *ReplicationState) GetFinalizedBlockForSequence(seq uint64) (common.Block, *common.VerifiedFinalization, bool) {
 	blockWithFinalization, exists := r.seqs[seq]
 	if !exists {
 		return nil, nil, false
@@ -354,13 +355,13 @@ func (r *ReplicationState) GetFinalizedBlockForSequence(seq uint64) (common.Bloc
 	return blockWithFinalization.block, blockWithFinalization.finalization, true
 }
 
-func (r *ReplicationState) GetLowestRound() *common.QuorumRound {
+func (r *ReplicationState) GetLowestRound() *common.VerifiedQuorumRound {
 	if !r.enabled.Load() {
 		// DeleteRound() early aborts if !r.enabled.Load(), so processReplicationState() will run into an infinite recursion
 		// unless we also early abort here.
 		return nil
 	}
-	var lowestRound *common.QuorumRound
+	var lowestRound *common.VerifiedQuorumRound
 
 	for round, qr := range r.rounds {
 		if lowestRound == nil {

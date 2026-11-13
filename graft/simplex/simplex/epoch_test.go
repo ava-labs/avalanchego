@@ -638,7 +638,7 @@ func TestEquivocatedBlock(t *testing.T) {
 			}, 5*time.Second, 50*time.Millisecond, "node did not reply to the replication request")
 
 			require.Len(t, resp.Data, 1)
-			gotBlock := resp.Data[0].VerifiedBlock
+			gotBlock := resp.Data[0].Block
 			require.Equal(t, blockB.BlockHeader().Digest, gotBlock.BlockHeader().Digest)
 			require.NotEqual(t, blockA.BlockHeader().Digest, gotBlock.BlockHeader().Digest)
 		})
@@ -1084,8 +1084,8 @@ func TestEpochResizesBlacklistOnEpochChange(t *testing.T) {
 	sealingFinalization, _ := testutil.NewFinalizationRecord(t, sigAggregator, sealingBlock, nodes)
 
 	conf, _, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NoopComm(validators), bb)
-	require.NoError(t, conf.Storage.Index(context.Background(), epoch0Block, epoch0Finalization))
-	require.NoError(t, conf.Storage.Index(context.Background(), sealingBlock, sealingFinalization))
+	require.NoError(t, conf.Storage.Index(context.Background(), epoch0Block, testutil.MustVerifyFinalization(t, epoch0Finalization)))
+	require.NoError(t, conf.Storage.Index(context.Background(), sealingBlock, testutil.MustVerifyFinalization(t, sealingFinalization)))
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
@@ -1104,8 +1104,8 @@ func TestEpochResizesBlacklistOnEpochChange(t *testing.T) {
 	// Next, create the other node (follower) and ensure it can verify the block,
 	// which it only does if it also expects the total weight of the new epoch's validators.
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[1], testutil.NoopComm(validators), bb)
-	require.NoError(t, conf.Storage.Index(context.Background(), epoch0Block, epoch0Finalization))
-	require.NoError(t, conf.Storage.Index(context.Background(), sealingBlock, sealingFinalization))
+	require.NoError(t, conf.Storage.Index(context.Background(), epoch0Block, testutil.MustVerifyFinalization(t, epoch0Finalization)))
+	require.NoError(t, conf.Storage.Index(context.Background(), sealingBlock, testutil.MustVerifyFinalization(t, sealingFinalization)))
 
 	e, err = NewEpoch(conf)
 	require.NoError(t, err)
@@ -2226,7 +2226,7 @@ func TestEpochPruneRestoredForkFromWal(t *testing.T) {
 
 	md.Round, md.Seq, md.Prev = 1, 1, block0.BlockHeader().Digest
 	appendBlock(md)
-	require.NoError(t, wal.Append(NewEmptyNotarizationRecord(testutil.NewEmptyNotarization(nodes[0:quorum], 1))))
+	require.NoError(t, wal.Append(NewEmptyNotarizationRecord(testutil.MustVerifyEmptyNotarization(t, testutil.NewEmptyNotarization(nodes[0:quorum], 1)))))
 
 	md.Round = 2
 	block2 := appendBlock(md)
@@ -3634,7 +3634,7 @@ func TestReplicationStatePrunesCommittedSequences(t *testing.T) {
 	for seq := uint64(1); seq <= 3; seq++ {
 		block := testutil.NewTestBlock(ProtocolMetadata{Seq: seq, Round: seq}, emptyBlacklist)
 		finalization, _ := testutil.NewFinalizationRecord(t, sigAggr, block, nodes)
-		replicationState.StoreQuorumRound(&QuorumRound{Block: block, Finalization: &finalization})
+		replicationState.StoreQuorumRound(&VerifiedQuorumRound{Block: block, Finalization: testutil.Ptr(testutil.MustVerifyFinalization(t, finalization))})
 
 		_, _, exists := replicationState.GetFinalizedBlockForSequence(seq)
 		require.True(t, exists)
@@ -3814,8 +3814,8 @@ func TestEpochFollowerIgnoresStaleBlacklistOnEpochChange(t *testing.T) {
 	sealingFinalization, _ := testutil.NewFinalizationRecord(t, sigAggregator, sealingBlock, nodes)
 
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
-	require.NoError(t, conf.Storage.Index(context.Background(), epoch0Block, epoch0Finalization))
-	require.NoError(t, conf.Storage.Index(context.Background(), sealingBlock, sealingFinalization))
+	require.NoError(t, conf.Storage.Index(context.Background(), epoch0Block, testutil.MustVerifyFinalization(t, epoch0Finalization)))
+	require.NoError(t, conf.Storage.Index(context.Background(), sealingBlock, testutil.MustVerifyFinalization(t, sealingFinalization)))
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
@@ -3882,8 +3882,8 @@ func TestEpochLeaderRecordsTimeoutDespiteStaleBlacklistOnEpochChange(t *testing.
 	sealingFinalization, _ := testutil.NewFinalizationRecord(t, sigAggregator, sealingBlock, nodes)
 
 	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
-	require.NoError(t, conf.Storage.Index(context.Background(), epoch0Block, epoch0Finalization))
-	require.NoError(t, conf.Storage.Index(context.Background(), sealingBlock, sealingFinalization))
+	require.NoError(t, conf.Storage.Index(context.Background(), epoch0Block, testutil.MustVerifyFinalization(t, epoch0Finalization)))
+	require.NoError(t, conf.Storage.Index(context.Background(), sealingBlock, testutil.MustVerifyFinalization(t, sealingFinalization)))
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
@@ -4516,8 +4516,8 @@ func TestEpochRejectsTelockReplicatedWithEmptyNotarization(t *testing.T) {
 	bb := testutil.NewTestBlockBuilder()
 	conf, _, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
 	conf.ReplicationEnabled = true
-	require.NoError(t, conf.Storage.Index(context.Background(), epoch0Block, epoch0Finalization))
-	require.NoError(t, conf.Storage.Index(context.Background(), sealingBlock, sealingFinalization))
+	require.NoError(t, conf.Storage.Index(context.Background(), epoch0Block, testutil.MustVerifyFinalization(t, epoch0Finalization)))
+	require.NoError(t, conf.Storage.Index(context.Background(), sealingBlock, testutil.MustVerifyFinalization(t, sealingFinalization)))
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)

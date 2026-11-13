@@ -22,8 +22,8 @@ func NewStorage(mempool *Mempool) *Storage {
 	}
 }
 
-func (s *Storage) Index(ctx context.Context, block common.VerifiedBlock, certificate common.Finalization) error {
-	s.mempool.AcceptBlock(block.(*Block))
+func (s *Storage) Index(ctx context.Context, block common.VerifiedBlock, certificate common.VerifiedFinalization) error {
+	s.mempool.AcceptBlock(block.UnVerifiedBlock().(*Block))
 	return s.InMemStorage.Index(ctx, block, certificate)
 }
 

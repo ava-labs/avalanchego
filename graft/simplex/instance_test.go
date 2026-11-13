@@ -820,7 +820,7 @@ func TestValidatorSetsMetadataFromSnowman(t *testing.T) {
 		pb := &ParsedBlock{StateMachineBlock: metadata.StateMachineBlock{InnerBlock: innerBlock, Metadata: metadata.StateMachineMetadata{
 			SimplexProtocolMetadata: md,
 		}}}
-		require.NoError(t, storage.Index(t.Context(), pb, common.Finalization{}))
+		require.NoError(t, storage.Index(t.Context(), pb, common.VerifiedFinalization{}))
 		lastBlock = innerBlock
 	}
 
@@ -955,7 +955,7 @@ func sealingBlockResponse(t *testing.T, storage *testStorage, seq uint64) *commo
 	block, finalization, err := storage.Retrieve(seq)
 	require.NoError(t, err)
 	require.NotNil(t, block.SealingBlockInfo())
-	qr := verifiedQuorumRoundToQuorumRound(t, common.VerifiedQuorumRound{VerifiedBlock: block, Finalization: &finalization})
+	qr := verifiedQuorumRoundToQuorumRound(t, common.VerifiedQuorumRound{Block: block.UnVerifiedBlock(), Finalization: &finalization})
 	return &common.Message{ReplicationResponse: &common.ReplicationResponse{Data: []common.QuorumRound{qr}}}
 }
 
@@ -1318,7 +1318,7 @@ func TestInstanceMaxBlacklistedRoundsDifferAtGenesis(t *testing.T) {
 func finalizedBlockResponse(t *testing.T, storage *testStorage, seq uint64) *common.Message {
 	block, finalization, err := storage.Retrieve(seq)
 	require.NoError(t, err)
-	qr := verifiedQuorumRoundToQuorumRound(t, common.VerifiedQuorumRound{VerifiedBlock: block, Finalization: &finalization})
+	qr := verifiedQuorumRoundToQuorumRound(t, common.VerifiedQuorumRound{Block: block.UnVerifiedBlock(), Finalization: &finalization})
 	return &common.Message{ReplicationResponse: &common.ReplicationResponse{Data: []common.QuorumRound{qr}}}
 }
 

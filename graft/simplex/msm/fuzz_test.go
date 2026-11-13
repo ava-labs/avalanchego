@@ -206,7 +206,7 @@ func buildEpochChain(tb testing.TB, logger common.Logger) ([]*StateMachineBlock,
 
 	ctx := context.Background()
 
-	addBlock := func(seq uint64, b *StateMachineBlock, fin *common.Finalization) {
+	addBlock := func(seq uint64, b *StateMachineBlock, fin *common.VerifiedFinalization) {
 		tc.blockStore[seq] = &outerBlock{block: *b, finalization: fin}
 	}
 	nextInner := func(h uint64) *InnerBlock {
@@ -235,7 +235,7 @@ func buildEpochChain(tb testing.TB, logger common.Logger) ([]*StateMachineBlock,
 	// the validator-set change and the sealing-block computation.
 	tc.blockBuilder.Block = nextInner(1)
 	block1 := build(1, 0, 1, nil)
-	addBlock(1, block1, &common.Finalization{})
+	addBlock(1, block1, &common.VerifiedFinalization{})
 	sm.LatestPersistedHeight = 1
 
 	// block2: a normal in-epoch block.
@@ -279,7 +279,7 @@ func buildEpochChain(tb testing.TB, logger common.Logger) ([]*StateMachineBlock,
 	block6 := build(6, 5, 1, block5)
 	require.Equal(tb, stateBuildBlockEpochSealed, block6.Metadata.NextState())
 	// Finalize the sealing block so the epoch transition can proceed.
-	addBlock(6, block6, &common.Finalization{})
+	addBlock(6, block6, &common.VerifiedFinalization{})
 
 	// ----- Epoch 2 (its epoch number is the sealing block's sequence, 6) -----
 

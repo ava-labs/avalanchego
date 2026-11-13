@@ -72,7 +72,7 @@ func newListenerTestEnv(t *testing.T, nextEpochValidatorSet metadata.NodeBLSMapp
 	getValidatorSet := func(uint64) (metadata.NodeBLSMappings, error) {
 		return nextEpochValidatorSet, nil
 	}
-	getBlock := func(seq uint64, _ common.Digest) (metadata.StateMachineBlock, *common.Finalization, error) {
+	getBlock := func(seq uint64, _ common.Digest) (metadata.StateMachineBlock, *common.VerifiedFinalization, error) {
 		require.Fail(t, "unexpected getBlock call", "seq %d", seq)
 		return metadata.StateMachineBlock{}, nil, nil
 	}

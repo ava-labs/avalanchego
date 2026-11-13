@@ -423,7 +423,7 @@ func TestSimplexMultiNodeBlacklistExpires(t *testing.T) {
 	testEpochConfig := &testutil.TestNodeConfig{
 		ReplicationEnabled:   true,
 		MaxBlacklistedRounds: maxBlacklistedRounds,
-		InitialStorage:       []common.VerifiedFinalizedBlock{{VerifiedBlock: genesis, Finalization: genesisFinalization}},
+		InitialStorage:       []common.VerifiedFinalizedBlock{{VerifiedBlock: genesis, Finalization: testutil.MustVerifyFinalization(t, genesisFinalization)}},
 	}
 	for _, node := range nodes {
 		testutil.NewControlledSimplexNode(t, node, net, testEpochConfig)

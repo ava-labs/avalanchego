@@ -285,13 +285,13 @@ func TestSizeMatchesBytes(t *testing.T) {
 	}
 	require.Equal(t, len(emptyVote.Bytes()), emptyVote.Size())
 
-	notarization := common.Notarization{Vote: common.ToBeSignedVote{BlockHeader: bh}, QC: qc}
+	notarization := common.VerifiedNotarization{Vote: common.ToBeSignedVote{BlockHeader: bh}, QC: qc}
 	require.Equal(t, len(notarization.Vote.Bytes())+len(notarization.QC.Bytes()), notarization.Size())
 
-	finalization := common.Finalization{Finalization: common.ToBeSignedFinalization{BlockHeader: bh}, QC: qc}
+	finalization := common.VerifiedFinalization{Finalization: common.ToBeSignedFinalization{BlockHeader: bh}, QC: qc}
 	require.Equal(t, len(finalization.Finalization.Bytes())+len(finalization.QC.Bytes()), finalization.Size())
 
-	emptyNotarization := common.EmptyNotarization{Vote: emptyVote, QC: qc}
+	emptyNotarization := common.VerifiedEmptyNotarization{Vote: emptyVote, QC: qc}
 	require.Equal(t, len(emptyNotarization.Vote.Bytes())+len(emptyNotarization.QC.Bytes()), emptyNotarization.Size())
 
 }

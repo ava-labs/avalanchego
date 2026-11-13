@@ -12,7 +12,10 @@ import (
 	"github.com/ava-labs/avalanchego/graft/simplex/common"
 )
 
-var _ common.Block = (*Block)(nil)
+var (
+	_ common.Block         = (*Block)(nil)
+	_ common.VerifiedBlock = (*Block)(nil)
+)
 
 type Block struct {
 	blacklist common.Blacklist
@@ -42,6 +45,10 @@ func NewBlock(metadata common.ProtocolMetadata, blacklist common.Blacklist, memp
 
 func (b *Block) Verify(ctx context.Context, _ ...common.VerifyOptions) (common.VerifiedBlock, error) {
 	return b, b.mempool.VerifyBlock(ctx, b)
+}
+
+func (b *Block) UnVerifiedBlock() common.Block {
+	return b
 }
 
 func (b *Block) Blacklist() common.Blacklist {

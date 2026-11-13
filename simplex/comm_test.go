@@ -105,7 +105,7 @@ func TestSimplexMessageReplicationResponse(t *testing.T) {
 			resp: &simplexcommon.VerifiedReplicationResponse{
 				Data: []simplexcommon.VerifiedQuorumRound{
 					{
-						VerifiedBlock: &Block{
+						Block: &Block{
 							metadata: simplexcommon.ProtocolMetadata{},
 							vmBlock:  snowmantest.Genesis,
 						},
@@ -126,7 +126,7 @@ func TestSimplexMessageReplicationResponse(t *testing.T) {
 			resp: &simplexcommon.VerifiedReplicationResponse{
 				Data: []simplexcommon.VerifiedQuorumRound{},
 				LatestRound: &simplexcommon.VerifiedQuorumRound{
-					VerifiedBlock: &Block{
+					Block: &Block{
 						metadata: simplexcommon.ProtocolMetadata{},
 						vmBlock:  snowmantest.Genesis,
 					},

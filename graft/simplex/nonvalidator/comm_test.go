@@ -174,13 +174,13 @@ func verifiedQRtoQR(vqr *common.VerifiedQuorumRound) *common.QuorumRound {
 	}
 
 	qr := &common.QuorumRound{
-		Notarization:      vqr.Notarization,
-		Finalization:      vqr.Finalization,
-		EmptyNotarization: vqr.EmptyNotarization,
+		Notarization:      testutil.UnverifiedNotarization(vqr.Notarization),
+		Finalization:      testutil.UnverifiedFinalization(vqr.Finalization),
+		EmptyNotarization: testutil.UnverifiedEmptyNotarization(vqr.EmptyNotarization),
 	}
 
-	if vqr.VerifiedBlock != nil {
-		qr.Block = vqr.VerifiedBlock.(common.Block)
+	if vqr.Block != nil {
+		qr.Block = vqr.Block.(common.Block)
 	}
 
 	return qr

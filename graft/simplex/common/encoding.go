@@ -120,20 +120,30 @@ func ParseNotarizationRecord(r []byte) ([]byte, ToBeSignedVote, error) {
 	return nr.QC, vote, nil
 }
 
-func NotarizationFromRecord(record []byte, qd QCDeserializer, nodes NodeIDs) (Notarization, error) {
+func NotarizationFromRecord(record []byte, qd QCDeserializer, nodes Nodes) (VerifiedNotarization, error) {
 	qcBytes, vote, err := ParseNotarizationRecord(record)
 	if err != nil {
-		return Notarization{}, err
+		return VerifiedNotarization{}, err
 	}
 
-	qc, err := qd.DeserializeQuorumCertificate(qcBytes, nodes)
+	qc, err := qd.DeserializeQuorumCertificate(qcBytes, nodes.NodeIDs())
 	if err != nil {
-		return Notarization{}, err
+		return VerifiedNotarization{}, err
 	}
 
-	return Notarization{
+	notarization := &Notarization{
 		Vote: vote,
 		QC:   qc,
+	}
+
+	vqc, err := notarization.Verify(nodes)
+	if err != nil {
+		return VerifiedNotarization{}, err
+	}
+
+	return VerifiedNotarization{
+		Vote: vote,
+		QC:   vqc,
 	}, nil
 }
 
