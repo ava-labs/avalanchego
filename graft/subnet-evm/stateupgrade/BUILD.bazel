@@ -26,5 +26,14 @@ graft_go_test(
     name = "stateupgrade_test",
     srcs = ["state_upgrade_test.go"],
     embed = [":stateupgrade"],
-    deps = ["@com_github_stretchr_testify//require"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//require",
+    ],
 )

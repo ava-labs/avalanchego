@@ -21,6 +21,8 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 
+	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry"
+
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
@@ -29,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 
+	legacycore "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
 
@@ -305,7 +308,14 @@ func (g *genesis) writeState(db ethdb.Database, tdb *triedb.Database) (common.Ha
 		return common.Hash{}, err
 	}
 
-	// TODO(alarso16): Register precompiles.
+	if err := legacycore.ApplyPrecompileActivations(
+		g.Config,
+		nil,
+		legacycore.NewBlockContext(big.NewInt(genesisNumber), g.Timestamp),
+		statedb,
+	); err != nil {
+		return common.Hash{}, fmt.Errorf("applying precompile activations: %w", err)
+	}
 
 	for addr, account := range g.Alloc {
 		statedb.SetBalance(addr, uint256.MustFromBig(account.Balance))
