@@ -104,6 +104,9 @@ type (
 		// target (Config.GasTarget); the resulting `DesiredTargetExcess` is
 		// what `header.TargetExcess` evolves toward (rate-limited per ACP-176).
 		gasTarget *gas.Gas
+		// databasePath, if non-empty, stores chain data in a standalone
+		// database in this directory. Use [withStandaloneDatabase] to set.
+		databasePath string
 		// configureValidatorState, if non-nil, is invoked AFTER the
 		// default `*validatorstest.State` has been built (with the
 		// always-empty `GetCurrentValidatorSetF` default) and BEFORE
@@ -152,6 +155,10 @@ func newL1SUT(t *testing.T, opts ...l1SUTOption) *l1SUT {
 	}
 	if cfg.gasTarget != nil {
 		chainConfig.GasTarget = cfg.gasTarget
+	}
+	if cfg.databasePath != "" {
+		chainConfig.UseStandaloneDatabase = new(true)
+		chainConfig.DatabasePath = cfg.databasePath
 	}
 	configBytes := mustMarshalJSON(t, &chainConfig)
 
@@ -417,6 +424,14 @@ func withFeeRecipient(addr common.Address) l1SUTOption {
 func withGasTarget(target gas.Gas) l1SUTOption {
 	return options.Func[l1SUTConfig](func(c *l1SUTConfig) {
 		c.gasTarget = &target
+	})
+}
+
+// withStandaloneDatabase stores chain data in a standalone database in dir,
+// rather than in [l1SUT.baseDB].
+func withStandaloneDatabase(dir string) l1SUTOption {
+	return options.Func[l1SUTConfig](func(c *l1SUTConfig) {
+		c.databasePath = dir
 	})
 }
 

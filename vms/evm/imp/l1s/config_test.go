@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/saeconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 )
 
@@ -93,13 +92,12 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 	})
 
 	t.Run("partial_override_keeps_other_defaults", func(t *testing.T) {
-		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"tx-pool-price-limit":42,"rpc-gas-cap":1234}`))
+		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"database-type":"leveldb","commit-interval":8192}`))
 		require.NoError(t, err)
-		require.Equal(t, uint64(42), c.TxPoolPriceLimit)
-		require.Equal(t, uint64(1234), c.RPCGasCap)
-		require.Equal(t, defaults.TxPoolPriceBump, c.TxPoolPriceBump)
-		require.Equal(t, defaults.RPCTxFeeCap, c.RPCTxFeeCap)
-		require.Equal(t, defaults.TxPoolLifetime, c.TxPoolLifetime)
+		want := defaultConfig()
+		want.DatabaseType = "leveldb"
+		want.CommitInterval = 8192
+		require.Equal(t, want, c)
 	})
 
 	t.Run("unknown_field_ignored_with_warning", func(t *testing.T) {
@@ -117,13 +115,13 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 	})
 
 	t.Run("duration_string", func(t *testing.T) {
-		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"tx-pool-lifetime":"30m"}`))
+		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"api-max-duration":"30m"}`))
 		require.NoError(t, err)
-		require.Equal(t, 30*time.Minute, c.TxPoolLifetime.Duration)
+		require.Equal(t, 30*time.Minute, c.APIMaxDuration.Duration)
 	})
 
 	t.Run("duration_numeric_rejected", func(t *testing.T) {
-		_, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"tx-pool-lifetime":900000000000}`))
+		_, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"api-max-duration":900000000000}`))
 		var typeErr *json.UnmarshalTypeError
 		require.ErrorAs(t, err, &typeErr)
 	})
@@ -141,20 +139,13 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 // fields so the Initialize-time wiring keeps matching what operators wrote.
 func TestConfig_SAEConfig(t *testing.T) {
 	c := defaultConfig()
-	c.RPCGasCap = 1
-	c.RPCTxFeeCap = 2
 	c.LocalTxsEnabled = true
-	c.TxPoolPriceLimit = 3
-	c.TxPoolLifetime = saeconfig.Duration{Duration: 42 * time.Second}
 	c.Pruning = false
 	c.CommitInterval = 8192
 
 	got := c.saeConfig(nil)
 	require.False(t, got.MempoolConfig.NoLocals, "LocalTxsEnabled=true => NoLocals=false")
-	require.Equal(t, uint64(3), got.MempoolConfig.PriceLimit)
-	require.Equal(t, 42*time.Second, got.MempoolConfig.Lifetime)
-	require.Equal(t, uint64(1), got.RPCConfig.GasCap)
-	require.InDelta(t, 2.0, got.RPCConfig.TxFeeCap, 0)
+	require.Empty(t, got.MempoolConfig.Journal)
 	require.True(t, got.DBConfig.Archival, "Pruning=false => Archival=true")
 	require.Equal(t, uint64(8192), got.DBConfig.CommitInterval)
 

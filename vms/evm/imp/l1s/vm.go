@@ -111,6 +111,17 @@ func (vm *VM) Initialize(
 		zap.Reflect("config", userConfig),
 	)
 
+	if userConfig.useStandaloneDatabase(snowCtx.NetworkID, avaDB) {
+		db, err := userConfig.standaloneDatabase(snowCtx)
+		if err != nil {
+			return fmt.Errorf("opening standalone database: %w", err)
+		}
+		vm.onClose = append(vm.onClose, func(context.Context) error {
+			return db.Close()
+		})
+		avaDB = db
+	}
+
 	genesis, err := parseGenesis(snowCtx, genesisBytes, upgradeBytes)
 	if err != nil {
 		return fmt.Errorf("parsing genesis: %w", err)

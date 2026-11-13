@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -35,22 +35,28 @@ import (
 type config struct {
 	saeconfig.Config
 
-	// API resource limits. Mirror the legacy VM where equivalents exist.
-	RPCGasCap   uint64  `json:"rpc-gas-cap"`
-	RPCTxFeeCap float64 `json:"rpc-tx-fee-cap"`
-
-	// Mempool (txpool) settings. JSON tags match legacy `tx-pool-*`.
-	TxPoolPriceLimit   uint64             `json:"tx-pool-price-limit"`
-	TxPoolPriceBump    uint64             `json:"tx-pool-price-bump"`
-	TxPoolAccountQueue uint64             `json:"tx-pool-account-queue"`
-	TxPoolGlobalQueue  uint64             `json:"tx-pool-global-queue"`
-	TxPoolLifetime     saeconfig.Duration `json:"tx-pool-lifetime"`
-
 	// FeeRecipient is the local node's preferred fee recipient when the
 	// network allows fee recipients (`AllowFeeRecipients=true` or
 	// rewardmanager `allowFeeRecipients()`). Must be empty (=> burn) or
 	// a valid hex address; [parseConfig] rejects any other value.
 	FeeRecipient string `json:"feeRecipient"`
+
+	// UseStandaloneDatabase selects whether chain data is stored in a database
+	// opened by the VM, rather than the one provided by the node. If nil, the
+	// standalone database is used iff the node's database holds no chain.
+	UseStandaloneDatabase *bool `json:"use-standalone-database"`
+	// DatabaseConfigContent is the base64-encoded JSON config of the
+	// standalone database. It takes precedence over [config.DatabaseConfigFile].
+	DatabaseConfigContent string `json:"database-config"`
+	// DatabaseConfigFile is the path of the JSON config of the standalone
+	// database.
+	DatabaseConfigFile string `json:"database-config-file"`
+	// DatabaseType is the standalone database's type, one of leveldb, memdb or
+	// pebbledb.
+	DatabaseType string `json:"database-type"`
+	// DatabasePath is the directory of the standalone database. If empty, the
+	// `db` directory in the chain's data directory is used.
+	DatabasePath string `json:"database-path"`
 }
 
 // defaultConfig returns the per-chain defaults. Values mirror the legacy
@@ -58,16 +64,8 @@ type config struct {
 // subset.
 func defaultConfig() config {
 	return config{
-		Config:             saeconfig.Default(),
-		RPCGasCap:          50_000_000, // 50M gas limit
-		RPCTxFeeCap:        100,        // 100 AVAX
-		TxPoolPriceLimit:   legacypool.DefaultConfig.PriceLimit,
-		TxPoolPriceBump:    legacypool.DefaultConfig.PriceBump,
-		TxPoolAccountQueue: legacypool.DefaultConfig.AccountQueue,
-		TxPoolGlobalQueue:  legacypool.DefaultConfig.GlobalQueue,
-		// The legacy plugin shortens the pool lifetime from legacypool's 3h
-		// default; see graft/subnet-evm/plugin/evm/config/default_config.go.
-		TxPoolLifetime: saeconfig.Duration{Duration: 10 * time.Minute},
+		Config:       saeconfig.Default(),
+		DatabaseType: pebbledb.Name,
 	}
 }
 
@@ -97,13 +95,6 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 	config := c.SAEConfig(now)
 	// The legacy plugin never journals local transactions.
 	config.MempoolConfig.Journal = ""
-	config.MempoolConfig.PriceLimit = c.TxPoolPriceLimit
-	config.MempoolConfig.PriceBump = c.TxPoolPriceBump
-	config.MempoolConfig.AccountQueue = c.TxPoolAccountQueue
-	config.MempoolConfig.GlobalQueue = c.TxPoolGlobalQueue
-	config.MempoolConfig.Lifetime = c.TxPoolLifetime.Duration
-	config.RPCConfig.GasCap = c.RPCGasCap
-	config.RPCConfig.TxFeeCap = c.RPCTxFeeCap
 	return config
 }
 
