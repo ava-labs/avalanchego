@@ -231,7 +231,7 @@ func (c *testCryptoOps) CreateSignatureAggregator(nodes []common.Node) common.Si
 	return &testutil.TestSignatureAggregator{N: len(nodes)}
 }
 
-func (c *testCryptoOps) DeserializeQuorumCertificate(bytes []byte) (common.QuorumCertificate, error) {
+func (c *testCryptoOps) DeserializeQuorumCertificate(bytes []byte, _ common.NodeIDs) (common.QuorumCertificate, error) {
 	qc, err := testutil.DeserializeTestQC(bytes)
 	if err != nil {
 		return nil, err

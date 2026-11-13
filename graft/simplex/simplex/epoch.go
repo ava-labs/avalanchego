@@ -380,7 +380,7 @@ func (e *Epoch) loadBlockRecord(block common.Block) error {
 }
 
 func (e *Epoch) restoreNotarizationRecord(r []byte, highestWalRound *walRound) error {
-	notarization, err := common.NotarizationFromRecord(r, e.QCDeserializer)
+	notarization, err := common.NotarizationFromRecord(r, e.QCDeserializer, e.validatorNodeIDs)
 	if err != nil {
 		return err
 	}
@@ -399,7 +399,7 @@ func (e *Epoch) restoreNotarizationRecord(r []byte, highestWalRound *walRound) e
 }
 
 func (e *Epoch) loadNotarizationRecord(r []byte) error {
-	notarization, err := common.NotarizationFromRecord(r, e.QCDeserializer)
+	notarization, err := common.NotarizationFromRecord(r, e.QCDeserializer, e.validatorNodeIDs)
 	if err != nil {
 		return err
 	}
@@ -459,7 +459,7 @@ func (e *Epoch) storeNotarization(notarization *common.Notarization) error {
 }
 
 func (e *Epoch) restoreEmptyNotarizationRecord(r []byte, highestWalRound *walRound) error {
-	emptyNotarization, err := common.EmptyNotarizationFromRecord(r, e.QCDeserializer)
+	emptyNotarization, err := common.EmptyNotarizationFromRecord(r, e.QCDeserializer, e.validatorNodeIDs)
 	if err != nil {
 		return err
 	}
@@ -478,7 +478,7 @@ func (e *Epoch) restoreEmptyNotarizationRecord(r []byte, highestWalRound *walRou
 }
 
 func (e *Epoch) loadEmptyNotarizationRecord(r []byte) error {
-	emptyNotarization, err := common.EmptyNotarizationFromRecord(r, e.QCDeserializer)
+	emptyNotarization, err := common.EmptyNotarizationFromRecord(r, e.QCDeserializer, e.validatorNodeIDs)
 	if err != nil {
 		return err
 	}
@@ -535,7 +535,7 @@ func (e *Epoch) loadEmptyVoteRecord(r []byte) error {
 }
 
 func (e *Epoch) restoreFinalizationRecord(r []byte, highestWalRound *walRound) error {
-	finalization, err := common.FinalizationFromRecord(r, e.QCDeserializer)
+	finalization, err := common.FinalizationFromRecord(r, e.QCDeserializer, e.validatorNodeIDs)
 	if err != nil {
 		return err
 	}
@@ -554,7 +554,7 @@ func (e *Epoch) restoreFinalizationRecord(r []byte, highestWalRound *walRound) e
 }
 
 func (e *Epoch) loadFinalizationRecord(r []byte) error {
-	finalization, err := common.FinalizationFromRecord(r, e.QCDeserializer)
+	finalization, err := common.FinalizationFromRecord(r, e.QCDeserializer, e.validatorNodeIDs)
 	if err != nil {
 		return err
 	}
@@ -725,7 +725,7 @@ func (e *Epoch) setMetadataFromRecords(records [][]byte) error {
 		recordType := binary.BigEndian.Uint16(records[i])
 		switch recordType {
 		case common.NotarizationRecordType:
-			notarization, err := common.NotarizationFromRecord(records[i], e.QCDeserializer)
+			notarization, err := common.NotarizationFromRecord(records[i], e.QCDeserializer, e.validatorNodeIDs)
 			if err != nil {
 				return err
 			}
@@ -735,7 +735,7 @@ func (e *Epoch) setMetadataFromRecords(records [][]byte) error {
 				found = true
 			}
 		case common.EmptyNotarizationRecordType:
-			emptyNotarization, err := common.EmptyNotarizationFromRecord(records[i], e.QCDeserializer)
+			emptyNotarization, err := common.EmptyNotarizationFromRecord(records[i], e.QCDeserializer, e.validatorNodeIDs)
 			if err != nil {
 				return err
 			}
@@ -745,7 +745,7 @@ func (e *Epoch) setMetadataFromRecords(records [][]byte) error {
 				found = true
 			}
 		case common.FinalizationRecordType:
-			finalization, err := common.FinalizationFromRecord(records[i], e.QCDeserializer)
+			finalization, err := common.FinalizationFromRecord(records[i], e.QCDeserializer, e.validatorNodeIDs)
 			if err != nil {
 				return err
 			}

@@ -271,7 +271,7 @@ func quorumCertificateFromP2P(qcBytes []byte, qcDeserializer *QCDeserializer) (c
 		return nil, errNilField
 	}
 
-	simplexQC, err := qcDeserializer.DeserializeQuorumCertificate(qcBytes)
+	simplexQC, err := qcDeserializer.deserialize(qcBytes)
 	if err != nil {
 		return nil, err
 	}

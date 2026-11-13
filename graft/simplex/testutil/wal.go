@@ -303,7 +303,7 @@ func (tw *TestWAL) AssertHealthy(bd common.BlockDeserializer, qcd common.QCDeser
 			require.False(tw.t, rounds[round].emptyVoteRecord, "duplicate empty vote record for round %d", round)
 			rounds[round].emptyVoteRecord = true
 		case common.FinalizationRecordType:
-			finalization, err := common.FinalizationFromRecord(r, qcd)
+			finalization, err := common.FinalizationFromRecord(r, qcd, nil)
 			require.NoError(tw.t, err)
 			round := finalization.Finalization.Round
 			if _, exists := rounds[round]; !exists {
