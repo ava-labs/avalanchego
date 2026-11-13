@@ -42,7 +42,7 @@ func (c *ChainConfig) verifyStateUpgrades() error {
 }
 
 // GetActivatingStateUpgrades returns all state upgrades configured to activate during the
-// state transition from a block with timestamp [from] to a block with timestamp [to].
+// state transition between the provided times. A nil from value indicates the beginning of time.
 func (c *ChainConfig) GetActivatingStateUpgrades(from *uint64, to uint64) []stateupgrade.Block {
 	return getActivatingStateUpgrades(from, to, c.StateUpgrades)
 }
