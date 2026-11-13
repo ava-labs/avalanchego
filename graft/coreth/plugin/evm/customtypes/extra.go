@@ -9,8 +9,8 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
@@ -26,8 +26,8 @@ const (
 // data. If the extra data does not contain predicate results, or cannot be
 // parsed, nil is returned. The same rules MUST be supplied for each call to a
 // given header.
-func PredicateResults(h *ethtypes.Header, rules cparams.Rules) predicate.BlockResults {
-	predicateBytes := PredicateBytesFromExtra(rules, h.Extra)
+func PredicateResults(h *ethtypes.Header, up upgrade.Upgrade) predicate.BlockResults {
+	predicateBytes := PredicateBytesFromExtra(up, h.Extra)
 	if len(predicateBytes) == 0 {
 		return nil
 	}
@@ -47,8 +47,8 @@ var ErrInsufficientFeeState = errors.New("insufficient length for ACP-176 fee st
 
 // PredicateBytesFromExtra returns the predicate result bytes from the header's
 // extra data. If the extra data is not long enough, an empty slice is returned.
-func PredicateBytesFromExtra(rules cparams.Rules, extra []byte) []byte {
-	offset := predicateBytesOffset(rules)
+func PredicateBytesFromExtra(up upgrade.Upgrade, extra []byte) []byte {
+	offset := predicateBytesOffset(up)
 	// Prior to Durango, the VM enforces the extra data is smaller than or equal
 	// to `offset`.
 	// After Durango, the VM pre-verifies the extra data past `offset` is valid.
@@ -58,11 +58,11 @@ func PredicateBytesFromExtra(rules cparams.Rules, extra []byte) []byte {
 	return extra[offset:]
 }
 
-func predicateBytesOffset(rules cparams.Rules) int {
+func predicateBytesOffset(up upgrade.Upgrade) int {
 	switch {
-	case rules.IsHelicon:
+	case up >= upgrade.Helicon:
 		return 0
-	case rules.IsFortuna:
+	case up >= upgrade.Fortuna:
 		return acp176StateSize
 	default:
 		return ap3WindowSize

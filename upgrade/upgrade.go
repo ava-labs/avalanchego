@@ -6,6 +6,7 @@ package upgrade
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -114,8 +115,8 @@ type Config struct {
 	// When adding a new upgrade, follow new_upgrade_checklist.md.
 }
 
-func (c *Config) Validate() error {
-	upgrades := []time.Time{
+func (c *Config) times() []time.Time {
+	return []time.Time{
 		c.ApricotPhase1Time,
 		c.ApricotPhase2Time,
 		c.ApricotPhase3Time,
@@ -133,6 +134,10 @@ func (c *Config) Validate() error {
 		c.HeliconTime,
 		c.IglooTime,
 	}
+}
+
+func (c *Config) Validate() error {
+	upgrades := c.times()
 	for i := 0; i < len(upgrades)-1; i++ {
 		if upgrades[i].After(upgrades[i+1]) {
 			return fmt.Errorf("%w: upgrade %d (%s) is after upgrade %d (%s)",
@@ -231,3 +236,32 @@ func GetConfig(networkID uint32) Config {
 func UnixTimestamp(t time.Time) uint64 {
 	return uint64(t.Unix()) //#nosec G115 -- Upgrade times are after the Unix epoch
 }
+
+func (c *Config) Current(t time.Time) Upgrade {
+	// DO NOT MERGE: this almost certainly has an off-by-one error or is
+	// incorrect at the boundary.
+	u, _ := slices.BinarySearchFunc(c.times(), t, time.Time.Compare)
+	return Upgrade(u)
+}
+
+type Upgrade int
+
+const (
+	Unknown               = Upgrade(-1)
+	ApricotPhase1 Upgrade = iota
+	ApricotPhase2
+	ApricotPhase3
+	ApricotPhase4
+	ApricotPhase5
+	ApricotPhasePre6
+	ApricotPhase6
+	ApricotPhasePost6
+	Banff
+	Cortina
+	Durango
+	Etna
+	Fortuna
+	Granite
+	Helicon
+	Igloo
+)

@@ -204,6 +204,7 @@ func (c *ChainConfig) Rules(timestamp uint64) Rules {
 		IsGranite:          c.IsGranite(timestamp),
 		IsHelicon:          c.IsHelicon(timestamp),
 		IsIgloo:            c.IsIgloo(timestamp),
+		LatestUpgrade:      upgrade.Unknown, // DO NOT MERGE
 	}
 }
 
@@ -298,6 +299,8 @@ type Rules struct {
 	IsGranite          bool
 	IsHelicon          bool
 	IsIgloo            bool
+
+	LatestUpgrade upgrade.Upgrade
 }
 
 // TODO(alarso16): Delete implementation.
