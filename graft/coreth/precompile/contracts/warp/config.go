@@ -23,8 +23,6 @@ const (
 	WarpQuorumDenominator      uint64 = 100
 )
 
-var _ precompileconfig.Predicater = (*Config)(nil)
-
 var (
 	errOverflowSignersGasCost     = errors.New("overflow calculating warp signers gas cost")
 	errInvalidPredicateBytes      = errors.New("cannot unpack predicate bytes")
@@ -54,7 +52,7 @@ type Config struct {
 // 4. TODO: Lookup of the validator set
 //
 // If the payload of the warp message fails parsing, return a non-nil error invalidating the transaction.
-func (*Config) PredicateGas(pred predicate.Predicate, rules precompileconfig.Rules) (uint64, error) {
+func PredicateGas(pred predicate.Predicate, rules precompileconfig.Rules) (uint64, error) {
 	gasConfig := CurrentGasConfig(rules)
 
 	totalGas := gasConfig.VerifyPredicateBase

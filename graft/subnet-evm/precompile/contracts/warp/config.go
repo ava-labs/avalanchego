@@ -27,9 +27,8 @@ const (
 )
 
 var (
-	_ precompileconfig.Config     = (*Config)(nil)
-	_ precompileconfig.Predicater = (*Config)(nil)
-	_ precompileconfig.Accepter   = (*Config)(nil)
+	_ precompileconfig.Config   = (*Config)(nil)
+	_ precompileconfig.Accepter = (*Config)(nil)
 )
 
 var (
@@ -158,7 +157,7 @@ func MessagesFromAccessList(list types.AccessList) []predicate.Predicate {
 // 4. TODO: Lookup of the validator set
 //
 // If the payload of the warp message fails parsing, return a non-nil error invalidating the transaction.
-func (*Config) PredicateGas(pred predicate.Predicate, rules precompileconfig.Rules) (uint64, error) {
+func PredicateGas(pred predicate.Predicate, rules precompileconfig.Rules) (uint64, error) {
 	gasConfig := CurrentGasConfig(rules)
 
 	totalGas := gasConfig.VerifyPredicateBase
