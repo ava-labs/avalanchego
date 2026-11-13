@@ -9,6 +9,7 @@ package tx
 import (
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
@@ -46,9 +47,23 @@ var (
 // Tx is a signed transaction that interacts with shared memory.
 // The [Unsigned] body can be implemented by either [Export] or [Import].
 // The [Credential] values are implemented by [secp256k1fx.Credential].
+//
+// A Tx MUST NOT be modified after calling [Tx.ID] or [Tx.Bytes], as their
+// results are cached.
 type Tx struct {
 	Unsigned Unsigned     `serialize:"true" json:"unsignedTx"`
 	Creds    []Credential `serialize:"true" json:"credentials"`
+
+	// encoded is populated by the first successful call to [Tx.ID] or
+	// [Tx.Bytes]. It is atomic because txs are shared across goroutines, such
+	// as by the txpool and the block builder.
+	encoded atomic.Pointer[encodedTx]
+}
+
+// encodedTx is the canonical binary format of a [Tx] along with its ID.
+type encodedTx struct {
+	bytes []byte
+	id    ids.ID
 }
 
 // Unsigned is a common interface implemented by [Import] and [Export].
@@ -102,23 +117,46 @@ type Credential interface {
 
 // ID returns the unique hash of the transaction.
 func (t *Tx) ID() ids.ID {
-	// TODO(StephenButtolph): Optimize ID by caching previously calculated
-	// values.
-	bytes, err := t.Bytes()
+	e, err := t.encode()
 	// This error can happen, but only with invalid transactions. To avoid
 	// polluting the interface, we represent all invalid transactions with
 	// the zero ID.
 	if err != nil {
 		return ids.ID{}
 	}
-	return hashing.ComputeHash256Array(bytes)
+	return e.id
 }
 
 // Bytes returns the canonical binary format of the transaction.
+//
+// The returned slice is shared by all callers and MUST NOT be modified.
 func (t *Tx) Bytes() ([]byte, error) {
-	// TODO(StephenButtolph): Optimize Bytes by caching previously calculated
-	// values.
-	return c.Marshal(codecVersion, t)
+	e, err := t.encode()
+	if err != nil {
+		return nil, err
+	}
+	return e.bytes, nil
+}
+
+// encode returns the cached encoding of t, calculating it on first use.
+//
+// Concurrent first calls may each calculate the encoding, which is safe
+// because t is not modified and every calculation produces the same value.
+// Errors are not cached.
+func (t *Tx) encode() (*encodedTx, error) {
+	if e := t.encoded.Load(); e != nil {
+		return e, nil
+	}
+	bytes, err := c.Marshal(codecVersion, t)
+	if err != nil {
+		return nil, err
+	}
+	e := &encodedTx{
+		bytes: bytes,
+		id:    hashing.ComputeHash256Array(bytes),
+	}
+	t.encoded.Store(e)
+	return e, nil
 }
 
 // InputIDs returns the one-time-use inputs consumed by this transaction.

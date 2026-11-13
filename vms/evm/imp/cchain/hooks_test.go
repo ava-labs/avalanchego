@@ -17,10 +17,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 )
 
 func TestDelayExponent(t *testing.T) {
@@ -162,5 +166,38 @@ func TestTargetExponent(t *testing.T) {
 			require.ErrorIs(t, err, tt.wantErr, "targetExponent()")
 			assert.Equal(t, tt.want, got, "targetExponent()")
 		})
+	}
+}
+
+// BenchmarkNewHookTx measures the conversion that the block builder performs
+// on every pool tx each time it builds a block.
+func BenchmarkNewHookTx(b *testing.B) {
+	stx := &tx.Tx{
+		Unsigned: &tx.Import{
+			ImportedInputs: []*avax.TransferableInput{{
+				Asset: avax.Asset{ID: snowtest.AVAXAssetID},
+				In: &secp256k1fx.TransferInput{
+					Amt: units.Avax,
+					Input: secp256k1fx.Input{
+						SigIndices: []uint32{0},
+					},
+				},
+			}},
+			Outs: []tx.Output{{
+				Amount:  units.Avax / 2,
+				AssetID: snowtest.AVAXAssetID,
+			}},
+		},
+		Creds: []tx.Credential{
+			&secp256k1fx.Credential{
+				Sigs: []txtest.Signature{{}},
+			},
+		},
+	}
+	_, err := newHookTx(stx, snowtest.AVAXAssetID)
+	require.NoError(b, err, "newHookTx()")
+
+	for b.Loop() {
+		_, _ = newHookTx(stx, snowtest.AVAXAssetID)
 	}
 }

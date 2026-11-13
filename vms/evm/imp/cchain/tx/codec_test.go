@@ -6,6 +6,7 @@ package tx_test
 import (
 	"encoding/json"
 	"math"
+	"sync"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -55,6 +56,77 @@ func TestBytes(t *testing.T) {
 	}
 }
 
+// TestIDAndBytesCached verifies that [Tx.ID] and [Tx.Bytes] return the same
+// values before and after they are cached.
+func TestIDAndBytesCached(t *testing.T) {
+	for _, golden := range goldens {
+		t.Run(golden.name, func(t *testing.T) {
+			tx, err := Parse(golden.bytes)
+			require.NoError(t, err, "Parse()")
+
+			// The first iteration populates the cache and the second reads
+			// from it.
+			for range 2 {
+				require.Equalf(t, golden.id, tx.ID(), "%T.ID()", tx)
+				got, err := tx.Bytes()
+				require.NoErrorf(t, err, "%T.Bytes()", tx)
+				require.Equalf(t, golden.bytes, got, "%T.Bytes()", tx)
+			}
+		})
+	}
+}
+
+// TestIDAndBytesConcurrent verifies that the ID and bytes of a tx can be
+// calculated concurrently, as the txpool, gossip, and the block builder share
+// txs across goroutines. It is only meaningful with the race detector.
+func TestIDAndBytesConcurrent(t *testing.T) {
+	const numGoroutines = 8
+	for _, golden := range goldens {
+		t.Run(golden.name, func(t *testing.T) {
+			tx, err := Parse(golden.bytes)
+			require.NoError(t, err, "Parse()")
+
+			var (
+				start    = make(chan struct{})
+				wg       sync.WaitGroup
+				gotIDs   [numGoroutines]ids.ID
+				gotBytes [numGoroutines][]byte
+				errs     [numGoroutines]error
+			)
+			for i := range numGoroutines {
+				wg.Go(func() {
+					<-start
+					// Alternate which method populates the cache.
+					if i%2 == 0 {
+						gotIDs[i] = tx.ID()
+						gotBytes[i], errs[i] = tx.Bytes()
+					} else {
+						gotBytes[i], errs[i] = tx.Bytes()
+						gotIDs[i] = tx.ID()
+					}
+				})
+			}
+			close(start)
+			wg.Wait()
+
+			for i := range numGoroutines {
+				require.Equalf(t, golden.id, gotIDs[i], "%T.ID()", tx)
+				require.NoErrorf(t, errs[i], "%T.Bytes()", tx)
+				require.Equalf(t, golden.bytes, gotBytes[i], "%T.Bytes()", tx)
+			}
+		})
+	}
+}
+
+// TestIDAndBytesInvalid verifies that a tx that can not be marshalled reports
+// the zero ID.
+func TestIDAndBytesInvalid(t *testing.T) {
+	tx := &Tx{}
+	require.Equalf(t, ids.ID{}, tx.ID(), "%T.ID()", tx)
+	_, err := tx.Bytes()
+	require.ErrorIsf(t, err, codec.ErrMarshalNil, "%T.Bytes()", tx)
+}
+
 func TestParse(t *testing.T) {
 	for _, golden := range goldens {
 		t.Run(golden.name, func(t *testing.T) {
@@ -62,6 +134,32 @@ func TestParse(t *testing.T) {
 			require.NoError(t, err, "Parse()")
 			if diff := cmp.Diff(golden.tx, got, txtest.CmpOpt()); diff != "" {
 				t.Errorf("Parse() diff (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+// BenchmarkID and BenchmarkBytes use parsed txs, because that is how txs
+// reach the txpool, the block builder, and block execution.
+func BenchmarkID(b *testing.B) {
+	for _, golden := range goldens {
+		b.Run(golden.name, func(b *testing.B) {
+			tx, err := Parse(golden.bytes)
+			require.NoError(b, err, "Parse()")
+			for b.Loop() {
+				_ = tx.ID()
+			}
+		})
+	}
+}
+
+func BenchmarkBytes(b *testing.B) {
+	for _, golden := range goldens {
+		b.Run(golden.name, func(b *testing.B) {
+			tx, err := Parse(golden.bytes)
+			require.NoError(b, err, "Parse()")
+			for b.Loop() {
+				_, _ = tx.Bytes()
 			}
 		})
 	}
