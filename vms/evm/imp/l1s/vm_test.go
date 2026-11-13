@@ -137,7 +137,7 @@ func TestTransfer(t *testing.T) {
 		_, verifier  = newSUT(t, withMaxAllocFor(sender), timeOpt)
 	)
 
-	recipient := common.Address{1}
+	recipient := common.Address{2}
 	const value = 42
 	transfer := func() (built, parsed *blocks.Block) {
 		t.Helper()
@@ -146,6 +146,7 @@ func TestTransfer(t *testing.T) {
 			To:        &recipient,
 			Value:     big.NewInt(value),
 			Gas:       ethparams.TxGas,
+			GasTipCap: big.NewInt(1),
 			GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
 		})
 		require.NoErrorf(t, builder.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction()", builder.EthClient())
@@ -209,6 +210,7 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 		txs[i] = wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 			To:        &common.Address{1},
 			Gas:       tt.gasLimit,
+			GasTipCap: big.NewInt(1),
 			GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
 		})
 		require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, txs[i]), "%T.SendTransaction(%s)", sut.EthClient(), tt.name)

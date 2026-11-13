@@ -280,6 +280,13 @@ func withStateSyncDisabled() sutOption {
 	})
 }
 
+// withLocalTxsEnabled sets [config.LocalTxsEnabled], which defaults to false.
+func withLocalTxsEnabled() sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.LocalTxsEnabled = true
+	})
+}
+
 // withPriceTarget sets [config.PriceTarget] on the SUT.
 func withPriceTarget(p gas.Price) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
@@ -1034,6 +1041,7 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 		txs[i] = w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 			To:        &common.Address{},
 			Gas:       tt.gasLimit,
+			GasTipCap: big.NewInt(1),
 			GasFeeCap: big.NewInt(1),
 		})
 		require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, txs[i]), "%T.SendTransaction(%s)", sut.EthClient(), tt.name)
@@ -1697,6 +1705,7 @@ func TestGasRefundsDisabled(t *testing.T) {
 	tx := w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		To:        &contract,
 		Gas:       wantGasUsed,
+		GasTipCap: big.NewInt(1),
 		GasFeeCap: big.NewInt(1),
 	})
 	require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction()", sut.EthClient())
