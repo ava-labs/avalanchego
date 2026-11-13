@@ -280,13 +280,6 @@ func withStateSyncDisabled() sutOption {
 	})
 }
 
-// withLocalTxsEnabled sets [config.LocalTxsEnabled], which defaults to false.
-func withLocalTxsEnabled() sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.LocalTxsEnabled = true
-	})
-}
-
 // withPriceTarget sets [config.PriceTarget] on the SUT.
 func withPriceTarget(p gas.Price) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
