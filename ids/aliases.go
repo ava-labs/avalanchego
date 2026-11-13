@@ -132,7 +132,7 @@ func GetRelevantAliases(aliaser Aliaser, ids []ID) (map[ID][]string, error) {
 		}
 
 		// remove the redundant alias where alias = id.
-		relevantAliases := make([]string, 0, len(aliases)-1)
+		relevantAliases := make([]string, 0, len(aliases))
 		for _, alias := range aliases {
 			if alias != id.String() {
 				relevantAliases = append(relevantAliases, alias)
