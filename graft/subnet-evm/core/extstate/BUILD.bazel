@@ -14,9 +14,9 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/core/extstate",
     deps = [
         "//graft/evm/firewood",
-        "//graft/evm/predicate",
         "//graft/subnet-evm/params",
         "//graft/subnet-evm/precompile/contracts/warp",
+        "//vms/evm/imp/warp/message",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/types",

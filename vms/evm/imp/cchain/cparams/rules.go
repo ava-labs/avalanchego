@@ -15,10 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
-	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -90,7 +90,7 @@ func (r Rules) AccessListGas(accessList libevm.AccessList) (uint64, bool, error)
 	gas, err := precompileconfig.AccessListGas(
 		accessList,
 		warp.ContractAddress,
-		func(msg predicate.Predicate) (uint64, error) {
+		func(msg message.Packed) (uint64, error) {
 			return warp.PredicateGas(msg, r)
 		},
 	)
@@ -194,7 +194,7 @@ var _ contract.Environment = (*environment)(nil)
 
 type environment struct {
 	vm.PrecompileEnvironment
-	predicateResults predicate.BlockResults
+	predicateResults message.BlockResults
 	rules            *Rules
 }
 

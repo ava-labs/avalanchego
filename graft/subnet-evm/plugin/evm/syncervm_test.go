@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/evm/firewood"
-	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/engine"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/synctest"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
@@ -44,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/database"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -255,7 +255,7 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 		require.NoError(serverVM.vm.Shutdown(t.Context()))
 	})
 	generateAndAcceptBlocks(t, serverVM.vm, numBlocks, func(_ int, gen *core.BlockGen) {
-		br := predicate.BlockResults{}
+		br := message.BlockResults{}
 		b, err := br.Bytes()
 		require.NoError(err)
 		gen.AppendExtra(b)
@@ -457,7 +457,7 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 	txsPerBlock := 10
 	toAddress := testEthAddrs[1] // arbitrary choice
 	generateAndAcceptBlocks(t, syncerVM, blocksToBuild, func(_ int, gen *core.BlockGen) {
-		br := predicate.BlockResults{}
+		br := message.BlockResults{}
 		b, err := br.Bytes()
 		require.NoError(err)
 		gen.AppendExtra(b)
@@ -491,7 +491,7 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 
 	// Generate blocks after we have entered normal consensus as well
 	generateAndAcceptBlocks(t, syncerVM, blocksToBuild, func(_ int, gen *core.BlockGen) {
-		br := predicate.BlockResults{}
+		br := message.BlockResults{}
 		b, err := br.Bytes()
 		require.NoError(err)
 		gen.AppendExtra(b)

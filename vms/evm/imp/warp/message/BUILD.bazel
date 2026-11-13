@@ -1,13 +1,13 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
-load("//.bazel:defs.bzl", "graft_go_test")
+load("//.bazel:defs.bzl", "go_test")
 
 go_library(
-    name = "predicate",
+    name = "message",
     srcs = [
-        "predicate.go",
+        "packed.go",
         "results.go",
     ],
-    importpath = "github.com/ava-labs/avalanchego/graft/evm/predicate",
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/warp/message",
     visibility = ["//visibility:public"],
     deps = [
         "//codec",
@@ -19,13 +19,13 @@ go_library(
     ],
 )
 
-graft_go_test(
-    name = "predicate_test",
+go_test(
+    name = "message_test",
     srcs = [
-        "predicate_test.go",
+        "packed_test.go",
         "results_test.go",
     ],
-    embed = [":predicate"],
+    embed = [":message"],
     deps = [
         "//codec",
         "//utils/set",

@@ -12,13 +12,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -69,7 +69,7 @@ func TestRulesExtra_AccessListGas(t *testing.T) {
 	require.NoError(t, err, "avalancheWarp.NewMessage()")
 	accessList := libevm.AccessList{{
 		Address:     warp.ContractAddress,
-		StorageKeys: predicate.New(msg.Bytes()),
+		StorageKeys: message.Pack(msg.Bytes()),
 	}}
 
 	tests := []struct {
