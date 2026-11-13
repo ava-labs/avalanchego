@@ -12,6 +12,7 @@ import (
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
@@ -21,12 +22,20 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/holiman/uint256"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -119,6 +128,34 @@ func withInitialMinDelay(delayMS uint64) genesisOption {
 func withFeeConfig(c commontype.FeeConfig) genesisOption {
 	return withGenesis(func(g *ethcore.Genesis) {
 		l1params.GetExtra(g.Config).FeeConfig = c
+	})
+}
+
+// withAllGenesisPrecompiles enables every registered precompile at the given
+// timestamp, with non-trivial initial state where supported. It exercises the
+// activation of every module, so that the genesis hash can be compared to
+// subnet-evm's. The native minter also mints to [testAllocAddr], making the
+// state root depend on the allocation being applied after activation.
+func withAllGenesisPrecompiles(timestamp uint64) genesisOption {
+	return withGenesis(func(g *ethcore.Genesis) {
+		var (
+			ts     = new(timestamp)
+			admins = []common.Address{{0xad}}
+			mint   = (*math.HexOrDecimal256)(big.NewInt(42))
+		)
+		l1params.GetExtra(g.Config).GenesisPrecompiles = extras.Precompiles{
+			deployerallowlist.ConfigKey: deployerallowlist.NewConfig(ts, admins, nil, nil),
+			txallowlist.ConfigKey:       txallowlist.NewConfig(ts, admins, nil, nil),
+			nativeminter.ConfigKey: nativeminter.NewConfig(ts, admins, nil, nil, map[common.Address]*math.HexOrDecimal256{
+				{0x11}:        mint,
+				testAllocAddr: mint,
+			}),
+			feemanager.ConfigKey: feemanager.NewConfig(ts, admins, nil, nil, new(l1params.DefaultFeeConfig)),
+			rewardmanager.ConfigKey: rewardmanager.NewConfig(ts, admins, nil, nil, &rewardmanager.InitialRewardConfig{
+				RewardAddress: common.Address{0x22},
+			}),
+			warp.ConfigKey: warp.NewDefaultConfig(ts),
+		}
 	})
 }
 
@@ -359,6 +396,16 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 			genesis: testGenesisJSON(withGenesis(func(g *ethcore.Genesis) {
 				g.Alloc[common.Address{0xe0}] = types.Account{Balance: new(big.Int)}
 			})),
+		},
+		spec{
+			name:     "precompiles",
+			upgrades: upgradetest.Latest,
+			genesis:  testGenesisJSON(withAllGenesisPrecompiles(testGenesisTime)),
+		},
+		spec{
+			name:     "precompiles_after_genesis",
+			upgrades: upgradetest.Latest,
+			genesis:  testGenesisJSON(withAllGenesisPrecompiles(testGenesisTime + 1)),
 		},
 		spec{
 			name:     "header_fields",
@@ -807,4 +854,61 @@ func TestWriteGenesisState(t *testing.T) {
 
 	_, err = state.New(root, state.NewDatabaseWithNodeDB(db, tdb), nil)
 	require.NoError(t, err, "state.New()")
+}
+
+// TestGenesisPrecompileState ensures that precompiles enabled at genesis are
+// activated in the genesis state, before the allocation is applied.
+func TestGenesisPrecompileState(t *testing.T) {
+	var (
+		recipient = common.Address{'r', 'e', 'c', 'i', 'p', 'i', 'e', 'n', 't'}
+		amount    = uint256.NewInt(42)
+	)
+
+	tests := []struct {
+		name          string
+		activation    uint64
+		wantRecipient *uint256.Int
+	}{
+		{
+			name:          "active_at_genesis",
+			activation:    testGenesisTime,
+			wantRecipient: amount,
+		},
+		{
+			name:          "active_after_genesis",
+			activation:    testGenesisTime + 1,
+			wantRecipient: uint256.NewInt(0),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			genesis := testGenesisJSON(withGenesis(func(g *ethcore.Genesis) {
+				mint := (*math.HexOrDecimal256)(amount.ToBig())
+				l1params.GetExtra(g.Config).GenesisPrecompiles = extras.Precompiles{
+					nativeminter.ConfigKey: nativeminter.NewConfig(new(tt.activation), nil, nil, nil, map[common.Address]*math.HexOrDecimal256{
+						recipient:     mint,
+						testAllocAddr: mint,
+					}),
+				}
+			}))
+			ctx := &snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgradetest.Latest)}
+			g, err := parseGenesis(ctx, []byte(genesis), nil)
+			require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
+
+			db := rawdb.NewMemoryDatabase()
+			tdb := triedb.NewDatabase(db, triedb.HashDefaults)
+			defer func() {
+				assert.NoErrorf(t, tdb.Close(), "%T.Close()", tdb)
+			}()
+			root, err := g.writeState(db, tdb)
+			require.NoErrorf(t, err, "%T.writeState()", g)
+			sdb, err := state.New(root, state.NewDatabaseWithNodeDB(db, tdb), nil)
+			require.NoError(t, err, "state.New()")
+
+			assert.Equal(t, tt.wantRecipient, sdb.GetBalance(recipient), "balance(recipient)")
+			// The allocation MUST override the mint.
+			assert.Equal(t, uint256.MustFromBig(testAllocFund), sdb.GetBalance(testAllocAddr), "balance(allocated)")
+		})
+	}
 }
