@@ -350,7 +350,6 @@ github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a h1:idn718Q4
 github.com/asaskevich/govalidator v0.0.0-20190424111038-f61b66f89f4a/go.mod h1:lB+ZfQJz7igIIfQNfa7Ml4HSf2uFQQRzpGGRXenZAgY=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.3.0/go.mod h1:71C76bo47zlDX9gWnn3p/0QZQXkTQ/GNqUNI6fchvjs=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.7.0/go.mod h1:3pf8KGfCmqegWoY5/pZ1NHUcyuRkfl/vHQuOjsdUtbI=
-github.com/ava-labs/firewood-go/ffi v0.9.0/go.mod h1:DsiOCyHGiwiwuqQxbSY6T5HkTHT8uGHbM+f0CJQIRfw=
 github.com/ava-labs/libevm v1.13.15-0.20260629092640-7d62036142ff/go.mod h1:6NxGoR1aLABnfLy+fncXRj0W6rUoUrXghnAWZ+Rhr4o=
 github.com/ava-labs/libevm v1.13.15-0.20260727180425-50f63c47d9ee/go.mod h1:6NxGoR1aLABnfLy+fncXRj0W6rUoUrXghnAWZ+Rhr4o=
 github.com/ava-labs/libevm v1.13.15-0.20261006144529-01f05591fc60/go.mod h1:6NxGoR1aLABnfLy+fncXRj0W6rUoUrXghnAWZ+Rhr4o=
@@ -885,6 +884,7 @@ github.com/spiffe/go-spiffe/v2 v2.7.0 h1:uXe1MflJoHw58wAUvxVlcM7WpKtijWG7I1UidcG
 github.com/spiffe/go-spiffe/v2 v2.7.0/go.mod h1:47Q0Q9/AqGha8QLHp+kxpH4Wca7X7EnOtlIJy3mxZ3U=
 github.com/stretchr/objx v0.1.1/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.5.2 h1:xuMeJ0Sdp5ZMRXx/aWO6RZxdr3beISkG5/G/aIRr3pY=
+github.com/stretchr/objx v0.5.3/go.mod h1:rDQraq+vQZU7Fde9LOZLr8Tax6zZvy4kuNKF+QYS+U0=
 github.com/stretchr/testify v1.10.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/tdewolff/minify/v2 v2.12.4/go.mod h1:h+SRvSIX3kwgwTFOpSckvSxgax3uy8kZTSF1Ojrr3bk=
 github.com/tdewolff/parse/v2 v2.6.4/go.mod h1:woz0cgbLwFdtbjJu8PIKxhW05KplTFQkOdX78o+Jgrs=
