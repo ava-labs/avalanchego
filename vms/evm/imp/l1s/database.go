@@ -5,11 +5,9 @@
 package l1s
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/ava-labs/libevm/common"
@@ -20,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/types"
 
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
@@ -28,17 +26,16 @@ import (
 )
 
 // useStandaloneDatabase reports whether chain data is stored in the database
-// returned by [config.standaloneDatabase] rather than in avaDB.
-func (c config) useStandaloneDatabase(networkID uint32, avaDB avadb.Database) bool {
-	if c.UseStandaloneDatabase != nil {
-		return *c.UseStandaloneDatabase
+// returned by [config.standaloneDatabase] rather than in avaDB. A chain already
+// in avaDB stays there, regardless of [config.UseStandaloneDatabase].
+func (c config) useStandaloneDatabase(log logging.Logger, avaDB avadb.Database) bool {
+	if rawdb.ReadCanonicalHash(types.NewChainEthDB(avaDB), genesisNumber) == (common.Hash{}) {
+		return c.UseStandaloneDatabase
 	}
-	// Unit tests inspect the database they provide.
-	if networkID == constants.UnitTestID {
-		return false
+	if c.UseStandaloneDatabase {
+		log.Warn(`ignoring "use-standalone-database" because the node's database already holds the chain`)
 	}
-	// A chain already in avaDB stays there.
-	return rawdb.ReadCanonicalHash(types.NewChainEthDB(avaDB), genesisNumber) == (common.Hash{})
+	return false
 }
 
 // standaloneDatabase opens the database configured by c, registering its
@@ -77,31 +74,15 @@ func (c config) standaloneDatabase(snowCtx *snow.Context) (avadb.Database, error
 
 // databaseConfig returns the JSON config of the standalone database.
 func (c config) databaseConfig() ([]byte, error) {
-	var (
-		b   []byte
-		err error
-	)
-	switch {
-	case c.DatabaseConfigContent != "":
-		b, err = base64.StdEncoding.DecodeString(c.DatabaseConfigContent)
-		if err != nil {
-			return nil, fmt.Errorf("decoding base64 database config: %w", err)
-		}
-	case c.DatabaseConfigFile != "":
-		b, err = os.ReadFile(c.DatabaseConfigFile)
-		if err != nil {
-			return nil, fmt.Errorf("reading database config file: %w", err)
-		}
-	}
 	if c.DatabaseType != pebbledb.Name {
-		return b, nil
+		return c.DatabaseConfig, nil
 	}
 
 	cfg := pebbledb.DefaultConfig
 	// Sync mode in pebble has an issue with OSs like MacOS.
 	cfg.Sync = false
-	if len(b) > 0 {
-		if err := json.Unmarshal(b, &cfg); err != nil {
+	if len(c.DatabaseConfig) > 0 {
+		if err := json.Unmarshal(c.DatabaseConfig, &cfg); err != nil {
 			return nil, fmt.Errorf("json.Unmarshal(%T): %w", cfg, err)
 		}
 	}

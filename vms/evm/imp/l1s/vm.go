@@ -111,7 +111,7 @@ func (vm *VM) Initialize(
 		zap.Reflect("config", userConfig),
 	)
 
-	if userConfig.useStandaloneDatabase(snowCtx.NetworkID, avaDB) {
+	if userConfig.useStandaloneDatabase(snowCtx.Log, avaDB) {
 		db, err := userConfig.standaloneDatabase(snowCtx)
 		if err != nil {
 			return fmt.Errorf("opening standalone database: %w", err)

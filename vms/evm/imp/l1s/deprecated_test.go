@@ -9,6 +9,11 @@ package l1s
 // TODO: delete this file together with deprecated.go.
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -51,7 +56,14 @@ func TestParseConfigDeprecated(t *testing.T) {
 		}
 	}
 
-	const addr = "0x0123456789abcdef0123456789abcdef01234567"
+	const (
+		addr     = "0x0123456789abcdef0123456789abcdef01234567"
+		dbConfig = `{"maxOpenFiles":1}`
+	)
+	dbConfigFile := filepath.Join(t.TempDir(), "db.json")
+	require.NoError(t, os.WriteFile(dbConfigFile, []byte(dbConfig), 0o600))
+	withDBConfig := with(func(c *config) { c.DatabaseConfig = json.RawMessage(dbConfig) })
+
 	tests := []struct {
 		name         string
 		json         string
@@ -91,6 +103,49 @@ func TestParseConfigDeprecated(t *testing.T) {
 			wantWarnings: []*loggingtest.Record{{
 				Level: logging.Warn,
 				Msg:   `ignoring deprecated "feeRecipient" because "fee-recipient" is set; "feeRecipient" will be removed in the next release`,
+			}},
+		},
+		{
+			name: "database_config_base64",
+			json: `{"database-config":"` + base64.StdEncoding.EncodeToString([]byte(dbConfig)) + `"}`,
+			want: withDBConfig,
+			wantWarnings: []*loggingtest.Record{{
+				Level: logging.Warn,
+				Msg:   `base64-encoded "database-config" is deprecated and will be removed in the next release; set it to the decoded JSON instead`,
+			}},
+		},
+		{
+			name: "database_config_base64_empty",
+			json: `{"database-config":""}`,
+			want: defaultConfig(""),
+		},
+		{
+			name:    "database_config_base64_invalid",
+			json:    `{"database-config":"!"}`,
+			wantErr: base64.CorruptInputError(0),
+		},
+		{
+			name: "database_config_file",
+			json: `{"database-config-file":` + string(mustMarshalJSON(t, dbConfigFile)) + `}`,
+			want: withDBConfig,
+			wantWarnings: []*loggingtest.Record{{
+				Level:  logging.Warn,
+				Msg:    `"database-config-file" is deprecated and will be removed in the next release; set "database-config" to the file's JSON instead`,
+				Fields: []zap.Field{zap.String("database-config-file", dbConfigFile)},
+			}},
+		},
+		{
+			name:    "database_config_file_missing",
+			json:    `{"database-config-file":"` + filepath.Join(t.TempDir(), "missing.json") + `"}`,
+			wantErr: fs.ErrNotExist,
+		},
+		{
+			name: "database_config_file_superseded",
+			json: `{"database-config":` + dbConfig + `,"database-config-file":"missing.json"}`,
+			want: withDBConfig,
+			wantWarnings: []*loggingtest.Record{{
+				Level: logging.Warn,
+				Msg:   `ignoring deprecated "database-config-file" because "database-config" is set; "database-config-file" will be removed in the next release`,
 			}},
 		},
 		{

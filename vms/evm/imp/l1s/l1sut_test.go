@@ -162,10 +162,8 @@ func newL1SUT(t *testing.T, opts ...l1SUTOption) *l1SUT {
 	if cfg.apis != nil {
 		chainConfig.APIs = cfg.apis
 	}
-	if cfg.databasePath != "" {
-		chainConfig.UseStandaloneDatabase = new(true)
-		chainConfig.DatabasePath = cfg.databasePath
-	}
+	chainConfig.UseStandaloneDatabase = cfg.databasePath != ""
+	chainConfig.DatabasePath = cfg.databasePath
 	configBytes := mustMarshalJSON(t, &chainConfig)
 
 	sut := &l1SUT{

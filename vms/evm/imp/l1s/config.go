@@ -5,6 +5,7 @@
 package l1s
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"time"
 
@@ -41,25 +42,22 @@ type config struct {
 	FeeRecipient common.Address `json:"fee-recipient"`
 
 	// UseStandaloneDatabase, if true, stores chain data in a database opened by
-	// the VM instead of the node's database. If nil, the standalone database is
-	// used iff the node's database holds no chain.
-	UseStandaloneDatabase *bool `json:"use-standalone-database"`
-	// DatabaseConfigContent is the base64-encoded JSON config of the standalone
-	// database. If set, [config.DatabaseConfigFile] is ignored.
-	DatabaseConfigContent string `json:"database-config"`
-	// DatabaseConfigFile is the path of the standalone database's JSON config.
-	DatabaseConfigFile string `json:"database-config-file"`
+	// the VM instead of the node's database. It is ignored if the node's
+	// database already holds the chain.
+	UseStandaloneDatabase bool `json:"use-standalone-database"`
+	// DatabaseConfig is the JSON config of the standalone database.
+	DatabaseConfig json.RawMessage `json:"database-config"`
+	// DatabasePath is the parent directory of the standalone database, which is
+	// stored in DatabasePath/DatabaseType.
+	DatabasePath string `json:"database-path"`
 	// DatabaseType is [leveldb.Name], [memdb.Name] or [pebbledb.Name].
 	DatabaseType string `json:"database-type"`
-	// DatabasePath is the directory holding the standalone database, in a
-	// subdirectory named by [config.DatabaseType].
-	DatabasePath string `json:"database-path"`
 
 	deprecatedConfig
 }
 
 // apiValidator is the [rpc.API] of the `validator` namespace, which is served
-// by the L1 VM rather than [sae.VM].
+// by the L1 VM.
 const apiValidator rpc.API = "validator"
 
 // defaultConfig returns the defaults for the chain with data directory
@@ -68,10 +66,11 @@ const apiValidator rpc.API = "validator"
 // subset.
 func defaultConfig(chainDataDir string) config {
 	c := config{
-		Config:       saeconfig.Default(),
-		FeeRecipient: blackhole.Address,
-		DatabaseType: pebbledb.Name,
-		DatabasePath: filepath.Join(chainDataDir, "db"),
+		Config:                saeconfig.Default(),
+		FeeRecipient:          blackhole.Address,
+		UseStandaloneDatabase: true,
+		DatabasePath:          filepath.Join(chainDataDir, "db"),
+		DatabaseType:          pebbledb.Name,
 	}
 	c.APIs.Add(apiValidator)
 	return c
@@ -110,10 +109,7 @@ func (c config) sae() saeconfig.Config {
 // saeConfig translates the operator-supplied [config] into the [sae.Config]
 // consumed by [sae.NewVM].
 func (c config) saeConfig(now func() time.Time) sae.Config {
-	config := c.sae().SAEConfig(now)
-	// The legacy plugin never journals local transactions.
-	config.MempoolConfig.Journal = ""
-	return config
+	return c.sae().SAEConfig(now)
 }
 
 // desired returns c's user-facing targets as internal excess votes.

@@ -10,9 +10,11 @@ package l1s
 // TODO: delete this file in the next release after the SAE transition.
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 
 	"github.com/ava-labs/libevm/common"
@@ -33,6 +35,7 @@ type deprecatedConfig struct {
 	ValidatorsAPIEnabled *bool    `json:"validators-api-enabled,omitempty"`
 	WarpAPIEnabled       *bool    `json:"warp-api-enabled,omitempty"`
 	AdminAPIEnabled      *bool    `json:"admin-api-enabled,omitempty"`
+	DatabaseConfigFile   *string  `json:"database-config-file,omitempty"`
 }
 
 // legacyEthAPIs maps each name that Subnet-EVM's `eth-apis` option accepted to
@@ -88,6 +91,9 @@ func (c *config) applyDeprecated(log logging.Logger, b []byte) error {
 	}
 	_, feeRecipientSet := keys["fee-recipient"]
 	c.applyLegacyFeeRecipient(log, d.LegacyFeeRecipient, feeRecipientSet)
+	if err := c.applyLegacyDatabaseConfig(log, d.DatabaseConfigFile); err != nil {
+		return err
+	}
 	_, apisSet := keys["apis"]
 	return c.applyLegacyAPIs(log, d, apisSet)
 }
@@ -110,6 +116,41 @@ func (c *config) applyLegacyFeeRecipient(log logging.Logger, legacy *string, fee
 			zap.Stringer("fee-recipient", c.FeeRecipient),
 		)
 	}
+}
+
+// applyLegacyDatabaseConfig replaces a base64-encoded JSON string in
+// [config.DatabaseConfig] with the bytes it encodes. Then, unless file is nil
+// or empty, or [config.DatabaseConfig] is set, it sets [config.DatabaseConfig]
+// to the contents of file.
+func (c *config) applyLegacyDatabaseConfig(log logging.Logger, file *string) error {
+	var encoded string
+	if json.Unmarshal(c.DatabaseConfig, &encoded) == nil {
+		c.DatabaseConfig = nil
+		if encoded != "" {
+			b, err := base64.StdEncoding.DecodeString(encoded)
+			if err != nil {
+				return fmt.Errorf(`decoding base64 "database-config": %w`, err)
+			}
+			c.DatabaseConfig = b
+			log.Warn(`base64-encoded "database-config" is deprecated and will be removed in the next release; set it to the decoded JSON instead`)
+		}
+	}
+
+	switch {
+	case file == nil || *file == "":
+	case len(c.DatabaseConfig) > 0:
+		log.Warn(`ignoring deprecated "database-config-file" because "database-config" is set; "database-config-file" will be removed in the next release`)
+	default:
+		b, err := os.ReadFile(*file)
+		if err != nil {
+			return fmt.Errorf(`reading "database-config-file": %w`, err)
+		}
+		c.DatabaseConfig = b
+		log.Warn(`"database-config-file" is deprecated and will be removed in the next release; set "database-config" to the file's JSON instead`,
+			zap.String("database-config-file", *file),
+		)
+	}
+	return nil
 }
 
 // applyLegacyAPIs sets [saeconfig.Config.APIs] from the deprecated API options

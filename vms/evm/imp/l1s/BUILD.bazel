@@ -47,7 +47,6 @@ go_library(
         "//snow/engine/snowman/block",
         "//upgrade",
         "//utils",
-        "//utils/constants",
         "//utils/logging",
         "//utils/math/intmath",
         "//utils/set",

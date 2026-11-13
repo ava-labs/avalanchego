@@ -74,11 +74,10 @@ This VM accepts every [C-Chain option](../cchain/config.md) plus the L1-specific
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
-| `use-standalone-database` | bool | Store chain data in a database opened by this VM, instead of the node's database. If unset, a standalone database is used only for a chain that isn't already in the node's database. | unset |
+| `use-standalone-database` | bool | Store chain data in a database opened by this VM, instead of the node's database. Ignored if the node's database already holds the chain. | `true` |
 | `database-type` | string | Type of the standalone database, one of `leveldb`, `memdb` or `pebbledb`. | `pebbledb` |
-| `database-path` | string | Directory holding the standalone database, in a subdirectory named by `database-type`. | `{chain-data-dir}/db` |
-| `database-config` | string | Base64-encoded JSON config of the standalone database. If set, `database-config-file` is ignored. | `""` |
-| `database-config-file` | string | Path of the standalone database's JSON config. | `""` |
+| `database-path` | string | Parent directory of the standalone database, which is stored in `{database-path}/{database-type}`. | `{chain-data-dir}/db` |
+| `database-config` | object | JSON config of the standalone database. | unset |
 
 ## Deprecated Options
 
@@ -91,3 +90,5 @@ These legacy Subnet-EVM options are deprecated and **WILL BE REMOVED in the next
 | `validators-api-enabled` | `apis` | Adds or removes `validator`. |
 | `warp-api-enabled` | none | The `warp_*` methods are no longer served. Enabling it logs a warning. |
 | `admin-api-enabled` | none | The `admin_*` methods are no longer served. Enabling it logs a warning. |
+| `database-config` as a base64 string | `database-config` as a JSON object | The string is decoded. |
+| `database-config-file` | `database-config` | The file's JSON is read at startup. |
