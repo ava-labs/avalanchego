@@ -30,7 +30,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
-	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
+	legacycore "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
+	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/evm/types"
 )
 
@@ -121,14 +122,29 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
+// StartExecutingBlock applies all upgrades starting at b.
 func (h *hooks) StartExecutingBlock(_ params.Rules, sdb *state.StateDB, parent *types.Header, b *types.Block) error {
-	// TODO: Apply the scheduled state upgrades.
-	return legacy.ApplyPrecompileActivations(
-		h.chainConfig,
-		new(parent.Time),
-		legacy.NewBlockContext(b.Number(), b.Time()),
-		sdb,
+	var (
+		parentTime  = new(parent.Time)
+		currentTime = b.Time()
+		number      = b.Number()
 	)
+
+	if err := legacycore.ApplyPrecompileActivations(
+		h.chainConfig,
+		parentTime,
+		legacycore.NewBlockContext(number, currentTime),
+		sdb,
+	); err != nil {
+		return err
+	}
+
+	configExtra := l1params.GetExtra(h.chainConfig)
+	for _, upgrade := range configExtra.GetActivatingStateUpgrades(parentTime, currentTime) {
+		upgrade.Apply(h.chainConfig, sdb, number)
+	}
+
+	return nil
 }
 
 func (*hooks) FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
