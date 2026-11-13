@@ -19,13 +19,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
@@ -52,8 +50,6 @@ var (
 	numTestVdrs = 10_000
 	testVdrs    []*testValidator
 	vdrs        map[ids.NodeID]*validators.GetValidatorOutput
-
-	graniteRules = forkToAvalancheRules(upgradetest.Granite)
 )
 
 func init() {
@@ -232,9 +228,8 @@ func createValidMessageTest(
 	snowCtx *snow.Context,
 	numKeys int,
 	packed message.Packed,
-	rules cparams.Rules,
+	gasConfig GasConfig,
 ) precompiletest.MessageTest {
-	gasCost := CurrentGasConfig(rules)
 	return precompiletest.MessageTest{
 		VerifyContext: &message.VerifyContext{
 			SnowCtx: snowCtx,
@@ -243,8 +238,8 @@ func createValidMessageTest(
 			},
 		},
 		Packed:      packed,
-		Rules:       rules,
-		Gas:         gasCost.MessageGasCost(len(packed), numKeys),
+		GasConfig:   gasConfig,
+		Gas:         gasConfig.MessageGasCost(len(packed), numKeys),
 		GasErr:      nil,
 		ExpectedErr: nil,
 	}
@@ -270,10 +265,10 @@ func TestInvalidPacking(t *testing.T) {
 				PChainHeight: 1,
 			},
 		},
-		Packed: packed,
-		Rules:  graniteRules,
-		Gas:    GraniteGasConfig.MessageGasCost(len(packed), numKeys),
-		GasErr: ErrInvalidPacked,
+		Packed:    packed,
+		GasConfig: GraniteGasConfig,
+		Gas:       GraniteGasConfig.MessageGasCost(len(packed), numKeys),
+		GasErr:    ErrInvalidPacked,
 	}
 
 	test.Run(t)
@@ -301,10 +296,10 @@ func TestInvalidWarpMessage(t *testing.T) {
 				PChainHeight: 1,
 			},
 		},
-		Packed: packed,
-		Rules:  graniteRules,
-		Gas:    GraniteGasConfig.MessageGasCost(len(packed), numKeys),
-		GasErr: ErrInvalidWarpMsg,
+		Packed:    packed,
+		GasConfig: GraniteGasConfig,
+		Gas:       GraniteGasConfig.MessageGasCost(len(packed), numKeys),
+		GasErr:    ErrInvalidWarpMsg,
 	}
 
 	test.Run(t)
@@ -345,10 +340,10 @@ func TestInvalidAddressedPayload(t *testing.T) {
 				PChainHeight: 1,
 			},
 		},
-		Packed: packed,
-		Rules:  graniteRules,
-		Gas:    GraniteGasConfig.MessageGasCost(len(packed), numKeys),
-		GasErr: ErrInvalidWarpMsgPayload,
+		Packed:    packed,
+		GasConfig: GraniteGasConfig,
+		Gas:       GraniteGasConfig.MessageGasCost(len(packed), numKeys),
+		GasErr:    ErrInvalidWarpMsgPayload,
 	}
 
 	test.Run(t)
@@ -390,10 +385,10 @@ func TestInvalidBitSet(t *testing.T) {
 				PChainHeight: 1,
 			},
 		},
-		Packed: packed,
-		Rules:  graniteRules,
-		Gas:    GraniteGasConfig.MessageGasCost(len(packed), numKeys),
-		GasErr: ErrCannotGetNumSigners,
+		Packed:    packed,
+		GasConfig: GraniteGasConfig,
+		Gas:       GraniteGasConfig.MessageGasCost(len(packed), numKeys),
+		GasErr:    ErrCannotGetNumSigners,
 	}
 
 	test.Run(t)
@@ -434,7 +429,7 @@ func TestWarpSignatureWeightsQuorumNumerator(t *testing.T) {
 				},
 			},
 			Packed:      packed,
-			Rules:       graniteRules,
+			GasConfig:   GraniteGasConfig,
 			Gas:         GraniteGasConfig.MessageGasCost(len(packed), tt.numSigners),
 			ExpectedErr: tt.wantErr,
 		})
@@ -492,7 +487,7 @@ func TestWarpMultipleMessages(t *testing.T) {
 					},
 				},
 				Packed:      packed,
-				Rules:       graniteRules,
+				GasConfig:   GraniteGasConfig,
 				Gas:         expectedGas,
 				GasErr:      nil,
 				ExpectedErr: expectedErr,
@@ -516,7 +511,7 @@ func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
 			SnowCtx:            createSnowCtx(t, nil /*=validators*/), // No validators in state
 			ProposerVMBlockCtx: proposervmContext,
 		},
-		Rules:       graniteRules,
+		GasConfig:   GraniteGasConfig,
 		Packed:      packed,
 		Gas:         expectedGas,
 		GasErr:      nil,
@@ -536,7 +531,7 @@ func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
 			ProposerVMBlockCtx: proposervmContext,
 		},
 		Packed:      packed,
-		Rules:       graniteRules,
+		GasConfig:   GraniteGasConfig,
 		Gas:         expectedGas,
 		GasErr:      nil,
 		ExpectedErr: safemath.ErrOverflow,
@@ -547,7 +542,7 @@ func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
 	})
 }
 
-func makeWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.MessageTest {
+func makeWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompiletest.MessageTest {
 	allTotalNodes := []int{10, 100, 1_000, 10_000}
 	tests := make([]precompiletest.MessageTest, len(allTotalNodes))
 	for i, totalNodes := range allTotalNodes {
@@ -560,7 +555,7 @@ func makeWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.M
 				publicKey: true,
 			},
 		})
-		test := createValidMessageTest(snowCtx, totalNodes, packed, rules)
+		test := createValidMessageTest(snowCtx, totalNodes, packed, gasConfig)
 		test.Name = fmt.Sprintf("%d signers/%d validators", totalNodes, totalNodes)
 		tests[i] = test
 	}
@@ -582,7 +577,7 @@ func makeWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.M
 				publicKey: true,
 			},
 		})
-		test := createValidMessageTest(snowCtx, numSigners, packed, rules)
+		test := createValidMessageTest(snowCtx, numSigners, packed, gasConfig)
 		test.Name = fmt.Sprintf("%d signers (heavily weighted)/%d validators", numSigners, totalNodes)
 		tests = append(tests, test)
 	}
@@ -603,7 +598,7 @@ func makeWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.M
 				publicKey: false,
 			},
 		})
-		test := createValidMessageTest(snowCtx, numSigners, packed, rules)
+		test := createValidMessageTest(snowCtx, numSigners, packed, gasConfig)
 		test.Name = fmt.Sprintf("%d signers (heavily weighted)/%d validators (non-signers without registered PublicKey)", numSigners, totalNodes)
 		tests = append(tests, test)
 	}
@@ -633,7 +628,7 @@ func makeWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.M
 			},
 		}
 
-		test := createValidMessageTest(snowCtx, numSigners, packed, rules)
+		test := createValidMessageTest(snowCtx, numSigners, packed, gasConfig)
 		test.Name = fmt.Sprintf("%d validators w/ %d signers/repeated PublicKeys", totalNodes, numSigners)
 		tests = append(tests, test)
 	}
@@ -641,20 +636,14 @@ func makeWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.M
 }
 
 func TestWarpMessage(t *testing.T) {
-	for _, fork := range forks {
-		t.Run(fork.String(), func(t *testing.T) {
-			rules := forkToAvalancheRules(fork)
-			tests := makeWarpMessageTests(t, rules)
-			precompiletest.RunMessageTests(t, tests)
-		})
-	}
+	// Verification doesn't depend on the gas config, so one is enough.
+	precompiletest.RunMessageTests(t, makeWarpMessageTests(t, GraniteGasConfig))
 }
 
 func BenchmarkWarpMessage(b *testing.B) {
-	for _, fork := range forks {
-		b.Run(fork.String(), func(b *testing.B) {
-			rules := forkToAvalancheRules(fork)
-			tests := makeWarpMessageTests(b, rules)
+	for _, tt := range gasConfigs {
+		b.Run(tt.name, func(b *testing.B) {
+			tests := makeWarpMessageTests(b, tt.gas)
 			precompiletest.RunMessageBenchmarks(b, tests)
 		})
 	}

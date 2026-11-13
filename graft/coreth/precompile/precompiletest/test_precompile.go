@@ -16,11 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
-	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 )
@@ -51,8 +49,6 @@ type PrecompileTest struct {
 	ExpectedRes []byte
 	// ExpectedErr is the expected error returned by the precompile
 	ExpectedErr error
-	// Rules is the rules to use for the precompile
-	Rules cparams.Rules
 }
 
 func (test PrecompileTest) Run(t *testing.T, precompile contract.StatefulPrecompiledContract) {
@@ -148,7 +144,6 @@ func (test PrecompileTest) setup(t testing.TB, state *testStateDB) *testEnv {
 		state:        state,
 		caller:       test.Caller,
 		snowContext:  snowtest.Context(t, snowtest.CChainID),
-		rules:        test.Rules,
 		warpFailures: set.NewBits(test.WarpMessageFailures...),
 	}
 }
@@ -184,7 +179,6 @@ type testEnv struct {
 	state        *testStateDB
 	caller       common.Address
 	snowContext  *snow.Context
-	rules        cparams.Rules
 	warpFailures set.Bits
 }
 
@@ -200,13 +194,12 @@ func (e *testEnv) UseGas(gas uint64) bool {
 	return true
 }
 
-func (e *testEnv) ReadOnly() bool                     { return e.readOnly }
-func (e *testEnv) StateDB() vm.StateDB                { return e.state }
-func (e *testEnv) ReadOnlyState() libevm.StateReader  { return e.state }
-func (*testEnv) BlockNumber() *big.Int                { return new(big.Int) }
-func (e *testEnv) Caller() common.Address             { return e.caller }
-func (e *testEnv) SnowContext() *snow.Context         { return e.snowContext }
-func (e *testEnv) ExtraRules() precompileconfig.Rules { return e.rules }
+func (e *testEnv) ReadOnly() bool                    { return e.readOnly }
+func (e *testEnv) StateDB() vm.StateDB               { return e.state }
+func (e *testEnv) ReadOnlyState() libevm.StateReader { return e.state }
+func (*testEnv) BlockNumber() *big.Int               { return new(big.Int) }
+func (e *testEnv) Caller() common.Address            { return e.caller }
+func (e *testEnv) SnowContext() *snow.Context        { return e.snowContext }
 
 func (e *testEnv) WarpMessageResults(common.Hash) set.Bits {
 	return e.warpFailures

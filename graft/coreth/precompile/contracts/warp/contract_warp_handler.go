@@ -43,9 +43,8 @@ type messageHandler interface {
 	handleMessage(msg *warp.Message) ([]byte, error)
 }
 
-func handleWarpMessage(env contract.Environment, input []byte, handler messageHandler) ([]byte, error) {
-	warpGasConfig := CurrentGasConfig(env.ExtraRules())
-	if err := contract.DeductGas(env, warpGasConfig.GetVerifiedWarpMessageBase); err != nil {
+func (g GasConfig) handleWarpMessage(env contract.Environment, input []byte, handler messageHandler) ([]byte, error) {
+	if err := contract.DeductGas(env, g.GetVerifiedWarpMessageBase); err != nil {
 		return nil, err
 	}
 
@@ -67,7 +66,7 @@ func handleWarpMessage(env contract.Environment, input []byte, handler messageHa
 
 	// Note: we charge for the size of the message during both Warp message verification and each time the message is read during
 	// EVM execution because each execution incurs an additional read cost.
-	msgBytesGas, overflow := math.SafeMul(warpGasConfig.PerWarpMessageChunk, uint64(len(packed)))
+	msgBytesGas, overflow := math.SafeMul(g.PerWarpMessageChunk, uint64(len(packed)))
 	if overflow {
 		msgBytesGas = math.MaxUint64
 	}
