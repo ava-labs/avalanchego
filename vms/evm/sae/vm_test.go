@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
+	"github.com/ava-labs/libevm/core/txpool"
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
@@ -1072,6 +1073,48 @@ func requireNotReceiveTx(tb testing.TB, nodes []*SUT, txHash common.Hash) {
 	}
 	if tb.Failed() {
 		tb.FailNow()
+	}
+}
+
+// TestMempoolMinTip asserts that the mempool rejects non-local transactions
+// with a gas tip cap below [legacypool.Config.PriceLimit].
+func TestMempoolMinTip(t *testing.T) {
+	const priceLimit = 2 // differs from [legacypool.DefaultConfig]
+	tests := []struct {
+		name    string
+		tip     int64
+		wantErr error
+	}{
+		{
+			name:    "below_limit",
+			tip:     priceLimit - 1,
+			wantErr: txpool.ErrUnderpriced,
+		},
+		{
+			name: "at_limit",
+			tip:  priceLimit,
+		},
+	}
+
+	_, sut := newSUT(t, uint(len(tests)), options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.MempoolConfig.PriceLimit = priceLimit
+	}))
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tx := sut.wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
+				To:        &common.Address{},
+				Gas:       params.TxGas,
+				GasTipCap: big.NewInt(tt.tip),
+				GasFeeCap: big.NewInt(priceLimit),
+			})
+			const (
+				isLocal = false
+				sync    = false
+			)
+			errs := sut.rawVM.mempool.Pool.Add([]*types.Transaction{tx}, isLocal, sync)
+			require.Len(t, errs, 1, "len(TxPool.Add())")
+			require.ErrorIs(t, errs[0], tt.wantErr, "TxPool.Add()[0]")
+		})
 	}
 }
 
