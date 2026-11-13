@@ -20,8 +20,7 @@ type Factory struct{}
 // New creates a new L1 VM.
 func (*Factory) New(log logging.Logger) (any, error) {
 	log.Info("Creating new L1 VM")
-	vm := &VM{
+	return adaptor.Convert(&VM{
 		now: time.Now,
-	}
-	return adaptor.Convert(vm), nil
+	}), nil
 }
