@@ -153,7 +153,7 @@ func TestParseConfigDeprecated(t *testing.T) {
 			json: `{"eth-apis":["eth","eth-filter","net","web3","internal-eth","internal-blockchain","internal-transaction"]}`,
 			want: with(func(c *config) {
 				c.APIs = set.Of(
-					apiValidator,
+					validatorAPI,
 					rpc.APIAvalanche,
 					rpc.APIChain,
 					rpc.APINet,
@@ -171,7 +171,7 @@ func TestParseConfigDeprecated(t *testing.T) {
 		{
 			name: "eth_apis_aliases",
 			json: `{"eth-apis":["internal-public-tx-pool","private-debug"]}`,
-			want: with(func(c *config) { c.APIs = set.Of(apiValidator, rpc.APITxPool) }),
+			want: with(func(c *config) { c.APIs = set.Of(validatorAPI, rpc.APITxPool) }),
 			wantWarnings: []*loggingtest.Record{
 				deprecatedAPIs("txpool", "validator"),
 				removed("private-debug"),
@@ -185,7 +185,7 @@ func TestParseConfigDeprecated(t *testing.T) {
 		{
 			name: "validators_api_disabled",
 			json: `{"validators-api-enabled":false}`,
-			want: with(func(c *config) { c.APIs.Remove(apiValidator) }),
+			want: with(func(c *config) { c.APIs.Remove(validatorAPI) }),
 			wantWarnings: []*loggingtest.Record{
 				deprecatedAPIs("avalanche", "chain", "filter", "logs", "net", "price", "subscription", "trace", "tx", "txpool", "web3"),
 			},
@@ -193,7 +193,7 @@ func TestParseConfigDeprecated(t *testing.T) {
 		{
 			name: "warp_and_admin_apis_enabled",
 			json: `{"eth-apis":["web3"],"warp-api-enabled":true,"admin-api-enabled":true}`,
-			want: with(func(c *config) { c.APIs = set.Of(apiValidator, rpc.APIWeb3) }),
+			want: with(func(c *config) { c.APIs = set.Of(validatorAPI, rpc.APIWeb3) }),
 			wantWarnings: []*loggingtest.Record{
 				deprecatedAPIs("validator", "web3"),
 				removed("warp-api-enabled", "admin-api-enabled"),

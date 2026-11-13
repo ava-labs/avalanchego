@@ -169,7 +169,7 @@ func (c *config) applyLegacyAPIs(log logging.Logger, d deprecatedConfig, apisSet
 
 	var removed []string
 	if d.EthAPIs != nil {
-		apis := set.Of(apiValidator) // Subnet-EVM's validators-api-enabled default
+		apis := set.Of(validatorAPI) // Subnet-EVM's validators-api-enabled default
 		for _, name := range d.EthAPIs {
 			mapped, ok := legacyEthAPIs[name]
 			if !ok {
@@ -185,9 +185,9 @@ func (c *config) applyLegacyAPIs(log logging.Logger, d deprecatedConfig, apisSet
 	}
 	if d.ValidatorsAPIEnabled != nil {
 		if *d.ValidatorsAPIEnabled {
-			c.APIs.Add(apiValidator)
+			c.APIs.Add(validatorAPI)
 		} else {
-			c.APIs.Remove(apiValidator)
+			c.APIs.Remove(validatorAPI)
 		}
 	}
 	if d.WarpAPIEnabled != nil && *d.WarpAPIEnabled {

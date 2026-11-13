@@ -54,9 +54,9 @@ type config struct {
 	deprecatedConfig
 }
 
-// apiValidator is the [rpc.API] of the `validator` namespace, which is served
+// validatorAPI is the [rpc.API] of the `validator` namespace, which is served
 // by the L1 VM.
-const apiValidator rpc.API = "validator"
+const validatorAPI rpc.API = "validator"
 
 // defaultConfig returns the defaults for the chain with data directory
 // chainDataDir. Values mirror the legacy
@@ -70,7 +70,7 @@ func defaultConfig(chainDataDir string) config {
 		DatabasePath:          filepath.Join(chainDataDir, "db"),
 		DatabaseType:          pebbledb.Name,
 	}
-	c.APIs.Add(apiValidator)
+	c.APIs.Add(validatorAPI)
 	return c
 }
 
@@ -97,7 +97,7 @@ func (c config) sae() saeconfig.Config {
 	s := c.Config
 	s.APIs = set.NewSet[rpc.API](c.APIs.Len())
 	for api := range c.APIs {
-		if api != apiValidator {
+		if api != validatorAPI {
 			s.APIs.Add(api)
 		}
 	}
