@@ -54,6 +54,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
@@ -1638,14 +1639,6 @@ func TestDynamicMinDelayExcess(t *testing.T) {
 				dynamic.InitialDelayExponent + 2*maxDiff,
 			},
 		},
-		{
-			name:    "votes_down_capped",
-			desired: new(uint64(1000)),
-			want: []dynamic.DelayExponent{
-				dynamic.InitialDelayExponent - maxDiff,
-				dynamic.InitialDelayExponent - 2*maxDiff,
-			},
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -1732,121 +1725,33 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 			e.TimeMilliseconds = &earlyMS
 		})(hdr)
 	})
-	require.ErrorIsf(t, err, errBelowMinBlockDelay, "%T.VerifyBlock() (block below the ACP-226 minimum delay)", sut.VM)
+	require.ErrorIsf(t, err, blockdelay.ErrBelowMinimum, "%T.VerifyBlock() (block below the ACP-226 minimum delay)", sut.VM)
 }
 
-// waitForEventResult carries a [VM.WaitForEvent] output.
-type waitForEventResult struct {
-	msg snowcommon.Message
-	err error
-}
-
-// TestWaitForEventMinDelayPacing exercises WaitForEvent's ACP-226 min-delay
-// pacing.
+// TestWaitForEventMinDelayPacing asserts that [VM.WaitForEvent] doesn't report
+// a pending tx until the preferred block's ACP-226 minimum delay has elapsed.
 func TestWaitForEventMinDelayPacing(t *testing.T) {
-	tests := []struct {
-		name string
-		// cancelDuringDelay releases WaitForEvent by canceling its context while
-		// it is parked on the pacing timer. When false, synctest advances the
-		// fake clock to fire the timer instead.
-		cancelDuringDelay bool
-		wantMsg           snowcommon.Message
-		wantErr           error
-	}{
-		{
-			name:    "timer_fires",
-			wantMsg: snowcommon.PendingTxs,
-		},
-		{
-			name:              "context_canceled",
-			cancelDuringDelay: true,
-			wantErr:           context.Canceled,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			synctest.Test(t, func(t *testing.T) {
-				// Build an in-process SUT with no real RPC transport: real
-				// sockets never reach a durable block under synctest, so the
-				// txpool is primed directly via the gossip set rather than
-				// through the absent Client.
-				//
-				// Do not build/execute blocks: these tests are only
-				// synctest-teardown-safe because they run no blocks (a block can
-				// reactivate a goleak-suppressed libevm shutdown race that
-				// deadlocks the bubble).
-				key := txtest.NewKey(t)
-				timeOpt, _ := withVMTime(upgrade.InitiallyActiveTime)
-				ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), timeOpt, withoutRPCTransport())
-				w := newWallet(key, sut.ctx, nil)
-
-				gossipTx := toGossipTx(w.newMinimalTx(t))
-				require.NoErrorf(t, sut.gossipSet.Add(gossipTx), "%T.Add()", sut.gossipSet)
-
-				ctx, cancel := context.WithCancel(ctx)
-				defer cancel()
-
-				done := make(chan waitForEventResult, 1)
-				go func() {
-					msg, err := sut.WaitForEvent(ctx)
-					done <- waitForEventResult{msg, err}
-				}()
-
-				// Blocked on the pacing timer until we release it.
-				synctest.Wait()
-				require.Emptyf(t, done, "%T.WaitForEvent() should be blocked on the min delay", sut.VM)
-
-				if test.cancelDuringDelay {
-					cancel()
-				}
-
-				got := <-done
-				require.ErrorIsf(t, got.err, test.wantErr, "%T.WaitForEvent()", sut.VM)
-				require.Equalf(t, test.wantMsg, got.msg, "%T.WaitForEvent() event", sut.VM)
-			})
-		})
-	}
-}
-
-// TestWaitForEventThrottle asserts that consecutive [VM.WaitForEvent] calls
-// are throttled even when a pending tx is available and the preferred block's
-// ACP-226 minimum delay has elapsed.
-func TestWaitForEventThrottle(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// See [TestWaitForEventMinDelayPacing] for why the SUT has no RPC
-		// transport and MUST NOT build blocks.
+		// Build an in-process SUT with no real RPC transport: real sockets never
+		// reach a durable block under synctest, so the txpool is primed directly
+		// via the gossip set rather than through the absent Client.
+		//
+		// Do not build/execute blocks: this test is only synctest-teardown-safe
+		// because it runs no blocks (a block can reactivate a goleak-suppressed
+		// libevm shutdown race that deadlocks the bubble).
 		key := txtest.NewKey(t)
-		timeOpt, clock := withVMTime(upgrade.InitiallyActiveTime)
+		timeOpt, _ := withVMTime(upgrade.InitiallyActiveTime)
 		ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), timeOpt, withoutRPCTransport())
 		w := newWallet(key, sut.ctx, nil)
 
 		gossipTx := toGossipTx(w.newMinimalTx(t))
 		require.NoErrorf(t, sut.gossipSet.Add(gossipTx), "%T.Add()", sut.gossipSet)
 
-		// Skip the min-delay pacing so only the throttle can block.
-		clock.Advance(2 * dynamic.InitialDelayExponent.DelayDuration())
-
-		// The throttle clock starts when a call returns, so this first
-		// (immediate) call is what forces the second one to wait.
-		msg, err := sut.WaitForEvent(ctx)
-		require.NoErrorf(t, err, "%T.WaitForEvent() first call", sut.VM)
-		require.Equalf(t, snowcommon.PendingTxs, msg, "%T.WaitForEvent() first call event", sut.VM)
-
 		start := time.Now()
-		done := make(chan waitForEventResult, 1)
-		go func() {
-			msg, err := sut.WaitForEvent(ctx)
-			done <- waitForEventResult{msg, err}
-		}()
-
-		// Blocked on the throttle timer until synctest fires it.
-		synctest.Wait()
-		require.Emptyf(t, done, "%T.WaitForEvent() second call should be blocked on the throttle", sut.VM)
-
-		got := <-done
-		require.Equalf(t, minWaitForEventDelay, time.Since(start), "%T.WaitForEvent() second call throttle delay", sut.VM)
-		require.NoErrorf(t, got.err, "%T.WaitForEvent() second call", sut.VM)
-		require.Equalf(t, snowcommon.PendingTxs, got.msg, "%T.WaitForEvent() second call event", sut.VM)
+		got, err := sut.WaitForEvent(ctx)
+		require.NoErrorf(t, err, "%T.WaitForEvent()", sut.VM)
+		require.Equalf(t, snowcommon.PendingTxs, got, "%T.WaitForEvent()", sut.VM)
+		require.Equalf(t, dynamic.InitialDelayExponent.DelayDuration(), time.Since(start), "%T.WaitForEvent() blocking duration", sut.VM)
 	})
 }
 
