@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
@@ -51,6 +52,7 @@ import (
 	legacyparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	engcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
+	saerpc "github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -97,13 +99,14 @@ type (
 		configureGenesis func(*core.Genesis, []common.Address)
 		configureUpgrade func([]common.Address) []byte
 		// feeRecipient, if non-nil, is passed through
-		// `Config.FeeRecipient` (as a hex string) to the VM. When nil, the
-		// VM's default (zero address => effective burn) applies.
+		// `Config.FeeRecipient` to the VM. When nil, the VM burns fees.
 		feeRecipient *common.Address
 		// gasTarget, if non-nil, sets the validator's preferred gas-per-second
 		// target (Config.GasTarget); the resulting `DesiredTargetExcess` is
 		// what `header.TargetExcess` evolves toward (rate-limited per ACP-176).
 		gasTarget *gas.Gas
+		// apis, if non-nil, are the APIs served. Use [withAPIs] to set.
+		apis set.Set[saerpc.API]
 		// databasePath, if non-empty, stores chain data in a standalone
 		// database in this directory. Use [withStandaloneDatabase] to set.
 		databasePath string
@@ -149,12 +152,15 @@ func newL1SUT(t *testing.T, opts ...l1SUTOption) *l1SUT {
 
 	// Build per-chain config bytes from [defaultConfig], with optional
 	// test overrides layered on top.
-	chainConfig := defaultConfig()
+	chainConfig := defaultConfig("")
 	if cfg.feeRecipient != nil {
-		chainConfig.FeeRecipient = cfg.feeRecipient.Hex()
+		chainConfig.FeeRecipient = *cfg.feeRecipient
 	}
 	if cfg.gasTarget != nil {
 		chainConfig.GasTarget = cfg.gasTarget
+	}
+	if cfg.apis != nil {
+		chainConfig.APIs = cfg.apis
 	}
 	if cfg.databasePath != "" {
 		chainConfig.UseStandaloneDatabase = new(true)
@@ -424,6 +430,13 @@ func withFeeRecipient(addr common.Address) l1SUTOption {
 func withGasTarget(target gas.Gas) l1SUTOption {
 	return options.Func[l1SUTConfig](func(c *l1SUTConfig) {
 		c.gasTarget = &target
+	})
+}
+
+// withAPIs serves only apis.
+func withAPIs(apis set.Set[saerpc.API]) l1SUTOption {
+	return options.Func[l1SUTConfig](func(c *l1SUTConfig) {
+		c.apis = apis
 	})
 }
 

@@ -9,65 +9,50 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 )
 
 func TestParseConfig_FeeRecipient(t *testing.T) {
 	tests := []struct {
 		name    string
-		bytes   []byte
-		want    string
-		wantErr error
+		json    string
+		want    common.Address
+		wantErr bool
 	}{
 		{
-			name:  "empty_bytes",
-			bytes: nil,
-			want:  "",
+			name: "unset_burns",
+			json: `{}`,
+			want: blackhole.Address,
 		},
 		{
-			name:  "absent_field",
-			bytes: []byte(`{}`),
-			want:  "",
+			name: "address",
+			json: `{"fee-recipient":"0x0123456789abcdef0123456789abcdef01234567"}`,
+			want: common.HexToAddress("0x0123456789abcdef0123456789abcdef01234567"),
 		},
 		{
-			name:  "explicit_empty_string",
-			bytes: []byte(`{"feeRecipient":""}`),
-			want:  "",
-		},
-		{
-			name:  "valid_hex_address_with_prefix",
-			bytes: []byte(`{"feeRecipient":"0x0123456789abcdef0123456789abcdef01234567"}`),
-			want:  "0x0123456789abcdef0123456789abcdef01234567",
-		},
-		{
-			name:  "valid_hex_address_without_prefix",
-			bytes: []byte(`{"feeRecipient":"0123456789abcdef0123456789abcdef01234567"}`),
-			want:  "0123456789abcdef0123456789abcdef01234567",
-		},
-		{
-			name:    "invalid_hex_address_too_short",
-			bytes:   []byte(`{"feeRecipient":"0xdead"}`),
-			wantErr: errInvalidFeeRecipient,
-		},
-		{
-			name:    "invalid_hex_address_garbage",
-			bytes:   []byte(`{"feeRecipient":"not-an-address"}`),
-			wantErr: errInvalidFeeRecipient,
+			name:    "missing_prefix",
+			json:    `{"fee-recipient":"0123456789abcdef0123456789abcdef01234567"}`,
+			wantErr: true,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, test.bytes)
-			require.ErrorIs(t, err, test.wantErr)
-			if test.wantErr == nil {
-				require.Equal(t, test.want, c.FeeRecipient)
+			c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(test.json))
+			if test.wantErr {
+				var typeErr *json.UnmarshalTypeError
+				require.ErrorAs(t, err, &typeErr)
+				return
 			}
+			require.NoError(t, err)
+			require.Equal(t, test.want, c.FeeRecipient)
 		})
 	}
 }
@@ -77,7 +62,7 @@ func TestParseConfig_FeeRecipient(t *testing.T) {
 // that operator overrides via flat legacy-shaped JSON keys take
 // effect.
 func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
-	defaults := defaultConfig()
+	defaults := defaultConfig("")
 
 	t.Run("nil_bytes_yields_defaults", func(t *testing.T) {
 		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, nil)
@@ -94,7 +79,7 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 	t.Run("partial_override_keeps_other_defaults", func(t *testing.T) {
 		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"database-type":"leveldb","commit-interval":8192}`))
 		require.NoError(t, err)
-		want := defaultConfig()
+		want := defaultConfig("")
 		want.DatabaseType = "leveldb"
 		want.CommitInterval = 8192
 		require.Equal(t, want, c)
@@ -104,13 +89,13 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 		// Legacy keys with no SAE counterpart MUST NOT prevent an existing
 		// node config from starting the VM.
 		log := loggingtest.NewRecorder(logging.Warn)
-		c, err := parseConfig(&snow.Context{Log: log}, []byte(`{"admin-api-enabled":true}`))
+		c, err := parseConfig(&snow.Context{Log: log}, []byte(`{"airdrop":"genesis.json"}`))
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
 		require.Equal(t, []*loggingtest.Record{{
 			Level:  logging.Warn,
 			Msg:    "ignoring unrecognized config options",
-			Fields: []zap.Field{zap.Strings("options", []string{"admin-api-enabled"})},
+			Fields: []zap.Field{zap.Strings("options", []string{"airdrop"})},
 		}}, log.Records)
 	})
 
@@ -138,7 +123,7 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 // TestConfig_SAEConfig spot-checks the [sae.Config] produced from operator
 // fields so the Initialize-time wiring keeps matching what operators wrote.
 func TestConfig_SAEConfig(t *testing.T) {
-	c := defaultConfig()
+	c := defaultConfig("")
 	c.LocalTxsEnabled = true
 	c.Pruning = false
 	c.CommitInterval = 8192
@@ -151,7 +136,7 @@ func TestConfig_SAEConfig(t *testing.T) {
 
 	// Defaults round-trip to the legacy-equivalent SAE state: pruning on
 	// (Archival=false), commit interval at the saedb default.
-	d := defaultConfig().saeConfig(nil)
+	d := defaultConfig("").saeConfig(nil)
 	require.False(t, d.DBConfig.Archival)
 	require.Equal(t, uint64(saedb.DefaultCommitInterval), d.DBConfig.CommitInterval)
 }
@@ -202,9 +187,9 @@ func TestParseConfig_RPC(t *testing.T) {
 }
 
 func TestDefaultConfig_Resources(t *testing.T) {
-	config := defaultConfig().saeConfig(nil)
-	require.Equal(t, uint64(1000), config.RPCConfig.BatchRequestLimit, "defaultConfig().saeConfig(nil)")
-	require.True(t, config.RPCConfig.ResolvePendingToLastExecuted, "defaultConfig().saeConfig(nil)")
-	require.Equal(t, uint64(saedb.DefaultTrieCacheSizeMiB), config.DBConfig.TrieCacheMiB, "defaultConfig().saeConfig(nil)")
-	require.Equal(t, uint64(saedb.DefaultSnapshotCacheSizeMiB), config.DBConfig.SnapshotCacheMiB, "defaultConfig().saeConfig(nil)")
+	config := defaultConfig("").saeConfig(nil)
+	require.Equal(t, uint64(1000), config.RPCConfig.BatchRequestLimit, `defaultConfig("").saeConfig(nil)`)
+	require.True(t, config.RPCConfig.ResolvePendingToLastExecuted, `defaultConfig("").saeConfig(nil)`)
+	require.Equal(t, uint64(saedb.DefaultTrieCacheSizeMiB), config.DBConfig.TrieCacheMiB, `defaultConfig("").saeConfig(nil)`)
+	require.Equal(t, uint64(saedb.DefaultSnapshotCacheSizeMiB), config.DBConfig.SnapshotCacheMiB, `defaultConfig("").saeConfig(nil)`)
 }

@@ -228,8 +228,10 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("registering warp signature handler: %w", err)
 	}
 
-	if err := vm.VM.RPCServer().RegisterName(validatorNamespace, l1api.NewValidator(vm.uptime)); err != nil {
-		return fmt.Errorf("registering %q RPC namespace: %w", validatorNamespace, err)
+	if userConfig.APIs.Contains(apiValidator) {
+		if err := vm.VM.RPCServer().RegisterName(validatorNamespace, l1api.NewValidator(vm.uptime)); err != nil {
+			return fmt.Errorf("registering %q RPC namespace: %w", validatorNamespace, err)
+		}
 	}
 
 	snowCtx.Log.Info("initialized L1 VM")

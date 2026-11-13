@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/rpc"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/uptimetracker"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 
 	l1api "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api"
+	saerpc "github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
 )
 
 // TestUptimeTracker exercises the SAE-side uptime tracker through
@@ -124,4 +126,16 @@ func TestUptimeAPI(t *testing.T) {
 
 	_, err = sut.client.Uptime(sut.ctx, ids.GenerateTestID())
 	require.ErrorContains(t, err, uptimetracker.ErrValidationIDNotFound.Error()) //nolint:forbidigo // RPC error
+}
+
+// TestValidatorAPIDisabled asserts that the validator namespace MUST NOT be
+// served unless [apiValidator] is enabled.
+func TestValidatorAPIDisabled(t *testing.T) {
+	sut := newL1SUT(t, withAPIs(saerpc.DefaultAPIs()))
+
+	_, err := sut.client.Uptime(sut.ctx, ids.GenerateTestID())
+	var rpcErr rpc.Error
+	require.ErrorAs(t, err, &rpcErr)
+	const methodNotFound = -32601 // JSON-RPC 2.0
+	require.Equal(t, methodNotFound, rpcErr.ErrorCode(), "%T.Uptime() error code", sut.client)
 }

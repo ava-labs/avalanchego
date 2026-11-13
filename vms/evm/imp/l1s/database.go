@@ -49,11 +49,7 @@ func (c config) standaloneDatabase(snowCtx *snow.Context) (avadb.Database, error
 		return nil, err
 	}
 
-	dir := c.DatabasePath
-	if dir == "" {
-		dir = filepath.Join(snowCtx.ChainDataDir, "db")
-	}
-	path := filepath.Join(dir, c.DatabaseType)
+	path := filepath.Join(c.DatabasePath, c.DatabaseType)
 	snowCtx.Log.Info("using standalone database",
 		zap.String("type", c.DatabaseType),
 		zap.String("path", path),
