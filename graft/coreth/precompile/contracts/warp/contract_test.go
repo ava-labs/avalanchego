@@ -13,12 +13,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
-	"github.com/ava-labs/avalanchego/graft/coreth/precompile/precompiletest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
@@ -28,51 +24,53 @@ import (
 	. "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 )
 
-var forks = []upgradetest.Fork{
-	upgradetest.Fortuna,
-	upgradetest.Granite,
-}
-
-func forkToAvalancheRules(fork upgradetest.Fork) cparams.Rules {
-	u := upgradetest.GetConfig(fork)
-	networkUpgrades := cparams.FromUpgrades(u)
-	return networkUpgrades.Rules(uint64(upgrade.InitiallyActiveTime.Unix()))
+var gasConfigs = []struct {
+	name string
+	gas  GasConfig
+}{
+	{"pre_granite", PreGraniteGasConfig},
+	{"granite", GraniteGasConfig},
 }
 
 func runTests(
 	t *testing.T,
-	makeTests func(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest,
+	makeTests func(tb testing.TB, gasConfig GasConfig) []precompileTest,
 ) {
-	for _, fork := range forks {
-		t.Run(fork.String(), func(t *testing.T) {
-			rules := forkToAvalancheRules(fork)
-			tests := makeTests(t, rules)
-			precompiletest.RunPrecompileTests(t, WarpPrecompile, tests)
+	for _, tt := range gasConfigs {
+		t.Run(tt.name, func(t *testing.T) {
+			precompile := NewPrecompile(tt.gas)
+			for _, test := range makeTests(t, tt.gas) {
+				t.Run(test.Name, func(t *testing.T) {
+					test.run(t, precompile)
+				})
+			}
 		})
 	}
 }
 
 func runBenchmarks(
 	b *testing.B,
-	makeTests func(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest,
+	makeTests func(tb testing.TB, gasConfig GasConfig) []precompileTest,
 ) {
-	for _, fork := range forks {
-		b.Run(fork.String(), func(b *testing.B) {
-			rules := forkToAvalancheRules(fork)
-			tests := makeTests(b, rules)
-			precompiletest.RunPrecompileBenchmarks(b, WarpPrecompile, tests)
+	for _, tt := range gasConfigs {
+		b.Run(tt.name, func(b *testing.B) {
+			precompile := NewPrecompile(tt.gas)
+			for _, test := range makeTests(b, tt.gas) {
+				b.Run(test.Name, func(b *testing.B) {
+					test.bench(b, precompile)
+				})
+			}
 		})
 	}
 }
 
-func getBlockchainIDTests(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest {
+func getBlockchainIDTests(tb testing.TB, gasConfig GasConfig) []precompileTest {
 	callerAddr := common.HexToAddress("0x0123")
 
 	defaultSnowCtx := snowtest.Context(tb, snowtest.CChainID)
 	blockchainID := defaultSnowCtx.ChainID
 
-	gasConfig := CurrentGasConfig(rules)
-	return []precompiletest.PrecompileTest{
+	return []precompileTest{
 		{
 			Name:   "getBlockchainID_success",
 			Caller: callerAddr,
@@ -88,7 +86,6 @@ func getBlockchainIDTests(tb testing.TB, rules cparams.Rules) []precompiletest.P
 				require.NoError(tb, err)
 				return expectedOutput
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:   "getBlockchainID_readOnly",
@@ -105,7 +102,6 @@ func getBlockchainIDTests(tb testing.TB, rules cparams.Rules) []precompiletest.P
 				require.NoError(tb, err)
 				return expectedOutput
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:   "getBlockchainID_insufficient_gas",
@@ -118,7 +114,6 @@ func getBlockchainIDTests(tb testing.TB, rules cparams.Rules) []precompiletest.P
 			SuppliedGas: gasConfig.GetBlockchainID - 1,
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
-			Rules:       rules,
 		},
 	}
 }
@@ -131,7 +126,7 @@ func BenchmarkGetBlockchainID(b *testing.B) {
 	runBenchmarks(b, getBlockchainIDTests)
 }
 
-func sendWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest {
+func sendWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompileTest {
 	callerAddr := common.HexToAddress("0x0123")
 
 	defaultSnowCtx := snowtest.Context(tb, snowtest.CChainID)
@@ -152,8 +147,7 @@ func sendWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.P
 	)
 	require.NoError(tb, err)
 
-	gasConfig := CurrentGasConfig(rules)
-	return []precompiletest.PrecompileTest{
+	return []precompileTest{
 		{
 			Name:        "send_warp_message_readOnly",
 			Caller:      callerAddr,
@@ -161,7 +155,6 @@ func sendWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.P
 			SuppliedGas: gasConfig.SendWarpMessageCost(len(sendWarpMessageInput[4:])),
 			ReadOnly:    true,
 			ExpectedErr: vm.ErrWriteProtection,
-			Rules:       rules,
 		},
 		{
 			Name:        "send_warp_message_insufficient_gas_for_first_step",
@@ -170,7 +163,6 @@ func sendWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.P
 			SuppliedGas: gasConfig.SendWarpMessageBase - 1,
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
-			Rules:       rules,
 		},
 		{
 			Name:        "send_warp_message_insufficient_gas_for_payload_bytes",
@@ -179,7 +171,6 @@ func sendWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.P
 			SuppliedGas: gasConfig.SendWarpMessageCost(len(sendWarpMessageInput[4:])) - 1,
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas,
-			Rules:       rules,
 		},
 		{
 			Name:   "send_warp_message_invalid_input",
@@ -190,7 +181,6 @@ func sendWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.P
 			SuppliedGas: gasConfig.SendWarpMessageBase,
 			ReadOnly:    false,
 			ExpectedErr: ErrInvalidSendInput,
-			Rules:       rules,
 		},
 		{
 			Name:        "send_warp_message_success",
@@ -228,7 +218,6 @@ func sendWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.P
 				require.Equal(t, unsignedWarpMsg.SourceChainID, blockchainID)
 				require.Equal(t, addressedPayload.Payload, sendWarpMessagePayload)
 			},
-			Rules: rules,
 		},
 	}
 }
@@ -241,7 +230,7 @@ func BenchmarkSendWarpMessage(b *testing.B) {
 	runBenchmarks(b, sendWarpMessageTests)
 }
 
-func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest {
+func getVerifiedWarpMessageTests(tb testing.TB, gasConfig GasConfig) []precompileTest {
 	networkID := uint32(54321)
 	callerAddr := common.HexToAddress("0x0123")
 	sourceAddress := common.HexToAddress("0x456789")
@@ -273,8 +262,7 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 	// Invalid packing by corrupting a valid packed message
 	malformedPacked := message.Packed{{}}
 
-	gasConfig := CurrentGasConfig(rules)
-	return []precompiletest.PrecompileTest{
+	return []precompileTest{
 		{
 			Name:         "get_message_success",
 			Caller:       callerAddr,
@@ -294,7 +282,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 				require.NoError(tb, err)
 				return res
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:   "get_message_out_of_bounds_non_zero_index",
@@ -312,7 +299,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 				require.NoError(tb, err)
 				return res
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:   "get_message_success_non_zero_index",
@@ -338,7 +324,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 				require.NoError(tb, err)
 				return res
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:   "get_message_failure_non_zero_index",
@@ -357,7 +342,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 				require.NoError(tb, err)
 				return res
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:        "get_non_existent_message",
@@ -370,7 +354,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 				require.NoError(tb, err)
 				return res
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:         "get_message_success_readOnly",
@@ -391,7 +374,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 				require.NoError(tb, err)
 				return res
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:        "get_non_existent_message_readOnly",
@@ -404,7 +386,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 				require.NoError(tb, err)
 				return res
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:         "get_message_out_of_gas_for_base_cost",
@@ -414,7 +395,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageBase - 1,
 			ReadOnly:     false,
 			ExpectedErr:  vm.ErrOutOfGas,
-			Rules:        rules,
 		},
 		{
 			Name:         "get_message_out_of_gas",
@@ -424,7 +404,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)) - 1,
 			ReadOnly:     false,
 			ExpectedErr:  vm.ErrOutOfGas,
-			Rules:        rules,
 		},
 		{
 			Name:         "get_message_invalid_packing",
@@ -434,7 +413,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(malformedPacked)),
 			ReadOnly:     false,
 			ExpectedErr:  ErrInvalidPacked,
-			Rules:        rules,
 		},
 		{
 			Name:         "get_message_invalid_warp_message",
@@ -444,7 +422,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedInvalidWarpMsg)),
 			ReadOnly:     false,
 			ExpectedErr:  ErrInvalidWarpMsg,
-			Rules:        rules,
 		},
 		{
 			Name:         "get_message_invalid_addressed_payload",
@@ -454,7 +431,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedInvalidAddressed)),
 			ReadOnly:     false,
 			ExpectedErr:  ErrInvalidAddressedPayload,
-			Rules:        rules,
 		},
 		{
 			Name:   "get_message_index_invalid_uint32",
@@ -465,7 +441,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
-			Rules:       rules,
 		},
 		{
 			Name:   "get_message_index_invalid_int32",
@@ -478,7 +453,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
-			Rules:       rules,
 		},
 		{
 			Name:   "get_message_index_invalid_input_bytes",
@@ -491,7 +465,6 @@ func getVerifiedWarpMessageTests(tb testing.TB, rules cparams.Rules) []precompil
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
-			Rules:       rules,
 		},
 	}
 }
@@ -504,7 +477,7 @@ func BenchmarkGetVerifiedWarpMessage(b *testing.B) {
 	runBenchmarks(b, getVerifiedWarpMessageTests)
 }
 
-func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precompiletest.PrecompileTest {
+func getVerifiedWarpBlockHashTests(tb testing.TB, gasConfig GasConfig) []precompileTest {
 	networkID := uint32(54321)
 	callerAddr := common.HexToAddress("0x0123")
 	sourceChainID := ids.GenerateTestID()
@@ -532,8 +505,7 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 	// Invalid packing by corrupting a valid packed message
 	malformedPacked := message.Packed{{}}
 
-	gasConfig := CurrentGasConfig(rules)
-	return []precompiletest.PrecompileTest{
+	return []precompileTest{
 		{
 			Name:         "get_message_success",
 			Caller:       callerAddr,
@@ -552,7 +524,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 				require.NoError(tb, err)
 				return res
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:   "get_message_out_of_bounds_non_zero_index",
@@ -570,7 +541,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 				require.NoError(tb, err)
 				return res
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:   "get_message_success_non_zero_index",
@@ -595,7 +565,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 				require.NoError(tb, err)
 				return res
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:   "get_message_failure_non_zero_index",
@@ -614,7 +583,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 				require.NoError(tb, err)
 				return res
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:        "get_non_existent_message",
@@ -627,7 +595,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 				require.NoError(tb, err)
 				return res
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:         "get_message_success_readOnly",
@@ -647,7 +614,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 				require.NoError(tb, err)
 				return res
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:        "get_non_existent_message_readOnly",
@@ -660,7 +626,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 				require.NoError(tb, err)
 				return res
 			}(),
-			Rules: rules,
 		},
 		{
 			Name:         "get_message_out_of_gas_for_base_cost",
@@ -670,7 +635,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageBase - 1,
 			ReadOnly:     false,
 			ExpectedErr:  vm.ErrOutOfGas,
-			Rules:        rules,
 		},
 		{
 			Name:         "get_message_out_of_gas",
@@ -680,7 +644,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedWarpMessage)) - 1,
 			ReadOnly:     false,
 			ExpectedErr:  vm.ErrOutOfGas,
-			Rules:        rules,
 		},
 		{
 			Name:         "get_message_invalid_packing",
@@ -690,7 +653,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(malformedPacked)),
 			ReadOnly:     false,
 			ExpectedErr:  ErrInvalidPacked,
-			Rules:        rules,
 		},
 		{
 			Name:         "get_message_invalid_warp_message",
@@ -700,7 +662,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedInvalidWarpMsg)),
 			ReadOnly:     false,
 			ExpectedErr:  ErrInvalidWarpMsg,
-			Rules:        rules,
 		},
 		{
 			Name:         "get_message_invalid_block_hash_payload",
@@ -710,7 +671,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 			SuppliedGas:  gasConfig.GetVerifiedWarpMessageCost(len(packedInvalidHash)),
 			ReadOnly:     false,
 			ExpectedErr:  ErrInvalidBlockHashPayload,
-			Rules:        rules,
 		},
 		{
 			Name:   "get_message_index_invalid_uint32",
@@ -721,7 +681,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
-			Rules:       rules,
 		},
 		{
 			Name:   "get_message_index_invalid_int32",
@@ -734,7 +693,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
-			Rules:       rules,
 		},
 		{
 			Name:   "get_message_invalid_index_input_bytes",
@@ -747,7 +705,6 @@ func getVerifiedWarpBlockHashTests(tb testing.TB, rules cparams.Rules) []precomp
 			SuppliedGas: gasConfig.GetVerifiedWarpMessageBase,
 			ReadOnly:    false,
 			ExpectedErr: ErrInvalidIndexInput,
-			Rules:       rules,
 		},
 	}
 }

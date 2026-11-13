@@ -14,8 +14,6 @@ var (
 	ErrInvalidSendInput        = errInvalidSendInput
 	ErrInvalidWarpMsg          = errInvalidWarpMsg
 	ErrInvalidWarpMsgPayload   = errInvalidWarpMsgPayload
-
-	GraniteGasConfig = graniteGasConfig
 )
 
 func (g GasConfig) GetVerifiedWarpMessageCost(chunks int) uint64 {

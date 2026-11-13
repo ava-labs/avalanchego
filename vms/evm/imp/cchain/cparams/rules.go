@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
@@ -23,10 +22,7 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-var (
-	_ ethparams.RulesHooks   = Rules{}
-	_ precompileconfig.Rules = Rules{} // TODO(alarso16): Delete implementation.
-)
+var _ ethparams.RulesHooks = Rules{}
 
 // Rules defines the activation status of various Avalanche network
 // upgrades.
@@ -41,14 +37,6 @@ type Rules struct {
 	IsGranite          bool
 	IsHelicon          bool
 	IsIgloo            bool
-}
-
-func (r Rules) IsGraniteActivated() bool {
-	return r.IsGranite
-}
-
-func (r Rules) IsDurangoActivated() bool {
-	return r.IsDurango
 }
 
 func (Rules) CanCreateContract(_ *libevm.AddressContext, gas uint64, _ libevm.StateReader) (uint64, error) {
@@ -81,18 +69,17 @@ var p256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
 
 // AccessListGas computes the intrinsic gas for an access list. Once Warp is
 // active, it calculates gas per-tuple, charging Warp messages by
-// [warp.MessageGas]. Otherwise, it returns override=false to use the
-// default calculation.
+// [warp.GasConfig.MessageGas]. Otherwise, it returns override=false to use
+// the default calculation.
 func (r Rules) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
 	if !r.IsDurango {
 		return 0, false, nil
 	}
-	gas, err := message.AccessListGas(
-		accessList,
-		func(msg message.Packed) (uint64, error) {
-			return warp.MessageGas(msg, r)
-		},
-	)
+	warpGas := warp.PreGraniteGasConfig
+	if r.IsGranite {
+		warpGas = warp.GraniteGasConfig
+	}
+	gas, err := message.AccessListGas(accessList, warpGas.MessageGas)
 	return gas, true, err
 }
 
@@ -166,14 +153,14 @@ var (
 		nativeasset.GenesisContractAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
 		nativeasset.NativeAssetBalanceAddr: makePrecompile(&nativeasset.DeprecatedContract{}),
 		nativeasset.NativeAssetCallAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
-		message.ContractAddress:            makePrecompile(warp.WarpPrecompile),
+		message.ContractAddress:            makePrecompile(warp.NewPrecompile(warp.PreGraniteGasConfig)),
 	}
 
 	precompiledContractsGranite = map[common.Address]vm.PrecompiledContract{
 		nativeasset.GenesisContractAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
 		nativeasset.NativeAssetBalanceAddr: makePrecompile(&nativeasset.DeprecatedContract{}),
 		nativeasset.NativeAssetCallAddr:    makePrecompile(&nativeasset.DeprecatedContract{}),
-		message.ContractAddress:            makePrecompile(warp.WarpPrecompile),
+		message.ContractAddress:            makePrecompile(warp.NewPrecompile(warp.GraniteGasConfig)),
 		p256VerifyAddress:                  &vm.P256Verify{},
 	}
 )
@@ -194,7 +181,6 @@ var _ contract.Environment = (*environment)(nil)
 type environment struct {
 	vm.PrecompileEnvironment
 	warpResults message.BlockResults
-	rules       *Rules
 }
 
 func newEnvironment(env vm.PrecompileEnvironment) (*environment, error) {
@@ -210,16 +196,11 @@ func newEnvironment(env vm.PrecompileEnvironment) (*environment, error) {
 	return &environment{
 		PrecompileEnvironment: env,
 		warpResults:           customtypes.PredicateResults(env.BlockHeader(), predicateBytes),
-		rules:                 rules,
 	}, nil
 }
 
 func (e *environment) Caller() common.Address {
 	return e.Addresses().EVMSemantic.Caller
-}
-
-func (e *environment) ExtraRules() precompileconfig.Rules {
-	return e.rules
 }
 
 func (e *environment) SnowContext() *snow.Context {
