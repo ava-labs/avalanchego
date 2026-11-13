@@ -6,6 +6,7 @@
 
 ### APIs
 
+- Added an `Rpc-Error-Codes` header to C-Chain `/rpc` responses with the count of each JSON-RPC error code in the response, e.g. `-32601;count=1, 3;count=2`.
 - Removed:
   - `platform.getBalance`
   - `platform.getStake`
