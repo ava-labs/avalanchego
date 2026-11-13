@@ -962,8 +962,22 @@ func getGenesisData(v *viper.Viper, networkID uint32, stakingCfg *genesis.Stakin
 	return genesis.FromConfig(config)
 }
 
-func getTrackedSubnets(v *viper.Viper) (set.Set[ids.ID], error) {
+func getTrackedSubnets(v *viper.Viper) (set.Set[ids.ID], bool, error) {
 	trackSubnetsStr := v.GetString(TrackSubnetsKey)
+	trackedSubnets, err := processTrackedSubnets(trackSubnetsStr)
+	if err != nil {
+		return nil, false, err
+	}
+	if trackedSubnets.Len() > 0 {
+		return trackedSubnets, false, nil
+	}
+	// Else, fallback to only-sync-subnets if track-subnets is not set
+	onlySyncSubnetsStr := v.GetString(OnlySyncSubnetsKey)
+	trackedSubnets, err = processTrackedSubnets(onlySyncSubnetsStr)
+	return trackedSubnets, trackedSubnets.Len() > 0, err
+}
+
+func processTrackedSubnets(trackSubnetsStr string) (set.Set[ids.ID], error) {
 	trackSubnetsStrs := strings.Split(trackSubnetsStr, ",")
 	trackedSubnetIDs := set.NewSet[ids.ID](len(trackSubnetsStrs))
 	for _, subnet := range trackSubnetsStrs {
@@ -1408,9 +1422,13 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	}
 
 	// Tracked Subnets
-	nodeConfig.TrackedSubnets, err = getTrackedSubnets(v)
+	var onlySyncSubnetsActivated bool
+	nodeConfig.TrackedSubnets, onlySyncSubnetsActivated, err = getTrackedSubnets(v)
 	if err != nil {
 		return node.Config{}, err
+	}
+	if onlySyncSubnetsActivated {
+		nodeConfig.StakingConfig.PartialSyncPrimaryNetwork = onlySyncSubnetsActivated
 	}
 
 	// HTTP APIs
