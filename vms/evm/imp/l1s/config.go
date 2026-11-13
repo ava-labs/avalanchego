@@ -72,6 +72,7 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	if err := saeconfig.Parse(snowCtx.Log, b, &c); err != nil {
 		return config{}, err
 	}
+	// TODO: Remove deprecated config handling after Igloo is activated.
 	if err := c.applyDeprecated(snowCtx.Log, b); err != nil {
 		return config{}, err
 	}
