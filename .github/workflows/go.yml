@@ -3,49 +3,68 @@ name: Go Test Jobs
 on:
   workflow_call:
 
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
   setup-cache-darwin-arm64:
+    permissions:
+      contents: read
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-go-workflow-cache-producer
 
   setup-cache-linux-amd64:
+    permissions:
+      contents: read
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-go-workflow-cache-producer
 
   build-antithesis-images-avalanchego:
+    permissions:
+      contents: read
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Check image build for avalanchego test setup
         uses: ./.github/actions/run-docker-with-disk-space
         with:
           run: ./scripts/run_task.sh test-build-antithesis-images-avalanchego
 
   build-antithesis-images-subnet-evm:
+    permissions:
+      contents: read
     needs: setup-cache-linux-amd64
     # Use a faster runner pending migration to bazel. The default free runners result
     # in 20+ minute runtime, slowing down every PR and merge queue CI run.
     runs-on: ubuntu-24.04-amd64-4-core
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Check image build for subnet-evm test setup
         uses: ./.github/actions/run-docker-with-disk-space
         with:
           run: ./scripts/run_task.sh test-build-antithesis-images-subnet-evm
 
   build-image-avalanchego:
+    permissions:
+      contents: read
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Check image build
         uses: ./.github/actions/run-docker-with-disk-space
         with:
@@ -55,10 +74,14 @@ jobs:
           run: ./scripts/run_task.sh test-build-image
 
   build-image-subnet-evm:
+    permissions:
+      contents: read
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Check image build
         uses: ./.github/actions/run-docker-with-disk-space
         with:
@@ -69,6 +92,8 @@ jobs:
           working_directory: ./graft/subnet-evm
 
   checks:
+    permissions:
+      contents: read
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
@@ -76,6 +101,8 @@ jobs:
         shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       # The dev shell provides the generators and restores the Go module cache.
       - uses: ./.github/actions/install-nix
 
@@ -148,6 +175,8 @@ jobs:
           fi
 
   e2e:
+    permissions:
+      contents: read
     needs: setup-cache-linux-amd64
     name: e2e (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -159,6 +188,8 @@ jobs:
         os: [ubuntu-24.04-amd64-4-core]
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -175,6 +206,8 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   e2e-bootstrap-monitor:
+    permissions:
+      contents: read
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
@@ -182,6 +215,8 @@ jobs:
         shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/ensure-disk-space
         with:
           diagnostic-groups: docker
@@ -199,10 +234,14 @@ jobs:
           artifact_name: bootstrap-monitor-kind-diagnostics
 
   e2e-kube:
+    permissions:
+      contents: read
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh test-e2e-kube-ci
@@ -219,16 +258,22 @@ jobs:
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   fuzz:
+    permissions:
+      contents: read
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-go-for-project
       - name: test-fuzz
         shell: bash
         run: ./scripts/run_task.sh test-fuzz
 
   lint-avalanchego:
+    permissions:
+      contents: read
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
@@ -236,6 +281,8 @@ jobs:
         shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       # Bazel is required by lint-all-ci since it runs check-go-mod-tidy, which
       # invokes `bazelisk mod tidy`. Since preparation of Bazel dependencies may
       # involve downloading Go modules, it needs to happen before install-nix disables
@@ -249,6 +296,8 @@ jobs:
         run: ./scripts/run_task.sh lint-all-ci
 
   lint-coreth:
+    permissions:
+      contents: read
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
@@ -257,6 +306,8 @@ jobs:
         working-directory: ./graft/coreth
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/install-nix
       - name: Run all lint checks
         run: ./scripts/run_task.sh lint-all-ci
@@ -264,6 +315,8 @@ jobs:
         run: ./scripts/run_task.sh check-go-mod-tidy
 
   lint-evm:
+    permissions:
+      contents: read
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
@@ -271,6 +324,8 @@ jobs:
         working-directory: ./graft/evm
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-go-for-project
       - name: Run all lint checks
         run: ../../scripts/run_task.sh lint-all-ci
@@ -278,6 +333,8 @@ jobs:
         run: ../../scripts/run_task.sh check-go-mod-tidy
 
   lint-subnet-evm:
+    permissions:
+      contents: read
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
@@ -286,6 +343,8 @@ jobs:
         working-directory: ./graft/subnet-evm
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/install-nix
       - name: Run all lint checks
         run: ./scripts/run_task.sh lint-all-ci
@@ -313,6 +372,8 @@ jobs:
   #         loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 
   robustness:
+    permissions:
+      contents: read
     needs: setup-cache-linux-amd64
     runs-on: ubuntu-24.04
     defaults:
@@ -320,6 +381,8 @@ jobs:
         shell: nix develop --command bash -x {0}
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/ensure-disk-space
         with:
           diagnostic-groups: docker
@@ -341,6 +404,8 @@ jobs:
   # Pre-merge CI runs only a smoke test on macOS. The scheduled Go workflow
   # runs the full suite on macOS.
   smoke:
+    permissions:
+      contents: read
     name: darwin-arm64
     needs: setup-cache-darwin-arm64
     uses: ./.github/workflows/go-smoke.yml
@@ -350,6 +415,8 @@ jobs:
     secrets: inherit
 
   unit:
+    permissions:
+      contents: read
     name: linux-amd64
     needs: setup-cache-linux-amd64
     uses: ./.github/workflows/go-unit.yml

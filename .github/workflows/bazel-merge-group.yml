@@ -15,8 +15,7 @@ on:
   merge_group:
     types: [checks_requested]
 
-permissions:
-  contents: read
+permissions: {}
 
 # Cancel ongoing workflow runs if a new one is started
 concurrency:
@@ -25,6 +24,8 @@ concurrency:
 
 jobs:
   unit-and-e2e:
+    permissions:
+      contents: read
     name: linux-amd64
     uses: ./.github/workflows/bazel.yml
     with:
@@ -36,6 +37,8 @@ jobs:
     secrets: inherit
 
   smoke:
+    permissions:
+      contents: read
     name: darwin-arm64
     uses: ./.github/workflows/bazel-smoke.yml
     with:
@@ -44,6 +47,7 @@ jobs:
     secrets: inherit
 
   darwin-arm64-required:
+    permissions: {}
     name: darwin-arm64 / bazel-required
     if: ${{ always() }}
     needs: smoke
@@ -72,6 +76,7 @@ jobs:
           fi
 
   linux-amd64-required:
+    permissions: {}
     name: linux-amd64 / bazel-required
     if: ${{ always() }}
     needs: unit-and-e2e

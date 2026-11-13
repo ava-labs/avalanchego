@@ -19,6 +19,8 @@ on:
       - ".github/packaging/**"
       - ".github/workflows/build-linux-packages.yml"
 
+permissions: {}
+
 jobs:
   build:
     strategy:
@@ -55,6 +57,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
+          persist-credentials: true  # kept: job runs git commands that use the checkout token
 
       # Defense in depth: workflow_dispatch accepts an arbitrary ref, and non-PR
       # events import the real signing key. The overlay below replaces only
@@ -91,6 +94,7 @@ jobs:
         with:
           path: .packaging-overlay
           sparse-checkout: .github/packaging
+          persist-credentials: true  # kept: job runs git commands that use the checkout token
 
       - name: Apply packaging overlay
         if: github.event.inputs.tag

@@ -60,4 +60,4 @@ runs:
       shell: bash
       env:
         TASK_VERSION: ${{ steps.version.outputs.version }}
-      run: ./scripts/setup_task.sh path >> "$GITHUB_PATH"
+      run: ./scripts/setup_task.sh path >> "$GITHUB_PATH" # zizmor: ignore[github-env] path printed by the repo setup_task.sh

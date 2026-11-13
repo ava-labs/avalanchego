@@ -9,11 +9,17 @@ on:
       - master
       - dev
 
+permissions: {}
+
 jobs:
   publish_docker_image:
+    permissions:
+      contents: read
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
       - name: Build and publish Docker images
         uses: ./.github/actions/run-docker-with-disk-space
         with:

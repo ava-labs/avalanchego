@@ -24,8 +24,11 @@ on:
         required: true
         type: string
 
+permissions: {}
+
 jobs:
   antithesis_subnet_evm:
+    permissions: {}
     name: Run Antithesis Subnet-EVM Test Setup
     runs-on: ubuntu-24.04
     steps:
