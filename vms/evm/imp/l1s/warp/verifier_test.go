@@ -32,8 +32,8 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m, goleak.IgnoreCurrent())
 }
 
-// newUptime returns an [uptimetracker.UptimeTracker] tracking a single validator with
-// `validationID` that has been connected for 60 seconds.
+// newUptime returns an [uptimetracker.UptimeTracker] tracking a single
+// validator with `validationID` that has been connected for 60 seconds.
 func newUptime(tb testing.TB, validationID ids.ID) *uptimetracker.UptimeTracker {
 	tb.Helper()
 
