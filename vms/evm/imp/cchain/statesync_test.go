@@ -51,6 +51,7 @@ func newEthTx(tb testing.TB, ethW *saetest.Wallet) *types.Transaction {
 	return ethW.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
 		To:        &to,
 		Gas:       ethparams.TxGas,
+		GasTipCap: big.NewInt(1),
 		GasFeeCap: big.NewInt(ethparams.GWei),
 	})
 }

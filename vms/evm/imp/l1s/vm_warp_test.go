@@ -315,6 +315,7 @@ func (s *l1SUT) sendWarpTx(
 		// the limit must cover well over GasCostPerSignatureVerification.
 		// Mirrors the legacy plugin's warp tests.
 		Gas:        1_000_000,
+		GasTipCap:  big.NewInt(1),
 		GasFeeCap:  big.NewInt(225 * params.GWei),
 		Value:      big.NewInt(0),
 		Data:       txPayload,

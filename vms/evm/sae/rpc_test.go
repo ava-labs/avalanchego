@@ -2093,6 +2093,9 @@ func TestGasUsedHeader(t *testing.T) {
 			req, err := http.NewRequestWithContext(ctx, http.MethodPost, server.URL, bytes.NewReader(marshalJSON(t, tt.body)))
 			require.NoError(t, err, "http.NewRequestWithContext()")
 			req.Header.Set("Content-Type", "application/json")
+			// A timed-out call's handler keeps running, and its connection isn't
+			// read again until it returns. Reusing it would block the next request.
+			req.Close = true
 			resp, err := server.Client().Do(req)
 			require.NoErrorf(t, err, "%T.Do()", server.Client())
 			defer resp.Body.Close()

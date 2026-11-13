@@ -485,6 +485,7 @@ func (s *l1SUT) signTransferTx(t *testing.T, from int, to int, value *big.Int) *
 	return s.ethWallet.SetNonceAndSign(t, from, &types.DynamicFeeTx{
 		To:        &toAddress,
 		Gas:       21_000,
+		GasTipCap: big.NewInt(1),
 		GasFeeCap: big.NewInt(225 * legacyparams.GWei),
 		Value:     value,
 	})
@@ -524,6 +525,7 @@ func (s *l1SUT) signDeployTx(t *testing.T, from int) *types.Transaction {
 	return s.ethWallet.SetNonceAndSign(t, from, &types.DynamicFeeTx{
 		To:        nil, // contract creation
 		Gas:       100_000,
+		GasTipCap: big.NewInt(1),
 		GasFeeCap: big.NewInt(225 * legacyparams.GWei),
 		Data:      minimalDeployInitCode,
 	})
@@ -549,6 +551,7 @@ func (s *l1SUT) signCallTx(t *testing.T, from int, to common.Address, data []byt
 	return s.ethWallet.SetNonceAndSign(t, from, &types.DynamicFeeTx{
 		To:        &to,
 		Gas:       gas,
+		GasTipCap: big.NewInt(1),
 		GasFeeCap: big.NewInt(225 * legacyparams.GWei),
 		Data:      data,
 	})
