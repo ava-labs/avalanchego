@@ -443,6 +443,126 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			wantUptime:      10 * time.Second,
 			wantLastUpdated: time.Time{}.Add(20 * time.Second),
 		},
+		{
+			name: "disconnected validator reactivated",
+			steps: []testStep{
+				{
+					validators: []validators.GetCurrentValidatorOutput{
+						{
+							ValidationID: ids.ID{1},
+							NodeID:       ids.NodeID{1},
+							StartTime:    uint64(time.Time{}.Unix()),
+							IsActive:     false,
+						},
+					},
+				},
+				{
+					timestamp: time.Time{}.Add(10 * time.Second),
+					validators: []validators.GetCurrentValidatorOutput{
+						{
+							ValidationID: ids.ID{1},
+							NodeID:       ids.NodeID{1},
+							StartTime:    uint64(time.Time{}.Unix()),
+							IsActive:     true,
+						},
+					},
+				},
+				{
+					timestamp: time.Time{}.Add(80 * time.Second),
+					validators: []validators.GetCurrentValidatorOutput{
+						{
+							ValidationID: ids.ID{1},
+							NodeID:       ids.NodeID{1},
+							StartTime:    uint64(time.Time{}.Unix()),
+							IsActive:     true,
+						},
+					},
+				},
+			},
+			validationID:    ids.ID{1},
+			wantUptime:      0, // never connected
+			wantLastUpdated: time.Time{}.Add(80 * time.Second),
+		},
+		{
+			name: "connected node re-registered as inactive validator",
+			steps: []testStep{
+				{
+					connectedValidators: []ids.NodeID{
+						{1},
+					},
+					validators: []validators.GetCurrentValidatorOutput{
+						{
+							ValidationID: ids.ID{1},
+							NodeID:       ids.NodeID{1},
+							StartTime:    uint64(time.Time{}.Unix()),
+							IsActive:     false,
+						},
+					},
+				},
+				{
+					timestamp: time.Time{}.Add(10 * time.Second),
+				},
+				{
+					timestamp: time.Time{}.Add(30 * time.Second),
+					validators: []validators.GetCurrentValidatorOutput{
+						{
+							ValidationID: ids.ID{2},
+							NodeID:       ids.NodeID{1},
+							StartTime:    uint64(time.Time{}.Add(20 * time.Second).Unix()),
+							IsActive:     false,
+						},
+					},
+				},
+			},
+			validationID:    ids.ID{2},
+			wantUptime:      0,
+			wantLastUpdated: time.Time{}.Add(30 * time.Second),
+		},
+		{
+			name: "connected inactive validator re-registered as active",
+			steps: []testStep{
+				{
+					connectedValidators: []ids.NodeID{
+						{1},
+					},
+					validators: []validators.GetCurrentValidatorOutput{
+						{
+							ValidationID: ids.ID{1},
+							NodeID:       ids.NodeID{1},
+							StartTime:    uint64(time.Time{}.Unix()),
+							IsActive:     false,
+						},
+					},
+				},
+				{
+					// The inactive validator is removed.
+				},
+				{
+					validators: []validators.GetCurrentValidatorOutput{
+						{
+							ValidationID: ids.ID{2},
+							NodeID:       ids.NodeID{1},
+							StartTime:    uint64(time.Time{}.Unix()),
+							IsActive:     true,
+						},
+					},
+				},
+				{
+					timestamp: time.Time{}.Add(10 * time.Second),
+					validators: []validators.GetCurrentValidatorOutput{
+						{
+							ValidationID: ids.ID{2},
+							NodeID:       ids.NodeID{1},
+							StartTime:    uint64(time.Time{}.Unix()),
+							IsActive:     true,
+						},
+					},
+				},
+			},
+			validationID:    ids.ID{2},
+			wantUptime:      10 * time.Second,
+			wantLastUpdated: time.Time{}.Add(10 * time.Second),
+		},
 	}
 
 	for _, tt := range tests {
@@ -624,4 +744,50 @@ func TestUptimeTracker_RemoveDisconnectedValidator(t *testing.T) {
 		require.Equalf(t, 20*time.Second, uptime, "%T.GetUptime() uptime of remaining validator", uptimeTracker)
 		require.Equalf(t, start.Add(20*time.Second), lastUpdated, "%T.GetUptime() lastUpdated of remaining validator", uptimeTracker)
 	})
+}
+
+// TestUptimeTracker_RestartWithInactiveValidator ensures that a validator that
+// was inactive before a restart, and is still inactive after it, is not
+// credited with uptime for the downtime between shutdown and restart, and
+// continues to be treated as offline when its node connects.
+func TestUptimeTracker_RestartWithInactiveValidator(t *testing.T) {
+	var (
+		validationID = ids.GenerateTestID()
+		nodeID       = ids.GenerateTestNodeID()
+		subnetID     = ids.GenerateTestID()
+	)
+
+	db := memdb.New()
+	start := time.Time{}
+	clock := &mockable.Clock{}
+	clock.Set(start)
+	validatorState := &validatorstest.State{
+		GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+			return map[ids.ID]*validators.GetCurrentValidatorOutput{
+				validationID: {
+					ValidationID: validationID,
+					StartTime:    uint64(start.Unix()),
+					NodeID:       nodeID,
+					IsActive:     false,
+				},
+			}, 0, nil
+		},
+	}
+	uptimeTracker, err := New(validatorState, subnetID, db, clock)
+	require.NoError(t, err, "New()")
+	require.NoErrorf(t, uptimeTracker.Sync(t.Context()), "%T.Sync()", uptimeTracker)
+	require.NoErrorf(t, uptimeTracker.Shutdown(), "%T.Shutdown()", uptimeTracker)
+
+	// The node is down for an hour before restarting.
+	restart := start.Add(time.Hour)
+	clock.Set(restart)
+	uptimeTracker, err = New(validatorState, subnetID, db, clock)
+	require.NoError(t, err, "New() after restart")
+	require.NoErrorf(t, uptimeTracker.Sync(t.Context()), "%T.Sync() after restart", uptimeTracker)
+	require.NoErrorf(t, uptimeTracker.Connect(nodeID), "%T.Connect(%s)", uptimeTracker, nodeID)
+
+	clock.Set(restart.Add(10 * time.Second))
+	uptime, _, err := uptimeTracker.GetUptime(validationID)
+	require.NoErrorf(t, err, "%T.GetUptime()", uptimeTracker)
+	require.Zerof(t, uptime, "%T.GetUptime() of inactive validator", uptimeTracker)
 }
