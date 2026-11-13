@@ -59,6 +59,13 @@ func TestEqual(t *testing.T) {
 			Other:    rewardmanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
 			Expected: false,
 		},
+		"nil initial config and non-nil initial config": {
+			Config: rewardmanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, nil),
+			Other: rewardmanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &rewardmanager.InitialRewardConfig{
+				AllowFeeRecipients: true,
+			}),
+			Expected: false,
+		},
 		"different initial config": {
 			Config: rewardmanager.NewConfig(utils.PointerTo[uint64](3), admins, nil, nil, &rewardmanager.InitialRewardConfig{
 				RewardAddress: common.HexToAddress("0x01"),

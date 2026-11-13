@@ -108,12 +108,13 @@ func (c *Config) Equal(cfg precompileconfig.Config) bool {
 	}
 
 	if c.InitialRewardConfig != nil {
-		if other.InitialRewardConfig == nil {
-			return false
-		}
+		// InitialRewardConfig.Equal returns false when its argument is nil, so
+		// this also covers the case where only other.InitialRewardConfig is nil.
 		if !c.InitialRewardConfig.Equal(other.InitialRewardConfig) {
 			return false
 		}
+	} else if other.InitialRewardConfig != nil {
+		return false
 	}
 
 	return c.Upgrade.Equal(&other.Upgrade) && c.AllowListConfig.Equal(&other.AllowListConfig)
