@@ -61,7 +61,7 @@ func newHooks(
 	now func() time.Time,
 	desired saeconfig.Desired,
 	warpStorage *saewarp.Storage,
-	configuredCoinbase common.Address,
+	coinbase common.Address,
 	metrics *metrics.Metrics,
 ) *hooks {
 	return &hooks{
@@ -70,7 +70,8 @@ func newHooks(
 			chainConfig: chainConfig,
 			now:         now,
 			desired:     desired,
-			coinbase:    configuredCoinbase,
+			coinbase:    coinbase,
+			building:    true,
 		},
 		warpStorage: warpStorage,
 		metrics:     metrics,
@@ -90,8 +91,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hookadaptor.BlockBuilder, er
 			TargetExponent: (*dynamic.TargetExponent)(headerExtra.TargetExcess),
 			DelayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 		},
-		coinbase:   header.Coinbase, // override with received block's Coinbase
-		rebuilding: true,
+		coinbase: header.Coinbase, // override with received block's Coinbase
 	}, nil
 }
 
@@ -344,8 +344,8 @@ type builder struct {
 	// header. See [hooks.BlockRebuilderFrom] for the determinism
 	// rationale.
 	coinbase common.Address
-	// rebuilding is true iff the builder rebuilds a received block.
-	rebuilding bool
+	// building is true iff the builder is building original blocks.
+	building bool
 }
 
 var (
@@ -523,8 +523,8 @@ func (b *builder) resolveCoinbase(settledRules ethparams.Rules, worstCaseState l
 // customCoinbase returns [builder.coinbase], warning if it burns the fees of a
 // block built by this node.
 func (b *builder) customCoinbase() common.Address {
-	if !b.rebuilding && b.coinbase == blackhole.Address {
-		b.ctx.Log.Warn(`burning fees of a block built by this node, although the chain allows claiming them; set "fee-recipient" to claim them`)
+	if b.building && b.coinbase == blackhole.Address {
+		b.ctx.Log.Warn(`burning priority fees; set "fee-recipient" to claim them`)
 	}
 	return b.coinbase
 }
