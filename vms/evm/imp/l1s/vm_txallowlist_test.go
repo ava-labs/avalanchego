@@ -22,6 +22,7 @@ import (
 
 	legacyparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // TestTxAllowListPrecompileUpgradesSAE exercises mid-chain `PrecompileUpgrades`
@@ -86,7 +87,7 @@ func TestTxAllowListPrecompileUpgradesSAE(t *testing.T) {
 	addresses := sut.ethWallet.Addresses()
 	admin := addresses[adminIdx]
 	nonAdmin := addresses[nonAdminIdx]
-	fundValue := new(big.Int).Mul(big.NewInt(legacyparams.Ether), big.NewInt(1000))
+	fundValue := new(big.Int).Mul(big.NewInt(ethparams.Ether), big.NewInt(1000))
 
 	// Step 0: at genesis, the allowlist is enabled with `admin` as the only
 	// allow-listed sender. Latest and finalized agree (no upgrades yet).

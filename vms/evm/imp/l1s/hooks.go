@@ -90,7 +90,8 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hookadaptor.BlockBuilder, er
 			TargetExponent: (*dynamic.TargetExponent)(headerExtra.TargetExcess),
 			DelayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 		},
-		coinbase: header.Coinbase, // override with received block's Coinbase
+		coinbase:   header.Coinbase, // override with received block's Coinbase
+		rebuilding: true,
 	}, nil
 }
 
@@ -343,6 +344,8 @@ type builder struct {
 	// header. See [hooks.BlockRebuilderFrom] for the determinism
 	// rationale.
 	coinbase common.Address
+	// rebuilding is true iff the builder rebuilds a received block.
+	rebuilding bool
 }
 
 var (
@@ -505,14 +508,23 @@ func (b *builder) resolveCoinbase(settledRules ethparams.Rules, worstCaseState l
 	if !legacyparams.GetRulesExtra(settledRules).IsPrecompileEnabled(rewardmanager.ContractAddress) {
 		configExtra := legacyparams.GetExtra(b.chainConfig)
 		if configExtra.AllowFeeRecipients {
-			return b.coinbase
+			return b.customCoinbase()
 		}
 		return blackhole.Address
 	}
 
 	addr, allowFeeRecipients := rewardmanager.GetStoredRewardAddress(worstCaseState)
 	if allowFeeRecipients {
-		return b.coinbase
+		return b.customCoinbase()
 	}
 	return addr
+}
+
+// customCoinbase returns [builder.coinbase], warning if it burns the fees of a
+// block built by this node.
+func (b *builder) customCoinbase() common.Address {
+	if !b.rebuilding && b.coinbase == blackhole.Address {
+		b.ctx.Log.Warn(`burning fees of a block built by this node, although the chain allows claiming them; set "fee-recipient" to claim them`)
+	}
+	return b.coinbase
 }

@@ -159,7 +159,7 @@ func (vm *VM) Initialize(
 		saeConfig.Now,
 		userConfig.Desired(),
 		warpStorage,
-		userConfig.feeRecipient(genesis.Config, snowCtx.Log),
+		userConfig.FeeRecipient,
 		chainMetrics,
 	)
 

@@ -497,7 +497,7 @@ func (s *l1SUT) signTransferTx(t *testing.T, from int, to int, value *big.Int) *
 		To:        &toAddress,
 		Gas:       21_000,
 		GasTipCap: big.NewInt(1),
-		GasFeeCap: big.NewInt(225 * legacyparams.GWei),
+		GasFeeCap: big.NewInt(225 * ethparams.GWei),
 		Value:     value,
 	})
 }
@@ -537,7 +537,7 @@ func (s *l1SUT) signDeployTx(t *testing.T, from int) *types.Transaction {
 		To:        nil, // contract creation
 		Gas:       100_000,
 		GasTipCap: big.NewInt(1),
-		GasFeeCap: big.NewInt(225 * legacyparams.GWei),
+		GasFeeCap: big.NewInt(225 * ethparams.GWei),
 		Data:      minimalDeployInitCode,
 	})
 }
@@ -563,7 +563,7 @@ func (s *l1SUT) signCallTx(t *testing.T, from int, to common.Address, data []byt
 		To:        &to,
 		Gas:       gas,
 		GasTipCap: big.NewInt(1),
-		GasFeeCap: big.NewInt(225 * legacyparams.GWei),
+		GasFeeCap: big.NewInt(225 * ethparams.GWei),
 		Data:      data,
 	})
 }

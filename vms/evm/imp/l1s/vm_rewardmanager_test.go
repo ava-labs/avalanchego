@@ -24,6 +24,7 @@ import (
 
 	legacyparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // blockBuildAdvance must exceed ACP-226's minDelay (~2s at initial delay excess).
@@ -37,7 +38,7 @@ const rewardManagerCallGas = 100_000
 
 // tipPerGas: only the priority fee is credited to `header.Coinbase`; base
 // fee is burned independently. Pick non-zero so credits are observable.
-var tipPerGas = big.NewInt(1 * legacyparams.GWei)
+var tipPerGas = big.NewInt(1 * ethparams.GWei)
 
 // expectedTipCredit is the credit a fee recipient gains per tipped 21_000-gas transfer.
 var expectedTipCredit = new(big.Int).Mul(big.NewInt(21_000), tipPerGas)
@@ -52,7 +53,7 @@ func signTippedTransferTxTo(t *testing.T, sut *l1SUT, from int, to common.Addres
 	return sut.ethWallet.SetNonceAndSign(t, from, &types.DynamicFeeTx{
 		To:        &to,
 		Gas:       21_000,
-		GasFeeCap: big.NewInt(225 * legacyparams.GWei),
+		GasFeeCap: big.NewInt(225 * ethparams.GWei),
 		GasTipCap: tipPerGas,
 		Value:     value,
 	})
