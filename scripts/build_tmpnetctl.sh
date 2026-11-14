@@ -9,7 +9,6 @@ source "$AVALANCHE_PATH"/scripts/constants.sh
 source "$AVALANCHE_PATH"/scripts/git_commit.sh
 
 echo "Building tmpnetctl..."
-go build -ldflags\
-   "-X github.com/ava-labs/avalanchego/version.GitCommit=$git_commit $static_ld_flags"\
+go build -ldflags "${go_ldflags}"\
    -o "$AVALANCHE_PATH/build/tmpnetctl"\
    "$AVALANCHE_PATH/tests/fixture/tmpnet/tmpnetctl/"*.go
