@@ -9,7 +9,7 @@ import (
 	"encoding/asn1"
 	"fmt"
 
-	"github.com/ava-labs/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
 )
 
 var _ common.Block = (*Block)(nil)

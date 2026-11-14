@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 	"github.com/ava-labs/avalanchego/utils/set"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
+	simplexcommon "github.com/ava-labs/avalanchego/graft/simplex/common"
 )
 
 var testSimplexMessage = simplexcommon.Message{
