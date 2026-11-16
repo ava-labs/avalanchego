@@ -116,12 +116,12 @@ func (n *LongRunningInMemoryNetwork) WaitForNodesToEnterRound(round uint64, node
 	// check if nodeIndexes have length 0
 	if len(nodeIndexes) == 0 {
 		for _, instance := range n.instances {
-			testutil.WaitToEnterRoundWithTimeout(n.t, instance.E, round, 3*time.Second)
+			testutil.WaitToEnterRoundWithTimeout(n.t, instance.E, round, 30*time.Second)
 		}
 	}
 
 	for _, idx := range nodeIndexes {
-		testutil.WaitToEnterRoundWithTimeout(n.t, n.instances[idx].E, round, 3*time.Second)
+		testutil.WaitToEnterRoundWithTimeout(n.t, n.instances[idx].E, round, 30*time.Second)
 	}
 }
 

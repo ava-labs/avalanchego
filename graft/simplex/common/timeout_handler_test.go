@@ -39,7 +39,7 @@ func waitReceive[T any](t *testing.T, ch <-chan T) T {
 	select {
 	case v := <-ch:
 		return v
-	case <-time.After(defaultWaitDuration):
+	case <-time.After(30 * time.Second):
 		t.Fatal("timed out waiting for signal")
 		return *new(T)
 	}

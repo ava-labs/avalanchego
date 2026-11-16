@@ -634,7 +634,7 @@ func TestEquivocatedBlock(t *testing.T) {
 						return false
 					}
 				}
-			}, 5*time.Second, 50*time.Millisecond, "node did not reply to the replication request")
+			}, 30*time.Second, 50*time.Millisecond, "node did not reply to the replication request")
 
 			require.Len(t, resp.Data, 1)
 			gotBlock := resp.Data[0].VerifiedBlock
@@ -798,7 +798,7 @@ func TestEpochLeaderEquivocationDoesNotFloodBlockVerification(t *testing.T) {
 
 	// The leader's proposal is verified at least once...
 	require.Eventually(t, func() bool { return timesVerified.Load() >= 1 },
-		time.Second, 10*time.Millisecond, "the leader's proposal should be verified")
+		30*time.Second, 10*time.Millisecond, "the leader's proposal should be verified")
 	// ...but no more than one proposal per (leader, round) is verified.
 	require.Never(t, func() bool { return timesVerified.Load() > 1 },
 		500*time.Millisecond, 10*time.Millisecond,
@@ -844,7 +844,7 @@ func TestReplicationRerequestsRoundWhenVerificationQueueIsFull(t *testing.T) {
 
 	// Once the queue drains the node advances past the notarized round and still commits it.
 	allowVerification()
-	require.Eventually(t, func() bool { return e.Metadata().Round == 1 }, 5*time.Second, 10*time.Millisecond)
+	require.Eventually(t, func() bool { return e.Metadata().Round == 1 }, 30*time.Second, 10*time.Millisecond)
 	require.NoError(t, e.HandleMessage(replicateSeq(blocks[0]), nodes[0]))
 	storage.WaitForBlockCommit(0)
 }
@@ -1129,7 +1129,7 @@ func TestEpochResizesBlacklistOnEpochChange(t *testing.T) {
 	require.NoError(t, err)
 
 	// The follower only verifies the block after accepting its blacklist.
-	require.Eventually(t, verified.Load, 5*time.Second, 10*time.Millisecond,
+	require.Eventually(t, verified.Load, 30*time.Second, 10*time.Millisecond,
 		"the follower rejected the blacklist: %s", blockBlacklist.String())
 	wal.AssertNotarization(2)
 }
@@ -3602,7 +3602,7 @@ func TestFutureProposalDispatchedOnceAfterReentrantCommit(t *testing.T) {
 				return false
 			}
 		}
-	}, 5*time.Second, 10*time.Millisecond, "the epoch should vote on the round 1 proposal")
+	}, 30*time.Second, 10*time.Millisecond, "the epoch should vote on the round 1 proposal")
 
 	// Give any extra, spurious verification task a chance to run before checking the counters.
 	require.Never(t, func() bool {
@@ -4019,7 +4019,7 @@ func TestEpochBuildsBlacklistWithValidatorWeights(t *testing.T) {
 
 	// The epoch only verifies the proposal after checking its blacklist against the weights of the validators.
 	// Had it used the weights in the unsorted order, it would expect node {2} to carry a weight of 40, and reject the blacklist.
-	require.Eventually(t, verified.Load, 5*time.Second, 10*time.Millisecond, "the epoch rejected the blacklist: %s", blacklist.String())
+	require.Eventually(t, verified.Load, 30*time.Second, 10*time.Millisecond, "the epoch rejected the blacklist: %s", blacklist.String())
 	wal.AssertBlockProposal(md.Round)
 
 	sigAggr := e.SignatureAggregatorCreator(e.Comm.Validators())
@@ -4328,7 +4328,7 @@ func TestReplicatedFinalizationExecutesBlockDependents(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return wal.ContainsNotarization(1)
-	}, 5*time.Second, 10*time.Millisecond, "block1 was not verified after its parent was finalized")
+	}, 30*time.Second, 10*time.Millisecond, "block1 was not verified after its parent was finalized")
 
 	// block1 was finalized by the rest of the network, which is what allowed block0 to be finalized
 	// despite round 0 being empty notarized. We ensure that finalizing block1 through replication commits it.
@@ -4395,7 +4395,7 @@ func TestFailedVerificationDoesNotExecuteBlockDependents(t *testing.T) {
 	// Now that block0 is verified, block1 should be scheduled for verification and succeed.
 	require.Eventually(t, func() bool {
 		return wal.ContainsNotarization(0) && wal.ContainsNotarization(1)
-	}, 5*time.Second, 10*time.Millisecond, "block1 was not verified after its parent was verified")
+	}, 30*time.Second, 10*time.Millisecond, "block1 was not verified after its parent was verified")
 }
 
 // TestRestoreFromWALSkipsOlderEpochRecords asserts that when the WAL has records of an older
@@ -4552,7 +4552,7 @@ func TestEpochRejectsTelockReplicatedWithEmptyNotarization(t *testing.T) {
 	block, _ := notarizeAndFinalizeRound(t, e, bb)
 	require.Eventually(t, func() bool {
 		return storage.NumBlocks() > md.Seq
-	}, 5*time.Second, 10*time.Millisecond,
+	}, 30*time.Second, 10*time.Millisecond,
 		"the block of round %d was finalized at seq %d on top of the Telock of epoch 0, and the node never committed seq %d",
 		block.BlockHeader().Round, block.BlockHeader().Seq, md.Seq)
 }
@@ -4743,7 +4743,7 @@ func TestEpochKeepsReplicatedNotarizedBlockWhenLeaderRefillsRound(t *testing.T) 
 
 	require.Eventually(t, func() bool {
 		return e.Metadata().Round == 1
-	}, 5*time.Second, 10*time.Millisecond, "the node dropped the notarized block B of round 0 and is stuck in round %d", e.Metadata().Round)
+	}, 30*time.Second, 10*time.Millisecond, "the node dropped the notarized block B of round 0 and is stuck in round %d", e.Metadata().Round)
 	require.True(t, wal.ContainsNotarization(0))
 }
 

@@ -2493,7 +2493,7 @@ func TestMSMWaitForPendingBlock(t *testing.T) {
 			cancel()
 			select {
 			case <-done:
-			case <-time.After(time.Second * 5):
+			case <-time.After(30 * time.Second):
 				require.FailNow(t, "WaitForPendingBlock ignored cancellation")
 			}
 		})

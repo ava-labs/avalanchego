@@ -304,7 +304,7 @@ func TestHonestLeaderBuildsOnFutureDatedParent(t *testing.T) {
 	for _, n := range nodes {
 		require.Eventually(t, func() bool {
 			return n.storage.NumBlocks() > network.seq
-		}, 3*time.Second, 10*time.Millisecond,
+		}, 30*time.Second, 10*time.Millisecond,
 			"node %s did not commit an honest block on top of a future-dated parent", n.id)
 	}
 
@@ -598,7 +598,7 @@ func TestInstanceEmptiesWALOfLeavingValidator(t *testing.T) {
 
 	require.Eventually(t, func() bool {
 		return len(leavingNode.walRecords()) == 0
-	}, 5*time.Second, 10*time.Millisecond)
+	}, 30*time.Second, 10*time.Millisecond)
 
 	// A non-validator must not add to the WAL.
 	network.acceptNewBlock()

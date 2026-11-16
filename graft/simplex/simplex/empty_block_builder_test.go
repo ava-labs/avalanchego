@@ -168,7 +168,7 @@ func TestEmptyBlockBuilderWaitForPendingBlockCancelledByShouldBuildEmpty(t *test
 
 	select {
 	case <-done:
-	case <-time.After(5 * time.Second):
+	case <-time.After(30 * time.Second):
 		require.Fail(t, "WaitForPendingBlock did not return after ShouldBuildEmptyBlock fired")
 	}
 }

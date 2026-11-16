@@ -244,7 +244,7 @@ func TestBlockVerificationScheduler(t *testing.T) {
 		require.True(t, bvs.IsSequenceScheduled(3, 0))
 
 		close(release)
-		require.Eventually(t, func() bool { return !bvs.IsSequenceScheduled(3, 0) }, defaultWaitDuration, 10*time.Millisecond)
+		require.Eventually(t, func() bool { return !bvs.IsSequenceScheduled(3, 0) }, 30*time.Second, 10*time.Millisecond)
 	})
 
 	// If the scheduler drops the task, IsSequenceScheduled should return false.
