@@ -59,6 +59,10 @@ const (
 )
 
 var (
+	ErrL1ValidatorSetNotIndexed = errors.New("L1 validator set is not indexed")
+
+	errL1ValidatorSetDuplicateNodeID  = errors.New("L1 validator set contains duplicate nodeID")
+	errL1ValidatorSetInvalidPublicKey = errors.New("L1 validator set contains invalid public key")
 	errValidatorSetAlreadyPopulated   = errors.New("validator set already populated")
 	errIsNotSubnet                    = errors.New("is not a subnet")
 	errMissingPrimaryNetworkValidator = errors.New("missing primary network validator")
@@ -77,6 +81,7 @@ var (
 	ValidatorWeightDiffsByHeightPrefix      = []byte("flatValidatorDiffsByHeight")
 	ValidatorPublicKeyDiffsBySubnetIDPrefix = []byte("flatPublicKeyDiffs")
 	ValidatorPublicKeyDiffsByHeightPrefix   = []byte("flatPublicKeyDiffsByHeight")
+	L1ValidatorSetDiffsPrefix               = []byte("l1ValidatorSetDiffs")
 	TxPrefix                                = []byte("tx")
 	RewardUTXOsPrefix                       = []byte("rewardUTXOs")
 	UTXOPrefix                              = []byte("utxo")
@@ -94,15 +99,16 @@ var (
 	InactivePrefix                          = []byte("inactive")
 	SingletonPrefix                         = []byte("singleton")
 
-	TimestampKey         = []byte("timestamp")
-	FeeStateKey          = []byte("fee state")
-	L1ValidatorExcessKey = []byte("l1Validator excess")
-	AccruedFeesKey       = []byte("accrued fees")
-	CurrentSupplyKey     = []byte("current supply")
-	LastAcceptedKey      = []byte("last accepted")
-	HeightsIndexedKey    = []byte("heights indexed")
-	InitializedKey       = []byte("initialized")
-	BlocksReindexedKey   = []byte("blocks reindexed.3")
+	TimestampKey                    = []byte("timestamp")
+	FeeStateKey                     = []byte("fee state")
+	L1ValidatorExcessKey            = []byte("l1Validator excess")
+	AccruedFeesKey                  = []byte("accrued fees")
+	CurrentSupplyKey                = []byte("current supply")
+	LastAcceptedKey                 = []byte("last accepted")
+	HeightsIndexedKey               = []byte("heights indexed")
+	L1ValidatorSetHeightsIndexedKey = []byte("l1 validator set heights indexed")
+	InitializedKey                  = []byte("initialized")
+	BlocksReindexedKey              = []byte("blocks reindexed.3")
 
 	emptyL1ValidatorCache = &cache.Empty[ids.ID, maybe.Maybe[L1Validator]]{}
 )
@@ -312,6 +318,8 @@ type State struct {
 	validatorPublicKeyDiffsBySubnetIDDB database.Database
 	validatorPublicKeyDiffsByHeightDB   database.Database
 
+	l1ValidatorSetDiffsDB database.Database
+
 	addedTxs map[ids.ID]*txAndStatus            // map of txID -> {*platform.Tx, Status}
 	txCache  cache.Cacher[ids.ID, *txAndStatus] // txID -> {*platform.Tx, Status}; if the entry is nil, it is not in the database
 	txDB     database.Database
@@ -360,17 +368,19 @@ type State struct {
 	lastAccepted, persistedLastAccepted ids.ID
 	// TODO: Remove indexedHeights once v1.11.3 has been released.
 	indexedHeights *heightRange
-	singletonDB    database.Database
+	// l1ValidatorSetIndexedHeights is the most recent contiguous range of
+	// heights whose L1 validator set diffs are written. It always ends at the
+	// last accepted height. It is nil if no height has been indexed since the
+	// node started indexing or since the range was reset.
+	l1ValidatorSetIndexedHeights *heightRange
+	singletonDB                  database.Database
 
 	// pendingWriteOps records the write for each staker mutation, in execution order.
 	pendingWriteOps []pendingWriteOp
 }
 
-// heightRange is used to track which heights are safe to use the native DB
-// iterator for querying validator diffs.
-//
-// TODO: Remove once we are guaranteed nodes can not rollback to not support the
-// new indexing mechanism.
+// heightRange is a contiguous range of heights for which an index has been
+// written.
 type heightRange struct {
 	LowerBound uint64 `serialize:"true"`
 	UpperBound uint64 `serialize:"true"`
@@ -501,6 +511,8 @@ func New(
 	validatorWeightDiffsByHeightDB := prefixdb.New(ValidatorWeightDiffsByHeightPrefix, validatorsDB)
 	validatorPublicKeyDiffsBySubnetIDDB := prefixdb.New(ValidatorPublicKeyDiffsBySubnetIDPrefix, validatorsDB)
 	validatorPublicKeyDiffsByHeightDB := prefixdb.New(ValidatorPublicKeyDiffsByHeightPrefix, validatorsDB)
+
+	l1ValidatorSetDiffsDB := prefixdb.New(L1ValidatorSetDiffsPrefix, validatorsDB)
 
 	weightsCache, err := metercacher.New(
 		"l1_validator_weights_cache",
@@ -695,6 +707,7 @@ func New(
 		validatorWeightDiffsByHeightDB:      validatorWeightDiffsByHeightDB,
 		validatorPublicKeyDiffsBySubnetIDDB: validatorPublicKeyDiffsBySubnetIDDB,
 		validatorPublicKeyDiffsByHeightDB:   validatorPublicKeyDiffsByHeightDB,
+		l1ValidatorSetDiffsDB:               l1ValidatorSetDiffsDB,
 
 		addedTxs: make(map[ids.ID]*txAndStatus),
 		txDB:     prefixdb.New(TxPrefix, baseDB),
@@ -845,6 +858,140 @@ func (s *State) GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*S
 	}
 
 	return legacyStakers, l1Validators, s.currentHeight, nil
+}
+
+// GetL1ValidatorSet returns every L1 validator of subnetID, active or inactive,
+// that existed at targetHeight, with its real NodeID, public key and weight.
+//
+// The set is reconstructed by starting from the persisted L1 validators and
+// applying the L1 validator set diffs from the persisted height down to
+// targetHeight+1. It returns [validators.ErrUnfinalizedHeight] if targetHeight
+// is above the persisted height, and [ErrL1ValidatorSetNotIndexed] if this
+// node didn't write the diffs of every one of those heights.
+//
+// Legacy subnet validators are not included.
+func (s *State) GetL1ValidatorSet(
+	ctx context.Context,
+	targetHeight uint64,
+	subnetID ids.ID,
+) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	// The persisted L1 validators hold the state at the persisted height.
+	persistedHeight, err := s.persistedHeight()
+	if err != nil {
+		return nil, err
+	}
+
+	if targetHeight > persistedHeight {
+		return nil, fmt.Errorf("%w with SubnetID = %s: persisted height (%d) < requested P-Chain height (%d)",
+			validators.ErrUnfinalizedHeight,
+			subnetID,
+			persistedHeight,
+			targetHeight,
+		)
+	}
+	if targetHeight < persistedHeight {
+		// Reaching targetHeight requires the diffs of every height in
+		// (targetHeight, persistedHeight].
+		indexedHeights := s.l1ValidatorSetIndexedHeights
+		if indexedHeights == nil || targetHeight+1 < indexedHeights.LowerBound {
+			return nil, fmt.Errorf("%w at height %d", ErrL1ValidatorSetNotIndexed, targetHeight)
+		}
+	}
+
+	vdrs, err := s.getPersistedL1ValidatorSet(ctx, subnetID)
+	if err != nil {
+		return nil, err
+	}
+
+	diffIter := s.l1ValidatorSetDiffsDB.NewIteratorWithStartAndPrefix(
+		marshalL1ValidatorSetDiffStartKey(subnetID, persistedHeight),
+		subnetID[:],
+	)
+	defer diffIter.Release()
+
+	for diffIter.Next() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		height, validationID, err := unmarshalL1ValidatorSetDiffKey(diffIter.Key())
+		if err != nil {
+			return nil, err
+		}
+		// A diff at height holds the state at height-1, so applying a diff at
+		// or below targetHeight would go past it.
+		if height <= targetHeight {
+			break
+		}
+
+		entry, err := unmarshalL1ValidatorSetDiffValue(diffIter.Value())
+		if err != nil {
+			return nil, err
+		}
+		if entry == nil {
+			delete(vdrs, validationID)
+			continue
+		}
+		vdrs[validationID] = *entry
+	}
+	if err := diffIter.Error(); err != nil {
+		return nil, err
+	}
+
+	validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(vdrs))
+	for _, vdr := range vdrs {
+		if _, ok := validatorSet[vdr.NodeID]; ok {
+			return nil, fmt.Errorf("%w: %s", errL1ValidatorSetDuplicateNodeID, vdr.NodeID)
+		}
+		// Every L1 validator has a public key, so a key that can't be
+		// deserialized means the stored bytes are corrupted.
+		pk := bls.PublicKeyFromValidUncompressedBytes(vdr.PublicKey)
+		if pk == nil {
+			return nil, fmt.Errorf("%w: %s", errL1ValidatorSetInvalidPublicKey, vdr.NodeID)
+		}
+		validatorSet[vdr.NodeID] = &validators.GetValidatorOutput{
+			NodeID:    vdr.NodeID,
+			PublicKey: pk,
+			Weight:    vdr.Weight,
+		}
+	}
+	return validatorSet, nil
+}
+
+// getPersistedL1ValidatorSet returns the persisted L1 validators of subnetID,
+// keyed by validationID.
+func (s *State) getPersistedL1ValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]l1ValidatorSetEntry, error) {
+	validationIDIter := s.subnetIDNodeIDDB.NewIteratorWithPrefix(subnetID[:])
+	defer validationIDIter.Release()
+
+	vdrs := make(map[ids.ID]l1ValidatorSetEntry)
+	for validationIDIter.Next() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		validationID, err := ids.ToID(validationIDIter.Value())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse validation ID: %w", err)
+		}
+
+		vdr, err := s.getPersistedL1Validator(validationID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get L1 validator %s: %w", validationID, err)
+		}
+		vdrs[validationID] = newL1ValidatorSetEntry(vdr)
+	}
+	return vdrs, validationIDIter.Error()
+}
+
+// persistedHeight returns the height of the last accepted block that has been
+// committed to disk.
+func (s *State) persistedHeight() (uint64, error) {
+	blk, err := s.GetStatelessBlock(s.persistedLastAccepted)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get persisted last accepted block %s: %w", s.persistedLastAccepted, err)
+	}
+	return blk.Height(), nil
 }
 
 func (s *State) GetActiveL1ValidatorsIterator() (iterator.Iterator[L1Validator], error) {
@@ -1850,6 +1997,7 @@ func (s *State) syncGenesis(genesisBlk platform.Block, genesis *genesis.Genesis)
 func (s *State) load() error {
 	return errors.Join(
 		s.loadMetadata(),
+		s.loadL1ValidatorSetIndexedHeights(),
 		s.loadExpiry(),
 		s.loadActiveL1Validators(),
 		s.loadCurrentValidators(),
@@ -1927,6 +2075,43 @@ func (s *State) loadMetadata() error {
 		return nil
 	}
 	s.indexedHeights = indexedHeights
+	return nil
+}
+
+// loadL1ValidatorSetIndexedHeights loads the range of heights whose L1 validator
+// set diffs are written.
+//
+// If a block was accepted by a version that doesn't write the diffs, the range
+// no longer ends at the last accepted height and the diffs have a gap. In that
+// case the range is reset and indexing restarts from the next accepted block.
+func (s *State) loadL1ValidatorSetIndexedHeights() error {
+	indexedHeightsBytes, err := s.singletonDB.Get(L1ValidatorSetHeightsIndexedKey)
+	if err == database.ErrNotFound {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	indexedHeights := &heightRange{}
+	if _, err := platform.GenesisCodec.Unmarshal(indexedHeightsBytes, indexedHeights); err != nil {
+		return err
+	}
+
+	// loadMetadata has already loaded persistedLastAccepted.
+	lastAcceptedHeight, err := s.persistedHeight()
+	if err != nil {
+		return err
+	}
+	if indexedHeights.UpperBound != lastAcceptedHeight {
+		s.ctx.Log.Warn("L1 validator set diffs have a gap, resetting the indexed heights",
+			zap.Uint64("lowerBound", indexedHeights.LowerBound),
+			zap.Uint64("upperBound", indexedHeights.UpperBound),
+			zap.Uint64("lastAcceptedHeight", lastAcceptedHeight),
+		)
+		return nil
+	}
+	s.l1ValidatorSetIndexedHeights = indexedHeights
 	return nil
 }
 
@@ -2345,6 +2530,12 @@ func (s *State) initValidatorSets() error {
 func (s *State) write(updateValidators bool, height uint64) error {
 	codecVersion := s.resolveValidatorMetadataCodec()
 
+	// The L1 validator set diffs must be written before the pending writes are
+	// replayed, while the persisted L1 validators still hold the state at the
+	// previous height.
+	if err := s.writeL1ValidatorSetDiffs(height); err != nil {
+		return err
+	}
 	if err := s.replayPendingWriteOps(updateValidators, height); err != nil {
 		return err
 	}
@@ -2410,6 +2601,7 @@ func (s *State) Close() error {
 		s.activeDB.Close(),
 		s.inactiveDB.Close(),
 		s.l1ValidatorsDB.Close(),
+		s.l1ValidatorSetDiffsDB.Close(),
 		s.pendingSubnetValidatorBaseDB.Close(),
 		s.pendingSubnetDelegatorBaseDB.Close(),
 		s.pendingDelegatorBaseDB.Close(),
@@ -2508,6 +2700,14 @@ func (s *State) SetHeight(height uint64) {
 	}
 
 	s.indexedHeights.UpperBound = height
+
+	if s.l1ValidatorSetIndexedHeights == nil {
+		s.l1ValidatorSetIndexedHeights = &heightRange{
+			LowerBound: height,
+		}
+	}
+	s.l1ValidatorSetIndexedHeights.UpperBound = height
+
 	s.currentHeight = height
 }
 
@@ -3064,6 +3264,40 @@ func (s *State) writeL1ValidatorDiff(
 	return nil
 }
 
+// writeL1ValidatorSetDiffs writes, for every L1 validator whose existence or
+// weight changes at height, its state at the previous height.
+//
+// Invariant: must be called before the pending writes are replayed, while the
+// persisted L1 validators still hold the state at the previous height.
+func (s *State) writeL1ValidatorSetDiffs(height uint64) error {
+	for validationID, next := range s.l1ValidatorsDiff.modified {
+		// If the validator did not exist, prev is empty and has zero weight.
+		prev, err := s.getPersistedL1Validator(validationID)
+		if err != nil && err != database.ErrNotFound {
+			return fmt.Errorf("failed to get L1 validator %s: %w", validationID, err)
+		}
+
+		// A validator exists if and only if its weight is non-zero, and its
+		// NodeID and public key never change. So the membership changed if and
+		// only if the weight changed.
+		if prev.Weight == next.Weight {
+			continue
+		}
+
+		var prevEntry *l1ValidatorSetEntry
+		if prev.Weight != 0 {
+			entry := newL1ValidatorSetEntry(prev)
+			prevEntry = &entry
+		}
+
+		key := marshalL1ValidatorSetDiffKey(next.SubnetID, height, validationID)
+		if err := s.l1ValidatorSetDiffsDB.Put(key, marshalL1ValidatorSetDiffValue(prevEntry)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *State) updateL1Validator(
 	prev *L1Validator,
 	next L1Validator,
@@ -3376,6 +3610,15 @@ func (s *State) writeMetadata() error {
 		}
 		if err := s.singletonDB.Put(HeightsIndexedKey, indexedHeightsBytes); err != nil {
 			return fmt.Errorf("failed to write indexed range: %w", err)
+		}
+	}
+	if s.l1ValidatorSetIndexedHeights != nil {
+		indexedHeightsBytes, err := platform.GenesisCodec.Marshal(platform.CodecVersion, s.l1ValidatorSetIndexedHeights)
+		if err != nil {
+			return err
+		}
+		if err := s.singletonDB.Put(L1ValidatorSetHeightsIndexedKey, indexedHeightsBytes); err != nil {
+			return fmt.Errorf("failed to write L1 validator set indexed range: %w", err)
 		}
 	}
 	return nil
