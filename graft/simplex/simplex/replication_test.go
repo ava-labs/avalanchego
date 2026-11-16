@@ -1607,7 +1607,7 @@ func TestReplicationStartsRoundFromFinalization(t *testing.T) {
 
 	// Verify the node sent an empty vote after timeout
 	var foundEmptyVote bool
-	timeout := time.After(30 * time.Second)
+	timeout := time.After(testutil.DefaultTimeout)
 	iteration := 1
 messages:
 	for {
@@ -1729,7 +1729,7 @@ func TestReplicationStartsRoundFromFinalizationWithBlock(t *testing.T) {
 
 	// Verify the node sent an empty vote after timeout
 	var foundEmptyVote bool
-	timeout := time.After(30 * time.Second)
+	timeout := time.After(testutil.DefaultTimeout)
 	iteration := 1
 messages:
 	for {
@@ -1903,7 +1903,7 @@ func TestLeaderStartsRoundAfterReplicatedQuorumRound(t *testing.T) {
 						return false
 					}
 				}
-			}, 30*time.Second, 10*time.Millisecond, "node did not request the missing block for round 0")
+			}, testutil.DefaultTimeout, 10*time.Millisecond, "node did not request the missing block for round 0")
 
 			// Answer the request with the notarized/finalized round 0 through the replication path,
 			// delivering the block together with the notarization/finalization once more.
@@ -1916,7 +1916,7 @@ func TestLeaderStartsRoundAfterReplicatedQuorumRound(t *testing.T) {
 			// The node advances to round 1 off the replicated notarization/finalization.
 			require.Eventually(t, func() bool {
 				return e.Metadata().Round == 1
-			}, 30*time.Second, 10*time.Millisecond, "node did not advance to round 1")
+			}, testutil.DefaultTimeout, 10*time.Millisecond, "node did not advance to round 1")
 
 			// Being the leader of round 1, the node must propose a block.
 			require.Eventually(t, func() bool {
@@ -1931,7 +1931,7 @@ func TestLeaderStartsRoundAfterReplicatedQuorumRound(t *testing.T) {
 						return false
 					}
 				}
-			}, 30*time.Second, 50*time.Millisecond, "leader never proposed a block for round 1 after advancing via a replicated quorum round")
+			}, testutil.DefaultTimeout, 50*time.Millisecond, "leader never proposed a block for round 1 after advancing via a replicated quorum round")
 		})
 	}
 }
@@ -1973,7 +1973,7 @@ func TestLeaderDoesNotRestartRoundAfterReplicatingOlderNotarization(t *testing.T
 	// Wait for the replicated notarization to be processed.
 	require.Eventually(t, func() bool {
 		return wal.ContainsNotarization(0)
-	}, 30*time.Second, 10*time.Millisecond, "node never persisted the replicated notarization for round 0")
+	}, testutil.DefaultTimeout, 10*time.Millisecond, "node never persisted the replicated notarization for round 0")
 	require.Equal(t, uint64(1), e.Metadata().Round)
 
 	// The node must not have halted. A halted node returns its error for any message it handles.

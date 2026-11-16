@@ -1349,7 +1349,7 @@ func TestNodeIsNotSuspectedAfterSigningALaterNotarization(t *testing.T) {
 				return false
 			}
 		}
-	}, 30*time.Second, 10*time.Millisecond, "we never proposed a block for round 4")
+	}, testutil.DefaultTimeout, 10*time.Millisecond, "we never proposed a block for round 4")
 
 	// Only the leaders of rounds 2 and 3 are accused, and not nodes[suspectIndex] for timing out in round 1.
 	parentBlacklist := roundTwoBlock.Blacklist()
