@@ -730,6 +730,10 @@ tasks:
     desc: Runs unified unit tests with race detection and shuffle
     cmd: '{{.NIX_RUN}} bash ./scripts/tests.unit.sh'
 
+  test-simplex-flake-loop:
+    desc: Rerun the simplex unit tests as test-unit-race-shuffle does until one fails or the time budget ends
+    cmd: '{{.NIX_RUN}} ./scripts/run_simplex_flake_loop.sh'
+
   test-unit-script:
     desc: Tests unified unit-test script behavior
     cmd: '{{.NIX_RUN}} ./scripts/test_tests_unit.sh'

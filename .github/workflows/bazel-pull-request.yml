@@ -3,7 +3,7 @@ name: Bazel
 # Keep this workflow separate from bazel-merge-group.yml.
 # This lets bazel-required skip before the shared test workflows complete.
 on:
-  pull_request:
+  workflow_dispatch: # pull_request trigger disabled on this branch: it only runs the simplex flake loop
 
 permissions:
   contents: read

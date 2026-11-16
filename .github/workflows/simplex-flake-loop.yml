@@ -1,0 +1,27 @@
+name: Simplex flake loop
+
+# Temporary: reruns the simplex Go tests the same way the scheduled Go race-shuffle
+# unit job does (go-scheduled.yml, ubuntu-24.04 / test-unit-race-shuffle) until one
+# fails, to capture the full output of a flaky test.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  setup-cache-linux-amd64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-go-workflow-cache-producer
+
+  loop:
+    name: ubuntu-24.04-amd64
+    needs: setup-cache-linux-amd64
+    uses: ./.github/workflows/go-unit.yml
+    with:
+      runner: ubuntu-24.04
+      test_task: test-simplex-flake-loop
+    secrets: inherit

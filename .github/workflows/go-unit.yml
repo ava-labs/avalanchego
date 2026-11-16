@@ -37,7 +37,7 @@ jobs:
               cache_mode=build-and-test-results
               clear_test_results=false
               ;;
-            test-unit:false|test-unit-race-shuffle:false)
+            test-unit:false|test-unit-race-shuffle:false|test-simplex-flake-loop:false)
               cache_mode=build-only
               clear_test_results=true
               ;;

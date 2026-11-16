@@ -8,7 +8,7 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: $0 <all|smoke> [bazel test options...]" >&2
+  echo "Usage: $0 <all|smoke|simplex> [bazel test options...]" >&2
   exit 1
 }
 
@@ -23,6 +23,9 @@ case "$scope" in
     ;;
   smoke)
     query_scope='//ids:ids_test'
+    ;;
+  simplex)
+    query_scope='//graft/simplex/...'
     ;;
   *)
     usage
@@ -40,5 +43,8 @@ done < <(bazelisk query "$query")
   exit 1
 }
 
-export BAZEL_CI_TARGET_PATTERNS="${query_scope}"
+# CI dependency caching is prepared for //..., which covers the simplex subset.
+ci_target_patterns="${query_scope}"
+[[ "${scope}" != "simplex" ]] || ci_target_patterns='//...'
+export BAZEL_CI_TARGET_PATTERNS="${ci_target_patterns}"
 exec "$(dirname "${BASH_SOURCE[0]}")/run_bazel_ci_command.sh" test "$@" "${targets[@]}"

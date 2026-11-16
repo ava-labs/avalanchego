@@ -3,7 +3,7 @@ name: Go
 # Keep this workflow separate from go-merge-group.yml.
 # This lets go-required skip before the shared test workflow completes.
 on:
-  pull_request:
+  workflow_dispatch: # pull_request trigger disabled on this branch: it only runs the simplex flake loop
 
 permissions:
   contents: read

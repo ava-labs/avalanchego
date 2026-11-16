@@ -40,6 +40,10 @@ trap 'rm -f "${package_list_file}"' EXIT
 
 packages=()
 while IFS= read -r package; do
+  # Optionally restrict the run to packages under a prefix (used by the simplex flake loop).
+  if [[ -n "${UNIT_TEST_PACKAGE_PREFIX:-}" && "${package}" != "${UNIT_TEST_PACKAGE_PREFIX}"* ]]; then
+    continue
+  fi
   case "${package}" in
     "${evm_prefix}"|"${evm_prefix}/"*)
       ;;

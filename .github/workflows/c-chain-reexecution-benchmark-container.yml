@@ -1,7 +1,6 @@
 name: C-Chain Re-exec / container
 
 on:
-  pull_request:
   workflow_dispatch:
     inputs:
       test:

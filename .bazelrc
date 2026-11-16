@@ -12,6 +12,8 @@ common --enable_platform_specific_config
 
 # Test settings
 test --test_output=errors
+# Print failing test output in full (default caps it at 1 MiB and skips larger logs).
+test --experimental_ui_max_stdouterr_bytes=-1
 # Per-category timeouts: short,moderate,long,eternal
 # "long" covers graft modules (coreth, evm, subnet-evm) via graft_go_test macro
 test --test_timeout=60,120,900,3600

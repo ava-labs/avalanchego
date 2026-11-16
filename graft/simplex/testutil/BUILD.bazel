@@ -24,6 +24,7 @@ go_library(
         "//graft/simplex/wal",
         "@com_github_stretchr_testify//require",
         "@org_uber_go_zap//:zap",
+        "@org_uber_go_zap//buffer",
         "@org_uber_go_zap//zapcore",
     ],
 )
