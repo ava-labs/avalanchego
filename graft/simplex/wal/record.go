@@ -10,7 +10,8 @@ import (
 	"fmt"
 	"hash/crc64"
 	"io"
-	"math"
+
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 const (
@@ -21,11 +22,15 @@ const (
 var (
 	ErrInvalidCRC      = errors.New("invalid CRC checksum")
 	ErrPayloadTooLarge = errors.New("payload too large for record length field")
+
+	// maxPayloadSize is the largest WAL record payload. It is above
+	// [constants.DefaultMaxMessageSize] to leave plenty of room for the record metadata.
+	maxPayloadSize uint64 = 2 * constants.DefaultMaxMessageSize
 )
 
 // writeRecord writes a length-prefixed and check-summed record to the writer.
 func writeRecord(w io.Writer, payload []byte) error {
-	if uint64(len(payload)) > math.MaxUint32 {
+	if uint64(len(payload)) > maxPayloadSize {
 		return fmt.Errorf("%w: %d bytes", ErrPayloadTooLarge, len(payload))
 	}
 
