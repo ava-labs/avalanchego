@@ -3,68 +3,31 @@
 
 package upgradetest
 
+import "github.com/ava-labs/avalanchego/upgrade"
+
+// Fork is an alias of [upgrade.Upgrade] to reduce the diff when introducing the
+// latter.
+//
+// TODO(arr4n): remove in a dedicated follow-up PR.
+type Fork = upgrade.Upgrade
+
 const (
-	NoUpgrades Fork = iota
-	ApricotPhase1
-	ApricotPhase2
-	ApricotPhase3
-	ApricotPhase4
-	ApricotPhase5
-	ApricotPhasePre6
-	ApricotPhase6
-	ApricotPhasePost6
-	Banff
-	Cortina
-	Durango
-	Etna
-	Fortuna
-	Granite
-	Helicon
-	Igloo
-
-	Latest Fork = iota - 1
+	NoUpgrades        = upgrade.NoUpgrades
+	ApricotPhase1     = upgrade.ApricotPhase1
+	ApricotPhase2     = upgrade.ApricotPhase2
+	ApricotPhase3     = upgrade.ApricotPhase3
+	ApricotPhase4     = upgrade.ApricotPhase4
+	ApricotPhase5     = upgrade.ApricotPhase5
+	ApricotPhasePre6  = upgrade.ApricotPhasePre6
+	ApricotPhase6     = upgrade.ApricotPhase6
+	ApricotPhasePost6 = upgrade.ApricotPhasePost6
+	Banff             = upgrade.Banff
+	Cortina           = upgrade.Cortina
+	Durango           = upgrade.Durango
+	Etna              = upgrade.Etna
+	Fortuna           = upgrade.Fortuna
+	Granite           = upgrade.Granite
+	Helicon           = upgrade.Helicon
+	Igloo             = upgrade.Igloo
+	Latest            = upgrade.Latest
 )
-
-// Fork is an enum of all the major network upgrades.
-type Fork int
-
-func (f Fork) String() string {
-	switch f {
-	case Igloo:
-		return "Igloo"
-	case Helicon:
-		return "Helicon"
-	case Granite:
-		return "Granite"
-	case Fortuna:
-		return "Fortuna"
-	case Etna:
-		return "Etna"
-	case Durango:
-		return "Durango"
-	case Cortina:
-		return "Cortina"
-	case Banff:
-		return "Banff"
-	case ApricotPhasePost6:
-		return "ApricotPhasePost6"
-	case ApricotPhase6:
-		return "ApricotPhase6"
-	case ApricotPhasePre6:
-		return "ApricotPhasePre6"
-	case ApricotPhase5:
-		return "ApricotPhase5"
-	case ApricotPhase4:
-		return "ApricotPhase4"
-	case ApricotPhase3:
-		return "ApricotPhase3"
-	case ApricotPhase2:
-		return "ApricotPhase2"
-	case ApricotPhase1:
-		return "ApricotPhase1"
-	case NoUpgrades:
-		return "NoUpgrades"
-	default:
-		return "Unknown"
-	}
-}
