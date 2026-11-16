@@ -17,6 +17,10 @@ import (
 const (
 	recordSizeLen     = 4
 	recordChecksumLen = 8
+
+	// RecordOverhead is the number of bytes a record occupies on disk in
+	// addition to its payload.
+	RecordOverhead = recordSizeLen + recordChecksumLen
 )
 
 var (
@@ -27,6 +31,11 @@ var (
 	// [constants.DefaultMaxMessageSize] to leave plenty of room for the record metadata.
 	maxPayloadSize uint64 = 2 * constants.DefaultMaxMessageSize
 )
+
+// recordSize returns the number of bytes [payload] occupies on disk once written as a record.
+func recordSize(payload []byte) int {
+	return len(payload) + RecordOverhead
+}
 
 // writeRecord writes a length-prefixed and check-summed record to the writer.
 func writeRecord(w io.Writer, payload []byte) error {
