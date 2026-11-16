@@ -1,0 +1,34 @@
+// Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package cparams
+
+import (
+	"math"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/ava-labs/avalanchego/upgrade"
+)
+
+func TestRules_MinimumGasConsumption(t *testing.T) {
+	tests := []struct {
+		name   string
+		latest upgrade.Upgrade
+		limit  uint64
+		want   uint64
+	}{
+		{"pre_fork_noop", upgrade.Granite, math.MaxUint64, 0},
+		{"post_fork_zero", upgrade.Helicon, 0, 0},
+		{"post_fork_odd_rounds_up", upgrade.Helicon, 3, 2},
+		{"post_fork_tx_gas", upgrade.Helicon, 21_000, 10_500},
+		{"post_fork_max_no_overflow", upgrade.Helicon, math.MaxUint64, 1 << 63},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := Rules{LatestUpgrade: tt.latest}
+			assert.Equalf(t, tt.want, r.MinimumGasConsumption(tt.limit), "%T.MinimumGasConsumption(%d)", r, tt.limit)
+		})
+	}
+}

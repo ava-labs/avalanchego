@@ -65,15 +65,13 @@ type newBlockConfig struct {
 	prev *Block
 	// If round is 0, it will be set to one higher than the prev's round
 	round uint64
-	// genesis nodes
-	numNodes uint64
 }
 
 func newTestBlock(config newBlockConfig) *Block {
 	if config.prev == nil {
 		vm := newTestVM()
 		block := &Block{
-			blacklist: common.NewBlacklist(uint16(config.numNodes), common.GenesisMaxBlacklistedRounds),
+			blacklist: common.NewBlacklist(common.GenesisMaxBlacklistedRounds),
 			vmBlock: &wrappedBlock{
 				Block: snowmantest.Genesis,
 				vm:    vm,

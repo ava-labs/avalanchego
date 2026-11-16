@@ -44,7 +44,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	cchainstate "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/evm/types"
@@ -172,11 +171,11 @@ func targetExponent(config *cparams.ChainConfig, h *types.Header) (dynamic.Targe
 
 	// Synchronous blocks store the target exponent in their ACP-176 fee state.
 	// Only the last one's is used, as the parent of the first SAE block.
-	return customtypes.TargetExponentFromExtra(h.Extra)
+	return cparams.TargetExponentFromExtra(h.Extra)
 }
 
 func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	config := corethparams.GetExtra(h.chainConfig)
+	config := cparams.GetExtra(h.chainConfig)
 	te, err := targetExponent(config, header)
 	if err != nil {
 		te = dynamic.InitialTargetExponent
@@ -242,8 +241,8 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 }
 
 func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
-	c := corethparams.GetExtra(h.chainConfig)
-	r := corethparams.GetRulesExtra(rules)
+	c := cparams.GetExtra(h.chainConfig)
+	r := cparams.GetRulesExtra(rules)
 	if firstDBlock := r.Is(upgrade.Durango) && !c.IsDurango(parent.Time); firstDBlock {
 		activatePrecompile(statedb, corethwarp.ContractAddress)
 	}
@@ -334,7 +333,7 @@ func (h *hooks) VerifyBlockSyntax(b *types.Block) error {
 	// For genesis and pre-ApricotPhase1 blocks, the header's ExtDataHash is
 	// expected to be empty with the actual data expected to be committed to in
 	// [extDataHashes].
-	if height := b.NumberU64(); height == 0 || !corethparams.GetExtra(h.chainConfig).IsApricotPhase1(b.Time()) {
+	if height := b.NumberU64(); height == 0 || !cparams.GetExtra(h.chainConfig).IsApricotPhase1(b.Time()) {
 		wantHash := customtypes.EmptyExtDataHash
 		if want, ok := extDataHashes[h.ctx.NetworkID][height]; ok {
 			wantHash = want
@@ -376,7 +375,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 
 	nowMS := uint64(now.UnixMilli())
 
-	config := corethparams.GetExtra(b.chainConfig)
+	config := cparams.GetExtra(b.chainConfig)
 	te, err := targetExponent(config, parent)
 	if err != nil {
 		return nil, fmt.Errorf("getting target exponent: %w", err)

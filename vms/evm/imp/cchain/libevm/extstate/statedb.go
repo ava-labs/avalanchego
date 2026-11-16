@@ -18,9 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
-
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 )
 
 // RegisterExtras registers the libevm hook that partitions state slots into
@@ -94,7 +93,7 @@ func (s *StateDB) Prepare(
 	precompiles []common.Address,
 	list types.AccessList,
 ) {
-	rulesExtra := corethparams.GetRulesExtra(rules)
+	rulesExtra := cparams.GetRulesExtra(rules)
 	if rulesExtra.Is(upgrade.Durango) {
 		s.warpMessages = warp.MessagesFromAccessList(list)
 	}

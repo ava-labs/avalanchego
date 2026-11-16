@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/stateupgrade"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -100,7 +101,7 @@ type UpgradeConfig struct {
 	NetworkUpgradeOverrides *NetworkUpgrades `json:"networkUpgradeOverrides,omitempty"`
 
 	// Config for modifying state as a network upgrade.
-	StateUpgrades []StateUpgrade `json:"stateUpgrades,omitempty"`
+	StateUpgrades []stateupgrade.Block `json:"stateUpgrades,omitempty"`
 
 	// Config for enabling and disabling precompiles as network upgrades.
 	PrecompileUpgrades []PrecompileUpgrade `json:"precompileUpgrades,omitempty"`
