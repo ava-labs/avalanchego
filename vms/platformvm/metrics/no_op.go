@@ -38,6 +38,12 @@ func (noopMetrics) AddValidatorSetsDuration(time.Duration) {}
 
 func (noopMetrics) AddValidatorSetsHeightDiff(uint64) {}
 
+func (noopMetrics) IncL1ValidatorSetsCreated() {}
+
+func (noopMetrics) IncL1ValidatorSetsCached() {}
+
+func (noopMetrics) AddL1ValidatorSetsDuration(time.Duration) {}
+
 func (noopMetrics) SetLocalStake(uint64) {}
 
 func (noopMetrics) SetLocalDelegatedStake(uint64) {}

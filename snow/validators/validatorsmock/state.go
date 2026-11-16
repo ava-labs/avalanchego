@@ -73,6 +73,21 @@ func (mr *StateMockRecorder) GetCurrentValidatorSet(ctx, subnetID any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentValidatorSet", reflect.TypeOf((*State)(nil).GetCurrentValidatorSet), ctx, subnetID)
 }
 
+// GetL1ValidatorSet mocks base method.
+func (m *State) GetL1ValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetL1ValidatorSet", ctx, height, subnetID)
+	ret0, _ := ret[0].(map[ids.NodeID]*validators.GetValidatorOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetL1ValidatorSet indicates an expected call of GetL1ValidatorSet.
+func (mr *StateMockRecorder) GetL1ValidatorSet(ctx, height, subnetID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetL1ValidatorSet", reflect.TypeOf((*State)(nil).GetL1ValidatorSet), ctx, height, subnetID)
+}
+
 // GetMinimumHeight mocks base method.
 func (m *State) GetMinimumHeight(arg0 context.Context) (uint64, error) {
 	m.ctrl.T.Helper()

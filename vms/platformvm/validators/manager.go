@@ -45,6 +45,10 @@ var (
 	errUnfinalizedHeight = errors.New("failed to fetch validator set at unfinalized height")
 )
 
+// validatorSetCache maps a height to the validator set of a subnet at that
+// height.
+type validatorSetCache = cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
+
 func NewManager(
 	cfg config.Internal,
 	state *state.State,
@@ -52,11 +56,12 @@ func NewManager(
 	clk *mockable.Clock,
 ) *Manager {
 	return &Manager{
-		cfg:     cfg,
-		state:   state,
-		metrics: metrics,
-		clk:     clk,
-		caches:  make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
+		cfg:      cfg,
+		state:    state,
+		metrics:  metrics,
+		clk:      clk,
+		caches:   make(map[ids.ID]validatorSetCache),
+		l1Caches: make(map[ids.ID]validatorSetCache),
 		recentlyAccepted: window.New[ids.ID](
 			window.Config{
 				Clock:   clk,
@@ -80,7 +85,12 @@ type Manager struct {
 	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
 	// Value: cache mapping height -> validator set map
-	caches map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
+	caches map[ids.ID]validatorSetCache
+	// Maps caches of the full L1 validator set for each subnet that is
+	// currently tracked.
+	// Key: Subnet ID
+	// Value: cache mapping height -> L1 validator set map
+	l1Caches map[ids.ID]validatorSetCache
 
 	// sliding window of blocks that were recently accepted
 	recentlyAccepted window.Window[ids.ID]
@@ -192,20 +202,60 @@ func (m *Manager) GetValidatorSet(
 	return maps.Clone(validatorSet), nil
 }
 
-func (m *Manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput] {
+func (m *Manager) getValidatorSetCache(subnetID ids.ID) validatorSetCache {
+	return m.getSubnetCache(m.caches, subnetID)
+}
+
+func (m *Manager) getL1ValidatorSetCache(subnetID ids.ID) validatorSetCache {
+	return m.getSubnetCache(m.l1Caches, subnetID)
+}
+
+func (m *Manager) getSubnetCache(caches map[ids.ID]validatorSetCache, subnetID ids.ID) validatorSetCache {
 	// Only cache tracked subnets
 	if subnetID != constants.PrimaryNetworkID && !m.cfg.TrackedSubnets.Contains(subnetID) {
 		return &cache.Empty[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{}
 	}
 
-	validatorSetsCache, exists := m.caches[subnetID]
+	validatorSetsCache, exists := caches[subnetID]
 	if exists {
 		return validatorSetsCache
 	}
 
 	validatorSetsCache = lru.NewCache[uint64, map[ids.NodeID]*validators.GetValidatorOutput](validatorSetsCacheSize)
-	m.caches[subnetID] = validatorSetsCache
+	caches[subnetID] = validatorSetsCache
 	return validatorSetsCache
+}
+
+// GetL1ValidatorSet returns every L1 validator of subnetID, active or inactive,
+// that existed at targetHeight, with its real NodeID, public key and weight.
+// Unlike [Manager.GetValidatorSet], inactive validators are not merged under
+// [ids.EmptyNodeID], and legacy subnet validators are not included.
+//
+// It returns [validators.ErrUnfinalizedHeight] if targetHeight isn't finalized
+// yet, and [state.ErrL1ValidatorSetNotIndexed] if this node didn't index the
+// heights needed to reconstruct the set at targetHeight.
+func (m *Manager) GetL1ValidatorSet(
+	ctx context.Context,
+	targetHeight uint64,
+	subnetID ids.ID,
+) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	validatorSetsCache := m.getL1ValidatorSetCache(subnetID)
+	if validatorSet, ok := validatorSetsCache.Get(targetHeight); ok {
+		m.metrics.IncL1ValidatorSetsCached()
+		return maps.Clone(validatorSet), nil
+	}
+
+	startTime := m.clk.Time()
+	validatorSet, err := m.state.GetL1ValidatorSet(ctx, targetHeight, subnetID)
+	if err != nil {
+		return nil, err
+	}
+
+	validatorSetsCache.Put(targetHeight, validatorSet)
+
+	m.metrics.IncL1ValidatorSetsCreated()
+	m.metrics.AddL1ValidatorSetsDuration(m.clk.Time().Sub(startTime))
+	return maps.Clone(validatorSet), nil
 }
 
 func (m *Manager) makeAllValidatorSets(

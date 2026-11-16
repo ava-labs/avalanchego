@@ -61,6 +61,13 @@ type Metrics interface {
 	// difference from the top.
 	AddValidatorSetsHeightDiff(uint64)
 
+	// Mark that an L1 validator set was created.
+	IncL1ValidatorSetsCreated()
+	// Mark that an L1 validator set was cached.
+	IncL1ValidatorSetsCached()
+	// Mark that we spent the given time computing L1 validator sets.
+	AddL1ValidatorSetsDuration(time.Duration)
+
 	// Mark that this much stake is staked on the node.
 	SetLocalStake(uint64)
 	// Mark that this much stake is delegated to the node.
@@ -148,6 +155,19 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 			Name: "validator_sets_duration_sum",
 			Help: "Total amount of time generating validator sets in nanoseconds",
 		}),
+
+		l1ValidatorSetsCached: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "l1_validator_sets_cached",
+			Help: "Total number of L1 validator sets cached",
+		}),
+		l1ValidatorSetsCreated: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "l1_validator_sets_created",
+			Help: "Total number of L1 validator sets created from applying difflayers",
+		}),
+		l1ValidatorSetsDuration: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "l1_validator_sets_duration_sum",
+			Help: "Total amount of time generating L1 validator sets in nanoseconds",
+		}),
 	}
 
 	errs := wrappers.Errs{Err: err}
@@ -172,6 +192,10 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 		registerer.Register(m.validatorSetsCached),
 		registerer.Register(m.validatorSetsHeightDiff),
 		registerer.Register(m.validatorSetsDuration),
+
+		registerer.Register(m.l1ValidatorSetsCached),
+		registerer.Register(m.l1ValidatorSetsCreated),
+		registerer.Register(m.l1ValidatorSetsDuration),
 	)
 
 	return m, errs.Err
@@ -201,6 +225,11 @@ type metrics struct {
 	validatorSetsCreated    prometheus.Counter
 	validatorSetsHeightDiff prometheus.Gauge
 	validatorSetsDuration   prometheus.Gauge
+
+	// L1 validator set metrics
+	l1ValidatorSetsCached   prometheus.Counter
+	l1ValidatorSetsCreated  prometheus.Counter
+	l1ValidatorSetsDuration prometheus.Counter
 }
 
 func (m *metrics) MarkAccepted(b Block) error {
@@ -231,6 +260,18 @@ func (m *metrics) AddValidatorSetsDuration(d time.Duration) {
 
 func (m *metrics) AddValidatorSetsHeightDiff(d uint64) {
 	m.validatorSetsHeightDiff.Add(float64(d))
+}
+
+func (m *metrics) IncL1ValidatorSetsCreated() {
+	m.l1ValidatorSetsCreated.Inc()
+}
+
+func (m *metrics) IncL1ValidatorSetsCached() {
+	m.l1ValidatorSetsCached.Inc()
+}
+
+func (m *metrics) AddL1ValidatorSetsDuration(d time.Duration) {
+	m.l1ValidatorSetsDuration.Add(float64(d))
 }
 
 func (m *metrics) SetLocalStake(s uint64) {
