@@ -81,7 +81,7 @@ func TestBLSVerifier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := verifier.Verify(msg, tt.sig, tt.nodeID)
+			err := verifier.VerifySignature(msg, tt.sig, tt.nodeID)
 			require.ErrorIs(t, err, tt.expectErr)
 		})
 	}

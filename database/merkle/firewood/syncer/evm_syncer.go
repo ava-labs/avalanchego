@@ -7,7 +7,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ava-labs/firewood-go-ethhash/ffi"
+	"github.com/ava-labs/firewood-go/ffi"
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/database/merkle/sync"
@@ -36,6 +36,7 @@ func NewEVM(
 ) (*sync.Syncer[*RangeProof, struct{}], error) {
 	return newWithDB(
 		config,
+		db,
 		&evmDB{
 			db:        &database{db},
 			codeQueue: codeQueue,
@@ -49,11 +50,12 @@ func (e *evmDB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]b
 	// First enqueue any code hashes found in the proof.
 	// If an error occurs here, we don't want to commit the proof to the database, because the
 	// code hashes will never be requested.
-	var codeHashes []common.Hash
-	for h, err := range proof.rp.CodeHashes() {
-		if err != nil {
-			return maybe.Nothing[[]byte](), err
-		}
+	hashes, err := proof.rp.CodeHashes()
+	if err != nil {
+		return maybe.Nothing[[]byte](), err
+	}
+	codeHashes := make([]common.Hash, 0, len(hashes))
+	for _, h := range hashes {
 		codeHashes = append(codeHashes, common.Hash(h))
 	}
 	if err := e.codeQueue.AddCode(codeHashes); err != nil {

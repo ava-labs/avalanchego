@@ -25,7 +25,7 @@ const (
 	maxActivationOffset = 500 * time.Second
 )
 
-// Creates docker-compose.yml, guest.sh, and the associated volumes in the
+// Creates docker-compose.yaml, guest.sh, and the associated volumes in the
 // target path.
 func main() {
 	log := tests.NewDefaultLogger("")

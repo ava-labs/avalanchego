@@ -16,10 +16,10 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/evm/sync/leaf"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
 var (

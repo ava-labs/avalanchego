@@ -24,7 +24,7 @@ docker create --name "${CONTAINER_NAME}" "${IMAGE_NAME}:${IMAGE_TAG}" /bin/true
 TMPDIR="$(mktemp -d)"
 echo "using temporary directory ${TMPDIR} as the docker compose path"
 
-COMPOSE_FILE="${TMPDIR}/docker-compose.yml"
+COMPOSE_FILE="${TMPDIR}/docker-compose.yaml"
 COMPOSE_CMD="docker compose -f ${COMPOSE_FILE}"
 
 # Ensure cleanup
@@ -40,8 +40,8 @@ function cleanup {
 }
 trap cleanup EXIT
 
-# Copy the docker-compose.yml file out of the container
-docker cp "${CONTAINER_NAME}":/docker-compose.yml "${COMPOSE_FILE}"
+# Copy the docker-compose.yaml file out of the container
+docker cp "${CONTAINER_NAME}":/docker-compose.yaml "${COMPOSE_FILE}"
 
 # Copy the volume paths out of the container
 docker cp "${CONTAINER_NAME}":/volumes "${TMPDIR}/"

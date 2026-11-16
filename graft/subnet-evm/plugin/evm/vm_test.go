@@ -31,6 +31,9 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/graft/evm/acp226"
+	"github.com/ava-labs/avalanchego/graft/evm/firewood"
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/evm/rpc"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/evm/utils/utilstest"
@@ -63,10 +66,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/evm/blackhole"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
@@ -84,7 +84,7 @@ func TestMain(m *testing.M) {
 }
 
 var (
-	schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}
+	schemes = []string{rawdb.HashScheme, firewood.Scheme}
 
 	testNetworkID uint32 = avagoconstants.UnitTestID
 
@@ -220,11 +220,11 @@ func newVM(t *testing.T, config testVMConfig) *testVM {
 // Firewood cannot yet be run with an empty config.
 func getConfig(scheme, otherConfig string) string {
 	innerConfig := otherConfig
-	if scheme == customrawdb.FirewoodScheme {
+	if scheme == firewood.Scheme {
 		if len(innerConfig) > 0 {
 			innerConfig += ", "
 		}
-		innerConfig += fmt.Sprintf(`"state-scheme": "%s", "snapshot-cache": 0`, customrawdb.FirewoodScheme)
+		innerConfig += fmt.Sprintf(`"state-scheme": "%s", "snapshot-cache": 0`, firewood.Scheme)
 	}
 
 	return fmt.Sprintf(`{%s}`, innerConfig)
