@@ -12,6 +12,7 @@ import (
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/stretchr/testify/assert"
@@ -332,32 +333,43 @@ func TestConfigStateSyncInterval(t *testing.T) {
 	tests := []struct {
 		name           string
 		networkID      uint32
+		scheme         string
 		commitInterval uint64
 		want           uint64
 	}{
 		{
 			name:           "custom_network",
 			networkID:      constants.UnitTestID,
+			scheme:         rawdb.HashScheme,
 			commitInterval: 256,
 			want:           256,
 		},
 		{
 			name:           "mainnet",
 			networkID:      constants.MainnetID,
+			scheme:         rawdb.HashScheme,
 			commitInterval: 256,
 			want:           saedb.DefaultCommitInterval,
 		},
 		{
 			name:           "fuji",
 			networkID:      constants.FujiID,
+			scheme:         rawdb.HashScheme,
 			commitInterval: 256,
 			want:           saedb.DefaultCommitInterval,
+		},
+		{
+			name:           "mainnet_firewood",
+			networkID:      constants.MainnetID,
+			scheme:         firewood.Scheme,
+			commitInterval: 1,
+			want:           1,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := defaultConfig()
-			c.StateScheme = firewood.Scheme
+			c.StateScheme = tt.scheme
 			c.CommitInterval = tt.commitInterval
 
 			got := c.stateSyncConfig(tt.networkID).DBConfig.CommitInterval
