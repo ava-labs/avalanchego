@@ -235,26 +235,25 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 // TestPrecompileActivation asserts that a precompile upgrade activates at the
 // time configured in the upgrade config.
 func TestPrecompileActivation(t *testing.T) {
+	const upgradeOffset = 10
+	upgradeTime := time.Unix(int64(testGenesisTime)+upgradeOffset, 0) //#nosec G115 -- Won't overflow
+	upgradeUnix := testGenesisTime + upgradeOffset
+
 	var (
 		recipient = common.Address{'r', 'e', 'c', 'i', 'p', 'i', 'e', 'n', 't'}
 		amount    = uint256.NewInt(42)
 	)
-
-	// upgradeTime MUST be after genesis.
-	upgradeTime := time.Unix(int64(testGenesisTime)+10, 0) //#nosec G115 -- Won't overflow
-	upgradeUnix := uint64(upgradeTime.Unix())              //#nosec G115 -- Known non-negative
-
 	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSignerForChainID(big.NewInt(testChainID)))
 	timeOpt, _ := withVMTime(upgradeTime)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(wallet.Addresses()...),
 		timeOpt,
-		options.Func[sutConfig](func(c *sutConfig) {
-			c.upgrades.PrecompileUpgrades = []extras.PrecompileUpgrade{{
+		withUpgrades(extras.UpgradeConfig{
+			PrecompileUpgrades: []extras.PrecompileUpgrade{{
 				Config: nativeminter.NewConfig(&upgradeUnix, nil, nil, nil, map[common.Address]*math.HexOrDecimal256{
 					recipient: (*math.HexOrDecimal256)(amount.ToBig()),
 				}),
-			}}
+			}},
 		}),
 	)
 

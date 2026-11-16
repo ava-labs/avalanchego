@@ -12,6 +12,8 @@ import (
 
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 
+	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry" // register precompiles
+
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/adaptor"

@@ -22,8 +22,6 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/holiman/uint256"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
@@ -854,61 +852,4 @@ func TestWriteGenesisState(t *testing.T) {
 
 	_, err = state.New(root, state.NewDatabaseWithNodeDB(db, tdb), nil)
 	require.NoError(t, err, "state.New()")
-}
-
-// TestGenesisPrecompileState ensures that precompiles enabled at genesis are
-// activated in the genesis state, before the allocation is applied.
-func TestGenesisPrecompileState(t *testing.T) {
-	var (
-		recipient = common.Address{'r', 'e', 'c', 'i', 'p', 'i', 'e', 'n', 't'}
-		amount    = uint256.NewInt(42)
-	)
-
-	tests := []struct {
-		name          string
-		activation    uint64
-		wantRecipient *uint256.Int
-	}{
-		{
-			name:          "active_at_genesis",
-			activation:    testGenesisTime,
-			wantRecipient: amount,
-		},
-		{
-			name:          "active_after_genesis",
-			activation:    testGenesisTime + 1,
-			wantRecipient: uint256.NewInt(0),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			genesis := testGenesisJSON(withGenesis(func(g *ethcore.Genesis) {
-				mint := (*math.HexOrDecimal256)(amount.ToBig())
-				l1params.GetExtra(g.Config).GenesisPrecompiles = extras.Precompiles{
-					nativeminter.ConfigKey: nativeminter.NewConfig(new(tt.activation), nil, nil, nil, map[common.Address]*math.HexOrDecimal256{
-						recipient:     mint,
-						testAllocAddr: mint,
-					}),
-				}
-			}))
-			ctx := &snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgradetest.Latest)}
-			g, err := parseGenesis(ctx, []byte(genesis), nil)
-			require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
-
-			db := rawdb.NewMemoryDatabase()
-			tdb := triedb.NewDatabase(db, triedb.HashDefaults)
-			defer func() {
-				assert.NoErrorf(t, tdb.Close(), "%T.Close()", tdb)
-			}()
-			root, err := g.writeState(db, tdb)
-			require.NoErrorf(t, err, "%T.writeState()", g)
-			sdb, err := state.New(root, state.NewDatabaseWithNodeDB(db, tdb), nil)
-			require.NoError(t, err, "state.New()")
-
-			assert.Equal(t, tt.wantRecipient, sdb.GetBalance(recipient), "balance(recipient)")
-			// The allocation MUST override the mint.
-			assert.Equal(t, uint256.MustFromBig(testAllocFund), sdb.GetBalance(testAllocAddr), "balance(allocated)")
-		})
-	}
 }

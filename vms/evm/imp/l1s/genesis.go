@@ -21,8 +21,6 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/holiman/uint256"
 
-	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry"
-
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
