@@ -26,20 +26,34 @@ func TestHealthCheckLocalL1ValidatorBalance(t *testing.T) {
 	tests := []struct {
 		name              string
 		subnetValidator   bool
+		l1Validator       bool
 		endAccumulatedFee uint64
-		want              uint64
+		removeL1Validator bool
+		want              string // Empty if no balance is reported.
 	}{
+		{
+			name: "not_validator",
+		},
 		{
 			name:            "subnet_validator",
 			subnetValidator: true,
 		},
 		{
 			name:              "active_l1_validator",
+			l1Validator:       true,
 			endAccumulatedFee: accruedFees + 900,
-			want:              900,
+			want:              "900",
 		},
 		{
-			name: "inactive_l1_validator",
+			name:        "inactive_l1_validator",
+			l1Validator: true,
+			want:        "0",
+		},
+		{
+			name:              "removed_l1_validator",
+			l1Validator:       true,
+			endAccumulatedFee: accruedFees + 900,
+			removeL1Validator: true,
 		},
 	}
 	for _, test := range tests {
@@ -74,15 +88,17 @@ func TestHealthCheckLocalL1ValidatorBalance(t *testing.T) {
 					EndTime:  time.Unix(1, 0),
 					Priority: platform.SubnetPermissionedValidatorCurrentPriority,
 				}))
-			} else {
-				require.NoError(vm.state.PutL1Validator(state.L1Validator{
-					ValidationID:      ids.GenerateTestID(),
-					SubnetID:          subnetID,
-					NodeID:            vm.ctx.NodeID,
-					PublicKey:         bls.PublicKeyToUncompressedBytes(pk),
-					Weight:            1,
-					EndAccumulatedFee: test.endAccumulatedFee,
-				}))
+			}
+			l1Validator := state.L1Validator{
+				ValidationID:      ids.GenerateTestID(),
+				SubnetID:          subnetID,
+				NodeID:            vm.ctx.NodeID,
+				PublicKey:         bls.PublicKeyToUncompressedBytes(pk),
+				Weight:            1,
+				EndAccumulatedFee: test.endAccumulatedFee,
+			}
+			if test.l1Validator {
+				require.NoError(vm.state.PutL1Validator(l1Validator))
 			}
 			vm.state.SetAccruedFees(accruedFees)
 			require.NoError(vm.state.Commit())
@@ -90,14 +106,26 @@ func TestHealthCheckLocalL1ValidatorBalance(t *testing.T) {
 			_, err = vm.HealthCheck(t.Context())
 			require.NoError(err)
 
-			want := fmt.Sprintf(`
+			if test.removeL1Validator {
+				l1Validator.Weight = 0
+				require.NoError(vm.state.PutL1Validator(l1Validator))
+				require.NoError(vm.state.Commit())
+
+				_, err = vm.HealthCheck(t.Context())
+				require.NoError(err)
+			}
+
+			var want string
+			if test.want != "" {
+				want = fmt.Sprintf(`
 # HELP local_l1_validator_balance Remaining balance (in nAVAX) of this node's L1 validator
 # TYPE local_l1_validator_balance gauge
-local_l1_validator_balance{subnetID="%s"} %d
+local_l1_validator_balance{subnetID="%s"} %s
 `,
-				subnetID,
-				test.want,
-			)
+					subnetID,
+					test.want,
+				)
+			}
 			require.NoError(testutil.GatherAndCompare(vm.ctx.Metrics, strings.NewReader(want), "local_l1_validator_balance"))
 		})
 	}

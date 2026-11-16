@@ -73,6 +73,8 @@ type Metrics interface {
 	SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration)
 	// Mark how much balance this node's L1 validator of a subnet has left.
 	SetLocalL1ValidatorBalance(subnetID ids.ID, balance uint64)
+	// Mark that this node is not an L1 validator of a subnet.
+	DeleteLocalL1ValidatorBalance(subnetID ids.ID)
 }
 
 func New(registerer prometheus.Registerer) (Metrics, error) {
@@ -266,4 +268,8 @@ func (m *metrics) SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake ti
 
 func (m *metrics) SetLocalL1ValidatorBalance(subnetID ids.ID, balance uint64) {
 	m.localL1ValidatorBalance.WithLabelValues(subnetID.String()).Set(float64(balance))
+}
+
+func (m *metrics) DeleteLocalL1ValidatorBalance(subnetID ids.ID) {
+	m.localL1ValidatorBalance.DeleteLabelValues(subnetID.String())
 }
