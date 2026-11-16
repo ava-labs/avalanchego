@@ -1270,8 +1270,6 @@ func TestInstanceMaxBlacklistedRoundsRollingRestart(t *testing.T) {
 	require.Equal(t, uint16(decreasedRounds), prevMaxRounds)
 }
 
-// nextMaxBlacklistedRounds returns the max blacklisted rounds of a block whose parent has [prev] max blacklisted rounds.
-// The block belongs to an epoch run by [validators], and its builder is configured with [target] max blacklisted rounds.
 func nextMaxBlacklistedRounds(prev, target uint16, validators common.Nodes) uint16 {
 	parent := common.NewBlacklist(prev)
 	next := parent.Next(validators, 0, target, nil, nil)
