@@ -13,6 +13,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//graft/simplex/common",
+        "//utils/constants",
         "@com_github_stretchr_testify//require",
     ],
 )
