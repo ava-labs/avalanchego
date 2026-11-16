@@ -163,4 +163,4 @@ until stopped by `tmpnetctl stop-metrics-collector` and `tmpnetctl stop-logs-col
 The results of collection will be viewable at
 https://avalabs.grafana.net.
 
-For more detail, see the [tmpnet docs](../fixture/tmpnet/README.md##monitoring).
+For more detail, see the [tmpnet docs](../fixture/tmpnet/README.md#monitoring).

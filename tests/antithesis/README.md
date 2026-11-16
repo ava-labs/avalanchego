@@ -23,7 +23,7 @@ enables discovery and reproduction of anomalous behavior.
 ## Instrumentation
 
 Software running in Antithesis's environment must be
-[instrumented](https://antithesis.com/docs/instrumentation/overview.html)
+[instrumented](https://antithesis.com/docs/product/writing_tests/instrumentation/coverage_instrumentation/)
 to take full advantage of the supported traceability. Since the
 Antithesis Go SDK only supports the amd64/x86_64 architecture as of this
 writing, running of instrumented binaries on Macs (arm64) is not possible

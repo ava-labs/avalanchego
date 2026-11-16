@@ -20,7 +20,7 @@ The transaction pool maintains the set of transactions that need to be issued in
 
 ## State Manager
 
-The State Manager manages references to state roots in the TrieDB implementations (see [`triedb`](../triedb/) for hashdb, pathdb, and firewood implementations). The TrieDB stores trie nodes (the individual components of state tries) in memory and on disk. When a block is processed, the state transition results in a new state root, and the TrieDB updates or inserts the trie nodes that compose this state. The State Manager tracks which state roots are referenced by processing blocks and manages when to commit trie nodes to disk or dereference them. The State Manager can operate in either archival or pruning mode.
+The State Manager manages references to state roots in the TrieDB implementations (for hashdb, pathdb, and firewood implementations). The TrieDB stores trie nodes (the individual components of state tries) in memory and on disk. When a block is processed, the state transition results in a new state root, and the TrieDB updates or inserts the trie nodes that compose this state. The State Manager tracks which state roots are referenced by processing blocks and manages when to commit trie nodes to disk or dereference them. The State Manager can operate in either archival or pruning mode.
 
 ### Archival Mode
 

@@ -1,0 +1,19 @@
+# Check the repository while respecting .gitignore (Lychee's default).
+# RELEASES.md is excluded because its historical release links are too numerous to
+# check efficiently.
+exclude_path = ["(^|/)RELEASES\\.md$"]
+
+# These links require a local service or authentication that lint does not have.
+exclude = [
+  "^http://localhost.*$",
+  # Lychee normalizes a bare host to a URL with a trailing slash.
+  "^https://.+\\.avax-dev\\.network/?$",
+  # GitHub returns 503 to Lychee's HTTP client. lint_links.sh checks these
+  # URLs with curl, without authentication, after Lychee checks other URLs.
+  "^https://github\\.com/.*$",
+]
+
+# GitHub rejects bursts of unauthenticated requests. Keep requests conservative so
+# this check does not need a GitHub token.
+host_concurrency = 2
+host_request_interval = "250ms"

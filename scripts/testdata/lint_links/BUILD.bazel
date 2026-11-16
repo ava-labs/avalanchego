@@ -1,0 +1,14 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "lint_links_lib",
+    srcs = ["http_server.go"],
+    importpath = "github.com/ava-labs/avalanchego/scripts/testdata/lint_links",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "lint_links",
+    embed = [":lint_links_lib"],
+    visibility = ["//visibility:public"],
+)
