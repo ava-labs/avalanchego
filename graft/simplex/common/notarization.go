@@ -16,7 +16,7 @@ var (
 	ErrorInvalidFinalizationDigest = errors.New("finalization digests do not match")
 )
 
-func NewEmptyNotarizationRecord(emptyNotarization *EmptyNotarization) []byte {
+func NewEmptyNotarizationRecord(emptyNotarization *VerifiedEmptyNotarization) []byte {
 	return NewQuorumRecord(emptyNotarization.QC.Bytes(), emptyNotarization.Vote.Bytes(), EmptyNotarizationRecordType)
 }
 
@@ -37,8 +37,8 @@ func EmptyNotarizationFromRecord(record []byte, qd QCDeserializer, nodes NodeIDs
 	}, nil
 }
 
-// NewNotarization builds a Notarization for a block described by [blockHeader] from [votesForCurrentRound].
-func NewNotarization(logger Logger, signatureAggregator SignatureAggregator, votesForCurrentRound map[NodeID]*Vote, blockHeader BlockHeader) (Notarization, error) {
+// AssembleNotarization builds a Notarization for a block described by [blockHeader] from [votesForCurrentRound].
+func AssembleNotarization(logger Logger, signatureAggregator SignatureAggregator, votesForCurrentRound map[NodeID]*Vote, blockHeader BlockHeader) (Notarization, VerifiedNotarization, error) {
 	voteCount := len(votesForCurrentRound)
 	signatures := make([]Signature, 0, voteCount)
 	logger.Info("Collected Quorum of votes", zap.Uint64("round", blockHeader.Round), zap.Int("votes", voteCount))
@@ -60,34 +60,40 @@ func NewNotarization(logger Logger, signatureAggregator SignatureAggregator, vot
 	}
 
 	if toBeSignedVote == nil {
-		return Notarization{}, ErrorNoVotes
+		return Notarization{}, VerifiedNotarization{}, ErrorNoVotes
 	}
 	// sort the signatures by Signer to ensure consistent ordering
 	slices.SortFunc(signatures, compareSignatures)
 
 	var notarization Notarization
 	var err error
+	var vqc VerifiedQuorumCertificate
 	notarization.Vote = *toBeSignedVote
-	notarization.QC, err = signatureAggregator.Aggregate(signatures)
+	notarization.QC, vqc, err = signatureAggregator.Aggregate(signatures)
 	if err != nil {
-		return Notarization{}, fmt.Errorf("could not aggregate signatures for notarization: %w", err)
+		return Notarization{}, VerifiedNotarization{}, fmt.Errorf("could not aggregate signatures for notarization: %w", err)
 	}
 
-	return notarization, nil
+	verifiedNotarization := VerifiedNotarization{
+		Vote: notarization.Vote,
+		QC:   vqc,
+	}
+
+	return notarization, verifiedNotarization, nil
 }
 
-// NewFinalization builds a Finalization from [finalizeVotes].
-func NewFinalization(signatureAggregator SignatureAggregator, finalizeVotes []*FinalizeVote) (Finalization, error) {
+// AssembleFinalization builds a Finalization from [finalizeVotes].
+func AssembleFinalization(signatureAggregator SignatureAggregator, finalizeVotes []*FinalizeVote) (Finalization, VerifiedFinalization, error) {
 	voteCount := len(finalizeVotes)
 	if voteCount == 0 {
-		return Finalization{}, ErrorNoVotes
+		return Finalization{}, VerifiedFinalization{}, ErrorNoVotes
 	}
 
 	signatures := make([]Signature, 0, voteCount)
 	expectedDigest := finalizeVotes[0].Finalization.Digest
 	for _, vote := range finalizeVotes {
 		if vote.Finalization.Digest != expectedDigest {
-			return Finalization{}, ErrorInvalidFinalizationDigest
+			return Finalization{}, VerifiedFinalization{}, ErrorInvalidFinalizationDigest
 		}
 		signatures = append(signatures, vote.Signature)
 	}
@@ -97,13 +103,19 @@ func NewFinalization(signatureAggregator SignatureAggregator, finalizeVotes []*F
 
 	var finalization Finalization
 	var err error
+	var vqc VerifiedQuorumCertificate
 	finalization.Finalization = finalizeVotes[0].Finalization
-	finalization.QC, err = signatureAggregator.Aggregate(signatures)
+	finalization.QC, vqc, err = signatureAggregator.Aggregate(signatures)
 	if err != nil {
-		return Finalization{}, fmt.Errorf("could not aggregate signatures for finalization: %w", err)
+		return Finalization{}, VerifiedFinalization{}, fmt.Errorf("could not aggregate signatures for finalization: %w", err)
 	}
 
-	return finalization, nil
+	verifiedFinalization := VerifiedFinalization{
+		Finalization: finalization.Finalization,
+		QC:           vqc,
+	}
+
+	return finalization, verifiedFinalization, nil
 }
 
 // compareSignatures compares two signatures by their Signer field returning -1, 0, 1 if i is less than, equal to, or greater than j.

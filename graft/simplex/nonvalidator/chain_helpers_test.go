@@ -70,19 +70,19 @@ func newSeededChain(t *testing.T, nodes common.Nodes, lastSeq uint64) *testChain
 		seq:           0, // set for clarity
 		epoch:         0,
 	}
-	require.NoError(t, tc.Index(context.Background(), genesis, common.Finalization{}))
+	require.NoError(t, tc.Index(context.Background(), genesis, common.VerifiedFinalization{}))
 	tc.validatorSets[0] = nodes
 
 	// firstSimplex comes after genesis
 	sealingBlock := tc.appendFirstSimplexAfterGenesis(nodes)
 	finalization := tc.newFinalization(sealingBlock)
-	require.NoError(t, tc.Index(context.Background(), sealingBlock, finalization))
+	require.NoError(t, tc.Index(context.Background(), sealingBlock, testutil.MustVerifyFinalization(tc.t, finalization)))
 
 	for tc.seq < lastSeq {
 		b := tc.appendBlock()
 		finalization := tc.newFinalization(b)
 
-		require.NoError(t, tc.Index(context.Background(), b, finalization))
+		require.NoError(t, tc.Index(context.Background(), b, testutil.MustVerifyFinalization(tc.t, finalization)))
 	}
 
 	return tc
@@ -102,11 +102,11 @@ func newSnowToSimplexChain(t *testing.T, lastSnowSeq uint64) *testChain {
 	}
 
 	// genesis
-	require.NoError(t, tc.Index(context.Background(), genesis, common.Finalization{}))
+	require.NoError(t, tc.Index(context.Background(), genesis, common.VerifiedFinalization{}))
 
 	for tc.seq < lastSnowSeq {
 		b := tc.appendBlock()
-		require.NoError(t, tc.Index(context.Background(), b, common.Finalization{}))
+		require.NoError(t, tc.Index(context.Background(), b, common.VerifiedFinalization{}))
 	}
 
 	require.Equal(t, tc.seq, lastSnowSeq)
@@ -236,7 +236,7 @@ func (tc *testChain) indexEpochs(epochs ...uint64) {
 		for tc.seq < epoch-1 {
 			b := tc.appendBlock()
 			finalization := tc.newFinalization(b)
-			require.NoError(tc.t, tc.Index(context.Background(), b, finalization))
+			require.NoError(tc.t, tc.Index(context.Background(), b, testutil.MustVerifyFinalization(tc.t, finalization)))
 		}
 		validatorSet, ok := tc.validatorSets[tc.epoch]
 		require.True(tc.t, ok)
@@ -247,7 +247,7 @@ func (tc *testChain) indexEpochs(epochs ...uint64) {
 		})
 		sealing := tc.appendSealing(newNodes)
 		finalization := tc.newFinalization(sealing)
-		require.NoError(tc.t, tc.Index(context.Background(), sealing, finalization))
+		require.NoError(tc.t, tc.Index(context.Background(), sealing, testutil.MustVerifyFinalization(tc.t, finalization)))
 	}
 }
 

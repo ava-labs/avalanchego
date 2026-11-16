@@ -24,14 +24,14 @@ func (s *stubStorage) NumBlocks() uint64 {
 	return uint64(len(s.blocks))
 }
 
-func (s *stubStorage) GetBlock(seq uint64) (metadata.StateMachineBlock, *common.Finalization, error) {
+func (s *stubStorage) GetBlock(seq uint64) (metadata.StateMachineBlock, *common.VerifiedFinalization, error) {
 	if s.err != nil && seq == s.errSeq {
 		return metadata.StateMachineBlock{}, nil, s.err
 	}
-	return s.blocks[seq], &common.Finalization{}, nil
+	return s.blocks[seq], &common.VerifiedFinalization{}, nil
 }
 
-func (s *stubStorage) Index(context.Context, common.VerifiedBlock, common.Finalization) error {
+func (s *stubStorage) Index(context.Context, common.VerifiedBlock, common.VerifiedFinalization) error {
 	return nil
 }
 

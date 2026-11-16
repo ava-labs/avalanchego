@@ -79,7 +79,7 @@ func (f *fakeVMBlock) Timestamp() time.Time                     { return time.Ti
 func (f *fakeVMBlock) Verify(_ context.Context, _ uint64) error { return nil }
 
 type outerBlock struct {
-	finalization *common.Finalization
+	finalization *common.VerifiedFinalization
 	block        StateMachineBlock
 }
 
@@ -91,7 +91,7 @@ func (bs blockStore) clone() blockStore {
 	return newStore
 }
 
-func (bs blockStore) getBlock(seq uint64, _ common.Digest) (StateMachineBlock, *common.Finalization, error) {
+func (bs blockStore) getBlock(seq uint64, _ common.Digest) (StateMachineBlock, *common.VerifiedFinalization, error) {
 	blk, exits := bs[seq]
 	if !exits {
 		return StateMachineBlock{}, nil, fmt.Errorf("%w: block %d not found", common.ErrBlockNotFound, seq)
@@ -159,7 +159,7 @@ type aggregatedSignature struct {
 	Signatures [][]byte
 }
 
-func (sv *signatureAggregator) Aggregate([]common.Signature) (common.QuorumCertificate, error) {
+func (sv *signatureAggregator) Aggregate([]common.Signature) (common.QuorumCertificate, common.VerifiedQuorumCertificate, error) {
 	panic("unused in tests")
 }
 
@@ -446,7 +446,7 @@ func newStateMachineWithLogger(tb testing.TB, logger common.Logger) (*StateMachi
 // concatAggregator concatenates signatures for easy verification in tests.
 type concatAggregator struct{}
 
-func (concatAggregator) Aggregate([]common.Signature) (common.QuorumCertificate, error) {
+func (concatAggregator) Aggregate([]common.Signature) (common.QuorumCertificate, common.VerifiedQuorumCertificate, error) {
 	panic("unused in tests")
 }
 
@@ -468,7 +468,7 @@ func (concatAggregator) AboveByzantineThreshold([]common.NodeID) bool {
 
 type failingAggregator struct{}
 
-func (failingAggregator) Aggregate([]common.Signature) (common.QuorumCertificate, error) {
+func (failingAggregator) Aggregate([]common.Signature) (common.QuorumCertificate, common.VerifiedQuorumCertificate, error) {
 	panic("unused in tests")
 }
 

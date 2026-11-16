@@ -18,7 +18,7 @@ import (
 type InMemStorage struct {
 	data map[uint64]struct {
 		common.VerifiedBlock
-		common.Finalization
+		common.VerifiedFinalization
 	}
 
 	lock   sync.Mutex
@@ -29,7 +29,7 @@ func NewInMemStorage() *InMemStorage {
 	s := &InMemStorage{
 		data: make(map[uint64]struct {
 			common.VerifiedBlock
-			common.Finalization
+			common.VerifiedFinalization
 		}),
 	}
 
@@ -88,18 +88,18 @@ func (mem *InMemStorage) EnsureNoBlockCommit(t *testing.T, seq uint64) {
 	}, time.Second, time.Millisecond*100, "block %d has been committed but shouldn't have been", seq)
 }
 
-func (mem *InMemStorage) Retrieve(seq uint64) (common.VerifiedBlock, common.Finalization, error) {
+func (mem *InMemStorage) Retrieve(seq uint64) (common.VerifiedBlock, common.VerifiedFinalization, error) {
 	mem.lock.Lock()
 	defer mem.lock.Unlock()
 
 	item, ok := mem.data[seq]
 	if !ok {
-		return nil, common.Finalization{}, fmt.Errorf("%w: seq %d", common.ErrBlockNotFound, seq)
+		return nil, common.VerifiedFinalization{}, fmt.Errorf("%w: seq %d", common.ErrBlockNotFound, seq)
 	}
-	return item.VerifiedBlock, item.Finalization, nil
+	return item.VerifiedBlock, common.VerifiedFinalization{Finalization: item.Finalization, QC: item.QC}, nil
 }
 
-func (mem *InMemStorage) Index(ctx context.Context, block common.VerifiedBlock, certificate common.Finalization) error {
+func (mem *InMemStorage) Index(ctx context.Context, block common.VerifiedBlock, certificate common.VerifiedFinalization) error {
 	mem.lock.Lock()
 	defer mem.lock.Unlock()
 
@@ -116,7 +116,7 @@ func (mem *InMemStorage) Index(ctx context.Context, block common.VerifiedBlock, 
 
 	mem.data[seq] = struct {
 		common.VerifiedBlock
-		common.Finalization
+		common.VerifiedFinalization
 	}{block,
 		certificate,
 	}
@@ -151,7 +151,7 @@ func (mem *InMemStorage) Compare(other *InMemStorage) error {
 		}
 
 		// compare finalizations
-		if !bytes.Equal(item.Finalization.Finalization.Bytes(), otherItem.Finalization.Finalization.Bytes()) {
+		if !bytes.Equal(item.Finalization.Bytes(), otherItem.Finalization.Bytes()) {
 			return fmt.Errorf("finalizations differ at seq %d", seq)
 		}
 	}

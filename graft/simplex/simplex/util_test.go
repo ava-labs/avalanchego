@@ -21,7 +21,8 @@ func TestRetrieveFromStorage(t *testing.T) {
 	block := testutil.NewTestBlock(ProtocolMetadata{Seq: 0}, emptyBlacklist)
 	finalization, _ := testutil.NewFinalizationRecord(t, &testutil.TestSignatureAggregator{N: len(nodes)}, block, nodes[:Quorum(len(nodes))])
 	normalStorage := testutil.NewInMemStorage()
-	err := normalStorage.Index(context.Background(), block, finalization)
+	verifiedFinalization := testutil.MustVerifyFinalization(t, finalization)
+	err := normalStorage.Index(context.Background(), block, verifiedFinalization)
 	require.NoError(t, err)
 
 	for _, testCase := range []struct {
@@ -40,7 +41,7 @@ func TestRetrieveFromStorage(t *testing.T) {
 			storage:     normalStorage,
 			expectedVerifiedBlock: &VerifiedFinalizedBlock{
 				VerifiedBlock: block,
-				Finalization:  finalization,
+				Finalization:  verifiedFinalization,
 			},
 		},
 	} {
@@ -55,10 +56,12 @@ func TestRetrieveFromStorage(t *testing.T) {
 
 type unverifiableQC struct{}
 
-func (u *unverifiableQC) Verify(Nodes) error {
-	return fmt.Errorf("invalid QC")
+func (u *unverifiableQC) Verify(Nodes) (VerifiedQuorumCertificate, error) {
+	return nil, fmt.Errorf("invalid QC")
 }
 
+// TestVerifyQC checks VerifyQC rejects a nil QC and otherwise returns what the message's Verify returns.
+// Checking the signers of a QC is up to the QuorumCertificate implementation.
 func TestVerifyQC(t *testing.T) {
 	var nodeIDs []NodeID
 	var nodes Nodes
@@ -67,94 +70,47 @@ func TestVerifyQC(t *testing.T) {
 		nodeIDs = append(nodeIDs, nodeID)
 	}
 
-	validatorsToPks := make(map[NodeID][]byte)
-	for _, n := range nodes {
-		validatorsToPks[n.Id] = []byte{}
-	}
 	quorumSize := Quorum(len(nodes))
 	signatureAggregator := &testutil.TestSignatureAggregator{N: len(nodes)}
-	// Test
+	block := testutil.NewTestBlock(ProtocolMetadata{}, emptyBlacklist)
+	validFinalization, _ := testutil.NewFinalizationRecord(t, signatureAggregator, block, nodeIDs[:quorumSize])
+
 	tests := []struct {
-		name         string
-		finalization Finalization
-		quorumSize   int
-		expectedErr  error
-		msgInvalid   bool
+		name string
+		qc   QuorumCertificate
+		msg  interface {
+			Verify(Nodes) (VerifiedQuorumCertificate, error)
+		}
+		expectedErr error
 	}{
 		{
 			name: "valid finalization",
-			finalization: func() Finalization {
-				block := testutil.NewTestBlock(ProtocolMetadata{}, emptyBlacklist)
-				finalization, _ := testutil.NewFinalizationRecord(t, signatureAggregator, block, nodeIDs[:quorumSize])
-				return finalization
-			}(),
-			quorumSize: quorumSize,
-		}, {
-			name: "not enough signers",
-			finalization: func() Finalization {
-				block := testutil.NewTestBlock(ProtocolMetadata{}, emptyBlacklist)
-				finalization, _ := testutil.NewFinalizationRecord(t, signatureAggregator, block, nodeIDs[:quorumSize-1])
-				return finalization
-			}(),
-			quorumSize:  quorumSize,
-			expectedErr: fmt.Errorf("quorum certificate signed by insufficient (3) nodes"),
+			qc:   validFinalization.QC,
+			msg:  &validFinalization,
 		},
 		{
-			name: "signer signed twice",
-			finalization: func() Finalization {
-				block := testutil.NewTestBlock(ProtocolMetadata{}, emptyBlacklist)
-				doubleNodes := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{4}}}
-				finalization, _ := testutil.NewFinalizationRecord(t, signatureAggregator, block, doubleNodes)
-				return finalization
-			}(),
-			quorumSize:  quorumSize,
-			expectedErr: fmt.Errorf("quorum certificate is signed by the same node (0400000000000000000000000000000000000000) more than once"),
+			name:        "quorum certificate not in finalization",
+			msg:         &Finalization{Finalization: ToBeSignedFinalization{}},
+			expectedErr: fmt.Errorf("nil QuorumCertificate"),
 		},
 		{
-			name:         "quorum certificate not in finalization",
-			finalization: Finalization{Finalization: ToBeSignedFinalization{}},
-			quorumSize:   quorumSize,
-			expectedErr:  fmt.Errorf("nil QuorumCertificate"),
-		},
-		{
-			name: "nodes are not eligible signers",
-			finalization: func() Finalization {
-				block := testutil.NewTestBlock(ProtocolMetadata{}, emptyBlacklist)
-				signers := []NodeID{{ShortID: ids.ShortID{1}}, {ShortID: ids.ShortID{2}}, {ShortID: ids.ShortID{3}}, {ShortID: ids.ShortID{4}}, {ShortID: ids.ShortID{6}}}
-				finalization, _ := testutil.NewFinalizationRecord(t, signatureAggregator, block, signers)
-				return finalization
-			}(), quorumSize: quorumSize,
-			expectedErr: fmt.Errorf("quorum certificate contains an unknown signer (0600000000000000000000000000000000000000)"),
-		},
-		{
-			name: "invalid QC",
-			finalization: func() Finalization {
-				block := testutil.NewTestBlock(ProtocolMetadata{}, emptyBlacklist)
-				finalization, _ := testutil.NewFinalizationRecord(t, signatureAggregator, block, nodeIDs[:quorumSize])
-				return finalization
-			}(),
-			quorumSize:  quorumSize,
-			msgInvalid:  true,
+			name:        "invalid QC",
+			qc:          validFinalization.QC,
+			msg:         &unverifiableQC{},
 			expectedErr: fmt.Errorf("invalid QC"),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			isQuorum := func(signers []NodeID) bool {
-				return len(signers) >= tt.quorumSize
-			}
-			if tt.msgInvalid {
-				err := VerifyQC(tt.finalization.QC, isQuorum, validatorsToPks, &unverifiableQC{}, nodes)
+			qc, err := VerifyQC(tt.qc, tt.msg, nodes)
+			if tt.expectedErr != nil {
 				require.EqualError(t, err, tt.expectedErr.Error())
-			} else {
-				err := VerifyQC(tt.finalization.QC, isQuorum, validatorsToPks, &tt.finalization, nodes)
-				if tt.expectedErr != nil {
-					require.EqualError(t, err, tt.expectedErr.Error())
-				} else {
-					require.NoError(t, err)
-				}
+				require.Nil(t, qc)
+				return
 			}
+			require.NoError(t, err)
+			require.NotNil(t, qc)
 		})
 	}
 }
@@ -173,24 +129,27 @@ func TestGetHighestQuorumRound(t *testing.T) {
 	notarization1, err := testutil.NewNotarization(l, signatureAggregator, block1, nodes)
 	require.NoError(t, err)
 	finalization1, _ := testutil.NewFinalizationRecord(t, signatureAggregator, block1, nodes)
+	verifiedNotarization1 := testutil.MustVerifyNotarization(t, notarization1)
+	verifiedFinalization1 := testutil.MustVerifyFinalization(t, finalization1)
 
 	// seq 10
 	block10 := testutil.NewTestBlock(ProtocolMetadata{Seq: 10, Round: 10}, emptyBlacklist)
 	notarization10, err := testutil.NewNotarization(l, signatureAggregator, block10, nodes)
 	require.NoError(t, err)
+	verifiedNotarization10 := testutil.MustVerifyNotarization(t, notarization10)
 
 	tests := []struct {
 		name       string
 		round      *Round
-		eNote      *EmptyNotarization
+		eNote      *VerifiedEmptyNotarization
 		lastBlock  *VerifiedFinalizedBlock
 		expectedQr *VerifiedQuorumRound
 	}{
 		{
 			name:  "only empty notarization",
-			eNote: testutil.NewEmptyNotarization(nodes, 1),
+			eNote: testutil.MustVerifyEmptyNotarization(t, testutil.NewEmptyNotarization(nodes, 1)),
 			expectedQr: &VerifiedQuorumRound{
-				EmptyNotarization: testutil.NewEmptyNotarization(nodes, 1),
+				EmptyNotarization: testutil.MustVerifyEmptyNotarization(t, testutil.NewEmptyNotarization(nodes, 1)),
 			},
 		},
 		{
@@ -199,35 +158,35 @@ func TestGetHighestQuorumRound(t *testing.T) {
 		},
 		{
 			name:  "round with finalization",
-			round: SetRound(block1, nil, &finalization1),
+			round: SetRound(block1, nil, &verifiedFinalization1),
 			expectedQr: &VerifiedQuorumRound{
-				VerifiedBlock: block1,
-				Finalization:  &finalization1,
+				Block:        block1,
+				Finalization: &verifiedFinalization1,
 			},
 		},
 		{
 			name:  "round with notarization",
-			round: SetRound(block1, &notarization1, nil),
+			round: SetRound(block1, &verifiedNotarization1, nil),
 			expectedQr: &VerifiedQuorumRound{
-				VerifiedBlock: block1,
-				Notarization:  &notarization1,
+				Block:        block1,
+				Notarization: &verifiedNotarization1,
 			},
 		},
 		{
 			name:  "higher round than empty notarization",
-			round: SetRound(block10, &notarization10, nil),
-			eNote: testutil.NewEmptyNotarization(nodes, 1),
+			round: SetRound(block10, &verifiedNotarization10, nil),
+			eNote: testutil.MustVerifyEmptyNotarization(t, testutil.NewEmptyNotarization(nodes, 1)),
 			expectedQr: &VerifiedQuorumRound{
-				VerifiedBlock: block10,
-				Notarization:  &notarization10,
+				Block:        block10,
+				Notarization: &verifiedNotarization10,
 			},
 		},
 		{
 			name:  "higher empty notarization",
-			eNote: testutil.NewEmptyNotarization(nodes, 100),
-			round: SetRound(block10, &notarization10, nil),
+			eNote: testutil.MustVerifyEmptyNotarization(t, testutil.NewEmptyNotarization(nodes, 100)),
+			round: SetRound(block10, &verifiedNotarization10, nil),
 			expectedQr: &VerifiedQuorumRound{
-				EmptyNotarization: testutil.NewEmptyNotarization(nodes, 100),
+				EmptyNotarization: testutil.MustVerifyEmptyNotarization(t, testutil.NewEmptyNotarization(nodes, 100)),
 			},
 		},
 	}

@@ -123,7 +123,7 @@ type ValidatorSetRetriever func(pChainHeight uint64) (NodeBLSMappings, error)
 // BlockRetriever retrieves a block and its finalization status given the block's sequence number and expected digest.
 // If the block cannot be found it returns ErrBlockNotFound.
 // If an error occurs during retrieval, it returns a non-nil error.
-type BlockRetriever func(seq uint64, digest common.Digest) (StateMachineBlock, *common.Finalization, error)
+type BlockRetriever func(seq uint64, digest common.Digest) (StateMachineBlock, *common.VerifiedFinalization, error)
 
 // BlockBuilder builds a new VM block with the given observed P-chain height.
 type BlockBuilder interface {

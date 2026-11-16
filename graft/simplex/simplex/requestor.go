@@ -21,7 +21,7 @@ type signedQuorum struct {
 	signers common.NodeIDs
 }
 
-func newSignedQuorum(qr *common.QuorumRound, myNodeID common.NodeID) *signedQuorum {
+func newSignedQuorum(qr *common.VerifiedQuorumRound, myNodeID common.NodeID) *signedQuorum {
 	// it's possible our node has signed this quorum.
 	// For example this may happen if our node has sent a finalized vote
 	// for this round and has not received the
@@ -49,8 +49,8 @@ func newSignedQuorum(qr *common.QuorumRound, myNodeID common.NodeID) *signedQuor
 	}
 }
 
-func newSignedQuorumFromFinalization(finalization *common.Finalization, nodeID common.NodeID) *signedQuorum {
-	return newSignedQuorum(&common.QuorumRound{
+func newSignedQuorumFromFinalization(finalization *common.VerifiedFinalization, nodeID common.NodeID) *signedQuorum {
+	return newSignedQuorum(&common.VerifiedQuorumRound{
 		Finalization: finalization,
 	}, nodeID)
 }

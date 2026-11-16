@@ -93,7 +93,7 @@ func TestNewNotarization(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			notarization, err := common.NewNotarization(l, tt.signatureAggregator, tt.votesForCurrentRound, tt.block.BlockHeader())
+			_, notarization, err := common.AssembleNotarization(l, tt.signatureAggregator, tt.votesForCurrentRound, tt.block.BlockHeader())
 			require.ErrorIs(t, err, tt.expectError, "expected error, got nil")
 
 			if tt.expectError == nil {
@@ -168,7 +168,7 @@ func TestNewFinalization(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			finalization, err := common.NewFinalization(tt.signatureAggregator, tt.finalizeVotes)
+			_, finalization, err := common.AssembleFinalization(tt.signatureAggregator, tt.finalizeVotes)
 			require.ErrorIs(t, err, tt.expectError, "expected error, got nil")
 
 			if tt.expectError == nil {

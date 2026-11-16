@@ -262,12 +262,12 @@ func newTestStorageWithPreSimplexBlocks(t *testing.T, blocks ...*testInnerBlock)
 				SimplexProtocolMetadata: common.ProtocolMetadata{Seq: inner.Height()},
 			},
 		}}
-		require.NoError(t, s.Index(context.Background(), block, common.Finalization{}))
+		require.NoError(t, s.Index(context.Background(), block, common.VerifiedFinalization{}))
 	}
 	return s
 }
 
-func (m *testStorage) GetBlock(seq uint64) (metadata.StateMachineBlock, *common.Finalization, error) {
+func (m *testStorage) GetBlock(seq uint64) (metadata.StateMachineBlock, *common.VerifiedFinalization, error) {
 	block, fin, err := m.Retrieve(seq)
 	if err != nil {
 		return metadata.StateMachineBlock{}, nil, err
@@ -328,12 +328,13 @@ func reparseBlock(t *testing.T, vb common.VerifiedBlock) *ParsedBlock {
 
 func verifiedQuorumRoundToQuorumRound(t *testing.T, vqr common.VerifiedQuorumRound) common.QuorumRound {
 	qr := common.QuorumRound{
-		Notarization:      vqr.Notarization,
-		Finalization:      vqr.Finalization,
-		EmptyNotarization: vqr.EmptyNotarization,
+		Notarization:      testutil.UnverifiedNotarization(vqr.Notarization),
+		Finalization:      testutil.UnverifiedFinalization(vqr.Finalization),
+		EmptyNotarization: testutil.UnverifiedEmptyNotarization(vqr.EmptyNotarization),
 	}
-	if vqr.VerifiedBlock != nil {
-		qr.Block = reparseBlock(t, vqr.VerifiedBlock)
+	if vqr.Block != nil {
+		// Outgoing blocks are of type VerifiedBlock, the test blocks implement both.
+		qr.Block = reparseBlock(t, vqr.Block.(common.VerifiedBlock))
 	}
 	return qr
 }
@@ -860,7 +861,7 @@ func (n *network) sync() {
 }
 
 // acceptNewBlock blocks until every online node has accepted a newly indexed block.
-func (n *network) acceptNewBlock() (common.VerifiedBlock, common.Finalization) {
+func (n *network) acceptNewBlock() (common.VerifiedBlock, common.VerifiedFinalization) {
 	// no nodes have indexed this sequence yet
 	for _, node := range n.nodes {
 		_, _, err := node.storage.Retrieve(n.seq)
@@ -873,7 +874,7 @@ func (n *network) acceptNewBlock() (common.VerifiedBlock, common.Finalization) {
 	n.pending.addPendingBlock()
 
 	var block common.VerifiedBlock
-	var finalization common.Finalization
+	var finalization common.VerifiedFinalization
 	for _, node := range n.nodes {
 		if n.isOffline(node.id) {
 			continue

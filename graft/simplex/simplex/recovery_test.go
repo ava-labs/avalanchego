@@ -160,7 +160,7 @@ func TestRecoverFromWalWithStorage(t *testing.T) {
 
 	indexedBlock := testutil.NewTestBlock(ProtocolMetadata{Seq: 0, Round: 0, Epoch: 0}, emptyBlacklist)
 	indexedFinalization, _ := testutil.NewFinalizationRecord(t, sigAggregrator, indexedBlock, nodes[0:quorum])
-	require.NoError(t, storage.Index(ctx, indexedBlock, indexedFinalization))
+	require.NoError(t, storage.Index(ctx, indexedBlock, testutil.MustVerifyFinalization(t, indexedFinalization)))
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
@@ -536,9 +536,9 @@ func TestRecoveryBlocksIndexed(t *testing.T) {
 	finalization2, _ := testutil.NewFinalizationRecord(t, sigAggr, secondBlock, nodes[0:quorum])
 	fCer3, _ := testutil.NewFinalizationRecord(t, sigAggr, thirdBlock, nodes[0:quorum])
 
-	require.NoError(t, conf.Storage.Index(ctx, firstBlock, finalization1))
-	require.NoError(t, conf.Storage.Index(ctx, secondBlock, finalization2))
-	require.NoError(t, conf.Storage.Index(ctx, thirdBlock, fCer3))
+	require.NoError(t, conf.Storage.Index(ctx, firstBlock, testutil.MustVerifyFinalization(t, finalization1)))
+	require.NoError(t, conf.Storage.Index(ctx, secondBlock, testutil.MustVerifyFinalization(t, finalization2)))
+	require.NoError(t, conf.Storage.Index(ctx, thirdBlock, testutil.MustVerifyFinalization(t, fCer3)))
 
 	e, err := NewEpoch(conf)
 	require.NoError(t, err)
@@ -609,7 +609,7 @@ func TestEpochCorrectlyInitializesMetadataFromStorage(t *testing.T) {
 					block.VerifiedBlock.(*testutil.TestBlock).Metadata = ProtocolMetadata{
 						Seq: uint64(i), // set the sequence so we can index without error
 					}
-					require.NoError(t, storage.Index(ctx, block.VerifiedBlock, Finalization{}))
+					require.NoError(t, storage.Index(ctx, block.VerifiedBlock, VerifiedFinalization{}))
 				}
 
 				return storage
@@ -865,7 +865,7 @@ func TestWalRecoverySetsRoundCorrectly(t *testing.T) {
 
 				// Create empty notarization for round 0
 				emptyNotarization0 := testutil.NewEmptyNotarization(nodes[0:quorum], 0)
-				emptyNotarizationRecord0 := NewEmptyNotarizationRecord(emptyNotarization0)
+				emptyNotarizationRecord0 := NewEmptyNotarizationRecord(testutil.MustVerifyEmptyNotarization(t, emptyNotarization0))
 
 				// Return out of order: finalization for round 1, then empty notarization for round 0
 				return [][]byte{blockRecord1, finalizationRecord1, emptyNotarizationRecord0}
@@ -905,7 +905,7 @@ func TestWalRecoverySetsRoundCorrectly(t *testing.T) {
 
 				// Create empty notarization for round 3
 				emptyNotarization3 := testutil.NewEmptyNotarization(nodes[0:quorum], 3)
-				emptyNotarizationRecord3 := NewEmptyNotarizationRecord(emptyNotarization3)
+				emptyNotarizationRecord3 := NewEmptyNotarizationRecord(testutil.MustVerifyEmptyNotarization(t, emptyNotarization3))
 
 				// Return out of order: notarization 0, notarization 1, empty notarization 3, notarization 2
 				return [][]byte{
@@ -932,7 +932,7 @@ func TestWalRecoverySetsRoundCorrectly(t *testing.T) {
 				// Create empty notarization for round 2
 				emptyNotarization2 := testutil.NewEmptyNotarization(nodes[0:quorum], 2)
 				emptyNotarization2.Vote.Epoch = 1
-				emptyNotarizationRecord2 := NewEmptyNotarizationRecord(emptyNotarization2)
+				emptyNotarizationRecord2 := NewEmptyNotarizationRecord(testutil.MustVerifyEmptyNotarization(t, emptyNotarization2))
 
 				// Create notarization for round 1
 				block1, ok := bb.BuildBlock(ctx, ProtocolMetadata{Round: 1, Epoch: 1, Seq: 1}, emptyBlacklist)
@@ -976,7 +976,7 @@ func TestWalRecoverySetsRoundCorrectly(t *testing.T) {
 
 				// Create empty notarization for round 5
 				emptyNotarization5 := testutil.NewEmptyNotarization(nodes[0:quorum], 5)
-				emptyNotarizationRecord5 := NewEmptyNotarizationRecord(emptyNotarization5)
+				emptyNotarizationRecord5 := NewEmptyNotarizationRecord(testutil.MustVerifyEmptyNotarization(t, emptyNotarization5))
 
 				// Return with highest in middle
 				return [][]byte{

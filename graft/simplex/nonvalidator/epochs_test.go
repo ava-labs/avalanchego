@@ -24,6 +24,11 @@ func (b *sealingTestBlock) SealingBlockInfo() *common.SealingBlockInfo {
 	return b.sealingInfo
 }
 
+// UnVerifiedBlock is overridden, otherwise the embedded TestBlock returns itself and loses the sealing info.
+func (b *sealingTestBlock) UnVerifiedBlock() common.Block {
+	return b
+}
+
 func (b *sealingTestBlock) Verify(_ context.Context, _ ...common.VerifyOptions) (common.VerifiedBlock, error) {
 	return b, nil
 }
@@ -127,7 +132,7 @@ func TestNewEpochs(t *testing.T) {
 			storage := testutil.NewInMemStorage()
 			for _, b := range tt.blocks {
 				block := newSealingTestBlock(b.seq, b.epoch, common.Digest{}, b.sealingInfo)
-				require.NoError(t, storage.Index(context.Background(), block, common.Finalization{}))
+				require.NoError(t, storage.Index(context.Background(), block, common.VerifiedFinalization{}))
 			}
 
 			epochs, err := newEpochs(storage, sigAggCreator)

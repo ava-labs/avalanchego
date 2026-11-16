@@ -661,7 +661,7 @@ func TestReplicationStuckInProposingBlock(t *testing.T) {
 		finalization := blocks[i].Finalization
 		quorumRounds = append(quorumRounds, common.QuorumRound{
 			Block:        tb,
-			Finalization: &finalization,
+			Finalization: testutil.UnverifiedFinalization(&finalization),
 		})
 	}
 
@@ -680,7 +680,7 @@ func TestReplicationStuckInProposingBlock(t *testing.T) {
 
 	// Trigger the replication process to start by sending a finalization for a block we do not have
 	require.NoError(t, e.HandleMessage(&common.Message{
-		Finalization: &blocks[4].Finalization,
+		Finalization: testutil.UnverifiedFinalization(&blocks[4].Finalization),
 	}, nodes[1]))
 
 	// Wait for the replication request to be sent
@@ -919,7 +919,7 @@ func createBlocks(t *testing.T, nodes []common.NodeID, seqCount uint64) []common
 		finalization, _ := testutil.NewFinalizationRecord(t, &testutil.TestSignatureAggregator{N: len(nodes)}, block, nodes)
 		data = append(data, common.VerifiedFinalizedBlock{
 			VerifiedBlock: block,
-			Finalization:  finalization,
+			Finalization:  testutil.MustVerifyFinalization(t, finalization),
 		})
 	}
 	return data
@@ -1313,7 +1313,7 @@ func testReplicationEmptyNotarizationsTail(t *testing.T, nodes []common.NodeID, 
 	}
 }
 
-func sendEmptyNotarizationQuorumRounds(emptyNotarizations map[uint64]*common.EmptyNotarization) testutil.MessageFilter {
+func sendEmptyNotarizationQuorumRounds(t *testing.T, emptyNotarizations map[uint64]*common.EmptyNotarization) testutil.MessageFilter {
 	return func(msg *common.Message, from, to common.NodeID) bool {
 		if msg.VerifiedReplicationResponse != nil {
 			newData := make([]common.VerifiedQuorumRound, 0, len(msg.VerifiedReplicationResponse.Data))
@@ -1322,7 +1322,7 @@ func sendEmptyNotarizationQuorumRounds(emptyNotarizations map[uint64]*common.Emp
 					EmptyNotarization: qr.EmptyNotarization,
 				}
 				if qr.EmptyNotarization == nil {
-					newQR.EmptyNotarization = emptyNotarizations[qr.GetRound()]
+					newQR.EmptyNotarization = testutil.MustVerifyEmptyNotarization(t, emptyNotarizations[qr.GetRound()])
 				}
 				newData = append(newData, newQR)
 			}
@@ -1375,7 +1375,7 @@ func TestReplicationStoresFinalization(t *testing.T) {
 	// Send a finalization for block 2 to trigger replication
 	finalization := blocks[1].Finalization
 	require.NoError(t, e.HandleMessage(&common.Message{
-		Finalization: &finalization,
+		Finalization: testutil.UnverifiedFinalization(&finalization),
 	}, nodes[1]))
 
 	// Wait for the replication request to be sent
@@ -1390,11 +1390,11 @@ func TestReplicationStoresFinalization(t *testing.T) {
 	quorumRounds := []common.QuorumRound{
 		{
 			Block:        blocks[0].VerifiedBlock.(common.Block),
-			Finalization: &blocks[0].Finalization,
+			Finalization: testutil.UnverifiedFinalization(&blocks[0].Finalization),
 		},
 		{
 			Block:        blocks[1].VerifiedBlock.(common.Block),
-			Finalization: &blocks[1].Finalization,
+			Finalization: testutil.UnverifiedFinalization(&blocks[1].Finalization),
 		},
 	}
 
@@ -1480,7 +1480,7 @@ func TestReplicationChain(t *testing.T) {
 	leader := simplex.LeaderForRound(nodes, numNotarizations)
 	require.NotEqual(t, laggingNode.E.ID, leader)
 
-	net.SetAllNodesMessageFilter(sendEmptyNotarizationQuorumRounds(emptyNotarizations))
+	net.SetAllNodesMessageFilter(sendEmptyNotarizationQuorumRounds(t, emptyNotarizations))
 	net.Connect(laggingNode.E.ID)
 	net.TriggerLeaderBlockBuilder(numNotarizations)
 
@@ -1552,7 +1552,7 @@ func TestReplicationStartsRoundFromFinalization(t *testing.T) {
 	lastFinalization := blocks[len(blocks)-1].Finalization
 
 	require.NoError(t, e.HandleMessage(&common.Message{
-		Finalization: &lastFinalization,
+		Finalization: testutil.UnverifiedFinalization(&lastFinalization),
 	}, nodes[1]))
 
 	// Wait for the replication request to be sent
@@ -1569,7 +1569,7 @@ func TestReplicationStartsRoundFromFinalization(t *testing.T) {
 		tb := vfb.VerifiedBlock.(*testutil.TestBlock)
 		quorumRounds = append(quorumRounds, common.QuorumRound{
 			Block:        tb,
-			Finalization: &vfb.Finalization,
+			Finalization: testutil.UnverifiedFinalization(&vfb.Finalization),
 		})
 	}
 
@@ -1678,7 +1678,7 @@ func TestReplicationStartsRoundFromFinalizationWithBlock(t *testing.T) {
 		tb := vfb.VerifiedBlock.(*testutil.TestBlock)
 		quorumRounds = append(quorumRounds, common.QuorumRound{
 			Block:        tb,
-			Finalization: &vfb.Finalization,
+			Finalization: testutil.UnverifiedFinalization(&vfb.Finalization),
 		})
 	}
 
@@ -1778,7 +1778,7 @@ func TestReplicationRequestsWithinMaxRoundWindow(t *testing.T) {
 	// observe a finalization more than MaxRoundWindow sequences ahead of us
 	seqCount := 2 * conf.MaxRoundWindow
 	finalization := createBlocks(t, nodes, seqCount)[seqCount-1].Finalization
-	err = e.HandleMessage(&common.Message{Finalization: &finalization}, nodes[0])
+	err = e.HandleMessage(&common.Message{Finalization: testutil.UnverifiedFinalization(&finalization)}, nodes[0])
 	require.NoError(t, err)
 
 	// collect the replication requests sent out in response to the finalization
@@ -1940,7 +1940,7 @@ func replicateSeq(block common.VerifiedFinalizedBlock) *common.Message {
 	return &common.Message{ReplicationResponse: &common.ReplicationResponse{
 		Data: []common.QuorumRound{{
 			Block:        block.VerifiedBlock.(common.Block),
-			Finalization: &block.Finalization,
+			Finalization: testutil.UnverifiedFinalization(&block.Finalization),
 		}},
 	}}
 }

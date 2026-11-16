@@ -26,8 +26,8 @@ type errQC struct {
 	common.QuorumCertificate
 }
 
-func (errQC) Verify(_ []byte, _ common.Nodes) error {
-	return errors.New("qc verification failed")
+func (errQC) Verify(_ []byte, _ common.Nodes) (common.VerifiedQuorumCertificate, error) {
+	return nil, errors.New("qc verification failed")
 }
 
 func blockMessage(t *testing.T, block common.Block, from common.NodeID) *common.Message {
@@ -832,7 +832,7 @@ func TestNonValidator_EpochReplication(t *testing.T) {
 			setup: func(t *testing.T) *testChain {
 				tc := newSnowToSimplexChain(t, 10)
 				firstBlock := tc.appendFirstSimplexAfterGenesis(testNodes)
-				require.NoError(t, tc.Index(context.Background(), firstBlock, tc.newFinalization(firstBlock)))
+				require.NoError(t, tc.Index(context.Background(), firstBlock, testutil.MustVerifyFinalization(t, tc.newFinalization(firstBlock))))
 				return tc
 			},
 			maxSequenceWindow: 50,
@@ -845,7 +845,7 @@ func TestNonValidator_EpochReplication(t *testing.T) {
 			setup: func(t *testing.T) *testChain {
 				tc := newSnowToSimplexChain(t, 10)
 				firstBlock := tc.appendFirstSimplexAfterGenesis(testNodes)
-				require.NoError(t, tc.Index(context.Background(), firstBlock, tc.newFinalization(firstBlock)))
+				require.NoError(t, tc.Index(context.Background(), firstBlock, testutil.MustVerifyFinalization(t, tc.newFinalization(firstBlock))))
 				tc.indexEpochs(20, 30)
 				return tc
 			},
@@ -995,7 +995,7 @@ func TestNonValidator_VerifiesFinalizationDuringReplication(t *testing.T) {
 
 	startTime := time.Now()
 	storage := testutil.NewInMemStorage()
-	require.NoError(t, storage.Index(context.Background(), genesis, common.Finalization{}))
+	require.NoError(t, storage.Index(context.Background(), genesis, common.VerifiedFinalization{}))
 
 	nv, err := NewNonValidator(
 		Config{
@@ -1058,11 +1058,11 @@ func TestNonValidator_VerifiesFinalizationDuringReplication(t *testing.T) {
 					},
 					{
 						Block:        s1.(common.Block),
-						Finalization: &f1,
+						Finalization: testutil.UnverifiedFinalization(&f1),
 					},
 					{
 						Block:        s2.(common.Block),
-						Finalization: &f2,
+						Finalization: testutil.UnverifiedFinalization(&f2),
 					},
 				},
 			},
@@ -1134,7 +1134,7 @@ func TestNonValidatorRejectsQuorumRoundFromNonValidator(t *testing.T) {
 			require.GreaterOrEqual(t, len(tt.senders), threshold)
 
 			storage := testutil.NewInMemStorage()
-			require.NoError(t, storage.Index(context.Background(), genesis, common.Finalization{}))
+			require.NoError(t, storage.Index(context.Background(), genesis, common.VerifiedFinalization{}))
 
 			nv, err := NewNonValidator(
 				Config{
@@ -1243,7 +1243,7 @@ func sealingResponse(tc *testChain, seq uint64) *common.Message {
 	block, fin, err := tc.Retrieve(seq)
 	require.NoError(tc.t, err)
 	return &common.Message{ReplicationResponse: &common.ReplicationResponse{
-		Data: []common.QuorumRound{{Block: block.(common.Block), Finalization: &fin}},
+		Data: []common.QuorumRound{{Block: block.(common.Block), Finalization: testutil.UnverifiedFinalization(&fin)}},
 	}}
 }
 
@@ -1392,13 +1392,13 @@ func TestNonValidator_EpochReplicationRequestsSealingBlock(t *testing.T) {
 
 	// seq 3, which is still in the first epoch.
 	epoch1Block := tc.appendBlock()
-	require.NoError(t, tc.Index(context.Background(), epoch1Block, tc.newFinalization(epoch1Block)))
+	require.NoError(t, tc.Index(context.Background(), epoch1Block, testutil.MustVerifyFinalization(t, tc.newFinalization(epoch1Block))))
 	// seq 4, the last block of epoch 1 and creates epoch 4
 	epoch4SealingBlock := tc.appendSealing(testNodes)
-	require.NoError(t, tc.Index(context.Background(), epoch4SealingBlock, tc.newFinalization(epoch4SealingBlock)))
+	require.NoError(t, tc.Index(context.Background(), epoch4SealingBlock, testutil.MustVerifyFinalization(t, tc.newFinalization(epoch4SealingBlock))))
 	// the validator does not know about epoch 4
 	blockInEpoch4 := tc.appendBlock()
-	require.NoError(t, tc.Index(context.Background(), blockInEpoch4, tc.newFinalization(blockInEpoch4)))
+	require.NoError(t, tc.Index(context.Background(), blockInEpoch4, testutil.MustVerifyFinalization(t, tc.newFinalization(blockInEpoch4))))
 	sender := testNodes.NodeIDs()[2]
 
 	for _, tt := range []struct {
@@ -1447,7 +1447,7 @@ func TestNonValidator_EpochReplicationLatestKnownEpoch(t *testing.T) {
 
 	qrMsg := &common.Message{
 		ReplicationResponse: &common.ReplicationResponse{
-			LatestSeq: &common.QuorumRound{Block: sealing.(common.Block), Finalization: &fin},
+			LatestSeq: &common.QuorumRound{Block: sealing.(common.Block), Finalization: testutil.UnverifiedFinalization(&fin)},
 		},
 	}
 
@@ -1474,7 +1474,7 @@ func TestNonValidator_EpochThenSequenceReplication(t *testing.T) {
 	tc := newSeededChain(t, testNodes, 1)
 	tc.indexEpochs(5, 10)
 	blockSeq11 := tc.appendBlock()
-	require.NoError(t, tc.Index(context.Background(), blockSeq11, tc.newFinalization(blockSeq11)))
+	require.NoError(t, tc.Index(context.Background(), blockSeq11, testutil.MustVerifyFinalization(t, tc.newFinalization(blockSeq11))))
 
 	myNodeID := common.NodeID{ShortID: ids.ShortID{100}}
 	msgQueue := &messageQueue{}
@@ -1539,7 +1539,7 @@ func advanceUntil(nv *NonValidator, epochs *testEpochs, msgQueue *messageQueue, 
 func TestNilBlockPanicMissingBlock(t *testing.T) {
 	startTime := time.Now()
 	storage := testutil.NewInMemStorage()
-	require.NoError(t, storage.Index(context.Background(), genesis, common.Finalization{}))
+	require.NoError(t, storage.Index(context.Background(), genesis, common.VerifiedFinalization{}))
 
 	tc := newSeededChain(t, testNodes, 2)
 
@@ -1657,13 +1657,13 @@ func TestNonValidatorRejectsQuorumRoundWithMismatchedHeader(t *testing.T) {
 	mismatched.Finalization.Round++
 	require.NoError(t, nv.HandleMessage(&common.Message{
 		ReplicationResponse: &common.ReplicationResponse{
-			Data: []common.QuorumRound{{Block: b3, Finalization: &mismatched}},
+			Data: []common.QuorumRound{{Block: b3, Finalization: testutil.UnverifiedFinalization(&mismatched)}},
 		},
 	}, testNodes.NodeIDs()[0]))
 
 	require.NoError(t, nv.HandleMessage(&common.Message{
 		ReplicationResponse: &common.ReplicationResponse{
-			Data: []common.QuorumRound{{Block: b3, Finalization: &finalization}},
+			Data: []common.QuorumRound{{Block: b3, Finalization: testutil.UnverifiedFinalization(&finalization)}},
 		},
 	}, testNodes.NodeIDs()[1]))
 
@@ -1707,7 +1707,7 @@ func TestNonValidatorDropsQuorumRoundPastSequenceWindow(t *testing.T) {
 	for seq := initialHeight; seq <= maxSequenceToSend; seq++ {
 		block, finalization, err := tc.Retrieve(seq)
 		require.NoError(t, err)
-		data = append(data, common.QuorumRound{Block: block.(common.Block), Finalization: &finalization})
+		data = append(data, common.QuorumRound{Block: block.(common.Block), Finalization: testutil.UnverifiedFinalization(&finalization)})
 	}
 
 	require.NoError(t, nv.HandleMessage(&common.Message{
@@ -1764,7 +1764,7 @@ func TestNonValidatorIgnoresReplayedQuorumRoundWhileVerifying(t *testing.T) {
 	for range 10 {
 		require.NoError(t, nv.HandleMessage(
 			&common.Message{ReplicationResponse: &common.ReplicationResponse{
-				Data: []common.QuorumRound{{Block: tb, Finalization: &finalization}},
+				Data: []common.QuorumRound{{Block: tb, Finalization: testutil.UnverifiedFinalization(&finalization)}},
 			}},
 			common.NodeID{ShortID: ids.ShortID{42}},
 		))
@@ -1810,7 +1810,7 @@ func TestNonValidatorServesReplicationRequest(t *testing.T) {
 		block, fin, err := tc.Retrieve(seq)
 		require.NoError(t, err)
 		require.Equal(t, block, resp.Data[i].Block)
-		require.Equal(t, fin, *resp.Data[i].Finalization)
+		require.Equal(t, testutil.UnverifiedFinalization(&fin), resp.Data[i].Finalization)
 	}
 	require.Equal(t, uint64(5), resp.LatestSeq.Block.BlockHeader().Seq)
 

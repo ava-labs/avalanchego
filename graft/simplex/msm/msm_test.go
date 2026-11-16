@@ -426,8 +426,8 @@ func TestMSMNormalOp(t *testing.T) {
 			chain := makeChain(t, simplexStartHeight, chainEndHeight, testConfig1.validatorSetRetriever.result)
 
 			for i, block := range chain {
-				testConfig1.blockStore[uint64(i)] = &outerBlock{block: block, finalization: &common.Finalization{}}
-				testConfig2.blockStore[uint64(i)] = &outerBlock{block: block, finalization: &common.Finalization{}}
+				testConfig1.blockStore[uint64(i)] = &outerBlock{block: block, finalization: &common.VerifiedFinalization{}}
+				testConfig2.blockStore[uint64(i)] = &outerBlock{block: block, finalization: &common.VerifiedFinalization{}}
 			}
 
 			lastBlock := chain[len(chain)-1]
@@ -510,7 +510,7 @@ func TestByzantinePChainHeightStallsHonestBuilders(t *testing.T) {
 	chain := makeChain(t, simplexStartHeight, chainEndHeight, attackerConfig.validatorSetRetriever.result)
 	for i, block := range chain {
 		for _, tc := range []*testConfig{attackerConfig, honestBuilderConfig, verifierConfig} {
-			tc.blockStore[uint64(i)] = &outerBlock{block: block, finalization: &common.Finalization{}}
+			tc.blockStore[uint64(i)] = &outerBlock{block: block, finalization: &common.VerifiedFinalization{}}
 		}
 	}
 
@@ -747,7 +747,7 @@ func TestMSMFullEpochLifecycle(t *testing.T) {
 			smVerify.LastNonSimplexBlockPChainHeight = pChainHeight1
 
 			// addBlock adds a block to both block stores so builder and verifier stay in sync.
-			addBlock := func(seq uint64, block StateMachineBlock, fin *common.Finalization) {
+			addBlock := func(seq uint64, block StateMachineBlock, fin *common.VerifiedFinalization) {
 				tc.blockStore[seq] = &outerBlock{block: block, finalization: fin}
 				tcVerify.blockStore[seq] = &outerBlock{block: block, finalization: fin}
 			}
@@ -790,7 +790,7 @@ func TestMSMFullEpochLifecycle(t *testing.T) {
 					ICMEpochInfo: testCase.firstBlockICMEpochInfo,
 				},
 			}, block1)
-			addBlock(md.Seq, *block1, &common.Finalization{})
+			addBlock(md.Seq, *block1, &common.VerifiedFinalization{})
 
 			require.NoError(t, smVerify.VerifyBlock(context.Background(), block1))
 
@@ -1002,7 +1002,7 @@ func TestMSMFullEpochLifecycle(t *testing.T) {
 				{
 					name: "sealing block immediately finalized",
 					setup: func() {
-						addBlock(sealingSeq, tc.blockStore[sealingSeq].block, &common.Finalization{})
+						addBlock(sealingSeq, tc.blockStore[sealingSeq].block, &common.VerifiedFinalization{})
 					},
 				},
 			} {
@@ -1044,7 +1044,7 @@ func TestMSMFullEpochLifecycle(t *testing.T) {
 						}, telock)
 
 						// Next, finalize the sealing block after we have built a Telock.
-						addBlock(sealingSeq, tc.blockStore[sealingSeq].block, &common.Finalization{})
+						addBlock(sealingSeq, tc.blockStore[sealingSeq].block, &common.VerifiedFinalization{})
 					}
 
 					// ----- Step 7: Build a new epoch block (sealing block is finalized) -----
@@ -1207,7 +1207,7 @@ func TestVerifyNextPChainRefHeightNormal(t *testing.T) {
 			},
 		}}}
 		if finalized {
-			ob.finalization = &common.Finalization{}
+			ob.finalization = &common.VerifiedFinalization{}
 		}
 		return ob
 	}
@@ -1288,7 +1288,7 @@ func TestVerifyDoesNotInitializeApprovalStore(t *testing.T) {
 
 	chain := makeChain(t, simplexStartHeight, chainEndHeight, currentSet)
 	for i, block := range chain {
-		tc.blockStore[uint64(i)] = &outerBlock{block: block, finalization: &common.Finalization{}}
+		tc.blockStore[uint64(i)] = &outerBlock{block: block, finalization: &common.VerifiedFinalization{}}
 	}
 	tc.validatorSetRetriever.resultMap = map[uint64]NodeBLSMappings{newPChainHeight: newSet}
 
@@ -2319,7 +2319,7 @@ func TestMSMWaitForPendingBlock(t *testing.T) {
 			SimplexEpochInfo:        sei,
 		}}}
 		if finalized {
-			ob.finalization = &common.Finalization{}
+			ob.finalization = &common.VerifiedFinalization{}
 		}
 		return ob
 	}
@@ -2327,7 +2327,7 @@ func TestMSMWaitForPendingBlock(t *testing.T) {
 	// zeroBlock is the finalized first simplex block that opens epoch 1 and records its validator set.
 	zeroBlock := func(set NodeBLSMappings) *outerBlock {
 		return &outerBlock{
-			finalization: &common.Finalization{},
+			finalization: &common.VerifiedFinalization{},
 			block: StateMachineBlock{Metadata: StateMachineMetadata{
 				SimplexProtocolMetadata: common.ProtocolMetadata{Epoch: 1},
 				SimplexEpochInfo: SimplexEpochInfo{
@@ -2611,14 +2611,14 @@ func TestMSMBuildBlockBuildsEmptyBlockWhenInnerBlockBuildingCancelled(t *testing
 
 func TestGetCurrentValidatorSet(t *testing.T) {
 	validators := NodeBLSMappings{{BLSKey: []byte{1}, Weight: 1}, {BLSKey: []byte{2}, Weight: 1}}
-	finalized := &common.Finalization{}
+	finalized := &common.VerifiedFinalization{}
 
 	descriptor := func(members NodeBLSMappings) *BlockValidationDescriptor {
 		return &BlockValidationDescriptor{AggregatedMembership: AggregatedMembership{Members: members}}
 	}
 
 	// zeroBlock opens the first epoch: it carries a descriptor and points to no previous sealing block.
-	zeroBlock := func(bvd *BlockValidationDescriptor, finalization *common.Finalization) *outerBlock {
+	zeroBlock := func(bvd *BlockValidationDescriptor, finalization *common.VerifiedFinalization) *outerBlock {
 		return &outerBlock{
 			finalization: finalization,
 			block: StateMachineBlock{Metadata: StateMachineMetadata{
@@ -2628,7 +2628,7 @@ func TestGetCurrentValidatorSet(t *testing.T) {
 	}
 
 	// sealingBlock at seq opens the epoch numbered seq: it carries a descriptor and points to the previous sealing block.
-	sealingBlock := func(seq uint64, bvd *BlockValidationDescriptor, finalization *common.Finalization) *outerBlock {
+	sealingBlock := func(seq uint64, bvd *BlockValidationDescriptor, finalization *common.VerifiedFinalization) *outerBlock {
 		return &outerBlock{
 			finalization: finalization,
 			block: StateMachineBlock{Metadata: StateMachineMetadata{

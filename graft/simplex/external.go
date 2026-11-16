@@ -55,6 +55,10 @@ func (p *ParsedBlock) BlockHeader() common.BlockHeader {
 	}
 }
 
+func (p *ParsedBlock) UnVerifiedBlock() common.Block {
+	return p
+}
+
 func (p *ParsedBlock) Blacklist() common.Blacklist {
 	return p.Metadata.SimplexBlacklist.Clone()
 }

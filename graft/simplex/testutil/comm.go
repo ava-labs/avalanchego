@@ -100,16 +100,16 @@ func (c *TestComm) maybeTranslateOutgoingToIncomingMessageTypes(msg *common.Mess
 			// so we do a type cast because the test block implements both.
 			quorumRound := common.QuorumRound{}
 			if verifiedQuorumRound.EmptyNotarization != nil {
-				quorumRound.EmptyNotarization = verifiedQuorumRound.EmptyNotarization
+				quorumRound.EmptyNotarization = UnverifiedEmptyNotarization(verifiedQuorumRound.EmptyNotarization)
 			}
-			if verifiedQuorumRound.VerifiedBlock != nil {
-				quorumRound.Block = verifiedQuorumRound.VerifiedBlock.(common.Block)
+			if verifiedQuorumRound.Block != nil {
+				quorumRound.Block = verifiedQuorumRound.Block.(common.Block)
 			}
 			if verifiedQuorumRound.Notarization != nil {
-				quorumRound.Notarization = verifiedQuorumRound.Notarization
+				quorumRound.Notarization = UnverifiedNotarization(verifiedQuorumRound.Notarization)
 			}
 			if verifiedQuorumRound.Finalization != nil {
-				quorumRound.Finalization = verifiedQuorumRound.Finalization
+				quorumRound.Finalization = UnverifiedFinalization(verifiedQuorumRound.Finalization)
 			}
 
 			data = append(data, quorumRound)
@@ -140,19 +140,48 @@ func (c *TestComm) maybeTranslateOutgoingToIncomingMessageTypes(msg *common.Mess
 	}
 }
 
+// UnverifiedQuorumRound returns the unverified counterpart of vqr.
+func UnverifiedQuorumRound(vqr *common.VerifiedQuorumRound) *common.QuorumRound {
+	return verifiedQRtoQR(vqr)
+}
+
+// UnverifiedNotarization returns the unverified counterpart of n.
+func UnverifiedNotarization(n *common.VerifiedNotarization) *common.Notarization {
+	if n == nil {
+		return nil
+	}
+	return &common.Notarization{Vote: n.Vote, QC: n.QC.UnVerified()}
+}
+
+// UnverifiedFinalization returns the unverified counterpart of f.
+func UnverifiedFinalization(f *common.VerifiedFinalization) *common.Finalization {
+	if f == nil {
+		return nil
+	}
+	return &common.Finalization{Finalization: f.Finalization, QC: f.QC.UnVerified()}
+}
+
+// UnverifiedEmptyNotarization returns the unverified counterpart of en.
+func UnverifiedEmptyNotarization(en *common.VerifiedEmptyNotarization) *common.EmptyNotarization {
+	if en == nil {
+		return nil
+	}
+	return &common.EmptyNotarization{Vote: en.Vote, QC: en.QC.UnVerified()}
+}
+
 func verifiedQRtoQR(vqr *common.VerifiedQuorumRound) *common.QuorumRound {
 	if vqr == nil {
 		return nil
 	}
 
 	qr := &common.QuorumRound{
-		Notarization:      vqr.Notarization,
-		Finalization:      vqr.Finalization,
-		EmptyNotarization: vqr.EmptyNotarization,
+		Notarization:      UnverifiedNotarization(vqr.Notarization),
+		Finalization:      UnverifiedFinalization(vqr.Finalization),
+		EmptyNotarization: UnverifiedEmptyNotarization(vqr.EmptyNotarization),
 	}
 
-	if vqr.VerifiedBlock != nil {
-		qr.Block = vqr.VerifiedBlock.(common.Block)
+	if vqr.Block != nil {
+		qr.Block = vqr.Block.(common.Block)
 	}
 
 	return qr

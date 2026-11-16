@@ -19,6 +19,10 @@ type verifiableMessage interface {
 	Verify(nodes common.Nodes) error
 }
 
+type verifiableQC interface {
+	Verify(nodes common.Nodes) (common.VerifiedQuorumCertificate, error)
+}
+
 // RetrieveLastIndexFromStorage retrieves the latest block and finalization from storage.
 // Returns an error if it cannot be retrieved but the storage has some block.
 // Returns (nil, nil) if the storage is empty.
@@ -37,39 +41,9 @@ func RetrieveLastIndexFromStorage(s common.Storage) (*common.VerifiedFinalizedBl
 	}, nil
 }
 
-func hasSomeNodeSignedTwice(nodeIDs []common.NodeID) (common.NodeID, bool) {
-	seen := make(map[common.NodeID]struct{}, len(nodeIDs))
-
-	for _, nodeID := range nodeIDs {
-		if _, alreadySeen := seen[nodeID]; alreadySeen {
-			return nodeID, true
-		}
-		seen[nodeID] = struct{}{}
-	}
-
-	return common.NodeID{}, false
-}
-
-func VerifyQC(qc common.QuorumCertificate, isQuorum func(signers []common.NodeID) bool, eligibleSigners map[common.NodeID][]byte, messageToVerify verifiableMessage, nodes common.Nodes) error {
+func VerifyQC(qc common.QuorumCertificate, messageToVerify verifiableQC, nodes common.Nodes) (common.VerifiedQuorumCertificate, error) {
 	if qc == nil {
-		return fmt.Errorf("nil QuorumCertificate")
-	}
-	// Ensure no node signed the QuorumCertificate twice
-	doubleSigner, signedTwice := hasSomeNodeSignedTwice(qc.Signers())
-	if signedTwice {
-		return fmt.Errorf("quorum certificate is signed by the same node (%s) more than once", doubleSigner)
-	}
-
-	// Check enough signers signed the QuorumCertificate
-	if !isQuorum(qc.Signers()) {
-		return fmt.Errorf("quorum certificate signed by insufficient (%d) nodes", len(qc.Signers()))
-	}
-
-	// Check QuorumCertificate was signed by only eligible nodes
-	for _, signer := range qc.Signers() {
-		if _, exists := eligibleSigners[signer]; !exists {
-			return fmt.Errorf("quorum certificate contains an unknown signer (%s)", signer)
-		}
+		return nil, fmt.Errorf("nil QuorumCertificate")
 	}
 
 	return messageToVerify.Verify(nodes)
@@ -77,7 +51,7 @@ func VerifyQC(qc common.QuorumCertificate, isQuorum func(signers []common.NodeID
 
 // GetLatestVerifiedQuorumRound returns the latest verified quorum round given
 // a round and empty notarization. If both are nil, it returns nil.
-func GetLatestVerifiedQuorumRound(round *Round, emptyNotarization *common.EmptyNotarization) *common.VerifiedQuorumRound {
+func GetLatestVerifiedQuorumRound(round *Round, emptyNotarization *common.VerifiedEmptyNotarization) *common.VerifiedQuorumRound {
 	var verifiedQuorumRound *common.VerifiedQuorumRound
 	var highestRound uint64
 	var exists bool
@@ -85,9 +59,9 @@ func GetLatestVerifiedQuorumRound(round *Round, emptyNotarization *common.EmptyN
 	if round != nil && (round.finalization != nil || round.notarization != nil) {
 		highestRound = round.num
 		verifiedQuorumRound = &common.VerifiedQuorumRound{
-			VerifiedBlock: round.block,
-			Notarization:  round.notarization,
-			Finalization:  round.finalization,
+			Block:        round.block.UnVerifiedBlock(),
+			Notarization: round.notarization,
+			Finalization: round.finalization,
 		}
 		exists = true
 	}
@@ -105,7 +79,7 @@ func GetLatestVerifiedQuorumRound(round *Round, emptyNotarization *common.EmptyN
 }
 
 // SetRound is a helper function that is used for tests to create a round.
-func SetRound(block common.VerifiedBlock, notarization *common.Notarization, finalization *common.Finalization) *Round {
+func SetRound(block common.VerifiedBlock, notarization *common.VerifiedNotarization, finalization *common.VerifiedFinalization) *Round {
 	round := &Round{
 		block:        block,
 		notarization: notarization,
@@ -226,10 +200,10 @@ func emptyVotesToSignatures(votes []*common.EmptyVote) []common.Signature {
 
 type walRound struct {
 	round             uint64
-	emptyNotarization *common.EmptyNotarization
+	emptyNotarization *common.VerifiedEmptyNotarization
 	emptyVote         *common.ToBeSignedEmptyVote
-	notarization      *common.Notarization
-	finalization      *common.Finalization
+	notarization      *common.VerifiedNotarization
+	finalization      *common.VerifiedFinalization
 	block             common.Block
 }
 

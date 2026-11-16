@@ -42,10 +42,10 @@ func NewCallbackStorage(storage *CachedStorage, msm *metadata.StateMachine, onIn
 	}
 }
 
-func (s *CallbackStorage) Retrieve(seq uint64) (common.VerifiedBlock, common.Finalization, error) {
+func (s *CallbackStorage) Retrieve(seq uint64) (common.VerifiedBlock, common.VerifiedFinalization, error) {
 	block, finalization, err := s.GetBlock(seq)
 	if err != nil {
-		return nil, common.Finalization{}, err
+		return nil, common.VerifiedFinalization{}, err
 	}
 	parsedBlock := &ParsedBlock{
 		legacyBlock:       seq <= s.lastNonSimplexHeight,
@@ -55,7 +55,7 @@ func (s *CallbackStorage) Retrieve(seq uint64) (common.VerifiedBlock, common.Fin
 	return parsedBlock, *finalization, nil
 }
 
-func (s *CallbackStorage) Index(ctx context.Context, block common.VerifiedBlock, certificate common.Finalization) error {
+func (s *CallbackStorage) Index(ctx context.Context, block common.VerifiedBlock, certificate common.VerifiedFinalization) error {
 	pb, ok := block.(*ParsedBlock)
 	if !ok {
 		return fmt.Errorf("expected ParsedBlock, got %T", block)
@@ -107,7 +107,7 @@ func NewCachedStorage(storage Storage, lastNonSimplexHeight uint64) *CachedStora
 	}
 }
 
-func (cs *CachedStorage) RetrieveBlock(seq uint64, digest common.Digest) (metadata.StateMachineBlock, *common.Finalization, error) {
+func (cs *CachedStorage) RetrieveBlock(seq uint64, digest common.Digest) (metadata.StateMachineBlock, *common.VerifiedFinalization, error) {
 	block, finalization, err := cs.Retrieve(seq, digest)
 	if err != nil {
 		return metadata.StateMachineBlock{}, nil, err
@@ -116,7 +116,7 @@ func (cs *CachedStorage) RetrieveBlock(seq uint64, digest common.Digest) (metada
 	return block.(*ParsedBlock).Clone(), finalization, nil
 }
 
-func (cs *CachedStorage) Retrieve(seq uint64, digest common.Digest) (common.VerifiedBlock, *common.Finalization, error) {
+func (cs *CachedStorage) Retrieve(seq uint64, digest common.Digest) (common.VerifiedBlock, *common.VerifiedFinalization, error) {
 	cs.lock.RLock()
 
 	item, exists := cs.cache[digest]
@@ -161,7 +161,7 @@ func (cs *CachedStorage) Retrieve(seq uint64, digest common.Digest) (common.Veri
 	}, finalization, err
 }
 
-func (cs *CachedStorage) Index(ctx context.Context, block common.VerifiedBlock, certificate common.Finalization) error {
+func (cs *CachedStorage) Index(ctx context.Context, block common.VerifiedBlock, certificate common.VerifiedFinalization) error {
 	cs.lock.Lock()
 	defer cs.lock.Unlock()
 

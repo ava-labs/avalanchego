@@ -67,8 +67,8 @@ type Storage interface {
 	NumBlocks() uint64
 	// Retrieve returns the block and finalization at [seq].
 	// If [seq] the block cannot be found, returns ErrBlockNotFound.
-	Retrieve(seq uint64) (VerifiedBlock, Finalization, error)
-	Index(ctx context.Context, block VerifiedBlock, certificate Finalization) error
+	Retrieve(seq uint64) (VerifiedBlock, VerifiedFinalization, error)
+	Index(ctx context.Context, block VerifiedBlock, certificate VerifiedFinalization) error
 }
 
 type Communication interface {
@@ -115,6 +115,9 @@ type Block interface {
 
 	// non nil only for sealing blocks & first ever simplex block
 	SealingBlockInfo() *SealingBlockInfo
+
+	// Size returns the number of bytes in the encoding of the block
+	Size() int
 }
 
 // SealingBlockInfo defines information that is derived from a sealing block,
@@ -144,6 +147,9 @@ type VerifiedBlock interface {
 
 	// SealingBlockInfo returns a non-nil value for a block that is not a sealing block and that is not the first ever simplex block.
 	SealingBlockInfo() *SealingBlockInfo
+
+	// UnVerifiedBlock returns the underlying Block that was verified to produce this VerifiedBlock.
+	UnVerifiedBlock() Block
 }
 
 // BlockDeserializer deserializes blocks according to formatting
@@ -172,7 +178,7 @@ type QCDeserializer interface {
 // SignatureAggregator aggregates signatures into a QuorumCertificate
 type SignatureAggregator interface {
 	// Aggregate aggregates several signatures into a QuorumCertificate
-	Aggregate([]Signature) (QuorumCertificate, error)
+	Aggregate([]Signature) (QuorumCertificate, VerifiedQuorumCertificate, error)
 
 	// AppendSignatures appends signatures to an existing signature.
 	// If the existing signature is empty, it just aggregates the given signatures.

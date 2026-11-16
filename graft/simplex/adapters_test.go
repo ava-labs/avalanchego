@@ -40,7 +40,7 @@ func newTestParsedBlock(num uint64, payload string) *ParsedBlock {
 func TestCachedStorageRetrieve(t *testing.T) {
 	cs := NewCachedStorage(newTestStorage(), 0)
 	indexedBlock := newTestParsedBlock(0, "indexed")
-	require.NoError(t, cs.Index(t.Context(), indexedBlock, common.Finalization{}))
+	require.NoError(t, cs.Index(t.Context(), indexedBlock, common.VerifiedFinalization{}))
 
 	verifiedBlockSeq := uint64(5)
 	verifiedBlock := newTestParsedBlock(verifiedBlockSeq, "cached")
@@ -122,7 +122,7 @@ func TestCachedStorageRetrieve(t *testing.T) {
 // finalization, even when a verified fork at the same seq was cached.
 func TestCachedStorageIndexEvictsSameSeqFork(t *testing.T) {
 	cs := NewCachedStorage(newTestStorage(), 0)
-	require.NoError(t, cs.Index(t.Context(), newTestParsedBlock(0, "genesis"), common.Finalization{}))
+	require.NoError(t, cs.Index(t.Context(), newTestParsedBlock(0, "genesis"), common.VerifiedFinalization{}))
 
 	equivocatedBlock := &cachedBlock{
 		ParsedBlock: newTestParsedBlock(1, "fork"),
@@ -132,7 +132,7 @@ func TestCachedStorageIndexEvictsSameSeqFork(t *testing.T) {
 	require.NoError(t, err)
 
 	finalized := newTestParsedBlock(1, "finalized")
-	require.NoError(t, cs.Index(t.Context(), finalized, common.Finalization{}))
+	require.NoError(t, cs.Index(t.Context(), finalized, common.VerifiedFinalization{}))
 
 	retrievedBlock, fin, err := cs.Retrieve(1, common.Digest{})
 	require.NoError(t, err)
@@ -144,10 +144,10 @@ func TestCachedStorageIndexEvictsSameSeqFork(t *testing.T) {
 // completes after its sibling(block with same sequence) was indexed is not cached.
 func TestCachedStorageLateVerifyDoesNotShadowIndexed(t *testing.T) {
 	cs := NewCachedStorage(newTestStorage(), 0)
-	require.NoError(t, cs.Index(t.Context(), newTestParsedBlock(0, "genesis"), common.Finalization{}))
+	require.NoError(t, cs.Index(t.Context(), newTestParsedBlock(0, "genesis"), common.VerifiedFinalization{}))
 
 	finalized := newTestParsedBlock(1, "finalized")
-	require.NoError(t, cs.Index(t.Context(), finalized, common.Finalization{}))
+	require.NoError(t, cs.Index(t.Context(), finalized, common.VerifiedFinalization{}))
 
 	delayedVerificationBlock := &cachedBlock{
 		ParsedBlock: newTestParsedBlock(1, "delayed sibling"),
