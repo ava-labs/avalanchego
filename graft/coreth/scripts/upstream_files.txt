@@ -1,4 +1,3 @@
-core/evm.go
 params/config_test.go
 params/config.go
 plugin/evm/customtypes/block_test.go

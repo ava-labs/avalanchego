@@ -18,7 +18,7 @@ func TestKeys() []*PrivateKey {
 	)
 
 	for i, key := range keyStrings {
-		privKeyBytes, err := cb58.Decode(key)
+		privKeyBytes, err := cb58.Decode(key, PrivateKeyLen)
 		if err != nil {
 			panic(err)
 		}

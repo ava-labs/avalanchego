@@ -267,40 +267,38 @@ func TestActivePrecompiles(t *testing.T) {
 }
 
 func TestChainConfigMarshalWithUpgrades(t *testing.T) {
-	config := ChainConfigWithUpgradesJSON{
-		ChainConfig: *WithExtra(
-			&ChainConfig{
-				ChainID:             big.NewInt(1),
-				HomesteadBlock:      big.NewInt(0),
-				EIP150Block:         big.NewInt(0),
-				EIP155Block:         big.NewInt(0),
-				EIP158Block:         big.NewInt(0),
-				ByzantiumBlock:      big.NewInt(0),
-				ConstantinopleBlock: big.NewInt(0),
-				PetersburgBlock:     big.NewInt(0),
-				IstanbulBlock:       big.NewInt(0),
-				MuirGlacierBlock:    big.NewInt(0),
-			},
-			&extras.ChainConfig{
-				FeeConfig:          DefaultFeeConfig,
-				AllowFeeRecipients: false,
-				NetworkUpgrades: extras.NetworkUpgrades{
-					SubnetEVMTimestamp: utils.PointerTo[uint64](0),
-					DurangoTimestamp:   utils.PointerTo[uint64](0),
-				},
-				GenesisPrecompiles: extras.Precompiles{},
-			},
-		),
-		UpgradeConfig: extras.UpgradeConfig{
-			PrecompileUpgrades: []extras.PrecompileUpgrade{
-				{
-					Config: txallowlist.NewConfig(utils.PointerTo[uint64](100), nil, nil, nil),
-				},
+	upgrades := extras.UpgradeConfig{
+		PrecompileUpgrades: []extras.PrecompileUpgrade{
+			{
+				Config: txallowlist.NewConfig(utils.PointerTo[uint64](100), nil, nil, nil),
 			},
 		},
 	}
-	result, err := json.Marshal(&config)
-	require.NoError(t, err)
+	config := WithExtra(
+		&ChainConfig{
+			ChainID:             big.NewInt(1),
+			HomesteadBlock:      big.NewInt(0),
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0),
+			ConstantinopleBlock: big.NewInt(0),
+			PetersburgBlock:     big.NewInt(0),
+			IstanbulBlock:       big.NewInt(0),
+			MuirGlacierBlock:    big.NewInt(0),
+		},
+		&extras.ChainConfig{
+			FeeConfig: DefaultFeeConfig,
+			NetworkUpgrades: extras.NetworkUpgrades{
+				SubnetEVMTimestamp: utils.PointerTo[uint64](0),
+				DurangoTimestamp:   utils.PointerTo[uint64](0),
+			},
+			GenesisPrecompiles: extras.Precompiles{},
+			UpgradeConfig:      upgrades,
+		},
+	)
+	result, err := json.Marshal(config)
+	require.NoError(t, err, "json.Marshal()")
 	expectedJSON := `{
 		"chainId": 1,
 		"feeConfig": {
@@ -337,7 +335,10 @@ func TestChainConfigMarshalWithUpgrades(t *testing.T) {
 	require.JSONEq(t, expectedJSON, string(result))
 
 	var unmarshalled ChainConfigWithUpgradesJSON
-	err = json.Unmarshal(result, &unmarshalled)
-	require.NoError(t, err)
-	require.Equal(t, config, unmarshalled)
+	require.NoError(t, json.Unmarshal(result, &unmarshalled), "json.Unmarshal()")
+	want := ChainConfigWithUpgradesJSON{
+		ChainConfig:   *config,
+		UpgradeConfig: upgrades,
+	}
+	require.Equal(t, want, unmarshalled)
 }

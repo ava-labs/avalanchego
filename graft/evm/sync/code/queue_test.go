@@ -15,8 +15,8 @@ import (
 	"go.uber.org/goleak"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 )
 
 func TestMain(m *testing.M) {
