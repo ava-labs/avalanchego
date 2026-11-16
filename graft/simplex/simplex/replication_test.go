@@ -1936,6 +1936,53 @@ func TestLeaderStartsRoundAfterReplicatedQuorumRound(t *testing.T) {
 	}
 }
 
+// TestLeaderDoesNotRestartRoundAfterReplicatingOlderNotarization makes sure that replicating a
+// notarized block for an older round does not restart the current round.
+func TestLeaderDoesNotRestartRoundAfterReplicatingOlderNotarization(t *testing.T) {
+	nodes := []common.NodeID{{1}, {2}, {3}, {4}}
+	quorum := common.Quorum(len(nodes))
+
+	conf, wal, _ := testutil.DefaultTestNodeEpochConfig(t, nodes[1], testutil.NewNoopComm(nodes), testutil.NewTestBlockBuilder())
+	conf.ReplicationEnabled = true
+
+	e, err := simplex.NewEpoch(conf)
+	require.NoError(t, err)
+	t.Cleanup(e.Stop)
+	require.NoError(t, e.Start())
+
+	// The notarized block for round 0 that the node never received.
+	block0 := testutil.NewTestBlock(e.Metadata(), emptyBlacklist)
+	notarization0, err := testutil.NewNotarization(e.Logger, conf.SignatureAggregatorCreator(conf.Comm.Validators()), block0, nodes[:quorum])
+	require.NoError(t, err)
+
+	// Node 1 times out on round 0 and moves to round 1. It is the leader, so it proposes a block.
+	require.NoError(t, e.HandleMessage(&common.Message{
+		EmptyNotarization: testutil.NewEmptyNotarization(nodes[:quorum], 0),
+	}, nodes[0]))
+
+	// node 1, creates a block proposal
+	wal.AssertBlockProposal(1)
+
+	// The network actually notarized round 0, so we receive it via a replication response.
+	require.NoError(t, e.HandleMessage(&common.Message{
+		ReplicationResponse: &common.ReplicationResponse{
+			Data: []common.QuorumRound{{Block: block0, Notarization: &notarization0}},
+		},
+	}, nodes[0]))
+
+	// Wait for the replicated notarization to be processed.
+	require.Eventually(t, func() bool {
+		return wal.ContainsNotarization(0)
+	}, 5*time.Second, 10*time.Millisecond, "node never persisted the replicated notarization for round 0")
+	require.Equal(t, uint64(1), e.Metadata().Round)
+
+	// The node must not have halted. A halted node returns its error for any message it handles.
+	for range 50 {
+		require.NoError(t, e.HandleMessage(&common.Message{}, nodes[0]))
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func replicateSeq(block common.VerifiedFinalizedBlock) *common.Message {
 	return &common.Message{ReplicationResponse: &common.ReplicationResponse{
 		Data: []common.QuorumRound{{
