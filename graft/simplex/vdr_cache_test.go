@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/ava-labs/simplex/avalanchego"
-	metadata "github.com/ava-labs/simplex/msm"
+	"github.com/ava-labs/avalanchego/graft/simplex/avalanchego"
+	metadata "github.com/ava-labs/avalanchego/graft/simplex/msm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

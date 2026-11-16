@@ -6,8 +6,8 @@ package random_network
 import (
 	"context"
 
-	"github.com/ava-labs/simplex/common"
-	"github.com/ava-labs/simplex/testutil"
+	"github.com/ava-labs/avalanchego/graft/simplex/common"
+	"github.com/ava-labs/avalanchego/graft/simplex/testutil"
 )
 
 type Storage struct {
