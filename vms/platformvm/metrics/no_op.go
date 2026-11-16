@@ -48,6 +48,8 @@ func (noopMetrics) SetTimeUntilUnstake(time.Duration) {}
 
 func (noopMetrics) SetTimeUntilSubnetUnstake(ids.ID, time.Duration) {}
 
+func (noopMetrics) SetLocalL1ValidatorBalance(ids.ID, uint64) {}
+
 func (noopMetrics) SetSubnetPercentConnected(ids.ID, float64) {}
 
 func (noopMetrics) SetPercentConnected(float64) {}

@@ -70,6 +70,7 @@ go_test(
     name = "platformvm_test",
     srcs = [
         "client_permissionless_validator_test.go",
+        "health_test.go",
         "main_test.go",
         "service_test.go",
         "validator_set_property_test.go",
@@ -157,6 +158,7 @@ go_test(
         "@com_github_leanovate_gopter//gen",
         "@com_github_leanovate_gopter//prop",
         "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_golang//prometheus/testutil",
         "@com_github_stretchr_testify//require",
         "@org_golang_x_exp//maps",
         "@org_golang_x_sync//errgroup",

@@ -71,6 +71,8 @@ type Metrics interface {
 	SetTimeUntilUnstake(time.Duration)
 	// Mark when this node will unstake from a subnet.
 	SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration)
+	// Mark how much balance this node's L1 validator of a subnet has left.
+	SetLocalL1ValidatorBalance(subnetID ids.ID, balance uint64)
 }
 
 func New(registerer prometheus.Registerer) (Metrics, error) {
@@ -100,6 +102,13 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 			Name: "total_staked",
 			Help: "Amount (in nAVAX) of AVAX staked on the Primary Network",
 		}),
+		localL1ValidatorBalance: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "local_l1_validator_balance",
+				Help: "Remaining balance (in nAVAX) of this node's L1 validator",
+			},
+			[]string{"subnetID"},
+		),
 
 		gasConsumed: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "gas_consumed",
@@ -160,6 +169,7 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 		registerer.Register(m.localStake),
 		registerer.Register(m.localDelegatedStake),
 		registerer.Register(m.totalStake),
+		registerer.Register(m.localL1ValidatorBalance),
 
 		registerer.Register(m.gasConsumed),
 		registerer.Register(m.gasCapacity),
@@ -183,11 +193,12 @@ type metrics struct {
 	blockMetrics *blockMetrics
 
 	// Staking metrics
-	timeUntilUnstake       prometheus.Gauge
-	timeUntilSubnetUnstake *prometheus.GaugeVec
-	localStake             prometheus.Gauge
-	localDelegatedStake    prometheus.Gauge
-	totalStake             prometheus.Gauge
+	timeUntilUnstake        prometheus.Gauge
+	timeUntilSubnetUnstake  *prometheus.GaugeVec
+	localStake              prometheus.Gauge
+	localDelegatedStake     prometheus.Gauge
+	totalStake              prometheus.Gauge
+	localL1ValidatorBalance *prometheus.GaugeVec
 
 	gasConsumed          prometheus.Counter
 	gasCapacity          prometheus.Gauge
@@ -251,4 +262,8 @@ func (m *metrics) SetTimeUntilUnstake(timeUntilUnstake time.Duration) {
 
 func (m *metrics) SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration) {
 	m.timeUntilSubnetUnstake.WithLabelValues(subnetID.String()).Set(float64(timeUntilUnstake))
+}
+
+func (m *metrics) SetLocalL1ValidatorBalance(subnetID ids.ID, balance uint64) {
+	m.localL1ValidatorBalance.WithLabelValues(subnetID.String()).Set(float64(balance))
 }
