@@ -14,6 +14,9 @@ inputs:
   setup_bazel:
     description: 'Whether to run Bazel setup before executing the command'
     default: 'false'
+  setup_go_module_cache:
+    description: 'Prepare dependencies for Go commands outside Bazel, even when Bazel setup is enabled'
+    default: 'false'
   filter_by_owner:
     default: ''
   artifact_prefix:
@@ -68,10 +71,10 @@ runs:
     - id: install-nix
       uses: ./.github/actions/install-nix
       with:
-        # Bazel setup prepares Gazelle's cache separately. Skip preparation of
-        # the non-Bazel Go module cache when this job uses Bazel.
+        # Gazelle's cache does not supply dependencies for Go commands outside
+        # Bazel, such as load-contract binding generation.
         # See docs/go-toolchains-and-caches.md#dependency-preparation.
-        setup_go_module_cache: ${{ inputs.setup_bazel != 'true' }}
+        setup_go_module_cache: ${{ inputs.setup_bazel != 'true' || inputs.setup_go_module_cache == 'true' }}
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash

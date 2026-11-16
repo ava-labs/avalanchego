@@ -47,9 +47,8 @@ jobs:
     needs: setup-cache-darwin-arm64
     uses: ./.github/workflows/go-unit.yml
     with:
-      platform_name: macos-26-arm64
       runner: macos-26
-      run_race_shuffle_unit_tests: false
+      test_task: test-unit
     secrets: inherit
 
   full-linux-amd64:
@@ -61,16 +60,16 @@ jobs:
         include:
           - platform_name: ubuntu-22.04-amd64
             runner: ubuntu-22.04
+            test_task: test-unit
           # Run race and shuffled tests once on our production platform to retain coverage
           # without increasing flake rate across every platform.
           - platform_name: ubuntu-24.04-amd64
             runner: ubuntu-24.04
-            run_race_shuffle_unit_tests: true
+            test_task: test-unit-race-shuffle
     uses: ./.github/workflows/go-unit.yml
     with:
-      platform_name: ${{ matrix.platform_name }}
       runner: ${{ matrix.runner }}
-      run_race_shuffle_unit_tests: ${{ matrix.run_race_shuffle_unit_tests || false }}
+      test_task: ${{ matrix.test_task }}
     secrets: inherit
 
   full-linux-arm64:
@@ -88,7 +87,6 @@ jobs:
             runner: ubuntu-24.04-arm
     uses: ./.github/workflows/go-unit.yml
     with:
-      platform_name: ${{ matrix.platform_name }}
       runner: ${{ matrix.runner }}
-      run_race_shuffle_unit_tests: false
+      test_task: test-unit
     secrets: inherit

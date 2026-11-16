@@ -6,13 +6,15 @@ package customtypes
 import (
 	"io"
 	"math/big"
+	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/rlp"
 
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/dynamic"
+	"github.com/ava-labs/avalanchego/graft/evm/acp226"
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -51,6 +53,8 @@ type HeaderExtra struct {
 	SettledGasUnix      *uint64
 	SettledGasNumerator *uint64
 	SettledExcess       *uint64
+
+	predicateResults atomic.Pointer[predicate.BlockResults]
 }
 
 // HeaderTimeMilliseconds returns the header timestamp in milliseconds.

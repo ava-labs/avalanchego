@@ -17,15 +17,6 @@ func Uint64ToTime(val *uint64) time.Time {
 	return time.Unix(timestamp, 0)
 }
 
-// Uint64PtrEqual returns true if x and y pointers are equivalent ie. both nil or both
-// contain the same value.
-func Uint64PtrEqual(x, y *uint64) bool {
-	if x == nil || y == nil {
-		return x == y
-	}
-	return *x == *y
-}
-
 // BigEqual returns true if a is equal to b. If a and b are nil, it returns
 // true.
 func BigEqual(a, b *big.Int) bool {

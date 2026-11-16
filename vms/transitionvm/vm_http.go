@@ -38,7 +38,7 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	return vm.httpHandlers.AsInterface(), nil
 }
 
-// None of Subnet-EVM, Coreth, or SAEVM implement NewHTTPHandler, so it is left
+// None of Subnet-EVM, Coreth, or the C-Chain VM implement NewHTTPHandler, so it is left
 // unimplemented.
 func (*VM) NewHTTPHandler(context.Context) (http.Handler, error) {
 	return nil, nil

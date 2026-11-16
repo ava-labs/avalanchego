@@ -122,7 +122,7 @@ func (s *SignatureAggregator) AggregateSignatures(
 		signatures = append(signatures, blsSignature)
 	}
 
-	results := make(chan result)
+	results := make(chan result, len(nonSigners))
 	handler := responseHandler{
 		message:             message,
 		nodeIDsToValidators: nodeIDsToValidator,

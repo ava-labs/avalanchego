@@ -14,7 +14,7 @@ import (
 
 const baseImageName = "antithesis-subnet-evm"
 
-// Creates docker-compose.yml and its associated volumes in the target path.
+// Creates docker-compose.yaml and its associated volumes in the target path.
 func main() {
 	// Create a network with a subnet-evm subnet
 	network := tmpnet.LocalNetworkOrPanic()
