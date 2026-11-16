@@ -25,7 +25,7 @@ The Avalanche Warp Precompile enables this flow to send a message from blockchai
 
 ### Warp Precompile
 
-The Warp Precompile is broken down into three functions defined in the Solidity interface file [IWarpMessenger.sol](../../../contracts/contracts/interfaces/IWarpMessenger.sol).
+The Warp Precompile is broken down into three functions defined in the Solidity interface file [IWarpMessenger.sol](../../../precompile/contracts/warp/warpbindings/IWarpMessenger.sol).
 
 #### sendWarpMessage
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This package implements a client and server that allows for the syncing of a [MerkleDB](../merkledb/README.md).
+This package implements a client and server that allows for the syncing of a [MerkleDB](../../../x/merkledb/README.md).
 The servers have an up-to-date version of the database, and the clients have an out of date version of the database or an empty database.
 
 It's planned that these client and server implementations will eventually be compatible with Firewood.
@@ -11,15 +11,15 @@ It's planned that these client and server implementations will eventually be com
 
 There are four message types sent between the client and server:
 
-1. `SyncGetRangeProofRequest`
+1. `RangeProofRequest`
 2. `RangeProof`
-3. `SyncGetChangeProofRequest`
-4. `SyncGetChangeProofResponse`
+3. `ChangeProofRequest`
+4. `ChangeProof`
 
-These message types are defined in `avalanchego/proto/sync.proto`.
-For more information on range proofs and change proofs, see their definitions in `avalanchego/merkledb/proof.go`.
+These message types are defined in `avalanchego/proto/sync/sync.proto`.
+For more information on range proofs and change proofs, see their definitions in `avalanchego/x/merkledb/proof.go`.
 
-### `SyncGetRangeProofRequest`
+### `RangeProofRequest`
 
 This message is sent from the client to the server to request a range proof for a given key range and root hash.
 That is, the client says, "Give me the key-value pairs that were in this key range when the database had this root."
@@ -27,7 +27,7 @@ This request includes a limit on the number of key-value pairs to return, and th
 
 ### `RangeProof`
 
-This message is sent from the server to the client in response to a `SyncGetRangeProofRequest`.
+This message is sent from the server to the client in response to a `RangeProofRequest`.
 It contains the key-value pairs that were in the requested key range when the database had the requested root, 
 as well as a proof that the key-value pairs are correct.
 If a server can't serve the entire requested key range in one response, its response will omit keys from the
@@ -36,15 +36,15 @@ For example, if a client requests a range proof for range [`requested_start`, `r
 can't fit all the key-value pairs in one response, it'll send a range proof for [`requested_start`, `proof_end`] where `proof_end` < `requested_end`, 
 as opposed to sending a range proof for [`proof_start`, `requested_end`] where `proof_start` > `requested_start`.
 
-### `SyncGetChangeProofRequest`
+### `ChangeProofRequest`
 
 This message is sent from the client to the server to request a change proof between the given root hashes.
 That is, the client says, "Give me the key-value pairs that changed between the time the database had this root and that root." 
 This request includes a limit on the number of key-value pairs to return, and the size of the response.
 
-### `SyncGetChangeProofResponse`
+### `ChangeProof`
 
-This message is sent from the server to the client in response to a `SyncGetChangeProofRequest`.
+This message is sent from the server to the client in response to a `ChangeProofRequest`.
 If the server had sufficient history to generate a change proof, it contains a change proof that contains 
 the key-value pairs that changed between the requested roots.
 If the server did not have sufficient history to generate a change proof, it contains a range proof that
