@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 )
 
@@ -27,7 +28,7 @@ func TestRulesExtra_MinimumGasConsumption(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := RulesExtra(cparams.Rules{IsHelicon: tt.isHelicon})
+			r := RulesExtra{cparams.Rules{LatestUpgrade: upgrade.Helicon}}
 			assert.Equalf(t, tt.want, r.MinimumGasConsumption(tt.limit), "%T.MinimumGasConsumption(%d)", r, tt.limit)
 		})
 	}

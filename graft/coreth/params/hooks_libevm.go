@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
@@ -27,11 +28,13 @@ import (
 // P256VerifyAddress is the address of the p256 signature verification precompile
 var P256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
 
-type RulesExtra cparams.Rules // TODO(alarso16): Avoid new type.
+type RulesExtra struct { // TODO(alarso16): Avoid new type.
+	cparams.Rules
+}
 
 func GetRulesExtra(r ethparams.Rules) *cparams.Rules {
 	rules := payloads.Rules.GetPointer(&r)
-	return (*cparams.Rules)(rules)
+	return &rules.Rules
 }
 
 func (RulesExtra) CanCreateContract(_ *libevm.AddressContext, gas uint64, _ libevm.StateReader) (uint64, error) {
@@ -39,12 +42,12 @@ func (RulesExtra) CanCreateContract(_ *libevm.AddressContext, gas uint64, _ libe
 }
 
 func (r RulesExtra) ShouldRefundGas() bool {
-	return !r.IsApricotPhase1
+	return !r.Is(upgrade.ApricotPhase1)
 }
 
 // MinimumGasConsumption returns the ACP-194 gas-charged floor (ceil(limit/2)).
 func (r RulesExtra) MinimumGasConsumption(limit uint64) uint64 {
-	if cparams.Rules(r).IsHelicon {
+	if r.Is(upgrade.Helicon) {
 		return hook.MinimumGasConsumption(limit)
 	}
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(limit)
@@ -72,10 +75,10 @@ var warpPredicaters = map[common.Address]precompileconfig.Predicater{
 // [warp.Config.PredicateGas]. Otherwise, it returns override=false to use the
 // default calculation.
 func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, error) {
-	if !r.IsDurango {
+	if !r.Is(upgrade.Durango) {
 		return 0, false, nil
 	}
-	gas, err := precompileconfig.AccessListGasWithPredicates(cparams.Rules(r), warpPredicaters, accessList)
+	gas, err := precompileconfig.AccessListGasWithPredicates(r.Rules, warpPredicaters, accessList)
 	return gas, true, err
 }
 
@@ -123,10 +126,10 @@ var precompiledContractsGranite = map[common.Address]vm.PrecompiledContract{
 func (r RulesExtra) ActivePrecompiles(existing []common.Address) []common.Address {
 	addresses := slices.Clone(existing)
 	switch {
-	case r.IsGranite:
+	case r.Is(upgrade.Granite):
 		addresses = append(addresses, P256VerifyAddress)
 		fallthrough
-	case r.IsApricotPhase2:
+	case r.Is(upgrade.ApricotPhase2):
 		addresses = append(addresses,
 			nativeasset.GenesisContractAddr,
 			nativeasset.NativeAssetBalanceAddr,
@@ -143,17 +146,17 @@ func (r RulesExtra) PrecompileOverride(addr common.Address) (libevm.PrecompiledC
 
 func (r RulesExtra) currentPrecompiles() map[common.Address]vm.PrecompiledContract {
 	switch {
-	case r.IsGranite:
+	case r.Is(upgrade.Granite):
 		return precompiledContractsGranite
-	case r.IsDurango:
+	case r.Is(upgrade.Durango):
 		return precompiledContractsDurango
-	case r.IsBanff:
+	case r.Is(upgrade.Banff):
 		return precompiledContractsBanff
-	case r.IsApricotPhase6:
+	case r.Is(upgrade.ApricotPhase6):
 		return precompiledContractsApricotPhase6
-	case r.IsApricotPhasePre6:
+	case r.Is(upgrade.ApricotPhasePre6):
 		return precompiledContractsApricotPhasePre6
-	case r.IsApricotPhase2:
+	case r.Is(upgrade.ApricotPhase2):
 		return precompiledContractsApricotPhase2
 	}
 	return nil
@@ -181,7 +184,7 @@ type environment struct {
 func newEnvironment(env vm.PrecompileEnvironment) (*environment, error) {
 	rules := GetRulesExtra(env.Rules())
 
-	if call := env.IncomingCallType(); (call == vm.DelegateCall || call == vm.CallCode) && rules.IsGranite {
+	if call := env.IncomingCallType(); (call == vm.DelegateCall || call == vm.CallCode) && rules.Is(upgrade.Granite) {
 		env.UseGas(env.Gas()) // A revert would otherwise refund the remaining gas.
 		return nil, vm.ErrExecutionReverted
 	}

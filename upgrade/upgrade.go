@@ -13,6 +13,33 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
+//go:generate go run golang.org/x/tools/cmd/stringer -type=Upgrade
+
+// Upgrade is an enum of all the major network upgrades.
+type Upgrade int
+
+const (
+	NoUpgrades Upgrade = iota
+	ApricotPhase1
+	ApricotPhase2
+	ApricotPhase3
+	ApricotPhase4
+	ApricotPhase5
+	ApricotPhasePre6
+	ApricotPhase6
+	ApricotPhasePost6
+	Banff
+	Cortina
+	Durango
+	Etna
+	Fortuna
+	Granite
+	Helicon
+	Igloo
+
+	Latest Upgrade = iota - 1
+)
+
 var (
 	InitiallyActiveTime       = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 	UnscheduledActivationTime = time.Date(9999, time.December, 1, 0, 0, 0, 0, time.UTC)
@@ -243,25 +270,3 @@ func (c *Config) Current(t time.Time) Upgrade {
 	u, _ := slices.BinarySearchFunc(c.times(), t, time.Time.Compare)
 	return Upgrade(u)
 }
-
-type Upgrade int
-
-const (
-	Unknown               = Upgrade(-1)
-	ApricotPhase1 Upgrade = iota
-	ApricotPhase2
-	ApricotPhase3
-	ApricotPhase4
-	ApricotPhase5
-	ApricotPhasePre6
-	ApricotPhase6
-	ApricotPhasePost6
-	Banff
-	Cortina
-	Durango
-	Etna
-	Fortuna
-	Granite
-	Helicon
-	Igloo
-)

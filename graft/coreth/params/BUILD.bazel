@@ -22,6 +22,7 @@ go_library(
         "//graft/evm/precompileconfig",
         "//graft/evm/predicate",
         "//snow",
+        "//upgrade",
         "//utils/set",
         "//vms/evm/hook",
         "//vms/evm/imp/cchain/cparams",
@@ -41,6 +42,7 @@ graft_go_test(
     ],
     embed = [":params"],
     deps = [
+        "//upgrade",
         "//vms/evm/imp/cchain/cparams",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//params",

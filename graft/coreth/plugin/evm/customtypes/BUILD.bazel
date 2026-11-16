@@ -48,6 +48,7 @@ graft_go_test(
     deps = [
         "//graft/evm/acp226",
         "//graft/evm/utils",
+        "//upgrade",
         "//utils/wrappers",
         "//vms/evm/imp/cchain/cparams",
         "//vms/evm/imp/dynamic",

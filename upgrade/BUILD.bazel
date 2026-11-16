@@ -3,7 +3,10 @@ load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "upgrade",
-    srcs = ["upgrade.go"],
+    srcs = [
+        "upgrade.go",
+        "upgrade_string.go",
+    ],
     importpath = "github.com/ava-labs/avalanchego/upgrade",
     visibility = ["//visibility:public"],
     deps = [
