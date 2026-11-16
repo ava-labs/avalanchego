@@ -22,7 +22,7 @@ go_library(
         "//utils/perms",
         "//utils/profiler",
         "//utils/timer",
-        "//vms/saevm/cchain/libevm",
+        "//vms/evm/imp/cchain/libevm",
         "@com_github_google_uuid//:uuid",
         "@com_github_prometheus_client_golang//prometheus",
         "@com_github_stretchr_testify//require",

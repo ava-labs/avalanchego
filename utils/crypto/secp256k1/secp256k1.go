@@ -262,33 +262,26 @@ func (k *PrivateKey) MarshalText() ([]byte, error) {
 }
 
 func (k *PrivateKey) UnmarshalJSON(b []byte) error {
-	str := string(b)
-	if str == nullStr { // If "null", do nothing
+	if string(b) == nullStr { // If "null", do nothing
 		return nil
-	} else if len(str) < 2 {
+	} else if len(b) < 2 {
 		return errMissingQuotes
 	}
 
-	lastIndex := len(str) - 1
-	if str[0] != '"' || str[lastIndex] != '"' {
+	lastIndex := len(b) - 1
+	if b[0] != '"' || b[lastIndex] != '"' {
 		return errMissingQuotes
 	}
-
-	strNoQuotes := str[1:lastIndex]
-	return k.unmarshalText(strNoQuotes)
+	return k.UnmarshalText(b[1:lastIndex])
 }
 
 func (k *PrivateKey) UnmarshalText(text []byte) error {
-	return k.unmarshalText(string(text))
-}
-
-func (k *PrivateKey) unmarshalText(text string) error {
-	if !strings.HasPrefix(text, PrivateKeyPrefix) {
+	str, ok := strings.CutPrefix(string(text), PrivateKeyPrefix)
+	if !ok {
 		return errMissingKeyPrefix
 	}
 
-	strNoPrefix := text[len(PrivateKeyPrefix):]
-	keyBytes, err := cb58.Decode(strNoPrefix)
+	keyBytes, err := cb58.Decode(str, PrivateKeyLen)
 	if err != nil {
 		return err
 	}

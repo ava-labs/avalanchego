@@ -73,7 +73,7 @@ func TestStorageNew(t *testing.T) {
 
 func TestStorageRetrieve(t *testing.T) {
 	numNodes := 4
-	genesis := newTestBlock(newBlockConfig{numNodes: uint64(numNodes)})
+	genesis := newTestBlock(newBlockConfig{})
 	genesisBytes := genesis.Bytes()
 
 	vm := newTestVM()
@@ -132,7 +132,7 @@ func TestStorageRetrieve(t *testing.T) {
 func TestStorageIndexFails(t *testing.T) {
 	ctx := t.Context()
 	numNodes := uint64(4)
-	genesis := newTestBlock(newBlockConfig{numNodes: numNodes})
+	genesis := newTestBlock(newBlockConfig{})
 	child1 := newTestBlock(newBlockConfig{prev: genesis})
 	child2 := newTestBlock(newBlockConfig{prev: child1})
 
@@ -220,7 +220,7 @@ func TestIndexMismatchedChild(t *testing.T) {
 	ctx := t.Context()
 	numNodes := uint64(4)
 
-	genesis := newTestBlock(newBlockConfig{numNodes: numNodes})
+	genesis := newTestBlock(newBlockConfig{})
 	child1 := newTestBlock(newBlockConfig{prev: genesis})
 	child1Sibling := newTestBlock(newBlockConfig{prev: genesis})
 	child2Nephew := newTestBlock(newBlockConfig{prev: child1Sibling})
@@ -257,7 +257,7 @@ func TestIndexMismatchedChild(t *testing.T) {
 func TestStorageIndexSuccess(t *testing.T) {
 	ctx := t.Context()
 	numNodes := uint64(4)
-	genesis := newTestBlock(newBlockConfig{numNodes: 4})
+	genesis := newTestBlock(newBlockConfig{})
 	configs := newNetworkConfigs(t, numNodes)
 
 	_, verifier, err := NewBLSAuth(configs[0])

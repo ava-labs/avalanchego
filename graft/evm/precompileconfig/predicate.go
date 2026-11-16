@@ -12,9 +12,9 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 )
 
 // PredicateContext is the context passed in to the Predicater interface to verify

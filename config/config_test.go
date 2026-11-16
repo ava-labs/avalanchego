@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
@@ -1379,4 +1380,16 @@ func setupViper(configFilePath string) *viper.Viper {
 		log.Fatal(err)
 	}
 	return v
+}
+
+func TestGetUpgradeConfigRejectsOutOfOrderUpgrades(t *testing.T) {
+	upgrades := upgrade.Default
+	upgrades.DurangoTime = upgrades.HeliconTime.Add(time.Hour)
+	upgradeJSON, err := json.Marshal(upgrades)
+	require.NoError(t, err, "json.Marshal(%T)", upgrades)
+
+	v := viper.New()
+	v.Set(UpgradeFileContentKey, base64.StdEncoding.EncodeToString(upgradeJSON))
+	_, err = getUpgradeConfig(v, constants.UnitTestID)
+	require.ErrorIs(t, err, upgrade.ErrInvalidUpgradeTimes, "getUpgradeConfig()")
 }

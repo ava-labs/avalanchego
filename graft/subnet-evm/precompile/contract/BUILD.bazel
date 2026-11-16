@@ -17,10 +17,10 @@ go_library(
     ],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contract",
     deps = [
+        "//graft/evm/predicate",
         "//graft/subnet-evm/precompile/precompileconfig",
         "//snow",
         "//utils/set",
-        "//vms/evm/predicate",
         "@com_github_ava_labs_libevm//accounts/abi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/types",

@@ -15,10 +15,9 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/cparams"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm"
-	"github.com/ava-labs/avalanchego/vms/saevm/cchain/libevm/extstate"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -438,7 +437,7 @@ func TestStatefulPrecompile(t *testing.T) {
 	}
 
 	// nativeasset precompiles are activated at AP2.
-	cfg := params.WithExtra(
+	cfg := cparams.WithExtra(
 		&ethparams.ChainConfig{},
 		&cparams.ChainConfig{
 			ApricotPhase2Timestamp: new(uint64),

@@ -8,9 +8,10 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"runtime"
 	"testing"
 
-	"github.com/ava-labs/firewood-go-ethhash/ffi"
+	"github.com/ava-labs/firewood-go/ffi"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -82,8 +83,10 @@ func testSync(t *testing.T, clientKeys int, serverKeys int) {
 	serverDB, root := generateDB(t, r, serverKeys)
 	clientDB, _ := generateDB(t, r, clientKeys)
 	defer func() {
-		require.NoError(t, serverDB.Close(ctx))
-		require.NoError(t, clientDB.Close(ctx))
+		// Allow unreachable proofs to release their database leases before closing.
+		runtime.GC()
+		assert.NoError(t, serverDB.Close(ctx))
+		assert.NoError(t, clientDB.Close(ctx))
 	}()
 
 	syncer, err := New(
@@ -147,8 +150,10 @@ func testSyncWithUpdate(t *testing.T, clientKeys int, serverKeys int, numRequest
 	serverDB, firstRoot := generateDB(t, r, serverKeys)
 	clientDB, _ := generateDB(t, r, clientKeys)
 	defer func() {
-		require.NoError(t, serverDB.Close(t.Context()))
-		require.NoError(t, clientDB.Close(t.Context()))
+		// Allow unreachable proofs to release their database leases before closing.
+		runtime.GC()
+		assert.NoError(t, serverDB.Close(t.Context()))
+		assert.NoError(t, clientDB.Close(t.Context()))
 	}()
 	wantRoot := fillDB(t, r, serverDB, serverKeys)
 

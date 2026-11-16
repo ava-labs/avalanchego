@@ -17,11 +17,11 @@ go_library(
     embedsrcs = ["IWarpMessenger.abi"],
     importpath = "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp",
     deps = [
+        "//graft/evm/predicate",
         "//graft/subnet-evm/precompile/contract",
         "//graft/subnet-evm/precompile/modules",
         "//graft/subnet-evm/precompile/precompileconfig",
         "//utils/constants",
-        "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
         "@com_github_ava_labs_libevm//accounts/abi",
@@ -42,6 +42,7 @@ graft_go_test(
     ],
     embed = [":warp"],
     deps = [
+        "//graft/evm/predicate",
         "//graft/evm/utils",
         "//graft/evm/utils/utilstest",
         "//graft/subnet-evm/core/extstate",
@@ -63,7 +64,6 @@ graft_go_test(
         "//utils/crypto/bls/signer/localsigner",
         "//utils/math",
         "//utils/set",
-        "//vms/evm/predicate",
         "//vms/platformvm/warp",
         "//vms/platformvm/warp/payload",
         "@com_github_ava_labs_libevm//common",

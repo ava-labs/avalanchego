@@ -39,12 +39,12 @@ var (
 )
 
 func init() {
-	b, err := cb58.Decode("31SoC6ehdWUWFcuzkXci7ymFEQ8HGTJgw")
+	b, err := cb58.Decode("31SoC6ehdWUWFcuzkXci7ymFEQ8HGTJgw", ids.ShortIDLen)
 	if err != nil {
 		panic(err)
 	}
 	copy(addr2[:], b)
-	b, err = cb58.Decode("c7doHa86hWYyfXTVnNsdP1CG1gxhXVpZ9Q5CiHi2oFRdnaxh2YR2Mvu2cUNMgyQy4BNQaXAxWWPt36BJ5pDWX1Xeos4h9L")
+	b, err = cb58.Decode("c7doHa86hWYyfXTVnNsdP1CG1gxhXVpZ9Q5CiHi2oFRdnaxh2YR2Mvu2cUNMgyQy4BNQaXAxWWPt36BJ5pDWX1Xeos4h9L", secp256k1.SignatureLen)
 	if err != nil {
 		panic(err)
 	}

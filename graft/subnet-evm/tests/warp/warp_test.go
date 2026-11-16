@@ -22,6 +22,7 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/api/info"
+	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator/key"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/cmd/simulator/load"
@@ -36,7 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
 

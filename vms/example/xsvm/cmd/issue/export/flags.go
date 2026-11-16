@@ -107,7 +107,7 @@ func ParseFlags(flags *pflag.FlagSet, args []string) (*Config, error) {
 	}
 
 	var sk secp256k1.PrivateKey
-	err = sk.UnmarshalText([]byte(`"` + skStr + `"`))
+	err = sk.UnmarshalText([]byte(skStr))
 	if err != nil {
 		return nil, err
 	}
