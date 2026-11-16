@@ -1,0 +1,53 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "simplex",
+    srcs = [
+        "empty_block_builder.go",
+        "epoch.go",
+        "monitor.go",
+        "replication_state.go",
+        "requestor.go",
+        "util.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/simplex/simplex",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/simplex/avalanchego",
+        "//graft/simplex/common",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+graft_go_test(
+    name = "simplex_test",
+    srcs = [
+        "empty_block_builder_test.go",
+        "epoch_failover_test.go",
+        "epoch_multinode_test.go",
+        "epoch_sealed_test.go",
+        "epoch_test.go",
+        "fuzz_network_test.go",
+        "leak_test.go",
+        "long_running_test.go",
+        "monitor_test.go",
+        "pos_test.go",
+        "recovery_test.go",
+        "replication_request_test.go",
+        "replication_test.go",
+        "replication_timeout_test.go",
+        "util_test.go",
+    ],
+    embed = [":simplex"],
+    deps = [
+        "//graft/simplex/common",
+        "//graft/simplex/testutil",
+        "//graft/simplex/testutil/long_running",
+        "//graft/simplex/testutil/random_network",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
+        "@org_uber_go_zap//:zap",
+        "@org_uber_go_zap//zapcore",
+    ],
+)

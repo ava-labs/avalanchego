@@ -1,0 +1,40 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "testutil",
+    srcs = [
+        "block.go",
+        "block_builder.go",
+        "comm.go",
+        "controlled.go",
+        "logger.go",
+        "network.go",
+        "node.go",
+        "record.go",
+        "storage.go",
+        "util.go",
+        "wal.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/simplex/testutil",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/simplex/common",
+        "//graft/simplex/simplex",
+        "//graft/simplex/wal",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//:zap",
+        "@org_uber_go_zap//buffer",
+        "@org_uber_go_zap//zapcore",
+    ],
+)
+
+graft_go_test(
+    name = "testutil_test",
+    srcs = ["logger_test.go"],
+    embed = [":testutil"],
+    deps = [
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//zapcore",
+    ],
+)
