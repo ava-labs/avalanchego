@@ -196,6 +196,7 @@ go_test(
         "//vms/evm/blocks/blockstest",
         "//vms/evm/cmputils",
         "//vms/evm/evmclient",
+        "//vms/evm/firewood",
         "//vms/evm/gastime",
         "//vms/evm/hook/hookstest",
         "//vms/evm/params",
