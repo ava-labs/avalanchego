@@ -55,13 +55,10 @@ type Config struct {
 	State            snow.State
 	HTTPPrefix       string
 	SkipRPCTransport bool
-	// Clock is the VM's clock. If both it and EarliestBuildTime are set,
-	// [SUT.WaitForPendingTxs] advances it to EarliestBuildTime of the preferred
-	// block, so that tests don't wait in real time for the ACP-226 minimum block
-	// delay.
-	Clock *saetest.Clock
-	// EarliestBuildTime returns the earliest time at which a child of a block
-	// may be built.
+	// If Clock and EarliestBuildTime are both set, [SUT.WaitForPendingTxs]
+	// advances Clock, which MUST be the VM's clock, to the preferred block's
+	// earliest build time instead of waiting out the minimum block delay.
+	Clock             *saetest.Clock
 	EarliestBuildTime func(*blocks.Block) time.Time
 }
 
