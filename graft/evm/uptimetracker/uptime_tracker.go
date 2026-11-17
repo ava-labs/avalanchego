@@ -25,6 +25,7 @@ type UptimeTracker struct {
 	validatorState validators.State
 	subnetID       ids.ID
 	manager        uptime.Manager
+	clock          *mockable.Clock
 
 	lock   sync.Mutex
 	height uint64
@@ -44,7 +45,7 @@ func New(
 	db database.Database,
 	clock *mockable.Clock,
 ) (*UptimeTracker, error) {
-	s, err := newState(db, clock)
+	s, err := newState(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize state: %w", err)
 	}
@@ -54,6 +55,7 @@ func New(
 		subnetID:       subnetID,
 		manager:        uptime.NewManager(s, clock),
 		synced:         false,
+		clock:          clock,
 		state:          s,
 	}, nil
 }
@@ -124,14 +126,13 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 
 	// Update validator set if we're behind
 	if !u.synced || u.height < height {
-		u.state.updateValidators(currentValidatorSet)
+		u.state.updateSet(currentValidatorSet, u.clock.Unix())
 		u.height = height
 	}
 
 	if !u.synced {
 		// StartTracking credits the given nodes with uptime for the period
-		// that was not observed, but inactive validators were likely offline
-		// during this time.
+		// that was not observed.
 		withUptime := make([]ids.NodeID, 0, len(u.state.validators))
 		for _, v := range u.state.validators {
 			if v.IsActive {
@@ -139,7 +140,7 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 			}
 		}
 		if err := u.manager.StartTracking(withUptime); err != nil {
-			return fmt.Errorf("failed to start tracking validators: %w", err)
+			return fmt.Errorf("start tracking validators: %w", err)
 		}
 
 		u.synced = true

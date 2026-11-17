@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 const codecVersion uint16 = 0
@@ -53,18 +52,16 @@ var _ uptime.State = (*state)(nil)
 
 // state holds the on-disk and cached representation of the validator set
 type state struct {
-	db    database.Database
-	clock *mockable.Clock
+	db database.Database
 
 	validators             map[ids.ID]*validator
 	nodeIDsToValidationIDs map[ids.NodeID]ids.ID
 	dirtyValidationIDs     set.Set[ids.ID]
 }
 
-func newState(db database.Database, clock *mockable.Clock) (*state, error) {
+func newState(db database.Database) (*state, error) {
 	s := &state{
 		db:                     db,
-		clock:                  clock,
 		validators:             make(map[ids.ID]*validator),
 		nodeIDsToValidationIDs: make(map[ids.NodeID]ids.ID),
 	}
@@ -132,7 +129,12 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	return time.Unix(int64(v.LastUpdated), 0), nil
 }
 
-func (s *state) updateValidators(currentSet map[ids.ID]*validators.GetCurrentValidatorOutput) {
+// updateSet updates the [state]'s validator set with the provided current set
+// of validators at time unix.
+func (s *state) updateSet(
+	currentSet map[ids.ID]*validators.GetCurrentValidatorOutput,
+	unix uint64,
+) {
 	for valID := range s.validators {
 		if _, ok := currentSet[valID]; !ok {
 			s.deleteValidator(valID)
@@ -149,7 +151,7 @@ func (s *state) updateValidators(currentSet map[ids.ID]*validators.GetCurrentVal
 		// even if it was previously connected.
 		lastUpdated := vdr.StartTime
 		if !vdr.IsActive {
-			lastUpdated = s.clock.Unix()
+			lastUpdated = unix
 		}
 		s.addNewValidator(&validator{
 			NodeID:        vdr.NodeID,
