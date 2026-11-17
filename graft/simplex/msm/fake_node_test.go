@@ -208,7 +208,7 @@ func TestFakeNodeEmptyMempool(t *testing.T) {
 
 	pChainHeight = 300
 
-	for node.Height() < 30 {
+	for node.lastFinalizedBlock().Metadata.SimplexEpochInfo.BlockValidationDescriptor == nil {
 		node.act()
 		if flipCoin() {
 			node.sm.HandleApproval(&common.ValidatorSetApproval{NodeID: [20]byte{2}, PChainHeight: 300, Signature: signApproval(300, emptyAuxInfoDigest), AuxInfoDigest: emptyAuxInfoDigest})
@@ -217,9 +217,14 @@ func TestFakeNodeEmptyMempool(t *testing.T) {
 		}
 	}
 
+	height = node.Height()
+
+	for node.Height() == height {
+		node.act()
+	}
+
 	t.Log("Epoch:", node.Epoch())
 	require.Greater(t, node.Epoch(), epoch)
-	require.Equal(t, node.Height(), uint64(30))
 }
 
 type innerBlock struct {
