@@ -16,12 +16,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
 	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
-
-// ContractAddress is the address of the warp precompile contract
-var ContractAddress = common.HexToAddress("0x0200000000000000000000000000000000000005")
 
 const addWarpMessageBaseGasCost uint64 = 20_000 // Cost of producing and serving a BLS Signature
 
@@ -192,7 +190,7 @@ func PackGetVerifiedWarpMessageOutput(outputStruct GetVerifiedWarpMessageOutput)
 	)
 }
 
-// getVerifiedWarpMessage retrieves the pre-verified warp message from the predicate storage slots and returns
+// getVerifiedWarpMessage retrieves the pre-verified warp message from the access list and returns
 // the expected ABI encoding of the message to the caller.
 func getVerifiedWarpMessage(env contract.Environment, input []byte) ([]byte, error) {
 	return handleWarpMessage(env, input, addressedPayloadHandler{})
@@ -277,7 +275,7 @@ func sendWarpMessage(env contract.Environment, input []byte) ([]byte, error) {
 		return nil, err
 	}
 	env.StateDB().AddLog(&types.Log{
-		Address:     ContractAddress,
+		Address:     message.ContractAddress,
 		Topics:      topics,
 		Data:        data,
 		BlockNumber: env.BlockNumber().Uint64(),

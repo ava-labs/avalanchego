@@ -2,7 +2,7 @@
 // See the file LICENSE for licensing terms.
 
 // Package extstate extends [state.StateDB] with the C-Chain's imported X-Chain
-// asset balances and access-list predicates.
+// asset balances and Warp messages.
 package extstate
 
 import (

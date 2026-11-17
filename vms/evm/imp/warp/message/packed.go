@@ -8,8 +8,16 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/math"
+	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/libevm"
+	"github.com/ava-labs/libevm/params"
 )
+
+// ContractAddress is the address of the Warp precompile. Warp messages are the
+// access-list entries at this address.
+var ContractAddress = common.HexToAddress("0x0200000000000000000000000000000000000005")
 
 // delimiter marks the end of the message bytes.
 //
@@ -71,15 +79,44 @@ func (p Packed) Unpack() ([]byte, error) {
 	return trimmed[:delimiterIndex], nil
 }
 
-// FromAccessList returns the storage keys of each entry in list at addr, in
-// order. Each entry is one packed message, including entries without storage
+// FromAccessList returns the Warp messages in list, in order. Each entry at
+// [ContractAddress] is one packed message, including entries without storage
 // keys.
-func FromAccessList(list types.AccessList, addr common.Address) []Packed {
+func FromAccessList(list types.AccessList) []Packed {
 	var packed []Packed
 	for _, tuple := range list {
-		if tuple.Address == addr {
+		if tuple.Address == ContractAddress {
 			packed = append(packed, tuple.StorageKeys)
 		}
 	}
 	return packed
+}
+
+// AccessListGas calculates the intrinsic gas of an access list. Each Warp
+// message costs warpGas. Every other entry costs the standard per-tuple amount.
+func AccessListGas(
+	accessList libevm.AccessList,
+	warpGas func(Packed) (uint64, error),
+) (uint64, error) {
+	var gas uint64
+	for _, tuple := range accessList {
+		var tupleGas uint64
+		if tuple.Address == ContractAddress {
+			var err error
+			tupleGas, err = warpGas(tuple.StorageKeys)
+			if err != nil {
+				return 0, err
+			}
+		} else {
+			// The standard cost of a tuple cannot overflow for any access list
+			// that fits in a block, but the sum of Warp costs can.
+			tupleGas = params.TxAccessListAddressGas + uint64(len(tuple.StorageKeys))*params.TxAccessListStorageKeyGas
+		}
+		var overflow bool
+		gas, overflow = math.SafeAdd(gas, tupleGas)
+		if overflow {
+			return 0, core.ErrGasUintOverflow
+		}
+	}
+	return gas, nil
 }
