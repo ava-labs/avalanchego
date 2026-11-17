@@ -50,6 +50,7 @@ Every hook runs at one of five points, and reads only what that point provides.
   - Hooks: `BuildHeader`, `PotentialEndOfBlockOps`, `BuildBlock`, `BlockRebuilderFrom`, `AdmitTransaction` and libevm's `AccessListGas`.
   - Reads the parent header and the P-Chain context.
   - `AdmitTransaction` also reads the settled view: the settled block's header, rules and read-only post-state.
+  - `AdmitTransaction` also runs on mempool entry, as advice the builder does not rely on, possibly concurrently with building. It MUST be stateless.
 - **Pure**
   - Runs at any time.
   - Hooks: `BlockTime`, `GasConfigAfter`, `SettledBy`, `EndOfBlockOps` and `VerifyBlockSyntax`.

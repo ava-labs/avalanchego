@@ -28,11 +28,7 @@ import (
 //nolint:testableexamples // Output is meaningless
 func ExampleRange() {
 	parent := blockBuildingPreference()
-	settle, ok, err := LastToSettleAt(time.Now().Add(-params.Tau), parent)
-	if err != nil {
-		// Due to a malformed input to block verification.
-		return // err
-	}
+	settle, ok := LastToSettleAt(time.Now().Add(-params.Tau), parent)
 	if !ok {
 		return // execution is lagging; please come back soon
 	}
@@ -90,8 +86,25 @@ func TestSettlementInvariants(t *testing.T) {
 		t.FailNow()
 	}
 
+	// A snapshot from before settlement, as a concurrent LastToSettleAt holds.
+	snapshot := b.ancestry.Load()
 	var lastSettledPtr atomic.Pointer[Block]
 	require.NoError(t, b.MarkSettled(&lastSettledPtr), "first call to MarkSettled()")
+
+	t.Run("LastToSettle_step_after_MarkSettled", func(t *testing.T) {
+		// b starts after settleAt, so the step moves to its parent.
+		settleAt := time.Unix(5, 0)
+		next, known, done := lastToSettleStep(
+			b,
+			snapshot,
+			settleAt,
+			proxytime.Of[gas.Gas](settleAt),
+			false,
+		)
+		require.False(t, done, "done")
+		require.True(t, known, "known")
+		require.Same(t, parent, next, "next block")
+	})
 
 	t.Run("after_MarkSettled", func(t *testing.T) {
 		assert.Equal(t, b, lastSettledPtr.Load(), "Atomic pointer to last-settled block")
@@ -376,16 +389,21 @@ func TestLastToSettleAt(t *testing.T) {
 			parent:   blocks[25],
 			wantOK:   true,
 			want:     blocks[24],
+		}, testCase{
+			// Unexecuted block 26 could still finish in time, so only block
+			// 25's partial execution makes the answer known.
+			settleAt: 26,
+			parent:   blocks[26],
+			wantOK:   true,
+			want:     blocks[24],
 		})
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			settleAt := time.Unix(int64(tt.settleAt), 0) //#nosec G115 -- Hard-coded, non-overflowing values
-			got, gotOK, err := LastToSettleAt(settleAt, tt.parent)
-			if err != nil || gotOK != tt.wantOK {
-				t.Fatalf("LastToSettleAt(%d, [parent height %d]) got (_, %t, %v); want (_, %t, nil)", tt.settleAt, tt.parent.Height(), gotOK, err, tt.wantOK)
-			}
+			got, gotOK := LastToSettleAt(settleAt, tt.parent)
+			require.Equal(t, tt.wantOK, gotOK, "LastToSettleAt(%d, [parent height %d]) ok", tt.settleAt, tt.parent.Height())
 			if tt.wantOK {
 				require.Equal(t, tt.want.Height(), got.Height(), "LastToSettleAt(%d, [parent height %d])", tt.settleAt, tt.parent.Height())
 			}

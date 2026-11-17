@@ -15,6 +15,9 @@ go_library(
         "//ids",
         "//network/p2p/gossip",
         "//utils/heap",
+        "//utils/logging",
+        "//vms/evm/blocks",
+        "//vms/evm/hook",
         "//vms/evm/params",
         "//vms/evm/saexec",
         "//vms/evm/types",
@@ -29,6 +32,7 @@ go_library(
         "@com_github_ava_labs_libevm//params",
         "@com_github_ava_labs_libevm//rlp",
         "@com_github_holiman_uint256//:uint256",
+        "@org_uber_go_zap//:zap",
     ],
 )
 
@@ -50,6 +54,7 @@ go_test(
         "//vms/evm/blocks",
         "//vms/evm/blocks/blockstest",
         "//vms/evm/cmputils",
+        "//vms/evm/hook",
         "//vms/evm/hook/hookstest",
         "//vms/evm/params",
         "//vms/evm/saedb",
@@ -63,6 +68,7 @@ go_test(
         "@com_github_ava_labs_libevm//core/txpool/legacypool",
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//eth",
+        "@com_github_ava_labs_libevm//ethdb",
         "@com_github_ava_labs_libevm//event",
         "@com_github_ava_labs_libevm//libevm/ethapi",
         "@com_github_ava_labs_libevm//params",

@@ -18,6 +18,7 @@ go_library(
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/txpool",
         "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//params",
         "@com_github_holiman_uint256//:uint256",
     ],
