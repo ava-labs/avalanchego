@@ -15,7 +15,9 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 const codecVersion uint16 = 0
@@ -51,16 +53,18 @@ var _ uptime.State = (*state)(nil)
 
 // state holds the on-disk and cached representation of the validator set
 type state struct {
-	db database.Database
+	db    database.Database
+	clock *mockable.Clock
 
 	validators             map[ids.ID]*validator
 	nodeIDsToValidationIDs map[ids.NodeID]ids.ID
 	dirtyValidationIDs     set.Set[ids.ID]
 }
 
-func newState(db database.Database) (*state, error) {
+func newState(db database.Database, clock *mockable.Clock) (*state, error) {
 	s := &state{
 		db:                     db,
+		clock:                  clock,
 		validators:             make(map[ids.ID]*validator),
 		nodeIDsToValidationIDs: make(map[ids.NodeID]ids.ID),
 	}
@@ -126,6 +130,38 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	}
 
 	return time.Unix(int64(v.LastUpdated), 0), nil
+}
+
+func (s *state) updateValidators(currentSet map[ids.ID]*validators.GetCurrentValidatorOutput) {
+	for valID := range s.validators {
+		if _, ok := currentSet[valID]; !ok {
+			s.deleteValidator(valID)
+		}
+	}
+
+	for valID, vdr := range currentSet {
+		if s.hasValidationID(valID) {
+			s.updateValidator(valID, vdr.IsActive)
+			continue
+		}
+
+		// An inactive validator could not have earned uptime before now,
+		// even if it was previously connected.
+		lastUpdated := vdr.StartTime
+		if !vdr.IsActive {
+			lastUpdated = s.clock.Unix()
+		}
+		s.addNewValidator(&validator{
+			NodeID:        vdr.NodeID,
+			validationID:  valID,
+			IsActive:      vdr.IsActive,
+			StartTime:     vdr.StartTime,
+			UpDuration:    0,
+			LastUpdated:   lastUpdated,
+			IsL1Validator: vdr.IsL1Validator,
+			Weight:        vdr.Weight,
+		})
+	}
 }
 
 // addNewValidator adds a new validator to the state and marks it for
