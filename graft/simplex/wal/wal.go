@@ -89,9 +89,12 @@ func (w *WriteAheadLog) ReadAll() (_ [][]byte, err error) {
 	var payloads [][]byte
 	for bytesToRead > 0 {
 		payload, bytesRead, err := readRecord(w.file, bytesToRead)
-		// record was corrupted in wal
-		if err != nil {
+		if errors.Is(err, ErrCorruptedWAL) {
 			return payloads, w.truncateAt(fileInfo.Size() - bytesToRead)
+		}
+		if err != nil {
+			// Transient read errors should not truncate the wal.
+			return nil, fmt.Errorf("error reading record: %w", err)
 		}
 
 		bytesToRead -= bytesRead
