@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/holiman/uint256"
 
-	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
@@ -49,8 +48,6 @@ type Environment interface {
 	vm.PrecompileEnvironment
 	Caller() common.Address
 	SnowContext() *snow.Context
-	// ExtraRules returns any registered rules on [params.Rules].
-	ExtraRules() precompileconfig.Rules
 	// WarpMessageResults returns the result of verifying the Warp messages
 	// of the given transaction.
 	WarpMessageResults(txHash common.Hash) set.Bits

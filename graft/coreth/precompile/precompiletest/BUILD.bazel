@@ -15,11 +15,9 @@ go_library(
     deps = [
         "//graft/coreth/precompile/contract",
         "//graft/coreth/precompile/contracts/warp",
-        "//graft/evm/precompileconfig",
         "//snow",
         "//snow/snowtest",
         "//utils/set",
-        "//vms/evm/imp/cchain/cparams",
         "//vms/evm/imp/cchain/libevm/extstate",
         "//vms/evm/imp/warp/message",
         "@com_github_ava_labs_libevm//common",

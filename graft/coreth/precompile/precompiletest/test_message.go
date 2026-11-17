@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
-	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 )
 
@@ -21,7 +20,7 @@ type MessageTest struct {
 	VerifyContext *message.VerifyContext
 
 	Packed      message.Packed
-	Rules       precompileconfig.Rules
+	GasConfig   warp.GasConfig
 	Gas         uint64
 	GasErr      error
 	ExpectedErr error
@@ -30,7 +29,7 @@ type MessageTest struct {
 func (test MessageTest) Run(t testing.TB) {
 	t.Helper()
 	require := require.New(t)
-	gas, gasErr := warp.MessageGas(test.Packed, test.Rules)
+	gas, gasErr := test.GasConfig.MessageGas(test.Packed)
 	require.ErrorIs(gasErr, test.GasErr)
 	if test.GasErr != nil {
 		return
