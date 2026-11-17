@@ -44,13 +44,12 @@ func TestLatestUpgradeFromConfig(t *testing.T) {
 		ap4 = upgrade.ApricotPhase4
 	)
 
-	p := func(u uint64) *uint64 { return &u }
-	shared := p(30)
+	shared := new(uint64(30))
 	config := &ChainConfig{
-		ApricotPhase1Timestamp: p(10),
+		ApricotPhase1Timestamp: new(uint64(10)),
 		ApricotPhase2Timestamp: shared,
 		ApricotPhase3Timestamp: shared,
-		ApricotPhase4Timestamp: p(40),
+		ApricotPhase4Timestamp: new(uint64(40)),
 	}
 	tests := map[uint64]upgrade.Upgrade{
 		// Dawn of time
