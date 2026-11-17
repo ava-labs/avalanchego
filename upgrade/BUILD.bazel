@@ -5,7 +5,7 @@ go_library(
     name = "upgrade",
     srcs = [
         "upgrade.go",
-        "upgrade_string.go",
+        "upgrade_string.gen.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/upgrade",
     visibility = ["//visibility:public"],
