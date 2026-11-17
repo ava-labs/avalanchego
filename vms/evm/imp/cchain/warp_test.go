@@ -138,6 +138,7 @@ func TestSendWarpMessage(t *testing.T) {
 	tx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		To:        &corethwarp.ContractAddress,
 		Gas:       1_000_000,
+		GasTipCap: big.NewInt(1),
 		GasFeeCap: big.NewInt(1),
 		Data:      callData,
 	})
@@ -331,6 +332,7 @@ func TestReceiveWarpMessage(t *testing.T) {
 			tx := wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
 				To:         &warpLogger,
 				Gas:        tt.gas,
+				GasTipCap:  big.NewInt(1),
 				GasFeeCap:  big.NewInt(1),
 				Data:       tt.callData,
 				AccessList: warpAccessList(tt.msg),

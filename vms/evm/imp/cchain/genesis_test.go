@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 
 	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -65,7 +64,7 @@ func TestParseGenesis(t *testing.T) {
 			ctx:     mainnetCtx,
 			genesis: avalanchegenesis.MainnetConfig.CChainGenesis,
 			want: &core.Genesis{
-				Config: corethparams.WithExtra(
+				Config: cparams.WithExtra(
 					&ethparams.ChainConfig{
 						ChainID:             mainnetChainID,
 						HomesteadBlock:      big.NewInt(0),
@@ -120,7 +119,7 @@ func TestParseGenesis(t *testing.T) {
 			ctx:     fujiCtx,
 			genesis: avalanchegenesis.FujiConfig.CChainGenesis,
 			want: &core.Genesis{
-				Config: corethparams.WithExtra(
+				Config: cparams.WithExtra(
 					&ethparams.ChainConfig{
 						ChainID:             fujiChainID,
 						HomesteadBlock:      big.NewInt(0),
@@ -175,7 +174,7 @@ func TestParseGenesis(t *testing.T) {
 			ctx:     localCtx,
 			genesis: avalanchegenesis.LocalConfig.CChainGenesis,
 			want: &core.Genesis{
-				Config: corethparams.WithExtra(
+				Config: cparams.WithExtra(
 					&ethparams.ChainConfig{
 						ChainID:             big.NewInt(43112),
 						HomesteadBlock:      big.NewInt(0),
@@ -591,7 +590,7 @@ func TestWriteGenesis(t *testing.T) {
 			}
 
 			cmpExtras := []cmp.Option{
-				cmp.Transformer("cparams", corethparams.GetExtra),
+				cmp.Transformer("cparams", cparams.GetExtra),
 				cmpopts.IgnoreFields(cparams.ChainConfig{}, "SnowCtx"), // contains lock
 			}
 			if diff := cmp.Diff(g.Config, gotConfig, cmpExtras...); diff != "" {

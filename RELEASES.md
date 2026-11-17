@@ -6,6 +6,7 @@
 
 ### APIs
 
+- Added an `Rpc-Error-Codes` header to C-Chain `/rpc` responses with the count of each JSON-RPC error code in the response, e.g. `-32601;count=1, 3;count=2`.
 - Removed:
   - `platform.getBalance`
   - `platform.getStake`
@@ -18,6 +19,8 @@
 ### Fixes
 
 - Fixed node shutdown leaving health check and bootstrapper timeout goroutines running. Shutdown now stops them, and waits up to 10 seconds for the health check goroutines to finish.
+- Fixed the C-Chain writing its local transaction journal, `transactions.rlp`, to the process working directory when `local-txs-enabled` is set. The journal is now disabled.
+- Fixed the C-Chain mempool accepting non-local transactions with a gas tip cap of 0. They now need a gas tip cap of at least 1 wei, matching the C-Chain before SAE.
 
 ## [v1.15.3](https://github.com/ava-labs/avalanchego/releases/tag/v1.15.3)
 

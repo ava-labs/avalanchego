@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/stateupgrade"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -93,12 +94,14 @@ func copyAndSet(c *ChainConfig, set func(*ChainConfig)) *ChainConfig {
 // UpgradeConfig includes the following configs that may be specified in upgradeBytes:
 // - Timestamps that enable avalanche network upgrades,
 // - Enabling or disabling precompiles as network upgrades.
+//
+// TODO(JonathanOppenheimer): Rename to Upgrades to match the "upgrades" JSON key.
 type UpgradeConfig struct {
 	// Config for timestamps that enable network upgrades.
 	NetworkUpgradeOverrides *NetworkUpgrades `json:"networkUpgradeOverrides,omitempty"`
 
 	// Config for modifying state as a network upgrade.
-	StateUpgrades []StateUpgrade `json:"stateUpgrades,omitempty"`
+	StateUpgrades []stateupgrade.Block `json:"stateUpgrades,omitempty"`
 
 	// Config for enabling and disabling precompiles as network upgrades.
 	PrecompileUpgrades []PrecompileUpgrade `json:"precompileUpgrades,omitempty"`
@@ -117,7 +120,7 @@ type ChainConfig struct {
 	FeeConfig          commontype.FeeConfig `json:"feeConfig"`                    // Set the configuration for the dynamic fee algorithm
 	AllowFeeRecipients bool                 `json:"allowFeeRecipients,omitempty"` // Allows fees to be collected by block builders.
 	GenesisPrecompiles Precompiles          `json:"-"`                            // Config for enabling precompiles from genesis. JSON encode/decode will be handled by the custom marshaler/unmarshaler.
-	UpgradeConfig      `json:"-"`           // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
+	UpgradeConfig      `json:"-"`           // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Marshalled as "upgrades" by the custom marshaler, but not unmarshalled.
 	InitialMinDelayMS  uint64               `json:"initialMinDelayMS,omitempty"` // ACP-226 minimum block delay of the genesis block, in milliseconds. Requires Granite at genesis. Zero uses the ACP-226 default.
 }
 
@@ -242,6 +245,17 @@ func (c *ChainConfig) MarshalJSON() ([]byte, error) {
 		}
 		raw[key] = conf
 	}
+
+	// Always written, so that a missing key identifies a config stored by an
+	// older node.
+	//
+	// TODO(#6357): Unmarshal the upgrades and drop their separate database key
+	// once every node has rewritten its stored chain config.
+	upgrades, err := json.Marshal(c.UpgradeConfig)
+	if err != nil {
+		return nil, err
+	}
+	raw["upgrades"] = upgrades
 
 	return json.Marshal(raw)
 }

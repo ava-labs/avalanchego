@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/options"
@@ -23,7 +24,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -55,8 +58,9 @@ type SUT struct {
 
 type (
 	sutConfig struct {
-		genesis core.Genesis
-		clock   *saetest.Clock
+		genesis  core.Genesis
+		upgrades extras.UpgradeConfig
+		clock    *saetest.Clock
 	}
 	sutOption = options.Option[sutConfig]
 )
@@ -101,15 +105,18 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	genesisBytes, err := json.Marshal(cfg.genesis)
 	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
+	upgradeBytes, err := json.Marshal(cfg.upgrades)
+	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.upgrades)
 
 	appSender := saetest.NewSender(tb, set.Of(snowCtx.NodeID))
 
 	ctx := log.CancelOnError(tb.Context())
 	vmSUT, err := vmtest.New(ctx, tb, vm, snowCtx, vmtest.Config{
-		DB:      memdb.New(),
-		Genesis: genesisBytes,
-		Sender:  appSender,
-		State:   snow.NormalOp,
+		DB:       memdb.New(),
+		Genesis:  genesisBytes,
+		Upgrades: upgradeBytes,
+		Sender:   appSender,
+		State:    snow.NormalOp,
 	})
 	require.NoError(tb, err, "vmtest.New()")
 	sut := &SUT{
@@ -132,7 +139,7 @@ func TestTransfer(t *testing.T) {
 		_, verifier  = newSUT(t, withMaxAllocFor(sender), timeOpt)
 	)
 
-	recipient := common.Address{1}
+	recipient := common.Address{2}
 	const value = 42
 	transfer := func() (built, parsed *blocks.Block) {
 		t.Helper()
@@ -141,6 +148,7 @@ func TestTransfer(t *testing.T) {
 			To:        &recipient,
 			Value:     big.NewInt(value),
 			Gas:       ethparams.TxGas,
+			GasTipCap: big.NewInt(1),
 			GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
 		})
 		require.NoErrorf(t, builder.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction()", builder.EthClient())
@@ -204,6 +212,7 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 		txs[i] = wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 			To:        &common.Address{1},
 			Gas:       tt.gasLimit,
+			GasTipCap: big.NewInt(1),
 			GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
 		})
 		require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, txs[i]), "%T.SendTransaction(%s)", sut.EthClient(), tt.name)
@@ -221,4 +230,46 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 			assert.Equal(t, tt.wantGasUsed, receipts[i].GasUsed, "receipt GasUsed")
 		})
 	}
+}
+
+// TestPrecompileActivation asserts that a precompile upgrade activates at the
+// time configured in the upgrade config.
+func TestPrecompileActivation(t *testing.T) {
+	const upgradeOffset = 10
+	upgradeTime := time.Unix(int64(testGenesisTime)+upgradeOffset, 0) //#nosec G115 -- Won't overflow
+	upgradeUnix := testGenesisTime + upgradeOffset
+
+	var (
+		recipient = common.Address{'r', 'e', 'c', 'i', 'p', 'i', 'e', 'n', 't'}
+		amount    = uint256.NewInt(42)
+	)
+	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSignerForChainID(big.NewInt(testChainID)))
+	timeOpt, _ := withVMTime(upgradeTime)
+	ctx, sut := newSUT(t,
+		withMaxAllocFor(wallet.Addresses()...),
+		timeOpt,
+		withUpgrades(extras.UpgradeConfig{
+			PrecompileUpgrades: []extras.PrecompileUpgrade{{
+				Config: nativeminter.NewConfig(&upgradeUnix, nil, nil, nil, map[common.Address]*math.HexOrDecimal256{
+					recipient: (*math.HexOrDecimal256)(amount.ToBig()),
+				}),
+			}},
+		}),
+	)
+
+	// tx is unrelated, but block can't be empty.
+	tx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &common.Address{1},
+		Gas:       ethparams.TxGas,
+		GasTipCap: big.NewInt(1),
+		GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
+	})
+	require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction()", sut.EthClient())
+	sut.WaitForPendingTxs(ctx, t, tx)
+
+	activating := sut.BuildVerifyAccept(ctx, t)
+	require.NoErrorf(t, activating.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", activating)
+
+	require.Equal(t, upgradeUnix, activating.Header().Time, "block time MUST activate the precompile")
+	assert.Equal(t, *amount, sut.Balance(t, recipient), "balance(recipient) after activating block")
 }
