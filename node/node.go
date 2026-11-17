@@ -1129,7 +1129,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 		return fmt.Errorf("couldn't initialize chain router: %w", err)
 	}
 
-	subnets, err := chains.NewSubnets(n.ID, n.Config.SubnetConfigs)
+	subnets, err := chains.NewSubnetsWithMembership(n.ID, n.Config.SubnetConfigs, n.Net)
 	if err != nil {
 		return fmt.Errorf("failed to initialize subnets: %w", err)
 	}
