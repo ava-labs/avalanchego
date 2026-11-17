@@ -315,6 +315,7 @@ func sendTx(ctx context.Context, tb testing.TB, sut *SUT, wallet *saetest.Wallet
 		To:        &common.Address{1},
 		Gas:       ethparams.TxGas,
 		GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
+		GasTipCap: big.NewInt(1),
 	})
 	backend := sut.GethRPCBackends()
 	require.NoErrorf(tb, backend.SendTx(ctx, tx), "%T.SendTx()", backend)
