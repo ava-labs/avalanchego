@@ -938,6 +938,9 @@ func getUpgradeConfig(v *viper.Viper, networkID uint32) (upgrade.Config, error) 
 	if err := json.Unmarshal(upgradeBytes, &upgradeConfig); err != nil {
 		return upgrade.Config{}, fmt.Errorf("unable to unmarshal upgrade bytes: %w", err)
 	}
+	if err := upgradeConfig.Validate(); err != nil {
+		return upgrade.Config{}, fmt.Errorf("validating upgrade config: %w", err)
+	}
 	return upgradeConfig, nil
 }
 

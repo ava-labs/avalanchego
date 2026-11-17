@@ -12,6 +12,7 @@ import (
 
 	"github.com/arr4n/shed/testerr"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
@@ -27,7 +28,12 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -37,11 +43,6 @@ import (
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	ethcore "github.com/ava-labs/libevm/core"
 )
-
-func TestMain(m *testing.M) {
-	evm.RegisterAllLibEVMExtras()
-	m.Run()
-}
 
 func errIsType[T error]() testerr.Want {
 	return testerr.As(func(T) string { return "" })
@@ -125,6 +126,33 @@ func withInitialMinDelay(delayMS uint64) genesisOption {
 func withFeeConfig(c commontype.FeeConfig) genesisOption {
 	return withGenesis(func(g *ethcore.Genesis) {
 		l1params.GetExtra(g.Config).FeeConfig = c
+	})
+}
+
+// withAllGenesisPrecompiles enables every registered precompile at the given
+// timestamp, with non-trivial initial state where supported.
+func withAllGenesisPrecompiles(timestamp uint64) genesisOption {
+	// The native minter also mints to [testAllocAddr], making the
+	// state root depend on the allocation being applied after activation.
+	return withGenesis(func(g *ethcore.Genesis) {
+		var (
+			ts     = new(timestamp)
+			admins = []common.Address{{0xad}}
+			mint   = (*math.HexOrDecimal256)(big.NewInt(42))
+		)
+		l1params.GetExtra(g.Config).GenesisPrecompiles = extras.Precompiles{
+			deployerallowlist.ConfigKey: deployerallowlist.NewConfig(ts, admins, nil, nil),
+			txallowlist.ConfigKey:       txallowlist.NewConfig(ts, admins, nil, nil),
+			nativeminter.ConfigKey: nativeminter.NewConfig(ts, admins, nil, nil, map[common.Address]*math.HexOrDecimal256{
+				{0x11}:        mint,
+				testAllocAddr: mint,
+			}),
+			feemanager.ConfigKey: feemanager.NewConfig(ts, admins, nil, nil, new(l1params.DefaultFeeConfig)),
+			rewardmanager.ConfigKey: rewardmanager.NewConfig(ts, admins, nil, nil, &rewardmanager.InitialRewardConfig{
+				RewardAddress: common.Address{0x22},
+			}),
+			warp.ConfigKey: warp.NewDefaultConfig(ts),
+		}
 	})
 }
 
@@ -365,6 +393,16 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 			genesis: testGenesisJSON(withGenesis(func(g *ethcore.Genesis) {
 				g.Alloc[common.Address{0xe0}] = types.Account{Balance: new(big.Int)}
 			})),
+		},
+		spec{
+			name:     "precompiles",
+			upgrades: upgradetest.Latest,
+			genesis:  testGenesisJSON(withAllGenesisPrecompiles(testGenesisTime)),
+		},
+		spec{
+			name:     "precompiles_after_genesis",
+			upgrades: upgradetest.Latest,
+			genesis:  testGenesisJSON(withAllGenesisPrecompiles(testGenesisTime + 1)),
 		},
 		spec{
 			name:     "header_fields",

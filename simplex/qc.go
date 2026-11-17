@@ -207,6 +207,11 @@ func (a *SignatureAggregator) Aggregate(signatures []common.Signature) (common.Q
 	}, nil
 }
 
+// AboveByzantineThreshold is not implemented yet.
+func (*SignatureAggregator) AboveByzantineThreshold([]common.NodeID) bool {
+	panic("AboveByzantineThreshold is not implemented")
+}
+
 // AppendSignatures appends signatures to an existing signature.
 // If the existing signature is empty, it just aggregates the given signatures.
 func (*SignatureAggregator) AppendSignatures(common.SignatureBytes, ...common.SignatureBytes) (common.SignatureBytes, error) {

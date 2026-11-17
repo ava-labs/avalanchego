@@ -193,11 +193,24 @@ func (w *worker) Start(ctx context.Context, freq time.Duration) {
 	})
 }
 
-func (w *worker) Stop() {
+func (w *worker) Stop(ctx context.Context) error {
 	w.closeOnce.Do(func() {
 		close(w.closer)
-		w.wg.Wait()
 	})
+
+	// Make a best-effort to stop health checks within the context
+	done := make(chan struct{})
+	go func() {
+		w.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("%s checks still running: %w", w.name, ctx.Err())
+	}
 }
 
 func (w *worker) runChecks(ctx context.Context) {

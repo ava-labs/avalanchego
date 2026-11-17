@@ -65,7 +65,9 @@ func TestServiceResponses(t *testing.T) {
 	}
 
 	h.Start(t.Context(), checkFreq)
-	defer h.Stop()
+	defer func() {
+		require.NoError(h.Stop(t.Context()))
+	}()
 
 	awaitReadiness(t, h, true)
 	awaitHealthy(t, h, true)
@@ -204,7 +206,7 @@ func TestServiceTagResponse(t *testing.T) {
 			}
 
 			// stop the health check
-			h.Stop()
+			require.NoError(h.Stop(t.Context()))
 
 			{
 				// now we'll add a new check which is unhealthy by default (notYetRunResult)
