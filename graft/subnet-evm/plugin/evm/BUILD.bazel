@@ -96,6 +96,7 @@ go_library(
         "//vms/components/chain",
         "//vms/evm/imp/blackhole",
         "//vms/evm/imp/database",
+        "//vms/evm/imp/warp/message",
         "//vms/evm/metrics/prometheus",
         "@com_github_ava_labs_firewood_go_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",

@@ -105,8 +105,8 @@ var fixtureJSON []byte
 //     Granite included, and restricts cross-chain transfers to AVAX. An AVAX
 //     export.
 //   - Cortina: raises the gas limit to 15M. A counter increment.
-//   - Durango: activates the warp precompile and access-list predicates. A
-//     sendWarpMessage, then a getVerifiedWarpMessage behind a predicate whose
+//   - Durango: activates the warp precompile and Warp messages. A
+//     sendWarpMessage, then a getVerifiedWarpMessage behind a Warp message whose
 //     results land in the header extra.
 //   - Etna: adds Cancun's blobGasUsed, excessBlobGas and parentBeaconRoot
 //     header fields. A dynamic-fee transfer.
