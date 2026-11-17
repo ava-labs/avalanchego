@@ -17,9 +17,8 @@ import (
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
-// Exponent returns the delay exponent stored in a header's ACP-226
-// MinDelayExcess field, defaulting to [dynamic.InitialDelayExponent] for headers
-// that predate the field.
+// Exponent returns the delay exponent encoded by excess. A nil excess, yields
+// [dynamic.InitialDelayExponent].
 //
 // TODO(JonathanOppenheimer): Replace with a generic pointer-dereference helper
 // once the acp226 package is removed.
@@ -30,10 +29,9 @@ func Exponent(excess *acp226.DelayExcess) dynamic.DelayExponent {
 	return dynamic.DelayExponent(*excess)
 }
 
-// minEventSpacing is the minimum spacing between consecutive successful
-// [Pacer.WaitForEvent] returns. 100ms isn't special here, it was selected as a
-// reasonable frequency for the engine to poll on whether to build a block or
-// not.
+// minEventSpacing is the minimum time between successful [Pacer.WaitForEvent]
+// returns. The value is arbitrary, chosen as a reasonable interval for the
+// engine to poll whether to build a block.
 const minEventSpacing = 100 * time.Millisecond
 
 // An EventWaiter blocks until there is an event for the consensus engine.
@@ -59,12 +57,12 @@ func NewPacer(now func() time.Time, waiter EventWaiter) *Pacer {
 // event have passed, then calls the wrapped [EventWaiter]. If ctx is canceled
 // first, it returns the cancellation cause.
 func (p *Pacer) WaitForEvent(ctx context.Context, earliest time.Time) (snowcommon.Message, error) {
-	// Throttle to avoid busy looping: the SAE mempool and the C-Chain's
-	// cross-chain txpool only drop txs once their block executes, so they keep
-	// reporting them as pending while the block is processing.
+	// Throttle to avoid busy looping. The SAE mempool and the C-Chain's
+	// cross-chain txpool only drop a tx once its block executes, so they keep
+	// reporting it as pending while that block is processing.
 	//
-	// TODO(JonathanOppenheimer): Those txpools should track the preferred
-	// block, including reorgs, so we don't need this throttle.
+	// TODO(JonathanOppenheimer): Remove this throttle once those txpools track
+	// the preferred block.
 	until := p.last.Get().Add(minEventSpacing)
 	if earliest.After(until) {
 		until = earliest
