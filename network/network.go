@@ -89,6 +89,10 @@ type Network interface {
 	// NodeUptime returns given node's primary network UptimeResults in the view of
 	// this node's peer validators.
 	NodeUptime() (UptimeResult, error)
+
+	// MembershipChecker reports which connected peers a subnet's membership CA
+	// certified.
+	subnets.MembershipChecker
 }
 
 type UptimeResult struct {
@@ -112,6 +116,7 @@ type UptimeResult struct {
 //
 // 1. peersLock
 // 2. manuallyTrackedIDsLock
+// 3. membership.lock
 //
 // If a higher lock (e.g. manuallyTrackedIDsLock) is held when trying to grab a
 // lower lock (e.g. peersLock) a deadlock could occur.
@@ -121,6 +126,7 @@ type network struct {
 	metrics    *metrics
 
 	outboundMsgThrottler throttling.OutboundMsgThrottler
+	membership           *membership
 
 	// Limits the number of connection attempts based on IP.
 	inboundConnUpgradeThrottler throttling.InboundConnUpgradeThrottler
@@ -232,6 +238,11 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing outbound message throttler failed with: %w", err)
 	}
 
+	membership, err := newMembership(log, config.TLSConfig, config.SubnetConfigs)
+	if err != nil {
+		return nil, fmt.Errorf("initializing membership failed with: %w", err)
+	}
+
 	peerMetrics, err := peer.NewMetrics(metricsRegisterer)
 	if err != nil {
 		return nil, fmt.Errorf("initializing peer metrics failed with: %w", err)
@@ -292,6 +303,7 @@ func NewNetwork(
 		peerConfig:           peerConfig,
 		metrics:              metrics,
 		outboundMsgThrottler: outboundMsgThrottler,
+		membership:           membership,
 
 		inboundConnUpgradeThrottler: throttling.NewInboundConnUpgradeThrottler(config.ThrottlerConfig.InboundConnUpgradeThrottlerConfig),
 		listener:                    listener,
@@ -498,13 +510,15 @@ func (n *network) Connected(nodeID ids.NodeID) {
 // AllowConnection returns true if this node should have a connection to the
 // provided nodeID. If the node is attempting to connect to the minimum number
 // of peers, then it should only connect if this node is a validator, or the
-// peer is a validator/beacon.
+// peer is a validator, a beacon, or a member of a subnet this node tracks.
 func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 	if !n.config.RequireValidatorToConnect {
 		return true
 	}
 	_, areWeAPrimaryNetworkAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
-	return areWeAPrimaryNetworkAValidator || n.ipTracker.WantsConnection(nodeID)
+	return areWeAPrimaryNetworkAValidator ||
+		n.ipTracker.WantsConnection(nodeID) ||
+		n.membership.isMemberOfAny(nodeID)
 }
 
 func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
@@ -842,6 +856,7 @@ func (n *network) disconnectedFromConnecting(nodeID ids.NodeID) {
 	defer n.peersLock.Unlock()
 
 	n.connectingPeers.Remove(nodeID)
+	n.membership.untrack(nodeID)
 
 	// The peer that is disconnecting from us didn't finish the handshake
 	tracked, ok := n.trackedIPs[nodeID]
@@ -867,6 +882,7 @@ func (n *network) disconnectedFromConnected(peer *peer.Peer, nodeID ids.NodeID) 
 	defer n.peersLock.Unlock()
 
 	n.connectedPeers.Remove(nodeID)
+	n.membership.untrack(nodeID)
 
 	// The peer that is disconnecting from us finished the handshake
 	if ip, wantsConnection := n.ipTracker.GetIP(nodeID); wantsConnection {
@@ -1030,7 +1046,7 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 		return err
 	}
 
-	nodeID, tlsConn, cert, err := upgrader.Upgrade(conn)
+	nodeID, tlsConn, cert, chain, err := upgrader.Upgrade(conn)
 	if err != nil {
 		_ = conn.Close()
 		n.peerConfig.Log.Verbo("failed to upgrade connection",
@@ -1056,7 +1072,10 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 		return nil
 	}
 
-	if !n.AllowConnection(nodeID) {
+	certified := n.membership.findCertifiedSubnets(chain)
+	// A verified chain admits on its own: AllowConnection reads the record,
+	// which is only written after the de-duplication checks below.
+	if len(certified) == 0 && !n.AllowConnection(nodeID) {
 		_ = tlsConn.Close()
 		n.peerConfig.Log.Verbo(
 			"dropping undesired connection",
@@ -1100,6 +1119,17 @@ func (n *network) upgrade(conn net.Conn, upgrader peer.Upgrader, isIngress bool)
 			zap.Stringer("nodeID", nodeID),
 		)
 		return nil
+	}
+
+	n.membership.track(nodeID, certified)
+	for subnetID, expiresAt := range certified {
+		n.peerConfig.Log.Debug("peer certified by membership CA",
+			zap.Stringer("nodeID", nodeID),
+			zap.Stringer("subnetID", subnetID),
+			// What a revocation list would have to name to evict this peer.
+			zap.String("serial", fmt.Sprintf("%X", chain[0].SerialNumber.Bytes())),
+			zap.String("expiresAt", expiresAt.UTC().Format(time.RFC3339)),
+		)
 	}
 
 	n.peerConfig.Log.Verbo("starting handshake",

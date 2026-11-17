@@ -26,7 +26,27 @@ type Config struct {
 	ValidatorOnly bool `json:"validatorOnly" yaml:"validatorOnly"`
 	// AllowedNodes is the set of node IDs that are explicitly allowed to connect to this Subnet when
 	// ValidatorOnly is enabled.
+	//
+	// Deprecated: Use [MembershipCAPath] or [MembershipCA], which admit a node
+	// without editing every other node's config. AllowedNodes is still honoured.
 	AllowedNodes set.Set[ids.NodeID] `json:"allowedNodes" yaml:"allowedNodes"`
+
+	// MembershipCAPath is the path to a PEM file holding one or more root
+	// certificates. A peer whose staking certificate chain verifies against one
+	// of them is a member of this Subnet, whether or not it validates it.
+	// Unlike [AllowedNodes], admitting a member edits no other node's config.
+	// Nothing in a certificate names a Subnet, so the roots must be
+	// this Subnet's alone. At most one of MembershipCAPath and MembershipCA may be set.
+	MembershipCAPath string `json:"membershipCAPath" yaml:"membershipCAPath"`
+	// MembershipCA inlines the same root certificates as PEM text.
+	MembershipCA []string `json:"membershipCA" yaml:"membershipCA"`
+	// MembershipCRLPath is the path to a PEM file of revocation lists issued
+	// under the membership CA. A certificate they revoke grants no membership, which evicts a member before its
+	// certificate expires. It requires a membership CA. At most one of
+	// MembershipCRLPath and MembershipCRL may be set.
+	MembershipCRLPath string `json:"membershipCRLPath" yaml:"membershipCRLPath"`
+	// MembershipCRL inlines the same revocation lists as PEM text.
+	MembershipCRL []string `json:"membershipCRL" yaml:"membershipCRL"`
 
 	// Deprecated: Use either SnowParameters or SimplexParameters instead.
 	ConsensusParameters *snowball.Parameters `json:"consensusParameters" yaml:"consensusParameters"`
@@ -76,6 +96,9 @@ func (c *Config) ValidConsensusConfiguration() error {
 func (c *Config) ValidParameters() error {
 	if !c.ValidatorOnly && c.AllowedNodes.Len() > 0 {
 		return errAllowedNodesWhenNotValidatorOnly
+	}
+	if err := c.validMembership(); err != nil {
+		return err
 	}
 
 	if c.SnowParameters != nil {
