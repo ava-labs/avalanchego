@@ -72,7 +72,9 @@ type Syncer struct {
 	// serialized bytes. A non-nil error aborts the sync.
 	onAccepted func(proof []byte) error
 
-	nodeIdx atomic.Uint32
+	nodeIdx                atomic.Uint32
+	failures               failures
+	maxConsecutiveFailures int
 }
 
 func New(
@@ -111,18 +113,31 @@ func newSyncer(
 		return nil, err
 	}
 	return &Syncer{
-		config:     config,
-		db:         db,
-		targetRoot: targetRoot,
-		client:     proofClient,
-		metrics:    m,
-		onAccepted: onAccepted,
+		config:                 config,
+		db:                     db,
+		targetRoot:             targetRoot,
+		client:                 proofClient,
+		metrics:                m,
+		onAccepted:             onAccepted,
+		maxConsecutiveFailures: defaultMaxConsecutiveFailures,
 	}, nil
 }
 
 // Sync blocks until the database matches the target root, a fatal error
 // occurs, or ctx is cancelled.
+//
+// Sync panics if no peer serves the target root: the sync can never finish,
+// and the target cannot be changed mid-sync.
 func (s *Syncer) Sync(ctx context.Context) error {
+	err := s.sync(ctx)
+	if errors.Is(err, errNoPeerServesRoot) {
+		s.config.Log.Fatal("firewood sync cannot continue", zap.Error(err))
+		panic(err)
+	}
+	return err
+}
+
+func (s *Syncer) sync(ctx context.Context) error {
 	start := time.Now()
 	s.config.Log.Info("starting firewood sync",
 		zap.Stringer("target root", s.targetRoot),
@@ -200,14 +215,7 @@ func (s *Syncer) logProgress(ctx context.Context, start time.Time) {
 // fetch returns the [ffi.FetchFunc] for one sync. abort cancels the sync with
 // a cause, for failures discovered after a proof is accepted.
 func (s *Syncer) fetch(abort context.CancelCauseFunc) ffi.FetchFunc {
-	return func(ctx context.Context, startKey, endKey ffi.Maybe[[]byte], attempt int, prevErr error) ([]byte, func(error), error) {
-		if prevErr != nil {
-			s.config.Log.Debug("refetching range after rejected proof",
-				zap.Int("attempt", attempt),
-				zap.Error(prevErr),
-			)
-		}
-
+	return func(ctx context.Context, startKey, endKey ffi.Maybe[[]byte], _ int, _ error) ([]byte, func(error), error) {
 		request := &pb.ProofRequest{
 			Request: &pb.ProofRequest_RangeProof{
 				RangeProof: &pb.RangeProofRequest{
@@ -226,12 +234,17 @@ func (s *Syncer) fetch(abort context.CancelCauseFunc) ffi.FetchFunc {
 
 		wait := initialRetryWait
 		for {
-			proof, verdict, err := s.request(ctx, requestBytes)
+			// Checked before every request so that rejected proofs, which
+			// return to the pool rather than retrying here, also count.
+			if err := s.failures.exceeded(s.maxConsecutiveFailures, s.targetRoot, s.metrics.accepted.Load(), s.peerCounts()); err != nil {
+				return nil, nil, err
+			}
+			resp, verdict, err := s.request(ctx, requestBytes)
 			if err != nil {
 				return nil, nil, err
 			}
-			if proof != nil {
-				return proof, s.report(abort, proof, verdict), nil
+			if resp.proof != nil {
+				return resp.proof, s.report(abort, resp, verdict), nil
 			}
 
 			select {
@@ -247,7 +260,11 @@ func (s *Syncer) fetch(abort context.CancelCauseFunc) ffi.FetchFunc {
 // report builds the per-proof callback the pool calls once Firewood has
 // judged the proof. It releases the peer's response callback with the verdict
 // so the peer is scored, then runs onAccepted for accepted proofs.
-func (s *Syncer) report(abort context.CancelCauseFunc, proof []byte, verdict chan<- error) func(error) {
+//
+// Only an accepted proof ends a run of consecutive failures; a rejected proof
+// extends it, so peers that serve only invalid proofs still trip the
+// no-peer-serves-root check.
+func (s *Syncer) report(abort context.CancelCauseFunc, resp response, verdict chan<- error) func(error) {
 	fetched := time.Now()
 	return func(err error) {
 		s.metrics.submitSeconds.Observe(time.Since(fetched).Seconds())
@@ -255,39 +272,65 @@ func (s *Syncer) report(abort context.CancelCauseFunc, proof []byte, verdict cha
 		if err != nil {
 			s.metrics.rejected.Add(1)
 			s.metrics.proofsRejected.Inc()
+			failed := s.failures.record(resp.nodeID, err)
+			s.config.Log.Warn("peer served invalid range proof",
+				append(s.peerFields(),
+					zap.Stringer("nodeID", resp.nodeID),
+					zap.Stringer("root", s.targetRoot),
+					zap.Int("consecutiveFailures", failed),
+					zap.Error(err),
+				)...,
+			)
 			return
 		}
+		s.failures.reset()
 		s.metrics.accepted.Add(1)
-		s.metrics.acceptedBytes.Add(uint64(len(proof)))
+		s.metrics.acceptedBytes.Add(uint64(len(resp.proof)))
 		s.metrics.proofsAccepted.Inc()
-		s.metrics.proofBytes.Add(float64(len(proof)))
+		s.metrics.proofBytes.Add(float64(len(resp.proof)))
 		if s.onAccepted != nil {
-			if err := s.onAccepted(proof); err != nil {
+			if err := s.onAccepted(resp.proof); err != nil {
 				abort(err)
 			}
 		}
 	}
 }
 
-// request sends one range-proof request and waits for the response. It
-// returns a nil proof when the response is unusable and should be retried.
+// response is a well-formed proof response and the peer that sent it. A nil
+// proof means the request failed and should be retried.
+type response struct {
+	proof  []byte
+	nodeID ids.NodeID
+}
+
+// request sends one range-proof request and waits for the response.
 //
 // For a usable response, the peer's response callback stays blocked until
 // the returned verdict channel receives Firewood's judgement, so a peer that
 // serves an invalid proof is scored as a failure.
-func (s *Syncer) request(ctx context.Context, requestBytes []byte) ([]byte, chan<- error, error) {
-	responses := make(chan []byte, 1)
+func (s *Syncer) request(ctx context.Context, requestBytes []byte) (response, chan<- error, error) {
+	responses := make(chan response, 1)
 	verdict := make(chan error, 1)
 	onResponse := func(_ context.Context, nodeID ids.NodeID, responseBytes []byte, appErr error) bool {
 		proof, err := parseResponse(responseBytes, appErr)
 		if err != nil {
 			s.metrics.requestsFailed.Inc()
-			s.config.Log.Debug("dropping proof response", zap.Stringer("nodeID", nodeID), zap.Error(err))
-			responses <- nil
+			if ctx.Err() == nil {
+				failed := s.failures.record(nodeID, err)
+				s.config.Log.Warn("peer failed to serve range proof",
+					append(s.peerFields(),
+						zap.Stringer("nodeID", nodeID),
+						zap.Stringer("root", s.targetRoot),
+						zap.Int("consecutiveFailures", failed),
+						zap.Error(err),
+					)...,
+				)
+			}
+			responses <- response{nodeID: nodeID}
 			return false
 		}
 		s.metrics.requestsSucceeded.Inc()
-		responses <- proof
+		responses <- response{proof: proof, nodeID: nodeID}
 		select {
 		case err := <-verdict:
 			return err == nil
@@ -298,15 +341,33 @@ func (s *Syncer) request(ctx context.Context, requestBytes []byte) ([]byte, chan
 	}
 
 	if err := s.send(ctx, requestBytes, onResponse); err != nil {
-		return nil, nil, err
+		return response{}, nil, err
 	}
 	s.metrics.requestsMade.Inc()
 
 	select {
-	case proof := <-responses:
-		return proof, verdict, nil
+	case resp := <-responses:
+		return resp, verdict, nil
 	case <-ctx.Done():
-		return nil, nil, ctx.Err()
+		return response{}, nil, ctx.Err()
+	}
+}
+
+func (s *Syncer) peerCounts() peerCounts {
+	connected, responsive, ok := s.client.PeerCounts()
+	return peerCounts{connected: connected, responsive: responsive, ok: ok}
+}
+
+// peerFields returns log fields describing the peers that could still be
+// selected.
+func (s *Syncer) peerFields() []zap.Field {
+	peers := s.peerCounts()
+	if !peers.ok {
+		return nil
+	}
+	return []zap.Field{
+		zap.Int("connectedPeers", peers.connected),
+		zap.Int("responsivePeers", peers.responsive),
 	}
 }
 
