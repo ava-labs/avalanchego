@@ -87,7 +87,6 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("setting up genesis trie: %w", err)
 	}
 
-	vm.pacer = blockdelay.NewPacer(vm.now)
 	vm.Network, err = network.New(snowCtx, appSender)
 	if err != nil {
 		return fmt.Errorf("creating network: %w", err)
@@ -99,20 +98,21 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}
+	vm.pacer = blockdelay.NewPacer(vm.now, vm.VM)
 	return nil
 }
 
 // WaitForEvent waits until the ACP-226 minimum block delay since the preferred
 // block has elapsed, then waits for the SAE VM to produce an event.
 func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
-	return vm.pacer.WaitForEvent(ctx, earliestBuildTime(vm.VM.GetPreference()), vm.VM.WaitForEvent)
+	return vm.pacer.WaitForEvent(ctx, earliestBuildTime(vm.VM.GetPreference()))
 }
 
 // earliestBuildTime returns the earliest wall-clock time at which a child of b
 // may be built.
 func earliestBuildTime(b *blocks.Block) time.Time {
 	h := b.Header()
-	return blockdelay.Earliest(blockTime(h), delayExponent(h))
+	return blockTime(h).Add(delayExponent(h).DelayDuration())
 }
 
 // Shutdown gracefully closes the VM.

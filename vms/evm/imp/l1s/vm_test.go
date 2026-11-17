@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/vmtest"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
@@ -278,7 +277,7 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 		hdr.Time = earlyMS / 1000
 		customtypes.GetHeaderExtra(hdr).TimeMilliseconds = &earlyMS
 	})
-	require.ErrorIsf(t, err, blockdelay.ErrBelowMinimum, "%T.VerifyBlock() (block below the ACP-226 minimum delay)", sut.VM)
+	require.ErrorIsf(t, err, errBelowMinBlockDelay, "%T.VerifyBlock() (block below the ACP-226 minimum delay)", sut.VM)
 }
 
 // TestWaitForEventMinDelayPacing asserts that [VM.WaitForEvent] doesn't report
