@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/libevm/core/state/snapshot"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -26,10 +27,11 @@ func RegisterHandlers(
 	tdb *triedb.Database,
 	snaps *snapshot.Tree,
 	state *cchainstate.State,
+	registerer prometheus.Registerer,
 ) error {
 	if err := cchainstate.RegisterSyncHandler(network, state); err != nil {
 		return fmt.Errorf("registering C-Chain state handler: %w", err)
 	}
 
-	return statesync.RegisterHandlers(log, network, db, tdb, snaps)
+	return statesync.RegisterHandlers(log, network, db, tdb, snaps, registerer)
 }

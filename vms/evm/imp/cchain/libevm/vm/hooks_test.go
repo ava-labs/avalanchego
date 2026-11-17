@@ -20,8 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
-
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 )
 
 func TestMain(m *testing.M) {
@@ -39,7 +37,7 @@ func TestHooksOverrideNewEVMArgs(t *testing.T) {
 	}{
 		{
 			name:           "pre_shanghai_keeps_difficulty",
-			config:         corethparams.WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &cparams.ChainConfig{}),
+			config:         cparams.WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &cparams.ChainConfig{}),
 			wantDifficulty: difficulty,
 		},
 		{

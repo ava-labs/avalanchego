@@ -28,12 +28,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
@@ -43,7 +45,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	cchainstate "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/state"
 	saetypes "github.com/ava-labs/avalanchego/vms/evm/types"
@@ -152,13 +153,9 @@ func priceExponent(h *types.Header) dynamic.PriceExponent {
 	return dynamic.InitialPriceExponent
 }
 
-// delayExponent returns h's ACP-226 minimum block delay exponent, defaulting to
-// [dynamic.InitialDelayExponent] when the header does not carry one.
+// delayExponent returns h's ACP-226 minimum block delay exponent.
 func delayExponent(h *types.Header) dynamic.DelayExponent {
-	if de := customtypes.GetHeaderExtra(h).MinDelayExcess; de != nil {
-		return dynamic.DelayExponent(*de)
-	}
-	return dynamic.InitialDelayExponent
+	return blockdelay.Exponent(customtypes.GetHeaderExtra(h).MinDelayExcess)
 }
 
 func targetExponent(config *cparams.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
@@ -171,11 +168,11 @@ func targetExponent(config *cparams.ChainConfig, h *types.Header) (dynamic.Targe
 
 	// Synchronous blocks store the target exponent in their ACP-176 fee state.
 	// Only the last one's is used, as the parent of the first SAE block.
-	return customtypes.TargetExponentFromExtra(h.Extra)
+	return cparams.TargetExponentFromExtra(h.Extra)
 }
 
 func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	config := corethparams.GetExtra(h.chainConfig)
+	config := cparams.GetExtra(h.chainConfig)
 	te, err := targetExponent(config, header)
 	if err != nil {
 		te = dynamic.InitialTargetExponent
@@ -241,8 +238,9 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 }
 
 func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
-	config := corethparams.GetExtra(h.chainConfig)
-	if isFirstDurangoBlock := corethparams.GetRulesExtra(rules).IsDurango && !config.IsDurango(parent.Time); isFirstDurangoBlock {
+	c := cparams.GetExtra(h.chainConfig)
+	r := cparams.GetRulesExtra(rules)
+	if firstDBlock := r.Is(upgrade.Durango) && !c.IsDurango(parent.Time); firstDBlock {
 		activatePrecompile(statedb, corethwarp.ContractAddress)
 	}
 	return nil
@@ -332,7 +330,7 @@ func (h *hooks) VerifyBlockSyntax(b *types.Block) error {
 	// For genesis and pre-ApricotPhase1 blocks, the header's ExtDataHash is
 	// expected to be empty with the actual data expected to be committed to in
 	// [extDataHashes].
-	if height := b.NumberU64(); height == 0 || !corethparams.GetExtra(h.chainConfig).IsApricotPhase1(b.Time()) {
+	if height := b.NumberU64(); height == 0 || !cparams.GetExtra(h.chainConfig).IsApricotPhase1(b.Time()) {
 		wantHash := customtypes.EmptyExtDataHash
 		if want, ok := extDataHashes[h.ctx.NetworkID][height]; ok {
 			wantHash = want
@@ -358,18 +356,12 @@ type builder struct {
 	desired      desiredParams
 }
 
-var (
-	errHeliconUnactivated = errors.New("helicon is not activated")
-	errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
-)
+var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
 
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
-	if !b.ctx.NetworkUpgrades.IsHeliconActivated(now) {
-		return nil, errHeliconUnactivated
-	}
 
 	de := delayExponent(parent)
 	parentTime := blockTime(parent)
@@ -380,7 +372,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 
 	nowMS := uint64(now.UnixMilli())
 
-	config := corethparams.GetExtra(b.chainConfig)
+	config := cparams.GetExtra(b.chainConfig)
 	te, err := targetExponent(config, parent)
 	if err != nil {
 		return nil, fmt.Errorf("getting target exponent: %w", err)
@@ -531,8 +523,8 @@ func (b *builder) BuildBlock(
 		return nil, fmt.Errorf("marshalling txs: %w", err)
 	}
 
-	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
-	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, corethparams.GetRulesExtra(rules).IsDurango, ethTxs)
+	// SAE blocks are post-Helicon, and therefore post-Durango.
+	warpValidity, err := warp.VerifyBlock(b.ctx, blockCtx, ethTxs)
 	if err != nil {
 		return nil, fmt.Errorf("verifying warp messages: %w", err)
 	}

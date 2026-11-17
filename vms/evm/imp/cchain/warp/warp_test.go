@@ -175,43 +175,26 @@ func TestVerifyBlock(t *testing.T) {
 	)
 	tests := []struct {
 		name         string
-		isDurango    bool
 		blockContext *block.Context
 		txs          []*types.Transaction
 		want         predicate.BlockResults
 		wantErr      error
 	}{
 		{
-			name:         "pre_durango",
-			blockContext: &block.Context{},
-			txs: []*types.Transaction{
-				validTx,
-			},
-		},
-		{
-			name: "pre_durango_no_context",
-			txs: []*types.Transaction{
-				validTx,
-			},
-		},
-		{
 			name:         "no_predicates",
-			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				types.NewTx(&types.DynamicFeeTx{}),
 			},
 		},
 		{
-			name:      "no_predicates_no_context",
-			isDurango: true,
+			name: "no_predicates_no_context",
 			txs: []*types.Transaction{
 				types.NewTx(&types.DynamicFeeTx{}),
 			},
 		},
 		{
 			name:         "filtered_predicates",
-			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				types.NewTx(&types.DynamicFeeTx{
@@ -222,8 +205,7 @@ func TestVerifyBlock(t *testing.T) {
 			},
 		},
 		{
-			name:      "missing_block_context",
-			isDurango: true,
+			name: "missing_block_context",
 			txs: []*types.Transaction{
 				validTx,
 			},
@@ -231,7 +213,6 @@ func TestVerifyBlock(t *testing.T) {
 		},
 		{
 			name:         "one_tx_one_address_one_predicate",
-			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				validTx,
@@ -244,7 +225,6 @@ func TestVerifyBlock(t *testing.T) {
 		},
 		{
 			name:         "one_tx_one_address_one_invalid_predicate",
-			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				invalidTx,
@@ -257,7 +237,6 @@ func TestVerifyBlock(t *testing.T) {
 		},
 		{
 			name:         "one_address_multiple_invalid_predicates",
-			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				twoInvalidTx,
@@ -270,7 +249,6 @@ func TestVerifyBlock(t *testing.T) {
 		},
 		{
 			name:         "one_address_mixed_predicates",
-			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				mixedTx,
@@ -283,7 +261,6 @@ func TestVerifyBlock(t *testing.T) {
 		},
 		{
 			name:         "multiple_txs",
-			isDurango:    true,
 			blockContext: &block.Context{},
 			txs: []*types.Transaction{
 				validTx,
@@ -304,7 +281,7 @@ func TestVerifyBlock(t *testing.T) {
 			snowContext := snowtest.Context(t, snowtest.CChainID)
 			warptest.SetValidators(t, snowContext, vdrs)
 
-			got, err := VerifyBlock(snowContext, test.blockContext, test.isDurango, test.txs)
+			got, err := VerifyBlock(snowContext, test.blockContext, test.txs)
 			require.ErrorIs(t, err, test.wantErr, "VerifyBlock()")
 			require.Equal(t, test.want, got, "VerifyBlock()")
 		})
@@ -346,7 +323,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 
 				// Confirm the predicates verify before timing, so the benchmark
 				// measures the success path rather than an early failure.
-				results, err := VerifyBlock(snowContext, blockContext, true /*isDurango*/, txs)
+				results, err := VerifyBlock(snowContext, blockContext, txs)
 				require.NoError(b, err, "VerifyBlock()")
 				require.Len(b, results, numTxs, "VerifyBlock() results length")
 
@@ -358,7 +335,7 @@ func BenchmarkVerifyBlock(b *testing.B) {
 				}
 
 				for b.Loop() {
-					_, _ = VerifyBlock(snowContext, blockContext, true /*isDurango*/, txs)
+					_, _ = VerifyBlock(snowContext, blockContext, txs)
 				}
 
 				predicates := numTxs * predicatesPerTx

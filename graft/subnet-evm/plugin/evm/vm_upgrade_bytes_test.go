@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/txallowlist"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/stateupgrade"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -238,7 +239,7 @@ func TestVMStateUpgrade(t *testing.T) {
 	upgradedCodeStr := "0xdeadbeef" // this code will be applied during the upgrade
 	upgradedCode, err := hexutil.Decode(upgradedCodeStr)
 	// This modification will be applied to an existing account
-	genesisAccountUpgrade := &extras.StateUpgradeAccount{
+	genesisAccountUpgrade := &stateupgrade.Account{
 		BalanceChange: (*math.HexOrDecimal256)(big.NewInt(100)),
 		Storage:       map[common.Hash]common.Hash{storageKey: {}},
 		Code:          upgradedCode,
@@ -247,7 +248,7 @@ func TestVMStateUpgrade(t *testing.T) {
 	// This modification will be applied to a new account
 	newAccount := common.Address{42}
 	require.NoError(t, err)
-	newAccountUpgrade := &extras.StateUpgradeAccount{
+	newAccountUpgrade := &stateupgrade.Account{
 		BalanceChange: (*math.HexOrDecimal256)(big.NewInt(100)),
 		Storage:       map[common.Hash]common.Hash{storageKey: common.HexToHash("0x6666")},
 		Code:          upgradedCode,
