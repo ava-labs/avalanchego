@@ -846,6 +846,15 @@ func (e *Epoch) isEpochSealed() bool {
 	return e.epochSealed.Load()
 }
 
+// appendToWAL appends [record] to the WAL, unless the epoch is sealed.
+func (e *Epoch) appendToWAL(record []byte) error {
+	if e.isEpochSealed() {
+		e.Logger.Debug("Epoch is sealed, not appending record to WAL")
+		return nil
+	}
+	return e.WAL.Append(record)
+}
+
 func (e *Epoch) handleFinalizationMessage(message *common.Finalization, from common.NodeID) error {
 	e.Logger.Verbo("Received finalization message",
 		zap.Stringer("from", from), zap.Uint64("round", message.Finalization.Round), zap.Uint64("seq", message.Finalization.Seq))
@@ -1379,7 +1388,7 @@ func (e *Epoch) persistFinalization(finalization common.Finalization) error {
 		}
 	} else {
 		finalizationRecord := common.NewQuorumRecord(finalization.QC.Bytes(), finalization.Finalization.Bytes(), common.FinalizationRecordType)
-		if err := e.WAL.Append(finalizationRecord); err != nil {
+		if err := e.appendToWAL(finalizationRecord); err != nil {
 			e.haltedError = err
 			e.Logger.Error("Failed to append finalization record to WAL", zap.Error(err))
 			return err
@@ -1642,7 +1651,7 @@ func (e *Epoch) persistEmptyNotarization(emptyVotes *EmptyVoteSet, shouldBroadca
 
 	emptyNotarization := emptyVotes.emptyNotarization
 	emptyNotarizationRecord := common.NewEmptyNotarizationRecord(emptyNotarization)
-	if err := e.WAL.Append(emptyNotarizationRecord); err != nil {
+	if err := e.appendToWAL(emptyNotarizationRecord); err != nil {
 		e.haltedError = err
 		e.Logger.Error("Failed to append empty notarization record to WAL", zap.Error(err))
 		return err
@@ -1738,7 +1747,7 @@ func (e *Epoch) maybeCollectNotarization() error {
 func (e *Epoch) writeNotarizationToWal(notarization common.Notarization) error {
 	notarizationRecord := common.NewQuorumRecord(notarization.QC.Bytes(), notarization.Vote.Bytes(), common.NotarizationRecordType)
 
-	if err := e.WAL.Append(notarizationRecord); err != nil {
+	if err := e.appendToWAL(notarizationRecord); err != nil {
 		e.haltedError = err
 		e.Logger.Error("Failed to append notarization record to WAL", zap.Error(err))
 		return err
@@ -2837,7 +2846,7 @@ func (e *Epoch) triggerEmptyBlockNotarization(round uint64) {
 	}
 
 	emptyVoteRecord := common.NewEmptyVoteRecord(emptyVote)
-	if err := e.WAL.Append(emptyVoteRecord); err != nil {
+	if err := e.appendToWAL(emptyVoteRecord); err != nil {
 		e.haltedError = err
 		e.Logger.Error("Failed appending empty vote", zap.Error(err))
 		return
@@ -3376,7 +3385,7 @@ func (e *Epoch) storeProposal(block common.VerifiedBlock) bool {
 		e.Logger.Error("Failed to create block record for WAL", zap.Error(err))
 		return false
 	}
-	if err := e.WAL.Append(blockRecord); err != nil {
+	if err := e.appendToWAL(blockRecord); err != nil {
 		e.haltedError = err
 		e.Logger.Error("Failed to append block record to WAL", zap.Error(err))
 		return false
