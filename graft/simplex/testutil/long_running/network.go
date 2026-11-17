@@ -116,12 +116,12 @@ func (n *LongRunningInMemoryNetwork) WaitForNodesToEnterRound(round uint64, node
 	// check if nodeIndexes have length 0
 	if len(nodeIndexes) == 0 {
 		for _, instance := range n.instances {
-			testutil.WaitToEnterRoundWithTimeout(n.t, instance.E, round, 3*time.Second)
+			testutil.WaitToEnterRoundWithTimeout(n.t, instance.E, round, testutil.DefaultTimeout)
 		}
 	}
 
 	for _, idx := range nodeIndexes {
-		testutil.WaitToEnterRoundWithTimeout(n.t, n.instances[idx].E, round, 3*time.Second)
+		testutil.WaitToEnterRoundWithTimeout(n.t, n.instances[idx].E, round, testutil.DefaultTimeout)
 	}
 }
 
@@ -140,7 +140,7 @@ func (n *LongRunningInMemoryNetwork) ConnectNodes(nodeIndexes ...uint64) {
 }
 
 func (n *LongRunningInMemoryNetwork) waitUntilAllRoundsEqual() {
-	maxWait := time.After(30 * time.Second)
+	maxWait := time.After(testutil.DefaultTimeout)
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
