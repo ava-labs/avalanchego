@@ -2,7 +2,7 @@
 // See the file LICENSE for licensing terms.
 
 // Package dynamic implements the exponential integrators used to ramp
-// C-Chain consensus parameters smoothly between blocks.
+// consensus parameters smoothly between blocks.
 //
 // Each parameter is encoded as an exponent type ([PriceExponent],
 // [DelayExponent], [TargetExponent]) that exposes:

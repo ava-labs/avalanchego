@@ -256,7 +256,7 @@ func newGossipMempool(
 	pools := []txpool.SubPool{
 		legacypool.New(config, bc),
 	}
-	txPool, err := txpool.New(0, bc, pools)
+	txPool, err := txpool.New(config.PriceLimit, bc, pools)
 	if err != nil {
 		return nil, nil, fmt.Errorf("txpool.New(...): %v", err)
 	}

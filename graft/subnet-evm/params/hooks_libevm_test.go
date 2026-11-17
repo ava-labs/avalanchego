@@ -9,15 +9,15 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 )
 
 func TestRulesExtra_MinimumGasConsumption(t *testing.T) {
 	tests := []struct {
-		name      string
-		isHelicon bool
-		limit     uint64
-		want      uint64
+		name    string
+		isIgloo bool
+		limit   uint64
+		want    uint64
 	}{
 		{"pre_fork_noop", false, math.MaxUint64, 0},
 		{"post_fork_zero", true, 0, 0},
@@ -27,7 +27,7 @@ func TestRulesExtra_MinimumGasConsumption(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := RulesExtra(cparams.Rules{IsHelicon: tt.isHelicon})
+			r := RulesExtra(extras.Rules{AvalancheRules: extras.AvalancheRules{IsIgloo: tt.isIgloo}})
 			assert.Equalf(t, tt.want, r.MinimumGasConsumption(tt.limit), "%T.MinimumGasConsumption(%d)", r, tt.limit)
 		})
 	}

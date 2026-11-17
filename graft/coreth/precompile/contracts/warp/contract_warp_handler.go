@@ -43,9 +43,8 @@ type messageHandler interface {
 	handleMessage(msg *warp.Message) ([]byte, error)
 }
 
-func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, handler messageHandler) ([]byte, error) {
-	env := accessibleState.GetPrecompileEnv()
-	warpGasConfig := CurrentGasConfig(accessibleState.GetRules())
+func handleWarpMessage(env contract.Environment, input []byte, handler messageHandler) ([]byte, error) {
+	warpGasConfig := CurrentGasConfig(env.ExtraRules())
 	if err := contract.DeductGas(env, warpGasConfig.GetVerifiedWarpMessageBase); err != nil {
 		return nil, err
 	}
@@ -58,9 +57,9 @@ func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, h
 		return nil, fmt.Errorf("%w: larger than MaxInt32", errInvalidIndexInput)
 	}
 	warpIndex := int(warpIndexInput) // This conversion is safe even if int is 32 bits because we checked above.
-	state := accessibleState.GetStateDB()
+	state := env.ReadOnlyState().(contract.StateDB)
 	pred, exists := state.GetWarpMessage(warpIndex)
-	results := accessibleState.GetBlockContext().GetWarpMessageResults(state.TxHash())
+	results := env.WarpMessageResults(state.TxHash())
 	valid := exists && !results.Contains(warpIndex)
 	if !valid {
 		return handler.packFailed(), nil
