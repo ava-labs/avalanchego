@@ -47,7 +47,6 @@ go_test(
         "@com_github_ava_labs_libevm//core/types",
         "@com_github_ava_labs_libevm//crypto",
         "@com_github_ava_labs_libevm//ethdb",
-        "@com_github_ava_labs_libevm//libevm",
         "@com_github_ava_labs_libevm//libevm/ethtest",
         "@com_github_ava_labs_libevm//params",
         "@com_github_google_go_cmp//cmp",

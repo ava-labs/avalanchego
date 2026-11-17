@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -36,7 +35,7 @@ type Points interface {
 	BlockTime(h *types.Header) time.Time
 	SettledBy(*types.Header) hook.Settled
 	VerifyBlockSyntax(*types.Block) error
-	CanExecuteTransaction(common.Address, *common.Address, libevm.StateReader) error
+	AdmitTransaction(from common.Address, tx *types.Transaction, settled hook.SettledView) error
 	StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error
 	FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error
 	AfterExecutingBlock(*types.Block, types.Receipts) error

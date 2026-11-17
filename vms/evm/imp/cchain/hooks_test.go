@@ -6,19 +6,24 @@ package cchain
 import (
 	"math/big"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/evm/hook"
+	"github.com/ava-labs/avalanchego/vms/evm/hook/hookstest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 )
 
@@ -135,4 +140,59 @@ func TestTargetExponent(t *testing.T) {
 			assert.Equal(t, tt.want, got, "targetExponent()")
 		})
 	}
+}
+
+// Drives the builder in the order SAE calls it, so [hookstest.Conformance]
+// fails if the C-Chain changes a header value it must not.
+func TestBuilderConformance(t *testing.T) {
+	key := txtest.NewKey(t)
+	ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()))
+	parent, err := sut.EthClient().HeaderByNumber(ctx, big.NewInt(0))
+	require.NoError(t, err, "HeaderByNumber(0)")
+	// A sub-second block time, so that dropping its milliseconds is visible.
+	sut.clock.Advance(1500 * time.Millisecond)
+
+	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
+	htx, err := newHookTx(stx, sut.ctx.AVAXAssetID)
+	require.NoError(t, err, "newHookTx()")
+
+	build := func(t *testing.T, builder hook.BlockBuilder[*hookTx]) *types.Block {
+		t.Helper()
+
+		hdr, err := builder.BuildHeader(parent)
+		require.NoError(t, err, "BuildHeader()")
+		hdr.Root = parent.Root
+		hdr.GasLimit = parent.GasLimit
+		hdr.BaseFee = parent.BaseFee
+		noBlocks := func(common.Hash, uint64) (*types.Block, bool) {
+			return nil, false
+		}
+		for range builder.PotentialEndOfBlockOps(ctx, hdr, parent.Hash(), noBlocks) {
+		}
+		block, err := builder.BuildBlock(
+			hdr,
+			nil, // blockContext
+			nil, // ethTxs
+			nil, // receipts
+			[]*hookTx{htx},
+			hook.Settled{GasUnix: parent.Time},
+		)
+		require.NoError(t, err, "BuildBlock()")
+		return block
+	}
+
+	hooks := hookstest.Conformance(t, newHooks(
+		sut.ctx,
+		sut.VM.state,
+		sut.VM.chainConfig,
+		sut.VM.pending,
+		warp.NewStorage(memdb.New()),
+		sut.VM.now,
+		desiredParams{},
+		sut.VM.metrics,
+	))
+	built := build(t, hooks)
+	rebuilder, err := hooks.BlockRebuilderFrom(built)
+	require.NoError(t, err, "BlockRebuilderFrom()")
+	assert.Equal(t, built.Hash(), build(t, rebuilder).Hash(), "rebuilt block hash")
 }

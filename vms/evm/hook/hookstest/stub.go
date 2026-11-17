@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
@@ -31,16 +30,16 @@ import (
 
 // Stub implements [hook.PointsG] parameterized by [Op].
 type Stub struct {
-	Now                     func() time.Time
-	Target                  gas.Gas
-	InvalidOpIDs            set.Set[ids.ID]
-	Ops                     []Op
-	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
-	VerifyBlockSyntaxFn     func(*types.Block) error
-	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
-	StartExecutingBlockFn   func(params.Rules, *state.StateDB, *types.Header, *types.Block) error
-	FinishExecutingBlockFn  func(*state.StateDB, *types.Block, types.Receipts) error
-	GasPriceConfig          gastime.GasPriceConfig
+	Now                    func() time.Time
+	Target                 gas.Gas
+	InvalidOpIDs           set.Set[ids.ID]
+	Ops                    []Op
+	ExecutionResultsDBFn   func(string) (saetypes.ExecutionResults, error)
+	VerifyBlockSyntaxFn    func(*types.Block) error
+	AdmitTransactionFn     func(common.Address, *types.Transaction, hook.SettledView) error
+	StartExecutingBlockFn  func(params.Rules, *state.StateDB, *types.Header, *types.Block) error
+	FinishExecutingBlockFn func(*state.StateDB, *types.Block, types.Receipts) error
+	GasPriceConfig         gastime.GasPriceConfig
 }
 
 var _ hook.PointsG[Op] = (*Stub)(nil)
@@ -244,11 +243,11 @@ func (s *Stub) VerifyBlockSyntax(b *types.Block) error {
 	return nil
 }
 
-// CanExecuteTransaction proxies to [Stub.CanExecuteTransactionFn] if non-nil,
-// otherwise it allows all transactions.
-func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr libevm.StateReader) error {
-	if fn := s.CanExecuteTransactionFn; fn != nil {
-		return fn(from, to, sr)
+// AdmitTransaction proxies to [Stub.AdmitTransactionFn] if non-nil, otherwise
+// it allows all transactions.
+func (s *Stub) AdmitTransaction(from common.Address, tx *types.Transaction, settled hook.SettledView) error {
+	if fn := s.AdmitTransactionFn; fn != nil {
+		return fn(from, tx, settled)
 	}
 	return nil
 }
