@@ -206,8 +206,8 @@ func (c *ChainConfig) Rules(timestamp uint64) Rules {
 	// Finding the first inactive fork removes the need to iterate over any that
 	// share an upgrade time when said time is `timestamp`.
 	inactive := sort.Search(len(fs), func(i int) bool {
-		f := fs[i]
-		return f.time == nil || *f.time > timestamp
+		t := fs[i].time
+		return t == nil || *t > timestamp
 	})
 	// The inclusion of [upgrade.NoUpgrades] at time 0 guarantees that `inactive` >= 1.
 	return Rules{fs[inactive-1].upgrade}
