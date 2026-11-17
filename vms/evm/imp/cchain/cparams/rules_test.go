@@ -45,10 +45,11 @@ func TestLatestUpgradeFromConfig(t *testing.T) {
 	)
 
 	p := func(u uint64) *uint64 { return &u }
+	shared := p(30)
 	config := &ChainConfig{
 		ApricotPhase1Timestamp: p(10),
-		ApricotPhase2Timestamp: p(20),
-		ApricotPhase3Timestamp: p(30),
+		ApricotPhase2Timestamp: shared,
+		ApricotPhase3Timestamp: shared,
 		ApricotPhase4Timestamp: p(40),
 	}
 	tests := map[uint64]upgrade.Upgrade{
@@ -59,6 +60,8 @@ func TestLatestUpgradeFromConfig(t *testing.T) {
 		9:  no,
 		10: ap1,
 		11: ap1,
+		// Return latest when times are shared
+		*shared: ap3,
 		// Around AP4
 		39: ap3,
 		40: ap4,

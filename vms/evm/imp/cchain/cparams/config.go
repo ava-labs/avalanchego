@@ -4,7 +4,6 @@
 package cparams
 
 import (
-	"cmp"
 	"fmt"
 	"math/big"
 	"slices"
@@ -174,19 +173,6 @@ func (f fork) name() string {
 	return f.upgrade.String()
 }
 
-func (f fork) Compare(g fork) int {
-	switch fn, gn := f.time == nil, g.time == nil; {
-	case fn && gn:
-		return 0
-	case fn:
-		return 1
-	case gn:
-		return -1
-	default:
-		return cmp.Compare(*f.time, *g.time)
-	}
-}
-
 // forks returns a list of all network upgrades in chronological order.
 // Timestamps are NOT guaranteed to be in ascending order.
 func (c *ChainConfig) forks() []fork {
@@ -214,13 +200,17 @@ func (c *ChainConfig) forks() []fork {
 // Rules requires that [ChainConfig.CheckConfigForkOrder] returns nil.
 func (c *ChainConfig) Rules(timestamp uint64) Rules {
 	fs := c.forks()
-	i, ok := slices.BinarySearchFunc(fs, fork{time: new(timestamp)}, fork.Compare)
-	if !ok {
-		// The inclusion of [upgrade.NoUpgrades] at time 0 guarantees that this
-		// can't underflow.
-		i--
-	}
-	return Rules{fs[i].upgrade}
+	// The comparator never reports equality, which results in the first fork
+	// that is NOT active at `timestamp`. The fork before it is therefore the
+	// latest active one, even if several share a timestamp.
+	i, _ := slices.BinarySearchFunc(fs, timestamp, func(f fork, t uint64) int {
+		if f.time == nil || *f.time > t {
+			return 1
+		}
+		return -1
+	})
+	// The inclusion of [upgrade.NoUpgrades] at time 0 guarantees that i >= 1.
+	return Rules{fs[i-1].upgrade}
 }
 
 // IsApricotPhase1 returns whether time represents a block with a timestamp
