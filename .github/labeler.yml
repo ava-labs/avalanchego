@@ -1,0 +1,14 @@
+# Labels PRs by the code directories they change.
+evm:
+  - changed-files:
+      - any-glob-to-any-file:
+          - graft/coreth/**
+          - graft/evm/**
+          - graft/subnet-evm/**
+          - vms/evm/**
+
+simplex:
+  - changed-files:
+      - any-glob-to-any-file:
+          - simplex/**
+          - graft/simplex/**
