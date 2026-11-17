@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
@@ -36,7 +36,7 @@ import (
 func TestBuildBlockBasic(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, upgradetest.Latest)
+	env := newEnvironment(t, upgrade.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -82,7 +82,7 @@ func TestBuildBlockBasic(t *testing.T) {
 func TestBuildBlockDoesNotBuildWithEmptyMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, upgradetest.Latest)
+	env := newEnvironment(t, upgrade.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -99,7 +99,7 @@ func TestBuildBlockDoesNotBuildWithEmptyMempool(t *testing.T) {
 func TestBuildBlockShouldReward(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, upgradetest.Latest)
+	env := newEnvironment(t, upgrade.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -215,7 +215,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 func TestBuildBlockShouldRewardAutoRenewedValidator(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, upgradetest.Latest)
+	env := newEnvironment(t, upgrade.Latest)
 
 	// Remove genesis validators so our auto-renewed validator is the only staker
 	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
@@ -268,7 +268,7 @@ func TestBuildBlockShouldRewardAutoRenewedValidator(t *testing.T) {
 func TestBuildBlockAdvanceTime(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, upgradetest.Latest)
+	env := newEnvironment(t, upgrade.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -301,7 +301,7 @@ func TestBuildBlockAdvanceTime(t *testing.T) {
 func TestBuildBlockForceAdvanceTime(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, upgradetest.Latest)
+	env := newEnvironment(t, upgrade.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -359,7 +359,7 @@ func TestBuildBlockForceAdvanceTime(t *testing.T) {
 func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, upgradetest.Latest)
+	env := newEnvironment(t, upgrade.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -465,7 +465,7 @@ func TestBuildBlockInvalidStakingDurations(t *testing.T) {
 func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, upgradetest.Latest)
+	env := newEnvironment(t, upgrade.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -509,7 +509,7 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
-	env := newEnvironment(t, upgradetest.Latest)
+	env := newEnvironment(t, upgrade.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 

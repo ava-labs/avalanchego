@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
@@ -37,7 +37,7 @@ func newAdvanceTimeTx(t testing.TB, timestamp time.Time) (*platform.Tx, error) {
 // for the primary network
 func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 	dummyHeight := uint64(1)
@@ -102,7 +102,7 @@ func TestAdvanceTimeTxUpdatePrimaryNetworkStakers(t *testing.T) {
 // current timestamp
 func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 
 	tx, err := newAdvanceTimeTx(t, env.state.GetTimestamp().Add(-time.Second))
 	require.NoError(err)
@@ -128,7 +128,7 @@ func TestAdvanceTimeTxTimestampTooEarly(t *testing.T) {
 // validator set change time
 func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -161,7 +161,7 @@ func TestAdvanceTimeTxTimestampTooLate(t *testing.T) {
 	}
 
 	// Case: Timestamp is after next validator end time
-	env = newEnvironment(t, upgradetest.ApricotPhase5)
+	env = newEnvironment(t, upgrade.ApricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -362,7 +362,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, upgradetest.ApricotPhase5)
+			env := newEnvironment(t, upgrade.ApricotPhase5)
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
@@ -472,7 +472,7 @@ func TestAdvanceTimeTxUpdateStakers(t *testing.T) {
 // is after the new timestamp
 func TestAdvanceTimeTxRemoveSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -585,7 +585,7 @@ func TestTrackedSubnet(t *testing.T) {
 	for _, tracked := range []bool{true, false} {
 		t.Run(fmt.Sprintf("tracked %t", tracked), func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, upgradetest.ApricotPhase5)
+			env := newEnvironment(t, upgrade.ApricotPhase5)
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 			dummyHeight := uint64(1)
@@ -660,7 +660,7 @@ func TestTrackedSubnet(t *testing.T) {
 
 func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 	dummyHeight := uint64(1)
@@ -767,7 +767,7 @@ func TestAdvanceTimeTxDelegatorStakerWeight(t *testing.T) {
 
 func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 	dummyHeight := uint64(1)
@@ -866,7 +866,7 @@ func TestAdvanceTimeTxDelegatorStakers(t *testing.T) {
 
 func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Durango)
+	env := newEnvironment(t, upgrade.Durango)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 	env.clk.Set(genesistest.DefaultValidatorStartTime) // VM's clock reads the genesis time
@@ -899,7 +899,7 @@ func TestAdvanceTimeTxAfterBanff(t *testing.T) {
 // Ensure marshaling/unmarshaling works
 func TestAdvanceTimeTxUnmarshal(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 

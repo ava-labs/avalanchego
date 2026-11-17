@@ -28,8 +28,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 
-	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
 	ethparams "github.com/ava-labs/libevm/params"
+
+	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
 )
 
 func errIsType[T error]() testerr.Want {
@@ -368,39 +369,39 @@ func TestGenesisHash(t *testing.T) {
 func TestHistoricalGenesisHashes(t *testing.T) {
 	hashes := [...]string{
 		// No changes.
-		upgradetest.NoUpgrades:    "0xd8a07966215173e9c4a5a5db8c337d2f717b41e24eb398eeb294caf1943d2556",
-		upgradetest.ApricotPhase1: "0xd8a07966215173e9c4a5a5db8c337d2f717b41e24eb398eeb294caf1943d2556",
-		upgradetest.ApricotPhase2: "0xd8a07966215173e9c4a5a5db8c337d2f717b41e24eb398eeb294caf1943d2556",
+		upgrade.NoUpgrades:    "0xd8a07966215173e9c4a5a5db8c337d2f717b41e24eb398eeb294caf1943d2556",
+		upgrade.ApricotPhase1: "0xd8a07966215173e9c4a5a5db8c337d2f717b41e24eb398eeb294caf1943d2556",
+		upgrade.ApricotPhase2: "0xd8a07966215173e9c4a5a5db8c337d2f717b41e24eb398eeb294caf1943d2556",
 
 		// Added the BaseFee
-		upgradetest.ApricotPhase3:     "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
-		upgradetest.ApricotPhase4:     "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
-		upgradetest.ApricotPhase5:     "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
-		upgradetest.ApricotPhasePre6:  "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
-		upgradetest.ApricotPhase6:     "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
-		upgradetest.ApricotPhasePost6: "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
-		upgradetest.Banff:             "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
-		upgradetest.Cortina:           "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+		upgrade.ApricotPhase3:     "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+		upgrade.ApricotPhase4:     "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+		upgrade.ApricotPhase5:     "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+		upgrade.ApricotPhasePre6:  "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+		upgrade.ApricotPhase6:     "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+		upgrade.ApricotPhasePost6: "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+		upgrade.Banff:             "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
+		upgrade.Cortina:           "0xcf3b70b572f31b036e2b0ca81788f34db5767899d7eed517c0c4cd61907b5755",
 
 		// Added the Warp precompile
-		upgradetest.Durango: "0xd650b9947b759224835fb8c845f128cb9c8f016f72fec0e953d48c5872dd923a",
+		upgrade.Durango: "0xd650b9947b759224835fb8c845f128cb9c8f016f72fec0e953d48c5872dd923a",
 
 		// Added various gas fields
-		upgradetest.Etna:    "0x17a7011ebbed7c97c7858cec856bd462a1fe9c216ef5f110b40c3b573dc84c6f",
-		upgradetest.Fortuna: "0x17a7011ebbed7c97c7858cec856bd462a1fe9c216ef5f110b40c3b573dc84c6f",
+		upgrade.Etna:    "0x17a7011ebbed7c97c7858cec856bd462a1fe9c216ef5f110b40c3b573dc84c6f",
+		upgrade.Fortuna: "0x17a7011ebbed7c97c7858cec856bd462a1fe9c216ef5f110b40c3b573dc84c6f",
 
 		// Added millisecond timestamps
-		upgradetest.Granite: "0x608ddbd611241719b64642d8e152537e2a5bdf46b6ddb9e8f15340c5e007b8b1",
+		upgrade.Granite: "0x608ddbd611241719b64642d8e152537e2a5bdf46b6ddb9e8f15340c5e007b8b1",
 
 		// Added the SAE fields: the ACP-176 target exponent, the ACP-283 min
 		// price exponent, and the settlement markers.
-		upgradetest.Helicon: "0xa8ba8fe99b2affb0ed27d0d8c825f6292c3c6f5eb9d53707504bea02ac9c1a9b",
-		upgradetest.Igloo:   "0xa8ba8fe99b2affb0ed27d0d8c825f6292c3c6f5eb9d53707504bea02ac9c1a9b",
+		upgrade.Helicon: "0xa8ba8fe99b2affb0ed27d0d8c825f6292c3c6f5eb9d53707504bea02ac9c1a9b",
+		upgrade.Igloo:   "0xa8ba8fe99b2affb0ed27d0d8c825f6292c3c6f5eb9d53707504bea02ac9c1a9b",
 	}
-	_ = hashes[upgradetest.Latest] // Enforce completeness at compile time.
+	_ = hashes[upgrade.Latest] // Enforce completeness at compile time.
 
 	for _fork, hash := range hashes {
-		fork := upgradetest.Fork(_fork)
+		fork := upgrade.Upgrade(_fork)
 		t.Run(fork.String(), func(t *testing.T) {
 			ctx := &snow.Context{
 				NetworkUpgrades: upgradetest.GetConfig(fork),
@@ -424,7 +425,7 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 	}
 }
 
-func upgradeAt(fork upgradetest.Fork, t time.Time) upgrade.Config {
+func upgradeAt(fork upgrade.Upgrade, t time.Time) upgrade.Config {
 	c := upgradetest.GetConfigWithUpgradeTime(fork, t)
 	upgradetest.SetTimesTo(&c, fork-1, upgrade.InitiallyActiveTime)
 	return c
@@ -440,7 +441,7 @@ func TestWriteGenesis(t *testing.T) {
 		"alloc":{}
 	}`
 	var (
-		latest       = upgradetest.GetConfig(upgradetest.Latest)
+		latest       = upgradetest.GetConfig(upgrade.Latest)
 		localGenesis = avalanchegenesis.LocalConfig.CChainGenesis
 		fujiGenesis  = avalanchegenesis.FujiConfig.CChainGenesis
 	)
@@ -491,12 +492,12 @@ func TestWriteGenesis(t *testing.T) {
 		{
 			name: "schedule_future_upgrade",
 			initial: spec{
-				upgrades: upgradetest.GetConfig(upgradetest.Latest - 1),
+				upgrades: upgradetest.GetConfig(upgrade.Latest - 1),
 				genesis:  localGenesis,
 			},
 			restart: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(time.Second),
 				),
 				genesis: localGenesis,
@@ -506,14 +507,14 @@ func TestWriteGenesis(t *testing.T) {
 			name: "delay_future_upgrade",
 			initial: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(time.Second),
 				),
 				genesis: localGenesis,
 			},
 			restart: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(2*time.Second),
 				),
 				genesis: localGenesis,
@@ -523,14 +524,14 @@ func TestWriteGenesis(t *testing.T) {
 			name: "advance_future_upgrade",
 			initial: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(2*time.Second),
 				),
 				genesis: localGenesis,
 			},
 			restart: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(time.Second),
 				),
 				genesis: localGenesis,
@@ -542,11 +543,11 @@ func TestWriteGenesis(t *testing.T) {
 			// without tripping a genesis-hash mismatch.
 			name: "incompatible_upgrade",
 			initial: spec{
-				upgrades: upgradetest.GetConfig(upgradetest.Fortuna),
+				upgrades: upgradetest.GetConfig(upgrade.Fortuna),
 				genesis:  localGenesis,
 			},
 			restart: spec{
-				upgrades: upgradetest.GetConfig(upgradetest.Etna),
+				upgrades: upgradetest.GetConfig(upgrade.Etna),
 				genesis:  localGenesis,
 			},
 			wantErr: errIsType[*ethparams.ConfigCompatError](),
@@ -554,12 +555,12 @@ func TestWriteGenesis(t *testing.T) {
 		{
 			name: "schedule_precompiles",
 			initial: spec{
-				upgrades: upgradetest.GetConfig(upgradetest.Cortina),
+				upgrades: upgradetest.GetConfig(upgrade.Cortina),
 				genesis:  localGenesis,
 			},
 			restart: spec{
 				upgrades: upgradeAt(
-					upgradetest.Durango,
+					upgrade.Durango,
 					upgrade.InitiallyActiveTime.Add(time.Second),
 				),
 				genesis: localGenesis,

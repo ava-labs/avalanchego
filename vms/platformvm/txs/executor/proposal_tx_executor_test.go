@@ -12,7 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
@@ -111,7 +111,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 		require.NoError(env.state.Commit())
 	}
 
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	currentTimestamp := env.state.GetTimestamp()
 
 	type test struct {
@@ -243,7 +243,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, upgradetest.ApricotPhase5)
+			env := newEnvironment(t, upgrade.ApricotPhase5)
 			env.config.UpgradeConfig.ApricotPhase3Time = tt.AP3Time
 
 			wallet := newWallet(t, env, walletConfig{
@@ -286,7 +286,7 @@ func TestProposalTxExecuteAddDelegator(t *testing.T) {
 
 func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -803,7 +803,7 @@ func TestProposalTxExecuteAddSubnetValidator(t *testing.T) {
 
 func TestProposalTxExecuteAddValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 

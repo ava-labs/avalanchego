@@ -4,7 +4,6 @@ go_library(
     name = "upgradetest",
     srcs = [
         "config.go",
-        "fork.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/upgrade/upgradetest",
     visibility = ["//visibility:public"],

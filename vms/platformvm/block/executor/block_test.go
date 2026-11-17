@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -629,7 +630,7 @@ func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
 
 	type test struct {
 		name              string
-		fork              upgradetest.Fork
+		fork              upgrade.Upgrade
 		startTime         time.Time
 		uptime            float64
 		wantPrefersCommit bool
@@ -702,28 +703,28 @@ func TestBlockOptionsACP267UptimeRequirement(t *testing.T) {
 	tests := []test{
 		{
 			name:              "pre_helicon",
-			fork:              upgradetest.Helicon,
+			fork:              upgrade.Helicon,
 			startTime:         heliconTime.Add(-time.Second),
 			uptime:            .85,
 			wantPrefersCommit: true,
 		},
 		{
 			name:              "at_helicon",
-			fork:              upgradetest.Helicon,
+			fork:              upgrade.Helicon,
 			startTime:         heliconTime,
 			uptime:            .85,
 			wantPrefersCommit: false,
 		},
 		{
 			name:              "post_helicon",
-			fork:              upgradetest.Helicon,
+			fork:              upgrade.Helicon,
 			startTime:         heliconTime.Add(time.Hour),
 			uptime:            .9,
 			wantPrefersCommit: true,
 		},
 		{
 			name:              "without_helicon",
-			fork:              upgradetest.Granite,
+			fork:              upgrade.Granite,
 			startTime:         heliconTime.Add(time.Hour),
 			uptime:            .85,
 			wantPrefersCommit: true,

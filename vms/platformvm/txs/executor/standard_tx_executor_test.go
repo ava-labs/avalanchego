@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -64,7 +65,7 @@ var errTest = errors.New("non-nil error")
 
 func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -205,7 +206,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 		require.NoError(env.state.Commit())
 	}
 
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	currentTimestamp := env.state.GetTimestamp()
 
 	type test struct {
@@ -337,7 +338,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
 			require := require.New(t)
-			env := newEnvironment(t, upgradetest.ApricotPhase5)
+			env := newEnvironment(t, upgrade.ApricotPhase5)
 			env.config.UpgradeConfig.ApricotPhase3Time = tt.AP3Time
 
 			wallet := newWallet(t, env, walletConfig{
@@ -377,7 +378,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 
 func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -896,7 +897,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 func TestEtnaStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Etna)
+	env := newEnvironment(t, upgrade.Etna)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -943,7 +944,7 @@ func TestEtnaStandardTxExecutorAddSubnetValidator(t *testing.T) {
 
 func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Banff)
+	env := newEnvironment(t, upgrade.Banff)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -1185,7 +1186,7 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, upgradetest.Durango)
+			env := newEnvironment(t, upgrade.Durango)
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
@@ -1591,7 +1592,7 @@ func TestDurangoMemoField(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			env := newEnvironment(t, upgradetest.Durango)
+			env := newEnvironment(t, upgrade.Durango)
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
@@ -1624,7 +1625,7 @@ func TestDurangoMemoField(t *testing.T) {
 func TestEtnaDisabledTransactions(t *testing.T) {
 	require := require.New(t)
 
-	env := newEnvironment(t, upgradetest.Etna)
+	env := newEnvironment(t, upgrade.Etna)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
@@ -1776,7 +1777,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				).Return(nil).Times(1)
 
 				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Etna, env.latestForkTime),
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Etna, env.latestForkTime),
 				}
 				feeCalculator := txfee.NewSimpleCalculator(0)
 				e := &standardTxExecutor{
@@ -1822,7 +1823,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.tx.Unsigned.(*platform.RemoveSubnetValidatorTx).Subnet = constants.PrimaryNetworkID
 
 				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &standardTxExecutor{
@@ -1847,7 +1848,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env := newValidRemoveSubnetValidatorTxVerifyEnv(t, ctrl)
 
 				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &standardTxExecutor{
@@ -1878,7 +1879,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				require.NoError(t, env.state.PutCurrentValidator(&staker))
 
 				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &standardTxExecutor{
@@ -1904,7 +1905,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				require.NoError(t, env.state.PutCurrentValidator(env.staker))
 
 				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &standardTxExecutor{
@@ -1934,7 +1935,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
 
 				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &standardTxExecutor{
@@ -1963,7 +1964,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				env.fx.EXPECT().VerifyPermission(gomock.Any(), env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(errTest)
 
 				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &standardTxExecutor{
@@ -1995,7 +1996,7 @@ func TestStandardExecutorRemoveSubnetValidatorTx(t *testing.T) {
 				).Return(errTest)
 
 				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &standardTxExecutor{
@@ -2155,7 +2156,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.tx.Unsigned = (*platform.TransformSubnetTx)(nil)
 
 				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &standardTxExecutor{
@@ -2181,7 +2182,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.unsignedTx.MaxStakeDuration = math.MaxUint32
 
 				cfg := &config.Internal{
-					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+					UpgradeConfig: upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, env.latestForkTime),
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
 				e := &standardTxExecutor{
@@ -2210,7 +2211,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.state.SetSubnetOwner(env.unsignedTx.Subnet, subnetOwner)
 
 				cfg := &config.Internal{
-					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, env.latestForkTime),
 					MaxStakeDuration: math.MaxInt64,
 				}
 
@@ -2244,7 +2245,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				).Return(ErrFlowCheckFailed)
 
 				cfg := &config.Internal{
-					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, env.latestForkTime),
 					MaxStakeDuration: math.MaxInt64,
 				}
 
@@ -2279,7 +2280,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				env.fx.EXPECT().VerifyPermission(env.unsignedTx, env.unsignedTx.SubnetAuth, env.tx.Creds[len(env.tx.Creds)-1], subnetOwner).Return(nil).Times(1)
 
 				cfg := &config.Internal{
-					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, env.latestForkTime),
 					MaxStakeDuration: math.MaxInt64,
 				}
 				feeCalculator := state.PickFeeCalculator(cfg, env.state)
@@ -2311,7 +2312,7 @@ func TestStandardExecutorTransformSubnetTx(t *testing.T) {
 				).Return(nil).Times(1)
 
 				cfg := &config.Internal{
-					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgradetest.Durango, env.latestForkTime),
+					UpgradeConfig:    upgradetest.GetConfigWithUpgradeTime(upgrade.Durango, env.latestForkTime),
 					MaxStakeDuration: math.MaxInt64,
 				}
 
@@ -2391,7 +2392,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		defaultConfig = &config.Internal{
 			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
-			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+			UpgradeConfig:      upgradetest.GetConfig(upgrade.Latest),
 		}
 		baseState = statetest.New(t, statetest.Config{
 			Upgrades: defaultConfig.UpgradeConfig,
@@ -2492,7 +2493,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 			tx:   convertSubnetToL1Tx,
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.backend.Config = &config.Internal{
-					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
+					UpgradeConfig: upgradetest.GetConfig(upgrade.Durango),
 				}
 				return nil
 			},
@@ -2576,7 +2577,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 						MinPrice:                 genesis.LocalParams.ValidatorFeeConfig.MinPrice,
 						ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
 					},
-					UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
+					UpgradeConfig: upgradetest.GetConfig(upgrade.Latest),
 				}
 				return nil
 			},
@@ -2774,7 +2775,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 		defaultConfig = &config.Internal{
 			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
-			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+			UpgradeConfig:      upgradetest.GetConfig(upgrade.Latest),
 		}
 		baseState = statetest.New(t, statetest.Config{
 			Upgrades: defaultConfig.UpgradeConfig,
@@ -2937,7 +2938,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 			name: "invalid prior to E-Upgrade",
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.backend.Config = &config.Internal{
-					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
+					UpgradeConfig: upgradetest.GetConfig(upgrade.Durango),
 				}
 				return nil
 			},
@@ -3150,7 +3151,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 						MinPrice:                 genesis.LocalParams.ValidatorFeeConfig.MinPrice,
 						ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
 					},
-					UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
+					UpgradeConfig: upgradetest.GetConfig(upgrade.Latest),
 				}
 				return nil
 			},
@@ -3298,7 +3299,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 		defaultConfig = &config.Internal{
 			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
-			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+			UpgradeConfig:      upgradetest.GetConfig(upgrade.Latest),
 		}
 		baseState = statetest.New(t, statetest.Config{
 			Upgrades: defaultConfig.UpgradeConfig,
@@ -3475,7 +3476,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 			name: "invalid prior to E-Upgrade",
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.backend.Config = &config.Internal{
-					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
+					UpgradeConfig: upgradetest.GetConfig(upgrade.Durango),
 				}
 				return nil
 			},
@@ -3797,7 +3798,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 		defaultConfig = &config.Internal{
 			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
-			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+			UpgradeConfig:      upgradetest.GetConfig(upgrade.Latest),
 		}
 		baseState = statetest.New(t, statetest.Config{
 			Upgrades: defaultConfig.UpgradeConfig,
@@ -3919,7 +3920,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 			name: "invalid prior to E-Upgrade",
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.backend.Config = &config.Internal{
-					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
+					UpgradeConfig: upgradetest.GetConfig(upgrade.Durango),
 				}
 				return nil
 			},
@@ -3975,7 +3976,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 						MinPrice:                 genesis.LocalParams.ValidatorFeeConfig.MinPrice,
 						ExcessConversionConstant: genesis.LocalParams.ValidatorFeeConfig.ExcessConversionConstant,
 					},
-					UpgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
+					UpgradeConfig: upgradetest.GetConfig(upgrade.Latest),
 				}
 				return nil
 			},
@@ -4087,7 +4088,7 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 		defaultConfig = &config.Internal{
 			DynamicFeeConfig:   genesis.LocalParams.DynamicFeeConfig,
 			ValidatorFeeConfig: genesis.LocalParams.ValidatorFeeConfig,
-			UpgradeConfig:      upgradetest.GetConfig(upgradetest.Latest),
+			UpgradeConfig:      upgradetest.GetConfig(upgrade.Latest),
 		}
 		baseState = statetest.New(t, statetest.Config{
 			Upgrades: defaultConfig.UpgradeConfig,
@@ -4212,7 +4213,7 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 			name: "invalid prior to E-Upgrade",
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.backend.Config = &config.Internal{
-					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
+					UpgradeConfig: upgradetest.GetConfig(upgrade.Durango),
 				}
 				return nil
 			},
@@ -4381,18 +4382,18 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 func TestHeliconMinStakeDurationValidator(t *testing.T) {
 	type test struct {
 		name        string
-		fork        upgradetest.Fork
+		fork        upgrade.Upgrade
 		expectedErr error
 	}
 	tests := []test{
 		{
 			name:        "pre-Helicon 12h stake rejected",
-			fork:        upgradetest.Granite,
+			fork:        upgrade.Granite,
 			expectedErr: ErrStakeTooShort,
 		},
 		{
 			name:        "post-Helicon 12h stake accepted",
-			fork:        upgradetest.Helicon,
+			fork:        upgrade.Helicon,
 			expectedErr: nil,
 		},
 	}
@@ -4444,7 +4445,7 @@ func TestHeliconMinStakeDurationValidator(t *testing.T) {
 
 func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 	var (
-		env           = newEnvironment(t, upgradetest.Latest)
+		env           = newEnvironment(t, upgrade.Latest)
 		wallet        = newWallet(t, env, walletConfig{})
 		feeCalculator = state.PickFeeCalculator(env.config, env.state)
 	)
@@ -4573,7 +4574,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 
 func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 	var (
-		env           = newEnvironment(t, upgradetest.Latest)
+		env           = newEnvironment(t, upgrade.Latest)
 		wallet        = newWallet(t, env, walletConfig{})
 		feeCalculator = state.PickFeeCalculator(env.config, env.state)
 	)
@@ -4695,7 +4696,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			env := newEnvironment(t, upgradetest.Latest)
+			env := newEnvironment(t, upgrade.Latest)
 			// Charge a non-zero fee so the config tx is funded with a real input
 			// and change output, letting us assert UTXO consumption/production below.
 			env.config.DynamicFeeConfig = genesis.LocalParams.DynamicFeeConfig
@@ -4812,7 +4813,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 
 func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 	var (
-		env           = newEnvironment(t, upgradetest.Latest)
+		env           = newEnvironment(t, upgrade.Latest)
 		wallet        = newWallet(t, env, walletConfig{})
 		feeCalculator = state.PickFeeCalculator(env.config, env.state)
 	)
@@ -4989,7 +4990,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 }
 
 func TestStandardExecutorRewardAutoRenewedValidatorTx(t *testing.T) {
-	env := newEnvironment(t, upgradetest.Latest)
+	env := newEnvironment(t, upgrade.Latest)
 
 	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
 	require.NoError(t, err)

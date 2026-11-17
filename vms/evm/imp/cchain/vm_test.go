@@ -67,11 +67,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
+	ethereum "github.com/ava-labs/libevm"
+	ethparams "github.com/ava-labs/libevm/params"
+
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
-	ethereum "github.com/ava-labs/libevm"
-	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestMain(m *testing.M) {
@@ -218,9 +219,9 @@ func withNetworkID(id uint32) sutOption {
 
 // withUpgradeTime schedules fork and all later upgrades at t. Earlier
 // upgrades remain initially active.
-func withUpgradeTime(fork upgradetest.Fork, t time.Time) sutOption {
+func withUpgradeTime(fork upgrade.Upgrade, t time.Time) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		upgradetest.SetTimesTo(&c.upgrades, upgradetest.Latest, t)
+		upgradetest.SetTimesTo(&c.upgrades, upgrade.Latest, t)
 		upgradetest.SetTimesTo(&c.upgrades, fork-1, upgrade.InitiallyActiveTime)
 	})
 }
@@ -358,7 +359,7 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 			db:           memdb.New(),
 			chainDataDir: tb.TempDir(),
 			state:        snow.NormalOp,
-			upgrades:     upgradetest.GetConfig(upgradetest.Latest),
+			upgrades:     upgradetest.GetConfig(upgrade.Latest),
 		}, opts...)
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
@@ -1891,7 +1892,7 @@ func TestWarpPrecompileActivation(t *testing.T) {
 	timeOpt, vmTime := withVMTime(upgrade.InitiallyActiveTime)
 	ctx, sut := newSUT(t,
 		withMaxAllocFor(key.EthAddress()),
-		withUpgradeTime(upgradetest.Durango, upgrade.InitiallyActiveTime.Add(upgradeThreshold)),
+		withUpgradeTime(upgrade.Durango, upgrade.InitiallyActiveTime.Add(upgradeThreshold)),
 		timeOpt,
 	)
 
