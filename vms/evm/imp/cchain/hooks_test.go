@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -22,33 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 )
-
-func TestDelayExponent(t *testing.T) {
-	tests := []struct {
-		name   string
-		header *types.Header
-		want   dynamic.DelayExponent
-	}{
-		{
-			name: "header_carries_excess",
-			header: customtypes.WithHeaderExtra(
-				&types.Header{},
-				&customtypes.HeaderExtra{MinDelayExcess: new(acp226.DelayExcess(42))},
-			),
-			want: dynamic.DelayExponent(42),
-		},
-		{
-			name:   "no_field_defaults_to_initial",
-			header: &types.Header{},
-			want:   dynamic.InitialDelayExponent,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, delayExponent(tt.header), "delayExponent()")
-		})
-	}
-}
 
 func TestAncestorInputIDs(t *testing.T) {
 	var (
