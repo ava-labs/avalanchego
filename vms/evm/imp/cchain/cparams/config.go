@@ -213,80 +213,11 @@ func (c *ChainConfig) Rules(timestamp uint64) Rules {
 	return Rules{fs[inactive-1].upgrade}
 }
 
-// IsApricotPhase1 returns whether time represents a block with a timestamp
-// after the Apricot Phase 1 upgrade time.
-func (c *ChainConfig) IsApricotPhase1(time uint64) bool {
-	return isTimestampForked(c.ApricotPhase1Timestamp, time)
-}
-
-// IsApricotPhase2 returns whether time represents a block with a timestamp
-// after the Apricot Phase 2 upgrade time.
-func (c *ChainConfig) IsApricotPhase2(time uint64) bool {
-	return isTimestampForked(c.ApricotPhase2Timestamp, time)
-}
-
-// IsApricotPhase3 returns whether time represents a block with a timestamp
-// after the Apricot Phase 3 upgrade time.
-func (c *ChainConfig) IsApricotPhase3(time uint64) bool {
-	return isTimestampForked(c.ApricotPhase3Timestamp, time)
-}
-
-// IsApricotPhase5 returns whether time represents a block with a timestamp
-// after the Apricot Phase 5 upgrade time.
-func (c *ChainConfig) IsApricotPhase5(time uint64) bool {
-	return isTimestampForked(c.ApricotPhase5Timestamp, time)
-}
-
-// IsApricotPhasePre6 returns whether time represents a block with a timestamp
-// after the Apricot Phase Pre 6 upgrade time.
-func (c *ChainConfig) IsApricotPhasePre6(time uint64) bool {
-	return isTimestampForked(c.ApricotPhasePre6Timestamp, time)
-}
-
-// IsApricotPhase6 returns whether time represents a block with a timestamp
-// after the Apricot Phase 6 upgrade time.
-func (c *ChainConfig) IsApricotPhase6(time uint64) bool {
-	return isTimestampForked(c.ApricotPhase6Timestamp, time)
-}
-
-// IsBanff returns whether time represents a block with a timestamp after the
-// Banff upgrade time.
-func (c *ChainConfig) IsBanff(time uint64) bool {
-	return isTimestampForked(c.BanffTimestamp, time)
-}
-
-// IsDurango returns whether time represents a block with a timestamp after the
-// Durango upgrade time.
-func (c *ChainConfig) IsDurango(time uint64) bool {
-	return isTimestampForked(c.DurangoTimestamp, time)
-}
-
-// IsEtna returns whether time represents a block with a timestamp after the
-// Etna upgrade time.
-func (c *ChainConfig) IsEtna(time uint64) bool {
-	return isTimestampForked(c.EtnaTimestamp, time)
-}
-
-// IsFortuna returns whether time represents a block with a timestamp after the
-// Fortuna upgrade time.
-func (c *ChainConfig) IsFortuna(time uint64) bool {
-	return isTimestampForked(c.FortunaTimestamp, time)
-}
-
-// IsGranite returns whether time represents a block with a timestamp after the
-// Granite upgrade time.
-func (c *ChainConfig) IsGranite(time uint64) bool {
-	return isTimestampForked(c.GraniteTimestamp, time)
-}
-
-// IsHelicon returns whether time represents a block with a timestamp after the
-// Helicon upgrade time.
-func (c *ChainConfig) IsHelicon(time uint64) bool {
-	return isTimestampForked(c.HeliconTimestamp, time)
-}
-
-// IsIgloo returns whether time represents a block with a timestamp after the
-// Igloo upgrade time.
-func (c *ChainConfig) IsIgloo(time uint64) bool {
-	return isTimestampForked(c.IglooTimestamp, time)
+func (c *ChainConfig) IsActive(upg upgrade.Upgrade, timestamp uint64) bool {
+	for _, f := range c.forks() {
+		if f.upgrade == upg {
+			return isTimestampForked(f.time, timestamp)
+		}
+	}
+	return false
 }
