@@ -16,9 +16,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/precompile/contract"
-	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 )
 
 // RegisterExtras registers the libevm hook that partitions state slots into
@@ -71,7 +71,7 @@ type StateDB struct {
 
 	// warpMessages is set by [StateDB.Prepare] and not modified during
 	// execution.
-	warpMessages []predicate.Predicate
+	warpMessages []message.Packed
 	// preAP1 is set by [StateDB.Prepare] and selects the pre-AP1 behaviour of
 	// [StateDB.GetCommittedState].
 	preAP1 bool
@@ -116,7 +116,7 @@ func (s *StateDB) GetCommittedState(addr common.Address, key common.Hash, opts .
 
 // GetWarpMessage returns the index-th Warp message in the access list passed
 // to [StateDB.Prepare]. It returns false if there is no message at index.
-func (s *StateDB) GetWarpMessage(index int) (predicate.Predicate, bool) {
+func (s *StateDB) GetWarpMessage(index int) (message.Packed, bool) {
 	if index < 0 || index >= len(s.warpMessages) {
 		return nil, false
 	}
