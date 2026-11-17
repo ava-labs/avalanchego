@@ -57,7 +57,10 @@ go_library(
 
 go_test(
     name = "config_test",
-    srcs = ["config_test.go"],
+    srcs = [
+        "config_test.go",
+        "subnet_membership_test.go",
+    ],
     embed = [":config"],
     deps = [
         "//chains",
@@ -66,9 +69,11 @@ go_test(
         "//ids",
         "//snow/consensus/simplex",
         "//snow/consensus/snowball",
+        "//staking/stakingtest",
         "//subnets",
         "//upgrade",
         "//utils/constants",
+        "//utils/perms",
         "@com_github_spf13_pflag//:pflag",
         "@com_github_spf13_viper//:viper",
         "@com_github_stretchr_testify//require",
