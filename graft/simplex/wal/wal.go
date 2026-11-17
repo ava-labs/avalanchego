@@ -4,6 +4,7 @@
 package wal
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -66,11 +67,15 @@ func (w *WriteAheadLog) Delete() error {
 	return os.Remove(w.file.Name())
 }
 
-func (w *WriteAheadLog) ReadAll() ([][]byte, error) {
+func (w *WriteAheadLog) ReadAll() (_ [][]byte, err error) {
 	if err := w.maybeOpenFile(); err != nil {
 		return nil, err
 	}
-	_, err := w.file.Seek(0, io.SeekStart)
+	defer func() {
+		err = errors.Join(err, w.Close())
+	}()
+
+	_, err = w.file.Seek(0, io.SeekStart)
 	if err != nil {
 		return nil, fmt.Errorf("error seeking to start %w", err)
 	}
