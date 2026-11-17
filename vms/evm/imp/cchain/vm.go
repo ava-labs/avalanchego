@@ -59,7 +59,7 @@ type VM struct {
 
 	// now is the clock provided to the [sae.VM] and is used for block building.
 	now   func() time.Time
-	pacer *blockdelay.Pacer // created by [VM.Initialize]
+	pacer *blockdelay.Pacer // created by [VM.SetState] as bootstrapping or normal op
 
 	chainConfig *ethparams.ChainConfig
 	state       *state.State
@@ -143,7 +143,6 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("registering cchain metrics: %w", err)
 	}
 
-	vm.pacer = blockdelay.NewPacer(vm.now, eventSources{vm})
 	vm.pending = txpool.NewPending()
 	warpStorage := warp.NewStorage(avaDB, warpMessages...)
 	hooks := newHooks(
@@ -208,6 +207,10 @@ func (vm *VM) Initialize(
 			return fmt.Errorf("creating SAE VM: %w", err)
 		}
 		vm.onClose = append(vm.onClose, vm.VM.Shutdown)
+		vm.pacer = blockdelay.NewPacer(vm.now, eventSources{
+			sae:     vm.VM,
+			pending: vm.pending,
+		})
 
 		const maxTxPoolSize = 1024
 		txpool, err := txpool.New(snowCtx, vm.chainConfig, vm.pending, vm.VM, maxTxPoolSize)
@@ -426,7 +429,8 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 
 // eventSources is the [blockdelay.EventWaiter] paced by [VM.WaitForEvent].
 type eventSources struct {
-	vm *VM
+	sae     *sae.VM
+	pending *txpool.Pending
 }
 
 // WaitForEvent races the SAE event source against the cross-chain txpool.
@@ -442,12 +446,12 @@ func (e eventSources) WaitForEvent(ctx context.Context) (snowcommon.Message, err
 	results := make(chan result, 2)
 	go func() {
 		defer cancel()
-		msg, err := e.vm.VM.WaitForEvent(raceCtx)
+		msg, err := e.sae.WaitForEvent(raceCtx)
 		results <- result{msg, err}
 	}()
 	go func() {
 		defer cancel()
-		err := e.vm.pending.AwaitTxs(raceCtx)
+		err := e.pending.AwaitTxs(raceCtx)
 		results <- result{snowcommon.PendingTxs, err}
 	}()
 

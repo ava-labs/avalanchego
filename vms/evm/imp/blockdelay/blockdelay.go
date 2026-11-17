@@ -40,7 +40,7 @@ type EventWaiter interface {
 }
 
 // A Pacer wraps an [EventWaiter], delaying each wait until the minimum block
-// delay has elapsed and a minimum spacing since the previous event has passed.
+// delay has elapsed.
 type Pacer struct {
 	now    func() time.Time
 	waiter EventWaiter
@@ -53,9 +53,8 @@ func NewPacer(now func() time.Time, waiter EventWaiter) *Pacer {
 	return &Pacer{now: now, waiter: waiter}
 }
 
-// WaitForEvent waits until earliest and the minimum spacing since the previous
-// event have passed, then calls the wrapped [EventWaiter]. If ctx is canceled
-// first, it returns the cancellation cause.
+// WaitForEvent waits until earliest, then calls the wrapped [EventWaiter]. If
+// ctx is canceled first, it returns the cancellation cause.
 func (p *Pacer) WaitForEvent(ctx context.Context, earliest time.Time) (snowcommon.Message, error) {
 	// Throttle to avoid busy looping. The SAE mempool and the C-Chain's
 	// cross-chain txpool only drop a tx once its block executes, so they keep
