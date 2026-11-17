@@ -17,6 +17,7 @@
 
 ### Metrics
 
+- Added `avalanche_platformvm_local_validating` (gauge): 1 if this node is in the current validator set of a tracked subnet, 0 otherwise.
 - Added `avalanche_platformvm_local_l1_validator_balance` (gauge): remaining balance (in nAVAX) of this node's L1 validator on each tracked subnet. Reads 0 once the validator is inactive, and is not reported on subnets this node is not an L1 validator of.
 
 ### Fixes

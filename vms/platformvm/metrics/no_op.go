@@ -48,6 +48,8 @@ func (noopMetrics) SetTimeUntilUnstake(time.Duration) {}
 
 func (noopMetrics) SetTimeUntilSubnetUnstake(ids.ID, time.Duration) {}
 
+func (noopMetrics) SetLocalValidating(ids.ID, bool) {}
+
 func (noopMetrics) SetLocalL1ValidatorBalance(ids.ID, uint64) {}
 
 func (noopMetrics) DeleteLocalL1ValidatorBalance(ids.ID) {}

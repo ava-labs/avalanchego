@@ -19,6 +19,8 @@ const (
 	ResourceLabel   = "resource"
 	GasLabel        = "gas"
 	ValidatorsLabel = "validators"
+
+	subnetIDLabel = "subnetID"
 )
 
 var (
@@ -71,6 +73,8 @@ type Metrics interface {
 	SetTimeUntilUnstake(time.Duration)
 	// Mark when this node will unstake from a subnet.
 	SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration)
+	// Mark whether this node is in the current validator set of a subnet.
+	SetLocalValidating(subnetID ids.ID, validating bool)
 	// Mark how much balance this node's L1 validator of a subnet has left.
 	SetLocalL1ValidatorBalance(subnetID ids.ID, balance uint64)
 	// Mark that this node is not an L1 validator of a subnet.
@@ -90,7 +94,7 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 				Name: "time_until_unstake_subnet",
 				Help: "Time (in ns) until this node leaves the subnet's validator set",
 			},
-			[]string{"subnetID"},
+			[]string{subnetIDLabel},
 		),
 		localStake: prometheus.NewGauge(prometheus.GaugeOpts{
 			Name: "local_staked",
@@ -104,12 +108,19 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 			Name: "total_staked",
 			Help: "Amount (in nAVAX) of AVAX staked on the Primary Network",
 		}),
+		localValidating: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
+				Name: "local_validating",
+				Help: "1 if this node is in the current validator set of the subnet, 0 otherwise",
+			},
+			[]string{subnetIDLabel},
+		),
 		localL1ValidatorBalance: prometheus.NewGaugeVec(
 			prometheus.GaugeOpts{
 				Name: "local_l1_validator_balance",
 				Help: "Remaining balance (in nAVAX) of this node's L1 validator",
 			},
-			[]string{"subnetID"},
+			[]string{subnetIDLabel},
 		),
 
 		gasConsumed: prometheus.NewCounter(prometheus.CounterOpts{
@@ -171,6 +182,7 @@ func New(registerer prometheus.Registerer) (Metrics, error) {
 		registerer.Register(m.localStake),
 		registerer.Register(m.localDelegatedStake),
 		registerer.Register(m.totalStake),
+		registerer.Register(m.localValidating),
 		registerer.Register(m.localL1ValidatorBalance),
 
 		registerer.Register(m.gasConsumed),
@@ -200,6 +212,7 @@ type metrics struct {
 	localStake              prometheus.Gauge
 	localDelegatedStake     prometheus.Gauge
 	totalStake              prometheus.Gauge
+	localValidating         *prometheus.GaugeVec
 	localL1ValidatorBalance *prometheus.GaugeVec
 
 	gasConsumed          prometheus.Counter
@@ -264,6 +277,14 @@ func (m *metrics) SetTimeUntilUnstake(timeUntilUnstake time.Duration) {
 
 func (m *metrics) SetTimeUntilSubnetUnstake(subnetID ids.ID, timeUntilUnstake time.Duration) {
 	m.timeUntilSubnetUnstake.WithLabelValues(subnetID.String()).Set(float64(timeUntilUnstake))
+}
+
+func (m *metrics) SetLocalValidating(subnetID ids.ID, validating bool) {
+	var v float64
+	if validating {
+		v = 1
+	}
+	m.localValidating.WithLabelValues(subnetID.String()).Set(v)
 }
 
 func (m *metrics) SetLocalL1ValidatorBalance(subnetID ids.ID, balance uint64) {

@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 )
 
-func TestHealthCheckLocalL1ValidatorBalance(t *testing.T) {
+func TestHealthCheckLocalValidatorMetrics(t *testing.T) {
 	const accruedFees = 100
 	tests := []struct {
 		name              string
@@ -29,7 +29,8 @@ func TestHealthCheckLocalL1ValidatorBalance(t *testing.T) {
 		l1Validator       bool
 		endAccumulatedFee uint64
 		removeL1Validator bool
-		want              string // Empty if no balance is reported.
+		wantValidating    int
+		wantBalance       string // Empty if no balance is reported.
 	}{
 		{
 			name: "not_validator",
@@ -37,17 +38,19 @@ func TestHealthCheckLocalL1ValidatorBalance(t *testing.T) {
 		{
 			name:            "subnet_validator",
 			subnetValidator: true,
+			wantValidating:  1,
 		},
 		{
 			name:              "active_l1_validator",
 			l1Validator:       true,
 			endAccumulatedFee: accruedFees + 900,
-			want:              "900",
+			wantValidating:    1,
+			wantBalance:       "900",
 		},
 		{
 			name:        "inactive_l1_validator",
 			l1Validator: true,
-			want:        "0",
+			wantBalance: "0",
 		},
 		{
 			name:              "removed_l1_validator",
@@ -115,18 +118,29 @@ func TestHealthCheckLocalL1ValidatorBalance(t *testing.T) {
 				require.NoError(err)
 			}
 
-			var want string
-			if test.want != "" {
-				want = fmt.Sprintf(`
-# HELP local_l1_validator_balance Remaining balance (in nAVAX) of this node's L1 validator
+			want := fmt.Sprintf(`
+# HELP local_validating 1 if this node is in the current validator set of the subnet, 0 otherwise
+# TYPE local_validating gauge
+local_validating{subnetID="%s"} %d
+`,
+				subnetID,
+				test.wantValidating,
+			)
+			if test.wantBalance != "" {
+				want += fmt.Sprintf(`# HELP local_l1_validator_balance Remaining balance (in nAVAX) of this node's L1 validator
 # TYPE local_l1_validator_balance gauge
 local_l1_validator_balance{subnetID="%s"} %s
 `,
 					subnetID,
-					test.want,
+					test.wantBalance,
 				)
 			}
-			require.NoError(testutil.GatherAndCompare(vm.ctx.Metrics, strings.NewReader(want), "local_l1_validator_balance"))
+			require.NoError(testutil.GatherAndCompare(
+				vm.ctx.Metrics,
+				strings.NewReader(want),
+				"local_validating",
+				"local_l1_validator_balance",
+			))
 		})
 	}
 }

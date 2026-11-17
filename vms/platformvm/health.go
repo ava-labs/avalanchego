@@ -41,6 +41,9 @@ func (vm *VM) HealthCheck(context.Context) (interface{}, error) {
 			return nil, fmt.Errorf("couldn't get current subnet validator of %q: %w", subnetID, err)
 		}
 
+		_, validating := vm.Validators.GetValidator(subnetID, vm.ctx.NodeID)
+		vm.metrics.SetLocalValidating(subnetID, validating)
+
 		if err := vm.updateLocalL1ValidatorBalance(subnetID); err != nil {
 			return nil, err
 		}
