@@ -1729,13 +1729,9 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 // a pending tx until the preferred block's ACP-226 minimum delay has elapsed.
 func TestWaitForEventMinDelayPacing(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// Build an in-process SUT with no real RPC transport: real sockets never
-		// reach a durable block under synctest, so the txpool is primed directly
-		// via the gossip set rather than through the absent Client.
-		//
-		// Do not build/execute blocks: this test is only synctest-teardown-safe
-		// because it runs no blocks (a block can reactivate a goleak-suppressed
-		// libevm shutdown race that deadlocks the bubble).
+		// This test MUST NOT build or execute blocks. Doing so can trigger a
+		// libevm shutdown leak that [saetest.GoleakOptions] ignores, and a
+		// leaked goroutine deadlocks the synctest bubble.
 		key := txtest.NewKey(t)
 		timeOpt, _ := withVMTime(upgrade.InitiallyActiveTime)
 		ctx, sut := newSUT(t, withMaxAllocFor(key.EthAddress()), timeOpt, withoutRPCTransport())
