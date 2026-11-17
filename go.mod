@@ -26,7 +26,7 @@ require (
 	github.com/ava-labs/avalanchego/graft/coreth v1.15.4
 	github.com/ava-labs/avalanchego/graft/evm v1.15.4
 	github.com/ava-labs/avalanchego/graft/subnet-evm v1.15.4
-	github.com/ava-labs/firewood-go/ffi v0.9.0
+	github.com/ava-labs/firewood-go/ffi v0.9.1
 	github.com/ava-labs/libevm v1.13.15-0.20261111112450-a335c2ecf4df
 	github.com/ava-labs/simplex v0.0.0-20261112233527-2f7a52cc827d
 	github.com/btcsuite/btcd/btcutil v1.1.3
