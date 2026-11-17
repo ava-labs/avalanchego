@@ -55,10 +55,9 @@ func NewPacer(now func() time.Time, waiter EventWaiter) *Pacer {
 	return &Pacer{now: now, waiter: waiter}
 }
 
-// WaitForEvent waits until both earliest and a minimum spacing after the
-// previous successful return have passed, then returns the result of the
-// wrapped [EventWaiter]. If ctx is canceled first, it returns the cancellation
-// cause without calling the wrapped [EventWaiter].
+// WaitForEvent waits until earliest and the minimum spacing since the previous
+// event have passed, then calls the wrapped [EventWaiter]. If ctx is canceled
+// first, it returns the cancellation cause.
 func (p *Pacer) WaitForEvent(ctx context.Context, earliest time.Time) (snowcommon.Message, error) {
 	// Throttle to avoid busy looping: the SAE mempool and the C-Chain's
 	// cross-chain txpool only drop txs once their block executes, so they keep
