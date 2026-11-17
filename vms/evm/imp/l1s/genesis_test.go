@@ -32,10 +32,9 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/evm/cmputils"
 
-	ethcore "github.com/ava-labs/libevm/core"
-
 	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
+	ethcore "github.com/ava-labs/libevm/core"
 )
 
 func errIsType[T error]() testerr.Want {

@@ -45,10 +45,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/database"
 
-	ethparams "github.com/ava-labs/libevm/params"
-
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestSkipStateSync(t *testing.T) {

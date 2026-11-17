@@ -28,9 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 
-	ethparams "github.com/ava-labs/libevm/params"
-
 	avalanchegenesis "github.com/ava-labs/avalanchego/genesis"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func errIsType[T error]() testerr.Want {

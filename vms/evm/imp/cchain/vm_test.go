@@ -67,12 +67,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	ethereum "github.com/ava-labs/libevm"
-	ethparams "github.com/ava-labs/libevm/params"
-
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
+	ethereum "github.com/ava-labs/libevm"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestMain(m *testing.M) {
