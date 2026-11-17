@@ -6,7 +6,6 @@ package upgrade
 import (
 	"errors"
 	"fmt"
-	"slices"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -262,11 +261,4 @@ func GetConfig(networkID uint32) Config {
 // fork activation times.
 func UnixTimestamp(t time.Time) uint64 {
 	return uint64(t.Unix()) //#nosec G115 -- Upgrade times are after the Unix epoch
-}
-
-func (c *Config) Current(t time.Time) Upgrade {
-	// DO NOT MERGE: this almost certainly has an off-by-one error or is
-	// incorrect at the boundary.
-	u, _ := slices.BinarySearchFunc(c.times(), t, time.Time.Compare)
-	return Upgrade(u)
 }

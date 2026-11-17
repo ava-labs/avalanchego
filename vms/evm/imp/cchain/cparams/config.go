@@ -191,6 +191,7 @@ func (f fork) Compare(g fork) int {
 // Timestamps are NOT guaranteed to be in ascending order.
 func (c *ChainConfig) forks() []fork {
 	return []fork{
+		{upgrade.NoUpgrades, new(uint64)}, // required for [ChainConfig.Rules] binary search
 		{upgrade.ApricotPhase1, c.ApricotPhase1Timestamp},
 		{upgrade.ApricotPhase2, c.ApricotPhase2Timestamp},
 		{upgrade.ApricotPhase3, c.ApricotPhase3Timestamp},
@@ -213,10 +214,13 @@ func (c *ChainConfig) forks() []fork {
 // Rules requires that [ChainConfig.CheckConfigForkOrder] returns nil.
 func (c *ChainConfig) Rules(timestamp uint64) Rules {
 	fs := c.forks()
-	i, _ := slices.BinarySearchFunc(fs, fork{time: new(timestamp)}, fork.Compare)
-	return Rules{
-		LatestUpgrade: fs[i].upgrade,
+	i, ok := slices.BinarySearchFunc(fs, fork{time: new(timestamp)}, fork.Compare)
+	if !ok {
+		// The inclusion of [upgrade.NoUpgrades] at time 0 guarantees that this
+		// can't underflow.
+		i--
 	}
+	return Rules{fs[i].upgrade}
 }
 
 // IsApricotPhase1 returns whether time represents a block with a timestamp

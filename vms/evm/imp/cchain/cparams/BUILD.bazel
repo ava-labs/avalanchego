@@ -47,6 +47,7 @@ go_test(
     embed = [":cparams"],
     deps = [
         "//snow/snowtest",
+        "//upgrade",
         "//utils/wrappers",
         "//vms/evm/imp/cchain/libevm",
         "//vms/evm/imp/dynamic",
@@ -54,6 +55,7 @@ go_test(
         "@com_github_ava_labs_libevm//params",
         "@com_github_google_go_cmp//cmp",
         "@com_github_google_go_cmp//cmp/cmpopts",
+        "@com_github_kylelemons_godebug//pretty",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],

@@ -35,7 +35,8 @@ type Rules struct {
 	LatestUpgrade upgrade.Upgrade
 }
 
-// Is returns whether u is active under r.
+// Is returns whether the specified [upgrade.Upgrade] is active under the
+// current Rules.
 func (r Rules) Is(u upgrade.Upgrade) bool {
 	return r.LatestUpgrade >= u
 }

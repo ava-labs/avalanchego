@@ -7,7 +7,9 @@ import (
 	"math"
 	"testing"
 
+	"github.com/kylelemons/godebug/pretty"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/upgrade"
 )
@@ -30,5 +32,47 @@ func TestRules_MinimumGasConsumption(t *testing.T) {
 			r := Rules{LatestUpgrade: tt.latest}
 			assert.Equalf(t, tt.want, r.MinimumGasConsumption(tt.limit), "%T.MinimumGasConsumption(%d)", r, tt.limit)
 		})
+	}
+}
+
+func TestLatestUpgradeFromConfig(t *testing.T) {
+	const (
+		no  = upgrade.NoUpgrades
+		ap1 = upgrade.ApricotPhase1
+		ap2 = upgrade.ApricotPhase2
+		ap3 = upgrade.ApricotPhase3
+		ap4 = upgrade.ApricotPhase4
+	)
+
+	p := func(u uint64) *uint64 { return &u }
+	config := &ChainConfig{
+		ApricotPhase1Timestamp: p(10),
+		ApricotPhase2Timestamp: p(20),
+		ApricotPhase3Timestamp: p(30),
+		ApricotPhase4Timestamp: p(40),
+	}
+	tests := map[uint64]upgrade.Upgrade{
+		// Dawn of time
+		0: no,
+		1: no,
+		// Around AP1
+		9:  no,
+		10: ap1,
+		11: ap1,
+		// Around AP4
+		39: ap3,
+		40: ap4,
+		41: ap4,
+		// Heat death of the universe
+		math.MaxUint64: ap4,
+	}
+
+	t.Logf("%T:\n%s", config, pretty.Sprint(config))
+	require.NoErrorf(t, config.CheckConfigForkOrder(), "%T.CheckConfigForkOrder()", config)
+
+	for timestamp, want := range tests {
+		if got := config.Rules(timestamp).LatestUpgrade; got != want {
+			t.Errorf("%T.Rules(%d).LatestUpgrade = %s; want %s", config, timestamp, got, want)
+		}
 	}
 }
