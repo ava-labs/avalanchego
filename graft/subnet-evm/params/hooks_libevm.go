@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/libevm/legacy"
 
-	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
@@ -26,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/warp/message"
 
 	evmprecompileconfig "github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -87,7 +87,7 @@ func (r RulesExtra) AccessListGas(accessList libevm.AccessList) (uint64, bool, e
 	gas, err := evmprecompileconfig.AccessListGas(
 		accessList,
 		warp.ContractAddress,
-		func(msg predicate.Predicate) (uint64, error) {
+		func(msg message.Packed) (uint64, error) {
 			return warp.PredicateGas(msg, r.AvalancheRules)
 		},
 	)
@@ -201,7 +201,7 @@ func (a accessibleState) GetPrecompileEnv() vm.PrecompileEnvironment {
 type precompileBlockContext struct {
 	number           *big.Int
 	time             uint64
-	predicateResults predicate.BlockResults
+	predicateResults message.BlockResults
 }
 
 func (p *precompileBlockContext) Number() *big.Int {
