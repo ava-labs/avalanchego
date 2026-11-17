@@ -6,7 +6,7 @@ package cparams
 import (
 	"fmt"
 	"math/big"
-	"slices"
+	"sort"
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -203,17 +203,14 @@ func (c *ChainConfig) forks() []fork {
 // binary search.
 func (c *ChainConfig) Rules(timestamp uint64) Rules {
 	fs := c.forks()
-	// The comparator never reports equality, which results in the first fork
-	// that is NOT active at `timestamp`. The fork before it is therefore the
-	// latest active one, even if several share a timestamp.
-	i, _ := slices.BinarySearchFunc(fs, timestamp, func(f fork, t uint64) int {
-		if f.time == nil || *f.time > t {
-			return 1
-		}
-		return -1
+	// Finding the first inactive fork removes the need to iterate over any that
+	// share an upgrade time when said time is `timestamp`.
+	inactive := sort.Search(len(fs), func(i int) bool {
+		f := fs[i]
+		return f.time == nil || *f.time > timestamp
 	})
-	// The inclusion of [upgrade.NoUpgrades] at time 0 guarantees that i >= 1.
-	return Rules{fs[i-1].upgrade}
+	// The inclusion of [upgrade.NoUpgrades] at time 0 guarantees that `inactive` >= 1.
+	return Rules{fs[inactive-1].upgrade}
 }
 
 // IsApricotPhase1 returns whether time represents a block with a timestamp
