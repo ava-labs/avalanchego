@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 )
@@ -35,9 +36,9 @@ func predicateBytesFromExtra(rules Rules, extra []byte) []byte {
 
 func predicateBytesOffset(rules Rules) int {
 	switch {
-	case rules.IsHelicon:
+	case rules.Is(upgrade.Helicon):
 		return 0
-	case rules.IsFortuna:
+	case rules.Is(upgrade.Fortuna):
 		return acp176StateSize
 	default:
 		return ap3WindowSize

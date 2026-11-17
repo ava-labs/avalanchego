@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -240,8 +241,9 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 }
 
 func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
-	config := cparams.GetExtra(h.chainConfig)
-	if isFirstDurangoBlock := cparams.GetRulesExtra(rules).IsDurango && !config.IsDurango(parent.Time); isFirstDurangoBlock {
+	c := cparams.GetExtra(h.chainConfig)
+	r := cparams.GetRulesExtra(rules)
+	if firstDBlock := r.Is(upgrade.Durango) && !c.IsDurango(parent.Time); firstDBlock {
 		activatePrecompile(statedb, corethwarp.ContractAddress)
 	}
 	return nil

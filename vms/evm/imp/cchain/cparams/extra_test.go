@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 )
@@ -43,27 +44,27 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		{
 			name: "fortuna_empty_extra",
 			rules: Rules{
-				IsFortuna: true,
+				LatestUpgrade: upgrade.Fortuna,
 			},
 		},
 		{
 			name: "fortuna_too_short",
 			rules: Rules{
-				IsFortuna: true,
+				LatestUpgrade: upgrade.Fortuna,
 			},
 			extra: make([]byte, acp176StateSize-1),
 		},
 		{
 			name: "fortuna_empty_predicate",
 			rules: Rules{
-				IsFortuna: true,
+				LatestUpgrade: upgrade.Fortuna,
 			},
 			extra: make([]byte, acp176StateSize),
 		},
 		{
 			name: "fortuna_non_empty_predicate",
 			rules: Rules{
-				IsFortuna: true,
+				LatestUpgrade: upgrade.Fortuna,
 			},
 			extra: []byte{
 				acp176StateSize: 5,
@@ -73,13 +74,13 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		{
 			name: "helicon_empty_predicate",
 			rules: Rules{
-				IsHelicon: true,
+				LatestUpgrade: upgrade.Helicon,
 			},
 		},
 		{
 			name: "helicon_non_empty_predicate",
 			rules: Rules{
-				IsHelicon: true,
+				LatestUpgrade: upgrade.Helicon,
 			},
 			extra: []byte{5},
 			want:  []byte{5},

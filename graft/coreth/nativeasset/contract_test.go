@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -15,6 +16,8 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
@@ -439,9 +442,11 @@ func TestStatefulPrecompile(t *testing.T) {
 	// nativeasset precompiles are activated at AP2.
 	cfg := cparams.WithExtra(
 		&ethparams.ChainConfig{},
-		&cparams.ChainConfig{
-			ApricotPhase2Timestamp: new(uint64),
-		},
+		cparams.FromUpgrades(
+			upgradetest.GetConfigWithUpgradeTime(
+				upgrade.ApricotPhase2, time.Unix(0, 0),
+			),
+		),
 	)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

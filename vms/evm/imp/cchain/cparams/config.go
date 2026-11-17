@@ -6,6 +6,7 @@ package cparams
 import (
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -114,7 +115,7 @@ func (c *ChainConfig) CheckConfigCompatible(newEth *ethparams.ChainConfig, headN
 		// Either fork could retroactively deactivate an upgrade
 		if isTimestampForked(oldFork.time, head) || isTimestampForked(newFork.time, head) {
 			return ethparams.NewTimestampCompatError(
-				fmt.Sprintf("%v fork block timestamp", oldFork.name),
+				fmt.Sprintf("%v fork block timestamp", oldFork.name()),
 				oldFork.time,
 				newFork.time,
 			)
@@ -144,11 +145,11 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 		}
 		if prev.time == nil {
 			return fmt.Errorf("unsupported fork ordering: %s not enabled, but %s enabled at timestamp %d",
-				prev.name, cur.name, *cur.time)
+				prev.name(), cur.name(), *cur.time)
 		}
 		if *prev.time > *cur.time {
 			return fmt.Errorf("unsupported fork ordering: %s enabled at timestamp %d, but %s enabled at timestamp %d",
-				prev.name, *prev.time, cur.name, *cur.time)
+				prev.name(), *prev.time, cur.name(), *cur.time)
 		}
 	}
 	return nil
@@ -164,46 +165,52 @@ func isTimestampForked(t *uint64, head uint64) bool {
 }
 
 type fork struct {
-	name string
-	time *uint64
+	upgrade upgrade.Upgrade
+	time    *uint64
+}
+
+func (f fork) name() string {
+	return f.upgrade.String()
 }
 
 // forks returns a list of all network upgrades in chronological order.
 // Timestamps are NOT guaranteed to be in ascending order.
 func (c *ChainConfig) forks() []fork {
 	return []fork{
-		{name: "Apricot Phase 1", time: c.ApricotPhase1Timestamp},
-		{name: "Apricot Phase 2", time: c.ApricotPhase2Timestamp},
-		{name: "Apricot Phase 3", time: c.ApricotPhase3Timestamp},
-		{name: "Apricot Phase 4", time: c.ApricotPhase4Timestamp},
-		{name: "Apricot Phase 5", time: c.ApricotPhase5Timestamp},
-		{name: "Apricot Phase Pre 6", time: c.ApricotPhasePre6Timestamp},
-		{name: "Apricot Phase 6", time: c.ApricotPhase6Timestamp},
-		{name: "Apricot Phase Post 6", time: c.ApricotPhasePost6Timestamp},
-		{name: "Banff", time: c.BanffTimestamp},
-		{name: "Cortina", time: c.CortinaTimestamp},
-		{name: "Durango", time: c.DurangoTimestamp},
-		{name: "Etna", time: c.EtnaTimestamp},
-		{name: "Fortuna", time: c.FortunaTimestamp},
-		{name: "Granite", time: c.GraniteTimestamp},
-		{name: "Helicon", time: c.HeliconTimestamp},
-		{name: "Igloo", time: c.IglooTimestamp},
+		{upgrade.NoUpgrades, new(uint64)}, // required for [ChainConfig.Rules] binary search
+		{upgrade.ApricotPhase1, c.ApricotPhase1Timestamp},
+		{upgrade.ApricotPhase2, c.ApricotPhase2Timestamp},
+		{upgrade.ApricotPhase3, c.ApricotPhase3Timestamp},
+		{upgrade.ApricotPhase4, c.ApricotPhase4Timestamp},
+		{upgrade.ApricotPhase5, c.ApricotPhase5Timestamp},
+		{upgrade.ApricotPhasePre6, c.ApricotPhasePre6Timestamp},
+		{upgrade.ApricotPhase6, c.ApricotPhase6Timestamp},
+		{upgrade.ApricotPhasePost6, c.ApricotPhasePost6Timestamp},
+		{upgrade.Banff, c.BanffTimestamp},
+		{upgrade.Cortina, c.CortinaTimestamp},
+		{upgrade.Durango, c.DurangoTimestamp},
+		{upgrade.Etna, c.EtnaTimestamp},
+		{upgrade.Fortuna, c.FortunaTimestamp},
+		{upgrade.Granite, c.GraniteTimestamp},
+		{upgrade.Helicon, c.HeliconTimestamp},
+		{upgrade.Igloo, c.IglooTimestamp},
 	}
 }
 
+// Rules returns the [Rules] active at the specified time.
+//
+// [ChainConfig.CheckConfigForkOrder] MUST return nil as this method uses a
+// binary search.
 func (c *ChainConfig) Rules(timestamp uint64) Rules {
-	return Rules{
-		IsApricotPhase1:    c.IsApricotPhase1(timestamp),
-		IsApricotPhase2:    c.IsApricotPhase2(timestamp),
-		IsApricotPhasePre6: c.IsApricotPhasePre6(timestamp),
-		IsApricotPhase6:    c.IsApricotPhase6(timestamp),
-		IsBanff:            c.IsBanff(timestamp),
-		IsDurango:          c.IsDurango(timestamp),
-		IsFortuna:          c.IsFortuna(timestamp),
-		IsGranite:          c.IsGranite(timestamp),
-		IsHelicon:          c.IsHelicon(timestamp),
-		IsIgloo:            c.IsIgloo(timestamp),
-	}
+	fs := c.forks()
+	// Finding the first inactive fork removes the need to iterate over any that
+	// share an upgrade time when said time is `timestamp`.
+	inactive := sort.Search(len(fs), func(i int) bool {
+		t := fs[i].time
+		return t == nil || *t > timestamp
+	})
+	// The inclusion of [upgrade.NoUpgrades] at time 0 guarantees that `inactive` >= 1.
+	return Rules{fs[inactive-1].upgrade}
 }
 
 // IsApricotPhase1 returns whether time represents a block with a timestamp

@@ -57,14 +57,14 @@ func TestCheckConfigForkOrder(t *testing.T) {
 				ApricotPhase1Timestamp: new(uint64),
 				ApricotPhase3Timestamp: new(uint64(10)),
 			},
-			wantErr: testerr.Contains("Apricot Phase 2 not enabled"),
+			wantErr: testerr.Contains("ApricotPhase2 not enabled"),
 		},
 		{
 			name: "first_fork_missing",
 			upgrades: ChainConfig{
 				ApricotPhase2Timestamp: new(uint64),
 			},
-			wantErr: testerr.Contains("Apricot Phase 1 not enabled"),
+			wantErr: testerr.Contains("ApricotPhase1 not enabled"),
 		},
 		{
 			name: "descending",
@@ -72,7 +72,7 @@ func TestCheckConfigForkOrder(t *testing.T) {
 				ApricotPhase1Timestamp: new(uint64(10)),
 				ApricotPhase2Timestamp: new(uint64(5)),
 			},
-			wantErr: testerr.Contains("Apricot Phase 1 enabled at timestamp 10, but Apricot Phase 2 enabled at timestamp 5"),
+			wantErr: testerr.Contains("ApricotPhase1 enabled at timestamp 10, but ApricotPhase2 enabled at timestamp 5"),
 		},
 	}
 	for _, tt := range tests {
