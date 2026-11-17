@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-//go:generate go run golang.org/x/tools/cmd/stringer -type=Upgrade
+//go:generate go run golang.org/x/tools/cmd/stringer -type=Upgrade -output upgrade_string.gen.go
 
 // Upgrade is an enum of all the major network upgrades.
 type Upgrade int
