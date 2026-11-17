@@ -42,18 +42,18 @@ This checklist ists all the required steps when when adding a new network upgrad
 
 - [ ] Add case to `SetTimesTo()` function
 
-### [`vms/evm/cchain/genesis_test.go`](../vms/evm/cchain/genesis_test.go)
+### [`vms/evm/imp/cchain/genesis_test.go`](../vms/evm/imp/cchain/genesis_test.go)
 
 - [ ] Add the fork's genesis hash to `hashes` (reuse the previous fork's hash if the genesis doesn't change)
 - [ ] Add the fork's timestamp to each network's `want` in `TestParseGenesis`
 
 ## 3. C-Chain Configuration
 
-### [`vms/evm/cchain/genesis.go`](../vms/evm/cchain/genesis.go)
+### [`vms/evm/imp/cchain/genesis.go`](../vms/evm/imp/cchain/genesis.go)
 
 - [ ] Add the fork's timestamp to the `extras.NetworkUpgrades` built in `parseGenesis()`
 
-### [`vms/evm/cchain/cchaintest/config.go`](../vms/evm/cchain/cchaintest/config.go)
+### [`vms/evm/imp/cchain/cchaintest/config.go`](../vms/evm/imp/cchain/cchaintest/config.go)
 
 - [ ] Update `ChainConfig()` to use the new fork's `extras.TestXChainConfig`
 

@@ -9,7 +9,7 @@ go_library(
         "//app",
         "//config",
         "//version",
-        "//vms/evm/cchain/libevm",
+        "//vms/evm/imp/cchain/libevm",
         "@com_github_spf13_pflag//:pflag",
         "@org_golang_x_term//:term",
     ],

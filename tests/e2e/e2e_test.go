@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/perms"
-	"github.com/ava-labs/avalanchego/vms/evm/cchain/libevm"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
 )
 
 func TestE2E(t *testing.T) {

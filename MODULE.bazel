@@ -89,6 +89,7 @@ use_repo(
     "com_github_jackpal_gateway",
     "com_github_jackpal_go_nat_pmp",
     "com_github_klauspost_compress",
+    "com_github_kylelemons_godebug",
     "com_github_leanovate_gopter",
     "com_github_mattn_go_colorable",
     "com_github_mattn_go_isatty",

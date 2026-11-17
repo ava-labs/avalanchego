@@ -7,7 +7,7 @@ This document covers the complete release process for AvalancheGo and its integr
 AvalancheGo is a monorepo which contains:
 
 - **AvalancheGo** - The main Avalanche node implementation
-- **Coreth** (in [graft/coreth/](graft/coreth/)) - C-Chain types, params and precompiles used by [SAEVM](vms/evm/), compiled into AvalancheGo
+- **Coreth** (in [graft/coreth/](graft/coreth/)) - C-Chain types, params and precompiles used by the [C-Chain VM](vms/evm/imp/cchain/), compiled into AvalancheGo
 - **Subnet-EVM** (in [graft/subnet-evm/](graft/subnet-evm/)) - Subnet-EVM plugin, released as a separate binary
 
 For the rationale behind the multi-module tagging process, see [Multi-Module Release Strategy](docs/design/multi-module-release.md).
@@ -38,7 +38,7 @@ If this release schedules or activates a network upgrade, merge a PR to master w
 
 #### Scheduling a Network Upgrade
 
-A release that schedules a new network upgrade increases the minor version (for example, `v1.16.0`). The prep PR from [step 9](#9-prepare-the-next-release) sets master to the next patch version, so change master to `$VERSION`:
+A release that schedules a new network upgrade increases the minor version (for example, `v1.16.0`). The prep PR from [step 8](#8-prepare-the-next-release) sets master to the next patch version, so change master to `$VERSION`:
 
 1. In [`version/constants.go`](version/constants.go), set `Current` to `$VERSION`. Bump the compatibility floor in the same file: `MinimumCompatibleVersion` to this release's minor version and `PrevMinimumCompatibleVersion` to the one before, both with `Patch: 0`:
 
@@ -109,7 +109,7 @@ If this release activates a new network upgrade on Mainnet:
      ]}
    ```
 
-The upgrade test runs the published `DEFAULT_VERSION` binary, which doesn't exist until `$VERSION` is released. [Step 9](#9-prepare-the-next-release) turns it back on.
+The upgrade test runs the published `DEFAULT_VERSION` binary, which doesn't exist until `$VERSION` is released. [Step 8](#8-prepare-the-next-release) turns it back on.
 
 ### 3. Create Release Candidate Tags
 
@@ -128,40 +128,7 @@ The `require` directives at this commit reference `$VERSION`, which is not tagge
 
 ### 4. Test the Release Candidate
 
-Deploy `$VERSION_RC` by bumping image tags in [`devops-argocd`](https://github.com/ava-labs/devops-argocd).
-
-#### Primary Network Canaries
-
-Set the canary image tags to `$VERSION_RC` on both Fuji and Mainnet (e.g. [#17347](https://github.com/ava-labs/devops-argocd/pull/17347) and [#17348](https://github.com/ava-labs/devops-argocd/pull/17348)):
-
-- Fuji: [`base/network/testnet/avalanchego/base-canary/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/network/testnet/avalanchego/base-canary/cornice.yaml)
-- Mainnet: [`base/network/mainnet/avalanchego/base-canary/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/network/mainnet/avalanchego/base-canary/cornice.yaml)
-
-```yaml
-########## Canary version. ##########
-- name: api.image.tag
-  value: "$VERSION_RC"
-- name: validator.image.tag
-  value: "$VERSION_RC"
-########## End of Canary version ##########
-```
-
-#### Echo and Dispatch
-
-Echo and Dispatch are Fuji chains that deploy the public `avaplatform/subnet-evm` image. Echo is an L1 and Dispatch is a subnet, so between them they cover both validator models. Set their `api.image.tag` and `validator.image.tag` to `$VERSION_RC`:
-
-- Echo: [`base/subnet/testnet/echo/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/echo/avalanchego/base/cornice.yaml)
-- Dispatch: [`base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/base/subnet/testnet/dispatch/avalanchego/base/cornice.yaml)
-
-Once merged, monitor the deployments:
-
-- **Dispatch**: [Logs][dispatch-logs] | [Dashboard][dispatch-dashboard]
-- **Echo**: [Logs][echo-logs] | [Dashboard][echo-dashboard]
-
-[dispatch-logs]: https://avalabs.grafana.net/explore?schemaVersion=1&orgId=1&panes=%7B%22subnet-logs%22%3A%7B%22datasource%22%3A%22grafanacloud-logs%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22%7Bcluster%3D%5C%22subnets-testnet%5C%22%2Cservice_name%3D%5C%22avago%5C%22%2Csubnet%3D%5C%22dispatch%5C%22%7D%22%2C%22queryType%22%3A%22range%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D
-[dispatch-dashboard]: https://avalabs.grafana.net/d/12154d054f846686fc46ad306e451c30/dispatch-testnet-subnets
-[echo-logs]: https://avalabs.grafana.net/explore?schemaVersion=1&orgId=1&panes=%7B%22subnet-logs%22%3A%7B%22datasource%22%3A%22grafanacloud-logs%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22%7Bcluster%3D%5C%22subnets-testnet%5C%22%2Cservice_name%3D%5C%22avago%5C%22%2Csubnet%3D%5C%22echo%5C%22%7D%22%2C%22queryType%22%3A%22range%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D
-[echo-dashboard]: https://avalabs.grafana.net/d/87d80a2c2c15b54189eac1ae9c0241e4/echo-testnet-subnets
+Deploy `$VERSION_RC` to test nodes on Fuji and Mainnet. Monitor the nodes' logs and metrics. Look for crashes, stalled block production, and new errors or warnings compared to the previous version.
 
 #### Fixing Issues Found in the Release Candidate
 
@@ -245,21 +212,7 @@ Create a release at [github.com/ava-labs/avalanchego/releases/new](https://githu
 1. Check "Set as the latest release"
 1. Publish
 
-### 8. Update the Notify Service
-
-The notify service warns node operators running old versions. In the `uptime` job of [`devops-argocd`'s `analytics-app.yaml`](https://github.com/ava-labs/devops-argocd/blob/main/aws/data/us-east-1/data-k8s/root/analytics/analytics-app.yaml), set `optionalVersion` to `$VERSION` without the leading `v`. For network upgrade (or otherwise critical) releases, set `requiredVersion` too:
-
-```yaml
-- cmd: uptime
-  config:
-    # ...
-    requiredVersion: '1.15.0'
-    optionalVersion: '1.15.1'
-```
-
-Merge the PR after infra team approval ([example](https://github.com/ava-labs/devops-argocd/pull/17216)).
-
-### 9. Prepare the Next Release
+### 8. Prepare the Next Release
 
 Update master so that it describes the next release:
 

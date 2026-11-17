@@ -122,8 +122,8 @@ func TestWorstCase(t *testing.T) {
 	// a block executes, it sends an event to the pool, which causes an
 	// incorrect nonce update if the pool already had a pending transaction from
 	// the same account.
-	if os.Getenv("SAEVM_TEST_FLAKY") == "" {
-		t.Skip("FLAKY: set SAEVM_TEST_FLAKY to run")
+	if os.Getenv("EVM_TEST_FLAKY") == "" {
+		t.Skip("FLAKY: set EVM_TEST_FLAKY to run")
 	}
 
 	flags := parseWorstCaseFlags()

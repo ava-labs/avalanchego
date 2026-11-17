@@ -1,4 +1,4 @@
-# Firewood for SAE
+# Firewood for the EVM
 
 ## Overview
 
