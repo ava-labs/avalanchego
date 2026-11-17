@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/evm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
@@ -129,7 +130,7 @@ func TestAwaitTxAccepted(t *testing.T) {
 	})
 
 	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
-	blk := sut.buildVerifyAccept(ctx, t)
+	blk := sut.BuildVerifyAccept(ctx, t)
 	t.Run("after_accept", func(t *testing.T) {
 		err := sut.AwaitTxAccepted(ctx, stx.ID(), time.Millisecond)
 		require.NoErrorf(t, err, "%T.AwaitTxAccepted()", sut.Client)
@@ -149,7 +150,7 @@ func TestIssueAfterAwaitTxAccepted(t *testing.T) {
 	for i := range 30 {
 		stx := w.newMinimalTx(t)
 		require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx(txs[%d])", sut.Client, i)
-		sut.buildVerifyAccept(ctx, t)
+		sut.BuildVerifyAccept(ctx, t)
 		require.NoErrorf(t, sut.AwaitTxAccepted(ctx, stx.ID(), time.Millisecond), "%T.AwaitTxAccepted(txs[%d])", sut.Client, i)
 	}
 }
@@ -290,7 +291,7 @@ func TestRPCExtras(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.method, func(t *testing.T) {
 			var got map[string]any
-			err := sut.ethclient.CallContext(ctx, &got, tt.method, tt.args...)
+			err := sut.EthClient().CallContext(ctx, &got, tt.method, tt.args...)
 			require.NoErrorf(t, err, "%s(%v)", tt.method, tt.args)
 			for k, want := range tt.want {
 				assert.Equalf(t, want, got[k], "field %q", k)
@@ -346,7 +347,7 @@ func TestBootstrappedSynchronousRPCs(t *testing.T) {
 		},
 		{
 			name:  "firewood",
-			opts:  []sutOption{withFirewood()},
+			opts:  []sutOption{withScheme(firewood.Scheme)},
 			calls: fixture.RPCCalls,
 		},
 	}
@@ -357,7 +358,7 @@ func TestBootstrappedSynchronousRPCs(t *testing.T) {
 			ctx, sut := newSUT(t, append(opts, tt.opts...)...)
 			sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
 
-			require.NoErrorf(t, sut.SetPreference(ctx, sut.lastAccepted(ctx, t), nil), "%T.SetPreference()", sut.VM)
+			require.NoErrorf(t, sut.SetPreference(ctx, sut.LastAcceptedID(ctx, t), nil), "%T.SetPreference()", sut.VM)
 			require.NoErrorf(t, sut.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", sut.VM)
 			sut.requireSynchronousRPCs(ctx, t, tt.calls, fixture.Blocks)
 		})
@@ -380,7 +381,7 @@ func (s *SUT) requireSynchronousRPCs(
 			t.Parallel()
 
 			var got json.RawMessage
-			err := s.ethclient.CallContext(ctx, &got, call.Method, call.Args()...)
+			err := s.EthClient().CallContext(ctx, &got, call.Method, call.Args()...)
 			if call.Error != "" {
 				require.EqualErrorf(t, err, call.Error, "%s(%s)", call.Method, call.Params)
 				return
@@ -411,13 +412,13 @@ func (s *SUT) requireSynchronousRPCs(
 			t.Logf("%s", block.Description)
 			want := block.EthBlock(t)
 
-			byNumber, err := s.ethclient.BlockByNumber(ctx, new(big.Int).SetUint64(block.Number))
+			byNumber, err := s.EthClient().BlockByNumber(ctx, new(big.Int).SetUint64(block.Number))
 			require.NoErrorf(t, err, "BlockByNumber(%d)", block.Number)
 			if diff := cmp.Diff(want, byNumber, opts); diff != "" {
 				t.Errorf("BlockByNumber(%d) diff (-want +got):\n%s", block.Number, diff)
 			}
 
-			byHash, err := s.ethclient.BlockByHash(ctx, block.Hash)
+			byHash, err := s.EthClient().BlockByHash(ctx, block.Hash)
 			require.NoErrorf(t, err, "BlockByHash(%s)", block.Hash)
 			if diff := cmp.Diff(want, byHash, opts); diff != "" {
 				t.Errorf("BlockByHash(%s) diff (-want +got):\n%s", block.Hash, diff)

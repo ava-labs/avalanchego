@@ -116,7 +116,7 @@ func initComposeConfig(
 	if err != nil {
 		return fmt.Errorf("failed to marshal compose project: %w", err)
 	}
-	composePath := filepath.Join(targetPath, "docker-compose.yml")
+	composePath := filepath.Join(targetPath, "docker-compose.yaml")
 	if err := os.WriteFile(composePath, bytes, perms.ReadWrite); err != nil {
 		return fmt.Errorf("failed to write genesis: %w", err)
 	}

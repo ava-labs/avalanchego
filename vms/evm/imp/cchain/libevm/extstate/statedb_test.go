@@ -25,8 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
-
 	. "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
 )
 
@@ -198,7 +196,7 @@ func TestGetCommittedState(t *testing.T) {
 	}{
 		{
 			name:   "pre_ap1_reads_untransformed_key",
-			config: corethparams.WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &cparams.ChainConfig{}),
+			config: cparams.WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &cparams.ChainConfig{}),
 			want:   assetVal,
 		},
 		{

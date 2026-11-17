@@ -32,8 +32,8 @@ import (
 func (s *SUT) acceptBlockWith(ctx context.Context, tb testing.TB, stx *tx.Tx, ethTx *types.Transaction) *blocks.Block {
 	tb.Helper()
 
-	require.NoErrorf(tb, s.ethclient.SendTransaction(ctx, ethTx), "%T.SendTransaction()", s.ethclient)
-	s.waitForPendingEthTxs(ctx, tb, ethTx)
+	require.NoErrorf(tb, s.EthClient().SendTransaction(ctx, ethTx), "%T.SendTransaction()", s.EthClient())
+	s.WaitForPendingTxs(ctx, tb, ethTx)
 	blk := s.issueAndExecute(ctx, tb, stx)
 	assertBlockIncludes(tb, blk, types.Transactions{ethTx}, []*tx.Tx{stx})
 
@@ -51,6 +51,7 @@ func newEthTx(tb testing.TB, ethW *saetest.Wallet) *types.Transaction {
 	return ethW.SetNonceAndSign(tb, 0, &types.DynamicFeeTx{
 		To:        &to,
 		Gas:       ethparams.TxGas,
+		GasTipCap: big.NewInt(1),
 		GasFeeCap: big.NewInt(ethparams.GWei),
 	})
 }
@@ -107,13 +108,13 @@ func (s *SUT) bootstrapFrom(ctx context.Context, t *testing.T, src *SUT, fromHei
 
 	require.NoErrorf(t, s.SetState(ctx, snow.Bootstrapping), "%T.SetState(Bootstrapping)", s.VM)
 
-	head := src.lastAcceptedHeight(ctx, t)
+	head := src.LastAcceptedHeight(ctx, t)
 	for height := fromHeight + 1; height <= head; height++ {
-		s.parseVerifyAccept(ctx, t, src.blockAtHeight(ctx, t, height))
+		s.ParseVerifyAccept(ctx, t, src.BlockAtHeight(ctx, t, height))
 	}
 
 	require.NoErrorf(t, s.SetState(ctx, snow.NormalOp), "%T.SetState(NormalOp)", s.VM)
-	require.NoErrorf(t, s.SetPreference(ctx, s.lastAccepted(ctx, t), nil), "%T.SetPreference()", s.VM)
+	require.NoErrorf(t, s.SetPreference(ctx, s.LastAcceptedID(ctx, t), nil), "%T.SetPreference()", s.VM)
 }
 
 // assertChainsMatch asserts that s and other agree on the last-accepted block
@@ -121,11 +122,11 @@ func (s *SUT) bootstrapFrom(ctx context.Context, t *testing.T, src *SUT, fromHei
 func (s *SUT) assertChainsMatch(ctx context.Context, t *testing.T, other *SUT) {
 	t.Helper()
 
-	require.Equalf(t, other.lastAccepted(ctx, t), s.lastAccepted(ctx, t), "%T.LastAccepted()", s.VM)
+	require.Equalf(t, other.LastAcceptedID(ctx, t), s.LastAcceptedID(ctx, t), "%T.LastAccepted()", s.VM)
 
-	head := s.lastAcceptedHeight(ctx, t)
-	headBlk := s.blockAtHeight(ctx, t, head)
-	otherHeadBlk := other.blockAtHeight(ctx, t, head)
+	head := s.LastAcceptedHeight(ctx, t)
+	headBlk := s.BlockAtHeight(ctx, t, head)
+	otherHeadBlk := other.BlockAtHeight(ctx, t, head)
 	require.NoErrorf(t, headBlk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(height %d)", headBlk, head)
 	require.NoErrorf(t, otherHeadBlk.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted(height %d)", otherHeadBlk, head)
 
@@ -209,12 +210,12 @@ func TestStateSyncNewNode(t *testing.T) {
 
 	// dst keeps up with the network...
 	blk := src.produceBlocks(srcCtx, t, w, ethW, 1)
-	dst.parseVerifyAccept(ctx, t, blk)
+	dst.ParseVerifyAccept(ctx, t, blk)
 
 	// ...and produces a block of its own that src accepts.
 	dstW := newWallet(dstKey, dst.ctx, dst.Client)
 	dstBlk := dst.acceptBlockWith(ctx, t, dstW.newMinimalTx(t), newEthTx(t, ethW))
-	src.parseVerifyAccept(srcCtx, t, dstBlk)
+	src.ParseVerifyAccept(srcCtx, t, dstBlk)
 	dst.assertChainsMatch(ctx, t, src)
 }
 
@@ -290,55 +291,62 @@ func TestStateSyncDisabled(t *testing.T) {
 }
 
 // TestStateSyncDBFailure checks that a database failure is surfaced to the
-// engine.
+// engine. Only ethdb.Database fails, so this doesn't cover Firewood disk
+// writes.
 func TestStateSyncDBFailure(t *testing.T) {
-	const commitInterval = 4
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			const commitInterval = 4
 
-	key := txtest.NewKey(t)
-	ethW := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
-	timeOpt, _ := withVMTime(testStartTime)
-	sharedOpts := []sutOption{
-		timeOpt,
-		withMaxAllocFor(key.EthAddress(), ethW.Addresses()[0]),
-		withCommitInterval(commitInterval),
-	}
-	srcCtx, src := newSUT(t, sharedOpts...)
-	w := newWallet(key, src.ctx, src.Client)
+			key := txtest.NewKey(t)
+			ethW := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
+			timeOpt, _ := withVMTime(testStartTime)
+			sharedOpts := []sutOption{
+				withScheme(scheme),
+				timeOpt,
+				withMaxAllocFor(key.EthAddress(), ethW.Addresses()[0]),
+				withCommitInterval(commitInterval),
+			}
+			srcCtx, src := newSUT(t, sharedOpts...)
+			w := newWallet(key, src.ctx, src.Client)
 
-	src.produceBlocks(srcCtx, t, w, ethW, commitInterval+1)
+			src.produceBlocks(srcCtx, t, w, ethW, commitInterval+1)
 
-	for numOps := 0; ; numOps++ {
-		flaky := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
-		ctx, dst := newSUT(t, append(slices.Clone(sharedOpts), withState(snow.StateSyncing), withDB(flaky))...)
-		saetest.ConnectTo(t, dst, src)
+			for numOps := 0; ; numOps++ {
+				flaky := saetest.NewFlakyDB(memdb.New(), math.MaxInt)
+				dstOpts := slices.Concat(sharedOpts, []sutOption{withState(snow.StateSyncing), withDB(flaky), withChainDataDir(t.TempDir())})
+				ctx, dst := newSUT(t, dstOpts...)
+				saetest.ConnectTo(t, dst, src)
 
-		flaky.SetFailAfter(numOps)
+				flaky.SetFailAfter(numOps)
 
-		dst.startStateSyncFrom(ctx, t, src)
-		msg, err := dst.WaitForEvent(ctx)
-		require.NoErrorf(t, err, "%T.WaitForEvent()", dst.VM)
-		require.Equalf(t, snowcommon.StateSyncDone, msg, "%T.WaitForEvent()", dst.VM)
+				dst.startStateSyncFrom(ctx, t, src)
+				msg, err := dst.WaitForEvent(ctx)
+				require.NoErrorf(t, err, "%T.WaitForEvent()", dst.VM)
+				require.Equalf(t, snowcommon.StateSyncDone, msg, "%T.WaitForEvent()", dst.VM)
 
-		var wantErr error
-		if flaky.Failed() {
-			wantErr = saetest.ErrInjected
-		}
-		// We MUST restore the db to allow a graceful transition, we're not testing DB failures there.
-		flaky.SetFailAfter(math.MaxInt)
+				var wantErr error
+				if flaky.Failed() {
+					wantErr = saetest.ErrInjected
+				}
+				// We MUST restore the db to allow a graceful transition, we're not testing DB failures there.
+				flaky.SetFailAfter(math.MaxInt)
 
-		err = dst.SetState(ctx, snow.Bootstrapping)
-		require.ErrorIsf(t, err, wantErr, "%T.SetState(%s)", dst.VM, snow.Bootstrapping)
-		if wantErr == nil {
-			return
-		}
+				err = dst.SetState(ctx, snow.Bootstrapping)
+				require.ErrorIsf(t, err, wantErr, "%T.SetState(%s)", dst.VM, snow.Bootstrapping)
+				if wantErr == nil {
+					return
+				}
 
-		t.Run("second_try", func(t *testing.T) {
-			ctx, dst := newSUT(t, append(slices.Clone(sharedOpts), withState(snow.StateSyncing), withDB(flaky))...)
-			saetest.ConnectTo(t, dst, src)
-			summaryHeight := dst.startStateSyncFrom(ctx, t, src)
-			dst.awaitStateSync(ctx, t)
-			dst.bootstrapFrom(ctx, t, src, summaryHeight)
-			dst.assertChainsMatch(ctx, t, src)
+				t.Run("second_try", func(t *testing.T) {
+					ctx, dst := newSUT(t, dstOpts...)
+					saetest.ConnectTo(t, dst, src)
+					summaryHeight := dst.startStateSyncFrom(ctx, t, src)
+					dst.awaitStateSync(ctx, t)
+					dst.bootstrapFrom(ctx, t, src, summaryHeight)
+					dst.assertChainsMatch(ctx, t, src)
+				})
+			}
 		})
 	}
 }
