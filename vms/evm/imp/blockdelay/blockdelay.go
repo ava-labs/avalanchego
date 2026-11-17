@@ -1,9 +1,9 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package blockdelay paces block building on the ACP-226 minimum block delay,
-// specified here:
-// https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/226-dynamic-minimum-block-times/README.md
+// Package blockdelay paces block building on the [ACP-226] minimum block delay.
+//
+// [ACP-226]: https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/226-dynamic-minimum-block-times/README.md
 package blockdelay
 
 import (
