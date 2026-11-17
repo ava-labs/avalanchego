@@ -197,7 +197,10 @@ func (c *ChainConfig) forks() []fork {
 	}
 }
 
-// Rules requires that [ChainConfig.CheckConfigForkOrder] returns nil.
+// Rules returns the [Rules] active at the specified time.
+//
+// [ChainConfig.CheckConfigForkOrder] MUST return nil as this method uses a
+// binary search.
 func (c *ChainConfig) Rules(timestamp uint64) Rules {
 	fs := c.forks()
 	// The comparator never reports equality, which results in the first fork
