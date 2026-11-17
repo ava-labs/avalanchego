@@ -25,6 +25,8 @@ type testStep struct {
 }
 
 func TestUptimeTracker_GetUptime(t *testing.T) {
+	startTime := time.Unix(1_000_000, 0)
+
 	tests := []struct {
 		name  string
 		steps []testStep
@@ -43,7 +45,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			name: "one validator",
 			steps: []testStep{
 				{
-					timestamp: time.Time{}.Add(10 * time.Second),
+					timestamp: startTime.Add(10 * time.Second),
 					connectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -51,7 +53,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{2},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
@@ -59,13 +61,13 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			},
 			validationID:    ids.ID{1},
 			wantUptime:      10 * time.Second,
-			wantLastUpdated: time.Time{}.Add(10 * time.Second),
+			wantLastUpdated: startTime.Add(10 * time.Second),
 		},
 		{
 			name: "one validator added and removed",
 			steps: []testStep{
 				{
-					timestamp: time.Time{}.Add(10 * time.Second),
+					timestamp: startTime.Add(10 * time.Second),
 					connectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -79,7 +81,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(20 * time.Second),
+					timestamp: startTime.Add(20 * time.Second),
 				},
 			},
 			validationID: ids.ID{1},
@@ -89,6 +91,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			name: "one validator deactivated",
 			steps: []testStep{
 				{
+					timestamp: startTime,
 					connectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -96,18 +99,18 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(10 * time.Second),
+					timestamp: startTime.Add(10 * time.Second),
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     false,
 						},
 					},
@@ -115,12 +118,13 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			},
 			validationID:    ids.ID{1},
 			wantUptime:      10 * time.Second,
-			wantLastUpdated: time.Time{}.Add(10 * time.Second),
+			wantLastUpdated: startTime.Add(10 * time.Second),
 		},
 		{
 			name: "one validator deactivated and reactivated",
 			steps: []testStep{
 				{
+					timestamp: startTime,
 					connectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -128,29 +132,29 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(10 * time.Second),
+					timestamp: startTime.Add(10 * time.Second),
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     false,
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(20 * time.Second),
+					timestamp: startTime.Add(20 * time.Second),
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
@@ -158,12 +162,13 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			},
 			validationID:    ids.ID{1},
 			wantUptime:      10 * time.Second,
-			wantLastUpdated: time.Time{}.Add(20 * time.Second),
+			wantLastUpdated: startTime.Add(20 * time.Second),
 		},
 		{
 			name: "one validator disconnected",
 			steps: []testStep{
 				{
+					timestamp: startTime,
 					connectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -171,13 +176,13 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(10 * time.Second),
+					timestamp: startTime.Add(10 * time.Second),
 					disconnectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -185,7 +190,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
@@ -193,12 +198,13 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			},
 			validationID:    ids.ID{1},
 			wantUptime:      10 * time.Second,
-			wantLastUpdated: time.Time{}.Add(10 * time.Second),
+			wantLastUpdated: startTime.Add(10 * time.Second),
 		},
 		{
 			name: "one validator connected and disconnected",
 			steps: []testStep{
 				{
+					timestamp: startTime,
 					connectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -206,13 +212,13 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(10 * time.Second),
+					timestamp: startTime.Add(10 * time.Second),
 					disconnectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -220,18 +226,18 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(20 * time.Second),
+					timestamp: startTime.Add(20 * time.Second),
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
@@ -239,28 +245,31 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			},
 			validationID:    ids.ID{1},
 			wantUptime:      10 * time.Second,
-			wantLastUpdated: time.Time{}.Add(20 * time.Second),
+			wantLastUpdated: startTime.Add(20 * time.Second),
 		},
 		{
 			name: "validator never connected",
 			steps: []testStep{
 				{
+					timestamp: startTime,
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
 				},
 			},
-			validationID: ids.ID{1},
+			validationID:    ids.ID{1},
+			wantLastUpdated: startTime,
 		},
 		{
 			name: "validator removed",
 			steps: []testStep{
 				{
+					timestamp: startTime,
 					connectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -268,13 +277,13 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(10 * time.Second),
+					timestamp: startTime.Add(10 * time.Second),
 					validators: []validators.GetCurrentValidatorOutput{
 						{},
 					},
@@ -287,6 +296,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			name: "connected inactive validator becomes active",
 			steps: []testStep{
 				{
+					timestamp: startTime,
 					connectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -294,39 +304,40 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(10 * time.Second),
+					timestamp: startTime.Add(10 * time.Second),
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
 				},
 			},
 			validationID:    ids.ID{1},
-			wantLastUpdated: time.Time{}.Add(10 * time.Second),
+			wantLastUpdated: startTime.Add(10 * time.Second),
 		},
 		{
 			name: "disconnected inactive validator becomes connected + active",
 			steps: []testStep{
 				{
+					timestamp: startTime,
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(10 * time.Second),
+					timestamp: startTime.Add(10 * time.Second),
 					connectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -334,19 +345,20 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
 				},
 			},
 			validationID:    ids.ID{1},
-			wantLastUpdated: time.Time{}.Add(10 * time.Second),
+			wantLastUpdated: startTime.Add(10 * time.Second),
 		},
 		{
 			name: "deactivated validator leaves validator set",
 			steps: []testStep{
 				{
+					timestamp: startTime,
 					connectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -354,12 +366,12 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(10 * time.Second),
+					timestamp: startTime.Add(10 * time.Second),
 				},
 			},
 			validationID: ids.ID{1},
@@ -369,6 +381,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			name: "validator has no updates",
 			steps: []testStep{
 				{
+					timestamp: startTime,
 					connectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -376,29 +389,29 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(10 * time.Second),
+					timestamp: startTime.Add(10 * time.Second),
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(20 * time.Second),
+					timestamp: startTime.Add(20 * time.Second),
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
@@ -406,12 +419,13 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			},
 			validationID:    ids.ID{1},
 			wantUptime:      20 * time.Second,
-			wantLastUpdated: time.Time{}.Add(20 * time.Second),
+			wantLastUpdated: startTime.Add(20 * time.Second),
 		},
 		{
 			name: "connected validator rejoins validator set",
 			steps: []testStep{
 				{
+					timestamp: startTime,
 					connectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -419,21 +433,21 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(10 * time.Second),
+					timestamp: startTime.Add(10 * time.Second),
 				},
 				{
-					timestamp: time.Time{}.Add(20 * time.Second),
+					timestamp: startTime.Add(20 * time.Second),
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Add(10 * time.Second).Unix()),
+							StartTime:    uint64(startTime.Add(10 * time.Second).Unix()),
 							IsActive:     true,
 						},
 					},
@@ -441,39 +455,40 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			},
 			validationID:    ids.ID{1},
 			wantUptime:      10 * time.Second,
-			wantLastUpdated: time.Time{}.Add(20 * time.Second),
+			wantLastUpdated: startTime.Add(20 * time.Second),
 		},
 		{
 			name: "disconnected validator reactivated",
 			steps: []testStep{
 				{
+					timestamp: startTime,
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     false,
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(10 * time.Second),
+					timestamp: startTime.Add(10 * time.Second),
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(80 * time.Second),
+					timestamp: startTime.Add(80 * time.Second),
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
@@ -481,12 +496,13 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			},
 			validationID:    ids.ID{1},
 			wantUptime:      0, // never connected
-			wantLastUpdated: time.Time{}.Add(80 * time.Second),
+			wantLastUpdated: startTime.Add(80 * time.Second),
 		},
 		{
 			name: "connected node re-registered as inactive validator",
 			steps: []testStep{
 				{
+					timestamp: startTime,
 					connectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -494,21 +510,21 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     false,
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(10 * time.Second),
+					timestamp: startTime.Add(10 * time.Second),
 				},
 				{
-					timestamp: time.Time{}.Add(30 * time.Second),
+					timestamp: startTime.Add(30 * time.Second),
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{2},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Add(20 * time.Second).Unix()),
+							StartTime:    uint64(startTime.Add(20 * time.Second).Unix()),
 							IsActive:     false,
 						},
 					},
@@ -516,12 +532,13 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			},
 			validationID:    ids.ID{2},
 			wantUptime:      0,
-			wantLastUpdated: time.Time{}.Add(30 * time.Second),
+			wantLastUpdated: startTime.Add(30 * time.Second),
 		},
 		{
 			name: "connected inactive validator re-registered as active",
 			steps: []testStep{
 				{
+					timestamp: startTime,
 					connectedValidators: []ids.NodeID{
 						{1},
 					},
@@ -529,31 +546,33 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 						{
 							ValidationID: ids.ID{1},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     false,
 						},
 					},
 				},
 				{
+					timestamp: startTime,
 					// The inactive validator is removed.
 				},
 				{
+					timestamp: startTime,
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{2},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
 				},
 				{
-					timestamp: time.Time{}.Add(10 * time.Second),
+					timestamp: startTime.Add(10 * time.Second),
 					validators: []validators.GetCurrentValidatorOutput{
 						{
 							ValidationID: ids.ID{2},
 							NodeID:       ids.NodeID{1},
-							StartTime:    uint64(time.Time{}.Unix()),
+							StartTime:    uint64(startTime.Unix()),
 							IsActive:     true,
 						},
 					},
@@ -561,7 +580,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			},
 			validationID:    ids.ID{2},
 			wantUptime:      10 * time.Second,
-			wantLastUpdated: time.Time{}.Add(10 * time.Second),
+			wantLastUpdated: startTime.Add(10 * time.Second),
 		},
 	}
 
@@ -627,7 +646,7 @@ func TestUptimeTracker_Restart(t *testing.T) {
 
 	validationID := ids.GenerateTestID()
 	nodeID := ids.GenerateTestNodeID()
-	start := time.Time{}
+	start := time.Unix(0, 0)
 	validatorState := &validatorstest.State{
 		GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
 			return map[ids.ID]*validators.GetCurrentValidatorOutput{
@@ -655,7 +674,7 @@ func TestUptimeTracker_Restart(t *testing.T) {
 	uptime, lastUpdated, err := uptimeTracker.GetUptime(validationID)
 	require.NoError(err)
 	require.Equal(10*time.Second, uptime)
-	require.Equal(time.Time{}.Add(10*time.Second), lastUpdated)
+	require.Equal(start.Add(10*time.Second), lastUpdated)
 
 	require.NoError(uptimeTracker.Shutdown())
 
@@ -667,7 +686,7 @@ func TestUptimeTracker_Restart(t *testing.T) {
 	uptime, lastUpdated, err = uptimeTracker.GetUptime(validationID)
 	require.NoError(err)
 	require.Equal(20*time.Second, uptime)
-	require.Equal(time.Time{}.Add(20*time.Second), lastUpdated)
+	require.Equal(start.Add(20*time.Second), lastUpdated)
 }
 
 // TestUptimeTracker_RemoveDisconnectedValidator ensures that removing a
@@ -758,7 +777,7 @@ func TestUptimeTracker_RestartWithInactiveValidator(t *testing.T) {
 	)
 
 	db := memdb.New()
-	start := time.Time{}
+	start := time.Unix(0, 0)
 	clock := &mockable.Clock{}
 	clock.Set(start)
 	validatorState := &validatorstest.State{
