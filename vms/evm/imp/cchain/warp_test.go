@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/cmputils"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp/warptest"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/vmtest"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
@@ -137,12 +138,13 @@ func TestSendWarpMessage(t *testing.T) {
 	tx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		To:        &corethwarp.ContractAddress,
 		Gas:       1_000_000,
+		GasTipCap: big.NewInt(1),
 		GasFeeCap: big.NewInt(1),
 		Data:      callData,
 	})
-	require.NoErrorf(t, sut.ethclient.SendTransaction(ctx, tx), "%T.SendTransaction(...)", sut.ethclient)
+	require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction(...)", sut.EthClient())
 
-	built := sut.buildVerify(ctx, t, sut.lastAccepted(ctx, t))
+	built := sut.BuildVerify(ctx, t, sut.LastAcceptedID(ctx, t))
 	if diff := cmp.Diff(types.Transactions{tx}, built.Transactions(), cmputils.TransactionsByHash()); diff != "" {
 		t.Errorf("%T eth txs (-want +got):\n%s", built, diff)
 	}
@@ -153,7 +155,7 @@ func TestSendWarpMessage(t *testing.T) {
 	sut.assertWarpSigningRefusal(ctx, t, sentMsg, warp.UnknownMessageErrCode)
 	sut.assertWarpSigningRefusal(ctx, t, hashMsg, warp.NotAcceptedErrCode)
 
-	sut.acceptAndExecute(ctx, t, built)
+	sut.AcceptAndExecute(ctx, t, built)
 	sut.signAndVerifyWarpMessage(ctx, t, sentMsg)
 	sut.signAndVerifyWarpMessage(ctx, t, hashMsg)
 }
@@ -330,20 +332,21 @@ func TestReceiveWarpMessage(t *testing.T) {
 			tx := wallet.SetNonceAndSign(t, i, &types.DynamicFeeTx{
 				To:         &warpLogger,
 				Gas:        tt.gas,
+				GasTipCap:  big.NewInt(1),
 				GasFeeCap:  big.NewInt(1),
 				Data:       tt.callData,
 				AccessList: warpAccessList(tt.msg),
 			})
-			err := sut.ethclient.SendTransaction(ctx, tx)
+			err := sut.EthClient().SendTransaction(ctx, tx)
 			if diff := testerr.Diff(err, tt.wantIssueErr); diff != "" {
-				t.Fatalf("%T.SendTransaction(...) error (-want +got)\n%s", sut.ethclient, diff)
+				t.Fatalf("%T.SendTransaction(...) error (-want +got)\n%s", sut.EthClient(), diff)
 			}
 			if err != nil {
 				return
 			}
 
-			sut.waitForPendingEthTxs(ctx, t, tx)
-			built := sut.runConsensusLoop(ctx, t, withBlockContext(&block.Context{}))
+			sut.WaitForPendingTxs(ctx, t, tx)
+			built := sut.RunConsensusLoop(ctx, t, vmtest.WithBlockContext(&block.Context{}))
 			receipts := built.Receipts()
 			require.Lenf(t, receipts, 1, "%T.Receipts()", built)
 			receipt := receipts[0]

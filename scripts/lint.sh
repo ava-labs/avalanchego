@@ -81,6 +81,7 @@ function _check_license_header {
       ! -path './**/*mock/*.go' \
       ! -name '*.canoto.go' \
       ! -name '*.bindings.go' \
+      ! -name '*.gen.go' \
       "${FIND_EXCLUDES[@]}" \
       "$@"
     )

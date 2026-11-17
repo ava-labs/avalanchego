@@ -25,7 +25,7 @@ go_library(
         "//utils/set",
         "//utils/units",
         "//vms/evm/gastime",
-        "//vms/evm/imp/cchain/dynamic",
+        "//vms/evm/imp/dynamic",
         "//vms/evm/worstcase",
         "//vms/proposervm",
         "//vms/secp256k1fx",
