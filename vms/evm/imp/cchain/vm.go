@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/firewood-go/ffi"
 	"github.com/ava-labs/libevm/triedb"
 	"go.uber.org/zap"
 
@@ -165,6 +166,10 @@ func (vm *VM) Initialize(
 
 	if err := genesis.verifyAndWriteBlock(ethDB); err != nil {
 		return fmt.Errorf("writing genesis block: %w", err)
+	}
+	// Registered here rather than in [sae.NewVM] to cover state sync.
+	if err := snowCtx.Metrics.Register(firewood.Scheme, ffi.Gatherer{}); err != nil {
+		return fmt.Errorf("registering firewood metrics: %w", err)
 	}
 	vm.Handler, err = statesync.New(
 		userConfig.stateSyncConfig(snowCtx.NetworkID),

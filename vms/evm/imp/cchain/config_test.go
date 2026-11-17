@@ -335,7 +335,7 @@ func TestConfigStateSyncInterval(t *testing.T) {
 		networkID      uint32
 		scheme         string
 		commitInterval uint64
-		want           uint64
+		want           uint64 // summary interval
 	}{
 		{
 			name:           "custom_network",
@@ -363,7 +363,7 @@ func TestConfigStateSyncInterval(t *testing.T) {
 			networkID:      constants.MainnetID,
 			scheme:         firewood.Scheme,
 			commitInterval: 1,
-			want:           1,
+			want:           saedb.DefaultCommitInterval,
 		},
 	}
 	for _, tt := range tests {
@@ -372,8 +372,9 @@ func TestConfigStateSyncInterval(t *testing.T) {
 			c.StateScheme = tt.scheme
 			c.CommitInterval = tt.commitInterval
 
-			got := c.stateSyncConfig(tt.networkID).DBConfig.CommitInterval
-			require.Equal(t, tt.want, got, "%T.stateSyncConfig(%d).DBConfig.CommitInterval", c, tt.networkID)
+			got := c.stateSyncConfig(tt.networkID)
+			require.Equal(t, tt.want, got.SummaryInterval, "%T.stateSyncConfig(%d).SummaryInterval", c, tt.networkID)
+			require.Equal(t, tt.commitInterval, got.DBConfig.CommitInterval, "%T.stateSyncConfig(%d).DBConfig.CommitInterval", c, tt.networkID)
 		})
 	}
 }

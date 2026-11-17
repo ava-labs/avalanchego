@@ -247,16 +247,18 @@ func (c config) saeConfig(now func() time.Time) sae.Config {
 }
 
 func (c config) stateSyncConfig(networkID uint32) statesync.Config {
-	saeCfg := c.saeConfig(nil)
+	dbCfg := c.saeConfig(nil).DBConfig
+	summaryInterval := dbCfg.CommitInterval
 	// All nodes in production networks MUST agree which state summaries to
 	// serve to ensure the state sync engine can hit the required quorum to
-	// accept the summaries. Firewood can serve any height in its history.
-	if constants.ProductionNetworkIDs.Contains(networkID) && c.StateScheme != firewood.Scheme {
-		saeCfg.DBConfig.CommitInterval = saedb.DefaultCommitInterval
+	// accept the summaries.
+	if constants.ProductionNetworkIDs.Contains(networkID) {
+		summaryInterval = saedb.DefaultCommitInterval
 	}
 	return statesync.Config{
-		DBConfig: saeCfg.DBConfig,
-		Enabled:  c.StateSyncEnabled,
+		DBConfig:        dbCfg,
+		SummaryInterval: summaryInterval,
+		Enabled:         c.StateSyncEnabled,
 	}
 }
 

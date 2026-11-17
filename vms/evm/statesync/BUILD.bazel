@@ -34,7 +34,6 @@ go_library(
         "//vms/evm/statesync/block",
         "//vms/evm/statesync/code",
         "//vms/evm/statesync/hashdb",
-        "@com_github_ava_labs_firewood_go_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/rawdb",

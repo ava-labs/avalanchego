@@ -10,7 +10,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/firewood-go/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -170,12 +169,6 @@ func (s *Syncer) syncFirewood(ctx context.Context, root common.Hash, codeSyncer 
 	if err != nil {
 		return fmt.Errorf("creating firewood proof client: %w", err)
 	}
-
-	// [sae.NewVM] registers the same gatherer once the sync is done.
-	if err := s.snowCtx.Metrics.Register(firewood.Scheme, ffi.Gatherer{}); err != nil {
-		return fmt.Errorf("registering firewood metrics: %w", err)
-	}
-	defer s.snowCtx.Metrics.Deregister(firewood.Scheme)
 
 	reg, err := apimetrics.MakeAndRegister(s.snowCtx.Metrics, "syncer_firewood")
 	if err != nil {
