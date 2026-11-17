@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 
+	// TODO(alarso16): Remove the dependency on the global module registration.
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry" // register precompiles
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
