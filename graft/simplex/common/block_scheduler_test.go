@@ -16,7 +16,6 @@ const (
 	defaultWaitDuration = 500 * time.Millisecond
 
 	// testTimeout is how long tests wait for an expected event before failing.
-	// It mirrors [testutil.DefaultTimeout], which cannot be imported here because testutil imports common.
 	testTimeout = 30 * time.Second
 )
 
