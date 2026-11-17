@@ -168,7 +168,6 @@ go_test(
         "//vms/evm/firewood",
         "//vms/evm/gastime",
         "//vms/evm/imp/blackhole",
-        "//vms/evm/imp/blockdelay",
         "//vms/evm/imp/cchain/cchaintest",
         "//vms/evm/imp/cchain/cparams",
         "//vms/evm/imp/cchain/libevm",

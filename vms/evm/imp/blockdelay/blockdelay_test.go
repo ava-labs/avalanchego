@@ -42,46 +42,21 @@ func TestExponent(t *testing.T) {
 	}
 }
 
-func TestVerify(t *testing.T) {
-	const parent = dynamic.InitialDelayExponent
-	var (
-		parentTime = time.Unix(1_000, 0)
-		minChild   = parentTime.Add(parent.DelayDuration())
-	)
-	tests := []struct {
-		name      string
-		childTime time.Time
-		wantErr   error
-	}{
-		{
-			name:      "at_minimum",
-			childTime: minChild,
-		},
-		{
-			name:      "after_minimum",
-			childTime: minChild.Add(time.Hour),
-		},
-		{
-			name:      "below_minimum",
-			childTime: minChild.Add(-time.Millisecond),
-			wantErr:   ErrBelowMinimum,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := Verify(parentTime, parent, tt.childTime)
-			require.ErrorIs(t, err, tt.wantErr, "Verify()")
-		})
-	}
+// waiterFunc is an [EventWaiter] that calls itself.
+type waiterFunc func(context.Context) (snowcommon.Message, error)
+
+func (f waiterFunc) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
+	return f(ctx)
 }
 
 func TestPacerWaitForEvent(t *testing.T) {
 	errWait := errors.New("wait failed")
 	tests := []struct {
 		name string
-		// prev holds the results of earlier calls, made immediately before the
-		// one under test.
-		prev       []error
+		// If prevCall is true, an earlier call returning prevErr is made
+		// immediately before the one under test.
+		prevCall   bool
+		prevErr    error
 		earliestIn time.Duration
 		want       time.Duration
 	}{
@@ -96,39 +71,41 @@ func TestPacerWaitForEvent(t *testing.T) {
 		},
 		{
 			name:       "throttled",
-			prev:       []error{nil},
+			prevCall:   true,
 			earliestIn: -time.Second,
-			want:       MinEventSpacing,
+			want:       minEventSpacing,
 		},
 		{
 			name:       "build_time_after_throttle",
-			prev:       []error{nil},
+			prevCall:   true,
 			earliestIn: time.Second,
 			want:       time.Second,
 		},
 		{
 			name:       "previous_call_failed",
-			prev:       []error{errWait},
+			prevCall:   true,
+			prevErr:    errWait,
 			earliestIn: -time.Second,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
-				p := NewPacer(time.Now)
-				for _, prevErr := range tt.prev {
-					_, err := p.WaitForEvent(t.Context(), time.Time{}, func(context.Context) (snowcommon.Message, error) {
-						return snowcommon.PendingTxs, prevErr
-					})
-					require.ErrorIs(t, err, prevErr, "WaitForEvent() previous call")
+				var waitErr error
+				p := NewPacer(time.Now, waiterFunc(func(context.Context) (snowcommon.Message, error) {
+					return snowcommon.PendingTxs, waitErr
+				}))
+				if tt.prevCall {
+					waitErr = tt.prevErr
+					_, err := p.WaitForEvent(t.Context(), time.Time{})
+					require.ErrorIs(t, err, tt.prevErr, "WaitForEvent() previous call")
 				}
 
+				waitErr = nil
 				start := time.Now()
-				got, err := p.WaitForEvent(t.Context(), start.Add(tt.earliestIn), func(context.Context) (snowcommon.Message, error) {
-					return snowcommon.StateSyncDone, nil
-				})
+				got, err := p.WaitForEvent(t.Context(), start.Add(tt.earliestIn))
 				require.NoError(t, err, "WaitForEvent()")
-				require.Equal(t, snowcommon.StateSyncDone, got, "WaitForEvent()")
+				require.Equal(t, snowcommon.PendingTxs, got, "WaitForEvent()")
 				require.Equal(t, tt.want, time.Since(start), "WaitForEvent() blocking duration")
 			})
 		})
@@ -140,10 +117,10 @@ func TestPacerWaitForEventCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancelCause(t.Context())
 	cancel(errCause)
 
-	p := NewPacer(time.Now)
-	_, err := p.WaitForEvent(ctx, time.Now().Add(time.Hour), func(context.Context) (snowcommon.Message, error) {
-		t.Error("wait called after ctx was canceled")
+	p := NewPacer(time.Now, waiterFunc(func(context.Context) (snowcommon.Message, error) {
+		t.Error("wrapped EventWaiter called after ctx was canceled")
 		return 0, nil
-	})
+	}))
+	_, err := p.WaitForEvent(ctx, time.Now().Add(time.Hour))
 	require.ErrorIs(t, err, errCause, "WaitForEvent()")
 }

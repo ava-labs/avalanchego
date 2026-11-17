@@ -54,7 +54,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/synchronoustest"
@@ -1723,7 +1722,7 @@ func TestVerifyRejectsBlockTimeBelowMinDelay(t *testing.T) {
 			e.TimeMilliseconds = &earlyMS
 		})(hdr)
 	})
-	require.ErrorIsf(t, err, blockdelay.ErrBelowMinimum, "%T.VerifyBlock() (block below the ACP-226 minimum delay)", sut.VM)
+	require.ErrorIsf(t, err, errBelowMinBlockDelay, "%T.VerifyBlock() (block below the ACP-226 minimum delay)", sut.VM)
 }
 
 // TestWaitForEventMinDelayPacing asserts that [VM.WaitForEvent] doesn't report

@@ -355,14 +355,18 @@ type builder struct {
 	desired      desiredParams
 }
 
+var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
+
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
 
 	de := delayExponent(parent)
-	if err := blockdelay.Verify(blockTime(parent), de, now); err != nil {
-		return nil, err
+	parentTime := blockTime(parent)
+	if minTime := parentTime.Add(de.DelayDuration()); now.Before(minTime) {
+		return nil, fmt.Errorf("%w: block time %s is before the minimum %s (parent %s + %s)",
+			errBelowMinBlockDelay, now, minTime, parentTime, de.DelayDuration())
 	}
 
 	nowMS := uint64(now.UnixMilli())

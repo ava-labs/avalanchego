@@ -143,7 +143,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("registering cchain metrics: %w", err)
 	}
 
-	vm.pacer = blockdelay.NewPacer(vm.now)
+	vm.pacer = blockdelay.NewPacer(vm.now, eventSources{vm})
 	vm.pending = txpool.NewPending()
 	warpStorage := warp.NewStorage(avaDB, warpMessages...)
 	hooks := newHooks(
@@ -403,7 +403,7 @@ func (vm *VM) LastAccepted(ctx context.Context) (ids.ID, error) {
 // may be built.
 func earliestBuildTime(b *blocks.Block) time.Time {
 	h := b.Header()
-	return blockdelay.Earliest(blockTime(h), delayExponent(h))
+	return blockTime(h).Add(delayExponent(h).DelayDuration())
 }
 
 // WaitForEvent waits until the ACP-226 minimum block delay since the preferred
@@ -421,11 +421,16 @@ func (vm *VM) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 
 	// Pace block building on the ACP-226 minimum block delay so that the event
 	// sources are consulted when we are actually willing to build.
-	return vm.pacer.WaitForEvent(ctx, earliestBuildTime(vm.VM.GetPreference()), vm.awaitEvent)
+	return vm.pacer.WaitForEvent(ctx, earliestBuildTime(vm.VM.GetPreference()))
 }
 
-// awaitEvent races the SAE event source against the cross-chain txpool.
-func (vm *VM) awaitEvent(ctx context.Context) (snowcommon.Message, error) {
+// eventSources is the [blockdelay.EventWaiter] paced by [VM.WaitForEvent].
+type eventSources struct {
+	vm *VM
+}
+
+// WaitForEvent races the SAE event source against the cross-chain txpool.
+func (e eventSources) WaitForEvent(ctx context.Context) (snowcommon.Message, error) {
 	// The winner's deferred cancel unblocks the loser, whose pending call
 	// returns and delivers its discarded result to the buffered channel, so
 	// neither goroutine leaks.
@@ -437,12 +442,12 @@ func (vm *VM) awaitEvent(ctx context.Context) (snowcommon.Message, error) {
 	results := make(chan result, 2)
 	go func() {
 		defer cancel()
-		msg, err := vm.VM.WaitForEvent(raceCtx)
+		msg, err := e.vm.VM.WaitForEvent(raceCtx)
 		results <- result{msg, err}
 	}()
 	go func() {
 		defer cancel()
-		err := vm.pending.AwaitTxs(raceCtx)
+		err := e.vm.pending.AwaitTxs(raceCtx)
 		results <- result{snowcommon.PendingTxs, err}
 	}()
 

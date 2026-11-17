@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/hookadaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
 	"github.com/ava-labs/avalanchego/x/blockdb"
@@ -143,10 +144,7 @@ type builder struct {
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	// TODO: Enforce the ACP-226 minimum block delay, and move it toward this
 	// node's desired delay.
-	minDelayExcess := acp226.InitialDelayExcess
-	if de := customtypes.GetHeaderExtra(parent).MinDelayExcess; de != nil {
-		minDelayExcess = *de
-	}
+	minDelayExcess := acp226.DelayExcess(blockdelay.Exponent(customtypes.GetHeaderExtra(parent).MinDelayExcess))
 
 	nowMS := uint64(b.now().UnixMilli()) //#nosec G115 -- Known non-negative
 	return customtypes.WithHeaderExtra(
