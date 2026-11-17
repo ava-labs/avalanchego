@@ -6,6 +6,7 @@ package extras
 import (
 	"github.com/ava-labs/libevm/common"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 )
 
@@ -18,22 +19,12 @@ type Rules struct {
 	// Note: none of these addresses should conflict with the address space used by
 	// any existing precompiles.
 	Precompiles map[common.Address]precompileconfig.Config
-	// Predicaters maps addresses to stateful precompile Predicaters
-	// that are enabled for this rule set.
-	Predicaters map[common.Address]precompileconfig.Predicater
+	// WarpConfig is the active Warp precompile config, or nil if Warp is not
+	// enabled for this rule set.
+	WarpConfig *warp.Config
 	// AccepterPrecompiles map addresses to stateful precompile accepter functions
 	// that are enabled for this rule set.
 	AccepterPrecompiles map[common.Address]precompileconfig.Accepter
-}
-
-func (r *Rules) PredicatersExist() bool {
-	return len(r.Predicaters) > 0
-}
-
-// HasPredicate implements the avalanchego predicate.Predicates interface.
-func (r *Rules) HasPredicate(addr common.Address) bool {
-	_, ok := r.Predicaters[addr]
-	return ok
 }
 
 // IsPrecompileEnabled returns true if the precompile at `addr` is enabled for this rule set.

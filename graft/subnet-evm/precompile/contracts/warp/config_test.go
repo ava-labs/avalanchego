@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package warp
+package warp_test
 
 import (
 	"testing"
@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/precompiletest"
+
+	. "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/warp"
 )
 
 func TestVerify(t *testing.T) {
@@ -39,7 +41,7 @@ func TestVerify(t *testing.T) {
 				config.EXPECT().IsDurango(gomock.Any()).Return(false)
 				return config
 			}(),
-			ExpectedError: errWarpCannotBeActivated,
+			ExpectedError: ErrWarpCannotBeActivated,
 		},
 	}
 	precompiletest.RunVerifyTests(t, tests)

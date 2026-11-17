@@ -67,6 +67,7 @@ go_library(
         "//graft/subnet-evm/plugin/evm/customtypes",
         "//graft/subnet-evm/plugin/evm/extension",
         "//graft/subnet-evm/plugin/evm/log",
+        "//graft/subnet-evm/precompile/contracts/warp",
         "//graft/subnet-evm/precompile/precompileconfig",
         "//graft/subnet-evm/precompile/registry",
         "//graft/subnet-evm/warp",

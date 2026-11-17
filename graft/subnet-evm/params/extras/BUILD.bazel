@@ -21,6 +21,7 @@ go_library(
         "//graft/evm/acp226",
         "//graft/evm/utils",
         "//graft/subnet-evm/commontype",
+        "//graft/subnet-evm/precompile/contracts/warp",
         "//graft/subnet-evm/precompile/modules",
         "//graft/subnet-evm/precompile/precompileconfig",
         "//graft/subnet-evm/stateupgrade",
