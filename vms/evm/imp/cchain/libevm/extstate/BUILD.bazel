@@ -11,10 +11,10 @@ go_library(
     srcs = ["statedb.go"],
     importpath = "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate",
     deps = [
-        "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/contract",
         "//graft/evm/predicate",
+        "//vms/evm/imp/cchain/cparams",
         "//vms/evm/imp/cchain/warp",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/state",
@@ -31,7 +31,6 @@ go_test(
     srcs = ["statedb_test.go"],
     deps = [
         ":extstate",
-        "//graft/coreth/params",
         "//graft/coreth/plugin/evm/customtypes",
         "//graft/coreth/precompile/contracts/warp",
         "//graft/evm/predicate",

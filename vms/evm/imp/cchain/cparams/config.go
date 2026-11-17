@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/graft/evm/precompileconfig"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
@@ -283,30 +282,4 @@ func (c *ChainConfig) IsHelicon(time uint64) bool {
 // Igloo upgrade time.
 func (c *ChainConfig) IsIgloo(time uint64) bool {
 	return isTimestampForked(c.IglooTimestamp, time)
-}
-
-// Rules defines the activation status of various Avalanche network
-// upgrades.
-type Rules struct {
-	IsApricotPhase1    bool
-	IsApricotPhase2    bool
-	IsApricotPhasePre6 bool
-	IsApricotPhase6    bool
-	IsBanff            bool
-	IsDurango          bool
-	IsFortuna          bool
-	IsGranite          bool
-	IsHelicon          bool
-	IsIgloo            bool
-}
-
-// TODO(alarso16): Delete implementation.
-var _ precompileconfig.Rules = Rules{}
-
-func (r Rules) IsGraniteActivated() bool {
-	return r.IsGranite
-}
-
-func (r Rules) IsDurangoActivated() bool {
-	return r.IsDurango
 }

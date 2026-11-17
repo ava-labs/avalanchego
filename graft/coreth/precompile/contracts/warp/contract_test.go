@@ -47,7 +47,7 @@ func runTests(
 		t.Run(fork.String(), func(t *testing.T) {
 			rules := forkToAvalancheRules(fork)
 			tests := makeTests(t, rules)
-			precompiletest.RunPrecompileTests(t, ContractAddress, WarpPrecompile, tests)
+			precompiletest.RunPrecompileTests(t, WarpPrecompile, tests)
 		})
 	}
 }
@@ -60,7 +60,7 @@ func runBenchmarks(
 		b.Run(fork.String(), func(b *testing.B) {
 			rules := forkToAvalancheRules(fork)
 			tests := makeTests(b, rules)
-			precompiletest.RunPrecompileBenchmarks(b, ContractAddress, WarpPrecompile, tests)
+			precompiletest.RunPrecompileBenchmarks(b, WarpPrecompile, tests)
 		})
 	}
 }

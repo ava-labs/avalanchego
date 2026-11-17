@@ -16,6 +16,7 @@ go_library(
         "//graft/coreth/precompile/contract",
         "//graft/evm/precompileconfig",
         "//graft/evm/predicate",
+        "//snow",
         "//snow/snowtest",
         "//utils/set",
         "//vms/evm/imp/cchain/cparams",
@@ -24,7 +25,7 @@ go_library(
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/state",
         "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//libevm",
         "@com_github_stretchr_testify//require",
-        "@org_uber_go_mock//gomock",
     ],
 )

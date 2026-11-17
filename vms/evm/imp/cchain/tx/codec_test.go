@@ -23,8 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
-
 	. "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
 )
 
@@ -185,7 +183,7 @@ func TestFromBlock(t *testing.T) {
 		preAP5Time uint64 = 0
 		ap5Time           = preAP5Time + 1
 	)
-	config := corethparams.WithExtra(
+	config := cparams.WithExtra(
 		&params.ChainConfig{},
 		&cparams.ChainConfig{
 			ApricotPhase5Timestamp: new(ap5Time),

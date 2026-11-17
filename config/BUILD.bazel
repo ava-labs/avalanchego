@@ -67,6 +67,7 @@ go_test(
         "//snow/consensus/simplex",
         "//snow/consensus/snowball",
         "//subnets",
+        "//upgrade",
         "//utils/constants",
         "@com_github_spf13_pflag//:pflag",
         "@com_github_spf13_viper//:viper",

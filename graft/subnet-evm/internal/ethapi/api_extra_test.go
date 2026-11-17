@@ -46,7 +46,7 @@ func TestBlockchainAPI_GetChainConfig(t *testing.T) {
 	api := NewBlockChainAPI(backend)
 
 	gotConfig := api.GetChainConfig(t.Context())
-	require.Equal(t, params.ToWithUpgradesJSON(wantConfig), gotConfig)
+	require.Equal(t, wantConfig, gotConfig)
 }
 
 // Copy one test case from TestCall

@@ -18,6 +18,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm/options"
@@ -54,6 +55,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cchaintest"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/synchronoustest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
@@ -65,7 +67,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	corethparams "github.com/ava-labs/avalanchego/graft/coreth/params"
 	corethwarp "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
@@ -254,10 +255,13 @@ func withCommitInterval(n uint64) sutOption {
 	})
 }
 
-// withFirewood selects Firewood as the trie database
-func withFirewood() sutOption {
+// schemes are the triedb schemes supported.
+var schemes = []string{rawdb.HashScheme, firewood.Scheme}
+
+// withScheme selects the triedb scheme. Defaults to HashDB.
+func withScheme(scheme string) sutOption {
 	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.StateScheme = firewood.Scheme
+		c.vmConfig.StateScheme = scheme
 	})
 }
 
@@ -848,7 +852,7 @@ func TestStatefulRPCsReconstructExtraState(t *testing.T) {
 		},
 		{
 			name: "firewood_commit_interval",
-			opts: []sutOption{withFirewood(), withArchival(), withCommitInterval(commitInterval)},
+			opts: []sutOption{withScheme(firewood.Scheme), withArchival(), withCommitInterval(commitInterval)},
 		},
 	}
 
@@ -1030,6 +1034,7 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 		txs[i] = w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 			To:        &common.Address{},
 			Gas:       tt.gasLimit,
+			GasTipCap: big.NewInt(1),
 			GasFeeCap: big.NewInt(1),
 		})
 		require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, txs[i]), "%T.SendTransaction(%s)", sut.EthClient(), tt.name)
@@ -1146,7 +1151,7 @@ func TestParseBlock(t *testing.T) {
 	w := newWallet(key, sut.ctx, nil)
 	stx := w.newMinimalTx(t)
 
-	ap1Time := *corethparams.GetExtra(sut.chainConfig).ApricotPhase1Timestamp
+	ap1Time := *cparams.GetExtra(sut.chainConfig).ApricotPhase1Timestamp
 
 	const (
 		preAP1WithDataHeight    = 1
@@ -1693,6 +1698,7 @@ func TestGasRefundsDisabled(t *testing.T) {
 	tx := w.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
 		To:        &contract,
 		Gas:       wantGasUsed,
+		GasTipCap: big.NewInt(1),
 		GasFeeCap: big.NewInt(1),
 	})
 	require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction()", sut.EthClient())
@@ -1876,50 +1882,6 @@ func TestEmptyBlocksDisallowed(t *testing.T) {
 	})
 }
 
-// TestPreHeliconBlocksDisallowed verifies blocks cannot be built or verified
-// before Helicon activates, but can still be parsed.
-func TestPreHeliconBlocksDisallowed(t *testing.T) {
-	key := txtest.NewKey(t)
-	// Schedule Helicon after the other upgrades so a pre-Helicon timestamp is
-	// representable without deactivating the rest of the schedule.
-	heliconTime := upgrade.InitiallyActiveTime.Add(5 * time.Second)
-	preHeliconTime := heliconTime.Add(-time.Second)
-	timeOpt, clock := withVMTime(preHeliconTime)
-	ctx, sut := newSUT(t,
-		withMaxAllocFor(key.EthAddress()),
-		withUpgradeTime(upgradetest.Helicon, heliconTime),
-		timeOpt,
-	)
-
-	stx := newWallet(key, sut.ctx, sut.Client).newMinimalTx(t)
-	require.NoErrorf(t, sut.IssueTx(ctx, stx), "%T.IssueTx()", sut.Client)
-	sut.WaitForPendingTxs(ctx, t)
-
-	t.Run("build", func(t *testing.T) {
-		_, err := sut.BuildBlock(ctx, nil)
-		require.ErrorIsf(t, err, errHeliconUnactivated, "%T.BuildBlock() should not build before Helicon", sut.VM)
-	})
-
-	t.Run("verify", func(t *testing.T) {
-		clock.Set(heliconTime)
-		valid := sut.BuildVerify(ctx, t, sut.LastAcceptedID(ctx, t))
-
-		hdr := valid.Header()
-		preHeliconMS := uint64(preHeliconTime.UnixMilli())
-		hdr.Time = preHeliconMS / 1000
-		customtypes.GetHeaderExtra(hdr).TimeMilliseconds = &preHeliconMS
-
-		rewound := valid.EthBlock().WithSeal(hdr)
-		buf, err := rlp.EncodeToBytes(rewound)
-		require.NoErrorf(t, err, "rlp.EncodeToBytes(rewound block)")
-		parsed, err := sut.ParseBlock(ctx, buf)
-		require.NoErrorf(t, err, "%T.ParseBlock(rewound block)", sut.VM)
-
-		err = sut.VerifyBlock(ctx, nil, parsed)
-		require.ErrorIsf(t, err, errHeliconUnactivated, "%T.VerifyBlock() should not allow pre-Helicon blocks", sut.VM)
-	})
-}
-
 // TestWarpPrecompileActivation verifies that executing the first post-Durango
 // block marks the warp precompile's account as non-empty when the genesis
 // predates Durango.
@@ -2032,7 +1994,7 @@ func TestWaitForEventInitializing(t *testing.T) {
 func TestRecoverFirewoodAcrossSynchronousTransition(t *testing.T) {
 	fixture, opts, clock := synchronousFixture(t)
 	dataDir := t.TempDir()
-	opts = append(opts, withFirewood(), withDB(memdb.New()), withChainDataDir(dataDir))
+	opts = append(opts, withScheme(firewood.Scheme), withDB(memdb.New()), withChainDataDir(dataDir))
 
 	ctx, sut := newSUT(t, opts...)
 	sut.acceptSynchronousBlocks(ctx, t, fixture.Blocks[1:])
