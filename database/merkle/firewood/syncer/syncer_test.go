@@ -153,6 +153,70 @@ func Test_Firewood_Sync_RejectedProofIsRefetched(t *testing.T) {
 	require.Positive(t, syncer.metrics.accepted.Load())
 }
 
+func Test_Firewood_Sync_NoPeerServesRoot(t *testing.T) {
+	tests := []struct {
+		name         string
+		servedBefore int32 // requests served before every peer refuses the root
+		invalid      bool  // refuse by serving an invalid proof instead of an error
+	}{
+		{name: "never served", servedBefore: 0},
+		{name: "expires mid-sync", servedBefore: 2},
+		{name: "only invalid proofs", servedBefore: 0, invalid: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := t.Context()
+			r := rand.New(rand.NewSource(1))
+
+			serverDB, root := generateDB(t, r, 10*sync.DefaultRequestKeyLimit)
+			clientDB, _ := generateDB(t, r, 0)
+			defer func() {
+				runtime.GC()
+				assert.NoError(t, serverDB.Close(ctx))
+				assert.NoError(t, clientDB.Close(ctx))
+			}()
+
+			inner := newTestGetProofHandler(t, serverDB)
+			var calls atomic.Int32
+			handler := &p2p.TestHandler{
+				AppRequestF: func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+					if calls.Add(1) <= tt.servedBefore {
+						return inner.AppRequest(ctx, nodeID, deadline, requestBytes)
+					}
+					if tt.invalid {
+						garbage, err := proto.Marshal(&pb.ProofResponse{
+							Response: &pb.ProofResponse_RangeProof{RangeProof: []byte{0xde, 0xad, 0xbe, 0xef}},
+						})
+						require.NoError(t, err)
+						return garbage, nil
+					}
+					return nil, &common.AppError{Code: p2p.ErrUnexpected.Code, Message: "revision not found"}
+				},
+			}
+
+			syncer, err := New(
+				Config{SimultaneousWorkLimit: 1},
+				clientDB,
+				root,
+				peertrackertest.NewSelfClient(t, ctx, ids.EmptyNodeID, handler),
+			)
+			require.NoError(t, err)
+			syncer.maxConsecutiveFailures = 5
+
+			var panicked error
+			func() {
+				defer func() {
+					panicked, _ = recover().(error)
+				}()
+				_ = syncer.Sync(ctx)
+			}()
+			require.ErrorIs(t, panicked, errNoPeerServesRoot)
+			require.Equal(t, peerCounts{connected: 1, responsive: 0, ok: true}, syncer.peerCounts())
+			require.Equal(t, uint64(tt.servedBefore), syncer.metrics.accepted.Load())
+		})
+	}
+}
+
 func Test_Firewood_Sync_UpdateSyncTarget(t *testing.T) {
 	t.Skip("firewood sync has no mid-sync target change until Phase 2 (pivot)")
 

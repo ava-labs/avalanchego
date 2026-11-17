@@ -341,3 +341,12 @@ func (p *PeerTracker) Size() int {
 
 	return p.untrackedPeers.Len() + p.trackedPeers.Len()
 }
+
+// PeerCounts returns the number of connected peers that could be selected, and
+// how many of them answered their last request.
+func (p *PeerTracker) PeerCounts() (connected, responsive int) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.untrackedPeers.Len() + p.trackedPeers.Len(), p.responsivePeers.Len()
+}

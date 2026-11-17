@@ -57,6 +57,18 @@ func (c *Client) HandlerID() uint64 {
 	return c.handlerID
 }
 
+// PeerCounts returns the number of connected peers the [PeerScorer] could
+// select and how many answered their last request. ok is false if the scorer
+// does not report counts.
+func (c *Client) PeerCounts() (connected, responsive int, ok bool) {
+	counter, ok := c.scorer.(interface{ PeerCounts() (int, int) })
+	if !ok {
+		return 0, 0, false
+	}
+	connected, responsive = counter.PeerCounts()
+	return connected, responsive, true
+}
+
 // AppRequestAny issues an AppRequest to the peer the [PeerScorer] selects.
 // See [Client.AppRequest] for more docs.
 func (c *Client) AppRequestAny(
