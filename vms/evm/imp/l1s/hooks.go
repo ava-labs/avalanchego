@@ -154,6 +154,8 @@ type builder struct {
 	now func() time.Time
 }
 
+var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
+
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
@@ -161,8 +163,10 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	// TODO(JonathanOppenheimer): Move the delay toward this node's desired
 	// delay once the user config supports `min-delay-target` (#6107).
 	de := delayExponent(parent)
-	if err := blockdelay.Verify(blockTime(parent), de, now); err != nil {
-		return nil, err
+	parentTime := blockTime(parent)
+	if minTime := parentTime.Add(de.DelayDuration()); now.Before(minTime) {
+		return nil, fmt.Errorf("%w: block time %s is before the minimum %s (parent %s + %s)",
+			errBelowMinBlockDelay, now, minTime, parentTime, de.DelayDuration())
 	}
 	minDelayExcess := acp226.DelayExcess(de)
 

@@ -102,7 +102,6 @@ go_test(
         "//utils/set",
         "//vms/evm/blocks",
         "//vms/evm/cmputils",
-        "//vms/evm/imp/blockdelay",
         "//vms/evm/imp/dynamic",
         "//vms/evm/imp/vmtest",
         "//vms/evm/sae/rpc",
