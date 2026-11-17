@@ -130,11 +130,10 @@ func withFeeConfig(c commontype.FeeConfig) genesisOption {
 }
 
 // withAllGenesisPrecompiles enables every registered precompile at the given
-// timestamp, with non-trivial initial state where supported. It exercises the
-// activation of every module, so that the genesis hash can be compared to
-// subnet-evm's. The native minter also mints to [testAllocAddr], making the
-// state root depend on the allocation being applied after activation.
+// timestamp, with non-trivial initial state where supported.
 func withAllGenesisPrecompiles(timestamp uint64) genesisOption {
+	// The native minter also mints to [testAllocAddr], making the
+	// state root depend on the allocation being applied after activation.
 	return withGenesis(func(g *ethcore.Genesis) {
 		var (
 			ts     = new(timestamp)
