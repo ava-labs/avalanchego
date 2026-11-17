@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
+	"github.com/ava-labs/avalanchego/vms/evm/topofblock"
 )
 
 var (
@@ -181,10 +182,11 @@ type (
 	}
 
 	executionConfig struct {
-		maxNumTxs         uint
-		skipEndOfBlockOps bool
-		canonical         bool
-		receiptStore      ReceiptStore
+		maxNumTxs                uint
+		skipEndOfBlockOps        bool
+		canonical                bool
+		receiptStore             ReceiptStore
+		disableTopOfBlockAuction bool
 	}
 
 	// ExecutionResults holds the outputs of [Execute].
@@ -213,6 +215,12 @@ type Option = options.Option[executionConfig]
 func WithMaxNumTxs(maxNumTxs uint) Option {
 	return options.Func[executionConfig](func(c *executionConfig) {
 		c.maxNumTxs = maxNumTxs
+	})
+}
+
+func DisableTopOfBlockAuction() Option {
+	return options.Func[executionConfig](func(c *executionConfig) {
+		c.disableTopOfBlockAuction = true
 	})
 }
 
@@ -286,6 +294,13 @@ func stateBeforeTransactions(hooks hook.Points, rules params.Rules, stateDB *sta
 // historical execution. Canonical-only side effects belong in
 // [hook.Points.AfterExecutingBlock], which only the [Executor] calls.
 //
+// Note that [topofblock.Settle] is always called for winning bids, even if the
+// winning transaction isn't executed due to [WithMaxNumTxs] with an argument of
+// 0. Adverse side effects are limited to niche simulations (i.e. against the
+// state before a transaction that would have otherwise won the auction), which
+// is tolerable as it protects other callers from forgetting settlement. Use
+// [DisableTopOfBlockAuction] to disable this behaviour.
+//
 // Execute does not call [blocks.Block.MarkExecuted]. Only canonical execution
 // records block progress. Receipts are always returned in [ExecutionResults]
 // but are only published to a [ReceiptStore] when configured with
@@ -331,21 +346,31 @@ func Execute(
 	}
 	header.BaseFee = baseFee.ToBig()
 
+	auctionBeneficiary, settleAuction := hooks.TopOfBlockAuctionBeneficiary(b.Header())
+
 	signer := b.Signer(chainConfig)
 	gasPool := core.GasPool(math.MaxUint64) // required by geth but irrelevant so max it out
 
-	txs = txs[:config.maxNumTxs]
 	res := &ExecutionResults{
 		BaseFee:  baseFee,
 		Signer:   signer,
 		BlockCtx: core.NewEVMBlockContext(header, chainCtx, &header.Coinbase),
-		Receipts: make(types.Receipts, len(txs)),
+		Receipts: make(types.Receipts, config.maxNumTxs),
 		rate:     gasClock.Rate(),
 	}
 
 	for ti, tx := range txs {
 		stateDB.SetTxContext(tx.Hash(), ti)
 		b.CheckSenderBalanceBound(stateDB, signer, tx)
+
+		if ti == 0 && settleAuction && !config.disableTopOfBlockAuction {
+			if err := topofblock.Settle(res.BlockCtx, stateDB, tx, signer, auctionBeneficiary); err != nil {
+				return nil, fmt.Errorf("%w: settling top-of-block auction: %v", errFatal, err)
+			}
+		}
+		if ti >= int(config.maxNumTxs) {
+			break
+		}
 
 		// Executes the transaction and calls [state.StateDB.Finalise].
 		receipt, err := core.ApplyTransaction(

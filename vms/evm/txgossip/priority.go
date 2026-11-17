@@ -12,6 +12,7 @@ import (
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/utils/heap"
+	"github.com/ava-labs/avalanchego/vms/evm/topofblock"
 )
 
 // A LazyTransaction couples a [txpool.LazyTransaction] with its sender.
@@ -20,27 +21,71 @@ type LazyTransaction struct {
 	Sender common.Address
 }
 
+type TopOfBlockAuctionOpen func() bool
+
+func (fn TopOfBlockAuctionOpen) Active() bool {
+	return fn != nil
+}
+
+func (fn TopOfBlockAuctionOpen) Available() bool {
+	return fn()
+}
+
+func NoTopOfBlockAuction() TopOfBlockAuctionOpen { return nil }
+
 // TransactionsByPriority yields [txpool.TxPool.Pending] by highest effective
 // gas tip, then first seen, then sender address. Each sender's transactions stay
 // in nonce order.
-func (s *Set) TransactionsByPriority(filter txpool.PendingFilter) iter.Seq[*LazyTransaction] {
+func (s *Set) TransactionsByPriority(filter txpool.PendingFilter, auction TopOfBlockAuctionOpen) iter.Seq[*LazyTransaction] {
 	// TODO(arr4n) investigate optimisations; e.g. skipping entire accounts once
 	// the block builder has found that a lower-nonced tx is invalid.
 
-	return byPriority(s.Pool.Pending(filter), filter.BaseFee)
+	return byPriority(s.Pool.Pending(filter), filter.BaseFee, auction)
 }
 
 // senderTxs is a sender's remaining transactions and the effective gas tip of
 // the first one.
 type senderTxs struct {
-	from     common.Address
-	txs      []*txpool.LazyTransaction
-	firstTip *uint256.Int
+	from          common.Address
+	txs           []*txpool.LazyTransaction
+	firstTip      *uint256.Int
+	topOfBlockBid *uint256.Int // of txs[0]; nil is no bid
+}
+
+func (s *senderTxs) populateFirstTxMetadata(baseFee *uint256.Int, auction TopOfBlockAuctionOpen) {
+	s.firstTip = effectiveGasTip(s.txs[0], baseFee)
+
+	s.topOfBlockBid = nil
+	if !auction.Active() {
+		return
+	}
+	tx := s.txs[0].Resolve()
+	if tx == nil {
+		return
+	}
+	switch bid, ok, err := topofblock.BidOf(tx); {
+	case err != nil:
+		panic("TODO: log an error here because this is impossible as admission checks")
+	case ok:
+		s.topOfBlockBid = &bid
+	}
 }
 
 // outranks reports whether the first transaction of `a` has higher priority
 // than the first transaction of `b`.
 func (a *senderTxs) outranks(b *senderTxs) bool {
+	switch an, bn := a.topOfBlockBid == nil, b.topOfBlockBid == nil; {
+	case an && bn:
+		// Based on priority only
+	case an || bn:
+		// Even if zero, any bid outranks any non-bidding tx.
+		return !an
+	default:
+		if c := a.topOfBlockBid.Cmp(b.topOfBlockBid); c != 0 {
+			return c > 0 // Higher bids first
+		}
+	}
+
 	if c := a.firstTip.Cmp(b.firstTip); c != 0 {
 		return c > 0 // Higher tips first
 	}
@@ -51,18 +96,20 @@ func (a *senderTxs) outranks(b *senderTxs) bool {
 	return a.from.Cmp(b.from) < 0
 }
 
-func byPriority(pending map[common.Address][]*txpool.LazyTransaction, baseFee *uint256.Int) iter.Seq[*LazyTransaction] {
+func byPriority(pending map[common.Address][]*txpool.LazyTransaction, baseFee *uint256.Int, auction TopOfBlockAuctionOpen) iter.Seq[*LazyTransaction] {
 	return func(yield func(*LazyTransaction) bool) {
 		senders := make([]*senderTxs, 0, len(pending))
 		for from, txs := range pending {
 			if len(txs) == 0 {
 				continue
 			}
-			senders = append(senders, &senderTxs{
-				from:     from,
-				txs:      txs,
-				firstTip: effectiveGasTip(txs[0], baseFee),
-			})
+
+			s := &senderTxs{
+				from: from,
+				txs:  txs,
+			}
+			s.populateFirstTxMetadata(baseFee, auction)
+			senders = append(senders, s)
 		}
 
 		// Heap by first transaction from each sender.
@@ -71,6 +118,10 @@ func byPriority(pending map[common.Address][]*txpool.LazyTransaction, baseFee *u
 			s, ok := q.Peek()
 			if !ok {
 				return
+			}
+			if auction.Active() && !auction.Available() && s.topOfBlockBid != nil {
+				q.Pop()
+				continue
 			}
 			if !yield(&LazyTransaction{
 				LazyTransaction: s.txs[0],
@@ -84,7 +135,7 @@ func byPriority(pending map[common.Address][]*txpool.LazyTransaction, baseFee *u
 				q.Pop()
 				continue
 			}
-			s.firstTip = effectiveGasTip(s.txs[0], baseFee)
+			s.populateFirstTxMetadata(baseFee, auction)
 			q.Fix(0)
 		}
 	}

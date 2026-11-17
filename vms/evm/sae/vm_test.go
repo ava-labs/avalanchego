@@ -391,6 +391,14 @@ func withPrecompile(addr common.Address, precompile libevm.PrecompiledContract) 
 	})
 }
 
+func withTopOfBlockAuctions(beneficiary common.Address) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.hooks.TopOfBlockAuctionBeneficiaryFn = func(*types.Header) (common.Address, bool) {
+			return beneficiary, true
+		}
+	})
+}
+
 // registerPrecompiles registers all `precompiles` as a libevm precompile.
 // As a side effect, a [testing.TB.Cleanup] will also be added, removing
 // the registration. This cleanup must run AFTER all transactions are

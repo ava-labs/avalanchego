@@ -13,6 +13,7 @@ go_library(
         "//vms/evm/hook",
         "//vms/evm/params",
         "//vms/evm/saedb",
+        "//vms/evm/topofblock",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core",
         "@com_github_ava_labs_libevm//core/state",

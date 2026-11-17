@@ -31,16 +31,17 @@ import (
 
 // Stub implements [hook.PointsG] parameterized by [Op].
 type Stub struct {
-	Now                     func() time.Time
-	Target                  gas.Gas
-	InvalidOpIDs            set.Set[ids.ID]
-	Ops                     []Op
-	ExecutionResultsDBFn    func(string) (saetypes.ExecutionResults, error)
-	VerifyBlockSyntaxFn     func(*types.Block) error
-	CanExecuteTransactionFn func(common.Address, *common.Address, libevm.StateReader) error
-	StartExecutingBlockFn   func(params.Rules, *state.StateDB, *types.Header, *types.Block) error
-	FinishExecutingBlockFn  func(*state.StateDB, *types.Block, types.Receipts) error
-	GasPriceConfig          gastime.GasPriceConfig
+	Now                            func() time.Time
+	Target                         gas.Gas
+	InvalidOpIDs                   set.Set[ids.ID]
+	Ops                            []Op
+	ExecutionResultsDBFn           func(string) (saetypes.ExecutionResults, error)
+	VerifyBlockSyntaxFn            func(*types.Block) error
+	CanExecuteTransactionFn        func(common.Address, *common.Address, libevm.StateReader) error
+	TopOfBlockAuctionBeneficiaryFn func(*types.Header) (common.Address, bool)
+	StartExecutingBlockFn          func(params.Rules, *state.StateDB, *types.Header, *types.Block) error
+	FinishExecutingBlockFn         func(*state.StateDB, *types.Block, types.Receipts) error
+	GasPriceConfig                 gastime.GasPriceConfig
 }
 
 var _ hook.PointsG[Op] = (*Stub)(nil)
@@ -251,6 +252,13 @@ func (s *Stub) CanExecuteTransaction(from common.Address, to *common.Address, sr
 		return fn(from, to, sr)
 	}
 	return nil
+}
+
+func (s *Stub) TopOfBlockAuctionBeneficiary(h *types.Header) (common.Address, bool) {
+	if fn := s.TopOfBlockAuctionBeneficiaryFn; fn != nil {
+		return fn(h)
+	}
+	return common.Address{}, false
 }
 
 // StartExecutingBlock proxies to [Stub.StartExecutingBlockFn] if non-nil,

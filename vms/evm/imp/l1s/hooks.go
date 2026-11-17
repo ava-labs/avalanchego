@@ -121,6 +121,10 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
+func (*hooks) TopOfBlockAuctionBeneficiary(*types.Header) (common.Address, bool) {
+	return common.Address{}, false
+}
+
 func (h *hooks) StartExecutingBlock(_ params.Rules, sdb *state.StateDB, parent *types.Header, b *types.Block) error {
 	// TODO: Apply the scheduled state upgrades.
 	return legacy.ApplyPrecompileActivations(

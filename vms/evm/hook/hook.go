@@ -85,6 +85,16 @@ type PointsWithoutBlockOps interface {
 	// sent from `from` to `to`, which is nil for contract creation. It runs
 	// during worst-case execution, reading the worst-case state.
 	CanExecuteTransaction(from common.Address, to *common.Address, _ libevm.StateReader) error
+	// TopOfBlockAuctionBeneficiary reports whether the first transaction of the
+	// block with the provided header is subject to a top-of-block auction and,
+	// if so, the address to which the winning bid is paid. The address is
+	// ignored if the returned boolean is false.
+	//
+	// It is called while building, verifying, and executing a block, at which
+	// points the header is populated to differing degrees, and all calls for
+	// the same block MUST return the same boolean. Only [types.Header.Number]
+	// and [types.Header.Time] MAY therefore be used to derive said boolean.
+	TopOfBlockAuctionBeneficiary(*types.Header) (common.Address, bool)
 	// StartExecutingBlock applies state changes before the block's transactions
 	// run. `rules` are those of the block and `parent` is the parent header. It
 	// runs during canonical and historical execution. It MUST NOT change data

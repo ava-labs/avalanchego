@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/vms/evm/saexec"
+	"github.com/ava-labs/avalanchego/vms/evm/topofblock"
 	"github.com/ava-labs/avalanchego/vms/evm/worstcase"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
@@ -135,14 +136,20 @@ func (s *txSet) addToPool(local bool, txs ...*types.Transaction) []error {
 	eligibleTxs := make([]*types.Transaction, 0, len(txs))
 	eligibleIdx := make([]int, 0, len(txs))
 	for i, tx := range txs {
-		minGas := minGasForSize(tx.Size(), blockGasLimit)
-		if tx.Gas() >= minGas {
-			eligibleTxs = append(eligibleTxs, tx)
-			eligibleIdx = append(eligibleIdx, i)
+		// DO NOT MERGE: only check if auctions are enabled.
+		if _, _, err := topofblock.BidOf(tx); err != nil {
+			errs[i] = err
 			continue
 		}
-		errs[i] = fmt.Errorf("%w: tx size %d bytes must specify gas limit at least %d when the block gas limit is %d",
-			errInsufficientGasPerByte, tx.Size(), minGas, blockGasLimit)
+		if minGas := minGasForSize(tx.Size(), blockGasLimit); tx.Gas() < minGas {
+			errs[i] = fmt.Errorf(
+				"%w: tx size %d bytes must specify gas limit at least %d when the block gas limit is %d",
+				errInsufficientGasPerByte, tx.Size(), minGas, blockGasLimit,
+			)
+			continue
+		}
+		eligibleTxs = append(eligibleTxs, tx)
+		eligibleIdx = append(eligibleIdx, i)
 	}
 
 	if len(eligibleTxs) == 0 {

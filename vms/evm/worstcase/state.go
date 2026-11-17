@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
+	"github.com/ava-labs/avalanchego/vms/evm/topofblock"
 
 	saeparams "github.com/ava-labs/avalanchego/vms/evm/params"
 )
@@ -56,6 +57,7 @@ type State struct {
 	qSize, blockSize, maxBlockSize gas.Gas
 
 	baseFee             *uint256.Int
+	auctionTopOfBlock   bool
 	curr                *types.Header
 	signer              types.Signer
 	minOpBurnerBalances []map[common.Address]*uint256.Int
@@ -128,6 +130,13 @@ func (s *State) StartBlock(h *types.Header) error {
 	s.baseFee = s.clock.BaseFee()
 	clear(s.minOpBurnerBalances) // [State.FinishBlock] returns a clone so we can reuse the alloc here
 	s.minOpBurnerBalances = s.minOpBurnerBalances[:0]
+
+	// The beneficiary is dropped because, like treatment of [hook.Op.Mint] in
+	// [State.txToOp], we always assume that _increases_ in balances might not
+	// occur. Even though, at the time of writing, this is impossible for
+	// top-of-block auctions, the defensive approach of an overly conservative
+	// queue is adopted to protect against future refactoring elsewhere.
+	_, s.auctionTopOfBlock = s.hooks.TopOfBlockAuctionBeneficiary(h)
 
 	// expectedParentHash is updated prior to modifying the GasLimit and BaseFee
 	// to ensure that historical block hashes are not modified.
@@ -212,7 +221,7 @@ func (s *State) ApplyTx(tx *types.Transaction) error {
 		return fmt.Errorf("transaction blocked by CanExecuteTransaction hook: %w", err)
 	}
 
-	op, err := txToOp(from, tx, s.baseFee)
+	op, err := s.txToOp(from, tx, s.baseFee)
 	if err != nil {
 		return fmt.Errorf("converting transaction to operation: %w", err)
 	}
@@ -236,7 +245,7 @@ func mulAdd(a uint64, b, c *uint256.Int) (_ uint256.Int, overflow bool) {
 	return x, overflow
 }
 
-func txToOp(from common.Address, tx *types.Transaction, baseFee *uint256.Int) (hook.Op, error) {
+func (s *State) txToOp(from common.Address, tx *types.Transaction, baseFee *uint256.Int) (hook.Op, error) {
 	type Op = hook.Op // for convenience when returning zero value
 
 	gasFeeCap, overflow := bigToUint256(tx.GasFeeCap())
@@ -245,6 +254,13 @@ func txToOp(from common.Address, tx *types.Transaction, baseFee *uint256.Int) (h
 	}
 	value, overflow := bigToUint256(tx.Value())
 	if overflow {
+		return Op{}, core.ErrInsufficientFundsForTransfer
+	}
+	bid, err := s.settleTopOfBlockAuction(tx)
+	if err != nil {
+		return Op{}, err
+	}
+	if _, overflow := value.AddOverflow(&value, &bid); overflow {
 		return Op{}, core.ErrInsufficientFundsForTransfer
 	}
 	minBalance, overflow := mulAdd(tx.Gas(), &gasFeeCap, &value)
@@ -278,6 +294,20 @@ func txToOp(from common.Address, tx *types.Transaction, baseFee *uint256.Int) (h
 		},
 		// Mint MUST NOT be populated here because this transaction may revert.
 	}, nil
+}
+
+func (s *State) settleTopOfBlockAuction(tx *types.Transaction) (uint256.Int, error) {
+	if !s.auctionTopOfBlock {
+		return uint256.Int{}, nil
+	}
+	bid, ok, err := topofblock.BidOf(tx)
+	if err != nil || !ok {
+		return uint256.Int{}, err
+	}
+	if s.blockSize != 0 {
+		return uint256.Int{}, topofblock.ErrNotAtTop
+	}
+	return bid, nil
 }
 
 // Apply attempts to apply the operation to this state.

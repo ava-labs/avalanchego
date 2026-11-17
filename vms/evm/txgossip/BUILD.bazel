@@ -17,6 +17,7 @@ go_library(
         "//utils/heap",
         "//vms/evm/params",
         "//vms/evm/saexec",
+        "//vms/evm/topofblock",
         "//vms/evm/types",
         "//vms/evm/worstcase",
         "@com_github_ava_labs_libevm//common",

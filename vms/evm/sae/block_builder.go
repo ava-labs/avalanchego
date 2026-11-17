@@ -121,7 +121,9 @@ func (b *blockBuilderG[_]) rebuild(
 		ctx,
 		bCtx,
 		parent,
-		func(txpool.PendingFilter) iter.Seq[*txgossip.LazyTransaction] { return slices.Values(txs) },
+		func(txpool.PendingFilter, txgossip.TopOfBlockAuctionOpen) iter.Seq[*txgossip.LazyTransaction] {
+			return slices.Values(txs)
+		},
 		rebuilder,
 		saeparams.MaxBlockBytes,
 	)
@@ -144,7 +146,7 @@ func (b *blockBuilderG[T]) buildWithTxs(
 	ctx context.Context,
 	bCtx *block.Context,
 	parent *blocks.Block,
-	pendingTxs func(txpool.PendingFilter) iter.Seq[*txgossip.LazyTransaction],
+	pendingTxs func(txpool.PendingFilter, txgossip.TopOfBlockAuctionOpen) iter.Seq[*txgossip.LazyTransaction],
 	builder hook.BlockBuilder[T],
 	blockByteBudget uint64,
 ) (*blocks.Block, error) {
@@ -249,14 +251,20 @@ func (b *blockBuilderG[T]) buildWithTxs(
 
 	hdr.GasLimit = state.GasLimit()
 	hdr.BaseFee = state.BaseFee().ToBig()
+	filter := txpool.PendingFilter{
+		BaseFee: state.BaseFee(),
+	}
 
 	var (
 		included      []*types.Transaction
 		includedBytes uint64
 	)
-	for ltx := range pendingTxs(txpool.PendingFilter{
-		BaseFee: state.BaseFee(),
-	}) {
+	auction := txgossip.NoTopOfBlockAuction()
+	if _, ok := b.hooks.TopOfBlockAuctionBeneficiary(hdr); ok {
+		auction = func() bool { return len(included) == 0 }
+	}
+
+	for ltx := range pendingTxs(filter, auction) {
 		// If we don't have enough gas remaining in the block for the minimum
 		// gas amount, we are done including transactions.
 		if remainingGas := state.GasLimit() - state.GasUsed(); remainingGas < params.TxGas {

@@ -305,7 +305,7 @@ func TestExecutorIntegration(t *testing.T) {
 		txs  types.Transactions
 		last *LazyTransaction
 	)
-	for ltx := range s.TransactionsByPriority(txpool.PendingFilter{}) {
+	for ltx := range s.TransactionsByPriority(txpool.PendingFilter{}, NoTopOfBlockAuction()) {
 		tx, ok := ltx.Resolve()
 		require.True(t, ok, "%T.Resolve() `ok` on tx returned by %T.TransactionsByPriority()", ltx, s)
 		txs = append(txs, tx)

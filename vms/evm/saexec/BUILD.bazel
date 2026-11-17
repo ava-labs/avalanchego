@@ -25,6 +25,7 @@ go_library(
         "//vms/evm/hook",
         "//vms/evm/params",
         "//vms/evm/saedb",
+        "//vms/evm/topofblock",
         "//vms/evm/types",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//consensus",

@@ -237,6 +237,10 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
+func (*hooks) TopOfBlockAuctionBeneficiary(*types.Header) (common.Address, bool) {
+	return common.Address{}, false
+}
+
 func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
 	c := cparams.GetExtra(h.chainConfig)
 	r := cparams.GetRulesExtra(rules)

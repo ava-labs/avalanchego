@@ -1,0 +1,29 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
+
+go_library(
+    name = "topofblock",
+    srcs = ["topofblock.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/topofblock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)
+
+go_test(
+    name = "topofblock_test",
+    srcs = ["topofblock_test.go"],
+    embed = [":topofblock"],
+    deps = [
+        "@com_github_arr4n_shed//testerr",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)

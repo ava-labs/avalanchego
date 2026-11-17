@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/txpool"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 )
@@ -93,6 +94,7 @@ func TestByPriority(t *testing.T) {
 			for from, txs := range tt.pending {
 				for _, tx := range txs {
 					pending[from] = append(pending[from], &txpool.LazyTransaction{
+						Pool:      emptyResolver{},
 						Hash:      common.Hash{tx.id},
 						GasFeeCap: uint256.NewInt(tx.feeCap),
 						GasTipCap: uint256.NewInt(tx.tipCap),
@@ -102,10 +104,16 @@ func TestByPriority(t *testing.T) {
 			}
 
 			var got []ordered
-			for ltx := range byPriority(pending, tt.baseFee) {
+			for ltx := range byPriority(pending, tt.baseFee, NoTopOfBlockAuction()) {
 				got = append(got, ordered{ltx.Sender, ltx.Hash[0]})
 			}
 			require.Equal(t, tt.want, got, "byPriority()")
 		})
 	}
+}
+
+type emptyResolver struct{}
+
+func (emptyResolver) Get(common.Hash) *types.Transaction {
+	return nil
 }
