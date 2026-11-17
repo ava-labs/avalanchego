@@ -23,7 +23,7 @@ func GetConfigWithUpgradeTime(fork Fork, upgradeTime time.Time) upgrade.Config {
 		GraniteEpochDuration: upgrade.Default.GraniteEpochDuration,
 	}
 	// Initialize all forks to be unscheduled
-	SetTimesTo(&c, upgrade.Latest, upgrade.UnscheduledActivationTime)
+	SetTimesTo(&c, Latest, upgrade.UnscheduledActivationTime)
 	// Schedule the requested forks at the provided upgrade time
 	SetTimesTo(&c, fork, upgradeTime)
 	return c
@@ -33,52 +33,52 @@ func GetConfigWithUpgradeTime(fork Fork, upgradeTime time.Time) upgrade.Config {
 // to the provided upgradeTime.
 func SetTimesTo(c *upgrade.Config, fork Fork, upgradeTime time.Time) {
 	switch fork {
-	case upgrade.Igloo:
+	case Igloo:
 		c.IglooTime = upgradeTime
 		fallthrough
-	case upgrade.Helicon:
+	case Helicon:
 		c.HeliconTime = upgradeTime
 		fallthrough
-	case upgrade.Granite:
+	case Granite:
 		c.GraniteTime = upgradeTime
 		fallthrough
-	case upgrade.Fortuna:
+	case Fortuna:
 		c.FortunaTime = upgradeTime
 		fallthrough
-	case upgrade.Etna:
+	case Etna:
 		c.EtnaTime = upgradeTime
 		fallthrough
-	case upgrade.Durango:
+	case Durango:
 		c.DurangoTime = upgradeTime
 		fallthrough
-	case upgrade.Cortina:
+	case Cortina:
 		c.CortinaTime = upgradeTime
 		fallthrough
-	case upgrade.Banff:
+	case Banff:
 		c.BanffTime = upgradeTime
 		fallthrough
-	case upgrade.ApricotPhasePost6:
+	case ApricotPhasePost6:
 		c.ApricotPhasePost6Time = upgradeTime
 		fallthrough
-	case upgrade.ApricotPhase6:
+	case ApricotPhase6:
 		c.ApricotPhase6Time = upgradeTime
 		fallthrough
-	case upgrade.ApricotPhasePre6:
+	case ApricotPhasePre6:
 		c.ApricotPhasePre6Time = upgradeTime
 		fallthrough
-	case upgrade.ApricotPhase5:
+	case ApricotPhase5:
 		c.ApricotPhase5Time = upgradeTime
 		fallthrough
-	case upgrade.ApricotPhase4:
+	case ApricotPhase4:
 		c.ApricotPhase4Time = upgradeTime
 		fallthrough
-	case upgrade.ApricotPhase3:
+	case ApricotPhase3:
 		c.ApricotPhase3Time = upgradeTime
 		fallthrough
-	case upgrade.ApricotPhase2:
+	case ApricotPhase2:
 		c.ApricotPhase2Time = upgradeTime
 		fallthrough
-	case upgrade.ApricotPhase1:
+	case ApricotPhase1:
 		c.ApricotPhase1Time = upgradeTime
 	}
 }
