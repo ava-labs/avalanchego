@@ -30,7 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
-	legacycore "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
+	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	saetypes "github.com/ava-labs/avalanchego/vms/evm/types"
 )
@@ -122,7 +122,7 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
-// StartExecutingBlock applies all upgrades starting at b.
+// StartExecutingBlock applies the precompile and state upgrades that activate at b.
 func (h *hooks) StartExecutingBlock(_ params.Rules, sdb *state.StateDB, parent *types.Header, b *types.Block) error {
 	var (
 		parentTime  = new(parent.Time)
@@ -130,10 +130,10 @@ func (h *hooks) StartExecutingBlock(_ params.Rules, sdb *state.StateDB, parent *
 		number      = b.Number()
 	)
 
-	if err := legacycore.ApplyPrecompileActivations(
+	if err := legacy.ApplyPrecompileActivations(
 		h.chainConfig,
 		parentTime,
-		legacycore.NewBlockContext(number, currentTime),
+		legacy.NewBlockContext(number, currentTime),
 		sdb,
 	); err != nil {
 		return err
