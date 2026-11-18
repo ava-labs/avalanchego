@@ -106,7 +106,7 @@ func (c *ChainConfig) CheckConfigCompatible(newEth *params.ChainConfig, headNumb
 
 	oldForks := c.forks()
 	newForks := newCfg.forks()
-	for u := upgrade.NoUpgrades; u <= upgrade.Latest; u++ {
+	for u := range upgrade.Latest + 1 {
 		oldFork := oldForks[u]
 		newFork := newForks[u]
 		if utils.PtrEqual(oldFork.time, newFork.time) {
@@ -171,7 +171,8 @@ func (f fork) isActive(t uint64) bool {
 // alwaysActive is a fork that is always considered active.
 var alwaysActive = fork{time: new(uint64)}
 
-// forks returns a list of all network upgrades in chronological order.
+// forks returns the activation time of every network upgrade, indexed by
+// [upgrade.Upgrade].
 //
 // Timestamps are only guaranteed to actually be chronological after calling
 // [ChainConfig.CheckConfigForkOrder].
@@ -213,7 +214,7 @@ func (c *ChainConfig) Rules(timestamp uint64) Rules {
 }
 
 func (c *ChainConfig) IsActive(upg upgrade.Upgrade, timestamp uint64) bool {
-	if upg < 0 || upg > upgrade.Latest {
+	if upg < upgrade.NoUpgrades || upg > upgrade.Latest {
 		return false
 	}
 	fs := c.forks()

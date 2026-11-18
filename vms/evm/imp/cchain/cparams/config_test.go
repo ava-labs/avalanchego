@@ -101,7 +101,7 @@ func TestCheckCompatible(t *testing.T) {
 		return WithExtra(&params.ChainConfig{}, &c)
 	}
 
-	// checks for non-nil [ethparams.ConfigCompatError] with matching timestamps
+	// checks for non-nil [params.ConfigCompatError] with matching timestamps
 	compatErr := func(storedTime, newTime *uint64) testerr.Want {
 		want := params.NewTimestampCompatError("", storedTime, newTime)
 		return testerr.As(func(got *params.ConfigCompatError) string {
