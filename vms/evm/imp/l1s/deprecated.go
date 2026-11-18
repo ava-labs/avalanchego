@@ -11,7 +11,6 @@ package l1s
 // SAE transition!
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -65,20 +64,6 @@ var legacyEthAPIs = map[string]set.Set[rpc.API]{
 	"private-admin":                    nil,
 	"public-debug":                     nil,
 	"private-debug":                    nil,
-}
-
-// applyDeprecated converts the deprecated options of c, which was parsed from
-// b, to their replacements.
-func (c *config) applyDeprecated(log logging.Logger, b []byte) error {
-	if c.EthAPIs == nil {
-		return nil
-	}
-	var keys map[string]json.RawMessage
-	if err := json.Unmarshal(b, &keys); err != nil {
-		return fmt.Errorf("json.Unmarshal(%T): %w", keys, err)
-	}
-	_, apisSet := keys["apis"]
-	return c.applyDeprecatedAPINames(log, apisSet)
 }
 
 // applyDeprecatedAPINames sets c.APIs from the deprecated c.EthAPIs, then

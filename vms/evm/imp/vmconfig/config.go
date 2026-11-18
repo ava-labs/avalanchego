@@ -25,16 +25,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 )
 
-// Duration is a [time.Duration] that JSON-unmarshals from a duration string
+// duration is a [time.Duration] that JSON-unmarshals from a duration string
 // parsed by [time.ParseDuration] (e.g. "10s", "2h45m"). Valid units are "ns",
 // "us", "ms", "s", "m" and "h".
-type Duration struct {
+type duration struct {
 	time.Duration
 }
 
-var _ json.Marshaler = (*Duration)(nil)
+var _ json.Marshaler = (*duration)(nil)
 
-func (d *Duration) UnmarshalJSON(b []byte) error {
+func (d *duration) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
@@ -48,7 +48,7 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (d Duration) MarshalJSON() ([]byte, error) {
+func (d duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.String())
 }
 
@@ -80,18 +80,18 @@ type Config struct {
 	BatchRequestLimit uint64 `json:"batch-request-limit"`
 	// APIMaxDuration limits how long each call to the /rpc and /ws endpoints
 	// runs. Non-positive values result in no limit. Defaults to no limit.
-	APIMaxDuration Duration `json:"api-max-duration"`
+	APIMaxDuration duration `json:"api-max-duration"`
 	// MaxBlocksPerRequest is the maximum block range (inclusive) that can be
 	// used in an eth_getLogs request.
 	MaxBlocksPerRequest          uint64 `json:"api-max-blocks-per-request"`
 	ResolvePendingToLastExecuted bool   `json:"api-resolve-pending-to-last-executed"`
 
-	InternalConfig
+	internalConfig
 }
 
-// InternalConfig holds undocumented, test-only options, kept out of config.md.
+// internalConfig holds undocumented, test-only options, kept out of config.md.
 // Don't set these unless you know what you're doing.
-type InternalConfig struct {
+type internalConfig struct {
 	// State sync
 	StateSyncIDs set.Set[ids.NodeID] `json:"state-sync-ids"`
 }
@@ -111,20 +111,21 @@ func Default() Config {
 	}
 }
 
-// Parse parses b as a JSON-encoded T into c, which SHOULD hold T's defaults.
-// This should be preferred over [json.Unmarshal] because it warns about, and
-// ignores, keys that don't unmarshal into a field of T.
-func Parse[T any](log logging.Logger, b []byte, c *T) error {
+// Parse parses b as a JSON-encoded T into c, which SHOULD hold T's defaults,
+// and returns the top-level keys of b. This should be preferred over
+// [json.Unmarshal] because it warns about, and ignores, keys that don't
+// unmarshal into a field of T.
+func Parse[T any](log logging.Logger, b []byte, c *T) (map[string]json.RawMessage, error) {
 	if len(b) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	var keys map[string]json.RawMessage
 	if err := json.Unmarshal(b, &keys); err != nil {
-		return fmt.Errorf("json.Unmarshal(%T): %w", keys, err)
+		return nil, fmt.Errorf("json.Unmarshal(%T): %w", keys, err)
 	}
 	if err := json.Unmarshal(b, c); err != nil {
-		return fmt.Errorf("json.Unmarshal(%T): %w", c, err)
+		return nil, fmt.Errorf("json.Unmarshal(%T): %w", c, err)
 	}
 
 	configKeys := jsonKeys[T]()
@@ -140,7 +141,7 @@ func Parse[T any](log logging.Logger, b []byte, c *T) error {
 			zap.Strings("options", unrecognized),
 		)
 	}
-	return nil
+	return keys, nil
 }
 
 // Verify returns an error if c is invalid.

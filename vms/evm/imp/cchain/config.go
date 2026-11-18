@@ -62,7 +62,7 @@ var errProductionCommitInterval = fmt.Errorf("production networks must use the c
 // that need the operator's attention are logged as warnings.
 func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	c := defaultConfig()
-	if err := vmconfig.Parse(snowCtx.Log, b, &c); err != nil {
+	if _, err := vmconfig.Parse(snowCtx.Log, b, &c); err != nil {
 		return config{}, err
 	}
 	if err := c.Verify(); err != nil {

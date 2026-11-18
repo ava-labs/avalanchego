@@ -36,7 +36,7 @@ func TestParse(t *testing.T) {
 	// parse parses b as the C-Chain and L1 VMs do.
 	parse := func(log logging.Logger, b []byte) (Config, error) {
 		c := Default()
-		if err := Parse(log, b, &c); err != nil {
+		if _, err := Parse(log, b, &c); err != nil {
 			return Config{}, err
 		}
 		if err := c.Verify(); err != nil {
@@ -162,7 +162,7 @@ func TestParse(t *testing.T) {
 		{
 			name: "api/api_max_duration",
 			json: `{"api-max-duration":"1m"}`,
-			want: with(func(c *Config) { c.APIMaxDuration = Duration{time.Minute} }),
+			want: with(func(c *Config) { c.APIMaxDuration = duration{time.Minute} }),
 		},
 		{
 			name:    "api/api_max_duration_number",
@@ -241,9 +241,9 @@ func TestParse(t *testing.T) {
 				AllowUnprotectedTxs:          true,
 				MaxBlocksPerRequest:          2000,
 				BatchRequestLimit:            50,
-				APIMaxDuration:               Duration{30 * time.Second},
+				APIMaxDuration:               duration{30 * time.Second},
 				ResolvePendingToLastExecuted: true,
-				InternalConfig: InternalConfig{
+				internalConfig: internalConfig{
 					StateSyncIDs: set.Of(nodeID),
 				},
 			},

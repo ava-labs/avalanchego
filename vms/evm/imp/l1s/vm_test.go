@@ -72,6 +72,15 @@ func withMaxAllocFor(addrs ...common.Address) sutOption {
 	})
 }
 
+func withAccount(addr common.Address, acc types.Account) sutOption {
+	if acc.Balance == nil {
+		acc.Balance = big.NewInt(0)
+	}
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.genesis.Alloc[addr] = acc
+	})
+}
+
 var testStartTime = upgrade.InitiallyActiveTime.Add(time.Duration(acp226.InitialDelayExcess.Delay()) * time.Millisecond)
 
 // withVMTime sets the clock used by the VM and returns it so that tests can

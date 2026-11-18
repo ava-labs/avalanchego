@@ -5,7 +5,6 @@
 package l1s
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/arr4n/shed/testerr"
@@ -49,8 +48,8 @@ func TestConfigResolvePendingToLastExecuted(t *testing.T) {
 			code := []byte{42}
 
 			ctx, sut := newSUT(t,
-				options.Func[sutConfig](func(c *sutConfig) {
-					c.genesis.Alloc[addr] = types.Account{Code: code, Balance: new(big.Int)}
+				withAccount(addr, types.Account{
+					Code: code,
 				}),
 				options.Func[sutConfig](tt.opt),
 			)

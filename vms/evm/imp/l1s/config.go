@@ -65,11 +65,17 @@ func defaultConfig() config {
 // that need the operator's attention are logged as warnings.
 func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	c := defaultConfig()
-	if err := vmconfig.Parse(snowCtx.Log, b, &c); err != nil {
+	keys, err := vmconfig.Parse(snowCtx.Log, b, &c)
+	if err != nil {
 		return config{}, err
 	}
-	if err := c.applyDeprecated(snowCtx.Log, b); err != nil {
-		return config{}, err
+
+	// TODO(JonathanOppenheimer): delete together with deprecated.go.
+	if c.EthAPIs != nil {
+		_, apisSet := keys["apis"]
+		if err := c.applyDeprecatedAPINames(snowCtx.Log, apisSet); err != nil {
+			return config{}, err
+		}
 	}
 	if err := c.Verify(); err != nil {
 		return config{}, err
