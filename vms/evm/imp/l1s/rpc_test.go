@@ -10,17 +10,17 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
-	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/stateupgrade"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/vmtest"
 )
 
 func withUpgrades(u extras.UpgradeConfig) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
+	return vmtest.WithChainConfig(func(c *sutConfig) {
 		c.upgrades = u
 	})
 }
