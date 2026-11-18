@@ -1,4 +1,5 @@
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "go_test")
 
 go_library(
     name = "nat",
@@ -17,8 +18,24 @@ go_library(
         "@com_github_huin_goupnp//:goupnp",
         "@com_github_huin_goupnp//dcps/internetgateway1",
         "@com_github_huin_goupnp//dcps/internetgateway2",
+        "@com_github_huin_goupnp//soap",
         "@com_github_jackpal_gateway//:gateway",
         "@com_github_jackpal_go_nat_pmp//:go-nat-pmp",
         "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "nat_test",
+    srcs = ["upnp_test.go"],
+    embed = [":nat"],
+    deps = [
+        "//utils",
+        "//utils/logging",
+        "@com_github_huin_goupnp//:goupnp",
+        "@com_github_huin_goupnp//dcps/internetgateway1",
+        "@com_github_huin_goupnp//soap",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
     ],
 )
