@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/arr4n/shed/testerr"
+	"github.com/ava-labs/libevm/params"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
@@ -17,8 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
-
-	ethparams "github.com/ava-labs/libevm/params"
 
 	. "github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 )
@@ -79,7 +78,7 @@ func TestCheckConfigForkOrder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := WithExtra(
-				&ethparams.ChainConfig{},
+				&params.ChainConfig{},
 				&tt.upgrades,
 			)
 			if diff := testerr.Diff(c.CheckConfigForkOrder(), tt.wantErr); diff != "" {
@@ -89,32 +88,32 @@ func TestCheckConfigForkOrder(t *testing.T) {
 	}
 
 	t.Run("nil_extra", func(t *testing.T) {
-		c := &ethparams.ChainConfig{}
+		c := &params.ChainConfig{}
 		require.NoErrorf(t, c.CheckConfigForkOrder(), "%T.CheckConfigForkOrder()", c)
 	})
 }
 
 // Tests [ChainConfig.CheckConfigCompatible] through
-// [ethparams.ChainConfig.CheckCompatible]. All eth fork handling is tested
-// in [ethparams] and is independent of Avalanche forks.
+// [params.ChainConfig.CheckCompatible]. All eth fork handling is tested
+// in [params] and is independent of Avalanche forks.
 func TestCheckCompatible(t *testing.T) {
-	newEthConfig := func(c ChainConfig) *ethparams.ChainConfig {
-		return WithExtra(&ethparams.ChainConfig{}, &c)
+	newEthConfig := func(c ChainConfig) *params.ChainConfig {
+		return WithExtra(&params.ChainConfig{}, &c)
 	}
 
 	// checks for non-nil [ethparams.ConfigCompatError] with matching timestamps
 	compatErr := func(storedTime, newTime *uint64) testerr.Want {
-		want := ethparams.NewTimestampCompatError("", storedTime, newTime)
-		return testerr.As(func(got *ethparams.ConfigCompatError) string {
-			return cmp.Diff(want, got, cmpopts.IgnoreFields(ethparams.ConfigCompatError{}, "What"))
+		want := params.NewTimestampCompatError("", storedTime, newTime)
+		return testerr.As(func(got *params.ConfigCompatError) string {
+			return cmp.Diff(want, got, cmpopts.IgnoreFields(params.ConfigCompatError{}, "What"))
 		})
 	}
 
 	const headTime = 100
 	tests := []struct {
 		name    string
-		stored  *ethparams.ChainConfig
-		new     *ethparams.ChainConfig
+		stored  *params.ChainConfig
+		new     *params.ChainConfig
 		wantErr testerr.Want
 	}{
 		{
@@ -170,13 +169,13 @@ func TestCheckCompatible(t *testing.T) {
 		},
 		{
 			name:   "stored_without_extra",
-			stored: &ethparams.ChainConfig{},
-			new:    &ethparams.ChainConfig{},
+			stored: &params.ChainConfig{},
+			new:    &params.ChainConfig{},
 		},
 		{
 			name:    "new_without_extra",
 			stored:  newEthConfig(ChainConfig{ApricotPhase5Timestamp: new(uint64)}),
-			new:     &ethparams.ChainConfig{},
+			new:     &params.ChainConfig{},
 			wantErr: compatErr(new(uint64), nil),
 		},
 	}
@@ -265,14 +264,14 @@ func TestChainConfigJSON(t *testing.T) {
 				config.SnowCtx = snowtest.Context(t, snowtest.CChainID)
 
 				// ChainID is required.
-				ethCfg := WithExtra(&ethparams.ChainConfig{ChainID: big.NewInt(1)}, &config)
+				ethCfg := WithExtra(&params.ChainConfig{ChainID: big.NewInt(1)}, &config)
 				got, err := json.Marshal(ethCfg)
 				require.NoError(t, err)
 				require.JSONEq(t, tt.json, string(got))
 			})
 
 			t.Run("unmarshal", func(t *testing.T) {
-				var got ethparams.ChainConfig
+				var got params.ChainConfig
 				require.NoError(t, json.Unmarshal([]byte(tt.json), &got))
 				require.Equal(t, big.NewInt(1), got.ChainID, "ChainID")
 				require.Equal(t, &tt.config, GetExtra(&got), "GetExtra()")

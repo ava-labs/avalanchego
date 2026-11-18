@@ -7,15 +7,14 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/libevm/libevm"
-
-	ethparams "github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/libevm/params"
 )
 
-var payloads ethparams.ExtraPayloads[*ChainConfig, Rules]
+var payloads params.ExtraPayloads[*ChainConfig, Rules]
 
 // GetExtra returns the registered extra [ChainConfig] on c. The returned value
 // will not be nil.
-func GetExtra(c *ethparams.ChainConfig) *ChainConfig {
+func GetExtra(c *params.ChainConfig) *ChainConfig {
 	ex := payloads.ChainConfig.Get(c)
 	if ex == nil {
 		ex = &ChainConfig{}
@@ -25,13 +24,13 @@ func GetExtra(c *ethparams.ChainConfig) *ChainConfig {
 }
 
 // WithExtra sets the extra payload on c and returns the modified argument.
-func WithExtra(c *ethparams.ChainConfig, extra *ChainConfig) *ethparams.ChainConfig {
+func WithExtra(c *params.ChainConfig, extra *ChainConfig) *params.ChainConfig {
 	payloads.ChainConfig.Set(c, extra)
 	return c
 }
 
 // GetRulesExtra returns the registered extra [Rules] on r.
-func GetRulesExtra(r ethparams.Rules) *Rules {
+func GetRulesExtra(r params.Rules) *Rules {
 	return payloads.Rules.GetPointer(&r)
 }
 
@@ -43,7 +42,7 @@ func GetRulesExtra(r ethparams.Rules) *Rules {
 // Without a call to RegisterExtras, much of the functionality of this package
 // will work, and most will simply panic.
 func RegisterExtras() {
-	payloads = ethparams.RegisterExtras(extrasToRegister())
+	payloads = params.RegisterExtras(extrasToRegister())
 }
 
 // WithTempRegisteredExtras runs `fn` with temporary registration otherwise
@@ -56,17 +55,17 @@ func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
 	old := payloads
 	defer func() { payloads = old }()
 
-	return ethparams.WithTempRegisteredExtras(
+	return params.WithTempRegisteredExtras(
 		lock, extrasToRegister(),
-		func(extras ethparams.ExtraPayloads[*ChainConfig, Rules]) error {
+		func(extras params.ExtraPayloads[*ChainConfig, Rules]) error {
 			payloads = extras
 			return fn()
 		},
 	)
 }
 
-func extrasToRegister() ethparams.Extras[*ChainConfig, Rules] {
-	return ethparams.Extras[*ChainConfig, Rules]{
+func extrasToRegister() params.Extras[*ChainConfig, Rules] {
+	return params.Extras[*ChainConfig, Rules]{
 		ReuseJSONRoot: true, // Reuse the root JSON input when unmarshalling the extra payload.
 		NewRules:      constructRulesExtra,
 	}
@@ -77,7 +76,7 @@ func extrasToRegister() ethparams.Extras[*ChainConfig, Rules] {
 // [params.Rules] but it MAY also modify the [params.Rules].
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
-func constructRulesExtra(c *ethparams.ChainConfig, r *ethparams.Rules, cEx *ChainConfig, blockNum *big.Int, isMerge bool, timestamp uint64) Rules {
+func constructRulesExtra(c *params.ChainConfig, r *params.Rules, cEx *ChainConfig, blockNum *big.Int, isMerge bool, timestamp uint64) Rules {
 	if cEx == nil {
 		return Rules{}
 	}
