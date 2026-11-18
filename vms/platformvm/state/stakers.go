@@ -291,7 +291,7 @@ func (s *diffStakers) PutValidator(staker *Staker) error {
 
 	if validatorDiff.removed != nil && validatorDiff.removed.Equals(staker) {
 		// We set the removed field when we delete the validator that was not added in this diff before.
-		// So if we reached here, it means we removed it first and now either re-adding it.
+		// So if we reached here, it means we removed it first and are now re-adding it.
 		// If we're re-adding the exact same validator, we should remove it from the deleted stakers set since it's no longer deleted.
 
 		delete(s.deletedStakers, validatorDiff.removed.TxID)
