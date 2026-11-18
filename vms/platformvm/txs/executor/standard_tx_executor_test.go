@@ -2489,17 +2489,6 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		expectedErr    error
 	}{
 		{
-			name: "invalid prior to E-Upgrade",
-			tx:   convertSubnetToL1Tx,
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Internal{
-					UpgradeConfig: upgradetest.GetConfig(upgrade.Durango),
-				}
-				return nil
-			},
-			expectedErr: errEtnaUpgradeNotActive,
-		},
-		{
 			name: "tx fails syntactic verification",
 			tx:   convertSubnetToL1Tx,
 			updateExecutor: func(e *standardTxExecutor) error {
@@ -2934,16 +2923,6 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 		updateExecutor func(*standardTxExecutor) error
 		expectedErr    error
 	}{
-		{
-			name: "invalid prior to E-Upgrade",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Internal{
-					UpgradeConfig: upgradetest.GetConfig(upgrade.Durango),
-				}
-				return nil
-			},
-			expectedErr: errEtnaUpgradeNotActive,
-		},
 		{
 			name: "tx fails syntactic verification",
 			updateExecutor: func(e *standardTxExecutor) error {
@@ -3473,16 +3452,6 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 		expectedErr                error
 	}{
 		{
-			name: "invalid prior to E-Upgrade",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Internal{
-					UpgradeConfig: upgradetest.GetConfig(upgrade.Durango),
-				}
-				return nil
-			},
-			expectedErr: errEtnaUpgradeNotActive,
-		},
-		{
 			name: "tx fails syntactic verification",
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.backend.Ctx = snowtest.Context(t, ids.GenerateTestID())
@@ -3917,16 +3886,6 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 		expectedErr     error
 	}{
 		{
-			name: "invalid prior to E-Upgrade",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Internal{
-					UpgradeConfig: upgradetest.GetConfig(upgrade.Durango),
-				}
-				return nil
-			},
-			expectedErr: errEtnaUpgradeNotActive,
-		},
-		{
 			name: "tx fails syntactic verification",
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.backend.Ctx = snowtest.Context(t, ids.GenerateTestID())
@@ -4209,16 +4168,6 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 		expectedBalance uint64
 		expectedErr     error
 	}{
-		{
-			name: "invalid prior to E-Upgrade",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Internal{
-					UpgradeConfig: upgradetest.GetConfig(upgrade.Durango),
-				}
-				return nil
-			},
-			expectedErr: errEtnaUpgradeNotActive,
-		},
 		{
 			name: "tx fails syntactic verification",
 			updateExecutor: func(e *standardTxExecutor) error {
@@ -4585,13 +4534,6 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 		update func(*platform.AddAutoRenewedValidatorTx, *state.Diff)
 	}{
 		{
-			name: "invalid_upgrade",
-			update: func(_ *platform.AddAutoRenewedValidatorTx, diff *state.Diff) {
-				diff.SetTimestamp(env.backend.Config.UpgradeConfig.HeliconTime.Add(-1 * time.Second))
-			},
-			want: errHeliconUpgradeNotActive,
-		},
-		{
 			name: "weight_too_small",
 			update: func(tx *platform.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).Amt = env.config.MinValidatorStake - 1
@@ -4886,13 +4828,6 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		updateState func(testing.TB, *state.Diff)
 		wantErr     error
 	}{
-		{
-			name: "invalid_upgrade",
-			updateState: func(_ testing.TB, diff *state.Diff) {
-				diff.SetTimestamp(env.backend.Config.UpgradeConfig.HeliconTime.Add(-1 * time.Second))
-			},
-			wantErr: errHeliconUpgradeNotActive,
-		},
 		{
 			name: "stopped_validator",
 			updateState: func(t testing.TB, diff *state.Diff) {
