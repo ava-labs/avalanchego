@@ -396,12 +396,12 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 		},
 		spec{
 			name:     "precompiles",
-			upgrades: upgradetest.Latest,
+			upgrades: upgrade.Latest,
 			genesis:  testGenesisJSON(withAllGenesisPrecompiles(testGenesisTime)),
 		},
 		spec{
 			name:     "precompiles_after_genesis",
-			upgrades: upgradetest.Latest,
+			upgrades: upgrade.Latest,
 			genesis:  testGenesisJSON(withAllGenesisPrecompiles(testGenesisTime + 1)),
 		},
 		spec{
