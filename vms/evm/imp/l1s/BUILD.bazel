@@ -96,6 +96,7 @@ go_test(
         "//utils/set",
         "//vms/evm/blocks",
         "//vms/evm/cmputils",
+        "//vms/evm/imp/vmconfig",
         "//vms/evm/imp/vmtest",
         "//vms/evm/sae/rpc",
         "//vms/evm/saetest",

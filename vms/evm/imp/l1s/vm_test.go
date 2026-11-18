@@ -7,14 +7,12 @@ package l1s
 import (
 	"context"
 	"encoding/json"
-	"maps"
 	"math/big"
 	"testing"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
-	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/holiman/uint256"
@@ -36,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/vmconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/vmtest"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 
@@ -57,55 +56,32 @@ type SUT struct {
 }
 
 type (
+	// sutConfig holds the options specific to the L1 SUT.
 	sutConfig struct {
-		genesis  core.Genesis
 		upgrades extras.UpgradeConfig
-		vmConfig config
-		clock    *saetest.Clock
 	}
-	sutOption = options.Option[sutConfig]
+	sutOption = vmtest.SUTOption[sutConfig]
 )
 
-func withMaxAllocFor(addrs ...common.Address) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		maps.Copy(c.genesis.Alloc, saetest.MaxAllocFor(addrs...))
-	})
-}
-
-func withAccount(addr common.Address, acc types.Account) sutOption {
-	if acc.Balance == nil {
-		acc.Balance = big.NewInt(0)
-	}
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc[addr] = acc
-	})
-}
+var (
+	withMaxAllocFor = vmtest.WithMaxAllocFor[sutConfig]
+	withVMTime      = vmtest.WithVMTime[sutConfig]
+)
 
 var testStartTime = upgrade.InitiallyActiveTime.Add(time.Duration(acp226.InitialDelayExcess.Delay()) * time.Millisecond)
-
-// withVMTime sets the clock used by the VM and returns it so that tests can
-// control it. The option MAY be passed to multiple SUTs so that they share the
-// clock.
-func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
-	c := saetest.NewClock(startTime, time.Millisecond)
-	opt := options.Func[sutConfig](func(cfg *sutConfig) {
-		cfg.clock = c
-	})
-	return opt, c
-}
 
 // newSUT returns a new SUT in [snow.NormalOp]. The returned context is
 // cancelled if the VM logs an error.
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	tb.Helper()
 
-	cfg := options.ApplyTo(&sutConfig{
-		genesis:  *testGenesis(),
-		vmConfig: defaultConfig(),
-		clock:    saetest.NewClock(testStartTime, time.Millisecond),
+	cfg := options.ApplyTo(&vmtest.SUTConfig[sutConfig]{
+		Genesis:  *testGenesis(),
+		Clock:    saetest.NewClock(testStartTime, time.Millisecond),
+		VMConfig: vmconfig.Default(),
 	}, opts...)
 	vm := &VM{
-		now: cfg.clock.Now,
+		now: cfg.Clock.Now,
 	}
 
 	snowCtx := snowtest.Context(tb, ids.GenerateTestID())
@@ -114,12 +90,13 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
 
-	genesisBytes, err := json.Marshal(cfg.genesis)
-	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
-	upgradeBytes, err := json.Marshal(cfg.upgrades)
-	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.upgrades)
-	configBytes, err := json.Marshal(cfg.vmConfig)
-	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.vmConfig)
+	genesisBytes, err := json.Marshal(cfg.Genesis)
+	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.Genesis)
+	upgradeBytes, err := json.Marshal(cfg.Chain.upgrades)
+	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.Chain.upgrades)
+	vmConfig := config{Config: cfg.VMConfig}
+	configBytes, err := json.Marshal(vmConfig)
+	require.NoErrorf(tb, err, "json.Marshal(%T)", vmConfig)
 
 	appSender := saetest.NewSender(tb, set.Of(snowCtx.NodeID))
 

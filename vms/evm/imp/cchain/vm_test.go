@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"math"
 	"math/big"
 	"os"
@@ -62,6 +61,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx/txtest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/vmconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/vmtest"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
@@ -98,12 +98,13 @@ type SUT struct {
 }
 
 type (
+	// sutConfig holds the options specific to the C-Chain SUT.
 	sutConfig struct {
-		genesis      core.Genesis
-		nodeID       ids.NodeID
-		networkID    uint32
-		validators   *warptest.Validators
-		clock        *saetest.Clock
+		nodeID     ids.NodeID
+		networkID  uint32
+		validators *warptest.Validators
+		// vmConfig holds the C-Chain-specific options. Shared options MUST be
+		// set with [withVMConfig].
 		vmConfig     config
 		db           database.Database
 		chainDataDir string
@@ -112,7 +113,7 @@ type (
 
 		skipRPCTransport bool
 	}
-	sutOption = options.Option[sutConfig]
+	sutOption = vmtest.SUTOption[sutConfig]
 )
 
 // withState controls the consensus state the SUT's VM is left in after
@@ -122,7 +123,7 @@ type (
 // Use [snow.StateSyncing] to test state-sync specific behavior.
 // Note that any RPCs will not be available until the node is bootstrapping.
 func withState(state snow.State) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
+	return vmtest.WithChainConfig(func(c *sutConfig) {
 		c.state = state
 	})
 }
@@ -138,7 +139,7 @@ func withState(state snow.State) sutOption {
 // net.Pipe or an in-memory listener) that stay durably blocked under
 // synctest, so RPC-driven tests can run in a bubble too.
 func withoutRPCTransport() sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
+	return vmtest.WithChainConfig(func(c *sutConfig) {
 		c.skipRPCTransport = true
 	})
 }
@@ -147,7 +148,7 @@ func withoutRPCTransport() sutOption {
 // fresh one, enabling restart simulations that reuse a prior VM's persisted
 // state.
 func withDB(db database.Database) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
+	return vmtest.WithChainConfig(func(c *sutConfig) {
 		c.db = db
 	})
 }
@@ -155,55 +156,46 @@ func withDB(db database.Database) sutOption {
 // withChainDataDir overrides the SUT's chain data directory, useful for
 // re-using the execution results DB.
 func withChainDataDir(dir string) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
+	return vmtest.WithChainConfig(func(c *sutConfig) {
 		c.chainDataDir = dir
 	})
 }
 
-// withMaxAllocFor configures the SUT's genesis to allocate the maximum possible
-// balance to each address, leaving the rest of the genesis allocation intact.
-func withMaxAllocFor(addrs ...common.Address) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		maps.Copy(c.genesis.Alloc, saetest.MaxAllocFor(addrs...))
-	})
-}
-
-// withAccount adds an account to the SUT's genesis, leaving the rest of the
-// genesis allocation intact.
-func withAccount(addr common.Address, acc types.Account) sutOption {
-	if acc.Balance == nil {
-		acc.Balance = big.NewInt(0)
-	}
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc[addr] = acc
-	})
-}
+var (
+	withMaxAllocFor = vmtest.WithMaxAllocFor[sutConfig]
+	withAccount     = vmtest.WithAccount[sutConfig]
+	// withVMTime also makes [SUT.WaitForPendingTxs] automatically advance the
+	// clock past the ACP-226 min-delay pacing timer; see
+	// [SUT.unblockWaitForEvent].
+	withVMTime   = vmtest.WithVMTime[sutConfig]
+	withVMConfig = vmtest.WithVMConfig[sutConfig]
+)
 
 // withGenesis replaces the SUT's default genesis.
 func withGenesis(g core.Genesis) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis = g
+	return options.Func[vmtest.SUTConfig[sutConfig]](func(c *vmtest.SUTConfig[sutConfig]) {
+		c.Genesis = g
 	})
 }
 
 // withUpgrades overrides the network upgrade schedule, which defaults to
 // every upgrade being active from genesis.
 func withUpgrades(u upgrade.Config) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
+	return vmtest.WithChainConfig(func(c *sutConfig) {
 		c.upgrades = u
 	})
 }
 
 // withNodeID overrides the SUT's randomly generated NodeID.
 func withNodeID(id ids.NodeID) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
+	return vmtest.WithChainConfig(func(c *sutConfig) {
 		c.nodeID = id
 	})
 }
 
 // withValidators sets the SUT's validator set.
 func withValidators(vdrs *warptest.Validators) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
+	return vmtest.WithChainConfig(func(c *sutConfig) {
 		c.validators = vdrs
 	})
 }
@@ -211,7 +203,7 @@ func withValidators(vdrs *warptest.Validators) sutOption {
 // withNetworkID overrides the SUT's network ID, which controls which recorded
 // extData hash set [VM.ParseBlock] consults for pre-ApricotPhase1 blocks.
 func withNetworkID(id uint32) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
+	return vmtest.WithChainConfig(func(c *sutConfig) {
 		c.networkID = id
 	})
 }
@@ -219,7 +211,7 @@ func withNetworkID(id uint32) sutOption {
 // withUpgradeTime schedules fork and all later upgrades at t. Earlier
 // upgrades remain initially active.
 func withUpgradeTime(fork upgrade.Upgrade, t time.Time) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
+	return vmtest.WithChainConfig(func(c *sutConfig) {
 		upgradetest.SetTimesTo(&c.upgrades, upgrade.Latest, t)
 		upgradetest.SetTimesTo(&c.upgrades, fork-1, upgrade.InitiallyActiveTime)
 	})
@@ -229,29 +221,17 @@ func withUpgradeTime(fork upgrade.Upgrade, t time.Time) sutOption {
 // delay deadline, i.e. the earliest time a child of genesis may be built.
 var testStartTime = upgrade.InitiallyActiveTime.Add(dynamic.InitialDelayExponent.DelayDuration())
 
-// withVMTime fixes the SUT's clock at startTime and returns a handle that lets
-// the test move the clock forward (e.g. past Tau to settle a block). It also
-// makes [SUT.WaitForPendingTxs] automatically advance the clock past the
-// ACP-226 min-delay pacing timer; see [SUT.unblockWaitForEvent].
-func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
-	c := saetest.NewClock(startTime, time.Millisecond)
-	opt := options.Func[sutConfig](func(cfg *sutConfig) {
-		cfg.clock = c
-	})
-	return opt, c
-}
-
 // withArchival disables pruning, persisting every state root.
 func withArchival() sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.Pruning = false
+	return withVMConfig(func(c *vmconfig.Config) {
+		c.Pruning = false
 	})
 }
 
 // withCommitInterval sets the interval at which trie roots are persisted.
 func withCommitInterval(n uint64) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.CommitInterval = n
+	return withVMConfig(func(c *vmconfig.Config) {
+		c.CommitInterval = n
 	})
 }
 
@@ -260,41 +240,41 @@ var schemes = []string{rawdb.HashScheme, firewood.Scheme}
 
 // withScheme selects the triedb scheme. Defaults to HashDB.
 func withScheme(scheme string) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.StateScheme = scheme
+	return withVMConfig(func(c *vmconfig.Config) {
+		c.StateScheme = scheme
 	})
 }
 
 // withSnapshotDisabled disables the snapshot.
 func withSnapshotDisabled() sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
-		c.vmConfig.SnapshotCache = 0
+	return withVMConfig(func(c *vmconfig.Config) {
+		c.SnapshotCache = 0
 	})
 }
 
 // withStateSyncDisabled clears [config.StateSyncEnabled], which defaults to
 // true.
 func withStateSyncDisabled() sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
+	return vmtest.WithChainConfig(func(c *sutConfig) {
 		c.vmConfig.StateSyncEnabled = false
 	})
 }
 
 // withPriceTarget sets [config.PriceTarget] on the SUT.
 func withPriceTarget(p gas.Price) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
+	return vmtest.WithChainConfig(func(c *sutConfig) {
 		c.vmConfig.PriceTarget = &p
 	})
 }
 
 func withGasTarget(g gas.Gas) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
+	return vmtest.WithChainConfig(func(c *sutConfig) {
 		c.vmConfig.GasTarget = &g
 	})
 }
 
 func withMinDelayTarget(ms uint64) sutOption {
-	return options.Func[sutConfig](func(c *sutConfig) {
+	return vmtest.WithChainConfig(func(c *sutConfig) {
 		c.vmConfig.MinDelayTarget = &ms
 	})
 }
@@ -342,30 +322,33 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 	tb.Helper()
 
 	var (
-		cfg = options.ApplyTo(&sutConfig{
-			genesis: core.Genesis{
+		cfg = options.ApplyTo(&vmtest.SUTConfig[sutConfig]{
+			Genesis: core.Genesis{
 				Config:     cchaintest.ChainConfig(),
 				Timestamp:  uint64(upgrade.InitiallyActiveTime.Unix()), //#nosec G115 -- Known non-negative
 				Difficulty: big.NewInt(0),                              // irrelevant but required to marshal
 				Alloc:      types.GenesisAlloc{},
 				BaseFee:    big.NewInt(ethparams.Wei),
 			},
-			nodeID:       ids.GenerateTestNodeID(),
-			networkID:    constants.UnitTestID,
-			validators:   warptest.NewValidators(tb),
-			clock:        saetest.NewClock(testStartTime, time.Millisecond),
-			vmConfig:     defaultConfig(),
-			db:           memdb.New(),
-			chainDataDir: tb.TempDir(),
-			state:        snow.NormalOp,
-			upgrades:     upgradetest.GetConfig(upgrade.Latest),
+			Clock:    saetest.NewClock(testStartTime, time.Millisecond),
+			VMConfig: vmconfig.Default(),
+			Chain: sutConfig{
+				nodeID:       ids.GenerateTestNodeID(),
+				networkID:    constants.UnitTestID,
+				validators:   warptest.NewValidators(tb),
+				vmConfig:     defaultConfig(),
+				db:           memdb.New(),
+				chainDataDir: tb.TempDir(),
+				state:        snow.NormalOp,
+				upgrades:     upgradetest.GetConfig(upgrade.Latest),
+			},
 		}, opts...)
 		vm = &VM{
 			pullGossipPeriod: 100 * time.Millisecond,
 			pushGossipPeriod: 100 * time.Millisecond,
-			now:              cfg.clock.Now,
+			now:              cfg.Clock.Now,
 		}
-		db = cfg.db
+		db = cfg.Chain.db
 	)
 
 	// The VM and shared memory MUST share an underlying database so that
@@ -374,24 +357,27 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 	memory := atomic.NewMemory(sharedMemoryDB)
 
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
-	snowCtx.ChainDataDir = cfg.chainDataDir
-	snowCtx.NodeID = cfg.nodeID
-	snowCtx.NetworkID = cfg.networkID
-	snowCtx.NetworkUpgrades = cfg.upgrades
+	snowCtx.ChainDataDir = cfg.Chain.chainDataDir
+	snowCtx.NodeID = cfg.Chain.nodeID
+	snowCtx.NetworkID = cfg.Chain.networkID
+	snowCtx.NetworkUpgrades = cfg.Chain.upgrades
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowtest.CChainID)
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
-	warptest.SetValidators(tb, snowCtx, cfg.validators)
+	warptest.SetValidators(tb, snowCtx, cfg.Chain.validators)
 
 	chainDB := prefixdb.New(chainDBPrefix, db)
 
-	genesisBytes, err := json.Marshal(cfg.genesis)
-	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.genesis)
+	genesisBytes, err := json.Marshal(cfg.Genesis)
+	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.Genesis)
 
-	configBytes, err := json.Marshal(cfg.vmConfig)
-	require.NoErrorf(tb, err, "json.Marshal(%T)", cfg.vmConfig)
+	vmConfig := cfg.Chain.vmConfig
+	require.Equal(tb, vmconfig.Default(), vmConfig.Config, "shared options MUST be set with withVMConfig")
+	vmConfig.Config = cfg.VMConfig
+	configBytes, err := json.Marshal(vmConfig)
+	require.NoErrorf(tb, err, "json.Marshal(%T)", vmConfig)
 
-	validatorIDs := cfg.validators.NodeIDs()
+	validatorIDs := cfg.Chain.validators.NodeIDs()
 	appSender := saetest.NewSender(tb, validatorIDs)
 
 	ctx := log.CancelOnError(tb.Context())
@@ -401,7 +387,7 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 		memory:         memory,
 		sharedMemoryDB: sharedMemoryDB,
 		p2pclient:      saetest.NewCapturingPeer(tb, validatorIDs),
-		clock:          cfg.clock,
+		clock:          cfg.Clock,
 		logger:         log,
 	}
 	sut.SUT, err = vmtest.New(ctx, tb, vm, snowCtx, vmtest.Config{
@@ -409,15 +395,15 @@ func tryNewSUT(tb testing.TB, opts ...sutOption) (*SUT, error) {
 		Genesis:            genesisBytes,
 		Config:             configBytes,
 		Sender:             appSender,
-		State:              cfg.state,
+		State:              cfg.Chain.state,
 		HTTPPrefix:         cchainHTTPPrefix,
-		SkipRPCTransport:   cfg.skipRPCTransport,
+		SkipRPCTransport:   cfg.Chain.skipRPCTransport,
 		BeforeWaitForEvent: sut.unblockWaitForEvent,
 	})
 	if err != nil {
 		return nil, err
 	}
-	if !cfg.skipRPCTransport {
+	if !cfg.Chain.skipRPCTransport {
 		sut.Client = NewClient(sut.URL)
 	}
 
@@ -1005,9 +991,7 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 	w := saetest.NewUNSAFEWallet(t, 1, types.LatestSigner(saetest.ChainConfig()))
 	sender := w.Addresses()[0]
 
-	ctx, sut := newSUT(t, options.Func[sutConfig](func(c *sutConfig) {
-		c.genesis.Alloc = saetest.MaxAllocFor(sender)
-	}))
+	ctx, sut := newSUT(t, withMaxAllocFor(sender))
 
 	const highLimit = 1_000_000
 	tests := []struct {
