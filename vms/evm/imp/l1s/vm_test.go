@@ -99,7 +99,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	snowCtx := snowtest.Context(tb, ids.GenerateTestID())
 	snowCtx.ChainDataDir = tb.TempDir()
-	snowCtx.NetworkUpgrades = upgradetest.GetConfig(upgradetest.Latest)
+	snowCtx.NetworkUpgrades = upgradetest.GetConfig(upgrade.Latest)
 	log := loggingtest.New(tb, logging.Debug)
 	snowCtx.Log = log
 

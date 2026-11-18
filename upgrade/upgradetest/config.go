@@ -11,19 +11,19 @@ import (
 
 // GetConfig returns an upgrade config with the provided fork scheduled to have
 // been initially activated and all other forks to be unscheduled.
-func GetConfig(fork Fork) upgrade.Config {
+func GetConfig(fork upgrade.Upgrade) upgrade.Config {
 	return GetConfigWithUpgradeTime(fork, upgrade.InitiallyActiveTime)
 }
 
 // GetConfigWithUpgradeTime returns an upgrade config with the provided fork
 // scheduled to be activated at the provided upgradeTime and all other forks to
 // be unscheduled.
-func GetConfigWithUpgradeTime(fork Fork, upgradeTime time.Time) upgrade.Config {
+func GetConfigWithUpgradeTime(fork upgrade.Upgrade, upgradeTime time.Time) upgrade.Config {
 	c := upgrade.Config{
 		GraniteEpochDuration: upgrade.Default.GraniteEpochDuration,
 	}
 	// Initialize all forks to be unscheduled
-	SetTimesTo(&c, Latest, upgrade.UnscheduledActivationTime)
+	SetTimesTo(&c, upgrade.Latest, upgrade.UnscheduledActivationTime)
 	// Schedule the requested forks at the provided upgrade time
 	SetTimesTo(&c, fork, upgradeTime)
 	return c
@@ -31,54 +31,54 @@ func GetConfigWithUpgradeTime(fork Fork, upgradeTime time.Time) upgrade.Config {
 
 // SetTimesTo sets the upgrade time of the provided fork, and all prior forks,
 // to the provided upgradeTime.
-func SetTimesTo(c *upgrade.Config, fork Fork, upgradeTime time.Time) {
+func SetTimesTo(c *upgrade.Config, fork upgrade.Upgrade, upgradeTime time.Time) {
 	switch fork {
-	case Igloo:
+	case upgrade.Igloo:
 		c.IglooTime = upgradeTime
 		fallthrough
-	case Helicon:
+	case upgrade.Helicon:
 		c.HeliconTime = upgradeTime
 		fallthrough
-	case Granite:
+	case upgrade.Granite:
 		c.GraniteTime = upgradeTime
 		fallthrough
-	case Fortuna:
+	case upgrade.Fortuna:
 		c.FortunaTime = upgradeTime
 		fallthrough
-	case Etna:
+	case upgrade.Etna:
 		c.EtnaTime = upgradeTime
 		fallthrough
-	case Durango:
+	case upgrade.Durango:
 		c.DurangoTime = upgradeTime
 		fallthrough
-	case Cortina:
+	case upgrade.Cortina:
 		c.CortinaTime = upgradeTime
 		fallthrough
-	case Banff:
+	case upgrade.Banff:
 		c.BanffTime = upgradeTime
 		fallthrough
-	case ApricotPhasePost6:
+	case upgrade.ApricotPhasePost6:
 		c.ApricotPhasePost6Time = upgradeTime
 		fallthrough
-	case ApricotPhase6:
+	case upgrade.ApricotPhase6:
 		c.ApricotPhase6Time = upgradeTime
 		fallthrough
-	case ApricotPhasePre6:
+	case upgrade.ApricotPhasePre6:
 		c.ApricotPhasePre6Time = upgradeTime
 		fallthrough
-	case ApricotPhase5:
+	case upgrade.ApricotPhase5:
 		c.ApricotPhase5Time = upgradeTime
 		fallthrough
-	case ApricotPhase4:
+	case upgrade.ApricotPhase4:
 		c.ApricotPhase4Time = upgradeTime
 		fallthrough
-	case ApricotPhase3:
+	case upgrade.ApricotPhase3:
 		c.ApricotPhase3Time = upgradeTime
 		fallthrough
-	case ApricotPhase2:
+	case upgrade.ApricotPhase2:
 		c.ApricotPhase2Time = upgradeTime
 		fallthrough
-	case ApricotPhase1:
+	case upgrade.ApricotPhase1:
 		c.ApricotPhase1Time = upgradeTime
 	}
 }

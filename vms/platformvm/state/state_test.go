@@ -105,7 +105,7 @@ func withMetrics(m metrics.Metrics) testStateOption {
 // overridden by opts.
 func newTestState(t testing.TB, db database.Database, opts ...testStateOption) *State {
 	cfg := options.ApplyTo(&testStateConfig{
-		upgradeConfig: upgradetest.GetConfig(upgradetest.Latest),
+		upgradeConfig: upgradetest.GetConfig(upgrade.Latest),
 		rewardConfig:  defaultRewardConfig,
 		localNodeID:   ids.GenerateTestNodeID(),
 		metrics:       metrics.Noop,
@@ -172,7 +172,7 @@ func TestNewInitializesGenesisValidatorsWithPrimaryNetworkRewards(t *testing.T) 
 	duration := genesistest.DefaultValidatorDuration
 	heliconTime := startTime.Add(-heliconRampElapsed)
 	upgradeConfig := upgradetest.GetConfigWithUpgradeTime(
-		upgradetest.Helicon,
+		upgrade.Helicon,
 		heliconTime,
 	)
 	rewardConfig := reward.Config{

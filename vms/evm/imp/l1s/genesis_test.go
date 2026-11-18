@@ -158,7 +158,7 @@ func withAllGenesisPrecompiles(timestamp uint64) genesisOption {
 
 func TestParseGenesis(t *testing.T) {
 	var (
-		latest = &snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgradetest.Latest)}
+		latest = &snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgrade.Latest)}
 		// Mainnet has non-zero network upgrade times.
 		mainnet            = &snow.Context{NetworkUpgrades: upgrade.Mainnet}
 		zeroGraniteGenesis = testGenesisJSON(withGenesis(func(g *ethcore.Genesis) {
@@ -212,7 +212,7 @@ func TestParseGenesis(t *testing.T) {
 		},
 		{
 			name:    "upgrade_bytes",
-			ctx:     &snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgradetest.Durango)},
+			ctx:     &snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgrade.Durango)},
 			genesis: testGenesisJSON(),
 			upgradeBytes: overridesJSON(extras.NetworkUpgrades{
 				DurangoTimestamp: new(testGenesisTime + 100),
@@ -360,11 +360,11 @@ func TestParseGenesis(t *testing.T) {
 func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 	type spec struct {
 		name     string
-		upgrades upgradetest.Fork
+		upgrades upgrade.Upgrade
 		genesis  string
 	}
 	var specs []spec
-	for fork := upgradetest.NoUpgrades; fork <= upgradetest.Latest; fork++ {
+	for fork := upgrade.NoUpgrades; fork <= upgrade.Latest; fork++ {
 		specs = append(specs, spec{
 			name:     fork.String(),
 			upgrades: fork,
@@ -374,7 +374,7 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 	specs = append(specs,
 		spec{
 			name:     "genesis_network_upgrades",
-			upgrades: upgradetest.Etna,
+			upgrades: upgrade.Etna,
 			genesis: testGenesisJSON(withGenesis(func(g *ethcore.Genesis) {
 				extra := l1params.GetExtra(g.Config)
 				extra.DurangoTimestamp = new(testGenesisTime + 1)
@@ -383,30 +383,30 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 		},
 		spec{
 			name:     "initial_min_delay",
-			upgrades: upgradetest.Latest,
+			upgrades: upgrade.Latest,
 			genesis:  testGenesisJSON(withInitialMinDelay(1_500)),
 		},
 		spec{
 			// subnet-evm commits the genesis state with deleteEmptyObjects=false.
 			name:     "empty_account",
-			upgrades: upgradetest.Latest,
+			upgrades: upgrade.Latest,
 			genesis: testGenesisJSON(withGenesis(func(g *ethcore.Genesis) {
 				g.Alloc[common.Address{0xe0}] = types.Account{Balance: new(big.Int)}
 			})),
 		},
 		spec{
 			name:     "precompiles",
-			upgrades: upgradetest.Latest,
+			upgrades: upgrade.Latest,
 			genesis:  testGenesisJSON(withAllGenesisPrecompiles(testGenesisTime)),
 		},
 		spec{
 			name:     "precompiles_after_genesis",
-			upgrades: upgradetest.Latest,
+			upgrades: upgrade.Latest,
 			genesis:  testGenesisJSON(withAllGenesisPrecompiles(testGenesisTime + 1)),
 		},
 		spec{
 			name:     "header_fields",
-			upgrades: upgradetest.Latest,
+			upgrades: upgrade.Latest,
 			genesis: testGenesisJSON(withGenesis(func(g *ethcore.Genesis) {
 				g.Nonce = 42
 				g.ExtraData = []byte("extra")
@@ -444,34 +444,34 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 func TestHistoricalGenesisHashes(t *testing.T) {
 	hashes := [...]string{
 		// SubnetEVM is always active at genesis, which adds the BaseFee.
-		upgradetest.NoUpgrades:        "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
-		upgradetest.ApricotPhase1:     "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
-		upgradetest.ApricotPhase2:     "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
-		upgradetest.ApricotPhase3:     "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
-		upgradetest.ApricotPhase4:     "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
-		upgradetest.ApricotPhase5:     "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
-		upgradetest.ApricotPhasePre6:  "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
-		upgradetest.ApricotPhase6:     "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
-		upgradetest.ApricotPhasePost6: "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
-		upgradetest.Banff:             "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
-		upgradetest.Cortina:           "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
-		upgradetest.Durango:           "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
+		upgrade.NoUpgrades:        "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
+		upgrade.ApricotPhase1:     "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
+		upgrade.ApricotPhase2:     "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
+		upgrade.ApricotPhase3:     "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
+		upgrade.ApricotPhase4:     "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
+		upgrade.ApricotPhase5:     "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
+		upgrade.ApricotPhasePre6:  "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
+		upgrade.ApricotPhase6:     "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
+		upgrade.ApricotPhasePost6: "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
+		upgrade.Banff:             "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
+		upgrade.Cortina:           "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
+		upgrade.Durango:           "0x66e75620d5123ead246047e3807b2a3c80f237bdb5105d0d6bee5708373eb0c9",
 
 		// Added the block gas cost and the Cancun fields
-		upgradetest.Etna:    "0xec21bbd365270e4807627fa4f78cf4637ce0540ab1e822eca34bba7661a79708",
-		upgradetest.Fortuna: "0xec21bbd365270e4807627fa4f78cf4637ce0540ab1e822eca34bba7661a79708",
+		upgrade.Etna:    "0xec21bbd365270e4807627fa4f78cf4637ce0540ab1e822eca34bba7661a79708",
+		upgrade.Fortuna: "0xec21bbd365270e4807627fa4f78cf4637ce0540ab1e822eca34bba7661a79708",
 
 		// Added millisecond timestamps and the min delay excess
-		upgradetest.Granite: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
-		upgradetest.Helicon: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
+		upgrade.Granite: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
+		upgrade.Helicon: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
 
 		// TODO(alarso16): Add SAE required fields
-		upgradetest.Igloo: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
+		upgrade.Igloo: "0xd57b1b98e59e33327a109e0e5c2d14e0c66f7521ea53939a35a09b1f4dfcbeae",
 	}
-	_ = hashes[upgradetest.Latest] // Enforce completeness at compile time.
+	_ = hashes[upgrade.Latest] // Enforce completeness at compile time.
 
 	for _fork, hash := range hashes {
-		fork := upgradetest.Fork(_fork)
+		fork := upgrade.Upgrade(_fork)
 		t.Run(fork.String(), func(t *testing.T) {
 			genesis := testGenesisJSON()
 			ctx := &snow.Context{
@@ -495,14 +495,14 @@ func TestHistoricalGenesisHashes(t *testing.T) {
 	}
 }
 
-func upgradeAt(fork upgradetest.Fork, t time.Time) upgrade.Config {
+func upgradeAt(fork upgrade.Upgrade, t time.Time) upgrade.Config {
 	c := upgradetest.GetConfigWithUpgradeTime(fork, t)
 	upgradetest.SetTimesTo(&c, fork-1, upgrade.InitiallyActiveTime)
 	return c
 }
 
 func TestWriteGenesis(t *testing.T) {
-	latest := upgradetest.GetConfig(upgradetest.Latest)
+	latest := upgradetest.GetConfig(upgrade.Latest)
 	type spec struct {
 		upgrades     upgrade.Config
 		genesisOpts  []genesisOption
@@ -559,7 +559,7 @@ func TestWriteGenesis(t *testing.T) {
 			},
 			restart: spec{
 				upgrades: upgradeAt(
-					upgradetest.Granite,
+					upgrade.Granite,
 					upgrade.InitiallyActiveTime.Add(1_000*time.Second),
 				),
 			},
@@ -568,11 +568,11 @@ func TestWriteGenesis(t *testing.T) {
 		{
 			name: "schedule_future_upgrade",
 			initial: spec{
-				upgrades: upgradetest.GetConfig(upgradetest.Latest - 1),
+				upgrades: upgradetest.GetConfig(upgrade.Latest - 1),
 			},
 			restart: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(1_000*time.Second),
 				),
 			},
@@ -581,13 +581,13 @@ func TestWriteGenesis(t *testing.T) {
 			name: "delay_future_upgrade",
 			initial: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(1_000*time.Second),
 				),
 			},
 			restart: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(2_000*time.Second),
 				),
 			},
@@ -596,13 +596,13 @@ func TestWriteGenesis(t *testing.T) {
 			name: "advance_future_upgrade",
 			initial: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(2_000*time.Second),
 				),
 			},
 			restart: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(1_000*time.Second),
 				),
 			},
@@ -611,25 +611,25 @@ func TestWriteGenesis(t *testing.T) {
 			name: "unschedule_future_upgrade",
 			initial: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(1_000*time.Second),
 				),
 			},
 			restart: spec{
-				upgrades: upgradetest.GetConfig(upgradetest.Latest - 1),
+				upgrades: upgradetest.GetConfig(upgrade.Latest - 1),
 			},
 		},
 		{
 			name: "add_future_network_override",
 			initial: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(1_000*time.Second),
 				),
 			},
 			restart: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(1_000*time.Second),
 				),
 				upgradeBytes: overridesJSON(extras.NetworkUpgrades{
@@ -641,14 +641,14 @@ func TestWriteGenesis(t *testing.T) {
 			name: "delay_activated_network_override",
 			initial: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.UnscheduledActivationTime,
 				),
 			},
 			headTime: testGenesisTime + 4_000,
 			restart: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(1_000*time.Second),
 				),
 				upgradeBytes: overridesJSON(extras.NetworkUpgrades{
@@ -662,14 +662,14 @@ func TestWriteGenesis(t *testing.T) {
 			name: "delay_missed_network_upgrade",
 			initial: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.UnscheduledActivationTime,
 				),
 			},
 			headTime: testGenesisTime + 2_000,
 			restart: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(1_000*time.Second),
 				),
 				upgradeBytes: overridesJSON(extras.NetworkUpgrades{
@@ -684,14 +684,14 @@ func TestWriteGenesis(t *testing.T) {
 			name: "delay_activated_upgrade",
 			initial: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(1_000*time.Second),
 				),
 			},
 			headTime: testGenesisTime + 4_000,
 			restart: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(3_000*time.Second),
 				),
 			},
@@ -701,14 +701,14 @@ func TestWriteGenesis(t *testing.T) {
 			name: "advance_activated_upgrade",
 			initial: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(3_000*time.Second),
 				),
 			},
 			headTime: testGenesisTime + 4_000,
 			restart: spec{
 				upgrades: upgradeAt(
-					upgradetest.Latest,
+					upgrade.Latest,
 					upgrade.InitiallyActiveTime.Add(1_000*time.Second),
 				),
 			},
@@ -720,10 +720,10 @@ func TestWriteGenesis(t *testing.T) {
 			// genesis-hash mismatch.
 			name: "incompatible_upgrade",
 			initial: spec{
-				upgrades: upgradetest.GetConfig(upgradetest.Durango),
+				upgrades: upgradetest.GetConfig(upgrade.Durango),
 			},
 			restart: spec{
-				upgrades: upgradetest.GetConfig(upgradetest.Cortina),
+				upgrades: upgradetest.GetConfig(upgrade.Cortina),
 			},
 			wantErr: errIsType[*params.ConfigCompatError](),
 		},
@@ -822,7 +822,7 @@ func requireStoredConfig(t *testing.T, db ethdb.Database, genesisHash common.Has
 // database and matches the root committed to by the written genesis header.
 func TestWriteGenesisState(t *testing.T) {
 	genesis := testGenesisJSON()
-	g, err := parseGenesis(&snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgradetest.Latest)}, []byte(genesis), nil)
+	g, err := parseGenesis(&snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgrade.Latest)}, []byte(genesis), nil)
 	require.NoErrorf(t, err, "parseGenesis(%s)", genesis)
 
 	block, err := g.block()

@@ -52,6 +52,7 @@ go_test(
         "//snow/snowtest",
         "//snow/uptime",
         "//snow/validators",
+        "//upgrade",
         "//upgrade/upgradetest",
         "//utils",
         "//utils/constants",
