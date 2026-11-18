@@ -1,7 +1,7 @@
 // Copyright (C) 2019, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package cparams
+package customtypes
 
 import (
 	"bytes"
@@ -19,7 +19,7 @@ import (
 func TestPredicateBytesFromExtra(t *testing.T) {
 	tests := []struct {
 		name  string
-		rules Rules
+		fork  upgrade.Upgrade
 		extra []byte
 		want  []byte
 	}{
@@ -43,29 +43,21 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "fortuna_empty_extra",
-			rules: Rules{
-				LatestUpgrade: upgrade.Fortuna,
-			},
+			fork: upgrade.Fortuna,
 		},
 		{
-			name: "fortuna_too_short",
-			rules: Rules{
-				LatestUpgrade: upgrade.Fortuna,
-			},
+			name:  "fortuna_too_short",
+			fork:  upgrade.Fortuna,
 			extra: make([]byte, acp176StateSize-1),
 		},
 		{
-			name: "fortuna_empty_predicate",
-			rules: Rules{
-				LatestUpgrade: upgrade.Fortuna,
-			},
+			name:  "fortuna_empty_predicate",
+			fork:  upgrade.Fortuna,
 			extra: make([]byte, acp176StateSize),
 		},
 		{
 			name: "fortuna_non_empty_predicate",
-			rules: Rules{
-				LatestUpgrade: upgrade.Fortuna,
-			},
+			fork: upgrade.Fortuna,
 			extra: []byte{
 				acp176StateSize: 5,
 			},
@@ -73,22 +65,18 @@ func TestPredicateBytesFromExtra(t *testing.T) {
 		},
 		{
 			name: "helicon_empty_predicate",
-			rules: Rules{
-				LatestUpgrade: upgrade.Helicon,
-			},
+			fork: upgrade.Helicon,
 		},
 		{
-			name: "helicon_non_empty_predicate",
-			rules: Rules{
-				LatestUpgrade: upgrade.Helicon,
-			},
+			name:  "helicon_non_empty_predicate",
+			fork:  upgrade.Helicon,
 			extra: []byte{5},
 			want:  []byte{5},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := predicateBytesFromExtra(tt.rules, tt.extra)
+			got := predicateBytesFromExtra(tt.fork, tt.extra)
 			require.Equal(t, tt.want, got, "predicateBytesFromExtra()")
 		})
 	}

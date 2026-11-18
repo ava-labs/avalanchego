@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm"
 
 	ethparams "github.com/ava-labs/libevm/params"
@@ -280,9 +281,8 @@ func TestChainConfigJSON(t *testing.T) {
 	}
 }
 
-// TestIsForked tests fork activation through [ChainConfig.IsApricotPhase1];
-// every `Is<Fork>` method shares the same activation logic.
-func TestIsForked(t *testing.T) {
+// TestIsActive tests fork activation through a single upgrade timestamp.
+func TestIsActive(t *testing.T) {
 	tests := []struct {
 		name     string
 		ts       *uint64
@@ -323,7 +323,7 @@ func TestIsForked(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := &ChainConfig{ApricotPhase1Timestamp: tt.ts}
-			require.Equalf(t, tt.isForked, c.IsApricotPhase1(tt.head), "%T.IsApricotPhase1(%d)", c, tt.head)
+			require.Equalf(t, tt.isForked, c.IsActive(upgrade.ApricotPhase1, tt.head), "%T.IsApricotPhase1(%d)", c, tt.head)
 		})
 	}
 }

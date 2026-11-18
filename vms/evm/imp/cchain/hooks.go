@@ -162,13 +162,13 @@ func targetExponent(config *cparams.ChainConfig, h *types.Header) (dynamic.Targe
 	if te := customtypes.GetHeaderExtra(h).TargetExponent; te != nil {
 		return *te, nil
 	}
-	if !config.IsFortuna(h.Time) || h.Number.Sign() == 0 {
+	if !config.IsActive(upgrade.Fortuna, h.Time) || h.Number.Sign() == 0 {
 		return dynamic.InitialTargetExponent, nil
 	}
 
 	// Synchronous blocks store the target exponent in their ACP-176 fee state.
 	// Only the last one's is used, as the parent of the first SAE block.
-	return cparams.TargetExponentFromExtra(h.Extra)
+	return customtypes.TargetExponentFromExtra(h.Extra)
 }
 
 func (h *hooks) GasConfigAfter(header *types.Header) (gas.Gas, gastime.GasPriceConfig) {
@@ -240,7 +240,7 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 func (h *hooks) StartExecutingBlock(rules params.Rules, statedb *state.StateDB, parent *types.Header, _ *types.Block) error {
 	c := cparams.GetExtra(h.chainConfig)
 	r := cparams.GetRulesExtra(rules)
-	if firstDBlock := r.Is(upgrade.Durango) && !c.IsDurango(parent.Time); firstDBlock {
+	if firstDBlock := r.Is(upgrade.Durango) && !c.IsActive(upgrade.Durango, parent.Time); firstDBlock {
 		activatePrecompile(statedb, corethwarp.ContractAddress)
 	}
 	return nil
@@ -330,7 +330,7 @@ func (h *hooks) VerifyBlockSyntax(b *types.Block) error {
 	// For genesis and pre-ApricotPhase1 blocks, the header's ExtDataHash is
 	// expected to be empty with the actual data expected to be committed to in
 	// [extDataHashes].
-	if height := b.NumberU64(); height == 0 || !cparams.GetExtra(h.chainConfig).IsApricotPhase1(b.Time()) {
+	if height := b.NumberU64(); height == 0 || !cparams.GetExtra(h.chainConfig).IsActive(upgrade.ApricotPhase1, b.Time()) {
 		wantHash := customtypes.EmptyExtDataHash
 		if want, ok := extDataHashes[h.ctx.NetworkID][height]; ok {
 			wantHash = want
