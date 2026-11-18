@@ -92,7 +92,9 @@ type testTimeoutMessageFilter struct {
 // a round or sequence at or below [highestReplicated].
 func (m *testTimeoutMessageFilter) failOnReplicationRequest(msg *common.Message, _, _ common.NodeID) bool {
 	if req := msg.ReplicationRequest; req != nil {
-		for _, seqOrRound := range append(slices.Clone(req.Seqs), req.Rounds...) {
+		seqsOrRounds := slices.Clone(req.Seqs)
+		seqsOrRounds = append(seqsOrRounds, req.Rounds...)
+		for _, seqOrRound := range seqsOrRounds {
 			require.Greater(m.t, seqOrRound, m.highestReplicated, "resent a replication request for an already replicated round/seq")
 		}
 	}
@@ -138,6 +140,10 @@ func TestReplicationRequestTimeoutCancels(t *testing.T) {
 	// this asserts that the lagging node catches up to the latest round
 	for _, n := range net.Instances {
 		n.Storage.WaitForBlockCommit(startSeq)
+		// allow the replication state to cancel the request before setting filter
+		// calling Metadata grabs the epoch lock which means the replication state
+		// should be done processing.
+		n.E.Metadata()
 	}
 
 	mf := &testTimeoutMessageFilter{
@@ -147,8 +153,6 @@ func TestReplicationRequestTimeoutCancels(t *testing.T) {
 		highestReplicated: startSeq,
 	}
 
-	// allow the replication state to cancel the request before setting filter
-	time.Sleep(100 * time.Millisecond)
 	laggingNode.E.Comm.(*testutil.TestComm).SetFilter(mf.failOnReplicationRequest)
 	laggingNode.E.AdvanceTime(laggingNode.E.StartTime.Add(simplex.DefaultReplicationRequestTimeout * 2))
 
