@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -39,6 +40,7 @@ import (
 // A VM is a VM built atop the SAE VM.
 type VM interface {
 	adaptor.ChainVM[*blocks.Block]
+	GetPreference() *blocks.Block
 	LastExecutedState() (libevm.StateReader, error)
 	GethRPCBackends() saerpc.GethBackends
 }
@@ -53,11 +55,11 @@ type Config struct {
 	State            snow.State
 	HTTPPrefix       string
 	SkipRPCTransport bool
-	// BeforeWaitForEvent, if non-nil, is called before each [VM.WaitForEvent].
-	//
-	// TODO(JonathanOppenheimer): Remove this hook once ACP-226 handling is
-	// unified across the imp VMs.
-	BeforeWaitForEvent func()
+	// If Clock and EarliestBuildTime are both set, [SUT.WaitForPendingTxs]
+	// advances Clock, which MUST be the VM's clock, to the preferred block's
+	// earliest build time instead of waiting out the minimum block delay.
+	Clock             *saetest.Clock
+	EarliestBuildTime func(*blocks.Block) time.Time
 }
 
 // A SUT drives a [VM] as the consensus engine would.
@@ -65,10 +67,11 @@ type SUT struct {
 	URL       string
 	ethclient func() *evmclient.Client
 
-	vm                 VM
-	nodeID             ids.NodeID
-	sender             *saetest.Sender
-	beforeWaitForEvent func()
+	vm                VM
+	nodeID            ids.NodeID
+	sender            *saetest.Sender
+	clock             *saetest.Clock
+	earliestBuildTime func(*blocks.Block) time.Time
 }
 
 func (s *SUT) NodeID() ids.NodeID      { return s.nodeID }
@@ -106,11 +109,12 @@ func New(ctx context.Context, tb testing.TB, vm VM, snowCtx *snow.Context, cfg C
 	require.NoErrorf(tb, vm.Connected(ctx, snowCtx.NodeID, version.Current), "%T.Connected(%s)", vm, snowCtx.NodeID)
 
 	sut := &SUT{
-		ethclient:          func() *evmclient.Client { return nil },
-		vm:                 vm,
-		nodeID:             snowCtx.NodeID,
-		sender:             cfg.Sender,
-		beforeWaitForEvent: cfg.BeforeWaitForEvent,
+		ethclient:         func() *evmclient.Client { return nil },
+		vm:                vm,
+		nodeID:            snowCtx.NodeID,
+		sender:            cfg.Sender,
+		clock:             cfg.Clock,
+		earliestBuildTime: cfg.EarliestBuildTime,
 	}
 
 	if !cfg.SkipRPCTransport {
@@ -268,8 +272,10 @@ func (s *SUT) WaitForPendingTxs(ctx context.Context, tb testing.TB, txs ...*type
 	tb.Helper()
 
 	txgossiptest.WaitUntilPending(tb, ctx, s.vm.GethRPCBackends(), txs...)
-	if s.beforeWaitForEvent != nil {
-		s.beforeWaitForEvent()
+	if s.clock != nil && s.earliestBuildTime != nil {
+		if t := s.earliestBuildTime(s.vm.GetPreference()); s.clock.Now().Before(t) {
+			s.clock.Set(t)
+		}
 	}
 	e, err := s.vm.WaitForEvent(ctx)
 	require.NoErrorf(tb, err, "%T.WaitForEvent()", s.vm)

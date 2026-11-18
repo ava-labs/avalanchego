@@ -31,6 +31,7 @@ Unrecognized options — a typo, or an option of Subnet-EVM that no longer exist
 
 L1s accept the options shared with the C-Chain, described in the [shared configuration](../vmconfig/config.md):
 
+- [Block Building](../vmconfig/config.md#block-building)
 - [State and Trie](../vmconfig/config.md#state-and-trie)
 - [Transaction Pool](../vmconfig/config.md#transaction-pool)
 - [APIs](../vmconfig/config.md#apis)

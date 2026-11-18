@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
 	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
@@ -65,6 +66,11 @@ type Config struct {
 	// OfflinePruning       bool    `json:"offline-pruning-enabled"`
 	StateScheme  string `json:"state-scheme"`
 	StateHistory uint64 `json:"state-history"` // Number of recent states to guarantee. Defaults to core.TriesInMemory.
+
+	// Block building
+	// MinDelayTarget is the ACP-226 minimum block delay (ms) this node votes
+	// for; nil follows the parent.
+	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
 
 	// Transaction pool
 	LocalTxsEnabled    bool   `json:"local-txs-enabled"`
@@ -170,6 +176,16 @@ func jsonKeys[T any]() set.Set[string] {
 		keys.Add(name)
 	}
 	return keys
+}
+
+// DesiredDelayExponent returns this node's ACP-226 minimum block delay vote, or
+// nil if it doesn't vote.
+func (c Config) DesiredDelayExponent() *dynamic.DelayExponent {
+	if c.MinDelayTarget == nil {
+		return nil
+	}
+	e := dynamic.DesiredDelayExponent(*c.MinDelayTarget)
+	return &e
 }
 
 // SAEConfig translates the operator-supplied [Config] into the [sae.Config]

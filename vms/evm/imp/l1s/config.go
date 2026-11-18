@@ -20,12 +20,6 @@ type config struct {
 	vmconfig.Config
 
 	// Block building
-	// TODO(JonathanOppenheimer) move MinDelayTarget into [vmconfig.Config],
-	// and its docs into vmconfig/config.md, once wired.
-	//
-	// MinDelayTarget is the ACP-226 minimum block delay (ms) this node votes
-	// for; nil follows the parent.
-	// MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
 	// Needed for allowFeeRecipients. Keeping the camelCase key so existing
 	// configs don't break.
 	// FeeRecipient string `json:"feeRecipient"`

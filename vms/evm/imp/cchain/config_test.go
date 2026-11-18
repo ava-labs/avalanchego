@@ -63,11 +63,6 @@ func TestParseConfig(t *testing.T) {
 			json: `{"gas-target":1000}`,
 			want: with(func(c *config) { c.GasTarget = new(gas.Gas(1000)) }),
 		},
-		{
-			name: "block_building/min_delay_target",
-			json: `{"min-delay-target":2000}`,
-			want: with(func(c *config) { c.MinDelayTarget = new(uint64(2000)) }),
-		},
 
 		// State & trie
 		{
@@ -108,7 +103,6 @@ func TestParseConfig(t *testing.T) {
 			json: `{
 				"min-price-target":500,
 				"gas-target":1500,
-				"min-delay-target":3000,
 				"state-sync-enabled":false,
 				"warp-off-chain-messages":["0x1234"]
 			}`,
@@ -116,7 +110,6 @@ func TestParseConfig(t *testing.T) {
 				Config:               vmconfig.Default(),
 				PriceTarget:          new(gas.Price(500)),
 				GasTarget:            new(gas.Gas(1500)),
-				MinDelayTarget:       new(uint64(3000)),
 				StateSyncEnabled:     false,
 				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
 			},
