@@ -53,6 +53,7 @@ graft_go_test(
         "//graft/subnet-evm/params/extras",
         "//graft/subnet-evm/plugin/evm/customtypes",
         "//graft/subnet-evm/precompile/contracts/txallowlist",
+        "//graft/subnet-evm/stateupgrade",
         "//graft/subnet-evm/tests",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/hexutil",

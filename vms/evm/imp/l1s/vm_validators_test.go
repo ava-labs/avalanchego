@@ -14,7 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/uptimetracker"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/version"
 
 	l1api "github.com/ava-labs/avalanchego/vms/evm/imp/l1s/api"
@@ -40,7 +40,7 @@ func TestUptimeTracker(t *testing.T) {
 
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Latest),
+		withFork(upgrade.Latest),
 		withNow(now),
 		withCurrentValidatorSet(testValidationID, testNodeID, startTime),
 	)
@@ -86,7 +86,7 @@ func TestUptimeTracker(t *testing.T) {
 // validation ID the tracker has never seen returns
 // `uptimetracker.ErrValidationIDNotFound`.
 func TestUptimeTrackerUnknownValidationID(t *testing.T) {
-	sut := newL1SUT(t, withFork(upgradetest.Latest))
+	sut := newL1SUT(t, withFork(upgrade.Latest))
 
 	_, _, err := sut.vm.uptime.GetUptime(ids.GenerateTestID())
 	require.ErrorIs(t, err, uptimetracker.ErrValidationIDNotFound)
@@ -104,7 +104,7 @@ func TestUptimeAPI(t *testing.T) {
 
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Latest),
+		withFork(upgrade.Latest),
 		withNow(baseTime),
 		withCurrentValidatorSet(testValidationID, testNodeID, startTime),
 	)

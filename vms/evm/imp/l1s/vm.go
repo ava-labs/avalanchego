@@ -15,8 +15,8 @@ import (
 
 	"go.uber.org/zap"
 
-	// Force-load precompiles to trigger registration.
-	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry"
+	// TODO(alarso16): Remove the dependency on the global module registration.
+	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry" // register precompiles
 
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/evm/uptimetracker"

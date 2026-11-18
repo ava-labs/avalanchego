@@ -16,11 +16,12 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
 
 func TestLegacyFeeManagerRetirement(t *testing.T) {
-	igloo := uint64(upgradetest.GetConfig(upgradetest.Igloo).IglooTime.Unix()) // #nosec G115 -- known positive test timestamp
+	igloo := uint64(upgradetest.GetConfig(upgrade.Igloo).IglooTime.Unix()) // #nosec G115 -- known positive test timestamp
 	chainConfig := params.Copy(params.TestSubnetEVMChainConfig)
 	extra := params.GetExtra(&chainConfig)
 	extra.GenesisPrecompiles = extras.Precompiles{
@@ -36,7 +37,7 @@ func TestLegacyFeeManagerRetirement(t *testing.T) {
 	require.NoError(t, err, "json.Marshal(genesis)")
 
 	tvm := newVM(t, testVMConfig{
-		fork:        utils.PointerTo(upgradetest.Igloo),
+		fork:        utils.PointerTo(upgrade.Igloo),
 		genesisJSON: string(genesisJSON),
 	})
 

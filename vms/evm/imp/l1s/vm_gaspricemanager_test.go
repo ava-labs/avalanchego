@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
@@ -99,7 +99,7 @@ func TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE(t *testing.T) {
 	now := postIglooStartTime(t)
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Igloo),
+		withFork(upgrade.Igloo),
 		withNumAccounts(2),
 		withNow(now),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
@@ -169,7 +169,7 @@ func TestGasPriceManagerSetGasPriceConfigSettlementLagSAE(t *testing.T) {
 	now := postIglooStartTime(t)
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Igloo),
+		withFork(upgrade.Igloo),
 		withNumAccounts(2),
 		withNow(now),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
@@ -259,7 +259,7 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 		now := postIglooStartTime(t)
 		sut := newL1SUT(
 			t,
-			withFork(upgradetest.Igloo),
+			withFork(upgrade.Igloo),
 			withNumAccounts(2),
 			withNow(now),
 			withGasTarget(desiredGasTarget),
@@ -367,7 +367,7 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 	now := postIglooStartTime(t)
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Igloo),
+		withFork(upgrade.Igloo),
 		withNumAccounts(2),
 		withNow(now),
 		withGasTarget(desiredTarget),
@@ -562,7 +562,7 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			sut := newL1SUT(
 				t,
-				withFork(upgradetest.Igloo),
+				withFork(upgrade.Igloo),
 				withNumAccounts(2),
 				withNow(now),
 				withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {
@@ -634,7 +634,7 @@ func TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE(t *testing.T) {
 	now := postIglooStartTime(t)
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Igloo),
+		withFork(upgrade.Igloo),
 		withNumAccounts(2),
 		withNow(now),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -28,7 +29,7 @@ import (
 var (
 	keys      = secp256k1.TestKeys()
 	feeConfig = config.Config{
-		Upgrades:         upgradetest.GetConfig(upgradetest.Durango),
+		Upgrades:         upgradetest.GetConfig(upgrade.Durango),
 		TxFee:            2,
 		CreateAssetTxFee: 3,
 	}

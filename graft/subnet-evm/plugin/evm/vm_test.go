@@ -146,7 +146,7 @@ func init() {
 
 type testVMConfig struct {
 	isSyncing bool
-	fork      *upgradetest.Fork
+	fork      *upgrade.Upgrade
 	// If genesisJSON is empty, defaults to the genesis corresponding to the
 	// fork.
 	genesisJSON string
@@ -164,7 +164,7 @@ type testVM struct {
 
 func newVM(t *testing.T, config testVMConfig) *testVM {
 	ctx := utilstest.NewTestSnowContext(t, utilstest.SubnetEVMTestChainID)
-	fork := upgradetest.Latest
+	fork := upgrade.Latest
 	if config.fork != nil {
 		fork = *config.fork
 	}
@@ -233,7 +233,7 @@ func getConfig(scheme, otherConfig string) string {
 // setupGenesis sets up the genesis
 func setupGenesis(
 	t *testing.T,
-	fork upgradetest.Fork,
+	fork upgrade.Upgrade,
 ) (*snow.Context,
 	*prefixdb.Database,
 	[]byte,
@@ -375,7 +375,7 @@ func TestBuildEthTxBlock(t *testing.T) {
 }
 
 func testBuildEthTxBlock(t *testing.T, scheme string) {
-	fork := upgradetest.ApricotPhase6
+	fork := upgrade.ApricotPhase6
 	tvm := newVM(t, testVMConfig{
 		fork:        &fork,
 		genesisJSON: genesisJSONSubnetEVM,
@@ -1474,47 +1474,47 @@ func TestTimeSemanticVerify(t *testing.T) {
 	timestamp := time.Unix(1714339200, 123_456_789)
 	cases := []struct {
 		name             string
-		fork             upgradetest.Fork
+		fork             upgrade.Upgrade
 		timeSeconds      uint64
 		timeMilliseconds *uint64
 		expectedError    error
 	}{
 		{
 			name:             "Fortuna without TimeMilliseconds",
-			fork:             upgradetest.Fortuna,
+			fork:             upgrade.Fortuna,
 			timeSeconds:      uint64(timestamp.Unix()),
 			timeMilliseconds: nil,
 		},
 		{
 			name:             "Granite with TimeMilliseconds",
-			fork:             upgradetest.Granite,
+			fork:             upgrade.Granite,
 			timeSeconds:      uint64(timestamp.Unix()),
 			timeMilliseconds: utils.PointerTo(uint64(timestamp.UnixMilli())),
 		},
 		{
 			name:             "Fortuna with TimeMilliseconds",
-			fork:             upgradetest.Fortuna,
+			fork:             upgrade.Fortuna,
 			timeSeconds:      uint64(timestamp.Unix()),
 			timeMilliseconds: utils.PointerTo(uint64(timestamp.UnixMilli())),
 			expectedError:    customheader.ErrTimeMillisecondsBeforeGranite,
 		},
 		{
 			name:             "Granite without TimeMilliseconds",
-			fork:             upgradetest.Granite,
+			fork:             upgrade.Granite,
 			timeSeconds:      uint64(timestamp.Unix()),
 			timeMilliseconds: nil,
 			expectedError:    customheader.ErrTimeMillisecondsRequired,
 		},
 		{
 			name:             "Granite with mismatched TimeMilliseconds",
-			fork:             upgradetest.Granite,
+			fork:             upgrade.Granite,
 			timeSeconds:      uint64(timestamp.Unix()),
 			timeMilliseconds: utils.PointerTo(uint64(timestamp.UnixMilli()) + 1000),
 			expectedError:    customheader.ErrTimeMillisecondsMismatched,
 		},
 		{
 			name:             "Block too far in the future",
-			fork:             upgradetest.Granite,
+			fork:             upgrade.Granite,
 			timeSeconds:      uint64(timestamp.Add(2 * time.Hour).Unix()),
 			timeMilliseconds: utils.PointerTo(uint64(timestamp.Add(2 * time.Hour).UnixMilli())),
 			expectedError:    customheader.ErrBlockTooFarInFuture,
@@ -1581,17 +1581,17 @@ func TestBuildTimeMilliseconds(t *testing.T) {
 	buildTime := time.Unix(1714339200, 123_456_789)
 	cases := []struct {
 		name                     string
-		fork                     upgradetest.Fork
+		fork                     upgrade.Upgrade
 		expectedTimeMilliseconds *uint64
 	}{
 		{
 			name:                     "fortuna_should_not_have_timestamp_milliseconds",
-			fork:                     upgradetest.Fortuna,
+			fork:                     upgrade.Fortuna,
 			expectedTimeMilliseconds: nil,
 		},
 		{
 			name:                     "granite_should_have_timestamp_milliseconds",
-			fork:                     upgradetest.Granite,
+			fork:                     upgrade.Granite,
 			expectedTimeMilliseconds: utils.PointerTo(uint64(buildTime.UnixMilli())),
 		},
 	}
@@ -1749,7 +1749,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	managerKey := testKeys[1]
 	managerAddress := testEthAddrs[1]
 	genesis := &core.Genesis{}
-	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Durango]))))
+	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Durango]))))
 	// this manager role should not be activated because DurangoTimestamp is in the future
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 		txallowlist.ConfigKey: txallowlist.NewConfig(utils.PointerTo[uint64](0), testEthAddrs[0:1], nil, nil),
@@ -1776,7 +1776,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	upgradeBytesJSON, err := json.Marshal(upgradeConfig)
 	require.NoError(t, err)
 
-	fork := upgradetest.Durango
+	fork := upgrade.Durango
 	tvm := newVM(t, testVMConfig{
 		fork:        &fork,
 		genesisJSON: string(genesisJSON),
@@ -1888,7 +1888,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 
 func TestVerifyManagerConfig(t *testing.T) {
 	genesis := &core.Genesis{}
-	ctx, dbManager, genesisBytes := setupGenesis(t, upgradetest.Durango)
+	ctx, dbManager, genesisBytes := setupGenesis(t, upgrade.Durango)
 	require.NoError(t, genesis.UnmarshalJSON(genesisBytes))
 
 	durangoTimestamp := time.Now().Add(10 * time.Hour)
@@ -1915,7 +1915,7 @@ func TestVerifyManagerConfig(t *testing.T) {
 	require.ErrorIs(t, err, allowlist.ErrCannotAddManagersBeforeDurango)
 
 	genesis = &core.Genesis{}
-	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Durango]))))
+	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Durango]))))
 	params.GetExtra(genesis.Config).DurangoTimestamp = utils.TimeToNewUint64(durangoTimestamp)
 	genesisJSON, err = genesis.MarshalJSON()
 	require.NoError(t, err)
@@ -1931,7 +1931,7 @@ func TestVerifyManagerConfig(t *testing.T) {
 	require.NoError(t, err)
 
 	vm = &VM{}
-	ctx, dbManager, _ = setupGenesis(t, upgradetest.Latest)
+	ctx, dbManager, _ = setupGenesis(t, upgrade.Latest)
 	err = vm.Initialize(
 		t.Context(),
 		ctx,
@@ -1950,7 +1950,7 @@ func TestVerifyManagerConfig(t *testing.T) {
 func TestTxAllowListDisablePrecompile(t *testing.T) {
 	// Setup chain params
 	genesis := &core.Genesis{}
-	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest]))))
+	require.NoError(t, genesis.UnmarshalJSON([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Latest]))))
 	enableAllowListTimestamp := upgrade.InitiallyActiveTime // enable at initially active time
 	params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
 		txallowlist.ConfigKey: txallowlist.NewConfig(utils.TimeToNewUint64(enableAllowListTimestamp), testEthAddrs[0:1], nil, nil),
@@ -2042,7 +2042,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 
 // Test that the fee manager changes fee configuration
 func TestFeeManagerChangeFee(t *testing.T) {
-	heliconFork := upgradetest.Helicon
+	heliconFork := upgrade.Helicon
 
 	// Setup chain params
 	genesis := &core.Genesis{}
@@ -2575,7 +2575,7 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	// use the block's timestamp instead of 0 since rewind to genesis
 	// is hardcoded to be allowed in core/genesis.go.
 	genesisWithUpgrade := &core.Genesis{}
-	require.NoError(t, json.Unmarshal([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Durango])), genesisWithUpgrade))
+	require.NoError(t, json.Unmarshal([]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Durango])), genesisWithUpgrade))
 	params.GetExtra(genesisWithUpgrade.Config).EtnaTimestamp = utils.TimeToNewUint64(blk.Timestamp())
 	genesisWithUpgradeBytes, err := json.Marshal(genesisWithUpgrade)
 	require.NoError(t, err)
@@ -2599,41 +2599,41 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 func TestParentBeaconRootBlock(t *testing.T) {
 	tests := []struct {
 		name          string
-		fork          upgradetest.Fork
+		fork          upgrade.Upgrade
 		beaconRoot    *common.Hash
 		expectedError error
 	}{
 		{
 			name:          "non-empty parent beacon root in Durango",
-			fork:          upgradetest.Durango,
+			fork:          upgrade.Durango,
 			beaconRoot:    &common.Hash{0x01},
 			expectedError: errInvalidParentBeaconRootBeforeCancun,
 		},
 		{
 			name:          "empty parent beacon root in Durango",
-			fork:          upgradetest.Durango,
+			fork:          upgrade.Durango,
 			beaconRoot:    &common.Hash{},
 			expectedError: errInvalidParentBeaconRootBeforeCancun,
 		},
 		{
 			name:       "nil parent beacon root in Durango",
-			fork:       upgradetest.Durango,
+			fork:       upgrade.Durango,
 			beaconRoot: nil,
 		},
 		{
 			name:          "non-empty parent beacon root in E-Upgrade (Cancun)",
-			fork:          upgradetest.Etna,
+			fork:          upgrade.Etna,
 			beaconRoot:    &common.Hash{0x01},
 			expectedError: errParentBeaconRootNonEmpty,
 		},
 		{
 			name:       "empty parent beacon root in E-Upgrade (Cancun)",
-			fork:       upgradetest.Etna,
+			fork:       upgrade.Etna,
 			beaconRoot: &common.Hash{},
 		},
 		{
 			name:          "nil parent beacon root in E-Upgrade (Cancun)",
-			fork:          upgradetest.Etna,
+			fork:          upgrade.Etna,
 			beaconRoot:    nil,
 			expectedError: errMissingParentBeaconRoot,
 		},
@@ -2708,7 +2708,7 @@ func TestStandaloneDB(t *testing.T) {
 		t.Context(),
 		ctx,
 		sharedDB,
-		[]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgradetest.Latest])),
+		[]byte(toGenesisJSON(paramstest.ForkToChainConfig[upgrade.Latest])),
 		nil,
 		[]byte(configJSON),
 		[]*commonEng.Fx{},
@@ -2745,7 +2745,7 @@ func TestStandaloneDB(t *testing.T) {
 func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	// The legacy feeManager precompile is rejected when scheduled at
 	// or after Igloo (see retirement.ReconcileForIgloo)
-	heliconFork := upgradetest.Helicon
+	heliconFork := upgrade.Helicon
 
 	// Setup chain params
 	genesis := &core.Genesis{}
@@ -2930,7 +2930,7 @@ func TestWaitForEvent(t *testing.T) {
 
 	for _, testCase := range []struct {
 		name     string
-		Fork     *upgradetest.Fork
+		Fork     *upgrade.Upgrade
 		testCase func(*testing.T, *VM)
 	}{
 		{
@@ -3114,7 +3114,7 @@ func TestWaitForEvent(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			fork := upgradetest.Latest
+			fork := upgrade.Latest
 			if testCase.Fork != nil {
 				fork = *testCase.Fork
 			}
@@ -3128,7 +3128,7 @@ func TestWaitForEvent(t *testing.T) {
 }
 
 func TestGenesisGasLimit(t *testing.T) {
-	ctx, db, genesisBytes := setupGenesis(t, upgradetest.Granite)
+	ctx, db, genesisBytes := setupGenesis(t, upgrade.Granite)
 	genesis := &core.Genesis{}
 	require.NoError(t, genesis.UnmarshalJSON(genesisBytes))
 	// change the gas limit in the genesis to be different from the fee config
@@ -3437,7 +3437,7 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 	ctx := t.Context()
 	tests := []struct {
 		name                string
-		fork                upgradetest.Fork
+		fork                upgrade.Upgrade
 		deployGasPrice      *big.Int
 		txGasPrice          *big.Int
 		preDeployTime       int64
@@ -3448,7 +3448,7 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 	}{
 		{
 			name:           "granite_should_revert",
-			fork:           upgradetest.Granite,
+			fork:           upgrade.Granite,
 			deployGasPrice: big.NewInt(testMinGasPrice),
 			txGasPrice:     big.NewInt(testMinGasPrice),
 			// Time is irrelevant as only the fork dictates the logic
@@ -3457,7 +3457,7 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 		},
 		{
 			name:                "fortuna_post_cutoff_should_invalidate",
-			fork:                upgradetest.Fortuna,
+			fork:                upgrade.Fortuna,
 			deployGasPrice:      big.NewInt(testMinGasPrice),
 			txGasPrice:          big.NewInt(testMinGasPrice),
 			setTime:             params.InvalidateDelegateUnix + 1,
@@ -3466,7 +3466,7 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 		},
 		{
 			name:              "fortuna_pre_cutoff_should_succeed",
-			fork:              upgradetest.Fortuna,
+			fork:              upgrade.Fortuna,
 			deployGasPrice:    big.NewInt(testMinGasPrice),
 			txGasPrice:        big.NewInt(testMinGasPrice),
 			preDeployTime:     params.InvalidateDelegateUnix - 1,
@@ -3541,37 +3541,37 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 func TestMinDelayExcessInHeader(t *testing.T) {
 	tests := []struct {
 		name                   string
-		fork                   upgradetest.Fork
+		fork                   upgrade.Upgrade
 		desiredMinDelay        *uint64
 		expectedMinDelayExcess *acp226.DelayExcess
 	}{
 		{
 			name:                   "pre_granite_no_min_delay_excess",
-			fork:                   upgradetest.Fortuna,
+			fork:                   upgrade.Fortuna,
 			desiredMinDelay:        nil,
 			expectedMinDelayExcess: nil,
 		},
 		{
 			name:                   "pre_granite_min_delay_excess",
-			fork:                   upgradetest.Fortuna,
+			fork:                   upgrade.Fortuna,
 			desiredMinDelay:        utils.PointerTo[uint64](1000),
 			expectedMinDelayExcess: nil,
 		},
 		{
 			name:                   "granite_first_block_initial_delay_excess",
-			fork:                   upgradetest.Granite,
+			fork:                   upgrade.Granite,
 			desiredMinDelay:        nil,
 			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess),
 		},
 		{
 			name:                   "granite_with_excessive_desired_min_delay_excess",
-			fork:                   upgradetest.Granite,
+			fork:                   upgrade.Granite,
 			desiredMinDelay:        utils.PointerTo[uint64](4000),
 			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess + acp226.MaxDelayExcessDiff),
 		},
 		{
 			name:                   "granite_with_zero_desired_min_delay_excess",
-			fork:                   upgradetest.Granite,
+			fork:                   upgrade.Granite,
 			desiredMinDelay:        utils.PointerTo[uint64](0),
 			expectedMinDelayExcess: utils.PointerTo(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff),
 		},
@@ -3669,7 +3669,7 @@ func TestFirewoodArchivalQueries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := t.Context()
-			fork := upgradetest.Latest
+			fork := upgrade.Latest
 
 			tvm := newVM(t, testVMConfig{
 				fork:       &fork,

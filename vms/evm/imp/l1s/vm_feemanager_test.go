@@ -17,7 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 
 	legacyparams "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 )
@@ -43,7 +43,7 @@ func TestFeeManagerForceDisabledAtIglooActivation(t *testing.T) {
 
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Igloo),
+		withFork(upgrade.Igloo),
 		withNumAccounts(2),
 		withNow(now),
 		withGenesisConfig(func(genesis *core.Genesis, addresses []common.Address) {

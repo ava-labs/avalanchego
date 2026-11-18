@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
@@ -30,10 +31,10 @@ import (
 )
 
 func TestBuildHeaderIglooOverride(t *testing.T) {
-	networkUpgrades := upgradetest.GetConfig(upgradetest.Igloo)
+	networkUpgrades := upgradetest.GetConfig(upgrade.Igloo)
 	iglooTime := networkUpgrades.IglooTime.Add(time.Hour)
 	snowCtx := newSnowCtx(t, networkUpgrades)
-	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgradetest.Igloo])
+	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgrade.Igloo])
 	legacyparams.GetExtra(&chainCfg).Override(&extras.NetworkUpgrades{
 		IglooTimestamp: new(uint64(iglooTime.Unix())), //#nosec G115 -- known positive test timestamp
 	})
@@ -98,7 +99,7 @@ func TestGasConfigAfterGenesisCanonicalTarget(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgradetest.Igloo])
+			chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgrade.Igloo])
 			config := &commontype.GasPriceConfig{
 				TargetGas:    uint64(test.storedTarget),
 				MinGasPrice:  1,
@@ -138,7 +139,7 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 		rebuilderCoinbase = common.HexToAddress("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
 	)
 
-	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgradetest.Igloo])
+	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgrade.Igloo])
 	legacyparams.GetExtra(&chainCfg).AllowFeeRecipients = true // route through customCoinbase branch in resolveCoinbase
 
 	parent := &types.Header{Number: big.NewInt(1), Time: parentTimeMS / 1000}
@@ -212,7 +213,7 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	)
 	forgedCoinbase := common.HexToAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
 
-	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgradetest.Igloo])
+	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgrade.Igloo])
 	// Vanilla Igloo: AllowFeeRecipients=false, no rewardmanager precompile
 	// => deterministic branch in resolveCoinbase MUST stamp BlackholeAddr.
 

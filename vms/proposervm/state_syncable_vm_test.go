@@ -23,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/proposervm/summary"
 
@@ -64,7 +65,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	vm := New(
 		innerVM,
 		Config{
-			Upgrades:            upgradetest.GetConfig(upgradetest.Latest),
+			Upgrades:            upgradetest.GetConfig(upgrade.Latest),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,

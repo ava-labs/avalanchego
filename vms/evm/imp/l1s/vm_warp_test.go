@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
@@ -81,7 +80,7 @@ func withWarpEnabled() l1SUTOption {
 func TestSendWarpMessage(t *testing.T) {
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Igloo),
+		withFork(upgrade.Igloo),
 		withNow(postIglooStartTime(t)),
 		withWarpEnabled(),
 	)
@@ -143,7 +142,7 @@ func TestInactiveWarpAddressLogsNotSigned(t *testing.T) {
 
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Igloo),
+		withFork(upgrade.Igloo),
 		withNow(postIglooStartTime(t)),
 		withGenesisConfig(func(genesis *core.Genesis, _ []common.Address) {
 			genesis.Alloc[warpcontract.ContractAddress] = types.Account{
@@ -192,7 +191,7 @@ func sendWarpMessageLogCode(t *testing.T, msg *avalancheWarp.UnsignedMessage) []
 func TestPredicateVerification(t *testing.T) {
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Igloo),
+		withFork(upgrade.Igloo),
 		withNow(postIglooStartTime(t)),
 		withWarpEnabled(),
 	)

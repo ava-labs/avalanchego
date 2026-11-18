@@ -33,6 +33,7 @@ go_test(
         "//database/leveldb",
         "//ids",
         "//snow/validators",
+        "//upgrade",
         "//upgrade/upgradetest",
         "//utils/constants",
         "//utils/crypto/bls",

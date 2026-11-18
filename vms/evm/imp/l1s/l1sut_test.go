@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/allowlist"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/stateupgrade"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -89,7 +90,7 @@ type l1SUT struct {
 
 type (
 	l1SUTConfig struct {
-		fork        upgradetest.Fork
+		fork        upgrade.Upgrade
 		numAccounts uint
 		// clockTime, if non-nil, pins the VM's mockable clock (and
 		// transitively `sae.Config.Now` and the uptime tracker) to a
@@ -124,7 +125,7 @@ func newL1SUT(t *testing.T, opts ...l1SUTOption) *l1SUT {
 	t.Helper()
 
 	cfg := options.ApplyTo(&l1SUTConfig{
-		fork:        upgradetest.Durango,
+		fork:        upgrade.Durango,
 		numAccounts: 1,
 	}, opts...)
 
@@ -324,7 +325,7 @@ func initVM(
 	return vm, appSender, shutdown, nil
 }
 
-func newTestGenesis(fork upgradetest.Fork, keychain *saetest.KeyChain) *core.Genesis {
+func newTestGenesis(fork upgrade.Upgrade, keychain *saetest.KeyChain) *core.Genesis {
 	chainConfig := legacyparams.Copy(paramstest.ForkToChainConfig[fork])
 	return &core.Genesis{
 		Config:     &chainConfig,
@@ -335,7 +336,7 @@ func newTestGenesis(fork upgradetest.Fork, keychain *saetest.KeyChain) *core.Gen
 	}
 }
 
-func withFork(fork upgradetest.Fork) l1SUTOption { //nolint:unparam // Igloo is currently Latest but caller-controlled by design
+func withFork(fork upgrade.Upgrade) l1SUTOption { //nolint:unparam // Igloo is currently Latest but caller-controlled by design
 	return options.Func[l1SUTConfig](func(c *l1SUTConfig) {
 		c.fork = fork
 	})
@@ -682,7 +683,7 @@ func (s *l1SUT) requireDeployFailed(t *testing.T, tx *types.Transaction) {
 func postIglooStartTime(t *testing.T) time.Time {
 	t.Helper()
 
-	networkUpgrades := extras.GetNetworkUpgrades(upgradetest.GetConfig(upgradetest.Igloo))
+	networkUpgrades := extras.GetNetworkUpgrades(upgradetest.GetConfig(upgrade.Igloo))
 	require.NotNil(t, networkUpgrades.IglooTimestamp)
 	return time.Unix(int64(*networkUpgrades.IglooTimestamp), 0).Add(saeparams.Tau) // #nosec G115 -- upgrade timestamp is far below MaxInt64
 }
@@ -690,7 +691,7 @@ func postIglooStartTime(t *testing.T) time.Time {
 // TestStateUpgradeAppliedAtActivationSAE exercises the `StateUpgrades` arm of
 // `StartExecutingBlock` -> `legacycore.ApplyUpgrades`.
 //
-// It schedules a single `extras.StateUpgrade` at `now + Tau` that:
+// It schedules a single `stateupgrade.Block` at `now + Tau` that:
 //   - bumps a known account's balance, and
 //   - writes a deterministic value to one of its storage slots.
 //
@@ -720,15 +721,15 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Igloo),
+		withFork(upgrade.Igloo),
 		withNumAccounts(2),
 		withNow(now),
 		withUpgradeConfig(func(_ []common.Address) []byte {
 			return mustMarshalJSON(t, &extras.UpgradeConfig{
-				StateUpgrades: []extras.StateUpgrade{
+				StateUpgrades: []stateupgrade.Block{
 					{
-						BlockTimestamp: &activationTS,
-						StateUpgradeAccounts: map[common.Address]extras.StateUpgradeAccount{
+						Timestamp: &activationTS,
+						Accounts: map[common.Address]stateupgrade.Account{
 							target: {
 								BalanceChange: (*math.HexOrDecimal256)(balanceBump),
 								Storage:       map[common.Hash]common.Hash{storageSlot: storageValue},
@@ -797,7 +798,7 @@ func TestRestartRejectsActivatedNetworkUpgradeChange(t *testing.T) {
 
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Igloo),
+		withFork(upgrade.Igloo),
 		withNumAccounts(2),
 		withNow(time.Unix(int64(initialIgloo+100), 0)), // #nosec G115 -- test timestamp is far below MaxInt64
 		withUpgradeConfig(func([]common.Address) []byte {

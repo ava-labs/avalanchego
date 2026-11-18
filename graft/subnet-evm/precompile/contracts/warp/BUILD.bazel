@@ -57,7 +57,7 @@ graft_go_test(
         "//snow/snowtest",
         "//snow/validators",
         "//snow/validators/validatorstest",
-        "//upgrade/upgradetest",
+        "//upgrade",
         "//utils",
         "//utils/constants",
         "//utils/crypto/bls",

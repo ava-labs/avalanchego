@@ -133,6 +133,7 @@ go_test(
         "//graft/subnet-evm/precompile/contracts/rewardmanager",
         "//graft/subnet-evm/precompile/contracts/txallowlist",
         "//graft/subnet-evm/precompile/contracts/warp",
+        "//graft/subnet-evm/stateupgrade",
         "//ids",
         "//network/p2p",
         "//network/p2p/acp118",

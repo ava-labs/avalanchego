@@ -17,7 +17,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
 	"github.com/ava-labs/avalanchego/vms/evm/txgossip/txgossiptest"
@@ -108,7 +108,7 @@ func TestRewardManagerDefaultBurnSAE(t *testing.T) {
 	now := postIglooStartTime(t)
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Igloo),
+		withFork(upgrade.Igloo),
 		withNumAccounts(1),
 		withNow(now),
 	)
@@ -137,7 +137,7 @@ func TestRewardManagerGenesisAllowFeeRecipientsSAE(t *testing.T) {
 
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Igloo),
+		withFork(upgrade.Igloo),
 		withNumAccounts(1),
 		withNow(now),
 		withFeeRecipient(validator),
@@ -192,7 +192,7 @@ func TestRewardManagerPrecompileUpgradesSAE(t *testing.T) {
 
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Igloo),
+		withFork(upgrade.Igloo),
 		withNumAccounts(2),
 		withNow(now),
 		withFeeRecipient(validator),
@@ -340,7 +340,7 @@ func TestRewardManagerForgedCoinbaseFailsVerifyBlock(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			now := postIglooStartTime(t)
 			opts := append([]l1SUTOption{
-				withFork(upgradetest.Igloo),
+				withFork(upgrade.Igloo),
 				withNumAccounts(1),
 				withNow(now),
 			}, test.opts...)

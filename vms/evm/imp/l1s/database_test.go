@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/evm/types"
 )
@@ -69,7 +69,7 @@ func TestConfig_UseStandaloneDatabase(t *testing.T) {
 func TestStandaloneDatabase(t *testing.T) {
 	sut := newL1SUT(
 		t,
-		withFork(upgradetest.Igloo),
+		withFork(upgrade.Igloo),
 		withNow(postIglooStartTime(t)),
 		withStandaloneDatabase(t.TempDir()),
 	)

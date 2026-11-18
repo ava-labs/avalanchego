@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/libevm/options"
@@ -25,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -99,7 +101,7 @@ func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
 
 	snowCtx := snowtest.Context(tb, ids.GenerateTestID())
 	snowCtx.ChainDataDir = tb.TempDir()
-	snowCtx.NetworkUpgrades = upgradetest.GetConfig(upgradetest.Latest)
+	snowCtx.NetworkUpgrades = upgradetest.GetConfig(upgrade.Latest)
 	snowCtx.ValidatorState.(*validatorstest.State).GetCurrentValidatorSetF = func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
 		return map[ids.ID]*validators.GetCurrentValidatorOutput{}, 0, nil
 	}
@@ -233,4 +235,46 @@ func TestMinGasConsumptionFloor(t *testing.T) {
 			assert.Equal(t, tt.wantGasUsed, receipts[i].GasUsed, "receipt GasUsed")
 		})
 	}
+}
+
+// TestPrecompileActivation asserts that a precompile upgrade activates at the
+// time configured in the upgrade config.
+func TestPrecompileActivation(t *testing.T) {
+	const upgradeOffset = 10
+	upgradeTime := time.Unix(int64(testGenesisTime)+upgradeOffset, 0) //#nosec G115 -- Won't overflow
+	upgradeUnix := testGenesisTime + upgradeOffset
+
+	var (
+		recipient = common.Address{'r', 'e', 'c', 'i', 'p', 'i', 'e', 'n', 't'}
+		amount    = uint256.NewInt(42)
+	)
+	wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSignerForChainID(big.NewInt(testChainID)))
+	timeOpt, _ := withVMTime(upgradeTime)
+	ctx, sut := newSUT(t,
+		withMaxAllocFor(wallet.Addresses()...),
+		timeOpt,
+		withUpgrades(extras.UpgradeConfig{
+			PrecompileUpgrades: []extras.PrecompileUpgrade{{
+				Config: nativeminter.NewConfig(&upgradeUnix, nil, nil, nil, map[common.Address]*math.HexOrDecimal256{
+					recipient: (*math.HexOrDecimal256)(amount.ToBig()),
+				}),
+			}},
+		}),
+	)
+
+	// tx is unrelated, but block can't be empty.
+	tx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+		To:        &common.Address{1},
+		Gas:       ethparams.TxGas,
+		GasTipCap: big.NewInt(1),
+		GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
+	})
+	require.NoErrorf(t, sut.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction()", sut.EthClient())
+	sut.WaitForPendingTxs(ctx, t, tx)
+
+	activating := sut.BuildVerifyAccept(ctx, t)
+	require.NoErrorf(t, activating.WaitUntilExecuted(ctx), "%T.WaitUntilExecuted()", activating)
+
+	require.Equal(t, upgradeUnix, activating.Header().Time, "block time MUST activate the precompile")
+	assert.Equal(t, *amount, sut.Balance(t, recipient), "balance(recipient) after activating block")
 }
