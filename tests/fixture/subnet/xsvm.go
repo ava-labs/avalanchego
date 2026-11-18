@@ -13,20 +13,23 @@ import (
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 )
 
+// NewXSVMGenesis returns an xsvm genesis that funds [key].
+func NewXSVMGenesis(key *secp256k1.PrivateKey) ([]byte, error) {
+	return genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{
+		Timestamp: time.Now().Unix(),
+		Allocations: []genesis.Allocation{{
+			Address: key.Address(),
+			Balance: math.MaxUint64,
+		}},
+	})
+}
+
 func NewXSVMOrPanic(name string, key *secp256k1.PrivateKey, nodes ...*tmpnet.Node) *tmpnet.Subnet {
 	if len(nodes) == 0 {
 		panic("a subnet must be validated by at least one node")
 	}
 
-	genesisBytes, err := genesis.Codec.Marshal(genesis.CodecVersion, &genesis.Genesis{
-		Timestamp: time.Now().Unix(),
-		Allocations: []genesis.Allocation{
-			{
-				Address: key.Address(),
-				Balance: math.MaxUint64,
-			},
-		},
-	})
+	genesisBytes, err := NewXSVMGenesis(key)
 	if err != nil {
 		panic(err)
 	}

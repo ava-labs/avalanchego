@@ -6,14 +6,12 @@ package config
 import (
 	"crypto/tls"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -40,7 +38,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -53,6 +50,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
@@ -107,6 +105,11 @@ var (
 	errDiskSpaceOutOfRange                    = fmt.Errorf("out of range [0,%d]", maxDiskSpaceThreshold)
 	errDiskWarnAfterFatal                     = errors.New("warning disk space threshold cannot be greater than fatal threshold")
 	errNegativeMutexProfileFraction           = fmt.Errorf("%s must be >= 0", ProfileContinuousMutexFractionKey)
+	errInvalidIsolatedL1Config                = fmt.Errorf("invalid %s", IsolatedL1ConfigFileKey)
+	errInvalidIsolatedL1Tx                    = errors.New("invalid isolated L1 createChainTx")
+	errIsolatedL1ChainIDMismatch              = errors.New("isolated L1 chainID does not match the createChainTx ID")
+	errInvalidIsolatedL1Validator             = errors.New("invalid isolated L1 validator")
+	errIsolatedL1WithoutSybilProtection       = errors.New("isolated L1 mode requires sybil protection")
 )
 
 func getPrimaryNetworkSnowConfig(v *viper.Viper) *snowball.Parameters {
@@ -634,7 +637,7 @@ func getBootstrapConfig(v *viper.Viper, networkID uint32) (node.BootstrapConfig,
 	if !ipsSet && idsSet {
 		return node.BootstrapConfig{}, fmt.Errorf("set %q but didn't set %q", BootstrapIDsKey, BootstrapIPsKey)
 	}
-	if !ipsSet && !idsSet && !v.IsSet(IsolatedL1TxFileKey) {
+	if !ipsSet && !idsSet && !v.IsSet(IsolatedL1ConfigFileKey) {
 		config.Bootstrappers = genesis.SampleBootstrappers(networkID, 5)
 		return config, nil
 	}
@@ -965,72 +968,56 @@ func getGenesisData(v *viper.Viper, networkID uint32, stakingCfg *genesis.Stakin
 	return genesis.FromConfig(config)
 }
 
-// getIsolatedL1 returns nil unless the isolated L1 flags are set.
+// IsolatedL1Config is the content of the file set by --isolated-l1-config-file.
+type IsolatedL1Config struct {
+	// CreateChainTx is the signed tx that created the chain on the P-chain, in
+	// the hex format returned by platform.getTx.
+	CreateChainTx string `json:"createChainTx"`
+	// ChainID must be the ID of CreateChainTx.
+	ChainID    ids.ID                `json:"chainID"`
+	Validators []IsolatedL1Validator `json:"validators"`
+}
+
+type IsolatedL1Validator struct {
+	NodeID ids.NodeID                `json:"nodeID"`
+	Weight uint64                    `json:"weight"`
+	Signer *signer.ProofOfPossession `json:"signer"`
+}
+
+// getIsolatedL1 returns nil unless the isolated L1 config file is set.
 func getIsolatedL1(v *viper.Viper) (*chains.IsolatedL1, error) {
-	txFile, chainIDStr, vdrsStr := v.GetString(IsolatedL1TxFileKey), v.GetString(IsolatedL1ChainIDKey), v.GetString(IsolatedL1ValidatorsKey)
-	if txFile == "" && chainIDStr == "" && vdrsStr == "" {
+	path := v.GetString(IsolatedL1ConfigFileKey)
+	if path == "" {
 		return nil, nil
 	}
-	if txFile == "" || chainIDStr == "" || vdrsStr == "" {
-		return nil, fmt.Errorf("%q, %q and %q must be set together", IsolatedL1TxFileKey, IsolatedL1ChainIDKey, IsolatedL1ValidatorsKey)
+	configBytes, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errInvalidIsolatedL1Config, err)
+	}
+	return parseIsolatedL1Config(configBytes)
+}
+
+func parseIsolatedL1Config(configBytes []byte) (*chains.IsolatedL1, error) {
+	var config IsolatedL1Config
+	if err := json.Unmarshal(configBytes, &config); err != nil {
+		return nil, fmt.Errorf("%w: %w", errInvalidIsolatedL1Config, err)
 	}
 
-	txHex, err := os.ReadFile(filepath.Clean(txFile))
+	createChainTx, txID, err := parseCreateChainTx(config.CreateChainTx)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't read %q: %w", IsolatedL1TxFileKey, err)
+		return nil, fmt.Errorf("%w: %w", errInvalidIsolatedL1Tx, err)
 	}
-	// Same format as platform.getTx with hex encoding: 0x prefix and checksum.
-	txBytes, err := formatting.Decode(formatting.Hex, strings.TrimSpace(string(txHex)))
+	if txID != config.ChainID {
+		return nil, fmt.Errorf("%w: tx ID is %s, chainID is %s", errIsolatedL1ChainIDMismatch, txID, config.ChainID)
+	}
+	vdrs, err := parseIsolatedL1Validators(config.Validators)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't decode %q: %w", IsolatedL1TxFileKey, err)
-	}
-	tx, err := platform.ParseTx(platform.Codec, txBytes)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't parse %q: %w", IsolatedL1TxFileKey, err)
-	}
-	chainID, err := ids.FromString(chainIDStr)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't parse %q: %w", IsolatedL1ChainIDKey, err)
-	}
-	if tx.ID() != chainID {
-		return nil, fmt.Errorf("%q has tx ID %s, but %q is %s", IsolatedL1TxFileKey, tx.ID(), IsolatedL1ChainIDKey, chainID)
-	}
-	createChainTx, ok := tx.Unsigned.(*platform.CreateChainTx)
-	if !ok {
-		return nil, fmt.Errorf("%q has %T, expected a CreateChainTx", IsolatedL1TxFileKey, tx.Unsigned)
-	}
-
-	vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput)
-	for _, entry := range strings.Split(vdrsStr, ",") {
-		parts := strings.Split(strings.TrimSpace(entry), ":")
-		if len(parts) != 3 {
-			return nil, fmt.Errorf("%q entry %q is not NodeID:weight:blsKey", IsolatedL1ValidatorsKey, entry)
-		}
-		nodeID, err := ids.NodeIDFromString(parts[0])
-		if err != nil {
-			return nil, fmt.Errorf("%q entry %q: %w", IsolatedL1ValidatorsKey, entry, err)
-		}
-		weight, err := strconv.ParseUint(parts[1], 10, 64)
-		if err != nil || weight == 0 {
-			return nil, fmt.Errorf("%q entry %q: invalid weight", IsolatedL1ValidatorsKey, entry)
-		}
-		pkBytes, err := hex.DecodeString(strings.TrimPrefix(parts[2], "0x"))
-		if err != nil {
-			return nil, fmt.Errorf("%q entry %q: %w", IsolatedL1ValidatorsKey, entry, err)
-		}
-		pk, err := bls.PublicKeyFromCompressedBytes(pkBytes)
-		if err != nil {
-			return nil, fmt.Errorf("%q entry %q: %w", IsolatedL1ValidatorsKey, entry, err)
-		}
-		if _, dup := vdrs[nodeID]; dup {
-			return nil, fmt.Errorf("%q has %s twice", IsolatedL1ValidatorsKey, nodeID)
-		}
-		vdrs[nodeID] = &validators.GetValidatorOutput{NodeID: nodeID, PublicKey: pk, Weight: weight}
+		return nil, err
 	}
 
 	return &chains.IsolatedL1{
 		Chain: chains.ChainParameters{
-			ID:          chainID,
+			ID:          txID,
 			SubnetID:    createChainTx.SubnetID,
 			GenesisData: createChainTx.GenesisData,
 			VMID:        createChainTx.VMID,
@@ -1038,6 +1025,51 @@ func getIsolatedL1(v *viper.Viper) (*chains.IsolatedL1, error) {
 		},
 		Validators: vdrs,
 	}, nil
+}
+
+// parseCreateChainTx parses a signed CreateChainTx in the hex format returned
+// by platform.getTx, and returns it with its ID.
+func parseCreateChainTx(txHex string) (*platform.CreateChainTx, ids.ID, error) {
+	txBytes, err := formatting.Decode(formatting.Hex, txHex)
+	if err != nil {
+		return nil, ids.Empty, err
+	}
+	tx, err := platform.ParseTx(platform.Codec, txBytes)
+	if err != nil {
+		return nil, ids.Empty, err
+	}
+	createChainTx, ok := tx.Unsigned.(*platform.CreateChainTx)
+	if !ok {
+		return nil, ids.Empty, fmt.Errorf("expected a CreateChainTx but got %T", tx.Unsigned)
+	}
+	return createChainTx, tx.ID(), nil
+}
+
+func parseIsolatedL1Validators(config []IsolatedL1Validator) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	if len(config) == 0 {
+		return nil, fmt.Errorf("%w: no validators", errInvalidIsolatedL1Validator)
+	}
+	vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, len(config))
+	for _, vdr := range config {
+		switch {
+		case vdr.Weight == 0:
+			return nil, fmt.Errorf("%w %s: weight must be positive", errInvalidIsolatedL1Validator, vdr.NodeID)
+		case vdr.Signer == nil:
+			return nil, fmt.Errorf("%w %s: missing signer", errInvalidIsolatedL1Validator, vdr.NodeID)
+		}
+		if err := vdr.Signer.Verify(); err != nil {
+			return nil, fmt.Errorf("%w %s: %w", errInvalidIsolatedL1Validator, vdr.NodeID, err)
+		}
+		if _, ok := vdrs[vdr.NodeID]; ok {
+			return nil, fmt.Errorf("%w %s: duplicate node ID", errInvalidIsolatedL1Validator, vdr.NodeID)
+		}
+		vdrs[vdr.NodeID] = &validators.GetValidatorOutput{
+			NodeID:    vdr.NodeID,
+			PublicKey: vdr.Signer.Key(),
+			Weight:    vdr.Weight,
+		}
+	}
+	return vdrs, nil
 }
 
 func getTrackedSubnets(v *viper.Viper) (set.Set[ids.ID], error) {
@@ -1495,6 +1527,11 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, err
 	}
 	if nodeConfig.IsolatedL1 != nil {
+		// The isolated L1 validators replace the P-chain's validator set,
+		// which is meaningless if the node ignores validator sets.
+		if !nodeConfig.SybilProtectionEnabled {
+			return node.Config{}, errIsolatedL1WithoutSybilProtection
+		}
 		nodeConfig.TrackedSubnets.Add(nodeConfig.IsolatedL1.Chain.SubnetID)
 	}
 

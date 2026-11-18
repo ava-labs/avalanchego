@@ -515,7 +515,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			BCLookup:     m,
 			Metrics:      metrics.NewPrefixGatherer(),
 
-			WarpSigner: warp.NewSigner(m.StakingBLSKey, m.NetworkID, chainParams.ID),
+			WarpSigner: m.warpSigner(chainParams.ID),
 
 			ValidatorState: m.validatorState,
 			ChainDataDir:   chainDataDir,
@@ -1519,9 +1519,10 @@ func (m *manager) registerBootstrappedHealthChecks() error {
 // Starts chain creation loop to process queued chains
 func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	if m.IsolatedL1 != nil {
-		m.validatorState = m.IsolatedL1
-		close(m.unblockChainCreatorCh)
-		m.QueueChainCreation(m.IsolatedL1.Chain)
+		m.startIsolatedL1()
+		m.Log.Info("starting chain creator for isolated L1",
+			zap.Stringer("chainID", m.IsolatedL1.Chain.ID),
+		)
 		m.chainCreatorExited.Add(1)
 		go m.dispatchChainCreator()
 		return m.registerBootstrappedHealthChecks()
@@ -1541,6 +1542,21 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	m.chainCreatorExited.Add(1)
 	go m.dispatchChainCreator()
 	return nil
+}
+
+// startIsolatedL1 uses the isolated L1 in place of the P-chain and queues the
+// L1 as the only chain to create.
+func (m *manager) startIsolatedL1() {
+	m.validatorState = m.IsolatedL1
+	m.QueueChainCreation(m.IsolatedL1.Chain)
+	close(m.unblockChainCreatorCh)
+}
+
+func (m *manager) warpSigner(chainID ids.ID) warp.Signer {
+	if m.IsolatedL1 != nil {
+		return disabledWarpSigner{}
+	}
+	return warp.NewSigner(m.StakingBLSKey, m.NetworkID, chainID)
 }
 
 func (m *manager) dispatchChainCreator() {

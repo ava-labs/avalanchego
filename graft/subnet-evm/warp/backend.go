@@ -129,9 +129,6 @@ func (b *backend) AddMessage(unsignedMessage *avalancheWarp.UnsignedMessage) err
 		return fmt.Errorf("failed to put warp signature in db: %w", err)
 	}
 
-	if _, err := b.signMessage(unsignedMessage); err != nil {
-		return fmt.Errorf("failed to sign warp message: %w", err)
-	}
 	return nil
 }
 

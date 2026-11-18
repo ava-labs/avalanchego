@@ -238,12 +238,8 @@ func New(
 	}
 	if l1 := n.Config.IsolatedL1; l1 != nil {
 		// No P-chain will populate the validators, so use the static set.
-		for _, subnetID := range []ids.ID{constants.PrimaryNetworkID, l1.Chain.SubnetID} {
-			for nodeID, vdr := range l1.Validators {
-				if err := n.vdrs.AddStaker(subnetID, nodeID, vdr.PublicKey, l1.Chain.ID, vdr.Weight); err != nil {
-					return nil, fmt.Errorf("couldn't add isolated L1 validator: %w", err)
-				}
-			}
+		if err := l1.RegisterValidators(n.vdrs); err != nil {
+			return nil, fmt.Errorf("couldn't add isolated L1 validators: %w", err)
 		}
 	}
 	if err := n.initResourceManager(); err != nil {
@@ -1553,10 +1549,16 @@ func (n *Node) initHealthAPI() error {
 		localUpgradeTime     = n.Config.UpgradeConfig.LatestTime()
 		localUpgradeTimeUnix = uint64(localUpgradeTime.Unix())
 		lastLogTime          time.Time
+		// An isolated L1 has no Primary Network validators, so its own
+		// validators are compared instead.
+		upgradeCheckSubnetID = constants.PrimaryNetworkID
 	)
+	if l1 := n.Config.IsolatedL1; l1 != nil {
+		upgradeCheckSubnetID = l1.Chain.SubnetID
+	}
 	futureUpgradeCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
 		var (
-			currentValidators = n.vdrs.GetMap(constants.PrimaryNetworkID)
+			currentValidators = n.vdrs.GetMap(upgradeCheckSubnetID)
 			totalWeight       uint64
 		)
 		for _, vdr := range currentValidators {
