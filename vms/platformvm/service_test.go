@@ -711,7 +711,7 @@ func TestGetCurrentValidatorsAutoRenewedValidator(t *testing.T) {
 				Priority:        addAutoRenewedValidatorTx.CurrentPriority(),
 			}
 
-			diff, err := state.NewDiffOn(service.vm.state, state.StakerAdditionAfterDeletionAllowed)
+			diff, err := state.NewDiffOn(service.vm.state)
 			require.NoError(err)
 			diff.AddTx(tx, status.Committed)
 			require.NoError(diff.PutCurrentValidator(staker))

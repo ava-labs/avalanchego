@@ -92,7 +92,7 @@ func TestApricotProposalBlockTimeVerification(t *testing.T) {
 	}))
 	require.NoError(env.state.Commit())
 
-	onParentAccept, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	onParentAccept, err := state.NewDiffOn(env.state)
 	require.NoError(err)
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: apricotParentBlk,
@@ -183,7 +183,7 @@ func TestBanffProposalBlockTimeVerification(t *testing.T) {
 	}))
 	require.NoError(env.state.Commit())
 
-	onParentAccept, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	onParentAccept, err := state.NewDiffOn(env.state)
 	require.NoError(err)
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: banffParentBlk,

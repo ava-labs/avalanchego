@@ -44,7 +44,7 @@ func TestApricotStandardBlockTimeVerification(t *testing.T) {
 
 	// store parent block, with relevant quantities
 
-	onParentAccept, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	onParentAccept, err := state.NewDiffOn(env.state)
 	require.NoError(err)
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: apricotParentBlk,
@@ -122,7 +122,7 @@ func TestBanffStandardBlockTimeVerification(t *testing.T) {
 		NodeID:   ids.GenerateTestNodeID(),
 	}))
 
-	onParentAccept, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionForbidden)
+	onParentAccept, err := state.NewDiffOn(env.state)
 	require.NoError(err)
 	env.blkManager.(*manager).blkIDToState[parentID] = &blockState{
 		statelessBlock: banffParentBlk,
