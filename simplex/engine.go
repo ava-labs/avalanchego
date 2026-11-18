@@ -78,8 +78,17 @@ func newEngineWithSignerVerifier(ctx context.Context, config *Config, signer BLS
 		return nil, errNilSimplexParameters
 	}
 
+	// The signer bitmask indexes into the validators sorted the same way the epoch sorts them.
+	var validators simplexcommon.Nodes
+	for _, vdr := range config.Params.InitialValidators {
+		validators = append(validators, simplexcommon.Node{Id: simplexcommon.NodeIDFromAvalancheID(vdr.NodeID)})
+	}
+	simplexcommon.SortNodes(validators)
+
 	qcDeserializer := &QCDeserializer{
-		verifier: &verifier,
+		chainID:   config.Ctx.ChainID,
+		networkID: config.Ctx.NetworkID,
+		nodes:     validators.NodeIDs(),
 	}
 
 	comm, err := NewComm(config)
@@ -131,8 +140,8 @@ func newEngineWithSignerVerifier(ctx context.Context, config *Config, signer BLS
 		Signer:             &signer,
 		Verifier:           &verifier,
 		BlockDeserializer:  blockDeserializer,
-		SignatureAggregatorCreator: func([]simplexcommon.Node) simplexcommon.SignatureAggregator {
-			return &SignatureAggregator{verifier: &verifier}
+		SignatureAggregatorCreator: func(nodes []simplexcommon.Node) simplexcommon.SignatureAggregator {
+			return newSignatureAggregator(config.Ctx.NetworkID, config.Ctx.ChainID, nodes)
 		},
 		Comm:               comm,
 		Storage:            storage,

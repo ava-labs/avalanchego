@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"golang.org/x/exp/constraints"
 )
 
 type Logger interface {
@@ -165,7 +166,7 @@ type Signature struct {
 type QCDeserializer interface {
 	// DeserializeQuorumCertificate parses the given bytes and initializes a QuorumCertificate.
 	// Returns an error upon failure.
-	DeserializeQuorumCertificate(bytes []byte) (QuorumCertificate, error)
+	DeserializeQuorumCertificate(bytes []byte, nodes NodeIDs) (QuorumCertificate, error)
 }
 
 // SignatureAggregator aggregates signatures into a QuorumCertificate
@@ -267,7 +268,7 @@ func SortNodes(nodes Nodes) {
 	})
 }
 
-func Quorum(n int) int {
+func Quorum[N constraints.Integer](n N) N {
 	f := (n - 1) / 3
 	// Obtained from the equation:
 	// Quorum * 2 = N + F + 1

@@ -286,8 +286,7 @@ type SignedMessage struct {
 type QuorumCertificate interface {
 	// Signers returns who participated in creating this QuorumCertificate.
 	Signers() []NodeID
-	// Verify checks whether the nodes participated in creating this QuorumCertificate,
-	// signed the given message.
+	// Verify checks whether this QuorumCertificate is valid for the given message and validator set.
 	Verify(msg []byte, nodes Nodes) error
 	// Bytes returns a raw representation of the given QuorumCertificate.
 	Bytes() []byte

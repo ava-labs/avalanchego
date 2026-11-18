@@ -14,8 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-// TestQCDuplicateSigners tests verification fails if the
-// same signer signs multiple times.
+// TestQCDuplicateSigners tests that signatures from the same signer are
+// not double counted when aggregating.
 func TestQCDuplicateSigners(t *testing.T) {
 	configs := newNetworkConfigs(t, 4)
 	quorum := common.Quorum(len(configs))
@@ -25,7 +25,7 @@ func TestQCDuplicateSigners(t *testing.T) {
 	require.NoError(t, err)
 	sig, err := signer.Sign(msg)
 	require.NoError(t, err)
-	require.NoError(t, verifier.VerifySignature(msg, sig, configs[0].Ctx.NodeID[:]))
+	require.NoError(t, verifier.VerifySignature(msg, sig, publicKeyOf(t, configs[0])))
 
 	signatures := make([]common.Signature, 0, quorum)
 	for range quorum {
@@ -35,21 +35,16 @@ func TestQCDuplicateSigners(t *testing.T) {
 		})
 	}
 
-	// aggregate the signatures into a quorum certificate
-	signatureAggregator := SignatureAggregator{verifier: &verifier}
-	qc, err := signatureAggregator.Aggregate(signatures)
-	require.NoError(t, err)
-
-	err = qc.Verify(msg, nil)
-	require.ErrorIs(t, err, errDuplicateSigner)
+	// A single signer repeated quorum times is still a single signer.
+	_, err = newTestSignatureAggregator(configs[0]).Aggregate(signatures)
+	require.ErrorIs(t, err, errUnexpectedSigners)
 }
 
 func TestQCDeserializerInvalidBytes(t *testing.T) {
 	config := newEngineConfig(t, 2)
 
-	_, verifier, err := NewBLSAuth(config)
-	require.NoError(t, err)
-	deserializer := QCDeserializer{verifier: &verifier}
+	deserializer := newTestQCDeserializer(config)
+	nodeIDs := testValidators(config).NodeIDs()
 
 	sig, err := config.SignBLS([]byte("message2Sign"))
 	require.NoError(t, err)
@@ -91,7 +86,7 @@ func TestQCDeserializerInvalidBytes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := deserializer.DeserializeQuorumCertificate(tt.input)
+			_, err := deserializer.DeserializeQuorumCertificate(tt.input, nodeIDs)
 			require.ErrorIs(t, err, tt.err)
 		})
 	}
@@ -150,11 +145,11 @@ func TestSignatureAggregation(t *testing.T) {
 		{
 			name: "not in membership set",
 			signers: func() []common.Signature {
-				sigs := make([]common.Signature, 0, 3)
+				sigs := make([]common.Signature, 0, 4)
 				for i, config := range configs {
 					signer, _, err := NewBLSAuth(config)
 					require.NoError(t, err)
-					if i < 2 {
+					if i < 3 {
 						sig, err := signer.Sign(msg)
 						require.NoError(t, err)
 						sigs = append(sigs, common.Signature{Signer: common.NodeIDFromAvalancheID(config.Ctx.NodeID), Value: sig})
@@ -177,27 +172,27 @@ func TestSignatureAggregation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, verifier, err := NewBLSAuth(configs[0])
-			require.NoError(t, err)
-			signatureAggregator := SignatureAggregator{verifier: &verifier}
+			signatureAggregator := newTestSignatureAggregator(configs[0])
 			qc, err := signatureAggregator.Aggregate(tt.signers)
 			require.ErrorIs(t, err, tt.expectError)
 
 			// verify the quorum certificate
 			if tt.expectError == nil {
-				require.Len(t, qc.Signers(), common.Quorum(len(configs)))
-				require.NoError(t, qc.Verify(msg, nil))
+				// every distinct signature is included, there is no truncation to a quorum
+				require.Len(t, qc.Signers(), len(tt.signers))
+				validators := testValidators(configs[0])
+				require.NoError(t, qc.Verify(msg, validators))
 
-				d := QCDeserializer{verifier: &verifier}
+				d := newTestQCDeserializer(configs[0])
 				// try to deserialize the quorum certificate
-				deserializedQC, err := d.DeserializeQuorumCertificate(qc.Bytes())
+				deserializedQC, err := d.DeserializeQuorumCertificate(qc.Bytes(), validators.NodeIDs())
 				require.NoError(t, err)
 
 				for _, signer := range qc.Signers() {
 					require.Contains(t, deserializedQC.Signers(), signer)
 				}
 				require.Equal(t, qc.Bytes(), deserializedQC.Bytes())
-				require.NoError(t, deserializedQC.Verify(msg, nil))
+				require.NoError(t, deserializedQC.Verify(msg, validators))
 			}
 		})
 	}
@@ -220,25 +215,22 @@ func TestQCVerifyWithWrongMessage(t *testing.T) {
 		})
 	}
 
-	_, verifier, err := NewBLSAuth(configs[0])
+	qc, err := newTestSignatureAggregator(configs[0]).Aggregate(sigs)
 	require.NoError(t, err)
-	signatureAggregator := SignatureAggregator{verifier: &verifier}
-	qc, err := signatureAggregator.Aggregate(sigs)
-	require.NoError(t, err)
+
+	validators := testValidators(configs[0])
 
 	// Verify with original message should succeed
-	require.NoError(t, qc.Verify(originalMsg, nil))
+	require.NoError(t, qc.Verify(originalMsg, validators))
 
 	// Verify with wrong message should fail
-	err = qc.Verify(wrongMsg, nil)
+	err = qc.Verify(wrongMsg, validators)
 	require.ErrorIs(t, err, errSignatureVerificationFailed)
 }
 
 func TestIsQuorum(t *testing.T) {
 	configs := newNetworkConfigs(t, 4)
-	_, verifier, err := NewBLSAuth(configs[0])
-	require.NoError(t, err)
-	aggregator := SignatureAggregator{verifier: &verifier}
+	aggregator := newTestSignatureAggregator(configs[0])
 
 	nodeIDs := make([]common.NodeID, len(configs))
 	for i, config := range configs {
@@ -286,40 +278,40 @@ func TestIsQuorum(t *testing.T) {
 }
 
 func TestFilterNodes(t *testing.T) {
-	nodeID1 := ids.GenerateTestNodeID()
-	nodeID2 := ids.GenerateTestNodeID()
+	nodeID1 := common.NodeIDFromAvalancheID(ids.GenerateTestNodeID())
+	nodeID2 := common.NodeIDFromAvalancheID(ids.GenerateTestNodeID())
 	tests := []struct {
 		name          string
 		indices       set.Bits
-		nodes         []ids.NodeID
-		expectedNodes []ids.NodeID
+		nodes         common.NodeIDs
+		expectedNodes common.NodeIDs
 		expectedErr   error
 	}{
 		{
 			name:          "empty",
 			indices:       set.NewBits(),
-			nodes:         []ids.NodeID{},
-			expectedNodes: []ids.NodeID{},
+			nodes:         common.NodeIDs{},
+			expectedNodes: common.NodeIDs{},
 			expectedErr:   nil,
 		},
 		{
 			name:        "unknown node",
 			indices:     set.NewBits(2),
-			nodes:       []ids.NodeID{nodeID1, nodeID2},
+			nodes:       common.NodeIDs{nodeID1, nodeID2},
 			expectedErr: errNodeNotFound,
 		},
 		{
 			name:          "two filtered out",
 			indices:       set.NewBits(),
-			nodes:         []ids.NodeID{nodeID1, nodeID2},
-			expectedNodes: []ids.NodeID{},
+			nodes:         common.NodeIDs{nodeID1, nodeID2},
+			expectedNodes: common.NodeIDs{},
 			expectedErr:   nil,
 		},
 		{
 			name:    "one filtered out",
 			indices: set.NewBits(1),
-			nodes:   []ids.NodeID{nodeID1, nodeID2},
-			expectedNodes: []ids.NodeID{
+			nodes:   common.NodeIDs{nodeID1, nodeID2},
+			expectedNodes: common.NodeIDs{
 				nodeID2,
 			},
 			expectedErr: nil,
@@ -327,8 +319,8 @@ func TestFilterNodes(t *testing.T) {
 		{
 			name:    "none filtered out",
 			indices: set.NewBits(0, 1),
-			nodes:   []ids.NodeID{nodeID1, nodeID2},
-			expectedNodes: []ids.NodeID{
+			nodes:   common.NodeIDs{nodeID1, nodeID2},
+			expectedNodes: common.NodeIDs{
 				nodeID1,
 				nodeID2,
 			},
@@ -340,7 +332,7 @@ func TestFilterNodes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			nodes, err := filterNodes(tt.indices, tt.nodes)
+			nodes, err := nodesFromBitmask(tt.indices, tt.nodes)
 			require.ErrorIs(err, tt.expectedErr)
 			if tt.expectedErr != nil {
 				return
