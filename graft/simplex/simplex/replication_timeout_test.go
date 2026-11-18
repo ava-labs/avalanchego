@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -80,10 +81,21 @@ type testTimeoutMessageFilter struct {
 	t *testing.T
 
 	replicationResponses chan struct{}
+
+	// highestReplicated is the highest round/sequence already replicated
+	// before the filter was set. Requests for anything above it are allowed,
+	// since normal consensus may legitimately trigger new requests.
+	highestReplicated uint64
 }
 
+// failOnReplicationRequest fails the test if a replication request is sent for
+// a round or sequence at or below [highestReplicated].
 func (m *testTimeoutMessageFilter) failOnReplicationRequest(msg *common.Message, _, _ common.NodeID) bool {
-	require.Nil(m.t, msg.ReplicationRequest)
+	if req := msg.ReplicationRequest; req != nil {
+		for _, seqOrRound := range append(slices.Clone(req.Seqs), req.Rounds...) {
+			require.Greater(m.t, seqOrRound, m.highestReplicated, "resent a replication request for an already replicated round/seq")
+		}
+	}
 	return true
 }
 
@@ -128,9 +140,11 @@ func TestReplicationRequestTimeoutCancels(t *testing.T) {
 		n.Storage.WaitForBlockCommit(startSeq)
 	}
 
-	// ensure lagging node doesn't resend requests
 	mf := &testTimeoutMessageFilter{
 		t: t,
+		// We may receive a notarization for round 9 before the block, causing us to
+		// send a replication request for that round
+		highestReplicated: startSeq,
 	}
 
 	// allow the replication state to cancel the request before setting filter
