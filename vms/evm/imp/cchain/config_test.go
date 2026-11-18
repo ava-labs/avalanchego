@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging/loggingtest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/firewood"
-	"github.com/ava-labs/avalanchego/vms/evm/imp/vmconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -112,14 +111,13 @@ func TestParseConfig(t *testing.T) {
 				"state-sync-enabled":false,
 				"warp-off-chain-messages":["0x1234"]
 			}`,
-			want: config{
-				Config:               vmconfig.Default(),
-				PriceTarget:          new(gas.Price(500)),
-				GasTarget:            new(gas.Gas(1500)),
-				MinDelayTarget:       new(uint64(3000)),
-				StateSyncEnabled:     false,
-				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
-			},
+			want: with(func(c *config) {
+				c.PriceTarget = new(gas.Price(500))
+				c.GasTarget = new(gas.Gas(1500))
+				c.MinDelayTarget = new(uint64(3000))
+				c.StateSyncEnabled = false
+				c.WarpOffChainMessages = []hexutil.Bytes{{0x12, 0x34}}
+			}),
 		},
 	}
 	for _, test := range tests {

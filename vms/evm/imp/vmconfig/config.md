@@ -32,7 +32,7 @@ This document describes the configuration options shared by the C-Chain and L1s.
 | `batch-request-limit` | uint64 | Maximum number of requests that can be batched in an RPC call (`0` = no limit). | `1000` |
 | `api-max-duration` | duration | Maximum duration of each call to the `/rpc` and `/ws` endpoints. A call that times out doesn't close its WebSocket connection. Accepts a [Go duration string](https://pkg.go.dev/time#ParseDuration), such as `"30s"`. Non-positive values result in no limit. | `0` |
 | `api-max-blocks-per-request` | uint64 | Maximum number of blocks per `eth_getLogs` request (`0` = no limit). | `0` |
-| `api-resolve-pending-to-last-executed` | bool | Requests for the "pending" block return the last-executed instead of the last-accepted to allow compatibility with EVM-ecosystem tooling that expect the pending block to have post-execution artefacts. | `true` |
+| `api-resolve-pending-to-last-executed` | bool | Requests for the "pending" block return the last-executed instead of the last-accepted to allow compatibility with EVM-ecosystem tooling that expect the pending block to have post-execution artefacts. | `true` on the C-Chain, `false` on L1s |
 
 ### Available APIs
 

@@ -24,8 +24,9 @@ func TestConfigResolvePendingToLastExecuted(t *testing.T) {
 		wantErr testerr.Want
 	}{
 		{
-			name: "default_config",
-			opt:  func(*sutConfig) {},
+			name:    "default_config",
+			opt:     func(*sutConfig) {},
+			wantErr: testerr.Contains("pending"),
 		},
 		{
 			name: "explicitly_enable_mapping",

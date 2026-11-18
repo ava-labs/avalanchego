@@ -22,12 +22,11 @@ import (
 
 // config is the operator-supplied node configuration for the C-Chain, decoded
 // from the configBytes passed to [VM.Initialize].
-//
-// TODO(JonathanOppenheimer) enable and wire all remaining configs
 type config struct {
 	vmconfig.Config
 
 	// Block building
+
 	// PriceTarget is the minimum gas price (in aAVAX) this node enforces when
 	// building blocks under ACP-283. nil means follow the parent block.
 	PriceTarget *gas.Price `json:"min-price-target,omitempty"`
@@ -42,6 +41,7 @@ type config struct {
 	StateSyncEnabled bool `json:"state-sync-enabled"`
 
 	// Warp
+
 	// WarpOffChainMessages encodes messages that the node is willing to sign.
 	// These messages don't need to correspond to any on-chain events.
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
@@ -49,10 +49,12 @@ type config struct {
 
 // defaultConfig returns the config used when an operator leaves a field unset.
 func defaultConfig() config {
-	return config{
+	c := config{
 		Config:           vmconfig.Default(),
 		StateSyncEnabled: true,
 	}
+	c.ResolvePendingToLastExecuted = true // support Foundry's cast and geth/libevm's bound contracts
+	return c
 }
 
 var errProductionCommitInterval = fmt.Errorf("production networks must use the commit interval %d", saedb.DefaultCommitInterval)

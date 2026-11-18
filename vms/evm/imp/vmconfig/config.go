@@ -61,10 +61,8 @@ type Config struct {
 	TrieCleanCache    uint64 `json:"trie-clean-cache"`
 	SnapshotCache     uint64 `json:"snapshot-cache"`
 	AllowMissingTries bool   `json:"allow-missing-tries"` // If enabled, checks preventing an incomplete trie index are skipped.
-	// PopulateMissingTries *uint64 `json:"populate-missing-tries,omitempty"`
-	// OfflinePruning       bool    `json:"offline-pruning-enabled"`
-	StateScheme  string `json:"state-scheme"`
-	StateHistory uint64 `json:"state-history"` // Number of recent states to guarantee. Defaults to core.TriesInMemory.
+	StateScheme       string `json:"state-scheme"`
+	StateHistory      uint64 `json:"state-history"` // Number of recent states to guarantee. Defaults to core.TriesInMemory.
 
 	// Transaction pool
 	LocalTxsEnabled    bool   `json:"local-txs-enabled"`
@@ -99,15 +97,14 @@ type internalConfig struct {
 // Default returns the config used when an operator leaves a field unset.
 func Default() Config {
 	return Config{
-		Pruning:                      true,
-		CommitInterval:               saedb.DefaultCommitInterval,
-		TrieCleanCache:               saedb.DefaultTrieCacheSizeMiB,
-		SnapshotCache:                saedb.DefaultSnapshotCacheSizeMiB,
-		TxPoolAccountSlots:           legacypool.DefaultConfig.AccountSlots,
-		TxPoolGlobalSlots:            legacypool.DefaultConfig.GlobalSlots,
-		APIs:                         rpc.DefaultAPIs(),
-		BatchRequestLimit:            1000, // matches geth / libevm's node.DefaultConfig
-		ResolvePendingToLastExecuted: true, // support Foundry's cast and geth/libevm's bound contracts
+		Pruning:            true,
+		CommitInterval:     saedb.DefaultCommitInterval,
+		TrieCleanCache:     saedb.DefaultTrieCacheSizeMiB,
+		SnapshotCache:      saedb.DefaultSnapshotCacheSizeMiB,
+		TxPoolAccountSlots: legacypool.DefaultConfig.AccountSlots,
+		TxPoolGlobalSlots:  legacypool.DefaultConfig.GlobalSlots,
+		APIs:               rpc.DefaultAPIs(),
+		BatchRequestLimit:  1000, // matches geth / libevm's node.DefaultConfig
 	}
 }
 

@@ -11,11 +11,6 @@ import (
 
 // config is the operator-supplied node configuration for L1s, decoded from the
 // configBytes passed to [VM.Initialize].
-//
-// TODO(JonathanOppenheimer) [vmconfig.Config.StateSyncIDs] is accepted but has
-// no effect until L1s support state sync.
-//
-// TODO(JonathanOppenheimer) enable and wire all remaining configs
 type config struct {
 	vmconfig.Config
 
