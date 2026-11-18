@@ -3,6 +3,12 @@
 
 This document describes the configuration options shared by the C-Chain and L1s. Default values for each option are specified below.
 
+## Block Building
+
+| Option | Type | Description | Default |
+|--------|------|-------------|---------|
+| `min-delay-target` | integer | The minimum delay between blocks (in milliseconds) that this node will attempt to use when creating blocks. | Parent block's target |
+
 ## State and Trie
 
 | Option | Type | Description | Default |

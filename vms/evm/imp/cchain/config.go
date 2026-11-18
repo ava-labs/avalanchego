@@ -34,9 +34,6 @@ type config struct {
 	// GasTarget is the target gas per second this node votes for when building
 	// blocks under ACP-176. nil means follow the parent block.
 	GasTarget *gas.Gas `json:"gas-target,omitempty"`
-	// MinDelayTarget is the ACP-226 minimum block delay (ms) this node votes
-	// for; nil follows the parent.
-	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
 
 	// State sync
 	StateSyncEnabled bool `json:"state-sync-enabled"`
@@ -117,7 +114,9 @@ type desiredParams struct {
 
 // desired returns c's user-facing targets as internal exponent votes.
 func (c config) desired() desiredParams {
-	var d desiredParams
+	d := desiredParams{
+		delayExponent: c.DesiredDelayExponent(),
+	}
 	if c.GasTarget != nil {
 		e := dynamic.DesiredTargetExponent(*c.GasTarget)
 		d.targetExponent = &e
@@ -125,10 +124,6 @@ func (c config) desired() desiredParams {
 	if c.PriceTarget != nil {
 		e := dynamic.DesiredPriceExponent(*c.PriceTarget)
 		d.priceExponent = &e
-	}
-	if c.MinDelayTarget != nil {
-		e := dynamic.DesiredDelayExponent(*c.MinDelayTarget)
-		d.delayExponent = &e
 	}
 	return d
 }

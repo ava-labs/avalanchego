@@ -109,6 +109,14 @@ func withVMTime(startTime time.Time) (sutOption, *saetest.Clock) {
 	return opt, c
 }
 
+// withMinDelayTarget sets the ACP-226 minimum block delay (ms) the VM votes
+// for; nil is no vote.
+func withMinDelayTarget(ms *uint64) sutOption {
+	return options.Func[sutConfig](func(c *sutConfig) {
+		c.vmConfig.MinDelayTarget = ms
+	})
+}
+
 // newSUT returns a new SUT in [snow.NormalOp]. The returned context is
 // cancelled if the VM logs an error.
 func newSUT(tb testing.TB, opts ...sutOption) (context.Context, *SUT) {
@@ -316,6 +324,71 @@ func TestWaitForEventMinDelayPacing(t *testing.T) {
 		require.Equalf(t, snowcommon.PendingTxs, got, "%T.WaitForEvent()", sut.VM)
 		require.Equalf(t, dynamic.InitialDelayExponent.DelayDuration(), time.Since(start), "%T.WaitForEvent() blocking duration", sut.VM)
 	})
+}
+
+// TestDynamicMinDelayExcess asserts that each built block's MinDelayExcess
+// steps toward the builder's ACP-226 vote by at most the per-block cap, and
+// that a node that doesn't vote rebuilds and accepts the blocks.
+func TestDynamicMinDelayExcess(t *testing.T) {
+	const maxDiff = 200
+	tests := []struct {
+		name    string
+		desired *uint64
+		want    []dynamic.DelayExponent
+	}{
+		{
+			name: "no_vote",
+			want: []dynamic.DelayExponent{
+				dynamic.InitialDelayExponent,
+				dynamic.InitialDelayExponent,
+			},
+		},
+		{
+			name:    "vote_up_capped",
+			desired: new(uint64(4000)), // above the 2000ms initial delay
+			want: []dynamic.DelayExponent{
+				dynamic.InitialDelayExponent + maxDiff,
+				dynamic.InitialDelayExponent + 2*maxDiff,
+			},
+		},
+		{
+			name:    "vote_down_capped",
+			desired: new(uint64(1000)), // below the 2000ms initial delay
+			want: []dynamic.DelayExponent{
+				dynamic.InitialDelayExponent - maxDiff,
+				dynamic.InitialDelayExponent - 2*maxDiff,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wallet := saetest.NewUNSAFEWallet(t, 1, types.LatestSignerForChainID(big.NewInt(testChainID)))
+			timeOpt, _ := withVMTime(testStartTime)
+			opts := []sutOption{withMaxAllocFor(wallet.Addresses()...), timeOpt}
+			var (
+				ctx, builder = newSUT(t, append(opts, withMinDelayTarget(tt.desired))...)
+				_, verifier  = newSUT(t, opts...)
+			)
+
+			for _, want := range tt.want {
+				tx := wallet.SetNonceAndSign(t, 0, &types.DynamicFeeTx{
+					To:        &common.Address{1},
+					Gas:       ethparams.TxGas,
+					GasFeeCap: big.NewInt(1_000 * ethparams.GWei),
+					GasTipCap: big.NewInt(1),
+				})
+				require.NoErrorf(t, builder.EthClient().SendTransaction(ctx, tx), "%T.SendTransaction()", builder.EthClient())
+				builder.WaitForPendingTxs(ctx, t, tx)
+
+				blk := builder.BuildVerifyAccept(ctx, t)
+				verifier.ParseVerifyAccept(ctx, t, blk)
+
+				he := customtypes.GetHeaderExtra(blk.Header())
+				require.NotNilf(t, he.MinDelayExcess, "block %d %T.MinDelayExcess", blk.Height(), he)
+				assert.Equalf(t, want, dynamic.DelayExponent(*he.MinDelayExcess), "block %d %T.MinDelayExcess", blk.Height(), he)
+			}
+		})
+	}
 }
 
 // TestPrecompileActivation asserts that a precompile upgrade activates at the

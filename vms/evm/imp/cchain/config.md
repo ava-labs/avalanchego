@@ -32,6 +32,7 @@ Unrecognized options — a typo, or an option of the pre-SAE C-Chain that no lon
 
 The C-Chain also accepts the options shared with L1s, described in the [shared configuration](../vmconfig/config.md):
 
+- [Block Building](../vmconfig/config.md#block-building)
 - [State and Trie](../vmconfig/config.md#state-and-trie)
 - [Transaction Pool](../vmconfig/config.md#transaction-pool)
 - [APIs](../vmconfig/config.md#apis)
@@ -42,7 +43,6 @@ The C-Chain also accepts the options shared with L1s, described in the [shared c
 |--------|------|-------------|---------|
 | `min-price-target` | integer | The target minimum gas price, in wei (aAVAX), that this node will attempt to use when creating blocks. | Parent block's target |
 | `gas-target` | integer | The target gas per second that this node will attempt to use when creating blocks. | Parent block's target |
-| `min-delay-target` | integer | The minimum delay between blocks (in milliseconds) that this node will attempt to use when creating blocks. | Parent block's target |
 
 ## State Sync
 

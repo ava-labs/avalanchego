@@ -101,6 +101,13 @@ func TestParse(t *testing.T) {
 			want: with(func(c *Config) { c.AllowMissingTries = true }),
 		},
 
+		// Block building
+		{
+			name: "block_building/min_delay_target",
+			json: `{"min-delay-target":2000}`,
+			want: with(func(c *Config) { c.MinDelayTarget = new(uint64(2000)) }),
+		},
+
 		// Transaction pool
 		{
 			name: "tx_pool/local_txs_enabled",
@@ -216,6 +223,7 @@ func TestParse(t *testing.T) {
 				"trie-clean-cache":256,
 				"snapshot-cache":128,
 				"allow-missing-tries":true,
+				"min-delay-target":3000,
 				"local-txs-enabled":true,
 				"tx-pool-account-slots":8,
 				"tx-pool-global-slots":2048,
@@ -234,6 +242,7 @@ func TestParse(t *testing.T) {
 				TrieCleanCache:               256,
 				SnapshotCache:                128,
 				AllowMissingTries:            true,
+				MinDelayTarget:               new(uint64(3000)),
 				LocalTxsEnabled:              true,
 				TxPoolAccountSlots:           8,
 				TxPoolGlobalSlots:            2048,
