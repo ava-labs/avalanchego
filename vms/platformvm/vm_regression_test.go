@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -51,7 +52,7 @@ import (
 
 func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm, _, _ := defaultVM(t, upgrade.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -229,7 +230,7 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := defaultVM(t, upgradetest.ApricotPhase3)
+			vm, _, _ := defaultVM(t, upgrade.ApricotPhase3)
 			vm.UpgradeConfig.ApricotPhase3Time = test.ap3Time
 
 			vm.ctx.Lock.Lock()
@@ -392,7 +393,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 		MinStakeDuration:       defaultMinStakingDuration,
 		MaxStakeDuration:       defaultMaxStakingDuration,
 		RewardConfig:           defaultRewardConfig,
-		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgradetest.Banff, latestForkTime),
+		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(upgrade.Banff, latestForkTime),
 	}}
 
 	ctx := snowtest.Context(t, snowtest.PChainID)
@@ -515,7 +516,7 @@ func TestUnverifiedParentPanicRegression(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM(t, upgradetest.Cortina)
+	vm, baseDB, mutableSharedMemory := defaultVM(t, upgrade.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -708,7 +709,7 @@ func TestRejectedStateRegressionInvalidValidatorTimestamp(t *testing.T) {
 func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 	require := require.New(t)
 
-	vm, baseDB, mutableSharedMemory := defaultVM(t, upgradetest.Cortina)
+	vm, baseDB, mutableSharedMemory := defaultVM(t, upgrade.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1009,7 +1010,7 @@ func TestRejectedStateRegressionInvalidValidatorReward(t *testing.T) {
 func TestValidatorSetAtCacheOverwriteRegression(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm, _, _ := defaultVM(t, upgrade.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1150,7 +1151,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	delegator2EndTime := delegator2StartTime.Add(3 * defaultMinStakingDuration)
 	delegator2Stake := defaultMaxValidatorStake - validatorStake
 
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm, _, _ := defaultVM(t, upgrade.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1252,7 +1253,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t
 	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm, _, _ := defaultVM(t, upgrade.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1389,7 +1390,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	validatorStartTime := latestForkTime.Add(executor.SyncBound).Add(1 * time.Second)
 	validatorEndTime := validatorStartTime.Add(360 * 24 * time.Hour)
 
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm, _, _ := defaultVM(t, upgrade.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1504,7 +1505,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 func TestAddValidatorDuringRemovalPostHelicon(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, upgradetest.Latest)
+	vm, _, _ := defaultVM(t, upgrade.Latest)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1570,7 +1571,7 @@ func TestAddValidatorDuringRemovalPostHelicon(t *testing.T) {
 func TestAddValidatorDuringRemovalPreHelicon(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, upgradetest.Durango)
+	vm, _, _ := defaultVM(t, upgrade.Durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1650,7 +1651,7 @@ func TestAddValidatorDuringRemovalPreHelicon(t *testing.T) {
 //  8. Advance chain time for the primary network validator to be moved to the
 //     current validator set
 func TestSubnetValidatorBLSKeyDiffAfterExpiry(t *testing.T) {
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm, _, _ := defaultVM(t, upgrade.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -1879,7 +1880,7 @@ func TestPrimaryNetworkValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm, _, _ := defaultVM(t, upgrade.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2020,7 +2021,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm, _, _ := defaultVM(t, upgrade.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2209,7 +2210,7 @@ func TestSubnetValidatorPopulatedToEmptyBLSKeyDiff(t *testing.T) {
 func TestValidatorSetReturnsCopy(t *testing.T) {
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, upgradetest.Latest)
+	vm, _, _ := defaultVM(t, upgrade.Latest)
 
 	validators1, err := vm.GetValidatorSet(t.Context(), 1, constants.PrimaryNetworkID)
 	require.NoError(err)
@@ -2230,7 +2231,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 
 	// setup
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm, _, _ := defaultVM(t, upgrade.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2356,7 +2357,7 @@ func TestSubnetValidatorSetAfterPrimaryNetworkValidatorRemoval(t *testing.T) {
 
 func TestValidatorSetRaceCondition(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm, _, _ := defaultVM(t, upgrade.Cortina)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2422,7 +2423,7 @@ func TestValidatorSetRaceCondition(t *testing.T) {
 
 func TestBanffStandardBlockWithNoChangesRemainsInvalid(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Etna)
+	vm, _, _ := defaultVM(t, upgrade.Etna)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2455,7 +2456,7 @@ func TestSubnetValidatorManagerAfterMultipleExpiration(t *testing.T) {
 
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, upgradetest.Latest)
+	vm, _, _ := defaultVM(t, upgrade.Latest)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2567,7 +2568,7 @@ func TestSubnetValidatorRemoveAddRemoveInSingleBlock(t *testing.T) {
 
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, upgradetest.Latest)
+	vm, _, _ := defaultVM(t, upgrade.Latest)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2687,7 +2688,7 @@ func TestSubnetValidatorRemoveAndReplaceInSingleBlock(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := defaultVM(t, upgradetest.Latest)
+			vm, _, _ := defaultVM(t, upgrade.Latest)
 			vm.ctx.Lock.Lock()
 			defer vm.ctx.Lock.Unlock()
 
@@ -2794,7 +2795,7 @@ func TestDelegatorWeightAfterMultipleExpiration(t *testing.T) {
 
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, upgradetest.Latest)
+	vm, _, _ := defaultVM(t, upgrade.Latest)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
@@ -2929,7 +2930,7 @@ func TestDelegatorReplacementWeight(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			vm, _, _ := defaultVM(t, upgradetest.Latest)
+			vm, _, _ := defaultVM(t, upgrade.Latest)
 			vm.ctx.Lock.Lock()
 			defer vm.ctx.Lock.Unlock()
 
@@ -3030,7 +3031,7 @@ func TestDelegatorAndValidatorExpireTogether(t *testing.T) {
 
 	require := require.New(t)
 
-	vm, _, _ := defaultVM(t, upgradetest.Durango)
+	vm, _, _ := defaultVM(t, upgrade.Durango)
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 

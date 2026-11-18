@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 )
 
 func TestGenesisCustomMinDelay(t *testing.T) {
@@ -111,19 +111,19 @@ func TestGenesisEthUpgrades(t *testing.T) {
 }
 
 func TestGenesisToBlockDecoding(t *testing.T) {
-	previousHashes := map[upgradetest.Fork]common.Hash{
-		upgradetest.ApricotPhase5: common.HexToHash("0x6116de25352c93149542e950162c7305f207bbc17b0eb725136b78c80aed79cc"),
-		upgradetest.ApricotPhase6: common.HexToHash("0x74dd5d404823f342fb3d372ea289565e5b1ff25d07e48a59db8130c5f61e941a"),
-		upgradetest.Banff:         common.HexToHash("0x74dd5d404823f342fb3d372ea289565e5b1ff25d07e48a59db8130c5f61e941a"),
-		upgradetest.Cortina:       common.HexToHash("0x74dd5d404823f342fb3d372ea289565e5b1ff25d07e48a59db8130c5f61e941a"),
-		upgradetest.Durango:       common.HexToHash("0x74dd5d404823f342fb3d372ea289565e5b1ff25d07e48a59db8130c5f61e941a"),
-		upgradetest.Etna:          common.HexToHash("0xa5de01cb7e5c6d721be62ab4b37878e863d65e0c1fe308e5df1f4c5b148650f9"),
-		upgradetest.Fortuna:       common.HexToHash("0xa5de01cb7e5c6d721be62ab4b37878e863d65e0c1fe308e5df1f4c5b148650f9"),
-		upgradetest.Granite:       common.HexToHash("0x4d5ff1b8509d30c6b7842b784a6cf8be78e34c78bc5de8559ea6f15ad18d6a10"),
-		upgradetest.Helicon:       common.HexToHash("0x4d5ff1b8509d30c6b7842b784a6cf8be78e34c78bc5de8559ea6f15ad18d6a10"),
-		upgradetest.Igloo:         common.HexToHash("0x4d5ff1b8509d30c6b7842b784a6cf8be78e34c78bc5de8559ea6f15ad18d6a10"),
+	previousHashes := map[upgrade.Upgrade]common.Hash{
+		upgrade.ApricotPhase5: common.HexToHash("0x6116de25352c93149542e950162c7305f207bbc17b0eb725136b78c80aed79cc"),
+		upgrade.ApricotPhase6: common.HexToHash("0x74dd5d404823f342fb3d372ea289565e5b1ff25d07e48a59db8130c5f61e941a"),
+		upgrade.Banff:         common.HexToHash("0x74dd5d404823f342fb3d372ea289565e5b1ff25d07e48a59db8130c5f61e941a"),
+		upgrade.Cortina:       common.HexToHash("0x74dd5d404823f342fb3d372ea289565e5b1ff25d07e48a59db8130c5f61e941a"),
+		upgrade.Durango:       common.HexToHash("0x74dd5d404823f342fb3d372ea289565e5b1ff25d07e48a59db8130c5f61e941a"),
+		upgrade.Etna:          common.HexToHash("0xa5de01cb7e5c6d721be62ab4b37878e863d65e0c1fe308e5df1f4c5b148650f9"),
+		upgrade.Fortuna:       common.HexToHash("0xa5de01cb7e5c6d721be62ab4b37878e863d65e0c1fe308e5df1f4c5b148650f9"),
+		upgrade.Granite:       common.HexToHash("0x4d5ff1b8509d30c6b7842b784a6cf8be78e34c78bc5de8559ea6f15ad18d6a10"),
+		upgrade.Helicon:       common.HexToHash("0x4d5ff1b8509d30c6b7842b784a6cf8be78e34c78bc5de8559ea6f15ad18d6a10"),
+		upgrade.Igloo:         common.HexToHash("0x4d5ff1b8509d30c6b7842b784a6cf8be78e34c78bc5de8559ea6f15ad18d6a10"),
 	}
-	require.Contains(t, previousHashes, upgradetest.Latest)
+	require.Contains(t, previousHashes, upgrade.Latest)
 	for fork, chainConfig := range paramstest.ForkToChainConfig {
 		t.Run(fork.String(), func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()

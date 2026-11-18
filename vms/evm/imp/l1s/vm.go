@@ -12,6 +12,9 @@ import (
 
 	"github.com/ava-labs/libevm/core/txpool/legacypool"
 
+	// TODO(alarso16): Remove the dependency on the global module registration.
+	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry" // register precompiles
+
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/adaptor"
@@ -94,7 +97,8 @@ func (vm *VM) Initialize(
 
 	// TODO: Support state sync, which requires the [sae.VM] to be created
 	// after the node has finished state syncing.
-	vm.VM, err = sae.NewVM(ctx, hookadaptor.Convert(newHooks(snowCtx, vm.now)), saeConfig, snowCtx, genesis.Config, ethDB, vm.Network)
+	hooks := newHooks(snowCtx, genesis.Config, vm.now)
+	vm.VM, err = sae.NewVM(ctx, hookadaptor.Convert(hooks), saeConfig, snowCtx, genesis.Config, ethDB, vm.Network)
 	if err != nil {
 		return fmt.Errorf("creating SAE VM: %w", err)
 	}

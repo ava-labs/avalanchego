@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -38,7 +39,7 @@ func TestGetValidatorSet_AfterEtna(t *testing.T) {
 	require := require.New(t)
 
 	vdrs := validators.NewManager()
-	upgrades := upgradetest.GetConfig(upgradetest.Durango)
+	upgrades := upgradetest.GetConfig(upgrade.Durango)
 	upgradeTime := genesistest.DefaultValidatorStartTime.Add(2 * time.Second)
 	upgrades.EtnaTime = upgradeTime
 	s := statetest.New(t, statetest.Config{

@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -324,7 +324,7 @@ func assertRewardAutoRenewedValidator(
 
 func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	dummyHeight := uint64(1)
 
 	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
@@ -425,7 +425,7 @@ func TestRewardValidatorTxExecuteOnCommit(t *testing.T) {
 
 func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	dummyHeight := uint64(1)
 
 	currentStakerIterator, err := env.state.GetCurrentStakerIterator()
@@ -520,7 +520,7 @@ func TestRewardValidatorTxExecuteOnAbort(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	dummyHeight := uint64(1)
 
 	wallet := newWallet(t, env, walletConfig{})
@@ -654,7 +654,7 @@ func TestRewardDelegatorTxExecuteOnCommitPreDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Cortina)
+	env := newEnvironment(t, upgrade.Cortina)
 	dummyHeight := uint64(1)
 
 	wallet := newWallet(t, env, walletConfig{})
@@ -883,7 +883,7 @@ func TestRewardDelegatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 
 func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.Cortina)
+	env := newEnvironment(t, upgrade.Cortina)
 	dummyHeight := uint64(1)
 
 	wallet := newWallet(t, env, walletConfig{})
@@ -1055,7 +1055,7 @@ func TestRewardDelegatorTxAndValidatorTxExecuteOnCommitPostDelegateeDeferral(t *
 
 func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	require := require.New(t)
-	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	env := newEnvironment(t, upgrade.ApricotPhase5)
 	dummyHeight := uint64(1)
 
 	wallet := newWallet(t, env, walletConfig{})
@@ -1240,7 +1240,7 @@ func TestRewardValidatorStakerTypeError(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			env := newEnvironment(t, upgradetest.Latest)
+			env := newEnvironment(t, upgrade.Latest)
 
 			stakerTx := test.tx(t, env)
 			uStakerTx := stakerTx.Unsigned.(platform.Staker)
@@ -1322,7 +1322,7 @@ func TestRewardAutoRenewedValidatorTxErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var (
-				env           = newEnvironment(t, upgradetest.Latest)
+				env           = newEnvironment(t, upgrade.Latest)
 				wallet        = newWallet(t, env, walletConfig{})
 				feeCalculator = state.PickFeeCalculator(env.config, env.state)
 				endTime       = genesistest.DefaultValidatorStartTime.Add(2 * env.config.MinStakeDuration)
@@ -1470,7 +1470,7 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			env := newEnvironment(t, upgradetest.Latest)
+			env := newEnvironment(t, upgrade.Latest)
 			cfg := tt.config(env)
 
 			stakerTx := newAddAutoRenewedValidatorTx(t, env, cfg.weight, cfg.delegationRewardShares, cfg.autoCompoundRewardShares)
@@ -1517,7 +1517,7 @@ func TestRewardAutoRenewedValidatorTx(t *testing.T) {
 // share, delegatee share is deferred to StakingInfo.DelegateeReward.
 func TestRewardDelegatorToAutoRenewedValidator(t *testing.T) {
 	var (
-		env = newEnvironment(t, upgradetest.Latest)
+		env = newEnvironment(t, upgrade.Latest)
 
 		delegationShares = uint32(reward.PercentDenominator / 4) // 25% to delegatee
 		vdrWeight        = env.config.MinValidatorStake

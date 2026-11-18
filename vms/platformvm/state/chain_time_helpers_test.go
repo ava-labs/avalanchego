@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
@@ -213,19 +214,19 @@ func TestPickFeeCalculator(t *testing.T) {
 	dynamicFeeConfig := genesis.LocalParams.DynamicFeeConfig
 
 	tests := []struct {
-		fork     upgradetest.Fork
+		fork     upgrade.Upgrade
 		expected txfee.Calculator
 	}{
 		{
-			fork:     upgradetest.ApricotPhase2,
+			fork:     upgrade.ApricotPhase2,
 			expected: txfee.NewSimpleCalculator(0),
 		},
 		{
-			fork:     upgradetest.ApricotPhase3,
+			fork:     upgrade.ApricotPhase3,
 			expected: txfee.NewSimpleCalculator(0),
 		},
 		{
-			fork: upgradetest.Etna,
+			fork: upgrade.Etna,
 			expected: txfee.NewDynamicCalculator(
 				dynamicFeeConfig.Weights,
 				dynamicFeeConfig.MinPrice,

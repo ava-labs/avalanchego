@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -24,7 +24,7 @@ func TestSetsAndGets(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: ids.GenerateTestID(),
 			Fx: &FxTest{
@@ -84,7 +84,7 @@ func TestSetsAndGets(t *testing.T) {
 
 func TestFundingNoAddresses(t *testing.T) {
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: ids.GenerateTestID(),
 			Fx: &FxTest{
@@ -114,7 +114,7 @@ func TestFundingAddresses(t *testing.T) {
 	require := require.New(t)
 
 	env := setup(t, &envConfig{
-		fork: upgradetest.Latest,
+		fork: upgrade.Latest,
 		additionalFxs: []*common.Fx{{
 			ID: ids.GenerateTestID(),
 			Fx: &FxTest{

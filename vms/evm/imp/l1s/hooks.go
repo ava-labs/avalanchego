@@ -32,6 +32,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
 	"github.com/ava-labs/avalanchego/x/blockdb"
 
+	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	saetypes "github.com/ava-labs/avalanchego/vms/evm/types"
 )
 
@@ -40,14 +41,17 @@ var _ hookadaptor.Points = (*hooks)(nil)
 // hooks are the L1-specific [hookadaptor.Points].
 type hooks struct {
 	builder
+
+	chainConfig *params.ChainConfig
 }
 
-func newHooks(ctx *snow.Context, now func() time.Time) *hooks {
+func newHooks(ctx *snow.Context, c *params.ChainConfig, now func() time.Time) *hooks {
 	return &hooks{
-		builder{
+		builder: builder{
 			ctx: ctx,
 			now: now,
 		},
+		chainConfig: c,
 	}
 }
 
@@ -124,9 +128,14 @@ func (*hooks) CanExecuteTransaction(common.Address, *common.Address, libevm.Stat
 	return nil
 }
 
-func (*hooks) StartExecutingBlock(params.Rules, *state.StateDB, *types.Header, *types.Block) error {
-	// TODO: Apply the scheduled precompile and state upgrades.
-	return nil
+func (h *hooks) StartExecutingBlock(_ params.Rules, sdb *state.StateDB, parent *types.Header, b *types.Block) error {
+	// TODO: Apply the scheduled state upgrades.
+	return legacy.ApplyPrecompileActivations(
+		h.chainConfig,
+		new(parent.Time),
+		legacy.NewBlockContext(b.Number(), b.Time()),
+		sdb,
+	)
 }
 
 func (*hooks) FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
