@@ -683,14 +683,6 @@ func (e *standardTxExecutor) TransferSubnetOwnershipTx(tx *platform.TransferSubn
 }
 
 func (e *standardTxExecutor) BaseTx(tx *platform.BaseTx) error {
-	var (
-		currentTimestamp = e.state.GetTimestamp()
-		upgrades         = e.backend.Config.UpgradeConfig
-	)
-	if !upgrades.IsDurangoActivated(currentTimestamp) {
-		return ErrDurangoUpgradeNotActive
-	}
-
 	// Verify the tx is well-formed
 	if err := e.tx.SyntacticVerify(e.backend.Ctx); err != nil {
 		return err
