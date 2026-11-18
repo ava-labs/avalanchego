@@ -1,4 +1,4 @@
-name: Triage new issues and PRs
+name: Add team items to project boards
 on:
   issues:
     types: [opened]
@@ -9,14 +9,9 @@ jobs:
   route_team_items:
     runs-on: ubuntu-24.04
     permissions:
-      contents: read # Required for actions/labeler to read .github/labeler.yml
       issues: write # Required for GITHUB_TOKEN to add the evm label to issues
-      pull-requests: write # Required for GITHUB_TOKEN to add labels to PRs and assign their authors
+      pull-requests: write # Required for GITHUB_TOKEN to assign PR authors
     steps:
-      - name: Add path-based labels
-        if: github.event_name == 'pull_request_target'
-        uses: actions/labeler@v7
-
       - name: Mint installation token
         id: token
         uses: actions/create-github-app-token@v3
@@ -67,7 +62,6 @@ jobs:
           project-url: https://github.com/orgs/ava-labs/projects/23
           github-token: ${{ steps.token.outputs.token }}
 
-      # PRs get labels from .github/labeler.yml.
       - name: Add evm label to issue
         if: github.event_name == 'issues' && steps.membership.outputs.evm == 'true'
         env:
