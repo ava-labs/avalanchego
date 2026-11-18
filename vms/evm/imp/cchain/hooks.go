@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/cparams"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/libevm/extstate"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/cchain/tx"
@@ -152,13 +153,9 @@ func priceExponent(h *types.Header) dynamic.PriceExponent {
 	return dynamic.InitialPriceExponent
 }
 
-// delayExponent returns h's ACP-226 minimum block delay exponent, defaulting to
-// [dynamic.InitialDelayExponent] when the header does not carry one.
+// delayExponent returns h's ACP-226 minimum block delay exponent.
 func delayExponent(h *types.Header) dynamic.DelayExponent {
-	if de := customtypes.GetHeaderExtra(h).MinDelayExcess; de != nil {
-		return dynamic.DelayExponent(*de)
-	}
-	return dynamic.InitialDelayExponent
+	return blockdelay.Exponent(customtypes.GetHeaderExtra(h).MinDelayExcess)
 }
 
 func targetExponent(config *cparams.ChainConfig, h *types.Header) (dynamic.TargetExponent, error) {
