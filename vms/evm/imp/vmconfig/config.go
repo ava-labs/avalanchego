@@ -196,9 +196,8 @@ func (c Config) SAEConfig(now func() time.Time) sae.Config {
 			BatchRequestLimit:   c.BatchRequestLimit,
 			CallTimeout:         c.APIMaxDuration.Duration,
 			MaxBlocksPerRequest: c.MaxBlocksPerRequest,
-			// GasCap and TxFeeCap are set to reasonable values for mainnet
-			// C-Chain. They are left unconfigurable to minimize the size of the
-			// user config.
+			// GasCap and TxFeeCap are set to reasonable values. They are left
+			// unconfigurable to minimize the size of the user config.
 			GasCap:                       50_000_000,
 			TxFeeCap:                     100,
 			ResolvePendingToLastExecuted: c.ResolvePendingToLastExecuted,

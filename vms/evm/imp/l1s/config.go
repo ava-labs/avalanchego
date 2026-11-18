@@ -12,16 +12,17 @@ import (
 // config is the operator-supplied node configuration for L1s, decoded from the
 // configBytes passed to [VM.Initialize].
 //
-// TODO(JonathanOppenheimer) enable and wire all remaining configs. Options also
-// on the C-Chain (min-delay-target, state sync and warp) should move into
-// [vmconfig.Config], and their docs into vmconfig/config.md, once wired.
-//
 // TODO(JonathanOppenheimer) [vmconfig.Config.StateSyncIDs] is accepted but has
 // no effect until L1s support state sync.
+//
+// TODO(JonathanOppenheimer) enable and wire all remaining configs
 type config struct {
 	vmconfig.Config
 
 	// Block building
+	// TODO(JonathanOppenheimer) move MinDelayTarget into [vmconfig.Config],
+	// and its docs into vmconfig/config.md, once wired.
+	//
 	// MinDelayTarget is the ACP-226 minimum block delay (ms) this node votes
 	// for; nil follows the parent.
 	// MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
@@ -30,9 +31,15 @@ type config struct {
 	// FeeRecipient string `json:"feeRecipient"`
 
 	// State sync
+	// TODO(JonathanOppenheimer) move into [vmconfig.Config], and its docs into
+	// vmconfig/config.md, once wired.
+	//
 	// StateSyncEnabled bool `json:"state-sync-enabled"`
 
 	// Warp
+	// TODO(JonathanOppenheimer) move into [vmconfig.Config], and its docs into
+	// vmconfig/config.md, once wired.
+	//
 	// WarpOffChainMessages encodes messages that the node is willing to sign.
 	// These messages don't need to correspond to any on-chain events.
 	// WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
