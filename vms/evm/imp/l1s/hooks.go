@@ -45,23 +45,33 @@ type hooks struct {
 	chainConfig *params.ChainConfig
 }
 
-func newHooks(ctx *snow.Context, c *params.ChainConfig, now func() time.Time) *hooks {
+func newHooks(
+	ctx *snow.Context,
+	c *params.ChainConfig,
+	now func() time.Time,
+	desiredDelay *dynamic.DelayExponent,
+) *hooks {
 	return &hooks{
 		builder: builder{
-			ctx: ctx,
-			now: now,
+			ctx:          ctx,
+			now:          now,
+			desiredDelay: desiredDelay,
 		},
 		chainConfig: c,
 	}
 }
 
 func (h *hooks) BlockRebuilderFrom(b *types.Block) (hookadaptor.BlockBuilder, error) {
-	now := blockTime(b.Header())
+	header := b.Header()
+	now := blockTime(header)
 	return &builder{
 		ctx: h.ctx,
 		now: func() time.Time {
 			return now
 		},
+		// Voting for the block's own delay reproduces it, because
+		// [dynamic.DelayExponent.Toward] stays within the per-block cap.
+		desiredDelay: (*dynamic.DelayExponent)(customtypes.GetHeaderExtra(header).MinDelayExcess),
 	}, nil
 }
 
@@ -152,6 +162,9 @@ var _ hookadaptor.BlockBuilder = (*builder)(nil)
 type builder struct {
 	ctx *snow.Context
 	now func() time.Time
+	// desiredDelay is this node's ACP-226 minimum block delay vote; nil
+	// follows the parent.
+	desiredDelay *dynamic.DelayExponent
 }
 
 var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
@@ -160,15 +173,13 @@ var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum blo
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
-	// TODO(JonathanOppenheimer): Move the delay toward this node's desired
-	// delay once the user config supports `min-delay-target` (#6107).
 	de := delayExponent(parent)
 	parentTime := blockTime(parent)
 	if minTime := parentTime.Add(de.DelayDuration()); now.Before(minTime) {
 		return nil, fmt.Errorf("%w: block time %s is before the minimum %s (parent %s + %s)",
 			errBelowMinBlockDelay, now, minTime, parentTime, de.DelayDuration())
 	}
-	minDelayExcess := acp226.DelayExcess(de)
+	minDelayExcess := acp226.DelayExcess(de.Toward(b.desiredDelay))
 
 	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
 	return customtypes.WithHeaderExtra(

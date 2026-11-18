@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
 	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
@@ -62,8 +63,6 @@ type Config struct {
 
 	// MinDelayTarget is the ACP-226 minimum block delay (ms) this node votes
 	// for; nil follows the parent.
-	//
-	// TODO(JonathanOppenheimer): wire into L1s.
 	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
 
 	// State & trie
@@ -203,6 +202,16 @@ func (c Config) verify() error {
 		return err
 	}
 	return saeCfg.DBConfig.Verify()
+}
+
+// DesiredDelayExponent returns this node's ACP-226 minimum block delay vote, or
+// nil if it doesn't vote.
+func (c Config) DesiredDelayExponent() *dynamic.DelayExponent {
+	if c.MinDelayTarget == nil {
+		return nil
+	}
+	e := dynamic.DesiredDelayExponent(*c.MinDelayTarget)
+	return &e
 }
 
 // SAEConfig translates the operator-supplied [Config] into the [sae.Config]
