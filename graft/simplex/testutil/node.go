@@ -33,6 +33,9 @@ type BasicNode struct {
 	l                *TestLogger
 	t                *testing.T
 	messageTypesSent map[string]uint64
+	// pendingMessages is the network-wide count of enqueued messages that were not yet handled.
+	// It is set when the node is added to a network.
+	pendingMessages *atomic.Int64
 
 	CustomHandler func(msg *common.Message, from common.NodeID) error
 }
@@ -91,6 +94,8 @@ func (b *BasicNode) handleMessages() {
 	defer b.running.Done()
 	for msg := range b.ingress {
 		if b.shouldStop.Load() {
+			// This message and any left in ingress are discarded by Stop.
+			b.discardPendingMessage()
 			return
 		}
 		var err error
@@ -99,6 +104,8 @@ func (b *BasicNode) handleMessages() {
 		} else {
 			err = b.HandleMessage(msg.msg, msg.from)
 		}
+		// Decrement only after handling, so messages sent while handling were already counted.
+		b.discardPendingMessage()
 		require.NoError(b.t, err)
 		if err != nil {
 			return
@@ -121,6 +128,10 @@ func (b *BasicNode) enqueue(msg *common.Message, from, to common.NodeID) {
 		return
 	}
 
+	// Count the message before handing it over, so the receiver can never decrement first.
+	if b.pendingMessages != nil {
+		b.pendingMessages.Add(1)
+	}
 	select {
 	case b.ingress <- struct {
 		msg  *common.Message
@@ -140,6 +151,19 @@ func (b *BasicNode) Stop() {
 	b.shouldStop.Store(true)
 	close(b.ingress)
 	b.running.Wait()
+
+	// Messages still queued will never be handled, so they are no longer pending.
+	for range b.ingress {
+		b.discardPendingMessage()
+	}
+}
+
+// discardPendingMessage marks one enqueued message as no longer pending, either because it was
+// handled or because it never will be.
+func (b *BasicNode) discardPendingMessage() {
+	if b.pendingMessages != nil {
+		b.pendingMessages.Add(-1)
+	}
 }
 
 func (b *BasicNode) RecordMessageTypeSent(msg *common.Message) {

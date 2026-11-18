@@ -1482,8 +1482,6 @@ func TestEpochQCSignedByNonExistentNodes(t *testing.T) {
 		}, nodes[1])
 		require.NoError(t, err)
 
-		time.Sleep(time.Second)
-
 		wal.AssertWALSize(1)
 	})
 

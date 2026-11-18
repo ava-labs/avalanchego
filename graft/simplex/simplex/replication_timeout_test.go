@@ -65,8 +65,9 @@ func TestReplicationRequestTimeout(t *testing.T) {
 
 	// assert the lagging node has not received any replication requests
 	require.Equal(t, uint64(0), laggingNode.Storage.NumBlocks())
-	// allow the replication state to cancel the request before setting filter
-	time.Sleep(100 * time.Millisecond)
+	// Replication requests the lagging node sent may still be queued at the other nodes.
+	// Let them be handled, and their responses dropped, before allowing responses again.
+	net.WaitForQuiescence()
 	// after the timeout, the nodes should respond and the lagging node will replicate
 	net.SetAllNodesMessageFilter(testutil.AllowAllMessages)
 	laggingNode.E.AdvanceTime(laggingNode.E.StartTime.Add(simplex.DefaultReplicationRequestTimeout / 2))
@@ -133,8 +134,6 @@ func TestReplicationRequestTimeoutCancels(t *testing.T) {
 		t: t,
 	}
 
-	// allow the replication state to cancel the request before setting filter
-	time.Sleep(100 * time.Millisecond)
 	laggingNode.E.Comm.(*testutil.TestComm).SetFilter(mf.failOnReplicationRequest)
 	laggingNode.E.AdvanceTime(laggingNode.E.StartTime.Add(simplex.DefaultReplicationRequestTimeout * 2))
 
@@ -772,8 +771,9 @@ func TestReplicationResendSplitsRequests(t *testing.T) {
 		n.Storage.WaitForBlockCommit(startSeq)
 	}
 	require.Equal(t, uint64(0), laggingNode.Storage.NumBlocks())
-	// wait to register the timeout before healing
-	time.Sleep(100 * time.Millisecond)
+	// Replication requests the lagging node sent may still be queued at the other nodes.
+	// Let them be handled, and their responses dropped, before healing the network.
+	net.WaitForQuiescence()
 	// network healed, responsed are no longer dropped
 	net.SetAllNodesMessageFilter(testutil.AllowAllMessages)
 	// trigger the resend of all timed-out responses. If the resend path doesn't split/ doesn't account for maxRoundWindow

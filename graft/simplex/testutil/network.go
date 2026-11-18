@@ -6,6 +6,7 @@ package testutil
 import (
 	"bytes"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,6 +21,10 @@ type BasicInMemoryNetwork struct {
 	lock         sync.RWMutex
 	disconnected map[string]struct{}
 	instances    []*BasicNode
+	// pendingMessages counts messages enqueued to any instance that have not finished being handled.
+	// A node increments it for every message it sends before decrementing it for the message it is
+	// handling, so it only reaches zero once no message is queued or being handled anywhere.
+	pendingMessages atomic.Int64
 }
 
 func NewBasicInMemoryNetwork(t *testing.T, nodes common.NodeIDs) *BasicInMemoryNetwork {
@@ -136,6 +141,7 @@ func (b *BasicInMemoryNetwork) ReplaceNode(node *BasicNode) {
 	for i, instance := range b.instances {
 		if bytes.Equal(instance.E.ID, node.E.ID) {
 			// Replace the instance in the slice
+			node.pendingMessages = &b.pendingMessages
 			b.instances[i] = node
 			return
 		}
@@ -154,7 +160,16 @@ func (b *BasicInMemoryNetwork) AddNode(node *BasicNode) {
 		}
 	}
 	require.True(node.t, allowed, "node must be declared before adding")
+	node.pendingMessages = &b.pendingMessages
 	b.instances = append(b.instances, node)
+}
+
+// WaitForQuiescence waits until every message sent between the instances has been handled,
+// including the messages sent while handling them.
+func (b *BasicInMemoryNetwork) WaitForQuiescence() {
+	require.Eventually(b.t, func() bool {
+		return b.pendingMessages.Load() == 0
+	}, 30*time.Second, 10*time.Millisecond, "messages are still pending between the instances")
 }
 
 func (b *BasicInMemoryNetwork) RemoveNode(node *BasicNode) {

@@ -336,8 +336,13 @@ func TestSplitVotes(t *testing.T) {
 		}
 	}
 
-	// allow outstanding messages to be dropped
-	time.Sleep(100 * time.Millisecond)
+	// Let every message sent under the old filter be handled (or dropped) before allowing all messages.
+	// Metadata() takes each epoch's lock, so any locked section that is about to send (such as an empty
+	// vote broadcast) finishes and its messages are counted before waiting for quiescence.
+	for _, n := range net.Instances {
+		n.E.Metadata()
+	}
+	net.WaitForQuiescence()
 
 	net.SetAllNodesMessageFilter(testutil.AllowAllMessages)
 

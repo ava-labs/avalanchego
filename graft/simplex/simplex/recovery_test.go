@@ -647,7 +647,7 @@ func TestRecoveryAsLeader(t *testing.T) {
 	ctx := context.Background()
 	nodes := []NodeID{{1}, {2}, {3}, {4}}
 	finalizedBlocks := createBlocks(t, nodes, 4)
-	conf, _, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
+	conf, wal, storage := testutil.DefaultTestNodeEpochConfig(t, nodes[0], testutil.NewNoopComm(nodes), bb)
 
 	for _, finalizedBlock := range finalizedBlocks {
 		err := storage.Index(ctx, finalizedBlock.VerifiedBlock, finalizedBlock.Finalization)
@@ -662,8 +662,7 @@ func TestRecoveryAsLeader(t *testing.T) {
 
 	bb.GetBuiltBlock()
 
-	// wait for the block to finish verifying
-	time.Sleep(50 * time.Millisecond)
+	wal.AssertBlockProposal(4)
 
 	// ensure the round is properly set
 	require.Equal(t, uint64(4), e.Metadata().Round)
