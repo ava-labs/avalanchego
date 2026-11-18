@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/vmconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
@@ -24,7 +25,9 @@ import (
 //
 // TODO(JonathanOppenheimer) enable and wire all remaining configs
 type config struct {
-	// Block-building targets
+	vmconfig.Config
+
+	// Block building
 	// PriceTarget is the minimum gas price (in aAVAX) this node enforces when
 	// building blocks under ACP-283. nil means follow the parent block.
 	PriceTarget *gas.Price `json:"min-price-target,omitempty"`
@@ -34,8 +37,6 @@ type config struct {
 	// MinDelayTarget is the ACP-226 minimum block delay (ms) this node votes
 	// for; nil follows the parent.
 	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
-
-	vmconfig.Config
 
 	// State sync
 	StateSyncEnabled bool `json:"state-sync-enabled"`
@@ -54,6 +55,8 @@ func defaultConfig() config {
 	}
 }
 
+var errProductionCommitInterval = fmt.Errorf("production networks must use the commit interval %d", saedb.DefaultCommitInterval)
+
 // parseConfig parses b as a JSON-encoded [config]. This should be preferred
 // over [json.Unmarshal] because it correctly populates default values. Options
 // that need the operator's attention are logged as warnings.
@@ -62,8 +65,14 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	if err := vmconfig.Parse(snowCtx.Log, b, &c); err != nil {
 		return config{}, err
 	}
-	if err := c.Verify(snowCtx.NetworkID); err != nil {
+	if err := c.Verify(); err != nil {
 		return config{}, err
+	}
+	ci := c.CommitInterval
+	if constants.ProductionNetworkIDs.Contains(snowCtx.NetworkID) &&
+		c.StateScheme != firewood.Scheme &&
+		ci != saedb.DefaultCommitInterval {
+		return config{}, fmt.Errorf("%w: commit interval %d", errProductionCommitInterval, ci)
 	}
 	return c, nil
 }

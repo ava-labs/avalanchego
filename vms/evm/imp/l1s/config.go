@@ -19,12 +19,15 @@ import (
 // TODO(JonathanOppenheimer) [vmconfig.Config.StateSyncIDs] is accepted but has
 // no effect until L1s support state sync.
 type config struct {
-	// Block-building targets
+	vmconfig.Config
+
+	// Block building
 	// MinDelayTarget is the ACP-226 minimum block delay (ms) this node votes
 	// for; nil follows the parent.
 	// MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
-
-	vmconfig.Config
+	// Needed for allowFeeRecipients. Keeping the camelCase key so existing
+	// configs don't break.
+	// FeeRecipient string `json:"feeRecipient"`
 
 	// State sync
 	// StateSyncEnabled bool `json:"state-sync-enabled"`
@@ -33,11 +36,6 @@ type config struct {
 	// WarpOffChainMessages encodes messages that the node is willing to sign.
 	// These messages don't need to correspond to any on-chain events.
 	// WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
-
-	// Fee recipient
-	// Needed for allowFeeRecipients. Keeping the camelCase key so existing
-	// configs don't break.
-	// FeeRecipient string `json:"feeRecipient"`
 
 	// Database
 	// UseStandaloneDatabase *PBool `json:"use-standalone-database"`
@@ -66,7 +64,7 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 	if err := c.applyDeprecated(snowCtx.Log, b); err != nil {
 		return config{}, err
 	}
-	if err := c.Verify(snowCtx.NetworkID); err != nil {
+	if err := c.Verify(); err != nil {
 		return config{}, err
 	}
 	return c, nil

@@ -17,10 +17,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
 	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
@@ -113,10 +111,6 @@ func Default() Config {
 	}
 }
 
-// ErrProductionCommitInterval is returned by [Config.Verify] for a HashDB
-// commit interval other than the default on a production network.
-var ErrProductionCommitInterval = fmt.Errorf("production networks must use the commit interval %d", saedb.DefaultCommitInterval)
-
 // Parse parses b as a JSON-encoded T into c, which SHOULD hold T's defaults.
 // This should be preferred over [json.Unmarshal] because it warns about, and
 // ignores, keys that don't unmarshal into a field of T.
@@ -149,22 +143,13 @@ func Parse[T any](log logging.Logger, b []byte, c *T) error {
 	return nil
 }
 
-// Verify returns an error if c is invalid for the network with ID networkID.
-func (c Config) Verify(networkID uint32) error {
+// Verify returns an error if c is invalid.
+func (c Config) Verify() error {
 	saeCfg := c.SAEConfig(nil)
 	if err := saeCfg.RPCConfig.Verify(); err != nil {
 		return err
 	}
-	if err := saeCfg.DBConfig.Verify(); err != nil {
-		return err
-	}
-	ci := saeCfg.DBConfig.CommitInterval
-	if constants.ProductionNetworkIDs.Contains(networkID) &&
-		c.StateScheme != firewood.Scheme &&
-		ci != saedb.DefaultCommitInterval {
-		return fmt.Errorf("%w: commit interval %d", ErrProductionCommitInterval, ci)
-	}
-	return nil
+	return saeCfg.DBConfig.Verify()
 }
 
 // jsonKeys returns the key under which [encoding/json] decodes each field of
