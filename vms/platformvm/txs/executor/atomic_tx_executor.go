@@ -149,11 +149,7 @@ func (e *atomicTxExecutor) ExportTx(*platform.ExportTx) error {
 }
 
 func (e *atomicTxExecutor) atomicTx() error {
-	onAccept, err := state.NewDiff(
-		e.parentID,
-		e.stateVersions,
-		state.StakerAdditionAfterDeletionForbidden,
-	)
+	onAccept, err := state.NewDiff(e.parentID, e.stateVersions)
 	if err != nil {
 		return err
 	}

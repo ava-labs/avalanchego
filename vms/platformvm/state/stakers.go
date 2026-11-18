@@ -13,19 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/iterator"
 )
 
-var (
-	ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
-	errUnexpectedStaker          = errors.New("unexpected staker")
-)
-
-// StakerAdditionAfterDeletionLegality specifies whether a staker can be added after being deleted in the same diff.
-// Pre Helicon it is forbidden, and post Helicon it is allowed.
-type StakerAdditionAfterDeletionLegality bool
-
-const (
-	StakerAdditionAfterDeletionAllowed   StakerAdditionAfterDeletionLegality = true
-	StakerAdditionAfterDeletionForbidden StakerAdditionAfterDeletionLegality = false
-)
+var errUnexpectedStaker = errors.New("unexpected staker")
 
 type Stakers interface {
 	CurrentStakers
@@ -236,10 +224,6 @@ func (v *baseStakers) pruneValidator(subnetID ids.ID, nodeID ids.NodeID) {
 }
 
 type diffStakers struct {
-	// isAdditionAfterDeletionAllowed specifies whether a staker can be added after being deleted in the same diff.
-	// This is done to preserve the pre-Helicon invariant that a staker cannot be added after being deleted,
-	// while allowing post-Helicon diffs to do that.
-	isAdditionAfterDeletionAllowed StakerAdditionAfterDeletionLegality
 	// subnetID --> nodeID --> diff for that validator
 	validatorDiffs map[ids.ID]map[ids.NodeID]*diffValidator
 	addedStakers   *btree.BTreeG[*Staker]
@@ -282,12 +266,6 @@ func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 
 func (s *diffStakers) PutValidator(staker *Staker) error {
 	validatorDiff := s.getOrCreateDiff(staker.SubnetID, staker.NodeID)
-
-	if validatorDiff.removed != nil && !s.isAdditionAfterDeletionAllowed {
-		// Enforce the invariant that a validator cannot be added after being
-		// deleted.
-		return ErrAddingStakerAfterDeletion
-	}
 
 	if validatorDiff.removed != nil && validatorDiff.removed.Equals(staker) {
 		// We set the removed field when we delete the validator that was not added in this diff before.
