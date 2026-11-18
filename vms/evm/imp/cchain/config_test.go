@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/firewood"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/vmconfig"
 	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -112,7 +113,7 @@ func TestParseConfig(t *testing.T) {
 			name:      "state/hash_commit_interval_production_network",
 			json:      `{"commit-interval":256}`,
 			networkID: constants.MainnetID,
-			wantErr:   testerr.Is(errProductionCommitInterval),
+			wantErr:   testerr.Is(vmconfig.ErrProductionCommitInterval),
 		},
 		{
 			name:      "state/production_firewood",
@@ -200,7 +201,7 @@ func TestParseConfig(t *testing.T) {
 		{
 			name: "api/api_max_duration",
 			json: `{"api-max-duration":"1m"}`,
-			want: with(func(c *config) { c.APIMaxDuration = duration{time.Minute} }),
+			want: with(func(c *config) { c.APIMaxDuration = vmconfig.Duration{Duration: time.Minute} }),
 		},
 		{
 			name:    "api/api_max_duration_number",
@@ -287,29 +288,31 @@ func TestParseConfig(t *testing.T) {
 				"state-sync-ids":["` + nodeID.String() + `"]
 			}`,
 			want: config{
-				PriceTarget:                  new(gas.Price(500)),
-				GasTarget:                    new(gas.Gas(1500)),
-				MinDelayTarget:               new(uint64(3000)),
-				Pruning:                      false,
-				StateScheme:                  firewood.Scheme,
-				CommitInterval:               256,
-				TrieCleanCache:               256,
-				SnapshotCache:                128,
-				AllowMissingTries:            true,
-				LocalTxsEnabled:              true,
-				TxPoolAccountSlots:           8,
-				TxPoolGlobalSlots:            2048,
-				APIs:                         set.Of(rpc.APIChain, rpc.APITrace),
-				AllowUnprotectedTxs:          true,
-				MaxBlocksPerRequest:          2000,
-				BatchRequestLimit:            50,
-				APIMaxDuration:               duration{30 * time.Second},
-				WarpOffChainMessages:         []hexutil.Bytes{{0x12, 0x34}},
-				ResolvePendingToLastExecuted: true,
-				StateSyncEnabled:             false,
-				internalConfig: internalConfig{
-					StateSyncIDs: set.Of(nodeID),
+				PriceTarget:    new(gas.Price(500)),
+				GasTarget:      new(gas.Gas(1500)),
+				MinDelayTarget: new(uint64(3000)),
+				Config: vmconfig.Config{
+					Pruning:                      false,
+					StateScheme:                  firewood.Scheme,
+					CommitInterval:               256,
+					TrieCleanCache:               256,
+					SnapshotCache:                128,
+					AllowMissingTries:            true,
+					LocalTxsEnabled:              true,
+					TxPoolAccountSlots:           8,
+					TxPoolGlobalSlots:            2048,
+					APIs:                         set.Of(rpc.APIChain, rpc.APITrace),
+					AllowUnprotectedTxs:          true,
+					MaxBlocksPerRequest:          2000,
+					BatchRequestLimit:            50,
+					APIMaxDuration:               vmconfig.Duration{Duration: 30 * time.Second},
+					ResolvePendingToLastExecuted: true,
+					InternalConfig: vmconfig.InternalConfig{
+						StateSyncIDs: set.Of(nodeID),
+					},
 				},
+				WarpOffChainMessages: []hexutil.Bytes{{0x12, 0x34}},
+				StateSyncEnabled:     false,
 			},
 		},
 	}

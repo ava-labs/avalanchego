@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/libevm/core/txpool/legacypool"
+	"go.uber.org/zap"
 
 	// TODO(alarso16): Remove the dependency on the global module registration.
 	_ "github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/registry" // register precompiles
@@ -22,8 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/hookadaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
-	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
-	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 	"github.com/ava-labs/avalanchego/vms/evm/types"
 
 	avadb "github.com/ava-labs/avalanchego/database"
@@ -50,10 +48,18 @@ func (vm *VM) Initialize(
 	avaDB avadb.Database,
 	genesisBytes []byte,
 	upgradeBytes []byte,
-	_ []byte, // TODO: Parse the user config.
+	configBytes []byte,
 	_ []*snowcommon.Fx,
 	appSender snowcommon.AppSender,
 ) error {
+	userConfig, err := parseConfig(snowCtx, configBytes)
+	if err != nil {
+		return fmt.Errorf("parsing user config: %w", err)
+	}
+	snowCtx.Log.Info("initializing L1",
+		zap.Reflect("config", userConfig),
+	)
+
 	genesis, err := parseGenesis(snowCtx, genesisBytes, upgradeBytes)
 	if err != nil {
 		return fmt.Errorf("parsing genesis: %w", err)
@@ -68,27 +74,13 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("writing genesis block: %w", err)
 	}
 
-	// TODO: Allow the mempool to be configured by the user config.
-	mempoolConfig := legacypool.DefaultConfig
-	mempoolConfig.NoLocals = true
-	saeConfig := sae.Config{
-		MempoolConfig: mempoolConfig,
-		DBConfig: saedb.Config{
-			TrieCacheMiB:     saedb.DefaultTrieCacheSizeMiB,
-			SnapshotCacheMiB: saedb.DefaultSnapshotCacheSizeMiB,
-			CommitInterval:   saedb.DefaultCommitInterval,
-		},
-		RPCConfig: rpc.Config{
-			APIs: rpc.DefaultAPIs(),
-		},
-		Now: vm.now,
-	}
+	saeConfig := userConfig.SAEConfig(vm.now)
 	tdbConfig := saeConfig.DBConfig.TrieDBConfig(snowCtx.ChainDataDir, snowCtx.Log)
 	if err := genesis.setupTrieDB(ethDB, tdbConfig); err != nil {
 		return fmt.Errorf("setting up genesis trie: %w", err)
 	}
 
-	vm.Network, err = network.New(snowCtx, appSender)
+	vm.Network, err = network.New(snowCtx, appSender, userConfig.NetworkOptions()...)
 	if err != nil {
 		return fmt.Errorf("creating network: %w", err)
 	}
