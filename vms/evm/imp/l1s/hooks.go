@@ -26,6 +26,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/blockdelay"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/hookadaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/saeheader"
 	"github.com/ava-labs/avalanchego/x/blockdb"
@@ -111,6 +113,11 @@ func blockTime(h *types.Header) time.Time {
 	return saeheader.Time(h.Time, customtypes.HeaderTimeMilliseconds(h))
 }
 
+// delayExponent returns h's ACP-226 minimum block delay exponent.
+func delayExponent(h *types.Header) dynamic.DelayExponent {
+	return blockdelay.Exponent(customtypes.GetHeaderExtra(h).MinDelayExcess)
+}
+
 func (*hooks) VerifyBlockSyntax(*types.Block) error {
 	// L1 VM has no extra block body fields.
 	return nil
@@ -147,17 +154,23 @@ type builder struct {
 	now func() time.Time
 }
 
+var errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
+
 // See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
 // the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
-	// TODO: Enforce the ACP-226 minimum block delay, and move it toward this
-	// node's desired delay.
-	minDelayExcess := acp226.InitialDelayExcess
-	if de := customtypes.GetHeaderExtra(parent).MinDelayExcess; de != nil {
-		minDelayExcess = *de
+	now := b.now()
+	// TODO(JonathanOppenheimer): Move the delay toward this node's desired
+	// delay once the user config supports `min-delay-target` (#6107).
+	de := delayExponent(parent)
+	parentTime := blockTime(parent)
+	if minTime := parentTime.Add(de.DelayDuration()); now.Before(minTime) {
+		return nil, fmt.Errorf("%w: block time %s is before the minimum %s (parent %s + %s)",
+			errBelowMinBlockDelay, now, minTime, parentTime, de.DelayDuration())
 	}
+	minDelayExcess := acp226.DelayExcess(de)
 
-	nowMS := uint64(b.now().UnixMilli()) //#nosec G115 -- Known non-negative
+	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- Known non-negative
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash: parent.Hash(),
