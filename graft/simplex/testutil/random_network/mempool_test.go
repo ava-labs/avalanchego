@@ -22,7 +22,7 @@ func TestMempoolVerifiesTx(t *testing.T) {
 	ctx := context.Background()
 	require := require.New(t)
 	round0MD := NewProtocolMetadata(0, 0, common.Digest{})
-	config := DefaultFuzzConfig()
+	config := DefaultFuzzConfig(t)
 
 	tests := []struct {
 		name      string
