@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/firewood-go/ffi"
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/triedb"
 	"go.uber.org/zap"
 
@@ -43,6 +44,7 @@ import (
 	apimetrics "github.com/ava-labs/avalanchego/api/metrics"
 	avadb "github.com/ava-labs/avalanchego/database"
 	snowcommon "github.com/ava-labs/avalanchego/snow/engine/common"
+	saestatesync "github.com/ava-labs/avalanchego/vms/evm/statesync"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -178,6 +180,7 @@ func (vm *VM) Initialize(
 		vm.Network,
 		hooks,
 		vm.state,
+		vm.canServe,
 	)
 	if err != nil {
 		return fmt.Errorf("creating statesync handler: %w", err)
@@ -333,6 +336,17 @@ var handlerPaths = append(slices.Clone(sae.HandlerPaths), avaxHTTPExtensionPath)
 // the [VM] is set as bootstrapping/normal operation.
 func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	return vm.handlers.AsInterface(), nil
+}
+
+// canServe reports whether the state at root can be served to syncing peers.
+// Nothing can be served until [VM.finishInitialize] has created the [sae.VM]
+// and registered the state sync server.
+func (vm *VM) canServe(root common.Hash) (bool, error) {
+	if vm.mode.Get() < snow.Bootstrapping {
+		return false, nil
+	}
+	tdb, _ := vm.VM.EVMState()
+	return saestatesync.CanServe(tdb, root)
 }
 
 // SetState sets the state of the VM. If the state is transitioning to

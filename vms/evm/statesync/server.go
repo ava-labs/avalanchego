@@ -64,6 +64,18 @@ func RegisterHandlers(
 	return nil
 }
 
+// CanServe reports whether the handlers registered by [RegisterHandlers] with
+// tdb can serve the state at root. Firewood only holds the roots it committed
+// since it was opened, so after a restart it can't serve the last summary
+// until the next one is executed.
+func CanServe(tdb *triedb.Database, root common.Hash) (bool, error) {
+	fw, ok := tdb.Backend().(*firewood.TrieDB)
+	if !ok {
+		return true, nil
+	}
+	return fw.HasCommitted(root)
+}
+
 func hashdbOptions(snap *snapshot.Tree) []hashdb.HandlerOption {
 	if snap == nil {
 		return nil

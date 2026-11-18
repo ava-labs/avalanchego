@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/saetest"
 )
 
@@ -149,6 +150,11 @@ func TestGetLastStateSummary(t *testing.T) {
 			wantErr: database.ErrNotFound,
 		},
 		{
+			name:      "below_first_summary_height",
+			numBlocks: defaultCommitInterval - 1,
+			wantErr:   database.ErrNotFound,
+		},
+		{
 			name:            "last_committed_synchronous",
 			numBlocks:       numBlocks,
 			lastSynchronous: lastCommitted,
@@ -186,4 +192,37 @@ func checkSummaryMatchesBlock(t *testing.T, summary *Summary, block *types.Block
 	if diff := cmp.Diff(want, summary, CmpOpt()); diff != "" {
 		t.Errorf("summary mismatch (-want +got):\n%s", diff)
 	}
+}
+
+// TestGetLastStateSummaryAfterRestart asserts that a Firewood node, which loses
+// its revision history when it shuts down, doesn't advertise a summary until it
+// can serve one again.
+func TestGetLastStateSummaryAfterRestart(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	vm := newVM(t, withScheme(firewood.Scheme))
+	vm.acceptBlocks(t, defaultCommitInterval+1)
+
+	summary, err := vm.Handler.GetLastStateSummary(ctx)
+	require.NoError(t, err, "GetLastStateSummary() before restart")
+	checkSummaryMatchesBlock(t, summary, vm.blockAtHeight(t, defaultCommitInterval).EthBlock())
+
+	require.NoError(t, vm.shutdown(), "shutdown()")
+	_, err = vm.Handler.GetLastStateSummary(ctx)
+	require.ErrorIs(t, err, database.ErrNotFound, "GetLastStateSummary() while shut down")
+
+	restarted := vm.restart(t)
+
+	// The last summary is still at the same height, but its root predates
+	// the restart.
+	_, err = restarted.Handler.GetLastStateSummary(ctx)
+	require.ErrorIs(t, err, database.ErrNotFound, "GetLastStateSummary() after restart")
+
+	// Executing the block at the next summary height commits its root again.
+	const nextHeight = 2 * defaultCommitInterval
+	restarted.acceptBlocks(t, nextHeight-restarted.lastAcceptedBlock(t).Height())
+	summary, err = restarted.Handler.GetLastStateSummary(ctx)
+	require.NoError(t, err, "GetLastStateSummary() after the next summary height")
+	checkSummaryMatchesBlock(t, summary, restarted.blockAtHeight(t, nextHeight).EthBlock())
 }

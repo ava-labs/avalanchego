@@ -44,16 +44,25 @@ type Handler struct {
 	snowCtx     *snow.Context
 	network     *network.Network
 	blockParser syncblocks.Parser
+	servable    ServableFunc
 }
+
+// A ServableFunc reports whether this node can currently serve the state at
+// root to syncing peers.
+type ServableFunc func(root common.Hash) (bool, error)
 
 // New constructs a new [Handler] with the given configuration and
 // database. See the README for the guarantees expected of the database.
+//
+// The last summary is only advertised if servable reports that its state can
+// be served. A nil servable treats every state as servable.
 func New(
 	cfg Config,
 	db ethdb.Database,
 	snowCtx *snow.Context,
 	network *network.Network,
 	hooks hook.Points,
+	servable ServableFunc,
 ) (*Handler, error) {
 	if err := cfg.DBConfig.Verify(); err != nil {
 		return nil, err
@@ -68,6 +77,7 @@ func New(
 		network:     network,
 		hooks:       hooks,
 		blockParser: parser(hooks),
+		servable:    servable,
 	}, nil
 }
 
@@ -95,7 +105,33 @@ func (h *Handler) GetLastStateSummary(context.Context) (*Summary, error) {
 	}
 
 	height := saedb.LastCommittedTrieDBHeight(*lastHeight, h.cfg.SummaryInterval)
-	return h.getSummaryAtHeight(height)
+	summary, err := h.getSummaryAtHeight(height)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.checkServable(summary); err != nil {
+		return nil, err
+	}
+	return summary, nil
+}
+
+// checkServable returns [database.ErrNotFound] if the state of summary can't
+// be served to syncing peers.
+func (h *Handler) checkServable(summary *Summary) error {
+	if h.servable == nil {
+		return nil
+	}
+	hdr := rawdb.ReadHeader(h.db, summary.AcceptedHash, summary.AcceptedHeight)
+	if hdr == nil {
+		return database.ErrNotFound
+	}
+	switch has, err := h.servable(hdr.Root); {
+	case err != nil:
+		return err
+	case !has:
+		return fmt.Errorf("%w: state root %s of summary at height %d", database.ErrNotFound, hdr.Root, summary.AcceptedHeight)
+	}
+	return nil
 }
 
 // GetStateSummary returns the summary of the block at the given height, if it
