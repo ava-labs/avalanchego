@@ -1813,17 +1813,15 @@ func TestEpochVotesForEquivocatedVotes(t *testing.T) {
 	testutil.InjectTestVote(t, e, equivocatedBlock, nodes[1])
 
 	// We should not have sent a notarization yet, since we have not received enough votes for the block we received from the leader
-	require.Never(t, func() bool {
+	noNotarizationUntil := time.After(time.Millisecond * 500)
+	for waiting := true; waiting; {
 		select {
 		case msg := <-recordedMessages:
-			if msg.Notarization != nil {
-				return true
-			}
-		default:
-			return false
+			require.Nil(t, msg.Notarization)
+		case <-noNotarizationUntil:
+			waiting = false
 		}
-		return false
-	}, time.Millisecond*500, time.Millisecond*100)
+	}
 
 	// node 2 sends a vote for the same block as the leader
 	testutil.InjectTestVote(t, e, block, nodes[2])
