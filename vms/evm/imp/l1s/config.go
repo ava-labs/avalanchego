@@ -12,7 +12,12 @@ import (
 // config is the operator-supplied node configuration for L1s, decoded from the
 // configBytes passed to [VM.Initialize].
 //
-// TODO(JonathanOppenheimer) enable and wire all remaining configs
+// TODO(JonathanOppenheimer) enable and wire all remaining configs. Options also
+// on the C-Chain (min-delay-target, state sync and warp) should move into
+// [vmconfig.Config], and their docs into vmconfig/config.md, once wired.
+//
+// TODO(JonathanOppenheimer) [vmconfig.Config.StateSyncIDs] is accepted but has
+// no effect until L1s support state sync.
 type config struct {
 	// Block-building targets
 	// MinDelayTarget is the ACP-226 minimum block delay (ms) this node votes
