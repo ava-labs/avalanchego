@@ -208,11 +208,9 @@ func newEnvironment(env vm.PrecompileEnvironment) (*environment, error) {
 		return nil, vm.ErrExecutionReverted
 	}
 
-	predicateBytes := predicateBytesFromExtra(*rules, env.BlockHeader().Extra)
-
 	return &environment{
 		PrecompileEnvironment: env,
-		predicateResults:      customtypes.PredicateResults(env.BlockHeader(), predicateBytes),
+		predicateResults:      customtypes.PredicateResults(env.BlockHeader(), rules.LatestUpgrade),
 		rules:                 rules,
 	}, nil
 }
