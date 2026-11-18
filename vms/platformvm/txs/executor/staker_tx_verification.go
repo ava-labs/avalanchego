@@ -879,10 +879,6 @@ func verifyAddAutoRenewedValidatorTx(
 	sTx *platform.Tx,
 	tx *platform.AddAutoRenewedValidatorTx,
 ) error {
-	if !backend.Config.UpgradeConfig.IsHeliconActivated(chainState.GetTimestamp()) {
-		return errHeliconUpgradeNotActive
-	}
-
 	// Verify the tx is well-formed
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
 		return err
@@ -964,10 +960,6 @@ func verifySetAutoRenewedValidatorConfigTx(
 	sTx *platform.Tx,
 	tx *platform.SetAutoRenewedValidatorConfigTx,
 ) (*state.Staker, error) {
-	if !backend.Config.UpgradeConfig.IsHeliconActivated(chainState.GetTimestamp()) {
-		return nil, errHeliconUpgradeNotActive
-	}
-
 	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
 		return nil, err
 	}
