@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm"
+	"github.com/ava-labs/libevm/params"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/nativeasset"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
@@ -20,12 +21,10 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/hook"
-
-	ethparams "github.com/ava-labs/libevm/params"
 )
 
 var (
-	_ ethparams.RulesHooks   = Rules{}
+	_ params.RulesHooks      = Rules{}
 	_ precompileconfig.Rules = Rules{} // TODO(alarso16): Delete implementation.
 )
 
@@ -62,7 +61,7 @@ func (r Rules) MinimumGasConsumption(limit uint64) uint64 {
 	if r.Is(upgrade.Helicon) {
 		return hook.MinimumGasConsumption(limit)
 	}
-	return (ethparams.NOOPHooks{}).MinimumGasConsumption(limit)
+	return (params.NOOPHooks{}).MinimumGasConsumption(limit)
 }
 
 // ShouldCreditBaseFeeToCoinbase returns true to credit the base fee to the
