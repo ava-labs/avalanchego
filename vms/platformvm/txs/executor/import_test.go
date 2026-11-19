@@ -147,7 +147,7 @@ func TestNewImportTx(t *testing.T) {
 
 			require.Equal(totalIn, totalOut)
 
-			stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+			stateDiff, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
 			stateDiff.SetTimestamp(tt.timestamp)

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/firewood-go/ffi"
 	"go.uber.org/zap"
 
 	// TODO(alarso16): Remove the dependency on the global module registration.
@@ -19,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/evm/adaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/blocks"
+	"github.com/ava-labs/avalanchego/vms/evm/firewood"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/l1s/hookadaptor"
 	"github.com/ava-labs/avalanchego/vms/evm/network"
 	"github.com/ava-labs/avalanchego/vms/evm/sae"
@@ -83,6 +85,10 @@ func (vm *VM) Initialize(
 	vm.Network, err = network.New(snowCtx, appSender, userConfig.NetworkOptions()...)
 	if err != nil {
 		return fmt.Errorf("creating network: %w", err)
+	}
+
+	if err := snowCtx.Metrics.Register(firewood.Scheme, ffi.Gatherer{}); err != nil {
+		return fmt.Errorf("registering firewood metrics: %w", err)
 	}
 
 	// TODO: Support state sync, which requires the [sae.VM] to be created

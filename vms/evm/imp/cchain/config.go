@@ -80,16 +80,18 @@ func parseConfig(snowCtx *snow.Context, b []byte) (config, error) {
 }
 
 func (c config) stateSyncConfig(networkID uint32) statesync.Config {
-	saeCfg := c.SAEConfig(nil)
+	dbCfg := c.SAEConfig(nil).DBConfig
+	summaryInterval := dbCfg.CommitInterval
 	// All nodes in production networks MUST agree which state summaries to
 	// serve to ensure the state sync engine can hit the required quorum to
 	// accept the summaries.
 	if constants.ProductionNetworkIDs.Contains(networkID) {
-		saeCfg.DBConfig.CommitInterval = saedb.DefaultCommitInterval
+		summaryInterval = saedb.DefaultCommitInterval
 	}
 	return statesync.Config{
-		DBConfig: saeCfg.DBConfig,
-		Enabled:  c.StateSyncEnabled,
+		DBConfig:        dbCfg,
+		SummaryInterval: summaryInterval,
+		Enabled:         c.StateSyncEnabled,
 	}
 }
 

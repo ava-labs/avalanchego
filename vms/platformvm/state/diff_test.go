@@ -33,7 +33,7 @@ func (nilStateGetter) GetState(ids.ID) (Chain, bool) {
 
 func TestDiffMissingState(t *testing.T) {
 	parentID := ids.GenerateTestID()
-	_, err := NewDiff(parentID, nilStateGetter{}, StakerAdditionAfterDeletionAllowed)
+	_, err := NewDiff(parentID, nilStateGetter{})
 	require.ErrorIs(t, err, ErrMissingParentState)
 }
 
@@ -42,7 +42,7 @@ func TestNewDiffOn(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	assertChainsEqual(t, state, d)
@@ -51,7 +51,7 @@ func TestNewDiffOn(t *testing.T) {
 func TestDiffTimestamp(t *testing.T) {
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(t, err)
 
 	initial := state.GetTimestamp()
@@ -69,7 +69,7 @@ func TestDiffFeeState(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	initialFeeState := state.GetFeeState()
@@ -90,7 +90,7 @@ func TestDiffL1ValidatorExcess(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	initialExcess := state.GetL1ValidatorExcess()
@@ -108,7 +108,7 @@ func TestDiffAccruedFees(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	initialAccruedFees := state.GetAccruedFees()
@@ -126,7 +126,7 @@ func TestDiffCurrentSupply(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	initialCurrentSupply, err := d.GetCurrentSupply(constants.PrimaryNetworkID)
@@ -273,7 +273,7 @@ func TestDiffExpiry(t *testing.T) {
 				state.PutExpiry(expiry)
 			}
 
-			d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+			d, err := NewDiffOn(state)
 			require.NoError(err)
 
 			var (
@@ -407,7 +407,7 @@ func TestDiffL1ValidatorsErrors(t *testing.T) {
 			l1Validator.EndAccumulatedFee = test.initialEndAccumulatedFee
 			require.NoError(state.PutL1Validator(l1Validator))
 
-			d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+			d, err := NewDiffOn(state)
 			require.NoError(err)
 
 			// Initialize subnetID, weight, and endAccumulatedFee as they are
@@ -429,7 +429,7 @@ func TestDiffCurrentValidator(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	// Put a current validator
@@ -458,7 +458,7 @@ func TestDiffPendingValidator(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	// Put a pending validator
@@ -487,7 +487,7 @@ func TestDiffCurrentDelegator(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	// Put a current delegator
@@ -535,7 +535,7 @@ func TestDiffPendingDelegator(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	// Put a pending delegator
@@ -582,7 +582,7 @@ func TestDiffSubnet(t *testing.T) {
 		subnetIDs,
 	)
 
-	diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	diff, err := NewDiffOn(state)
 	require.NoError(err)
 
 	// Put a subnet
@@ -632,7 +632,7 @@ func TestDiffChain(t *testing.T) {
 		chains,
 	)
 
-	diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	diff, err := NewDiffOn(state)
 	require.NoError(err)
 
 	// Put a chain
@@ -663,7 +663,7 @@ func TestDiffTx(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	// Put a tx
@@ -734,7 +734,7 @@ func TestDiffRewardUTXO(t *testing.T) {
 		rewardUTXOs,
 	)
 
-	diff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	diff, err := NewDiffOn(state)
 	require.NoError(err)
 
 	// Put a reward UTXO
@@ -763,7 +763,7 @@ func TestDiffUTXO(t *testing.T) {
 
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	// Put a UTXO
@@ -797,7 +797,7 @@ func TestDiffUTXO(t *testing.T) {
 	require.NoError(err)
 	require.Equal(utxo, gotUTXO)
 
-	d, err = NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err = NewDiffOn(state)
 	require.NoError(err)
 	{
 		// Delete the UTXO
@@ -907,7 +907,7 @@ func TestDiffSubnetOwner(t *testing.T) {
 	require.Equal(owner1, owner)
 
 	// Create diff and verify that subnet owner returns correctly
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	owner, err = d.GetSubnetOwner(subnetID)
@@ -948,7 +948,7 @@ func TestDiffSubnetToL1Conversion(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Zero(actualConversion)
 
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(err)
 
 	actualConversion, err = d.GetSubnetToL1Conversion(subnetID)
@@ -976,7 +976,7 @@ func TestDiffSubnetTransformation(t *testing.T) {
 	state := newTestState(t, memdb.New())
 	subnetID := ids.GenerateTestID()
 
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(t, err)
 
 	wantTx := &platform.Tx{Unsigned: &platform.TransformSubnetTx{Subnet: subnetID}}
@@ -1028,7 +1028,7 @@ func TestDiffStacking(t *testing.T) {
 	require.Equal(owner1, owner)
 
 	// Create first diff and verify that subnet owner returns correctly
-	statesDiff, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	statesDiff, err := NewDiffOn(state)
 	require.NoError(err)
 
 	owner, err = statesDiff.GetSubnetOwner(subnetID)
@@ -1046,7 +1046,7 @@ func TestDiffStacking(t *testing.T) {
 	require.Equal(owner1, owner)
 
 	// Create a second diff on first diff and verify that subnet owner returns correctly
-	stackedDiff, err := NewDiffOn(statesDiff, StakerAdditionAfterDeletionAllowed)
+	stackedDiff, err := NewDiffOn(statesDiff)
 	require.NoError(err)
 	owner, err = stackedDiff.GetSubnetOwner(subnetID)
 	require.NoError(err)
@@ -1087,7 +1087,7 @@ func TestDiffStacking(t *testing.T) {
 func TestDiffStakingInfo(t *testing.T) {
 	state := newTestState(t, memdb.New())
 
-	d, err := NewDiffOn(state, StakerAdditionAfterDeletionAllowed)
+	d, err := NewDiffOn(state)
 	require.NoError(t, err)
 
 	// Get falls through to parent when not set in diff

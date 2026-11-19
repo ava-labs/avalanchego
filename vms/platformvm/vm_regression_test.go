@@ -41,7 +41,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/platform"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
-	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state/statetest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -1502,7 +1501,7 @@ func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionTracked(t *t
 	require.NoError(blk3.Accept(t.Context()))
 }
 
-func TestAddValidatorDuringRemovalPostHelicon(t *testing.T) {
+func TestAddValidatorDuringRemoval(t *testing.T) {
 	require := require.New(t)
 
 	vm, _, _ := defaultVM(t, upgrade.Latest)
@@ -1566,74 +1565,6 @@ func TestAddValidatorDuringRemovalPostHelicon(t *testing.T) {
 	// Verify that the transaction was executed
 	_, _, err = vm.state.GetTx(secondSubnetValidatorTx.ID())
 	require.NoError(err)
-}
-
-func TestAddValidatorDuringRemovalPreHelicon(t *testing.T) {
-	require := require.New(t)
-
-	vm, _, _ := defaultVM(t, upgrade.Durango)
-	vm.ctx.Lock.Lock()
-	defer vm.ctx.Lock.Unlock()
-
-	var (
-		nodeID   = genesistest.DefaultNodeIDs[0]
-		subnetID = testSubnet1.ID()
-		wallet   = newWallet(t, vm, walletConfig{
-			subnetIDs: []ids.ID{subnetID},
-		})
-
-		duration     = defaultMinStakingDuration
-		firstEndTime = latestForkTime.Add(duration)
-	)
-
-	firstAddSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
-		Validator: platform.Validator{
-			NodeID: nodeID,
-			End:    uint64(firstEndTime.Unix()),
-			Wght:   1,
-		},
-		Subnet: subnetID,
-	})
-	require.NoError(err)
-
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(firstAddSubnetValidatorTx))
-	vm.ctx.Lock.Lock()
-
-	// Accept firstAddSubnetValidatorTx
-	require.NoError(buildAndAcceptStandardBlock(vm))
-
-	// Verify that the validator was added
-	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
-	require.NoError(err)
-
-	secondEndTime := firstEndTime.Add(duration)
-	secondSubnetValidatorTx, err := wallet.IssueAddSubnetValidatorTx(&platform.SubnetValidator{
-		Validator: platform.Validator{
-			NodeID: nodeID,
-			End:    uint64(secondEndTime.Unix()),
-			Wght:   1,
-		},
-		Subnet: subnetID,
-	})
-	require.NoError(err)
-
-	vm.clock.Set(firstEndTime)
-	vm.ctx.Lock.Unlock()
-	err = vm.issueTxFromRPC(secondSubnetValidatorTx)
-	vm.ctx.Lock.Lock()
-	require.ErrorIs(err, state.ErrAddingStakerAfterDeletion)
-
-	// Remove the first subnet validator
-	require.NoError(buildAndAcceptStandardBlock(vm))
-
-	// Verify that the validator does not exist
-	_, err = vm.state.GetCurrentValidator(subnetID, nodeID)
-	require.ErrorIs(err, database.ErrNotFound)
-
-	// Verify that the invalid transaction was not executed
-	_, _, err = vm.state.GetTx(secondSubnetValidatorTx.ID())
-	require.ErrorIs(err, database.ErrNotFound)
 }
 
 // GetValidatorSet must return the BLS keys for a given validator correctly when

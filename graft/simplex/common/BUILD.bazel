@@ -1,0 +1,54 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("//.bazel:defs.bzl", "graft_go_test")
+
+go_library(
+    name = "common",
+    srcs = [
+        "api.go",
+        "blacklist.canoto.go",
+        "blacklist.go",
+        "block_scheduler.go",
+        "consts.go",
+        "encoding.go",
+        "global.go",
+        "metadata.canoto.go",
+        "metadata.go",
+        "msg.canoto.go",
+        "msg.go",
+        "notarization.go",
+        "random.go",
+        "sched.go",
+        "timeout_handler.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/simplex/common",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/simplex/avalanchego",
+        "@com_github_stephenbuttolph_canoto//:canoto",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+graft_go_test(
+    name = "common_test",
+    srcs = [
+        "blacklist_test.go",
+        "block_scheduler_test.go",
+        "encoding_maxalloc_test.go",
+        "encoding_test.go",
+        "global_test.go",
+        "leak_test.go",
+        "metadata_test.go",
+        "msg_test.go",
+        "notarization_test.go",
+        "sched_test.go",
+        "timeout_handler_test.go",
+    ],
+    embed = [":common"],
+    deps = [
+        "//graft/simplex/testutil",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_goleak//:goleak",
+        "@org_uber_go_zap//:zap",
+    ],
+)

@@ -106,7 +106,7 @@ func TestStandardTxExecutorAddValidatorTxEmptyID(t *testing.T) {
 		)
 		require.NoError(err)
 
-		stateDiff, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		stateDiff, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, stateDiff)
@@ -359,7 +359,7 @@ func TestStandardTxExecutorAddDelegator(t *testing.T) {
 				tt.setup(env)
 			}
 
-			onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+			onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
 			env.config.UpgradeConfig.BanffTime = onAcceptState.GetTimestamp()
@@ -407,7 +407,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -441,7 +441,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -494,7 +494,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -545,7 +545,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -577,7 +577,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -609,7 +609,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -644,7 +644,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -713,7 +713,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -756,7 +756,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 		addSubnetValidatorTx.SyntacticallyVerified = false
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -795,7 +795,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		// This tx was syntactically verified when it was created...pretend it wasn't so we don't use cache
 		addSubnetValidatorTx.SyntacticallyVerified = false
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -832,7 +832,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		require.NoError(err)
 		copy(tx.Creds[0].(*secp256k1fx.Credential).Sigs[0][:], sig)
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -881,7 +881,7 @@ func TestApricotStandardTxExecutorAddSubnetValidator(t *testing.T) {
 		env.state.SetHeight(dummyHeight)
 		require.NoError(env.state.Commit())
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -920,7 +920,7 @@ func TestEtnaStandardTxExecutorAddSubnetValidator(t *testing.T) {
 	)
 	require.NoError(err)
 
-	onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+	onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 	require.NoError(err)
 
 	onAcceptState.SetSubnetToL1Conversion(
@@ -969,7 +969,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -1010,7 +1010,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		require.NoError(onAcceptState.PutCurrentValidator(staker))
@@ -1049,7 +1049,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		)
 		require.NoError(err)
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		require.NoError(onAcceptState.PutPendingValidator(staker))
@@ -1088,7 +1088,7 @@ func TestBanffStandardTxExecutorAddValidator(t *testing.T) {
 		utxoIDs, err := env.state.UTXOIDs(genesistest.DefaultFundedKeys[0].Address().Bytes(), ids.Empty, math.MaxInt32)
 		require.NoError(err)
 
-		onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+		onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 		require.NoError(err)
 
 		for _, utxoID := range utxoIDs {
@@ -1190,7 +1190,7 @@ func TestDurangoDisabledTransactions(t *testing.T) {
 			env.ctx.Lock.Lock()
 			defer env.ctx.Lock.Unlock()
 
-			onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
+			onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 			require.NoError(err)
 
 			tx := tt.buildTx(t, env)
@@ -1255,7 +1255,7 @@ func TestDurangoMemoField(t *testing.T) {
 				)
 				require.NoError(err)
 
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(err)
 				return tx, onAcceptState
 			},
@@ -1280,7 +1280,7 @@ func TestDurangoMemoField(t *testing.T) {
 				)
 				require.NoError(err)
 
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(err)
 				return tx, onAcceptState
 			},
@@ -1297,7 +1297,7 @@ func TestDurangoMemoField(t *testing.T) {
 				)
 				require.NoError(err)
 
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(err)
 				return tx, onAcceptState
 			},
@@ -1336,7 +1336,7 @@ func TestDurangoMemoField(t *testing.T) {
 				)
 				require.NoError(err)
 
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(err)
 				return tx, onAcceptState
 			},
@@ -1360,7 +1360,7 @@ func TestDurangoMemoField(t *testing.T) {
 				)
 				require.NoError(err)
 
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(err)
 				return tx, onAcceptState
 			},
@@ -1402,7 +1402,7 @@ func TestDurangoMemoField(t *testing.T) {
 				)
 				require.NoError(err)
 
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(err)
 
 				feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -1452,7 +1452,7 @@ func TestDurangoMemoField(t *testing.T) {
 				)
 				require.NoError(err)
 
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(err)
 				return tx, onAcceptState
 			},
@@ -1491,7 +1491,7 @@ func TestDurangoMemoField(t *testing.T) {
 				)
 				require.NoError(err)
 
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(err)
 				return tx, onAcceptState
 			},
@@ -1531,7 +1531,7 @@ func TestDurangoMemoField(t *testing.T) {
 				)
 				require.NoError(err)
 
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(err)
 				return tx, onAcceptState
 			},
@@ -1553,7 +1553,7 @@ func TestDurangoMemoField(t *testing.T) {
 				)
 				require.NoError(err)
 
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(err)
 				return tx, onAcceptState
 			},
@@ -1581,7 +1581,7 @@ func TestDurangoMemoField(t *testing.T) {
 				)
 				require.NoError(err)
 
-				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
+				onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 				require.NoError(err)
 				return tx, onAcceptState
 			},
@@ -1629,7 +1629,7 @@ func TestEtnaDisabledTransactions(t *testing.T) {
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
-	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env, state.StakerAdditionAfterDeletionForbidden)
+	onAcceptState, err := state.NewDiff(env.state.GetLastAccepted(), env)
 	require.NoError(err)
 
 	feeCalculator := state.PickFeeCalculator(env.config, env.state)
@@ -1727,7 +1727,7 @@ func newValidRemoveSubnetValidatorTxVerifyEnv(t *testing.T, ctrl *gomock.Control
 	mockFlowChecker := utxomock.NewVerifier(ctrl)
 	unsignedTx, tx := newRemoveSubnetValidatorTx(t)
 	s := statetest.New(t, statetest.Config{})
-	stateDiff, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	stateDiff, err := state.NewDiffOn(s)
 	require.NoError(t, err)
 
 	return removeSubnetValidatorTxVerifyEnv{
@@ -2126,7 +2126,7 @@ func newValidTransformSubnetTxVerifyEnv(t *testing.T, ctrl *gomock.Controller) t
 	mockFlowChecker := utxomock.NewVerifier(ctrl)
 	unsignedTx, tx := newTransformSubnetTx(t)
 	s := statetest.New(t, statetest.Config{})
-	stateDiff, err := state.NewDiffOn(s, state.StakerAdditionAfterDeletionForbidden)
+	stateDiff, err := state.NewDiffOn(s)
 	require.NoError(t, err)
 
 	return transformSubnetTxVerifyEnv{
@@ -2428,7 +2428,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	diff, err := state.NewDiffOn(baseState, state.StakerAdditionAfterDeletionAllowed)
+	diff, err := state.NewDiffOn(baseState)
 	require.NoError(t, err)
 
 	_, _, _, err = StandardTx(
@@ -2488,17 +2488,6 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		updateExecutor func(executor *standardTxExecutor) error
 		expectedErr    error
 	}{
-		{
-			name: "invalid prior to E-Upgrade",
-			tx:   convertSubnetToL1Tx,
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Internal{
-					UpgradeConfig: upgradetest.GetConfig(upgrade.Durango),
-				}
-				return nil
-			},
-			expectedErr: errEtnaUpgradeNotActive,
-		},
 		{
 			name: "tx fails syntactic verification",
 			tx:   convertSubnetToL1Tx,
@@ -2667,7 +2656,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			diff, err := state.NewDiffOn(baseState, state.StakerAdditionAfterDeletionAllowed)
+			diff, err := state.NewDiffOn(baseState)
 			require.NoError(err)
 
 			executor := &standardTxExecutor{
@@ -2808,7 +2797,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 	)
 
 	// Create the initial state
-	diff, err := state.NewDiffOn(baseState, state.StakerAdditionAfterDeletionAllowed)
+	diff, err := state.NewDiffOn(baseState)
 	require.NoError(t, err)
 
 	// Create the subnet
@@ -2934,16 +2923,6 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 		updateExecutor func(*standardTxExecutor) error
 		expectedErr    error
 	}{
-		{
-			name: "invalid prior to E-Upgrade",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Internal{
-					UpgradeConfig: upgradetest.GetConfig(upgrade.Durango),
-				}
-				return nil
-			},
-			expectedErr: errEtnaUpgradeNotActive,
-		},
 		{
 			name: "tx fails syntactic verification",
 			updateExecutor: func(e *standardTxExecutor) error {
@@ -3215,7 +3194,7 @@ func TestStandardExecutorRegisterL1ValidatorTx(t *testing.T) {
 				test.updateTx(unsignedTx)
 			}
 
-			diff, err := state.NewDiffOn(baseState, state.StakerAdditionAfterDeletionAllowed)
+			diff, err := state.NewDiffOn(baseState)
 			require.NoError(err)
 
 			executor := &standardTxExecutor{
@@ -3332,7 +3311,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 	)
 
 	// Create the initial state
-	diff, err := state.NewDiffOn(baseState, state.StakerAdditionAfterDeletionAllowed)
+	diff, err := state.NewDiffOn(baseState)
 	require.NoError(t, err)
 
 	// Create the subnet
@@ -3472,16 +3451,6 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 		expectedRemainingFundsUTXO *avax.UTXO
 		expectedErr                error
 	}{
-		{
-			name: "invalid prior to E-Upgrade",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Internal{
-					UpgradeConfig: upgradetest.GetConfig(upgrade.Durango),
-				}
-				return nil
-			},
-			expectedErr: errEtnaUpgradeNotActive,
-		},
 		{
 			name: "tx fails syntactic verification",
 			updateExecutor: func(e *standardTxExecutor) error {
@@ -3716,7 +3685,7 @@ func TestStandardExecutorSetL1ValidatorWeightTx(t *testing.T) {
 				unsignedTx.Message = test.message
 			}
 
-			diff, err := state.NewDiffOn(baseState, state.StakerAdditionAfterDeletionAllowed)
+			diff, err := state.NewDiffOn(baseState)
 			require.NoError(err)
 
 			executor := &standardTxExecutor{
@@ -3831,7 +3800,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 	)
 
 	// Create the initial state
-	diff, err := state.NewDiffOn(baseState, state.StakerAdditionAfterDeletionAllowed)
+	diff, err := state.NewDiffOn(baseState)
 	require.NoError(t, err)
 
 	// Create the subnet
@@ -3916,16 +3885,6 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 		expectedBalance uint64
 		expectedErr     error
 	}{
-		{
-			name: "invalid prior to E-Upgrade",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Internal{
-					UpgradeConfig: upgradetest.GetConfig(upgrade.Durango),
-				}
-				return nil
-			},
-			expectedErr: errEtnaUpgradeNotActive,
-		},
 		{
 			name: "tx fails syntactic verification",
 			updateExecutor: func(e *standardTxExecutor) error {
@@ -4025,7 +3984,7 @@ func TestStandardExecutorIncreaseL1ValidatorBalanceTx(t *testing.T) {
 				test.updateTx(unsignedTx)
 			}
 
-			diff, err := state.NewDiffOn(baseState, state.StakerAdditionAfterDeletionAllowed)
+			diff, err := state.NewDiffOn(baseState)
 			require.NoError(err)
 
 			executor := &standardTxExecutor{
@@ -4121,7 +4080,7 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 	)
 
 	// Create the initial state
-	diff, err := state.NewDiffOn(baseState, state.StakerAdditionAfterDeletionAllowed)
+	diff, err := state.NewDiffOn(baseState)
 	require.NoError(t, err)
 
 	// Create the subnet
@@ -4210,16 +4169,6 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 		expectedErr     error
 	}{
 		{
-			name: "invalid prior to E-Upgrade",
-			updateExecutor: func(e *standardTxExecutor) error {
-				e.backend.Config = &config.Internal{
-					UpgradeConfig: upgradetest.GetConfig(upgrade.Durango),
-				}
-				return nil
-			},
-			expectedErr: errEtnaUpgradeNotActive,
-		},
-		{
 			name: "tx fails syntactic verification",
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.backend.Ctx = snowtest.Context(t, ids.GenerateTestID())
@@ -4300,7 +4249,7 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 				test.updateTx(unsignedTx)
 			}
 
-			diff, err := state.NewDiffOn(baseState, state.StakerAdditionAfterDeletionAllowed)
+			diff, err := state.NewDiffOn(baseState)
 			require.NoError(err)
 
 			executor := &standardTxExecutor{
@@ -4433,7 +4382,7 @@ func TestHeliconMinStakeDurationValidator(t *testing.T) {
 			)
 			require.NoError(err)
 
-			onAcceptState, err := state.NewDiff(lastAcceptedID, env, state.StakerAdditionAfterDeletionForbidden)
+			onAcceptState, err := state.NewDiff(lastAcceptedID, env)
 			require.NoError(err)
 
 			feeCalculator := state.PickFeeCalculator(env.config, onAcceptState)
@@ -4450,7 +4399,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTx(t *testing.T) {
 		feeCalculator = state.PickFeeCalculator(env.config, env.state)
 	)
 
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	diff, err := state.NewDiffOn(env.state)
 	require.NoError(t, err)
 
 	sk, err := localsigner.New()
@@ -4585,13 +4534,6 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 		update func(*platform.AddAutoRenewedValidatorTx, *state.Diff)
 	}{
 		{
-			name: "invalid_upgrade",
-			update: func(_ *platform.AddAutoRenewedValidatorTx, diff *state.Diff) {
-				diff.SetTimestamp(env.backend.Config.UpgradeConfig.HeliconTime.Add(-1 * time.Second))
-			},
-			want: errHeliconUpgradeNotActive,
-		},
-		{
 			name: "weight_too_small",
 			update: func(tx *platform.AddAutoRenewedValidatorTx, _ *state.Diff) {
 				tx.StakeOuts[0].Out.(*secp256k1fx.TransferOutput).Amt = env.config.MinValidatorStake - 1
@@ -4656,7 +4598,7 @@ func TestStandardExecutorAddAutoRenewedValidatorTxErrors(t *testing.T) {
 			)
 			require.NoError(t, got)
 
-			diff, got := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+			diff, got := state.NewDiffOn(env.state)
 			require.NoError(t, got)
 
 			tt.update(tx.Unsigned.(*platform.AddAutoRenewedValidatorTx), diff)
@@ -4732,7 +4674,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 			// it spends/creates are reflected in env.state. This keeps env.state in
 			// sync with the wallet's UTXO set, so the config tx is funded with a UTXO
 			// that actually exists during execution.
-			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+			diff, err := state.NewDiffOn(env.state)
 			require.NoError(t, err)
 
 			_, _, _, err = StandardTx(&env.backend, feeCalculator, addAutoRenewedValidatorTx, diff)
@@ -4773,7 +4715,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTx(t *testing.T) {
 				require.ErrorIs(t, err, database.ErrNotFound)
 			}
 
-			diff, err = state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+			diff, err = state.NewDiffOn(env.state)
 			require.NoError(t, err)
 			require.NoError(t, diff.SetStakingInfo(constants.PrimaryNetworkID, nodeID, initialStakingInfo))
 
@@ -4873,7 +4815,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	diff, err := state.NewDiffOn(env.state)
 	require.NoError(t, err)
 	diff.AddTx(addPastContValidatorTx, status.Committed)
 	diff.AddTx(addAutoRenewedValidatorTx, status.Committed)
@@ -4886,13 +4828,6 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 		updateState func(testing.TB, *state.Diff)
 		wantErr     error
 	}{
-		{
-			name: "invalid_upgrade",
-			updateState: func(_ testing.TB, diff *state.Diff) {
-				diff.SetTimestamp(env.backend.Config.UpgradeConfig.HeliconTime.Add(-1 * time.Second))
-			},
-			wantErr: errHeliconUpgradeNotActive,
-		},
 		{
 			name: "stopped_validator",
 			updateState: func(t testing.TB, diff *state.Diff) {
@@ -4963,7 +4898,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+			diff, err := state.NewDiffOn(env.state)
 			require.NoError(t, err)
 
 			tx, err := wallet.IssueSetAutoRenewedValidatorConfigTx(addAutoRenewedValidatorTx.ID(), 0, 0)
@@ -4992,7 +4927,7 @@ func TestStandardExecutorSetAutoRenewedValidatorConfigTxErrors(t *testing.T) {
 func TestStandardExecutorRewardAutoRenewedValidatorTx(t *testing.T) {
 	env := newEnvironment(t, upgrade.Latest)
 
-	diff, err := state.NewDiffOn(env.state, state.StakerAdditionAfterDeletionAllowed)
+	diff, err := state.NewDiffOn(env.state)
 	require.NoError(t, err)
 
 	_, _, _, err = StandardTx(
