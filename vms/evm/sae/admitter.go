@@ -91,7 +91,7 @@ func (a *admitter) Admit(tx *types.Transaction) error {
 		return fmt.Errorf("determining sender: %w", err)
 	}
 
-	if err := a.hooks.CanExecuteTransaction(head.rules, from, tx.To(), state); err != nil {
+	if err := a.hooks.CanExecuteTransaction(head.rules, from, state); err != nil {
 		return fmt.Errorf("transaction blocked by CanExecuteTransaction hook: %w", err)
 	}
 	return nil

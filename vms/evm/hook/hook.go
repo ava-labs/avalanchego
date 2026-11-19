@@ -81,11 +81,10 @@ type PointsWithoutBlockOps interface {
 	// block, beyond the universal invariants enforced by [blocks.Parse]. It
 	// MUST be stateless.
 	VerifyBlockSyntax(*types.Block) error
-	// CanExecuteTransaction returns an error if a transaction from `from` to
-	// `to`, which is nil for contract creation, is not allowed. `rules` and
-	// `state` are of the same block, which MAY be older than the block that
-	// includes the transaction.
-	CanExecuteTransaction(rules params.Rules, from common.Address, to *common.Address, state libevm.StateReader) error
+	// CanExecuteTransaction returns an error if a transaction from `from` is
+	// not allowed. `rules` and `state` are of the same block, which MAY be
+	// older than the block that includes the transaction.
+	CanExecuteTransaction(rules params.Rules, from common.Address, state libevm.StateReader) error
 	// StartExecutingBlock applies state changes before the block's transactions
 	// run. `rules` are those of the block and `parent` is the parent header. It
 	// runs during canonical and historical execution. It MUST NOT change data

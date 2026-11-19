@@ -163,7 +163,7 @@ func withAllGenesisPrecompiles(timestamp uint64) genesisOption {
 func TestParseGenesis(t *testing.T) {
 	var (
 		latest = &snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgrade.Latest)}
-		// Helicon is the last upgrade before Igloo.
+		// helicon leaves Igloo unscheduled.
 		helicon = &snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgrade.Helicon)}
 		// Mainnet has non-zero network upgrade times.
 		mainnet            = &snow.Context{NetworkUpgrades: upgrade.Mainnet}

@@ -223,7 +223,7 @@ func (s *State) ApplyTx(tx *types.Transaction) error {
 	// state-dependent precompile checks read storage from `s.db` and gate that
 	// read with `rules.IsPrecompileEnabled(...)`.
 	settledRules := s.config.Rules(s.settled.Number, true /*isMerge*/, s.settled.Time)
-	if err := s.hooks.CanExecuteTransaction(settledRules, from, tx.To(), s.db); err != nil {
+	if err := s.hooks.CanExecuteTransaction(settledRules, from, s.db); err != nil {
 		return fmt.Errorf("transaction blocked by CanExecuteTransaction hook: %w", err)
 	}
 

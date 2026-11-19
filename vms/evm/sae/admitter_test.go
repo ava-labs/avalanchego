@@ -33,7 +33,7 @@ type admitterOption func(*hookstest.Stub)
 
 // withCanExecuteTransaction installs a stub for
 // [hook.Points.CanExecuteTransaction].
-func withCanExecuteTransaction(fn func(params.Rules, common.Address, *common.Address, libevm.StateReader) error) admitterOption {
+func withCanExecuteTransaction(fn func(params.Rules, common.Address, libevm.StateReader) error) admitterOption {
 	return func(s *hookstest.Stub) { s.CanExecuteTransactionFn = fn }
 }
 
@@ -100,24 +100,24 @@ func TestAdmit(t *testing.T) {
 
 	tests := []struct {
 		name string
-		// CanExecuteTransaction MAY assert on its received `from` / `to`
+		// CanExecuteTransaction MAY assert on its received `from`
 		// directly (e.g. to selectively block a specific sender) and is
 		// expected to surface its decision via the returned error.
-		CanExecuteTransaction func(params.Rules, common.Address, *common.Address, libevm.StateReader) error
+		CanExecuteTransaction func(params.Rules, common.Address, libevm.StateReader) error
 		wantErr               map[common.Address]error
 	}{
 		{
 			name: "allowed",
-			CanExecuteTransaction: func(params.Rules, common.Address, *common.Address, libevm.StateReader) error {
+			CanExecuteTransaction: func(params.Rules, common.Address, libevm.StateReader) error {
 				return nil
 			},
 		},
 		{
 			name: "blocked_for_specific_sender",
 			// Reject only when the recovered sender matches `from`. This
-			// proves the hook receives the exact tx sender (not e.g. the
-			// recipient) by acting on it directly.
-			CanExecuteTransaction: func(_ params.Rules, from common.Address, _ *common.Address, _ libevm.StateReader) error {
+			// proves the hook receives the exact tx sender by acting on it
+			// directly.
+			CanExecuteTransaction: func(_ params.Rules, from common.Address, _ libevm.StateReader) error {
 				if from == addrs[0] {
 					return blockedErr
 				}

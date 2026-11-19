@@ -98,8 +98,6 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 	return executionresults.New(dataDir, h.ctx.Log)
 }
 
-// GasConfigAfter returns the gas target and price config in effect after hdr.
-// It depends only on hdr.
 func (*hooks) GasConfigAfter(hdr *types.Header) (gas.Gas, gastime.GasPriceConfig) {
 	target := targetExponent(hdr).Target()
 	he := customtypes.GetHeaderExtra(hdr)
@@ -118,16 +116,13 @@ func (*hooks) GasConfigAfter(hdr *types.Header) (gas.Gas, gastime.GasPriceConfig
 	return target, c
 }
 
-// targetExponent returns hdr's ACP-176 target exponent, or zero if unset.
 func targetExponent(hdr *types.Header) dynamic.TargetExponent {
 	if te := customtypes.GetHeaderExtra(hdr).TargetExponent; te != nil {
 		return *te
 	}
-	return 0
+	return dynamic.InitialTargetExponent
 }
 
-// SettledBy returns the settlement marker in h, or the zero value, which
-// indicates synchronous pre-SAE execution, if h has none.
 func (*hooks) SettledBy(h *types.Header) hook.Settled {
 	he := customtypes.GetHeaderExtra(h)
 	if he.SettledHeight == nil ||
@@ -144,7 +139,6 @@ func (*hooks) SettledBy(h *types.Header) hook.Settled {
 	}
 }
 
-// BlockTime returns the canonical wall-clock time of a block.
 func (*hooks) BlockTime(h *types.Header) time.Time {
 	return blockTime(h)
 }
@@ -153,49 +147,12 @@ func blockTime(h *types.Header) time.Time {
 	return saeheader.Time(h.Time, customtypes.HeaderTimeMilliseconds(h))
 }
 
-var (
-	errNonZeroBlockGasCost  = errors.New("non-zero BlockGasCost under SAE")
-	errPartialSettledMarker = errors.New("partially populated settled marker")
-	errPartialGasConfig     = errors.New("partially populated gas-config group")
-)
-
-// VerifyBlockSyntax checks the stateless L1-specific invariants of a
-// parsed block: BlockGasCost is unused under SAE and MUST be zero, and the
-// optional Settled* and gas-config header groups MUST each be fully
-// populated or fully absent.
-//
-// The all-or-nothing checks only reject truncated groups. RLP decodes a
-// present-but-empty optional item as a pointer to zero, so a crafted header can
-// carry zero-valued fields. This is safe because an honest builder never stamps
-// an all-zero group, so the rebuilt header's hash differs.
-func (*hooks) VerifyBlockSyntax(b *types.Block) error {
-	he := customtypes.GetHeaderExtra(b.Header())
-	if he.BlockGasCost != nil && he.BlockGasCost.Sign() != 0 {
-		return fmt.Errorf("%w: %v", errNonZeroBlockGasCost, he.BlockGasCost)
-	}
-
-	settledFields := 0
-	for _, f := range []*uint64{he.SettledHeight, he.SettledGasUnix, he.SettledGasNumerator, he.SettledExcess} {
-		if f != nil {
-			settledFields++
-		}
-	}
-	if settledFields != 0 && settledFields != 4 {
-		return fmt.Errorf("%w: %d of 4 fields set", errPartialSettledMarker, settledFields)
-	}
-
-	if (he.TargetToExcessScaling == nil) != (he.MinPrice == nil) {
-		return errPartialGasConfig
-	}
+func (*hooks) VerifyBlockSyntax(*types.Block) error {
 	return nil
 }
 
-// CanExecuteTransaction rejects transactions from senders excluded by the
-// tx allow list, as of the provided rules and state.
-//
-// The deployer allow list is not checked. It is enforced during execution, so
-// a disallowed deployment is included and fails instead of being rejected.
-func (*hooks) CanExecuteTransaction(rules ethparams.Rules, from common.Address, _ *common.Address, state libevm.StateReader) error {
+// CanExecuteTransaction enforces the tx allow list.
+func (*hooks) CanExecuteTransaction(rules ethparams.Rules, from common.Address, state libevm.StateReader) error {
 	extra := legacyparams.GetRulesExtra(rules)
 	if !extra.IsPrecompileEnabled(txallowlist.ContractAddress) {
 		return nil
@@ -206,9 +163,8 @@ func (*hooks) CanExecuteTransaction(rules ethparams.Rules, from common.Address, 
 	return nil
 }
 
-// StartExecutingBlock applies the precompile and state upgrades scheduled in
-// (parent.Time, block.Time()]. Consecutive windows are contiguous, so each
-// upgrade is applied exactly once.
+// StartExecutingBlock applies the precompile and state upgrades scheduled
+// since parent, so each is applied exactly once.
 func (h *hooks) StartExecutingBlock(_ ethparams.Rules, statedb *state.StateDB, parent *types.Header, block *types.Block) error {
 	blockContext := legacycore.NewBlockContext(block.Number(), block.Time())
 	if err := legacycore.ApplyUpgrades(h.chainConfig, &parent.Time, blockContext, statedb); err != nil {
@@ -217,14 +173,10 @@ func (h *hooks) StartExecutingBlock(_ ethparams.Rules, statedb *state.StateDB, p
 	return nil
 }
 
-// FinishExecutingBlock is a no-op: the L1 VM has no end-of-block state
-// changes outside of the EVM transactions themselves.
 func (*hooks) FinishExecutingBlock(*state.StateDB, *types.Block, types.Receipts) error {
 	return nil
 }
 
-// AfterExecutingBlock records the block's minimum delay metric and stores its
-// warp messages for ACP-118 signature requests.
 func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) error {
 	if mde := customtypes.GetHeaderExtra(b.Header()).MinDelayExcess; mde != nil {
 		h.metrics.SetMinBlockDelay(dynamic.DelayExponent(*mde).DelayDuration())
@@ -247,8 +199,6 @@ func (h *hooks) AfterExecutingBlock(b *types.Block, receipts types.Receipts) err
 	return nil
 }
 
-// activeWarpConfig returns the Warp precompile config in `rules`, or false if
-// Warp is not active.
 func activeWarpConfig(rules ethparams.Rules) (*legacywarp.Config, bool) {
 	config, ok := legacyparams.GetRulesExtra(rules).Precompiles[legacywarp.ContractAddress].(*legacywarp.Config)
 	return config, ok
@@ -260,37 +210,31 @@ type builder struct {
 	ctx         *snow.Context
 	chainConfig *ethparams.ChainConfig
 
-	now func() time.Time
-	// When fields in desired are set, the block builder will build blocks
-	// that move the network values towards their desired values.
+	now     func() time.Time
 	desired saeconfig.Desired
 
-	// coinbase is the fee recipient used when neither the chain config nor
-	// the rewardmanager precompile fixes one. A rebuilder uses the received
+	// coinbase is the operator's fee recipient. A rebuilder uses the received
 	// block's coinbase so the rebuilt header hashes identically.
 	coinbase common.Address
-	// building is true iff the builder is building original blocks.
+	// building is false for a rebuilder.
 	building bool
 }
 
 var (
-	errIglooUnactivated   = errors.New("igloo is not activated")
-	errBelowMinBlockDelay = errors.New("block time below the ACP-226 minimum block delay")
+	errIglooUnactivated  = errors.New("igloo is not activated")
+	errBlockTimeTooEarly = errors.New("block time too early")
 )
 
-// earliestBlockTime returns the earliest time at which a child of parent may be
-// built. It is zero if parent has no MinDelayExcess, matching
-// [customheader.VerifyTime]. SAE enforces monotonic block times regardless.
+// earliestBlockTime returns the earliest time a child of parent may be built.
 func earliestBlockTime(parent *types.Header) time.Time {
+	t := blockTime(parent)
 	e := customtypes.GetHeaderExtra(parent)
 	if e.MinDelayExcess == nil {
-		return time.Time{}
+		return t
 	}
-	return blockTime(parent).Add(dynamic.DelayExponent(*e.MinDelayExcess).DelayDuration())
+	return t.Add(dynamic.DelayExponent(*e.MinDelayExcess).DelayDuration())
 }
 
-// See [hook.BlockBuilder.BuildHeader] for which fields MUST or MAY be set in
-// the returned header.
 func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	now := b.now()
 	configExtra := legacyparams.GetExtra(b.chainConfig)
@@ -299,8 +243,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 		return nil, errIglooUnactivated
 	}
 	if earliest := earliestBlockTime(parent); now.Before(earliest) {
-		return nil, fmt.Errorf("%w: block time %s is before the minimum %s",
-			errBelowMinBlockDelay, now, earliest)
+		return nil, fmt.Errorf("%w: %s is before %s", errBlockTimeTooEarly, now, earliest)
 	}
 	nowMS := uint64(now.UnixMilli()) //#nosec G115 -- block times are known non-negative
 
@@ -314,8 +257,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash: parent.Hash(),
-			// Set by [builder.BuildBlock], which has the settled state that
-			// [builder.resolveCoinbase] reads.
+			// Set by [builder.BuildBlock], which has the settled state.
 			Coinbase:         blackhole.Address,
 			Difficulty:       big.NewInt(1),
 			Number:           new(big.Int).Add(parent.Number, common.Big1),
@@ -335,11 +277,9 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 
 var errEmptyBlock = errors.New("empty block")
 
-// BuildBlock completes header with its coinbase, gas-config group, warp
-// predicate results and settled marker. The coinbase and gas-config group are
-// gated on settledRules rather than the rules at header.Time, because a
-// precompile's storage in worstCaseState is only initialized once its
-// activation has settled.
+// BuildBlock reads the coinbase and gas config under settledRules rather than
+// the rules at header.Time, because a precompile's storage in worstCaseState is
+// only initialized once its activation has settled.
 func (b *builder) BuildBlock(
 	header *types.Header,
 	blockCtx *block.Context,
@@ -356,8 +296,8 @@ func (b *builder) BuildBlock(
 	settledRulesExtra := legacyparams.GetRulesExtra(settledRules)
 	header.Coinbase = b.resolveCoinbase(settledRulesExtra, worstCaseState)
 
-	// The gas-config group is stamped even while gaspricemanager is disabled,
-	// because header fields can't be removed once populated.
+	// Written even while gaspricemanager is disabled, because header fields
+	// can't be removed once populated.
 	headerExtra := customtypes.GetHeaderExtra(header)
 	setGasConfig(headerExtra, readGasConfig(settledRulesExtra, worstCaseState))
 

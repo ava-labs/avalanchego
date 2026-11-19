@@ -226,7 +226,7 @@ func (h *hooks) EndOfBlockOps(b *types.Block) ([]hook.Op, error) {
 	return ops, nil
 }
 
-func (*hooks) CanExecuteTransaction(params.Rules, common.Address, *common.Address, libevm.StateReader) error {
+func (*hooks) CanExecuteTransaction(params.Rules, common.Address, libevm.StateReader) error {
 	return nil
 }
 

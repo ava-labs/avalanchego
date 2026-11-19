@@ -14,7 +14,7 @@ const MinTargetGas uint64 = 1_000_000
 
 // DefaultGasPriceConfig returns the config aligned with the C-Chain, which
 // applies when the gas price manager precompile is disabled or has no initial
-// config. Validators control the target gas.
+// config.
 func DefaultGasPriceConfig() GasPriceConfig {
 	return GasPriceConfig{
 		ValidatorTargetGas: true,

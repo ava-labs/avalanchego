@@ -62,24 +62,21 @@ type l1SUT struct {
 	snowCtx *snow.Context
 	vm      *VM
 
-	// client serves both the standard Ethereum surface (via the embedded
-	// `*evmclient.Client`) and the L1-specific methods.
 	client *l1sclient.Client
 
-	// Wallet for issuing transactions
 	ethWallet *saetest.Wallet
-	// BLS warp validator set served by the snow context's validator state.
+	// validators is the warp validator set of snowCtx.
 	validators *warptest.Validators
 
-	// See [l1SUT.verifyWarpMessage]
+	// appResponse and appErr receive the VM's app responses.
 	appResponse chan []byte
 	appErr      chan *engcommon.AppError
 
-	// Per-boot resources (replaced by [l1SUT.restart]).
+	// Per-boot resources, replaced by [l1SUT.restart].
 	shutdownVM func() error
 	apiServer  *httptest.Server
 
-	// Persistent restart inputs.
+	// Inputs reused by [l1SUT.restart].
 	baseDB       avadb.Database
 	cfg          *l1SUTConfig
 	upgrades     upgrade.Config
@@ -90,35 +87,16 @@ type l1SUT struct {
 
 type (
 	l1SUTConfig struct {
-		fork        upgrade.Upgrade
-		numAccounts uint
-		// clockTime, if non-nil, pins the VM's mockable clock (and
-		// transitively `sae.Config.Now` and the uptime tracker) to a
-		// deterministic instant. When nil, the VM falls back to wall
-		// time. Use [withNow] to set.
-		clockTime        *time.Time
-		configureGenesis func(*core.Genesis, []common.Address)
-		// iglooGenesis, if true, starts the genesis at Igloo. Use
-		// [withIglooGenesis] to set.
-		iglooGenesis     bool
-		configureUpgrade func([]common.Address) []byte
-		// feeRecipient, if non-nil, is passed through
-		// `Config.FeeRecipient` to the VM. When nil, the VM burns fees.
-		feeRecipient *common.Address
-		// gasTarget, if non-nil, sets the validator's preferred gas-per-second
-		// target (Config.GasTarget); the resulting `DesiredTargetExponent` is
-		// what `header.TargetExponent` evolves toward (rate-limited per ACP-176).
-		gasTarget *gas.Gas
-		// apis, if non-nil, are the APIs served. Use [withAPIs] to set.
-		apis set.Set[saerpc.API]
-		// databasePath, if non-empty, stores chain data in a standalone
-		// database in this directory. Use [withStandaloneDatabase] to set.
-		databasePath string
-		// configureValidatorState, if non-nil, is invoked AFTER the
-		// default `*validatorstest.State` has been built (with the
-		// always-empty `GetCurrentValidatorSetF` default) and BEFORE
-		// `vm.Initialize` runs. Use it to inject a non-trivial validator
-		// set for tests that exercise the uptime tracker / validators API.
+		fork                    upgrade.Upgrade
+		numAccounts             uint
+		clockTime               *time.Time
+		configureGenesis        func(*core.Genesis, []common.Address)
+		iglooGenesis            bool
+		configureUpgrade        func([]common.Address) []byte
+		feeRecipient            *common.Address
+		gasTarget               *gas.Gas
+		apis                    set.Set[saerpc.API]
+		databasePath            string
 		configureValidatorState func(*validatorstest.State)
 	}
 	l1SUTOption = options.Option[l1SUTConfig]
@@ -134,8 +112,8 @@ func newL1SUT(t *testing.T, opts ...l1SUTOption) *l1SUT {
 
 	upgrades := upgradetest.GetConfig(cfg.fork)
 
-	// Test will fail if any error log from libevm, or warn log from SAE, is emitted.
-	// Some warn logs from libevm are expected.
+	// Error logs from libevm and warn logs from SAE fail the test. Some libevm
+	// warnings are expected.
 	log.SetDefault(log.NewLogger(ethtest.NewTBLogHandler(t, log.LevelError)))
 	logger := loggingtest.New(t, logging.Info)
 	ctx := logger.CancelOnError(t.Context())
@@ -157,8 +135,6 @@ func newL1SUT(t *testing.T, opts ...l1SUTOption) *l1SUT {
 		upgradeBytes = cfg.configureUpgrade(keychain.Addresses())
 	}
 
-	// Build per-chain config bytes from [defaultConfig], with optional
-	// test overrides layered on top.
 	chainConfig := defaultConfig(t.TempDir())
 	if cfg.feeRecipient != nil {
 		chainConfig.FeeRecipient = *cfg.feeRecipient
@@ -188,8 +164,7 @@ func newL1SUT(t *testing.T, opts ...l1SUTOption) *l1SUT {
 	}
 	sut.bootVM(t, cfg.clockTime)
 
-	// Single cleanup that always operates on the latest per-boot
-	// resources (post-[l1SUT.restart]).
+	// The cleanup reads the fields at exit, so it closes the latest boot.
 	t.Cleanup(func() {
 		if sut.shutdownVM != nil {
 			require.NoError(t, sut.shutdownVM())
@@ -201,34 +176,17 @@ func newL1SUT(t *testing.T, opts ...l1SUTOption) *l1SUT {
 	return sut
 }
 
-// bootVM initialises a fresh VM against [l1SUT.baseDB] and wires the API
-// surface onto the l1SUT. Used by [newL1SUT] for first boot and by
-// [l1SUT.restart] to spin a new VM against the same on-disk state.
-//
-// `clockTime`, if non-nil, pins the new VM's mockable clock before
-// `Initialize` runs (matching [withNow] semantics). A restart MUST pass
-// the previous VM's clock value so block-building separation against
-// the last-accepted block remains satisfied.
-//
-// Each boot constructs a new `snowCtx` so the embedded metrics registry
-// is fresh; otherwise the `"sae"` namespace would conflict on restart.
-// Validator-state customisations from [l1SUTConfig.configureValidatorState]
-// are re-applied; the validator set (and its BLS keys) is regenerated on
-// each boot, so tests that hold onto [l1SUT.validators] across a restart
-// must re-read it.
+// bootVM starts a VM on [l1SUT.baseDB] and wires its API into s. Each boot
+// gets a new snow context, since metrics namespaces would otherwise conflict,
+// and a new validator set.
 func (s *l1SUT) bootVM(t *testing.T, clockTime *time.Time) {
 	t.Helper()
 
 	snowCtx := newSnowCtx(t, s.upgrades)
 	vdrs := warptest.NewValidators(t, warptest.WithMinimum(2))
 	warptest.SetValidators(t, snowCtx, vdrs)
-	// Safe: `newSnowCtx` always installs a `*validatorstest.State`.
 	validatorState := snowCtx.ValidatorState.(*validatorstest.State)
-	// Default to an empty current validator set so that tests which don't
-	// care about uptime tracking still drive `vm.SetState(NormalOp)`
-	// successfully (the uptime tracker calls `GetCurrentValidatorSet`
-	// during its first `Sync`). The uptime-specific tests overwrite this
-	// via [withCurrentValidatorSet].
+	// The uptime tracker needs a current validator set to reach NormalOp.
 	validatorState.GetCurrentValidatorSetF = func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
 		return map[ids.ID]*validators.GetCurrentValidatorOutput{}, 0, nil
 	}
@@ -244,8 +202,6 @@ func (s *l1SUT) bootVM(t *testing.T, clockTime *time.Time) {
 	handlers, err := vm.CreateHandlers(s.ctx)
 	require.NoError(t, err)
 
-	// Mount every handler returned by `CreateHandlers` at its extension path,
-	// matching how AvalancheGo serves these in production.
 	apiMux := http.NewServeMux()
 	for path, handler := range handlers {
 		apiMux.Handle(path, handler)
@@ -255,8 +211,7 @@ func (s *l1SUT) bootVM(t *testing.T, clockTime *time.Time) {
 	c, err := l1sclient.Dial(s.ctx, apiServer.URL+"/rpc")
 	require.NoError(t, err)
 
-	// Mimic the engine: on entering normal operation it points the VM at the
-	// last-accepted block before any BuildBlock call (matches cchain's l1SUT).
+	// The engine sets the preference before the first BuildBlock.
 	lastID, err := vm.LastAccepted(s.ctx)
 	require.NoError(t, err)
 	require.NoError(t, vm.SetPreference(s.ctx, lastID, nil))
@@ -271,12 +226,8 @@ func (s *l1SUT) bootVM(t *testing.T, clockTime *time.Time) {
 	s.appErr = appSender.SentAppError
 }
 
-// restart shuts down the current VM (and tears down its API surface), then
-// re-initialises a fresh VM against the same backing database so a test can
-// assert that on-disk state alone is sufficient to resume operation.
-//
-// The mockable clock is carried over so block-building separation against
-// the last-accepted block holds.
+// restart replaces the VM with a new one on the same database, keeping the
+// clock.
 func (s *l1SUT) restart(t *testing.T) {
 	t.Helper()
 
@@ -289,13 +240,8 @@ func (s *l1SUT) restart(t *testing.T) {
 	s.bootVM(t, &prevClock)
 }
 
-// initVM constructs a VM, pins the mockable clock if requested, and runs
-// `Initialize`. The returned shutdown closure is safe to call multiple
-// times; subsequent calls are no-ops.
-//
-// The clock must be pinned BEFORE `Initialize` so `sae.Config.Now` (wired
-// to `vm.now`) and the validator uptime tracker (wired to `vm.clock`) both
-// observe a deterministic instant from their very first read.
+// initVM initializes a VM with its clock at clockTime, if non-nil. The returned
+// shutdown is idempotent.
 func initVM(
 	ctx context.Context,
 	snowCtx *snow.Context,
@@ -360,8 +306,8 @@ func withGenesisConfig(fn func(*core.Genesis, []common.Address)) l1SUTOption {
 	})
 }
 
-// withIglooGenesis starts the genesis at Igloo, which configs that only
-// Igloo allows, like gaspricemanager genesis precompiles, require.
+// withIglooGenesis starts the genesis at Igloo, which gaspricemanager genesis
+// precompiles require.
 func withIglooGenesis() l1SUTOption {
 	return options.Func[l1SUTConfig](func(c *l1SUTConfig) {
 		c.iglooGenesis = true
@@ -374,31 +320,24 @@ func withUpgradeConfig(fn func([]common.Address) []byte) l1SUTOption {
 	})
 }
 
-// withNow pins the VM's mockable clock to `now` before `Initialize`
-// runs. The same clock backs `sae.Config.Now` (used by the block
-// builder) and the validator uptime tracker, so a single set is enough
-// to drive both deterministically.
+// withNow pins the VM's clock, which drives block building and uptime
+// tracking.
 func withNow(now time.Time) l1SUTOption {
 	return options.Func[l1SUTConfig](func(c *l1SUTConfig) {
 		c.clockTime = &now
 	})
 }
 
-// withValidatorState lets a test mutate the default
-// `*validatorstest.State` (e.g. install a `GetCurrentValidatorSetF`
-// that returns a non-empty set) before `vm.Initialize` runs.
+// withValidatorState lets fn modify the validator state before the VM is
+// initialized.
 func withValidatorState(fn func(*validatorstest.State)) l1SUTOption {
 	return options.Func[l1SUTConfig](func(c *l1SUTConfig) {
 		c.configureValidatorState = fn
 	})
 }
 
-// withCurrentValidatorSet seeds the validator state with a single active
-// validator pinned to (`validationID`, `nodeID`, `startTime`). Both
-// `GetCurrentValidatorSetF` (consumed by `uptimetracker.UptimeTracker`)
-// and `GetValidatorSetF` (consumed by `*p2p.Validators` to drive
-// `IsConnected`) are populated so that the validator round-trips through
-// the entire validators-API surface.
+// withCurrentValidatorSet makes the given validator the only one, for both
+// uptime tracking and peer connectivity.
 func withCurrentValidatorSet(validationID ids.ID, nodeID ids.NodeID, startTime uint64) l1SUTOption {
 	return withValidatorState(func(s *validatorstest.State) {
 		s.GetCurrentValidatorSetF = func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
@@ -421,25 +360,15 @@ func withCurrentValidatorSet(validationID ids.ID, nodeID ids.NodeID, startTime u
 	})
 }
 
-// withFeeRecipient sets the validator's preferred fee recipient on the VM
-// (`Config.FeeRecipient`). Required for any test that exercises a path
-// where fees end up at a configurable address — i.e. the
-// `AllowFeeRecipients=true` arms (genesis-flag or rewardmanager
-// `allowFeeRecipients()`). The address is serialised to hex; the VM's
-// [Config.ParsedFeeRecipient] handles the round-trip back to
-// [common.Address].
+// withFeeRecipient sets the node's fee recipient. Without it, fees are burned.
 func withFeeRecipient(addr common.Address) l1SUTOption {
 	return options.Func[l1SUTConfig](func(c *l1SUTConfig) {
 		c.feeRecipient = &addr
 	})
 }
 
-// withGasTarget pins the validator's preferred per-second gas target
-// (`Config.GasTarget`). The VM converts this to a `DesiredTargetExponent` that
-// `header.TargetExponent` evolves toward (rate-limited per ACP-226 to
-// [maxTargetExponentDiff] per block). Tests use this to drive
-// observable per-block changes in `header.GasLimit` (which is linear in the
-// target gas).
+// withGasTarget sets the node's preferred gas target, which the header target
+// exponent moves toward.
 func withGasTarget(target gas.Gas) l1SUTOption {
 	return options.Func[l1SUTConfig](func(c *l1SUTConfig) {
 		c.gasTarget = &target
@@ -482,14 +411,11 @@ func (s *l1SUT) acceptAndExecuteBlock(t *testing.T, built *blocks.Block) {
 	require.NoError(t, built.WaitUntilExecuted(s.ctx))
 }
 
-// setTime pins the VM's mockable clock (used by both the SAE block
-// builder and the validator uptime tracker) to `now`.
 func (s *l1SUT) setTime(t *testing.T, now time.Time) {
 	t.Helper()
 	s.vm.clock.Set(now)
 }
 
-// advanceTime moves the VM's mockable clock forward by `d`.
 func (s *l1SUT) advanceTime(t *testing.T, d time.Duration) {
 	t.Helper()
 	s.vm.clock.Set(s.vm.clock.Time().Add(d))
@@ -525,13 +451,8 @@ func (s *l1SUT) buildAcceptExecuteBlock(t *testing.T) *blocks.Block {
 	return built
 }
 
-// minimalDeployInitCode returns initcode that deploys exactly 1 byte of
-// runtime code (`0x01`), so that presence/absence of code at the deploy
-// address cleanly distinguishes a successful deploy from a reverted (or
-// never-executed) one.
-//
-//	PUSH1 1; PUSH1 0; MSTORE8  // mem[0] = 0x01
-//	PUSH1 1; PUSH1 0; RETURN   // return mem[0..1]
+// minimalDeployInitCode deploys 1 byte of code, so code presence shows whether
+// a deploy succeeded.
 var minimalDeployInitCode = []byte{
 	// mem[0] = 0x01
 	byte(vm.PUSH1), 0x01,
@@ -543,8 +464,7 @@ var minimalDeployInitCode = []byte{
 	byte(vm.RETURN),
 }
 
-// signDeployTx signs (without broadcasting) a contract creation tx from
-// account `from` whose initcode deploys [minimalDeployInitCode].
+// signDeployTx signs a deployment of [minimalDeployInitCode].
 func (s *l1SUT) signDeployTx(t *testing.T, from int) *types.Transaction {
 	t.Helper()
 
@@ -557,7 +477,6 @@ func (s *l1SUT) signDeployTx(t *testing.T, from int) *types.Transaction {
 	})
 }
 
-// sendDeployTx is signDeployTx + broadcast.
 func (s *l1SUT) sendDeployTx(t *testing.T, from int) *types.Transaction {
 	t.Helper()
 
@@ -566,11 +485,6 @@ func (s *l1SUT) sendDeployTx(t *testing.T, from int) *types.Transaction {
 	return tx
 }
 
-// signCallTx signs (without broadcasting) a contract call from account `from`
-// to `to` with the given calldata and gas limit. Use this for any precompile
-// invocation (nativeminter, rewardmanager, allowlist setters, ...): the
-// per-precompile sign helper is just `signCallTx(t, from, addr, packedData,
-// gasCap)`.
 func (s *l1SUT) signCallTx(t *testing.T, from int, to common.Address, data []byte, gas uint64) *types.Transaction {
 	t.Helper()
 
@@ -583,7 +497,6 @@ func (s *l1SUT) signCallTx(t *testing.T, from int, to common.Address, data []byt
 	})
 }
 
-// sendCallTx is signCallTx + broadcast.
 func (s *l1SUT) sendCallTx(t *testing.T, from int, to common.Address, data []byte, gas uint64) *types.Transaction {
 	t.Helper()
 
@@ -592,7 +505,6 @@ func (s *l1SUT) sendCallTx(t *testing.T, from int, to common.Address, data []byt
 	return tx
 }
 
-// fetchAllowListRole fetches the allowlist role for `address` at `blockNumber`.
 func (s *l1SUT) fetchAllowListRole(
 	t *testing.T,
 	precompile common.Address,
@@ -606,15 +518,15 @@ func (s *l1SUT) fetchAllowListRole(
 	return allowlist.GetAllowListStatus(stateDB, precompile, address)
 }
 
-// isPrecompileEnabledAtLatest returns whether `precompile` is enabled per the
-// chain config at the l1SUT's current (latest) timestamp.
+// isPrecompileEnabledAtLatest reports whether precompile is enabled at the
+// VM's clock time.
 func (s *l1SUT) isPrecompileEnabledAtLatest(precompile common.Address) bool {
 	chainConfig := s.vm.GethRPCBackends().ChainConfig()
 	return legacyparams.GetExtra(chainConfig).IsPrecompileEnabled(precompile, s.vm.clock.Unix())
 }
 
-// requireBlockContainsTxs asserts that `block` contains exactly the supplied
-// tx hashes, ignoring order.
+// requireBlockContainsTxs asserts that block contains exactly want, in any
+// order.
 func requireBlockContainsTxs(t *testing.T, block *blocks.Block, want ...common.Hash) {
 	t.Helper()
 
@@ -629,8 +541,6 @@ func requireBlockContainsTxs(t *testing.T, block *blocks.Block, want ...common.H
 	}
 }
 
-// requireTxSucceeded fetches `tx`'s receipt and asserts a successful status
-// (status=1).
 func (s *l1SUT) requireTxSucceeded(t *testing.T, tx *types.Transaction) *types.Receipt {
 	t.Helper()
 
@@ -641,10 +551,7 @@ func (s *l1SUT) requireTxSucceeded(t *testing.T, tx *types.Transaction) *types.R
 	return receipt
 }
 
-// requireTxFailed fetches `tx`'s receipt and asserts a failed status
-// (status=0). Use for txs that revert inside the EVM (precompile errors,
-// frame-local CanCreateContract rejection, ...): the tx is included in the
-// block but its state changes are rolled back.
+// requireTxFailed asserts that tx was included but reverted.
 func (s *l1SUT) requireTxFailed(t *testing.T, tx *types.Transaction) *types.Receipt {
 	t.Helper()
 
@@ -655,9 +562,7 @@ func (s *l1SUT) requireTxFailed(t *testing.T, tx *types.Transaction) *types.Rece
 	return receipt
 }
 
-// requireDeploySucceeded fetches `tx`'s receipt and asserts a successful
-// contract creation (status=1; deployed code present at receipt's contract
-// address).
+// requireDeploySucceeded asserts that tx deployed code.
 func (s *l1SUT) requireDeploySucceeded(t *testing.T, tx *types.Transaction) {
 	t.Helper()
 	require.Nil(t, tx.To(), "test setup: tx must be a contract creation")
@@ -671,29 +576,20 @@ func (s *l1SUT) requireDeploySucceeded(t *testing.T, tx *types.Transaction) {
 	require.NotEmptyf(t, code, "successful deploy at %s must leave code on chain", receipt.ContractAddress)
 }
 
-// requireDeployFailed fetches `tx`'s receipt and asserts a failed contract
-// creation (status=0; no code at the derived deploy address).
-//
-// `CanCreateContract` returns its error as `vmerr` inside the EVM, which
-// surfaces as a failed receipt rather than excluding the tx from the block.
-// See the design note on [hook.Points.CanExecuteTransaction].
+// requireDeployFailed asserts that tx was included but deployed no code.
 func (s *l1SUT) requireDeployFailed(t *testing.T, tx *types.Transaction) {
 	t.Helper()
 	require.Nil(t, tx.To(), "test setup: tx must be a contract creation")
 
 	receipt := s.requireTxFailed(t, tx)
-	// receipt.ContractAddress is still derived from (sender, nonce) even
-	// for failed deploys; assert the address has no code.
+	// Failed deploys still report the derived address.
 	code, err := s.client.CodeAt(s.ctx, receipt.ContractAddress, nil)
 	require.NoErrorf(t, err, "CodeAt(%s)", receipt.ContractAddress)
 	require.Emptyf(t, code, "failed deploy must leave no code at %s", receipt.ContractAddress)
 }
 
-// postIglooStartTime returns a deterministic clock anchor at
-// `IglooTimestamp + Tau`, suitable for tests that need (a) Igloo and
-// all preceding upgrades to be active in the worst-case state and (b) at
-// least one settlement window of headroom for subsequent
-// `sut.advanceTime` arithmetic.
+// postIglooStartTime returns Tau after Igloo, so Igloo is active in the
+// settled state.
 func postIglooStartTime(t *testing.T) time.Time {
 	t.Helper()
 
@@ -702,16 +598,8 @@ func postIglooStartTime(t *testing.T) time.Time {
 	return time.Unix(int64(*networkUpgrades.IglooTimestamp), 0).Add(saeparams.Tau) // #nosec G115 -- upgrade timestamp is far below MaxInt64
 }
 
-// TestStateUpgradeAppliedAtActivationSAE exercises the `StateUpgrades` arm of
-// `StartExecutingBlock` -> `legacycore.ApplyUpgrades`.
-//
-// It schedules a single `stateupgrade.Block` at `now + Tau` that:
-//   - bumps a known account's balance, and
-//   - writes a deterministic value to one of its storage slots.
-//
-// The deterministic clock is then advanced past activation; the next block
-// fires `StartExecutingBlock`, applies the upgrade, and we assert both
-// effects via `client.BalanceAt` / `client.StorageAt` at `LatestBlockNumber`.
+// TestStateUpgradeAppliedAtActivationSAE asserts that a state upgrade MUST
+// apply in the first block at or after its timestamp.
 func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 	const (
 		fromIdx = 0
@@ -723,10 +611,7 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 		activationTime = now.Add(saeparams.Tau)
 		activationTS   = uint64(activationTime.Unix()) // #nosec G115 -- known positive test timestamp
 
-		// `target` is intentionally NOT one of the funded keychain accounts;
-		// it starts with zero balance and empty storage, so the upgrade's
-		// effects are unambiguous (no overflow risk, no interference from
-		// the trigger tx).
+		// target is unfunded, so the upgrade's effects are unambiguous.
 		target       = common.HexToAddress("0x00000000000000000000000000000000DeadBeef")
 		balanceBump  = big.NewInt(123_456_789)
 		storageSlot  = common.HexToHash("0x01")
@@ -755,7 +640,6 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 		}),
 	)
 
-	// Pre-activation: target is empty (no balance, no storage).
 	preBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
 	require.NoError(t, err)
 	require.Zero(t, preBalance.Sign(), "target balance must be 0 before activation")
@@ -764,16 +648,11 @@ func TestStateUpgradeAppliedAtActivationSAE(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, common.Hash{}.Bytes(), preStorage, "storage slot must be empty before activation")
 
-	// Activation block: SAE block builders only fire on `PendingTxs`, so we
-	// piggy-back the activation on a trivial keychain-internal transfer.
-	// `StartExecutingBlock` runs the StateUpgrade BEFORE the tx executes,
-	// but `target` is not the tx recipient, so the upgrade's effects are
-	// observable in isolation.
+	// Blocks are only built for pending txs.
 	sut.setTime(t, activationTime)
 	_ = sut.sendTransferTx(t, fromIdx, toIdx, common.Big1)
 	_ = sut.buildAcceptExecuteBlock(t)
 
-	// Post-activation: balance + storage reflect the StateUpgrade exactly.
 	postBalance, err := sut.client.BalanceAt(sut.ctx, target, nil)
 	require.NoError(t, err)
 	require.Zerof(t, postBalance.Cmp(balanceBump),

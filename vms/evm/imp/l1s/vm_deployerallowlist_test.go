@@ -27,8 +27,8 @@ import (
 // end-to-end through the same enable -> disable -> re-enable timeline used
 // by [TestTxAllowListPrecompileUpgradesSAE]. The execution-semantics step
 // (3) is materially different because deployer allowlist is enforced by
-// libevm's frame-local [params.RulesExtra.CanCreateContract] (not by SAE
-// admission); see the design note on [hook.Points.CanExecuteTransaction].
+// libevm's frame-local [params.RulesExtra.CanCreateContract], not by SAE
+// admission.
 //
 //  1. The precompile is correctly enabled / disabled at the scheduled
 //     timestamp (via `StartExecutingBlock` -> `core.ApplyUpgrades`).
@@ -102,11 +102,11 @@ func TestDeployerAllowListPrecompileUpgradesSAE(t *testing.T) {
 	require.Equal(t, allowlist.AdminRole, sut.fetchAllowListRole(t, deployerallowlist.ContractAddress, admin, rpc.FinalizedBlockNumber))
 	require.Equal(t, allowlist.NoRole, sut.fetchAllowListRole(t, deployerallowlist.ContractAddress, nonAdmin, rpc.FinalizedBlockNumber))
 
-	// (3) Both deploys are admitted at RPC (deployer allowlist is NOT
-	// enforced at admission; see `hook.Points.CanExecuteTransaction`
-	// design note). The admin deploy succeeds, while the non-admin's deploy
-	// reverts inside the EVM via libevm's `CanCreateContract` hook,
-	// producing a status=failed receipt with no code at the deploy address.
+	// (3) Both deploys are admitted at RPC because the deployer allowlist is
+	// not enforced at admission. The admin deploy succeeds, while the
+	// non-admin's deploy reverts inside the EVM via libevm's
+	// `CanCreateContract` hook, producing a status=failed receipt with no
+	// code at the deploy address.
 	adminDeploy := sut.sendDeployTx(t, adminIdx)
 	block := sut.buildAcceptExecuteBlock(t)
 	require.Len(t, block.Transactions(), 1)

@@ -125,9 +125,8 @@ func updateChainConfig(cfg *params.ChainConfig, genesisTimestamp uint64, upgrade
 	return cfg.CheckConfigForkOrder()
 }
 
-// verifyGasPriceManagerAfterIgloo returns an error if cfg activates the
-// gaspricemanager precompile before Igloo. Only Igloo headers carry its gas
-// config.
+// verifyGasPriceManagerAfterIgloo returns an error if gaspricemanager activates
+// before Igloo, since only Igloo headers carry its gas config.
 func verifyGasPriceManagerAfterIgloo(cfg *extras.ChainConfig, genesisTimestamp uint64) error {
 	if c, ok := cfg.GenesisPrecompiles[gaspricemanager.ConfigKey]; ok && !c.IsDisabled() {
 		if ts := c.Timestamp(); ts != nil {
@@ -234,9 +233,8 @@ func writeGenesisBlock(db ethdb.Database, block *types.Block, config *params.Cha
 	return b.Write()
 }
 
-// block constructs the genesis block. The header MUST be identical to the one
-// produced by subnet-evm for the same genesis so that existing L1s retain
-// their genesis hash.
+// block constructs the genesis block. Before Igloo, the header MUST match
+// subnet-evm's so that existing L1s retain their genesis hash.
 func (g *genesis) block() (*types.Block, error) {
 	root, err := g.root()
 	if err != nil {

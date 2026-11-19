@@ -36,11 +36,8 @@ const (
 	maxTargetExponentDiff = 1 << 15
 )
 
-// fetchStoredGasPriceConfig reads the precompile's stored config at
-// `blockNumber` directly from the StateDB. `eth_call` would also work via the
-// runtime gas-config read path, but going through the StateDB keeps these
-// assertions independent of `Points.GasConfigAfter` so a regression in the
-// runtime path doesn't mask a storage-write regression.
+// fetchStoredGasPriceConfig reads storage directly, so storage assertions don't
+// depend on [hooks.GasConfigAfter].
 func fetchStoredGasPriceConfig(t *testing.T, sut *l1SUT, blockNumber rpc.BlockNumber) commontype.GasPriceConfig {
 	t.Helper()
 	stateDB, _, err := sut.vm.GethRPCBackends().StateAndHeaderByNumber(sut.ctx, blockNumber)
@@ -48,12 +45,8 @@ func fetchStoredGasPriceConfig(t *testing.T, sut *l1SUT, blockNumber rpc.BlockNu
 	return gaspricemanager.GetStoredGasPriceConfig(stateDB, gaspricemanager.ContractAddress)
 }
 
-// settleGasPriceManagerMutation drives the chain forward by Tau-plus-a-second
-// of wall-clock time and builds the next block, so the mutation in the
-// previously-built block becomes visible via subsequent builds' `parent.Root`.
-// Returns the next block so callers can assert [blocks.Block.ExecutedBaseFee]
-// on the settlement block itself. `settleAdvance` is the shared Tau+1s cushion
-// defined in [vm_rewardmanager_test.go].
+// settleGasPriceManagerMutation builds and returns a block after the previous
+// block has settled.
 func settleGasPriceManagerMutation(t *testing.T, sut *l1SUT) *blocks.Block {
 	t.Helper()
 	const fromIdx = 1
@@ -63,14 +56,11 @@ func settleGasPriceManagerMutation(t *testing.T, sut *l1SUT) *blocks.Block {
 	return sut.buildAcceptExecuteBlock(t)
 }
 
-// staticPricingConfig returns a [commontype.GasPriceConfig] with [StaticPricing]
-// pinned to [minPrice]. Used by the runtime-path tests so that
-// `header.BaseFee == minPrice` is a deterministic, settlement-aware assertion
-// (under static pricing the gastime excess is zeroed each block, and the
-// `MinPrice` floor in [gastime.Time.Price] is the only contributor).
+// staticPricingConfig returns a config under which every block's base fee is
+// minPrice.
 func staticPricingConfig(minPrice uint64) commontype.GasPriceConfig {
 	return commontype.GasPriceConfig{
-		ValidatorTargetGas: true, // header-controlled target is irrelevant under static pricing
+		ValidatorTargetGas: true,
 		TargetGas:          0,
 		StaticPricing:      true,
 		MinGasPrice:        minPrice,
@@ -78,14 +68,9 @@ func staticPricingConfig(minPrice uint64) commontype.GasPriceConfig {
 	}
 }
 
-// TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE genesis-enables
-// `gaspricemanager` with a static-pricing config pinning `MinGasPrice` and
-// asserts that every subsequent block's `header.BaseFee` equals the pinned
-// value. This locks in the end-to-end runtime path: `BuildBlock` reads
-// the gas config from the settled state and stamps it into the header's
-// GasConfig* group, and per-block `GasConfigAfter` calls read it back from
-// the parent header (with the genesis-precompile fallback covering the
-// blocks before the first stamped header) to keep the clock pinned.
+// TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE asserts that a static
+// pricing config enabled at genesis MUST pin every block's base fee, before and
+// after settlement.
 func TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE(t *testing.T) {
 	const (
 		adminIdx = 0
@@ -116,18 +101,9 @@ func TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE(t *testing.T) {
 		}),
 	)
 
-	// Sanity-check that `InitialGasPriceConfig` from `GenesisPrecompiles`
-	// has been seeded into precompile storage exactly as configured. This
-	// is the only place this assertion lives now that the storage-CRUD
-	// tests have been folded into runtime-pricing tests.
 	require.Equal(t, cfg, fetchStoredGasPriceConfig(t, sut, rpc.LatestBlockNumber),
 		"genesis-stored gaspricemanager config must equal InitialGasPriceConfig")
 
-	// Build several blocks separated by `blockBuildAdvance` and assert that
-	// every one of them carries the pinned `BaseFee`. We deliberately include
-	// blocks both before and after a Tau-sized settlement window to confirm
-	// that settled-state reads don't accidentally flip the chain off the
-	// static-pricing floor.
 	wantPinned := uint256.NewInt(pinnedMinPrice)
 	for i := 0; i < 3; i++ {
 		sut.advanceTime(t, blockBuildAdvance)
@@ -137,7 +113,6 @@ func TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE(t *testing.T) {
 			"static-pricing block %d ExecutedBaseFee", i)
 	}
 
-	// Cross a settlement boundary and rebuild; the pin must still hold.
 	_ = settleGasPriceManagerMutation(t, sut)
 	sut.advanceTime(t, blockBuildAdvance)
 	sut.sendTransferTx(t, fromIdx, toIdx, common.Big1)
@@ -147,14 +122,8 @@ func TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE(t *testing.T) {
 }
 
 // TestGasPriceManagerSetGasPriceConfigSettlementLagSAE asserts that a
-// `setGasPriceConfig` mutation lands in the gas clock only AFTER the
-// mutating block has settled. Concretely: genesis seeds a permissive static
-// config (`MinGasPrice=1`); admin then sets a new static config with a
-// much larger `MinGasPrice` in block M; blocks before M settles continue to
-// see the old floor; the first build after the settle helper observes the
-// new floor. The exact block where the change first appears is M+2 (M+1 is
-// the next built by the settle helper using gas-clock state inherited
-// from M, whose own AfterBlock read state at genesis.Root).
+// setGasPriceConfig mutation MUST NOT change the base fee before its block
+// settles.
 func TestGasPriceManagerSetGasPriceConfigSettlementLagSAE(t *testing.T) {
 	const (
 		adminIdx = 0
@@ -187,8 +156,7 @@ func TestGasPriceManagerSetGasPriceConfigSettlementLagSAE(t *testing.T) {
 		}),
 	)
 
-	// Block M: admin tx that mutates the precompile storage. The block
-	// itself is built with BaseFee derived from the pre-mutation clock.
+	// Block M mutates the config.
 	sut.advanceTime(t, blockBuildAdvance)
 	newCfg := staticPricingConfig(newMinPrice)
 	mutationCalldata, err := gaspricemanager.PackSetGasPriceConfig(newCfg)
@@ -199,21 +167,14 @@ func TestGasPriceManagerSetGasPriceConfigSettlementLagSAE(t *testing.T) {
 	require.Equal(t, uint256.NewInt(oldMinPrice), mutationBlock.ExecutedBaseFee(),
 		"mutation block ExecutedBaseFee must use pre-mutation floor")
 
-	// Settle helper builds the next block (M+1). Its BaseFee was
-	// computed at build time from the gas clock that ran AfterBlock(M)
-	// against settled state at genesis.Root (since at M's build, the
-	// chain's lastSettled was still genesis). So M+1 still sees the OLD
-	// floor.
+	// M+1 is built after M settles, but its base fee comes from the clock
+	// after M, which M built before anything had settled.
 	next := settleGasPriceManagerMutation(t, sut)
 	require.Equal(t, uint256.NewInt(oldMinPrice), next.ExecutedBaseFee(),
 		"settle-next block ExecutedBaseFee must still use pre-mutation floor")
 
-	// Delivery build (M+2): this block's BaseFee was computed from gas
-	// clock state after `AfterBlock(M+1)`. M+1 was built when lastSettled
-	// had advanced to M (the settle helper waited Tau+1s); its header.Root
-	// is M's post-execution state -- which has the NEW precompile config.
-	// So AfterBlock(M+1) installs the new config, and M+2's BaseFee
-	// reflects the new floor.
+	// M+2's base fee comes from the clock after M+1, which M+1 built against
+	// M's settled state.
 	sut.advanceTime(t, blockBuildAdvance)
 	sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
 	delivery := sut.buildAcceptExecuteBlock(t)
@@ -221,37 +182,21 @@ func TestGasPriceManagerSetGasPriceConfigSettlementLagSAE(t *testing.T) {
 		"delivery block ExecutedBaseFee must reflect post-settlement new floor")
 }
 
-// TestGasPriceManagerValidatorTargetGasSAE pins the precompile's
-// `ValidatorTargetGas` flag and asserts that the gas-target resolution
-// path differs as documented, via two subtests:
-//
-//   - `precompile_target_pinned`: `ValidatorTargetGas=false` makes
-//     `BuildBlock` replace `header.TargetExponent` with the exponent derived
-//     from the precompile-stored `TargetGas`; every block's GasLimit and
-//     post-execution gas-time Target reflect that pin.
-//   - `validator_target_converges`: `ValidatorTargetGas=true` makes the
-//     chain follow `header.TargetExponent.Target()`, which is rate-limited
-//     toward `DesiredTargetExponent(Config.GasTarget)` per
-//     [maxTargetExponentDiff] per block. GasLimit climbs monotonically
-//     and the chain converges to `desiredGasTarget` exactly.
-//
-// Both subtests use the validator's `Config.GasTarget` as the convergence
-// pull; the override case must visibly ignore it.
+// TestGasPriceManagerValidatorTargetGasSAE asserts that a stored TargetGas
+// MUST pin the target when ValidatorTargetGas is false, and that the target
+// MUST converge to the validators' preference at the ACP-176 rate when it is
+// true.
 func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 	const (
 		adminIdx = 0
 		fromIdx  = 1
-		// numBlocks must be enough for the VTG=true chain's
-		// `header.TargetExponent` to reach `desiredGasTarget`'s desired
-		// exponent under the `maxTargetExponentDiff`/block rate limit AND leave
-		// at least 2 plateau blocks at the end to assert convergence.
+		// numBlocks MUST cover the rate-limited climb to desiredTargetExponent
+		// plus 2 plateau blocks.
 		numBlocks = 8
 	)
 
-	// `overrideTargetGas` is 2x `MinTargetPerSecond`; `desiredGasTarget` is
-	// the gas target produced by a `5 * maxTargetExponentDiff` exponent
-	// (~1.005x `MinTargetPerSecond`). It is well below `overrideTargetGas`
-	// so the override case must visibly ignore the validator's pull.
+	// desiredGasTarget is below overrideTargetGas, so the pinned case visibly
+	// ignores validators.
 	const overrideTargetGas uint64 = 2 * dynamic.MinTarget
 	desiredGasTarget := dynamic.TargetExponent(gas.Gas(5 * maxTargetExponentDiff)).Target()
 	desiredTargetExponent := dynamic.DesiredTargetExponent(desiredGasTarget)
@@ -319,8 +264,6 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 			TimeToDouble:       60,
 		})
 
-		// GasLimit climbs monotonically toward `desiredGasTarget` (rate-limited
-		// per block) and plateaus once header.TargetExponent catches up.
 		for i := uint64(0); i < numBlocks; i++ {
 			wantTargetExponent := min(
 				dynamic.TargetExponent((i+1)*maxTargetExponentDiff),
@@ -338,18 +281,14 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 		}
 		require.Greater(t, gasLimit(chain[numBlocks-1]), gasLimit(chain[0]),
 			"last block GasLimit must exceed block 1 (chain evolved toward desired)")
-		// Final convergence: the post-execution gas-time Target equals
-		// `desiredGasTarget` (the canonical "where did the chain converge to"
-		// signal, independent of any GasLimit-to-Target multiplier).
 		require.Equal(t, desiredGasTarget, chain[numBlocks-1].ExecutedByGasTime().Target(),
 			"final post-execution gas-time Target must equal desiredGasTarget")
 	})
 }
 
-// TestGasPriceManagerTargetAuthorityTransitionsSAE verifies that target
-// authority changes take effect only after the mutating block settles. A
-// pinned target replaces the header exponent immediately; validator authority
-// resumes bounded evolution from the pinned parent exponent.
+// TestGasPriceManagerTargetAuthorityTransitionsSAE asserts that a change of
+// target authority MUST NOT apply before its block settles, and that
+// validators MUST resume one bounded step from the pinned exponent.
 func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 	const (
 		adminIdx = 0
@@ -440,26 +379,8 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 		"pinned authority must replace TargetExponent after the mutation settles")
 }
 
-// TestGasPriceManagerActivationTransitionsSAE walks the runtime-pricing
-// effect of a precompile activation across three timings, asserting
-// `ExecutedBaseFee` on both the pre-transition block (when present) and the
-// post-settle delivery block. Each case explicitly configures
-// `GenesisPrecompiles` and `PrecompileUpgrades`; the runner derives the
-// activation timestamp from `activationOffset` so the chain can be driven
-// past the activation deterministically.
-//
-//   - `enable_first_async_block`: chain starts without gaspricemanager;
-//     `PrecompileUpgrades` activates it with `pinnedCfg` at the timestamp
-//     of the first async block. Locks in the header-stamping path when
-//     the activation height is the very first SAE-executed block.
-//   - `enable_mid_chain`: chain starts without gaspricemanager; activation
-//     fires `Tau` after genesis. Locks in the same path for `h > 0`.
-//   - `disable_mid_chain`: chain starts with `pinnedCfg` at genesis;
-//     `PrecompileUpgrades` disables it `Tau` after genesis. Locks in the
-//     `SelfDestruct + Finalise` storage-wipe path: post-settlement
-//     builds observe zero-valued settled storage, stamp the default
-//     GasConfig* group, and the chain begins decaying back toward ACP-176
-//     defaults.
+// TestGasPriceManagerActivationTransitionsSAE asserts that enabling or
+// disabling gaspricemanager MUST change the base fee once the change settles.
 func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 	const (
 		adminIdx = 0
@@ -501,12 +422,11 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 		}}
 	}
 
-	// baseFeeExpectation declares what to assert against a block's
-	// `ExecutedBaseFee`. Exactly one of `equal` / `below` is set per
-	// non-zero expectation; the zero value skips the block entirely.
+	// baseFeeExpectation sets at most one field. The zero value skips the
+	// block.
 	type baseFeeExpectation struct {
-		equal *uint256.Int // ExecutedBaseFee == equal
-		below *uint256.Int // ExecutedBaseFee.Uint64() < below.Uint64()
+		equal *uint256.Int
+		below *uint256.Int
 	}
 	check := func(t *testing.T, label string, e baseFeeExpectation, b *blocks.Block) {
 		t.Helper()
@@ -520,20 +440,12 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 	}
 
 	cases := []struct {
-		name string
-		// genesisPrecompiles installs the genesis precompile set (may be nil).
+		name               string
 		genesisPrecompiles func(addresses []common.Address) extras.Precompiles
-		// upgrades returns the `PrecompileUpgrades` slice for the case,
-		// given the addresses and the case's `activationTime`.
-		upgrades func(addresses []common.Address, activationTime time.Time) []extras.PrecompileUpgrade
-		// activationTime is the upgrade activation timestamp AND the clock
-		// the runner advances to before triggering the activation block.
-		activationTime time.Time
-		// preTransition asserts the pre-transition block's `ExecutedBaseFee`.
-		// Zero value skips the pre-transition block entirely.
-		preTransition baseFeeExpectation
-		// postTransition asserts the post-settle block's `ExecutedBaseFee`.
-		postTransition baseFeeExpectation
+		upgrades           func(addresses []common.Address, activationTime time.Time) []extras.PrecompileUpgrade
+		activationTime     time.Time
+		preTransition      baseFeeExpectation
+		postTransition     baseFeeExpectation
 	}{
 		{
 			name:           "enable_first_async_block",
@@ -554,10 +466,8 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 			upgrades:           disableUpgrades,
 			activationTime:     midChainActivation,
 			preTransition:      baseFeeExpectation{equal: pinnedBaseFee},
-			// Post-disable the chain transitions back to ACP-176 dynamic
-			// pricing and `ExecutedBaseFee` begins decaying from the pinned
-			// floor. The exact one-block decay is gas-time math-sensitive,
-			// so we assert the strictly-less-than the prior pin.
+			// The base fee starts decaying from the pin. Its exact value is
+			// gastime's concern.
 			postTransition: baseFeeExpectation{below: pinnedBaseFee},
 		},
 	}
@@ -584,10 +494,6 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 			}
 			sut := newL1SUT(t, opts...)
 
-			// Pre-transition block: built only when the case sets a
-			// pre-transition expectation. Cases whose activation fires at
-			// the first async block have nothing to assert pre-transition,
-			// so they leave `preTransition` as the zero expectation.
 			if tc.preTransition != (baseFeeExpectation{}) {
 				require.True(t, tc.activationTime.After(now),
 					"test setup: pre-transition assertion requires activationTime > now")
@@ -597,22 +503,14 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 				check(t, "pre-transition", tc.preTransition, preTransition)
 			}
 
-			// Activation block. The deploy tx is just a vehicle to trigger
-			// the SAE block-build path; the activator runs in
-			// `StartExecutingBlock`, so the activation block's BaseFee is
-			// sealed against the pre-activation gas clock.
+			// Any tx triggers the activation block.
 			sut.setTime(t, tc.activationTime)
 			activationTx := sut.sendDeployTx(t, adminIdx)
 			_ = sut.buildAcceptExecuteBlock(t)
 			sut.requireTxSucceeded(t, activationTx)
 
-			// Settle past the activation block so `BuildBlock` reads the
-			// post-activation gas config from the settled state and stamps
-			// it into subsequent headers' GasConfig* group.
 			_ = settleGasPriceManagerMutation(t, sut)
 
-			// Delivery: built after settlement has crossed the activation
-			// block. Pricing now reflects the new precompile state.
 			sut.advanceTime(t, blockBuildAdvance)
 			sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
 			delivery := sut.buildAcceptExecuteBlock(t)
@@ -621,13 +519,8 @@ func TestGasPriceManagerActivationTransitionsSAE(t *testing.T) {
 	}
 }
 
-// TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE pins a static
-// gaspricemanager config at genesis, builds a settled block, then restarts
-// the VM against the same backing database and asserts that the next block
-// still carries the pinned `BaseFee`. Locks in the config roundtrip through
-// the header: `BuildBlock` stamps the GasConfig* group pre-restart, and
-// post-restart `GasConfigAfter` recovers it from the persisted parent header
-// with no auxiliary database state.
+// TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE asserts that the gas
+// config MUST survive a restart, since it is read only from headers.
 func TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE(t *testing.T) {
 	const (
 		adminIdx = 0
@@ -659,16 +552,12 @@ func TestGasPriceManagerPinnedConfigPersistsAcrossRestartSAE(t *testing.T) {
 
 	wantPinned := uint256.NewInt(pinnedMinPrice)
 
-	// Build a block pre-restart and confirm the pinned floor.
 	sut.advanceTime(t, blockBuildAdvance)
 	sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
 	preRestart := sut.buildAcceptExecuteBlock(t)
 	require.Equal(t, wantPinned, preRestart.ExecutedBaseFee(),
 		"pre-restart ExecutedBaseFee must reflect pinned MinGasPrice")
 
-	// Restart: shuts down the current VM, then reinitialises a fresh VM
-	// against the same `baseDB`. On the new boot, builds recover the gas
-	// config from the persisted parent header's GasConfig* group.
 	sut.restart(t)
 
 	sut.advanceTime(t, blockBuildAdvance)

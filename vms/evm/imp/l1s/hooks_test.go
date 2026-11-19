@@ -77,14 +77,12 @@ func TestBuildHeaderIglooOverride(t *testing.T) {
 	}
 }
 
-// TestBlockRebuilderFromOverridesValidatorCoinbase: in operator-chosen
-// Coinbase branches the rebuilt block MUST carry the BUILDER's Coinbase
-// from the received header, else differing local `Config.FeeRecipient`
-// would cause hash mismatches in [VM.VerifyBlock].
+// TestBlockRebuilderFromOverridesValidatorCoinbase asserts that, when builders
+// choose the coinbase, a rebuilt block MUST keep the received block's coinbase.
 func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	const (
-		parentTimeMS = uint64(2_000_000_000_000) // well past SubnetEVM activation
-		nowMS        = parentTimeMS + 5_000      // > InitialDelayExcess (~2s)
+		parentTimeMS = uint64(2_000_000_000_000)
+		nowMS        = parentTimeMS + 5_000 // beyond the initial minimum delay
 	)
 	var (
 		builderCoinbase   = common.HexToAddress("0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -92,7 +90,7 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	)
 
 	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgrade.Igloo])
-	legacyparams.GetExtra(&chainCfg).AllowFeeRecipients = true // route through customCoinbase branch in resolveCoinbase
+	legacyparams.GetExtra(&chainCfg).AllowFeeRecipients = true
 
 	parent := &types.Header{Number: big.NewInt(1), Time: parentTimeMS / 1000}
 	customtypes.SetHeaderExtra(parent, &customtypes.HeaderExtra{
@@ -101,13 +99,10 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	})
 	tx := types.NewTx(&types.DynamicFeeTx{Gas: 21_000, Value: big.NewInt(0)})
 	settledRules := chainCfg.Rules(big.NewInt(0), true /*isMerge*/, parent.Time)
-	// Any non-zero marker works; it only needs to match on both sides for the
-	// hash-equality assertion.
+	// Any marker works, as long as both sides use it.
 	settledMarker := hook.Settled{Height: 1, GasUnix: parent.Time, GasNumerator: 1, Excess: 1}
 
-	// Builder side: stamp `builderCoinbase` into a real block. The worst-case
-	// state reader is nil because neither rewardmanager nor gaspricemanager
-	// is enabled, so BuildBlock never reads it.
+	// The state is nil because no precompile that BuildBlock reads is enabled.
 	builderPts := newHooks(
 		nil, &chainCfg,
 		func() time.Time { return time.UnixMilli(int64(nowMS)) },
@@ -122,8 +117,6 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	require.Equal(t, builderCoinbase, builderBlock.Header().Coinbase,
 		"sanity: builder must stamp its own Coinbase")
 
-	// Rebuilder side: a DIFFERENT node (rebuilderCoinbase != builderCoinbase)
-	// rebuilds builderBlock. Its rebuilt block must carry builderCoinbase.
 	rebuilderPts := newHooks(nil, &chainCfg, nil, saeconfig.Desired{}, nil, rebuilderCoinbase, nil)
 	rebuilder, err := rebuilderPts.BlockRebuilderFrom(builderBlock)
 	require.NoError(t, err)
@@ -138,26 +131,9 @@ func TestBlockRebuilderFromOverridesValidatorCoinbase(t *testing.T) {
 	require.Equal(t, builderBlock.Hash(), rebuilt.Hash())
 }
 
-// TestBlockRebuildRejectsForgedCoinbase covers the dual of
-// [TestBlockRebuilderFromOverridesValidatorCoinbase]: in DETERMINISTIC
-// branches of [resolveCoinbase] (where the chain pins a unique correct
-// Coinbase per block), a builder that ships a different `Coinbase` MUST
-// produce a block whose rebuilt twin has a DIFFERENT hash, so
-// [sae.ErrHashMismatch] fires in [VM.VerifyBlock]. This is what makes the
-// pinned branches enforceable and not just advisory.
-//
-// Two pinned branches:
-//   - `!AllowFeeRecipients && rewardmanager not enabled` => MUST be BlackholeAddr.
-//   - `rewardmanager enabled && stored allowFeeRecipients == false` =>
-//     MUST be the stored reward address. (Not exercised here; it requires
-//     a settled state with the rewardmanager slot populated, which
-//     belongs to the integration tests.)
-//
-// We simulate the malicious builder by stamping a non-deterministic
-// `Coinbase` into the received block's header BEFORE handing it to
-// `BlockRebuilderFrom`. The rebuilder's `BuildBlock` then ignores that
-// override and stamps the deterministic value. We assert both the
-// resolved address and the resulting hash differ.
+// TestBlockRebuildRejectsForgedCoinbase asserts that, when the chain
+// determines the coinbase, a block with any other coinbase MUST NOT rebuild to
+// the same hash.
 func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	const (
 		parentTimeMS = uint64(2_000_000_000_000)
@@ -166,8 +142,6 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	forgedCoinbase := common.HexToAddress("0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
 
 	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgrade.Igloo])
-	// Vanilla Igloo: AllowFeeRecipients=false, no rewardmanager precompile
-	// => deterministic branch in resolveCoinbase MUST stamp BlackholeAddr.
 
 	parent := &types.Header{Number: big.NewInt(1), Time: parentTimeMS / 1000}
 	customtypes.SetHeaderExtra(parent, &customtypes.HeaderExtra{
@@ -178,11 +152,6 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	settledRules := chainCfg.Rules(big.NewInt(0), true /*isMerge*/, parent.Time)
 	settledMarker := hook.Settled{Height: 1, GasUnix: parent.Time, GasNumerator: 1, Excess: 1}
 
-	// "Builder" forges by skipping resolveCoinbase entirely and stamping
-	// `forgedCoinbase` directly into the header that will be served as the
-	// received block. We don't need to call this side's `BuildBlock`; we
-	// just need a `*types.Block` whose Coinbase is the forged value and
-	// whose extras match what `BlockRebuilderFrom` reads.
 	forgedHdr := &types.Header{
 		Coinbase: forgedCoinbase,
 		Time:     nowMS / 1000,
@@ -194,7 +163,7 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 	})
 	forgedBlock := types.NewBlockWithHeader(forgedHdr)
 
-	rebuilderPts := newHooks(nil, &chainCfg, nil, saeconfig.Desired{}, nil, forgedCoinbase /* same as builder; doesn't matter */, nil)
+	rebuilderPts := newHooks(nil, &chainCfg, nil, saeconfig.Desired{}, nil, forgedCoinbase, nil)
 	rebuilder, err := rebuilderPts.BlockRebuilderFrom(forgedBlock)
 	require.NoError(t, err)
 	rebuiltHdr, err := rebuilder.BuildHeader(parent)
@@ -213,12 +182,12 @@ func TestBlockRebuildRejectsForgedCoinbase(t *testing.T) {
 }
 
 // TestBuildBlockStampsDefaultGasConfig asserts that a block built while
-// gaspricemanager is disabled MUST carry the default gas-config group, because
-// header fields can't be removed once populated.
+// gaspricemanager is disabled MUST carry the default gas config, because header
+// fields can't be removed once populated.
 func TestBuildBlockStampsDefaultGasConfig(t *testing.T) {
 	const (
 		parentTimeMS = uint64(2_000_000_000_000)
-		nowMS        = parentTimeMS + 5_000 // > InitialDelayExcess (~2s)
+		nowMS        = parentTimeMS + 5_000 // beyond the initial minimum delay
 	)
 	chainCfg := legacyparams.Copy(paramstest.ForkToChainConfig[upgrade.Igloo])
 	parent := &types.Header{Number: big.NewInt(1), Time: parentTimeMS / 1000}
@@ -242,41 +211,4 @@ func TestBuildBlockStampsDefaultGasConfig(t *testing.T) {
 	he := customtypes.GetHeaderExtra(block.Header())
 	require.Equal(t, new(uint64(gastime.DefaultTargetToExcessScaling)), he.TargetToExcessScaling, "BuildBlock() TargetToExcessScaling")
 	require.Equal(t, new(uint64(gastime.DefaultMinPrice)), he.MinPrice, "BuildBlock() MinPrice")
-}
-
-func TestVerifyBlockSyntaxGasConfigGroup(t *testing.T) {
-	one := new(uint64(1))
-	tests := []struct {
-		name    string
-		extra   *customtypes.HeaderExtra
-		wantErr error
-	}{
-		{name: "absent", extra: &customtypes.HeaderExtra{}},
-		{
-			name: "partial",
-			extra: &customtypes.HeaderExtra{
-				TargetToExcessScaling: one,
-			},
-			wantErr: errPartialGasConfig,
-		},
-		{
-			name: "complete",
-			extra: &customtypes.HeaderExtra{
-				TargetToExcessScaling: one,
-				MinPrice:              one,
-			},
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			header := customtypes.WithHeaderExtra(&types.Header{}, test.extra)
-			err := (&hooks{}).VerifyBlockSyntax(types.NewBlockWithHeader(header))
-			if test.wantErr != nil {
-				require.ErrorIs(t, err, test.wantErr, "hooks.VerifyBlockSyntax()")
-				return
-			}
-			require.NoError(t, err, "hooks.VerifyBlockSyntax()")
-		})
-	}
 }
