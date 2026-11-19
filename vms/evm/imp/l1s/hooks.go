@@ -335,10 +335,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	), nil
 }
 
-var (
-	errZeroStoredGasPriceConfig = errors.New("gaspricemanager enabled but storage is zero")
-	errEmptyBlock               = errors.New("empty block")
-)
+var errEmptyBlock = errors.New("empty block")
 
 // BuildBlock completes header with its coinbase, gas-config group, warp
 // predicate results and settled marker. The coinbase and gas-config group are
@@ -364,17 +361,7 @@ func (b *builder) BuildBlock(
 	// The gas-config group is stamped even while gaspricemanager is disabled,
 	// because header fields can't be removed once populated.
 	headerExtra := customtypes.GetHeaderExtra(header)
-	stored := commontype.DefaultGasPriceConfig()
-	if settledRulesExtra.IsPrecompileEnabled(gaspricemanager.ContractAddress) {
-		stored = gaspricemanager.GetStoredGasPriceConfig(worstCaseState, gaspricemanager.ContractAddress)
-		if stored == (commontype.GasPriceConfig{}) {
-			// [gaspricemanager.Configure] and every mutator write a non-zero
-			// config, so zero storage is corrupt. Defaulting would silently
-			// diverge from other nodes.
-			return nil, fmt.Errorf("%w: block %d settling %d", errZeroStoredGasPriceConfig, header.Number, settled.Height)
-		}
-	}
-	setGasConfig(headerExtra, stored)
+	setGasConfig(headerExtra, readGasConfig(settledRulesExtra, worstCaseState))
 
 	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
 	var warpValidity predicate.BlockResults
@@ -403,6 +390,15 @@ func (b *builder) BuildBlock(
 		receipts,
 		trie.NewStackTrie(nil),
 	), nil
+}
+
+// readGasConfig returns the gas config in effect under rules, read from
+// state if gaspricemanager is enabled.
+func readGasConfig(rules *extras.Rules, state libevm.StateReader) commontype.GasPriceConfig {
+	if !rules.IsPrecompileEnabled(gaspricemanager.ContractAddress) {
+		return commontype.DefaultGasPriceConfig()
+	}
+	return gaspricemanager.GetStoredGasPriceConfig(state, gaspricemanager.ContractAddress)
 }
 
 // resolveCoinbase returns the fee recipient of the block being built.
