@@ -70,9 +70,7 @@ func TestShutdownLeaksNoGoroutines(t *testing.T) {
 	goleak.VerifyNone(t, opts...)
 }
 
-var (
-	errStopInitialization = errors.New("stop initialization")
-)
+var errStopInitialization = errors.New("stop initialization")
 
 // failingLogFactory makes New return right after it logs the node
 // configuration, before it starts anything.
