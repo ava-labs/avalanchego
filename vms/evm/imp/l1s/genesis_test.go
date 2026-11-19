@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/deployerallowlist"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/rewardmanager"
@@ -155,7 +156,8 @@ func withAllGenesisPrecompiles(timestamp uint64) genesisOption {
 			rewardmanager.ConfigKey: rewardmanager.NewConfig(ts, admins, nil, nil, &rewardmanager.InitialRewardConfig{
 				RewardAddress: common.Address{0x22},
 			}),
-			warp.ConfigKey: warp.NewDefaultConfig(ts),
+			feemanager.ConfigKey: feemanager.NewConfig(ts, admins, nil, nil, new(l1params.DefaultFeeConfig)),
+			warp.ConfigKey:       warp.NewDefaultConfig(ts),
 		}
 	})
 }
