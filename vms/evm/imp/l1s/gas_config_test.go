@@ -13,7 +13,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 )
 
 func TestScalingFromTimeToDouble(t *testing.T) {
@@ -39,26 +41,29 @@ func TestScalingFromTimeToDouble(t *testing.T) {
 }
 
 // TestGasConfigRoundTrip asserts that [hooks.GasConfigAfter] MUST return the
-// price config written by [setGasConfig].
+// target and price config written by [setGasConfig].
 func TestGasConfigRoundTrip(t *testing.T) {
 	tests := []struct {
-		name   string
-		stored commontype.GasPriceConfig
-		want   gastime.GasPriceConfig
+		name       string
+		stored     commontype.GasPriceConfig
+		wantTarget gas.Gas
+		wantConfig gastime.GasPriceConfig
 	}{
 		{
-			name:   "disabled",
-			stored: commontype.DefaultGasPriceConfig(),
-			want:   gastime.DefaultGasPriceConfig(),
+			name:       "default",
+			stored:     commontype.DefaultGasPriceConfig(),
+			wantTarget: dynamic.MinTarget,
+			wantConfig: gastime.DefaultGasPriceConfig(),
 		},
 		{
-			name: "dynamic",
+			name: "pinned_target",
 			stored: commontype.GasPriceConfig{
-				ValidatorTargetGas: true,
-				MinGasPrice:        2,
-				TimeToDouble:       120,
+				TargetGas:    20_000_000,
+				MinGasPrice:  2,
+				TimeToDouble: 120,
 			},
-			want: gastime.GasPriceConfig{
+			wantTarget: 20_000_000,
+			wantConfig: gastime.GasPriceConfig{
 				TargetToExcessScaling: 174,
 				MinPrice:              2,
 			},
@@ -70,7 +75,8 @@ func TestGasConfigRoundTrip(t *testing.T) {
 				MinGasPrice:        2,
 				StaticPricing:      true,
 			},
-			want: gastime.GasPriceConfig{
+			wantTarget: dynamic.MinTarget,
+			wantConfig: gastime.GasPriceConfig{
 				TargetToExcessScaling: gastime.DefaultTargetToExcessScaling,
 				MinPrice:              2,
 				StaticPricing:         true,
@@ -79,11 +85,13 @@ func TestGasConfigRoundTrip(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			header := customtypes.WithHeaderExtra(&types.Header{}, &customtypes.HeaderExtra{})
-			setGasConfig(customtypes.GetHeaderExtra(header), test.stored)
+			extra := new(customtypes.HeaderExtra)
+			setGasConfig(extra, test.stored)
+			header := customtypes.WithHeaderExtra(new(types.Header), extra)
 
-			_, got := (*hooks)(nil).GasConfigAfter(header)
-			require.Equal(t, test.want, got, "GasConfigAfter()")
+			gotTarget, gotConfig := new(hooks).GasConfigAfter(header)
+			require.Equal(t, test.wantTarget, gotTarget, "target")
+			require.Equal(t, test.wantConfig, gotConfig, "config")
 		})
 	}
 }

@@ -504,7 +504,7 @@ func TestGenesisBlockStampsGasConfig(t *testing.T) {
 			block, err := g.block()
 			require.NoError(t, err, "%T.block()", g)
 
-			target, config := (*hooks)(nil).GasConfigAfter(block.Header())
+			target, config := new(hooks).GasConfigAfter(block.Header())
 			require.Equal(t, test.want, target, "GasConfigAfter(genesis) target")
 			want := gastime.GasPriceConfig{
 				TargetToExcessScaling: gastime.DefaultTargetToExcessScaling,
