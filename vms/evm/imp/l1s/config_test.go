@@ -12,8 +12,8 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/blackhole"
 	"github.com/ava-labs/avalanchego/vms/evm/saedb"
 )
@@ -43,7 +43,7 @@ func TestParseConfig_FeeRecipient(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(test.json))
+			c, err := parseConfig(snowtest.Context(t, ids.GenerateTestID()), []byte(test.json))
 			if test.wantErr {
 				var typeErr *json.UnmarshalTypeError
 				require.ErrorAs(t, err, &typeErr)
@@ -60,24 +60,25 @@ func TestParseConfig_FeeRecipient(t *testing.T) {
 // that operator overrides via flat legacy-shaped JSON keys take
 // effect.
 func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
-	defaults := defaultConfig("")
+	snowCtx := snowtest.Context(t, ids.GenerateTestID())
+	defaults := defaultConfig(snowCtx.ChainDataDir)
 
 	t.Run("nil_bytes_yields_defaults", func(t *testing.T) {
-		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, nil)
+		c, err := parseConfig(snowCtx, nil)
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
 	})
 
 	t.Run("empty_object_yields_defaults", func(t *testing.T) {
-		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{}`))
+		c, err := parseConfig(snowCtx, []byte(`{}`))
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
 	})
 
 	t.Run("partial_override_keeps_other_defaults", func(t *testing.T) {
-		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"database-type":"leveldb","commit-interval":8192}`))
+		c, err := parseConfig(snowCtx, []byte(`{"database-type":"leveldb","commit-interval":8192}`))
 		require.NoError(t, err)
-		want := defaultConfig("")
+		want := defaultConfig(snowCtx.ChainDataDir)
 		want.DatabaseType = "leveldb"
 		want.CommitInterval = 8192
 		require.Equal(t, want, c)
@@ -86,19 +87,19 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 	t.Run("unknown_field_ignored", func(t *testing.T) {
 		// Legacy keys with no SAE counterpart MUST NOT prevent an existing
 		// node config from starting the VM.
-		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"airdrop":"genesis.json"}`))
+		c, err := parseConfig(snowCtx, []byte(`{"airdrop":"genesis.json"}`))
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
 	})
 
 	t.Run("duration_string", func(t *testing.T) {
-		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"api-max-duration":"30m"}`))
+		c, err := parseConfig(snowCtx, []byte(`{"api-max-duration":"30m"}`))
 		require.NoError(t, err)
 		require.Equal(t, 30*time.Minute, c.APIMaxDuration.Duration)
 	})
 
 	t.Run("duration_numeric_rejected", func(t *testing.T) {
-		_, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"api-max-duration":900000000000}`))
+		_, err := parseConfig(snowCtx, []byte(`{"api-max-duration":900000000000}`))
 		var typeErr *json.UnmarshalTypeError
 		require.ErrorAs(t, err, &typeErr)
 	})
@@ -106,7 +107,7 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 	t.Run("marshal_roundtrip", func(t *testing.T) {
 		out, err := json.Marshal(defaults)
 		require.NoError(t, err)
-		c, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, out)
+		c, err := parseConfig(snowCtx, out)
 		require.NoError(t, err)
 		require.Equal(t, defaults, c)
 	})
@@ -115,7 +116,7 @@ func TestParseConfig_DefaultsAndOverrides(t *testing.T) {
 // TestConfig_SAEConfig spot-checks the [sae.Config] produced from operator
 // fields so the Initialize-time wiring keeps matching what operators wrote.
 func TestConfig_SAEConfig(t *testing.T) {
-	c := defaultConfig("")
+	c := defaultConfig(t.TempDir())
 	c.LocalTxsEnabled = true
 	c.Pruning = false
 	c.CommitInterval = 8192
@@ -128,7 +129,7 @@ func TestConfig_SAEConfig(t *testing.T) {
 
 	// Defaults round-trip to the legacy-equivalent SAE state: pruning on
 	// (Archival=false), commit interval at the saedb default.
-	d := defaultConfig("").saeConfig(nil)
+	d := defaultConfig(t.TempDir()).saeConfig(nil)
 	require.False(t, d.DBConfig.Archival)
 	require.Equal(t, uint64(saedb.DefaultCommitInterval), d.DBConfig.CommitInterval)
 }
@@ -137,7 +138,7 @@ func TestConfig_SAEConfig(t *testing.T) {
 // derived SAE configuration: values the SAE core would only reject at
 // runtime (or worse, divide by) MUST fail at chain-config parse time.
 func TestParseConfig_ValidatesSAEConfig(t *testing.T) {
-	_, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(`{"commit-interval":0}`))
+	_, err := parseConfig(snowtest.Context(t, ids.GenerateTestID()), []byte(`{"commit-interval":0}`))
 	require.ErrorIs(t, err, saedb.Config{}.Verify(), "parseConfig()")
 }
 
@@ -167,7 +168,7 @@ func TestParseConfig_RPC(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			config, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(test.config))
+			config, err := parseConfig(snowtest.Context(t, ids.GenerateTestID()), []byte(test.config))
 			require.NoError(t, err, "parseConfig(..., %q)", test.config)
 
 			rpcConfig := config.saeConfig(nil).RPCConfig
@@ -179,9 +180,9 @@ func TestParseConfig_RPC(t *testing.T) {
 }
 
 func TestDefaultConfig_Resources(t *testing.T) {
-	config := defaultConfig("").saeConfig(nil)
-	require.Equal(t, uint64(1000), config.RPCConfig.BatchRequestLimit, `defaultConfig("").saeConfig(nil)`)
-	require.True(t, config.RPCConfig.ResolvePendingToLastExecuted, `defaultConfig("").saeConfig(nil)`)
-	require.Equal(t, uint64(saedb.DefaultTrieCacheSizeMiB), config.DBConfig.TrieCacheMiB, `defaultConfig("").saeConfig(nil)`)
-	require.Equal(t, uint64(saedb.DefaultSnapshotCacheSizeMiB), config.DBConfig.SnapshotCacheMiB, `defaultConfig("").saeConfig(nil)`)
+	config := defaultConfig(t.TempDir()).saeConfig(nil)
+	require.Equal(t, uint64(1000), config.RPCConfig.BatchRequestLimit, "defaultConfig(...).saeConfig(nil)")
+	require.True(t, config.RPCConfig.ResolvePendingToLastExecuted, "defaultConfig(...).saeConfig(nil)")
+	require.Equal(t, uint64(saedb.DefaultTrieCacheSizeMiB), config.DBConfig.TrieCacheMiB, "defaultConfig(...).saeConfig(nil)")
+	require.Equal(t, uint64(saedb.DefaultSnapshotCacheSizeMiB), config.DBConfig.SnapshotCacheMiB, "defaultConfig(...).saeConfig(nil)")
 }

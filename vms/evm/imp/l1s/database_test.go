@@ -56,7 +56,7 @@ func TestConfig_UseStandaloneDatabase(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			c := defaultConfig("")
+			c := defaultConfig(t.TempDir())
 			c.UseStandaloneDatabase = test.setting
 			require.Equal(t, test.want, c.useStandaloneDatabase(logging.NoLog{}, test.avaDB), "useStandaloneDatabase(...)")
 		})

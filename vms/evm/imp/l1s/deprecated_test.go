@@ -19,8 +19,8 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/evm/sae/rpc"
 )
@@ -28,10 +28,13 @@ import (
 // TestParseConfigDeprecated asserts that each deprecated option MUST convert
 // to its replacement, which MUST take precedence when also set.
 func TestParseConfigDeprecated(t *testing.T) {
+	snowCtx := snowtest.Context(t, ids.GenerateTestID())
+	defaults := defaultConfig(snowCtx.ChainDataDir)
+
 	// with applies mod to defaultConfig so each case asserts that the
 	// deprecated option overrides the default while the rest are preserved.
 	with := func(mod func(*config)) config {
-		c := defaultConfig("")
+		c := defaultConfig(snowCtx.ChainDataDir)
 		mod(&c)
 		return c
 	}
@@ -58,12 +61,12 @@ func TestParseConfigDeprecated(t *testing.T) {
 		{
 			name: "fee_recipient_empty",
 			json: `{"feeRecipient":""}`,
-			want: defaultConfig(""),
+			want: defaults,
 		},
 		{
 			name: "fee_recipient_invalid",
 			json: `{"feeRecipient":"0xdead"}`,
-			want: defaultConfig(""),
+			want: defaults,
 		},
 		{
 			name: "fee_recipient_superseded",
@@ -78,7 +81,7 @@ func TestParseConfigDeprecated(t *testing.T) {
 		{
 			name: "database_config_base64_empty",
 			json: `{"database-config":""}`,
-			want: defaultConfig(""),
+			want: defaults,
 		},
 		{
 			name:    "database_config_base64_invalid",
@@ -144,7 +147,7 @@ func TestParseConfigDeprecated(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got, err := parseConfig(&snow.Context{Log: logging.NoLog{}}, []byte(test.json))
+			got, err := parseConfig(snowCtx, []byte(test.json))
 			require.ErrorIs(t, err, test.wantErr)
 			if test.wantErr != nil {
 				return

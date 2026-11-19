@@ -153,7 +153,7 @@ func newL1SUT(t *testing.T, opts ...l1SUTOption) *l1SUT {
 
 	// Build per-chain config bytes from [defaultConfig], with optional
 	// test overrides layered on top.
-	chainConfig := defaultConfig("")
+	chainConfig := defaultConfig(t.TempDir())
 	if cfg.feeRecipient != nil {
 		chainConfig.FeeRecipient = *cfg.feeRecipient
 	}
