@@ -393,7 +393,7 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 		genesis  string
 	}
 	var specs []spec
-	for fork := upgrade.NoUpgrades; fork < upgrade.Igloo; fork++ {
+	for fork := range upgrade.Igloo {
 		specs = append(specs, spec{
 			name:     fork.String(),
 			upgrades: fork,
@@ -520,7 +520,7 @@ func TestGenesisBlockStampsGasConfig(t *testing.T) {
 // itself. RLP decodes an unset optional field followed by a set one as zero, so
 // every such field MUST be set.
 func TestGenesisBlockRLPRoundTrip(t *testing.T) {
-	for fork := upgrade.NoUpgrades; fork <= upgrade.Latest; fork++ {
+	for fork := range upgrade.Latest + 1 {
 		t.Run(fork.String(), func(t *testing.T) {
 			ctx := &snow.Context{NetworkUpgrades: upgradetest.GetConfig(fork)}
 			g, err := parseGenesis(ctx, []byte(testGenesisJSON()), nil)

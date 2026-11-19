@@ -105,7 +105,7 @@ func TestGasPriceManagerStaticPricingRuntimeBaseFeeSAE(t *testing.T) {
 		"genesis-stored gaspricemanager config must equal InitialGasPriceConfig")
 
 	wantPinned := uint256.NewInt(pinnedMinPrice)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		sut.advanceTime(t, blockBuildAdvance)
 		sut.sendTransferTx(t, fromIdx, toIdx, common.Big1)
 		built := sut.buildAcceptExecuteBlock(t)
@@ -192,7 +192,7 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 		fromIdx  = 1
 		// numBlocks MUST cover the rate-limited climb to desiredTargetExponent
 		// plus 2 plateau blocks.
-		numBlocks = 8
+		numBlocks uint64 = 8
 	)
 
 	// desiredGasTarget is below overrideTargetGas, so the pinned case visibly
@@ -223,7 +223,7 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 		)
 
 		built := make([]*blocks.Block, 0, numBlocks)
-		for i := 0; i < numBlocks; i++ {
+		for range numBlocks {
 			sut.advanceTime(t, blockBuildAdvance)
 			sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
 			built = append(built, sut.buildAcceptExecuteBlock(t))
@@ -264,7 +264,7 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 			TimeToDouble:       60,
 		})
 
-		for i := uint64(0); i < numBlocks; i++ {
+		for i := range numBlocks {
 			wantTargetExponent := min(
 				dynamic.TargetExponent((i+1)*maxTargetExponentDiff),
 				desiredTargetExponent,
