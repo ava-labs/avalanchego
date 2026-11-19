@@ -67,7 +67,7 @@ func TestParseConfig(t *testing.T) {
 			json: `{
 				"use-standalone-database":false,
 				"database-config":{"maxOpenFiles":1},
-				"database-path":` + string(marshalJSON(dbPath)) + `,
+				"database-path":` + marshalJSON(dbPath) + `,
 				"database-type":"leveldb"
 			}`,
 			want: with(func(c *config) {
