@@ -133,13 +133,7 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 	if !u.synced {
 		// StartTracking credits the given nodes with uptime for the period
 		// that was not observed.
-		withUptime := make([]ids.NodeID, 0, len(u.state.validators))
-		for _, v := range u.state.validators {
-			if v.IsActive {
-				withUptime = append(withUptime, v.NodeID)
-			}
-		}
-		if err := u.manager.StartTracking(withUptime); err != nil {
+		if err := u.manager.StartTracking(u.state.getActiveNodeIDs()); err != nil {
 			return fmt.Errorf("start tracking validators: %w", err)
 		}
 

@@ -698,9 +698,9 @@ func TestUptimeTracker_Restart(t *testing.T) {
 			t.Run("restart", func(t *testing.T) {
 				clock.Set(restart)
 				uptimeTracker, err = New(validatorState, subnetID, db, clock)
-				require.NoError(t, err, "New() after restart")
-				require.NoErrorf(t, uptimeTracker.Sync(t.Context()), "%T.Sync() after restart", uptimeTracker)
-				require.NoErrorf(t, uptimeTracker.Connect(nodeID), "%T.Connect(%s) after restart", uptimeTracker, nodeID)
+				require.NoError(t, err, "New()")
+				require.NoErrorf(t, uptimeTracker.Sync(t.Context()), "%T.Sync()", uptimeTracker)
+				require.NoErrorf(t, uptimeTracker.Connect(nodeID), "%T.Connect(%s)", uptimeTracker, nodeID)
 
 				clock.Set(end)
 				uptime, lastUpdated, err := uptimeTracker.GetUptime(validationID)

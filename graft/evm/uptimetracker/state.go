@@ -198,6 +198,16 @@ func (s *state) deleteValidator(validationID ids.ID) {
 	s.dirtyValidationIDs.Add(v.validationID)
 }
 
+func (s *state) getActiveNodeIDs() []ids.NodeID {
+	activeNodes := make([]ids.NodeID, 0, len(s.validators))
+	for _, v := range s.validators {
+		if v.IsActive {
+			activeNodes = append(activeNodes, v.NodeID)
+		}
+	}
+	return activeNodes
+}
+
 func (s *state) writeModifications() error {
 	batch := s.db.NewBatch()
 
