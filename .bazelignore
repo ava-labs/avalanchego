@@ -2,4 +2,5 @@
 .claude
 .direnv
 .bazel/patches/build_files
+.cache
 bazel-avalanchego

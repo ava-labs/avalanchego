@@ -20,6 +20,9 @@ while IFS= read -r target_set; do
   bazelisk fetch "${target_args[@]}"
 done < <(bazel_ci_dependency_targets)
 
+# Image targets are prepared separately by setup-bazel-image-inputs so their
+# package downloads do not enlarge the cache restored by unit and E2E jobs.
+
 # bazel-check-metadata also runs `bazel mod deps`. It has no target patterns,
 # but it must load every repository in the module graph with repository and
 # Go module downloads disabled.

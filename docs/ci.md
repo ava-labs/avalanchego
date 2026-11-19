@@ -796,27 +796,30 @@ Bazel-specific cache.
 #### Binfmt image cache
 
 [`run-docker-with-disk-space`](../.github/actions/run-docker-with-disk-space/action.yml)
-optionally configures QEMU for cross-platform Docker builds. Setup requires the
-`tonistiigi/binfmt` image. The action attempts to restore a cached image but
+optionally configures QEMU to run non-native binaries in Docker containers.
+Setup requires the `tonistiigi/binfmt` image. The action attempts to restore a cached image but
 will fall back to pulling from Docker Hub.
 
 This action replaces `docker/setup-qemu-action` because its `cache-image` input
 controls cache reads and writes together. It cannot restore a cache on a pull
 request while it saves only from `master`.
 
-CI historically used the default AMD64 runners. The image-build jobs continue
-that pattern and cross-compile images for AMD64 and ARM64. AMD64 is not a
-design requirement.
+The Go image-build jobs use AMD64 runners. Scheduled Bazel image validation
+also uses ARM64 runners to check the native ARM64 builder and its cross-compiler.
+QEMU runs the non-native binaries during smoke tests on either host architecture.
+Cross-compilation itself does not require QEMU. Use native runners for broader
+image tests because emulation is too slow.
 
-QEMU enables cross-platform smoke tests on these runners. Use native runners
-for broader image tests because emulation is too slow. Revisit the runner
-choice, binfmt image pin, and cache platform key when adding native tests.
+The `binfmt-image` action input defines the image reference. It pins a
+multi-platform image index that includes Linux AMD64 and ARM64 installers.
+Docker selects the installer for the Docker host architecture. The runner and
+Docker host must use the same OS and architecture.
+Do not use a mutable tag such as `latest`. A mutable tag can select new QEMU
+code without a repository change.
 
-The `binfmt-image` action input defines the image reference. It uses the Linux
-AMD64 image digest, not a mutable tag such as `latest`. A mutable tag can
-select new QEMU code without a repository change. The cache key includes the
-image digest. Changing the digest changes the cache key. The cache key also
-contains a format version and the platform.
+The cache key includes the image index digest, a format version, and the runner's
+OS and architecture. Changing the digest changes the cache key. Separate platform
+keys prevent an ARM64 runner from restoring an AMD64 installer archive, or the reverse.
 
 Change the action input to update the image. Do not copy the digest into a
 cache key or script.
@@ -835,9 +838,9 @@ rate limits until a `master` job saves the image.
 
 On a cache miss, the action requests permission to save. The
 [`cache-policy`](../.github/actions/cache-policy/action.yml) action permits
-saves only on `master`. The publish job and both Go image-check jobs can save
-the image tar file. GitHub cache entries are immutable. Concurrent `master`
-jobs can pull the same image. The first job to save the key creates the
+saves only on `master`. The publish job, both Go image-check jobs, and the Bazel
+image-validation jobs can save the image tar file. GitHub cache entries are
+immutable. Concurrent `master` jobs can pull the same image. The first job to save the key creates the
 shared entry.
 
 [`setup-qemu.sh`](../.github/actions/run-docker-with-disk-space/setup-qemu.sh)
@@ -855,7 +858,9 @@ that changes the cache:
    and saves the cache.
 3. Check that a job restores the cached image without a pull. Run the jobs again
    if the first run has no cache hit.
-4. Check that the cross-platform builds succeed.
+4. Check cache misses and hits on both AMD64 and ARM64 runners. The platforms must
+   use separate cache keys. Check that each runner executes the native installer
+   and that the cross-platform smoke tests succeed.
 5. Remove the `DONOTMERGE` commit before merging. Check that the final
    configuration permits cache writes only on `master`.
 
