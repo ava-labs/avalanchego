@@ -287,9 +287,6 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 
 var errEmptyBlock = errors.New("empty block")
 
-// BuildBlock reads the coinbase and gas config under settledRules rather than
-// the rules at header.Time, because a precompile's storage in worstCaseState is
-// only initialized once its activation has settled.
 func (b *builder) BuildBlock(
 	header *types.Header,
 	blockCtx *block.Context,
@@ -303,6 +300,9 @@ func (b *builder) BuildBlock(
 		return nil, errEmptyBlock
 	}
 
+	// A precompile's storage in worstCaseState is only initialized once its
+	// activation has settled, so the rules at header.Time could read it
+	// uninitialized.
 	settledRulesExtra := legacyparams.GetRulesExtra(settledRules)
 	header.Coinbase = b.resolveCoinbase(settledRulesExtra, worstCaseState)
 
