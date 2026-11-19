@@ -19,7 +19,7 @@ The disk layout is critical to the correctness of the summary handler. It is exp
 
 Note that these invariants are followed by the SAE VM (see [invariants.md](../docs/invariants.md)).
 
-Additionally, summaries can only be served at heights where the state was committed to disk: heights that are a multiple of the configured trie commit interval (`Config.DBConfig.CommitInterval`). Thus, the each node should agree on the commit interval provided here.
+Additionally, summaries can only be served at heights where the state was committed to disk: heights that are a multiple of `Config.SummaryInterval`, which defaults to the trie commit interval (`Config.DBConfig.CommitInterval`) and for HashDB must be a multiple of it. Thus, each node should agree on the summary interval provided here.
 
 ## Serving State Summaries
 
