@@ -336,13 +336,12 @@ type HeaderSerializable struct {
 	// We use *uint64 type here to avoid rlpgen generating incorrect code
 	MinDelayExcess *uint64 `json:"minDelayExcess" rlp:"optional"`
 
-	SettledHeight       *uint64 `json:"settledHeight"       rlp:"optional"`
-	SettledGasUnix      *uint64 `json:"settledGasUnix"      rlp:"optional"`
-	SettledGasNumerator *uint64 `json:"settledGasNumerator" rlp:"optional"`
-	SettledExcess       *uint64 `json:"settledExcess"       rlp:"optional"`
-
-	// TargetExponent, TargetToExcessScaling and MinPrice were added by Igloo
-	// (SAE) and are ignored in legacy headers.
+	// The Settled* fields, TargetExponent, TargetToExcessScaling and MinPrice
+	// were added by Igloo (SAE) and are ignored in legacy headers.
+	SettledHeight         *uint64 `json:"settledHeight"         rlp:"optional"`
+	SettledGasUnix        *uint64 `json:"settledGasUnix"        rlp:"optional"`
+	SettledGasNumerator   *uint64 `json:"settledGasNumerator"   rlp:"optional"`
+	SettledExcess         *uint64 `json:"settledExcess"         rlp:"optional"`
 	TargetExponent        *uint64 `json:"targetExponent"        rlp:"optional"`
 	TargetToExcessScaling *uint64 `json:"targetToExcessScaling" rlp:"optional"`
 	MinPrice              *uint64 `json:"minPrice"              rlp:"optional"`

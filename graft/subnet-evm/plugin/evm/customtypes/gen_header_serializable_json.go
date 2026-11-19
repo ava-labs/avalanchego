@@ -39,10 +39,10 @@ func (h HeaderSerializable) MarshalJSON() ([]byte, error) {
 		ParentBeaconRoot      *common.Hash     `json:"parentBeaconBlockRoot" rlp:"optional"`
 		TimeMilliseconds      *hexutil.Uint64  `json:"timestampMilliseconds" rlp:"optional"`
 		MinDelayExcess        *hexutil.Uint64  `json:"minDelayExcess" rlp:"optional"`
-		SettledHeight         *hexutil.Uint64  `json:"settledHeight"       rlp:"optional"`
-		SettledGasUnix        *hexutil.Uint64  `json:"settledGasUnix"      rlp:"optional"`
-		SettledGasNumerator   *hexutil.Uint64  `json:"settledGasNumerator" rlp:"optional"`
-		SettledExcess         *hexutil.Uint64  `json:"settledExcess"       rlp:"optional"`
+		SettledHeight         *hexutil.Uint64  `json:"settledHeight"         rlp:"optional"`
+		SettledGasUnix        *hexutil.Uint64  `json:"settledGasUnix"        rlp:"optional"`
+		SettledGasNumerator   *hexutil.Uint64  `json:"settledGasNumerator"   rlp:"optional"`
+		SettledExcess         *hexutil.Uint64  `json:"settledExcess"         rlp:"optional"`
 		TargetExponent        *hexutil.Uint64  `json:"targetExponent"        rlp:"optional"`
 		TargetToExcessScaling *hexutil.Uint64  `json:"targetToExcessScaling" rlp:"optional"`
 		MinPrice              *hexutil.Uint64  `json:"minPrice"              rlp:"optional"`
@@ -107,10 +107,10 @@ func (h *HeaderSerializable) UnmarshalJSON(input []byte) error {
 		ParentBeaconRoot      *common.Hash      `json:"parentBeaconBlockRoot" rlp:"optional"`
 		TimeMilliseconds      *hexutil.Uint64   `json:"timestampMilliseconds" rlp:"optional"`
 		MinDelayExcess        *hexutil.Uint64   `json:"minDelayExcess" rlp:"optional"`
-		SettledHeight         *hexutil.Uint64   `json:"settledHeight"       rlp:"optional"`
-		SettledGasUnix        *hexutil.Uint64   `json:"settledGasUnix"      rlp:"optional"`
-		SettledGasNumerator   *hexutil.Uint64   `json:"settledGasNumerator" rlp:"optional"`
-		SettledExcess         *hexutil.Uint64   `json:"settledExcess"       rlp:"optional"`
+		SettledHeight         *hexutil.Uint64   `json:"settledHeight"         rlp:"optional"`
+		SettledGasUnix        *hexutil.Uint64   `json:"settledGasUnix"        rlp:"optional"`
+		SettledGasNumerator   *hexutil.Uint64   `json:"settledGasNumerator"   rlp:"optional"`
+		SettledExcess         *hexutil.Uint64   `json:"settledExcess"         rlp:"optional"`
 		TargetExponent        *hexutil.Uint64   `json:"targetExponent"        rlp:"optional"`
 		TargetToExcessScaling *hexutil.Uint64   `json:"targetToExcessScaling" rlp:"optional"`
 		MinPrice              *hexutil.Uint64   `json:"minPrice"              rlp:"optional"`
