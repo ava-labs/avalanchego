@@ -26,31 +26,31 @@ func TestConfig_UseStandaloneDatabase(t *testing.T) {
 	tests := []struct {
 		name    string
 		setting bool
-		avaDB   *memdb.Database
+		nodeDB  *memdb.Database
 		want    bool
 	}{
 		{
 			name:    "true_without_chain",
 			setting: true,
-			avaDB:   memdb.New(),
+			nodeDB:  memdb.New(),
 			want:    true,
 		},
 		{
 			name:    "false_without_chain",
 			setting: false,
-			avaDB:   memdb.New(),
+			nodeDB:  memdb.New(),
 			want:    false,
 		},
 		{
 			name:    "true_with_chain",
 			setting: true,
-			avaDB:   withChain,
+			nodeDB:  withChain,
 			want:    false,
 		},
 		{
 			name:    "false_with_chain",
 			setting: false,
-			avaDB:   withChain,
+			nodeDB:  withChain,
 			want:    false,
 		},
 	}
@@ -58,7 +58,7 @@ func TestConfig_UseStandaloneDatabase(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			c := defaultConfig(t.TempDir())
 			c.UseStandaloneDatabase = test.setting
-			require.Equal(t, test.want, c.useStandaloneDatabase(logging.NoLog{}, test.avaDB), "useStandaloneDatabase(...)")
+			require.Equal(t, test.want, c.useStandaloneDatabase(logging.NoLog{}, test.nodeDB), "useStandaloneDatabase(...)")
 		})
 	}
 }
