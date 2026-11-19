@@ -76,6 +76,10 @@ func VerifyExtraPrefix(
 func VerifyExtra(rules extras.AvalancheRules, extra []byte) error {
 	extraLen := len(extra)
 	switch {
+	case rules.IsIgloo:
+		// Igloo headers have no fee window, and the SAE VM verifies the
+		// predicate results.
+		return nil
 	case rules.IsDurango:
 		if extraLen < subnetevm.WindowSize {
 			return fmt.Errorf(

@@ -46,7 +46,22 @@ import (
 
 func TestMain(m *testing.M) {
 	evm.RegisterAllLibEVMExtras()
-	goleak.VerifyTestMain(m, saetest.GoleakOptions()...)
+	goleak.VerifyTestMain(
+		m,
+		append(
+			saetest.GoleakOptions(),
+			// The legacy VM, started by [TestLegacyVMParsesIglooBlocks], leaks
+			// these after Shutdown.
+			goleak.IgnoreTopFunction("github.com/ava-labs/libevm/accounts/keystore.(*KeyStore).updater"),
+			goleak.IgnoreTopFunction("github.com/ava-labs/libevm/accounts/keystore.(*watcher).loop"),
+			goleak.IgnoreTopFunction("github.com/ava-labs/libevm/accounts.(*Manager).update"),
+			goleak.IgnoreTopFunction("github.com/ava-labs/avalanchego/graft/subnet-evm/eth/gasprice.NewOracle.func1"),
+			goleak.IgnoreTopFunction("github.com/ava-labs/avalanchego/graft/subnet-evm/eth/gasprice.newFeeInfoProvider.func1"),
+			// The keystore's file watcher, whose backend varies by platform.
+			goleak.IgnoreAnyFunction("github.com/fsnotify/fsnotify.(*inotify).readEvents"),
+			goleak.IgnoreAnyFunction("github.com/fsnotify/fsnotify.(*kqueue).readEvents"),
+		)...,
+	)
 }
 
 var _ saetest.Peer = (*SUT)(nil)

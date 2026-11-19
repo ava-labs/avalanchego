@@ -5,6 +5,7 @@
 package l1s
 
 import (
+	"context"
 	"maps"
 	"math/big"
 	"slices"
@@ -18,13 +19,16 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
+	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -357,4 +361,39 @@ func (s *l1SUT) verifyWarpMessage(t *testing.T, payloadData []byte, expected int
 		require.NotNil(t, appErr)
 		require.Equal(t, expected, appErr.Code)
 	}
+}
+
+// TestLegacyVMParsesIglooBlocks checks that the legacy VM MUST parse blocks
+// built by this VM, since both VMs parse each other's blocks across the
+// transition.
+func TestLegacyVMParsesIglooBlocks(t *testing.T) {
+	sut := newL1SUT(
+		t,
+		withFork(upgrade.Igloo),
+		withNow(postIglooStartTime(t)),
+		withWarpEnabled(),
+	)
+	// Without Warp transactions, the predicate results are shorter than the
+	// legacy fee window.
+	sut.sendTransferTx(t, 0, 0, big.NewInt(1))
+	built := sut.buildAndVerifyBlock(t, nil)
+
+	legacy := &evm.VM{}
+	require.NoError(t, legacy.Initialize(
+		sut.ctx,
+		newSnowCtx(t, sut.upgrades),
+		memdb.New(),
+		sut.genesisBytes,
+		sut.upgradeBytes,
+		nil, // configBytes
+		nil, // fxs
+		&enginetest.Sender{T: t},
+	))
+	t.Cleanup(func() {
+		require.NoError(t, legacy.Shutdown(context.Background()))
+	})
+
+	parsed, err := legacy.ParseBlock(sut.ctx, built.Bytes())
+	require.NoError(t, err)
+	require.Equal(t, built.ID(), parsed.ID())
 }

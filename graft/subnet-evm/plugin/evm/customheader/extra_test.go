@@ -251,6 +251,15 @@ func TestVerifyExtra(t *testing.T) {
 			extra:    make([]byte, subnetevm.WindowSize-1),
 			expected: errInvalidExtraLength,
 		},
+		{
+			name: "igloo_no_fee_window",
+			rules: extras.AvalancheRules{
+				IsDurango: true,
+				IsIgloo:   true,
+			},
+			extra:    make([]byte, subnetevm.WindowSize-1),
+			expected: nil,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

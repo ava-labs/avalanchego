@@ -226,6 +226,11 @@ func (b *wrappedBlock) verify(predicateContext *precompileconfig.PredicateContex
 		return fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 
+	// Igloo blocks are parsed but executed by the SAE VM.
+	if params.GetExtra(b.vm.chainConfig).IsIgloo(b.ethBlock.Time()) {
+		return errIglooUnsupported
+	}
+
 	if err := b.semanticVerify(predicateContext); err != nil {
 		return fmt.Errorf("failed to verify block: %w", err)
 	}
@@ -345,10 +350,6 @@ func (b *wrappedBlock) syntacticVerify() error {
 	ethHeader := b.ethBlock.Header()
 	rules := b.vm.chainConfig.Rules(ethHeader.Number, params.IsMergeTODO, ethHeader.Time)
 	rulesExtra := params.GetRulesExtra(rules)
-	// The SAE VM executes Igloo blocks, which use a different header format.
-	if rulesExtra.IsIgloo {
-		return errIglooUnsupported
-	}
 	// Perform block and header sanity checks
 	if !ethHeader.Number.IsUint64() {
 		return fmt.Errorf("invalid block number: %v", ethHeader.Number)
