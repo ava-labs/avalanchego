@@ -86,8 +86,8 @@ decides this on its own:
   `network-require-validator-to-connect`, a node that does not validate the
   primary network drops its own subnet's `allowedNodes` at the handshake today.
   The flag would keep every member, `allowedNodes` included.
-- **Members dial the validators.** Only validators' IPs are gossiped, so a
-  validator never dials a member.
+- **Members dial the validators by default.** Membership alone does not make a
+  member's IP gossipable or cause validators to dial it.
 - **`allowedNodes` would be deprecated** in favor of a membership CA. It would
   still admit and keep the listed nodes, with a warning at startup when it is
   set.
