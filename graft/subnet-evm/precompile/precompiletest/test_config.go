@@ -40,6 +40,7 @@ func RunVerifyTests(t *testing.T, tests map[string]ConfigVerifyTest) {
 				mockChainConfig.EXPECT().GetFeeConfig().AnyTimes().Return(commontype.ValidTestFeeConfig)
 				mockChainConfig.EXPECT().AllowedFeeRecipients().AnyTimes().Return(false)
 				mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(true)
+				mockChainConfig.EXPECT().IsIgloo(gomock.Any()).AnyTimes().Return(true)
 				chainConfig = mockChainConfig
 			}
 			err := test.Config.Verify(chainConfig)

@@ -335,7 +335,7 @@ func TestParseGenesis(t *testing.T) {
 					gaspricemanager.ConfigKey: gaspricemanager.NewConfig(new(testGenesisTime), nil, nil, nil, nil),
 				}
 			})),
-			wantErr: testerr.Is(errGasPriceManagerBeforeIgloo),
+			wantErr: testerr.Contains("cannot activate before Igloo"),
 		},
 		{
 			name:    "gaspricemanager_upgrade_before_igloo",
@@ -346,7 +346,7 @@ func TestParseGenesis(t *testing.T) {
 					Config: gaspricemanager.NewConfig(new(testGenesisTime+1), nil, nil, nil, nil),
 				}},
 			}),
-			wantErr: testerr.Is(errGasPriceManagerBeforeIgloo),
+			wantErr: testerr.Contains("cannot activate before Igloo"),
 		},
 	}
 	for _, test := range tests {

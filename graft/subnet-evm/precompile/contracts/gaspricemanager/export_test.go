@@ -12,6 +12,7 @@ const (
 )
 
 var (
+	ErrActivatedBeforeIgloo    = errActivatedBeforeIgloo
 	ErrCannotSetGasPriceConfig = errCannotSetGasPriceConfig
 	ErrNilBlockNumber          = errNilBlockNumber
 )

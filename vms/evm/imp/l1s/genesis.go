@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/feemanager/retirement"
-	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
@@ -46,7 +45,6 @@ var (
 	errNonZeroGenesisParentHash   = errors.New("non-zero genesis parentHash")
 	errNonNilGenesisExcessBlobGas = errors.New("non-nil genesis excessBlobGas")
 	errNonNilGenesisBlobGasUsed   = errors.New("non-nil genesis blobGasUsed")
-	errGasPriceManagerBeforeIgloo = errors.New("gaspricemanager scheduled before Igloo")
 )
 
 type genesis core.Genesis
@@ -111,10 +109,6 @@ func updateChainConfig(cfg *params.ChainConfig, genesisTimestamp uint64, upgrade
 			return err
 		}
 	}
-	if err := verifyGasPriceManagerAfterIgloo(extra); err != nil {
-		return err
-	}
-
 	if err := extra.Verify(); err != nil {
 		return err
 	}
@@ -123,25 +117,6 @@ func updateChainConfig(cfg *params.ChainConfig, genesisTimestamp uint64, upgrade
 		return err
 	}
 	return cfg.CheckConfigForkOrder()
-}
-
-// verifyGasPriceManagerAfterIgloo returns an error if gaspricemanager is
-// scheduled before Igloo, since only Igloo headers carry its gas config.
-func verifyGasPriceManagerAfterIgloo(cfg *extras.ChainConfig) error {
-	if c, ok := cfg.GenesisPrecompiles[gaspricemanager.ConfigKey]; ok && !c.IsDisabled() {
-		if ts := c.Timestamp(); ts != nil && !cfg.IsIgloo(*ts) {
-			return fmt.Errorf("%w: genesis precompile scheduled at %d", errGasPriceManagerBeforeIgloo, *ts)
-		}
-	}
-	for i, u := range cfg.PrecompileUpgrades {
-		if u.Key() != gaspricemanager.ConfigKey || u.IsDisabled() {
-			continue
-		}
-		if ts := u.Timestamp(); ts != nil && !cfg.IsIgloo(*ts) {
-			return fmt.Errorf("%w: precompileUpgrades[%d] scheduled at %d", errGasPriceManagerBeforeIgloo, i, *ts)
-		}
-	}
-	return nil
 }
 
 // makeUpgrades returns an [extras.NetworkUpgrades] based on the following rules:
