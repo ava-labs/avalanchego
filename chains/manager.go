@@ -515,7 +515,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			BCLookup:     m,
 			Metrics:      metrics.NewPrefixGatherer(),
 
-			WarpSigner: m.warpSigner(chainParams.ID),
+			WarpSigner: warp.NewSigner(m.StakingBLSKey, m.NetworkID, chainParams.ID),
 
 			ValidatorState: m.validatorState,
 			ChainDataDir:   chainDataDir,
@@ -1550,13 +1550,6 @@ func (m *manager) startIsolatedL1() {
 	m.validatorState = m.IsolatedL1
 	m.QueueChainCreation(m.IsolatedL1.Chain)
 	close(m.unblockChainCreatorCh)
-}
-
-func (m *manager) warpSigner(chainID ids.ID) warp.Signer {
-	if m.IsolatedL1 != nil {
-		return disabledWarpSigner{}
-	}
-	return warp.NewSigner(m.StakingBLSKey, m.NetworkID, chainID)
 }
 
 func (m *manager) dispatchChainCreator() {

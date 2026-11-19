@@ -293,7 +293,7 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Uint64(StakeSupplyCapKey, genesis.LocalParams.RewardConfig.SupplyCap, "Supply cap of the staking function")
 	// Subnets
 	fs.String(TrackSubnetsKey, "", "List of subnets for the node to track. A node tracking a subnet will track the uptimes of the subnet validators and attempt to sync all the chains in the subnet. Before validating a subnet, a node should be tracking the subnet to avoid impacting their subnet validation uptime")
-	fs.String(IsolatedL1ConfigFileKey, "", "Path to a JSON file with the signed CreateChainTx of an L1 (as returned by platform.getTx), its chain ID and its validators. If set, the P-chain is not started and only this chain runs. The tx must be issued on the P-chain before the subnet is converted to an L1. Set bootstrap-ips and bootstrap-ids to the other isolated validators. Warp is disabled")
+	fs.String(IsolatedL1ConfigFileKey, "", "Path to a JSON file with the signed CreateChainTx of an L1 (as returned by platform.getTx), its chain ID and its validators. If set, the P-chain is not started and only this chain runs. The tx must be issued on the P-chain before the subnet is converted to an L1. Set bootstrap-ips and bootstrap-ids to the other isolated validators.")
 
 	// State syncing
 	fs.String(StateSyncIPsKey, "", "Comma separated list of state sync peer ips to connect to. Example: 127.0.0.1:9630,127.0.0.1:9631")

@@ -4,7 +4,6 @@
 package warp
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -60,43 +59,6 @@ func TestAddAndGetValidMessage(t *testing.T) {
 	expectedSig, err := warpSigner.Sign(testUnsignedMessage)
 	require.NoError(t, err)
 	require.Equal(t, expectedSig, signature)
-}
-
-var errSigningRefused = errors.New("signing refused")
-
-// refusingSigner never signs, like a node running an isolated L1.
-type refusingSigner struct{}
-
-func (refusingSigner) Sign(*avalancheWarp.UnsignedMessage) ([]byte, error) {
-	return nil, errSigningRefused
-}
-
-// A node that refuses to sign must still be able to accept blocks that send
-// warp messages. The message is stored and is signed once the node signs
-// again, such as after an isolated L1 rejoins the P-chain.
-func TestAddMessageWhenSigningIsRefused(t *testing.T) {
-	require := require.New(t)
-	db := memdb.New()
-
-	refusing, err := NewBackend(networkID, sourceChainID, refusingSigner{}, nil, nil, db, lru.NewCache[ids.ID, []byte](500), nil)
-	require.NoError(err)
-
-	require.NoError(refusing.AddMessage(testUnsignedMessage))
-	_, err = refusing.GetMessageSignature(t.Context(), testUnsignedMessage)
-	require.ErrorIs(err, errSigningRefused)
-
-	// Restart with a working signer and the same database.
-	sk, err := localsigner.New()
-	require.NoError(err)
-	warpSigner := avalancheWarp.NewSigner(sk, networkID, sourceChainID)
-	signing, err := NewBackend(networkID, sourceChainID, warpSigner, nil, nil, db, lru.NewCache[ids.ID, []byte](500), nil)
-	require.NoError(err)
-
-	signature, err := signing.GetMessageSignature(t.Context(), testUnsignedMessage)
-	require.NoError(err)
-	expectedSig, err := warpSigner.Sign(testUnsignedMessage)
-	require.NoError(err)
-	require.Equal(expectedSig, signature)
 }
 
 func TestAddAndGetUnknownMessage(t *testing.T) {

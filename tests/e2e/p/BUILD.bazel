@@ -20,7 +20,6 @@ go_library(
     deps = [
         "//api/admin",
         "//api/info",
-        "//chains",
         "//config",
         "//genesis",
         "//ids",

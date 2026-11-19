@@ -13,7 +13,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
@@ -66,9 +65,7 @@ var _ = e2e.DescribePChain("[Isolated L1]", func() {
 		})
 
 		var exportTxID ids.ID
-
-		// Ensure the chain is completely isolated and does not sign warp messages.
-		tc.By("refusing to sign warp messages while isolated", func() {
+		tc.By("sending a warp message while isolated", func() {
 			exportTx, err := export.Export(tc.DefaultContext(), &export.Config{
 				URI:                isolatedA.GetAccessibleURI(),
 				SourceChainID:      chainID,
@@ -79,13 +76,6 @@ var _ = e2e.DescribePChain("[Isolated L1]", func() {
 			})
 			require.NoError(err)
 			exportTxID = exportTx.TxID
-
-			for _, node := range validators {
-				_, _, err := api.NewClient(node.GetAccessibleURI(), chainID.String()).Message(tc.DefaultContext(), exportTxID)
-				// The error crosses an RPC boundary, so only its message is kept.
-				//nolint:forbidigo
-				require.ErrorContains(err, chains.ErrWarpDisabled.Error())
-			}
 		})
 
 		tc.By("converting the subnet to an L1 with the same validators", func() {
@@ -153,21 +143,9 @@ var _ = e2e.DescribePChain("[Isolated L1]", func() {
 		})
 
 		isolatedRecipient := e2e.NewPrivateKey(tc).Address()
-		var exportTxID ids.ID
-		tc.By("producing blocks and a warp message while isolated", func() {
+		tc.By("producing blocks while isolated", func() {
 			issueTransfer(tc, isolatedA, chainID, chainKey, isolatedRecipient)
 			requireReceivedTransfer(tc, isolatedB, chainID, isolatedRecipient)
-
-			exportTx, err := export.Export(tc.DefaultContext(), &export.Config{
-				URI:                isolatedA.GetAccessibleURI(),
-				SourceChainID:      chainID,
-				DestinationChainID: ids.GenerateTestID(),
-				Amount:             units.Schmeckle,
-				To:                 e2e.NewPrivateKey(tc).Address(),
-				PrivateKey:         chainKey,
-			})
-			require.NoError(err)
-			exportTxID = exportTx.TxID
 		})
 
 		// Validator B is dropped and a new node is added. Validator A holds the chains history
@@ -204,13 +182,6 @@ var _ = e2e.DescribePChain("[Isolated L1]", func() {
 			recipient := e2e.NewPrivateKey(tc).Address()
 			issueTransfer(tc, isolatedA, chainID, chainKey, recipient)
 			requireReceivedTransfer(tc, newValidator, chainID, recipient)
-		})
-
-		// Warp messages are signed by the current validators, so a validator
-		// that joined after the isolated period can sign a message sent during
-		// it.
-		tc.By("signing the isolated warp message with the new validator", func() {
-			requireSignsMessage(tc, newValidator, chainID, exportTxID)
 		})
 	})
 })

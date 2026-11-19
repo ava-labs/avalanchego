@@ -12,16 +12,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 var (
 	_ validators.State = (*IsolatedL1)(nil)
-	_ warp.Signer      = disabledWarpSigner{}
 
 	errUnknownChain  = errors.New("unknown chain")
 	errUnknownSubnet = errors.New("unknown subnet")
-	ErrWarpDisabled  = errors.New("warp is disabled in isolated L1 mode")
+	ErrWarpDisabled  = errors.New("warp verification is disabled in isolated L1 mode")
 )
 
 // IsolatedL1 runs one chain without the P-chain.
@@ -94,11 +92,4 @@ func (l *IsolatedL1) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID
 		}
 	}
 	return out, l.Height, nil
-}
-
-// disabledWarpSigner refuses to sign warp messages.
-type disabledWarpSigner struct{}
-
-func (disabledWarpSigner) Sign(*warp.UnsignedMessage) ([]byte, error) {
-	return nil, ErrWarpDisabled
 }
