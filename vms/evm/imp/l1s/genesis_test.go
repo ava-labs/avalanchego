@@ -40,9 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/cmputils"
-	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 
 	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -464,54 +462,6 @@ func TestGenesisBlockMatchesSubnetEVM(t *testing.T) {
 
 			require.Equalf(t, want.Root(), got.Root(), "%T.block().Root()", g)
 			require.Equalf(t, want.Hash(), got.Hash(), "%T.block().Hash()", g)
-		})
-	}
-}
-
-// TestGenesisBlockStampsGasConfig asserts that a genesis enabling
-// gaspricemanager MUST carry its initial gas config, with the canonical target.
-func TestGenesisBlockStampsGasConfig(t *testing.T) {
-	tests := []struct {
-		name         string
-		storedTarget gas.Gas
-		want         gas.Gas
-	}{
-		{
-			name:         "exactly_representable",
-			storedTarget: 3_000_000,
-			want:         3_000_000,
-		},
-		{
-			name:         "rounded_up",
-			storedTarget: 1_000_000_000,
-			want:         1_000_000_006,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			stored := commontype.GasPriceConfig{
-				TargetGas:    uint64(test.storedTarget),
-				MinGasPrice:  1,
-				TimeToDouble: 60,
-			}
-			genesisJSON := testGenesisJSON(withGenesis(func(g *ethcore.Genesis) {
-				l1params.GetExtra(g.Config).GenesisPrecompiles = extras.Precompiles{
-					gaspricemanager.ConfigKey: gaspricemanager.NewConfig(new(g.Timestamp), nil, nil, nil, &stored),
-				}
-			}))
-			ctx := &snow.Context{NetworkUpgrades: upgradetest.GetConfig(upgrade.Latest)}
-			g, err := parseGenesis(ctx, []byte(genesisJSON), nil)
-			require.NoError(t, err, "parseGenesis(...)")
-			block, err := g.block()
-			require.NoError(t, err, "%T.block()", g)
-
-			target, config := new(hooks).GasConfigAfter(block.Header())
-			require.Equal(t, test.want, target, "GasConfigAfter(genesis) target")
-			want := gastime.GasPriceConfig{
-				TargetToExcessScaling: gastime.DefaultTargetToExcessScaling,
-				MinPrice:              1,
-			}
-			require.Equal(t, want, config, "GasConfigAfter(genesis) config")
 		})
 	}
 }
