@@ -268,9 +268,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	te := targetExponent(parent).Toward(b.desired.TargetExponent)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
-			ParentHash: parent.Hash(),
-			// Set by [builder.BuildBlock], which has the settled state.
-			Coinbase:         blackhole.Address,
+			ParentHash:       parent.Hash(),
 			Difficulty:       big.NewInt(1),
 			Number:           new(big.Int).Add(parent.Number, common.Big1),
 			Time:             nowUnix,
