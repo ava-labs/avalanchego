@@ -114,6 +114,21 @@ type ChainContext interface {
 	GetHeader(common.Hash, uint64) *types.Header
 }
 
+// NewEVMBlockContextWithPredicateResults creates a new context for use in the EVM with an override for the predicate results that is not present
+// in header.Extra.
+// This function is used to create a BlockContext when the header Extra data is not fully formed yet and it's more efficient to pass in predicateResults
+// directly rather than re-encode the latest results when executing each individual transaction.
+func NewEVMBlockContextWithPredicateResults(header *types.Header, chain ChainContext, author *common.Address, predicateBytes []byte) vm.BlockContext {
+	blockCtx := NewEVMBlockContext(header, chain, author)
+	// Note this only sets the block context, which is the hand-off point for
+	// the EVM. The actual header is not modified.
+	blockCtx.Header.Extra = customheader.SetPredicateBytesInExtra(
+		bytes.Clone(header.Extra),
+		predicateBytes,
+	)
+	return blockCtx
+}
+
 // NewEVMBlockContext creates a new context for use in the EVM.
 func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common.Address) vm.BlockContext {
 	var (
@@ -151,21 +166,6 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 			Extra:  header.Extra,
 		},
 	}
-}
-
-// NewEVMBlockContextWithPredicateResults creates a new context for use in the EVM with an override for the predicate results that is not present
-// in header.Extra.
-// This function is used to create a BlockContext when the header Extra data is not fully formed yet and it's more efficient to pass in predicateResults
-// directly rather than re-encode the latest results when executing each individual transaction.
-func NewEVMBlockContextWithPredicateResults(header *types.Header, chain ChainContext, author *common.Address, predicateBytes []byte) vm.BlockContext {
-	blockCtx := NewEVMBlockContext(header, chain, author)
-	// Note this only sets the block context, which is the hand-off point for
-	// the EVM. The actual header is not modified.
-	blockCtx.Header.Extra = customheader.SetPredicateBytesInExtra(
-		bytes.Clone(header.Extra),
-		predicateBytes,
-	)
-	return blockCtx
 }
 
 // NewEVMTxContext creates a new transaction context for a single transaction.
