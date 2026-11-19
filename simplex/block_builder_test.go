@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
-	simplexcommon "github.com/ava-labs/simplex/common"
+	simplexcommon "github.com/ava-labs/avalanchego/graft/simplex/common"
 )
 
 var emptyBlacklist = simplexcommon.Blacklist{}
