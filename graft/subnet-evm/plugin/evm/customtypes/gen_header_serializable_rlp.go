@@ -48,7 +48,7 @@ func (obj *HeaderSerializable) EncodeRLP(_w io.Writer) error {
 	_tmp9 := obj.SettledGasUnix != nil
 	_tmp10 := obj.SettledGasNumerator != nil
 	_tmp11 := obj.SettledExcess != nil
-	_tmp12 := obj.TargetExcess != nil
+	_tmp12 := obj.TargetExponent != nil
 	_tmp13 := obj.TargetToExcessScaling != nil
 	_tmp14 := obj.MinPrice != nil
 	if _tmp1 || _tmp2 || _tmp3 || _tmp4 || _tmp5 || _tmp6 || _tmp7 || _tmp8 || _tmp9 || _tmp10 || _tmp11 || _tmp12 || _tmp13 || _tmp14 {
@@ -135,10 +135,10 @@ func (obj *HeaderSerializable) EncodeRLP(_w io.Writer) error {
 		}
 	}
 	if _tmp12 || _tmp13 || _tmp14 {
-		if obj.TargetExcess == nil {
+		if obj.TargetExponent == nil {
 			w.Write([]byte{0x80})
 		} else {
-			w.WriteUint64((*obj.TargetExcess))
+			w.WriteUint64((*obj.TargetExponent))
 		}
 	}
 	if _tmp13 || _tmp14 {

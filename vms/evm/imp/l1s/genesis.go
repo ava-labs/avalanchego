@@ -30,7 +30,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/precompile/contracts/gaspricemanager"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 
 	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -149,18 +148,17 @@ func verifyGasPriceManagerAfterIgloo(cfg *extras.ChainConfig, genesisTimestamp u
 }
 
 // genesisGasConfig returns the gas config that [gaspricemanager.Configure]
-// seeds into genesis state, or false if gaspricemanager isn't enabled at
-// genesisTime.
-func genesisGasConfig(cfg *extras.ChainConfig, genesisTime uint64) (commontype.GasPriceConfig, bool) {
+// seeds into genesis state, or [disabledGasConfig] if gaspricemanager isn't
+// enabled at genesisTime.
+func genesisGasConfig(cfg *extras.ChainConfig, genesisTime uint64) commontype.GasPriceConfig {
 	if !cfg.IsPrecompileEnabled(gaspricemanager.ContractAddress, genesisTime) {
-		return commontype.GasPriceConfig{}, false
+		return disabledGasConfig()
 	}
-	stored := commontype.DefaultGasPriceConfig()
 	precompileConfig := cfg.GetActivePrecompileConfig(gaspricemanager.ContractAddress, genesisTime)
 	if c, ok := precompileConfig.(*gaspricemanager.Config); ok && c.InitialGasPriceConfig != nil {
-		stored = *c.InitialGasPriceConfig
+		return *c.InitialGasPriceConfig
 	}
-	return stored, true
+	return commontype.DefaultGasPriceConfig()
 }
 
 // makeUpgrades returns an [extras.NetworkUpgrades] based on the following rules:
@@ -305,11 +303,7 @@ func (g *genesis) block() (*types.Block, error) {
 	}
 
 	if c.IsIgloo(g.Timestamp) {
-		if stored, ok := genesisGasConfig(c, g.Timestamp); ok {
-			stampStoredGasConfig(headerExtra, stored)
-		} else {
-			stampGasConfig(headerExtra, gastime.DefaultGasPriceConfig())
-		}
+		setGasConfig(headerExtra, genesisGasConfig(c, g.Timestamp))
 	}
 
 	// TODO(alarso16): Add SAE required fields if active at genesis.

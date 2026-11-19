@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/cmputils"
+	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 
 	legacy "github.com/ava-labs/avalanchego/graft/subnet-evm/core"
 	l1params "github.com/ava-labs/avalanchego/graft/subnet-evm/params"
@@ -503,7 +504,11 @@ func TestGenesisBlockStampsGasConfig(t *testing.T) {
 
 			target, config := (*hooks)(nil).GasConfigAfter(block.Header())
 			require.Equal(t, test.want, target, "GasConfigAfter(genesis) target")
-			require.Equal(t, gasConfigFromStored(stored), config, "GasConfigAfter(genesis) config")
+			want := gastime.GasPriceConfig{
+				TargetToExcessScaling: gastime.DefaultTargetToExcessScaling,
+				MinPrice:              1,
+			}
+			require.Equal(t, want, config, "GasConfigAfter(genesis) config")
 		})
 	}
 }

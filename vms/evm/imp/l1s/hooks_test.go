@@ -239,9 +239,9 @@ func TestBuildBlockStampsDefaultGasConfig(t *testing.T) {
 	block, err := b.BuildBlock(header, nil, []*types.Transaction{tx}, nil, hook.Settled{}, settledRules, nil)
 	require.NoError(t, err, "BuildBlock()")
 
-	got, ok := readGasConfig(customtypes.GetHeaderExtra(block.Header()))
-	require.True(t, ok, "BuildBlock() MUST stamp the gas-config group")
-	require.Equal(t, gastime.DefaultGasPriceConfig(), got, "BuildBlock() gas-config group")
+	he := customtypes.GetHeaderExtra(block.Header())
+	require.Equal(t, new(uint64(gastime.DefaultTargetToExcessScaling)), he.TargetToExcessScaling, "BuildBlock() TargetToExcessScaling")
+	require.Equal(t, new(uint64(gastime.DefaultMinPrice)), he.MinPrice, "BuildBlock() MinPrice")
 }
 
 func TestVerifyBlockSyntaxGasConfigGroup(t *testing.T) {

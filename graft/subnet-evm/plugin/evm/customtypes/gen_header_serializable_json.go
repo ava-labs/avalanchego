@@ -43,7 +43,7 @@ func (h HeaderSerializable) MarshalJSON() ([]byte, error) {
 		SettledGasUnix        *hexutil.Uint64  `json:"settledGasUnix"      rlp:"optional"`
 		SettledGasNumerator   *hexutil.Uint64  `json:"settledGasNumerator" rlp:"optional"`
 		SettledExcess         *hexutil.Uint64  `json:"settledExcess"       rlp:"optional"`
-		TargetExcess          *hexutil.Uint64  `json:"targetExcess"          rlp:"optional"`
+		TargetExponent        *hexutil.Uint64  `json:"targetExponent"        rlp:"optional"`
 		TargetToExcessScaling *hexutil.Uint64  `json:"targetToExcessScaling" rlp:"optional"`
 		MinPrice              *hexutil.Uint64  `json:"minPrice"              rlp:"optional"`
 		Hash                  common.Hash      `json:"hash"`
@@ -75,7 +75,7 @@ func (h HeaderSerializable) MarshalJSON() ([]byte, error) {
 	enc.SettledGasUnix = (*hexutil.Uint64)(h.SettledGasUnix)
 	enc.SettledGasNumerator = (*hexutil.Uint64)(h.SettledGasNumerator)
 	enc.SettledExcess = (*hexutil.Uint64)(h.SettledExcess)
-	enc.TargetExcess = (*hexutil.Uint64)(h.TargetExcess)
+	enc.TargetExponent = (*hexutil.Uint64)(h.TargetExponent)
 	enc.TargetToExcessScaling = (*hexutil.Uint64)(h.TargetToExcessScaling)
 	enc.MinPrice = (*hexutil.Uint64)(h.MinPrice)
 	enc.Hash = h.Hash()
@@ -111,7 +111,7 @@ func (h *HeaderSerializable) UnmarshalJSON(input []byte) error {
 		SettledGasUnix        *hexutil.Uint64   `json:"settledGasUnix"      rlp:"optional"`
 		SettledGasNumerator   *hexutil.Uint64   `json:"settledGasNumerator" rlp:"optional"`
 		SettledExcess         *hexutil.Uint64   `json:"settledExcess"       rlp:"optional"`
-		TargetExcess          *hexutil.Uint64   `json:"targetExcess"          rlp:"optional"`
+		TargetExponent        *hexutil.Uint64   `json:"targetExponent"        rlp:"optional"`
 		TargetToExcessScaling *hexutil.Uint64   `json:"targetToExcessScaling" rlp:"optional"`
 		MinPrice              *hexutil.Uint64   `json:"minPrice"              rlp:"optional"`
 	}
@@ -210,8 +210,8 @@ func (h *HeaderSerializable) UnmarshalJSON(input []byte) error {
 	if dec.SettledExcess != nil {
 		h.SettledExcess = (*uint64)(dec.SettledExcess)
 	}
-	if dec.TargetExcess != nil {
-		h.TargetExcess = (*uint64)(dec.TargetExcess)
+	if dec.TargetExponent != nil {
+		h.TargetExponent = (*uint64)(dec.TargetExponent)
 	}
 	if dec.TargetToExcessScaling != nil {
 		h.TargetToExcessScaling = (*uint64)(dec.TargetToExcessScaling)

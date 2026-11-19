@@ -27,7 +27,7 @@ func VerifyNoSAEFields(header *types.Header) error {
 		extra.SettledGasUnix != nil ||
 		extra.SettledGasNumerator != nil ||
 		extra.SettledExcess != nil ||
-		extra.TargetExcess != nil ||
+		extra.TargetExponent != nil ||
 		extra.TargetToExcessScaling != nil ||
 		extra.MinPrice != nil {
 		return fmt.Errorf("%w: %s", errSAEFieldSet, header.Hash())

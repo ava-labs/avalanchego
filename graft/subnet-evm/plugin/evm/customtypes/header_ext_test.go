@@ -21,7 +21,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 )
 
 func TestMain(m *testing.M) {
@@ -70,7 +70,7 @@ func TestHeaderExtraPostRPCMarshal(t *testing.T) {
 		"settledGasUnix":        hexutil.Uint64(27),
 		"settledGasNumerator":   hexutil.Uint64(28),
 		"settledExcess":         hexutil.Uint64(29),
-		"targetExcess":          hexutil.Uint64(30),
+		"targetExponent":        hexutil.Uint64(30),
 		"targetToExcessScaling": hexutil.Uint64(31),
 		"minPrice":              hexutil.Uint64(32),
 	}
@@ -148,7 +148,7 @@ func headerWithNonZeroFields() (*types.Header, *HeaderExtra) {
 		SettledGasNumerator: utils.PointerTo[uint64](28),
 		SettledExcess:       utils.PointerTo[uint64](29),
 
-		TargetExcess:          utils.PointerTo(gas.Gas(30)),
+		TargetExponent:        utils.PointerTo(dynamic.TargetExponent(30)),
 		TargetToExcessScaling: utils.PointerTo[uint64](31),
 		MinPrice:              utils.PointerTo[uint64](32),
 	}
@@ -202,7 +202,7 @@ func allFieldsSet[T interface {
 				assertNonZero(t, f)
 			case *acp226.DelayExcess:
 				assertNonZero(t, f)
-			case *gas.Gas:
+			case *dynamic.TargetExponent:
 				assertNonZero(t, f)
 			case []uint8, []*types.Header, types.Transactions, []*types.Transaction, types.Withdrawals, []*types.Withdrawal:
 				require.NotEmpty(t, f)
@@ -215,7 +215,7 @@ func allFieldsSet[T interface {
 
 func assertNonZero[T interface {
 	common.Hash | common.Address | types.BlockNonce | uint32 | uint64 | types.Bloom |
-		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header | *acp226.DelayExcess | *gas.Gas
+		*big.Int | *common.Hash | *uint64 | *[]uint8 | *types.Header | *acp226.DelayExcess | *dynamic.TargetExponent
 }](t *testing.T, v T) {
 	t.Helper()
 	require.NotZero(t, v)

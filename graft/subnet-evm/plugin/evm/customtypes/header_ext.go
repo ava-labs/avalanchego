@@ -14,7 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/acp226"
 	"github.com/ava-labs/avalanchego/graft/evm/predicate"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
@@ -50,7 +50,7 @@ type HeaderExtra struct {
 	SettledGasNumerator *uint64
 	SettledExcess       *uint64
 
-	TargetExcess          *gas.Gas
+	TargetExponent        *dynamic.TargetExponent
 	TargetToExcessScaling *uint64 // 0 for static pricing
 	MinPrice              *uint64
 
@@ -167,9 +167,9 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		v := *h.SettledExcess
 		cp.SettledExcess = &v
 	}
-	if h.TargetExcess != nil {
-		v := *h.TargetExcess
-		cp.TargetExcess = &v
+	if h.TargetExponent != nil {
+		v := *h.TargetExponent
+		cp.TargetExponent = &v
 	}
 	if h.TargetToExcessScaling != nil {
 		v := *h.TargetToExcessScaling
@@ -204,8 +204,8 @@ func (h *HeaderExtra) PostRPCMarshal(_ *ethtypes.Header, m map[string]any) {
 	if h.SettledExcess != nil {
 		m["settledExcess"] = hexutil.Uint64(*h.SettledExcess)
 	}
-	if h.TargetExcess != nil {
-		m["targetExcess"] = hexutil.Uint64(*h.TargetExcess)
+	if h.TargetExponent != nil {
+		m["targetExponent"] = hexutil.Uint64(*h.TargetExponent)
 	}
 	if h.TargetToExcessScaling != nil {
 		m["targetToExcessScaling"] = hexutil.Uint64(*h.TargetToExcessScaling)
@@ -267,7 +267,7 @@ func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.SettledGasUnix = extras.SettledGasUnix
 	h.SettledGasNumerator = extras.SettledGasNumerator
 	h.SettledExcess = extras.SettledExcess
-	h.TargetExcess = (*uint64)(extras.TargetExcess)
+	h.TargetExponent = (*uint64)(extras.TargetExponent)
 	h.TargetToExcessScaling = extras.TargetToExcessScaling
 	h.MinPrice = extras.MinPrice
 }
@@ -280,7 +280,7 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.SettledGasUnix = h.SettledGasUnix
 	extras.SettledGasNumerator = h.SettledGasNumerator
 	extras.SettledExcess = h.SettledExcess
-	extras.TargetExcess = (*gas.Gas)(h.TargetExcess)
+	extras.TargetExponent = (*dynamic.TargetExponent)(h.TargetExponent)
 	extras.TargetToExcessScaling = h.TargetToExcessScaling
 	extras.MinPrice = h.MinPrice
 }
@@ -341,9 +341,9 @@ type HeaderSerializable struct {
 	SettledGasNumerator *uint64 `json:"settledGasNumerator" rlp:"optional"`
 	SettledExcess       *uint64 `json:"settledExcess"       rlp:"optional"`
 
-	// TargetExcess, TargetToExcessScaling and MinPrice were added by Igloo
+	// TargetExponent, TargetToExcessScaling and MinPrice were added by Igloo
 	// (SAE) and are ignored in legacy headers.
-	TargetExcess          *uint64 `json:"targetExcess"          rlp:"optional"`
+	TargetExponent        *uint64 `json:"targetExponent"        rlp:"optional"`
 	TargetToExcessScaling *uint64 `json:"targetToExcessScaling" rlp:"optional"`
 	MinPrice              *uint64 `json:"minPrice"              rlp:"optional"`
 }
@@ -367,7 +367,7 @@ type headerMarshaling struct {
 	SettledGasUnix        *hexutil.Uint64
 	SettledGasNumerator   *hexutil.Uint64
 	SettledExcess         *hexutil.Uint64
-	TargetExcess          *hexutil.Uint64
+	TargetExponent        *hexutil.Uint64
 	TargetToExcessScaling *hexutil.Uint64
 	MinPrice              *hexutil.Uint64
 }

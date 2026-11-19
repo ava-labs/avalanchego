@@ -31,9 +31,9 @@ import (
 
 const (
 	gasPriceManagerCallGas = 200_000
-	// maxTargetExcessDiff is the ACP-176 cap on the per-block change of the
-	// target excess.
-	maxTargetExcessDiff = 1 << 15
+	// maxTargetExponentDiff is the ACP-176 cap on the per-block change of the
+	// target exponent.
+	maxTargetExponentDiff = 1 << 15
 )
 
 // fetchStoredGasPriceConfig reads the precompile's stored config at
@@ -226,13 +226,13 @@ func TestGasPriceManagerSetGasPriceConfigSettlementLagSAE(t *testing.T) {
 // path differs as documented, via two subtests:
 //
 //   - `precompile_target_pinned`: `ValidatorTargetGas=false` makes
-//     `BuildBlock` replace `header.TargetExcess` with the exponent derived
+//     `BuildBlock` replace `header.TargetExponent` with the exponent derived
 //     from the precompile-stored `TargetGas`; every block's GasLimit and
 //     post-execution gas-time Target reflect that pin.
 //   - `validator_target_converges`: `ValidatorTargetGas=true` makes the
-//     chain follow `header.TargetExcess.Target()`, which is rate-limited
-//     toward `DesiredTargetExcess(Config.GasTarget)` per
-//     [maxTargetExcessDiff] per block. GasLimit climbs monotonically
+//     chain follow `header.TargetExponent.Target()`, which is rate-limited
+//     toward `DesiredTargetExponent(Config.GasTarget)` per
+//     [maxTargetExponentDiff] per block. GasLimit climbs monotonically
 //     and the chain converges to `desiredGasTarget` exactly.
 //
 // Both subtests use the validator's `Config.GasTarget` as the convergence
@@ -242,19 +242,19 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 		adminIdx = 0
 		fromIdx  = 1
 		// numBlocks must be enough for the VTG=true chain's
-		// `header.TargetExcess` to reach `desiredGasTarget`'s desired
-		// excess under the `MaxTargetExcessDiff`/block rate limit AND leave
+		// `header.TargetExponent` to reach `desiredGasTarget`'s desired
+		// exponent under the `maxTargetExponentDiff`/block rate limit AND leave
 		// at least 2 plateau blocks at the end to assert convergence.
 		numBlocks = 8
 	)
 
 	// `overrideTargetGas` is 2x `MinTargetPerSecond`; `desiredGasTarget` is
-	// the gas target produced by `5 * MaxTargetExcessDiff` of excess
+	// the gas target produced by a `5 * maxTargetExponentDiff` exponent
 	// (~1.005x `MinTargetPerSecond`). It is well below `overrideTargetGas`
 	// so the override case must visibly ignore the validator's pull.
 	const overrideTargetGas uint64 = 2 * dynamic.MinTarget
-	desiredGasTarget := dynamic.TargetExponent(gas.Gas(5 * maxTargetExcessDiff)).Target()
-	desiredTargetExcess := gas.Gas(dynamic.DesiredTargetExponent(desiredGasTarget))
+	desiredGasTarget := dynamic.TargetExponent(gas.Gas(5 * maxTargetExponentDiff)).Target()
+	desiredTargetExponent := dynamic.DesiredTargetExponent(desiredGasTarget)
 
 	buildChain := func(t *testing.T, cfg commontype.GasPriceConfig) []*blocks.Block {
 		t.Helper()
@@ -296,12 +296,12 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 			TimeToDouble:       60,
 		})
 
-		wantTargetExponent := gas.Gas(dynamic.DesiredTargetExponent(gas.Gas(overrideTargetGas)))
+		wantTargetExponent := dynamic.DesiredTargetExponent(gas.Gas(overrideTargetGas))
 		for i := range numBlocks {
-			headerTargetExponent := customtypes.GetHeaderExtra(chain[i].EthBlock().Header()).TargetExcess
-			require.NotNil(t, headerTargetExponent, "block %d TargetExcess must be present", i+1)
+			headerTargetExponent := customtypes.GetHeaderExtra(chain[i].EthBlock().Header()).TargetExponent
+			require.NotNil(t, headerTargetExponent, "block %d TargetExponent must be present", i+1)
 			require.Equal(t, wantTargetExponent, *headerTargetExponent,
-				"block %d TargetExcess must encode the precompile target", i+1)
+				"block %d TargetExponent must encode the precompile target", i+1)
 			if i == 0 {
 				continue
 			}
@@ -320,16 +320,16 @@ func TestGasPriceManagerValidatorTargetGasSAE(t *testing.T) {
 		})
 
 		// GasLimit climbs monotonically toward `desiredGasTarget` (rate-limited
-		// per block) and plateaus once header.TargetExcess catches up.
+		// per block) and plateaus once header.TargetExponent catches up.
 		for i := uint64(0); i < numBlocks; i++ {
 			wantTargetExponent := min(
-				gas.Gas((i+1)*maxTargetExcessDiff),
-				desiredTargetExcess,
+				dynamic.TargetExponent((i+1)*maxTargetExponentDiff),
+				desiredTargetExponent,
 			)
-			headerTargetExponent := customtypes.GetHeaderExtra(chain[i].EthBlock().Header()).TargetExcess
-			require.NotNil(t, headerTargetExponent, "block %d TargetExcess must be present", i+1)
+			headerTargetExponent := customtypes.GetHeaderExtra(chain[i].EthBlock().Header()).TargetExponent
+			require.NotNil(t, headerTargetExponent, "block %d TargetExponent must be present", i+1)
 			require.Equal(t, wantTargetExponent, *headerTargetExponent,
-				"block %d TargetExcess must follow the bounded validator vote", i+1)
+				"block %d TargetExponent must follow the bounded validator vote", i+1)
 			if i == 0 {
 				continue
 			}
@@ -360,7 +360,7 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 		finalPinnedTarget   uint64 = 3 * dynamic.MinTarget
 	)
 
-	desiredTarget := dynamic.TargetExponent(gas.Gas(5 * maxTargetExcessDiff)).Target()
+	desiredTarget := dynamic.TargetExponent(gas.Gas(5 * maxTargetExponentDiff)).Target()
 	initialConfig := commontype.GasPriceConfig{
 		TargetGas:    initialPinnedTarget,
 		MinGasPrice:  1,
@@ -386,10 +386,10 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 		}),
 	)
 
-	targetExponent := func(t *testing.T, b *blocks.Block) gas.Gas {
+	blockTargetExponent := func(t *testing.T, b *blocks.Block) dynamic.TargetExponent {
 		t.Helper()
-		q := customtypes.GetHeaderExtra(b.EthBlock().Header()).TargetExcess
-		require.NotNil(t, q, "block %d TargetExcess must be present", b.Height())
+		q := customtypes.GetHeaderExtra(b.EthBlock().Header()).TargetExponent
+		require.NotNil(t, q, "block %d TargetExponent must be present", b.Height())
 		return *q
 	}
 	mutate := func(t *testing.T, config commontype.GasPriceConfig) *blocks.Block {
@@ -405,9 +405,9 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 	sut.advanceTime(t, blockBuildAdvance)
 	sut.sendTransferTx(t, fromIdx, fromIdx, common.Big1)
 	baseline := sut.buildAcceptExecuteBlock(t)
-	initialPinnedExponent := gas.Gas(dynamic.DesiredTargetExponent(gas.Gas(initialPinnedTarget)))
-	require.Equal(t, initialPinnedExponent, targetExponent(t, baseline),
-		"initial pinned config must set TargetExcess")
+	initialPinnedExponent := dynamic.DesiredTargetExponent(gas.Gas(initialPinnedTarget))
+	require.Equal(t, initialPinnedExponent, blockTargetExponent(t, baseline),
+		"initial pinned config must set TargetExponent")
 
 	validatorConfig := commontype.GasPriceConfig{
 		ValidatorTargetGas: true,
@@ -416,12 +416,12 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 	}
 	sut.advanceTime(t, blockBuildAdvance)
 	validatorMutation := mutate(t, validatorConfig)
-	require.Equal(t, initialPinnedExponent, targetExponent(t, validatorMutation),
+	require.Equal(t, initialPinnedExponent, blockTargetExponent(t, validatorMutation),
 		"validator authority must not apply before the mutation settles")
 
 	validatorActive := settleGasPriceManagerMutation(t, sut)
-	wantValidatorExponent := initialPinnedExponent - maxTargetExcessDiff
-	require.Equal(t, wantValidatorExponent, targetExponent(t, validatorActive),
+	wantValidatorExponent := initialPinnedExponent - maxTargetExponentDiff
+	require.Equal(t, wantValidatorExponent, blockTargetExponent(t, validatorActive),
 		"validator authority must resume one bounded step from the pinned parent")
 
 	finalConfig := commontype.GasPriceConfig{
@@ -431,13 +431,13 @@ func TestGasPriceManagerTargetAuthorityTransitionsSAE(t *testing.T) {
 	}
 	sut.advanceTime(t, blockBuildAdvance)
 	pinnedMutation := mutate(t, finalConfig)
-	require.Equal(t, wantValidatorExponent-maxTargetExcessDiff, targetExponent(t, pinnedMutation),
+	require.Equal(t, wantValidatorExponent-maxTargetExponentDiff, blockTargetExponent(t, pinnedMutation),
 		"pinned authority must not apply before the mutation settles")
 
 	pinnedActive := settleGasPriceManagerMutation(t, sut)
-	finalPinnedExponent := gas.Gas(dynamic.DesiredTargetExponent(gas.Gas(finalPinnedTarget)))
-	require.Equal(t, finalPinnedExponent, targetExponent(t, pinnedActive),
-		"pinned authority must replace TargetExcess after the mutation settles")
+	finalPinnedExponent := dynamic.DesiredTargetExponent(gas.Gas(finalPinnedTarget))
+	require.Equal(t, finalPinnedExponent, blockTargetExponent(t, pinnedActive),
+		"pinned authority must replace TargetExponent after the mutation settles")
 }
 
 // TestGasPriceManagerActivationTransitionsSAE walks the runtime-pricing

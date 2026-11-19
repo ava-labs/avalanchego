@@ -106,8 +106,8 @@ type (
 		// `Config.FeeRecipient` to the VM. When nil, the VM burns fees.
 		feeRecipient *common.Address
 		// gasTarget, if non-nil, sets the validator's preferred gas-per-second
-		// target (Config.GasTarget); the resulting `DesiredTargetExcess` is
-		// what `header.TargetExcess` evolves toward (rate-limited per ACP-176).
+		// target (Config.GasTarget); the resulting `DesiredTargetExponent` is
+		// what `header.TargetExponent` evolves toward (rate-limited per ACP-176).
 		gasTarget *gas.Gas
 		// apis, if non-nil, are the APIs served. Use [withAPIs] to set.
 		apis set.Set[saerpc.API]
@@ -435,9 +435,9 @@ func withFeeRecipient(addr common.Address) l1SUTOption {
 }
 
 // withGasTarget pins the validator's preferred per-second gas target
-// (`Config.GasTarget`). The VM converts this to a `DesiredTargetExcess` that
-// `header.TargetExcess` evolves toward (rate-limited per ACP-226 to
-// [acp176.MaxTargetExcessDiff] per block). Tests use this to drive
+// (`Config.GasTarget`). The VM converts this to a `DesiredTargetExponent` that
+// `header.TargetExponent` evolves toward (rate-limited per ACP-226 to
+// [maxTargetExponentDiff] per block). Tests use this to drive
 // observable per-block changes in `header.GasLimit` (which is linear in the
 // target gas).
 func withGasTarget(target gas.Gas) l1SUTOption {

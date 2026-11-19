@@ -8,25 +8,25 @@ import (
 	"math"
 	"testing"
 
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/graft/subnet-evm/commontype"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/gastime"
 )
 
 func TestScalingFromTimeToDouble(t *testing.T) {
 	tests := []struct {
 		timeToDouble uint64
-		want         gas.Gas
+		want         uint64
 	}{
-		{timeToDouble: 0, want: 87},
+		{timeToDouble: 0, want: 0},
 		{timeToDouble: 1, want: 1},
 		{timeToDouble: 60, want: 87},
 		{timeToDouble: 12_721_892_464_627_276_976, want: math.MaxUint64},
 		{timeToDouble: 12_721_892_464_627_276_977, want: math.MaxUint64},
 	}
-
 	for _, test := range tests {
 		require.Equal(
 			t,
@@ -38,42 +38,52 @@ func TestScalingFromTimeToDouble(t *testing.T) {
 	}
 }
 
-// TestGasConfigRoundTrip asserts that [readGasConfig] MUST return the config
-// written by [stampGasConfig], and that static pricing MUST be stamped as a
-// zero TargetToExcessScaling.
+// TestGasConfigRoundTrip asserts that [hooks.GasConfigAfter] MUST return the
+// price config written by [setGasConfig].
 func TestGasConfigRoundTrip(t *testing.T) {
 	tests := []struct {
-		name        string
-		config      gastime.GasPriceConfig
-		wantScaling uint64
+		name   string
+		stored commontype.GasPriceConfig
+		want   gastime.GasPriceConfig
 	}{
 		{
+			name:   "disabled",
+			stored: disabledGasConfig(),
+			want:   gastime.DefaultGasPriceConfig(),
+		},
+		{
 			name: "dynamic",
-			config: gastime.GasPriceConfig{
-				TargetToExcessScaling: 100,
+			stored: commontype.GasPriceConfig{
+				ValidatorTargetGas: true,
+				MinGasPrice:        2,
+				TimeToDouble:       120,
+			},
+			want: gastime.GasPriceConfig{
+				TargetToExcessScaling: 174,
 				MinPrice:              2,
 			},
-			wantScaling: 100,
 		},
 		{
 			name: "static",
-			config: gastime.GasPriceConfig{
+			stored: commontype.GasPriceConfig{
+				ValidatorTargetGas: true,
+				MinGasPrice:        2,
+				StaticPricing:      true,
+			},
+			want: gastime.GasPriceConfig{
 				TargetToExcessScaling: gastime.DefaultTargetToExcessScaling,
 				MinPrice:              2,
 				StaticPricing:         true,
 			},
-			wantScaling: 0,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			var he customtypes.HeaderExtra
-			stampGasConfig(&he, test.config)
-			require.Equal(t, test.wantScaling, *he.TargetToExcessScaling, "stampGasConfig() TargetToExcessScaling")
+			header := customtypes.WithHeaderExtra(&types.Header{}, &customtypes.HeaderExtra{})
+			setGasConfig(customtypes.GetHeaderExtra(header), test.stored)
 
-			got, ok := readGasConfig(&he)
-			require.True(t, ok, "readGasConfig() ok")
-			require.Equal(t, test.config, got, "readGasConfig()")
+			_, got := (*hooks)(nil).GasConfigAfter(header)
+			require.Equal(t, test.want, got, "GasConfigAfter()")
 		})
 	}
 }

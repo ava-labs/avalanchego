@@ -89,7 +89,7 @@ func (h *hooks) BlockRebuilderFrom(b *types.Block) (hookadaptor.BlockBuilder, er
 			return h.BlockTime(header)
 		},
 		desired: saeconfig.Desired{
-			TargetExponent: (*dynamic.TargetExponent)(headerExtra.TargetExcess),
+			TargetExponent: headerExtra.TargetExponent,
 			DelayExponent:  (*dynamic.DelayExponent)(headerExtra.MinDelayExcess),
 		},
 		coinbase: header.Coinbase,
@@ -103,16 +103,26 @@ func (h *hooks) ExecutionResultsDB(dataDir string) (saetypes.ExecutionResults, e
 // GasConfigAfter returns the gas target and price config in effect after hdr.
 // It depends only on hdr.
 func (*hooks) GasConfigAfter(hdr *types.Header) (gas.Gas, gastime.GasPriceConfig) {
-	target := dynamic.TargetExponent(targetExcess(hdr)).Target()
-	if cfg, ok := readGasConfig(customtypes.GetHeaderExtra(hdr)); ok {
-		return target, cfg
+	target := targetExponent(hdr).Target()
+	he := customtypes.GetHeaderExtra(hdr)
+	if he.TargetToExcessScaling == nil || he.MinPrice == nil { // Before SAE
+		return target, gastime.DefaultGasPriceConfig()
 	}
-	return target, gastime.DefaultGasPriceConfig()
+	c := gastime.GasPriceConfig{
+		TargetToExcessScaling: gas.Gas(*he.TargetToExcessScaling),
+		MinPrice:              gas.Price(*he.MinPrice),
+	}
+	// Static pricing ignores the scaling, but gastime requires a non-zero one.
+	if c.TargetToExcessScaling == 0 {
+		c.TargetToExcessScaling = gastime.DefaultTargetToExcessScaling
+		c.StaticPricing = true
+	}
+	return target, c
 }
 
-// targetExcess returns hdr's ACP-176 target excess, or zero if unset.
-func targetExcess(hdr *types.Header) gas.Gas {
-	if te := customtypes.GetHeaderExtra(hdr).TargetExcess; te != nil {
+// targetExponent returns hdr's ACP-176 target exponent, or zero if unset.
+func targetExponent(hdr *types.Header) dynamic.TargetExponent {
+	if te := customtypes.GetHeaderExtra(hdr).TargetExponent; te != nil {
 		return *te
 	}
 	return 0
@@ -302,7 +312,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 	}
 	minDelayExcess := acp226.DelayExcess(mde.Toward(b.desired.DelayExponent))
 
-	te := gas.Gas(dynamic.TargetExponent(targetExcess(parent)).Toward(b.desired.TargetExponent))
+	te := targetExponent(parent).Toward(b.desired.TargetExponent)
 	return customtypes.WithHeaderExtra(
 		&types.Header{
 			ParentHash: parent.Hash(),
@@ -320,7 +330,7 @@ func (b *builder) BuildHeader(parent *types.Header) (*types.Header, error) {
 			BlockGasCost:     big.NewInt(0), // Unused under SAE.
 			TimeMilliseconds: new(nowMS),
 			MinDelayExcess:   &minDelayExcess,
-			TargetExcess:     &te,
+			TargetExponent:   &te,
 		},
 	), nil
 }
@@ -354,18 +364,17 @@ func (b *builder) BuildBlock(
 	// The gas-config group is stamped even while gaspricemanager is disabled,
 	// because header fields can't be removed once populated.
 	headerExtra := customtypes.GetHeaderExtra(header)
+	stored := disabledGasConfig()
 	if settledRulesExtra.IsPrecompileEnabled(gaspricemanager.ContractAddress) {
-		stored := gaspricemanager.GetStoredGasPriceConfig(worstCaseState, gaspricemanager.ContractAddress)
+		stored = gaspricemanager.GetStoredGasPriceConfig(worstCaseState, gaspricemanager.ContractAddress)
 		if stored == (commontype.GasPriceConfig{}) {
 			// [gaspricemanager.Configure] and every mutator write a non-zero
 			// config, so zero storage is corrupt. Defaulting would silently
 			// diverge from other nodes.
 			return nil, fmt.Errorf("%w: block %d settling %d", errZeroStoredGasPriceConfig, header.Number, settled.Height)
 		}
-		stampStoredGasConfig(headerExtra, stored)
-	} else {
-		stampGasConfig(headerExtra, gastime.DefaultGasPriceConfig())
 	}
+	setGasConfig(headerExtra, stored)
 
 	rules := b.chainConfig.Rules(header.Number, true /*isMerge*/, header.Time)
 	var warpValidity predicate.BlockResults

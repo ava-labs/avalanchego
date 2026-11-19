@@ -11,7 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/evm/utils"
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/plugin/evm/customtypes"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/imp/dynamic"
 )
 
 func TestVerifyNoSAEFields(t *testing.T) {
@@ -51,8 +51,8 @@ func TestVerifyNoSAEFields(t *testing.T) {
 			wantErr: errSAEFieldSet,
 		},
 		{
-			name:    "target_excess_should_fail",
-			extra:   &customtypes.HeaderExtra{TargetExcess: utils.PointerTo(gas.Gas(1))},
+			name:    "target_exponent_should_fail",
+			extra:   &customtypes.HeaderExtra{TargetExponent: utils.PointerTo(dynamic.TargetExponent(1))},
 			wantErr: errSAEFieldSet,
 		},
 		{
