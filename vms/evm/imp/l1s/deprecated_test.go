@@ -4,8 +4,6 @@
 
 package l1s
 
-// This file tests the deprecated Subnet-EVM options.
-//
 // TODO: delete this file together with deprecated.go.
 
 import (
@@ -31,8 +29,6 @@ func TestParseConfigDeprecated(t *testing.T) {
 	snowCtx := snowtest.Context(t, ids.GenerateTestID())
 	defaults := defaultConfig(snowCtx.ChainDataDir)
 
-	// with applies mod to defaultConfig so each case asserts that the
-	// deprecated option overrides the default while the rest are preserved.
 	with := func(mod func(*config)) config {
 		c := defaultConfig(snowCtx.ChainDataDir)
 		mod(&c)
@@ -45,7 +41,9 @@ func TestParseConfigDeprecated(t *testing.T) {
 	)
 	dbConfigFile := filepath.Join(t.TempDir(), "db.json")
 	require.NoError(t, os.WriteFile(dbConfigFile, []byte(dbConfig), 0o600))
-	withDBConfig := with(func(c *config) { c.DatabaseConfig = json.RawMessage(dbConfig) })
+	withDBConfig := with(func(c *config) {
+		c.DatabaseConfig = json.RawMessage(dbConfig)
+	})
 
 	tests := []struct {
 		name    string
@@ -56,7 +54,9 @@ func TestParseConfigDeprecated(t *testing.T) {
 		{
 			name: "fee_recipient",
 			json: `{"feeRecipient":"0123456789abcdef0123456789abcdef01234567"}`,
-			want: with(func(c *config) { c.FeeRecipient = common.HexToAddress(addr) }),
+			want: with(func(c *config) {
+				c.FeeRecipient = common.HexToAddress(addr)
+			}),
 		},
 		{
 			name: "fee_recipient_empty",
@@ -71,7 +71,9 @@ func TestParseConfigDeprecated(t *testing.T) {
 		{
 			name: "fee_recipient_superseded",
 			json: `{"feeRecipient":"0xdead","fee-recipient":"` + addr + `"}`,
-			want: with(func(c *config) { c.FeeRecipient = common.HexToAddress(addr) }),
+			want: with(func(c *config) {
+				c.FeeRecipient = common.HexToAddress(addr)
+			}),
 		},
 		{
 			name: "database_config_base64",
@@ -95,7 +97,7 @@ func TestParseConfigDeprecated(t *testing.T) {
 		},
 		{
 			name:    "database_config_file_missing",
-			json:    `{"database-config-file":"` + filepath.Join(t.TempDir(), "missing.json") + `"}`,
+			json:    `{"database-config-file":` + string(marshalJSON(t, filepath.Join(t.TempDir(), "missing.json"))) + `}`,
 			wantErr: fs.ErrNotExist,
 		},
 		{
@@ -122,7 +124,9 @@ func TestParseConfigDeprecated(t *testing.T) {
 		{
 			name: "eth_apis_aliases",
 			json: `{"eth-apis":["internal-public-tx-pool","private-debug"]}`,
-			want: with(func(c *config) { c.APIs = set.Of(validatorAPI, rpc.APITxPool) }),
+			want: with(func(c *config) {
+				c.APIs = set.Of(validatorAPI, rpc.APITxPool)
+			}),
 		},
 		{
 			name:    "eth_apis_unknown_name",
@@ -132,26 +136,27 @@ func TestParseConfigDeprecated(t *testing.T) {
 		{
 			name: "validators_api_disabled",
 			json: `{"validators-api-enabled":false}`,
-			want: with(func(c *config) { c.APIs.Remove(validatorAPI) }),
+			want: with(func(c *config) {
+				c.APIs.Remove(validatorAPI)
+			}),
 		},
 		{
 			name: "warp_and_admin_apis_enabled",
-			json: `{"eth-apis":["web3"],"warp-api-enabled":true,"admin-api-enabled":true}`,
-			want: with(func(c *config) { c.APIs = set.Of(validatorAPI, rpc.APIWeb3) }),
+			json: `{"warp-api-enabled":true,"admin-api-enabled":true}`,
+			want: defaults,
 		},
 		{
 			name: "api_options_superseded",
 			json: `{"eth-apis":["bogus"],"validators-api-enabled":true,"apis":["net"]}`,
-			want: with(func(c *config) { c.APIs = set.Of(rpc.APINet) }),
+			want: with(func(c *config) {
+				c.APIs = set.Of(rpc.APINet)
+			}),
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			got, err := parseConfig(snowCtx, []byte(test.json))
-			require.ErrorIs(t, err, test.wantErr)
-			if test.wantErr != nil {
-				return
-			}
+			require.ErrorIs(t, err, test.wantErr, "parseConfig(...)")
 			require.Equal(t, test.want, got, "parseConfig(...)")
 		})
 	}
