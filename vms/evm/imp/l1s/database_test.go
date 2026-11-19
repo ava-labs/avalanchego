@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -84,8 +85,7 @@ func TestStandaloneDatabase(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, want.ID(), got, "LastAccepted() after restart")
 
-	it := sut.baseDB.NewIterator()
-	defer it.Release()
-	require.False(t, it.Next(), "node database has key %x", it.Key())
-	require.NoError(t, it.Error())
+	count, err := database.Count(sut.baseDB)
+	require.NoError(t, err)
+	require.Zero(t, count, "database.Count(node database)")
 }
